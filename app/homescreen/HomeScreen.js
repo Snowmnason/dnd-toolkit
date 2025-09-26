@@ -4,6 +4,7 @@ import styles from './HomeScreen.styles';
 
 export default function HomeScreen() {
   const [selectedWorld, setSelectedWorld] = useState(null);
+  let selectedMapImage = require('../../assets/images/Miku.png');
 
   return (
     <View style={styles.container}>
@@ -14,10 +15,11 @@ export default function HomeScreen() {
           {/* Placeholder worlds as buttons */}
           {Array.from({ length: 10 }).map((_, i) => {
             const worldName = `World Placeholder ${i + 1}`;
+            const isSelected = selectedWorld === worldName;
             return (
               <TouchableOpacity
                 key={i}
-                style={styles.worldItem}
+                style={[styles.worldItem, isSelected && styles.selectedWorldItem]}
                 onPress={() => setSelectedWorld(worldName)}
               >
                 <Text style={styles.worldItemText}>{worldName}</Text>
@@ -37,20 +39,20 @@ export default function HomeScreen() {
             <Text style={styles.selectedWorldTitle}>{selectedWorld}</Text>
             <View style={styles.rightButtonsContainer}>
               <View style={styles.leftButtonWrapper}>
-                <TouchableOpacity style={styles.rightButton}>
-                  <Text style={styles.rightButtonText}>Delete</Text>
+                <TouchableOpacity style={styles.deleteButton}>
+                  <Text style={styles.deleteButtonText}>Delete</Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.rightButtonWrapper}>
-                <TouchableOpacity style={styles.rightButton}>
-                  <Text style={styles.rightButtonText}>Open</Text>
+                <TouchableOpacity style={styles.openButton}>
+                  <Text style={styles.openButtonText}>Open</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </>
         )}
         <Image
-          source={require('../../assets/images/Miku.png')}
+          source={selectedMapImage}
           style={styles.mapImage}
           resizeMode="contain"
         />

@@ -1,3 +1,4 @@
-import HomeScreen from '../screens/HomeScreen';
 
-export default HomeScreen;
+import AppNavigator from '../homescreen/AppNavigator.js';
+
+export default AppNavigator;
