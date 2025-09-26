@@ -1,0 +1,117 @@
+import { StyleSheet } from 'react-native';
+
+const homeScreenStyles = StyleSheet.create({
+  rightButtonsContainer: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    left: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    zIndex: 2,
+  },
+  leftButtonWrapper: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  rightButtonWrapper: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  rightButton: {
+    backgroundColor: '#1976d2',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+    marginLeft: 8,
+    elevation: 2,
+  },
+  rightButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  selectedWorldTitle: {
+    position: 'absolute',
+    top: 24,
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+    zIndex: 2,
+  },
+  container: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#f5f5f5',
+    minHeight: 0,
+  },
+  leftPanel: {
+    flex: 1,
+    padding: 24,
+    borderRightWidth: 1,
+    borderRightColor: '#ddd',
+    justifyContent: 'flex-start',
+    alignItems: 'stretch',
+    position: 'relative',
+    minWidth: 300,
+  },
+  mapImage: {
+    width: '100%',
+    height: '100%',
+    maxWidth: '500',
+    borderRadius: 8,
+    backgroundColor: '#e0e0e0',
+  },
+  rightPanel: {
+    flex: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    minWidth: 0,
+  },
+  worldListTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  worldList: {
+    flex: 1,
+    marginBottom: 64,
+  },
+  worldItem: {
+    padding: 12,
+    marginBottom: 8,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+    alignItems: 'center',
+  },
+  worldItemText: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    color: '#1976d2',
+  },
+  createButton: {
+    position: 'absolute',
+    right: 24,
+    bottom: 24,
+    backgroundColor: '#1976d2',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 24,
+    elevation: 2,
+  },
+  createButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+});
+
+export default homeScreenStyles;
