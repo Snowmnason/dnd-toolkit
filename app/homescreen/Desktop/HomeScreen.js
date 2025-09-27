@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import PrimaryButton from '../../components/baseComps';
+import PrimaryButton from '../../components/PrimaryButton';
 import styles from '../HomeScreen.styles';
 
 export default function HomeScreen({ navigation }) {

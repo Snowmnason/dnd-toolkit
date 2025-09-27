@@ -7,12 +7,6 @@ const titleText = {
   color: '#ffffffff',
 };
 
-const worldItemText = {
-  fontWeight: 'bold',
-  fontSize: 18,
-  color: '#920000ff',
-};
-
 const worldItem = {
     padding: 12,
     marginBottom: 8,
@@ -55,6 +49,13 @@ const homeScreenStyles = StyleSheet.create({
     padding: 0,
     minWidth: 0,
   },
+  rightPanelMoblie: {
+    flex: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 0,
+    minWidth: 0,
+  },
   mapImage: {
     width: '100%',
     height: '100%',
@@ -82,7 +83,9 @@ const homeScreenStyles = StyleSheet.create({
     backgroundColor: '#000000ff',
   },
   worldItemText: {
-    ...worldItemText,
+    fontWeight: 'bold',
+    fontSize: 18,
+    color: '#920000ff',
   },
   selectedWorldItem: {
     ...worldItem,
@@ -111,6 +114,15 @@ const homeScreenStyles = StyleSheet.create({
   rightButtonWrapper: {
     flex: 1,
     alignItems: 'flex-end',
+  },
+  rightButtonsContainerMoblie: {
+    position: 'absolute',
+    bottom: 44,
+    right: 24,
+    left: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    zIndex: 2,
   },
 
 });

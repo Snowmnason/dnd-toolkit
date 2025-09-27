@@ -1,8 +1,10 @@
 import { Text, TouchableOpacity } from 'react-native';
 
-export default function PrimaryButton({ onPress, children, style, textStyle }) {
+export default function PrimaryButton({ onPress, children, style, textStyle, disabled = false }) {
   return (
-    <TouchableOpacity style={[buttonBase, style]} onPress={onPress}>
+    <TouchableOpacity style={[buttonBase, style, disabled && { backgroundColor: '#888', opacity: 0.6 }]} 
+    onPress={onPress} 
+    disabled={disabled}>
       <Text style={[buttonTextBase, textStyle]}>{children}</Text>
     </TouchableOpacity>
   );

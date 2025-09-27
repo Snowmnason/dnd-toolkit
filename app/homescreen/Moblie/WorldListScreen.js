@@ -1,4 +1,5 @@
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import PrimaryButton from '../../components/PrimaryButton';
 import styles from '../HomeScreen.styles';
 
 export default function WorldListScreen({ navigation }) {
@@ -18,9 +19,18 @@ export default function WorldListScreen({ navigation }) {
           </TouchableOpacity>
         ))}
       </ScrollView>
-      <TouchableOpacity style={styles.createButton}>
-        <Text style={styles.createButtonText}>Create New World</Text>
-      </TouchableOpacity>
+          <PrimaryButton
+            style={{
+              position: 'absolute',
+              left: 16,
+              right: 16,
+              bottom: 16,
+              borderRadius: 14,
+            }}
+            onPress={() => {navigation.navigate('CreateWorld')}}
+          >
+            Create New World
+          </PrimaryButton>
     </View>
   );
 }
