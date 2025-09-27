@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import styles from './HomeScreen.styles';
+import PrimaryButton from '../../components/baseComps';
+import styles from '../HomeScreen.styles';
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
   const [selectedWorld, setSelectedWorld] = useState(null);
-  let selectedMapImage = require('../../assets/images/Miku.png');
+  let selectedMapImage = require('../../../assets/images/Miku.png');
 
   return (
     <View style={styles.container}>
@@ -28,9 +29,18 @@ export default function HomeScreen() {
           })}
         </ScrollView>
         {/* Create New World Button */}
-        <TouchableOpacity style={styles.createButton}>
-          <Text style={styles.createButtonText}>Create New World</Text>
-        </TouchableOpacity>
+    <PrimaryButton
+      style={{
+        position: 'absolute',
+        left: 16,
+        right: 16,
+        bottom: 16,
+        borderRadius: 14,
+      }}
+      onPress={() => {navigation.navigate('CreateWorld')}}
+    >
+      Create New World
+    </PrimaryButton>
       </View>
       {/* Right Panel: Image/Map */}
       <View style={styles.rightPanel}>
@@ -38,16 +48,16 @@ export default function HomeScreen() {
           <>
             <Text style={styles.selectedWorldTitle}>{selectedWorld}</Text>
             <View style={styles.rightButtonsContainer}>
-              <View style={styles.leftButtonWrapper}>
-                <TouchableOpacity style={styles.deleteButton}>
-                  <Text style={styles.deleteButtonText}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.rightButtonWrapper}>
-                <TouchableOpacity style={styles.openButton}>
-                  <Text style={styles.openButtonText}>Open</Text>
-                </TouchableOpacity>
-              </View>
+                <PrimaryButton
+                    onPress={() => {/* handle create */}}
+                >
+                    Delete
+                </PrimaryButton>
+                <PrimaryButton
+                    onPress={() => {navigation.reset({index: 0, routes: [{ name: 'Main' }]})}}
+                >
+                    Open
+                </PrimaryButton>
             </View>
           </>
         )}

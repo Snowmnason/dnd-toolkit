@@ -1,20 +1,6 @@
 import { StyleSheet } from 'react-native';
 
 // --- Shared base styles ---
-const buttonBase = {
-  backgroundColor: '#1976d2',
-  paddingVertical: 12,
-  borderRadius: 16,
-  elevation: 2,
-  alignItems: 'center',
-};
-
-const buttonTextBase = {
-  color: '#fff',
-  fontWeight: 'bold',
-  fontSize: 16,
-};
-
 const titleText = {
   fontSize: 22,
   fontWeight: 'bold',
@@ -45,6 +31,12 @@ const homeScreenStyles = StyleSheet.create({
     backgroundColor: '#2d1f03ff',
     minHeight: 0,
   },
+  containerMobile: {
+    paddingTop: 52,
+    paddingHorizontal: 16,
+    flex: 1,
+    backgroundColor: '#2d1f03ff',
+  },
   leftPanel: {
     flex: 1,
     padding: 14,
@@ -72,6 +64,12 @@ const homeScreenStyles = StyleSheet.create({
   },
   worldListTitle: {
     ...titleText,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  worldListTitleMobile: {
+    ...titleText,
+    fontSize: 48,
     textAlign: 'center',
     marginBottom: 16,
   },
@@ -110,40 +108,11 @@ const homeScreenStyles = StyleSheet.create({
     justifyContent: 'space-between',
     zIndex: 2,
   },
-  leftButtonWrapper: {
-    flex: 1,
-    alignItems: 'flex-start',
-  },
   rightButtonWrapper: {
     flex: 1,
     alignItems: 'flex-end',
   },
-  createButton: {
-    ...buttonBase,
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 16,
-    borderRadius: 14,
-  },
-  createButtonText: {
-    ...buttonTextBase,
-  },
-  openButton: {
-    ...buttonBase,
-    paddingHorizontal: 20,
-    marginLeft: 8,
-  },
-  openButtonText: {
-    ...buttonTextBase,
-  },
-  deleteButton: {
-    ...buttonBase,
-    paddingHorizontal: 20,
-  },
-  deleteButtonText: {
-    ...buttonTextBase,
-  },
+
 });
 
 export default homeScreenStyles;

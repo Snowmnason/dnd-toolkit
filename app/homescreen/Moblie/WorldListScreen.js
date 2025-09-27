@@ -1,12 +1,12 @@
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import styles from './HomeScreen.styles';
+import styles from '../HomeScreen.styles';
 
 export default function WorldListScreen({ navigation }) {
   const worlds = Array.from({ length: 10 }).map((_, i) => `World Placeholder ${i + 1}`);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.worldListTitle}>Worlds</Text>
+    <View style={styles.containerMobile}>
+      <Text style={styles.worldListTitleMobile}>Worlds</Text>
       <ScrollView style={styles.worldList}>
         {worlds.map((worldName, i) => (
           <TouchableOpacity

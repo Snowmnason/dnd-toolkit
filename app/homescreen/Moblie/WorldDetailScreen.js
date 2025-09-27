@@ -1,9 +1,9 @@
 import { Image, Text, TouchableOpacity, View } from 'react-native';
-import styles from './HomeScreen.styles';
+import styles from '../HomeScreen.styles';
 
 export default function WorldDetailScreen({ route, navigation }) {
   const { worldName } = route.params;
-  let selectedMapImage = require('../../assets/images/Miku.png');
+  let selectedMapImage = require('../../../assets/images/Miku.png');
 
   return (
     <View style={styles.rightPanel}>
