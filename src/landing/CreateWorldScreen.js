@@ -79,9 +79,13 @@ export default function CreateWorldScreen({ navigation }) {
             <PrimaryButton onPress={() => navigation.goBack()}>Cancel</PrimaryButton>
             <PrimaryButton
               disabled={worldName === ''}
-              onPress={() =>
-                navigation.reset({ index: 0, routes: [{ name: 'Main' }] })
-              }
+              onPress={() => {
+                if (isDesktop) {
+                  navigation.reset({ index: 0, routes: [{ name: 'Main' }] })
+                }else{
+                  navigation.reset({ index: 0, routes: [{ name: 'MainMobile' }] })
+                }
+              }}
             >
               Create
             </PrimaryButton>

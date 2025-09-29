@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Image, ScrollView, TouchableOpacity, View } from 'react-native';
-import { PanGestureHandler } from 'react-native-gesture-handler';
 import IconButton from '../../components/custom_components/IconButton';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../components/themed-text';
@@ -11,18 +10,11 @@ export default function LandingMobile({ navigation }) {
   const worlds = Array.from({ length: 10 }).map((_, i) => `World Placeholder ${i + 1}`);
   const selectedMapImage = require('../../assets/images/Miku.png');
 
-  // Swipe back gesture: detail -> list
-  const handleSwipeBack = ({ nativeEvent }) => {
-    if (nativeEvent.translationX > 50) {
-      setSelectedWorld(null);
-    }
-  };
-
   if (!selectedWorld) {
     // World List View
     return (
       <ThemedView style={{ flex: 1, paddingTop: 52, paddingHorizontal: 16 }}>
-        <ThemedText type="title" style={{ marginBottom: 16, textAlign: 'center' }}>
+        <ThemedText type="title" style={{ marginBottom: 16, textAlign: 'center', fontWeight: '650', fontSize: 58 }}>
           Worlds
         </ThemedText>
 
@@ -48,10 +40,8 @@ export default function LandingMobile({ navigation }) {
       </ThemedView>
     );
   }
-
   // World Detail View
   return (
-    <PanGestureHandler onGestureEvent={handleSwipeBack}>
       <ThemedView style={{ flex: 1, alignItems: 'center', padding: 16 }}>
         {/* Back button */}
         <IconButton
@@ -60,30 +50,30 @@ export default function LandingMobile({ navigation }) {
           style={{ position: 'absolute', top: 36, left: 16, backgroundColor: 'transparent' }}
           textStyle={{ fontSize: 24 }}
         />
-
-        <ThemedText type="title" style={{ marginTop: 32, marginBottom: 16 }}>
-          {selectedWorld}
-        </ThemedText>
-        <Image
-          source={selectedMapImage}
-          resizeMode="contain"
-          style={[{ width: '100%', height: '70%', borderRadius: 12, zIndex: 1 }]}
-        />
-        <View style={styles.detailButtonRow}>
-          <PrimaryButton onPress={() => {/* TODO: delete */}}>Delete</PrimaryButton>
-          <PrimaryButton
-            onPress={() =>
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Main' }],
-              })
-            }
-          >
-            Open
-          </PrimaryButton>
+      <View style={{ flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' }}>
+          <ThemedText type="title" style={{ marginBottom: 16, textAlign: 'center', fontWeight: '650', fontSize: 58 }}>
+            {selectedWorld}
+          </ThemedText>
+          <Image
+            source={selectedMapImage}
+            resizeMode="contain"
+            style={[{ width: '100%', height: '70%', borderRadius: 12, zIndex: 1 }]}
+          />
+          <View style={styles.detailButtonRow}>
+            <PrimaryButton onPress={() => {/* TODO: delete */}}>Delete</PrimaryButton>
+            <PrimaryButton
+              onPress={() =>
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'MainMobile' }],
+                })
+              }
+            >
+              Open
+            </PrimaryButton>
+          </View>
         </View>
       </ThemedView>
-    </PanGestureHandler>
   );
 }
 

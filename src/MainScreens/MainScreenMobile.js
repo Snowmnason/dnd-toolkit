@@ -16,7 +16,15 @@ export default function MainScreenMobile({ navigation }) {
   const [expandedPanel, setExpandedPanel] = useState(null);
 
   return (
-    <ThemedView style={{ flex: 1 }}>
+    <ThemedView>
+      <View style={{ height: '100%', width: '100%', paddingTop: 42, paddingHorizontal: 0,}}>
+       {/* Home Button */}
+      <PrimaryButton
+        style={{ position: 'absolute', top: 34, left: 16,  zIndex: 1 }}
+        onPress={() => navigation.reset({ index: 0, routes: [{ name: 'WorldList' }] })}
+      >
+        Go Home
+      </PrimaryButton>
       {panels.map((panel) => (
         <ExpandablePanel
           key={panel.key}
@@ -29,13 +37,7 @@ export default function MainScreenMobile({ navigation }) {
         />
       ))}
 
-      {/* Home Button */}
-      <PrimaryButton
-        style={{ position: 'absolute', bottom: 24, left: 16, right: 16 }}
-        onPress={() => navigation.reset({ index: 0, routes: [{ name: 'WorldList' }] })}
-      >
-        Go Home
-      </PrimaryButton>
+     </View>
     </ThemedView>
   );
 }
@@ -52,7 +54,7 @@ function ExpandablePanel({ title, items, expanded, onToggle }) {
 
   const height = animation.interpolate({
     inputRange: [0, 1],
-    outputRange: [80, 220], // collapsed vs expanded height
+    outputRange: [160, 220], // collapsed vs expanded height
   });
 
   return (
@@ -60,8 +62,8 @@ function ExpandablePanel({ title, items, expanded, onToggle }) {
       <Animated.View
         style={{
           height,
-          margin: 6,
-          borderRadius: 12,
+          margin: 0,
+          borderRadius: 0,
           backgroundColor: '#e6d3a3',
           justifyContent: 'center',
           alignItems: 'center',

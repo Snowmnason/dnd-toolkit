@@ -10,7 +10,7 @@ export default function ParchmentBackground() {
 
   // Theme-driven tints
   const paperColor = useThemeColor({}, "agedPaper");
-  const inkColor = useThemeColor({}, "inkStains");
+  //const inkColor = useThemeColor({}, "inkStains");
   const backgroundColor = useThemeColor({}, "background");
 
   return (
