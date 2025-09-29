@@ -1,23 +1,28 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { AppRegistry } from 'react-native';
-import AppLoader from './AppLoader';
-
 import { name as appName } from '../app.json';
-import MobileNavigator from './navigators/MobileNavigator';
+import AppLoader from './AppLoader';
+import DesktopNavigator from './navigators/DesktopNavigator';
 
 function App() {
   return (
     <AppLoader
       onReady={async () => {
-        // ⚡️ Place Mobile-specific initialization here later (e.g., Skia/CanvasKit)
+        // ⚡️ Web-only initialization (Skia, CanvasKit, etc.)
       }}
     >
       <NavigationContainer>
-        <MobileNavigator />
+        <DesktopNavigator />
       </NavigationContainer>
-      
     </AppLoader>
   );
 }
 
 AppRegistry.registerComponent(appName, () => App);
+
+// ✅ Only run in a browser environment
+if (typeof document !== 'undefined') {
+  AppRegistry.runApplication(appName, {
+    rootTag: document.getElementById('root'),
+  });
+}
