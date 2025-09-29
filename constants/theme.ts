@@ -17,6 +17,8 @@ export const Colors = {
     tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
     textColor: '#be8f4cff',
+    agedPaper: '#f4e1b5',   // base parchment tone
+    inkStains: '#5a3e1a',   // darker blotches
   },
   dark: {
     text: '#462908',
@@ -26,6 +28,8 @@ export const Colors = {
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
     textColor: '#be8f4cff',
+    agedPaper: '#f4e1b5',
+    inkStains: '#5a3e1a',
   },
 };
 

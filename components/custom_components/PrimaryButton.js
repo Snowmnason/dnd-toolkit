@@ -25,12 +25,7 @@ export default function PrimaryButton({
           paddingHorizontal: 20,
           opacity: disabled ? 0.6 : 1,
 
-          shadowColor: '#000',
-          shadowOffset: { width: 4, height: 6 },
-          shadowOpacity: 0.25,
-          shadowRadius: 3.84,
-          // Android shadow
-          elevation: 3,
+          boxShadow: '1px 5px 4px rgba(0,0,0,0.25)',
         },
         style,
       ]}
