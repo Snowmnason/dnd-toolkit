@@ -4,7 +4,6 @@ import { StyleSheet } from 'react-native';
 const titleText = {
   fontSize: 22,
   fontWeight: 'bold',
-  color: '#ffffffff',
 };
 
 const worldItem = {
@@ -22,7 +21,6 @@ const homeScreenStyles = StyleSheet.create({
   container: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#2d1f03ff',
     minHeight: 0,
   },
   containerMobile: {
@@ -61,7 +59,6 @@ const homeScreenStyles = StyleSheet.create({
     height: '100%',
     maxWidth: '500',
     borderRadius: 0,
-    backgroundColor: '#2d1f03ff',
   },
   worldListTitle: {
     ...titleText,
@@ -99,7 +96,6 @@ const homeScreenStyles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
     zIndex: 2,
   },
   rightButtonsContainer: {

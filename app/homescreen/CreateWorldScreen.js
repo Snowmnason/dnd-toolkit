@@ -66,10 +66,11 @@ export default function CreateWorldScreen({ navigation }) {
             //Save world to a json and create a new folder in app data with the world name
                 onPress={() => {
                     // const worldData = {
-                    //     name: worldName,
+                    //     name: worldName, / folder name
                     //     isDM,
                     //     system,
                     //     description,
+                    //     createdAt: new Date().toISOString(),
                     // };
                     // Save worldData to a JSON file and create a new folder in app data
                     navigation.reset({index: 0, routes: [{ name: 'Main' }]})

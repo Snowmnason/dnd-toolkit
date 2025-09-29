@@ -2,16 +2,18 @@ import { useState } from 'react';
 import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import PrimaryButton from '../../components/PrimaryButton';
 import styles from '../HomeScreen.styles';
+import { ThemedText } from '../../../components/themed-text';
+import { ThemedView } from '../../../components/themed-view';
 
 export default function HomeScreen({ navigation }) {
   const [selectedWorld, setSelectedWorld] = useState(null);
   let selectedMapImage = require('../../../assets/images/Miku.png');
 
   return (
-    <View style={styles.container}>
+    <ThemedView style={styles.container}>
       {/* Left Panel: Scrollable World List */}
       <View style={styles.leftPanel}>
-        <Text style={styles.worldListTitle}>Worlds</Text>
+        <ThemedText type="title">Worlds</ThemedText>
         <ScrollView style={styles.worldList}>
           {/* Placeholder worlds as buttons */}
           {Array.from({ length: 10 }).map((_, i) => {
@@ -67,7 +69,7 @@ export default function HomeScreen({ navigation }) {
           resizeMode="contain"
         />
       </View>
-    </View>
+    </ThemedView>
   );
 }
 
