@@ -37,18 +37,6 @@ export default function WelcomeScreen() {
     }
   };
 
-  const handleContinueWithoutAccount = async () => {
-    try {
-      // User chose to skip authentication - save this preference
-      await AuthStateManager.setSkipAuth(true);
-      router.replace('/select/world-selection');
-    } catch (error) {
-      console.error('Error saving preference:', error);
-      // Still navigate even if saving fails
-      router.replace('/select/world-selection');
-    }
-  };
-
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: "#2f353d" }}>
@@ -89,7 +77,7 @@ export default function WelcomeScreen() {
           <ThemedText 
             style={{ textAlign: 'center', color: '#8B4513', lineHeight: 22, fontSize: 16 }}
           >
-            Sign in to sync your campaigns across devices, or continue without an account to use the toolkit offline.
+            Create an account or sign in to start building your campaigns and sync across all your devices.
           </ThemedText>
         </View>
 
@@ -112,14 +100,6 @@ export default function WelcomeScreen() {
             Create Account
           </PrimaryButton>
           
-          <PrimaryButton
-            onPress={handleContinueWithoutAccount}
-            style={{ backgroundColor: 'rgba(139, 69, 19, 0.2)', borderWidth: 2, borderColor: '#8B4513', paddingVertical: 16, borderRadius: 8 }}
-            textStyle={{ color: '#8B4513', fontSize: 16, fontWeight: '500' }}
-          >
-            Continue Without Account
-          </PrimaryButton>
-          
         </View>
 
         {/* Benefits Info */}
@@ -128,13 +108,7 @@ export default function WelcomeScreen() {
             type="caption" 
             style={{ textAlign: 'center', color: '#F5E6D3', opacity: 0.7, fontSize: 12, lineHeight: 18 }}
           >
-            With an account: Cloud sync • Backup your worlds • Access anywhere
-          </ThemedText>
-          <ThemedText 
-            type="caption" 
-            style={{ textAlign: 'center', color: '#F5E6D3', opacity: 0.7, marginTop: 4, fontSize: 12, lineHeight: 18 }}
-          >
-            Without account: Full offline access • Privacy first • No data collection
+            Cloud sync • Backup your worlds • Access anywhere • Share with friends
           </ThemedText>
         </View>
         

@@ -1,12 +1,15 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Platform, ScrollView, Switch, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Platform, ScrollView, Switch, View } from 'react-native';
 import Dropdown from '../../components/custom_components/Dropdown';
 import MapCanvas from '../../components/custom_components/MapCanvas'; // placeholder
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import TextInputComponent from '../../components/custom_components/TextInput';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
+import { AuthStateManager } from '../../lib/auth-state';
+import { worldsDB } from '../../lib/database/worlds';
+import { supabase } from '../../lib/supabase';
 
 const tabletopSystems = ['D&D 5e', 'Pathfinder', 'Call of Cthulhu', 'Custom'];
 
@@ -15,10 +18,84 @@ export default function CreateWorldScreen() {
   const [isDM, setIsDM] = useState(true);
   const [system, setSystem] = useState(tabletopSystems[0]);
   const [description, setDescription] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUserLoggedIn, setIsUserLoggedIn] = useState<boolean | null>(null);
   const router = useRouter();
 
   const isDesktop =
     Platform.OS === 'web' || Platform.OS === 'windows' || Platform.OS === 'macos';
+
+  // Check if user is logged in on component mount
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const authState = await AuthStateManager.getAuthState();
+        setIsUserLoggedIn(user !== null && !authState.skipAuth);
+      } catch (error) {
+        console.error('Error checking auth status:', error);
+        setIsUserLoggedIn(false);
+      }
+    };
+
+    checkAuthStatus();
+  }, []);
+
+  const handleCreateWorld = async () => {
+    if (!worldName.trim()) {
+      Alert.alert('Error', 'Please enter a world name');
+      return;
+    }
+
+    // Check if user is logged in
+    if (!isUserLoggedIn) {
+      Alert.alert(
+        'Sign In Required', 
+        'You need to sign in to create and save worlds. Would you like to sign in now?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          },
+          {
+            text: 'Sign In',
+            onPress: () => router.push('/login/welcome')
+          }
+        ]
+      );
+      return;
+    }
+
+    setIsCreating(true);
+    
+    try {
+      const newWorld = await worldsDB.create({
+        name: worldName.trim(),
+        description: description.trim() || '',
+        system: system,
+        is_dm: isDM
+      });
+
+      Alert.alert(
+        'Success!', 
+        `World "${newWorld.name}" created and saved to your account!`,
+        [
+          {
+            text: 'OK',
+            onPress: () => router.replace(isDesktop ? '/main/desktop' : '/main/mobile')
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Create world error:', error);
+      Alert.alert(
+        'Error', 
+        'Failed to create world. Please check your connection and try again.'
+      );
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   return (
     <ThemedView style={{ flex: 1, flexDirection: isDesktop ? 'row' : 'column' }}>
@@ -83,10 +160,10 @@ export default function CreateWorldScreen() {
               Cancel
             </PrimaryButton>
             <PrimaryButton style={{}} textStyle={{}}
-              disabled={worldName === ''}
-              onPress={() => router.replace(isDesktop ? '/main/desktop' : '/main/mobile')}
+              disabled={worldName.trim() === '' || isCreating}
+              onPress={handleCreateWorld}
             >
-              Create
+              {isCreating ? 'Creating...' : 'Create'}
             </PrimaryButton>
           </View>
         </ScrollView>

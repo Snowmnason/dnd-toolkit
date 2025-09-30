@@ -28,6 +28,15 @@ export default function SettingsPage() {
     return () => subscription.unsubscribe();
   }, []);
 
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      router.replace('/login/welcome');
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
   if (loading) {
     return (
       <ThemedView style={styles.container}>
@@ -65,6 +74,15 @@ export default function SettingsPage() {
           onPress={() => router.back()}
         >
           ← Back to Main
+        </PrimaryButton>
+
+        {/* Sign Out Button */}
+        <PrimaryButton
+          style={[styles.backButton, { backgroundColor: '#dc3545', marginTop: 16 }]}
+          textStyle={{ color: '#fff' }}
+          onPress={handleSignOut}
+        >
+          Sign Out
         </PrimaryButton>
       </ScrollView>
     </ThemedView>

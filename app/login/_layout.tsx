@@ -1,20 +1,20 @@
 import { Stack } from 'expo-router';
-import { ThemedView } from '../../components/themed-view';
+import { View } from 'react-native';
 import TopBar from '../../components/TopBar';
 
-export default function MainLayout() {
+export default function LoginLayout() {
   return (
-    <ThemedView style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: '#2f353d' }}>
       <TopBar 
         title="D&D Toolkit" 
         showBackButton={true} 
-        showHamburger={true} 
+        showHamburger={false} 
       />
-      <Stack 
+      <Stack
         screenOptions={{
           headerShown: false,
         }}
       />
-    </ThemedView>
+    </View>
   );
 }

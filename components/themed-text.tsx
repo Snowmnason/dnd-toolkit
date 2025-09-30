@@ -42,7 +42,6 @@ export function ThemedText({
 
 /** Utility for dynamic lineHeight */
 const lh = (fs: number) => Math.round(fs * 1.3);
-const shadowColor = 'rgba(239,191,4, 0.54)';
 
 const styles = StyleSheet.create({
   default: {

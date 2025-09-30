@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
 
-import { ThemedView } from '../../../components/themed-view';
 import PrimaryButton from '../../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../../components/themed-text';
+import { ThemedView } from '../../../components/themed-view';
 
 export default function PartyOverviewPage() {
   const router = useRouter();
@@ -13,7 +13,7 @@ export default function PartyOverviewPage() {
         Party Overview
       </ThemedText>
       <ThemedText style={{ marginBottom: 40, textAlign: 'center', fontSize: 18 }}>
-        View your entire party's status, health, and resources at a glance.
+        View your entire partys status, health, and resources at a glance.
       </ThemedText>
       
       {/* Placeholder content */}

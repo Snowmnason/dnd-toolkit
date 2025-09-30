@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
 
-import { ThemedView } from '../../../components/themed-view';
 import PrimaryButton from '../../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../../components/themed-text';
+import { ThemedView } from '../../../components/themed-view';
 
 export default function CharacterSheetsPage() {
   const router = useRouter();
@@ -13,7 +13,7 @@ export default function CharacterSheetsPage() {
         Character Sheets
       </ThemedText>
       <ThemedText style={{ marginBottom: 40, textAlign: 'center', fontSize: 18 }}>
-        Manage your party's character sheets and track character progression.
+        Manage your partys character sheets and track character progression.
       </ThemedText>
       
       {/* Placeholder content */}

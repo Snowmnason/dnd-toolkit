@@ -75,18 +75,6 @@ export default function LoginScreen() {
     }
   };
 
-  const handleContinueWithoutAccount = async () => {
-    try {
-      // User chose to skip authentication - save this preference
-      await AuthStateManager.setSkipAuth(true);
-      router.replace('/select/world-selection');
-    } catch (error) {
-      console.error('Error saving preference:', error);
-      // Still navigate even if saving fails
-      router.replace('/select/world-selection');
-    }
-  };
-
   return (
     <View style={{ flex: 1, backgroundColor: '#2f353d' }}>
       
@@ -172,19 +160,19 @@ export default function LoginScreen() {
             </PrimaryButton>
           </View>
 
-
+          {/* Switch Mode Button */}
           <PrimaryButton
-            style={{ width: '100%', backgroundColor: 'rgba(139, 69, 19, 0.2)', borderWidth: 2, borderColor: '#8B4513', paddingVertical: 16, borderRadius: 8 }}
-            textStyle={{ color: '#8B4513', fontSize: 16, fontWeight: '500' }}
-            onPress={handleContinueWithoutAccount}
+            style={{ width: '100%', backgroundColor: 'rgba(139, 69, 19, 0.15)', borderWidth: 1, borderColor: '#8B4513', paddingVertical: 12, borderRadius: 8 }}
+            textStyle={{ color: '#F5E6D3', fontSize: 13, fontWeight: '500' }}
+            onPress={() => router.push(isSignUp ? '/login/login?action=signin' : '/login/login?action=signup')}
             disabled={loading}
           >
-            Continue Without Account
+            {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
           </PrimaryButton>
         </View>
 
         <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
-          You can always sign in later from your profile settings.
+          Secure authentication powered by Supabase
         </ThemedText>
       </View>
     </View>

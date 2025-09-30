@@ -103,7 +103,7 @@ export default function MainScreenDesktop() {
       <PrimaryButton
         style={{ position: 'absolute', bottom: 24, right: 24 }}
         textStyle={{}}
-        onPress={() => router.replace('/')}
+        onPress={() => router.replace('/select/world-selection')}
       >
         Go Home
       </PrimaryButton>
@@ -123,14 +123,19 @@ const styles = StyleSheet.create({
   panelTitle: {
     marginBottom: 20,
     textAlign: 'center',
+    textShadowColor: '#D4AF37', 
+    textShadowOffset: { width: 1, height: 1 }, 
+    textShadowRadius: 2,
   },
   featureButton: {
     marginBottom: 8,
     width: '90%',
     borderRadius: 8,
+    borderColor: '#D4AF37',
+    shadowColor: '#D4AF37',
+    borderWidth: 2,
   },
   featureText: {
-    fontSize: 14,
     textAlign: 'center',
   },
 });
