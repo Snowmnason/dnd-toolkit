@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform, ScrollView, Switch, View } from 'react-native';
 import Dropdown from '../../components/custom_components/Dropdown';
@@ -9,11 +10,12 @@ import { ThemedView } from '../../components/themed-view';
 
 const tabletopSystems = ['D&D 5e', 'Pathfinder', 'Call of Cthulhu', 'Custom'];
 
-export default function CreateWorldScreen({ navigation }) {
+export default function CreateWorldScreen() {
   const [worldName, setWorldName] = useState('');
   const [isDM, setIsDM] = useState(true);
   const [system, setSystem] = useState(tabletopSystems[0]);
   const [description, setDescription] = useState('');
+  const router = useRouter();
 
   const isDesktop =
     Platform.OS === 'web' || Platform.OS === 'windows' || Platform.OS === 'macos';
@@ -45,6 +47,7 @@ export default function CreateWorldScreen({ navigation }) {
 
           {/* Tabletop System */}
           <ThemedText>Tabletop System</ThemedText>
+          {/* TODO: Dropdown is currently a placeholder - uncomment Picker implementation when ready */}
           <Dropdown value={system} onChange={setSystem} options={tabletopSystems} />
 
           {/* Description */}
@@ -63,7 +66,11 @@ export default function CreateWorldScreen({ navigation }) {
 
           {/* Import Image (mobile only here) */}
           {!isDesktop && (
-            <PrimaryButton style={{ marginBottom: 16 }} onPress={() => {}}>
+            <PrimaryButton 
+              style={{ marginBottom: 16 }} 
+              textStyle={{}}
+              onPress={() => {}}
+            >
               Import Image
             </PrimaryButton>
           )}
@@ -76,16 +83,18 @@ export default function CreateWorldScreen({ navigation }) {
               marginTop: 16,
             }}
           >
-            <PrimaryButton onPress={() => navigation.goBack()}>Cancel</PrimaryButton>
+            <PrimaryButton 
+              style={{}}
+              textStyle={{}}
+              onPress={() => router.back()}
+            >
+              Cancel
+            </PrimaryButton>
             <PrimaryButton
+              style={{}}
+              textStyle={{}}
               disabled={worldName === ''}
-              onPress={() => {
-                if (isDesktop) {
-                  navigation.reset({ index: 0, routes: [{ name: 'Main' }] })
-                }else{
-                  navigation.reset({ index: 0, routes: [{ name: 'MainMobile' }] })
-                }
-              }}
+              onPress={() => router.replace(isDesktop ? '/main/desktop' : '/main/mobile')}
             >
               Create
             </PrimaryButton>
@@ -100,7 +109,11 @@ export default function CreateWorldScreen({ navigation }) {
           <MapCanvas />
 
           {/* Import image button */}
-          <PrimaryButton style={{ margin: 16 }} onPress={() => {}}>
+          <PrimaryButton 
+            style={{ margin: 16 }} 
+            textStyle={{}}
+            onPress={() => {}}
+          >
             Import Image
           </PrimaryButton>
 
