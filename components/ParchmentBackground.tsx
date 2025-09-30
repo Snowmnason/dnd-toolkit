@@ -1,13 +1,12 @@
 // components/ParchmentBackground.tsx
-import { useThemeColor } from "@/hooks/use-theme-color";
 import { Canvas, Rect, Turbulence } from "@shopify/react-native-skia";
 import React from "react";
 import { StyleSheet, useWindowDimensions } from "react-native";
 
 export default function ParchmentBackground() {
   const { width, height } = useWindowDimensions();
-  const paperColor = useThemeColor({}, "agedPaper");
-  const backgroundColor = useThemeColor({}, "background");
+  const paperColor = '#f4e1b5';
+  const backgroundColor = '#a77e44ff';
 
   // Generate random seeds for unique parchment texture on each page
   const seed1 = React.useMemo(() => Math.floor(Math.random() * 1000), []);

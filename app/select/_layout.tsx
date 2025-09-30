@@ -1,14 +1,15 @@
 import { Stack } from 'expo-router';
-import { ThemedView } from '../../components/themed-view';
+import { View } from 'react-native';
+//import { View } from '../../components/themed-view';
 
 export default function LandingLayout() {
   return (
-    <ThemedView style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: "#2f353d" }}>
       <Stack 
         screenOptions={{
           headerShown: false,
         }}
       />
-    </ThemedView>
+    </View>
   );
 }

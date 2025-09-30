@@ -8,16 +8,16 @@ export default function TextInput({
   style,
   ...props
 }) {
-  const borderColor = useThemeColor({}, 'icon');
-  const bgColor = useThemeColor({}, 'background');
+  const borderColor = "#FFBF00";
+  const bgColor = useThemeColor({}, 'tint');
   const textColor = useThemeColor({}, 'text');
-  const placeholderColor = useThemeColor({}, 'icon');
+  const placeholderColor = useThemeColor({}, 'text');
 
   return (
     <RNTextInput
       style={[
         {
-          borderWidth: 1,
+          borderWidth: 2,
           borderColor,
           borderRadius: 8,
           padding: 12,

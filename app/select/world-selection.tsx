@@ -19,7 +19,7 @@ export default function LandingPage() {
     if (!selectedWorld) {
       // Mobile World List View
       return (
-        <View style={{ flex: 1, paddingTop: 52, paddingHorizontal: 16 }}>
+        <ThemedView style={{ flex: 1, paddingTop: 52, paddingHorizontal: 16 }}>
           <ThemedText type="title" style={{ marginBottom: 16, textAlign: 'center', fontWeight: '600', fontSize: 58 }}>
             Worlds
           </ThemedText>
@@ -39,16 +39,16 @@ export default function LandingPage() {
           <PrimaryButton
             style={styles.createButton}
             textStyle={{}}
-            onPress={() => router.push('/landing/create-world')}
+            onPress={() => router.push('/select/create-world')}
           >
             Create New World
           </PrimaryButton>
-        </View>
+        </ThemedView>
       );
     } else {
       // Mobile World Detail View
       return (
-        <View style={{ flex: 1, alignItems: 'center', padding: 16 }}>
+        <ThemedView style={{ flex: 1, alignItems: 'center', padding: 16 }}>
           <IconButton
             icon="⬅️"
             label="Back"
@@ -84,7 +84,7 @@ export default function LandingPage() {
               </PrimaryButton>
             </View>
           </View>
-        </View>
+        </ThemedView>
       );
     }
   }
@@ -116,7 +116,7 @@ export default function LandingPage() {
         <PrimaryButton
           style={{ position: 'absolute', left: 16, right: 16, bottom: 16, borderRadius: 14 }}
           textStyle={{}}
-          onPress={() => router.push('/landing/create-world')}
+          onPress={() => router.push('/select/create-world')}
         >
           Create New World
         </PrimaryButton>
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
     borderRadius: 8,
-    backgroundColor: '#f2e2c4',
+    backgroundColor: '#eff4fbff',
     alignItems: 'center' as const,
   },
   createButton: {

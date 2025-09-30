@@ -1,86 +1,76 @@
-/*
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { Picker } from '@react-native-picker/picker';
-import { Platform } from 'react-native';
+import { useState } from 'react';
+import DropDownPicker from 'react-native-dropdown-picker';
 
-export default function Dropdown({ value, onChange, options, style }) {
-  const bgColor = useThemeColor({}, 'background');
+export default function Dropdown({ value, onChange, options, style = {}, placeholder = "Select an option..." }) {
+  const [open, setOpen] = useState(false);
+  const [dropdownValue, setDropdownValue] = useState(value);
+  const bgColor = useThemeColor({}, 'tint');
   const borderColor = useThemeColor({}, 'icon');
   const textColor = useThemeColor({}, 'text');
 
-  if (Platform.OS === 'web') {
-    return (
-      <select
-        style={{
-          borderWidth: 1,
-          borderColor,
-          borderRadius: 8,
-          padding: 12,
-          backgroundColor: bgColor,
-          color: textColor,
-          fontFamily: 'GrenzeGotisch',
-          marginBottom: 16,
-          ...style,
-        }}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-      >
-        {options.map(opt => (
-          <option key={opt} value={opt}>
-            {opt}
-          </option>
-        ))}
-      </select>
-    );
-  }
+  // Convert options array to the format expected by react-native-dropdown-picker
+  //https://hossein-zare.github.io/react-native-dropdown-picker-website/docs/changelog
+  const items = options.map(option => ({
+    label: option,
+    value: option,
+  }));
 
-  // Mobile picker
+  const handleValueChange = (val) => {
+    setDropdownValue(val);
+    if (onChange) {
+      onChange(val);
+    }
+  };
+
   return (
-    <Picker
-      selectedValue={value}
-      onValueChange={onChange}
+    <DropDownPicker
+      open={open}
+      value={dropdownValue}
+      items={items}
+      setOpen={setOpen}
+      setValue={handleValueChange}
+      placeholder={placeholder}
       style={{
-        borderWidth: 1,
         borderColor,
-        borderRadius: 8,
         backgroundColor: bgColor,
-        color: textColor,
-        fontFamily: 'GrenzeGotisch',
+        borderRadius: 8,
         marginBottom: 16,
         ...style,
       }}
-    >
-      {options.map(opt => (
-        <Picker.Item key={opt} label={opt} value={opt} color={textColor} />
-      ))}
-    </Picker>
-  );
-}
-*/
-
-// Simple placeholder component - easy to swap back to Picker implementation above
-import { useThemeColor } from '@/hooks/use-theme-color';
-import { Text, View } from 'react-native';
-
-export default function Dropdown({ value, onChange, options, style = {} }) {
-  const bgColor = useThemeColor({}, 'background');
-  const borderColor = useThemeColor({}, 'icon');
-  const textColor = useThemeColor({}, 'text');
-
-  return (
-    <View style={{
-      borderWidth: 1,
-      borderColor,
-      borderRadius: 8,
-      padding: 12,
-      backgroundColor: bgColor,
-      marginBottom: 16,
-      ...style,
-    }}>
-      <Text style={{ color: textColor, fontFamily: 'GrenzeGotisch' }}>
-        {value} ▼
-      </Text>
-      {/* TODO: Replace with actual dropdown when ready */}
-    </View>
+      textStyle={{
+        color: textColor,
+        fontFamily: 'GrenzeGotisch',
+        fontSize: 16,
+      }}
+      placeholderStyle={{
+        color: textColor,
+        fontFamily: 'GrenzeGotisch',
+        fontSize: 16,
+        opacity: 0.7,
+      }}
+      dropDownContainerStyle={{
+        borderColor,
+        backgroundColor: bgColor,
+        borderRadius: 8,
+      }}
+      listItemLabelStyle={{
+        color: textColor,
+        fontFamily: 'GrenzeGotisch',
+        fontSize: 16,
+      }}
+      selectedItemLabelStyle={{
+        color: textColor,
+        fontWeight: 'bold',
+      }}
+      arrowIconStyle={{
+        tintColor: textColor,
+      }}
+      tickIconStyle={{
+        tintColor: textColor,
+      }}
+      zIndex={1000}
+      zIndexInverse={3000}
+    />
   );
 }

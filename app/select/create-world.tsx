@@ -47,8 +47,12 @@ export default function CreateWorldScreen() {
 
           {/* Tabletop System */}
           <ThemedText>Tabletop System</ThemedText>
-          {/* TODO: Dropdown is currently a placeholder - uncomment Picker implementation when ready */}
-          <Dropdown value={system} onChange={setSystem} options={tabletopSystems} />
+          <Dropdown 
+            value={system} 
+            onChange={setSystem}
+            options={tabletopSystems}
+            placeholder="Select a tabletop system"
+          />
 
           {/* Description */}
           <ThemedText>Description</ThemedText>
@@ -57,32 +61,18 @@ export default function CreateWorldScreen() {
             value={description}
             onChangeText={setDescription}
             multiline
-            style={{
-              height: 100,
-              textAlignVertical: 'top',
-              marginBottom: 16,
-            }}
-          />
+            style={{ height: 100, textAlignVertical: 'top', marginBottom: 16, }}/>
 
           {/* Import Image (mobile only here) */}
           {!isDesktop && (
-            <PrimaryButton 
-              style={{ marginBottom: 16 }} 
-              textStyle={{}}
-              onPress={() => {}}
-            >
+            <PrimaryButton style={{ marginBottom: 16 }} textStyle={{}}onPress={() => {}}>
               Import Image
             </PrimaryButton>
           )}
 
           {/* Action Buttons */}
           <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              marginTop: 16,
-            }}
-          >
+            style={{flexDirection: 'row',justifyContent: 'space-between',marginTop: 16,}}>
             <PrimaryButton 
               style={{}}
               textStyle={{}}
@@ -90,9 +80,7 @@ export default function CreateWorldScreen() {
             >
               Cancel
             </PrimaryButton>
-            <PrimaryButton
-              style={{}}
-              textStyle={{}}
+            <PrimaryButton style={{}} textStyle={{}}
               disabled={worldName === ''}
               onPress={() => router.replace(isDesktop ? '/main/desktop' : '/main/mobile')}
             >
