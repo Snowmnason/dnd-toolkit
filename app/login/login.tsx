@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, View } from 'react-native';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
@@ -9,10 +9,13 @@ import { supabase } from '../../lib/supabase';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { action } = useLocalSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
+  
+  // Determine if we're in sign-up mode based on the passed parameter
+  const isSignUp = action === 'signup';
 
   const handleAuth = async () => {
     if (!email || !password) {
@@ -50,6 +53,28 @@ export default function LoginScreen() {
     }
   };
 
+  const handleSocialAuth = async (provider: 'google' | 'apple') => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: provider,
+      });
+
+      if (error) {
+        Alert.alert('Authentication Error', error.message);
+      } else {
+        // Save successful authentication state
+        await AuthStateManager.setHasAccount(true);
+        router.replace('/select/world-selection');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An unexpected error occurred');
+      console.error('Social auth error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleContinueWithoutAccount = async () => {
     try {
       // User chose to skip authentication - save this preference
@@ -70,7 +95,7 @@ export default function LoginScreen() {
         <PrimaryButton
           style={{ backgroundColor: 'rgba(139, 69, 19, 0.2)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6 }}
           textStyle={{ color: '#8B4513', fontSize: 14, fontWeight: '500' }}
-          onPress={() => router.back()}
+          onPress={() => router.replace('/login/welcome')}
         >
           ← Back
         </PrimaryButton>
@@ -126,14 +151,27 @@ export default function LoginScreen() {
             )}
           </PrimaryButton>
 
-          <PrimaryButton
-            style={{ width: '100%', backgroundColor: 'rgba(139, 69, 19, 0.15)', borderWidth: 1, borderColor: '#8B4513', paddingVertical: 16, borderRadius: 8 }}
-            textStyle={{ color: '#F5E6D3', fontSize: 14, fontWeight: '500' }}
-            onPress={() => setIsSignUp(!isSignUp)}
-            disabled={loading}
-          >
-            {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
-          </PrimaryButton>
+          {/* Social Auth Buttons - Side by Side */}
+          <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
+            <PrimaryButton
+              style={{ flex: 1, backgroundColor: '#000', paddingVertical: 16, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+              textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '500', marginLeft: 8 }}
+              onPress={() => handleSocialAuth('apple')}
+              disabled={loading}
+            >
+              🍎 Apple
+            </PrimaryButton>
+            
+            <PrimaryButton
+              style={{ flex: 1, backgroundColor: '#4285F4', paddingVertical: 16, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+              textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '500', marginLeft: 8 }}
+              onPress={() => handleSocialAuth('google')}
+              disabled={loading}
+            >
+              🔵 Google
+            </PrimaryButton>
+          </View>
+
 
           <PrimaryButton
             style={{ width: '100%', backgroundColor: 'rgba(139, 69, 19, 0.2)', borderWidth: 2, borderColor: '#8B4513', paddingVertical: 16, borderRadius: 8 }}

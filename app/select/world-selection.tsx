@@ -16,13 +16,16 @@ export default function LandingPage() {
 
   // Mobile: Two-screen flow (list → detail)
   if (!isDesktop) {
+    
     if (!selectedWorld) {
       // Mobile World List View
       return (
         <ThemedView style={{ flex: 1, paddingTop: 52, paddingHorizontal: 16 }}>
-          <ThemedText type="title" style={{ marginBottom: 16, textAlign: 'center', fontWeight: '600', fontSize: 58 }}>
-            Worlds
-          </ThemedText>
+          <View style={{ backgroundColor: 'rgba(139, 69, 19, 0.9)', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 12, marginBottom: 16, borderWidth: 2, borderColor: '#D4AF37', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 8 }}>
+            <ThemedText type="title" style={{ textAlign: 'center', fontWeight: '700', fontSize: 58, color: '#F5E6D3', textShadowColor: '#000', textShadowOffset: { width: 2, height: 2 }, textShadowRadius: 4 }}>
+              Worlds
+            </ThemedText>
+          </View>
 
           <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
             {worlds.map((worldName, i) => (
@@ -94,7 +97,9 @@ export default function LandingPage() {
     <ThemedView style={{ flex: 1, flexDirection: 'row' }}>
       {/* Left Panel */}
       <View style={styles.leftPanel}>
-        <ThemedText type="title" style={{ textAlign: 'center' }}>Worlds</ThemedText>
+        <View style={{ backgroundColor: 'rgba(139, 69, 19, 0.9)', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 8, marginBottom: 16, borderWidth: 2, borderColor: '#D4AF37', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 6 }}>
+          <ThemedText type="title" style={{ textAlign: 'center', color: '#F5E6D3', fontWeight: '700', textShadowColor: '#000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 }}>Worlds</ThemedText>
+        </View>
         <ScrollView style={{ flex: 1, marginBottom: 64 }}>
           {worlds.map((worldName, i) => {
             const isSelected = selectedWorld === worldName;
@@ -124,6 +129,15 @@ export default function LandingPage() {
 
       {/* Right Panel */}
       <View style={styles.rightPanel}>
+          <View style={{ position: 'absolute', top: 30, left: 50, zIndex: 10, backgroundColor: '#2f353d' }}>
+            <PrimaryButton
+              style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6 }}
+              textStyle={{ color: '#8B4513', fontSize: 14, fontWeight: '500' }}
+              onPress={() => router.replace('/login/welcome')}
+            >
+              Back to Login
+            </PrimaryButton>
+          </View>
         <Image
           source={selectedMapImage}
           resizeMode="contain"
@@ -167,6 +181,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#eff4fbff',
     alignItems: 'center' as const,
+    borderWidth: 2,
+    borderColor: '#D4AF37',
+    shadowColor: '#D4AF37',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   createButton: {
     position: 'absolute' as const,
@@ -199,6 +220,13 @@ const styles = StyleSheet.create({
   },
   selectedWorldItem: {
     backgroundColor: '#644820ff',
+    borderWidth: 3,
+    borderColor: '#D4AF37',
+    shadowColor: '#D4AF37',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 6,
   },
   selectedWorldTitle: {
     position: 'absolute' as const,

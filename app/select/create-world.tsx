@@ -25,12 +25,14 @@ export default function CreateWorldScreen() {
       {/* Left Panel: Form */}
       <View style={{ flex: 1, padding: 16 }}>
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          <ThemedText type="title" style={{ marginBottom: 16 }}>
-            Create New World
-          </ThemedText>
+          <View style={{ backgroundColor: 'rgba(139, 69, 19, 0.9)', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 12, marginBottom: 24, borderWidth: 2, borderColor: '#D4AF37', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 8 }}>
+            <ThemedText type="title" style={{ textAlign: 'center', fontWeight: '700', color: '#F5E6D3', textShadowColor: '#000', textShadowOffset: { width: 2, height: 2 }, textShadowRadius: 4 }}>
+              Create New World
+            </ThemedText>
+          </View>
 
           {/* World Name */}
-          <ThemedText>Name of World</ThemedText>
+          <ThemedText style={{ fontWeight: '600', fontSize: 16, textShadowColor: '#D4AF37', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2, marginBottom: 8 }}>Name of World</ThemedText>
           <TextInputComponent
             placeholder="World Name"
             value={worldName}
@@ -40,13 +42,13 @@ export default function CreateWorldScreen() {
 
           {/* DM / Player Toggle */}
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-            <ThemedText>DM</ThemedText>
+            <ThemedText style={{ fontWeight: '600', fontSize: 16, textShadowColor: '#D4AF37', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 }}>DM</ThemedText>
             <Switch value={isDM} onValueChange={setIsDM} style={{ marginHorizontal: 8 }} />
-            <ThemedText>Player</ThemedText>
+            <ThemedText style={{ fontWeight: '600', fontSize: 16, textShadowColor: '#D4AF37', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 }}>Player</ThemedText>
           </View>
 
           {/* Tabletop System */}
-          <ThemedText>Tabletop System</ThemedText>
+          <ThemedText style={{ fontWeight: '600', fontSize: 16, textShadowColor: '#D4AF37', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2, marginBottom: 8 }}>Tabletop System</ThemedText>
           <Dropdown 
             value={system} 
             onChange={setSystem}
@@ -55,7 +57,7 @@ export default function CreateWorldScreen() {
           />
 
           {/* Description */}
-          <ThemedText>Description</ThemedText>
+          <ThemedText style={{ fontWeight: '600', fontSize: 16, textShadowColor: '#D4AF37', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2, marginBottom: 8 }}>Description</ThemedText>
           <TextInputComponent
             placeholder="Description"
             value={description}
