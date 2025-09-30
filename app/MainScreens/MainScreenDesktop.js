@@ -9,7 +9,7 @@ export default function MainScreenDesktop({ navigation }) {
       {/* Characters & NPCs */}
       <View style={{ flex: 1, borderWidth: 1, borderColor: 'black', alignItems: 'center', justifyContent: 'center' }}>
         <ThemedText type="title">Characters & NPCs</ThemedText>
-        <ThemedText>Character Sheets</ThemedText>
+        <ThemedText style>Character Sheets</ThemedText>
         <ThemedText>Party Overview</ThemedText>
         <ThemedText>NPC Forge</ThemedText>
         <ThemedText>Faction Tracker</ThemedText>

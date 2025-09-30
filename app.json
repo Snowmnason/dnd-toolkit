@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "dnd-toolkit",
-    "slug": "dnd-toolkit",
+    "name": "skia-test",
+    "slug": "skia-test",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.jpg",
-    "scheme": "dndtoolkit",
+    "scheme": "skiatest",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -22,19 +22,27 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "bundler": "metro",
-      "useHermes": false,
+      "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-    "plugins": [ 
-      
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    },
-    "assetBundlePatterns": [
-      "**/*"
-    ]
+    }
   }
 }

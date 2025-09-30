@@ -1,34 +1,22 @@
-import { StyleSheet, Text, View } from "react-native";
+import { LoadSkiaWeb } from "@shopify/react-native-skia/lib/module/web";
+import React from "react";
+import AppLoader from "./AppLoader";
+import DesktopNavigator from "./navigators/DesktopNavigator";
 
-export default function Page() {
+export default function App() {
   return (
-    <View style={styles.container}>
-      <View style={styles.main}>
-        <Text style={styles.title}>Hello World</Text>
-        <Text style={styles.subtitle}>This is the first page of your app.</Text>
-      </View>
-    </View>
+    <AppLoader
+      onReady={async () => {
+        // Point Skia to where your wasm lives (you said: web/static/js)
+        await LoadSkiaWeb({
+          locateFile: (file) => `/${file}`,  // resolves to /canvaskit.wasm
+        });
+          
+      }}
+    >
+
+        <DesktopNavigator />
+
+    </AppLoader>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    padding: 24,
-  },
-  main: {
-    flex: 1,
-    justifyContent: "center",
-    maxWidth: 960,
-    marginHorizontal: "auto",
-  },
-  title: {
-    fontSize: 64,
-    fontWeight: "bold",
-  },
-  subtitle: {
-    fontSize: 36,
-    color: "#38434D",
-  },
-});

@@ -1,4 +1,4 @@
-import { useThemeColor } from '@/hooks/use-theme-color';
+/*import { useThemeColor } from '@/hooks/use-theme-color';
 import { Picker } from '@react-native-picker/picker';
 import { Platform } from 'react-native';
 
@@ -55,3 +55,4 @@ export default function Dropdown({ value, onChange, options, style }) {
     </Picker>
   );
 }
+*/
