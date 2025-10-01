@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Alert, Platform, TouchableOpacity, View } from 'react-native';
-import { AuthStateManager } from '../lib/auth-state';
-import { supabase } from '../lib/supabase';
+import { ComponentStyles, CoreColors } from '../constants/theme';
+import SettingsMenu from './SettingsMenu';
 import { ThemedText } from './themed-text';
 
 interface TopBarProps {
@@ -19,6 +20,7 @@ export default function TopBar({
 }: TopBarProps) {
   const router = useRouter();
   const isMobile = Platform.OS !== 'web';
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 
   const handleBackPress = () => {
     if (onBackPress) {
@@ -29,126 +31,91 @@ export default function TopBar({
   };
 
   const handleHamburgerPress = () => {
-    // Show settings menu
-    Alert.alert(
-      'Settings',
-      'Choose an option',
-      [
-        {
-          text: 'Account Settings',
-          onPress: () => router.push('/settings')
-        },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: handleSignOut
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel'
-        }
-      ]
-    );
-  };
-
-  const handleSignOut = async () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel'
-        },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Sign out from Supabase
-              await supabase.auth.signOut();
-              
-              // Clear auth state
-              await AuthStateManager.clearAuthState();
-              
-              // Navigate back to welcome screen
-              router.replace('/login/welcome');
-            } catch (error) {
-              console.error('Sign out error:', error);
-              Alert.alert('Error', 'Failed to sign out. Please try again.');
-            }
+    if (Platform.OS === 'web') {
+      // Use custom modal for web
+      setShowSettingsMenu(true);
+    } else {
+      // Use native Alert for mobile
+      Alert.alert(
+        'Menu',
+        'Choose an option',
+        [
+          {
+            text: 'Account Settings',
+            onPress: () => router.push('/settings')
+          },
+          {
+            text: 'Return to World Selection',
+            onPress: () => router.replace('/select/world-selection')
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel'
           }
-        }
-      ]
-    );
+        ]
+      );
+    }
   };
 
-  // Only show on mobile
-  if (!isMobile) {
-    return null;
-  }
-
+  // Show on all platforms now (not just mobile)
   return (
-    <View style={{ 
-      flexDirection: 'row', 
-      alignItems: 'center', 
-      justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      paddingTop: 50, // Account for status bar
-      backgroundColor: '#2f353d',
-      borderBottomWidth: 1,
-      borderBottomColor: 'rgba(139, 69, 19, 0.3)'
-    }}>
-      {/* Left: Back Button */}
-      <View style={{ width: 40 }}>
-        {showBackButton && (
-          <TouchableOpacity 
-            onPress={handleBackPress}
-            style={{ 
-              padding: 8,
-              borderRadius: 6,
-              backgroundColor: 'rgba(139, 69, 19, 0.2)'
-            }}
-          >
-            <ThemedText style={{ color: '#8B4513', fontSize: 16, fontWeight: '600' }}>
-              ←
-            </ThemedText>
-          </TouchableOpacity>
-        )}
+    <>
+      <View style={{ ...ComponentStyles.topBar.container, paddingTop: isMobile ? 50 : 8 }}>
+        {/* Left: Back Button */}
+        <View style={{ width: 40 }}>
+          {showBackButton && (
+            <TouchableOpacity 
+              onPress={handleBackPress}
+              style={ComponentStyles.topBar.button}
+            >
+              <ThemedText style={{ color: CoreColors.primary, fontSize: 16, fontWeight: '600' }}>
+                ←
+              </ThemedText>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Center: Title */}
+        <ThemedText 
+          style={{ 
+            color: CoreColors.textPrimary, 
+            fontSize: 18, 
+            fontWeight: '700',
+            textAlign: 'center',
+            flex: 1
+          }}
+        >
+          {title}
+        </ThemedText>
+
+        {/* Right: Hamburger Menu */}
+        <View style={{ width: 40 }}>
+          {showHamburger && (
+            <TouchableOpacity 
+              onPress={handleHamburgerPress}
+              style={ComponentStyles.topBar.button}
+            >
+              <ThemedText style={{ color: CoreColors.primary, fontSize: 16, fontWeight: '600' }}>
+                ☰
+              </ThemedText>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
-      {/* Center: Title */}
-      <ThemedText 
-        style={{ 
-          color: '#F5E6D3', 
-          fontSize: 18, 
-          fontWeight: '700',
-          textAlign: 'center',
-          flex: 1
+      {/* Cross-platform Settings Menu */}
+      <SettingsMenu
+        visible={showSettingsMenu}
+        onClose={() => setShowSettingsMenu(false)}
+        onAccountSettings={() => {
+          setShowSettingsMenu(false);
+          router.push('/settings');
         }}
-      >
-        {title}
-      </ThemedText>
-
-      {/* Right: Hamburger Menu */}
-      <View style={{ width: 40 }}>
-        {showHamburger && (
-          <TouchableOpacity 
-            onPress={handleHamburgerPress}
-            style={{ 
-              padding: 8,
-              borderRadius: 6,
-              backgroundColor: 'rgba(139, 69, 19, 0.2)',
-              alignItems: 'center'
-            }}
-          >
-            <ThemedText style={{ color: '#8B4513', fontSize: 16, fontWeight: '600' }}>
-              ☰
-            </ThemedText>
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
+        onReturnToWorldSelection={() => {
+          setShowSettingsMenu(false);
+          router.replace('/select/world-selection');
+        }}
+      />
+    </>
   );
 }

@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, View } from 'react-native';
+import { Alert, View } from 'react-native';
+import CustomLoad from '../../components/custom_components/CustomLoad';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../components/themed-text';
 import { AuthStateManager } from '../../lib/auth-state';
@@ -40,7 +41,7 @@ export default function WelcomeScreen() {
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: "#2f353d" }}>
-        <ActivityIndicator size="large" color="#8B4513" />
+        <CustomLoad size="large"/>
         <ThemedText style={{ marginTop: 16, color: '#F5E6D3' }}>Loading...</ThemedText>
       </View>
     );

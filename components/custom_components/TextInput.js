@@ -1,4 +1,4 @@
-import { useThemeColor } from '@/hooks/use-theme-color';
+import { BorderRadius, CoreColors, Spacing, Typography } from '@/constants/theme';
 import { TextInput as RNTextInput } from 'react-native';
 
 export default function TextInput({
@@ -8,28 +8,23 @@ export default function TextInput({
   style,
   ...props
 }) {
-  const borderColor = "#FFBF00";
-  const bgColor = useThemeColor({}, 'tint');
-  const textColor = useThemeColor({}, 'text');
-  const placeholderColor = useThemeColor({}, 'text');
-
   return (
     <RNTextInput
       style={[
         {
           borderWidth: 2,
-          borderColor,
-          borderRadius: 8,
-          padding: 12,
-          backgroundColor: bgColor,
-          color: textColor,
-          fontFamily: 'GrenzeGotisch',
-          marginBottom: 16,
+          borderColor: CoreColors.secondary,
+          borderRadius: BorderRadius.sm,
+          padding: Spacing.sm,
+          backgroundColor: CoreColors.backgroundLight,
+          color: CoreColors.textOnLight,
+          fontFamily: Typography.fontFamilyPrimary,
+          marginBottom: Spacing.md,
         },
         style,
       ]}
       placeholder={placeholder}
-      placeholderTextColor={placeholderColor}
+      placeholderTextColor={CoreColors.textSecondary}
       value={value}
       onChangeText={onChangeText}
       {...props}

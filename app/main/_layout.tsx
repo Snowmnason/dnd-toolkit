@@ -1,10 +1,11 @@
 import { Stack } from 'expo-router';
-import { ThemedView } from '../../components/themed-view';
+import { View } from 'react-native';
 import TopBar from '../../components/TopBar';
+import { CoreColors } from '../../constants/theme';
 
 export default function MainLayout() {
   return (
-    <ThemedView style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: CoreColors.backgroundDark }}>
       <TopBar 
         title="D&D Toolkit" 
         showBackButton={true} 
@@ -15,6 +16,6 @@ export default function MainLayout() {
           headerShown: false,
         }}
       />
-    </ThemedView>
+    </View>
   );
 }

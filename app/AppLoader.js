@@ -1,7 +1,8 @@
 import { Asset } from 'expo-asset';
 import * as Font from 'expo-font';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
+import CustomLoad from '../components/custom_components/CustomLoad';
 
 // Put all shared fonts here
 const customFonts = {
@@ -13,6 +14,7 @@ const customFonts = {
 // Put all shared images here
 const preloadImages = [
   require('../assets/images/Miku.png'),
+  require('../assets/images/load.gif'),
 ];
 
 export default function AppLoader({ children, onReady }) {
@@ -42,7 +44,7 @@ export default function AppLoader({ children, onReady }) {
   if (!loaded) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
+        <CustomLoad size="large" />
       </View>
     );
   }

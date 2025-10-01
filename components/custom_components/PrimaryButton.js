@@ -1,6 +1,6 @@
 // components/PrimaryButton.js
 import { ThemedText } from '@/components/themed-text';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import { ComponentStyles, CoreColors } from '@/constants/theme';
 import { TouchableOpacity } from 'react-native';
 
 export default function PrimaryButton({
@@ -10,22 +10,14 @@ export default function PrimaryButton({
   textStyle,
   disabled = false,
 }) {
-  const bgColor = useThemeColor({}, 'tint');        // main accent color
-  const textColor = useThemeColor({}, 'textColor'); // invert text against bg
-  const disabledColor = useThemeColor({}, 'icon');
-
   return (
     <TouchableOpacity
       style={[
+        ComponentStyles.button.primary,
         {
-          backgroundColor: disabled ? disabledColor : bgColor,
-          paddingVertical: 12,
-          borderRadius: 16,
+          backgroundColor: disabled ? CoreColors.textSecondary : CoreColors.backgroundLight,
           alignItems: 'center',
-          paddingHorizontal: 20,
           opacity: disabled ? 0.6 : 1,
-
-          boxShadow: '1px 5px 4px rgba(0, 0, 0, 0.4)',
         },
         style,
       ]}
@@ -34,7 +26,13 @@ export default function PrimaryButton({
     >
       <ThemedText
         type="defaultSemiBold"
-        style={[{ color: textColor, fontSize: 22 }, textStyle]}
+        style={[
+          { 
+            color: CoreColors.primary, 
+            fontSize: 22 
+          }, 
+          textStyle
+        ]}
       >
         {children}
       </ThemedText>

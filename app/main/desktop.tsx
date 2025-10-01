@@ -13,7 +13,7 @@ export default function MainScreenDesktop() {
   };
 
   return (
-    <ThemedView style={{ flex: 1, flexDirection: 'row' }}>
+    <ThemedView style={{ flexDirection: 'row' }}>
       {/* Characters & NPCs */}
       <View style={styles.panel}>
         <ThemedText type="title" style={styles.panelTitle}>Characters & NPCs</ThemedText>
@@ -98,15 +98,6 @@ export default function MainScreenDesktop() {
           Handouts
         </PrimaryButton>
       </View>
-
-      {/* Home Button */}
-      <PrimaryButton
-        style={{ position: 'absolute', bottom: 24, right: 24 }}
-        textStyle={{}}
-        onPress={() => router.replace('/select/world-selection')}
-      >
-        Go Home
-      </PrimaryButton>
     </ThemedView>
   );
 }

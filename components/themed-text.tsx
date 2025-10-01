@@ -92,7 +92,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: lh(16),
     fontFamily: 'GrenzeGotisch',
-    //color: '#0a7ea4',
     textDecorationLine: 'underline',
     fontWeight: '500',
   },

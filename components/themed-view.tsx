@@ -4,24 +4,42 @@ import { View, type ViewProps } from "react-native";
 import ParchmentBackground from "./ParchmentBackground";
 
 export type ThemedViewProps = ViewProps & {
-  parchment?: boolean;
+  lightColor?: string;
+  darkColor?: string;
+  showParchment?: boolean;
+  defaultFlex?: number;
 };
 
+/**
+ * Themed view component with optional parchment background
+ * Set showParchment={true} to include the parchment texture
+ */
 export function ThemedView({
   style,
-  children,
-  parchment = true,
-  ...rest
+  lightColor,
+  darkColor,
+  showParchment = true,
+  defaultFlex = 1,
+  ...otherProps
 }: ThemedViewProps) {
-  const backgroundColor = useThemeColor({}, "background");
+  const backgroundColor = useThemeColor(
+    { light: lightColor, dark: darkColor }, 
+    'background'
+  );
 
   return (
-    <View style={[{ backgroundColor }, style]} {...rest}>
-      {/* Background noise, painted underneath */}
-      {parchment && <ParchmentBackground />}
-
-      {/* Children stack above */}
-      {children}
+    <View 
+      style={[
+        { 
+          flex: defaultFlex ? defaultFlex : undefined,
+          backgroundColor: showParchment ? 'transparent' : backgroundColor 
+        }, 
+        style
+      ]} 
+      {...otherProps} 
+    >
+      {showParchment && <ParchmentBackground />}
+      {otherProps.children}
     </View>
   );
 }

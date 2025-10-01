@@ -7,7 +7,7 @@ import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import TextInputComponent from '../../components/custom_components/TextInput';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
-import { AuthStateManager } from '../../lib/auth-state';
+import { ComponentStyles, CoreColors, Spacing } from '../../constants/theme';
 import { worldsDB } from '../../lib/database/worlds';
 import { supabase } from '../../lib/supabase';
 
@@ -30,8 +30,7 @@ export default function CreateWorldScreen() {
     const checkAuthStatus = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        const authState = await AuthStateManager.getAuthState();
-        setIsUserLoggedIn(user !== null && !authState.skipAuth);
+        setIsUserLoggedIn(user !== null);
       } catch (error) {
         console.error('Error checking auth status:', error);
         setIsUserLoggedIn(false);
@@ -100,32 +99,81 @@ export default function CreateWorldScreen() {
   return (
     <ThemedView style={{ flex: 1, flexDirection: isDesktop ? 'row' : 'column' }}>
       {/* Left Panel: Form */}
-      <View style={{ flex: 1, padding: 16 }}>
+      <View style={{ flex: 1, padding: Spacing.md }}>
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          <View style={{ backgroundColor: 'rgba(139, 69, 19, 0.9)', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 12, marginBottom: 24, borderWidth: 2, borderColor: '#D4AF37', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 8 }}>
-            <ThemedText type="title" style={{ textAlign: 'center', fontWeight: '700', color: '#F5E6D3', textShadowColor: '#000', textShadowOffset: { width: 2, height: 2 }, textShadowRadius: 4 }}>
+          <View style={ComponentStyles.card.container}>
+            <ThemedText type="title" style={{
+              textAlign: 'center',
+              fontWeight: '700',
+              color: CoreColors.textPrimary,
+              textShadowColor: CoreColors.backgroundDark,
+              textShadowOffset: { width: 2, height: 2 },
+              textShadowRadius: 4
+            }}>
               Create New World
             </ThemedText>
           </View>
 
           {/* World Name */}
-          <ThemedText style={{ fontWeight: '600', fontSize: 16, textShadowColor: '#D4AF37', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2, marginBottom: 8 }}>Name of World</ThemedText>
+          <ThemedText style={{
+            fontWeight: '600',
+            fontSize: 16,
+            textShadowColor: CoreColors.secondary,
+            textShadowOffset: { width: 1, height: 1 },
+            textShadowRadius: 2,
+            marginBottom: Spacing.xs
+          }}>
+            Name of World
+          </ThemedText>
           <TextInputComponent
             placeholder="World Name"
             value={worldName}
             onChangeText={setWorldName}
-            style={{ marginBottom: 16 }}
+            style={{ marginBottom: Spacing.md }}
           />
 
           {/* DM / Player Toggle */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-            <ThemedText style={{ fontWeight: '600', fontSize: 16, textShadowColor: '#D4AF37', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 }}>DM</ThemedText>
-            <Switch value={isDM} onValueChange={setIsDM} style={{ marginHorizontal: 8 }} />
-            <ThemedText style={{ fontWeight: '600', fontSize: 16, textShadowColor: '#D4AF37', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 }}>Player</ThemedText>
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginBottom: Spacing.md
+          }}>
+            <ThemedText style={{
+              fontWeight: '600',
+              fontSize: 16,
+              textShadowColor: CoreColors.secondary,
+              textShadowOffset: { width: 1, height: 1 },
+              textShadowRadius: 2
+            }}>
+              DM
+            </ThemedText>
+            <Switch
+              value={isDM}
+              onValueChange={setIsDM}
+              style={{ marginHorizontal: Spacing.xs }}
+            />
+            <ThemedText style={{
+              fontWeight: '600',
+              fontSize: 16,
+              textShadowColor: CoreColors.secondary,
+              textShadowOffset: { width: 1, height: 1 },
+              textShadowRadius: 2
+            }}>
+              Player
+            </ThemedText>
           </View>
 
           {/* Tabletop System */}
-          <ThemedText style={{ fontWeight: '600', fontSize: 16, textShadowColor: '#D4AF37', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2, marginBottom: 8 }}>Tabletop System</ThemedText>
+          <ThemedText style={{
+            fontWeight: '600',
+            fontSize: 16,
+            textShadowColor: CoreColors.secondary,
+            textShadowOffset: { width: 1, height: 1 },
+            textShadowRadius: 2,
+            marginBottom: Spacing.xs
+          }}>
+            Tabletop System
+          </ThemedText>
           <Dropdown 
             value={system} 
             onChange={setSystem}
@@ -134,24 +182,45 @@ export default function CreateWorldScreen() {
           />
 
           {/* Description */}
-          <ThemedText style={{ fontWeight: '600', fontSize: 16, textShadowColor: '#D4AF37', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2, marginBottom: 8 }}>Description</ThemedText>
+          <ThemedText style={{
+            fontWeight: '600',
+            fontSize: 16,
+            textShadowColor: CoreColors.secondary,
+            textShadowOffset: { width: 1, height: 1 },
+            textShadowRadius: 2,
+            marginBottom: Spacing.xs
+          }}>
+            Description
+          </ThemedText>
           <TextInputComponent
             placeholder="Description"
             value={description}
             onChangeText={setDescription}
             multiline
-            style={{ height: 100, textAlignVertical: 'top', marginBottom: 16, }}/>
+            style={{
+              height: 100,
+              textAlignVertical: 'top',
+              marginBottom: Spacing.md,
+            }}
+          />
 
           {/* Import Image (mobile only here) */}
           {!isDesktop && (
-            <PrimaryButton style={{ marginBottom: 16 }} textStyle={{}}onPress={() => {}}>
+            <PrimaryButton
+              style={{ marginBottom: Spacing.md }}
+              textStyle={{}}
+              onPress={() => {}}
+            >
               Import Image
             </PrimaryButton>
           )}
 
           {/* Action Buttons */}
-          <View
-            style={{flexDirection: 'row',justifyContent: 'space-between',marginTop: 16,}}>
+          <View style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            marginTop: Spacing.md,
+          }}>
             <PrimaryButton 
               style={{}}
               textStyle={{}}
@@ -159,7 +228,9 @@ export default function CreateWorldScreen() {
             >
               Cancel
             </PrimaryButton>
-            <PrimaryButton style={{}} textStyle={{}}
+            <PrimaryButton
+              style={{}}
+              textStyle={{}}
               disabled={worldName.trim() === '' || isCreating}
               onPress={handleCreateWorld}
             >
@@ -171,13 +242,17 @@ export default function CreateWorldScreen() {
 
       {/* Right Panel (desktop only) */}
       {isDesktop && (
-        <View style={{ flex: 4, borderLeftWidth: 1, borderLeftColor: '#ccc' }}>
+        <View style={{
+          flex: 4,
+          borderLeftWidth: 1,
+          borderLeftColor: CoreColors.borderPrimary
+        }}>
           {/* Canvas placeholder */}
           <MapCanvas />
 
           {/* Import image button */}
           <PrimaryButton 
-            style={{ margin: 16 }} 
+            style={{ margin: Spacing.md }} 
             textStyle={{}}
             onPress={() => {}}
           >

@@ -1,5 +1,6 @@
 // components/IconButton.js
 import { ThemedText } from '@/components/themed-text';
+import { Spacing } from '@/constants/theme';
 import { TouchableOpacity, View } from 'react-native';
 
 export default function IconButton({ icon, label, onPress, style, textStyle }) {
@@ -11,7 +12,7 @@ export default function IconButton({ icon, label, onPress, style, textStyle }) {
 
         {/* Label (if present) */}
         {label && (
-          <ThemedText style={[{ marginLeft: 8 }, textStyle]}>
+          <ThemedText style={[{ marginLeft: Spacing.xs }, textStyle]}>
             {label}
           </ThemedText>
         )}

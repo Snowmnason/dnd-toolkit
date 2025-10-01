@@ -7,7 +7,7 @@ export default function LoginLayout() {
   return (
     <View style={{ flex: 1, backgroundColor: '#2f353d' }}>
       <TopBar 
-        title="D&D Toolkit" 
+        title="World Exploration" 
         showBackButton={true} 
         showHamburger={false} 
       />
