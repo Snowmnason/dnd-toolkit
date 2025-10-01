@@ -85,6 +85,29 @@ export const AuthStateManager = {
   },
 
   // ==========================================
+  // 🔒 AUTHENTICATION CHECK - Quick check for route guards
+  // ==========================================
+  async isAuthenticated(): Promise<boolean> {
+    try {
+      const authState = await this.getAuthState();
+      
+      if (!authState.hasAccount) {
+        return false;
+      }
+
+      // Import supabase dynamically to avoid circular dependency
+      const { supabase } = await import('./supabase');
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // User must exist and have a username to be considered fully authenticated
+      return !!(user && user.user_metadata?.username);
+    } catch (error) {
+      console.error('Error checking authentication:', error);
+      return false;
+    }
+  },
+
+  // ==========================================
   // 🎯 MAIN ROUTING LOGIC - This decides where the user goes
   // ==========================================
   async getRoutingDecision(): Promise<'welcome' | 'login' | 'profile' | 'main'> {

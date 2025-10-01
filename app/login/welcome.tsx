@@ -5,34 +5,44 @@ import CustomLoad from '../../components/custom_components/CustomLoad';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../components/themed-text';
 import { AuthStateManager } from '../../lib/auth-state';
+import { supabase } from '../../lib/supabase';
 
 export default function WelcomeScreen() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSignUp = async () => {
+  const handleSocialAuth = async (provider: 'google' | 'apple') => {
     setIsLoading(true);
     try {
-      // User wants to create account - save this preference
-      await AuthStateManager.setHasAccount(true);
-      router.push('/login/auth?action=signup');
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: provider,
+      });
+
+      if (error) {
+        Alert.alert('Authentication Error', error.message);
+      } else {
+        // Save successful authentication state
+        await AuthStateManager.setHasAccount(true);
+        // Note: OAuth will redirect away, username check will happen on return
+        // The profile completion will be handled by the auth state management
+      }
     } catch (error) {
-      console.error('Navigation error:', error);
-      Alert.alert('Error', 'Unable to navigate to sign-up');
+      Alert.alert('Error', 'An unexpected error occurred');
+      console.error('Social auth error:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSignIn = async () => {
+  const handleContinueWithEmail = async () => {
     setIsLoading(true);
     try {
-      // User wants to sign in - save this preference
+      // User wants to use email - save this preference and go to auth screen
       await AuthStateManager.setHasAccount(true);
       router.push('/login/auth?action=signin');
     } catch (error) {
       console.error('Navigation error:', error);
-      Alert.alert('Error', 'Unable to navigate to sign-in');
+      Alert.alert('Error', 'Unable to navigate to email sign-in');
     } finally {
       setIsLoading(false);
     }
@@ -82,23 +92,87 @@ export default function WelcomeScreen() {
           </ThemedText>
         </View>
 
-        {/* Action Buttons */}
-        <View style={{ width: '100%', maxWidth: 300, backgroundColor: 'transparent' }}>
+        {/* Social Auth Buttons - Primary Options */}
+        <View style={{ width: '100%', maxWidth: 300, backgroundColor: 'transparent', marginBottom: 24 }}>
           
-          <PrimaryButton
-            onPress={handleSignIn}
-            style={{ marginBottom: 12, backgroundColor: '#8B4513', paddingVertical: 16, borderRadius: 8 }}
-            textStyle={{ color: '#F5E6D3', fontSize: 16, fontWeight: '600' }}
-          >
-            Sign In
-          </PrimaryButton>
+          {/* Social Auth Row */}
+          <View style={{ flexDirection: 'row', gap: 12, width: '100%', marginBottom: 0 }}>
+            <PrimaryButton
+              style={{ 
+                flex: 1, 
+                backgroundColor: '#000', 
+                paddingVertical: 16, 
+                borderRadius: 8, 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                justifyContent: 'center' 
+              }}
+              textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
+              onPress={() => handleSocialAuth('apple')}
+              disabled={isLoading}
+            >
+              🍎 Apple
+            </PrimaryButton>
+            
+            <PrimaryButton
+              style={{ 
+                flex: 1, 
+                backgroundColor: '#4285F4', 
+                paddingVertical: 16, 
+                borderRadius: 8, 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                justifyContent: 'center' 
+              }}
+              textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
+              onPress={() => handleSocialAuth('google')}
+              disabled={isLoading}
+            >
+              🔵 Google
+            </PrimaryButton>
+          </View>
+
+          {/* Divider */}
+          <View style={{ 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            marginVertical: 20 
+          }}>
+            <View style={{ 
+              flex: 1, 
+              height: 1, 
+              backgroundColor: 'rgba(245, 230, 211, 0.3)' 
+            }} />
+            <ThemedText style={{ 
+              marginHorizontal: 16, 
+              color: '#F5E6D3', 
+              opacity: 0.6, 
+              fontSize: 12 
+            }}>
+              or
+            </ThemedText>
+            <View style={{ 
+              flex: 1, 
+              height: 1, 
+              backgroundColor: 'rgba(245, 230, 211, 0.3)' 
+            }} />
+          </View>
           
+          {/* Email Option */}
           <PrimaryButton
-            onPress={handleSignUp}
-            style={{ marginBottom: 24, backgroundColor: '#654321', paddingVertical: 16, borderRadius: 8 }}
+            onPress={handleContinueWithEmail}
+            style={{ 
+              width: '100%', 
+              backgroundColor: 'rgba(139, 69, 19, 0.15)', 
+              borderWidth: 1, 
+              borderColor: '#8B4513', 
+              paddingVertical: 16, 
+              borderRadius: 8 
+            }}
             textStyle={{ color: '#F5E6D3', fontSize: 16, fontWeight: '600' }}
+            disabled={isLoading}
           >
-            Create Account
+            Continue with Email
           </PrimaryButton>
           
         </View>

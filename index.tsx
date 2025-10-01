@@ -18,13 +18,13 @@ function AppWithLoader() {
             await LoadSkiaWeb({
               locateFile: (file) => `/${file}`, // since wasm is in /public
             });
-            console.log("✅ Skia (CanvasKit) fully loaded for web");
+            //console.log("✅ Skia (CanvasKit) fully loaded for web");
           } catch (error) {
             console.error("❌ Failed to load Skia for web:", error);
           }
         } else {
           // Mobile: No Skia loading needed
-          console.log("✅ App ready (mobile)");
+          //console.log("✅ App ready (mobile)");
         }
       }}
     >

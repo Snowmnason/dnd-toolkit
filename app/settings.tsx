@@ -19,6 +19,24 @@ export default function SettingsPage() {
   const [buttonDisabled, setButtonDisabled] = useState(false);
 
   useEffect(() => {
+    // Check authentication first
+    const checkAuth = async () => {
+      try {
+        const authenticated = await AuthStateManager.isAuthenticated();
+        if (!authenticated) {
+          console.log('🚫 Settings: User not authenticated, redirecting');
+          router.replace('/login/welcome');
+          return;
+        }
+      } catch (error) {
+        console.error('Settings auth check error:', error);
+        router.replace('/login/welcome');
+        return;
+      }
+    };
+
+    checkAuth();
+
     // Get current user
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
@@ -31,7 +49,7 @@ export default function SettingsPage() {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [router]);
 
   const handleSignOutConfirm = async () => {
     if (buttonDisabled) return; // Prevent spam clicking
@@ -44,7 +62,7 @@ export default function SettingsPage() {
       // Re-enable button after 2 seconds
       setTimeout(() => {
         setButtonDisabled(false);
-      }, 2000);
+      }, 1500);
     } else {
       // Second click - actually sign out
       setButtonDisabled(true);

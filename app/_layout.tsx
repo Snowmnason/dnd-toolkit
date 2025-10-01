@@ -1,11 +1,57 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
+import CustomLoad from '../components/custom_components/CustomLoad';
 import TopBar from '../components/TopBar';
 import { CoreColors } from '../constants/theme';
+import { AuthStateManager } from '../lib/auth-state';
 
 export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // Protected routes that require authentication
+  const protectedRoutes = ['select', 'main', 'settings'];
+  const isProtectedRoute = protectedRoutes.includes(segments[0]);
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const authenticated = await AuthStateManager.isAuthenticated();
+
+        // If trying to access protected route without authentication, redirect
+        if (isProtectedRoute && !authenticated) {
+          console.log('🚫 Unauthorized access attempt, redirecting to welcome');
+          router.replace('/login/welcome');
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        if (isProtectedRoute) {
+          router.replace('/login/welcome');
+        }
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkAuth();
+  }, [segments, router, isProtectedRoute]);
+
+  // Show loading while checking authentication for protected routes
+  if (isCheckingAuth && isProtectedRoute) {
+    return (
+      <View style={{ 
+        flex: 1, 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        backgroundColor: CoreColors.backgroundDark 
+      }}>
+        <CustomLoad />
+      </View>
+    );
+  }
 
   // Determine if we should show the TopBar - only hide on login/welcome routes
   const hideTopBar = segments.some(segment => segment === 'login') ||
