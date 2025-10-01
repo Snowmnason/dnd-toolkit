@@ -5,6 +5,71 @@
 
 import { Platform } from 'react-native';
 
+/**
+ * Cross-platform shadow utility
+ * Automatically provides the correct shadow properties for React Native vs Web
+ */
+export const createShadow = (
+  color: string = '#000',
+  offset: { width: number; height: number } = { width: 0, height: 2 },
+  opacity: number = 0.1,
+  radius: number = 2,
+  elevation: number = 2
+) => {
+  if (Platform.OS === 'web') {
+    // Web uses boxShadow
+    const hexToRgb = (hex: string) => {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '0, 0, 0';
+    };
+    return {
+      boxShadow: `${offset.width}px ${offset.height}px ${radius}px rgba(${hexToRgb(color)}, ${opacity})`,
+    };
+  } else {
+    // React Native uses individual shadow properties
+    return {
+      shadowColor: color,
+      shadowOffset: offset,
+      shadowOpacity: opacity,
+      shadowRadius: radius,
+      elevation: elevation,
+    };
+  }
+};
+
+/**
+ * Cross-platform text shadow utility
+ * Automatically provides the correct textShadow properties for React Native vs Web
+ */
+export const createTextShadow = (
+  color: string = '#000',
+  offset: { width: number; height: number } = { width: 1, height: 1 },
+  radius: number = 2
+) => {
+  if (Platform.OS === 'web') {
+    // Web uses CSS textShadow string
+    const hexToRgb = (hex: string) => {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '0, 0, 0';
+    };
+    return {
+      textShadow: `${offset.width}px ${offset.height}px ${radius}px ${color.startsWith('#') ? `rgb(${hexToRgb(color)})` : color}`,
+    };
+  } else {
+    // React Native uses individual textShadow properties
+    return {
+      textShadowColor: color,
+      textShadowOffset: offset,
+      textShadowRadius: radius,
+    };
+  }
+};
+
+/**
+ * D&D Toolkit Theme System
+ * Centralized colors, spacing, and design tokens for consistent styling
+ */
+
 // Core D&D Theme Colors
 export const CoreColors = {
   // Primary colors - Browns for D&D fantasy theme
@@ -57,32 +122,16 @@ export const BorderRadius = {
 // Shadow system
 export const Shadows = {
   sm: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    ...createShadow('#000', { width: 0, height: 2 }, 0.1, 2, 2),
   },
   md: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
+    ...createShadow('#000', { width: 0, height: 4 }, 0.15, 4, 4),
   },
   lg: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 6,
+    ...createShadow('#000', { width: 0, height: 6 }, 0.2, 6, 6),
   },
   gold: {
-    shadowColor: CoreColors.secondary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+    ...createShadow(CoreColors.secondary, { width: 0, height: 2 }, 0.3, 4, 4),
   },
 };
 
@@ -90,14 +139,10 @@ export const Shadows = {
 export const Typography = {
   // Text shadows for better readability
   textShadow: {
-    textShadowColor: CoreColors.secondary,
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    ...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2),
   },
   textShadowDark: {
-    textShadowColor: '#000',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    ...createTextShadow('#000', { width: 2, height: 2 }, 4),
   },
 };
 
@@ -150,11 +195,7 @@ export const ComponentStyles = {
       ...Shadows.md,
     },
     default: {
-      shadowColor: CoreColors.backgroundDark,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.3,
-      shadowRadius: 4,
-      elevation: 4,
+      ...createShadow(CoreColors.backgroundDark, { width: 0, height: 2 }, 0.3, 4, 4),
       backgroundColor: CoreColors.backgroundLight,
       borderRadius: BorderRadius.sm,
       padding: Spacing.sm,

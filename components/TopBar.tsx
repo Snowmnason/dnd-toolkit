@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Platform, TouchableOpacity, View } from 'react-native';
+import { Platform, TouchableOpacity, View } from 'react-native';
 import { ComponentStyles, CoreColors } from '../constants/theme';
 import SettingsMenu from './SettingsMenu';
 import { ThemedText } from './themed-text';
@@ -31,30 +31,8 @@ export default function TopBar({
   };
 
   const handleHamburgerPress = () => {
-    if (Platform.OS === 'web') {
-      // Use custom modal for web
-      setShowSettingsMenu(true);
-    } else {
-      // Use native Alert for mobile
-      Alert.alert(
-        'Menu',
-        'Choose an option',
-        [
-          {
-            text: 'Account Settings',
-            onPress: () => router.push('/settings')
-          },
-          {
-            text: 'Return to World Selection',
-            onPress: () => router.replace('/select/world-selection')
-          },
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          }
-        ]
-      );
-    }
+    // Always use the beautiful custom modal instead of system alerts
+    setShowSettingsMenu(true);
   };
 
   // Show on all platforms now (not just mobile)
@@ -103,7 +81,7 @@ export default function TopBar({
         </View>
       </View>
 
-      {/* Cross-platform Settings Menu */}
+      {/* Beautiful Custom Settings Menu for All Platforms */}
       <SettingsMenu
         visible={showSettingsMenu}
         onClose={() => setShowSettingsMenu(false)}

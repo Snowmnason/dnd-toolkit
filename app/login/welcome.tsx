@@ -15,7 +15,7 @@ export default function WelcomeScreen() {
     try {
       // User wants to create account - save this preference
       await AuthStateManager.setHasAccount(true);
-      router.push('/login/login?action=signup');
+      router.push('/login/auth?action=signup');
     } catch (error) {
       console.error('Navigation error:', error);
       Alert.alert('Error', 'Unable to navigate to sign-up');
@@ -29,7 +29,7 @@ export default function WelcomeScreen() {
     try {
       // User wants to sign in - save this preference
       await AuthStateManager.setHasAccount(true);
-      router.push('/login/login?action=signin');
+      router.push('/login/auth?action=signin');
     } catch (error) {
       console.error('Navigation error:', error);
       Alert.alert('Error', 'Unable to navigate to sign-in');

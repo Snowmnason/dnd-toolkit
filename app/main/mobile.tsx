@@ -1,7 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Animated, TouchableOpacity, View } from 'react-native';
-import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
 
@@ -64,15 +63,7 @@ export default function MainScreenMobile() {
 
   return (
     <ThemedView>
-      <View style={{ height: '100%', width: '100%', paddingTop: 42, paddingHorizontal: 0,}}>
-       {/* Home Button */}
-      <PrimaryButton
-        style={{ position: 'absolute', top: 34, left: 16,  zIndex: 1 }}
-        textStyle={{}}
-        onPress={() => router.replace('/')}
-      >
-        Go Home
-      </PrimaryButton>
+      <View style={{ height: '100%', width: '100%', paddingTop: 0, paddingHorizontal: 0,}}>
       {panels.map((panel) => (
         <ExpandablePanel
           key={panel.key}
@@ -116,7 +107,7 @@ function ExpandablePanel({ title, items, expanded, onToggle, router }: Expandabl
 
   const height = animation.interpolate({
     inputRange: [0, 1],
-    outputRange: [160, 220], // collapsed vs expanded height
+    outputRange: [160, 280], // collapsed vs expanded height
   });
 
   return (
@@ -125,8 +116,10 @@ function ExpandablePanel({ title, items, expanded, onToggle, router }: Expandabl
         style={{
           height,
           margin: 0,
-          borderRadius: 0,
-          backgroundColor: '#e6d3a3',
+          borderRadius: 2,
+          backgroundColor: '#292928ff',
+          borderColor: '#6e6d6dff',
+          borderWidth: 1,
           justifyContent: 'center',
           alignItems: 'center',
         }}
@@ -143,11 +136,18 @@ function ExpandablePanel({ title, items, expanded, onToggle, router }: Expandabl
                   padding: 8,
                   marginBottom: 4,
                   borderRadius: 6,
-                  minWidth: 200,
+                  minWidth: 300,
                   alignItems: 'center'
                 }}
               >
-                <ThemedText>{item.name}</ThemedText>
+                <ThemedText 
+                  numberOfLines={1}
+                  style={{ 
+                    textAlign: 'center',
+                  }}
+                >
+                  {item.name}
+                </ThemedText>
               </TouchableOpacity>
             ))}
           </View>

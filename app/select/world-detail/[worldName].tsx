@@ -43,7 +43,7 @@ export default function WorldDetail() {
             style={{}}
             textStyle={{}}
             onPress={() => {
-              router.push('/main/mobile');
+              router.replace('/main/mobile');
             }}
           >
             Open

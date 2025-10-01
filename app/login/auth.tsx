@@ -2,6 +2,7 @@ import { CoreColors } from '@/constants/theme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Linking, Platform, View } from 'react-native';
+import CustomModal from '../../components/CustomModal';
 import CustomLoad from '../../components/custom_components/CustomLoad';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import TextInput from '../../components/custom_components/TextInput';
@@ -17,6 +18,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
   const [confirmationEmail, setConfirmationEmail] = useState('');
+  const [showEmailSentModal, setShowEmailSentModal] = useState(false);
   
   // Determine if we're in sign-up mode based on the passed parameter
   const isSignUp = action === 'signup';
@@ -133,7 +135,7 @@ export default function LoginScreen() {
       if (error) {
         Alert.alert('Error', error.message);
       } else {
-        Alert.alert('Email Sent', 'Check your inbox for the confirmation link');
+        setShowEmailSentModal(true);
       }
     } catch {
       Alert.alert('Error', 'Failed to resend email');
@@ -255,7 +257,7 @@ export default function LoginScreen() {
               <PrimaryButton
                 style={{ width: '100%', backgroundColor: '#4285F4', paddingVertical: 12, borderRadius: 8 }}
                 textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '500' }}
-                onPress={() => router.replace('/login/login?action=signin' as any)}
+                onPress={() => router.replace('/login/auth?action=signin' as any)}
               >
                 Already Confirmed? Sign In
               </PrimaryButton>
@@ -353,7 +355,7 @@ export default function LoginScreen() {
               <PrimaryButton
                 style={{ width: '100%', backgroundColor: 'rgba(139, 69, 19, 0.15)', borderWidth: 1, borderColor: '#8B4513', paddingVertical: 12, borderRadius: 8 }}
                 textStyle={{ color: '#F5E6D3', fontSize: 13, fontWeight: '500' }}
-                onPress={() => router.push(isSignUp ? '/login/login?action=signin' : '/login/login?action=signup')}
+                onPress={() => router.push(isSignUp ? '/login/auth?action=signin' : '/login/auth?action=signup')}
                 disabled={loading}
               >
                 {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
@@ -366,6 +368,21 @@ export default function LoginScreen() {
           </>
         )}
       </View>
+
+      {/* Email Sent Success Modal */}
+      <CustomModal
+        visible={showEmailSentModal}
+        onClose={() => setShowEmailSentModal(false)}
+        title="Email Sent! 📧"
+        message="Check your inbox for the confirmation link to complete your account setup."
+        buttons={[
+          {
+            text: 'Got it!',
+            onPress: () => setShowEmailSentModal(false),
+            style: 'primary'
+          }
+        ]}
+      />
     </View>
   );
 }

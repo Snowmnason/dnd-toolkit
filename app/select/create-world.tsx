@@ -1,13 +1,14 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Platform, ScrollView, Switch, View } from 'react-native';
+import CustomModal from '../../components/CustomModal';
 import Dropdown from '../../components/custom_components/Dropdown';
 import MapCanvas from '../../components/custom_components/MapCanvas'; // placeholder
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import TextInputComponent from '../../components/custom_components/TextInput';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
-import { ComponentStyles, CoreColors, Spacing } from '../../constants/theme';
+import { ComponentStyles, CoreColors, Spacing, createTextShadow } from '../../constants/theme';
 import { worldsDB } from '../../lib/database/worlds';
 import { supabase } from '../../lib/supabase';
 
@@ -20,6 +21,10 @@ export default function CreateWorldScreen() {
   const [description, setDescription] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [isUserLoggedIn, setIsUserLoggedIn] = useState<boolean | null>(null);
+  const [showSignInModal, setShowSignInModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successWorldName, setSuccessWorldName] = useState('');
+  const [showValidationModal, setShowValidationModal] = useState(false);
   const router = useRouter();
 
   const isDesktop =
@@ -42,26 +47,13 @@ export default function CreateWorldScreen() {
 
   const handleCreateWorld = async () => {
     if (!worldName.trim()) {
-      Alert.alert('Error', 'Please enter a world name');
+      setShowValidationModal(true);
       return;
     }
 
     // Check if user is logged in
     if (!isUserLoggedIn) {
-      Alert.alert(
-        'Sign In Required', 
-        'You need to sign in to create and save worlds. Would you like to sign in now?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          },
-          {
-            text: 'Sign In',
-            onPress: () => router.push('/login/welcome')
-          }
-        ]
-      );
+      setShowSignInModal(true);
       return;
     }
 
@@ -75,16 +67,8 @@ export default function CreateWorldScreen() {
         is_dm: isDM
       });
 
-      Alert.alert(
-        'Success!', 
-        `World "${newWorld.name}" created and saved to your account!`,
-        [
-          {
-            text: 'OK',
-            onPress: () => router.replace(isDesktop ? '/main/desktop' : '/main/mobile')
-          }
-        ]
-      );
+      setSuccessWorldName(newWorld.name);
+      setShowSuccessModal(true);
     } catch (error) {
       console.error('Create world error:', error);
       Alert.alert(
@@ -106,9 +90,7 @@ export default function CreateWorldScreen() {
               textAlign: 'center',
               fontWeight: '700',
               color: CoreColors.textPrimary,
-              textShadowColor: CoreColors.backgroundDark,
-              textShadowOffset: { width: 2, height: 2 },
-              textShadowRadius: 4
+              ...createTextShadow(CoreColors.backgroundDark, { width: 2, height: 2 }, 4)
             }}>
               Create New World
             </ThemedText>
@@ -118,9 +100,7 @@ export default function CreateWorldScreen() {
           <ThemedText style={{
             fontWeight: '600',
             fontSize: 16,
-            textShadowColor: CoreColors.secondary,
-            textShadowOffset: { width: 1, height: 1 },
-            textShadowRadius: 2,
+            ...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2),
             marginBottom: Spacing.xs
           }}>
             Name of World
@@ -141,9 +121,7 @@ export default function CreateWorldScreen() {
             <ThemedText style={{
               fontWeight: '600',
               fontSize: 16,
-              textShadowColor: CoreColors.secondary,
-              textShadowOffset: { width: 1, height: 1 },
-              textShadowRadius: 2
+              ...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2)
             }}>
               DM
             </ThemedText>
@@ -155,9 +133,7 @@ export default function CreateWorldScreen() {
             <ThemedText style={{
               fontWeight: '600',
               fontSize: 16,
-              textShadowColor: CoreColors.secondary,
-              textShadowOffset: { width: 1, height: 1 },
-              textShadowRadius: 2
+              ...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2)
             }}>
               Player
             </ThemedText>
@@ -167,9 +143,7 @@ export default function CreateWorldScreen() {
           <ThemedText style={{
             fontWeight: '600',
             fontSize: 16,
-            textShadowColor: CoreColors.secondary,
-            textShadowOffset: { width: 1, height: 1 },
-            textShadowRadius: 2,
+            ...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2),
             marginBottom: Spacing.xs
           }}>
             Tabletop System
@@ -185,9 +159,7 @@ export default function CreateWorldScreen() {
           <ThemedText style={{
             fontWeight: '600',
             fontSize: 16,
-            textShadowColor: CoreColors.secondary,
-            textShadowOffset: { width: 1, height: 1 },
-            textShadowRadius: 2,
+            ...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2),
             marginBottom: Spacing.xs
           }}>
             Description
@@ -224,7 +196,7 @@ export default function CreateWorldScreen() {
             <PrimaryButton 
               style={{}}
               textStyle={{}}
-              onPress={() => router.back()}
+              onPress={() => router.replace('/select/world-selection')}
             >
               Cancel
             </PrimaryButton>
@@ -263,6 +235,65 @@ export default function CreateWorldScreen() {
 
         </View>
       )}
+
+      {/* Sign In Required Modal */}
+      <CustomModal
+        visible={showSignInModal}
+        onClose={() => setShowSignInModal(false)}
+        title="Sign In Required"
+        message="You need to sign in to create and save worlds. Would you like to sign in now?"
+        buttons={[
+          {
+            text: 'Cancel',
+            onPress: () => setShowSignInModal(false),
+            style: 'cancel'
+          },
+          {
+            text: 'Sign In',
+            onPress: () => {
+              setShowSignInModal(false);
+              router.push('/login/welcome');
+            },
+            style: 'primary'
+          }
+        ]}
+      />
+
+      {/* Validation Modal */}
+      <CustomModal
+        visible={showValidationModal}
+        onClose={() => setShowValidationModal(false)}
+        title="World Name Required"
+        message="Please enter a name for your world before creating it."
+        buttons={[
+          {
+            text: 'Got it',
+            onPress: () => setShowValidationModal(false),
+            style: 'primary'
+          }
+        ]}
+      />
+
+      {/* Success Modal */}
+      <CustomModal
+        visible={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false);
+          router.replace(isDesktop ? '/main/desktop' : '/main/mobile');
+        }}
+        title="Success!"
+        message={`World "${successWorldName}" created and saved to your account!`}
+        buttons={[
+          {
+            text: 'Continue',
+            onPress: () => {
+              setShowSuccessModal(false);
+              router.replace(isDesktop ? '/main/desktop' : '/main/mobile');
+            },
+            style: 'primary'
+          }
+        ]}
+      />
     </ThemedView>
   );
 }

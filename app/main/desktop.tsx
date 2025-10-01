@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
+import { createShadow, createTextShadow } from '../../constants/theme';
 
 export default function MainScreenDesktop() {
   const router = useRouter();
@@ -114,17 +115,15 @@ const styles = StyleSheet.create({
   panelTitle: {
     marginBottom: 20,
     textAlign: 'center',
-    textShadowColor: '#D4AF37', 
-    textShadowOffset: { width: 1, height: 1 }, 
-    textShadowRadius: 2,
+    ...createTextShadow('#D4AF37', { width: 1, height: 1 }, 2),
   },
   featureButton: {
     marginBottom: 8,
     width: '90%',
     borderRadius: 8,
     borderColor: '#D4AF37',
-    shadowColor: '#D4AF37',
     borderWidth: 2,
+    ...createShadow('#D4AF37', { width: 0, height: 2 }, 0.3, 4, 4),
   },
   featureText: {
     textAlign: 'center',

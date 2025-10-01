@@ -2,6 +2,7 @@ import CustomLoad from '@/components/custom_components/CustomLoad';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
+import CustomModal from '../../components/CustomModal';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import TextInput from '../../components/custom_components/TextInput';
 import { ThemedText } from '../../components/themed-text';
@@ -13,6 +14,10 @@ export default function CompleteProfileScreen() {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [userEmail, setUserEmail] = useState('');
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [validationMessage, setValidationMessage] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showSkipModal, setShowSkipModal] = useState(false);
 
   // Get current user info on component mount
   useEffect(() => {
@@ -40,18 +45,21 @@ export default function CompleteProfileScreen() {
 
   const handleCompleteProfile = async () => {
     if (!username.trim()) {
-      Alert.alert('Username Required', 'Please enter a username to continue');
+      setValidationMessage('Please enter a username to continue');
+      setShowValidationModal(true);
       return;
     }
 
     // Basic username validation
     if (username.length < 3) {
-      Alert.alert('Username Too Short', 'Username must be at least 3 characters long');
+      setValidationMessage('Username must be at least 3 characters long');
+      setShowValidationModal(true);
       return;
     }
 
     if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-      Alert.alert('Invalid Username', 'Username can only contain letters, numbers, hyphens, and underscores');
+      setValidationMessage('Username can only contain letters, numbers, hyphens, and underscores');
+      setShowValidationModal(true);
       return;
     }
 
@@ -69,11 +77,7 @@ export default function CompleteProfileScreen() {
         Alert.alert('Update Error', error.message);
       } else {
         // Profile completed successfully
-        Alert.alert(
-          'Profile Complete!',
-          'Welcome to your D&D Toolkit adventure!',
-          [{ text: 'Continue', onPress: () => router.replace('/select/world-selection') }]
-        );
+        setShowSuccessModal(true);
       }
     } catch (error) {
       Alert.alert('Error', 'An unexpected error occurred');
@@ -83,16 +87,6 @@ export default function CompleteProfileScreen() {
     }
   };
 
-  const handleSkipForNow = () => {
-    Alert.alert(
-      'Skip Profile Setup?',
-      'You can always complete your profile later in settings. Continue without username?',
-      [
-        { text: 'Go Back', style: 'cancel' },
-        { text: 'Skip For Now', onPress: () => router.replace('/select/world-selection') }
-      ]
-    );
-  };
 
   return (
     <View style={{ flex: 1, backgroundColor: '#2f353d' }}>
@@ -172,16 +166,6 @@ export default function CompleteProfileScreen() {
               'Complete Profile'
             )}
           </PrimaryButton>
-
-          {/* Skip For Now Button */}
-          <PrimaryButton
-            style={{ width: '100%', backgroundColor: 'rgba(139, 69, 19, 0.15)', borderWidth: 1, borderColor: '#8B4513', paddingVertical: 12, borderRadius: 8 }}
-            textStyle={{ color: '#F5E6D3', fontSize: 14, fontWeight: '500' }}
-            onPress={handleSkipForNow}
-            disabled={loading}
-          >
-            Skip For Now
-          </PrimaryButton>
         </View>
 
         {/* Tips */}
@@ -192,6 +176,65 @@ export default function CompleteProfileScreen() {
             Your Username helps friends find you and keeps your adventures organized. You can also add your name if you want to avoid confusion in local games!
         </ThemedText>
       </View>
+
+      {/* Validation Modal */}
+      <CustomModal
+        visible={showValidationModal}
+        onClose={() => setShowValidationModal(false)}
+        title="Username Issue"
+        message={validationMessage}
+        buttons={[
+          {
+            text: 'Got it',
+            onPress: () => setShowValidationModal(false),
+            style: 'primary'
+          }
+        ]}
+      />
+
+      {/* Success Modal */}
+      <CustomModal
+        visible={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false);
+          router.replace('/select/world-selection');
+        }}
+        title="Profile Complete! 🎉"
+        message="Welcome to your D&D Toolkit adventure! Your profile has been set up successfully."
+        buttons={[
+          {
+            text: 'Continue',
+            onPress: () => {
+              setShowSuccessModal(false);
+              router.replace('/select/world-selection');
+            },
+            style: 'primary'
+          }
+        ]}
+      />
+
+      {/* Skip Confirmation Modal */}
+      <CustomModal
+        visible={showSkipModal}
+        onClose={() => setShowSkipModal(false)}
+        title="Skip Profile Setup?"
+        message="You can always complete your profile later in settings. Continue without username?"
+        buttons={[
+          {
+            text: 'Go Back',
+            onPress: () => setShowSkipModal(false),
+            style: 'cancel'
+          },
+          {
+            text: 'Skip For Now',
+            onPress: () => {
+              setShowSkipModal(false);
+              router.replace('/select/world-selection');
+            },
+            style: 'primary'
+          }
+        ]}
+      />
     </View>
   );
 }

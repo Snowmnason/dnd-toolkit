@@ -1,16 +1,8 @@
 import { Platform } from 'react-native';
 
-// ==========================================
-// 🔧 DEVELOPMENT CONTROLS - Change these during development:
-// ==========================================
-const DEV_ALWAYS_SHOW_WELCOME = false; // Set to TRUE to always show welcome screen during development
-const DEV_SKIP_STORAGE = false;         // Set to TRUE to bypass storage completely during development
-
 // Simple storage interface for cross-platform compatibility
 const storage = {
   async getItem(key: string): Promise<string | null> {
-    if (DEV_SKIP_STORAGE) return null; // 🔧 DEV: Bypass storage if flag is set
-    
     if (Platform.OS === 'web') {
       if (typeof window !== 'undefined' && window.localStorage) {
         return window.localStorage.getItem(key);
@@ -24,8 +16,6 @@ const storage = {
   },
 
   async setItem(key: string, value: string): Promise<void> {
-    if (DEV_SKIP_STORAGE) return; // 🔧 DEV: Bypass storage if flag is set
-    
     if (Platform.OS === 'web') {
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.setItem(key, value);
@@ -38,8 +28,6 @@ const storage = {
   },
 
   async removeItem(key: string): Promise<void> {
-    if (DEV_SKIP_STORAGE) return; // 🔧 DEV: Bypass storage if flag is set
-    
     if (Platform.OS === 'web') {
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.removeItem(key);
@@ -101,24 +89,25 @@ export const AuthStateManager = {
   // ==========================================
   async getRoutingDecision(): Promise<'welcome' | 'login' | 'profile' | 'main'> {
     try {
-      // 🔧 DEV BYPASS: Change DEV_ALWAYS_SHOW_WELCOME to true at the top of this file
-      // to always show the welcome screen during development
-      if (DEV_ALWAYS_SHOW_WELCOME) {
-        console.log('🔧 DEV: Forced to welcome screen');
-        return 'welcome';
-      }
-
       const authState = await this.getAuthState();
 
-      // If user has an account, check if they need to complete profile
+      // If user has an account, check if they're actually logged in
       if (authState.hasAccount) {
-        console.log('📱 User has account - checking profile completion');
+        console.log('📱 User has account - checking authentication status');
         
         // Import supabase dynamically to avoid circular dependency
         const { supabase } = await import('./supabase');
         const { data: { user } } = await supabase.auth.getUser();
         
-        if (user && !user.user_metadata?.username) {
+        // If no user exists (signed out), clear local state and go to welcome
+        if (!user) {
+          console.log('❌ No authenticated user found - clearing local state');
+          await this.clearAuthState();
+          return 'welcome';
+        }
+        
+        // User exists, check if they need to complete profile
+        if (!user.user_metadata?.username) {
           console.log('👤 User needs to complete profile');
           return 'profile';
         }

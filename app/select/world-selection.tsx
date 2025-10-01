@@ -4,7 +4,7 @@ import { Image, ScrollView, TouchableOpacity, View, useWindowDimensions } from '
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
-import { ComponentStyles, CoreColors, Spacing } from '../../constants/theme';
+import { ComponentStyles, CoreColors, Spacing, createTextShadow } from '../../constants/theme';
 
 export default function LandingPage() {
   const [selectedWorld, setSelectedWorld] = useState<string | null>(null);
@@ -17,16 +17,14 @@ export default function LandingPage() {
   // Mobile: Simple list view (detail handled by TopBar back button naturally)
   if (!isDesktop) {
     return (
-      <ThemedView style={{ flex: 1, paddingTop: 52, paddingHorizontal: Spacing.md }}>
+      <ThemedView style={{ flex: 1, paddingTop: 12, paddingHorizontal: Spacing.md }}>
         <View style={ComponentStyles.card.container}>
           <ThemedText type="title" style={{
             textAlign: 'center',
             fontWeight: '700',
             fontSize: 58,
             color: CoreColors.textPrimary,
-            textShadowColor: CoreColors.backgroundDark,
-            textShadowOffset: { width: 2, height: 2 },
-            textShadowRadius: 4
+            ...createTextShadow(CoreColors.backgroundDark, { width: 2, height: 2 }, 4)
           }}>
             Worlds
           </ThemedText>
@@ -39,7 +37,7 @@ export default function LandingPage() {
               style={ComponentStyles.card.base}
               onPress={() => router.push('/select/world-detail/' + encodeURIComponent(worldName) as any)}
             >
-              <ThemedText>{worldName}</ThemedText>
+              <ThemedText numberOfLines={1} style={{ textAlign: 'center', fontSize: 20 }}>{worldName}</ThemedText>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -79,9 +77,7 @@ export default function LandingPage() {
             textAlign: 'center',
             color: CoreColors.textPrimary,
             fontWeight: '700',
-            textShadowColor: CoreColors.backgroundDark,
-            textShadowOffset: { width: 1, height: 1 },
-            textShadowRadius: 2
+            ...createTextShadow(CoreColors.backgroundDark, { width: 1, height: 1 }, 2)
           }}>
             Worlds
           </ThemedText>

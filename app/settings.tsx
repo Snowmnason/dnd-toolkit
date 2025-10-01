@@ -15,6 +15,8 @@ export default function SettingsPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [signingOut, setSigningOut] = useState(false);
+  const [buttonDisabled, setButtonDisabled] = useState(false);
 
   useEffect(() => {
     // Get current user
@@ -31,31 +33,32 @@ export default function SettingsPage() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleSignOut = async () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel'
-        },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await supabase.auth.signOut();
-              await AuthStateManager.clearAuthState();
-              router.replace('/login/welcome');
-            } catch (error) {
-              console.error('Sign out error:', error);
-              Alert.alert('Error', 'Failed to sign out. Please try again.');
-            }
-          }
-        }
-      ]
-    );
+  const handleSignOutConfirm = async () => {
+    if (buttonDisabled) return; // Prevent spam clicking
+    
+    if (!signingOut) {
+      // First click - show confirmation state
+      setSigningOut(true);
+      setButtonDisabled(true);
+      
+      // Re-enable button after 2 seconds
+      setTimeout(() => {
+        setButtonDisabled(false);
+      }, 2000);
+    } else {
+      // Second click - actually sign out
+      setButtonDisabled(true);
+      try {
+        await supabase.auth.signOut();
+        await AuthStateManager.clearAuthState();
+        router.replace('/login/welcome');
+      } catch (error) {
+        console.error('Sign out error:', error);
+        Alert.alert('Error', 'Failed to sign out. Please try again.');
+        setSigningOut(false);
+        setButtonDisabled(false);
+      }
+    }
   };
 
   if (loading) {
@@ -82,20 +85,7 @@ export default function SettingsPage() {
           paddingBottom: Spacing.xl * 2 
         }}
       >
-        {/* Page Title */}
-        <View style={ComponentStyles.card.container}>
-          <ThemedText type="title" style={{
-            textAlign: 'center',
-            fontSize: 48,
-            fontWeight: '700',
-            color: CoreColors.textPrimary,
-            textShadowColor: CoreColors.backgroundDark,
-            textShadowOffset: { width: 2, height: 2 },
-            textShadowRadius: 4
-          }}>
-            Settings
-          </ThemedText>
-        </View>
+
 
         {/* User Profile Section */}
         <UserProfile user={user} />
@@ -131,33 +121,23 @@ export default function SettingsPage() {
           gap: Spacing.md,
           alignItems: 'center'
         }}>
-          {/* Back Button */}
-          <PrimaryButton
-            style={{
-              paddingHorizontal: Spacing.xl,
-              minWidth: 200
-            }}
-            textStyle={{}}
-            onPress={() => router.back()}
-          >
-            ← Return
-          </PrimaryButton>
-
           {/* Sign Out Button */}
           <PrimaryButton
             style={{
-              backgroundColor: '#dc3545',
+              backgroundColor: buttonDisabled ? '#6c757d' : '#dc3545',
               paddingHorizontal: Spacing.xl,
               minWidth: 200,
-              borderColor: '#c82333'
+              borderColor: buttonDisabled ? '#6c757d' : '#c82333',
+              opacity: buttonDisabled ? 0.6 : 1
             }}
             textStyle={{ 
               color: CoreColors.textPrimary,
               fontWeight: '600'
             }}
-            onPress={handleSignOut}
+            onPress={handleSignOutConfirm}
+            disabled={buttonDisabled}
           >
-            Sign Out
+            {signingOut ? 'Confirm Sign Out' : 'Sign Out'}
           </PrimaryButton>
         </View>
       </ScrollView>
