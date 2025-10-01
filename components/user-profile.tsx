@@ -186,7 +186,7 @@ export default function UserProfile({ user }: UserProfileProps) {
           </View>
         )}
         
-        {/* Username Field */}
+        {/* Username Field - TODO: Fetch from database instead of metadata 
         {user.user_metadata?.username && (
           <View style={{ marginBottom: Spacing.sm }}>
             <ThemedText type="defaultSemiBold" style={{
@@ -205,6 +205,7 @@ export default function UserProfile({ user }: UserProfileProps) {
             </ThemedText>
           </View>
         )}
+        */}
       </View>
 
       {/* Delete Account Section */}

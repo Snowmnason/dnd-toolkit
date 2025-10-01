@@ -1,7 +1,8 @@
 import CustomLoad from '@/components/custom_components/CustomLoad';
+import { usersDB } from '@/lib/database/users';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Animated, View } from 'react-native';
 import CustomModal from '../../components/CustomModal';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import TextInput from '../../components/custom_components/TextInput';
@@ -11,13 +12,67 @@ import { supabase } from '../../lib/supabase';
 export default function CompleteProfileScreen() {
   const router = useRouter();
   const [username, setUsername] = useState('');
-  const [fullName, setFullName] = useState('');
+  const [firstName, setFirstName] = useState('');
   const [loading, setLoading] = useState(false);
   const [userEmail, setUserEmail] = useState('');
-  const [showValidationModal, setShowValidationModal] = useState(false);
-  const [validationMessage, setValidationMessage] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showSkipModal, setShowSkipModal] = useState(false);
+  const [validationError, setValidationError] = useState('');
+  
+  // Animation for validation feedback
+  const shakeAnimation = useRef(new Animated.Value(0)).current;
+  
+  const triggerShake = () => {
+    Animated.sequence([
+      Animated.timing(shakeAnimation, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: -10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: 0, duration: 50, useNativeDriver: true }),
+    ]).start();
+  };
+
+  // ⚡ Real-time validation functions - same pattern as login screens
+  const validateUsername = (value: string) => {
+    if (!value.trim()) {
+      return { isValid: false, message: 'Username required', color: '#6c757d' };
+    }
+    if (value.length < 3) {
+      return { isValid: false, message: 'Username too short', color: '#dc3545' };
+    }
+    if (value.length > 20) {
+      return { isValid: false, message: 'Username too long', color: '#dc3545' };
+    }
+    if (!/^[a-zA-Z0-9]+$/.test(value)) {
+      return { isValid: false, message: 'Letters and numbers only', color: '#dc3545' };
+    }
+    return { isValid: true, message: 'Username looks good!', color: '#28a745' };
+  };
+
+  const validateFirstName = (value: string) => {
+    // First name is optional
+    if (!value.trim()) {
+      return { isValid: true, message: 'Optional field', color: '#6c757d' };
+    }
+    if (value.length > 30) {
+      return { isValid: false, message: 'Name too long', color: '#dc3545' };
+    }
+    if (!/^[a-zA-Z0-9\s]+$/.test(value)) {
+      return { isValid: false, message: 'Letters, numbers, and spaces only', color: '#dc3545' };
+    }
+    return { isValid: true, message: 'Name looks good!', color: '#28a745' };
+  };
+
+  // Helper functions for hint colors
+  const getUsernameHintColor = () => {
+    if (!username) return '#F5E6D3';
+    const validation = validateUsername(username);
+    return validation.isValid ? '#A3D4A0' : '#F5A5A5';
+  };
+
+  const getFirstNameHintColor = () => {
+    if (!firstName) return '#F5E6D3';
+    const validation = validateFirstName(firstName);
+    return validation.isValid ? '#A3D4A0' : '#F5A5A5';
+  };
 
   // Get current user info on component mount
   useEffect(() => {
@@ -26,9 +81,9 @@ export default function CompleteProfileScreen() {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           setUserEmail(user.email || '');
-          // Pre-fill full name if available from OAuth
+          // Pre-fill first name if available from OAuth
           if (user.user_metadata?.full_name) {
-            setFullName(user.user_metadata.full_name);
+            setFirstName(user.user_metadata.full_name.split(' ')[0] || '');
           }
         } else {
           // No user found, redirect to login
@@ -44,44 +99,49 @@ export default function CompleteProfileScreen() {
   }, [router]);
 
   const handleCompleteProfile = async () => {
-    if (!username.trim()) {
-      setValidationMessage('Please enter a username to continue');
-      setShowValidationModal(true);
+    const usernameValidation = validateUsername(username);
+    const firstNameValidation = validateFirstName(firstName);
+    
+    // Don't submit if validations fail - show user feedback
+    if (!usernameValidation.isValid || !firstNameValidation.isValid) {
+      triggerShake();
+      if (!usernameValidation.isValid) {
+        setValidationError(`Username issue: ${usernameValidation.message}`);
+      } else if (!firstNameValidation.isValid) {
+        setValidationError(`Name issue: ${firstNameValidation.message}`);
+      }
       return;
     }
-
-    // Basic username validation
-    if (username.length < 3) {
-      setValidationMessage('Username must be at least 3 characters long');
-      setShowValidationModal(true);
-      return;
-    }
-
-    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-      setValidationMessage('Username can only contain letters, numbers, hyphens, and underscores');
-      setShowValidationModal(true);
-      return;
-    }
+    
+    // Clear any validation errors if we get here
+    setValidationError('');
 
     setLoading(true);
     try {
-      // Update user metadata with username and full name
-      const { error } = await supabase.auth.updateUser({
+      // Create user profile in our custom table
+      await usersDB.create({
+        auth_id: (await supabase.auth.getUser()).data.user?.id || '',
+        username: username.trim(),
+        display_name: firstName.trim() || undefined,
+      });
+
+      // Mark profile as complete by setting role
+      const { error: roleError } = await supabase.auth.updateUser({
         data: {
-          username: username.trim(),
-          full_name: fullName.trim() || undefined,
+          role: 'complete'
         }
       });
 
-      if (error) {
-        Alert.alert('Update Error', error.message);
-      } else {
-        // Profile completed successfully
-        setShowSuccessModal(true);
+      if (roleError) {
+        Alert.alert('Update Error', roleError.message);
+        return;
       }
+
+      // Profile completed successfully
+      setShowSuccessModal(true);
     } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred');
-      console.error('Profile update error:', error);
+      Alert.alert('Error', 'An unexpected error occurred while creating your profile');
+      console.error('Profile creation error:', error);
     } finally {
       setLoading(false);
     }
@@ -129,25 +189,116 @@ export default function CompleteProfileScreen() {
         </ThemedText>
 
         {/* ==========================================
-            📝 PROFILE FORM - Cross-platform
+            📝 PROFILE FORM - Cross-platform with shake animation
             Future: Add profile picture, bio, etc.
             ========================================== */}
-        <View style={{ width: '100%', maxWidth: 300, marginBottom: 30, backgroundColor: 'transparent' }}>
+        <Animated.View 
+          style={{ 
+            width: '100%', 
+            maxWidth: 300, 
+            marginBottom: 30, 
+            backgroundColor: 'transparent',
+            transform: [{ translateX: shakeAnimation }]
+          }}
+        >
           <TextInput
             placeholder="Username (required)"
             value={username}
-            onChangeText={setUsername}
+            onChangeText={(text: string) => {
+              setUsername(text);
+              if (validationError) setValidationError('');
+            }}
             autoCapitalize="none"
-            style={{ marginBottom: 16 }}
+            style={{ 
+              marginBottom: 8,
+              borderColor: !validateUsername(username).isValid && username.length > 0 ? '#dc3545' : undefined,
+              borderWidth: !validateUsername(username).isValid && username.length > 0 ? 2 : undefined
+            }}
           />
           
+          {/* Username Validation Hint */}
+          {username.length > 0 && (
+            <View style={{ marginBottom: 16 }}>
+              <ThemedText 
+                style={{ 
+                  textAlign: 'left', 
+                  fontSize: 11, 
+                  color: getUsernameHintColor(), 
+                  fontWeight: '500', 
+                  lineHeight: 16,
+                  opacity: 0.9
+                }}
+              >
+                {(() => {
+                  const validation = validateUsername(username);
+                  if (validation.isValid) {
+                    return `Welcome aboard, ${username.trim()}!`;
+                  } else {
+                    return validation.message;
+                  }
+                })()}
+              </ThemedText>
+            </View>
+          )}
+          
           <TextInput
-            placeholder="Full Name (optional)"
-            value={fullName}
-            onChangeText={setFullName}
-            style={{ marginBottom: 16 }}
+            placeholder="First Name (optional)"
+            value={firstName}
+            onChangeText={(text: string) => {
+              setFirstName(text);
+              if (validationError) setValidationError('');
+            }}
+            style={{ 
+              marginBottom: 8,
+              borderColor: !validateFirstName(firstName).isValid && firstName.length > 0 ? '#dc3545' : undefined,
+              borderWidth: !validateFirstName(firstName).isValid && firstName.length > 0 ? 2 : undefined
+            }}
           />
-        </View>
+          
+          {/* First Name Validation Hint */}
+          {firstName.length > 0 && (
+            <View style={{ marginBottom: 16 }}>
+              <ThemedText 
+                style={{ 
+                  textAlign: 'left', 
+                  fontSize: 11, 
+                  color: getFirstNameHintColor(), 
+                  fontWeight: '500', 
+                  lineHeight: 16,
+                  opacity: 0.9
+                }}
+              >
+                {(() => {
+                  const validation = validateFirstName(firstName);
+                  if (validation.isValid) {
+                    return `Hello, ${firstName.trim()}!`;
+                  } else {
+                    return validation.message;
+                  }
+                })()}
+              </ThemedText>
+            </View>
+          )}
+        </Animated.View>
+
+        {/* Validation Error Display */}
+        {validationError ? (
+          <View style={{ width: '100%', maxWidth: 300, marginBottom: 15, backgroundColor: 'transparent' }}>
+            <ThemedText style={{ 
+              textAlign: 'center', 
+              fontSize: 14, 
+              color: '#dc3545', 
+              backgroundColor: 'rgba(220, 53, 69, 0.1)',
+              paddingVertical: 8,
+              paddingHorizontal: 12,
+              borderRadius: 6,
+              borderWidth: 1,
+              borderColor: 'rgba(220, 53, 69, 0.3)'
+            }}>
+              {validationError}
+            </ThemedText>
+          </View>
+        ) : null}
 
         {/* ==========================================
             🔘 ACTION BUTTONS - Same styling as login
@@ -155,10 +306,24 @@ export default function CompleteProfileScreen() {
         <View style={{ width: '100%', maxWidth: 300, gap: 16, backgroundColor: 'transparent' }}>
           {/* Complete Profile Button */}
           <PrimaryButton
-            style={{ width: '100%', backgroundColor: '#8B4513', paddingVertical: 16, borderRadius: 8 }}
+            style={{ 
+              width: '100%', 
+              backgroundColor: (() => {
+                const usernameValid = validateUsername(username).isValid;
+                const firstNameValid = validateFirstName(firstName).isValid;
+                return (loading || !usernameValid || !firstNameValid) ? '#6c757d' : '#8B4513';
+              })(),
+              paddingVertical: 16, 
+              borderRadius: 8,
+              opacity: (() => {
+                const usernameValid = validateUsername(username).isValid;
+                const firstNameValid = validateFirstName(firstName).isValid;
+                return (loading || !usernameValid || !firstNameValid) ? 0.6 : 1;
+              })()
+            }}
             textStyle={{ color: '#F5E6D3', fontSize: 16, fontWeight: '600' }}
             onPress={handleCompleteProfile}
-            disabled={loading}
+            disabled={loading || !validateUsername(username).isValid || !validateFirstName(firstName).isValid}
           >
             {loading ? (
               <CustomLoad size="small" />
@@ -170,27 +335,12 @@ export default function CompleteProfileScreen() {
 
         {/* Tips */}
         <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
-          Username must be 3+ characters and can contain letters, numbers, hyphens, and underscores
+          Username: 3-20 characters, letters and numbers only
         </ThemedText>
-        <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
-            Your Username helps friends find you and keeps your adventures organized. You can also add your name if you want to avoid confusion in local games!
+        <ThemedText style={{ marginTop: 10, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
+            Your Username helps friends find you and keeps your adventures organized. First name is optional for local games!
         </ThemedText>
       </View>
-
-      {/* Validation Modal */}
-      <CustomModal
-        visible={showValidationModal}
-        onClose={() => setShowValidationModal(false)}
-        title="Username Issue"
-        message={validationMessage}
-        buttons={[
-          {
-            text: 'Got it',
-            onPress: () => setShowValidationModal(false),
-            style: 'primary'
-          }
-        ]}
-      />
 
       {/* Success Modal */}
       <CustomModal
@@ -206,29 +356,6 @@ export default function CompleteProfileScreen() {
             text: 'Continue',
             onPress: () => {
               setShowSuccessModal(false);
-              router.replace('/select/world-selection');
-            },
-            style: 'primary'
-          }
-        ]}
-      />
-
-      {/* Skip Confirmation Modal */}
-      <CustomModal
-        visible={showSkipModal}
-        onClose={() => setShowSkipModal(false)}
-        title="Skip Profile Setup?"
-        message="You can always complete your profile later in settings. Continue without username?"
-        buttons={[
-          {
-            text: 'Go Back',
-            onPress: () => setShowSkipModal(false),
-            style: 'cancel'
-          },
-          {
-            text: 'Skip For Now',
-            onPress: () => {
-              setShowSkipModal(false);
               router.replace('/select/world-selection');
             },
             style: 'primary'

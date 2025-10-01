@@ -1,58 +1,75 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, View } from 'react-native';
+import AuthButton from '../../components/custom_components/auth_components/AuthButton';
 import CustomLoad from '../../components/custom_components/CustomLoad';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../components/themed-text';
 import { AuthStateManager } from '../../lib/auth-state';
 import { supabase } from '../../lib/supabase';
 
+// TODO: Uncomment when ready to enable social authentication
+// import AppleSignInButton from '../../components/social-auth-buttons/apple/apple-sign-in-button';
+// import GoogleSignInButton from '../../components/social-auth-buttons/google/google-sign-in-button';
+
 export default function WelcomeScreen() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(false);
 
-  const handleSocialAuth = async (provider: 'google' | 'apple') => {
-    setIsLoading(true);
+  const handleSignIn = async () => {
+    setIsCheckingSession(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: provider,
-      });
-
-      if (error) {
-        Alert.alert('Authentication Error', error.message);
-      } else {
-        // Save successful authentication state
+      // First, check if user already has valid session
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (session && !error) {
+        console.log('Valid session found, auto-signing in');
         await AuthStateManager.setHasAccount(true);
-        // Note: OAuth will redirect away, username check will happen on return
-        // The profile completion will be handled by the auth state management
+        
+        // Check if profile is complete
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.role !== 'complete') {
+          router.replace('/login/complete-profile');
+        } else {
+          router.replace('/select/world-selection');
+        }
+        return;
       }
+      
+      // No valid session, go to sign-in screen
+      console.log('No valid session, redirecting to sign-in');
+      router.push('/login/sign-in');
+      
     } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred');
-      console.error('Social auth error:', error);
+      console.error('Session check error:', error);
+      // On error, just go to sign-in screen
+      router.push('/login/sign-in');
     } finally {
-      setIsLoading(false);
+      setIsCheckingSession(false);
     }
   };
 
-  const handleContinueWithEmail = async () => {
+  const handleSignUp = async () => {
     setIsLoading(true);
     try {
-      // User wants to use email - save this preference and go to auth screen
       await AuthStateManager.setHasAccount(true);
-      router.push('/login/auth?action=signin');
+      router.push('/login/sign-up');
     } catch (error) {
       console.error('Navigation error:', error);
-      Alert.alert('Error', 'Unable to navigate to email sign-in');
+      Alert.alert('Error', 'Unable to navigate to sign-up');
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (isLoading) {
+  if (isLoading || isCheckingSession) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: "#2f353d" }}>
         <CustomLoad size="large"/>
-        <ThemedText style={{ marginTop: 16, color: '#F5E6D3' }}>Loading...</ThemedText>
+        <ThemedText style={{ marginTop: 16, color: '#F5E6D3' }}>
+          {isCheckingSession ? 'Checking your session...' : 'Loading...'}
+        </ThemedText>
       </View>
     );
   }
@@ -92,87 +109,58 @@ export default function WelcomeScreen() {
           </ThemedText>
         </View>
 
-        {/* Social Auth Buttons - Primary Options */}
-        <View style={{ width: '100%', maxWidth: 300, backgroundColor: 'transparent', marginBottom: 24 }}>
+        {/* Authentication Options */}
+        <View style={{ width: '100%', maxWidth: 300, gap: 16, backgroundColor: 'transparent', marginBottom: 24 }}>
           
-          {/* Social Auth Row */}
-          <View style={{ flexDirection: 'row', gap: 12, width: '100%', marginBottom: 0 }}>
-            <PrimaryButton
-              style={{ 
-                flex: 1, 
-                backgroundColor: '#000', 
-                paddingVertical: 16, 
-                borderRadius: 8, 
-                flexDirection: 'row', 
-                alignItems: 'center', 
-                justifyContent: 'center' 
-              }}
-              textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
-              onPress={() => handleSocialAuth('apple')}
-              disabled={isLoading}
-            >
-              🍎 Apple
-            </PrimaryButton>
+          {/* 
+            TODO: Social Auth Buttons - Uncomment when ready to enable
             
-            <PrimaryButton
-              style={{ 
-                flex: 1, 
-                backgroundColor: '#4285F4', 
-                paddingVertical: 16, 
-                borderRadius: 8, 
-                flexDirection: 'row', 
-                alignItems: 'center', 
-                justifyContent: 'center' 
-              }}
-              textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
-              onPress={() => handleSocialAuth('google')}
-              disabled={isLoading}
-            >
-              🔵 Google
-            </PrimaryButton>
-          </View>
+            Social Auth Row - Both buttons side by side:
+            <View style={{ flexDirection: 'row', gap: 12, width: '100%', marginBottom: 16 }}>
+              <AppleSignInButton
+                style={{ flex: 1 }}
+                disabled={isLoading || isCheckingSession}
+              />
+              <GoogleSignInButton
+                style={{ flex: 1 }}
+                disabled={isLoading || isCheckingSession}
+              />
+            </View>
 
-          {/* Divider */}
-          <View style={{ 
-            flexDirection: 'row', 
-            alignItems: 'center', 
-            marginVertical: 20 
-          }}>
-            <View style={{ 
-              flex: 1, 
-              height: 1, 
-              backgroundColor: 'rgba(245, 230, 211, 0.3)' 
-            }} />
-            <ThemedText style={{ 
-              marginHorizontal: 16, 
-              color: '#F5E6D3', 
-              opacity: 0.6, 
-              fontSize: 12 
-            }}>
-              or
-            </ThemedText>
-            <View style={{ 
-              flex: 1, 
-              height: 1, 
-              backgroundColor: 'rgba(245, 230, 211, 0.3)' 
-            }} />
-          </View>
+            Add divider between social and email auth when enabled:
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 16 }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(245, 230, 211, 0.3)' }} />
+              <ThemedText style={{ marginHorizontal: 16, color: '#F5E6D3', opacity: 0.6, fontSize: 12 }}>or</ThemedText>
+              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(245, 230, 211, 0.3)' }} />
+            </View>
+
+            Don't forget to uncomment the imports at the top!
+          */}
           
-          {/* Email Option */}
+          {/* Sign In Button - with intelligent session checking */}
+          <AuthButton
+            title="Sign In"
+            onPress={handleSignIn}
+            disabled={isLoading || isCheckingSession}
+            loading={isCheckingSession}
+          />
+
+          {/* Sign Up Button - matching secondary style from sign-in screen */}
           <PrimaryButton
-            onPress={handleContinueWithEmail}
             style={{ 
               width: '100%', 
               backgroundColor: 'rgba(139, 69, 19, 0.15)', 
               borderWidth: 1, 
               borderColor: '#8B4513', 
               paddingVertical: 16, 
-              borderRadius: 8 
+              borderRadius: 8,
+              opacity: (isLoading || isCheckingSession) ? 0.5 : 1
             }}
             textStyle={{ color: '#F5E6D3', fontSize: 16, fontWeight: '600' }}
-            disabled={isLoading}
+            onPress={handleSignUp}
+            disabled={isLoading || isCheckingSession}
           >
-            Continue with Email
+            Create Account
           </PrimaryButton>
           
         </View>

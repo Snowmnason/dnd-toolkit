@@ -99,8 +99,8 @@ export const AuthStateManager = {
       const { supabase } = await import('./supabase');
       const { data: { user } } = await supabase.auth.getUser();
       
-      // User must exist and have a username to be considered fully authenticated
-      return !!(user && user.user_metadata?.username);
+      // User must exist and have completed profile setup (role = 'complete')
+      return !!(user && user.role === 'complete');
     } catch (error) {
       console.error('Error checking authentication:', error);
       return false;
@@ -130,7 +130,7 @@ export const AuthStateManager = {
         }
         
         // User exists, check if they need to complete profile
-        if (!user.user_metadata?.username) {
+        if (user.role !== 'complete') {
           console.log('👤 User needs to complete profile');
           return 'profile';
         }
