@@ -41,11 +41,34 @@ export interface CreateWorldData {
 export const worldsDB = {
   // Create a new world
   async create(worldData: CreateWorldData): Promise<World> {
+    // Get current user's auth ID for lookup
+    const { data: { user } } = await supabase.auth.getUser();
+    console.log('Auth user:', user); // DEBUG
+    if (!user) throw new Error('Not authenticated');
+
+    // Get the user's profile ID (this is what owner_id should reference)
+    const { data: currentUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('auth_id', user.id)
+      .single();
+
+    if (!currentUser) throw new Error('User profile not found');
+
+    // Store profile ID as owner_id (proper FK relationship)
+    const insertData = {
+      ...worldData,
+      owner_id: currentUser.id // This is the profile ID: 797cefa7-6640-40a7-ba7a-91eee369faa3
+    };
+    console.log('Insert data:', insertData); // DEBUG
+
     const { data, error } = await supabase
       .from('worlds')
-      .insert(worldData)
+      .insert(insertData)
       .select()
       .single();
+    
+    console.log('Insert result:', { data, error }); // DEBUG
     
     if (error) {
       console.error('Error creating world:', error);
@@ -69,38 +92,42 @@ export const worldsDB = {
 
     if (!currentUser) throw new Error('User profile not found');
 
-    // Get owned worlds
-    const { data: ownedWorlds, error: ownedError } = await supabase
-      .from('worlds')
-      .select('*')
-      .eq('owner_id', currentUser.id)
-      .order('created_at', { ascending: false });
+    // OPTIMIZED: Get both owned worlds and accessible worlds in parallel
+    const [ownedWorldsResult, accessWorldsResult] = await Promise.all([
+      // Get owned worlds (uses idx_worlds_owner_id index) - owner_id stores profile ID
+      supabase
+        .from('worlds')
+        .select('*')
+        .eq('owner_id', currentUser.id)
+        .order('created_at', { ascending: false }),
+      
+      // Get worlds where user has access (uses idx_world_access_user_id + idx_world_access_user_created index)
+      supabase
+        .from('world_access')
+        .select(`
+          *,
+          worlds(*)
+        `)
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false })
+    ]);
 
-    if (ownedError) {
-      console.error('Error fetching owned worlds:', ownedError);
-      throw new Error(ownedError.message || 'Failed to fetch owned worlds');
+    // Handle errors from parallel queries
+    if (ownedWorldsResult.error) {
+      console.error('Error fetching owned worlds:', ownedWorldsResult.error);
+      throw new Error(ownedWorldsResult.error.message || 'Failed to fetch owned worlds');
     }
 
-    // Get worlds where user has access
-    const { data: accessWorlds, error: accessError } = await supabase
-      .from('world_access')
-      .select(`
-        *,
-        worlds(*)
-      `)
-      .eq('user_id', currentUser.id)
-      .order('created_at', { ascending: false });
-
-    if (accessError) {
-      console.error('Error fetching accessible worlds:', accessError);
-      throw new Error(accessError.message || 'Failed to fetch accessible worlds');
+    if (accessWorldsResult.error) {
+      console.error('Error fetching accessible worlds:', accessWorldsResult.error);
+      throw new Error(accessWorldsResult.error.message || 'Failed to fetch accessible worlds');
     }
 
     // Combine and format results
     const allWorlds: WorldWithAccess[] = [];
 
     // Add owned worlds
-    (ownedWorlds || []).forEach(world => {
+    (ownedWorldsResult.data || []).forEach(world => {
       allWorlds.push({
         ...world,
         user_role: 'owner'
@@ -108,7 +135,7 @@ export const worldsDB = {
     });
 
     // Add accessible worlds (where user is not owner)
-    (accessWorlds || []).forEach(access => {
+    (accessWorldsResult.data || []).forEach(access => {
       if (access.worlds && access.worlds.owner_id !== currentUser.id) {
         allWorlds.push({
           ...access.worlds,
@@ -118,7 +145,7 @@ export const worldsDB = {
       }
     });
 
-    // Sort by created_at (most recent first)
+    // Sort by created_at (most recent first) - much faster now with pre-sorted data from database
     allWorlds.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     return allWorlds;
@@ -182,6 +209,7 @@ export const worldsDB = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
+    // Get user profile ID
     const { data: currentUser } = await supabase
       .from('users')
       .select('id')
@@ -190,6 +218,7 @@ export const worldsDB = {
 
     if (!currentUser) throw new Error('User profile not found');
 
+    // owner_id stores profile ID
     const { data, error } = await supabase
       .from('worlds')
       .select('*')

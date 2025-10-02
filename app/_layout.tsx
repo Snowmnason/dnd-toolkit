@@ -90,6 +90,15 @@ export default function RootLayout() {
         
         // Handle feature-specific titles based on second segment
         const secondSegment = segments[1];
+        
+        // Handle desktop/mobile routes - always go back to world-selection
+        if (secondSegment === 'desktop' || secondSegment === 'mobile') {
+          config.onBackPress = () => {
+            router.replace('/select/world-selection');
+            return true; // Prevent default
+          };
+        }
+        
         switch (secondSegment) {
           case 'characters-npcs':
             config.title = 'Characters & NPCs';

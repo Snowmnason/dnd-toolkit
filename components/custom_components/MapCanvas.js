@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import IconButton from './IconButton';
 
-export default function MapCanvas() {
+export default function MapCanvas({ onPress, imageImported = false, imageUrl }) {
   const [selected, setSelected] = useState(null);
 
   const buttons = [
@@ -14,7 +14,21 @@ export default function MapCanvas() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#222', position: 'relative' }}>
+      <IconButton 
+        icon="❌"
+        onPress={() => onPress()}
+        style={{
+          position: 'absolute',
+          top: 16,
+          left: 16,
+          backgroundColor: '#333',
+          borderRadius: 12,
+          padding: 8,
+          zIndex: 5,
+        }}
+      />
       {/* Canvas area */}
+      {imageImported === false ? (
       <View
         style={{
           flex: 1,
@@ -24,6 +38,18 @@ export default function MapCanvas() {
       >
         <Text style={{ color: '#888' }}>[Map Canvas Area]</Text>
       </View>
+      ) : (
+        <Image 
+          source={{ uri: imageUrl }}
+          style={{
+            flex: 1,
+            margin: 16,
+            borderRadius: 8,
+            backgroundColor: '#f0f0f0'
+          }}
+          resizeMode="cover"
+        />
+      )}
 
       {/* Bottom toolbar */}
       <View
