@@ -1,18 +1,12 @@
-import { CoreColors } from '@/constants/theme';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
 import { View } from 'react-native';
 import AuthButton from '../../components/custom_components/auth_components/AuthButton';
-import AuthError from '../../components/custom_components/auth_components/AuthError';
 import AuthInput from '../../components/custom_components/auth_components/AuthInput';
-import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../components/themed-text';
 import { useSignInForm } from '../../lib/auth';
-import { supabase } from '../../lib/supabase';
 
 export default function SignInScreen() {
   const router = useRouter();
-  const [isResendingEmail, setIsResendingEmail] = useState(false);
   
   const {
     // Form data
@@ -33,48 +27,10 @@ export default function SignInScreen() {
     setShowPassword,
   } = useSignInForm();
 
-  const handleResendConfirmationFromError = async (email: string) => {
-    setIsResendingEmail(true);
-    try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: email
-      });
-      
-      if (error) {
-        // Note: This would need to be handled differently since authError is managed by the hook
-        console.error('Failed to resend email:', error.message);
-      } else {
-        console.log('Confirmation email sent!');
-      }
-    } catch {
-      console.error('Failed to resend confirmation email.');
-    } finally {
-      setIsResendingEmail(false);
-    }
-  };
 
   return (
     <View style={{ flex: 1, backgroundColor: '#2f353d' }}>
       
-      {/* Back Button */}
-      <View style={{ position: 'absolute', top: 50, left: 20, zIndex: 10, backgroundColor: 'transparent' }}>
-        <PrimaryButton
-          style={{ 
-            backgroundColor: loading ? 'rgba(139, 69, 19, 0.1)' : 'rgba(139, 69, 19, 0.2)', 
-            paddingHorizontal: 16, 
-            paddingVertical: 8, 
-            borderRadius: 6,
-            opacity: loading ? 0.5 : 1
-          }}
-          textStyle={{ color: CoreColors.textPrimary, fontSize: 14, fontWeight: '500' }}
-          onPress={() => router.replace('/login/welcome')}
-          disabled={loading}
-        >
-          ← Back
-        </PrimaryButton>
-      </View>
-
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'transparent' }}>
         
         <ThemedText 
@@ -85,7 +41,7 @@ export default function SignInScreen() {
         </ThemedText>
         
         <ThemedText style={{ marginBottom: 40, textAlign: 'center', fontSize: 16, opacity: 0.8, color: '#F5E6D3', lineHeight: 22, paddingHorizontal: 20 }}>
-          Sign in to access your saved worlds and characters
+          Continue the sign-in process to confirm your account and adventures.
         </ThemedText>
 
         {/* Form Inputs */}
@@ -118,22 +74,38 @@ export default function SignInScreen() {
             }}
           />
 
-          {/* Authentication Error Display */}
-          <AuthError 
-            error={authError} 
-            onResendEmail={authError === 'RESEND_EMAIL' ? () => handleResendConfirmationFromError(email) : undefined}
-            isResending={isResendingEmail}
-          />
-
           {/* Forgot Password Link - TODO: Add forgot password screen */}
           <ThemedText
             style={{ textAlign: 'right', fontSize: 13, color: '#D4AF37', fontWeight: '500', marginBottom: 4, cursor: 'pointer', marginTop: -14 }}
-            //onPress={() => router.push('/login/forgot-password')}
+            onPress={() => router.push('/login/forgot-password')}
           >
             Forgot Password?
           </ThemedText>
 
         </View>
+
+        {/* Error Display */}
+        {authError && (
+          <View style={{ 
+            width: '100%', 
+            maxWidth: 300, 
+            backgroundColor: 'rgba(220, 53, 69, 0.1)', 
+            borderColor: '#dc3545', 
+            borderWidth: 1, 
+            borderRadius: 8, 
+            padding: 12, 
+            marginBottom: 16 
+          }}>
+            <ThemedText style={{ 
+              color: '#dc3545', 
+              fontSize: 14, 
+              textAlign: 'center',
+              fontWeight: '500'
+            }}>
+              {authError}
+            </ThemedText>
+          </View>
+        )}
 
         {/* Action Buttons */}
         <View style={{ width: '100%', maxWidth: 300, gap: 16, backgroundColor: 'transparent' }}>
@@ -144,24 +116,21 @@ export default function SignInScreen() {
             disabled={!isFormValid}
             loading={loading}
           />
-
-          {/* Switch to Sign Up */}
-          <PrimaryButton
+          
+          {/* Back to Welcome Button */}
+          <ThemedText
             style={{ 
-              width: '100%', 
-              backgroundColor: 'rgba(139, 69, 19, 0.15)', 
-              borderWidth: 1, 
-              borderColor: '#8B4513', 
-              paddingVertical: 12, 
-              borderRadius: 8,
-              opacity: loading ? 0.5 : 1
+              textAlign: 'center', 
+              fontSize: 14, 
+              color: '#D4AF37', 
+              fontWeight: '500',
+              marginTop: 8,
+              textDecorationLine: 'underline'
             }}
-            textStyle={{ color: '#F5E6D3', fontSize: 13, fontWeight: '500' }}
-            onPress={() => router.push('/login/sign-up')}
-            disabled={loading}
+            onPress={() => router.replace('/login/welcome')}
           >
-            Need an account? Sign Up
-          </PrimaryButton>
+            ← Back to Welcome
+          </ThemedText>
         </View>
 
         <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>

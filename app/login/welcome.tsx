@@ -127,6 +127,10 @@ export default function WelcomeScreen() {
           >
             Cloud sync • Backup your worlds • Access anywhere • Share with friends
           </ThemedText>
+          
+          <ThemedText style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
+            © 2025 The Snow Post · Forged for storytellers & adventurers
+          </ThemedText>
         </View>
         
       </View>

@@ -214,6 +214,10 @@ export default function EmailConfirmationScreen() {
         <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
           After confirming your email, you&apos;ll be automatically signed in and can start your adventure!
         </ThemedText>
+        
+        <ThemedText style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
+          © 2025 The Snow Post · Forged for storytellers & adventurers
+        </ThemedText>
       </View>
 
       {/* Email Sent Success Modal */}
