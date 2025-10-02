@@ -42,6 +42,46 @@ To learn more about developing your project with Expo, look at the following res
 - [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
 - [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
 
+## Deployment to GitHub Pages
+
+This app is configured to deploy to GitHub Pages. You have two deployment options:
+
+### Option 1: Manual Deployment
+
+Run the following commands to deploy manually:
+
+```bash
+# Build and deploy in one step
+npm run deploy
+
+# Or build first, then deploy
+npm run predeploy
+npm run deploy
+```
+
+### Option 2: Automatic Deployment (Recommended)
+
+The app will automatically deploy to GitHub Pages when you push to the `main` branch, thanks to the GitHub Actions workflow.
+
+**Important Setup Steps:**
+
+1. Go to your GitHub repository settings
+2. Navigate to "Pages" in the sidebar
+3. Under "Source", select "GitHub Actions"
+4. Push your changes to the `main` branch
+
+Your app will be available at: `https://snowmnason.github.io/dnd-toolkit`
+
+### Development Deployment
+
+To deploy to a development branch:
+
+```bash
+npm run deploy-dev
+```
+
+This will deploy to the `gh-pages-dev` branch, which you can configure as a separate GitHub Pages environment for testing.
+
 ## Join the community
 
 Join our community of developers creating universal apps.
