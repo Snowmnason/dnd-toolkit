@@ -37,12 +37,17 @@ async function handleAuthSuccess(data: any) {
   // Save successful authentication state
   await AuthStateManager.setHasAccount(true);
   
-  // Check if profile is complete (same logic as other auth flows)
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user?.role !== 'complete') {
-    router.replace('/login/complete-profile');
-  } else {
-    router.replace('/select/world-selection');
+  // Check if user has profile in database
+  const { usersDB } = await import('../../../lib/database/users');
+  try {
+    const userProfile = await usersDB.getCurrentUser();
+    if (userProfile && userProfile.username) {
+      router.replace('/select/world-selection');
+    } else {
+      router.replace('/login/sign-up');
+    }
+  } catch {
+    router.replace('/login/sign-up');
   }
 }
 

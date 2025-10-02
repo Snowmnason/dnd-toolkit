@@ -19,12 +19,12 @@ export default function HomePage() {
             case 'welcome':
               router.replace('/login/welcome');
               break;
+            case 'complete-profile':
+              router.replace('/login/complete-profile');
+              break;
             case 'login':
               // Could implement auto-login here, for now go to main
               router.replace('/select/world-selection');
-              break;
-            case 'profile':
-              router.replace('/login/complete-profile' as any);
               break;
             case 'main':
               router.replace('/select/world-selection');

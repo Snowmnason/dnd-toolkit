@@ -31,7 +31,7 @@ export default function AuthInput({
   showPassword = false,
 }: AuthInputProps) {
   return (
-    <View style={{ position: 'relative', marginBottom: 8 }}>
+    <View style={{ position: 'relative', marginBottom: 2 }}>
       <TextInput
         placeholder={placeholder}
         value={value}

@@ -36,7 +36,7 @@ async function onAppleButtonPress() {
         // Check if username is needed (same logic as other auth flows)
         const { data: { user } } = await supabase.auth.getUser();
         if (!user?.user_metadata?.username) {
-          router.replace('/login/complete-profile');
+          router.replace('/login/sign-up');
         } else {
           router.replace('/select/world-selection');
         }

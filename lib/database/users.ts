@@ -36,6 +36,17 @@ export const usersDB = {
     return data;
   },
 
+  // Create user with default values after signup (called from auth triggers or signup)
+  async createWithDefaults(authId: string): Promise<User> {
+    const defaultUserData: CreateUserData = {
+      auth_id: authId,
+      username: `user_${authId.slice(-8)}`, // Default username using last 8 chars of auth_id
+      display_name: undefined // Will be set in settings if user chooses
+    };
+
+    return this.create(defaultUserData);
+  },
+
   // Get current user's profile
   async getCurrentUser(): Promise<User | null> {
     const { data: { user: authUser } } = await supabase.auth.getUser();

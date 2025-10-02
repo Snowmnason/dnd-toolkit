@@ -1,12 +1,9 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { ComponentStyles, CoreColors, Spacing } from '../constants/theme';
-import { AuthStateManager } from '../lib/auth-state';
-import { supabase } from '../lib/supabase';
+import { usersDB } from '../lib/database/users';
 import PrimaryButton from './custom_components/PrimaryButton';
-import TextInput from './custom_components/TextInput';
-import SignOutButton from './social-auth-buttons/sign-out-button';
 import { ThemedText } from './themed-text';
 
 interface UserProfileProps {
@@ -21,70 +18,33 @@ interface UserProfileProps {
 
 export default function UserProfile({ user }: UserProfileProps) {
   const router = useRouter();
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [password, setPassword] = useState('');
-  const [deleting, setDeleting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
 
-  const handleDeleteAccount = async () => {
-    setErrorMessage('');
-    setSuccessMessage('');
-    
-    if (!password.trim()) {
-      setErrorMessage('Please enter your password to confirm account deletion.');
-      return;
-    }
-
-    setDeleting(true);
-    try {
-      // Re-authenticate user with their password
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user?.email || '',
-        password: password
-      });
-
-      if (signInError) {
-        setErrorMessage('Incorrect password. Please try again.');
-        setDeleting(false);
+  // Fetch user profile from database
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (!user) {
+        setLoadingProfile(false);
         return;
       }
-
-      // Delete the user account
-      const { error: deleteError } = await supabase.rpc('delete_user');
       
-      if (deleteError) {
-        console.error('Delete account error:', deleteError);
-        setErrorMessage('Failed to delete account. Please try again or contact support.');
-        setDeleting(false);
-        return;
+      try {
+        const profile = await usersDB.getCurrentUser();
+        setUserProfile(profile);
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      } finally {
+        setLoadingProfile(false);
       }
+    };
 
-      // Clear auth state and show success message
-      await AuthStateManager.clearAuthState();
-      setSuccessMessage('Your account has been successfully deleted. Redirecting...');
-      
-      // Redirect after a short delay
-      setTimeout(() => {
-        router.replace('/login/welcome');
-      }, 2000);
-      
-    } catch (error) {
-      console.error('Delete account error:', error);
-      setErrorMessage('An unexpected error occurred. Please try again.');
-      setDeleting(false);
-    }
-  };
-
-  const cancelDelete = () => {
-    setShowDeleteConfirm(false);
-    setPassword('');
-    setErrorMessage('');
-    setSuccessMessage('');
-  };
+    fetchUserProfile();
+  }, [user]);
 
   if (!user) {
-    // Not logged in - show login option
+    // This shouldn't happen in normal flow since settings requires authentication
+    // But show a fallback just in case
     return (
       <View style={ComponentStyles.card.default}>
         <ThemedText type="subtitle" style={{
@@ -104,23 +64,23 @@ export default function UserProfile({ user }: UserProfileProps) {
           fontSize: 16,
           lineHeight: 22
         }}>
-          Sign in to sync your D&D worlds across devices
+          Unable to load profile information
         </ThemedText>
         <PrimaryButton
           style={{
             alignSelf: 'center',
             paddingHorizontal: Spacing.lg,
             minWidth: 140,
-            backgroundColor: '#dc3545',
-            borderColor: '#c82333'
+            backgroundColor: CoreColors.primary,
+            borderColor: CoreColors.primaryDark
           }}
           textStyle={{
             color: CoreColors.textPrimary,
             fontWeight: '600'
           }}
-          onPress={() => setShowDeleteConfirm(true)}
+          onPress={() => router.replace('/login/welcome')}
         >
-          Delete Account
+          Return to Login
         </PrimaryButton>
       </View>
     );
@@ -166,28 +126,8 @@ export default function UserProfile({ user }: UserProfileProps) {
           </ThemedText>
         </View>
         
-        {/* Full Name Field */}
-        {user.user_metadata?.full_name && (
-          <View style={{ marginBottom: Spacing.sm }}>
-            <ThemedText type="defaultSemiBold" style={{
-              color: CoreColors.textOnLight,
-              fontSize: 16,
-              marginBottom: 4
-            }}>
-              Full Name
-            </ThemedText>
-            <ThemedText style={{
-              color: CoreColors.textSecondary,
-              fontSize: 15,
-              fontStyle: 'italic'
-            }}>
-              {user.user_metadata.full_name}
-            </ThemedText>
-          </View>
-        )}
-        
-        {/* Username Field - TODO: Fetch from database instead of metadata 
-        {user.user_metadata?.username && (
+        {/* Username Field - from database */}
+        {userProfile?.username && (
           <View style={{ marginBottom: Spacing.sm }}>
             <ThemedText type="defaultSemiBold" style={{
               color: CoreColors.textOnLight,
@@ -201,156 +141,46 @@ export default function UserProfile({ user }: UserProfileProps) {
               fontSize: 15,
               fontStyle: 'italic'
             }}>
-              {user.user_metadata.username}
+              {userProfile.username}
             </ThemedText>
           </View>
         )}
-        */}
-      </View>
-
-      {/* Delete Account Section */}
-      {!showDeleteConfirm ? (
-        <PrimaryButton
-          style={{
-            alignSelf: 'center',
-            paddingHorizontal: Spacing.lg,
-            minWidth: 140,
-            backgroundColor: '#dc3545',
-            borderColor: '#c82333',
-            marginBottom: Spacing.md
-          }}
-          textStyle={{
-            color: CoreColors.textPrimary,
-            fontWeight: '600'
-          }}
-          onPress={() => setShowDeleteConfirm(true)}
-        >
-          Delete Account
-        </PrimaryButton>
-      ) : (
-        <View style={{
-          backgroundColor: '#ffeaea',
-          padding: Spacing.md,
-          borderRadius: 8,
-          borderWidth: 1,
-          borderColor: '#dc3545',
-          marginBottom: Spacing.md
-        }}>
-          <ThemedText style={{
-            color: '#721c24',
-            fontWeight: '600',
-            fontSize: 16,
-            textAlign: 'center',
-            marginBottom: Spacing.sm
-          }}>
-            ⚠️ Delete Account
-          </ThemedText>
-          <ThemedText style={{
-            color: '#721c24',
-            fontSize: 14,
-            textAlign: 'center',
-            marginBottom: Spacing.md,
-            lineHeight: 20
-          }}>
-            This action cannot be undone. Enter your password to confirm:
-          </ThemedText>
-          
-          <TextInput
-            placeholder="Enter your password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            style={{
-              marginBottom: Spacing.md
-            }}
-          />
-          
-          {/* Error Message */}
-          {errorMessage ? (
-            <View style={{
-              backgroundColor: '#f8d7da',
-              borderColor: '#f1aeb5',
-              borderWidth: 1,
-              borderRadius: 6,
-              padding: Spacing.sm,
-              marginBottom: Spacing.md
+        
+        {/* Display Name Field - from database */}
+        {userProfile?.display_name && (
+          <View style={{ marginBottom: Spacing.sm }}>
+            <ThemedText type="defaultSemiBold" style={{
+              color: CoreColors.textOnLight,
+              fontSize: 16,
+              marginBottom: 4
             }}>
-              <ThemedText style={{
-                color: '#721c24',
-                fontSize: 14,
-                textAlign: 'center',
-                fontWeight: '500'
-              }}>
-                ❌ {errorMessage}
-              </ThemedText>
-            </View>
-          ) : null}
-          
-          {/* Success Message */}
-          {successMessage ? (
-            <View style={{
-              backgroundColor: '#d1edff',
-              borderColor: '#bee5eb',
-              borderWidth: 1,
-              borderRadius: 6,
-              padding: Spacing.sm,
-              marginBottom: Spacing.md
+              Display Name
+            </ThemedText>
+            <ThemedText style={{
+              color: CoreColors.textSecondary,
+              fontSize: 15,
+              fontStyle: 'italic'
             }}>
-              <ThemedText style={{
-                color: '#0c5460',
-                fontSize: 14,
-                textAlign: 'center',
-                fontWeight: '500'
-              }}>
-                ✅ {successMessage}
-              </ThemedText>
-            </View>
-          ) : null}
-          
-          <View style={{
-            flexDirection: 'row',
-            gap: Spacing.sm,
-            justifyContent: 'center'
-          }}>
-            <PrimaryButton
-              style={{
-                backgroundColor: '#6c757d',
-                borderColor: '#5a6268',
-                paddingHorizontal: Spacing.md,
-                flex: 1
-              }}
-              textStyle={{
-                color: CoreColors.textPrimary,
-                fontWeight: '600'
-              }}
-              onPress={cancelDelete}
-              disabled={deleting}
-            >
-              Cancel
-            </PrimaryButton>
-            
-            <PrimaryButton
-              style={{
-                backgroundColor: deleting ? '#6c757d' : '#dc3545',
-                borderColor: deleting ? '#6c757d' : '#c82333',
-                paddingHorizontal: Spacing.md,
-                flex: 1,
-                opacity: deleting ? 0.6 : 1
-              }}
-              textStyle={{
-                color: CoreColors.textPrimary,
-                fontWeight: '600'
-              }}
-              onPress={handleDeleteAccount}
-              disabled={deleting}
-            >
-              {deleting ? 'Deleting...' : 'Confirm Delete'}
-            </PrimaryButton>
+              {userProfile.display_name}
+            </ThemedText>
           </View>
-        </View>
-      )}
-
-      <SignOutButton />
+        )}
+        
+        {/* Show loading state */}
+        {loadingProfile && (
+          <View style={{ marginBottom: Spacing.sm }}>
+            <ThemedText style={{
+              color: CoreColors.textSecondary,
+              fontSize: 14,
+              fontStyle: 'italic',
+              textAlign: 'center'
+            }}>
+              Loading profile...
+            </ThemedText>
+          </View>
+        )}
+        
+      </View>
     </View>
   );
 }

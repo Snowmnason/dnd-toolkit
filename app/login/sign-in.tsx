@@ -5,80 +5,33 @@ import { View } from 'react-native';
 import AuthButton from '../../components/custom_components/auth_components/AuthButton';
 import AuthError from '../../components/custom_components/auth_components/AuthError';
 import AuthInput from '../../components/custom_components/auth_components/AuthInput';
-import { validateEmail } from '../../components/custom_components/auth_components/authUtils';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../components/themed-text';
-import { AuthStateManager } from '../../lib/auth-state';
+import { useSignInForm } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
 
 export default function SignInScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [authError, setAuthError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [isResendingEmail, setIsResendingEmail] = useState(false);
-
-  const handleSignIn = async () => {
-    setAuthError('');
+  
+  const {
+    // Form data
+    email,
+    password,
+    loading,
+    authError,
+    showPassword,
     
-    // Defensive client-side validation with user feedback
-    const emailValidation = validateEmail(email);
-    if (!emailValidation.isValid) {
-      if (!email.trim()) {
-        setAuthError('Email is required');
-      } else if (!emailValidation.hasAtSymbol) {
-        setAuthError('Email must contain @ symbol');
-      } else if (!emailValidation.hasDomain) {
-        setAuthError('Email must have a valid domain');
-      } else {
-        setAuthError('Please enter a valid email address');
-      }
-      return;
-    }
-    if (!password.trim()) {
-      setAuthError('Password is required');
-      return;
-    }
+    // Validation state
+    emailValidation,
+    isFormValid,
     
-    setLoading(true);
-    
-    try {
-      const { error } = await supabase.auth.signInWithPassword({ 
-        email, 
-        password 
-      });
-
-      if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          setAuthError('Incorrect email or password. Please try again.');
-        } else if (error.message.includes('Email not confirmed')) {
-          setAuthError('RESEND_EMAIL');
-        } else if (error.message.includes('User not found')) {
-          setAuthError('No account found with this email. Please check your email or create an account.');
-        } else {
-          setAuthError(error.message || 'Sign in failed. Please try again.');
-        }
-      } else {
-        // Sign in successful
-        await AuthStateManager.setHasAccount(true);
-        
-        // Check if username is needed
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user?.user_metadata?.username) {
-          router.replace('/login/complete-profile' as any);
-        } else {
-          router.replace('/select/world-selection');
-        }
-      }
-    } catch (error) {
-      console.error('Sign in error:', error);
-      setAuthError('An unexpected error occurred. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Handlers
+    handleSignIn,
+    handleEmailChange,
+    handlePasswordChange,
+    setShowPassword,
+  } = useSignInForm();
 
   const handleResendConfirmationFromError = async (email: string) => {
     setIsResendingEmail(true);
@@ -89,19 +42,17 @@ export default function SignInScreen() {
       });
       
       if (error) {
-        setAuthError(`Failed to resend email: ${error.message}`);
+        // Note: This would need to be handled differently since authError is managed by the hook
+        console.error('Failed to resend email:', error.message);
       } else {
-        setAuthError('✅ Confirmation email sent! Check your inbox.');
-        setTimeout(() => setAuthError(''), 3000);
+        console.log('Confirmation email sent!');
       }
     } catch {
-      setAuthError('Failed to resend confirmation email. Please try again.');
+      console.error('Failed to resend confirmation email.');
     } finally {
       setIsResendingEmail(false);
     }
   };
-
-  const isFormValid = email && password && validateEmail(email).isValid;
 
   return (
     <View style={{ flex: 1, backgroundColor: '#2f353d' }}>
@@ -142,26 +93,20 @@ export default function SignInScreen() {
           <AuthInput
             placeholder="Email"
             value={email}
-            onChangeText={(text: string) => {
-              setEmail(text);
-              if (authError) setAuthError('');
-            }}
+            onChangeText={handleEmailChange}
             keyboardType="email-address"
             autoCapitalize="none"
             editable={!loading}
             style={{
-              borderColor: !validateEmail(email).isValid && email.length > 0 ? '#dc3545' : undefined,
-              borderWidth: !validateEmail(email).isValid && email.length > 0 ? 2 : undefined
+              borderColor: !emailValidation.isValid && email.length > 0 ? '#dc3545' : undefined,
+              borderWidth: !emailValidation.isValid && email.length > 0 ? 2 : undefined
             }}
           />
           
           <AuthInput
             placeholder="Password"
             value={password}
-            onChangeText={(text: string) => {
-              setPassword(text);
-              if (authError) setAuthError('');
-            }}
+            onChangeText={handlePasswordChange}
             secureTextEntry={true}
             editable={!loading}
             showPasswordToggle={true}
@@ -180,13 +125,14 @@ export default function SignInScreen() {
             isResending={isResendingEmail}
           />
 
-          {/* Forgot Password Link */}
+          {/* Forgot Password Link - TODO: Add forgot password screen */}
           <ThemedText
             style={{ textAlign: 'right', fontSize: 13, color: '#D4AF37', fontWeight: '500', marginBottom: 4, cursor: 'pointer' }}
-            onPress={() => router.push('./login/auth?action=reset-password')}
+            //onPress={() => router.push('/login/forgot-password')}
           >
             Forgot Password?
           </ThemedText>
+
         </View>
 
         {/* Action Buttons */}
@@ -211,7 +157,7 @@ export default function SignInScreen() {
               opacity: loading ? 0.5 : 1
             }}
             textStyle={{ color: '#F5E6D3', fontSize: 13, fontWeight: '500' }}
-            onPress={() => router.push('/login/auth?action=signup' as any)}
+            onPress={() => router.push('/login/sign-up')}
             disabled={loading}
           >
             Need an account? Sign Up

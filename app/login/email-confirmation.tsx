@@ -3,11 +3,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import AuthButton from '../../components/custom_components/auth_components/AuthButton';
-import { openEmailApp } from '../../components/custom_components/auth_components/emailUtils';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import CustomModal from '../../components/CustomModal';
 import { ThemedText } from '../../components/themed-text';
 import { AuthStateManager } from '../../lib/auth-state';
+import { openEmailApp } from '../../lib/auth/emailUtils';
 import { supabase } from '../../lib/supabase';
 
 export default function EmailConfirmationScreen() {
@@ -39,11 +39,24 @@ export default function EmailConfirmationScreen() {
         // User successfully confirmed email and is now signed in
         await AuthStateManager.setHasAccount(true);
         
-        // Check if username is needed
-        if (!session.user?.user_metadata?.username) {
-          router.replace('/login/complete-profile' as any);
-        } else {
-          router.replace('/select/world-selection');
+        // Check if user has completed their profile
+        try {
+          const { data: profile } = await supabase
+            .from('users')
+            .select('username')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (profile && profile.username) {
+            // Profile is complete, go to world selection
+            router.replace('/select/world-selection');
+          } else {
+            // Profile needs completion
+            router.replace('/login/complete-profile');
+          }
+        } catch {
+          // No profile exists, redirect to complete profile
+          router.replace('/login/complete-profile');
         }
       }
     });
@@ -63,20 +76,25 @@ export default function EmailConfirmationScreen() {
       
       if (error) {
         Alert.alert('Error', error.message);
+        setLoading(false);
+        return;
       } else {
         setShowEmailSentModal(true);
         
-        // Start countdown and disable button
+        // Start countdown and disable button immediately
+        setLoading(false); // Stop loading spinner
         setIsCountingDown(true);
         let countdown = 30;
         setWaitingResend(`(${countdown}s)`);
         
         timerRef.current = setInterval(() => {
           countdown--;
+          console.log('Countdown:', countdown); // Debug log
           if (countdown > 0) {
             setWaitingResend(`(${countdown}s)`);
           } else {
             // Re-enable button and reset text
+            console.log('Timer finished, re-enabling button'); // Debug log
             setWaitingResend('Resend Email');
             setIsCountingDown(false);
             if (timerRef.current) {
@@ -88,9 +106,9 @@ export default function EmailConfirmationScreen() {
       }
     } catch {
       Alert.alert('Error', 'Failed to resend email');
-    } finally {
       setLoading(false);
     }
+    // Note: setLoading(false) is handled above in success case
   };
 
   const handleChangeEmail = () => {
@@ -186,7 +204,7 @@ export default function EmailConfirmationScreen() {
                 borderRadius: 8 
               }}
               textStyle={{ color: '#FFF', fontSize: 13, fontWeight: '500' }}
-              onPress={() => router.replace('/login/auth?action=signin' as any)}
+              onPress={() => router.replace('/login/sign-in')}
             >
               Already Confirmed?
             </PrimaryButton>
@@ -194,7 +212,7 @@ export default function EmailConfirmationScreen() {
         </View>
 
         <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
-          After confirming your email, you&apos;ll be automatically signed in and redirected to complete your profile.
+          After confirming your email, you&apos;ll be automatically signed in and can start your adventure!
         </ThemedText>
       </View>
 

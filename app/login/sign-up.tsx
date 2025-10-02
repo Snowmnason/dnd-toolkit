@@ -1,114 +1,45 @@
 import { CoreColors } from '@/constants/theme';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
 import { View } from 'react-native';
 import AuthButton from '../../components/custom_components/auth_components/AuthButton';
 import AuthError from '../../components/custom_components/auth_components/AuthError';
 import AuthInput from '../../components/custom_components/auth_components/AuthInput';
-import { isExistingUser, validateEmail, validatePassword } from '../../components/custom_components/auth_components/authUtils';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import CustomModal from '../../components/CustomModal';
 import { ThemedText } from '../../components/themed-text';
-import { supabase } from '../../lib/supabase';
+import { useSignUpForm } from '../../lib/auth';
 
 export default function SignUpScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [authError, setAuthError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showEmailExistsModal, setShowEmailExistsModal] = useState(false);
-
-  const handleSignUp = async () => {
-    setAuthError('');
+  const {
+    // Form data
+    email,
+    password,
+    confirmPassword,
+    loading,
+    authError,
+    showPassword,
+    showEmailExistsModal,
     
-    // Defensive client-side validation with user feedback
-    const emailValidation = validateEmail(email);
-    if (!emailValidation.isValid) {
-      if (!email.trim()) {
-        setAuthError('Email is required');
-      } else if (!emailValidation.hasAtSymbol) {
-        setAuthError('Email must contain @ symbol');
-      } else if (!emailValidation.hasDomain) {
-        setAuthError('Email must have a valid domain');
-      } else {
-        setAuthError('Please enter a valid email address');
-      }
-      return;
-    }
+    // Validation state
+    passwordValidation,
+    emailValidation,
+    passwordsMatch,
+    isFormValid,
     
-    const passwordValidation = validatePassword(password);
-    if (!passwordValidation.isValid) {
-      if (!password.trim()) {
-        setAuthError('Password is required');
-      } else {
-        setAuthError('Password must meet all requirements above');
-      }
-      return;
-    }
+    // Handlers
+    handleSignUp,
+    handleEmailChange,
+    handlePasswordChange,
+    handleConfirmPasswordChange,
+    setShowPassword,
+    setShowEmailExistsModal,
     
-    setLoading(true);
-    
-    try {
-      const { data, error } = await supabase.auth.signUp({ 
-        email, 
-        password 
-      });
-
-      // Give Supabase a moment to process
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      if (error) {
-        // Check for email already exists error
-        if (error.message.includes('User already registered') || 
-            error.message.includes('already registered') || 
-            error.message.includes('already been registered') ||
-            error.message.includes('email address not available') ||
-            error.message.includes('duplicate key value') ||
-            error.code === '23505') {
-          setShowEmailExistsModal(true);
-          return;
-        }
-        
-        if (error.message.includes('Password')) {
-          setAuthError('Password does not meet requirements. Please check and try again.');
-        } else {
-          setAuthError(error.message || 'Account creation failed. Please try again.');
-        }
-      } else {
-        // Check if this is an existing user trying to sign up again
-        if (isExistingUser(data)) {
-          setShowEmailExistsModal(true);
-          return;
-        }
-        
-        // Successful signup - redirect to email confirmation with auto-signin
-        router.replace(`/login/email-confirmation?email=${encodeURIComponent(email)}` as any);
-      }
-    } catch (error) {
-      console.error('Sign up error:', error);
-      setAuthError('An unexpected error occurred. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const passwordValidation = validatePassword(password);
-  const emailValidation = validateEmail(email);
-  const isFormValid = emailValidation.isValid && passwordValidation.isValid;
-
-  // Get password hint color based on validation
-  const getPasswordHintColor = () => {
-    if (!password) return '#F5E6D3'; // Default when no password
-    
-    switch (passwordValidation.strength) {
-      case 'weak': return '#F5E6D3';
-      case 'medium': return '#D4AF37';
-      case 'strong': return '#A3D4A0';
-      default: return '#F5E6D3';
-    }
-  };
+    // UI helpers
+    getPasswordHintColor,
+    getPasswordRequirementsText,
+    getPasswordMatchText,
+  } = useSignUpForm();
 
   return (
     <View style={{ flex: 1, backgroundColor: '#2f353d' }}>
@@ -145,46 +76,36 @@ export default function SignUpScreen() {
         </ThemedText>
 
         {/* Form Inputs */}
-        <View style={{ width: '100%', maxWidth: 300, marginBottom: 15, backgroundColor: 'transparent' }}>
+        <View style={{ width: '100%', maxWidth: 300, marginBottom: 2, backgroundColor: 'transparent' }}>
           <AuthInput
             placeholder="Email"
             value={email}
-            onChangeText={(text: string) => {
-              setEmail(text);
-              if (authError) setAuthError('');
-            }}
+            onChangeText={handleEmailChange}
             keyboardType="email-address"
             autoCapitalize="none"
             editable={!loading}
             style={{
-              borderColor: !validateEmail(email).isValid && email.length > 0 ? '#dc3545' : undefined,
-              borderWidth: !validateEmail(email).isValid && email.length > 0 ? 2 : undefined
+              borderColor: !emailValidation.isValid && email.length > 0 ? '#dc3545' : undefined,
+              borderWidth: !emailValidation.isValid && email.length > 0 ? 2 : undefined
             }}
           />
-          
+
           <AuthInput
             placeholder="Password"
             value={password}
-            onChangeText={(text: string) => {
-              setPassword(text);
-              if (authError) setAuthError('');
-            }}
+            onChangeText={handlePasswordChange}
             secureTextEntry={true}
             editable={!loading}
             showPasswordToggle={true}
             onTogglePassword={() => setShowPassword(!showPassword)}
             showPassword={showPassword}
             style={{
-              borderColor: !validatePassword(password).isValid && password.length > 0 ? '#dc3545' : undefined,
-              borderWidth: !validatePassword(password).isValid && password.length > 0 ? 2 : undefined
+              borderColor: !passwordValidation.isValid && password.length > 0 ? '#dc3545' : undefined,
+              borderWidth: !passwordValidation.isValid && password.length > 0 ? 2 : undefined
             }}
           />
-
-          {/* Authentication Error Display */}
-          <AuthError error={authError} />
-
           {/* Password Requirements */}
-          <View style={{ marginBottom: 4 }}>
+          <View style={{ marginBottom: 6, marginTop: -14 }}>
             <ThemedText 
               style={{ 
                 textAlign: 'left', 
@@ -195,21 +116,42 @@ export default function SignUpScreen() {
                 opacity: 0.9
               }}
             >
-              {password ? (() => {
-                const missingCriteria = [];
-                if (!passwordValidation.minLength) missingCriteria.push('6+ characters');
-                if (!passwordValidation.hasUppercase) missingCriteria.push('uppercase letter');
-                if (!passwordValidation.hasLowercase) missingCriteria.push('lowercase letter');
-                if (!passwordValidation.hasNumber) missingCriteria.push('number');
-                
-                if (passwordValidation.isValid) {
-                  return '✅ Password meets all requirements!';
-                } else {
-                  return `Need: ${missingCriteria.join(', ')}`;
-                }
-              })() : 'Password must be at least 6 characters with at least 1 uppercase letter, 1 lowercase letter, and 1 number.'}
+              {getPasswordRequirementsText()}
             </ThemedText>
           </View>
+          
+          <AuthInput
+            placeholder="Confirm Password"
+            value={confirmPassword}
+            onChangeText={handleConfirmPasswordChange}
+            secureTextEntry={true}
+            showPassword={showPassword}
+            editable={!loading}
+            style={{
+              borderColor: confirmPassword.length > 0 && password !== confirmPassword ? '#dc3545' : undefined,
+              borderWidth: confirmPassword.length > 0 && password !== confirmPassword ? 2 : undefined
+            }}
+          />
+          {/* Password Match Indicator */}
+          {confirmPassword.length > 0 && (
+            <View style={{ marginBottom: 6, marginTop: -14 }}>
+              <ThemedText 
+                style={{ 
+                  textAlign: 'left', 
+                  fontSize: 11, 
+                  color: passwordsMatch ? '#A3D4A0' : '#F5A5A5', 
+                  fontWeight: '500', 
+                  lineHeight: 16,
+                  opacity: 0.9
+                }}
+              >
+                {getPasswordMatchText()}
+              </ThemedText>
+            </View>
+          )}
+
+          {/* Authentication Error Display */}
+          <AuthError error={authError} />
         </View>
 
         {/* Action Buttons */}
@@ -234,7 +176,7 @@ export default function SignUpScreen() {
               opacity: loading ? 0.5 : 1
             }}
             textStyle={{ color: '#F5E6D3', fontSize: 13, fontWeight: '500' }}
-            onPress={() => router.push('/login/auth?action=signin' as any)}
+            onPress={() => router.push('/login/sign-in')}
             disabled={loading}
           >
             Already have an account? Sign In
@@ -242,7 +184,7 @@ export default function SignUpScreen() {
         </View>
 
         <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
-          Secure authentication powered by Supabase
+          After confirming your email, you&apos;ll choose a username to complete your account setup.
         </ThemedText>
       </View>
 
@@ -262,7 +204,7 @@ export default function SignUpScreen() {
             text: 'Sign In',
             onPress: () => {
               setShowEmailExistsModal(false);
-              router.push('/login/auth?action=signin' as any);
+              router.push('/login/sign-in');
             },
             style: 'primary'
           }

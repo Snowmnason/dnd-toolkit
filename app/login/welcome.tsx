@@ -1,74 +1,28 @@
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, View } from 'react-native';
+import React from 'react';
+import { View } from 'react-native';
 import AuthButton from '../../components/custom_components/auth_components/AuthButton';
 import CustomLoad from '../../components/custom_components/CustomLoad';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../components/themed-text';
-import { AuthStateManager } from '../../lib/auth-state';
-import { supabase } from '../../lib/supabase';
+import { useWelcomeScreen } from '../../lib/auth';
 
 // TODO: Uncomment when ready to enable social authentication
 // import AppleSignInButton from '../../components/social-auth-buttons/apple/apple-sign-in-button';
 // import GoogleSignInButton from '../../components/social-auth-buttons/google/google-sign-in-button';
 
 export default function WelcomeScreen() {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isCheckingSession, setIsCheckingSession] = useState(false);
+  const {
+    isLoading,
+    handleSignIn,
+    handleSignUp,
+  } = useWelcomeScreen();
 
-  const handleSignIn = async () => {
-    setIsCheckingSession(true);
-    try {
-      // First, check if user already has valid session
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (session && !error) {
-        console.log('Valid session found, auto-signing in');
-        await AuthStateManager.setHasAccount(true);
-        
-        // Check if profile is complete
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user?.role !== 'complete') {
-          router.replace('/login/complete-profile');
-        } else {
-          router.replace('/select/world-selection');
-        }
-        return;
-      }
-      
-      // No valid session, go to sign-in screen
-      console.log('No valid session, redirecting to sign-in');
-      router.push('/login/sign-in');
-      
-    } catch (error) {
-      console.error('Session check error:', error);
-      // On error, just go to sign-in screen
-      router.push('/login/sign-in');
-    } finally {
-      setIsCheckingSession(false);
-    }
-  };
-
-  const handleSignUp = async () => {
-    setIsLoading(true);
-    try {
-      await AuthStateManager.setHasAccount(true);
-      router.push('/login/sign-up');
-    } catch (error) {
-      console.error('Navigation error:', error);
-      Alert.alert('Error', 'Unable to navigate to sign-up');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (isLoading || isCheckingSession) {
+  if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: "#2f353d" }}>
         <CustomLoad size="large"/>
         <ThemedText style={{ marginTop: 16, color: '#F5E6D3' }}>
-          {isCheckingSession ? 'Checking your session...' : 'Loading...'}
+          Loading...
         </ThemedText>
       </View>
     );
@@ -137,12 +91,12 @@ export default function WelcomeScreen() {
             Don't forget to uncomment the imports at the top!
           */}
           
-          {/* Sign In Button - with intelligent session checking */}
+          {/* Sign In Button */}
           <AuthButton
             title="Sign In"
             onPress={handleSignIn}
-            disabled={isLoading || isCheckingSession}
-            loading={isCheckingSession}
+            disabled={isLoading}
+            loading={isLoading}
           />
 
           {/* Sign Up Button - matching secondary style from sign-in screen */}
@@ -154,11 +108,11 @@ export default function WelcomeScreen() {
               borderColor: '#8B4513', 
               paddingVertical: 16, 
               borderRadius: 8,
-              opacity: (isLoading || isCheckingSession) ? 0.5 : 1
+              opacity: isLoading ? 0.5 : 1
             }}
             textStyle={{ color: '#F5E6D3', fontSize: 16, fontWeight: '600' }}
             onPress={handleSignUp}
-            disabled={isLoading || isCheckingSession}
+            disabled={isLoading}
           >
             Create Account
           </PrimaryButton>

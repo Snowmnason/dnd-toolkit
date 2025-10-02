@@ -99,8 +99,8 @@ export const AuthStateManager = {
       const { supabase } = await import('./supabase');
       const { data: { user } } = await supabase.auth.getUser();
       
-      // User must exist and have completed profile setup (role = 'complete')
-      return !!(user && user.role === 'complete');
+      // User must exist and be confirmed
+      return !!(user && user.email_confirmed_at);
     } catch (error) {
       console.error('Error checking authentication:', error);
       return false;
@@ -110,7 +110,7 @@ export const AuthStateManager = {
   // ==========================================
   // 🎯 MAIN ROUTING LOGIC - This decides where the user goes
   // ==========================================
-  async getRoutingDecision(): Promise<'welcome' | 'login' | 'profile' | 'main'> {
+  async getRoutingDecision(): Promise<'welcome' | 'login' | 'main' | 'complete-profile'> {
     try {
       const authState = await this.getAuthState();
 
@@ -129,14 +129,32 @@ export const AuthStateManager = {
           return 'welcome';
         }
         
-        // User exists, check if they need to complete profile
-        if (user.role !== 'complete') {
-          console.log('👤 User needs to complete profile');
-          return 'profile';
+        // User exists - check if they have a profile in our database
+        try {
+          const { usersDB } = await import('./database/users');
+          const userProfile = await usersDB.getCurrentUser();
+          
+          // More robust profile validation - check for both existence AND valid username
+          const hasValidProfile = userProfile && 
+                                 userProfile.username && 
+                                 userProfile.username.trim().length > 0;
+          
+          if (!hasValidProfile) {
+            console.log('👤 User missing or invalid profile - redirect to complete-profile');
+            return 'complete-profile';
+          }
+          
+          console.log('📱 User profile complete - going to main app');
+          return 'main';
+        } catch (profileError) {
+          console.log('👤 Database error checking profile:', profileError);
+          
+          // If database is down or unreachable, allow user to proceed to main app
+          // rather than trapping them in an infinite redirect loop
+          // They can complete profile later when database is available
+          console.log('⚠️  Database unavailable - allowing access to main app');
+          return 'main';
         }
-        
-        console.log('📱 User profile complete - going to main app');
-        return 'main';
       }
 
       // First time user - show welcome screen
