@@ -15,6 +15,13 @@ export interface SignInResult {
   redirectTo?: string;
 }
 
+export interface ResetPasswordResult {
+  success: boolean;
+  error?: string;
+  message?: string;
+  showEmailNotFoundModal?: boolean;
+}
+
 // Sign up a new user
 export const signUpUser = async (
   email: string,
@@ -151,4 +158,98 @@ export const isEmailExistsError = (error: any): boolean => {
          error?.message?.includes('email address not available') ||
          error?.message?.includes('duplicate key value') ||
          error?.code === '23505';
+};
+
+// Send password reset email
+export const sendPasswordReset = async (email: string): Promise<ResetPasswordResult> => {
+  try {
+    // First, check if email exists by attempting to get user info
+    // We'll use a sign-in attempt with a dummy password to check if email exists
+    // This is a common pattern for checking email existence without exposing user data
+    const { error: checkError } = await supabase.auth.signInWithPassword({
+      email,
+      password: 'dummy_password_for_check_only'
+    });
+    
+    // If we get "Invalid login credentials", it means the email exists but password is wrong
+    // If we get "User not found" or similar, the email doesn't exist
+    if (checkError) {
+      if (checkError.message.includes('User not found') || 
+          checkError.message.includes('not found') ||
+          checkError.message.includes('Invalid email')) {
+        return { 
+          success: false, 
+          showEmailNotFoundModal: true 
+        };
+      }
+      // If we get "Invalid login credentials", the email exists, proceed with reset
+    }
+
+    // Email exists, proceed with password reset
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/login/reset-password`
+    });
+
+    if (error) {
+      // Handle specific error cases
+      if (error.message.includes('Invalid email') || 
+          error.message.includes('not valid') ||
+          error.message.includes('invalid email format')) {
+        return { 
+          success: false, 
+          error: 'Please enter a valid email address.' 
+        };
+      }
+      
+      return { 
+        success: false, 
+        error: error.message || 'Failed to send reset email. Please try again.' 
+      };
+    }
+
+    return { 
+      success: true, 
+      message: 'Password reset email sent! Please check your inbox and follow the instructions.' 
+    };
+  } catch (error) {
+    console.error('Password reset error:', error);
+    return { 
+      success: false, 
+      error: 'An unexpected error occurred. Please try again.' 
+    };
+  }
+};
+
+// Update password after reset (called from reset confirmation page)
+export const updatePassword = async (newPassword: string): Promise<ResetPasswordResult> => {
+  try {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+
+    if (error) {
+      if (error.message.includes('Password')) {
+        return { 
+          success: false, 
+          error: 'Password does not meet requirements. Please ensure it is at least 6 characters long.' 
+        };
+      }
+      
+      return { 
+        success: false, 
+        error: error.message || 'Failed to update password. Please try again.' 
+      };
+    }
+
+    return { 
+      success: true, 
+      message: 'Password updated successfully! You can now sign in with your new password.' 
+    };
+  } catch (error) {
+    console.error('Password update error:', error);
+    return { 
+      success: false, 
+      error: 'An unexpected error occurred. Please try again.' 
+    };
+  }
 };

@@ -194,6 +194,10 @@ export default function CompleteProfileScreen() {
         <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
           Your username will be used for online games and friend connections.
         </ThemedText>
+        
+        <ThemedText style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
+          © 2025 The Snow Post · Forged for storytellers & adventurers
+        </ThemedText>
       </View>
     </View>
   );
