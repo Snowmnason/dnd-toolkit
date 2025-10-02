@@ -2,7 +2,7 @@
   "name": "dnd-toolkit",
   "main": "index.tsx",
   "version": "1.0.0",
-  "homepage": "https://snowmnason.github.io/dnd-toolkit",
+  "homepage": "dnd-tool.thesnowpost.com",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
