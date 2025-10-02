@@ -12,19 +12,21 @@ function AppWithLoader() {
       onReady={async () => {
         // Platform-specific initialization
         if (Platform.OS === 'web') {
-          // Web/Desktop: Load Skia
+          // Web/Desktop: Load Skia with error handling
           try {
+            console.log('🔄 Attempting to load Skia for web...');
             const { LoadSkiaWeb } = await import("@shopify/react-native-skia/lib/module/web");
             await LoadSkiaWeb({
               locateFile: (file) => `/${file}`, // since wasm is in /public
             });
-            //console.log("✅ Skia (CanvasKit) fully loaded for web");
+            console.log("✅ Skia (CanvasKit) fully loaded for web");
           } catch (error) {
-            console.error("❌ Failed to load Skia for web:", error);
+            console.warn("⚠️  Skia loading failed (non-critical):", error);
+            // Don't throw - app can work without Skia canvas features
           }
         } else {
           // Mobile: No Skia loading needed
-          //console.log("✅ App ready (mobile)");
+          console.log("✅ App ready (mobile platform)");
         }
       }}
     >
