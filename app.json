@@ -26,7 +26,8 @@
       "output": "static",
       "favicon": "./assets/images/icon.jpg",
       "bundler": "metro",
-      "name": "D&D Toolkit"
+      "name": "D&D Toolkit",
+      "basePath": "."
     },
     "plugins": [
       [
