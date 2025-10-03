@@ -96,14 +96,28 @@ export const AuthStateManager = {
       }
 
       // Import supabase dynamically to avoid circular dependency
-      const { supabase } = await import('./supabase');
+      const { supabase, isSupabaseConfigured } = await import('./supabase');
+      
+      // If Supabase isn't configured (like on GitHub Pages without env vars), 
+      // fall back to local auth state
+      if (!isSupabaseConfigured()) {
+        console.warn('⚠️  Supabase not configured, using local auth state');
+        return authState.hasAccount;
+      }
+      
       const { data: { user } } = await supabase.auth.getUser();
       
       // User must exist and be confirmed
       return !!(user && user.email_confirmed_at);
     } catch (error) {
       console.error('Error checking authentication:', error);
-      return false;
+      // On error, fall back to local auth state
+      try {
+        const authState = await this.getAuthState();
+        return authState.hasAccount;
+      } catch {
+        return false;
+      }
     }
   },
 
@@ -119,7 +133,14 @@ export const AuthStateManager = {
         console.log('📱 User has account - checking authentication status');
         
         // Import supabase dynamically to avoid circular dependency
-        const { supabase } = await import('./supabase');
+        const { supabase, isSupabaseConfigured } = await import('./supabase');
+        
+        // If Supabase isn't configured (like on GitHub Pages), use local state
+        if (!isSupabaseConfigured()) {
+          console.warn('⚠️  Supabase not configured, using local auth state for routing');
+          return 'main';
+        }
+        
         const { data: { user } } = await supabase.auth.getUser();
         
         // If no user exists (signed out), clear local state and go to welcome

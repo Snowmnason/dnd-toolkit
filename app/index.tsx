@@ -10,7 +10,7 @@ export default function HomePage() {
   const [isRouting, setIsRouting] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Check auth state and route accordingly
+  // Check auth state and route accordingly - simplified for web reliability
   React.useEffect(() => {
     const handleRouting = async () => {
       try {
@@ -20,7 +20,23 @@ export default function HomePage() {
         // For web deployment, add a longer delay to ensure everything is loaded
         const delay = Platform.OS === 'web' ? 500 : 100;
 
-        const routingDecision = await AuthStateManager.getRoutingDecision();
+        // Simplified routing - always start at welcome for new users on web
+        // This avoids Supabase client initialization issues on GitHub Pages
+        let routingDecision: string;
+        
+        if (Platform.OS === 'web') {
+          // On web, be more conservative - just check if user has account flag
+          try {
+            const authState = await AuthStateManager.getAuthState();
+            routingDecision = authState.hasAccount ? 'main' : 'welcome';
+          } catch {
+            // If auth state check fails, default to welcome
+            routingDecision = 'welcome';
+          }
+        } else {
+          // On mobile, use full routing decision
+          routingDecision = await AuthStateManager.getRoutingDecision();
+        }
         
         setTimeout(() => {
           try {
@@ -32,8 +48,6 @@ export default function HomePage() {
                 router.replace('/login/complete-profile');
                 break;
               case 'login':
-                router.replace('/select/world-selection');
-                break;
               case 'main':
                 router.replace('/select/world-selection');
                 break;
