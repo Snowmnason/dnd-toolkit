@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import React from "react";
 import { Platform, View } from "react-native";
 import CustomLoad from "../components/custom_components/CustomLoad";
@@ -10,43 +10,22 @@ export default function HomePage() {
   const [isRouting, setIsRouting] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Check auth state and route accordingly - simplified for web reliability
+  // For mobile platforms, do the full routing logic
   React.useEffect(() => {
     const handleRouting = async () => {
       try {
         setIsRouting(true);
         setError(null);
 
-        // For web deployment, add a longer delay to ensure everything is loaded
-        const delay = Platform.OS === 'web' ? 500 : 100;
-
-        // Simplified routing - always start at welcome for new users on web
-        // This avoids Supabase client initialization issues on GitHub Pages
-        let routingDecision: string;
-        
+        // For web, use simple redirect to welcome to avoid GitHub Pages issues
         if (Platform.OS === 'web') {
-          // On web, be more conservative - just check if user has account flag
-          // Don't call any Supabase functions if not configured
-          try {
-            // First check if Supabase is even configured
-            const { isSupabaseConfigured } = await import('../lib/supabase');
-            
-            if (!isSupabaseConfigured()) {
-              console.log('⚠️  Supabase not configured on web - defaulting to welcome');
-              routingDecision = 'welcome';
-            } else {
-              const authState = await AuthStateManager.getAuthState();
-              routingDecision = authState.hasAccount ? 'main' : 'welcome';
-            }
-          } catch {
-            // If anything fails, default to welcome
-            console.log('⚠️  Auth state check failed - defaulting to welcome');
-            routingDecision = 'welcome';
-          }
-        } else {
-          // On mobile, use full routing decision
-          routingDecision = await AuthStateManager.getRoutingDecision();
+          console.log('🌐 Web platform detected - redirecting to welcome');
+          router.replace('/login/welcome');
+          return;
         }
+
+        // For mobile, do full routing logic
+        const routingDecision = await AuthStateManager.getRoutingDecision();
         
         setTimeout(() => {
           try {
@@ -69,7 +48,7 @@ export default function HomePage() {
             // Fallback navigation
             router.replace('/login/welcome');
           }
-        }, delay);
+        }, 100);
       } catch (error) {
         console.error('Routing error:', error);
         setError('Failed to load app. Please refresh the page.');
@@ -81,17 +60,22 @@ export default function HomePage() {
           } catch (navError) {
             console.error('Emergency navigation failed:', navError);
           }
-        }, 2000);
+        }, 1000);
       } finally {
-        // Remove loading state after delay
+        // Remove loading state after a short delay
         setTimeout(() => {
           setIsRouting(false);
-        }, Platform.OS === 'web' ? 1000 : 500);
+        }, 300);
       }
     };
 
     handleRouting();
   }, [router]);
+
+  // For web, also provide a declarative redirect as backup
+  if (Platform.OS === 'web' && !isRouting) {
+    return <Redirect href="/login/welcome" />;
+  }
 
   // Show loading spinner while determining route
   return (
