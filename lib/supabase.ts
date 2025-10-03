@@ -25,9 +25,23 @@ const WebStorageAdapter = {
   },
 };
 
+// Get environment variables with fallbacks for development
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+
+// Log configuration status for debugging
+if (Platform.OS === 'web') {
+  console.log('🔧 Supabase Configuration:', {
+    hasUrl: !!supabaseUrl,
+    hasKey: !!supabaseAnonKey,
+    urlLength: supabaseUrl.length,
+    keyLength: supabaseAnonKey.length
+  });
+}
+
 export const supabase = createClient(
-  process.env.EXPO_PUBLIC_SUPABASE_URL ?? '',
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
+  supabaseUrl,
+  supabaseAnonKey,
   {
     auth: {
       storage: Platform.OS === 'web' ? WebStorageAdapter : EncryptedStorageAdapter,
@@ -37,3 +51,8 @@ export const supabase = createClient(
     },
   },
 );
+
+// Add a simple health check function
+export const isSupabaseConfigured = () => {
+  return !!(supabaseUrl && supabaseAnonKey && supabaseUrl.length > 0 && supabaseAnonKey.length > 0);
+};

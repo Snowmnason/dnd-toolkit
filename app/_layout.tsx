@@ -15,19 +15,26 @@ export default function RootLayout() {
   const protectedRoutes = ['select', 'main', 'settings'];
   const isProtectedRoute = protectedRoutes.includes(segments[0]);
 
-  // Check authentication status
+  // Check authentication status - but be more gentle about redirects
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // Don't interfere with login routes at all
+        if (segments[0] === 'login') {
+          setIsCheckingAuth(false);
+          return;
+        }
+
         const authenticated = await AuthStateManager.isAuthenticated();
 
-        // If trying to access protected route without authentication, redirect
+        // Only redirect if trying to access protected route without authentication
         if (isProtectedRoute && !authenticated) {
           console.log('🚫 Unauthorized access attempt, redirecting to welcome');
           router.replace('/login/welcome');
         }
       } catch (error) {
         console.error('Auth check error:', error);
+        // On error, only redirect protected routes, let login routes work normally
         if (isProtectedRoute) {
           router.replace('/login/welcome');
         }
