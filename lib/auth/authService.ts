@@ -160,15 +160,17 @@ export const signInUser = async (
     }
 
     if (data.user) {
+      // Set local auth state so route guards work immediately
+      const { AuthStateManager } = await import('../auth-state');
+      await AuthStateManager.setHasAccount(true);
+
       // Check if user has a complete profile
       try {
         const userProfile = await usersDB.getCurrentUser();
-        
         // Robust profile validation
         const hasValidProfile = userProfile && 
                                userProfile.username && 
                                userProfile.username.trim().length > 0;
-        
         if (hasValidProfile) {
           // Profile is complete - go to world selection
           return { 
@@ -184,7 +186,6 @@ export const signInUser = async (
         }
       } catch (profileError) {
         console.error('Database error during sign-in profile check:', profileError);
-        
         // If database is unreachable, let user proceed to main app
         // They can complete profile when database is available
         // This prevents infinite redirect loops during database outages

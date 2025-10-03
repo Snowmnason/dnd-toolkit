@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { View } from 'react-native';
 import AuthButton from '../../components/custom_components/auth_components/AuthButton';
@@ -9,8 +10,8 @@ import { useWelcomeScreen } from '../../lib/auth';
 // TODO: Uncomment when ready to enable social authentication
 // import AppleSignInButton from '../../components/social-auth-buttons/apple/apple-sign-in-button';
 // import GoogleSignInButton from '../../components/social-auth-buttons/google/google-sign-in-button';
-
 export default function WelcomeScreen() {
+  const router = useRouter();
   const {
     isLoading,
     handleSignIn,
@@ -116,11 +117,27 @@ export default function WelcomeScreen() {
           >
             Create Account
           </PrimaryButton>
+          {/* Anon sign in */}
+          <ThemedText
+            style={{ 
+              textAlign: 'center', 
+              fontSize: 14, 
+              color: isLoading ? '#BDB76B' : '#D4AF37', 
+              fontWeight: '500',
+              textDecorationLine: 'underline',
+              opacity: isLoading ? 0.5 : 1
+            }}
+            onPress={() => {
+              if (false) {}
+            }}
+          >
+            Continue without an account
+          </ThemedText>
           
         </View>
 
         {/* Benefits Info */}
-        <View style={{ marginTop: 32, backgroundColor: 'transparent', alignItems: 'center' }}>
+        <View style={{ marginTop: 22, backgroundColor: 'transparent', alignItems: 'center' }}>
           <ThemedText 
             type="caption" 
             style={{ textAlign: 'center', color: '#F5E6D3', opacity: 0.7, fontSize: 12, lineHeight: 18 }}
