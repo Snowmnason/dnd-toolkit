@@ -2,7 +2,7 @@
   "name": "dnd-toolkit",
   "main": "index.tsx",
   "version": "1.0.0",
-  "homepage": "dnd-tool.thesnowpost.com",
+  "homepage": "https://dnd-tool.thesnowpost.com/",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
@@ -11,7 +11,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "predeploy": "expo export -p web",
-    "deploy": "gh-pages -d dist",
+    "deploy": "gh-pages -d dist --dotfiles",
     "deploy-dev": "gh-pages -d dist -b gh-pages-dev"
   },
   "dependencies": {

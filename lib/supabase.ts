@@ -40,9 +40,33 @@ if (Platform.OS === 'web') {
 }
 
 // Check if Supabase is properly configured
+// Check if Supabase is properly configured
+let hasLoggedSupabaseConfig = false;
+
+// Check if Supabase is properly configured
 export const isSupabaseConfigured = () => {
-  return !!(supabaseUrl && supabaseAnonKey && supabaseUrl.length > 0 && supabaseAnonKey.length > 0);
+  const configured = !!(
+    supabaseUrl &&
+    supabaseAnonKey &&
+    supabaseUrl.length > 0 &&
+    supabaseAnonKey.length > 0
+  );
+
+  if (!hasLoggedSupabaseConfig) {
+    console.log("🔑 Supabase Config:", {
+      hasUrl: !!supabaseUrl,
+      hasKey: !!supabaseAnonKey,
+      urlLength: supabaseUrl?.length || 0,
+      keyLength: supabaseAnonKey?.length || 0,
+      configured,
+    });
+    hasLoggedSupabaseConfig = true;
+  }
+
+  return configured;
 };
+
+
 
 // Lazy initialization of Supabase client - only create when variables are available
 let _supabaseClient: any = null;

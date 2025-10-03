@@ -17,7 +17,7 @@ function AppWithLoader() {
             console.log('🔄 Attempting to load Skia for web...');
             const { LoadSkiaWeb } = await import("@shopify/react-native-skia/lib/module/web");
             await LoadSkiaWeb({
-              locateFile: (file) => `/${file}`, // since wasm is in /public
+              locateFile: (file) => `./${file}`, // since wasm is in /public
             });
             console.log("✅ Skia (CanvasKit) fully loaded for web");
           } catch (error) {
