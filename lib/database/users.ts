@@ -1,3 +1,4 @@
+import { sanitizeInput, validateUsername } from '../auth/validation';
 import { supabase } from '../supabase';
 
 export interface User {
@@ -20,8 +21,22 @@ export interface UpdateUserData {
 }
 
 export const usersDB = {
-  // Create a new user profile (called after auth signup)
+  // Create a new user profile (called after auth signup) with input validation
   async create(userData: CreateUserData): Promise<User> {
+    // Validate and sanitize username if provided
+    if (userData.username) {
+      const usernameValidation = validateUsername(userData.username);
+      if (!usernameValidation.isValid) {
+        throw new Error('Username contains invalid characters or format');
+      }
+      userData.username = usernameValidation.sanitized;
+    }
+    
+    // Sanitize display name if provided
+    if (userData.display_name) {
+      userData.display_name = sanitizeInput(userData.display_name).slice(0, 50); // Limit length
+    }
+
     const { data, error } = await supabase
       .from('users')
       .insert(userData)
@@ -73,12 +88,26 @@ export const usersDB = {
     return data;
   },
 
-  // Update current user's profile
+  // Update current user's profile with input validation
   async updateCurrentUser(updates: UpdateUserData): Promise<User> {
     const { data: { user: authUser } } = await supabase.auth.getUser();
     
     if (!authUser) {
       throw new Error('Not authenticated');
+    }
+
+    // Validate and sanitize username if being updated
+    if (updates.username) {
+      const usernameValidation = validateUsername(updates.username);
+      if (!usernameValidation.isValid) {
+        throw new Error('Username contains invalid characters or format');
+      }
+      updates.username = usernameValidation.sanitized;
+    }
+    
+    // Sanitize display name if being updated
+    if (updates.display_name) {
+      updates.display_name = sanitizeInput(updates.display_name).slice(0, 50); // Limit length
     }
 
     const { data, error } = await supabase

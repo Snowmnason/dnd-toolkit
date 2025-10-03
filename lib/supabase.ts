@@ -74,11 +74,11 @@ export const getSupabaseClient = () => {
 export const supabase = new Proxy({} as any, {
   get(target, prop) {
     if (!isSupabaseConfigured()) {
-      console.warn('⚠️  Supabase not configured - operations will be skipped');
+      console.warn('⚠️  Server connection unavailable - operations will be skipped');
       // Return a mock object that doesn't throw but logs warnings
       return new Proxy({} as any, {
         get() {
-          return () => Promise.resolve({ data: null, error: { message: 'Supabase not configured' } });
+          return () => Promise.resolve({ data: null, error: { message: 'Connection unavailable' } });
         }
       });
     }
