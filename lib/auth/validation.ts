@@ -2,54 +2,123 @@
 // CORE VALIDATION FUNCTIONS
 // ============================================================================
 
-// Password validation function
+// Password validation function with enhanced security
 export const validatePassword = (password: string) => {
+  // Don't sanitize passwords as they may contain special characters intentionally
+  // But check for dangerous patterns
+  if (typeof password !== 'string') {
+    return {
+      minLength: false,
+      hasUppercase: false,
+      hasLowercase: false,
+      hasNumber: false,
+      hasSpecialChar: false,
+      criteriaCount: 0,
+      isValid: false,
+      strength: 'weak',
+      hasNoSqlKeywords: false,
+      hasNoControlChars: false
+    };
+  }
+  
   const minLength = password.length >= 6;
+  const maxLength = password.length <= 128; // Reasonable maximum
   const hasUppercase = /[A-Z]/.test(password);
   const hasLowercase = /[a-z]/.test(password);
   const hasNumber = /\d/.test(password);
+  // Safe special characters that don't interfere with common systems
+  const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>?]/.test(password);
   
-  const criteriaCount = [minLength, hasUppercase, hasLowercase, hasNumber].filter(Boolean).length;
+  // Security checks
+  const hasNoSqlKeywords = !/(union|select|insert|update|delete|drop|create|alter|exec|script)/i.test(password);
+  const hasNoControlChars = !/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(password);
+  
+  const criteriaCount = [minLength, hasUppercase, hasLowercase, hasNumber, hasSpecialChar].filter(Boolean).length;
   
   return {
     minLength,
+    maxLength,
     hasUppercase,
     hasLowercase,
     hasNumber,
+    hasSpecialChar,
     criteriaCount,
-    isValid: criteriaCount >= 4,
-    strength: criteriaCount === 0 ? 'weak' : criteriaCount <= 2 ? 'weak' : criteriaCount === 3 ? 'medium' : 'strong'
+    hasNoSqlKeywords,
+    hasNoControlChars,
+    isValid: criteriaCount >= 5 && maxLength && hasNoSqlKeywords && hasNoControlChars,
+    strength: criteriaCount === 0 ? 'weak' : criteriaCount <= 2 ? 'weak' : criteriaCount <= 3 ? 'medium' : criteriaCount === 4 ? 'strong' : 'very strong'
   };
 };
 
-// Email validation function
-export const validateEmail = (email: string) => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const isValidFormat = emailRegex.test(email);
-  const hasAtSymbol = email.includes('@');
-  const hasDomain = email.split('@')[1]?.includes('.') ?? false;
-  const hasValidLength = email.length >= 5; // minimum: a@b.c
+// Input sanitization helper
+export const sanitizeInput = (input: string): string => {
+  if (typeof input !== 'string') {
+    return '';
+  }
+  
+  return input
+    .trim()
+    // Remove null bytes
+    .replace(/\0/g, '')
+    // Remove control characters except newline and tab
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    // Limit length to prevent DoS
+    .slice(0, 1000);
+};
 
+// Email validation function with enhanced security
+export const validateEmail = (email: string) => {
+  // Sanitize input first
+  const sanitizedEmail = sanitizeInput(email);
+  
+  // Enhanced email regex that prevents common injection patterns
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+  
+  const isValidFormat = emailRegex.test(sanitizedEmail);
+  const hasAtSymbol = sanitizedEmail.includes('@');
+  const hasDomain = sanitizedEmail.split('@')[1]?.includes('.') ?? false;
+  const hasValidLength = sanitizedEmail.length >= 5 && sanitizedEmail.length <= 320; // RFC 5321 limit
+  
+  // Additional security checks
+  const hasNoSqlKeywords = !/(union|select|insert|update|delete|drop|create|alter|exec|script)/i.test(sanitizedEmail);
+  const hasNoControlChars = !/[\x00-\x1F\x7F]/.test(sanitizedEmail);
+  
   return {
     hasAtSymbol,
     hasDomain,
     hasValidLength,
     isValidFormat,
-    isValid: isValidFormat && hasValidLength
+    hasNoSqlKeywords,
+    hasNoControlChars,
+    sanitized: sanitizedEmail,
+    isValid: isValidFormat && hasValidLength && hasNoSqlKeywords && hasNoControlChars
   };
 };
 
-// Username validation function
+// Username validation function with enhanced security
 export const validateUsername = (username: string) => {
-  const minLength = username.length >= 3;
-  const maxLength = username.length <= 20;
-  const validChars = /^[a-zA-Z0-9]+$/.test(username);
+  // Sanitize input first
+  const sanitizedUsername = sanitizeInput(username);
+  
+  const minLength = sanitizedUsername.length >= 3;
+  const maxLength = sanitizedUsername.length <= 20;
+  // Only allow alphanumeric characters and underscores
+  const validChars = /^[a-zA-Z0-9_]+$/.test(sanitizedUsername);
+  
+  // Additional security checks
+  const hasNoSqlKeywords = !/(union|select|insert|update|delete|drop|create|alter|exec|script|admin|root|system)/i.test(sanitizedUsername);
+  const hasNoControlChars = !/[\x00-\x1F\x7F]/.test(sanitizedUsername);
+  const startsWithLetter = /^[a-zA-Z]/.test(sanitizedUsername);
   
   return {
     minLength,
     maxLength,
     validChars,
-    isValid: minLength && maxLength && validChars
+    hasNoSqlKeywords,
+    hasNoControlChars,
+    startsWithLetter,
+    sanitized: sanitizedUsername,
+    isValid: minLength && maxLength && validChars && hasNoSqlKeywords && hasNoControlChars && startsWithLetter
   };
 };
 
@@ -67,7 +136,7 @@ export const isExistingUser = (data: any) => {
 // FORM VALIDATION HELPERS
 // ============================================================================
 
-// Form validation errors helper
+// Form validation errors helper with enhanced security
 export const getFormValidationErrors = (
   email: string,
   username: string,
@@ -86,6 +155,8 @@ export const getFormValidationErrors = (
       return 'Email must contain @ symbol';
     } else if (!emailValidation.hasDomain) {
       return 'Email must have a valid domain';
+    } else if (!emailValidation.hasNoSqlKeywords) {
+      return 'Email contains invalid characters';
     } else {
       return 'Please enter a valid email address';
     }
@@ -95,6 +166,10 @@ export const getFormValidationErrors = (
   if (!passwordValidation.isValid) {
     if (!password.trim()) {
       return 'Password is required';
+    } else if (!passwordValidation.hasNoSqlKeywords) {
+      return 'Password contains invalid characters';
+    } else if (!passwordValidation.hasNoControlChars) {
+      return 'Password contains invalid characters';
     } else {
       return 'Password must meet all requirements above';
     }
@@ -109,8 +184,12 @@ export const getFormValidationErrors = (
   if (!usernameValidation.isValid) {
     if (!username.trim()) {
       return 'Username is required';
+    } else if (!usernameValidation.startsWithLetter) {
+      return 'Username must start with a letter';
+    } else if (!usernameValidation.hasNoSqlKeywords) {
+      return 'Username contains reserved words';
     } else {
-      return 'Username must be 3-20 characters, letters and numbers only';
+      return 'Username must be 3-20 characters, letters, numbers, and underscores only';
     }
   }
 
@@ -148,9 +227,10 @@ export const getPasswordHintColor = (password: string): string => {
   
   const passwordValidation = validatePassword(password);
   switch (passwordValidation.strength) {
-    case 'weak': return '#F5E6D3';
-    case 'medium': return '#D4AF37';
-    case 'strong': return '#A3D4A0';
+    case 'weak': return '#F5A5A5'; // Red for weak
+    case 'medium': return '#F5E6D3'; // Light for medium
+    case 'strong': return '#D4AF37'; // Gold for strong
+    case 'very strong': return '#A3D4A0'; // Green for very strong
     default: return '#F5E6D3';
   }
 };
@@ -158,7 +238,7 @@ export const getPasswordHintColor = (password: string): string => {
 // Get password requirements text
 export const getPasswordRequirementsText = (password: string): string => {
   if (!password) {
-    return 'Password must be at least 6 characters with at least 1 uppercase letter, 1 lowercase letter, and 1 number.';
+    return 'Password must be at least 6 characters with uppercase, lowercase, number, and special character.';
   }
 
   const passwordValidation = validatePassword(password);
@@ -168,9 +248,10 @@ export const getPasswordRequirementsText = (password: string): string => {
   if (!passwordValidation.hasUppercase) missingCriteria.push('uppercase letter');
   if (!passwordValidation.hasLowercase) missingCriteria.push('lowercase letter');
   if (!passwordValidation.hasNumber) missingCriteria.push('number');
+  if (!passwordValidation.hasSpecialChar) missingCriteria.push('special character (!@#$%^&*...)');
   
   if (passwordValidation.isValid) {
-    return '✅ Password meets all requirements!';
+    return `✅ Password is ${passwordValidation.strength}! All requirements met.`;
   } else {
     return `Need: ${missingCriteria.join(', ')}`;
   }

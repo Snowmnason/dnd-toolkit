@@ -1,6 +1,6 @@
 import { usersDB } from '../database/users';
 import { supabase } from '../supabase';
-import { isExistingUser } from './validation';
+import { isExistingUser, validateEmail, validatePassword } from './validation';
 
 export interface SignUpResult {
   success: boolean;
@@ -28,8 +28,38 @@ export const signUpUser = async (
   password: string
 ): Promise<SignUpResult> => {
   try {
+    // Validate and sanitize inputs
+    const emailValidation = validateEmail(email);
+    const passwordValidation = validatePassword(password);
+    
+    if (!emailValidation.isValid) {
+      return {
+        success: false,
+        error: 'Please enter a valid email address.'
+      };
+    }
+    
+    if (!passwordValidation.isValid) {
+      return {
+        success: false,
+        error: 'Password does not meet security requirements.'
+      };
+    }
+    
+    // Use sanitized email
+    const sanitizedEmail = emailValidation.sanitized;
+
+    // Check if Supabase is configured before attempting signup
+    const { isSupabaseConfigured } = await import('../supabase');
+    if (!isSupabaseConfigured()) {
+      return {
+        success: false,
+        error: 'Unable to connect to servers. Please check your internet connection and try again.'
+      };
+    }
+
     const { data, error } = await supabase.auth.signUp({ 
-      email, 
+      email: sanitizedEmail, 
       password 
     });
 
@@ -69,7 +99,7 @@ export const signUpUser = async (
       // Successful signup
       return { 
         success: true, 
-        redirectTo: `/login/email-confirmation?email=${encodeURIComponent(email)}` 
+        redirectTo: `/login/email-confirmation?email=${encodeURIComponent(sanitizedEmail)}` 
       };
     }
 
@@ -86,8 +116,30 @@ export const signInUser = async (
   password: string
 ): Promise<SignInResult> => {
   try {
+    // Validate and sanitize inputs
+    const emailValidation = validateEmail(email);
+    
+    if (!emailValidation.isValid) {
+      return {
+        success: false,
+        error: 'Please enter a valid email address.'
+      };
+    }
+    
+    // Use sanitized email
+    const sanitizedEmail = emailValidation.sanitized;
+
+    // Check if Supabase is configured before attempting signin
+    const { isSupabaseConfigured } = await import('../supabase');
+    if (!isSupabaseConfigured()) {
+      return {
+        success: false,
+        error: 'Unable to connect to servers. Please check your internet connection and try again.'
+      };
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: sanitizedEmail,
       password
     });
 
@@ -163,11 +215,33 @@ export const isEmailExistsError = (error: any): boolean => {
 // Send password reset email
 export const sendPasswordReset = async (email: string): Promise<ResetPasswordResult> => {
   try {
+    // Validate and sanitize input
+    const emailValidation = validateEmail(email);
+    
+    if (!emailValidation.isValid) {
+      return {
+        success: false,
+        error: 'Please enter a valid email address.'
+      };
+    }
+    
+    // Use sanitized email
+    const sanitizedEmail = emailValidation.sanitized;
+
+    // Check if Supabase is configured before attempting password reset
+    const { isSupabaseConfigured } = await import('../supabase');
+    if (!isSupabaseConfigured()) {
+      return {
+        success: false,
+        error: 'Unable to connect to servers. Please check your internet connection and try again.'
+      };
+    }
+
     // First, check if email exists by attempting to get user info
     // We'll use a sign-in attempt with a dummy password to check if email exists
     // This is a common pattern for checking email existence without exposing user data
     const { error: checkError } = await supabase.auth.signInWithPassword({
-      email,
+      email: sanitizedEmail,
       password: 'dummy_password_for_check_only'
     });
     
@@ -186,7 +260,7 @@ export const sendPasswordReset = async (email: string): Promise<ResetPasswordRes
     }
 
     // Email exists, proceed with password reset
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(sanitizedEmail, {
       redirectTo: `${window.location.origin}/login/reset-password`
     });
 
@@ -223,6 +297,15 @@ export const sendPasswordReset = async (email: string): Promise<ResetPasswordRes
 // Update password after reset (called from reset confirmation page)
 export const updatePassword = async (newPassword: string): Promise<ResetPasswordResult> => {
   try {
+    // Check if Supabase is configured before attempting password update
+    const { isSupabaseConfigured } = await import('../supabase');
+    if (!isSupabaseConfigured()) {
+      return {
+        success: false,
+        error: 'Unable to connect to servers. Please check your internet connection and try again.'
+      };
+    }
+
     const { error } = await supabase.auth.updateUser({
       password: newPassword
     });
