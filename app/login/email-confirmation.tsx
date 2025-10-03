@@ -1,4 +1,5 @@
 import { CoreColors } from '@/constants/theme';
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
@@ -32,7 +33,7 @@ export default function EmailConfirmationScreen() {
 
   // Listen for auth state changes (for auto-signin after email confirmation)
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
       console.log('Auth state change:', event, session?.user?.email);
       
       if (event === 'SIGNED_IN' && session?.user?.email === userEmail) {
