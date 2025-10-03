@@ -39,20 +39,49 @@ if (Platform.OS === 'web') {
   });
 }
 
-export const supabase = createClient(
-  supabaseUrl,
-  supabaseAnonKey,
-  {
-    auth: {
-      storage: Platform.OS === 'web' ? WebStorageAdapter : EncryptedStorageAdapter,
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: false,
-    },
-  },
-);
-
-// Add a simple health check function
+// Check if Supabase is properly configured
 export const isSupabaseConfigured = () => {
   return !!(supabaseUrl && supabaseAnonKey && supabaseUrl.length > 0 && supabaseAnonKey.length > 0);
 };
+
+// Lazy initialization of Supabase client - only create when variables are available
+let _supabaseClient: any = null;
+
+export const getSupabaseClient = () => {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Supabase is not configured. Missing URL or API key.');
+  }
+  
+  if (!_supabaseClient) {
+    _supabaseClient = createClient(
+      supabaseUrl,
+      supabaseAnonKey,
+      {
+        auth: {
+          storage: Platform.OS === 'web' ? WebStorageAdapter : EncryptedStorageAdapter,
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: false,
+        },
+      },
+    );
+  }
+  
+  return _supabaseClient;
+};
+
+// For backward compatibility, create a proxy that throws helpful errors
+export const supabase = new Proxy({} as any, {
+  get(target, prop) {
+    if (!isSupabaseConfigured()) {
+      console.warn('⚠️  Supabase not configured - operations will be skipped');
+      // Return a mock object that doesn't throw but logs warnings
+      return new Proxy({} as any, {
+        get() {
+          return () => Promise.resolve({ data: null, error: { message: 'Supabase not configured' } });
+        }
+      });
+    }
+    return getSupabaseClient()[prop];
+  }
+});

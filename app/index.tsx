@@ -26,11 +26,21 @@ export default function HomePage() {
         
         if (Platform.OS === 'web') {
           // On web, be more conservative - just check if user has account flag
+          // Don't call any Supabase functions if not configured
           try {
-            const authState = await AuthStateManager.getAuthState();
-            routingDecision = authState.hasAccount ? 'main' : 'welcome';
+            // First check if Supabase is even configured
+            const { isSupabaseConfigured } = await import('../lib/supabase');
+            
+            if (!isSupabaseConfigured()) {
+              console.log('⚠️  Supabase not configured on web - defaulting to welcome');
+              routingDecision = 'welcome';
+            } else {
+              const authState = await AuthStateManager.getAuthState();
+              routingDecision = authState.hasAccount ? 'main' : 'welcome';
+            }
           } catch {
-            // If auth state check fails, default to welcome
+            // If anything fails, default to welcome
+            console.log('⚠️  Auth state check failed - defaulting to welcome');
             routingDecision = 'welcome';
           }
         } else {
