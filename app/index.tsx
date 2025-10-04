@@ -13,14 +13,46 @@ export default function HomePage() {
   // For mobile platforms, do the full routing logic
   React.useEffect(() => {
     const handleRouting = async () => {
+      // Helper: attempt a router.replace safely, blurring active element on web
+      const safeReplace = (path: '/login/welcome' | '/login/complete-profile' | '/select/world-selection', attempts = 6, delay = 80) => {
+        const tryReplace = (remaining: number) => {
+          try {
+            // On web, blur the active element so it won't be hidden by aria-hidden overlays
+            if (Platform.OS === 'web' && typeof document !== 'undefined') {
+              try {
+                const active = document.activeElement as HTMLElement | null;
+                if (active && typeof active.blur === 'function') active.blur();
+              } catch {
+                // ignore
+              }
+            }
+
+            router.replace(path as any);
+          } catch {
+            if (remaining > 0) {
+              setTimeout(() => tryReplace(remaining - 1), delay);
+            } else {
+              try {
+                router.replace(path as any);
+              } catch (err) {
+                console.warn('safeReplace: failed to navigate to', path, err);
+              }
+            }
+          }
+        };
+
+        tryReplace(attempts - 1);
+      };
+
       try {
         setIsRouting(true);
         setError(null);
 
+        
         // For web, use simple redirect to welcome to avoid GitHub Pages issues
         if (Platform.OS === 'web') {
           console.log('🌐 Web platform detected - redirecting to welcome');
-          router.replace('/login/welcome');
+          safeReplace('/login/welcome');
           return;
         }
 
@@ -31,35 +63,31 @@ export default function HomePage() {
           try {
             switch (routingDecision) {
               case 'welcome':
-                router.replace('/login/welcome');
+                safeReplace('/login/welcome');
                 break;
               case 'complete-profile':
-                router.replace('/login/complete-profile');
+                safeReplace('/login/complete-profile');
                 break;
               case 'login':
               case 'main':
-                router.replace('/select/world-selection');
+                safeReplace('/select/world-selection');
                 break;
               default:
-                router.replace('/login/welcome');
+                safeReplace('/login/welcome');
             }
-          } catch (navError) {
-            console.error('Navigation error:', navError);
-            // Fallback navigation
-            router.replace('/login/welcome');
-          }
+            } catch {
+              console.error('Navigation error: (see above)');
+              // Fallback navigation
+              safeReplace('/login/welcome');
+            }
         }, 100);
       } catch (error) {
         console.error('Routing error:', error);
         setError('Failed to load app. Please refresh the page.');
         
-        // Emergency fallback to welcome screen
+            // Emergency fallback to welcome screen
         setTimeout(() => {
-          try {
-            router.replace('/login/welcome');
-          } catch (navError) {
-            console.error('Emergency navigation failed:', navError);
-          }
+          safeReplace('/login/welcome');
         }, 1000);
       } finally {
         // Remove loading state after a short delay
