@@ -26,6 +26,7 @@ export default function SettingsMenu({
       transparent={true}
       animationType="fade"
       onRequestClose={onClose}
+      accessibilityViewIsModal={true}
     >
       <TouchableOpacity 
         style={{

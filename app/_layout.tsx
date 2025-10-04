@@ -1,22 +1,31 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import CustomLoad from '../components/custom_components/CustomLoad';
+import LoadingOverlay from '../components/LoadingOverlay';
 import TopBar from '../components/TopBar';
 import { CoreColors } from '../constants/theme';
+import { useAppBootstrap } from '../hooks/use-app-bootstrap';
 import { AuthStateManager } from '../lib/auth-state';
 
 export default function RootLayout() {
   const router = useRouter();
   const segments = useSegments();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  
+  // Use the bootstrap hook to ensure assets and session are loaded
+  const bootstrap = useAppBootstrap();
 
   // Protected routes that require authentication
   const protectedRoutes = ['select', 'main', 'settings'];
   const isProtectedRoute = protectedRoutes.includes(segments[0]);
 
-  // Check authentication status - but be more gentle about redirects
+  // Check authentication status ONLY after bootstrap is complete
   useEffect(() => {
+    // Don't proceed until bootstrap is complete
+    if (!bootstrap.isReady) {
+      return;
+    }
+
     const checkAuth = async () => {
       try {
         // Don't interfere with login routes at all
@@ -44,19 +53,16 @@ export default function RootLayout() {
     };
 
     checkAuth();
-  }, [segments, router, isProtectedRoute]);
+  }, [segments, router, isProtectedRoute, bootstrap.isReady]);
 
-  // Show loading while checking authentication for protected routes
-  if (isCheckingAuth && isProtectedRoute) {
+  // Show loading while bootstrap is happening OR while checking auth for protected routes
+  if (!bootstrap.isReady || (isCheckingAuth && isProtectedRoute)) {
     return (
-      <View style={{ 
-        flex: 1, 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        backgroundColor: CoreColors.backgroundDark 
-      }}>
-        <CustomLoad />
-      </View>
+      <LoadingOverlay 
+        message="Loading D&D Toolkit..."
+        error={bootstrap.error}
+        assetsLoaded={bootstrap.assetsLoaded}
+      />
     );
   }
 
