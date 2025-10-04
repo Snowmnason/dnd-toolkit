@@ -75,6 +75,26 @@ export const AuthStateManager = {
     }
   },
 
+  // Store session information or mark that user has an account when a session exists
+  async setSession(session: any): Promise<void> {
+    try {
+      // Keep the simple has-account flag in sync
+      await storage.setItem(STORAGE_KEYS.HAS_ACCOUNT, 'true');
+
+      // Optionally cache minimal session info on web (not storing full token for security)
+      if (Platform.OS === 'web' && session?.user?.email) {
+        try {
+          const key = 'dnd_session_user_email';
+          window.localStorage.setItem(key, session.user.email);
+        } catch {
+          // ignore
+        }
+      }
+    } catch (error) {
+      console.error('Error setting session state:', error);
+    }
+  },
+
   // Clear all auth state (logout)
   async clearAuthState(): Promise<void> {
     try {
@@ -126,60 +146,62 @@ export const AuthStateManager = {
   // ==========================================
   async getRoutingDecision(): Promise<'welcome' | 'login' | 'main' | 'complete-profile'> {
     try {
+      // First, get local auth flag
       const authState = await this.getAuthState();
 
-      // If user has an account, check if they're actually logged in
-      if (authState.hasAccount) {
-        console.log('📱 User has account - checking authentication status');
-        
-        // Import supabase dynamically to avoid circular dependency
-        const { supabase, isSupabaseConfigured } = await import('./supabase');
-        
-        // If Supabase isn't configured (like on GitHub Pages), use local state
-        if (!isSupabaseConfigured()) {
-          console.warn('⚠️  Supabase not configured, using local auth state for routing');
-          return 'main';
-        }
-        
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        // If no user exists (signed out), clear local state and go to welcome
-        if (!user) {
-          console.log('❌ No authenticated user found - clearing local state');
-          await this.clearAuthState();
-          return 'welcome';
-        }
-        
-        // User exists - check if they have a profile in our database
-        try {
-          const { usersDB } = await import('./database/users');
-          const userProfile = await usersDB.getCurrentUser();
-          
-          // More robust profile validation - check for both existence AND valid username
-          const hasValidProfile = userProfile && 
-                                 userProfile.username && 
-                                 userProfile.username.trim().length > 0;
-          
-          if (!hasValidProfile) {
-            console.log('👤 User missing or invalid profile - redirect to complete-profile');
-            return 'complete-profile';
-          }
-          
-          console.log('📱 User profile complete - going to main app');
-          return 'main';
-        } catch (profileError) {
-          console.log('👤 Database error checking profile:', profileError);
-          
-          // If database is down or unreachable, allow user to proceed to main app
-          // rather than trapping them in an infinite redirect loop
-          // They can complete profile later when database is available
-          console.log('⚠️  Database unavailable - allowing access to main app');
-          return 'main';
-        }
+      // Import supabase (lazy) and check if configured
+      const { supabase, isSupabaseConfigured } = await import('./supabase');
+
+      // If Supabase isn't configured, fall back to local state
+      if (!isSupabaseConfigured()) {
+        console.warn('⚠️ Supabase not configured - defaulting to welcome');
+        return 'welcome';
       }
 
-      // First time user - show welcome screen
-      console.log('👋 First time user - showing welcome');
+      // Ask Supabase for an active session
+      const { data: { session } } = await supabase.auth.getSession();
+
+      // Try to fetch the user profile once (may fail)
+      let userProfile: any = null;
+      try {
+        const { usersDB } = await import('./database/users');
+        userProfile = await usersDB.getCurrentUser();
+      } catch (dbError) {
+        console.log('👤 Database error checking profile:', dbError);
+        // If DB fails, allow user to continue to main (graceful degradation)
+        if (session) return 'main';
+        // If no session but we can't query profile, prefer 'login' if user has account, else 'welcome'
+        return authState.hasAccount ? 'login' : 'welcome';
+      }
+
+      // If there is an active Supabase session
+      if (session) {
+        // Sanity-check profile identity: prefer auth_id match, fallback to id
+        const matchesAuth = !!userProfile && (
+          userProfile.auth_id === session.user.id || userProfile.id === session.user.id
+        );
+
+        // If profile missing or mismatch -> force complete-profile path
+        if (!matchesAuth) {
+          return 'complete-profile';
+        }
+
+        // If username is missing or blank -> complete-profile
+        if (!userProfile.username || userProfile.username.trim().length === 0) {
+          return 'complete-profile';
+        }
+
+        // Session and profile valid -> main
+        return 'main';
+      }
+
+      // No active session
+      if (authState.hasAccount) {
+        // User has an account but no active session -> prompt login
+        return 'login';
+      }
+
+      // No account and no session -> welcome
       return 'welcome';
     } catch (error) {
       console.error('Error getting routing decision:', error);
