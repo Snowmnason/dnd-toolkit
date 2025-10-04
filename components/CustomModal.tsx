@@ -87,6 +87,7 @@ export default function CustomModal({
       transparent={true}
       animationType="fade"
       onRequestClose={onClose}
+      accessibilityViewIsModal={true}
     >
       <TouchableOpacity 
         style={{

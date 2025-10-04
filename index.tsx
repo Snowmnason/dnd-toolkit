@@ -3,36 +3,80 @@ import { App } from "expo-router/build/qualified-entry";
 import { renderRootComponent } from "expo-router/build/renderRootComponent";
 import React from "react";
 import { Platform } from "react-native";
-import AppLoader from "./app/AppLoader";
 
-// Create a wrapper component that includes AppLoader
-function AppWithLoader() {
-  return (
-    <AppLoader
-      onReady={async () => {
-        // Platform-specific initialization
-        if (Platform.OS === 'web') {
-          // Web/Desktop: Load Skia with error handling
-          try {
-            console.log('🔄 Attempting to load Skia for web...');
-            const { LoadSkiaWeb } = await import("@shopify/react-native-skia/lib/module/web");
-            await LoadSkiaWeb({
-              locateFile: (file) => `./${file}`, // since wasm is in /public
-            });
-            console.log("✅ Skia (CanvasKit) fully loaded for web");
-          } catch (error) {
-            console.warn("⚠️  Skia loading failed (non-critical):", error);
-            // Don't throw - app can work without Skia canvas features
-          }
-        } else {
-          // Mobile: No Skia loading needed
-          console.log("✅ App ready (mobile platform)");
-        }
-      }}
-    >
-      <App />
-    </AppLoader>
-  );
+// Global flag to track Skia readiness
+if (Platform.OS === 'web') {
+  (window as any).SkiaReady = false;
 }
 
-renderRootComponent(AppWithLoader);
+// For web, we need to load Skia BEFORE React renders anything
+async function initializeWebApp() {
+  if (Platform.OS === 'web') {
+    try {
+      console.log('🔄 Loading Skia for web before app render...');
+      
+      const { LoadSkiaWeb } = await import("@shopify/react-native-skia/lib/module/web");
+      await LoadSkiaWeb({
+        locateFile: (file) => {
+          console.log('🔍 Locating file:', file);
+          // Always use absolute path from domain root to avoid any path resolution issues
+          if (file === 'canvaskit.wasm') {
+            return `${window.location.origin}/canvaskit.wasm`;
+          }
+          // For any other files, use absolute path from root
+          return `${window.location.origin}/${file}`;
+        },
+      });
+      
+      // Mark Skia as ready
+      (window as any).SkiaReady = true;
+      console.log("✅ Skia (CanvasKit) loaded successfully");
+    } catch (error) {
+      console.error("❌ Failed to load Skia:", error);
+      console.warn("⚠️ App will continue without Skia canvas features");
+      // Mark as "ready" but with an error flag
+      (window as any).SkiaReady = 'error';
+    }
+  }
+}
+
+// Create wrapper that ensures Skia loads first on web
+function AppWithSkiaInit() {
+  const [skiaReady, setSkiaReady] = React.useState(Platform.OS !== 'web');
+
+  React.useEffect(() => {
+    if (Platform.OS === 'web') {
+      initializeWebApp().finally(() => {
+        setSkiaReady(true);
+      });
+    }
+  }, []);
+
+  // On web, show a minimal loading screen while Skia loads
+  if (!skiaReady) {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: '#2f353d',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        color: '#F5E6D3',
+        fontFamily: 'system-ui, sans-serif'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '24px', marginBottom: '16px' }}>⚡</div>
+          <div>Loading D&D Toolkit...</div>
+        </div>
+      </div>
+    );
+  }
+
+  return <App />;
+}
+
+renderRootComponent(AppWithSkiaInit);
