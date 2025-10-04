@@ -1,4 +1,4 @@
-import type { User } from '@supabase/supabase-js';
+import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
@@ -38,13 +38,18 @@ export default function SettingsPage() {
     checkAuth();
 
     // Get current user
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user);
+    supabase.auth.getUser().then((res: { data?: { user?: User | null }; error?: any }) => {
+      setUser(res.data?.user ?? null);
+      setLoading(false);
+    }).catch((err: unknown) => {
+      console.error('Error fetching user on settings mount:', err);
       setLoading(false);
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+      // event can be 'SIGNED_IN', 'SIGNED_OUT', etc.
+      // Update local user state when session changes
       setUser(session?.user ?? null);
     });
 
