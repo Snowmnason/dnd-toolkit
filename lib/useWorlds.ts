@@ -4,8 +4,9 @@ import { WorldWithAccess, worldsDB } from './database/worlds';
 /**
  * Custom hook for managing world data and state
  * Provides loading, error handling, and retry functionality
+ * @param userId - Optional user ID for optimization. If not provided, uses current auth user
  */
-export function useWorlds() {
+export function useWorlds(userId?: string) {
   const [selectedWorld, setSelectedWorld] = useState<WorldWithAccess | null>(null);
   const [worlds, setWorlds] = useState<WorldWithAccess[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -15,7 +16,8 @@ export function useWorlds() {
     try {
       setIsLoading(true);
       setError(null);
-      const userWorlds = await worldsDB.getMyWorlds();
+      // Pass userId to getMyWorlds for potential optimization
+      const userWorlds = await worldsDB.getMyWorlds(userId);
       setWorlds(userWorlds);
     } catch (err) {
       console.error('Error loading worlds:', err);
@@ -23,7 +25,7 @@ export function useWorlds() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [userId]); // Include userId since it's used in the callback
 
   // Load worlds on mount
   useEffect(() => {

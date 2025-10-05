@@ -1,4 +1,4 @@
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import LoadingOverlay from '../components/LoadingOverlay';
@@ -8,6 +8,11 @@ import { useAppBootstrap } from '../hooks/use-app-bootstrap';
 import { AuthStateManager } from '../lib/auth-state';
 
 export default function RootLayout() {
+    // Get local search params using the hook at the top level
+  const params = useLocalSearchParams();
+  const userId = typeof params.userId === 'string' ? params.userId : undefined;
+  const worldId = typeof params.worldId === 'string' ? params.worldId : undefined;
+  const userRole = typeof params.userRole === 'string' ? params.userRole : undefined;
   const router = useRouter();
   const segments = useSegments();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -92,7 +97,12 @@ export default function RootLayout() {
         // Handle create-world and world-detail back navigation
         if (segments.some(segment => segment === 'create-world') || segments.some(segment => segment === 'world-detail')) {
           config.onBackPress = () => {
-            router.replace('/select/world-selection');
+            const routeParams: any = {};
+            if (userId) routeParams.userId = userId;
+            router.replace({
+              pathname: '/select/world-selection',
+              params: routeParams,
+            });
             return true; // Prevent default
           };
         }
@@ -107,7 +117,12 @@ export default function RootLayout() {
         // Handle desktop/mobile routes - always go back to world-selection
         if (secondSegment === 'desktop' || secondSegment === 'mobile') {
           config.onBackPress = () => {
-            router.replace('/select/world-selection');
+            const routeParams: any = {};
+            if (userId) routeParams.userId = userId;
+            router.replace({
+              pathname: '/select/world-selection',
+              params: routeParams,
+            });
             return true; // Prevent default
           };
         }
@@ -115,18 +130,73 @@ export default function RootLayout() {
         switch (secondSegment) {
           case 'characters-npcs':
             config.title = 'Characters & NPCs';
+            config.onBackPress = () => {
+              const routeParams: any = {};
+              if (userId) routeParams.userId = userId;
+              if (worldId) routeParams.worldId = worldId;
+              if (userRole) routeParams.userRole = userRole;
+              router.replace({
+                pathname: '/main/desktop',
+                params: routeParams,
+              });
+              return true; // Prevent default
+            };
             break;
           case 'items-treasure':
             config.title = 'Items & Treasure';
+            config.onBackPress = () => {
+              const routeParams: any = {};
+              if (userId) routeParams.userId = userId;
+              if (worldId) routeParams.worldId = worldId;
+              if (userRole) routeParams.userRole = userRole;
+              router.replace({
+                pathname: '/main/desktop',
+                params: routeParams,
+              });
+              return true; // Prevent default
+            };
             break;
           case 'world-exploration':
             config.title = 'World & Exploration';
+            config.onBackPress = () => {
+              const routeParams: any = {};
+              if (userId) routeParams.userId = userId;
+              if (worldId) routeParams.worldId = worldId;
+              if (userRole) routeParams.userRole = userRole;
+              router.replace({
+                pathname: '/main/desktop',
+                params: routeParams,
+              });
+              return true; // Prevent default
+            };
             break;
           case 'combat-events':
             config.title = 'Combat & Events';
+            config.onBackPress = () => {
+              const routeParams: any = {};
+              if (userId) routeParams.userId = userId;
+              if (worldId) routeParams.worldId = worldId;
+              if (userRole) routeParams.userRole = userRole;
+              router.replace({
+                pathname: '/main/desktop',
+                params: routeParams,
+              });
+              return true; // Prevent default
+            };
             break;
           case 'story-notes':
             config.title = 'Story & Notes';
+            config.onBackPress = () => {
+              const routeParams: any = {};
+              if (userId) routeParams.userId = userId;
+              if (worldId) routeParams.worldId = worldId;
+              if (userRole) routeParams.userRole = userRole;
+              router.replace({
+                pathname: '/main/desktop',
+                params: routeParams,
+              });
+              return true; // Prevent default
+            };
             break;
           default:
             // Keep 'D&D Toolkit' for main menu
@@ -143,7 +213,6 @@ export default function RootLayout() {
         // Keep defaults
         break;
     }
-
     return config;
   };
 

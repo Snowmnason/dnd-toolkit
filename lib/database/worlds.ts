@@ -79,18 +79,26 @@ export const worldsDB = {
   },
 
   // Get all worlds for current user (both owned and member of)
-  async getMyWorlds(): Promise<WorldWithAccess[]> {
-    // Get current user ID
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
+  async getMyWorlds(userId?: string): Promise<WorldWithAccess[]> {
+    let currentUserId: string;
+    
+    if (userId) {
+      // Use provided userId for optimization
+      currentUserId = userId;
+    } else {
+      // Fall back to getting current user from auth
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
 
-    const { data: currentUser } = await supabase
-      .from('users')
-      .select('id')
-      .eq('auth_id', user.id)
-      .single();
+      const { data: currentUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_id', user.id)
+        .single();
 
-    if (!currentUser) throw new Error('User profile not found');
+      if (!currentUser) throw new Error('User profile not found');
+      currentUserId = currentUser.id;
+    }
 
     // OPTIMIZED: Get both owned worlds and accessible worlds in parallel
     const [ownedWorldsResult, accessWorldsResult] = await Promise.all([
@@ -98,7 +106,7 @@ export const worldsDB = {
       supabase
         .from('worlds')
         .select('*')
-        .eq('owner_id', currentUser.id)
+        .eq('owner_id', currentUserId)
         .order('created_at', { ascending: false }),
       
       // Get worlds where user has access (uses idx_world_access_user_id + idx_world_access_user_created index)
@@ -108,7 +116,7 @@ export const worldsDB = {
           *,
           worlds(*)
         `)
-        .eq('user_id', currentUser.id)
+        .eq('user_id', currentUserId)
         .order('created_at', { ascending: false })
     ]);
 
@@ -127,7 +135,7 @@ export const worldsDB = {
     const allWorlds: WorldWithAccess[] = [];
 
     // Add owned worlds
-    (ownedWorldsResult.data || []).forEach(world => {
+    (ownedWorldsResult.data || []).forEach((world: World) => {
       allWorlds.push({
         ...world,
         user_role: 'owner'
@@ -135,8 +143,8 @@ export const worldsDB = {
     });
 
     // Add accessible worlds (where user is not owner)
-    (accessWorldsResult.data || []).forEach(access => {
-      if (access.worlds && access.worlds.owner_id !== currentUser.id) {
+    (accessWorldsResult.data || []).forEach((access: any) => {
+      if (access.worlds && access.worlds.owner_id !== currentUserId) {
         allWorlds.push({
           ...access.worlds,
           world_access: access,
@@ -260,7 +268,7 @@ export const worldsDB = {
       throw new Error(error.message || 'Failed to fetch member worlds');
     }
 
-    return (data || []).map(access => ({
+    return (data || []).map((access: any) => ({
       ...access.worlds,
       world_access: access,
       user_role: access.user_role // Direct assignment since it's already the correct type

@@ -1,19 +1,49 @@
+import EditWorldModal from '@/components/create-world/EditWorldModal';
 import CustomLoad from '@/components/custom_components/CustomLoad';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Image, ScrollView, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
 import { ComponentStyles, CoreColors, Spacing } from '../../constants/theme';
+import { useWorldModal } from '../../hooks/use-world-modal';
 import { useWorlds } from '../../lib/useWorlds';
 
+
+
 export default function LandingPage() {
-  const { selectedWorld, setSelectedWorld, worlds, isLoading, error, retry } = useWorlds();
+  const params = useLocalSearchParams();
+  // Extract userId from params and ensure it's a string (not string[])
+  const userId = typeof params.userId === 'string' ? params.userId : undefined;
   
-  const selectedMapImage = require('../../assets/images/Miku.png');
+  const { selectedWorld, setSelectedWorld, worlds, isLoading, error, retry } = useWorlds(userId);
+  
+  const noImageSelected = require('../../assets/images/Miku.png');
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 900;
+  const [mapImage, setMapImage] = useState<string | null>(null);
+  
+  // Use the custom hook for modal functionality
+  const {
+    editModalVisible,
+    modalWorldName,
+    setModalWorldName,
+    openEditModal,
+    closeEditModal,
+    handleConfirmWorldName,
+    createGenerateInviteLinkHandler,
+    createDeleteWorldHandler,
+    createRemoveFromWorldHandler,
+  } = useWorldModal({
+    // You can provide custom handlers here in the future
+    // onWorldNameUpdate: async (worldId, newName) => { /* custom logic */ },
+    // onDeleteWorld: async (worldId) => { /* custom logic */ },
+    // onRemoveFromWorld: async (worldId) => { /* custom logic */ },
+  });
+  
+
 
   // Show loading screen
   if (isLoading) {
@@ -83,10 +113,24 @@ export default function LandingPage() {
                     world.user_role === 'dm' && { borderLeftWidth: 3, borderLeftColor: CoreColors.secondaryLight }
                   ]}
                   onPress={() => {
+                    setMapImage(world.map_image_url);
                     if (isDesktop) {
-                      setSelectedWorld(world);
+                      setSelectedWorld(prev => {
+                        const newSelection = prev === world ? null : world;
+                        setMapImage(newSelection ? world.map_image_url : null);
+                        return newSelection;
+                      });
                     } else {
-                      router.push('/select/world-detail/' + encodeURIComponent(world.world_id) as any);
+                      // Include userId, userRole, and mapImage in the route
+                      const routeParams: Record<string, string> = {};
+                      if (world.name) routeParams.name = world.name;
+                      if (userId) routeParams.userId = userId;
+                      routeParams.userRole = world.user_role;
+                      if (world.map_image_url) routeParams.mapImage = world.map_image_url;
+                      
+                      const queryString = new URLSearchParams(routeParams).toString();
+                      const route = `/select/world-detail/${encodeURIComponent(world.world_id)}?${queryString}`;
+                      router.push(route as any);
                     }
                   }}
                 >
@@ -112,7 +156,16 @@ export default function LandingPage() {
         {/* Create New World Button */}
         <PrimaryButton
           style={{position: 'absolute',left: Spacing.md,right: Spacing.md,bottom: Spacing.md,borderRadius: 14}} textStyle={{}}
-          onPress={() => router.push('/select/create-world')}
+          onPress={() => {
+            const routeParams: Record<string, string> = {};
+
+            if (userId) routeParams.userId = userId;
+
+            router.push({
+              pathname: '/select/create-world',
+              params: routeParams,
+            });
+          }}
         >
           Create New World
         </PrimaryButton>
@@ -125,10 +178,21 @@ export default function LandingPage() {
           justifyContent: 'center',
           alignItems: 'center',
         }}>
+      {/* Edit World Modal */}
+          <EditWorldModal 
+            visible={editModalVisible} 
+            onClose={closeEditModal}
+            worldName={modalWorldName}
+            onWorldNameChange={setModalWorldName}
+            onConfirmWorldName={() => handleConfirmWorldName(selectedWorld?.world_id)}
+            onGenerateInviteLink={createGenerateInviteLinkHandler(selectedWorld?.world_id, selectedWorld?.name)}
+            onDeleteWorld={createDeleteWorldHandler(selectedWorld?.world_id)}
+          />
+          {/* World Preview */}
           <View style={{ position: 'absolute', top: 30, left: 50, zIndex: 10, backgroundColor: CoreColors.backgroundDark}}>
           </View>
           <Image
-            source={selectedMapImage}
+            source={mapImage || noImageSelected}
             resizeMode="contain"
             style={{ width: '100%', height: '100%', zIndex: -1 }}
           />
@@ -138,21 +202,30 @@ export default function LandingPage() {
                 {selectedWorld.name}
               </ThemedText>
               <View style={{position: 'absolute',bottom: 44,left: 54,right: 54,flexDirection: 'row',justifyContent: 'space-between',}}>
-                {/* Only show delete button for owners */}
-                {selectedWorld.user_role === 'owner' && (
-                  <PrimaryButton 
-                    style={{ backgroundColor: '#FF6B6B' }}
-                    textStyle={{}}
-                    onPress={() => {/* TODO: delete world */}}
-                  >
-                    Delete
-                  </PrimaryButton>
-                )}
+                {/* Show Edit for owners, Leave for non-owners */}
+                <PrimaryButton 
+                  style={{}}
+                  textStyle={{}}
+                  disabled={true} //TODO enable when edit modal is fixed
+                  onPress={selectedWorld.user_role === 'owner' 
+                    ? () => openEditModal(selectedWorld.name) 
+                    : createRemoveFromWorldHandler(selectedWorld.world_id)
+                  }
+                >
+                  {selectedWorld.user_role === 'owner' ? 'Edit' : 'Leave'}
+                </PrimaryButton>
                 <PrimaryButton
                   style={{ marginLeft: selectedWorld.user_role === 'owner' ? 0 : 'auto' }}
                   textStyle={{}}
                   onPress={() => {
-                    router.push(`/main/desktop?worldId=${encodeURIComponent(selectedWorld.world_id)}` as any);
+                    const routeParams: Record<string, string> = { worldId: selectedWorld.world_id };
+                      if (userId) routeParams.userId = userId;
+                      routeParams.userRole = selectedWorld.user_role;
+
+                      router.push({
+                        pathname: '/main/desktop',
+                        params: routeParams,
+                      });
                   }}
                 >
                   Open

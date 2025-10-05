@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../components/themed-text';
@@ -7,10 +7,19 @@ import { createShadow, createTextShadow } from '../../constants/theme';
 
 export default function MainScreenDesktop() {
   const router = useRouter();
+    const params = useLocalSearchParams();
+    const userId = typeof params.userId === 'string' ? params.userId : undefined;
+    const worldId = typeof params.worldId === 'string' ? params.worldId : undefined;
 
   // Navigation helper function
   const navigateToFeature = (featurePath: string) => {
-    router.push(`/main/${featurePath}` as any);
+    const routeParams: any = {};
+                    if (userId) routeParams.userId = userId;
+                    if (worldId) routeParams.worldId = worldId;
+                    router.push({
+                      pathname: `/main/${featurePath}` as any,
+                      params: routeParams,
+                    });
   };
 
   return (

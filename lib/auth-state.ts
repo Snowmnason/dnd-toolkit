@@ -144,7 +144,7 @@ export const AuthStateManager = {
   // ==========================================
   // 🎯 MAIN ROUTING LOGIC - This decides where the user goes
   // ==========================================
-  async getRoutingDecision(): Promise<'welcome' | 'login' | 'main' | 'complete-profile'> {
+  async getRoutingDecision(): Promise<{ routingDecision: 'welcome' | 'login' | 'main' | 'complete-profile'; profileId: string | null }> {
     try {
       // First, get local auth flag
       const authState = await this.getAuthState();
@@ -155,7 +155,7 @@ export const AuthStateManager = {
       // If Supabase isn't configured, fall back to local state
       if (!isSupabaseConfigured()) {
         console.warn('⚠️ Supabase not configured - defaulting to welcome');
-        return 'welcome';
+        return { routingDecision: 'welcome', profileId: null };
       }
 
       // Ask Supabase for an active session
@@ -169,9 +169,9 @@ export const AuthStateManager = {
       } catch (dbError) {
         console.log('👤 Database error checking profile:', dbError);
         // If DB fails, allow user to continue to main (graceful degradation)
-        if (session) return 'main';
+        if (session) return { routingDecision: 'main', profileId: userProfile?.id || null };
         // If no session but we can't query profile, prefer 'login' if user has account, else 'welcome'
-        return authState.hasAccount ? 'login' : 'welcome';
+        return { routingDecision: authState.hasAccount ? 'login' : 'welcome', profileId: null };
       }
 
       // If there is an active Supabase session
@@ -183,29 +183,29 @@ export const AuthStateManager = {
 
         // If profile missing or mismatch -> force complete-profile path
         if (!matchesAuth) {
-          return 'complete-profile';
+          return { routingDecision: 'complete-profile', profileId: userProfile.id };
         }
 
         // If username is missing or blank -> complete-profile
         if (!userProfile.username || userProfile.username.trim().length === 0) {
-          return 'complete-profile';
+          return { routingDecision: 'complete-profile', profileId: userProfile.id };
         }
 
         // Session and profile valid -> main
-        return 'main';
+        return { routingDecision: 'main', profileId: userProfile.id };
       }
 
       // No active session
       if (authState.hasAccount) {
         // User has an account but no active session -> prompt login
-        return 'login';
+        return { routingDecision: 'login', profileId: null };
       }
 
       // No account and no session -> welcome
-      return 'welcome';
+      return { routingDecision: 'welcome', profileId: null };
     } catch (error) {
       console.error('Error getting routing decision:', error);
-      return 'welcome';
+      return { routingDecision: 'welcome', profileId: null };
     }
   }
 };
