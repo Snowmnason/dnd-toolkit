@@ -109,3 +109,4 @@ export const supabase = new Proxy({} as any, {
     return getSupabaseClient()[prop];
   }
 });
+

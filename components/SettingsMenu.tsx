@@ -38,19 +38,44 @@ export default function SettingsMenu({
         activeOpacity={1}
         onPress={onClose}
       >
-        <View style={{
-          backgroundColor: CoreColors.backgroundLight,
-          borderRadius: 12,
-          padding: Spacing.lg * scale,
-          minWidth: 200 * scale,
-          borderWidth: 2,
-          borderColor: CoreColors.secondary,
-        }}>
-          <ThemedText style={{
-            fontSize: 18 * (isDesktop ? 1.3 : 1.1),
-            fontWeight: 'bold',
-            marginBottom: Spacing.md * scale,
-            textAlign: 'center',
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <View style={{
+            backgroundColor: CoreColors.backgroundLight,
+            borderRadius: 12,
+            padding: Spacing.lg * scale,
+            minWidth: 200 * scale,
+            borderWidth: 2,
+            borderColor: CoreColors.secondary,
+            position: 'relative',
+          }}>
+            {/* Close button */}
+            <TouchableOpacity
+              style={{
+                position: 'absolute',
+                top: Spacing.sm * scale,
+                right: Spacing.sm * scale,
+                zIndex: 1,
+                padding: Spacing.sm * scale,
+              }}
+              onPress={onClose}
+            >
+              <ThemedText style={{
+                fontSize: 18 * (isDesktop ? 1.3 : 1.1),
+                fontWeight: 'bold',
+                color: CoreColors.textSecondary,
+              }}>
+                ×
+              </ThemedText>
+            </TouchableOpacity>
+
+            <ThemedText style={{
+              fontSize: 18 * (isDesktop ? 1.3 : 1.1),
+              fontWeight: 'bold',
+              marginBottom: Spacing.md * scale,
+              textAlign: 'center',
             color: CoreColors.textOnLight,
           }}>
             Settings
@@ -116,7 +141,8 @@ export default function SettingsMenu({
               Cancel
             </ThemedText>
           </TouchableOpacity>
-        </View>
+          </View>
+        </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
   );

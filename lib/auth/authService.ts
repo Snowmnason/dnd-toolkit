@@ -58,10 +58,10 @@ export const signUpUser = async (
       };
     }
 
-    const { data, error } = await supabase.auth.signUp({ 
-      email: sanitizedEmail, 
-      password 
-    });
+    const { data, error } = await supabase.auth.signUp( 
+      { email: sanitizedEmail, password }, 
+      { emailRedirectTo: 'https://dnd-tool.thesnowpost.com/login/auth-redirect?action=signup-confirm' } 
+    );
 
     // Give Supabase a moment to process
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -171,12 +171,28 @@ export const signInUser = async (
         const hasValidProfile = userProfile && 
                                userProfile.username && 
                                userProfile.username.trim().length > 0;
+        
+        // Check for pending invites
+        const pendingInvite = checkPendingInvites();
+        
         if (hasValidProfile) {
-          // Profile is complete - go to world selection
-          return { 
-            success: true, 
-            redirectTo: '/select/world-selection' 
-          };
+          // Profile is complete
+          if (pendingInvite) {
+            // Has pending invite - redirect to auth-redirect to process it
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('pending_world_invite'); // Clean up
+            }
+            return { 
+              success: true, 
+              redirectTo: `/login/auth-redirect?action=world-invite&worldId=${pendingInvite.worldId}&worldName=${encodeURIComponent(pendingInvite.worldName)}` 
+            };
+          } else {
+            // No pending invite - go to world selection
+            return { 
+              success: true, 
+              redirectTo: '/select/world-selection' 
+            };
+          }
         } else {
           // Profile needs completion
           return { 
@@ -262,7 +278,7 @@ export const sendPasswordReset = async (email: string): Promise<ResetPasswordRes
 
     // Email exists, proceed with password reset
     const { error } = await supabase.auth.resetPasswordForEmail(sanitizedEmail, {
-      redirectTo: `${window.location.origin}/login/reset-password`
+      redirectTo: `${window.location.origin}/login/auth-redirect?action=reset-password`
     });
 
     if (error) {
@@ -336,4 +352,86 @@ export const updatePassword = async (newPassword: string): Promise<ResetPassword
       error: 'An unexpected error occurred. Please try again.' 
     };
   }
+};
+
+// Generate world invite link for manual sharing
+export const generateWorldInviteLink = async (
+  worldId: string, 
+  worldName: string
+): Promise<{ success: boolean; inviteLink?: string; error?: string }> => {
+  try {
+    if (!worldId || !worldName) {
+      return {
+        success: false,
+        error: 'World ID and name are required'
+      };
+    }
+
+    // Create the invite URL
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://dnd-tool.thesnowpost.com';
+    const inviteLink = `${baseUrl}/login/auth-redirect?action=world-invite&worldId=${worldId}&worldName=${encodeURIComponent(worldName)}`;
+
+    // Try to copy to clipboard
+    if (typeof window !== 'undefined' && window.navigator?.clipboard) {
+      try {
+        await window.navigator.clipboard.writeText(inviteLink);
+        console.log('📋 Invite link copied to clipboard!');
+      } catch {
+        console.log('📋 Could not copy to clipboard automatically');
+      }
+    }
+
+    console.log('🔗 World Invite Link Generated:');
+    console.log(`World: ${worldName}`);
+    console.log(`Link: ${inviteLink}`);
+    
+    return { 
+      success: true,
+      inviteLink 
+    };
+
+  } catch (error) {
+    console.error('Failed to generate invite link:', error);
+    return {
+      success: false,
+      error: 'Failed to generate invite link'
+    };
+  }
+};
+
+// Legacy function - now just calls generateWorldInviteLink
+export const sendWorldInvite = async (
+  toEmail: string, 
+  worldId: string, 
+  worldName: string
+): Promise<{ success: boolean; error?: string }> => {
+  // For now, just generate the link (email parameter ignored)
+  const result = await generateWorldInviteLink(worldId, worldName);
+  return {
+    success: result.success,
+    error: result.error
+  };
+};
+
+// Helper function to check for pending invites
+export const checkPendingInvites = (): { worldId: string; worldName: string } | null => {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('pending_world_invite');
+    if (stored) {
+      try {
+        const inviteData = JSON.parse(stored);
+        // Check if invite is less than 24 hours old
+        if (Date.now() - inviteData.timestamp < 24 * 60 * 60 * 1000) {
+          return { worldId: inviteData.worldId, worldName: inviteData.worldName };
+        } else {
+          // Clean up expired invite
+          localStorage.removeItem('pending_world_invite');
+        }
+      } catch (error) {
+        console.error('Error parsing pending invite:', error);
+        localStorage.removeItem('pending_world_invite');
+      }
+    }
+  }
+  return null;
 };

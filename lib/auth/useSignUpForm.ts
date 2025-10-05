@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { usersDB } from '../database/users';
-import { signUpUser } from './authService';
+import { checkPendingInvites, signUpUser } from './authService';
 import { getPasswordHintColor, getPasswordRequirementsText, validateEmail, validatePassword, validateUsername } from './validation';
 
 type SignUpMode = 'signup' | 'complete-profile';
@@ -60,8 +60,18 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
           display_name: username.trim()
         });
         
-        // Success! Redirect to world selection
-        router.replace('/select/world-selection');
+        // Check for pending invites after profile creation
+        const pendingInvite = checkPendingInvites();
+        if (pendingInvite) {
+          // Clear the pending invite from localStorage since we're processing it
+          localStorage.removeItem('pendingWorldInvite');
+          
+          // Redirect to auth-redirect to process the invite
+          router.replace(`/login/auth-redirect?action=world-invite&worldId=${pendingInvite.worldId}&worldName=${encodeURIComponent(pendingInvite.worldName)}`);
+        } else {
+          // No pending invite - redirect to world selection
+          router.replace('/select/world-selection');
+        }
         
       } catch (error: any) {
         console.error('Profile creation error:', error);
