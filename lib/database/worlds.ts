@@ -100,80 +100,121 @@ export const worldsDB = {
       currentUserId = currentUser.id;
     }
 
-    // OPTIMIZED: Get both owned worlds and accessible worlds in parallel
-    const [ownedWorldsResult, accessWorldsResult] = await Promise.all([
-      // Get owned worlds (uses idx_worlds_owner_id index) - owner_id stores profile ID
-      supabase
-        .from('worlds')
-        .select('*')
-        .eq('owner_id', currentUserId)
-        .order('created_at', { ascending: false }),
-      
-      // Get worlds where user has access (uses idx_world_access_user_id + idx_world_access_user_created index)
+    // STEP 1: Get world IDs from both world_access and owned worlds in parallel
+    // Uses indexes: idx_world_access_user_id, idx_worlds_owner_id
+    const [accessRecordsResult, ownedWorldIdsResult] = await Promise.all([
+      // Get world_access records where user_id matches (includes world_id and role)
       supabase
         .from('world_access')
-        .select(`
-          *,
-          worlds(*)
-        `)
-        .eq('user_id', currentUserId)
-        .order('created_at', { ascending: false })
+        .select('world_id, user_role, permissions')
+        .eq('user_id', currentUserId),
+      
+      // Get world IDs where owner_id matches
+      supabase
+        .from('worlds')
+        .select('world_id')
+        .eq('owner_id', currentUserId)
     ]);
 
-    // Handle errors from parallel queries
-    if (ownedWorldsResult.error) {
-      console.error('Error fetching owned worlds:', ownedWorldsResult.error);
-      throw new Error(ownedWorldsResult.error.message || 'Failed to fetch owned worlds');
+    if (accessRecordsResult.error) {
+      console.error('❌ Error fetching access records:', accessRecordsResult.error);
+      throw new Error(accessRecordsResult.error.message || 'Failed to fetch access records');
     }
 
-    if (accessWorldsResult.error) {
-      console.error('Error fetching accessible worlds:', accessWorldsResult.error);
-      throw new Error(accessWorldsResult.error.message || 'Failed to fetch accessible worlds');
+    if (ownedWorldIdsResult.error) {
+      console.error('❌ Error fetching owned world IDs:', ownedWorldIdsResult.error);
+      throw new Error(ownedWorldIdsResult.error.message || 'Failed to fetch owned world IDs');
     }
 
-    // Combine and format results
-    const allWorlds: WorldWithAccess[] = [];
+    // STEP 2: Collect all unique world IDs and build role mapping
+    const worldIdSet = new Set<string>();
+    const roleMap = new Map<string, { role: UserRole; permissions: any }>();
 
-    // Add owned worlds
-    (ownedWorldsResult.data || []).forEach((world: World) => {
-      allWorlds.push({
-        ...world,
-        user_role: 'owner'
+    // Add world IDs from world_access (user is a member/dm)
+    (accessRecordsResult.data || []).forEach((access: any) => {
+      worldIdSet.add(access.world_id);
+      roleMap.set(access.world_id, {
+        role: access.user_role,
+        permissions: access.permissions || {}
       });
     });
 
-    // Add accessible worlds (where user is not owner)
-    (accessWorldsResult.data || []).forEach((access: any) => {
-      if (access.worlds && access.worlds.owner_id !== currentUserId) {
-        allWorlds.push({
-          ...access.worlds,
-          world_access: access,
-          user_role: access.user_role // Direct assignment since it's already the correct type
-        });
-      }
+    // Add world IDs from owned worlds (user is owner) - owner takes precedence
+    (ownedWorldIdsResult.data || []).forEach((world: any) => {
+      worldIdSet.add(world.world_id);
+      roleMap.set(world.world_id, {
+        role: 'owner',
+        permissions: {}
+      });
     });
 
-    // Sort by created_at (most recent first) - much faster now with pre-sorted data from database
-    allWorlds.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    // DEBUGGING: Uncomment to see collected IDs
+    console.log('🔍 DEBUG - Unique world IDs:', worldIdSet.size);
+    console.log('🔍 DEBUG - World IDs:', Array.from(worldIdSet));
 
+    // STEP 3: Early return if no worlds found
+    if (worldIdSet.size === 0) {
+      // DEBUGGING: Uncomment to trace empty results
+      console.log('ℹ️ No worlds found for user');
+      return [];
+    }
+
+    // STEP 4: Fetch all worlds in ONE query using the collected IDs
+    const worldIds = Array.from(worldIdSet);
+    const { data: worldsData, error: worldsError } = await supabase
+      .from('worlds')
+      .select('*')
+      .in('world_id', worldIds)
+      .order('created_at', { ascending: false });
+
+    if (worldsError) {
+      console.error('❌ Error fetching worlds:', worldsError);
+      throw new Error(worldsError.message || 'Failed to fetch worlds');
+    }
+
+    // DEBUGGING: Uncomment to see fetched worlds count
+    console.log('🔍 DEBUG - Worlds fetched:', worldsData?.length || 0);
+
+    // STEP 5: Map worlds with their roles
+    const allWorlds: WorldWithAccess[] = (worldsData || []).map((world: World) => {
+      const roleInfo = roleMap.get(world.world_id);
+      
+      // DEBUGGING: Uncomment to trace each world
+      console.log(`✅ Adding world: ${world.name} (role: ${roleInfo?.role})`);
+      
+      return {
+        ...world,
+        user_role: roleInfo?.role || 'player',
+        world_access: roleInfo?.role !== 'owner' ? {
+          id: '',
+          world_id: world.world_id,
+          user_id: currentUserId,
+          user_role: roleInfo?.role as AccessRole,
+          permissions: roleInfo?.permissions || {},
+          created_at: world.created_at
+        } : undefined
+      };
+    });
+
+    // DEBUGGING: Uncomment to see final count
+    console.log(`🎲 Total worlds returned: ${allWorlds.length}`);
+    
     return allWorlds;
   },
 
-  // Get a specific world by ID
-  async getById(worldId: string): Promise<World | null> {
+    // Update a world name (only owner)
+  async updateName(worldId: string, userId: string, newName: string): Promise<World> {
     const { data, error } = await supabase
       .from('worlds')
-      .select('*')
+      .update({name: newName, updated_at: 'now()'})
       .eq('id', worldId)
+      .eq('owner_id', userId)
+      .select()
       .single();
     
     if (error) {
-      if (error.code === 'PGRST116') {
-        // No rows returned
-        return null;
-      }
-      console.error('Error fetching world:', error);
-      throw new Error(error.message || 'Failed to fetch world');
+      console.error('Error updating world:', error);
+      throw new Error(error.message || 'Failed to update world');
     }
     
     return data;
@@ -185,7 +226,7 @@ export const worldsDB = {
       .from('worlds')
       .update({
         ...updates,
-        updated_at: new Date().toISOString()
+        updated_at: 'now()'
       })
       .eq('id', worldId)
       .select()
@@ -200,11 +241,12 @@ export const worldsDB = {
   },
 
   // Delete a world
-  async delete(worldId: string): Promise<void> {
+  async delete(worldId: string, userId: string): Promise<void> {
     const { error } = await supabase
       .from('worlds')
       .delete()
-      .eq('id', worldId);
+      .eq('id', worldId)
+      .eq('owner_id', userId); // Ensure only owner can delete
     
     if (error) {
       console.error('Error deleting world:', error);
@@ -212,70 +254,21 @@ export const worldsDB = {
     }
   },
 
-  // Get only worlds I own
-  async getOwnedWorlds(): Promise<World[]> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
-
-    // Get user profile ID
-    const { data: currentUser } = await supabase
-      .from('users')
-      .select('id')
-      .eq('auth_id', user.id)
-      .single();
-
-    if (!currentUser) throw new Error('User profile not found');
-
-    // owner_id stores profile ID
-    const { data, error } = await supabase
-      .from('worlds')
-      .select('*')
-      .eq('owner_id', currentUser.id)
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-      console.error('Error fetching owned worlds:', error);
-      throw new Error(error.message || 'Failed to fetch owned worlds');
-    }
-    
-    return data || [];
-  },
-
-  // Get only worlds I'm a member of (not owner)
-  async getMemberWorlds(): Promise<WorldWithAccess[]> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
-
-    const { data: currentUser } = await supabase
-      .from('users')
-      .select('id')
-      .eq('auth_id', user.id)
-      .single();
-
-    if (!currentUser) throw new Error('User profile not found');
-
-    const { data, error } = await supabase
+    // Remove user from world
+  async removeUserFromWorld(worldId: string, userId: string): Promise<void> {
+    const { error } = await supabase
       .from('world_access')
-      .select(`
-        *,
-        worlds(*)
-      `)
-      .eq('user_id', currentUser.id)
-      .order('created_at', { ascending: false });
+      .delete()
+      .eq('world_id', worldId)
+      .eq('user_id', userId);
 
     if (error) {
-      console.error('Error fetching member worlds:', error);
-      throw new Error(error.message || 'Failed to fetch member worlds');
+      console.error('Error removing user from world:', error);
+      throw new Error(error.message || 'Failed to remove user from world');
     }
-
-    return (data || []).map((access: any) => ({
-      ...access.worlds,
-      world_access: access,
-      user_role: access.user_role // Direct assignment since it's already the correct type
-    })) as WorldWithAccess[];
   },
 
-  // Add user to world (invite/join)
+    // Add user to world (invite/join)
   async addUserToWorld(worldId: string, userId: string, userRole: AccessRole = 'player', permissions: any = {}): Promise<WorldAccess> {
     const { data, error } = await supabase
       .from('world_access')
@@ -296,20 +289,6 @@ export const worldsDB = {
     return data;
   },
 
-  // Remove user from world
-  async removeUserFromWorld(worldId: string, userId: string): Promise<void> {
-    const { error } = await supabase
-      .from('world_access')
-      .delete()
-      .eq('world_id', worldId)
-      .eq('user_id', userId);
-
-    if (error) {
-      console.error('Error removing user from world:', error);
-      throw new Error(error.message || 'Failed to remove user from world');
-    }
-  },
-
   // Get all members of a world
   async getWorldMembers(worldId: string): Promise<(WorldAccess & { user: any })[]> {
     const { data, error } = await supabase
@@ -327,5 +306,141 @@ export const worldsDB = {
     }
 
     return data || [];
-  }
+  },
+
+  /**
+   * NOT NEEDED FUNCTIONS
+   * Get only worlds I own
+   * 
+   * INDEXES LEVERAGED:
+   * - idx_users_auth_id: Fast user profile lookup by auth ID
+   * - idx_worlds_owner_id: Fast owned worlds lookup
+   */
+    // Get a specific world by ID
+  async getById(worldId: string): Promise<World | null> {
+    const { data, error } = await supabase
+      .from('worlds')
+      .select('*')
+      .eq('id', worldId)
+      .single();
+    
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No rows returned
+        return null;
+      }
+      console.error('Error fetching world:', error);
+      throw new Error(error.message || 'Failed to fetch world');
+    }
+    
+    return data;
+  },
+
+  async getOwnedWorlds(): Promise<World[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    // Get user profile ID (uses idx_users_auth_id)
+    const { data: currentUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('auth_id', user.id)
+      .single();
+
+    if (!currentUser) throw new Error('User profile not found');
+
+    // Fetch owned worlds (uses idx_worlds_owner_id)
+    const { data, error } = await supabase
+      .from('worlds')
+      .select('*')
+      .eq('owner_id', currentUser.id)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('❌ Error fetching owned worlds:', error);
+      throw new Error(error.message || 'Failed to fetch owned worlds');
+    }
+    
+    return data || [];
+  },
+
+  /**
+   * Get only worlds I'm a member of (not owner)
+   * 
+   * INDEXES LEVERAGED:
+   * - idx_users_auth_id: Fast user profile lookup by auth ID
+   * - idx_world_access_user_id: Fast access records lookup
+   * - idx_worlds_owner_id: Filter out owned worlds
+   */
+  async getMemberWorlds(): Promise<WorldWithAccess[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    // Get user profile ID (uses idx_users_auth_id)
+    const { data: currentUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('auth_id', user.id)
+      .single();
+
+    if (!currentUser) throw new Error('User profile not found');
+
+    // STEP 1: Get world_access records (uses idx_world_access_user_id)
+    const { data: accessRecords, error: accessError } = await supabase
+      .from('world_access')
+      .select('world_id, user_role, permissions, created_at')
+      .eq('user_id', currentUser.id);
+
+    if (accessError) {
+      console.error('❌ Error fetching access records:', accessError);
+      throw new Error(accessError.message || 'Failed to fetch access records');
+    }
+
+    if (!accessRecords || accessRecords.length === 0) {
+      return [];
+    }
+
+    // STEP 2: Build role map and collect world IDs
+    const roleMap = new Map<string, { role: AccessRole; permissions: any; created_at: string }>();
+    const worldIds: string[] = [];
+
+    accessRecords.forEach((access: any) => {
+      worldIds.push(access.world_id);
+      roleMap.set(access.world_id, {
+        role: access.user_role,
+        permissions: access.permissions || {},
+        created_at: access.created_at
+      });
+    });
+
+    // STEP 3: Fetch all worlds in one query
+    const { data: worldsData, error: worldsError } = await supabase
+      .from('worlds')
+      .select('*')
+      .in('world_id', worldIds)
+      .neq('owner_id', currentUser.id) // Filter out worlds user owns
+      .order('created_at', { ascending: false });
+
+    if (worldsError) {
+      console.error('❌ Error fetching member worlds:', worldsError);
+      throw new Error(worldsError.message || 'Failed to fetch member worlds');
+    }
+
+    // STEP 4: Combine world data with access info
+    return (worldsData || []).map((world: World) => {
+      const accessInfo = roleMap.get(world.world_id);
+      return {
+        ...world,
+        world_access: {
+          id: '',
+          world_id: world.world_id,
+          user_id: currentUser.id,
+          user_role: accessInfo?.role || 'player',
+          permissions: accessInfo?.permissions || {},
+          created_at: accessInfo?.created_at || world.created_at
+        },
+        user_role: accessInfo?.role || 'player'
+      };
+    });
+  },
 };

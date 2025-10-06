@@ -256,3 +256,125 @@ export const getPasswordRequirementsText = (password: string): string => {
     return `Need: ${missingCriteria.join(', ')}`;
   }
 };
+
+// ============================================================================
+// WORLD NAME VALIDATION FUNCTIONS
+// ============================================================================
+
+export interface WorldNameValidationResult {
+  isValid: boolean;
+  sanitizedName: string;
+  errors: string[];
+}
+
+/**
+ * Validates and sanitizes a world name input
+ * @param name - The raw world name input
+ * @param originalName - Optional original name for comparison (used in edit scenarios)
+ * @returns Validation result with sanitized name and any errors
+ */
+export function validateWorldName(name: string, originalName?: string): WorldNameValidationResult {
+  const errors: string[] = [];
+  
+  // Step 1: Basic sanitization - trim whitespace
+  let sanitizedName = name.trim();
+  
+  // Step 2: Length validation
+  if (sanitizedName.length === 0) {
+    errors.push('World name cannot be empty');
+  } else if (sanitizedName.length < 2) {
+    errors.push('World name must be at least 2 characters long');
+  } else if (sanitizedName.length > 50) {
+    errors.push('World name must be 50 characters or less');
+    sanitizedName = sanitizedName.substring(0, 50); // Truncate if too long
+  }
+  
+  // Step 3: Character validation - allow alphanumeric, spaces, and safe special characters
+  const allowedCharPattern = /^[a-zA-Z0-9\s\-_'.(),!&]*$/;
+  if (!allowedCharPattern.test(sanitizedName)) {
+    errors.push('World name contains invalid characters. Only letters, numbers, spaces, and basic punctuation allowed');
+  }
+  
+  // Step 4: SQL injection pattern detection
+  const sqlInjectionPatterns = [
+    /['";]/g,                    // Single/double quotes, semicolons
+    /--/g,                       // SQL comments
+    /\/\*/g,                     // SQL comments
+    /\*\//g,                     // SQL comments
+    /\bunion\b/gi,              // UNION attacks
+    /\bselect\b/gi,             // SELECT statements
+    /\binsert\b/gi,             // INSERT statements
+    /\bupdate\b/gi,             // UPDATE statements
+    /\bdelete\b/gi,             // DELETE statements
+    /\bdrop\b/gi,               // DROP statements
+    /\balter\b/gi,              // ALTER statements
+    /\bexec\b/gi,               // EXEC statements
+    /\bscript\b/gi,             // Script tags
+    /[<>]/g,                     // HTML/XML tags
+  ];
+  
+  // Remove potentially dangerous patterns
+  let cleanName = sanitizedName;
+  sqlInjectionPatterns.forEach(pattern => {
+    if (pattern.test(cleanName)) {
+      errors.push('World name contains potentially unsafe characters');
+      cleanName = cleanName.replace(pattern, '');
+    }
+  });
+  
+  // Step 5: Remove excessive whitespace
+  cleanName = cleanName.replace(/\s+/g, ' ').trim();
+  
+  // Step 6: Check if name changed during sanitization
+  if (cleanName !== sanitizedName && errors.length === 0) {
+    // Only add this error if we haven't already flagged unsafe characters
+    errors.push('World name was automatically cleaned for safety');
+  }
+  
+  // Step 7: Check for unchanged name in edit scenarios
+  if (originalName && cleanName === originalName.trim()) {
+    errors.push('New world name must be different from the current name');
+  }
+  
+  // Step 8: Final length check after cleaning
+  if (cleanName.length < 2 && errors.length === 0) {
+    errors.push('World name too short after cleaning');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    sanitizedName: cleanName,
+    errors
+  };
+}
+
+/**
+ * Creates a sanitized onChange handler for world name inputs
+ * @param setValue - The state setter function
+ * @param onValidationChange - Optional callback for validation state changes
+ * @returns A function that can be used as onChangeText for TextInput
+ */
+export function createWorldNameChangeHandler(
+  setValue: (value: string) => void,
+  onValidationChange?: (result: WorldNameValidationResult) => void
+) {
+  return (text: string) => {
+    const result = validateWorldName(text);
+    setValue(result.sanitizedName);
+    
+    if (onValidationChange) {
+      onValidationChange(result);
+    }
+  };
+}
+
+/**
+ * Checks if a world name is valid for submission
+ * @param name - The world name to validate
+ * @param originalName - Optional original name for edit scenarios
+ * @returns True if the name is valid for submission
+ */
+export function isValidWorldNameForSubmission(name: string, originalName?: string): boolean {
+  const result = validateWorldName(name, originalName);
+  return result.isValid && result.sanitizedName.length >= 2;
+}
