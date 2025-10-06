@@ -1,31 +1,37 @@
+import { usersDB } from '@/lib/database/users';
+import { worldsDB } from '@/lib/database/worlds';
 import { useState } from 'react';
 import { generateWorldInviteLink } from '../lib/auth/authService';
 
-interface UseWorldModalProps {
-  onWorldNameUpdate?: (worldId: string, newName: string) => Promise<void> | void;
-  onDeleteWorld?: (worldId: string) => Promise<void> | void;
-  onRemoveFromWorld?: (worldId: string) => Promise<void> | void;
-}
 
-export const useWorldModal = ({
-  onWorldNameUpdate,
-  onDeleteWorld,
-  onRemoveFromWorld,
-}: UseWorldModalProps = {}) => {
+export const useWorldModal = () => {
   const [editModalVisible, setEditModalVisible] = useState<boolean>(false);
   const [modalWorldName, setModalWorldName] = useState<string>('');
-  const [modalInviteEmail, setModalInviteEmail] = useState<string>('');
+  const [leaveModalVisible, setLeaveModalVisible] = useState<boolean>(false); 
+  const [generatingLink, setGeneratingLink] = useState(false); 
 
   // Modal handlers
-  const handleConfirmWorldName = async (worldId?: string) => {
+  const handleConfirmWorldName = async (worldId?: string, newWorldName?: string, userId?: string) => {
     console.log('Confirm world name:', modalWorldName);
-    
-    if (onWorldNameUpdate && worldId) {
-      try {
-        await onWorldNameUpdate(worldId, modalWorldName);
-      } catch (error) {
-        console.error('Failed to update world name:', error);
+    if (!worldId) {
+      throw new Error('No worldId provided for invite');
+    }
+    if (!newWorldName || newWorldName.trim().length === 0) {
+      throw new Error('World name cannot be empty');
+    }
+    let currentUserId = userId;
+    if (!currentUserId) {
+      const currentUser = await usersDB.getCurrentUser();
+      if (!currentUser?.id) {
+        throw new Error('No user ID available for delete operation');
       }
+      currentUserId = currentUser.id;
+    }
+
+    try {
+      await worldsDB.updateName(worldId, currentUserId, newWorldName);
+    } catch (error) {
+      console.error('Failed to update world name:', error);
     }
     // TODO: Implement default world name update logic if no custom handler provided
   };
@@ -37,7 +43,7 @@ export const useWorldModal = ({
     if (!worldId) {
       throw new Error('No worldId provided for invite');
     }
-
+    setGeneratingLink(true);
     try {
       const result = await generateWorldInviteLink(
         worldId, 
@@ -47,7 +53,6 @@ export const useWorldModal = ({
       if (result.success) {
         console.log('✅ Invite link generated and copied to clipboard!');
         // Optionally clear the email field since we're not using email anymore
-        setModalInviteEmail('');
       } else {
         console.error('❌ Failed to generate invite link:', result.error);
         throw new Error(result.error || 'Failed to generate invite link');
@@ -56,23 +61,28 @@ export const useWorldModal = ({
       console.error('Failed to generate invite link:', error);
       throw error;
     }
+    // Note: generatingLink stays true until modal is reopened (prevents spam clicking)
   };
 
-  const createDeleteWorldHandler = (worldId?: string) => async (): Promise<void> => {
+  const createDeleteWorldHandler = (worldId?: string, userId?: string) => async (): Promise<void> => {
     console.log('Delete world (owner):', worldId);
     
     if (!worldId) {
       throw new Error('No worldId provided for delete');
     }
-
-    try {
-      if (onDeleteWorld) {
-        await onDeleteWorld(worldId);
-      } else {
-        // TODO: Implement default delete world logic
-        console.log('🗑️ Would delete world:', worldId);
-        // await worldsDB.deleteWorld(worldId);
+    
+    let currentUserId = userId;
+    if (!currentUserId) {
+      const currentUser = await usersDB.getCurrentUser();
+      if (!currentUser?.id) {
+        throw new Error('No user ID available for delete operation');
       }
+      currentUserId = currentUser.id;
+    }
+    
+    try {
+      await worldsDB.delete(worldId, currentUserId);
+      console.log('World deleted:', worldId);
       setEditModalVisible(false);
     } catch (error) {
       console.error('Failed to delete world:', error);
@@ -80,21 +90,26 @@ export const useWorldModal = ({
     }
   };
 
-  const createRemoveFromWorldHandler = (worldId?: string) => async (): Promise<void> => {
+  const createRemoveFromWorldHandler = (worldId?: string, userId?: string) => async (): Promise<void> => {
     console.log('Remove from world:', worldId);
     
     if (!worldId) {
       throw new Error('No worldId provided for remove');
     }
+    
+    let currentUserId = userId;
+    if (!currentUserId) {
+      const currentUser = await usersDB.getCurrentUser();
+      if (!currentUser?.id) {
+        throw new Error('No user ID available for remove operation');
+      }
+      currentUserId = currentUser.id;
+    }
 
     try {
-      if (onRemoveFromWorld) {
-        await onRemoveFromWorld(worldId);
-      } else {
-        // TODO: Implement default remove from world logic
-        console.log('🚪 Would remove user from world:', worldId);
-        // await worldsDB.removeUserFromWorld(worldId, userId);
-      }
+        await worldsDB.removeUserFromWorld(worldId, currentUserId);
+        console.log('Removed from world:', worldId);
+        setLeaveModalVisible(false);
     } catch (error) {
       console.error('Failed to remove from world:', error);
       throw error;
@@ -103,29 +118,40 @@ export const useWorldModal = ({
 
   const openEditModal = (worldName: string) => {
     setModalWorldName(worldName);
-    setModalInviteEmail('');
     setEditModalVisible(true);
+    setGeneratingLink(false); // Reset generatingLink state when opening modal
   };
 
   const closeEditModal = () => {
     setEditModalVisible(false);
     setModalWorldName('');
-    setModalInviteEmail('');
+    };
+
+    const openLeaveModal = (worldName: string) => {
+    setModalWorldName(worldName);
+    setLeaveModalVisible(true);
+  };
+
+  const closeLeaveModal = () => {
+    setLeaveModalVisible(false);
   };
 
   return {
     // State
     editModalVisible,
+    leaveModalVisible,
     modalWorldName,
-    modalInviteEmail,
+    generatingLink,
     
     // State setters (for controlled components)
     setModalWorldName,
-    setModalInviteEmail,
+    setGeneratingLink,
     
     // Actions
     openEditModal,
     closeEditModal,
+    openLeaveModal,
+    closeLeaveModal,
     handleConfirmWorldName,
     
     // Handler creators (these return the actual handlers)

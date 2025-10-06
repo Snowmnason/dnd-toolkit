@@ -1,3 +1,4 @@
+import LeaveWorldModal from '@/components/create-world/ConfrimLeaveModal';
 import EditWorldModal from '@/components/create-world/EditWorldModal';
 import CustomLoad from '@/components/custom_components/CustomLoad';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -28,21 +29,22 @@ export default function LandingPage() {
   // Use the custom hook for modal functionality
   const {
     editModalVisible,
+    leaveModalVisible,
     modalWorldName,
     setModalWorldName,
     openEditModal,
     closeEditModal,
+    openLeaveModal,
+    closeLeaveModal,
     handleConfirmWorldName,
     createGenerateInviteLinkHandler,
     createDeleteWorldHandler,
+    generatingLink,
+
     createRemoveFromWorldHandler,
-  } = useWorldModal({
-    // You can provide custom handlers here in the future
-    // onWorldNameUpdate: async (worldId, newName) => { /* custom logic */ },
-    // onDeleteWorld: async (worldId) => { /* custom logic */ },
-    // onRemoveFromWorld: async (worldId) => { /* custom logic */ },
-  });
-  
+  } = useWorldModal();
+
+
 
 
   // Show loading screen
@@ -109,8 +111,9 @@ export default function LandingPage() {
                   key={world.world_id}
                   style={[
                     ComponentStyles.card.base,
+                    { borderWidth: 5 },
                     isSelected && ComponentStyles.card.selected,
-                    world.user_role === 'dm' && { borderLeftWidth: 3, borderLeftColor: CoreColors.secondaryLight }
+                    world.user_role !== 'owner' && { borderColor: 'rgba(0, 0, 0, 0.2)' }
                   ]}
                   onPress={() => {
                     setMapImage(world.map_image_url);
@@ -127,6 +130,7 @@ export default function LandingPage() {
                       if (userId) routeParams.userId = userId;
                       routeParams.userRole = world.user_role;
                       if (world.map_image_url) routeParams.mapImage = world.map_image_url;
+                      if (world.world_id) routeParams.worldId = world.world_id;
                       
                       const queryString = new URLSearchParams(routeParams).toString();
                       const route = `/select/world-detail/${encodeURIComponent(world.world_id)}?${queryString}`;
@@ -180,13 +184,21 @@ export default function LandingPage() {
         }}>
       {/* Edit World Modal */}
           <EditWorldModal 
-            visible={editModalVisible} 
+            visible={editModalVisible}
             onClose={closeEditModal}
             worldName={modalWorldName}
+            originalWorldName={selectedWorld?.name}
             onWorldNameChange={setModalWorldName}
             onConfirmWorldName={() => handleConfirmWorldName(selectedWorld?.world_id)}
             onGenerateInviteLink={createGenerateInviteLinkHandler(selectedWorld?.world_id, selectedWorld?.name)}
-            onDeleteWorld={createDeleteWorldHandler(selectedWorld?.world_id)}
+            onDeleteWorld={createDeleteWorldHandler(selectedWorld?.world_id, userId)}
+            generatingLink={generatingLink}
+          />
+          <LeaveWorldModal
+            visible={leaveModalVisible} 
+            onClose={closeLeaveModal}
+            worldName={modalWorldName}
+            onLeaveWorld={createRemoveFromWorldHandler(selectedWorld?.world_id, userId)}
           />
           {/* World Preview */}
           <View style={{ position: 'absolute', top: 30, left: 50, zIndex: 10, backgroundColor: CoreColors.backgroundDark}}>
@@ -206,10 +218,10 @@ export default function LandingPage() {
                 <PrimaryButton 
                   style={{}}
                   textStyle={{}}
-                  disabled={true} //TODO enable when edit modal is fixed
+                  //disabled={true} //TODO enable when edit modal is fixed
                   onPress={selectedWorld.user_role === 'owner' 
-                    ? () => openEditModal(selectedWorld.name) 
-                    : createRemoveFromWorldHandler(selectedWorld.world_id)
+                    ? () => openEditModal(selectedWorld.name)
+                    : () => openLeaveModal(selectedWorld.name) //createRemoveFromWorldHandler(selectedWorld.world_id, userId)
                   }
                 >
                   {selectedWorld.user_role === 'owner' ? 'Edit' : 'Leave'}

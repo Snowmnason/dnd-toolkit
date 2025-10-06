@@ -1,3 +1,4 @@
+import LeaveWorldModal from '@/components/create-world/ConfrimLeaveModal';
 import EditWorldModal from '@/components/create-world/EditWorldModal';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image, View } from 'react-native';
@@ -26,19 +27,19 @@ export default function WorldDetail() {
   // Use the custom hook for modal functionality
   const {
     editModalVisible,
+    leaveModalVisible,
     modalWorldName,
     setModalWorldName,
     openEditModal,
     closeEditModal,
+    openLeaveModal,
+    closeLeaveModal,
     handleConfirmWorldName,
     createGenerateInviteLinkHandler,
     createDeleteWorldHandler,
     createRemoveFromWorldHandler,
-  } = useWorldModal({
-    // You can provide custom handlers here in the future for mobile-specific behavior
-    // onWorldNameUpdate: async (worldId, newName) => { /* mobile-specific logic */ },
-    // onDeleteWorld: async (worldId) => { /* mobile-specific delete with navigation */ },
-  });
+    generatingLink,
+  } = useWorldModal();
   
   // Helper function to build route parameters
   const buildRouteParams = () => {
@@ -61,13 +62,21 @@ export default function WorldDetail() {
     <ThemedView style={{ flex: 1, alignItems: 'center', padding: Spacing.md }}>
       <View style={{ flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' }}>
         <EditWorldModal
-            visible={editModalVisible} 
+            visible={editModalVisible}
             onClose={closeEditModal}
             worldName={modalWorldName}
+            originalWorldName={worldName}
             onWorldNameChange={setModalWorldName}
             onConfirmWorldName={() => handleConfirmWorldName(worldId)}
             onGenerateInviteLink={createGenerateInviteLinkHandler(worldId, worldName)}
-            onDeleteWorld={createDeleteWorldHandler(worldId)}
+            onDeleteWorld={createDeleteWorldHandler(worldId, userId)}
+            generatingLink={generatingLink}
+          />
+        <LeaveWorldModal
+            visible={leaveModalVisible} 
+            onClose={closeLeaveModal}
+            worldName={modalWorldName}
+            onLeaveWorld={createRemoveFromWorldHandler(worldId, userId)}
           />
         <ThemedText type="title" style={{
           marginBottom: Spacing.md,
@@ -92,10 +101,10 @@ export default function WorldDetail() {
           <PrimaryButton 
             style={{}}
             textStyle={{}}
-            disabled={true} //TODO enable when edit modal is fixed
+            //disabled={true} //TODO enable when edit modal is fixed
             onPress={userRole === 'owner' 
               ? () => openEditModal(worldName) 
-              : createRemoveFromWorldHandler(worldId)
+              : () => openLeaveModal(worldName)
             }
           >
             {userRole === 'owner' ? 'Edit' : 'Leave'}

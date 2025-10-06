@@ -12,6 +12,7 @@ import { ComponentStyles, CoreColors, Spacing, createTextShadow } from '../../co
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { useSuccessNavigation } from '../../hooks/use-success-navigation';
 import { useWorldCreation } from '../../hooks/use-world-creation';
+import { createWorldNameChangeHandler, isValidWorldNameForSubmission, type WorldNameValidationResult } from '../../lib/auth/validation';
 
 const tabletopSystems = ['D&D 5e', 'Pathfinder', 'Call of Cthulhu', 'Custom'];
 const defaultMapImages = ["https://media.wizards.com/2015/images/dnd/resources/Sword-Coast-Map_MedRes.jpg",
@@ -23,6 +24,7 @@ const defaultMapImages = ["https://media.wizards.com/2015/images/dnd/resources/S
 export default function CreateWorldScreen() {
   // Form state
   const [worldName, setWorldName] = useState('');
+  const [worldNameValidation, setWorldNameValidation] = useState<WorldNameValidationResult | null>(null);
   const [isDM, setIsDM] = useState(true);
   const [system, setSystem] = useState(tabletopSystems[0]);
   const [description, setDescription] = useState('');
@@ -49,7 +51,7 @@ export default function CreateWorldScreen() {
   });
 
   const handleCreateWorld = async () => {
-    if (!worldName.trim()) {
+    if (!isValidWorldNameForSubmission(worldName)) {
       setShowValidationModal(true);
       return;
     }
@@ -105,9 +107,24 @@ export default function CreateWorldScreen() {
           <TextInputComponent
             placeholder="World Name"
             value={worldName}
-            onChangeText={setWorldName}
+            onChangeText={createWorldNameChangeHandler(setWorldName, setWorldNameValidation)}
             style={{ marginBottom: Spacing.md }}
           />
+          
+          {/* Validation errors */}
+          {worldNameValidation && !worldNameValidation.isValid && (
+            <View style={{ marginBottom: Spacing.md }}>
+              {worldNameValidation.errors.map((error, index) => (
+                <ThemedText key={index} style={{
+                  color: '#FF6B6B',
+                  fontSize: 14,
+                  marginBottom: Spacing.xs
+                }}>
+                  ⚠️ {error}
+                </ThemedText>
+              ))}
+            </View>
+          )}
 
           {/* DM / Player Toggle */}
           <View style={{
@@ -200,7 +217,7 @@ export default function CreateWorldScreen() {
             <PrimaryButton
               style={{}}
               textStyle={{}}
-              disabled={worldName.trim() === '' || isCreating}
+              disabled={!isValidWorldNameForSubmission(worldName) || isCreating}
               onPress={handleCreateWorld}
             >
               {isCreating ? 'Creating...' : 'Create'}
