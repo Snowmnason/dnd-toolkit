@@ -1,7 +1,6 @@
-import { ThemedText } from '@/components/themed-text';
-import { ComponentStyles, CoreColors } from '@/constants/theme';
 import React from 'react';
-import { TextStyle, TouchableOpacity, ViewStyle } from 'react-native';
+import { TextStyle, ViewStyle } from 'react-native';
+import BaseButton from '../ui/BaseButton';
 
 interface PrimaryButtonProps {
   onPress: () => void;
@@ -9,41 +8,37 @@ interface PrimaryButtonProps {
   style?: ViewStyle | ViewStyle[];
   textStyle?: TextStyle | TextStyle[];
   disabled?: boolean;
+  loading?: boolean;
 }
 
+/**
+ * PrimaryButton - Main action button component
+ * Now uses BaseButton with automatic disabled state handling
+ */
 export default function PrimaryButton({
   onPress,
   children,
   style,
   textStyle,
   disabled = false,
+  loading = false,
 }: PrimaryButtonProps) {
+  const combinedTextStyle: TextStyle = {
+    fontSize: 22,
+    ...(Array.isArray(textStyle) ? Object.assign({}, ...textStyle) : textStyle || {})
+  };
+
   return (
-    <TouchableOpacity
-      style={[
-        ComponentStyles.button.primary,
-        {
-          backgroundColor: disabled ? CoreColors.textSecondary : CoreColors.backgroundLight,
-          alignItems: 'center',
-          opacity: disabled ? 0.6 : 1,
-        },
-        style,
-      ]}
+    <BaseButton
+      variant="primary"
+      size="medium"
       onPress={onPress}
       disabled={disabled}
+      loading={loading}
+      style={style}
+      textStyle={combinedTextStyle}
     >
-      <ThemedText
-        type="defaultSemiBold"
-        style={[
-          { 
-            color: CoreColors.primary, 
-            fontSize: 22 
-          }, 
-          textStyle
-        ]}
-      >
-        {children}
-      </ThemedText>
-    </TouchableOpacity>
+      {children}
+    </BaseButton>
   );
 }

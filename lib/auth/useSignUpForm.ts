@@ -64,10 +64,10 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
         const pendingInvite = checkPendingInvites();
         if (pendingInvite) {
           // Clear the pending invite from localStorage since we're processing it
-          localStorage.removeItem('pendingWorldInvite');
+          localStorage.removeItem('pending_world_invite');
           
           // Redirect to auth-redirect to process the invite
-          router.replace(`/login/auth-redirect?action=world-invite&worldId=${pendingInvite.worldId}&worldName=${encodeURIComponent(pendingInvite.worldName)}`);
+          router.replace(`/login/auth-redirect?action=world-invite&token=${pendingInvite.token}&worldName=${encodeURIComponent(pendingInvite.worldName)}`);
         } else {
           // No pending invite - redirect to world selection
           router.replace('/select/world-selection');

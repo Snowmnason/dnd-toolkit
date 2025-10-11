@@ -268,6 +268,30 @@ export const worldsDB = {
     }
   },
 
+    // Check if user is already in a world (either as owner or member)
+  async isUserInWorld(worldId: string, userId: string): Promise<boolean> {
+    // Check if user is the owner
+    const { data: world } = await supabase
+      .from('worlds')
+      .select('owner_id')
+      .eq('id', worldId)
+      .single();
+
+    if (world && world.owner_id === userId) {
+      return true;
+    }
+
+    // Check if user has access via world_access table
+    const { data: access } = await supabase
+      .from('world_access')
+      .select('id')
+      .eq('world_id', worldId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    return !!access;
+  },
+
     // Add user to world (invite/join)
   async addUserToWorld(worldId: string, userId: string, userRole: AccessRole = 'player', permissions: any = {}): Promise<WorldAccess> {
     const { data, error } = await supabase

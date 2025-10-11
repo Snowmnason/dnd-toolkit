@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import CustomLoad from '../../components/custom_components/CustomLoad';
 import CustomModal from '../../components/CustomModal';
 import { ThemedText } from '../../components/themed-text';
@@ -12,16 +12,16 @@ import { supabase } from '../../lib/supabase';
 const PENDING_INVITE_KEY = 'pending_world_invite';
 
 interface PendingInvite {
-  worldId: string;
+  token: string;
   worldName: string;
   timestamp: number;
 }
 
 // Helper functions for invite storage
-const savePendingInvite = (worldId: string, worldName: string) => {
+const savePendingInvite = (token: string, worldName: string) => {
   if (typeof window !== 'undefined') {
     const inviteData: PendingInvite = {
-      worldId,
+      token,
       worldName,
       timestamp: Date.now()
     };
@@ -58,7 +58,10 @@ export default function AuthRedirect() {
   const [processing, setProcessing] = useState(true);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [showAlreadyMemberModal, setShowAlreadyMemberModal] = useState(false);
   const [worldName, setWorldName] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     const handleAuthRedirect = async () => {
@@ -85,8 +88,8 @@ export default function AuthRedirect() {
 
               if (error) {
                 console.error('❌ Session error:', error);
-                Alert.alert('Error', 'Invalid or expired link. Please try again.');
-                router.replace('/login/welcome');
+                setErrorMessage('Invalid or expired link. Please try again.');
+                setShowErrorModal(true);
                 return;
               }
 
@@ -136,8 +139,8 @@ export default function AuthRedirect() {
         }
       } catch (error) {
         console.error('Auth redirect error:', error);
-        Alert.alert('Error', 'Something went wrong. Please try again.');
-        router.replace('/login/welcome');
+        setErrorMessage('Something went wrong. Please try again.');
+        setShowErrorModal(true);
       } finally {
         setProcessing(false);
       }
@@ -146,21 +149,36 @@ export default function AuthRedirect() {
     const handleWorldInvite = async (hasValidSession: boolean) => {
       console.log('🌍 Processing world invite...');
       
-      const inviteWorldId = params.worldId as string;
+      const inviteToken = params.token as string;
       const inviteWorldName = params.worldName as string;
 
-      if (!inviteWorldId || !inviteWorldName) {
-        Alert.alert('Error', 'Invalid invite link. Please ask for a new invitation.');
-        router.replace('/login/welcome');
+      if (!inviteToken || !inviteWorldName) {
+        setErrorMessage('Invalid invite link. Please ask for a new invitation.');
+        setShowErrorModal(true);
         return;
       }
 
       const decodedWorldName = decodeURIComponent(inviteWorldName);
 
+      // Import invitesDB dynamically to avoid circular dependencies
+      const { invitesDB } = await import('../../lib/database/invites');
+
+      // Validate the invite token first
+      console.log('🔍 Validating invite token...');
+      const validationResult = await invitesDB.validateInviteToken(inviteToken);
+
+      if (!validationResult.success || !validationResult.worldId) {
+        setErrorMessage(validationResult.error || 'This invite link is invalid or has expired. Please ask for a new invitation.');
+        setShowErrorModal(true);
+        return;
+      }
+
+      const inviteWorldId = validationResult.worldId;
+
       if (!hasValidSession) {
-        // User not logged in - save invite and redirect to sign in
+        // User not logged in - save invite token and redirect to sign in
         console.log('💾 Saving pending invite for after login...');
-        savePendingInvite(inviteWorldId, decodedWorldName);
+        savePendingInvite(inviteToken, decodedWorldName);
         
         setWorldName(decodedWorldName);
         setShowInviteModal(true);
@@ -178,9 +196,31 @@ export default function AuthRedirect() {
           throw new Error('No authenticated user found');
         }
 
+        // Get user's profile ID
+        const { data: userProfile } = await supabase
+          .from('users')
+          .select('id')
+          .eq('auth_id', user.id)
+          .single();
+
+        if (!userProfile) {
+          throw new Error('User profile not found');
+        }
+
+        // Check if user is already in the world
+        console.log('🔍 Checking if user is already in world...');
+        const isAlreadyMember = await worldsDB.isUserInWorld(inviteWorldId, userProfile.id);
+
+        if (isAlreadyMember) {
+          console.log('ℹ️ User is already a member of this world');
+          setWorldName(decodedWorldName);
+          setShowAlreadyMemberModal(true);
+          return;
+        }
+
         // Add user to world in database
         console.log('🎲 Adding user to world:', inviteWorldId);
-        await worldsDB.addUserToWorld(inviteWorldId, user.id, 'player');
+        await worldsDB.addUserToWorld(inviteWorldId, userProfile.id, 'player');
         console.log('✅ User successfully added to world');
         
         setWorldName(decodedWorldName);
@@ -189,19 +229,15 @@ export default function AuthRedirect() {
       } catch (error) {
         console.error('❌ Failed to add user to world:', error);
         
-        // Check if user is already in the world
+        // Check if user is already in the world (database constraint error)
         if (error instanceof Error && error.message.includes('duplicate')) {
-          // User already in world - show welcome anyway
+          console.log('ℹ️ User already in world (duplicate key), showing already member modal');
           setWorldName(decodedWorldName);
-          setShowWelcomeModal(true);
-          console.log('ℹ️ User already in world, showing welcome modal');
+          setShowAlreadyMemberModal(true);
         } else {
           // Other error - show error message
-          Alert.alert(
-            'Error', 
-            'Failed to join world. Please try again or contact the world owner.',
-            [{ text: 'OK', onPress: () => router.replace('/login/welcome') }]
-          );
+          setErrorMessage('Failed to join world. Please try again or contact the world owner.');
+          setShowErrorModal(true);
         }
       }
     };
@@ -218,9 +254,42 @@ export default function AuthRedirect() {
           clearPendingInvite();
           
           try {
+            // Import invitesDB dynamically
+            const { invitesDB } = await import('../../lib/database/invites');
+            
+            // Validate the token and get worldId
+            console.log('🔍 Validating pending invite token...');
+            const validationResult = await invitesDB.validateInviteToken(pendingInvite.token);
+            
+            if (!validationResult.success || !validationResult.worldId) {
+              throw new Error(validationResult.error || 'Invalid or expired invite token');
+            }
+
+            // Get user's profile ID
+            const { data: userProfile } = await supabase
+              .from('users')
+              .select('id')
+              .eq('auth_id', session.user.id)
+              .single();
+
+            if (!userProfile) {
+              throw new Error('User profile not found');
+            }
+
+            // Check if user is already in the world
+            console.log('🔍 Checking if user is already in world...');
+            const isAlreadyMember = await worldsDB.isUserInWorld(validationResult.worldId, userProfile.id);
+
+            if (isAlreadyMember) {
+              console.log('ℹ️ User is already a member of this world (pending invite)');
+              setWorldName(pendingInvite.worldName);
+              setShowAlreadyMemberModal(true);
+              return;
+            }
+
             // Add user to world in database
-            console.log('🎲 Adding user to world from pending invite:', pendingInvite.worldId);
-            await worldsDB.addUserToWorld(pendingInvite.worldId, session.user.id, 'player');
+            console.log('🎲 Adding user to world from pending invite:', validationResult.worldId);
+            await worldsDB.addUserToWorld(validationResult.worldId, userProfile.id, 'player');
             console.log('✅ User successfully added to world from pending invite');
             
             setWorldName(pendingInvite.worldName);
@@ -229,17 +298,20 @@ export default function AuthRedirect() {
           } catch (error) {
             console.error('❌ Failed to add user to world from pending invite:', error);
             
-            // Check if user is already in the world
+            // Check if user is already in the world (database constraint error)
             if (error instanceof Error && error.message.includes('duplicate')) {
-              // User already in world - show welcome anyway
+              console.log('ℹ️ User already in world from pending invite (duplicate key), showing already member modal');
               setWorldName(pendingInvite.worldName);
-              setShowWelcomeModal(true);
-              console.log('ℹ️ User already in world from pending invite, showing welcome modal');
+              setShowAlreadyMemberModal(true);
             } else {
               // Other error - show error message but don't completely fail
               console.error('Failed to process pending invite, but continuing...');
-              setWorldName(pendingInvite.worldName);
-              setShowWelcomeModal(true);
+              
+              // Don't show success modal if invite was invalid/expired
+              if (error instanceof Error && (error.message.includes('Invalid') || error.message.includes('expired'))) {
+                setErrorMessage('This invite link has expired. Please ask for a new invitation.');
+                setShowErrorModal(true);
+              }
             }
           }
         }
@@ -278,7 +350,7 @@ export default function AuthRedirect() {
 
   return (
     <>
-      {/* World Invite Welcome Modal (for logged-in users) */}
+      {/* World Invite Welcome Modal (for successfully joined worlds) */}
       <CustomModal
         visible={showWelcomeModal}
         onClose={handleWelcomeModalClose}
@@ -318,6 +390,48 @@ export default function AuthRedirect() {
               router.replace('/login/welcome');
             },
             style: 'cancel'
+          }
+        ]}
+      />
+
+      {/* Already a Member Modal */}
+      <CustomModal
+        visible={showAlreadyMemberModal}
+        onClose={() => {
+          setShowAlreadyMemberModal(false);
+          router.replace('/select/world-selection');
+        }}
+        title="Already a Member! 🎉"
+        message={`You're already part of "${worldName}"! No need to join again.`}
+        buttons={[
+          {
+            text: 'Go to Worlds',
+            onPress: () => {
+              setShowAlreadyMemberModal(false);
+              router.replace('/select/world-selection');
+            },
+            style: 'primary'
+          }
+        ]}
+      />
+
+      {/* Error Modal */}
+      <CustomModal
+        visible={showErrorModal}
+        onClose={() => {
+          setShowErrorModal(false);
+          router.replace('/login/welcome');
+        }}
+        title="Oops! ⚠️"
+        message={errorMessage}
+        buttons={[
+          {
+            text: 'OK',
+            onPress: () => {
+              setShowErrorModal(false);
+              router.replace('/login/welcome');
+            },
+            style: 'primary'
           }
         ]}
       />
