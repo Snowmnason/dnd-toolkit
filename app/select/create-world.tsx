@@ -2,8 +2,8 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform, ScrollView, Switch, View } from 'react-native';
 import CreateWorldModals from '../../components/create-world/CreateWorldModals';
+import MapCanvas from '../../components/create-world/MapCanvas';
 import Dropdown from '../../components/custom_components/Dropdown';
-import MapCanvas from '../../components/custom_components/MapCanvas';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import TextInputComponent from '../../components/custom_components/TextInput';
 import { ThemedText } from '../../components/themed-text';
@@ -164,7 +164,9 @@ export default function CreateWorldScreen() {
           </ThemedText>
           <Dropdown 
             value={system} 
-            onChange={setSystem}
+            onChange={(value) => {
+              if (value !== null) setSystem(value);
+            }}
             options={tabletopSystems}
             placeholder="Select a tabletop system"
           />

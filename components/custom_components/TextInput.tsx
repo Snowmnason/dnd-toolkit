@@ -1,5 +1,13 @@
-import { BorderRadius, CoreColors, Spacing, Typography } from '@/constants/theme';
-import { TextInput as RNTextInput } from 'react-native';
+import { BorderRadius, CoreColors, Spacing } from '@/constants/theme';
+import React from 'react';
+import { TextInput as RNTextInput, TextInputProps, TextStyle } from 'react-native';
+
+interface CustomTextInputProps extends Omit<TextInputProps, 'style'> {
+  placeholder?: string;
+  value?: string;
+  onChangeText?: (text: string) => void;
+  style?: TextStyle | TextStyle[];
+}
 
 export default function TextInput({
   placeholder = "Enter text here",
@@ -7,7 +15,7 @@ export default function TextInput({
   onChangeText,
   style,
   ...props
-}) {
+}: CustomTextInputProps) {
   return (
     <RNTextInput
       style={[
@@ -18,7 +26,6 @@ export default function TextInput({
           padding: Spacing.sm,
           backgroundColor: CoreColors.backgroundLight,
           color: CoreColors.textOnLight,
-          fontFamily: Typography.fontFamilyPrimary,
           marginBottom: Spacing.md,
         },
         style,

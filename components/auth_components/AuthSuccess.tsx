@@ -1,6 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
-import { ThemedText } from '../../themed-text';
+import { ThemedText } from '../themed-text';
 
 interface AuthSuccessProps {
   message: string;

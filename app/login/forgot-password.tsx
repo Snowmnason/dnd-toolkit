@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import AuthButton from '../../components/custom_components/auth_components/AuthButton';
-import AuthInput from '../../components/custom_components/auth_components/AuthInput';
+import AuthButton from '../../components/auth_components/AuthButton';
+import AuthInput from '../../components/auth_components/AuthInput';
 import CustomModal from '../../components/CustomModal';
 import { ThemedText } from '../../components/themed-text';
 import { sendPasswordReset } from '../../lib/auth/authService';

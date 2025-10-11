@@ -1,7 +1,15 @@
-// components/PrimaryButton.js
 import { ThemedText } from '@/components/themed-text';
 import { ComponentStyles, CoreColors } from '@/constants/theme';
-import { TouchableOpacity } from 'react-native';
+import React from 'react';
+import { TextStyle, TouchableOpacity, ViewStyle } from 'react-native';
+
+interface PrimaryButtonProps {
+  onPress: () => void;
+  children: React.ReactNode;
+  style?: ViewStyle | ViewStyle[];
+  textStyle?: TextStyle | TextStyle[];
+  disabled?: boolean;
+}
 
 export default function PrimaryButton({
   onPress,
@@ -9,7 +17,7 @@ export default function PrimaryButton({
   style,
   textStyle,
   disabled = false,
-}) {
+}: PrimaryButtonProps) {
   return (
     <TouchableOpacity
       style={[

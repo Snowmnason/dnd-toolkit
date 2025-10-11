@@ -1,9 +1,23 @@
-// components/IconButton.js
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { TouchableOpacity, View } from 'react-native';
+import React from 'react';
+import { TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native';
 
-export default function IconButton({ icon, label, onPress, style, textStyle }) {
+interface IconButtonProps {
+  icon: string;
+  label?: string;
+  onPress: () => void;
+  style?: ViewStyle;
+  textStyle?: TextStyle;
+}
+
+export default function IconButton({ 
+  icon, 
+  label, 
+  onPress, 
+  style, 
+  textStyle 
+}: IconButtonProps) {
   return (
     <TouchableOpacity style={style} onPress={onPress}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>

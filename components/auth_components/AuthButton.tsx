@@ -1,6 +1,6 @@
 import React from 'react';
-import CustomLoad from '../CustomLoad';
-import PrimaryButton from '../PrimaryButton';
+import CustomLoad from '../custom_components/CustomLoad';
+import PrimaryButton from '../custom_components/PrimaryButton';
 
 interface AuthButtonProps {
   title: string;

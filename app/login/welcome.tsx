@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { View } from 'react-native';
-import AuthButton from '../../components/custom_components/auth_components/AuthButton';
+import AuthButton from '../../components/auth_components/AuthButton';
 import CustomLoad from '../../components/custom_components/CustomLoad';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../components/themed-text';

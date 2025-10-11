@@ -3,7 +3,7 @@ import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
-import AuthButton from '../../components/custom_components/auth_components/AuthButton';
+import AuthButton from '../../components/auth_components/AuthButton';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import CustomModal from '../../components/CustomModal';
 import { ThemedText } from '../../components/themed-text';
