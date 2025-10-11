@@ -1,7 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
-import PrimaryButton from '../PrimaryButton';
-import TextInput from '../TextInput';
+import PrimaryButton from '../custom_components/PrimaryButton';
+import TextInput from '../custom_components/TextInput';
 
 interface AuthInputProps {
   placeholder: string;

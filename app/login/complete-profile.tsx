@@ -1,9 +1,9 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
-import AuthButton from '../../components/custom_components/auth_components/AuthButton';
-import AuthError from '../../components/custom_components/auth_components/AuthError';
-import AuthInput from '../../components/custom_components/auth_components/AuthInput';
+import AuthButton from '../../components/auth_components/AuthButton';
+import AuthError from '../../components/auth_components/AuthError';
+import AuthInput from '../../components/auth_components/AuthInput';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../components/themed-text';
 import { useSignUpForm } from '../../lib/auth';

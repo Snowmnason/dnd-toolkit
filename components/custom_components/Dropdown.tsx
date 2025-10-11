@@ -1,19 +1,38 @@
-import { BorderRadius, CoreColors, Spacing, Typography } from '@/constants/theme';
-import { useState } from 'react';
+import { BorderRadius, CoreColors, Spacing } from '@/constants/theme';
+import React, { useState } from 'react';
+import { TextStyle, ViewStyle } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 
-export default function Dropdown({ value, onChange, options, style = {}, placeholder = "Select an option..." }) {
+interface DropdownProps {
+  value: string | null;
+  onChange: (value: string | null) => void;
+  options: string[];
+  style?: ViewStyle;
+  placeholder?: string;
+}
+
+interface DropdownItem {
+  label: string;
+  value: string;
+}
+
+export default function Dropdown({ 
+  value, 
+  onChange, 
+  options, 
+  style = {}, 
+  placeholder = "Select an option..." 
+}: DropdownProps) {
   const [open, setOpen] = useState(false);
-  const [dropdownValue, setDropdownValue] = useState(value);
+  const [dropdownValue, setDropdownValue] = useState<string | null>(value);
+  const [items, setItems] = useState<DropdownItem[]>(
+    options.map(option => ({
+      label: option,
+      value: option,
+    }))
+  );
 
-  // Convert options array to the format expected by react-native-dropdown-picker
-  //https://hossein-zare.github.io/react-native-dropdown-picker-website/docs/changelog
-  const items = options.map(option => ({
-    label: option,
-    value: option,
-  }));
-
-  const handleValueChange = (val) => {
+  const handleValueChange = (val: string | null) => {
     setDropdownValue(val);
     if (onChange) {
       onChange(val);
@@ -26,7 +45,9 @@ export default function Dropdown({ value, onChange, options, style = {}, placeho
       value={dropdownValue}
       items={items}
       setOpen={setOpen}
-      setValue={handleValueChange}
+      setValue={setDropdownValue}
+      setItems={setItems}
+      onChangeValue={handleValueChange}
       placeholder={placeholder}
       style={{
         borderColor: CoreColors.secondary,
@@ -34,38 +55,35 @@ export default function Dropdown({ value, onChange, options, style = {}, placeho
         borderRadius: BorderRadius.sm,
         marginBottom: Spacing.md,
         ...style,
-      }}
+      } as ViewStyle}
       textStyle={{
         color: CoreColors.textOnLight,
-        fontFamily: Typography.fontFamilyPrimary,
         fontSize: 16,
-      }}
+      } as TextStyle}
       placeholderStyle={{
         color: CoreColors.textSecondary,
-        fontFamily: Typography.fontFamilyPrimary,
         fontSize: 16,
         opacity: 0.7,
-      }}
+      } as TextStyle}
       dropDownContainerStyle={{
         borderColor: CoreColors.secondary,
         backgroundColor: CoreColors.backgroundLight,
         borderRadius: BorderRadius.sm,
-      }}
+      } as ViewStyle}
       listItemLabelStyle={{
         color: CoreColors.textOnLight,
-        fontFamily: Typography.fontFamilyPrimary,
         fontSize: 16,
-      }}
+      } as TextStyle}
       selectedItemLabelStyle={{
         color: CoreColors.textOnLight,
         fontWeight: 'bold',
-      }}
+      } as TextStyle}
       arrowIconStyle={{
         tintColor: CoreColors.textOnLight,
-      }}
+      } as any}
       tickIconStyle={{
         tintColor: CoreColors.textOnLight,
-      }}
+      } as any}
       zIndex={1000}
       zIndexInverse={3000}
     />

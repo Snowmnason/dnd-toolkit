@@ -1,17 +1,25 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Image } from 'react-native';
+import { ActivityIndicator, ActivityIndicatorProps, Image, ImageProps } from 'react-native';
 import { CoreColors } from '../../constants/theme';
 
+interface CustomLoadProps extends Omit<ImageProps, 'source' | 'style'> {
+  size?: 'small' | 'medium' | 'large' | 'xlarge' | number;
+  resizeMode?: 'cover' | 'contain' | 'stretch' | 'repeat' | 'center';
+  color?: string;
+  style?: ImageProps['style'];
+}
+
 export default function CustomLoad({
-    size = 'large',
-    resizeMode = 'contain',
-    color = CoreColors.primary, // Fallback color for ActivityIndicator
+  size = 'large',
+  resizeMode = 'contain',
+  color = CoreColors.primary,
+  style,
   ...props
-}) {
+}: CustomLoadProps) {
   const [imageError, setImageError] = useState(false);
 
   // Define size mappings
-  const getSizeValue = () => {
+  const getSizeValue = (): number => {
     switch (size) {
       case 'small':
         return 30;
@@ -30,7 +38,7 @@ export default function CustomLoad({
   const sizeValue = getSizeValue();
 
   // Convert size to ActivityIndicator size
-  const getActivityIndicatorSize = () => {
+  const getActivityIndicatorSize = (): ActivityIndicatorProps['size'] => {
     if (sizeValue <= 30) return 'small';
     return 'large';
   };
@@ -41,7 +49,8 @@ export default function CustomLoad({
       <ActivityIndicator 
         size={getActivityIndicatorSize()} 
         color={color}
-        {...props}
+        style={style}
+        {...(props as ActivityIndicatorProps)}
       />
     );
   }
@@ -49,10 +58,13 @@ export default function CustomLoad({
   return (
     <Image
       source={require('../../assets/images/load.gif')}
-      style={{ 
-        width: sizeValue, 
-        height: sizeValue 
-      }}
+      style={[
+        { 
+          width: sizeValue, 
+          height: sizeValue 
+        },
+        style
+      ]}
       resizeMode={resizeMode}
       onError={() => setImageError(true)}
       onLoadStart={() => setImageError(false)}
