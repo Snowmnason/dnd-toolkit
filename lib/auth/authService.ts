@@ -184,7 +184,7 @@ export const signInUser = async (
             }
             return { 
               success: true, 
-              redirectTo: `/login/auth-redirect?action=world-invite&worldId=${pendingInvite.worldId}&worldName=${encodeURIComponent(pendingInvite.worldName)}` 
+              redirectTo: `/login/auth-redirect?action=world-invite&token=${pendingInvite.token}&worldName=${encodeURIComponent(pendingInvite.worldName)}` 
             };
           } else {
             // No pending invite - go to world selection
@@ -354,10 +354,11 @@ export const updatePassword = async (newPassword: string): Promise<ResetPassword
   }
 };
 
-// Generate world invite link for manual sharing
+// Generate world invite link with Supabase-generated token
 export const generateWorldInviteLink = async (
   worldId: string, 
-  worldName: string
+  worldName: string,
+  hoursValid = 24
 ): Promise<{ success: boolean; inviteLink?: string; error?: string }> => {
   try {
     if (!worldId || !worldName) {
@@ -367,9 +368,28 @@ export const generateWorldInviteLink = async (
       };
     }
 
-    // Create the invite URL
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://dnd-tool.thesnowpost.com';
-    const inviteLink = `${baseUrl}/login/auth-redirect?action=world-invite&worldId=${worldId}&worldName=${encodeURIComponent(worldName)}`;
+    // Import invitesDB here to avoid circular dependencies
+    const { invitesDB } = await import('../database/invites');
+    
+    // Create invite link in database with Supabase-generated token
+    const result = await invitesDB.createInviteLink({ 
+      worldId, 
+      hoursValid 
+    });
+
+    if (!result.success || !result.inviteLink) {
+      return {
+        success: false,
+        error: result.error || 'Failed to create invite link'
+      };
+    }
+
+    // Build the full invite URL using the token
+    const baseUrl = typeof window !== 'undefined' 
+      ? window.location.origin 
+      : 'https://dnd-tool.thesnowpost.com';
+    
+    const inviteLink = `${baseUrl}/login/auth-redirect?action=world-invite&token=${result.inviteLink.token}&worldName=${encodeURIComponent(worldName)}`;
 
     // Try to copy to clipboard
     if (typeof window !== 'undefined' && window.navigator?.clipboard) {
@@ -383,6 +403,8 @@ export const generateWorldInviteLink = async (
 
     console.log('🔗 World Invite Link Generated:');
     console.log(`World: ${worldName}`);
+    console.log(`Token: ${result.inviteLink.token}`);
+    console.log(`Expires: ${result.inviteLink.expires_at}`);
     console.log(`Link: ${inviteLink}`);
     
     return { 
@@ -399,22 +421,8 @@ export const generateWorldInviteLink = async (
   }
 };
 
-// Legacy function - now just calls generateWorldInviteLink
-export const sendWorldInvite = async (
-  toEmail: string, 
-  worldId: string, 
-  worldName: string
-): Promise<{ success: boolean; error?: string }> => {
-  // For now, just generate the link (email parameter ignored)
-  const result = await generateWorldInviteLink(worldId, worldName);
-  return {
-    success: result.success,
-    error: result.error
-  };
-};
-
 // Helper function to check for pending invites
-export const checkPendingInvites = (): { worldId: string; worldName: string } | null => {
+export const checkPendingInvites = (): { token: string; worldName: string } | null => {
   if (typeof window !== 'undefined') {
     const stored = localStorage.getItem('pending_world_invite');
     if (stored) {
@@ -422,7 +430,7 @@ export const checkPendingInvites = (): { worldId: string; worldName: string } | 
         const inviteData = JSON.parse(stored);
         // Check if invite is less than 24 hours old
         if (Date.now() - inviteData.timestamp < 24 * 60 * 60 * 1000) {
-          return { worldId: inviteData.worldId, worldName: inviteData.worldName };
+          return { token: inviteData.token, worldName: inviteData.worldName };
         } else {
           // Clean up expired invite
           localStorage.removeItem('pending_world_invite');

@@ -1,16 +1,20 @@
 import React from 'react';
-import CustomLoad from '../custom_components/CustomLoad';
-import PrimaryButton from '../custom_components/PrimaryButton';
+import { TextStyle, ViewStyle } from 'react-native';
+import BaseButton from '../ui/BaseButton';
 
 interface AuthButtonProps {
   title: string;
   onPress: () => void;
   disabled?: boolean;
   loading?: boolean;
-  style?: object;
-  textStyle?: object;
+  style?: ViewStyle | ViewStyle[];
+  textStyle?: TextStyle | TextStyle[];
 }
 
+/**
+ * AuthButton - Specialized button for authentication flows
+ * Uses BaseButton with automatic disabled/loading state handling
+ */
 export default function AuthButton({
   title,
   onPress,
@@ -19,28 +23,33 @@ export default function AuthButton({
   style,
   textStyle
 }: AuthButtonProps) {
-  const isDisabled = disabled || loading;
-  
+  const combinedStyle: ViewStyle = {
+    width: '100%', 
+    backgroundColor: '#8B4513',
+    paddingVertical: 16, 
+    borderRadius: 8,
+    ...(Array.isArray(style) ? Object.assign({}, ...style) : style || {})
+  };
+
+  const combinedTextStyle: TextStyle = {
+    color: '#F5E6D3', 
+    fontSize: 16, 
+    fontWeight: '600',
+    ...(Array.isArray(textStyle) ? Object.assign({}, ...textStyle) : textStyle || {})
+  };
+
   return (
-    <PrimaryButton
-      style={{ 
-        width: '100%', 
-        backgroundColor: isDisabled ? '#6c757d' : '#8B4513',
-        paddingVertical: 16, 
-        borderRadius: 8,
-        opacity: isDisabled ? 0.6 : 1,
-        ...style
-      }}
-      textStyle={{ 
-        color: '#F5E6D3', 
-        fontSize: 16, 
-        fontWeight: '600',
-        ...textStyle
-      }}
+    <BaseButton
+      variant="primary"
+      size="medium"
       onPress={onPress}
-      disabled={isDisabled}
+      disabled={disabled}
+      loading={loading}
+      loadingColor="#F5E6D3"
+      style={combinedStyle}
+      textStyle={combinedTextStyle}
     >
-      {loading ? <CustomLoad /> : title}
-    </PrimaryButton>
+      {title}
+    </BaseButton>
   );
 }

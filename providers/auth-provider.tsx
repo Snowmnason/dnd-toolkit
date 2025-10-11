@@ -30,10 +30,15 @@ export default function AuthProvider({ children }: PropsWithChildren) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('Auth state changed:', { event: _event, session })
-      setSession(session)
-    })
+    } = supabase.auth.onAuthStateChange(
+      (
+        _event: import('@supabase/supabase-js').AuthChangeEvent,
+        session: Session | null
+      ) => {
+        console.log('Auth state changed:', { event: _event, session })
+        setSession(session)
+      }
+    )
 
     // Cleanup subscription on unmount
     return () => {
