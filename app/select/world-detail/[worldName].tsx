@@ -24,6 +24,14 @@ export default function WorldDetail() {
   // Determine map image source
   const selectedMapImage = mapUrl ? { uri: mapUrl } : require('../../../assets/images/Miku.png');
   
+  // Navigate back to world selection after delete/leave
+  const handleNavigateBackToSelection = () => {
+    router.replace({
+      pathname: '/select/world-selection',
+      params: userId ? { userId } : {},
+    });
+  };
+  
   // Use the custom hook for modal functionality
   const {
     editModalVisible,
@@ -39,7 +47,9 @@ export default function WorldDetail() {
     createDeleteWorldHandler,
     createRemoveFromWorldHandler,
     generatingLink,
-  } = useWorldModal();
+  } = useWorldModal({
+    onWorldsChange: handleNavigateBackToSelection, // Navigate back after delete/leave
+  });
   
   // Helper function to build route parameters
   const buildRouteParams = () => {
@@ -67,7 +77,7 @@ export default function WorldDetail() {
             worldName={modalWorldName}
             originalWorldName={worldName}
             onWorldNameChange={setModalWorldName}
-            onConfirmWorldName={() => handleConfirmWorldName(worldId)}
+            onConfirmWorldName={() => handleConfirmWorldName(worldId, modalWorldName, userId)}
             onGenerateInviteLink={createGenerateInviteLinkHandler(worldId, worldName)}
             onDeleteWorld={createDeleteWorldHandler(worldId, userId)}
             generatingLink={generatingLink}

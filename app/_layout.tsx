@@ -6,6 +6,7 @@ import TopBar from '../components/TopBar';
 import { CoreColors } from '../constants/theme';
 import { useAppBootstrap } from '../hooks/use-app-bootstrap';
 import { AuthStateManager } from '../lib/auth-state';
+import { logger } from '../lib/utils/logger';
 
 export default function RootLayout() {
     // Get local search params using the hook at the top level
@@ -43,11 +44,11 @@ export default function RootLayout() {
 
         // Only redirect if trying to access protected route without authentication
         if (isProtectedRoute && !authenticated) {
-          console.log('🚫 Unauthorized access attempt, redirecting to welcome');
+          logger.debug('app-layout', 'Unauthorized access attempt, redirecting to welcome');
           router.replace('/login/welcome');
         }
       } catch (error) {
-        console.error('Auth check error:', error);
+        logger.error('app-layout', 'Auth check error:', error);
         // On error, only redirect protected routes, let login routes work normally
         if (isProtectedRoute) {
           router.replace('/login/welcome');

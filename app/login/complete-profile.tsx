@@ -9,6 +9,7 @@ import { ThemedText } from '../../components/themed-text';
 import { useSignUpForm } from '../../lib/auth';
 import { usersDB } from '../../lib/database/users';
 import { supabase } from '../../lib/supabase';
+import { logger } from '../../lib/utils/logger';
 
 export default function CompleteProfileScreen() {
   const router = useRouter();
@@ -39,20 +40,20 @@ export default function CompleteProfileScreen() {
                                  existingProfile.username.trim().length > 0;
           
           if (hasValidProfile) {
-            console.log('User already has complete profile, redirecting to world selection');
+            logger.debug('complete-profile', 'User already has complete profile, redirecting to world selection');
             router.replace('/select/world-selection');
             return;
           }
           
-          console.log('User needs to complete profile');
+          logger.debug('complete-profile', 'User needs to complete profile');
         } catch (profileError) {
           // Database error - but don't redirect away since user was sent here intentionally
           // Just log the error and allow them to complete profile
-          console.log('Database error checking profile, allowing profile completion:', profileError);
+          logger.warn('complete-profile', 'Database error checking profile, allowing profile completion:', profileError);
         }
         
       } catch (error) {
-        console.error('Auth check error:', error);
+        logger.error('complete-profile', 'Auth check error:', error);
         router.replace('/login/sign-in');
       } finally {
         setInitializing(false);

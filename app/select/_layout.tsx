@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import CustomLoad from '../../components/custom_components/CustomLoad';
 import { CoreColors } from '../../constants/theme';
 import { AuthStateManager } from '../../lib/auth-state';
+import { logger } from '../../lib/utils/logger';
 
 export default function SelectLayout() {
   const router = useRouter();
@@ -15,12 +16,12 @@ export default function SelectLayout() {
         const authenticated = await AuthStateManager.isAuthenticated();
         
         if (!authenticated) {
-          console.log('🚫 Select route: User not authenticated');
+          logger.debug('select-layout', 'User not authenticated');
           router.replace('/login/welcome');
           return;
         }
       } catch (error) {
-        console.error('Select layout auth check error:', error);
+        logger.error('select-layout', 'Select layout auth check error:', error);
         router.replace('/login/welcome');
       } finally {
         setIsCheckingAuth(false);

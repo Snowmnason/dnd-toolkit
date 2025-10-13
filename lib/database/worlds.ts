@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { logger } from '../utils/logger';
 
 // User role types for better type safety and maintainability
 export type UserRole = 'owner' | 'dm' | 'player';
@@ -43,7 +44,7 @@ export const worldsDB = {
   async create(worldData: CreateWorldData): Promise<World> {
     // Get current user's auth ID for lookup
     const { data: { user } } = await supabase.auth.getUser();
-    console.log('Auth user:', user); // DEBUG
+    logger.debug('worlds', 'Auth user:', user); // DEBUG
     if (!user) throw new Error('Not authenticated');
 
     // Get the user's profile ID (this is what owner_id should reference)
@@ -60,7 +61,7 @@ export const worldsDB = {
       ...worldData,
       owner_id: currentUser.id // This is the profile ID: 797cefa7-6640-40a7-ba7a-91eee369faa3
     };
-    console.log('Insert data:', insertData); // DEBUG
+    logger.debug('worlds', 'Insert data:', insertData); // DEBUG
 
     const { data, error } = await supabase
       .from('worlds')
@@ -68,10 +69,10 @@ export const worldsDB = {
       .select()
       .single();
     
-    console.log('Insert result:', { data, error }); // DEBUG
+    logger.debug('worlds', 'Insert result:', { data, error }); // DEBUG
     
     if (error) {
-      console.error('Error creating world:', error);
+      logger.error('worlds', 'Error creating world:', error);
       throw new Error(error.message || 'Failed to create world');
     }
     
@@ -117,12 +118,12 @@ export const worldsDB = {
     ]);
 
     if (accessRecordsResult.error) {
-      console.error('❌ Error fetching access records:', accessRecordsResult.error);
+      logger.error('worlds', 'Error fetching access records:', accessRecordsResult.error);
       throw new Error(accessRecordsResult.error.message || 'Failed to fetch access records');
     }
 
     if (ownedWorldIdsResult.error) {
-      console.error('❌ Error fetching owned world IDs:', ownedWorldIdsResult.error);
+      logger.error('worlds', 'Error fetching owned world IDs:', ownedWorldIdsResult.error);
       throw new Error(ownedWorldIdsResult.error.message || 'Failed to fetch owned world IDs');
     }
 
@@ -149,13 +150,13 @@ export const worldsDB = {
     });
 
     // DEBUGGING: Uncomment to see collected IDs
-    console.log('🔍 DEBUG - Unique world IDs:', worldIdSet.size);
-    console.log('🔍 DEBUG - World IDs:', Array.from(worldIdSet));
+    logger.debug('worlds', 'Unique world IDs:', worldIdSet.size);
+    logger.debug('worlds', 'World IDs:', Array.from(worldIdSet));
 
     // STEP 3: Early return if no worlds found
     if (worldIdSet.size === 0) {
       // DEBUGGING: Uncomment to trace empty results
-      console.log('ℹ️ No worlds found for user');
+      logger.info('worlds', 'No worlds found for user');
       return [];
     }
 
@@ -168,19 +169,19 @@ export const worldsDB = {
       .order('created_at', { ascending: false });
 
     if (worldsError) {
-      console.error('❌ Error fetching worlds:', worldsError);
+      logger.error('worlds', 'Error fetching worlds:', worldsError);
       throw new Error(worldsError.message || 'Failed to fetch worlds');
     }
 
     // DEBUGGING: Uncomment to see fetched worlds count
-    console.log('🔍 DEBUG - Worlds fetched:', worldsData?.length || 0);
+    logger.debug('worlds', 'Worlds fetched:', worldsData?.length || 0);
 
     // STEP 5: Map worlds with their roles
     const allWorlds: WorldWithAccess[] = (worldsData || []).map((world: World) => {
       const roleInfo = roleMap.get(world.world_id);
       
       // DEBUGGING: Uncomment to trace each world
-      console.log(`✅ Adding world: ${world.name} (role: ${roleInfo?.role})`);
+      logger.debug('worlds', `Adding world: ${world.name} (role: ${roleInfo?.role})`);
       
       return {
         ...world,
@@ -197,7 +198,7 @@ export const worldsDB = {
     });
 
     // DEBUGGING: Uncomment to see final count
-    console.log(`🎲 Total worlds returned: ${allWorlds.length}`);
+    logger.debug('worlds', `Total worlds returned: ${allWorlds.length}`);
     
     return allWorlds;
   },
@@ -207,13 +208,13 @@ export const worldsDB = {
     const { data, error } = await supabase
       .from('worlds')
       .update({name: newName, updated_at: 'now()'})
-      .eq('id', worldId)
+      .eq('world_id', worldId)
       .eq('owner_id', userId)
       .select()
       .single();
     
     if (error) {
-      console.error('Error updating world:', error);
+      logger.error('worlds', 'Error updating world:', error);
       throw new Error(error.message || 'Failed to update world');
     }
     
@@ -228,12 +229,12 @@ export const worldsDB = {
         ...updates,
         updated_at: 'now()'
       })
-      .eq('id', worldId)
+      .eq('world_id', worldId)
       .select()
       .single();
     
     if (error) {
-      console.error('Error updating world:', error);
+      logger.error('worlds', 'Error updating world:', error);
       throw new Error(error.message || 'Failed to update world');
     }
     
@@ -245,11 +246,11 @@ export const worldsDB = {
     const { error } = await supabase
       .from('worlds')
       .delete()
-      .eq('id', worldId)
+      .eq('world_id', worldId)
       .eq('owner_id', userId); // Ensure only owner can delete
     
     if (error) {
-      console.error('Error deleting world:', error);
+      logger.error('worlds', 'Error deleting world:', error);
       throw new Error(error.message || 'Failed to delete world');
     }
   },
@@ -263,7 +264,7 @@ export const worldsDB = {
       .eq('user_id', userId);
 
     if (error) {
-      console.error('Error removing user from world:', error);
+      logger.error('worlds', 'Error removing user from world:', error);
       throw new Error(error.message || 'Failed to remove user from world');
     }
   },
@@ -274,7 +275,7 @@ export const worldsDB = {
     const { data: world } = await supabase
       .from('worlds')
       .select('owner_id')
-      .eq('id', worldId)
+      .eq('world_id', worldId)
       .single();
 
     if (world && world.owner_id === userId) {
@@ -306,7 +307,7 @@ export const worldsDB = {
       .single();
 
     if (error) {
-      console.error('Error adding user to world:', error);
+      logger.error('worlds', 'Error adding user to world:', error);
       throw new Error(error.message || 'Failed to add user to world');
     }
 
@@ -325,7 +326,7 @@ export const worldsDB = {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching world members:', error);
+      logger.error('worlds', 'Error fetching world members:', error);
       throw new Error(error.message || 'Failed to fetch world members');
     }
 
@@ -345,7 +346,7 @@ export const worldsDB = {
     const { data, error } = await supabase
       .from('worlds')
       .select('*')
-      .eq('id', worldId)
+      .eq('world_id', worldId)
       .single();
     
     if (error) {
@@ -353,7 +354,7 @@ export const worldsDB = {
         // No rows returned
         return null;
       }
-      console.error('Error fetching world:', error);
+      logger.error('worlds', 'Error fetching world:', error);
       throw new Error(error.message || 'Failed to fetch world');
     }
     
@@ -381,7 +382,7 @@ export const worldsDB = {
       .order('created_at', { ascending: false });
     
     if (error) {
-      console.error('❌ Error fetching owned worlds:', error);
+      logger.error('worlds', 'Error fetching owned worlds:', error);
       throw new Error(error.message || 'Failed to fetch owned worlds');
     }
     
@@ -416,7 +417,7 @@ export const worldsDB = {
       .eq('user_id', currentUser.id);
 
     if (accessError) {
-      console.error('❌ Error fetching access records:', accessError);
+      logger.error('worlds', 'Error fetching access records:', accessError);
       throw new Error(accessError.message || 'Failed to fetch access records');
     }
 
@@ -446,7 +447,7 @@ export const worldsDB = {
       .order('created_at', { ascending: false });
 
     if (worldsError) {
-      console.error('❌ Error fetching member worlds:', worldsError);
+      logger.error('worlds', 'Error fetching member worlds:', worldsError);
       throw new Error(worldsError.message || 'Failed to fetch member worlds');
     }
 

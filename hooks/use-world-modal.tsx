@@ -1,10 +1,15 @@
+import { validateWorldName } from '@/lib/auth/validation';
 import { usersDB } from '@/lib/database/users';
 import { worldsDB } from '@/lib/database/worlds';
+import { logger } from '@/lib/utils/logger';
 import { useState } from 'react';
 import { generateWorldInviteLink } from '../lib/auth/authService';
 
+interface UseWorldModalOptions {
+  onWorldsChange?: () => void; // Callback to refresh worlds list
+}
 
-export const useWorldModal = () => {
+export const useWorldModal = (options?: UseWorldModalOptions) => {
   const [editModalVisible, setEditModalVisible] = useState<boolean>(false);
   const [modalWorldName, setModalWorldName] = useState<string>('');
   const [leaveModalVisible, setLeaveModalVisible] = useState<boolean>(false); 
@@ -12,36 +17,52 @@ export const useWorldModal = () => {
 
   // Modal handlers
   const handleConfirmWorldName = async (worldId?: string, newWorldName?: string, userId?: string) => {
-    console.log('Confirm world name:', modalWorldName);
+    logger.debug('world-modal', 'Confirm world name:', newWorldName);
     if (!worldId) {
-      throw new Error('No worldId provided for invite');
+      logger.error('world-modal', 'No worldId provided for update');
+      return;
     }
     if (!newWorldName || newWorldName.trim().length === 0) {
-      throw new Error('World name cannot be empty');
+      logger.warn('world-modal', 'World name cannot be empty');
+      return;
     }
+
+    // Validate/sanitize the provided name
+    const { isValid, sanitizedName, errors } = validateWorldName(newWorldName);
+    if (!isValid) {
+      logger.warn('world-modal', 'World name validation failed:', errors.join('; '));
+      return;
+    }
+
     let currentUserId = userId;
     if (!currentUserId) {
       const currentUser = await usersDB.getCurrentUser();
       if (!currentUser?.id) {
-        throw new Error('No user ID available for delete operation');
+        logger.error('world-modal', 'No user ID available for update operation');
+        return;
       }
       currentUserId = currentUser.id;
     }
 
     try {
-      await worldsDB.updateName(worldId, currentUserId, newWorldName);
+      await worldsDB.updateName(worldId, currentUserId, sanitizedName);
+      // Close modal and reset state on success
+      setEditModalVisible(false);
+      setModalWorldName('');
+      // Refresh worlds list to show updated name
+      options?.onWorldsChange?.();
     } catch (error) {
-      console.error('Failed to update world name:', error);
+      logger.error('world-modal', 'Failed to update world name:', error);
     }
-    // TODO: Implement default world name update logic if no custom handler provided
   };
 
   // Create wrapper functions that include worldId and worldName
   const createGenerateInviteLinkHandler = (worldId?: string, worldName?: string) => async (): Promise<void> => {
-    console.log('Generate invite link for world:', worldName);
+    logger.debug('world-modal', 'Generate invite link for world:', worldName);
     
     if (!worldId) {
-      throw new Error('No worldId provided for invite');
+      logger.error('world-modal', 'No worldId provided for invite');
+      return;
     }
     setGeneratingLink(true);
     try {
@@ -51,68 +72,79 @@ export const useWorldModal = () => {
       );
       
       if (result.success) {
-        console.log('✅ Invite link generated and copied to clipboard!');
+        logger.success('world-modal', 'Invite link generated and copied to clipboard!');
         // Optionally clear the email field since we're not using email anymore
       } else {
-        console.error('❌ Failed to generate invite link:', result.error);
-        throw new Error(result.error || 'Failed to generate invite link');
+        logger.error('world-modal', 'Failed to generate invite link:', result.error);
+        // Do not throw to avoid crashing the UI
       }
     } catch (error) {
-      console.error('Failed to generate invite link:', error);
-      throw error;
+      logger.error('world-modal', 'Failed to generate invite link:', error);
+      // Swallow error to prevent unhandled rejection in UI
+    } finally {
+      // Allow user to try again
+      setGeneratingLink(false);
     }
     // Note: generatingLink stays true until modal is reopened (prevents spam clicking)
   };
 
   const createDeleteWorldHandler = (worldId?: string, userId?: string) => async (): Promise<void> => {
-    console.log('Delete world (owner):', worldId);
+    logger.debug('world-modal', 'Delete world (owner):', worldId);
     
     if (!worldId) {
-      throw new Error('No worldId provided for delete');
+      logger.error('world-modal', 'No worldId provided for delete');
+      return;
     }
     
     let currentUserId = userId;
     if (!currentUserId) {
       const currentUser = await usersDB.getCurrentUser();
       if (!currentUser?.id) {
-        throw new Error('No user ID available for delete operation');
+        logger.error('world-modal', 'No user ID available for delete operation');
+        return;
       }
       currentUserId = currentUser.id;
     }
     
     try {
       await worldsDB.delete(worldId, currentUserId);
-      console.log('World deleted:', worldId);
+      logger.info('world-modal', 'World deleted:', worldId);
       setEditModalVisible(false);
+      // Refresh worlds list to remove deleted world
+      options?.onWorldsChange?.();
     } catch (error) {
-      console.error('Failed to delete world:', error);
-      throw error;
+      logger.error('world-modal', 'Failed to delete world:', error);
+      // Avoid throwing to prevent UI crash
     }
   };
 
   const createRemoveFromWorldHandler = (worldId?: string, userId?: string) => async (): Promise<void> => {
-    console.log('Remove from world:', worldId);
+    logger.debug('world-modal', 'Remove from world:', worldId);
     
     if (!worldId) {
-      throw new Error('No worldId provided for remove');
+      logger.error('world-modal', 'No worldId provided for remove');
+      return;
     }
     
     let currentUserId = userId;
     if (!currentUserId) {
       const currentUser = await usersDB.getCurrentUser();
       if (!currentUser?.id) {
-        throw new Error('No user ID available for remove operation');
+        logger.error('world-modal', 'No user ID available for remove operation');
+        return;
       }
       currentUserId = currentUser.id;
     }
 
     try {
         await worldsDB.removeUserFromWorld(worldId, currentUserId);
-        console.log('Removed from world:', worldId);
+        logger.info('world-modal', 'Removed from world:', worldId);
         setLeaveModalVisible(false);
+        // Refresh worlds list to remove left world
+        options?.onWorldsChange?.();
     } catch (error) {
-      console.error('Failed to remove from world:', error);
-      throw error;
+      logger.error('world-modal', 'Failed to remove from world:', error);
+      // Avoid throwing to prevent UI crash
     }
   };
 

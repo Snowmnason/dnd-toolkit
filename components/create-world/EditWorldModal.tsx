@@ -1,3 +1,4 @@
+import { logger } from '@/lib/utils/logger';
 import React, { useState } from 'react';
 import { Modal, Platform, TextInput, TouchableOpacity, View } from 'react-native';
 import { BorderRadius, CoreColors, Shadows, Spacing } from '../../constants/theme';
@@ -48,7 +49,7 @@ export default function EditWorldModal({
     try {
       await onGenerateInviteLink();
     } catch (error) {
-      console.error('Failed to generate invite link:', error);
+      logger.error('edit-world-modal', 'Failed to generate invite link:', error);
     }finally {
       //setGeneratingLink(false);
     }
@@ -68,7 +69,7 @@ export default function EditWorldModal({
         setDeleteDisabled(true);
         await onDeleteWorld();
       } catch (error) {
-        console.error('Failed to delete world:', error);
+        logger.error('edit-world-modal', 'Failed to delete world:', error);
         setDeleteDisabled(false);
       }
     }

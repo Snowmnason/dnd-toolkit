@@ -10,6 +10,7 @@ import { ThemedText } from '../../components/themed-text';
 import { AuthStateManager } from '../../lib/auth-state';
 import { openEmailApp } from '../../lib/auth/emailUtils';
 import { supabase } from '../../lib/supabase';
+import { logger } from '../../lib/utils/logger';
 
 export default function EmailConfirmationScreen() {
   const router = useRouter();
@@ -34,7 +35,7 @@ export default function EmailConfirmationScreen() {
   // Listen for auth state changes (for auto-signin after email confirmation)
   useEffect(() => {
   const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
-      console.log('Auth state change:', event, session?.user?.email);
+  logger.debug('email-confirmation', 'Auth state change:', event, session?.user?.email);
       
       if (event === 'SIGNED_IN' && session?.user?.email === userEmail) {
         // User successfully confirmed email and is now signed in
@@ -45,7 +46,7 @@ export default function EmailConfirmationScreen() {
           const { data: profile } = await supabase
             .from('users')
             .select('username')
-            .eq('id', session.user.id)
+            .eq('auth_id', session.user.id)
             .single();
           
           if (profile && profile.username) {
@@ -90,12 +91,12 @@ export default function EmailConfirmationScreen() {
         
         timerRef.current = setInterval(() => {
           countdown--;
-          console.log('Countdown:', countdown); // Debug log
+          logger.debug('email-confirmation', 'Countdown:', countdown);
           if (countdown > 0) {
             setWaitingResend(`(${countdown}s)`);
           } else {
             // Re-enable button and reset text
-            console.log('Timer finished, re-enabling button'); // Debug log
+            logger.debug('email-confirmation', 'Timer finished, re-enabling button');
             setWaitingResend('Resend Email');
             setIsCountingDown(false);
             if (timerRef.current) {

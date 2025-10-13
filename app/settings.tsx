@@ -10,6 +10,7 @@ import UserProfile from '../components/user-profile';
 import { ComponentStyles, CoreColors, Spacing } from '../constants/theme';
 import { AuthStateManager } from '../lib/auth-state';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/utils/logger';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -22,14 +23,14 @@ export default function SettingsPage() {
     // Check authentication first
     const checkAuth = async () => {
       try {
-        const authenticated = await AuthStateManager.isAuthenticated();
-        if (!authenticated) {
-          console.log('🚫 Settings: User not authenticated, redirecting');
+  await AuthStateManager.isAuthenticated();
+  if (!user) {
+          logger.debug('settings', 'User not authenticated, redirecting');
           router.replace('/login/welcome');
           return;
         }
       } catch (error) {
-        console.error('Settings auth check error:', error);
+        logger.error('settings', 'Settings auth check error:', error);
         router.replace('/login/welcome');
         return;
       }
@@ -42,7 +43,7 @@ export default function SettingsPage() {
       setUser(res.data?.user ?? null);
       setLoading(false);
     }).catch((err: unknown) => {
-      console.error('Error fetching user on settings mount:', err);
+      logger.error('settings', 'Error fetching user on settings mount:', err);
       setLoading(false);
     });
 
@@ -54,7 +55,7 @@ export default function SettingsPage() {
     });
 
     return () => subscription.unsubscribe();
-  }, [router]);
+  }, [router, user]);
 
   const handleSignOutConfirm = async () => {
     if (buttonDisabled) return; // Prevent spam clicking
@@ -76,7 +77,7 @@ export default function SettingsPage() {
         await AuthStateManager.clearAuthState();
         router.replace('/login/welcome');
       } catch (error) {
-        console.error('Sign out error:', error);
+        logger.error('settings', 'Sign out error:', error);
         Alert.alert('Error', 'Failed to sign out. Please try again.');
         setSigningOut(false);
         setButtonDisabled(false);

@@ -275,76 +275,42 @@ export interface WorldNameValidationResult {
  */
 export function validateWorldName(name: string, originalName?: string): WorldNameValidationResult {
   const errors: string[] = [];
-  
-  // Step 1: Basic sanitization - trim whitespace
-  let sanitizedName = name.trim();
-  
-  // Step 2: Length validation
-  if (sanitizedName.length === 0) {
-    errors.push('World name cannot be empty');
-  } else if (sanitizedName.length < 2) {
-    errors.push('World name must be at least 2 characters long');
-  } else if (sanitizedName.length > 50) {
-    errors.push('World name must be 50 characters or less');
-    sanitizedName = sanitizedName.substring(0, 50); // Truncate if too long
+
+  // Step 1: Basic trim (trailing spaces removed on submit/typing)
+  let working = (name ?? '').trim();
+
+  // Step 2: Silently strip dangerous delimiter characters (not keywords)
+  // We allow words like "delete" or "insert"; we only remove characters that could break queries/HTML.
+  const dangerousChars = /['"`;<>]|--|\/\*|\*\//g;
+  working = working.replace(dangerousChars, '');
+
+  // Step 3: Collapse internal whitespace to single spaces
+  working = working.replace(/\s+/g, ' ').trim();
+
+  // Step 4: Enforce max length of 20 characters
+  if (working.length > 20) {
+    working = working.substring(0, 20);
   }
-  
-  // Step 3: Character validation - allow alphanumeric, spaces, and safe special characters
+
+  // Step 5: Validate basic rules
   const allowedCharPattern = /^[a-zA-Z0-9\s\-_'.(),!&]*$/;
-  if (!allowedCharPattern.test(sanitizedName)) {
+  if (working.length === 0) {
+    errors.push('World name cannot be empty');
+  } else if (working.length < 2) {
+    errors.push('World name must be at least 2 characters long');
+  } else if (!allowedCharPattern.test(working)) {
     errors.push('World name contains invalid characters. Only letters, numbers, spaces, and basic punctuation allowed');
   }
-  
-  // Step 4: SQL injection pattern detection
-  const sqlInjectionPatterns = [
-    /['";]/g,                    // Single/double quotes, semicolons
-    /--/g,                       // SQL comments
-    /\/\*/g,                     // SQL comments
-    /\*\//g,                     // SQL comments
-    /\bunion\b/gi,              // UNION attacks
-    /\bselect\b/gi,             // SELECT statements
-    /\binsert\b/gi,             // INSERT statements
-    /\bupdate\b/gi,             // UPDATE statements
-    /\bdelete\b/gi,             // DELETE statements
-    /\bdrop\b/gi,               // DROP statements
-    /\balter\b/gi,              // ALTER statements
-    /\bexec\b/gi,               // EXEC statements
-    /\bscript\b/gi,             // Script tags
-    /[<>]/g,                     // HTML/XML tags
-  ];
-  
-  // Remove potentially dangerous patterns
-  let cleanName = sanitizedName;
-  sqlInjectionPatterns.forEach(pattern => {
-    if (pattern.test(cleanName)) {
-      errors.push('World name contains potentially unsafe characters');
-      cleanName = cleanName.replace(pattern, '');
-    }
-  });
-  
-  // Step 5: Remove excessive whitespace
-  cleanName = cleanName.replace(/\s+/g, ' ').trim();
-  
-  // Step 6: Check if name changed during sanitization
-  if (cleanName !== sanitizedName && errors.length === 0) {
-    // Only add this error if we haven't already flagged unsafe characters
-    errors.push('World name was automatically cleaned for safety');
-  }
-  
-  // Step 7: Check for unchanged name in edit scenarios
-  if (originalName && cleanName === originalName.trim()) {
+
+  // Step 6: If editing, ensure the name actually changes
+  if (originalName && working === originalName.trim()) {
     errors.push('New world name must be different from the current name');
   }
-  
-  // Step 8: Final length check after cleaning
-  if (cleanName.length < 2 && errors.length === 0) {
-    errors.push('World name too short after cleaning');
-  }
-  
+
   return {
     isValid: errors.length === 0,
-    sanitizedName: cleanName,
-    errors
+    sanitizedName: working,
+    errors,
   };
 }
 
@@ -359,12 +325,18 @@ export function createWorldNameChangeHandler(
   onValidationChange?: (result: WorldNameValidationResult) => void
 ) {
   return (text: string) => {
-    const result = validateWorldName(text);
-    setValue(result.sanitizedName);
-    
-    if (onValidationChange) {
-      onValidationChange(result);
+    // Live input sanitization: allow spaces while typing, strip only dangerous delimiters, cap length to 20.
+    const dangerousChars = /['"`;<>]|--|\/\*|\*\//g;
+    let live = (text ?? '').replace(dangerousChars, '');
+    if (live.length > 20) {
+      live = live.substring(0, 20);
     }
+
+    setValue(live);
+
+    // Compute validation state (uses trimming internally for submit-time correctness)
+    const result = validateWorldName(live);
+    if (onValidationChange) onValidationChange(result);
   };
 }
 

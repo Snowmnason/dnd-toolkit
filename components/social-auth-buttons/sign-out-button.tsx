@@ -1,6 +1,7 @@
 import React from 'react';
 import { AuthStateManager } from '../../lib/auth-state';
 import { supabase } from '../../lib/supabase';
+import { logger } from '../../lib/utils/logger';
 import PrimaryButton from '../custom_components/PrimaryButton';
 
 async function onSignOutButtonPress() {
@@ -8,14 +9,14 @@ async function onSignOutButtonPress() {
     // Clear Supabase session
     const { error } = await supabase.auth.signOut();
     if (error) {
-      console.error('Error signing out from Supabase:', error);
+      logger.error('auth', 'Error signing out from Supabase:', error);
     }
     
     // Clear local auth state
     await AuthStateManager.clearAuthState();
-    console.log('✅ Successfully signed out');
+    logger.info('auth', 'Successfully signed out');
   } catch (error) {
-    console.error('Error during sign out:', error);
+    logger.error('auth', 'Error during sign out:', error);
   }
 }
 

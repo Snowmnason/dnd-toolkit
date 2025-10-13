@@ -2,6 +2,7 @@ import * as aesjs from 'aes-js';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import 'react-native-get-random-values';
+import { logger } from './utils/logger';
 
 // Type-safe import for AsyncStorage
 let AsyncStorage: any;
@@ -50,7 +51,7 @@ export class EncryptedStorage {
         return newKey;
       }
     } catch (error) {
-      console.error('Error managing encryption key:', error);
+      logger.error('encrypted-storage', 'Error managing encryption key:', error);
       // Fallback to a simple key if SecureStore fails
       const fallbackKey = new Uint8Array(32);
       fallbackKey.fill(123);
@@ -124,7 +125,7 @@ export class EncryptedStorage {
       const encryptedValue = this.encryptData(value, encryptionKey);
       await this.platformSetItem(key, encryptedValue);
     } catch (error) {
-      console.error('Error storing encrypted data:', error);
+      logger.error('encrypted-storage', 'Error storing encrypted data:', error);
       throw error;
     }
   }
@@ -141,7 +142,7 @@ export class EncryptedStorage {
       const encryptionKey = await this.getOrCreateEncryptionKey();
       return this.decryptData(encryptedValue, encryptionKey);
     } catch (error) {
-      console.error('Error retrieving encrypted data:', error);
+      logger.error('encrypted-storage', 'Error retrieving encrypted data:', error);
       return null;
     }
   }
@@ -151,7 +152,7 @@ export class EncryptedStorage {
     try {
       await this.platformRemoveItem(key);
     } catch (error) {
-      console.error('Error removing encrypted data:', error);
+      logger.error('encrypted-storage', 'Error removing encrypted data:', error);
       throw error;
     }
   }
@@ -161,7 +162,7 @@ export class EncryptedStorage {
     try {
       await this.platformClear();
     } catch (error) {
-      console.error('Error clearing encrypted data:', error);
+      logger.error('encrypted-storage', 'Error clearing encrypted data:', error);
       throw error;
     }
   }

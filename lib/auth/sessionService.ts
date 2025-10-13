@@ -1,6 +1,7 @@
 import { AuthStateManager } from '../auth-state';
 import { usersDB } from '../database/users';
 import { supabase } from '../supabase';
+import { logger } from '../utils/logger';
 
 export interface SessionCheckResult {
   hasValidSession: boolean;
@@ -25,7 +26,7 @@ export const checkUserSession = async (): Promise<SessionCheckResult> => {
       };
     }
 
-    console.log('Valid session found for:', session.user?.email);
+  logger.info('session', 'Valid session found for:', session.user?.email);
     
     // Update auth state
     await AuthStateManager.setHasAccount(true);
@@ -41,7 +42,7 @@ export const checkUserSession = async (): Promise<SessionCheckResult> => {
         };
       }
     } catch (profileError) {
-      console.log('Profile check failed:', profileError);
+      logger.warn('session', 'Profile check failed:', profileError);
       // Profile doesn't exist or can't be retrieved
     }
     
@@ -53,7 +54,7 @@ export const checkUserSession = async (): Promise<SessionCheckResult> => {
     };
     
   } catch (error) {
-    console.error('Session check error:', error);
+    logger.error('session', 'Session check error:', error);
     return {
       hasValidSession: false,
       hasCompleteProfile: false,
@@ -69,7 +70,7 @@ export const prepareAuthNavigation = async (): Promise<void> => {
   try {
     await AuthStateManager.setHasAccount(true);
   } catch (error) {
-    console.error('Auth state preparation error:', error);
+    logger.error('session', 'Auth state preparation error:', error);
     throw new Error('Unable to prepare authentication state');
   }
 };

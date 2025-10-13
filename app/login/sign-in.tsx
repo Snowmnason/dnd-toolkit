@@ -9,6 +9,7 @@ import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../components/themed-text';
 import { useSignInForm } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
+import { logger } from '../../lib/utils/logger';
 
 export default function SignInScreen() {
   const router = useRouter();
@@ -43,12 +44,12 @@ export default function SignInScreen() {
       
       if (error) {
         // Note: This would need to be handled differently since authError is managed by the hook
-        console.error('Failed to resend email:', error.message);
+        logger.error('sign-in', 'Failed to resend email:', error.message);
       } else {
-        console.log('Confirmation email sent!');
+        logger.info('sign-in', 'Confirmation email sent!');
       }
     } catch {
-      console.error('Failed to resend confirmation email.');
+      logger.error('sign-in', 'Failed to resend confirmation email.');
     } finally {
       setIsResendingEmail(false);
     }

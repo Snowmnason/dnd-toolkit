@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import CustomLoad from '../../components/custom_components/CustomLoad';
 import { CoreColors } from '../../constants/theme';
 import { AuthStateManager } from '../../lib/auth-state';
+import { logger } from '../../lib/utils/logger';
 
 export default function MainLayout() {
   const router = useRouter();
@@ -15,12 +16,12 @@ export default function MainLayout() {
         const authenticated = await AuthStateManager.isAuthenticated();
         
         if (!authenticated) {
-          console.log('🚫 Main route: User not authenticated');
+          logger.debug('main-layout', 'User not authenticated');
           router.replace('/login/welcome');
           return;
         }
       } catch (error) {
-        console.error('Main layout auth check error:', error);
+        logger.error('main-layout', 'Main layout auth check error:', error);
         router.replace('/login/welcome');
       } finally {
         setIsCheckingAuth(false);

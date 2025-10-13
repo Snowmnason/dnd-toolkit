@@ -1,4 +1,5 @@
 import { Alert, Linking, Platform } from 'react-native';
+import { logger } from '../utils/logger';
 
 // Get email domain from email address
 export const getEmailDomain = (email: string) => {
@@ -40,7 +41,7 @@ export const openEmailApp = async (email: string) => {
       // If no mail app available, do nothing - user will handle it themselves
     }
   } catch (error) {
-    console.error('Error opening email:', error);
+    logger.error('email-utils', 'Error opening email:', error);
     // Only show error alert if something actually went wrong during the attempt
     if (Platform.OS === 'web') {
       Alert.alert('Error', 'Could not open email app');

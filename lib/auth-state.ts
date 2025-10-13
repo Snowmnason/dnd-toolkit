@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { logger } from './utils/logger';
 
 // Simple storage interface for cross-platform compatibility
 const storage = {
@@ -59,7 +60,7 @@ export const AuthStateManager = {
         hasAccount: hasAccount === 'true'
       };
     } catch (error) {
-      console.error('Error getting auth state:', error);
+      logger.error('auth-state', 'Error getting auth state:', error);
       return {
         hasAccount: false
       };
@@ -71,7 +72,7 @@ export const AuthStateManager = {
     try {
       await storage.setItem(STORAGE_KEYS.HAS_ACCOUNT, hasAccount.toString());
     } catch (error) {
-      console.error('Error setting has account:', error);
+      logger.error('auth-state', 'Error setting hasAccount:', error);
     }
   },
 
@@ -86,12 +87,12 @@ export const AuthStateManager = {
         try {
           const key = 'dnd_session_user_email';
           window.localStorage.setItem(key, session.user.email);
-        } catch {
+  } catch {
           // ignore
         }
       }
-    } catch (error) {
-      console.error('Error setting session state:', error);
+    } catch {
+      logger.error('auth-state', '', );
     }
   },
 
@@ -99,8 +100,8 @@ export const AuthStateManager = {
   async clearAuthState(): Promise<void> {
     try {
       await storage.removeItem(STORAGE_KEYS.HAS_ACCOUNT);
-    } catch (error) {
-      console.error('Error clearing auth state:', error);
+    } catch {
+      logger.error('auth-state', '', );
     }
   },
 
@@ -121,7 +122,7 @@ export const AuthStateManager = {
       // If Supabase isn't configured (like on GitHub Pages without env vars), 
       // fall back to local auth state
       if (!isSupabaseConfigured()) {
-        console.warn('⚠️  Supabase not configured, using local auth state');
+        logger.warn('auth-state', 'Supabase not configured, using local auth state');
         return authState.hasAccount;
       }
       
@@ -129,13 +130,13 @@ export const AuthStateManager = {
       
       // User must exist and be confirmed
       return !!(user && user.email_confirmed_at);
-    } catch (error) {
-      console.error('Error checking authentication:', error);
+    } catch {
+      logger.error('auth-state', '', );
       // On error, fall back to local auth state
       try {
         const authState = await this.getAuthState();
         return authState.hasAccount;
-      } catch {
+  } catch {
         return false;
       }
     }
@@ -154,7 +155,7 @@ export const AuthStateManager = {
 
       // If Supabase isn't configured, fall back to local state
       if (!isSupabaseConfigured()) {
-        console.warn('⚠️ Supabase not configured - defaulting to welcome');
+        logger.warn('auth-state', 'Supabase not configured - defaulting to welcome');
         return { routingDecision: 'welcome', profileId: null };
       }
 
@@ -167,7 +168,7 @@ export const AuthStateManager = {
         const { usersDB } = await import('./database/users');
         userProfile = await usersDB.getCurrentUser();
       } catch (dbError) {
-        console.log('👤 Database error checking profile:', dbError);
+        logger.debug('auth-state', 'Database error checking profile:', dbError);
         // If DB fails, allow user to continue to main (graceful degradation)
         if (session) return { routingDecision: 'main', profileId: userProfile?.id || null };
         // If no session but we can't query profile, prefer 'login' if user has account, else 'welcome'
@@ -204,7 +205,7 @@ export const AuthStateManager = {
       // No account and no session -> welcome
       return { routingDecision: 'welcome', profileId: null };
     } catch (error) {
-      console.error('Error getting routing decision:', error);
+      logger.error('auth-state', '', );
       return { routingDecision: 'welcome', profileId: null };
     }
   }

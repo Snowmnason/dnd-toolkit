@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { usersDB } from '../database/users';
+import { logger } from '../utils/logger';
 import { checkPendingInvites, signUpUser } from './authService';
 import { getPasswordHintColor, getPasswordRequirementsText, validateEmail, validatePassword, validateUsername } from './validation';
 
@@ -74,7 +75,7 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
         }
         
       } catch (error: any) {
-        console.error('Profile creation error:', error);
+        logger.error('signup', 'Profile creation error:', error);
         
         // Handle specific errors
         if (error.message?.includes('duplicate') || error.code === '23505') {
