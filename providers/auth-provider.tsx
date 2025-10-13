@@ -1,5 +1,6 @@
 import { AuthContext } from '@/hooks/use-auth-context'
 import { supabase } from '@/lib/supabase'
+import { logger } from '@/lib/utils/logger'
 import type { Session } from '@supabase/supabase-js'
 import { PropsWithChildren, useEffect, useState } from 'react'
 
@@ -19,7 +20,7 @@ export default function AuthProvider({ children }: PropsWithChildren) {
       } = await supabase.auth.getSession()
 
       if (error) {
-        console.error('Error fetching session:', error)
+        logger.error('auth-provider', 'Error fetching session:', error)
       }
 
       setSession(session)
@@ -35,7 +36,7 @@ export default function AuthProvider({ children }: PropsWithChildren) {
         _event: import('@supabase/supabase-js').AuthChangeEvent,
         session: Session | null
       ) => {
-        console.log('Auth state changed:', { event: _event, session })
+        logger.debug('auth-provider', 'Auth state changed:', { event: _event, session })
         setSession(session)
       }
     )

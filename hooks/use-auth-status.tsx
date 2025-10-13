@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/utils/logger';
 
 export function useAuthStatus() {
   const [isUserLoggedIn, setIsUserLoggedIn] = useState<boolean | null>(null);
@@ -10,7 +11,7 @@ export function useAuthStatus() {
         const { data: { user } } = await supabase.auth.getUser();
         setIsUserLoggedIn(user !== null);
       } catch (error) {
-        console.error('Error checking auth status:', error);
+        logger.error('auth', 'Error checking auth status:', error);
         setIsUserLoggedIn(false);
       }
     };

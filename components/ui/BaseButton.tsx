@@ -43,7 +43,7 @@ export default function BaseButton({
     switch (variant) {
       case 'primary':
         return {
-          backgroundColor: isDisabled ? CoreColors.textSecondary : CoreColors.backgroundLight,
+          backgroundColor: isDisabled ? CoreColors.textSecondary : CoreColors.buttonBackgroundLight,
           borderColor: CoreColors.secondary,
           borderWidth: 2,
         };

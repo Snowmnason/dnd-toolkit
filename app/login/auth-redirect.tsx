@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import CustomLoad from '../../components/custom_components/CustomLoad';
 import CustomModal from '../../components/CustomModal';
@@ -7,6 +7,7 @@ import { ThemedText } from '../../components/themed-text';
 import { AuthStateManager } from '../../lib/auth-state';
 import { worldsDB } from '../../lib/database/worlds';
 import { supabase } from '../../lib/supabase';
+import { logger } from '../../lib/utils/logger';
 
 // Storage for pending invites when user isn't logged in
 const PENDING_INVITE_KEY = 'pending_world_invite';
@@ -62,12 +63,23 @@ export default function AuthRedirect() {
   const [showAlreadyMemberModal, setShowAlreadyMemberModal] = useState(false);
   const [worldName, setWorldName] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const lastProcessedRef = useRef<string | null>(null);
 
   useEffect(() => {
     const handleAuthRedirect = async () => {
       try {
         const action = params.action as string;
-        console.log('🔄 Auth redirect action:', action);
+        // Build a processing key to prevent duplicate processing (StrictMode/dev double-run)
+        const key = `${action || 'none'}|${params.token || ''}|${params.worldName || ''}|${
+          typeof window !== 'undefined' ? window.location.hash : ''
+        }`;
+        if (lastProcessedRef.current === key) {
+          logger.debug('auth-redirect', 'Duplicate processing detected, skipping');
+          setProcessing(false);
+          return;
+        }
+        lastProcessedRef.current = key;
+        logger.debug('auth-redirect', 'Auth redirect action:', action);
 
         // First, handle any auth tokens from the URL
         let hasValidSession = false;
@@ -79,7 +91,7 @@ export default function AuthRedirect() {
             const refreshToken = hashParams.get('refresh_token');
 
             if (accessToken && refreshToken) {
-              console.log('🔑 Setting session from email link...');
+              logger.debug('auth-redirect', 'Setting session from email link...');
               
               const { error } = await supabase.auth.setSession({
                 access_token: accessToken,
@@ -87,13 +99,12 @@ export default function AuthRedirect() {
               });
 
               if (error) {
-                console.error('❌ Session error:', error);
+                logger.error('auth-redirect', 'Session error:', error);
                 setErrorMessage('Invalid or expired link. Please try again.');
                 setShowErrorModal(true);
                 return;
               }
-
-              console.log('✅ Session established');
+              logger.info('auth-redirect', 'Session established');
               await AuthStateManager.setHasAccount(true);
               hasValidSession = true;
             }
@@ -106,17 +117,24 @@ export default function AuthRedirect() {
           hasValidSession = !!session;
         }
 
+        // If we established a session but no explicit action provided, default based on context
+        if (!action && hasValidSession) {
+          // Prefer completing profile next
+          router.replace('/login/complete-profile');
+          return;
+        }
+
         // Route based on action
         switch (action) {
           case 'signup-confirm':
             // User confirmed email from signup -> go to complete profile
-            console.log('📝 Redirecting to complete profile...');
+            logger.debug('auth-redirect', 'Redirecting to complete profile...');
             router.replace('/login/complete-profile');
             break;
           
           case 'reset-password':
             // User clicked password reset link -> go to reset password page
-            console.log('🔐 Redirecting to reset password...');
+            logger.debug('auth-redirect', 'Redirecting to reset password...');
             router.replace('/login/reset-password');
             break;
           
@@ -138,7 +156,7 @@ export default function AuthRedirect() {
             }
         }
       } catch (error) {
-        console.error('Auth redirect error:', error);
+        logger.error('auth-redirect', 'Auth redirect error:', error);
         setErrorMessage('Something went wrong. Please try again.');
         setShowErrorModal(true);
       } finally {
@@ -147,7 +165,7 @@ export default function AuthRedirect() {
     };
 
     const handleWorldInvite = async (hasValidSession: boolean) => {
-      console.log('🌍 Processing world invite...');
+      logger.debug('auth-redirect', 'Processing world invite...');
       
       const inviteToken = params.token as string;
       const inviteWorldName = params.worldName as string;
@@ -160,11 +178,11 @@ export default function AuthRedirect() {
 
       const decodedWorldName = decodeURIComponent(inviteWorldName);
 
-      // Import invitesDB dynamically to avoid circular dependencies
+  // Import invitesDB dynamically to avoid circular dependencies
       const { invitesDB } = await import('../../lib/database/invites');
 
       // Validate the invite token first
-      console.log('🔍 Validating invite token...');
+  logger.debug('auth-redirect', 'Validating invite token...');
       const validationResult = await invitesDB.validateInviteToken(inviteToken);
 
       if (!validationResult.success || !validationResult.worldId) {
@@ -177,7 +195,7 @@ export default function AuthRedirect() {
 
       if (!hasValidSession) {
         // User not logged in - save invite token and redirect to sign in
-        console.log('💾 Saving pending invite for after login...');
+        logger.debug('auth-redirect', 'Saving pending invite for after login...');
         savePendingInvite(inviteToken, decodedWorldName);
         
         setWorldName(decodedWorldName);
@@ -186,7 +204,7 @@ export default function AuthRedirect() {
       }
 
       // User is logged in - process invite immediately
-      console.log('✅ User logged in, processing invite...');
+      logger.info('auth-redirect', 'User logged in, processing invite...');
       
       try {
         // Get current user
@@ -208,30 +226,30 @@ export default function AuthRedirect() {
         }
 
         // Check if user is already in the world
-        console.log('🔍 Checking if user is already in world...');
+        logger.debug('auth-redirect', 'Checking if user is already in world...');
         const isAlreadyMember = await worldsDB.isUserInWorld(inviteWorldId, userProfile.id);
 
         if (isAlreadyMember) {
-          console.log('ℹ️ User is already a member of this world');
+          logger.info('auth-redirect', 'User is already a member of this world');
           setWorldName(decodedWorldName);
           setShowAlreadyMemberModal(true);
           return;
         }
 
         // Add user to world in database
-        console.log('🎲 Adding user to world:', inviteWorldId);
+        logger.info('auth-redirect', 'Adding user to world:', inviteWorldId);
         await worldsDB.addUserToWorld(inviteWorldId, userProfile.id, 'player');
-        console.log('✅ User successfully added to world');
+        logger.success('auth-redirect', 'User successfully added to world');
         
         setWorldName(decodedWorldName);
         setShowWelcomeModal(true);
         
       } catch (error) {
-        console.error('❌ Failed to add user to world:', error);
+        logger.error('auth-redirect', 'Failed to add user to world:', error);
         
         // Check if user is already in the world (database constraint error)
         if (error instanceof Error && error.message.includes('duplicate')) {
-          console.log('ℹ️ User already in world (duplicate key), showing already member modal');
+          logger.info('auth-redirect', 'User already in world (duplicate key), showing already member modal');
           setWorldName(decodedWorldName);
           setShowAlreadyMemberModal(true);
         } else {
@@ -245,12 +263,12 @@ export default function AuthRedirect() {
     const checkForPendingInvites = async () => {
       const pendingInvite = getPendingInvite();
       if (pendingInvite) {
-        console.log('🔍 Found pending invite:', pendingInvite);
+        logger.debug('auth-redirect', 'Found pending invite:', pendingInvite);
         
         // Check if user is now logged in
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          console.log('✅ User logged in, processing pending invite...');
+          logger.info('auth-redirect', 'User logged in, processing pending invite...');
           clearPendingInvite();
           
           try {
@@ -258,7 +276,7 @@ export default function AuthRedirect() {
             const { invitesDB } = await import('../../lib/database/invites');
             
             // Validate the token and get worldId
-            console.log('🔍 Validating pending invite token...');
+            logger.debug('auth-redirect', 'Validating pending invite token...');
             const validationResult = await invitesDB.validateInviteToken(pendingInvite.token);
             
             if (!validationResult.success || !validationResult.worldId) {
@@ -277,35 +295,35 @@ export default function AuthRedirect() {
             }
 
             // Check if user is already in the world
-            console.log('🔍 Checking if user is already in world...');
+            logger.debug('auth-redirect', 'Checking if user is already in world...');
             const isAlreadyMember = await worldsDB.isUserInWorld(validationResult.worldId, userProfile.id);
 
             if (isAlreadyMember) {
-              console.log('ℹ️ User is already a member of this world (pending invite)');
+              logger.info('auth-redirect', 'User is already a member of this world (pending invite)');
               setWorldName(pendingInvite.worldName);
               setShowAlreadyMemberModal(true);
               return;
             }
 
             // Add user to world in database
-            console.log('🎲 Adding user to world from pending invite:', validationResult.worldId);
+            logger.info('auth-redirect', 'Adding user to world from pending invite:', validationResult.worldId);
             await worldsDB.addUserToWorld(validationResult.worldId, userProfile.id, 'player');
-            console.log('✅ User successfully added to world from pending invite');
+            logger.success('auth-redirect', 'User successfully added to world from pending invite');
             
             setWorldName(pendingInvite.worldName);
             setShowWelcomeModal(true);
             
           } catch (error) {
-            console.error('❌ Failed to add user to world from pending invite:', error);
+            logger.error('auth-redirect', 'Failed to add user to world from pending invite:', error);
             
             // Check if user is already in the world (database constraint error)
             if (error instanceof Error && error.message.includes('duplicate')) {
-              console.log('ℹ️ User already in world from pending invite (duplicate key), showing already member modal');
+              logger.info('auth-redirect', 'User already in world from pending invite (duplicate key), showing already member modal');
               setWorldName(pendingInvite.worldName);
               setShowAlreadyMemberModal(true);
             } else {
               // Other error - show error message but don't completely fail
-              console.error('Failed to process pending invite, but continuing...');
+              logger.error('auth-redirect', 'Failed to process pending invite, but continuing...');
               
               // Don't show success modal if invite was invalid/expired
               if (error instanceof Error && (error.message.includes('Invalid') || error.message.includes('expired'))) {
@@ -396,7 +414,7 @@ export default function AuthRedirect() {
 
       {/* Already a Member Modal */}
       <CustomModal
-        visible={showAlreadyMemberModal}
+        visible={showAlreadyMemberModal && !showWelcomeModal}
         onClose={() => {
           setShowAlreadyMemberModal(false);
           router.replace('/select/world-selection');

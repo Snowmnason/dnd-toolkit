@@ -1,3 +1,4 @@
+import { logger } from '@/lib/utils/logger';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
@@ -33,7 +34,7 @@ export default function UserProfile({ user }: UserProfileProps) {
         const profile = await usersDB.getCurrentUser();
         setUserProfile(profile);
       } catch (error) {
-        console.error('Error fetching user profile:', error);
+        logger.error('user-profile', 'Error fetching user profile:', error);
       } finally {
         setLoadingProfile(false);
       }

@@ -3,6 +3,7 @@
  */
 
 import { Platform } from 'react-native';
+import { logger } from '../utils/logger';
 
 const REDIRECT_SAFETY_KEY = 'dnd_redirect_attempts';
 const MAX_REDIRECT_ATTEMPTS = 3;
@@ -63,7 +64,7 @@ export const isSafeToRedirect = async (targetRoute: string): Promise<boolean> =>
     
     // Same route too many times
     if (attempt.count >= MAX_REDIRECT_ATTEMPTS) {
-      console.warn(`🚨 Redirect safety: Too many attempts to redirect to ${targetRoute}`);
+      logger.warn('redirect-safety', `Too many attempts to redirect to ${targetRoute}`);
       return false;
     }
     
@@ -72,7 +73,7 @@ export const isSafeToRedirect = async (targetRoute: string): Promise<boolean> =>
     return true;
     
   } catch (error) {
-    console.error('Error checking redirect safety:', error);
+    logger.error('redirect-safety', 'Error checking redirect safety:', error);
     // If we can't check, allow the redirect
     return true;
   }
@@ -92,7 +93,7 @@ const recordRedirectAttempt = async (targetRoute: string, count = 1): Promise<vo
     
     await storage.setItem(REDIRECT_SAFETY_KEY, JSON.stringify(attempt));
   } catch (error) {
-    console.error('Error recording redirect attempt:', error);
+    logger.error('redirect-safety', 'Error recording redirect attempt:', error);
   }
 };
 
@@ -104,7 +105,7 @@ export const clearRedirectSafety = async (): Promise<void> => {
     const storage = await getStorage();
     await storage.removeItem(REDIRECT_SAFETY_KEY);
   } catch (error) {
-    console.error('Error clearing redirect safety:', error);
+    logger.error('redirect-safety', 'Error clearing redirect safety:', error);
   }
 };
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { WorldWithAccess, worldsDB } from './database/worlds';
+import { logger } from './utils/logger';
 
 /**
  * Custom hook for managing world data and state
@@ -20,7 +21,7 @@ export function useWorlds(userId?: string) {
       const userWorlds = await worldsDB.getMyWorlds(userId);
       setWorlds(userWorlds);
     } catch (err) {
-      console.error('Error loading worlds:', err);
+      logger.error('useWorlds', 'Error loading worlds:', err);
       setError('Failed to load worlds. Please try again.');
     } finally {
       setIsLoading(false);

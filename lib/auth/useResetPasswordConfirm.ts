@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { supabase } from '../supabase';
+import { logger } from '../utils/logger';
 import { updatePassword } from './authService';
 
 export const useResetPasswordConfirm = () => {
@@ -41,9 +42,9 @@ export const useResetPasswordConfirm = () => {
             
             if (!error && data.user) {
               setUserEmail(data.user.email || '');
-              console.log('✅ Reset session established for:', data.user.email);
+              logger.info('reset-password', 'Reset session established for:', data.user.email);
             } else {
-              console.error('❌ Failed to establish reset session:', error);
+              logger.error('reset-password', 'Failed to establish reset session:', error);
               setError('Invalid or expired reset link. Please request a new password reset.');
             }
           }
@@ -55,7 +56,7 @@ export const useResetPasswordConfirm = () => {
           setUserEmail(user.email);
         }
       } catch (err) {
-        console.error('Error getting user info:', err);
+        logger.error('reset-password', 'Error getting user info:', err);
         setError('Failed to verify reset token. Please try again.');
       }
     };

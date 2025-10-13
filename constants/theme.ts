@@ -98,7 +98,13 @@ export const CoreColors = {
   
   // Utility colors with transparency
   primaryTransparent: 'rgba(139, 69, 19, 0.2)',
-  secondaryTransparent: 'rgba(212, 175, 55, 0.3)',
+  secondaryTransparent: 'rgba(48, 4, 79, 0.3)',
+
+  buttonBackgroundLight: '#F5E6D3', // Parchment/cream color for buttons
+  buttonBackgroundSelected: '#654321', // Dark brown for selected buttons
+
+  // Top bar colors
+  TopBarDark: '#1f262eff', // Dark slate
 };
 
 // Spacing system (8pt grid)
@@ -182,14 +188,14 @@ export const ComponentStyles = {
       padding: Spacing.sm,
       marginBottom: Spacing.xs,
       borderRadius: BorderRadius.sm,
-      backgroundColor: CoreColors.backgroundLight,
+      backgroundColor: CoreColors.buttonBackgroundLight,
       alignItems: 'center' as const,
       borderWidth: 2,
       borderColor: CoreColors.secondary,
       ...Shadows.sm,
     },
     selected: {
-      backgroundColor: CoreColors.primaryDark,
+      backgroundColor: CoreColors.buttonBackgroundSelected,
       borderWidth: 3,
       borderColor: CoreColors.secondary,
       ...Shadows.md,
@@ -220,9 +226,9 @@ export const ComponentStyles = {
       paddingHorizontal: Spacing.md,
       paddingVertical: Spacing.sm,
       paddingTop: 50, // Account for status bar
-      backgroundColor: CoreColors.backgroundDark,
+      backgroundColor: CoreColors.TopBarDark,
       borderBottomWidth: 1,
-      borderBottomColor: CoreColors.primaryTransparent,
+      borderBottomColor: CoreColors.backgroundLight,
     },
     button: {
       padding: Spacing.xs,

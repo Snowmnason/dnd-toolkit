@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 import { EncryptedStorageAdapter } from './encrypted-storage';
+import { logger } from './utils/logger';
 
 // Web storage adapter that uses localStorage (browser) instead of AsyncStorage
 const WebStorageAdapter = {
@@ -37,7 +38,7 @@ const supabaseAnonKey =
 
 // Log configuration status for debugging
 if (Platform.OS === 'web') {
-  console.log('🔧 Supabase Configuration:', {
+  logger.debug('supabase', 'Supabase Configuration:', {
     hasUrl: !!supabaseUrl,
     hasKey: !!supabaseAnonKey,
     urlLength: supabaseUrl.length,
@@ -59,7 +60,7 @@ export const isSupabaseConfigured = () => {
   );
 
   if (!hasLoggedSupabaseConfig) {
-    console.log("🔑 Supabase Config:", {
+    logger.debug('supabase', 'Supabase Config:', {
       hasUrl: !!supabaseUrl,
       hasKey: !!supabaseAnonKey,
       urlLength: supabaseUrl?.length || 0,
@@ -104,7 +105,7 @@ export const getSupabaseClient = () => {
 export const supabase = new Proxy({} as any, {
   get(target, prop) {
     if (!isSupabaseConfigured()) {
-      console.warn('⚠️  Server connection unavailable - operations will be skipped');
+      logger.warn('supabase', 'Server connection unavailable - operations will be skipped');
       // Return a mock object that doesn't throw but logs warnings
       return new Proxy({} as any, {
         get() {

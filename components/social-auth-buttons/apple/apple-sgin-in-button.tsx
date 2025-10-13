@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/utils/logger';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import { Platform } from 'react-native';
@@ -14,7 +15,7 @@ async function onAppleButtonPress() {
       ],
     });
 
-    console.log('Apple sign in successful:', credential);
+  logger.info('apple-auth', 'Apple sign in successful:', credential);
 
     if (credential.identityToken) {
       const { data, error } = await supabase.auth.signInWithIdToken({
@@ -23,12 +24,12 @@ async function onAppleButtonPress() {
       });
 
       if (error) {
-        console.error('Error signing in with Apple:', error);
+        logger.error('apple-auth', 'Error signing in with Apple:', error);
         return;
       }
 
       if (data) {
-        console.log('Apple authentication successful:', data);
+        logger.info('apple-auth', 'Apple authentication successful:', data);
         
         // Save successful authentication state
         await AuthStateManager.setHasAccount(true);
@@ -43,7 +44,7 @@ async function onAppleButtonPress() {
       }
     }
   } catch (error) {
-    console.error('Apple sign in error:', error);
+    logger.error('apple-auth', 'Apple sign in error:', error);
   }
 }
 

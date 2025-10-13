@@ -1,5 +1,6 @@
 import { usersDB } from '../database/users';
 import { supabase } from '../supabase';
+import { logger } from '../utils/logger';
 import { isExistingUser, validateEmail, validatePassword } from './validation';
 
 export interface SignUpResult {
@@ -58,10 +59,17 @@ export const signUpUser = async (
       };
     }
 
-    const { data, error } = await supabase.auth.signUp( 
-      { email: sanitizedEmail, password }, 
-      { emailRedirectTo: 'https://dnd-tool.thesnowpost.com/login/auth-redirect?action=signup-confirm' } 
-    );
+    const baseUrl = typeof window !== 'undefined' 
+      ? window.location.origin 
+      : 'https://dnd-tool.thesnowpost.com';
+
+    const { data, error } = await supabase.auth.signUp({ 
+      email: sanitizedEmail, 
+      password,
+      options: {
+        emailRedirectTo: `${baseUrl}/login/auth-redirect?action=signup-confirm`,
+      }
+    });
 
     // Give Supabase a moment to process
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -105,7 +113,7 @@ export const signUpUser = async (
 
     return { success: false, error: 'An unexpected error occurred. Please try again.' };
   } catch (error) {
-    console.error('Sign up error:', error);
+    logger.error('auth', 'Sign up error:', error);
     return { success: false, error: 'An unexpected error occurred. Please try again.' };
   }
 };
@@ -201,7 +209,7 @@ export const signInUser = async (
           };
         }
       } catch (profileError) {
-        console.error('Database error during sign-in profile check:', profileError);
+        logger.error('auth', 'Database error during sign-in profile check:', profileError);
         // If database is unreachable, let user proceed to main app
         // They can complete profile when database is available
         // This prevents infinite redirect loops during database outages
@@ -214,7 +222,7 @@ export const signInUser = async (
 
     return { success: false, error: 'An unexpected error occurred. Please try again.' };
   } catch (error) {
-    console.error('Sign in error:', error);
+    logger.error('auth', 'Sign in error:', error);
     return { success: false, error: 'An unexpected error occurred. Please try again.' };
   }
 };
@@ -277,8 +285,11 @@ export const sendPasswordReset = async (email: string): Promise<ResetPasswordRes
     }
 
     // Email exists, proceed with password reset
+    const baseUrl = typeof window !== 'undefined' 
+      ? window.location.origin 
+      : 'https://dnd-tool.thesnowpost.com';
     const { error } = await supabase.auth.resetPasswordForEmail(sanitizedEmail, {
-      redirectTo: `${window.location.origin}/login/auth-redirect?action=reset-password`
+      redirectTo: `${baseUrl}/login/auth-redirect?action=reset-password`
     });
 
     if (error) {
@@ -303,7 +314,7 @@ export const sendPasswordReset = async (email: string): Promise<ResetPasswordRes
       message: 'Password reset email sent! Please check your inbox and follow the instructions.' 
     };
   } catch (error) {
-    console.error('Password reset error:', error);
+    logger.error('auth', 'Password reset error:', error);
     return { 
       success: false, 
       error: 'An unexpected error occurred. Please try again.' 
@@ -346,7 +357,7 @@ export const updatePassword = async (newPassword: string): Promise<ResetPassword
       message: 'Password updated successfully! You can now sign in with your new password.' 
     };
   } catch (error) {
-    console.error('Password update error:', error);
+    logger.error('auth', 'Password update error:', error);
     return { 
       success: false, 
       error: 'An unexpected error occurred. Please try again.' 
@@ -395,17 +406,18 @@ export const generateWorldInviteLink = async (
     if (typeof window !== 'undefined' && window.navigator?.clipboard) {
       try {
         await window.navigator.clipboard.writeText(inviteLink);
-        console.log('📋 Invite link copied to clipboard!');
+        logger.debug('auth', 'Invite link copied to clipboard!');
       } catch {
-        console.log('📋 Could not copy to clipboard automatically');
+        logger.debug('auth', 'Could not copy to clipboard automatically');
       }
     }
 
-    console.log('🔗 World Invite Link Generated:');
-    console.log(`World: ${worldName}`);
-    console.log(`Token: ${result.inviteLink.token}`);
-    console.log(`Expires: ${result.inviteLink.expires_at}`);
-    console.log(`Link: ${inviteLink}`);
+    logger.info('auth', 'World Invite Link Generated:', {
+      world: worldName,
+      token: result.inviteLink.token,
+      expires: result.inviteLink.expires_at,
+      link: inviteLink
+    });
     
     return { 
       success: true,
@@ -413,7 +425,7 @@ export const generateWorldInviteLink = async (
     };
 
   } catch (error) {
-    console.error('Failed to generate invite link:', error);
+    logger.error('auth', 'Failed to generate invite link:', error);
     return {
       success: false,
       error: 'Failed to generate invite link'
@@ -436,7 +448,7 @@ export const checkPendingInvites = (): { token: string; worldName: string } | nu
           localStorage.removeItem('pending_world_invite');
         }
       } catch (error) {
-        console.error('Error parsing pending invite:', error);
+        logger.error('auth', 'Error parsing pending invite:', error);
         localStorage.removeItem('pending_world_invite');
       }
     }

@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Platform, ScrollView, Switch, View } from 'react-native';
+import { Platform, ScrollView, View } from 'react-native';
 import CreateWorldModals from '../../components/create-world/CreateWorldModals';
 import MapCanvas from '../../components/create-world/MapCanvas';
 import Dropdown from '../../components/custom_components/Dropdown';
@@ -25,7 +25,6 @@ export default function CreateWorldScreen() {
   // Form state
   const [worldName, setWorldName] = useState('');
   const [worldNameValidation, setWorldNameValidation] = useState<WorldNameValidationResult | null>(null);
-  const [isDM, setIsDM] = useState(true);
   const [system, setSystem] = useState(tabletopSystems[0]);
   const [description, setDescription] = useState('');
   const [imageImported, setImageImported] = useState(false);
@@ -66,7 +65,6 @@ export default function CreateWorldScreen() {
       name: worldName,
       description: description,
       system: system,
-      isDM: isDM,
       mapImageUrl: defaultMapImages[mapIndex]
     });
 
@@ -125,33 +123,6 @@ export default function CreateWorldScreen() {
               ))}
             </View>
           )}
-
-          {/* DM / Player Toggle */}
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            marginBottom: Spacing.md
-          }}>
-            <ThemedText style={{
-              fontWeight: '600',
-              fontSize: 16,
-              ...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2)
-            }}>
-              DM
-            </ThemedText>
-            <Switch
-              value={isDM}
-              onValueChange={setIsDM}
-              style={{ marginHorizontal: Spacing.xs }}
-            />
-            <ThemedText style={{
-              fontWeight: '600',
-              fontSize: 16,
-              ...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2)
-            }}>
-              Player
-            </ThemedText>
-          </View>
 
           {/* Tabletop System */}
           <ThemedText style={{

@@ -18,13 +18,20 @@ export default function LandingPage() {
   // Extract userId from params and ensure it's a string (not string[])
   const userId = typeof params.userId === 'string' ? params.userId : undefined;
   
-  const { selectedWorld, setSelectedWorld, worlds, isLoading, error, retry } = useWorlds(userId);
+  const { selectedWorld, setSelectedWorld, worlds, isLoading, error, retry, refetch } = useWorlds(userId);
   
   const noImageSelected = require('../../assets/images/Miku.png');
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 900;
   const [mapImage, setMapImage] = useState<string | null>(null);
+  
+  // Handler to refresh worlds and clear selection
+  const handleWorldsChange = () => {
+    setSelectedWorld(null); // Clear selected world to avoid showing deleted/left world
+    setMapImage(null);
+    refetch(); // Refresh the worlds list
+  };
   
   // Use the custom hook for modal functionality
   const {
@@ -42,7 +49,9 @@ export default function LandingPage() {
     generatingLink,
 
     createRemoveFromWorldHandler,
-  } = useWorldModal();
+  } = useWorldModal({
+    onWorldsChange: handleWorldsChange, // Refresh worlds list and clear selection after delete/leave/update
+  });
 
 
 
@@ -189,7 +198,7 @@ export default function LandingPage() {
             worldName={modalWorldName}
             originalWorldName={selectedWorld?.name}
             onWorldNameChange={setModalWorldName}
-            onConfirmWorldName={() => handleConfirmWorldName(selectedWorld?.world_id)}
+            onConfirmWorldName={() => handleConfirmWorldName(selectedWorld?.world_id, modalWorldName, userId)}
             onGenerateInviteLink={createGenerateInviteLinkHandler(selectedWorld?.world_id, selectedWorld?.name)}
             onDeleteWorld={createDeleteWorldHandler(selectedWorld?.world_id, userId)}
             generatingLink={generatingLink}

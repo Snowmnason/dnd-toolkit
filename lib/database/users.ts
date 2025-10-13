@@ -1,5 +1,6 @@
 import { sanitizeInput, validateUsername } from '../auth/validation';
 import { supabase } from '../supabase';
+import { logger } from '../utils/logger';
 
 export interface User {
   id: string;
@@ -44,7 +45,7 @@ export const usersDB = {
       .single();
     
     if (error) {
-      console.error('Error creating user profile:', error);
+      logger.error('users', 'Error creating user profile:', error);
       throw new Error(error.message || 'Failed to create user profile');
     }
     
@@ -81,7 +82,7 @@ export const usersDB = {
         // No profile exists yet
         return null;
       }
-      console.error('Error fetching current user:', error);
+      logger.error('users', 'Error fetching current user:', error);
       throw new Error(error.message || 'Failed to fetch user profile');
     }
     
@@ -118,8 +119,8 @@ export const usersDB = {
       .single();
     
     if (error) {
-      console.error('Error updating user profile:', error);
-      throw new Error(error.message || 'Failed to update profile');
+      logger.error('users', 'Error updating user profile:', error);
+      throw new Error(error.message || 'Failed to update user profile');
     }
     
     return data;
