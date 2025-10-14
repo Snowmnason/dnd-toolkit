@@ -19,33 +19,75 @@ export default function CompleteProfileScreen() {
   // Check if user is authenticated and needs to complete profile
   useEffect(() => {
     const checkAuthAndProfile = async () => {
+      logger.info('complete-profile', 'Starting auth and profile check');
       try {
-        // Use usersDB.getCurrentUser for all user/profile fetches
-        const existingProfile = await usersDB.getCurrentUser();
-        if (!existingProfile) {
-          // User not authenticated, redirect to sign-in
+        // First check Supabase auth session
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+        logger.debug('complete-profile', 'Auth user check result:', { 
+          hasAuthUser: !!authUser, 
+          authUserId: authUser?.id,
+          authError: authError?.message 
+        });
+
+        if (authError) {
+          logger.error('complete-profile', 'Auth session error:', authError);
           router.replace('/login/sign-in');
           return;
         }
-        setUser(existingProfile);
+
+        if (!authUser) {
+          logger.warn('complete-profile', 'No authenticated user found, redirecting to sign-in');
+          router.replace('/login/sign-in');
+          return;
+        }
+
+        // Try to get existing profile (might not exist for new users)
+        logger.debug('complete-profile', 'Fetching user profile from database');
+        const existingProfile = await usersDB.getCurrentUser();
+        logger.info('complete-profile', 'Profile fetch result:', { 
+          hasProfile: !!existingProfile,
+          profileId: existingProfile?.id,
+          profileUsername: existingProfile?.username,
+          profileAuthId: existingProfile?.auth_id
+        });
+
+        if (existingProfile) {
+          // Profile exists - check if it's complete
+          setUser(existingProfile);
+        } else {
+          // No profile exists - this is expected for new users
+          // Use the auth user data to create the profile
+          logger.info('complete-profile', 'No database profile found - this is expected for new users');
+          setUser(authUser);
+        }
+        
         // Robust profile validation - only redirect if profile is truly complete
         const hasValidProfile = existingProfile && 
                                existingProfile.username && 
                                existingProfile.username.trim().length > 0;
+        
+        logger.debug('complete-profile', 'Profile validation:', { 
+          hasValidProfile,
+          hasExistingProfile: !!existingProfile,
+          username: existingProfile?.username,
+          usernameLength: existingProfile?.username?.length
+        });
+
         if (hasValidProfile) {
-          logger.debug('complete-profile', 'User already has complete profile, redirecting to world selection');
+          logger.info('complete-profile', 'User already has complete profile, redirecting to world selection');
           router.replace({
             pathname: '/select/world-selection',
             params: { userId: existingProfile.id }
           });
           return;
         }
-        logger.debug('complete-profile', 'User needs to complete profile');
+        logger.info('complete-profile', 'User needs to complete profile, staying on this screen');
       } catch (error) {
         logger.error('complete-profile', 'Auth check error:', error);
         router.replace('/login/sign-in');
       } finally {
         setInitializing(false);
+        logger.debug('complete-profile', 'Auth check completed, initializing set to false');
       }
     };
     

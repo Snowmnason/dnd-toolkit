@@ -52,38 +52,66 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
       }
       
       setLoading(true);
+      logger.info('signup', 'Starting profile creation in complete-profile mode');
       
       try {
+        logger.debug('signup', 'Creating user profile with data:', {
+          auth_id: user.id,
+          username: username.trim(),
+          usernameLength: username.trim().length
+        });
+        
         // Create user profile
-        await usersDB.create({
+        const newProfile = await usersDB.create({
           auth_id: user.id,
           username: username.trim()
         });
         
+        logger.info('signup', 'Profile created successfully:', {
+          profileId: newProfile.id,
+          profileUsername: newProfile.username,
+          profileAuthId: newProfile.auth_id
+        });
+        
         // Check for pending invites after profile creation
+        logger.debug('signup', 'Checking for pending invites');
         const pendingInvite = checkPendingInvites();
+        
         if (pendingInvite) {
+          logger.info('signup', 'Found pending invite, redirecting to process it:', pendingInvite);
           // Clear the pending invite from localStorage since we're processing it
           localStorage.removeItem('pending_world_invite');
           
           // Redirect to auth-redirect to process the invite
           router.replace(`/login/auth-redirect?action=world-invite&token=${pendingInvite.token}&worldName=${encodeURIComponent(pendingInvite.worldName)}`);
         } else {
+          logger.info('signup', 'No pending invite found, redirecting to world selection');
           // No pending invite - redirect to world selection
           router.replace('/select/world-selection');
         }
         
       } catch (error: any) {
         logger.error('signup', 'Profile creation error:', error);
+        logger.error('signup', 'Error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          stack: error.stack
+        });
         
         // Handle specific errors
         if (error.message?.includes('duplicate') || error.code === '23505') {
           setAuthError('Username already taken. Please choose another.');
+        } else if (error.message?.includes('display_name')) {
+          logger.error('signup', 'Display name column error detected - database schema issue');
+          setAuthError('Database configuration error. Please contact support.');
         } else {
           setAuthError('Failed to create profile. Please try again.');
         }
       } finally {
         setLoading(false);
+        logger.debug('signup', 'Profile creation process completed');
       }
     } else {
       // Sign up mode - validate email and password only (no username)
