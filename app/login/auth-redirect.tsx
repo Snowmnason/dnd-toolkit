@@ -4,7 +4,9 @@ import { View } from 'react-native';
 import CustomLoad from '../../components/custom_components/CustomLoad';
 import CustomModal from '../../components/CustomModal';
 import { ThemedText } from '../../components/themed-text';
+import { useAppParams } from '../../contexts/AppParamsContext';
 import { AuthStateManager } from '../../lib/auth-state';
+import { usersDB } from '../../lib/database/users';
 import { worldsDB } from '../../lib/database/worlds';
 import { supabase } from '../../lib/supabase';
 import { logger } from '../../lib/utils/logger';
@@ -56,6 +58,7 @@ const clearPendingInvite = () => {
 export default function AuthRedirect() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { updateParams } = useAppParams();
   const [processing, setProcessing] = useState(true);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -63,7 +66,19 @@ export default function AuthRedirect() {
   const [showAlreadyMemberModal, setShowAlreadyMemberModal] = useState(false);
   const [worldName, setWorldName] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const lastProcessedRef = useRef<string | null>(null);
+
+  // Helper function to get current user ID using usersDB
+  const getCurrentUserId = async (): Promise<string | null> => {
+    try {
+      const userProfile = await usersDB.getCurrentUser();
+      return userProfile?.id || null;
+    } catch (error) {
+      logger.error('auth-redirect', 'Error fetching user ID:', error);
+      return null;
+    }
+  };
 
   useEffect(() => {
     const handleAuthRedirect = async () => {
@@ -119,8 +134,27 @@ export default function AuthRedirect() {
 
         // If we established a session but no explicit action provided, default based on context
         if (!action && hasValidSession) {
-          // Prefer completing profile next
-          router.replace('/login/complete-profile');
+          // Get userId and redirect to complete-profile or world-selection
+          const userProfile = await usersDB.getCurrentUser();
+          const userId = userProfile?.id;
+          if (userId) {
+            // Update centralized params context
+            updateParams({ userId });
+            // Check if user has completed profile
+            if (userProfile.username) {
+              // Profile complete, go to world selection
+              router.replace({
+                pathname: '/select/world-selection',
+                params: { userId }
+              });
+            } else {
+              // Profile incomplete, go to complete profile
+              router.replace('/login/complete-profile');
+            }
+          } else {
+            // Fallback if we can't get userId
+            router.replace('/login/complete-profile');
+          }
           return;
         }
 
@@ -207,23 +241,13 @@ export default function AuthRedirect() {
       logger.info('auth-redirect', 'User logged in, processing invite...');
       
       try {
-        // Get current user
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          throw new Error('No authenticated user found');
-        }
-
-        // Get user's profile ID
-        const { data: userProfile } = await supabase
-          .from('users')
-          .select('id')
-          .eq('auth_id', user.id)
-          .single();
-
+        // Get user's profile
+        const userProfile = await usersDB.getCurrentUser();
         if (!userProfile) {
           throw new Error('User profile not found');
         }
+        // Store the userId for navigation
+        setCurrentUserId(userProfile.id);
 
         // Check if user is already in the world
         logger.debug('auth-redirect', 'Checking if user is already in world...');
@@ -283,33 +307,24 @@ export default function AuthRedirect() {
               throw new Error(validationResult.error || 'Invalid or expired invite token');
             }
 
-            // Get user's profile ID
-            const { data: userProfile } = await supabase
-              .from('users')
-              .select('id')
-              .eq('auth_id', session.user.id)
-              .single();
-
+            // Get user's profile
+            const userProfile = await usersDB.getCurrentUser();
             if (!userProfile) {
               throw new Error('User profile not found');
             }
-
             // Check if user is already in the world
             logger.debug('auth-redirect', 'Checking if user is already in world...');
             const isAlreadyMember = await worldsDB.isUserInWorld(validationResult.worldId, userProfile.id);
-
             if (isAlreadyMember) {
               logger.info('auth-redirect', 'User is already a member of this world (pending invite)');
               setWorldName(pendingInvite.worldName);
               setShowAlreadyMemberModal(true);
               return;
             }
-
             // Add user to world in database
             logger.info('auth-redirect', 'Adding user to world from pending invite:', validationResult.worldId);
             await worldsDB.addUserToWorld(validationResult.worldId, userProfile.id, 'player');
             logger.success('auth-redirect', 'User successfully added to world from pending invite');
-            
             setWorldName(pendingInvite.worldName);
             setShowWelcomeModal(true);
             
@@ -337,12 +352,26 @@ export default function AuthRedirect() {
     };
 
     handleAuthRedirect();
-  }, [params, router]);
+  }, [params, router, updateParams]);
 
-  const handleWelcomeModalClose = () => {
+  const handleWelcomeModalClose = async () => {
     setShowWelcomeModal(false);
-    // Clean redirect to world selection (removes all URL params)
-    router.replace('/select/world-selection');
+    
+    // Get userId and include it in navigation
+    const userId = currentUserId || await getCurrentUserId();
+    
+    if (userId) {
+      // Update centralized params context
+      updateParams({ userId });
+      
+      router.replace({
+        pathname: '/select/world-selection',
+        params: { userId }
+      });
+    } else {
+      // Fallback if we can't get userId
+      router.replace('/select/world-selection');
+    }
   };
 
   const handleInviteModalSignIn = () => {
@@ -415,9 +444,24 @@ export default function AuthRedirect() {
       {/* Already a Member Modal */}
       <CustomModal
         visible={showAlreadyMemberModal && !showWelcomeModal}
-        onClose={() => {
+        onClose={async () => {
           setShowAlreadyMemberModal(false);
-          router.replace('/select/world-selection');
+          
+          // Get userId and include it in navigation
+          const userId = currentUserId || await getCurrentUserId();
+          
+          if (userId) {
+            // Update centralized params context
+            updateParams({ userId });
+            
+            router.replace({
+              pathname: '/select/world-selection',
+              params: { userId }
+            });
+          } else {
+            // Fallback if we can't get userId
+            router.replace('/select/world-selection');
+          }
         }}
         title="Already a Member! 🎉"
         message={`You're already part of "${worldName}"! No need to join again.`}

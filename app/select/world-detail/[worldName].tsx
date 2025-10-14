@@ -6,20 +6,22 @@ import PrimaryButton from '../../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../../components/themed-text';
 import { ThemedView } from '../../../components/themed-view';
 import { Spacing } from '../../../constants/theme';
+import { useAppParams } from '../../../contexts/AppParamsContext';
 import { useWorldModal } from '../../../hooks/use-world-modal';
 
 type WorldDetailParams = Record<string, string | string[]>;
 
 export default function WorldDetail() {
-  const params = useLocalSearchParams<WorldDetailParams>();
+  const urlParams = useLocalSearchParams<WorldDetailParams>();
   const router = useRouter();
+  const { params: contextParams, updateParams } = useAppParams();
   
-  // Extract and validate parameters
-  const worldName = typeof params.name === 'string' ? params.name : '';
-  const userId = typeof params.userId === 'string' ? params.userId : undefined;
-  const worldId = typeof params.worldId === 'string' ? params.worldId : undefined;
-  const userRole = typeof params.userRole === 'string' ? params.userRole : undefined;
-  const mapUrl = typeof params.mapImage === 'string' ? params.mapImage : undefined;
+  // Extract and validate parameters - prefer URL params for display, but use context for navigation
+  const worldName = typeof urlParams.name === 'string' ? urlParams.name : '';
+  const userId = contextParams.userId;
+  const worldId = contextParams.worldId;
+  const userRole = contextParams.userRole;
+  const mapUrl = typeof urlParams.mapImage === 'string' ? urlParams.mapImage : undefined;
   
   // Determine map image source
   const selectedMapImage = mapUrl ? { uri: mapUrl } : require('../../../assets/images/Miku.png');
@@ -62,6 +64,13 @@ export default function WorldDetail() {
   
   // Navigation handlers
   const handleOpenWorld = () => {
+    // Update centralized params context
+    updateParams({
+      userId,
+      worldId,
+      userRole,
+    });
+
     router.replace({
       pathname: '/main/mobile',
       params: buildRouteParams(),

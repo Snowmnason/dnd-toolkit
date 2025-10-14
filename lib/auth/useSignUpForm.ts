@@ -57,8 +57,7 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
         // Create user profile
         await usersDB.create({
           auth_id: user.id,
-          username: username.trim(),
-          display_name: username.trim()
+          username: username.trim()
         });
         
         // Check for pending invites after profile creation

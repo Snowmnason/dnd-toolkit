@@ -20,38 +20,27 @@ export default function CompleteProfileScreen() {
   useEffect(() => {
     const checkAuthAndProfile = async () => {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        
-        if (error || !user) {
+        // Use usersDB.getCurrentUser for all user/profile fetches
+        const existingProfile = await usersDB.getCurrentUser();
+        if (!existingProfile) {
           // User not authenticated, redirect to sign-in
           router.replace('/login/sign-in');
           return;
         }
-        
-        setUser(user);
-        
-        // Check if user already has a profile
-        try {
-          const existingProfile = await usersDB.getCurrentUser();
-          
-          // Robust profile validation - only redirect if profile is truly complete
-          const hasValidProfile = existingProfile && 
-                                 existingProfile.username && 
-                                 existingProfile.username.trim().length > 0;
-          
-          if (hasValidProfile) {
-            logger.debug('complete-profile', 'User already has complete profile, redirecting to world selection');
-            router.replace('/select/world-selection');
-            return;
-          }
-          
-          logger.debug('complete-profile', 'User needs to complete profile');
-        } catch (profileError) {
-          // Database error - but don't redirect away since user was sent here intentionally
-          // Just log the error and allow them to complete profile
-          logger.warn('complete-profile', 'Database error checking profile, allowing profile completion:', profileError);
+        setUser(existingProfile);
+        // Robust profile validation - only redirect if profile is truly complete
+        const hasValidProfile = existingProfile && 
+                               existingProfile.username && 
+                               existingProfile.username.trim().length > 0;
+        if (hasValidProfile) {
+          logger.debug('complete-profile', 'User already has complete profile, redirecting to world selection');
+          router.replace({
+            pathname: '/select/world-selection',
+            params: { userId: existingProfile.id }
+          });
+          return;
         }
-        
+        logger.debug('complete-profile', 'User needs to complete profile');
       } catch (error) {
         logger.error('complete-profile', 'Auth check error:', error);
         router.replace('/login/sign-in');

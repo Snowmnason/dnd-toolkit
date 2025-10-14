@@ -1,25 +1,65 @@
 import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Dimensions, Platform, View } from 'react-native';
 import LoadingOverlay from '../components/LoadingOverlay';
 import TopBar from '../components/TopBar';
 import { CoreColors } from '../constants/theme';
+import { AppParamsProvider, useAppParams } from '../contexts/AppParamsContext';
 import { useAppBootstrap } from '../hooks/use-app-bootstrap';
 import { AuthStateManager } from '../lib/auth-state';
 import { logger } from '../lib/utils/logger';
 
-export default function RootLayout() {
-    // Get local search params using the hook at the top level
-  const params = useLocalSearchParams();
-  const userId = typeof params.userId === 'string' ? params.userId : undefined;
-  const worldId = typeof params.worldId === 'string' ? params.worldId : undefined;
-  const userRole = typeof params.userRole === 'string' ? params.userRole : undefined;
+function RootLayoutContent() {
+  // Get local search params using the hook at the top level
+  const urlParams = useLocalSearchParams();
   const router = useRouter();
   const segments = useSegments();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const { width } = Dimensions.get('window');
+  const isMobile = Platform.OS !== 'web' || width < 900;
+  
+  // Use centralized params context
+  const { params, updateParams, clearWorldParams, clearAllParams } = useAppParams();
+  const { userId, worldId, userRole } = params;
   
   // Use the bootstrap hook to ensure assets and session are loaded
   const bootstrap = useAppBootstrap();
+
+  // Update context params when URL params change
+  useEffect(() => {
+    const currentUserId = typeof urlParams.userId === 'string' ? urlParams.userId : undefined;
+    const currentWorldId = typeof urlParams.worldId === 'string' ? urlParams.worldId : undefined;
+    const currentUserRole = typeof urlParams.userRole === 'string' ? urlParams.userRole : undefined;
+
+    // Only update if values are different from context
+    let shouldUpdate = false;
+    const updates: { userId?: string; worldId?: string; userRole?: string } = {};
+    if (currentUserId && currentUserId !== params.userId) {
+      updates.userId = currentUserId;
+      shouldUpdate = true;
+    }
+    if (currentWorldId && currentWorldId !== params.worldId) {
+      updates.worldId = currentWorldId;
+      shouldUpdate = true;
+    }
+    if (currentUserRole && currentUserRole !== params.userRole) {
+      updates.userRole = currentUserRole;
+      shouldUpdate = true;
+    }
+
+    if (shouldUpdate) {
+      updateParams(updates);
+    }
+
+    // Only clear params when entering login routes and params exist
+    if (segments[0] === 'login' && (params.userId || params.worldId || params.userRole)) {
+      clearAllParams();
+    } 
+    // Only clear world params when entering select routes and world params exist
+    else if (segments[0] === 'select' && (params.worldId || params.userRole)) {
+      clearWorldParams();
+    }
+  }, [urlParams, segments, updateParams, clearAllParams, clearWorldParams, params.userId, params.worldId, params.userRole]);
 
   // Protected routes that require authentication
   const protectedRoutes = ['select', 'main', 'settings'];
@@ -99,7 +139,7 @@ export default function RootLayout() {
         if (segments.some(segment => segment === 'create-world') || segments.some(segment => segment === 'world-detail')) {
           config.onBackPress = () => {
             const routeParams: any = {};
-            if (userId) routeParams.userId = userId;
+            routeParams.userId = userId;
             router.replace({
               pathname: '/select/world-selection',
               params: routeParams,
@@ -119,7 +159,7 @@ export default function RootLayout() {
         if (secondSegment === 'desktop' || secondSegment === 'mobile') {
           config.onBackPress = () => {
             const routeParams: any = {};
-            if (userId) routeParams.userId = userId;
+            routeParams.userId = userId;
             router.replace({
               pathname: '/select/world-selection',
               params: routeParams,
@@ -127,77 +167,47 @@ export default function RootLayout() {
             return true; // Prevent default
           };
         }
-        
+
+        // Helper function to create feature screen back handler
+        const createFeatureBackHandler = (tabKey: string) => () => {
+          const routeParams: any = {};
+          routeParams.userId = userId;
+          routeParams.worldId = worldId;
+          routeParams.userRole = userRole;
+          
+          const pathname = isMobile ? '/main/mobile' : '/main/desktop';
+          
+          if (isMobile) {
+            routeParams.tab = tabKey;
+          }
+          
+          router.replace({
+            pathname,
+            params: routeParams,
+          });
+          return true; // Prevent default
+        };
+
         switch (secondSegment) {
           case 'characters-npcs':
             config.title = 'Characters & NPCs';
-            config.onBackPress = () => {
-              const routeParams: any = {};
-              if (userId) routeParams.userId = userId;
-              if (worldId) routeParams.worldId = worldId;
-              if (userRole) routeParams.userRole = userRole;
-              router.replace({
-                pathname: '/main/desktop',
-                params: routeParams,
-              });
-              return true; // Prevent default
-            };
+            config.onBackPress = createFeatureBackHandler('characters');
             break;
           case 'items-treasure':
             config.title = 'Items & Treasure';
-            config.onBackPress = () => {
-              const routeParams: any = {};
-              if (userId) routeParams.userId = userId;
-              if (worldId) routeParams.worldId = worldId;
-              if (userRole) routeParams.userRole = userRole;
-              router.replace({
-                pathname: '/main/desktop',
-                params: routeParams,
-              });
-              return true; // Prevent default
-            };
+            config.onBackPress = createFeatureBackHandler('items');
             break;
           case 'world-exploration':
             config.title = 'World & Exploration';
-            config.onBackPress = () => {
-              const routeParams: any = {};
-              if (userId) routeParams.userId = userId;
-              if (worldId) routeParams.worldId = worldId;
-              if (userRole) routeParams.userRole = userRole;
-              router.replace({
-                pathname: '/main/desktop',
-                params: routeParams,
-              });
-              return true; // Prevent default
-            };
+            config.onBackPress = createFeatureBackHandler('world');
             break;
           case 'combat-events':
             config.title = 'Combat & Events';
-            config.onBackPress = () => {
-              const routeParams: any = {};
-              if (userId) routeParams.userId = userId;
-              if (worldId) routeParams.worldId = worldId;
-              if (userRole) routeParams.userRole = userRole;
-              router.replace({
-                pathname: '/main/desktop',
-                params: routeParams,
-              });
-              return true; // Prevent default
-            };
+            config.onBackPress = createFeatureBackHandler('combat');
             break;
           case 'story-notes':
             config.title = 'Story & Notes';
-            config.onBackPress = () => {
-              const routeParams: any = {};
-              if (userId) routeParams.userId = userId;
-              if (worldId) routeParams.worldId = worldId;
-              if (userRole) routeParams.userRole = userRole;
-              router.replace({
-                pathname: '/main/desktop',
-                params: routeParams,
-              });
-              return true; // Prevent default
-            };
+            config.onBackPress = createFeatureBackHandler('story');
             break;
           default:
             // Keep 'D&D Toolkit' for main menu
@@ -208,6 +218,15 @@ export default function RootLayout() {
       case 'settings':
         config.title = 'Settings';
         config.showHamburger = false;
+        config.onBackPress = () => {
+          const routeParams: any = {};
+          if (userId) routeParams.userId = userId;
+          router.replace({
+            pathname: '/select/world-selection',
+            params: routeParams,
+          });
+          return true; // Prevent default
+        };
         break;
       
       default:
@@ -232,6 +251,9 @@ export default function RootLayout() {
           showBackButton={topBarConfig.showBackButton}
           showHamburger={topBarConfig.showHamburger}
           onBackPress={topBarConfig.onBackPress}
+          userId={userId}
+          worldId={worldId}
+          userRole={userRole}
         />
       )}
       
@@ -241,5 +263,14 @@ export default function RootLayout() {
         }}
       />
     </View>
+  );
+}
+
+// Main export with provider wrapper
+export default function RootLayout() {
+  return (
+    <AppParamsProvider>
+      <RootLayoutContent />
+    </AppParamsProvider>
   );
 }

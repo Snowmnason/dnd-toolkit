@@ -205,7 +205,7 @@ export const AuthStateManager = {
       // No account and no session -> welcome
       return { routingDecision: 'welcome', profileId: null };
     } catch (error) {
-      logger.error('auth-state', '', );
+      logger.error('auth-state', '', error);
       return { routingDecision: 'welcome', profileId: null };
     }
   }

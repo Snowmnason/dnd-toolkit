@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Platform, TouchableOpacity, View } from 'react-native';
+import { Platform, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { ComponentStyles, CoreColors } from '../constants/theme';
 import SettingsMenu from './SettingsMenu';
 import { ThemedText } from './themed-text';
@@ -10,16 +10,23 @@ interface TopBarProps {
   showBackButton?: boolean;
   showHamburger?: boolean;
   onBackPress?: () => void;
+  userId?: string;
+  worldId?: string;
+  userRole?: string;
 }
 
 export default function TopBar({ 
   title = 'D&D Toolkit', 
   showBackButton = true, 
   showHamburger = true,
-  onBackPress 
+  onBackPress,
+  userId,
+  worldId,
+  userRole
 }: TopBarProps) {
   const router = useRouter();
-  const isMobile = Platform.OS !== 'web';
+  const { width } = useWindowDimensions();
+  const isMobile = Platform.OS !== 'web' || width < 900;
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 
   const handleBackPress = () => {
@@ -87,11 +94,27 @@ export default function TopBar({
         onClose={() => setShowSettingsMenu(false)}
         onAccountSettings={() => {
           setShowSettingsMenu(false);
-          router.push('/settings');
+          
+          const routeParams: any = {};
+          if (userId) routeParams.userId = userId;
+          if (worldId) routeParams.worldId = worldId;
+          if (userRole) routeParams.userRole = userRole;
+          
+          router.push({
+            pathname: '/settings',
+            params: routeParams,
+          });
         }}
         onReturnToWorldSelection={() => {
           setShowSettingsMenu(false);
-          router.replace('/select/world-selection');
+          
+          const routeParams: any = {};
+          if (userId) routeParams.userId = userId;
+          
+          router.replace({
+            pathname: '/select/world-selection',
+            params: routeParams,
+          });
         }}
       />
     </>

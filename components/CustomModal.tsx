@@ -15,6 +15,7 @@ interface CustomModalProps {
   title: string;
   message?: string;
   buttons: ModalButton[];
+  children?: React.ReactNode; // For custom content instead of buttons
 }
 
 export default function CustomModal({ 
@@ -22,7 +23,8 @@ export default function CustomModal({
   onClose, 
   title, 
   message, 
-  buttons 
+  buttons,
+  children
 }: CustomModalProps) {
   // Responsive sizing - larger on desktop
   const isDesktop = Platform.OS === 'web' || Platform.OS === 'windows' || Platform.OS === 'macos';
@@ -99,15 +101,40 @@ export default function CustomModal({
         activeOpacity={1}
         onPress={onClose}
       >
-        <View style={{
-          backgroundColor: CoreColors.backgroundLight,
-          borderRadius: 12,
-          padding: scaledSpacing.lg,
-          width: modalWidth.width,
-          maxWidth: modalWidth.maxWidth,
-          borderWidth: 2,
-          borderColor: CoreColors.secondary,
-        }}>
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <View style={{
+            backgroundColor: CoreColors.backgroundLight,
+            borderRadius: 12,
+            padding: scaledSpacing.lg,
+            width: modalWidth.width,
+            maxWidth: modalWidth.maxWidth,
+            borderWidth: 2,
+            borderColor: CoreColors.secondary,
+            position: 'relative',
+          }}>
+          {/* Close button */}
+          <TouchableOpacity
+            style={{
+              position: 'absolute',
+              top: scaledSpacing.sm,
+              right: scaledSpacing.sm,
+              zIndex: 1,
+              padding: scaledSpacing.sm,
+            }}
+            onPress={onClose}
+          >
+            <ThemedText style={{
+              fontSize: fontSize.title,
+              fontWeight: 'bold',
+              color: CoreColors.textSecondary,
+            }}>
+              ×
+            </ThemedText>
+          </TouchableOpacity>
+
           <ThemedText style={{
             fontSize: fontSize.title,
             fontWeight: 'bold',
@@ -130,35 +157,39 @@ export default function CustomModal({
             </ThemedText>
           )}
 
-          <View style={{
-            flexDirection: buttons.length <= 2 ? 'row' : 'column',
-            gap: scaledSpacing.sm,
-            justifyContent: 'center',
-          }}>
-            {buttons.map((button, index) => (
-              <TouchableOpacity
-                key={index}
-                style={{
-                  padding: scaledSpacing.sm,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  flex: buttons.length <= 2 ? 1 : undefined,
-                  minWidth: buttons.length <= 2 ? undefined : (isDesktop ? 250 : 200),
-                  ...getButtonStyle(button.style),
-                }}
-                onPress={button.onPress}
-              >
-                <ThemedText style={{
-                  fontSize: fontSize.button,
-                  textAlign: 'center',
-                  ...getButtonTextStyle(button.style),
-                }}>
-                  {button.text}
-                </ThemedText>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {/* Custom children content or default buttons */}
+          {children || (
+            <View style={{
+              flexDirection: buttons.length <= 2 ? 'row' : 'column',
+              gap: scaledSpacing.sm,
+              justifyContent: 'center',
+            }}>
+              {buttons.map((button, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={{
+                    padding: scaledSpacing.sm,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    flex: buttons.length <= 2 ? 1 : undefined,
+                    minWidth: buttons.length <= 2 ? undefined : (isDesktop ? 250 : 200),
+                    ...getButtonStyle(button.style),
+                  }}
+                  onPress={button.onPress}
+                >
+                  <ThemedText style={{
+                    fontSize: fontSize.button,
+                    textAlign: 'center',
+                    ...getButtonTextStyle(button.style),
+                  }}>
+                    {button.text}
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
+        </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
   );
