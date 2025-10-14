@@ -1,22 +1,23 @@
 import LeaveWorldModal from '@/components/create-world/ConfrimLeaveModal';
 import EditWorldModal from '@/components/create-world/EditWorldModal';
 import CustomLoad from '@/components/custom_components/CustomLoad';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Image, ScrollView, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
 import { ComponentStyles, CoreColors, Spacing } from '../../constants/theme';
+import { useAppParams } from '../../contexts/AppParamsContext';
 import { useWorldModal } from '../../hooks/use-world-modal';
 import { useWorlds } from '../../lib/useWorlds';
 
 
 
 export default function LandingPage() {
-  const params = useLocalSearchParams();
-  // Extract userId from params and ensure it's a string (not string[])
-  const userId = typeof params.userId === 'string' ? params.userId : undefined;
+  // Use centralized params context
+  const { params, updateParams } = useAppParams();
+  const userId = params.userId;
   
   const { selectedWorld, setSelectedWorld, worlds, isLoading, error, retry, refetch } = useWorlds(userId);
   
@@ -133,13 +134,17 @@ export default function LandingPage() {
                         return newSelection;
                       });
                     } else {
-                      // Include userId, userRole, and mapImage in the route
+                      // Update centralized params context
+                      updateParams({
+                        userId,
+                        worldId: world.world_id,
+                        userRole: world.user_role,
+                      });
+
+                      // Include only display params in the route (context handles the rest)
                       const routeParams: Record<string, string> = {};
                       if (world.name) routeParams.name = world.name;
-                      if (userId) routeParams.userId = userId;
-                      routeParams.userRole = world.user_role;
                       if (world.map_image_url) routeParams.mapImage = world.map_image_url;
-                      if (world.world_id) routeParams.worldId = world.world_id;
                       
                       const queryString = new URLSearchParams(routeParams).toString();
                       const route = `/select/world-detail/${encodeURIComponent(world.world_id)}?${queryString}`;
@@ -239,14 +244,22 @@ export default function LandingPage() {
                   style={{ marginLeft: selectedWorld.user_role === 'owner' ? 0 : 'auto' }}
                   textStyle={{}}
                   onPress={() => {
-                    const routeParams: Record<string, string> = { worldId: selectedWorld.world_id };
-                      if (userId) routeParams.userId = userId;
-                      routeParams.userRole = selectedWorld.user_role;
+                    // Update centralized params context
+                    updateParams({
+                      userId,
+                      worldId: selectedWorld.world_id,
+                      userRole: selectedWorld.user_role,
+                    });
 
-                      router.push({
-                        pathname: '/main/desktop',
-                        params: routeParams,
-                      });
+                    // Navigate with params in URL (for page refresh/direct access support)
+                    router.push({
+                      pathname: '/main/desktop',
+                      params: {
+                        userId: userId || '',
+                        worldId: selectedWorld.world_id,
+                        userRole: selectedWorld.user_role,
+                      },
+                    });
                   }}
                 >
                   Open

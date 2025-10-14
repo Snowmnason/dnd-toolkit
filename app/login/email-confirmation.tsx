@@ -9,6 +9,7 @@ import CustomModal from '../../components/CustomModal';
 import { ThemedText } from '../../components/themed-text';
 import { AuthStateManager } from '../../lib/auth-state';
 import { openEmailApp } from '../../lib/auth/emailUtils';
+import { usersDB } from '../../lib/database/users';
 import { supabase } from '../../lib/supabase';
 import { logger } from '../../lib/utils/logger';
 
@@ -43,15 +44,13 @@ export default function EmailConfirmationScreen() {
         
         // Check if user has completed their profile
         try {
-          const { data: profile } = await supabase
-            .from('users')
-            .select('username')
-            .eq('auth_id', session.user.id)
-            .single();
-          
+          const profile = await usersDB.getCurrentUser();
           if (profile && profile.username) {
-            // Profile is complete, go to world selection
-            router.replace('/select/world-selection');
+            // Profile is complete, go to world selection with userId
+            router.replace({
+              pathname: '/select/world-selection',
+              params: { userId: profile.id }
+            });
           } else {
             // Profile needs completion
             router.replace('/login/complete-profile');

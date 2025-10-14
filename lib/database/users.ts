@@ -1,4 +1,4 @@
-import { sanitizeInput, validateUsername } from '../auth/validation';
+import { validateUsername } from '../auth/validation';
 import { supabase } from '../supabase';
 import { logger } from '../utils/logger';
 
@@ -6,19 +6,16 @@ export interface User {
   id: string;
   auth_id: string;
   username: string;
-  display_name: string | null;
   created_at: string;
 }
 
 export interface CreateUserData {
   auth_id: string;
   username: string;
-  display_name?: string;
 }
 
 export interface UpdateUserData {
   username?: string;
-  display_name?: string;
 }
 
 export const usersDB = {
@@ -33,10 +30,7 @@ export const usersDB = {
       userData.username = usernameValidation.sanitized;
     }
     
-    // Sanitize display name if provided
-    if (userData.display_name) {
-      userData.display_name = sanitizeInput(userData.display_name).slice(0, 50); // Limit length
-    }
+    // Note: display_name removed from schema
 
     const { data, error } = await supabase
       .from('users')
@@ -57,7 +51,6 @@ export const usersDB = {
     const defaultUserData: CreateUserData = {
       auth_id: authId,
       username: `user_${authId.slice(-8)}`, // Default username using last 8 chars of auth_id
-      display_name: undefined // Will be set in settings if user chooses
     };
 
     return this.create(defaultUserData);
@@ -106,10 +99,7 @@ export const usersDB = {
       updates.username = usernameValidation.sanitized;
     }
     
-    // Sanitize display name if being updated
-    if (updates.display_name) {
-      updates.display_name = sanitizeInput(updates.display_name).slice(0, 50); // Limit length
-    }
+    // Note: display_name removed from schema
 
     const { data, error } = await supabase
       .from('users')
@@ -124,5 +114,20 @@ export const usersDB = {
     }
     
     return data;
+  },
+
+
+  async deleteCurrentUser(): Promise<boolean> {
+    // make sure we’re logged in so invoke sends a valid Authorization header
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) throw new Error(error.message || 'Auth check failed');
+    if (!user) throw new Error('Not authenticated');
+
+    // call your Edge Function by name (no URL needed, no body needed)
+    const { data, error: fnError } = await supabase.functions.invoke('delete-account');
+    if (fnError) throw new Error(fnError.message || 'Failed to delete account');
+    logger.debug('users', 'Account deletion function response:', data);
+    return true;
   }
+
 };

@@ -320,7 +320,7 @@ export const worldsDB = {
       .from('world_access')
       .select(`
         *,
-        users(id, username, display_name)
+        users(id, username)
       `)
       .eq('world_id', worldId)
       .order('created_at', { ascending: false });

@@ -1,6 +1,7 @@
 import React from 'react';
-import { Modal, Platform, TouchableOpacity, View } from 'react-native';
+import { Platform, TouchableOpacity, View } from 'react-native';
 import { CoreColors, Spacing } from '../constants/theme';
+import CustomModal from './CustomModal';
 import { ThemedText } from './themed-text';
 
 interface SettingsMenuProps {
@@ -16,134 +17,79 @@ export default function SettingsMenu({
   onAccountSettings, 
   onReturnToWorldSelection 
 }: SettingsMenuProps) {
-  // Make it bigger!
+  // Keep a subtle scale bump per platform while letting CustomModal handle spacing/layout
   const isDesktop = Platform.OS === 'web' || Platform.OS === 'windows' || Platform.OS === 'macos';
-  const scale = isDesktop ? 2 : 1.6; // Slightly more reasonable scaling
-  
+  const scale = isDesktop ? 1.25 : 1.0;
+
   return (
-    <Modal
+    <CustomModal
       visible={visible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={onClose}
-      accessibilityViewIsModal={true}
+      onClose={onClose}
+      title="Settings"
+      buttons={[]}
     >
-      <TouchableOpacity 
-        style={{
-          flex: 1,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-        activeOpacity={1}
-        onPress={onClose}
-      >
+      <View style={{ minWidth: 260 * scale }}>
         <TouchableOpacity
-          activeOpacity={1}
-          onPress={(e) => e.stopPropagation()}
+          style={{
+            padding: Spacing.md * scale,
+            borderRadius: 8,
+            marginBottom: Spacing.xs * scale,
+            borderColor: 'rgba(117, 117, 117, 0.5)',
+            borderWidth: 1,
+          }}
+          onPress={() => {
+            onClose();
+            onAccountSettings();
+          }}
         >
-          <View style={{
-            backgroundColor: CoreColors.backgroundLight,
-            borderRadius: 12,
-            padding: Spacing.lg * scale,
-            minWidth: 200 * scale,
-            borderWidth: 2,
-            borderColor: CoreColors.secondary,
-            position: 'relative',
-          }}>
-            {/* Close button */}
-            <TouchableOpacity
-              style={{
-                position: 'absolute',
-                top: Spacing.sm * scale,
-                right: Spacing.sm * scale,
-                zIndex: 1,
-                padding: Spacing.sm * scale,
-              }}
-              onPress={onClose}
-            >
-              <ThemedText style={{
-                fontSize: 18 * (isDesktop ? 1.3 : 1.1),
-                fontWeight: 'bold',
-                color: CoreColors.textSecondary,
-              }}>
-                ×
-              </ThemedText>
-            </TouchableOpacity>
-
-            <ThemedText style={{
-              fontSize: 18 * (isDesktop ? 1.3 : 1.1),
-              fontWeight: 'bold',
-              marginBottom: Spacing.md * scale,
-              textAlign: 'center',
+          <ThemedText style={{
+            fontSize: 16 * scale,
             color: CoreColors.textOnLight,
+            textAlign: 'center',
           }}>
-            Settings
+            Account Settings
           </ThemedText>
-          
-          <TouchableOpacity
-            style={{
-              padding: Spacing.sm * scale,
-              borderRadius: 8,
-              marginBottom: Spacing.xs * scale,
-              borderColor: 'rgba(117, 117, 117, 0.5)',
-              borderWidth: 1,
-            }}
-            onPress={() => {
-              onClose();
-              onAccountSettings();
-            }}
-          >
-            <ThemedText style={{
-              fontSize: 16 * (isDesktop ? 1.2 : 1.05),
-              color: CoreColors.textOnLight,
-              textAlign: 'center',
-            }}>
-              Account Settings
-            </ThemedText>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={{
-              padding: Spacing.sm * scale,
-              borderRadius: 8,
-              backgroundColor: 'rgba(139, 115, 39, 0.1)',
-              marginBottom: Spacing.sm * scale,
-            }}
-            onPress={() => {
-              onClose();
-              onReturnToWorldSelection();
-            }}
-          >
-            <ThemedText style={{
-              fontSize: 16 * (isDesktop ? 1.2 : 1.05),
-              color: CoreColors.secondary,
-              textAlign: 'center',
-              fontWeight: '600',
-            }}>
-              Return to World Selection
-            </ThemedText>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={{
-              padding: Spacing.sm * scale,
-              borderRadius: 8,
-              backgroundColor: CoreColors.primaryTransparent,
-            }}
-            onPress={onClose}
-          >
-            <ThemedText style={{
-              fontSize: 16 * (isDesktop ? 1.2 : 1.05),
-              color: CoreColors.textOnLight,
-              textAlign: 'center',
-            }}>
-              Cancel
-            </ThemedText>
-          </TouchableOpacity>
-          </View>
         </TouchableOpacity>
-      </TouchableOpacity>
-    </Modal>
+
+        <TouchableOpacity
+          style={{
+            padding: Spacing.md * scale,
+            borderRadius: 8,
+            backgroundColor: 'rgba(139, 115, 39, 0.1)',
+            marginBottom: Spacing.sm * scale,
+          }}
+          onPress={() => {
+            onClose();
+            onReturnToWorldSelection();
+          }}
+        >
+          <ThemedText style={{
+            fontSize: 16 * scale,
+            color: CoreColors.secondary,
+            textAlign: 'center',
+            fontWeight: '600',
+          }}>
+            Return to World Selection
+          </ThemedText>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={{
+            padding: Spacing.md * scale,
+            borderRadius: 8,
+            backgroundColor: CoreColors.primaryTransparent,
+          }}
+          onPress={onClose}
+        >
+          <ThemedText style={{
+            fontSize: 16 * scale,
+            color: CoreColors.textOnLight,
+            textAlign: 'center',
+          }}>
+            Cancel
+          </ThemedText>
+        </TouchableOpacity>
+      </View>
+    </CustomModal>
   );
 }

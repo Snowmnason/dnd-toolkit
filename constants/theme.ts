@@ -105,6 +105,9 @@ export const CoreColors = {
 
   // Top bar colors
   TopBarDark: '#1f262eff', // Dark slate
+
+  // Bottom tab bar active tab background
+  activeTabBackground: 'rgba(212, 175, 55, 0.13)', // Subtle gold highlight for active tab
 };
 
 // Spacing system (8pt grid)
@@ -139,6 +142,12 @@ export const Shadows = {
   gold: {
     ...createShadow(CoreColors.secondary, { width: 0, height: 2 }, 0.3, 4, 4),
   },
+  buttonShadow: {
+    ...createShadow(CoreColors.secondary, { width: 0, height: 2 }, 0.18, 4, 4),
+  },
+  panelShadow: {
+    ...createShadow(CoreColors.primaryDark, { width: 0, height: 4 }, 0.22, 8, 8),
+  },
 };
 
 // Typography system
@@ -149,6 +158,9 @@ export const Typography = {
   },
   textShadowDark: {
     ...createTextShadow('#000', { width: 2, height: 2 }, 4),
+  },
+  buttonTextShadow: {
+    ...createTextShadow(CoreColors.primaryDark, { width: 1, height: 1 }, 2),
   },
 };
 
@@ -228,7 +240,7 @@ export const ComponentStyles = {
       paddingTop: 50, // Account for status bar
       backgroundColor: CoreColors.TopBarDark,
       borderBottomWidth: 1,
-      borderBottomColor: CoreColors.backgroundLight,
+      borderBottomColor: CoreColors.borderPrimary,
     },
     button: {
       padding: Spacing.xs,
@@ -236,6 +248,68 @@ export const ComponentStyles = {
       backgroundColor: CoreColors.primaryTransparent,
       alignItems: 'center' as const,
     }
+  },
+  bottomTabBar: {
+    container: {
+      flexDirection: 'row' as const,
+      height: 60,
+      backgroundColor: CoreColors.TopBarDark,
+      borderTopWidth: 1,
+      borderTopColor: CoreColors.borderPrimary,
+      paddingBottom: 5,
+      ...Shadows.panelShadow,
+    },
+    tab: {
+      flex: 1,
+      justifyContent: 'center' as const,
+      alignItems: 'center' as const,
+      paddingVertical: 5,
+    },
+    activeTab: {
+      backgroundColor: CoreColors.activeTabBackground,
+    },
+    icon: {
+      fontSize: 24,
+      marginBottom: 2,
+    },
+    activeIcon: {
+      // Can add different styling for active icon
+    },
+    label: {
+      fontSize: 10,
+      color: CoreColors.textSecondary,
+    },
+    activeLabel: {
+      color: CoreColors.secondary,
+      fontWeight: 'bold' as const,
+    },
+  },
+  panelView: {
+    panel: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: CoreColors.primaryDark,
+      alignItems: 'center' as const,
+      justifyContent: 'flex-start' as const,
+      padding: Spacing.md,
+      ...Shadows.panelShadow,
+    },
+    panelTitle: {
+      marginBottom: 20,
+      textAlign: 'center' as const,
+      ...Typography.textShadow,
+    },
+    featureButton: {
+      marginBottom: Spacing.sm,
+      width: '90%' as any,
+      borderRadius: BorderRadius.md,
+      borderColor: CoreColors.secondary,
+      borderWidth: 2,
+      ...Shadows.buttonShadow,
+    },
+    featureText: {
+      textAlign: 'center' as const,
+    },
   }
 };
 

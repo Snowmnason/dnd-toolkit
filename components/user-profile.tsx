@@ -3,47 +3,39 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { ComponentStyles, CoreColors, Spacing } from '../constants/theme';
-import { usersDB } from '../lib/database/users';
 import PrimaryButton from './custom_components/PrimaryButton';
 import { ThemedText } from './themed-text';
 
 interface UserProfileProps {
-  user?: {
-    email?: string;
-    user_metadata?: {
-      full_name?: string;
-      username?: string;
-    };
+  profile?: {
+    id?: string;
+    username?: string;
   } | null;
 }
 
-export default function UserProfile({ user }: UserProfileProps) {
+export default function UserProfile({ profile }: UserProfileProps) {
   const router = useRouter();
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [sessionUser, setSessionUser] = useState<any>(null);
+  const [loadingSession, setLoadingSession] = useState(true);
 
-  // Fetch user profile from database
+  // Fetch session user for email
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      if (!user) {
-        setLoadingProfile(false);
-        return;
-      }
-      
+    const fetchSessionUser = async () => {
       try {
-        const profile = await usersDB.getCurrentUser();
-        setUserProfile(profile);
+        const { supabase } = await import('../lib/supabase');
+        const { data: { user } } = await supabase.auth.getUser();
+        setSessionUser(user);
       } catch (error) {
-        logger.error('user-profile', 'Error fetching user profile:', error);
+        logger.error('user-profile', 'Error fetching session user:', error);
       } finally {
-        setLoadingProfile(false);
+        setLoadingSession(false);
       }
     };
 
-    fetchUserProfile();
-  }, [user]);
+    fetchSessionUser();
+  }, []);
 
-  if (!user) {
+  if (!profile && !loadingSession) {
     // This shouldn't happen in normal flow since settings requires authentication
     // But show a fallback just in case
     return (
@@ -123,12 +115,12 @@ export default function UserProfile({ user }: UserProfileProps) {
             fontSize: 15,
             fontStyle: 'italic'
           }}>
-            {user.email}
+            {sessionUser?.email || 'Loading...'}
           </ThemedText>
         </View>
         
-        {/* Username Field - from database */}
-        {userProfile?.username && (
+        {/* Username Field - from database profile */}
+        {profile?.username && (
           <View style={{ marginBottom: Spacing.sm }}>
             <ThemedText type="defaultSemiBold" style={{
               color: CoreColors.textOnLight,
@@ -142,33 +134,13 @@ export default function UserProfile({ user }: UserProfileProps) {
               fontSize: 15,
               fontStyle: 'italic'
             }}>
-              {userProfile.username}
-            </ThemedText>
-          </View>
-        )}
-        
-        {/* Display Name Field - from database */}
-        {userProfile?.display_name && (
-          <View style={{ marginBottom: Spacing.sm }}>
-            <ThemedText type="defaultSemiBold" style={{
-              color: CoreColors.textOnLight,
-              fontSize: 16,
-              marginBottom: 4
-            }}>
-              Display Name
-            </ThemedText>
-            <ThemedText style={{
-              color: CoreColors.textSecondary,
-              fontSize: 15,
-              fontStyle: 'italic'
-            }}>
-              {userProfile.display_name}
+              {profile.username}
             </ThemedText>
           </View>
         )}
         
         {/* Show loading state */}
-        {loadingProfile && (
+        {loadingSession && (
           <View style={{ marginBottom: Spacing.sm }}>
             <ThemedText style={{
               color: CoreColors.textSecondary,
