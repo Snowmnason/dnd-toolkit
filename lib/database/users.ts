@@ -21,16 +21,30 @@ export interface UpdateUserData {
 export const usersDB = {
   // Create a new user profile (called after auth signup) with input validation
   async create(userData: CreateUserData): Promise<User> {
+    logger.info('usersDB', 'Starting user profile creation', {
+      auth_id: userData.auth_id,
+      username: userData.username,
+      usernameLength: userData.username?.length
+    });
+
     // Validate and sanitize username if provided
     if (userData.username) {
       const usernameValidation = validateUsername(userData.username);
+      logger.debug('usersDB', 'Username validation result:', {
+        isValid: usernameValidation.isValid,
+        sanitized: usernameValidation.sanitized,
+        original: userData.username
+      });
+      
       if (!usernameValidation.isValid) {
+        logger.error('usersDB', 'Username validation failed');
         throw new Error('Username contains invalid characters or format');
       }
       userData.username = usernameValidation.sanitized;
     }
     
     // Note: display_name removed from schema
+    logger.debug('usersDB', 'Inserting user data into database:', userData);
 
     const { data, error } = await supabase
       .from('users')
@@ -39,9 +53,21 @@ export const usersDB = {
       .single();
     
     if (error) {
-      logger.error('users', 'Error creating user profile:', error);
+      logger.error('usersDB', 'Database error during user creation:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
       throw new Error(error.message || 'Failed to create user profile');
     }
+    
+    logger.info('usersDB', 'User profile created successfully:', {
+      id: data.id,
+      auth_id: data.auth_id,
+      username: data.username,
+      created_at: data.created_at
+    });
     
     return data;
   },
@@ -58,11 +84,27 @@ export const usersDB = {
 
   // Get current user's profile
   async getCurrentUser(): Promise<User | null> {
-    const { data: { user: authUser } } = await supabase.auth.getUser();
+    logger.debug('usersDB', 'Starting getCurrentUser');
+    
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+    
+    logger.debug('usersDB', 'Auth user fetch result:', {
+      hasAuthUser: !!authUser,
+      authUserId: authUser?.id,
+      authError: authError?.message
+    });
+    
+    if (authError) {
+      logger.error('usersDB', 'Auth error in getCurrentUser:', authError);
+      throw new Error(authError.message || 'Authentication error');
+    }
     
     if (!authUser) {
+      logger.debug('usersDB', 'No authenticated user found');
       return null;
     }
+
+    logger.debug('usersDB', 'Fetching user profile from database for auth_id:', authUser.id);
 
     const { data, error } = await supabase
       .from('users')
@@ -72,12 +114,29 @@ export const usersDB = {
     
     if (error) {
       if (error.code === 'PGRST116') {
-        // No profile exists yet
+        // This is expected for new users who haven't created a profile yet
+        logger.debug('usersDB', 'No profile exists yet for user - this is expected for new users');
         return null;
       }
-      logger.error('users', 'Error fetching current user:', error);
+      
+      // Only log as error for unexpected database issues
+      logger.error('usersDB', 'Unexpected database error in getCurrentUser:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        auth_id: authUser.id
+      });
+      
       throw new Error(error.message || 'Failed to fetch user profile');
     }
+    
+    logger.info('usersDB', 'User profile fetched successfully:', {
+      id: data?.id,
+      auth_id: data?.auth_id,
+      username: data?.username,
+      created_at: data?.created_at
+    });
     
     return data;
   },
