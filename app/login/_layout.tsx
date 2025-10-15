@@ -1,6 +1,6 @@
+import { CoreColors } from '@/constants/corecolors';
 import { Stack } from 'expo-router';
 import { View } from 'react-native';
-import { CoreColors } from '../../constants/theme';
 
 export default function LoginLayout() {
   return (

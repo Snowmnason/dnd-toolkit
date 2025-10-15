@@ -1,3 +1,4 @@
+import { CoreColors } from '@/constants/corecolors';
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -8,7 +9,7 @@ import CredentialConfirmModal from '../components/modals/CredentialConfirmModal'
 import { ThemedText } from '../components/themed-text';
 import { ThemedView } from '../components/themed-view';
 import UserProfile from '../components/user-profile';
-import { ComponentStyles, CoreColors, Spacing } from '../constants/theme';
+import { ComponentStyles, Spacing } from '../constants/theme';
 import { AuthStateManager } from '../lib/auth-state';
 import { usersDB } from '../lib/database/users';
 import { deleteUserAccount, signOutUser } from '../lib/settings';

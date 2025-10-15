@@ -1,4 +1,5 @@
-import { BorderRadius, CoreColors, Spacing } from '@/constants/theme';
+import { CoreColors } from '@/constants/corecolors';
+import { BorderRadius, Spacing } from '@/constants/theme';
 import React, { useState } from 'react';
 import { TextStyle, ViewStyle } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';

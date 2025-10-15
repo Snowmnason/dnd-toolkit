@@ -1,4 +1,4 @@
-import { CoreColors } from '@/constants/theme';
+import { CoreColors } from '@/constants/corecolors';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';

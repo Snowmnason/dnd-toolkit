@@ -1,4 +1,4 @@
-import { CoreColors } from '@/constants/theme';
+import { CoreColors } from '@/constants/corecolors';
 import { useRouter } from 'expo-router';
 import { View } from 'react-native';
 import AuthButton from '../../components/auth_components/AuthButton';

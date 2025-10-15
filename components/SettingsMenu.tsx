@@ -1,6 +1,7 @@
+import { CoreColors } from '@/constants/corecolors';
 import React from 'react';
 import { Platform, TouchableOpacity, View } from 'react-native';
-import { CoreColors, Spacing } from '../constants/theme';
+import { Spacing } from '../constants/theme';
 import CustomModal from './CustomModal';
 import { ThemedText } from './themed-text';
 

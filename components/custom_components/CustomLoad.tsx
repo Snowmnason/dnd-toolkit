@@ -1,6 +1,6 @@
+import { CoreColors } from '@/constants/corecolors';
 import React, { useState } from 'react';
 import { ActivityIndicator, ActivityIndicatorProps, Image, ImageProps } from 'react-native';
-import { CoreColors } from '../../constants/theme';
 
 interface CustomLoadProps extends Omit<ImageProps, 'source' | 'style'> {
   size?: 'small' | 'medium' | 'large' | 'xlarge' | number;
