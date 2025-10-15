@@ -1,7 +1,8 @@
+import { CoreColors } from '@/constants/corecolors';
 import { logger } from '@/lib/utils/logger';
 import React, { useState } from 'react';
 import { Platform, TextInput, TouchableOpacity, View } from 'react-native';
-import { BorderRadius, CoreColors, Spacing } from '../../constants/theme';
+import { BorderRadius, Spacing } from '../../constants/theme';
 import { createWorldNameChangeHandler, isValidWorldNameForSubmission, type WorldNameValidationResult } from '../../lib/auth/validation';
 import CustomModal from '../CustomModal';
 import { ThemedText } from '../themed-text';

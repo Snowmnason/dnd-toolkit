@@ -1,3 +1,4 @@
+import { CoreColors } from '@/constants/corecolors';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform, ScrollView, View } from 'react-native';
@@ -8,7 +9,7 @@ import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import TextInputComponent from '../../components/custom_components/TextInput';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
-import { ComponentStyles, CoreColors, Spacing, createTextShadow } from '../../constants/theme';
+import { ComponentStyles, Spacing, createTextShadow } from '../../constants/theme';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { useSuccessNavigation } from '../../hooks/use-success-navigation';
 import { useWorldCreation } from '../../hooks/use-world-creation';

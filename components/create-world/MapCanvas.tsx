@@ -1,5 +1,6 @@
 import IconButton from '@/components/custom_components/IconButton';
-import { BorderRadius, CoreColors, Spacing } from '@/constants/theme';
+import { CoreColors } from '@/constants/corecolors';
+import { BorderRadius, Spacing } from '@/constants/theme';
 import React, { useState } from 'react';
 import { Image, ImageStyle, Text, TextStyle, View, ViewStyle } from 'react-native';
 

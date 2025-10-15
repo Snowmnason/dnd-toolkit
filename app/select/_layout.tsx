@@ -1,8 +1,8 @@
+import { CoreColors } from '@/constants/corecolors';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import CustomLoad from '../../components/custom_components/CustomLoad';
-import { CoreColors } from '../../constants/theme';
 import { AuthStateManager } from '../../lib/auth-state';
 import { logger } from '../../lib/utils/logger';
 

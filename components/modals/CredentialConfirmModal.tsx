@@ -1,6 +1,7 @@
+import { CoreColors } from '@/constants/corecolors';
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { CoreColors, Spacing } from '../../constants/theme';
+import { Spacing } from '../../constants/theme';
 import PrimaryButton from '../custom_components/PrimaryButton';
 import TextInput from '../custom_components/TextInput';
 import CustomModal from '../CustomModal';
@@ -67,7 +68,7 @@ export default function CredentialConfirmModal({
           onPress={() => setShowPassword((s) => !s)}
           style={{
             textAlign: 'right',
-            color: '#D4AF37',
+            color: CoreColors.textSecondary,
             fontSize: 12,
             marginBottom: Spacing.sm,
           }}
@@ -78,7 +79,7 @@ export default function CredentialConfirmModal({
         {!!errorText && (
           <ThemedText
             style={{
-              color: '#dc3545',
+              color: CoreColors.destructive,
               fontSize: 13,
               marginBottom: Spacing.sm,
               textAlign: 'center',
@@ -99,11 +100,11 @@ export default function CredentialConfirmModal({
      >
         <PrimaryButton
           style={{
-            backgroundColor: 'rgba(108, 117, 125, 0.1)',
-            borderColor: '#6c757d',
+            backgroundColor: CoreColors.cancel,
+            borderColor: CoreColors.cancelBoarder,
             opacity: loading ? 0.6 : 1,
           }}
-          textStyle={{ color: '#6c757d', fontWeight: '500' }}
+          textStyle={{ color: CoreColors.cancelText, fontWeight: '500' }}
           disabled={loading}
           onPress={onCancel}
         >
@@ -112,11 +113,11 @@ export default function CredentialConfirmModal({
 
         <PrimaryButton
           style={{
-            backgroundColor: destructive ? '#dc3545' : CoreColors.primary,
-            borderColor: destructive ? '#c82333' : CoreColors.primary,
+            backgroundColor: destructive ? CoreColors.destructive : CoreColors.primary,
+            borderColor: destructive ? CoreColors.destructiveBoarder : CoreColors.primary,
             opacity: loading || !password ? 0.6 : 1,
           }}
-          textStyle={{ color: CoreColors.textPrimary, fontWeight: '600' }}
+          textStyle={{ color: CoreColors.destructiveText, fontWeight: '600' }}
           disabled={loading || !password}
           onPress={() => onConfirm(password)}
         >

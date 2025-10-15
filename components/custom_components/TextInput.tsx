@@ -1,4 +1,5 @@
-import { BorderRadius, CoreColors, Spacing } from '@/constants/theme';
+import { CoreColors } from '@/constants/corecolors';
+import { BorderRadius, Spacing } from '@/constants/theme';
 import React from 'react';
 import { TextInput as RNTextInput, TextInputProps, TextStyle } from 'react-native';
 

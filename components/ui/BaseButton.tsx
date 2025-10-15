@@ -1,4 +1,4 @@
-import { CoreColors } from '@/constants/theme';
+import { CoreColors } from '@/constants/corecolors';
 import React from 'react';
 import { ActivityIndicator, TextStyle, TouchableOpacity, ViewStyle } from 'react-native';
 import { ThemedText } from '../themed-text';
@@ -50,15 +50,15 @@ export default function BaseButton({
       case 'secondary':
         return {
           backgroundColor: isDisabled 
-            ? 'rgba(139, 69, 19, 0.1)' 
-            : 'rgba(139, 69, 19, 0.15)',
-          borderColor: '#8B4513',
+            ? CoreColors.secondaryButtonDisable
+            : CoreColors.secondaryButtonBackground,
+          borderColor: CoreColors.secondaryButtonBorder,
           borderWidth: 1,
         };
       case 'destructive':
         return {
-          backgroundColor: isDisabled ? '#6c757d' : '#dc3545',
-          borderColor: isDisabled ? '#6c757d' : '#c82333',
+          backgroundColor: isDisabled ? CoreColors.destructiveDisabled : CoreColors.destructive,
+          borderColor: isDisabled ? CoreColors.destructiveDisabled : CoreColors.destructiveBoarder,
           borderWidth: 1,
         };
       case 'ghost':

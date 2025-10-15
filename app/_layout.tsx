@@ -1,9 +1,9 @@
+import { CoreColors } from '@/constants/corecolors';
 import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Dimensions, Platform, View } from 'react-native';
 import LoadingOverlay from '../components/LoadingOverlay';
 import TopBar from '../components/TopBar';
-import { CoreColors } from '../constants/theme';
 import { AppParamsProvider, useAppParams } from '../contexts/AppParamsContext';
 import { useAppBootstrap } from '../hooks/use-app-bootstrap';
 import { AuthStateManager } from '../lib/auth-state';
