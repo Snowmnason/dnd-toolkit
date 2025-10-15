@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import AuthButton from '../../components/auth_components/AuthButton';
 import AuthInput from '../../components/auth_components/AuthInput';
-import CustomModal from '../../components/CustomModal';
+import CustomModal from '../../components/modals/CustomModal';
 import { ThemedText } from '../../components/themed-text';
 import { sendPasswordReset } from '../../lib/auth/authService';
 import { validateEmail } from '../../lib/auth/validation';

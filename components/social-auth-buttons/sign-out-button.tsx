@@ -1,6 +1,6 @@
 import React from 'react';
 import { AuthStateManager } from '../../lib/auth-state';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/database/supabase';
 import { logger } from '../../lib/utils/logger';
 import PrimaryButton from '../custom_components/PrimaryButton';
 

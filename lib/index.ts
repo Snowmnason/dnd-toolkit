@@ -14,5 +14,5 @@ export * from './utils';
 
 // Individual module exports for convenience
 export { AuthStateManager } from './auth-state';
-export { supabase } from './supabase';
+export { supabase } from './database/supabase';
 

@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import CustomModal from '../CustomModal';
+import CustomModal from '../modals/CustomModal';
 
 interface CreateWorldModalsProps {
   showSignInModal: boolean;

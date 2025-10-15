@@ -8,7 +8,7 @@ import AuthInput from '../../components/auth_components/AuthInput';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../components/themed-text';
 import { useSignInForm } from '../../lib/auth';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/database/supabase';
 import { logger } from '../../lib/utils/logger';
 
 export default function SignInScreen() {

@@ -7,8 +7,8 @@ import AuthInput from '../../components/auth_components/AuthInput';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import { ThemedText } from '../../components/themed-text';
 import { useSignUpForm } from '../../lib/auth';
+import { supabase } from '../../lib/database/supabase';
 import { usersDB } from '../../lib/database/users';
-import { supabase } from '../../lib/supabase';
 import { logger } from '../../lib/utils/logger';
 
 export default function CompleteProfileScreen() {

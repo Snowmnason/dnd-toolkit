@@ -1,6 +1,6 @@
 import { validateUsername } from '../auth/validation';
-import { supabase } from '../supabase';
 import { logger } from '../utils/logger';
+import { supabase } from './supabase';
 
 export interface User {
   id: string;

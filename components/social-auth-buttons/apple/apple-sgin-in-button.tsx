@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/database/supabase';
 import { logger } from '@/lib/utils/logger';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';

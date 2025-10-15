@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import { supabase } from '../supabase';
+import { supabase } from '../database/supabase';
 import { logger } from '../utils/logger';
 import { updatePassword } from './authService';
 

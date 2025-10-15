@@ -1,8 +1,8 @@
 import { CoreColors } from '@/constants/corecolors';
 import React from 'react';
 import { Platform, View } from 'react-native';
-import CustomLoad from './custom_components/CustomLoad';
 import { ThemedText } from './themed-text';
+import CustomLoad from './ui/CustomLoad';
 
 interface LoadingOverlayProps {
   message?: string;

@@ -5,7 +5,7 @@ import AuthButton from '../../components/auth_components/AuthButton';
 import AuthError from '../../components/auth_components/AuthError';
 import AuthInput from '../../components/auth_components/AuthInput';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
-import CustomModal from '../../components/CustomModal';
+import CustomModal from '../../components/modals/CustomModal';
 import { ThemedText } from '../../components/themed-text';
 import { useSignUpForm } from '../../lib/auth';
 

@@ -3,10 +3,10 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 import { Spacing } from '../../constants/theme';
 import { validateUsername } from '../../lib/auth/validation';
-import CustomModal from '../CustomModal';
 import AuthError from '../auth_components/AuthError';
 import AuthInput from '../auth_components/AuthInput';
 import { ThemedText } from '../themed-text';
+import CustomModal from './CustomModal';
 
 interface UpdateUsernameModalProps {
   visible: boolean;

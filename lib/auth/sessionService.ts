@@ -1,6 +1,6 @@
 import { AuthStateManager } from '../auth-state';
+import { supabase } from '../database/supabase';
 import { usersDB } from '../database/users';
-import { supabase } from '../supabase';
 import { logger } from '../utils/logger';
 
 export interface SessionCheckResult {

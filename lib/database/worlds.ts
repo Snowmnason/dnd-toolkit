@@ -1,5 +1,5 @@
-import { supabase } from '../supabase';
 import { logger } from '../utils/logger';
+import { supabase } from './supabase';
 
 // User role types for better type safety and maintainability
 export type UserRole = 'owner' | 'dm' | 'player';

@@ -1,5 +1,5 @@
 import { AuthStateManager } from '../auth-state';
-import { supabase } from '../supabase';
+import { supabase } from '../database/supabase';
 import { logger } from '../utils/logger';
 
 /**

@@ -3,17 +3,17 @@ import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
-import CustomLoad from '../components/custom_components/CustomLoad';
-import PrimaryButton from '../components/custom_components/PrimaryButton';
 import CredentialConfirmModal from '../components/modals/CredentialConfirmModal';
+import UserProfile from '../components/settings/user-profile';
 import { ThemedText } from '../components/themed-text';
 import { ThemedView } from '../components/themed-view';
-import UserProfile from '../components/user-profile';
+import CustomLoad from '../components/ui/CustomLoad';
+import PrimaryButton from '../components/ui/PrimaryButton';
 import { ComponentStyles, Spacing } from '../constants/theme';
 import { AuthStateManager } from '../lib/auth-state';
+import { supabase } from '../lib/database/supabase';
 import { usersDB } from '../lib/database/users';
 import { deleteUserAccount, signOutUser } from '../lib/settings';
-import { supabase } from '../lib/supabase';
 import { logger } from '../lib/utils/logger';
 
 export default function SettingsPage() {

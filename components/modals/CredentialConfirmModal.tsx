@@ -4,8 +4,8 @@ import { View } from 'react-native';
 import { Spacing } from '../../constants/theme';
 import PrimaryButton from '../custom_components/PrimaryButton';
 import TextInput from '../custom_components/TextInput';
-import CustomModal from '../CustomModal';
 import { ThemedText } from '../themed-text';
+import CustomModal from './CustomModal';
 
 export interface CredentialConfirmModalProps {
   visible: boolean;

@@ -2,13 +2,13 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import CustomLoad from '../../components/custom_components/CustomLoad';
-import CustomModal from '../../components/CustomModal';
+import CustomModal from '../../components/modals/CustomModal';
 import { ThemedText } from '../../components/themed-text';
 import { useAppParams } from '../../contexts/AppParamsContext';
 import { AuthStateManager } from '../../lib/auth-state';
+import { supabase } from '../../lib/database/supabase';
 import { usersDB } from '../../lib/database/users';
 import { worldsDB } from '../../lib/database/worlds';
-import { supabase } from '../../lib/supabase';
 import { logger } from '../../lib/utils/logger';
 
 // Storage for pending invites when user isn't logged in

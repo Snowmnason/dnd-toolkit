@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Platform, TextInput, TouchableOpacity, View } from 'react-native';
 import { BorderRadius, Spacing } from '../../constants/theme';
 import { createWorldNameChangeHandler, isValidWorldNameForSubmission, type WorldNameValidationResult } from '../../lib/auth/validation';
-import CustomModal from '../CustomModal';
+import CustomModal from '../modals/CustomModal';
 import { ThemedText } from '../themed-text';
 
 interface EditWorldModalProps {

@@ -5,16 +5,16 @@ import AuthButton from '../components/auth_components/AuthButton';
 import AuthError from '../components/auth_components/AuthError';
 import AuthInput from '../components/auth_components/AuthInput';
 import AuthSuccess from '../components/auth_components/AuthSuccess';
-import CustomLoad from '../components/custom_components/CustomLoad';
-import Dropdown from '../components/custom_components/Dropdown';
-import IconButton from '../components/custom_components/IconButton';
-import PrimaryButton from '../components/custom_components/PrimaryButton';
-import TextInput from '../components/custom_components/TextInput';
-import CustomModal from '../components/CustomModal';
 import CredentialConfirmModal from '../components/modals/CredentialConfirmModal';
+import CustomModal from '../components/modals/CustomModal';
 import UpdateUsernameModal from '../components/modals/UpdateUsernameModal';
 import { ThemedText } from '../components/themed-text';
 import { ThemedView } from '../components/themed-view';
+import CustomLoad from '../components/ui/CustomLoad';
+import Dropdown from '../components/ui/Dropdown';
+import IconButton from '../components/ui/IconButton';
+import PrimaryButton from '../components/ui/PrimaryButton';
+import TextInput from '../components/ui/TextInput';
 import { CoreColors } from '../constants/corecolors';
 import { ComponentStyles, Spacing } from '../constants/theme';
 
@@ -317,7 +317,7 @@ export default function StyleGuidePage() {
               </View>
               <View>
                 <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textOnLight }}>Dropdown</ThemedText>
-                <Dropdown options={dropdownOptions} value={dropdownValue} onChange={(value) => value && setDropdownValue(value)} placeholder="Select an option" />
+                <Dropdown options={dropdownOptions} value={dropdownValue} onChange={(value: string | null) => value && setDropdownValue(value)} placeholder="Select an option" />
               </View>
             </View>
           </View>
@@ -336,7 +336,7 @@ export default function StyleGuidePage() {
               </View>
               <View>
                 <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textPrimary }}>Dropdown</ThemedText>
-                <Dropdown options={dropdownOptions} value={dropdownValue} onChange={(value) => value && setDropdownValue(value)} placeholder="Select an option" />
+                <Dropdown options={dropdownOptions} value={dropdownValue} onChange={(value: string | null) => value && setDropdownValue(value)} placeholder="Select an option" />
               </View>
             </View>
           </View>

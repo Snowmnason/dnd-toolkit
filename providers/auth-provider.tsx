@@ -1,5 +1,5 @@
 import { AuthContext } from '@/hooks/use-auth-context'
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/database/supabase'
 import { logger } from '@/lib/utils/logger'
 import type { Session } from '@supabase/supabase-js'
 import { PropsWithChildren, useEffect, useState } from 'react'

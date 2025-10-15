@@ -117,7 +117,7 @@ export const AuthStateManager = {
       }
 
       // Import supabase dynamically to avoid circular dependency
-      const { supabase, isSupabaseConfigured } = await import('./supabase');
+      const { supabase, isSupabaseConfigured } = await import('./database/supabase');
       
       // If Supabase isn't configured (like on GitHub Pages without env vars), 
       // fall back to local auth state
@@ -151,7 +151,7 @@ export const AuthStateManager = {
       const authState = await this.getAuthState();
 
       // Import supabase (lazy) and check if configured
-      const { supabase, isSupabaseConfigured } = await import('./supabase');
+      const { supabase, isSupabaseConfigured } = await import('./database/supabase');
 
       // If Supabase isn't configured, fall back to local state
       if (!isSupabaseConfigured()) {

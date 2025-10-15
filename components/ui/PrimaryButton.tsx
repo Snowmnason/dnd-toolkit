@@ -1,6 +1,6 @@
 import React from 'react';
 import { TextStyle, ViewStyle } from 'react-native';
-import BaseButton from '../ui/BaseButton';
+import BaseButton from './BaseButton';
 
 interface PrimaryButtonProps {
   onPress: () => void;

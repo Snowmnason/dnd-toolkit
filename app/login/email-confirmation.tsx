@@ -5,12 +5,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import AuthButton from '../../components/auth_components/AuthButton';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
-import CustomModal from '../../components/CustomModal';
+import CustomModal from '../../components/modals/CustomModal';
 import { ThemedText } from '../../components/themed-text';
 import { AuthStateManager } from '../../lib/auth-state';
 import { openEmailApp } from '../../lib/auth/emailUtils';
+import { supabase } from '../../lib/database/supabase';
 import { usersDB } from '../../lib/database/users';
-import { supabase } from '../../lib/supabase';
 import { logger } from '../../lib/utils/logger';
 
 export default function EmailConfirmationScreen() {

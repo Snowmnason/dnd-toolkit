@@ -3,12 +3,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { TouchableOpacity, View } from 'react-native';
-import { CoreColors } from '../constants/corecolors';
-import { ComponentStyles, Spacing } from '../constants/theme';
-import { updateUsername } from '../lib/settings';
-import PrimaryButton from './custom_components/PrimaryButton';
-import UpdateUsernameModal from './modals/UpdateUsernameModal';
-import { ThemedText } from './themed-text';
+import { CoreColors } from '../../constants/corecolors';
+import { ComponentStyles, Spacing } from '../../constants/theme';
+import { updateUsername } from '../../lib/settings';
+import UpdateUsernameModal from '../modals/UpdateUsernameModal';
+import { ThemedText } from '../themed-text';
+import PrimaryButton from '../ui/PrimaryButton';
 
 interface UserProfileProps {
   profile?: {
@@ -29,7 +29,7 @@ export default function UserProfile({ profile }: UserProfileProps) {
   useEffect(() => {
     const fetchSessionUser = async () => {
       try {
-        const { supabase } = await import('../lib/supabase');
+        const { supabase } = await import('../../lib/database/supabase');
         const { data: { user } } = await supabase.auth.getUser();
         setSessionUser(user);
       } catch (error) {
