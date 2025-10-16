@@ -1,10 +1,9 @@
-import { CoreColors } from '@/constants/corecolors';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Platform, TouchableOpacity, View, useWindowDimensions } from 'react-native';
-import { ComponentStyles } from '../constants/theme';
+import { Platform, useWindowDimensions } from 'react-native';
+import { Button, Text, View } from 'tamagui';
+// import { ComponentStyles } from '../constants/theme'; // deprecated
 import SettingsMenu from './settings/SettingsMenu';
-import { ThemedText } from './themed-text';
 
 interface TopBarProps {
   title?: string;
@@ -46,50 +45,39 @@ export default function TopBar({
   // Show on all platforms now (not just mobile)
   return (
     <>
-      <View style={{ ...ComponentStyles.topBar.container, paddingTop: isMobile ? 50 : 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8, paddingTop: isMobile ? 50 : 8, borderBottomWidth: 1 }}>
         {/* Left: Back Button */}
         <View style={{ width: 40 }}>
           {showBackButton && (
-            <TouchableOpacity 
-              onPress={handleBackPress}
-              style={ComponentStyles.topBar.button}
-            >
-              <ThemedText style={{ color: CoreColors.primary, fontSize: 16, fontWeight: '600' }}>
-                ←
-              </ThemedText>
-            </TouchableOpacity>
+            <Button unstyled onPress={handleBackPress}>
+              <Text style={{ color: '#F5E6D3', fontSize: 16, fontWeight: '600' }}>←</Text>
+            </Button>
           )}
         </View>
 
         {/* Center: Title */}
-        <ThemedText 
-          style={{ 
-            color: CoreColors.textPrimary, 
-            fontSize: 18, 
+        <Text
+          style={{
+            color: '#F5E6D3',
+            fontSize: 18,
             fontWeight: '700',
             textAlign: 'center',
-            flex: 1
+            flex: 1,
           }}
         >
           {title}
-        </ThemedText>
+        </Text>
 
         {/* Right: Hamburger Menu */}
         <View style={{ width: 40 }}>
           {showHamburger && (
-            <TouchableOpacity 
-              onPress={handleHamburgerPress}
-              style={ComponentStyles.topBar.button}
-            >
-              <ThemedText style={{ color: CoreColors.primary, fontSize: 16, fontWeight: '600' }}>
-                ☰
-              </ThemedText>
-            </TouchableOpacity>
+            <Button unstyled onPress={handleHamburgerPress}>
+              <Text style={{ color: '#F5E6D3', fontSize: 16, fontWeight: '600' }}>☰</Text>
+            </Button>
           )}
         </View>
       </View>
 
-      {/* Beautiful Custom Settings Menu for All Platforms */}
       <SettingsMenu
         visible={showSettingsMenu}
         onClose={() => setShowSettingsMenu(false)}

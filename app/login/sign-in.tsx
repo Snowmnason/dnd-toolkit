@@ -1,12 +1,9 @@
-import { CoreColors } from '@/constants/corecolors';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Button, Text, View } from 'tamagui';
 import AuthButton from '../../components/auth_components/AuthButton';
 import AuthError from '../../components/auth_components/AuthError';
 import AuthInput from '../../components/auth_components/AuthInput';
-import PrimaryButton from '../../components/custom_components/PrimaryButton';
-import { ThemedText } from '../../components/themed-text';
 import { useSignInForm } from '../../lib/auth';
 import { supabase } from '../../lib/database/supabase';
 import { logger } from '../../lib/utils/logger';
@@ -60,7 +57,8 @@ export default function SignInScreen() {
       
       {/* Back Button */}
       <View style={{ position: 'absolute', top: 50, left: 20, zIndex: 10, backgroundColor: 'transparent' }}>
-        <PrimaryButton
+        <Button
+          //variant="ghost"
           style={{ 
             backgroundColor: loading ? 'rgba(139, 69, 19, 0.1)' : 'rgba(139, 69, 19, 0.2)', 
             paddingHorizontal: 16, 
@@ -68,26 +66,21 @@ export default function SignInScreen() {
             borderRadius: 6,
             opacity: loading ? 0.5 : 1
           }}
-          textStyle={{ color: CoreColors.textPrimary, fontSize: 14, fontWeight: '500' }}
+          //textStyle={{ color: CoreColors.textPrimary, fontSize: 14, fontWeight: '500' }}
           onPress={() => router.replace('/login/welcome')}
           disabled={loading}
         >
           ← Back
-        </PrimaryButton>
+        </Button>
       </View>
 
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'transparent' }}>
         
-        <ThemedText 
-          type="title" 
-          style={{ marginBottom: 20, textAlign: 'center', color: '#F5E6D3', fontSize: 32, fontWeight: '700' }}
-        >
-          Welcome Back
-        </ThemedText>
+        <Text style={{ marginBottom: 20, textAlign: 'center' }}>Welcome Back</Text>
         
-        <ThemedText style={{ marginBottom: 40, textAlign: 'center', fontSize: 16, opacity: 0.8, color: '#F5E6D3', lineHeight: 22, paddingHorizontal: 20 }}>
+        <Text style={{ marginBottom: 40, textAlign: 'center', fontSize: 16, opacity: 0.8, color: '#F5E6D3', lineHeight: 22, paddingHorizontal: 20 }}>
           Sign in to access your saved worlds and characters
-        </ThemedText>
+        </Text>
 
         {/* Form Inputs */}
         <View style={{ width: '100%', maxWidth: 300, marginBottom: 15, backgroundColor: 'transparent' }}>
@@ -127,12 +120,12 @@ export default function SignInScreen() {
           />
 
           {/* Forgot Password Link - TODO: Add forgot password screen */}
-          <ThemedText
+          <Text
             style={{ textAlign: 'right', fontSize: 13, color: '#D4AF37', fontWeight: '500', marginBottom: 4, cursor: 'pointer', marginTop: -14 }}
             //onPress={() => router.push('/login/forgot-password')}
           >
             Forgot Password?
-          </ThemedText>
+          </Text>
 
         </View>
 
@@ -147,31 +140,23 @@ export default function SignInScreen() {
           />
 
           {/* Switch to Sign Up */}
-          <PrimaryButton
-            style={{ 
-              width: '100%', 
-              backgroundColor: 'rgba(139, 69, 19, 0.15)', 
-              borderWidth: 1, 
-              borderColor: '#8B4513', 
-              paddingVertical: 12, 
-              borderRadius: 8,
-              opacity: loading ? 0.5 : 1
-            }}
-            textStyle={{ color: '#F5E6D3', fontSize: 13, fontWeight: '500' }}
+          <Button
+            //variant="secondary"
+            //fullWidth
             onPress={() => router.push('/login/sign-up')}
             disabled={loading}
           >
             Need an account? Sign Up
-          </PrimaryButton>
+          </Button>
         </View>
 
-        <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
+        <Text style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
           Secure authentication powered by Supabase
-        </ThemedText>
+        </Text>
         
-        <ThemedText style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
+        <Text style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
           © 2025 The Snow Post · Forged for storytellers & adventurers
-        </ThemedText>
+        </Text>
       </View>
     </View>
   );

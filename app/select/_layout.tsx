@@ -1,8 +1,7 @@
-import { CoreColors } from '@/constants/corecolors';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
-import CustomLoad from '../../components/custom_components/CustomLoad';
+import { View } from 'tamagui';
+import CustomLoad from '../../components/ui/CustomLoad';
 import { AuthStateManager } from '../../lib/auth-state';
 import { logger } from '../../lib/utils/logger';
 
@@ -37,14 +36,14 @@ export default function SelectLayout() {
         flex: 1, 
         justifyContent: 'center', 
         alignItems: 'center', 
-        backgroundColor: CoreColors.backgroundDark 
+        //backgroundColor: CoreColors.backgroundDark 
       }}>
         <CustomLoad />
       </View>
     );
   }
   return (
-    <View style={{ flex: 1, backgroundColor: CoreColors.backgroundDark }}>
+    <View style={{ flex: 1, backgroundColor: /*CoreColors.backgroundDark*/ '#1e1e1e' }}>
       <Stack 
         screenOptions={{
           headerShown: false,

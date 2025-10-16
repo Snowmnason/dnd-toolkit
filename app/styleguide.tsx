@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Button, Card, Heading, Input, Paragraph, ScrollView, Select, Text, View, XStack, YStack } from 'tamagui';
 import AuthButton from '../components/auth_components/AuthButton';
 import AuthError from '../components/auth_components/AuthError';
 import AuthInput from '../components/auth_components/AuthInput';
@@ -8,15 +8,15 @@ import AuthSuccess from '../components/auth_components/AuthSuccess';
 import CredentialConfirmModal from '../components/modals/CredentialConfirmModal';
 import CustomModal from '../components/modals/CustomModal';
 import UpdateUsernameModal from '../components/modals/UpdateUsernameModal';
-import { ThemedText } from '../components/themed-text';
-import { ThemedView } from '../components/themed-view';
+// import AppButton from '../components/ui/AppButton'; // deprecated
 import CustomLoad from '../components/ui/CustomLoad';
-import Dropdown from '../components/ui/Dropdown';
+// import Dropdown from '../components/ui/Dropdown'; // deprecated
 import IconButton from '../components/ui/IconButton';
-import PrimaryButton from '../components/ui/PrimaryButton';
-import TextInput from '../components/ui/TextInput';
-import { CoreColors } from '../constants/corecolors';
-import { ComponentStyles, Spacing } from '../constants/theme';
+// import TextInput from '../components/ui/TextInput'; // deprecated
+// import { CoreColors } from '../constants/corecolors'; // deprecated
+
+// Local spacing scale (px) while we transition to Tamagui tokens in this page
+const S = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 } as const;
 
 export default function StyleGuidePage() {
   const [showModal, setShowModal] = useState(false);
@@ -27,388 +27,388 @@ export default function StyleGuidePage() {
   const [authInputValue, setAuthInputValue] = useState('');
 
   const dropdownOptions = ['Option 1', 'Option 2', 'Option 3'];
-  
-  // Grid styles for side-by-side layout with wrap
-  const gridContainerStyle = {
-    flexDirection: 'row' as const,
-    flexWrap: 'wrap' as const,
-    gap: Spacing.lg
-  };
-  const gridItemStyle = {
 
-    flexGrow: 1,
-    flexShrink: 1
-  };
+  const gridContainerStyle = { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: S.lg };
+  const gridItemStyle = { flexGrow: 1, flexShrink: 1 };
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          padding: Spacing.lg,
-          paddingBottom: Spacing.xl * 3
-        }}
-      >
+    <YStack style={{ flex: 1 }}>
+      <ScrollView>
+        <YStack style={{ padding: S.lg, paddingBottom: S.xl * 3 }}>
         {/* Header */}
-        <View style={{ marginBottom: Spacing.xl }}>
-          <ThemedText type="title" style={{ 
-            textAlign: 'center',
-            color: CoreColors.textPrimary,
-            fontSize: 32,
-            fontWeight: '700',
-            marginBottom: Spacing.sm
-          }}>
+        <YStack style={{ marginBottom: S.xl }}>
+          <Heading size="$10" style={{ textAlign: 'center', marginBottom: S.sm }}>
             🎨 Style Guide
-          </ThemedText>
-          <ThemedText style={{ 
-            textAlign: 'center',
-            color: CoreColors.textPrimary,
-            fontSize: 16
-          }}>
+          </Heading>
+          <Paragraph size="$5" style={{ textAlign: 'center' }}>
             Component Showcase & Theme Reference
-          </ThemedText>
-        </View>
+          </Paragraph>
+        </YStack>
 
         {/* Grid container: side-by-side with wrap */}
-        <View style={gridContainerStyle}>
+        <XStack style={gridContainerStyle}>
           {/* Color Palette - Card */}
-          <View style={[gridItemStyle, ComponentStyles.card.default]}>
-            <ThemedText type="subtitle" style={{ 
-              marginBottom: Spacing.md,
-              color: CoreColors.textOnLight,
-              fontSize: 24,
-              fontWeight: '600'
-            }}>
-              Color Palette
-            </ThemedText>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.lg }}>
+          <Card style={[gridItemStyle, { padding: S.md, borderRadius: 12, borderWidth: 1, borderColor: '#ccc' }]}>
+            <Heading size="$8" style={{ marginBottom: S.md }}>Color Palette</Heading>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: S.lg }}>
               {/* Primary Colors */}
               <View style={{ }}>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.sm, color: CoreColors.textOnLight }}>Primary Colors</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md, flexWrap: 'wrap' }}>
-                  <ColorSwatch color={CoreColors.primary} label="Primary" />
-                  <ColorSwatch color={CoreColors.primaryLight} label="Primary Light" />
-                  <ColorSwatch color={CoreColors.primaryDark} label="Primary Dark" />
+                <Text style={{ marginBottom: S.sm, fontWeight: '600' }}>Primary Colors</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, marginBottom: S.md, flexWrap: 'wrap' }}>
+                  <ColorSwatch color={"#8B4513"} label="Primary" />
+                  <ColorSwatch color={"#A0522D"} label="Primary Light" />
+                  <ColorSwatch color={"#5D3315"} label="Primary Dark" />
                 </View>
               </View>
 
               {/* Secondary Colors */}
               <View style={{ }}>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.sm, color: CoreColors.textOnLight }}>Secondary Colors</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md, flexWrap: 'wrap' }}>
-                  <ColorSwatch color={CoreColors.secondary} label="Secondary" />
-                  <ColorSwatch color={CoreColors.secondaryLight} label="Secondary Light" />
-                  <ColorSwatch color={CoreColors.secondaryDark} label="Secondary Dark" />
+                <Text style={{ marginBottom: S.sm, fontWeight: '600' }}>Secondary Colors</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, marginBottom: S.md, flexWrap: 'wrap' }}>
+                  <ColorSwatch color={"#D4AF37"} label="Secondary" />
+                  <ColorSwatch color={"#E6C84E"} label="Secondary Light" />
+                  <ColorSwatch color={"#B6942E"} label="Secondary Dark" />
                 </View>
               </View>
 
               {/* Background Colors */}
               <View style={{ }}>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.sm, color: CoreColors.textOnLight }}>Background Colors</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md, flexWrap: 'wrap' }}>
-                  <ColorSwatch color={CoreColors.backgroundDark} label="BG Dark" />
-                  <ColorSwatch color={CoreColors.backgroundLight} label="BG Light" />
-                  <ColorSwatch color={CoreColors.backgroundAccent} label="BG Accent" />
+                <Text style={{ marginBottom: S.sm, fontWeight: '600' }}>Background Colors</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, marginBottom: S.md, flexWrap: 'wrap' }}>
+                  <ColorSwatch color={"#2f353d"} label="BG Dark" />
+                  <ColorSwatch color={"#F5E6D3"} label="BG Light" />
+                  <ColorSwatch color={"#3D444C"} label="BG Accent" />
                 </View>
               </View>
 
               {/* Text Colors */}
               <View style={{ }}>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.sm, color: CoreColors.textOnLight }}>Text Colors</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md, flexWrap: 'wrap' }}>
-                  <ColorSwatch color={CoreColors.textPrimary} label="Text Primary" />
-                  <ColorSwatch color={CoreColors.textSecondary} label="Text Secondary" />
-                  <ColorSwatch color={CoreColors.textOnLight} label="Text On Light" />
+                <Text style={{ marginBottom: S.sm, fontWeight: '600' }}>Text Colors</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, marginBottom: S.md, flexWrap: 'wrap' }}>
+                  <ColorSwatch color={"#F5E6D3"} label="Text Primary" />
+                  <ColorSwatch color={"#C8B9A1"} label="Text Secondary" />
+                  <ColorSwatch color={"#2f353d"} label="Text On Light" />
                 </View>
               </View>
 
               {/* Utility Colors - full width */}
               <View style={{  }}>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.sm, color: CoreColors.textOnLight }}>Utility Colors</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' }}>
-                  <ColorSwatch color={CoreColors.destructive} label="Destructive" />
-                  <ColorSwatch color={CoreColors.error} label="Error" />
-                  <ColorSwatch color={CoreColors.cancel} label="Cancel" />
+                <Text style={{ marginBottom: S.sm, fontWeight: '600' }}>Utility Colors</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
+                  <ColorSwatch color={"#DC2626"} label="Destructive" />
+                  <ColorSwatch color={"#EF4444"} label="Error" />
+                  <ColorSwatch color={"#6B7280"} label="Cancel" />
                 </View>
               </View>
             </View>
-          </View>
+          </Card>
 
           {/* Color Palette - Plain */}
-          <View style={[gridItemStyle]}> 
-            <ThemedText type="subtitle" style={{ 
-              marginBottom: Spacing.md,
-              color: CoreColors.textPrimary,
-              fontSize: 24,
-              fontWeight: '600'
-            }}>
-              Color Palette
-            </ThemedText>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.lg }}>
+          <YStack style={[gridItemStyle]}> 
+            <Heading size="$8" style={{ marginBottom: S.md }}>Color Palette</Heading>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: S.lg }}>
               {/* Primary Colors */}
               <View style={{ }}>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.sm, color: CoreColors.textPrimary }}>Primary Colors</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md, flexWrap: 'wrap' }}>
-                  <ColorSwatch color={CoreColors.primary} label="Primary" textColor={CoreColors.textPrimary} />
-                  <ColorSwatch color={CoreColors.primaryLight} label="Primary Light" textColor={CoreColors.textPrimary} />
-                  <ColorSwatch color={CoreColors.primaryDark} label="Primary Dark" textColor={CoreColors.textPrimary} />
-                </View>
+                <Text style={{ marginBottom: S.sm, fontWeight: '600' }}>Primary Colors</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, marginBottom: S.md, flexWrap: 'wrap' }}>
+                  <ColorSwatch color={"#8B4513"} label="Primary" textColor={"#F5E6D3"} />
+                  <ColorSwatch color={"#A0522D"} label="Primary Light" textColor={"#2f353d"} />
+                  <ColorSwatch color={"#5D3315"} label="Primary Dark" textColor={"#F5E6D3"} />
+              </View>
               </View>
 
               {/* Secondary Colors */}
               <View style={{ }}>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.sm, color: CoreColors.textPrimary }}>Secondary Colors</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md, flexWrap: 'wrap' }}>
-                  <ColorSwatch color={CoreColors.secondary} label="Secondary" textColor={CoreColors.textPrimary} />
-                  <ColorSwatch color={CoreColors.secondaryLight} label="Secondary Light" textColor={CoreColors.textPrimary} />
-                  <ColorSwatch color={CoreColors.secondaryDark} label="Secondary Dark" textColor={CoreColors.textPrimary} />
+                <Text style={{ marginBottom: S.sm, fontWeight: '600' }}>Secondary Colors</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, marginBottom: S.md, flexWrap: 'wrap' }}>
+                  <ColorSwatch color={"#D4AF37"} label="Secondary" textColor={"#2f353d"} />
+                  <ColorSwatch color={"#E6C84E"} label="Secondary Light" textColor={"#2f353d"} />
+                  <ColorSwatch color={"#B6942E"} label="Secondary Dark" textColor={"#F5E6D3"} />
                 </View>
               </View>
 
               {/* Background Colors */}
               <View style={{  }}>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.sm, color: CoreColors.textPrimary }}>Background Colors</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md, flexWrap: 'wrap' }}>
-                  <ColorSwatch color={CoreColors.backgroundDark} label="BG Dark" textColor={CoreColors.textPrimary} />
-                  <ColorSwatch color={CoreColors.backgroundLight} label="BG Light" textColor={CoreColors.textPrimary} />
-                  <ColorSwatch color={CoreColors.backgroundAccent} label="BG Accent" textColor={CoreColors.textPrimary} />
+                <Text style={{ marginBottom: S.sm, fontWeight: '600' }}>Background Colors</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, marginBottom: S.md, flexWrap: 'wrap' }}>
+                  <ColorSwatch color={"#2f353d"} label="BG Dark" textColor={"#F5E6D3"} />
+                  <ColorSwatch color={"#F5E6D3"} label="BG Light" textColor={"#2f353d"} />
+                  <ColorSwatch color={"#3D444C"} label="BG Accent" textColor={"#F5E6D3"} />
                 </View>
               </View>
 
               {/* Text Colors */}
               <View style={{  }}>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.sm, color: CoreColors.textPrimary }}>Text Colors</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md, flexWrap: 'wrap' }}>
-                  <ColorSwatch color={CoreColors.textPrimary} label="Text Primary" textColor={CoreColors.textPrimary} />
-                  <ColorSwatch color={CoreColors.textSecondary} label="Text Secondary" textColor={CoreColors.textPrimary} />
-                  <ColorSwatch color={CoreColors.textOnLight} label="Text On Light" textColor={CoreColors.textPrimary} />
+                <Text style={{ marginBottom: S.sm, fontWeight: '600' }}>Text Colors</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, marginBottom: S.md, flexWrap: 'wrap' }}>
+                  <ColorSwatch color={"#F5E6D3"} label="Text Primary" textColor={"#2f353d"} />
+                  <ColorSwatch color={"#C8B9A1"} label="Text Secondary" textColor={"#2f353d"} />
+                  <ColorSwatch color={"#2f353d"} label="Text On Light" textColor={"#F5E6D3"} />
                 </View>
               </View>
 
               {/* Utility Colors - full width */}
               <View style={{  }}>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.sm, color: CoreColors.textPrimary }}>Utility Colors</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' }}>
-                  <ColorSwatch color={CoreColors.destructive} label="Destructive" textColor={CoreColors.textPrimary} />
-                  <ColorSwatch color={CoreColors.error} label="Error" textColor={CoreColors.textPrimary} />
-                  <ColorSwatch color={CoreColors.cancel} label="Cancel" textColor={CoreColors.textPrimary} />
+                <Text style={{ marginBottom: S.sm, fontWeight: '600' }}>Utility Colors</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
+                  <ColorSwatch color={"#DC2626"} label="Destructive" textColor={"#F5E6D3"} />
+                  <ColorSwatch color={"#EF4444"} label="Error" textColor={"#F5E6D3"} />
+                  <ColorSwatch color={"#6B7280"} label="Cancel" textColor={"#F5E6D3"} />
                 </View>
               </View>
             </View>
-          </View>
+          </YStack>
 
           {/* Typography - Card */}
-          <View style={[gridItemStyle, ComponentStyles.card.default]}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md, color: CoreColors.textOnLight, fontSize: 24, fontWeight: '600' }}>Typography</ThemedText>
-            <ThemedText type="title" style={{ color: CoreColors.textOnLight, marginBottom: Spacing.sm }}>Title Text - Large Headers</ThemedText>
-            <ThemedText type="subtitle" style={{ color: CoreColors.textOnLight, marginBottom: Spacing.sm }}>Subtitle Text - Section Headers</ThemedText>
-            <ThemedText type="defaultSemiBold" style={{ color: CoreColors.textOnLight, marginBottom: Spacing.sm }}>Default Semi-Bold - Emphasis</ThemedText>
-            <ThemedText type="default" style={{ color: CoreColors.textOnLight, marginBottom: Spacing.sm }}>Default Text - Body Content</ThemedText>
-            <ThemedText type="link" style={{ marginBottom: Spacing.sm }}>Link Text - Interactive Links</ThemedText>
-          </View>
+          <Card style={[gridItemStyle, { padding: S.md, borderRadius: 12, borderWidth: 1, borderColor: '#ccc' }]}>
+            <Heading size="$8" style={{ marginBottom: S.md }}>Typography</Heading>
+            <Heading size="$10" style={{ marginBottom: S.sm }}>Title Text - Large Headers</Heading>
+            <Heading size="$8" style={{ marginBottom: S.sm }}>Subtitle Text - Section Headers</Heading>
+            <Text style={{ fontWeight: '600', marginBottom: S.sm }}>Default Semi-Bold - Emphasis</Text>
+            <Paragraph style={{ marginBottom: S.sm }}>Default Text - Body Content</Paragraph>
+            <Text style={{ textDecorationLine: 'underline', marginBottom: S.sm }}>Link Text - Interactive Links</Text>
+          </Card>
 
           {/* Typography - Plain */}
-          <View style={[gridItemStyle]}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md, color: CoreColors.textPrimary, fontSize: 24, fontWeight: '600' }}>Typography</ThemedText>
-            <ThemedText type="title" style={{ color: CoreColors.textPrimary, marginBottom: Spacing.sm }}>Title Text - Large Headers</ThemedText>
-            <ThemedText type="subtitle" style={{ color: CoreColors.textPrimary, marginBottom: Spacing.sm }}>Subtitle Text - Section Headers</ThemedText>
-            <ThemedText type="defaultSemiBold" style={{ color: CoreColors.textPrimary, marginBottom: Spacing.sm }}>Default Semi-Bold - Emphasis</ThemedText>
-            <ThemedText type="default" style={{ color: CoreColors.textPrimary, marginBottom: Spacing.sm }}>Default Text - Body Content</ThemedText>
-            <ThemedText type="link" style={{ color: CoreColors.textPrimary, marginBottom: Spacing.sm }}>Link Text - Interactive Links</ThemedText>
-          </View>
+          <YStack style={[gridItemStyle]}>
+            <Heading size="$8" style={{ marginBottom: S.md }}>Typography</Heading>
+            <Heading size="$10" style={{ marginBottom: S.sm }}>Title Text - Large Headers</Heading>
+            <Heading size="$8" style={{ marginBottom: S.sm }}>Subtitle Text - Section Headers</Heading>
+            <Text style={{ fontWeight: '600', marginBottom: S.sm }}>Default Semi-Bold - Emphasis</Text>
+            <Paragraph style={{ marginBottom: S.sm }}>Default Text - Body Content</Paragraph>
+            <Text style={{ textDecorationLine: 'underline', marginBottom: S.sm }}>Link Text - Interactive Links</Text>
+          </YStack>
 
           {/* Buttons - Card */}
-          <View style={[gridItemStyle, ComponentStyles.card.default]}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md, color: CoreColors.textOnLight, fontSize: 24, fontWeight: '600' }}>Buttons</ThemedText>
-            <View style={{ gap: Spacing.md }}>
+          <Card style={[gridItemStyle, { padding: S.md, borderRadius: 12, borderWidth: 1, borderColor: '#ccc' }]}>
+            <Heading size="$8" style={{ marginBottom: S.md }}>Buttons</Heading>
+            <View style={{ gap: S.md }}>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textOnLight }}>Primary Buttons</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' }}>
-                  <PrimaryButton style={{ backgroundColor: CoreColors.primary, borderColor: CoreColors.primaryDark }} textStyle={{ color: CoreColors.textPrimary }} onPress={() => {}}>Primary Button</PrimaryButton>
-                  <PrimaryButton style={{ backgroundColor: CoreColors.primary, borderColor: CoreColors.primaryDark, opacity: 0.5 }} textStyle={{ color: CoreColors.textPrimary }} onPress={() => {}} disabled>Disabled</PrimaryButton>
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Primary Buttons</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
+                  <Button onPress={() => {}}>Primary Button</Button>
+                  <Button disabled onPress={() => {}}>Disabled</Button>
                 </View>
               </View>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textOnLight }}>Secondary Buttons</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' }}>
-                  <PrimaryButton style={{ backgroundColor: CoreColors.secondaryButtonBackground, borderColor: CoreColors.secondaryButtonBorder, borderWidth: 1 }} textStyle={{ color: CoreColors.textOnLight }} onPress={() => {}}>Secondary Button</PrimaryButton>
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Secondary Buttons</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
+                  <Button onPress={() => {}}>Secondary Button</Button>
                 </View>
               </View>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textOnLight }}>Destructive Buttons</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' }}>
-                  <PrimaryButton style={{ backgroundColor: CoreColors.destructive, borderColor: CoreColors.destructiveBoarder }} textStyle={{ color: CoreColors.destructiveText }} onPress={() => {}}>Delete</PrimaryButton>
-                  <PrimaryButton style={{ backgroundColor: CoreColors.destructiveDisabled, borderColor: CoreColors.destructiveDisabled, opacity: 0.6 }} textStyle={{ color: CoreColors.destructiveText }} onPress={() => {}} disabled>Disabled</PrimaryButton>
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Destructive Buttons</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
+                  <Button onPress={() => {}}>Delete</Button>
+                  <Button disabled onPress={() => {}}>Disabled</Button>
                 </View>
               </View>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textOnLight }}>Auth Buttons</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' }}>
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Auth Buttons</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
                   <AuthButton title="Sign In" onPress={() => {}} />
                   <AuthButton title="Loading..." onPress={() => {}} loading />
                   <AuthButton title="Disabled" onPress={() => {}} disabled />
                 </View>
               </View>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textOnLight }}>Icon Buttons</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' }}>
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Icon Buttons</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
                   <IconButton icon="settings" onPress={() => {}} />
                   <IconButton icon="trash" onPress={() => {}} />
                   <IconButton icon="add" onPress={() => {}} />
                 </View>
               </View>
             </View>
-          </View>
+          </Card>
 
           {/* Buttons - Plain */}
-          <View style={[gridItemStyle]}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md, color: CoreColors.textPrimary, fontSize: 24, fontWeight: '600' }}>Buttons</ThemedText>
-            <View style={{ gap: Spacing.md }}>
+          <YStack style={[gridItemStyle]}>
+            <Heading size="$8" style={{ marginBottom: S.md }}>Buttons</Heading>
+            <View style={{ gap: S.md }}>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textPrimary }}>Primary Buttons</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' }}>
-                  <PrimaryButton style={{ backgroundColor: CoreColors.primary, borderColor: CoreColors.primaryDark }} textStyle={{ color: CoreColors.textPrimary }} onPress={() => {}}>Primary Button</PrimaryButton>
-                  <PrimaryButton style={{ backgroundColor: CoreColors.primary, borderColor: CoreColors.primaryDark, opacity: 0.5 }} textStyle={{ color: CoreColors.textPrimary }} onPress={() => {}} disabled>Disabled</PrimaryButton>
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Primary Buttons</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
+                  <Button onPress={() => {}}>Primary Button</Button>
+                  <Button disabled onPress={() => {}}>Disabled</Button>
                 </View>
               </View>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textPrimary }}>Secondary Buttons</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' }}>
-                  <PrimaryButton style={{ backgroundColor: CoreColors.secondaryButtonBackground, borderColor: CoreColors.secondaryButtonBorder, borderWidth: 1 }} textStyle={{ color: CoreColors.textOnLight }} onPress={() => {}}>Secondary Button</PrimaryButton>
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Secondary Buttons</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
+                  <Button onPress={() => {}}>Secondary Button</Button>
                 </View>
               </View>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textPrimary }}>Destructive Buttons</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' }}>
-                  <PrimaryButton style={{ backgroundColor: CoreColors.destructive, borderColor: CoreColors.destructiveBoarder }} textStyle={{ color: CoreColors.destructiveText }} onPress={() => {}}>Delete</PrimaryButton>
-                  <PrimaryButton style={{ backgroundColor: CoreColors.destructiveDisabled, borderColor: CoreColors.destructiveDisabled, opacity: 0.6 }} textStyle={{ color: CoreColors.destructiveText }} onPress={() => {}} disabled>Disabled</PrimaryButton>
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Destructive Buttons</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
+                  <Button onPress={() => {}}>Delete</Button>
+                  <Button disabled onPress={() => {}}>Disabled</Button>
                 </View>
               </View>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textPrimary }}>Auth Buttons</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' }}>
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Auth Buttons</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
                   <AuthButton title="Sign In" onPress={() => {}} />
                   <AuthButton title="Loading..." onPress={() => {}} loading />
                   <AuthButton title="Disabled" onPress={() => {}} disabled />
                 </View>
               </View>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textPrimary }}>Icon Buttons</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' }}>
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Icon Buttons</Text>
+                <View style={{ flexDirection: 'row', gap: S.sm, flexWrap: 'wrap' }}>
                   <IconButton icon="settings" onPress={() => {}} />
                   <IconButton icon="trash" onPress={() => {}} />
                   <IconButton icon="add" onPress={() => {}} />
                 </View>
               </View>
             </View>
-          </View>
+          </YStack>
 
           {/* Input Fields - Card */}
-          <View style={[gridItemStyle, ComponentStyles.card.default]}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md, color: CoreColors.textOnLight, fontSize: 24, fontWeight: '600' }}>Input Fields</ThemedText>
-            <View style={{ gap: Spacing.md }}>
+          <Card style={[gridItemStyle, { padding: S.md, borderRadius: 12, borderWidth: 1, borderColor: '#ccc' }]}>
+            <Heading size="$8" style={{ marginBottom: S.md }}>Input Fields</Heading>
+            <View style={{ gap: S.md }}>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textOnLight }}>Text Input</ThemedText>
-                <TextInput placeholder="Enter text here..." value={textInputValue} onChangeText={setTextInputValue} />
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Text Input</Text>
+                <Input placeholder="Enter text here..." value={textInputValue} onChangeText={setTextInputValue} />
               </View>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textOnLight }}>Auth Input</ThemedText>
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Auth Input</Text>
                 <AuthInput placeholder="Email or password..." value={authInputValue} onChangeText={setAuthInputValue} />
               </View>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textOnLight }}>Dropdown</ThemedText>
-                <Dropdown options={dropdownOptions} value={dropdownValue} onChange={(value: string | null) => value && setDropdownValue(value)} placeholder="Select an option" />
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Dropdown</Text>
+                <Select value={dropdownValue} onValueChange={(v) => v && setDropdownValue(v)}>
+                  <Select.Trigger>
+                    <Select.Value placeholder="Select an option">
+                      {dropdownOptions.find((o) => o.toLowerCase().replace(/\s+/g, '') === dropdownValue)?.toString() || ''}
+                    </Select.Value>
+                  </Select.Trigger>
+                  <Select.Content>
+                    <Select.ScrollUpButton />
+                    <Select.Viewport>
+                      <Select.Group>
+                        {dropdownOptions.map((opt, idx) => (
+                          <Select.Item key={opt} value={opt.toLowerCase().replace(/\s+/g, '')} index={idx}>
+                            <Select.ItemText>{opt}</Select.ItemText>
+                          </Select.Item>
+                        ))}
+                      </Select.Group>
+                    </Select.Viewport>
+                    <Select.ScrollDownButton />
+                  </Select.Content>
+                </Select>
               </View>
             </View>
-          </View>
+          </Card>
 
           {/* Input Fields - Plain */}
-          <View style={[gridItemStyle]}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md, color: CoreColors.textPrimary, fontSize: 24, fontWeight: '600' }}>Input Fields</ThemedText>
-            <View style={{ gap: Spacing.md }}>
+          <YStack style={[gridItemStyle]}>
+            <Heading size="$8" style={{ marginBottom: S.md }}>Input Fields</Heading>
+            <View style={{ gap: S.md }}>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textPrimary }}>Text Input</ThemedText>
-                <TextInput placeholder="Enter text here..." value={textInputValue} onChangeText={setTextInputValue} />
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Text Input</Text>
+                <Input placeholder="Enter text here..." value={textInputValue} onChangeText={setTextInputValue} />
               </View>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textPrimary }}>Auth Input</ThemedText>
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Auth Input</Text>
                 <AuthInput placeholder="Email or password..." value={authInputValue} onChangeText={setAuthInputValue} />
               </View>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textPrimary }}>Dropdown</ThemedText>
-                <Dropdown options={dropdownOptions} value={dropdownValue} onChange={(value: string | null) => value && setDropdownValue(value)} placeholder="Select an option" />
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Dropdown</Text>
+                <Select value={dropdownValue} onValueChange={(v) => v && setDropdownValue(v)}>
+                  <Select.Trigger>
+                    <Select.Value placeholder="Select an option">
+                      {dropdownOptions.find((o) => o.toLowerCase().replace(/\s+/g, '') === dropdownValue)?.toString() || ''}
+                    </Select.Value>
+                  </Select.Trigger>
+                  <Select.Content>
+                    <Select.ScrollUpButton />
+                    <Select.Viewport>
+                      <Select.Group>
+                        {dropdownOptions.map((opt, idx) => (
+                          <Select.Item key={opt} value={opt.toLowerCase().replace(/\s+/g, '')} index={idx}>
+                            <Select.ItemText>{opt}</Select.ItemText>
+                          </Select.Item>
+                        ))}
+                      </Select.Group>
+                    </Select.Viewport>
+                    <Select.ScrollDownButton />
+                  </Select.Content>
+                </Select>
               </View>
             </View>
-          </View>
+          </YStack>
 
           {/* Feedback - Card */}
-          <View style={[gridItemStyle, ComponentStyles.card.default]}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md, color: CoreColors.textOnLight, fontSize: 24, fontWeight: '600' }}>Feedback Components</ThemedText>
-            <View style={{ gap: Spacing.md }}>
+          <Card style={[gridItemStyle, { padding: S.md, borderRadius: 12, borderWidth: 1, borderColor: '#ccc' }]}>
+            <Heading size="$8" style={{ marginBottom: S.md }}>Feedback Components</Heading>
+            <View style={{ gap: S.md }}>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textOnLight }}>Loading Spinner</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.md, alignItems: 'center' }}>
-                  <CustomLoad size="small" color={CoreColors.primary} />
-                  <CustomLoad size="large" color={CoreColors.secondary} />
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Loading Spinner</Text>
+                <View style={{ flexDirection: 'row', gap: S.md, alignItems: 'center' }}>
+                  <CustomLoad size="small" color={'#8B4513'} />
+                  <CustomLoad size="large" color={'#D4AF37'} />
                 </View>
               </View>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textOnLight }}>Success Message</ThemedText>
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Success Message</Text>
                 <AuthSuccess message="Operation completed successfully!" />
               </View>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textOnLight }}>Error Message</ThemedText>
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Error Message</Text>
                 <AuthError error="Something went wrong. Please try again." />
               </View>
             </View>
-          </View>
+          </Card>
 
           {/* Feedback - Plain */}
-          <View style={[gridItemStyle]}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md, color: CoreColors.textPrimary, fontSize: 24, fontWeight: '600' }}>Feedback Components</ThemedText>
-            <View style={{ gap: Spacing.md }}>
+          <YStack style={[gridItemStyle]}>
+            <Heading size="$8" style={{ marginBottom: S.md }}>Feedback Components</Heading>
+            <View style={{ gap: S.md }}>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textPrimary }}>Loading Spinner</ThemedText>
-                <View style={{ flexDirection: 'row', gap: Spacing.md, alignItems: 'center' }}>
-                  <CustomLoad size="small" color={CoreColors.primary} />
-                  <CustomLoad size="large" color={CoreColors.secondary} />
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Loading Spinner</Text>
+                <View style={{ flexDirection: 'row', gap: S.md, alignItems: 'center' }}>
+                  <CustomLoad size="small" color={'#8B4513'} />
+                  <CustomLoad size="large" color={'#D4AF37'} />
                 </View>
               </View>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textPrimary }}>Success Message</ThemedText>
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Success Message</Text>
                 <AuthSuccess message="Operation completed successfully!" />
               </View>
               <View>
-                <ThemedText type="defaultSemiBold" style={{ marginBottom: Spacing.xs, color: CoreColors.textPrimary }}>Error Message</ThemedText>
+                <Text style={{ marginBottom: S.xs, fontWeight: '600' }}>Error Message</Text>
                 <AuthError error="Something went wrong. Please try again." />
               </View>
             </View>
-          </View>
+          </YStack>
 
           {/* Modals - Card */}
-          <View style={[gridItemStyle, ComponentStyles.card.default]}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md, color: CoreColors.textOnLight, fontSize: 24, fontWeight: '600' }}>Modals</ThemedText>
-            <View style={{ gap: Spacing.sm }}>
-              <PrimaryButton style={{ backgroundColor: CoreColors.primary, borderColor: CoreColors.primaryDark }} textStyle={{ color: CoreColors.textPrimary }} onPress={() => setShowModal(true)}>Open Custom Modal</PrimaryButton>
-              <PrimaryButton style={{ backgroundColor: CoreColors.primary, borderColor: CoreColors.primaryDark }} textStyle={{ color: CoreColors.textPrimary }} onPress={() => setShowCredentialModal(true)}>Open Credential Modal</PrimaryButton>
-              <PrimaryButton style={{ backgroundColor: CoreColors.primary, borderColor: CoreColors.primaryDark }} textStyle={{ color: CoreColors.textPrimary }} onPress={() => setShowUsernameModal(true)}>Open Username Modal</PrimaryButton>
+          <Card style={[gridItemStyle, { padding: S.md, borderRadius: 12, borderWidth: 1, borderColor: '#ccc' }]}>
+            <Heading size="$8" style={{ marginBottom: S.md }}>Modals</Heading>
+            <View style={{ gap: S.sm }}>
+              <Button onPress={() => setShowModal(true)}>Open Custom Modal</Button>
+              <Button onPress={() => setShowCredentialModal(true)}>Open Credential Modal</Button>
+              <Button onPress={() => setShowUsernameModal(true)}>Open Username Modal</Button>
             </View>
-          </View>
+          </Card>
 
           {/* Modals - Plain */}
-          <View style={[gridItemStyle]}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md, color: CoreColors.textPrimary, fontSize: 24, fontWeight: '600' }}>Modals</ThemedText>
-            <View style={{ gap: Spacing.sm }}>
-              <PrimaryButton style={{ backgroundColor: CoreColors.primary, borderColor: CoreColors.primaryDark }} textStyle={{ color: CoreColors.textPrimary }} onPress={() => setShowModal(true)}>Open Custom Modal</PrimaryButton>
-              <PrimaryButton style={{ backgroundColor: CoreColors.primary, borderColor: CoreColors.primaryDark }} textStyle={{ color: CoreColors.textPrimary }} onPress={() => setShowCredentialModal(true)}>Open Credential Modal</PrimaryButton>
-              <PrimaryButton style={{ backgroundColor: CoreColors.primary, borderColor: CoreColors.primaryDark }} textStyle={{ color: CoreColors.textPrimary }} onPress={() => setShowUsernameModal(true)}>Open Username Modal</PrimaryButton>
+          <YStack style={[gridItemStyle]}>
+            <Heading size="$8" style={{ marginBottom: S.md }}>Modals</Heading>
+            <View style={{ gap: S.sm }}>
+              <Button onPress={() => setShowModal(true)}>Open Custom Modal</Button>
+              <Button onPress={() => setShowCredentialModal(true)}>Open Credential Modal</Button>
+              <Button onPress={() => setShowUsernameModal(true)}>Open Username Modal</Button>
             </View>
-          </View>
+          </YStack>
 
           {/* Icons - Card */}
-          <View style={[gridItemStyle, ComponentStyles.card.default]}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md, color: CoreColors.textOnLight, fontSize: 24, fontWeight: '600' }}>Icons</ThemedText>
-            <View style={{ flexDirection: 'row', gap: Spacing.md, flexWrap: 'wrap' }}>
+          <Card style={[gridItemStyle, { padding: S.md, borderRadius: 12, borderWidth: 1, borderColor: '#ccc' }]}>
+            <Heading size="$8" style={{ marginBottom: S.md }}>Icons</Heading>
+            <View style={{ flexDirection: 'row', gap: S.md, flexWrap: 'wrap' }}>
               <IconDisplay name="home" />
               <IconDisplay name="settings" />
               <IconDisplay name="person" />
@@ -418,47 +418,48 @@ export default function StyleGuidePage() {
               <IconDisplay name="checkmark" />
               <IconDisplay name="arrow-forward" />
             </View>
-          </View>
+          </Card>
 
           {/* Icons - Plain */}
-          <View style={[gridItemStyle]}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md, color: CoreColors.textPrimary, fontSize: 24, fontWeight: '600' }}>Icons</ThemedText>
-            <View style={{ flexDirection: 'row', gap: Spacing.md, flexWrap: 'wrap' }}>
-              <IconDisplay name="home" textColor={CoreColors.textPrimary} />
-              <IconDisplay name="settings" textColor={CoreColors.textPrimary} />
-              <IconDisplay name="person" textColor={CoreColors.textPrimary} />
-              <IconDisplay name="trash" textColor={CoreColors.textPrimary} />
-              <IconDisplay name="add" textColor={CoreColors.textPrimary} />
-              <IconDisplay name="close" textColor={CoreColors.textPrimary} />
-              <IconDisplay name="checkmark" textColor={CoreColors.textPrimary} />
-              <IconDisplay name="arrow-forward" textColor={CoreColors.textPrimary} />
+          <YStack style={[gridItemStyle]}>
+            <Heading size="$8" style={{ marginBottom: S.md }}>Icons</Heading>
+            <View style={{ flexDirection: 'row', gap: S.md, flexWrap: 'wrap' }}>
+              <IconDisplay name="home" textColor={'#F5E6D3'} />
+              <IconDisplay name="settings" textColor={'#F5E6D3'} />
+              <IconDisplay name="person" textColor={'#F5E6D3'} />
+              <IconDisplay name="trash" textColor={'#F5E6D3'} />
+              <IconDisplay name="add" textColor={'#F5E6D3'} />
+              <IconDisplay name="close" textColor={'#F5E6D3'} />
+              <IconDisplay name="checkmark" textColor={'#F5E6D3'} />
+              <IconDisplay name="arrow-forward" textColor={'#F5E6D3'} />
             </View>
-          </View>
+          </YStack>
 
           {/* Spacing Reference - Card */}
-          <View style={[gridItemStyle, ComponentStyles.card.default]}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md, color: CoreColors.textOnLight, fontSize: 24, fontWeight: '600' }}>Spacing Reference</ThemedText>
-            <View style={{ gap: Spacing.sm }}>
-              <SpacingExample size={Spacing.xs} label="XS (4px)" />
-              <SpacingExample size={Spacing.sm} label="SM (8px)" />
-              <SpacingExample size={Spacing.md} label="MD (16px)" />
-              <SpacingExample size={Spacing.lg} label="LG (24px)" />
-              <SpacingExample size={Spacing.xl} label="XL (32px)" />
+          <Card style={[gridItemStyle, { padding: S.md, borderRadius: 12, borderWidth: 1, borderColor: '#ccc' }]}>
+            <Heading size="$8" style={{ marginBottom: S.md }}>Spacing Reference</Heading>
+            <View style={{ gap: S.sm }}>
+              <SpacingExample size={S.xs} label="XS (4px)" />
+              <SpacingExample size={S.sm} label="SM (8px)" />
+              <SpacingExample size={S.md} label="MD (16px)" />
+              <SpacingExample size={S.lg} label="LG (24px)" />
+              <SpacingExample size={S.xl} label="XL (32px)" />
             </View>
-          </View>
+          </Card>
 
           {/* Spacing Reference - Plain */}
-          <View style={[gridItemStyle]}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md, color: CoreColors.textPrimary, fontSize: 24, fontWeight: '600' }}>Spacing Reference</ThemedText>
-            <View style={{ gap: Spacing.sm }}>
-              <SpacingExample size={Spacing.xs} label="XS (4px)" textColor={CoreColors.textPrimary} />
-              <SpacingExample size={Spacing.sm} label="SM (8px)" textColor={CoreColors.textPrimary} />
-              <SpacingExample size={Spacing.md} label="MD (16px)" textColor={CoreColors.textPrimary} />
-              <SpacingExample size={Spacing.lg} label="LG (24px)" textColor={CoreColors.textPrimary} />
-              <SpacingExample size={Spacing.xl} label="XL (32px)" textColor={CoreColors.textPrimary} />
+          <YStack style={[gridItemStyle]}>
+            <Heading size="$8" style={{ marginBottom: S.md }}>Spacing Reference</Heading>
+            <View style={{ gap: S.sm }}>
+              <SpacingExample size={S.xs} label="XS (4px)" textColor={'#F5E6D3'} />
+              <SpacingExample size={S.sm} label="SM (8px)" textColor={'#F5E6D3'} />
+              <SpacingExample size={S.md} label="MD (16px)" textColor={'#F5E6D3'} />
+              <SpacingExample size={S.lg} label="LG (24px)" textColor={'#F5E6D3'} />
+              <SpacingExample size={S.xl} label="XL (32px)" textColor={'#F5E6D3'} />
             </View>
-          </View>
-        </View>
+          </YStack>
+        </XStack>
+        </YStack>
       </ScrollView>
 
       {/* Modals */}
@@ -492,7 +493,7 @@ export default function StyleGuidePage() {
           setShowUsernameModal(false);
         }}
       />
-    </ThemedView>
+    </YStack>
   );
 }
 
@@ -507,16 +508,16 @@ function ColorSwatch({ color, label, textColor }: { color: string; label: string
           backgroundColor: color,
           borderRadius: 8,
           borderWidth: 1,
-          borderColor: CoreColors.borderPrimary,
-          marginBottom: Spacing.xs
+          borderColor: '#888',
+          marginBottom: S.xs
         }}
       />
-      <ThemedText style={{ fontSize: 10, textAlign: 'center', color: textColor ?? CoreColors.textSecondary }}>
+      <Text style={{ fontSize: 10, textAlign: 'center', color: textColor ?? '#C8B9A1' }}>
         {label}
-      </ThemedText>
-      <ThemedText style={{ fontSize: 9, textAlign: 'center', color: textColor ?? CoreColors.textSecondary, opacity: 0.7 }}>
+      </Text>
+      <Text style={{ fontSize: 9, textAlign: 'center', color: textColor ?? '#C8B9A1', opacity: 0.7 }}>
         {color}
-      </ThemedText>
+      </Text>
     </View>
   );
 }
@@ -528,36 +529,36 @@ function IconDisplay({ name, textColor }: { name: any; textColor?: string }) {
         style={{
           width: 50,
           height: 50,
-          backgroundColor: CoreColors.secondaryButtonBackground,
+          backgroundColor: '#3D444C',
           borderRadius: 8,
           justifyContent: 'center',
           alignItems: 'center',
-          marginBottom: Spacing.xs
+          marginBottom: S.xs
         }}
       >
-        <Ionicons name={name} size={24} color={CoreColors.textOnLight} />
+        <Ionicons name={name} size={24} color={'#F5E6D3'} />
       </View>
-      <ThemedText style={{ fontSize: 10, textAlign: 'center', color: textColor ?? CoreColors.textSecondary }}>
+      <Text style={{ fontSize: 10, textAlign: 'center', color: textColor ?? '#C8B9A1' }}>
         {name}
-      </ThemedText>
+      </Text>
     </View>
   );
 }
 
 function SpacingExample({ size, label, textColor }: { size: number; label: string; textColor?: string }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+  <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.sm }}>
       <View
         style={{
           width: size,
           height: 20,
-          backgroundColor: CoreColors.secondary,
+          backgroundColor: '#D4AF37',
           borderRadius: 4
         }}
       />
-      <ThemedText style={{ fontSize: 14, color: textColor ?? CoreColors.textOnLight }}>
+      <Text style={{ fontSize: 14, color: textColor ?? '#F5E6D3' }}>
         {label}
-      </ThemedText>
+      </Text>
     </View>
   );
 }

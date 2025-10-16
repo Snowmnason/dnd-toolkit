@@ -1,7 +1,7 @@
-import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import React from 'react';
-import { TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { TextStyle, View, ViewStyle } from 'react-native';
+import { Button, Text } from 'tamagui';
 
 interface IconButtonProps {
   icon: string;
@@ -19,18 +19,18 @@ export default function IconButton({
   textStyle 
 }: IconButtonProps) {
   return (
-    <TouchableOpacity style={style} onPress={onPress}>
+    <Button unstyled style={style} onPress={onPress}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {/* Icon */}
-        <ThemedText style={textStyle}>{icon}</ThemedText>
+  {/* Icon */}
+  <Text style={textStyle as any}>{icon}</Text>
 
         {/* Label (if present) */}
         {label && (
-          <ThemedText style={[{ marginLeft: Spacing.xs }, textStyle]}>
+          <Text style={[{ marginLeft: Spacing.xs }, textStyle] as any}>
             {label}
-          </ThemedText>
+          </Text>
         )}
       </View>
-    </TouchableOpacity>
+    </Button>
   );
 }

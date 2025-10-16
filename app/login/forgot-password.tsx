@@ -1,10 +1,9 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'tamagui';
 import AuthButton from '../../components/auth_components/AuthButton';
 import AuthInput from '../../components/auth_components/AuthInput';
 import CustomModal from '../../components/modals/CustomModal';
-import { ThemedText } from '../../components/themed-text';
 import { sendPasswordReset } from '../../lib/auth/authService';
 import { validateEmail } from '../../lib/auth/validation';
 
@@ -69,16 +68,15 @@ export default function ForgotPasswordScreen() {
       
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'transparent' }}>
         
-        <ThemedText 
-          type="title" 
+        <Text 
           style={{ marginBottom: 20, textAlign: 'center', color: '#F5E6D3', fontSize: 32, fontWeight: '700' }}
         >
           Forgot Password
-        </ThemedText>
+        </Text>
         
-        <ThemedText style={{ marginBottom: 40, textAlign: 'center', fontSize: 16, opacity: 0.8, color: '#F5E6D3', lineHeight: 22, paddingHorizontal: 20 }}>
+        <Text style={{ marginBottom: 40, textAlign: 'center', fontSize: 16, opacity: 0.8, color: '#F5E6D3', lineHeight: 22, paddingHorizontal: 20 }}>
           Enter your email to receive password reset instructions.
-        </ThemedText>
+        </Text>
 
         {/* Form Inputs */}
         <View style={{ width: '100%', maxWidth: 300, marginBottom: 15, backgroundColor: 'transparent' }}>
@@ -108,14 +106,14 @@ export default function ForgotPasswordScreen() {
             padding: 12, 
             marginBottom: 16 
           }}>
-            <ThemedText style={{ 
+            <Text style={{ 
               color: '#dc3545', 
               fontSize: 14, 
               textAlign: 'center',
               fontWeight: '500'
             }}>
               {error}
-            </ThemedText>
+            </Text>
           </View>
         )}
 
@@ -131,14 +129,14 @@ export default function ForgotPasswordScreen() {
             padding: 12, 
             marginBottom: 16 
           }}>
-            <ThemedText style={{ 
+            <Text style={{ 
               color: '#28a745', 
               fontSize: 14, 
               textAlign: 'center',
               fontWeight: '500'
             }}>
               {successMessage}
-            </ThemedText>
+            </Text>
           </View>
         )}
 
@@ -153,7 +151,7 @@ export default function ForgotPasswordScreen() {
           />
           
           {/* Back to Welcome Button */}
-          <ThemedText
+          <Text
             style={{ 
               textAlign: 'center', 
               fontSize: 14, 
@@ -165,16 +163,16 @@ export default function ForgotPasswordScreen() {
             onPress={() => router.replace('/login/sign-in')}
           >
             ← Back to Sign In
-          </ThemedText>
+          </Text>
         </View>
 
-        <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
+        <Text style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
           Secure authentication powered by Supabase
-        </ThemedText>
+        </Text>
         
-        <ThemedText style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
+        <Text style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
           © 2025 The Snow Post · Forged for storytellers & adventurers
-        </ThemedText>
+        </Text>
       </View>
 
       {/* Email Not Found Modal */}

@@ -1,7 +1,6 @@
-import { CoreColors } from '@/constants/corecolors';
 import React from 'react';
 import { Platform, View } from 'react-native';
-import { ThemedText } from './themed-text';
+import { Text } from 'tamagui';
 import CustomLoad from './ui/CustomLoad';
 
 interface LoadingOverlayProps {
@@ -41,7 +40,7 @@ export default function LoadingOverlay({
         flex: 1, 
         justifyContent: 'center', 
         alignItems: 'center', 
-        backgroundColor: CoreColors.backgroundDark,
+        backgroundColor: '#2f353d', // Dark semi-transparent background
         // Ensure this overlay is on top
         zIndex: 9999,
       }}
@@ -53,17 +52,17 @@ export default function LoadingOverlay({
     >
       <CustomLoad />
       
-      <ThemedText style={{ 
+      <Text style={{ 
         marginTop: 20, 
         color: '#F5E6D3', 
         textAlign: 'center',
         fontSize: 16
       }}>
         {displayMessage}
-      </ThemedText>
+      </Text>
 
       {error && (
-        <ThemedText style={{ 
+        <Text style={{ 
           marginTop: 10, 
           color: '#ffa500', 
           textAlign: 'center',
@@ -72,7 +71,7 @@ export default function LoadingOverlay({
           paddingHorizontal: 20
         }}>
           Some assets failed to load but the app will continue...
-        </ThemedText>
+        </Text>
       )}
     </View>
   );

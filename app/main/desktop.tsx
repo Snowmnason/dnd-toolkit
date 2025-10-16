@@ -1,7 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
+import { View } from 'tamagui';
 import { panelConfigs } from '../../components/main-panels/PanelData';
 import { PanelView } from '../../components/main-panels/PanelView';
-import { ThemedView } from '../../components/themed-view';
 
 export default function MainScreenDesktop() {
   const params = useLocalSearchParams();
@@ -10,7 +10,7 @@ export default function MainScreenDesktop() {
   const userRole = typeof params.userRole === 'string' ? params.userRole : undefined;
 
   return (
-    <ThemedView style={{ flexDirection: 'row' }}>
+    <View style={{ flexDirection: 'row', flex: 1 }}>
       {panelConfigs.map((panel) => (
         <PanelView
           key={panel.key}
@@ -20,6 +20,6 @@ export default function MainScreenDesktop() {
           userRole={userRole}
         />
       ))}
-    </ThemedView>
+    </View>
   );
 }

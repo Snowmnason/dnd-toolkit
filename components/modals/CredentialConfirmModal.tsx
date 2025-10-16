@@ -1,10 +1,6 @@
-import { CoreColors } from '@/constants/corecolors';
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Button, Input, Text, View } from 'tamagui';
 import { Spacing } from '../../constants/theme';
-import PrimaryButton from '../custom_components/PrimaryButton';
-import TextInput from '../custom_components/TextInput';
-import { ThemedText } from '../themed-text';
 import CustomModal from './CustomModal';
 
 export interface CredentialConfirmModalProps {
@@ -56,73 +52,49 @@ export default function CredentialConfirmModal({
       buttons={[]} // We'll use children instead
     >
       {/* Password field */}
-  <View style={{ marginBottom: Spacing.sm }}>
-        <TextInput
+      <View style={{ marginBottom: Spacing.sm }}>
+        <Input
           placeholder="Enter your password"
           value={password}
           onChangeText={setPassword}
           secureTextEntry={!showPassword}
           style={{ marginBottom: 8 }}
         />
-        <ThemedText
+        <Text
           onPress={() => setShowPassword((s) => !s)}
           style={{
             textAlign: 'right',
-            color: CoreColors.textSecondary,
+            color: '#C8B9A1', //UPDATE TO THEME
             fontSize: 12,
             marginBottom: Spacing.sm,
           }}
         >
           {showPassword ? 'Hide password' : 'Show password'}
-        </ThemedText>
+        </Text>
 
         {!!errorText && (
-          <ThemedText
+          <Text
             style={{
-              color: CoreColors.destructive,
+              color: '#EF4444',//UPDATE TO THEME
               fontSize: 13,
               marginBottom: Spacing.sm,
               textAlign: 'center',
             }}
           >
             {errorText}
-          </ThemedText>
+          </Text>
         )}
       </View>
 
       {/* Action buttons */}
-      <View
-        style={{
-          flexDirection: 'row',
-          gap: Spacing.sm,
-          justifyContent: 'center',
-        }}
-     >
-        <PrimaryButton
-          style={{
-            backgroundColor: CoreColors.cancel,
-            borderColor: CoreColors.cancelBoarder,
-            opacity: loading ? 0.6 : 1,
-          }}
-          textStyle={{ color: CoreColors.cancelText, fontWeight: '500' }}
-          disabled={loading}
-          onPress={onCancel}
-        >
+      <View style={{ flexDirection: 'row', gap: Spacing.sm, justifyContent: 'center' }}>
+        <Button disabled={loading} onPress={onCancel}>
           Cancel
-        </PrimaryButton>
+        </Button>
 
-        <PrimaryButton
-          style={{
-            backgroundColor: destructive ? CoreColors.destructive : CoreColors.primary,
-            borderColor: destructive ? CoreColors.destructiveBoarder : CoreColors.primary,
-            opacity: loading || !password ? 0.6 : 1,
-          }}
-          textStyle={{ color: CoreColors.destructiveText, fontWeight: '600' }}
-          disabled={loading || !password}
-          onPress={() => onConfirm(password)}
-        >
+        <Button disabled={loading || !password} onPress={() => onConfirm(password)}>
           {confirmLabel}
-        </PrimaryButton>
+        </Button>
       </View>
     </CustomModal>
   );

@@ -3,7 +3,7 @@ import { logger } from '@/lib/utils/logger';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import { Platform } from 'react-native';
-import { AuthStateManager } from '../../../lib/auth-state';
+import { AuthStateManager } from '../../../../lib/auth-state';
 import PrimaryButton from '../../custom_components/PrimaryButton';
 
 async function onAppleButtonPress() {

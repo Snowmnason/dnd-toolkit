@@ -1,11 +1,9 @@
-import { CoreColors } from '@/constants/corecolors';
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'tamagui';
 import { Spacing } from '../../constants/theme';
 import { validateUsername } from '../../lib/auth/validation';
 import AuthError from '../auth_components/AuthError';
 import AuthInput from '../auth_components/AuthInput';
-import { ThemedText } from '../themed-text';
 import CustomModal from './CustomModal';
 
 interface UpdateUsernameModalProps {
@@ -80,17 +78,17 @@ export default function UpdateUsernameModal({
       buttons={buttons}
     >
       <View style={{ width: '100%', paddingHorizontal: Spacing.md }}>
-        <ThemedText
+        <Text
           style={{
             marginBottom: Spacing.lg,
-            color: CoreColors.textSecondary,
+            color: '#C8B9A1',//UPDATE TO THEME
             textAlign: 'center',
             fontSize: 14,
             lineHeight: 20
           }}
         >
-          Current username: <ThemedText style={{ fontWeight: '600' }}>{currentUsername}</ThemedText>
-        </ThemedText>
+          Current username: <Text style={{ fontWeight: '600' } as any}>{currentUsername}</Text>
+        </Text>
 
         {/* Username Input */}
         <View style={{ marginBottom: Spacing.md }}>
@@ -108,7 +106,7 @@ export default function UpdateUsernameModal({
 
           {/* Validation Hint */}
           {newUsername.length > 0 && (
-            <ThemedText
+            <Text
               style={{
                 marginTop: Spacing.xs,
                 fontSize: 12,
@@ -118,7 +116,7 @@ export default function UpdateUsernameModal({
               }}
             >
               {getUsernameHint()}
-            </ThemedText>
+            </Text>
           )}
 
           {/* Error Display */}

@@ -1,6 +1,5 @@
 import { View } from 'react-native';
-import PrimaryButton from '../custom_components/PrimaryButton';
-import { ThemedText } from '../themed-text';
+import { Button, Text } from 'tamagui';
 
 interface AuthErrorProps {
   error: string;
@@ -24,7 +23,7 @@ export default function AuthError({ error, onResendEmail, isResending }: AuthErr
           borderWidth: 1,
           borderColor: 'rgba(245, 230, 211, 0.2)'
         }}>
-          <ThemedText 
+          <Text 
             style={{ 
               textAlign: 'center', 
               fontSize: 12, 
@@ -36,22 +35,16 @@ export default function AuthError({ error, onResendEmail, isResending }: AuthErr
             }}
           >
             ❌ Please check your email and click the confirmation link before signing in.
-          </ThemedText>
+          </Text>
           
-          <PrimaryButton
-            style={{ 
-              backgroundColor: '#D4AF37', 
-              paddingVertical: 8, 
-              paddingHorizontal: 12, 
-              borderRadius: 4,
-              alignSelf: 'center'
-            }}
-            textStyle={{ color: '#2f353d', fontSize: 11, fontWeight: '600' }}
+          <Button
+            //variant="primary"
+            //size="sm"
             onPress={onResendEmail}
             disabled={isResending}
           >
             {isResending ? '📧 Sending...' : '📧 Resend Email'}
-          </PrimaryButton>
+          </Button>
         </View>
       </View>
     );
@@ -59,7 +52,7 @@ export default function AuthError({ error, onResendEmail, isResending }: AuthErr
 
   return (
     <View style={{ marginBottom: 8 }}>
-      <ThemedText 
+      <Text 
         style={{ 
           textAlign: 'center', 
           fontSize: 12, 
@@ -75,7 +68,7 @@ export default function AuthError({ error, onResendEmail, isResending }: AuthErr
         }}
       >
         {isSuccess ? error : `❌ ${error}`}
-      </ThemedText>
+      </Text>
     </View>
   );
 }

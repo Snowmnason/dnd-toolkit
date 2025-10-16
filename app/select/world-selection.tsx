@@ -1,14 +1,12 @@
 import LeaveWorldModal from '@/components/create-world/ConfrimLeaveModal';
 import EditWorldModal from '@/components/create-world/EditWorldModal';
-import CustomLoad from '@/components/custom_components/CustomLoad';
-import { CoreColors } from '@/constants/corecolors';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Image, ScrollView, TouchableOpacity, View, useWindowDimensions } from 'react-native';
-import PrimaryButton from '../../components/custom_components/PrimaryButton';
-import { ThemedText } from '../../components/themed-text';
-import { ThemedView } from '../../components/themed-view';
-import { ComponentStyles, Spacing } from '../../constants/theme';
+import { Image, useWindowDimensions } from 'react-native';
+import { Button, ScrollView, Text, View } from 'tamagui';
+import CustomLoad from '../../components/ui/CustomLoad';
+// import { ComponentStyles } from '../../constants/theme'; // deprecated
+import { Spacing } from '../../constants/theme';
 import { useAppParams } from '../../contexts/AppParamsContext';
 import { useWorldModal } from '../../hooks/use-world-modal';
 import { useWorlds } from '../../lib/useWorlds';
@@ -20,7 +18,7 @@ export default function LandingPage() {
   const { params, updateParams } = useAppParams();
   const userId = params.userId;
   
-  const { selectedWorld, setSelectedWorld, worlds, isLoading, error, retry, refetch } = useWorlds(userId);
+  const { selectedWorld, setSelectedWorld, worlds, isLoading, error, refetch } = useWorlds(userId);
   
   const noImageSelected = require('../../assets/images/Miku.png');
   const router = useRouter();
@@ -61,11 +59,13 @@ export default function LandingPage() {
   // Show loading screen
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: CoreColors.backgroundDark }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <CustomLoad size="large" />
-        <ThemedText style={{ marginTop: 16, color: CoreColors.textSecondary }}>
+        <Text 
+        //style={{ marginTop: 16, color: CoreColors.textSecondary }}
+        >
           Loading your worlds...
-        </ThemedText>
+        </Text>
       </View>
     );
   }
@@ -73,20 +73,23 @@ export default function LandingPage() {
   // Show error screen
   if (error) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: CoreColors.backgroundDark }}>
-        <ThemedText style={{ color: '#FF6B6B', textAlign: 'center', marginBottom: 20 }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <Text style={{ color: '#FF6B6B', textAlign: 'center', marginBottom: 20 }}>
           {error}
-        </ThemedText>
-        <PrimaryButton style={{}} textStyle={{}} onPress={retry}>
+        </Text>
+        <Button 
+        //variant="secondary" onPress={retry}
+        >
           Try Again
-        </PrimaryButton>
+        </Button>
       </View>
     );
   }
 
   // Main layout - unified for both mobile and desktop
   return (
-    <ThemedView style={{ 
+    <View style={{ 
+      //bg=
       flexDirection: isDesktop ? 'row' : 'column',
       flex: 1, 
       paddingTop: isDesktop ? 0 : 12, 
@@ -98,7 +101,7 @@ export default function LandingPage() {
         flex: isDesktop ? 1 : 1,
         padding: isDesktop ? 14 : 0,
         borderRightWidth: isDesktop ? 2 : 0,
-        borderRightColor: CoreColors.borderPrimary,
+        //borderRightColor: CoreColors.borderPrimary,
         position: 'relative',
         minWidth: isDesktop ? 100 : undefined,
         maxWidth: isDesktop ? 400 : undefined,
@@ -109,23 +112,20 @@ export default function LandingPage() {
           {/* World List */}
           {worlds.length === 0 ? (
             <View style={{ padding: 20, alignItems: 'center' }}>
-              <ThemedText style={{ textAlign: 'center', color: CoreColors.backgroundLight }}>
+              <Text 
+              //style={{ textAlign: 'center', color: CoreColors.backgroundLight }}
+              >
                 No worlds yet. Create your first world to get started!
-              </ThemedText>
+              </Text>
             </View>
           ) : (
             worlds.map((world) => {
               const isSelected = selectedWorld?.world_id === world.world_id;
               
               return (
-                <TouchableOpacity
+                <Button
                   key={world.world_id}
-                  style={[
-                    ComponentStyles.card.base,
-                    { borderWidth: 5 },
-                    isSelected && ComponentStyles.card.selected,
-                    world.user_role !== 'owner' && { borderColor: 'rgba(0, 0, 0, 0.2)' }
-                  ]}
+                  style={{ marginBottom: Spacing.xs, borderWidth: isSelected ? 3 : 2, borderRadius: 8, borderColor: world.user_role !== 'owner' ? 'rgba(0,0,0,0.2)' : undefined }}
                   onPress={() => {
                     setMapImage(world.map_image_url);
                     if (isDesktop) {
@@ -155,17 +155,17 @@ export default function LandingPage() {
                 >
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <View style={{ flex: 1 }}>
-                      <ThemedText 
+                      <Text 
                         numberOfLines={1} 
                         style={{ fontSize: 20,fontWeight: 'bold',
-                          color: isSelected ? CoreColors.textPrimary : CoreColors.textSecondary
+                          //color: isSelected ? CoreColors.textPrimary : CoreColors.textSecondary
                         }}
                         >
                         {world.name}
-                      </ThemedText>
+                      </Text>
                     </View>
                   </View>
-                </TouchableOpacity>
+                </Button>
               );
             })
           )}
@@ -173,8 +173,8 @@ export default function LandingPage() {
         </ScrollView>
         
         {/* Create New World Button */}
-        <PrimaryButton
-          style={{position: 'absolute',left: Spacing.md,right: Spacing.md,bottom: Spacing.md,borderRadius: 14}} textStyle={{}}
+        <Button
+          style={{position: 'absolute',left: Spacing.md,right: Spacing.md,bottom: Spacing.md,borderRadius: 14}} 
           onPress={() => {
             const routeParams: Record<string, string> = {};
 
@@ -187,7 +187,7 @@ export default function LandingPage() {
           }}
         >
           Create New World
-        </PrimaryButton>
+        </Button>
       </View>
 
       {/* Right Panel (Desktop Only) */}
@@ -216,7 +216,8 @@ export default function LandingPage() {
             onLeaveWorld={createRemoveFromWorldHandler(selectedWorld?.world_id, userId)}
           />
           {/* World Preview */}
-          <View style={{ position: 'absolute', top: 30, left: 50, zIndex: 10, backgroundColor: CoreColors.backgroundDark}}>
+          <View //style={{ position: 'absolute', top: 30, left: 50, zIndex: 10, backgroundColor: CoreColors.backgroundDark}}
+          >
           </View>
           <Image
             source={mapImage || noImageSelected}
@@ -225,25 +226,24 @@ export default function LandingPage() {
           />
           {selectedWorld && (
             <>
-              <ThemedText type="title" style={{ position: 'absolute', top: 24, left: 0, right: 0, textAlign: 'center', }}>
+              <Text style={{ position: 'absolute', top: 24, left: 0, right: 0, textAlign: 'center', fontWeight: '700', fontSize: 24 }}>
                 {selectedWorld.name}
-              </ThemedText>
+              </Text>
               <View style={{position: 'absolute',bottom: 44,left: 54,right: 54,flexDirection: 'row',justifyContent: 'space-between',}}>
                 {/* Show Edit for owners, Leave for non-owners */}
-                <PrimaryButton 
+                <Button 
                   style={{}}
-                  textStyle={{}}
-                  //disabled={true} //TODO enable when edit modal is fixed
+                  //variant={selectedWorld.user_role === 'owner' ? 'secondary' : 'cancel'}
                   onPress={selectedWorld.user_role === 'owner' 
                     ? () => openEditModal(selectedWorld.name)
                     : () => openLeaveModal(selectedWorld.name) //createRemoveFromWorldHandler(selectedWorld.world_id, userId)
                   }
                 >
                   {selectedWorld.user_role === 'owner' ? 'Edit' : 'Leave'}
-                </PrimaryButton>
-                <PrimaryButton
+                </Button>
+                <Button
                   style={{ marginLeft: selectedWorld.user_role === 'owner' ? 0 : 'auto' }}
-                  textStyle={{}}
+                  //variant="primary"
                   onPress={() => {
                     // Update centralized params context
                     updateParams({
@@ -264,12 +264,12 @@ export default function LandingPage() {
                   }}
                 >
                   Open
-                </PrimaryButton>
+                </Button>
               </View>
             </>
           )}
         </View>
       )}
-    </ThemedView>
+    </View>
   );
 }

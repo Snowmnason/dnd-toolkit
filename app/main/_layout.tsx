@@ -1,4 +1,3 @@
-import { CoreColors } from '@/constants/corecolors';
 import { Stack, useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Platform, View, useWindowDimensions } from 'react-native';
@@ -79,7 +78,7 @@ export default function MainLayout() {
         flex: 1, 
         justifyContent: 'center', 
         alignItems: 'center', 
-        backgroundColor: CoreColors.backgroundDark 
+        //backgroundColor: CoreColors.backgroundDark 
       }}>
         <CustomLoad />
       </View>
@@ -87,7 +86,7 @@ export default function MainLayout() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: CoreColors.backgroundDark }}>
+    <View style={{ flex: 1,}}>
       <View style={{ flex: 1 }}>
         <Stack 
           screenOptions={{

@@ -1,11 +1,9 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { Button, Text, View } from 'tamagui';
 import AuthButton from '../../components/auth_components/AuthButton';
 import AuthError from '../../components/auth_components/AuthError';
 import AuthInput from '../../components/auth_components/AuthInput';
-import PrimaryButton from '../../components/custom_components/PrimaryButton';
-import { ThemedText } from '../../components/themed-text';
 import { useSignUpForm } from '../../lib/auth';
 import { supabase } from '../../lib/database/supabase';
 import { usersDB } from '../../lib/database/users';
@@ -115,9 +113,9 @@ export default function CompleteProfileScreen() {
   if (initializing || !user) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#2f353d' }}>
-        <ThemedText style={{ color: '#F5E6D3' }}>
+        <Text style={{ color: '#F5E6D3' }}>
           {initializing ? 'Checking authentication...' : 'Loading...'}
-        </ThemedText>
+        </Text>
       </View>
     );
   }
@@ -126,29 +124,28 @@ export default function CompleteProfileScreen() {
     <View style={{ flex: 1, backgroundColor: '#2f353d' }}>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'transparent' }}>
         
-        <ThemedText 
-          type="title" 
+        <Text 
           style={{ marginBottom: 20, textAlign: 'center', color: '#F5E6D3', fontSize: 32, fontWeight: '700' }}
         >
           Complete Your Profile
-        </ThemedText>
+        </Text>
         
-        <ThemedText style={{ marginBottom: 40, textAlign: 'center', fontSize: 16, opacity: 0.8, color: '#F5E6D3', lineHeight: 22, paddingHorizontal: 20 }}>
+        <Text style={{ marginBottom: 40, textAlign: 'center', fontSize: 16, opacity: 0.8, color: '#F5E6D3', lineHeight: 22, paddingHorizontal: 20 }}>
           Choose a username to complete your account setup
-        </ThemedText>
+        </Text>
 
         {/* Welcome Message */}
         <View style={{ backgroundColor: 'rgba(245, 230, 211, 0.95)', padding: 24, borderRadius: 12, marginBottom: 32, borderWidth: 2, borderColor: '#8B4513', maxWidth: 350 }}>
-          <ThemedText 
+          <Text 
             style={{ textAlign: 'center', color: '#8B4513', fontWeight: '600', marginBottom: 8, fontSize: 16 }}
           >
             Welcome, {username ? username : 'Adventurer'}!
-          </ThemedText>
-          <ThemedText 
+          </Text>
+          <Text 
             style={{ textAlign: 'center', color: '#8B4513', lineHeight: 20, fontSize: 14 }}
           >
             There will be more added soon to customize your profile more.
-          </ThemedText>
+          </Text>
         </View>
 
         {/* Form Input */}
@@ -171,7 +168,7 @@ export default function CompleteProfileScreen() {
           {/* Username Requirements */}
           {username.length > 0 && (
             <View style={{ marginBottom: 4, marginTop: -14 }}>
-              <ThemedText 
+              <Text 
                 style={{ 
                   textAlign: 'left', 
                   fontSize: 11, 
@@ -182,7 +179,7 @@ export default function CompleteProfileScreen() {
                 }}
               >
                 {getUsernameDisplayText()}
-              </ThemedText>
+              </Text>
             </View>
           )}
         </View>
@@ -198,38 +195,30 @@ export default function CompleteProfileScreen() {
           />
 
           {/* Sign Out Button */}
-          <PrimaryButton
-            style={{ 
-              width: '100%', 
-              backgroundColor: 'rgba(139, 69, 19, 0.15)', 
-              borderWidth: 1, 
-              borderColor: '#8B4513', 
-              paddingVertical: 12, 
-              borderRadius: 8,
-              opacity: loading ? 0.5 : 1
-            }}
-            textStyle={{ color: '#F5E6D3', fontSize: 13, fontWeight: '500' }}
+          <Button
+            //variant="secondary"
+            //fullWidth
             onPress={async () => {
               try {
                 await supabase.auth.signOut();
                 router.replace('/login/welcome');
               } catch {
-                Alert.alert('Error', 'Failed to sign out');
+                //Alert.alert('Error', 'Failed to sign out');
               }
             }}
             disabled={loading}
           >
             Sign Out
-          </PrimaryButton>
+          </Button>
         </View>
 
-        <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
+        <Text style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
           Your username will be used for online games and friend connections.
-        </ThemedText>
+        </Text>
         
-        <ThemedText style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
+        <Text style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
           © 2025 The Snow Post · Forged for storytellers & adventurers
-        </ThemedText>
+        </Text>
       </View>
     </View>
   );

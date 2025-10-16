@@ -4,7 +4,7 @@
  */
 
 import { Platform } from 'react-native';
-import { CoreColors } from './corecolors';
+//import { CoreColors } from './corecolors';
 
 /**
  * Cross-platform shadow utility
@@ -101,13 +101,13 @@ export const Shadows = {
     ...createShadow('#000', { width: 0, height: 6 }, 0.2, 6, 6),
   },
   gold: {
-    ...createShadow(CoreColors.secondary, { width: 0, height: 2 }, 0.3, 4, 4),
+    //...createShadow(CoreColors.secondary, { width: 0, height: 2 }, 0.3, 4, 4),
   },
   buttonShadow: {
-    ...createShadow(CoreColors.secondary, { width: 0, height: 2 }, 0.18, 4, 4),
+    //...createShadow(CoreColors.secondary, { width: 0, height: 2 }, 0.18, 4, 4),
   },
   panelShadow: {
-    ...createShadow(CoreColors.primaryDark, { width: 0, height: 4 }, 0.22, 8, 8),
+    //...createShadow(CoreColors.primaryDark, { width: 0, height: 4 }, 0.22, 8, 8),
   },
 };
 
@@ -115,13 +115,13 @@ export const Shadows = {
 export const Typography = {
   // Text shadows for better readability
   textShadow: {
-    ...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2),
+    //...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2),
   },
   textShadowDark: {
-    ...createTextShadow('#000', { width: 2, height: 2 }, 4),
+    //...createTextShadow('#000', { width: 2, height: 2 }, 4),
   },
   buttonTextShadow: {
-    ...createTextShadow(CoreColors.primaryDark, { width: 1, height: 1 }, 2),
+    //...createTextShadow(CoreColors.primaryDark, { width: 1, height: 1 }, 2),
   },
 };
 
@@ -129,65 +129,65 @@ export const Typography = {
 export const ComponentStyles = {
   button: {
     primary: {
-      backgroundColor: CoreColors.primary,
+     // backgroundColor: CoreColors.primary,
       borderRadius: BorderRadius.md,
       paddingVertical: Spacing.sm,
       paddingHorizontal: Spacing.lg,
       ...Shadows.md,
       borderWidth: 2,
-      borderColor: CoreColors.secondary,
+      //borderColor: CoreColors.secondary,
     },
     secondary: {
-      backgroundColor: CoreColors.backgroundLight,
+      //backgroundColor: CoreColors.backgroundLight,
       borderRadius: BorderRadius.md,
       paddingVertical: Spacing.sm,
       paddingHorizontal: Spacing.lg,
       borderWidth: 2,
-      borderColor: CoreColors.primary,
+      //borderColor: CoreColors.primary,
     }
   },
   card: {
     container: {
-      backgroundColor: CoreColors.primaryTransparent,
+      //backgroundColor: CoreColors.primaryTransparent,
       paddingVertical: Spacing.md,
       paddingHorizontal: Spacing.lg,
       borderRadius: BorderRadius.lg,
       marginBottom: Spacing.md,
       borderWidth: 2,
-      borderColor: CoreColors.secondary,
+      //borderColor: CoreColors.secondary,
       ...Shadows.lg,
     },
     base: {
       padding: Spacing.sm,
       marginBottom: Spacing.xs,
       borderRadius: BorderRadius.sm,
-      backgroundColor: CoreColors.buttonBackgroundLight,
+      //backgroundColor: CoreColors.buttonBackgroundLight,
       alignItems: 'center' as const,
       borderWidth: 2,
-      borderColor: CoreColors.secondary,
+      //borderColor: CoreColors.secondary,
       ...Shadows.sm,
     },
     selected: {
-      backgroundColor: CoreColors.buttonBackgroundSelected,
+      //backgroundColor: CoreColors.buttonBackgroundSelected,
       borderWidth: 3,
-      borderColor: CoreColors.secondary,
+      //borderColor: CoreColors.secondary,
       ...Shadows.md,
     },
     default: {
-      ...createShadow(CoreColors.backgroundDark, { width: 0, height: 2 }, 0.3, 4, 4),
-      backgroundColor: CoreColors.backgroundLight,
+      //...createShadow(CoreColors.backgroundDark, { width: 0, height: 2 }, 0.3, 4, 4),
+      //backgroundColor: CoreColors.backgroundLight,
       borderRadius: BorderRadius.sm,
       padding: Spacing.sm,
       borderWidth: 1,
-      borderColor: CoreColors.secondary,
+      //borderColor: CoreColors.secondary,
     },
     world: {
-      backgroundColor: CoreColors.backgroundLight,
+      //backgroundColor: CoreColors.backgroundLight,
       borderRadius: BorderRadius.md,
       padding: Spacing.md,
       marginBottom: Spacing.sm,
       borderWidth: 2,
-      borderColor: CoreColors.secondary,
+      //borderColor: CoreColors.secondary,
       ...Shadows.sm,
     }
   },
@@ -199,14 +199,14 @@ export const ComponentStyles = {
       paddingHorizontal: Spacing.md,
       paddingVertical: Spacing.sm,
       paddingTop: 50, // Account for status bar
-      backgroundColor: CoreColors.TopBarDark,
+      //backgroundColor: CoreColors.TopBarDark,
       borderBottomWidth: 1,
-      borderBottomColor: CoreColors.borderPrimary,
+      //borderBottomColor: CoreColors.borderPrimary,
     },
     button: {
       padding: Spacing.xs,
       borderRadius: BorderRadius.sm,
-      backgroundColor: CoreColors.primaryTransparent,
+      //backgroundColor: CoreColors.primaryTransparent,
       alignItems: 'center' as const,
     }
   },
@@ -214,9 +214,9 @@ export const ComponentStyles = {
     container: {
       flexDirection: 'row' as const,
       height: 60,
-      backgroundColor: CoreColors.TopBarDark,
+      //backgroundColor: CoreColors.TopBarDark,
       borderTopWidth: 1,
-      borderTopColor: CoreColors.borderPrimary,
+      //borderTopColor: CoreColors.borderPrimary,
       paddingBottom: 5,
       ...Shadows.panelShadow,
     },
@@ -227,7 +227,7 @@ export const ComponentStyles = {
       paddingVertical: 5,
     },
     activeTab: {
-      backgroundColor: CoreColors.activeTabBackground,
+      //backgroundColor: CoreColors.activeTabBackground,
     },
     icon: {
       fontSize: 24,
@@ -238,10 +238,10 @@ export const ComponentStyles = {
     },
     label: {
       fontSize: 10,
-      color: CoreColors.textSecondary,
+      //color: CoreColors.textSecondary,
     },
     activeLabel: {
-      color: CoreColors.secondary,
+      //color: CoreColors.secondary,
       fontWeight: 'bold' as const,
     },
   },
@@ -249,7 +249,7 @@ export const ComponentStyles = {
     panel: {
       flex: 1,
       borderWidth: 1,
-      borderColor: CoreColors.primaryDark,
+      //borderColor: CoreColors.primaryDark,
       alignItems: 'center' as const,
       justifyContent: 'flex-start' as const,
       padding: Spacing.md,
@@ -264,7 +264,7 @@ export const ComponentStyles = {
       marginBottom: Spacing.sm,
       width: '90%' as any,
       borderRadius: BorderRadius.md,
-      borderColor: CoreColors.secondary,
+      //borderColor: CoreColors.secondary,
       borderWidth: 2,
       ...Shadows.buttonShadow,
     },
@@ -277,24 +277,24 @@ export const ComponentStyles = {
 // Legacy Colors object for backward compatibility
 export const Colors = {
   light: {
-    text: CoreColors.textSecondary,
-    background: CoreColors.backgroundAccent,
-    tint: CoreColors.backgroundLight,
-    icon: '#687076',
+    //text: CoreColors.textSecondary,
+    //background: CoreColors.backgroundAccent,
+    //tint: CoreColors.backgroundLight,
+    //icon: '#687076',
     tabIconDefault: '#687076',
-    tabIconSelected: CoreColors.primaryTransparent,
-    textColor: CoreColors.primary,
-    border: CoreColors.secondary,
+    //tabIconSelected: CoreColors.primaryTransparent,
+    //textColor: CoreColors.primary,
+    //border: CoreColors.secondary,
   },
   dark: {
-    text: CoreColors.textSecondary,
-    background: CoreColors.backgroundAccent,
-    tint: CoreColors.backgroundLight,
+    //text: CoreColors.textSecondary,
+    //background: CoreColors.backgroundAccent,
+    //tint: CoreColors.backgroundLight,
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
-    tabIconSelected: CoreColors.backgroundLight,
-    textColor: CoreColors.primary,
-    border: CoreColors.secondary,
+    //tabIconSelected: CoreColors.backgroundLight,
+    //textColor: CoreColors.primary,
+    //border: CoreColors.secondary,
   },
 };
 

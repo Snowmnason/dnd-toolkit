@@ -1,8 +1,8 @@
-import IconButton from '@/components/custom_components/IconButton';
-import { CoreColors } from '@/constants/corecolors';
 import { BorderRadius, Spacing } from '@/constants/theme';
 import React, { useState } from 'react';
-import { Image, ImageStyle, Text, TextStyle, View, ViewStyle } from 'react-native';
+import { Image, ImageStyle } from 'react-native';
+import { Text, View } from 'tamagui';
+import IconButton from '../ui/IconButton';
 
 interface MapCanvasProps {
   onPress: () => void;
@@ -60,30 +60,30 @@ export default function MapCanvas({
   //   onMapEdit?.(newMapData);
   // };
 
-  const containerStyle: ViewStyle = {
+  const containerStyle = {
     flex: 1,
-    backgroundColor: CoreColors.backgroundDark,
+    backgroundColor: '#2f353d',//UPDATE TO THEME
     position: 'relative',
   };
 
-  const closeButtonStyle: ViewStyle = {
+  const closeButtonStyle = {
     position: 'absolute',
     top: Spacing.md,
     left: Spacing.md,
-    backgroundColor: CoreColors.backgroundAccent,
+    backgroundColor: '#3D444C',//UPDATE TO THEME
     borderRadius: BorderRadius.md,
     padding: Spacing.sm,
     zIndex: 5,
   };
 
-  const canvasAreaStyle: ViewStyle = {
+  const canvasAreaStyle = {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   };
 
-  const placeholderTextStyle: TextStyle = {
-    color: CoreColors.textSecondary,
+  const placeholderTextStyle = {
+    color: '#C8B9A1',
     fontSize: 16,
   };
 
@@ -93,47 +93,47 @@ export default function MapCanvas({
     borderRadius: BorderRadius.sm,
   };
 
-  const toolbarStyle: ViewStyle = {
+  const toolbarStyle = {
     position: 'absolute',
     bottom: Spacing.lg,
     left: Spacing.lg,
     right: Spacing.lg,
-    backgroundColor: CoreColors.backgroundAccent,
+    backgroundColor: '#3D444C',
     borderRadius: BorderRadius.lg,
     flexDirection: 'row',
     justifyContent: 'space-around',
     padding: Spacing.md,
   };
 
-  const getToolButtonStyle = (toolKey: string): ViewStyle => ({
-    backgroundColor: selectedTool === toolKey ? CoreColors.primary : 'transparent',
+  const getToolButtonStyle = (toolKey: string) => ({
+    backgroundColor: selectedTool === toolKey ? '#8B4513' : 'transparent',
     borderRadius: BorderRadius.md,
     padding: Spacing.sm,
     minWidth: 44,
     alignItems: 'center',
   });
 
-  const getToolTextStyle = (toolKey: string): TextStyle => ({
-    color: selectedTool === toolKey ? CoreColors.textPrimary : CoreColors.textSecondary,
+  const getToolTextStyle = (toolKey: string) => ({
+    color: selectedTool === toolKey ? '#F5E6D3' : '#C8B9A1',
     fontSize: 20,
   });
 
   return (
-    <View style={containerStyle}>
+    <View style={containerStyle as any}>
       <IconButton 
         icon="❌"
         onPress={onPress}
-        style={closeButtonStyle}
+        style={closeButtonStyle as any}
       />
       
       {/* Canvas area */}
       {!imageImported ? (
-        <View style={canvasAreaStyle}>
-          <Text style={placeholderTextStyle}>
+        <View style={canvasAreaStyle as any}>
+          <Text style={placeholderTextStyle as any}>
             {selectedTool ? `${tools.find(t => t.key === selectedTool)?.label} Tool Selected` : '[Map Canvas Area]'}
           </Text>
           {selectedTool && (
-            <Text style={[placeholderTextStyle, { marginTop: Spacing.sm, fontSize: 14 }]}>
+            <Text style={[placeholderTextStyle as any, { marginTop: Spacing.sm, fontSize: 14 }]}> 
               Tap to start {selectedTool === 'marker' ? 'placing markers' : 
                            selectedTool === 'pen' ? 'drawing' :
                            selectedTool === 'brush' ? 'painting' : 'importing image'}
@@ -149,14 +149,14 @@ export default function MapCanvas({
       )}
 
       {/* Bottom toolbar */}
-      <View style={toolbarStyle}>
+      <View style={toolbarStyle as any}>
         {tools.map((tool) => (
           <IconButton
             key={tool.key}
             icon={tool.icon}
             onPress={() => handleToolSelect(tool.key)}
-            style={getToolButtonStyle(tool.key)}
-            textStyle={getToolTextStyle(tool.key)}
+            style={getToolButtonStyle(tool.key) as any}
+            textStyle={getToolTextStyle(tool.key) as any}
           />
         ))}
       </View>

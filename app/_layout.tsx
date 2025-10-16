@@ -1,13 +1,16 @@
-import { CoreColors } from '@/constants/corecolors';
 import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Dimensions, Platform, View } from 'react-native';
+import { TamaguiProvider } from 'tamagui';
 import LoadingOverlay from '../components/LoadingOverlay';
 import TopBar from '../components/TopBar';
 import { AppParamsProvider, useAppParams } from '../contexts/AppParamsContext';
 import { useAppBootstrap } from '../hooks/use-app-bootstrap';
+import { useThemeManager } from '../hooks/useThemeManager';
 import { AuthStateManager } from '../lib/auth-state';
 import { logger } from '../lib/utils/logger';
+import { config } from '../tamagui.config';
+
 
 function RootLayoutContent() {
   // Get local search params using the hook at the top level
@@ -242,7 +245,7 @@ function RootLayoutContent() {
     <View style={{
       height: '100%',
       width: '100%',
-      backgroundColor: CoreColors.backgroundDark
+      backgroundColor: '#2f353d' //Temporary hardcoded dark background to avoid flash on load
     }}>
       {/* Global TopBar - shown on most screens */}
       {topBarConfig && (
@@ -268,9 +271,12 @@ function RootLayoutContent() {
 
 // Main export with provider wrapper
 export default function RootLayout() {
+  const { theme } = useThemeManager();
   return (
-    <AppParamsProvider>
-      <RootLayoutContent />
-    </AppParamsProvider>
+      <TamaguiProvider config={config} defaultTheme="dark">
+        <AppParamsProvider>
+          <RootLayoutContent />
+        </AppParamsProvider>
+      </TamaguiProvider>
   );
 }

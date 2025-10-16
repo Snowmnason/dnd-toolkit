@@ -1,7 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
-import PrimaryButton from '../custom_components/PrimaryButton';
-import TextInput from '../custom_components/TextInput';
+import { Button, Input, Text } from 'tamagui';
 
 interface AuthInputProps {
   placeholder: string;
@@ -32,7 +31,7 @@ export default function AuthInput({
 }: AuthInputProps) {
   return (
     <View style={{ position: 'relative', marginBottom: 2 }}>
-      <TextInput
+      <Input
         placeholder={placeholder}
         value={value}
         onChangeText={onChangeText}
@@ -45,7 +44,7 @@ export default function AuthInput({
       
       {/* Password Toggle Button */}
       {showPasswordToggle && onTogglePassword && (
-        <PrimaryButton
+        <Button
           style={{ 
             position: 'absolute', 
             right: 4, 
@@ -58,12 +57,11 @@ export default function AuthInput({
             height: 32,
             opacity: editable ? 1 : 0.5
           }}
-          textStyle={{ color: '#D4AF37', fontSize: 16 }}
           onPress={onTogglePassword}
           disabled={!editable}
         >
-          {showPassword ? '👁️' : '👁️‍🗨️'}
-        </PrimaryButton>
+          <Text style={{ color: '#D4AF37', fontSize: 16 }}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+        </Button>
       )}
     </View>
   );

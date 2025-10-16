@@ -1,21 +1,22 @@
-import { CoreColors } from '@/constants/corecolors';
+
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Platform, ScrollView, View } from 'react-native';
+import { Platform } from 'react-native';
+import { Button, Input, ScrollView, Select, Text, TextArea, View } from 'tamagui';
 import CreateWorldModals from '../../components/create-world/CreateWorldModals';
 import MapCanvas from '../../components/create-world/MapCanvas';
-import Dropdown from '../../components/custom_components/Dropdown';
-import PrimaryButton from '../../components/custom_components/PrimaryButton';
-import TextInputComponent from '../../components/custom_components/TextInput';
-import { ThemedText } from '../../components/themed-text';
-import { ThemedView } from '../../components/themed-view';
-import { ComponentStyles, Spacing, createTextShadow } from '../../constants/theme';
+// import { ComponentStyles } from '../../constants/theme'; // deprecated
+import { Spacing } from '../../constants/theme';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { useSuccessNavigation } from '../../hooks/use-success-navigation';
 import { useWorldCreation } from '../../hooks/use-world-creation';
 import { createWorldNameChangeHandler, isValidWorldNameForSubmission, type WorldNameValidationResult } from '../../lib/auth/validation';
 
-const tabletopSystems = ['D&D 5e', 'Pathfinder', 'Call of Cthulhu', 'Custom'];
+const tabletopSystems = [
+  { label: 'D&D 5e', value: 'dnd5e' },
+  { label: 'Pathfinder 2e', value: 'pf2e' },
+  { label: 'Call of Cthulhu', value: 'coc' },
+]
 const defaultMapImages = ["https://media.wizards.com/2015/images/dnd/resources/Sword-Coast-Map_MedRes.jpg",
   "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgJm47wbufqY9yqRw_OLFJBtLEYYNGlCMMHWRozByIB4-SvH-6lwXPEI7L4LXhA1la-Ek0w7L_TU1wBkX4P7Z4fKmVQ2XAHuAmiF-4HYOGKWAZofbqc0e3pNca2dvU4HAWDuh8bg4y869M/s1600/Vlaroa1.jpg",
   "https://talaraska.com/wp-content/uploads/2024/01/text-1-hw-terrain-4275x2600-1.jpg",
@@ -26,7 +27,7 @@ export default function CreateWorldScreen() {
   // Form state
   const [worldName, setWorldName] = useState('');
   const [worldNameValidation, setWorldNameValidation] = useState<WorldNameValidationResult | null>(null);
-  const [system, setSystem] = useState(tabletopSystems[0]);
+  const [system, setSystem] = useState(tabletopSystems[0].value);
   const [description, setDescription] = useState('');
   const [imageImported, setImageImported] = useState(false);
   
@@ -66,6 +67,7 @@ export default function CreateWorldScreen() {
       name: worldName,
       description: description,
       system: system,
+      //system: system,
       mapImageUrl: defaultMapImages[mapIndex]
     });
 
@@ -79,31 +81,31 @@ export default function CreateWorldScreen() {
   };
 
   return (
-    <ThemedView style={{ flex: 1, flexDirection: isDesktop ? 'row' : 'column' }}>
+    <View style={{ flex: 1, flexDirection: isDesktop ? 'row' : 'column' }}>
       {/* Left Panel: Form */}
       <View style={{ flex: 1, padding: Spacing.md }}>
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          <View style={ComponentStyles.card.container}>
-            <ThemedText type="title" style={{
+        <ScrollView >
+          <View style={{ paddingVertical: Spacing.md, paddingHorizontal: Spacing.lg, borderRadius: 12, marginBottom: Spacing.md, borderWidth: 2 }}>
+            <Text style={{
               textAlign: 'center',
               fontWeight: '700',
-              color: CoreColors.textPrimary,
-              ...createTextShadow(CoreColors.backgroundDark, { width: 2, height: 2 }, 4)
+              //color: CoreColors.textPrimary,
+              //...createTextShadow(CoreColors.backgroundDark, { width: 2, height: 2 }, 4)
             }}>
               Create New World
-            </ThemedText>
+            </Text>
           </View>
 
           {/* World Name */}
-          <ThemedText style={{
+          <Text style={{
             fontWeight: '600',
             fontSize: 16,
-            ...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2),
+            //...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2),
             marginBottom: Spacing.xs
           }}>
             Name of World
-          </ThemedText>
-          <TextInputComponent
+          </Text>
+          <Input
             placeholder="World Name"
             value={worldName}
             onChangeText={createWorldNameChangeHandler(setWorldName, setWorldNameValidation)}
@@ -114,45 +116,63 @@ export default function CreateWorldScreen() {
           {worldNameValidation && !worldNameValidation.isValid && (
             <View style={{ marginBottom: Spacing.md }}>
               {worldNameValidation.errors.map((error, index) => (
-                <ThemedText key={index} style={{
+                <Text key={index} style={{
                   color: '#FF6B6B',
                   fontSize: 14,
                   marginBottom: Spacing.xs
                 }}>
                   ⚠️ {error}
-                </ThemedText>
+                </Text>
               ))}
             </View>
           )}
 
           {/* Tabletop System */}
-          <ThemedText style={{
+          <Text style={{
             fontWeight: '600',
             fontSize: 16,
-            ...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2),
+            //...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2),
             marginBottom: Spacing.xs
           }}>
             Tabletop System
-          </ThemedText>
-          <Dropdown 
-            value={system} 
-            onChange={(value) => {
+          </Text>
+          <Select
+            value={system}
+            onValueChange={(value) => {
               if (value !== null) setSystem(value);
             }}
-            options={tabletopSystems}
-            placeholder="Select a tabletop system"
-          />
+          >
+            <Select.Trigger>
+              <Select.Value placeholder="Select a tabletop system">
+                {tabletopSystems.find((item) => item.value === system)?.label ?? ''}
+              </Select.Value>
+            </Select.Trigger>
+
+            <Select.Content>
+              <Select.ScrollUpButton />
+              <Select.Viewport>
+                <Select.Group>
+                  {tabletopSystems.map((item, idx) => (
+                    <Select.Item key={item.value} value={item.value} index={idx}>
+                      <Select.ItemText>{item.label}</Select.ItemText>
+                    </Select.Item>
+                  ))}
+                </Select.Group>
+              </Select.Viewport>
+              <Select.ScrollDownButton />
+            </Select.Content>
+          </Select>
 
           {/* Description */}
-          <ThemedText style={{
+          <Text style={{
             fontWeight: '600',
             fontSize: 16,
-            ...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2),
+            //...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2),
             marginBottom: Spacing.xs
           }}>
             Description
-          </ThemedText>
-          <TextInputComponent
+          </Text>
+          <TextArea
             placeholder="Description"
             value={description}
             onChangeText={setDescription}
@@ -166,13 +186,11 @@ export default function CreateWorldScreen() {
 
           {/* Import Image (mobile only here) */}
           {!isDesktop && (
-            <PrimaryButton
-              style={{ marginBottom: Spacing.md }}
-              textStyle={{}}
-              onPress={() => {}}
-            >
+            <Button 
+            //variant="secondary" style={{ marginBottom: Spacing.md }} 
+            onPress={() => {}}>
               Import Image
-            </PrimaryButton>
+            </Button>
           )}
 
           {/* Action Buttons */}
@@ -181,21 +199,19 @@ export default function CreateWorldScreen() {
             justifyContent: 'space-between',
             marginTop: Spacing.md,
           }}>
-            <PrimaryButton 
-              style={{}}
-              textStyle={{}}
+            <Button 
+              //variant="cancel"
               onPress={() => router.replace('/select/world-selection')}
             >
               Cancel
-            </PrimaryButton>
-            <PrimaryButton
-              style={{}}
-              textStyle={{}}
+            </Button>
+            <Button
+              //variant="primary"
               disabled={!isValidWorldNameForSubmission(worldName) || isCreating}
               onPress={handleCreateWorld}
             >
               {isCreating ? 'Creating...' : 'Create'}
-            </PrimaryButton>
+            </Button>
           </View>
         </ScrollView>
       </View>
@@ -205,7 +221,7 @@ export default function CreateWorldScreen() {
         <View style={{
           flex: 4,
           borderLeftWidth: 1,
-          borderLeftColor: CoreColors.borderPrimary
+          //borderLeftColor: CoreColors.borderPrimary
         }}>
           {/* Canvas placeholder */}
           <MapCanvas 
@@ -218,13 +234,11 @@ export default function CreateWorldScreen() {
           />
 
           {/* Import image button */}
-          <PrimaryButton 
-            style={{ margin: Spacing.md }} 
-            textStyle={{}}
-            onPress={() => setImageImported(true)}
-          >
+          <Button 
+          //variant="secondary" style={{ margin: Spacing.md }} 
+          onPress={() => setImageImported(true)}>
             Import Image
-          </PrimaryButton>
+          </Button>
 
           {/* Future drawing tools placeholder */}
         </View>
@@ -241,6 +255,6 @@ export default function CreateWorldScreen() {
         successWorldName={successWorldName}
         onSuccessNavigate={handleSuccessNavigate}
       />
-    </ThemedView>
+    </View>
   );
 }

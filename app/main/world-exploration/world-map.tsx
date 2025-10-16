@@ -1,20 +1,17 @@
-import { ThemedText } from '../../../components/themed-text';
-import { ThemedView } from '../../../components/themed-view';
+import { Heading, Text, View } from 'tamagui';
 
 export default function WorldMapPage() {
   return (
-    <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-      <ThemedText type="title" style={{ marginBottom: 20, textAlign: 'center', color: '#F5E6D3' }}>
-        World Map
-      </ThemedText>
-      <ThemedText style={{ marginBottom: 40, textAlign: 'center', fontSize: 18, color: '#F5E6D3' }}>
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+      <Heading>World Map</Heading>
+      <Text style={{ marginBottom: 40, textAlign: 'center', fontSize: 18 }}>
         Navigate and manage your campaign world with interactive maps.
-      </ThemedText>
+      </Text>
       
       {/* Placeholder content */}
-      <ThemedText style={{ textAlign: 'center', fontStyle: 'italic', marginBottom: 40, color: '#F5E6D3' }}>
+      <Text style={{ textAlign: 'center', fontStyle: 'italic', marginBottom: 40 }}>
         🗺️ Coming Soon: Interactive world maps, location markers, and travel tracking.
-      </ThemedText>
-    </ThemedView>
+      </Text>
+    </View>
   );
 }

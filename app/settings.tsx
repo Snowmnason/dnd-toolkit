@@ -1,15 +1,11 @@
-import { CoreColors } from '@/constants/corecolors';
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, View } from 'react-native';
+import { Alert } from 'react-native';
+import { Card, Heading, Paragraph, ScrollView, Spinner, YStack } from 'tamagui';
 import CredentialConfirmModal from '../components/modals/CredentialConfirmModal';
 import UserProfile from '../components/settings/user-profile';
-import { ThemedText } from '../components/themed-text';
-import { ThemedView } from '../components/themed-view';
-import CustomLoad from '../components/ui/CustomLoad';
-import PrimaryButton from '../components/ui/PrimaryButton';
-import { ComponentStyles, Spacing } from '../constants/theme';
+import { AppButton } from '../components/ui';
 import { AuthStateManager } from '../lib/auth-state';
 import { supabase } from '../lib/database/supabase';
 import { usersDB } from '../lib/database/users';
@@ -159,119 +155,64 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <CustomLoad size="large" color={CoreColors.primary} />
-        <ThemedText style={{ 
-          marginTop: Spacing.md, 
-          color: CoreColors.textPrimary,
-          fontSize: 16
-        }}>
+      <YStack style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <Spinner size="large" color="$color" />
+        <Paragraph size="$4" style={{ marginTop: 12 }}>
           Loading Settings...
-        </ThemedText>
-      </ThemedView>
+        </Paragraph>
+      </YStack>
     );
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <ScrollView 
-        style={{ flex: 1 }} 
-        contentContainerStyle={{ 
-          padding: Spacing.lg,
-          paddingBottom: Spacing.xl * 2 
-        }}
-      >
-
-
+    <YStack style={{ flex: 1 }}>
+      <ScrollView>
+        <YStack style={{ padding: 16, paddingBottom: 32 }}>
         {/* User Profile Section */}
-        <View style={{ marginBottom: Spacing.sm }}>
+        <YStack style={{ marginBottom: 8 }}>
           <UserProfile profile={profile} />
-        </View>
+        </YStack>
 
         {/* App Settings Section */}
-        <View style={ComponentStyles.card.default}>
-          <ThemedText type="subtitle" style={{
-            marginBottom: Spacing.sm,
-            fontSize: 24,
-            fontWeight: '600',
-            color: CoreColors.textOnLight,
-            textAlign: 'center'
-          }}>
-            App Settings
-          </ThemedText>
-          
-          {/* TODO: Add app settings here */}
-          <ThemedText style={{
-            fontStyle: 'italic',
-            opacity: 0.7,
-            textAlign: 'center',
-            color: CoreColors.textSecondary,
-            fontSize: 16,
-            lineHeight: 24
-          }}>
+        <Card style={{ padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#ccc' }}>
+          <Heading size="$8" style={{ textAlign: 'center', marginBottom: 12 }}>App Settings</Heading>
+          <Paragraph size="$4" style={{ textAlign: 'center', opacity: 0.8 }}>
             🎲 Coming Soon: Theme settings, backup options, and more!
-          </ThemedText>
-        </View>
+          </Paragraph>
+        </Card>
 
         {/* Action Buttons */}
-        <View style={{
-          marginTop: Spacing.xl,
-          gap: Spacing.md,
-          alignItems: 'center'
-        }}>
-          {/* Sign Out Button */}
-          <PrimaryButton
-            style={{
-              backgroundColor: buttonDisabled ? '#6c757d' : '#dc3545',
-              paddingHorizontal: Spacing.xl,
-              minWidth: 200,
-              borderColor: buttonDisabled ? '#6c757d' : '#c82333',
-              opacity: buttonDisabled ? 0.6 : 1
-            }}
-            textStyle={{ 
-              color: CoreColors.textPrimary,
-              fontWeight: '600'
-            }}
+        <YStack style={{ marginTop: 24, alignItems: 'center' }}>
+          <AppButton
+            variant="destructive"
+            size="md"
+            style={{ borderRadius: 12, paddingHorizontal: 24, width: 220, opacity: buttonDisabled ? 0.7 : 1 }}
             onPress={handleSignOutConfirm}
             disabled={buttonDisabled}
           >
             {signingOut ? 'Confirm Sign Out' : 'Sign Out'}
-          </PrimaryButton>
-        </View>
-                <View style={{
-          marginTop: Spacing.xl,
-          gap: Spacing.md,
-          alignItems: 'center'
-        }}>
-          {/* Sign Out Button */}
-          <PrimaryButton
-            style={{
-              backgroundColor: buttonDeleteDisabled ? '#6c757d' : '#dc3545',
-              paddingHorizontal: Spacing.xl,
-              minWidth: 200,
-              borderColor: buttonDeleteDisabled ? '#6c757d' : '#c82333',
-              opacity: buttonDeleteDisabled ? 0.6 : 1
-            }}
-            textStyle={{ 
-              color: CoreColors.textPrimary,
-              fontWeight: '600'
-            }}
+          </AppButton>
+        </YStack>
+
+        <YStack style={{ marginTop: 16, alignItems: 'center' }}>
+          <AppButton
+            variant="destructive"
+            size="md"
+            style={{ borderRadius: 12, paddingHorizontal: 24, width: 220, opacity: buttonDeleteDisabled ? 0.7 : 1 }}
             onPress={handleDeleteConfirm}
             disabled={buttonDeleteDisabled}
           >
             {confirmDelete ? 'Confirm Delete' : 'Delete Account'}
-          </PrimaryButton>
-        </View>
+          </AppButton>
+        </YStack>
+        </YStack>
       </ScrollView>
 
       {/* Delete confirmation modal */}
-      {/* Note: This is a generic password-confirm modal you can reuse elsewhere */}
       <CredentialConfirmModal
         visible={showDeleteModal}
         title="Confirm Account Deletion"
-        message={
-          'This action is permanent. Please enter your password to confirm you want to delete your account. '
-        }
+        message={'This action is permanent. Please enter your password to confirm you want to delete your account. '}
         confirmLabel="Delete Account"
         destructive
         loading={deleting}
@@ -279,6 +220,6 @@ export default function SettingsPage() {
         onCancel={handleCloseDeleteModal}
         onConfirm={handleDeleteAccount}
       />
-    </ThemedView>
+    </YStack>
   );
 }

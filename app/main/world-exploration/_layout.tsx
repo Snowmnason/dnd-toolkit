@@ -1,10 +1,10 @@
 import { Stack } from 'expo-router';
-import { View } from 'react-native';
-import { CoreColors } from '../../../constants/theme';
+import { View } from 'tamagui';
+// import { CoreColors } from '../../../constants/theme'; // deprecated
 
 export default function WorldExplorationLayout() {
   return (
-    <View style={{ flex: 1, backgroundColor: CoreColors.backgroundDark }}>
+    <View style={{ flex: 1 }}>
       <Stack
         screenOptions={{
           headerShown: false,

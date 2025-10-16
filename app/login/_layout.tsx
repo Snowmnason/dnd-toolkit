@@ -1,10 +1,9 @@
-import { CoreColors } from '@/constants/corecolors';
 import { Stack } from 'expo-router';
-import { View } from 'react-native';
+import { View } from 'tamagui';
 
 export default function LoginLayout() {
   return (
-    <View style={{ flex: 1, backgroundColor: CoreColors.backgroundDark }}>
+    <View>
       <Stack
         screenOptions={{
           headerShown: false,

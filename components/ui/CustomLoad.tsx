@@ -1,4 +1,3 @@
-import { CoreColors } from '@/constants/corecolors';
 import React, { useState } from 'react';
 import { ActivityIndicator, ActivityIndicatorProps, Image, ImageProps } from 'react-native';
 
@@ -12,7 +11,7 @@ interface CustomLoadProps extends Omit<ImageProps, 'source' | 'style'> {
 export default function CustomLoad({
   size = 'large',
   resizeMode = 'contain',
-  color = CoreColors.primary,
+  color = '#2f353d', // Default color to prevent flash bang
   style,
   ...props
 }: CustomLoadProps) {

@@ -1,20 +1,17 @@
-import { ThemedText } from '../../../components/themed-text';
-import { ThemedView } from '../../../components/themed-view';
+import { Heading, Text, View } from 'tamagui';
 
 export default function EncounterBuilderPage() {
   return (
-    <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-      <ThemedText type="title" style={{ marginBottom: 20, textAlign: 'center', color: '#F5E6D3' }}>
-        Encounter Builder
-      </ThemedText>
-      <ThemedText style={{ marginBottom: 40, textAlign: 'center', fontSize: 18, color: '#F5E6D3' }}>
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+      <Heading>Encounter Builder</Heading>
+      <Text style={{ marginBottom: 40, textAlign: 'center', fontSize: 18 }}>
         Design balanced encounters and manage combat scenarios.
-      </ThemedText>
+      </Text>
       
       {/* Placeholder content */}
-      <ThemedText style={{ textAlign: 'center', fontStyle: 'italic', marginBottom: 40, color: '#F5E6D3' }}>
+      <Text style={{ textAlign: 'center', fontStyle: 'italic', marginBottom: 40 }}>
         ⚔️ Coming Soon: Encounter calculator, monster database, and difficulty balancing.
-      </ThemedText>
-    </ThemedView>
+      </Text>
+    </View>
   );
 }

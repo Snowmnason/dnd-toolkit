@@ -1,9 +1,7 @@
 import { useRouter } from 'expo-router';
-import { View } from 'react-native';
-import { ComponentStyles } from '../../constants/theme';
+import { Button, Heading, View } from 'tamagui';
+// import { ComponentStyles } from '../../constants/theme'; // deprecated
 import { useAppParams } from '../../contexts/AppParamsContext';
-import PrimaryButton from '../custom_components/PrimaryButton';
-import { ThemedText } from '../themed-text';
 import { PanelConfig } from './PanelData';
 
 interface PanelViewProps {
@@ -17,7 +15,7 @@ interface PanelViewProps {
 export function PanelView({ config, userId, worldId, userRole, style }: PanelViewProps) {
   const router = useRouter();
   const { updateParams } = useAppParams();
-  const styles = ComponentStyles.panelView;
+  // const styles = ComponentStyles.panelView; // deprecated
 
   const navigateToFeature = (featurePath: string) => {
     // Update centralized params context before navigation
@@ -38,23 +36,20 @@ export function PanelView({ config, userId, worldId, userRole, style }: PanelVie
   };
 
   return (
-    <View style={[styles.panel, style]}>
-        <View style={{ flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5, flex: 1, width: '100%' }}>
-            <ThemedText type="title" style={styles.panelTitle}>
-                {config.title}
-            </ThemedText>
-        </View>
-        {/* Feature Buttons */}
-        <View style={{ flexDirection: 'column', alignItems: 'center', flex: 10, justifyContent: 'center', width: '100%' }}>
+    <View style={[{ flex: 1, alignItems: 'center', justifyContent: 'flex-start', padding: 16, borderRadius: 8, borderWidth: 1 }, style]}>
+      <View style={{ width: '100%', flex: 1, justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <Heading>{config.title}</Heading>
+      </View>
+      {/* Feature Buttons */}
+      <View style={{ width: '100%', flex: 10, alignItems: 'center', justifyContent: 'center' }}>
         {config.items.map((item, index) => (
-            <PrimaryButton
+          <Button
             key={index}
-            style={styles.featureButton}
-            textStyle={styles.featureText}
+            style={{ width: '90%', borderRadius: 8, borderWidth: 2, marginBottom: 8 }}
             onPress={() => navigateToFeature(item.route)}
-            >
+          >
             {item.name}
-            </PrimaryButton>
+          </Button>
         ))}
       </View>
     </View>

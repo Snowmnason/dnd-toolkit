@@ -2,13 +2,10 @@ import { logger } from '@/lib/utils/logger';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { TouchableOpacity, View } from 'react-native';
-import { CoreColors } from '../../constants/corecolors';
-import { ComponentStyles, Spacing } from '../../constants/theme';
+import { Button, Text, View } from 'tamagui';
+import { Spacing } from '../../constants/theme';
 import { updateUsername } from '../../lib/settings';
 import UpdateUsernameModal from '../modals/UpdateUsernameModal';
-import { ThemedText } from '../themed-text';
-import PrimaryButton from '../ui/PrimaryButton';
 
 interface UserProfileProps {
   profile?: {
@@ -73,57 +70,48 @@ export default function UserProfile({ profile }: UserProfileProps) {
     // This shouldn't happen in normal flow since settings requires authentication
     // But show a fallback just in case
     return (
-      <View style={ComponentStyles.card.default}>
-        <ThemedText type="subtitle" style={{
+      <View style={{ padding: Spacing.sm, borderWidth: 1, borderRadius: 8 }}>
+        <Text style={{
           marginBottom: Spacing.xs,
           fontSize: 24,
           fontWeight: '600',
-          color: CoreColors.textOnLight,
           textAlign: 'center'
         }}>
           Account
-        </ThemedText>
-        <ThemedText style={{
+        </Text>
+        <Text style={{
           marginBottom: Spacing.md,
           opacity: 0.8,
-          color: CoreColors.textSecondary,
           textAlign: 'center',
           fontSize: 16,
           lineHeight: 22
         }}>
           Unable to load profile information
-        </ThemedText>
-        <PrimaryButton
+        </Text>
+        <Button
           style={{
             alignSelf: 'center',
             paddingHorizontal: Spacing.lg,
             minWidth: 140,
-            backgroundColor: CoreColors.primary,
-            borderColor: CoreColors.primaryDark
-          }}
-          textStyle={{
-            color: CoreColors.textPrimary,
-            fontWeight: '600'
           }}
           onPress={() => router.replace('/login/welcome')}
         >
           Return to Login
-        </PrimaryButton>
+        </Button>
       </View>
     );
   }
 
   // Logged in - show profile info
   return (
-    <View style={ComponentStyles.card.default}>
-      <ThemedText type="title" style={{
+    <View style={{ padding: Spacing.sm, borderWidth: 1, borderRadius: 8 }}>
+      <Text style={{
         marginBottom: Spacing.sm,
         fontWeight: '600',
-        color: CoreColors.textOnLight,
         textAlign: 'center'
       }}>
         Profile
-      </ThemedText>
+      </Text>
       
       <View style={{
         gap: Spacing.xs,
@@ -132,63 +120,55 @@ export default function UserProfile({ profile }: UserProfileProps) {
         padding: Spacing.md,
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: CoreColors.secondary
+        borderColor: 'rgba(0,0,0,0.2)'
       }}>
         {/* Email Field */}
         <View style={{ marginBottom: Spacing.sm }}>
-          <ThemedText type="defaultSemiBold" style={{
-            color: CoreColors.textOnLight,
-            marginBottom: 4
+          <Text style={{
+            marginBottom: 4,
+            fontWeight: '600'
           }}>
             Email
-          </ThemedText>
-          <ThemedText style={{
+          </Text>
+          <Text style={{
             fontStyle: 'italic'
           }}>
             {sessionUser?.email || 'Loading...'}
-          </ThemedText>
+          </Text>
         </View>
         
         {/* Username Field - from database profile */}
         {profile?.username && (
           <View style={{ marginBottom: Spacing.sm }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <ThemedText type="defaultSemiBold" style={{
-                color: CoreColors.textOnLight,
+              <Text style={{
                 fontSize: 16,
-                marginBottom: 4
+                marginBottom: 4,
+                fontWeight: '600'
               }}>
                 Username
-              </ThemedText>
-              <TouchableOpacity
-                onPress={() => setShowUsernameModal(true)}
-                style={{
-                  padding: 4,
-                  borderRadius: 4,
-                  backgroundColor: 'rgba(139, 69, 19, 0.1)'
-                }}
-              >
-                <Ionicons name="settings-outline" size={18} color={CoreColors.textOnLight} />
-              </TouchableOpacity>
+              </Text>
+              <Button unstyled onPress={() => setShowUsernameModal(true)}>
+                <Ionicons name="settings-outline" size={18} />
+              </Button>
             </View>
-            <ThemedText style={{
+            <Text style={{
               fontStyle: 'italic',
             }}>
               {profile.username}
-            </ThemedText>
+            </Text>
           </View>
         )}
         
         {/* Show loading state */}
         {loadingSession && (
           <View style={{ marginBottom: Spacing.sm }}>
-            <ThemedText style={{
-              color: CoreColors.textSecondary,
+            <Text style={{
               fontStyle: 'italic',
               textAlign: 'center'
             }}>
               Loading profile...
-            </ThemedText>
+            </Text>
           </View>
         )}
         

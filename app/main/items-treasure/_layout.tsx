@@ -1,10 +1,9 @@
 import { Stack } from 'expo-router';
-import { View } from 'react-native';
-import { CoreColors } from '../../../constants/theme';
+import { View } from 'tamagui';
 
 export default function ItemsTreasureLayout() {
   return (
-    <View style={{ flex: 1, backgroundColor: CoreColors.backgroundDark }}>
+    <View style={{ flex: 1, backgroundColor: '#1e1e1e' /* UPDATE TO THEME */ }}>
       <Stack
         screenOptions={{
           headerShown: false,

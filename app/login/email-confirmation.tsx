@@ -1,12 +1,10 @@
-import { CoreColors } from '@/constants/corecolors';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { Text, View } from 'tamagui';
 import AuthButton from '../../components/auth_components/AuthButton';
-import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import CustomModal from '../../components/modals/CustomModal';
-import { ThemedText } from '../../components/themed-text';
+import AppButton from '../../components/ui/AppButton';
 import { AuthStateManager } from '../../lib/auth-state';
 import { openEmailApp } from '../../lib/auth/emailUtils';
 import { supabase } from '../../lib/database/supabase';
@@ -76,7 +74,7 @@ export default function EmailConfirmationScreen() {
       });
       
       if (error) {
-        Alert.alert('Error', error.message);
+        //Alert.alert('Error', error.message);
         setLoading(false);
         return;
       } else {
@@ -106,7 +104,7 @@ export default function EmailConfirmationScreen() {
         }, 1000);
       }
     } catch {
-      Alert.alert('Error', 'Failed to resend email');
+      //Alert.alert('Error', 'Failed to resend email');
       setLoading(false);
     }
     // Note: setLoading(false) is handled above in success case
@@ -121,39 +119,29 @@ export default function EmailConfirmationScreen() {
       
       {/* Back Button */}
       <View style={{ position: 'absolute', top: 50, left: 20, zIndex: 10, backgroundColor: 'transparent' }}>
-        <PrimaryButton
-          style={{ 
-            backgroundColor: 'rgba(139, 69, 19, 0.2)', 
-            paddingHorizontal: 16, 
-            paddingVertical: 8, 
-            borderRadius: 6
-          }}
-          textStyle={{ color: CoreColors.textPrimary, fontSize: 14, fontWeight: '500' }}
-          onPress={handleChangeEmail}
-        >
+        <AppButton variant="secondary" size="sm" onPress={handleChangeEmail}>
           ← Back
-        </PrimaryButton>
+        </AppButton>
       </View>
 
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'transparent' }}>
         
-        <ThemedText 
-          type="title" 
+        <Text 
           style={{ marginBottom: 20, textAlign: 'center', color: '#F5E6D3', fontSize: 32, fontWeight: '700' }}
         >
           Check Your Email
-        </ThemedText>
+        </Text>
         
-        <ThemedText style={{ marginBottom: 30, textAlign: 'center', fontSize: 16, opacity: 0.8, color: '#F5E6D3', lineHeight: 22, paddingHorizontal: 20 }}>
+        <Text style={{ marginBottom: 30, textAlign: 'center', fontSize: 16, opacity: 0.8, color: '#F5E6D3', lineHeight: 22, paddingHorizontal: 20 }}>
           We sent a confirmation link to:
-        </ThemedText>
+        </Text>
 
-        <ThemedText style={{ marginBottom: 40, textAlign: 'center', fontSize: 18, color: '#D4AF37', fontWeight: '600', paddingHorizontal: 20 }}>
+        <Text style={{ marginBottom: 40, textAlign: 'center', fontSize: 18, color: '#D4AF37', fontWeight: '600', paddingHorizontal: 20 }}>
           {userEmail}
-        </ThemedText>
+        </Text>
 
-        <ThemedText style={{ marginBottom: 40, textAlign: 'center', fontSize: 14, opacity: 0.7, color: '#F5E6D3', lineHeight: 20, paddingHorizontal: 20 }}>
-          <ThemedText 
+        <Text style={{ marginBottom: 40, textAlign: 'center', fontSize: 14, opacity: 0.7, color: '#F5E6D3', lineHeight: 20, paddingHorizontal: 20 }}>
+          <Text 
             style={{ 
               color: '#D4AF37', 
               textDecorationLine: 'underline', 
@@ -164,9 +152,9 @@ export default function EmailConfirmationScreen() {
             onPress={() => openEmailApp(userEmail)}
           >
             Click the link in your email
-          </ThemedText>
-          <ThemedText style={{ fontSize: 14, opacity: 0.7, color: '#F5E6D3' }}> to activate your account. You&apos;ll be automatically signed in!</ThemedText>
-        </ThemedText>
+          </Text>
+          <Text style={{ fontSize: 14, opacity: 0.7, color: '#F5E6D3' }}> to activate your account. You&apos;ll be automatically signed in!</Text>
+        </Text>
 
         {/* Action Buttons */}
         <View style={{ width: '100%', maxWidth: 300, gap: 16, backgroundColor: 'transparent' }}>
@@ -181,44 +169,24 @@ export default function EmailConfirmationScreen() {
           {/* Bottom Row: Change Email + Already Confirmed */}
           <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
             {/* Change Email Button */}
-            <PrimaryButton
-              style={{ 
-                flex: 1, 
-                backgroundColor: 'rgba(139, 69, 19, 0.15)', 
-                borderWidth: 1, 
-                borderColor: '#8B4513', 
-                paddingVertical: 12, 
-                borderRadius: 8 
-              }}
-              textStyle={{ color: '#F5E6D3', fontSize: 13, fontWeight: '500' }}
-              onPress={handleChangeEmail}
-            >
+            <AppButton variant="cancel" style={{ flex: 1, paddingVertical: 12, borderRadius: 8 }} onPress={handleChangeEmail}>
               Use Different Email
-            </PrimaryButton>
+            </AppButton>
 
             {/* Already Confirmed Button */}
-            <PrimaryButton
-              style={{ 
-                flex: 1, 
-                backgroundColor: '#4285F4', 
-                paddingVertical: 12, 
-                borderRadius: 8 
-              }}
-              textStyle={{ color: '#FFF', fontSize: 13, fontWeight: '500' }}
-              onPress={() => router.replace('/login/sign-in')}
-            >
+            <AppButton variant="secondary" style={{ flex: 1, paddingVertical: 12, borderRadius: 8 }} onPress={() => router.replace('/login/sign-in')}>
               Already Confirmed?
-            </PrimaryButton>
+            </AppButton>
           </View>
         </View>
 
-        <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
+        <Text style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
           After confirming your email, you&apos;ll be automatically signed in and can start your adventure!
-        </ThemedText>
+        </Text>
         
-        <ThemedText style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
+        <Text style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
           © 2025 The Snow Post · Forged for storytellers & adventurers
-        </ThemedText>
+        </Text>
       </View>
 
       {/* Email Sent Success Modal */}

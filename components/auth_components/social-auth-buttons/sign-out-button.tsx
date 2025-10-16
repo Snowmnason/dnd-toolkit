@@ -1,8 +1,8 @@
 import React from 'react';
-import { AuthStateManager } from '../../lib/auth-state';
-import { supabase } from '../../lib/database/supabase';
-import { logger } from '../../lib/utils/logger';
-import PrimaryButton from '../custom_components/PrimaryButton';
+import { Text, TouchableOpacity } from 'react-native';
+import { AuthStateManager } from '../../../lib/auth-state';
+import { supabase } from '../../../lib/database/supabase';
+import { logger } from '../../../lib/utils/logger';
 
 async function onSignOutButtonPress() {
   try {
@@ -22,12 +22,12 @@ async function onSignOutButtonPress() {
 
 export default function SignOutButton() {
   return (
-    <PrimaryButton
-      style={{ paddingHorizontal: 20 }}
-      textStyle={{}}
+    <TouchableOpacity
       onPress={onSignOutButtonPress}
+      style={{ paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#8B4513', borderRadius: 8 }}
+      activeOpacity={0.8}
     >
-      Sign Out
-    </PrimaryButton>
+      <Text style={{ color: '#F5E6D3', fontWeight: '600' }}>Sign Out</Text>
+    </TouchableOpacity>
   );
 }

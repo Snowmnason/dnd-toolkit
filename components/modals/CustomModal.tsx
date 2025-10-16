@@ -1,8 +1,7 @@
-import { CoreColors } from '@/constants/corecolors';
 import React from 'react';
 import { Modal, Platform, TouchableOpacity, View } from 'react-native';
+import { Text } from 'tamagui';
 import { Spacing } from '../../constants/theme';
-import { ThemedText } from '../themed-text';
 
 interface ModalButton {
   text: string;
@@ -17,6 +16,25 @@ interface CustomModalProps {
   message?: string;
   buttons: ModalButton[];
   children?: React.ReactNode; // For custom content instead of buttons
+  // Theming overrides
+  overlayColor?: string; // backdrop color
+  surfaceColor?: string; // card background
+  borderColor?: string;
+  titleColor?: string;
+  messageColor?: string;
+  // Button palette overrides
+  primaryBg?: string;
+  primaryBorder?: string;
+  primaryText?: string;
+  destructiveBg?: string;
+  destructiveBorder?: string;
+  destructiveText?: string;
+  cancelBg?: string;
+  cancelBorder?: string;
+  cancelText?: string;
+  defaultBg?: string;
+  defaultBorder?: string;
+  defaultText?: string;
 }
 
 export default function CustomModal({ 
@@ -25,7 +43,24 @@ export default function CustomModal({
   title, 
   message, 
   buttons,
-  children
+  children,
+  overlayColor,
+  surfaceColor,
+  borderColor,
+  titleColor,
+  messageColor,
+  primaryBg,
+  primaryBorder,
+  primaryText,
+  destructiveBg,
+  destructiveBorder,
+  destructiveText,
+  cancelBg,
+  cancelBorder,
+  cancelText,
+  defaultBg,
+  defaultBorder,
+  defaultText,
 }: CustomModalProps) {
   // Responsive sizing - larger on desktop
   const isDesktop = Platform.OS === 'web' || Platform.OS === 'windows' || Platform.OS === 'macos';
@@ -50,23 +85,23 @@ export default function CustomModal({
     switch (style) {
       case 'primary':
         return {
-          backgroundColor: CoreColors.primary,
-          borderColor: CoreColors.primary,
+          backgroundColor: primaryBg ?? '#8B4513',//UPDATE TO THEME
+          borderColor: primaryBorder ?? '#8B4513',
         };
       case 'destructive':
         return {
-          backgroundColor: '#dc3545',
-          borderColor: '#c82333',
+          backgroundColor: destructiveBg ?? '#dc3545',
+          borderColor: destructiveBorder ?? '#c82333',
         };
       case 'cancel':
         return {
-          backgroundColor: 'rgba(108, 117, 125, 0.1)',
-          borderColor: '#6c757d',
+          backgroundColor: cancelBg ?? 'rgba(108, 117, 125, 0.1)',
+          borderColor: cancelBorder ?? '#6c757d',
         };
       default:
         return {
-          backgroundColor: CoreColors.primaryTransparent,
-          borderColor: CoreColors.primary,
+          backgroundColor: defaultBg ?? 'rgba(139, 69, 19, 0.2)',
+          borderColor: defaultBorder ?? '#8B4513',
         };
     }
   };
@@ -74,13 +109,13 @@ export default function CustomModal({
   const getButtonTextStyle = (style: ModalButton['style'] = 'default') => {
     switch (style) {
       case 'primary':
-        return { color: CoreColors.textPrimary, fontWeight: '600' as const };
+        return { color: primaryText ?? '#F5E6D3', fontWeight: '600' as const };
       case 'destructive':
-        return { color: CoreColors.textPrimary, fontWeight: '600' as const };
+        return { color: destructiveText ?? '#F5E6D3', fontWeight: '600' as const };
       case 'cancel':
-        return { color: '#6c757d', fontWeight: '500' as const };
+        return { color: cancelText ?? '#6c757d', fontWeight: '500' as const };
       default:
-        return { color: CoreColors.textOnLight, fontWeight: '500' as const };
+        return { color: defaultText ?? '#F5E6D3', fontWeight: '500' as const };
     }
   };
 
@@ -95,7 +130,7 @@ export default function CustomModal({
       <TouchableOpacity 
         style={{
           flex: 1,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backgroundColor: overlayColor ?? 'rgba(0, 0, 0, 0.5)',
           justifyContent: 'center',
           alignItems: 'center',
         }}
@@ -107,13 +142,13 @@ export default function CustomModal({
           onPress={(e) => e.stopPropagation()}
         >
           <View style={{
-            backgroundColor: CoreColors.backgroundLight,
+            backgroundColor: surfaceColor ?? '#3D444C',
             borderRadius: 12,
             padding: scaledSpacing.lg,
             width: modalWidth.width,
             maxWidth: modalWidth.maxWidth,
             borderWidth: 2,
-            borderColor: CoreColors.secondary,
+            borderColor: borderColor ?? '#D4AF37',
             position: 'relative',
           }}>
           {/* Close button */}
@@ -127,35 +162,35 @@ export default function CustomModal({
             }}
             onPress={onClose}
           >
-            <ThemedText style={{
+            <Text style={{
               fontSize: fontSize.title,
               fontWeight: 'bold',
-              color: CoreColors.textSecondary,
+              color: messageColor ?? '#C8B9A1',
             }}>
               ×
-            </ThemedText>
+            </Text>
           </TouchableOpacity>
 
-          <ThemedText style={{
+          <Text style={{
             fontSize: fontSize.title,
             fontWeight: 'bold',
             marginBottom: message ? scaledSpacing.sm : scaledSpacing.md,
             textAlign: 'center',
-            color: CoreColors.textOnLight,
+            color: titleColor ?? '#F5E6D3',
           }}>
             {title}
-          </ThemedText>
+          </Text>
           
           {message && (
-            <ThemedText style={{
+            <Text style={{
               fontSize: fontSize.message,
               marginBottom: scaledSpacing.md,
               textAlign: 'center',
-              color: CoreColors.textOnLight,
+              color: messageColor ?? '#F5E6D3',
               lineHeight: fontSize.message * 1.4,
             }}>
               {message}
-            </ThemedText>
+            </Text>
           )}
 
           {/* Custom children content or default buttons */}
@@ -178,13 +213,13 @@ export default function CustomModal({
                   }}
                   onPress={button.onPress}
                 >
-                  <ThemedText style={{
+                  <Text style={{
                     fontSize: fontSize.button,
                     textAlign: 'center',
                     ...getButtonTextStyle(button.style),
                   }}>
                     {button.text}
-                  </ThemedText>
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>

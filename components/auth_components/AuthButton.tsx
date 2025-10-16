@@ -1,6 +1,6 @@
 import React from 'react';
 import { TextStyle, ViewStyle } from 'react-native';
-import BaseButton from '../ui/BaseButton';
+import { Button } from 'tamagui';
 
 interface AuthButtonProps {
   title: string;
@@ -39,17 +39,17 @@ export default function AuthButton({
   };
 
   return (
-    <BaseButton
-      variant="primary"
-      size="medium"
+    <Button
+      //variant="primary"
+      //size="md"
       onPress={onPress}
       disabled={disabled}
-      loading={loading}
-      loadingColor="#F5E6D3"
+      //loading={loading}
       style={combinedStyle}
-      textStyle={combinedTextStyle}
+      //textStyle={combinedTextStyle}
+      //fullWidth
     >
       {title}
-    </BaseButton>
+    </Button>
   );
 }

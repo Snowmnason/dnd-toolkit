@@ -1,9 +1,8 @@
-import { CoreColors } from '@/constants/corecolors';
 import React from 'react';
-import { Platform, TouchableOpacity, View } from 'react-native';
+import { Platform } from 'react-native';
+import { Button, Text, YStack } from 'tamagui';
 import { Spacing } from '../../constants/theme';
 import CustomModal from '../modals/CustomModal';
-import { ThemedText } from '../themed-text';
 
 interface SettingsMenuProps {
   visible: boolean;
@@ -29,68 +28,56 @@ export default function SettingsMenu({
       title="Settings"
       buttons={[]}
     >
-      <View style={{ minWidth: 260 * scale }}>
-        <TouchableOpacity
-          style={{
-            padding: Spacing.md * scale,
-            borderRadius: 8,
-            marginBottom: Spacing.xs * scale,
-            borderColor: 'rgba(117, 117, 117, 0.5)',
-            borderWidth: 1,
-          }}
+      <YStack style={{ minWidth: 260 * scale }} gap={Spacing.xs * scale}>
+        <Button
+          unstyled
           onPress={() => {
             onClose();
             onAccountSettings();
           }}
-        >
-          <ThemedText style={{
-            fontSize: 16 * scale,
-            color: CoreColors.textOnLight,
-            textAlign: 'center',
-          }}>
-            Account Settings
-          </ThemedText>
-        </TouchableOpacity>
-
-        <TouchableOpacity
           style={{
             padding: Spacing.md * scale,
             borderRadius: 8,
-            backgroundColor: 'rgba(139, 115, 39, 0.1)',
-            marginBottom: Spacing.sm * scale,
+            borderColor: 'rgba(117, 117, 117, 0.5)',
+            borderWidth: 1,
           }}
+        >
+          <Text style={{ fontSize: 16 * scale, color: '#F5E6D3' /* UPDATE TO THEME */, textAlign: 'center' }}>
+            Account Settings
+          </Text>
+        </Button>
+
+        <Button
+          unstyled
           onPress={() => {
             onClose();
             onReturnToWorldSelection();
           }}
-        >
-          <ThemedText style={{
-            fontSize: 16 * scale,
-            color: CoreColors.secondary,
-            textAlign: 'center',
-            fontWeight: '600',
-          }}>
-            Return to World Selection
-          </ThemedText>
-        </TouchableOpacity>
-
-        <TouchableOpacity
           style={{
             padding: Spacing.md * scale,
             borderRadius: 8,
-            backgroundColor: CoreColors.primaryTransparent,
+            backgroundColor: 'rgba(139, 115, 39, 0.1)',
           }}
-          onPress={onClose}
         >
-          <ThemedText style={{
-            fontSize: 16 * scale,
-            color: CoreColors.textOnLight,
-            textAlign: 'center',
-          }}>
+          <Text style={{ fontSize: 16 * scale, color: '#D4AF37' /* UPDATE TO THEME */, textAlign: 'center', fontWeight: '600' }}>
+            Return to World Selection
+          </Text>
+        </Button>
+
+        <Button
+          unstyled
+          onPress={onClose}
+          style={{
+            padding: Spacing.md * scale,
+            borderRadius: 8,
+            backgroundColor: 'rgba(139, 69, 19, 0.2)' /* UPDATE TO THEME */,
+          }}
+        >
+          <Text style={{ fontSize: 16 * scale, color: '#F5E6D3' /* UPDATE TO THEME */, textAlign: 'center' }}>
             Cancel
-          </ThemedText>
-        </TouchableOpacity>
-      </View>
+          </Text>
+        </Button>
+      </YStack>
     </CustomModal>
   );
 }

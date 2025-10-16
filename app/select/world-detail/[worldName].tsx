@@ -2,9 +2,8 @@ import LeaveWorldModal from '@/components/create-world/ConfrimLeaveModal';
 import EditWorldModal from '@/components/create-world/EditWorldModal';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image, View } from 'react-native';
-import PrimaryButton from '../../../components/custom_components/PrimaryButton';
-import { ThemedText } from '../../../components/themed-text';
-import { ThemedView } from '../../../components/themed-view';
+import { Text } from 'tamagui';
+import AppButton from '../../../components/ui/AppButton';
 import { Spacing } from '../../../constants/theme';
 import { useAppParams } from '../../../contexts/AppParamsContext';
 import { useWorldModal } from '../../../hooks/use-world-modal';
@@ -78,7 +77,7 @@ export default function WorldDetail() {
   };
 
   return (
-    <ThemedView style={{ flex: 1, alignItems: 'center', padding: Spacing.md }}>
+    <View style={{ flex: 1, alignItems: 'center', padding: Spacing.md }}>
       <View style={{ flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' }}>
         <EditWorldModal
             visible={editModalVisible}
@@ -97,14 +96,14 @@ export default function WorldDetail() {
             worldName={modalWorldName}
             onLeaveWorld={createRemoveFromWorldHandler(worldId, userId)}
           />
-        <ThemedText type="title" style={{
+        <Text style={{
           marginBottom: Spacing.md,
           textAlign: 'center',
           fontWeight: '600',
           fontSize: 58
         }}>
           {worldName}
-        </ThemedText>
+        </Text>
         <Image
           source={selectedMapImage}
           resizeMode="contain"
@@ -117,9 +116,8 @@ export default function WorldDetail() {
           marginBottom: Spacing.md,
         }}>
           {/* Show Edit for owners, Leave for non-owners */}
-          <PrimaryButton 
-            style={{}}
-            textStyle={{}}
+          <AppButton 
+            variant={userRole === 'owner' ? 'secondary' : 'cancel'}
             //disabled={true} //TODO enable when edit modal is fixed
             onPress={userRole === 'owner' 
               ? () => openEditModal(worldName) 
@@ -127,16 +125,15 @@ export default function WorldDetail() {
             }
           >
             {userRole === 'owner' ? 'Edit' : 'Leave'}
-          </PrimaryButton>
-          <PrimaryButton
-            style={{}}
-            textStyle={{}}
+          </AppButton>
+          <AppButton
+            variant="primary"
             onPress={handleOpenWorld}
           >
             Open
-          </PrimaryButton>
+          </AppButton>
         </View>
       </View>
-    </ThemedView>
+    </View>
   );
 }

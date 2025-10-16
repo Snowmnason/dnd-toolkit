@@ -1,6 +1,5 @@
 import React from 'react';
-import { View } from 'react-native';
-import { ThemedText } from '../themed-text';
+import { Text, View } from 'tamagui';
 
 interface AuthSuccessProps {
   message: string;
@@ -22,7 +21,7 @@ const AuthSuccess: React.FC<AuthSuccessProps> = ({ message }) => {
         maxWidth: 300
       }}
     >
-      <ThemedText
+      <Text
         style={{
           color: '#A3D4A0',
           fontSize: 14,
@@ -32,7 +31,7 @@ const AuthSuccess: React.FC<AuthSuccessProps> = ({ message }) => {
         }}
       >
         ✓ {message}
-      </ThemedText>
+      </Text>
     </View>
   );
 };

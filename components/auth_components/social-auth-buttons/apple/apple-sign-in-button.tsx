@@ -20,9 +20,24 @@ import { logger } from '@/lib/utils/logger';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, Platform } from 'react-native';
-import { AuthStateManager } from '../../../lib/auth-state';
-import PrimaryButton from '../../custom_components/PrimaryButton';
+import { Alert, Platform, Text as RNText, TouchableOpacity } from 'react-native';
+import { AuthStateManager } from '../../../../lib/auth-state';
+
+// Centralized base styles for consistent look-and-feel
+const APPLE_BUTTON_BASE_STYLE = {
+  backgroundColor: '#000',
+  paddingVertical: 16,
+  borderRadius: 8,
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+};
+
+const APPLE_TEXT_BASE_STYLE = {
+  color: '#FFF',
+  fontSize: 14,
+  fontWeight: '600' as const,
+};
 
 // Web-specific components (loaded dynamically)
 interface AppleWebComponents {
@@ -35,7 +50,7 @@ async function handleAuthSuccess(data?: any) {
   await AuthStateManager.setHasAccount(true);
   
   // Check if user has profile in database
-  const { usersDB } = await import('../../../lib/database/users');
+  const { usersDB } = await import('../../../../lib/database/users');
   try {
     const userProfile = await usersDB.getCurrentUser();
     if (userProfile && userProfile.username) {
@@ -170,43 +185,17 @@ function AppleButtonWeb({ disabled }: { disabled: boolean }) {
 
   if (isLoading) {
     return (
-      <PrimaryButton
-        style={{ 
-          backgroundColor: '#000', 
-          paddingVertical: 16, 
-          borderRadius: 8, 
-          flexDirection: 'row', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          opacity: 0.7
-        }}
-        textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
-        onPress={() => {}}
-        disabled={true}
-      >
-        🍎 Loading Apple...
-      </PrimaryButton>
+      <TouchableOpacity style={[APPLE_BUTTON_BASE_STYLE, { opacity: 0.7 }]} disabled>
+        <RNText style={APPLE_TEXT_BASE_STYLE as any}>🍎 Loading Apple...</RNText>
+      </TouchableOpacity>
     );
   }
 
   if (!appleComponents) {
     return (
-      <PrimaryButton
-        style={{ 
-          backgroundColor: '#000', 
-          paddingVertical: 16, 
-          borderRadius: 8, 
-          flexDirection: 'row', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          opacity: 0.5
-        }}
-        textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
-        onPress={() => {}}
-        disabled={true}
-      >
-        🍎 Apple (Unavailable)
-      </PrimaryButton>
+      <TouchableOpacity style={[APPLE_BUTTON_BASE_STYLE, { opacity: 0.5 }]} disabled>
+        <RNText style={APPLE_TEXT_BASE_STYLE as any}>🍎 Apple (Unavailable)</RNText>
+      </TouchableOpacity>
     );
   }
 
@@ -294,43 +283,21 @@ export default function AppleSignInButton({ disabled = false, style }: AppleSign
     };
 
     return (
-      <PrimaryButton
-        style={{ 
-          backgroundColor: '#000', 
-          paddingVertical: 16, 
-          borderRadius: 8, 
-          flexDirection: 'row', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          ...style
-        }}
-        textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
+      <TouchableOpacity
+        style={[APPLE_BUTTON_BASE_STYLE, style as any, { opacity: disabled || isLoading ? 0.5 : 1 }]}
         onPress={handlePress}
         disabled={disabled || isLoading}
+        activeOpacity={0.8}
       >
-        🍎 Apple
-      </PrimaryButton>
+        <RNText style={APPLE_TEXT_BASE_STYLE as any}>🍎 Apple</RNText>
+      </TouchableOpacity>
     );
   }
 
   // Android or iOS unavailable - show disabled button for consistent UI
   return (
-    <PrimaryButton
-      style={{ 
-        backgroundColor: '#000', 
-        paddingVertical: 16, 
-        borderRadius: 8, 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        opacity: 0.3, // Clearly disabled appearance
-        ...style
-      }}
-      textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
-      onPress={() => {}}
-      disabled={true}
-    >
-      🍎 Apple
-    </PrimaryButton>
+    <TouchableOpacity style={[APPLE_BUTTON_BASE_STYLE, { opacity: 0.3 }, style as any]} disabled>
+      <RNText style={APPLE_TEXT_BASE_STYLE as any}>🍎 Apple</RNText>
+    </TouchableOpacity>
   );
 }

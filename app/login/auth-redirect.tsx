@@ -1,9 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
-import CustomLoad from '../../components/custom_components/CustomLoad';
+import { Text, View } from 'tamagui';
 import CustomModal from '../../components/modals/CustomModal';
-import { ThemedText } from '../../components/themed-text';
+import CustomLoad from '../../components/ui/CustomLoad';
 import { useAppParams } from '../../contexts/AppParamsContext';
 import { AuthStateManager } from '../../lib/auth-state';
 import { supabase } from '../../lib/database/supabase';
@@ -388,9 +387,9 @@ export default function AuthRedirect() {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#2f353d' }}>
         <CustomLoad size="large" />
-        <ThemedText style={{ marginTop: 16, color: '#F5E6D3', textAlign: 'center' }}>
+        <Text style={{ marginTop: 16, color: '#F5E6D3', textAlign: 'center' }}>
           Processing authentication...
-        </ThemedText>
+        </Text>
       </View>
     );
   }

@@ -21,6 +21,7 @@
     "@react-oauth/google": "^0.12.2",
     "@shopify/react-native-skia": "2.2.12",
     "@supabase/supabase-js": "^2.58.0",
+    "@tamagui/babel-plugin": "^1.135.2",
     "@tamagui/config": "^1.135.2",
     "aes-js": "^3.1.2",
     "expo": "54.0.13",

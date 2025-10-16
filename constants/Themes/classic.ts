@@ -22,6 +22,13 @@ const darkShadows = {
   shadow6: 'rgba(0,0,0,0.7)',
 }
 
+const supplementaryColors = {
+  destructive: '#dc3545',
+  destructiveBoarder: '#c82333',
+  destructiveText: '#F5E6D3',
+  destructiveDisabled: '#6c757d',
+}
+
 // we're adding some example sub-themes for you to show how they are done, "success" "warning", "error":
 
 const builtThemes = createThemes({
@@ -39,6 +46,7 @@ const builtThemes = createThemes({
         ...Colors.red,
         ...Colors.yellow,
         ...lightShadows,
+        ...supplementaryColors,
         shadowColor: lightShadows.shadow1,
       },
       dark: {
@@ -46,6 +54,7 @@ const builtThemes = createThemes({
         ...Colors.redDark,
         ...Colors.yellowDark,
         ...darkShadows,
+        ...supplementaryColors,
         shadowColor: darkShadows.shadow1,
       },
     },
@@ -53,8 +62,8 @@ const builtThemes = createThemes({
 
   accent: {
     palette: {
-      dark: ['hsla(248, 53%, 28%, 1)','hsla(248, 53%, 32%, 1)','hsla(248, 53%, 35%, 1)','hsla(248, 53%, 39%, 1)','hsla(248, 53%, 42%, 1)','hsla(248, 53%, 46%, 1)','hsla(248, 53%, 49%, 1)','hsla(248, 53%, 53%, 1)','hsla(248, 53%, 56%, 1)','hsla(248, 53%, 60%, 1)','hsla(250, 50%, 90%, 1)','hsla(226, 92%, 95%, 1)'],
-      light: ['hsla(248, 53%, 39%, 1)','hsla(248, 53%, 42%, 1)','hsla(248, 53%, 45%, 1)','hsla(248, 53%, 48%, 1)','hsla(248, 53%, 51%, 1)','hsla(248, 53%, 54%, 1)','hsla(248, 53%, 56%, 1)','hsla(248, 53%, 59%, 1)','hsla(248, 53%, 62%, 1)','hsla(248, 53%, 65%, 1)','hsla(250, 50%, 95%, 1)','hsla(226, 92%, 95%, 1)'],
+      dark: ['hsla(49, 45%, 32%, 1)','hsla(49, 45%, 35%, 1)','hsla(49, 45%, 38%, 1)','hsla(49, 45%, 41%, 1)','hsla(49, 45%, 44%, 1)','hsla(49, 45%, 48%, 1)','hsla(49, 45%, 51%, 1)','hsla(49, 45%, 54%, 1)','hsla(49, 45%, 57%, 1)','hsla(49, 45%, 60%, 1)','hsla(250, 50%, 90%, 1)','hsla(226, 92%, 95%, 1)'],
+      light: ['hsla(49, 45%, 42%, 1)','hsla(49, 45%, 45%, 1)','hsla(49, 45%, 47%, 1)','hsla(49, 45%, 50%, 1)','hsla(49, 45%, 52%, 1)','hsla(49, 45%, 55%, 1)','hsla(49, 45%, 57%, 1)','hsla(49, 45%, 60%, 1)','hsla(49, 45%, 62%, 1)','hsla(49, 45%, 65%, 1)','hsla(250, 50%, 95%, 1)','hsla(226, 92%, 95%, 1)'],
     },
   },
 
@@ -68,8 +77,8 @@ const builtThemes = createThemes({
 
     error: {
       palette: {
-        dark: Object.values(Colors.redDark),
-        light: Object.values(Colors.red),
+        dark: Object.values('#dc3545'),
+        light: Object.values('#dc3545'),
       },
     },
 

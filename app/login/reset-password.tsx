@@ -1,9 +1,8 @@
-import { View } from 'react-native';
+import { Text, View } from 'tamagui';
 import AuthButton from '../../components/auth_components/AuthButton';
 import AuthError from '../../components/auth_components/AuthError';
 import AuthInput from '../../components/auth_components/AuthInput';
 import AuthSuccess from '../../components/auth_components/AuthSuccess';
-import { ThemedText } from '../../components/themed-text';
 import { useResetPasswordConfirm } from '../../lib/auth/useResetPasswordConfirm';
 
 export default function ResetPasswordScreen() {
@@ -51,16 +50,15 @@ export default function ResetPasswordScreen() {
       
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'transparent' }}>
         
-        <ThemedText 
-          type="title" 
+        <Text 
           style={{ marginBottom: 20, textAlign: 'center', color: '#F5E6D3', fontSize: 32, fontWeight: '700' }}
         >
           Reset Password
-        </ThemedText>
+        </Text>
         
-        <ThemedText style={{ marginBottom: 40, textAlign: 'center', fontSize: 16, opacity: 0.8, color: '#F5E6D3', lineHeight: 22, paddingHorizontal: 20 }}>
+        <Text style={{ marginBottom: 40, textAlign: 'center', fontSize: 16, opacity: 0.8, color: '#F5E6D3', lineHeight: 22, paddingHorizontal: 20 }}>
           {userEmail ? `${userEmail} is ready to reset your password. Please enter a new password below.` : 'Please enter a new password below.'}
-        </ThemedText>
+        </Text>
 
         {/* Success Message */}
         {success && (
@@ -86,7 +84,7 @@ export default function ResetPasswordScreen() {
           />
           {/* Password Requirements */}
           <View style={{ marginBottom: 6, marginTop: -14 }}>
-            <ThemedText 
+            <Text 
               style={{ 
                 textAlign: 'left', 
                 fontSize: 11, 
@@ -97,7 +95,7 @@ export default function ResetPasswordScreen() {
               }}
             >
               {getPasswordRequirementsText()}
-            </ThemedText>
+            </Text>
           </View>
           
           <AuthInput
@@ -114,7 +112,7 @@ export default function ResetPasswordScreen() {
           {/* Password Match Indicator */}
           {confirmPassword.length > 0 && (
             <View style={{ marginBottom: 6, marginTop: -14 }}>
-              <ThemedText 
+              <Text 
                 style={{ 
                   textAlign: 'left', 
                   fontSize: 11, 
@@ -125,7 +123,7 @@ export default function ResetPasswordScreen() {
                 }}
               >
                 {getPasswordMatchText()}
-              </ThemedText>
+              </Text>
             </View>
           )}
 
@@ -145,7 +143,7 @@ export default function ResetPasswordScreen() {
           )}
           
           {/* Back to Sign In Button */}
-          <ThemedText
+          <Text
             style={{ 
               textAlign: 'center', 
               fontSize: 14, 
@@ -157,15 +155,15 @@ export default function ResetPasswordScreen() {
             onPress={goToSignIn}
           >
             {success ? 'Continue to Sign In →' : '← Back to Sign In'}
-          </ThemedText>
+          </Text>
         </View>
 
-        <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
+        <Text style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
           {success ? 'Your password has been updated successfully!' : 'After changing your password, you\'ll be returned to the sign-in page.'}
-        </ThemedText>
-        <ThemedText style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
+        </Text>
+        <Text style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
           © 2025 The Snow Post · Forged for storytellers & adventurers
-        </ThemedText>
+        </Text>
       </View>
     </View>
   );

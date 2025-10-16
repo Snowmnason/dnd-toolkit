@@ -113,7 +113,7 @@ CREATE POLICY "Users can read worlds they own or have access to"
 ```
 📦 Components
 ├── 🎨 Themed Components (ThemedView, ThemedText)
-├── 🔧 Custom Components (PrimaryButton, TextInput, Dropdown)
+├── 🔧 Custom Components (AppButton, TextInput, Dropdown)
 ├── 🏠 Screen Components (WorldSelection, CreateWorld)
 └── 🎯 Modal Components (EditWorldModal, ConfirmationModal)
 ```

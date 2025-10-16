@@ -1,7 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
+import { View } from 'tamagui';
 import { panelConfigs } from '../../components/main-panels/PanelData';
 import { PanelView } from '../../components/main-panels/PanelView';
-import { ThemedView } from '../../components/themed-view';
 
 export default function MainScreenMobile() {
   const params = useLocalSearchParams();
@@ -14,13 +14,13 @@ export default function MainScreenMobile() {
   const activePanel = panelConfigs.find(p => p.key === tab) || panelConfigs[0];
 
   return (
-    <ThemedView style={{ flex: 1 }}>
+    <View style={{ flex: 1 }}>
       <PanelView
         config={activePanel}
         userId={userId}
         worldId={worldId}
         userRole={userRole}
       />
-    </ThemedView>
+    </View>
   );
 }

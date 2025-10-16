@@ -20,9 +20,25 @@ import { logger } from '@/lib/utils/logger';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useState } from 'react';
-import { Alert, Platform } from 'react-native';
-import { AuthStateManager } from '../../../lib/auth-state';
-import PrimaryButton from '../../custom_components/PrimaryButton';
+import { Alert, Platform, Text as RNText, TouchableOpacity } from 'react-native';
+import { AuthStateManager } from '../../../../lib/auth-state';
+// Intentionally avoid central AppButton to preserve bespoke look
+
+// Centralized base styles for consistent look-and-feel
+const GOOGLE_BUTTON_BASE_STYLE = {
+  backgroundColor: '#4285F4',
+  paddingVertical: 16,
+  borderRadius: 8,
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+};
+
+const GOOGLE_TEXT_BASE_STYLE = {
+  color: '#FFF',
+  fontSize: 14,
+  fontWeight: '600' as const,
+};
 
 // Complete auth session setup for mobile
 WebBrowser.maybeCompleteAuthSession();
@@ -39,7 +55,7 @@ async function handleAuthSuccess(data: any) {
   await AuthStateManager.setHasAccount(true);
   
   // Check if user has profile in database
-  const { usersDB } = await import('../../../lib/database/users');
+  const { usersDB } = await import('../../../../lib/database/users');
   try {
     const userProfile = await usersDB.getCurrentUser();
     if (userProfile && userProfile.username) {
@@ -219,43 +235,17 @@ function GoogleButtonWeb({ disabled }: { disabled: boolean }) {
 
   if (isLoading) {
     return (
-      <PrimaryButton
-        style={{ 
-          backgroundColor: '#4285F4', 
-          paddingVertical: 16, 
-          borderRadius: 8, 
-          flexDirection: 'row', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          opacity: 0.7
-        }}
-        textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
-        onPress={() => {}}
-        disabled={true}
-      >
-        🔵 Loading Google...
-      </PrimaryButton>
+      <TouchableOpacity style={[GOOGLE_BUTTON_BASE_STYLE, { opacity: 0.7 }]} disabled>
+        <RNText style={GOOGLE_TEXT_BASE_STYLE as any}>🔵 Loading Google...</RNText>
+      </TouchableOpacity>
     );
   }
 
   if (!googleComponents) {
     return (
-      <PrimaryButton
-        style={{ 
-          backgroundColor: '#4285F4', 
-          paddingVertical: 16, 
-          borderRadius: 8, 
-          flexDirection: 'row', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          opacity: 0.5
-        }}
-        textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
-        onPress={() => {}}
-        disabled={true}
-      >
-        🔵 Google (Unavailable)
-      </PrimaryButton>
+      <TouchableOpacity style={[GOOGLE_BUTTON_BASE_STYLE, { opacity: 0.5 }]} disabled>
+        <RNText style={GOOGLE_TEXT_BASE_STYLE as any}>🔵 Google (Unavailable)</RNText>
+      </TouchableOpacity>
     );
   }
 
@@ -319,21 +309,13 @@ export default function GoogleSignInButton({ disabled = false, style }: GoogleSi
   };
 
   return (
-    <PrimaryButton
-      style={{ 
-        backgroundColor: '#4285F4', 
-        paddingVertical: 16, 
-        borderRadius: 8, 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        ...style
-      }}
-      textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
+    <TouchableOpacity
+      style={[GOOGLE_BUTTON_BASE_STYLE, style as any, { opacity: disabled || isLoading ? 0.5 : 1 }]}
       onPress={handlePress}
       disabled={disabled || isLoading}
+      activeOpacity={0.8}
     >
-      🔵 Google
-    </PrimaryButton>
+      <RNText style={GOOGLE_TEXT_BASE_STYLE as any}>🔵 Google</RNText>
+    </TouchableOpacity>
   );
 }

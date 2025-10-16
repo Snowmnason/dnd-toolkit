@@ -1,11 +1,10 @@
-import { CoreColors } from '@/constants/corecolors';
 import { logger } from '@/lib/utils/logger';
 import React, { useState } from 'react';
-import { Platform, TextInput, TouchableOpacity, View } from 'react-native';
+import { Platform } from 'react-native';
+import { Button, Input, Text, View } from 'tamagui';
 import { BorderRadius, Spacing } from '../../constants/theme';
 import { createWorldNameChangeHandler, isValidWorldNameForSubmission, type WorldNameValidationResult } from '../../lib/auth/validation';
 import CustomModal from '../modals/CustomModal';
-import { ThemedText } from '../themed-text';
 
 interface EditWorldModalProps {
   visible: boolean;
@@ -79,28 +78,28 @@ export default function EditWorldModal({
       buttons={[]} // We'll use children instead
     >
       {/* Textbox and inline button */}
-      <ThemedText>Edit World Name</ThemedText>
+      <Text>Edit World Name</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md }}>
-        <TextInput
+        <Input
           style={{
             flex: 1,
             borderWidth: 1,
-            borderColor: CoreColors.borderPrimary,
+            borderColor: '#888',//UPDATE TO THEME
             borderRadius: BorderRadius.md,
             padding: Spacing.sm,
             marginRight: Spacing.sm,
-            color: CoreColors.textPrimary,
-            backgroundColor: CoreColors.backgroundDark,
+            color: '#F5E6D3',
+            backgroundColor: '#2f353d',//UPDATE TO THEME
             fontSize: isDesktop ? 18 : 16,
           }}
           placeholder="Enter world name..."
-          placeholderTextColor={CoreColors.textSecondary}
+          placeholderTextColor={'#C8B9A1'}
           value={worldName}
           onChangeText={createWorldNameChangeHandler(onWorldNameChange, setWorldNameValidation)}
         />
-        <TouchableOpacity
+        <Button
           style={{
-            backgroundColor: (worldName.length > 3) ? CoreColors.secondary : '#6c757d',
+            backgroundColor: (worldName.length > 3) ? '#D4AF37' : '#6c757d',
             paddingVertical: Spacing.sm,
             paddingHorizontal: Spacing.md,
             borderRadius: BorderRadius.md,
@@ -109,30 +108,30 @@ export default function EditWorldModal({
           onPress={onConfirmWorldName}
           disabled={!isValidWorldNameForSubmission(worldName, originalWorldName)}
         >
-          <ThemedText style={{ color: CoreColors.textPrimary, fontWeight: 'bold', fontSize: isDesktop ? 17 : 16 }}>Confirm</ThemedText>
-        </TouchableOpacity>
+          <Text style={{ color: '#2f353d', fontWeight: 'bold', fontSize: isDesktop ? 17 : 16 }}>Confirm</Text>
+        </Button>
       </View>
 
       {/* Validation errors */}
       {worldNameValidation && !worldNameValidation.isValid && (
         <View style={{ marginBottom: Spacing.md }}>
           {worldNameValidation.errors.map((error, index) => (
-            <ThemedText key={index} style={{
+            <Text key={index} style={{
               color: '#FF6B6B',
               fontSize: 14,
               marginBottom: Spacing.xs
             }}>
               ⚠️ {error}
-            </ThemedText>
+            </Text>
           ))}
         </View>
       )}
 
       {/* Invite Section */}
-      <ThemedText>Share {worldName || 'this world'} with others</ThemedText>
-      <TouchableOpacity
+      <Text>Share {worldName || 'this world'} with others</Text>
+      <Button
         style={{
-          backgroundColor: !generatingLink ? CoreColors.secondary : '#6c757d',
+          backgroundColor: !generatingLink ? '#D4AF37' : '#6c757d',
           paddingVertical: Spacing.md,
           borderRadius: BorderRadius.md,
           marginBottom: Spacing.md,
@@ -141,27 +140,27 @@ export default function EditWorldModal({
         onPress={handleGenerateInviteLinkClick}
         disabled={generatingLink}
       >
-        <ThemedText style={{ 
-          color: CoreColors.textPrimary, 
+        <Text style={{ 
+          color: '#2f353d', 
           textAlign: 'center', 
           fontWeight: 'bold', 
           fontSize: isDesktop ? 17 : 16 
         }}>
           {generatingLink ? '📋 Link Saved to Clipboard' : '🔗 Generate Invite Link'}
-        </ThemedText>
-      </TouchableOpacity>
-      <ThemedText style={{ 
+        </Text>
+      </Button>
+      <Text style={{ 
         fontSize: (isDesktop ? 18 : 16) - 2,
-        color: CoreColors.textSecondary,
+        color: '#C8B9A1',
         textAlign: 'center',
         marginBottom: Spacing.sm,
         marginTop: -20
       }}>
         Creates a shareable link that&apos;s copied to your clipboard
-      </ThemedText>
+      </Text>
 
       {/* Delete button below */}
-      <TouchableOpacity
+      <Button
         style={{
           backgroundColor: deleteDisabled ? '#6c757d' : '#FF6B6B',
           paddingVertical: Spacing.sm,
@@ -172,10 +171,10 @@ export default function EditWorldModal({
         onPress={handleDeleteClick}
         disabled={deleteDisabled}
       >
-        <ThemedText style={{ color: '#fff', textAlign: 'center', fontWeight: 'bold', fontSize: isDesktop ? 17 : 16 }}>
+        <Text style={{ color: '#fff', textAlign: 'center', fontWeight: 'bold', fontSize: isDesktop ? 17 : 16 }}>
           {deleting ? 'Confirm Delete' : 'Delete'}
-        </ThemedText>
-      </TouchableOpacity>
+        </Text>
+      </Button>
     </CustomModal>
   );
 }

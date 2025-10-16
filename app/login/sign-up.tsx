@@ -1,12 +1,9 @@
-import { CoreColors } from '@/constants/corecolors';
 import { useRouter } from 'expo-router';
-import { View } from 'react-native';
+import { Button, Text, View } from 'tamagui';
 import AuthButton from '../../components/auth_components/AuthButton';
 import AuthError from '../../components/auth_components/AuthError';
 import AuthInput from '../../components/auth_components/AuthInput';
-import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import CustomModal from '../../components/modals/CustomModal';
-import { ThemedText } from '../../components/themed-text';
 import { useSignUpForm } from '../../lib/auth';
 
 export default function SignUpScreen() {
@@ -46,7 +43,8 @@ export default function SignUpScreen() {
       
       {/* Back Button */}
       <View style={{ position: 'absolute', top: 50, left: 20, zIndex: 10, backgroundColor: 'transparent' }}>
-        <PrimaryButton
+        <Button
+          //variant="ghost"
           style={{ 
             backgroundColor: loading ? 'rgba(139, 69, 19, 0.1)' : 'rgba(139, 69, 19, 0.2)', 
             paddingHorizontal: 16, 
@@ -54,26 +52,25 @@ export default function SignUpScreen() {
             borderRadius: 6,
             opacity: loading ? 0.5 : 1
           }}
-          textStyle={{ color: CoreColors.textPrimary, fontSize: 14, fontWeight: '500' }}
+          //textStyle={{ color: CoreColors.textPrimary, fontSize: 14, fontWeight: '500' }}
           onPress={() => router.replace('/login/welcome')}
           disabled={loading}
         >
           ← Back
-        </PrimaryButton>
+        </Button>
       </View>
 
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'transparent' }}>
         
-        <ThemedText 
-          type="title" 
+        <Text 
           style={{ marginBottom: 20, textAlign: 'center', color: '#F5E6D3', fontSize: 32, fontWeight: '700' }}
         >
           Create Account
-        </ThemedText>
+        </Text>
         
-        <ThemedText style={{ marginBottom: 40, textAlign: 'center', fontSize: 16, opacity: 0.8, color: '#F5E6D3', lineHeight: 22, paddingHorizontal: 20 }}>
+        <Text style={{ marginBottom: 40, textAlign: 'center', fontSize: 16, opacity: 0.8, color: '#F5E6D3', lineHeight: 22, paddingHorizontal: 20 }}>
           Join the adventure and sync your worlds across devices
-        </ThemedText>
+        </Text>
 
         {/* Form Inputs */}
         <View style={{ width: '100%', maxWidth: 300, marginBottom: 2, backgroundColor: 'transparent' }}>
@@ -106,7 +103,7 @@ export default function SignUpScreen() {
           />
           {/* Password Requirements */}
           <View style={{ marginBottom: 6, marginTop: -14 }}>
-            <ThemedText 
+            <Text 
               style={{ 
                 textAlign: 'left', 
                 fontSize: 11, 
@@ -117,7 +114,7 @@ export default function SignUpScreen() {
               }}
             >
               {getPasswordRequirementsText()}
-            </ThemedText>
+            </Text>
           </View>
           
           <AuthInput
@@ -135,7 +132,7 @@ export default function SignUpScreen() {
           {/* Password Match Indicator */}
           {confirmPassword.length > 0 && (
             <View style={{ marginBottom: 6, marginTop: -14 }}>
-              <ThemedText 
+              <Text 
                 style={{ 
                   textAlign: 'left', 
                   fontSize: 11, 
@@ -146,7 +143,7 @@ export default function SignUpScreen() {
                 }}
               >
                 {getPasswordMatchText()}
-              </ThemedText>
+              </Text>
             </View>
           )}
 
@@ -165,31 +162,23 @@ export default function SignUpScreen() {
           />
 
           {/* Switch to Sign In */}
-          <PrimaryButton
-            style={{ 
-              width: '100%', 
-              backgroundColor: 'rgba(139, 69, 19, 0.15)', 
-              borderWidth: 1, 
-              borderColor: '#8B4513', 
-              paddingVertical: 12, 
-              borderRadius: 8,
-              opacity: loading ? 0.5 : 1
-            }}
-            textStyle={{ color: '#F5E6D3', fontSize: 13, fontWeight: '500' }}
+          <Button
+            //variant="secondary"
+            //fullWidth
             onPress={() => router.push('/login/sign-in')}
             disabled={loading}
           >
             Already have an account? Sign In
-          </PrimaryButton>
+          </Button>
         </View>
 
-        <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
+        <Text style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
           After confirming your email, you&apos;ll choose a username to complete your account setup.
-        </ThemedText>
+        </Text>
         
-        <ThemedText style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
+        <Text style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
           © 2025 The Snow Post · Forged for storytellers & adventurers
-        </ThemedText>
+        </Text>
       </View>
 
       {/* Email Already Exists Modal */}
