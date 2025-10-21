@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 import PrimaryButton from '../custom_components/PrimaryButton';
-import { ThemedText } from '../themed-text';
+import { ThemedText } from '../ui/themed-text';
 
 interface AuthErrorProps {
   error: string;

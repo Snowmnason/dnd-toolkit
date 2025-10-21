@@ -1,7 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { panelConfigs } from '../../components/main-panels/PanelData';
 import { PanelView } from '../../components/main-panels/PanelView';
-import { ThemedView } from '../../components/themed-view';
+import { ThemedView } from '../../components/ui/themed-view';
 
 export default function MainScreenMobile() {
   const params = useLocalSearchParams();

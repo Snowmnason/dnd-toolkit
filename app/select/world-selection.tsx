@@ -2,16 +2,16 @@ import LeaveWorldModal from '@/components/create-world/ConfrimLeaveModal';
 import EditWorldModal from '@/components/create-world/EditWorldModal';
 import CustomLoad from '@/components/custom_components/CustomLoad';
 import { CoreColors } from '@/constants/corecolors';
+import { useWorlds } from "@/lib";
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Image, ScrollView, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
-import { ThemedText } from '../../components/themed-text';
-import { ThemedView } from '../../components/themed-view';
+import { ThemedText } from '../../components/ui/themed-text';
+import { ThemedView } from '../../components/ui/themed-view';
 import { ComponentStyles, Spacing } from '../../constants/theme';
 import { useAppParams } from '../../contexts/AppParamsContext';
 import { useWorldModal } from '../../hooks/use-world-modal';
-import { useWorlds } from '../../lib/useWorlds';
 
 
 

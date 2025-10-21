@@ -1,9 +1,10 @@
+import { AuthButton, AuthInput } from '@/components/auth_components';
+import { useSignInForm } from '@/lib';
 import { useRouter } from 'expo-router';
 import { View } from 'react-native';
-import AuthButton from '../../components/auth_components/AuthButton';
-import AuthInput from '../../components/auth_components/AuthInput';
-import { ThemedText } from '../../components/themed-text';
-import { useSignInForm } from '../../lib/auth';
+import { ThemedText } from '../../components/ui/themed-text';
+
+
 
 export default function SignInScreen() {
   const router = useRouter();

@@ -1,15 +1,12 @@
+import { AuthButton, AuthError, AuthInput } from '@/components/auth_components';
+import { logger, supabase, usersDB, useSignUpForm } from '@/lib';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
-import AuthButton from '../../components/auth_components/AuthButton';
-import AuthError from '../../components/auth_components/AuthError';
-import AuthInput from '../../components/auth_components/AuthInput';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
-import { ThemedText } from '../../components/themed-text';
-import { useSignUpForm } from '../../lib/auth';
-import { usersDB } from '../../lib/database/users';
-import { supabase } from '../../lib/supabase';
-import { logger } from '../../lib/utils/logger';
+import { ThemedText } from '../../components/ui/themed-text';
+
+
 
 export default function CompleteProfileScreen() {
   const router = useRouter();

@@ -1,7 +1,7 @@
 import { CoreColors } from '@/constants/corecolors';
 import React from 'react';
 import { ActivityIndicator, TextStyle, TouchableOpacity, ViewStyle } from 'react-native';
-import { ThemedText } from '../themed-text';
+import { ThemedText } from './themed-text';
 
 export interface BaseButtonProps {
   onPress: () => void;

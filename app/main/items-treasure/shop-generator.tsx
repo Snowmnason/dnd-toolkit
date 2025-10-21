@@ -1,5 +1,5 @@
-import { ThemedText } from '../../../components/themed-text';
-import { ThemedView } from '../../../components/themed-view';
+import { ThemedText } from '../../../components/ui/themed-text';
+import { ThemedView } from '../../../components/ui/themed-view';
 
 export default function ShopGeneratorPage() {
   return (

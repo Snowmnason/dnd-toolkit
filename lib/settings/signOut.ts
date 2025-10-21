@@ -1,6 +1,4 @@
-import { AuthStateManager } from '../auth-state';
-import { supabase } from '../supabase';
-import { logger } from '../utils/logger';
+import { AuthStateManager, logger, supabase } from '@/lib';
 
 /**
  * Signs out the current user and clears local auth state

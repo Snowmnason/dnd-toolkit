@@ -1,5 +1,4 @@
-import { supabase } from '@/lib/supabase'
-import { logger } from '@/lib/utils/logger'
+import { logger, supabase } from '@/lib'
 import React from 'react'
 import { Button } from 'react-native'
 

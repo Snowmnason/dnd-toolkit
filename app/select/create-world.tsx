@@ -1,4 +1,5 @@
 import { CoreColors } from '@/constants/corecolors';
+import { createWorldNameChangeHandler, isValidWorldNameForSubmission, type WorldNameValidationResult } from '@/lib/';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform, ScrollView, View } from 'react-native';
@@ -7,13 +8,12 @@ import MapCanvas from '../../components/create-world/MapCanvas';
 import Dropdown from '../../components/custom_components/Dropdown';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import TextInputComponent from '../../components/custom_components/TextInput';
-import { ThemedText } from '../../components/themed-text';
-import { ThemedView } from '../../components/themed-view';
+import { ThemedText } from '../../components/ui/themed-text';
+import { ThemedView } from '../../components/ui/themed-view';
 import { ComponentStyles, Spacing, createTextShadow } from '../../constants/theme';
 import { useAuthStatus } from '../../hooks/use-auth-status';
 import { useSuccessNavigation } from '../../hooks/use-success-navigation';
 import { useWorldCreation } from '../../hooks/use-world-creation';
-import { createWorldNameChangeHandler, isValidWorldNameForSubmission, type WorldNameValidationResult } from '../../lib/auth/validation';
 
 const tabletopSystems = ['D&D 5e', 'Pathfinder', 'Call of Cthulhu', 'Custom'];
 const defaultMapImages = ["https://media.wizards.com/2015/images/dnd/resources/Sword-Coast-Map_MedRes.jpg",

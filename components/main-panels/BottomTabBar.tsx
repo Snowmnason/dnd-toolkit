@@ -1,6 +1,6 @@
 import { TouchableOpacity, View } from 'react-native';
 import { ComponentStyles } from '../../constants/theme';
-import { ThemedText } from '../themed-text';
+import { ThemedText } from '../ui/themed-text';
 import { panelConfigs } from './PanelData';
 
 interface BottomTabBarProps {

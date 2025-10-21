@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { ComponentStyles } from '../../constants/theme';
 import { useAppParams } from '../../contexts/AppParamsContext';
 import PrimaryButton from '../custom_components/PrimaryButton';
-import { ThemedText } from '../themed-text';
+import { ThemedText } from '../ui/themed-text';
 import { PanelConfig } from './PanelData';
 
 interface PanelViewProps {

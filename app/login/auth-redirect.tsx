@@ -1,15 +1,12 @@
+import { AuthStateManager, logger, supabase, usersDB, worldsDB } from '@/lib';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import CustomLoad from '../../components/custom_components/CustomLoad';
-import CustomModal from '../../components/CustomModal';
-import { ThemedText } from '../../components/themed-text';
+import CustomModal from '../../components/modals/CustomModal';
+import { ThemedText } from '../../components/ui/themed-text';
 import { useAppParams } from '../../contexts/AppParamsContext';
-import { AuthStateManager } from '../../lib/auth-state';
-import { usersDB } from '../../lib/database/users';
-import { worldsDB } from '../../lib/database/worlds';
-import { supabase } from '../../lib/supabase';
-import { logger } from '../../lib/utils/logger';
+
 
 // Storage for pending invites when user isn't logged in
 const PENDING_INVITE_KEY = 'pending_world_invite';

@@ -1,10 +1,10 @@
 import { CoreColors } from '@/constants/corecolors';
+import { AuthStateManager, logger } from '@/lib';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import CustomLoad from '../../components/custom_components/CustomLoad';
-import { AuthStateManager } from '../../lib/auth-state';
-import { logger } from '../../lib/utils/logger';
+
 
 export default function SelectLayout() {
   const router = useRouter();

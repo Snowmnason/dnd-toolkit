@@ -1,7 +1,6 @@
 import { useTheme } from "@/contexts/ThemeContext";
 import React from "react";
 import { View, type ViewProps } from "react-native";
-import ParchmentBackground from "./ParchmentBackground";
 
 export type ThemedViewProps = ViewProps & {
   lightColor?: string;
@@ -43,7 +42,6 @@ export function ThemedView({
       ]} 
       {...otherProps} 
     >
-      {showParchment && <ParchmentBackground />}
       {otherProps.children}
     </View>
   );

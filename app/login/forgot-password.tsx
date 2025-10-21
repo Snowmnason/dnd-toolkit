@@ -1,12 +1,10 @@
+import { AuthButton, AuthInput } from '@/components/auth_components';
+import { sendPasswordReset, validateEmail } from '@/lib';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import AuthButton from '../../components/auth_components/AuthButton';
-import AuthInput from '../../components/auth_components/AuthInput';
-import CustomModal from '../../components/CustomModal';
-import { ThemedText } from '../../components/themed-text';
-import { sendPasswordReset } from '../../lib/auth/authService';
-import { validateEmail } from '../../lib/auth/validation';
+import CustomModal from '../../components/modals/CustomModal';
+import { ThemedText } from '../../components/ui/themed-text';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();

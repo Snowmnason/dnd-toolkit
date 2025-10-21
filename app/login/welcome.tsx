@@ -1,16 +1,17 @@
+import { useWelcomeScreen } from '@/lib';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { View } from 'react-native';
 import AuthButton from '../../components/auth_components/AuthButton';
 import CustomLoad from '../../components/custom_components/CustomLoad';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
-import { ThemedText } from '../../components/themed-text';
-import { useWelcomeScreen } from '../../lib/auth';
+import { ThemedText } from '../../components/ui/themed-text';
 
 // TODO: Uncomment when ready to enable social authentication
 // import AppleSignInButton from '../../components/social-auth-buttons/apple/apple-sign-in-button';
 // import GoogleSignInButton from '../../components/social-auth-buttons/google/google-sign-in-button';
 export default function WelcomeScreen() {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const router = useRouter();
   const {
     isLoading,

@@ -1,15 +1,11 @@
+import { AuthButton, AuthError, AuthInput } from '@/components/auth_components';
 import { CoreColors } from '@/constants/corecolors';
+import { logger, supabase, useSignInForm } from '@/lib';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import AuthButton from '../../components/auth_components/AuthButton';
-import AuthError from '../../components/auth_components/AuthError';
-import AuthInput from '../../components/auth_components/AuthInput';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
-import { ThemedText } from '../../components/themed-text';
-import { useSignInForm } from '../../lib/auth';
-import { supabase } from '../../lib/supabase';
-import { logger } from '../../lib/utils/logger';
+import { ThemedText } from '../../components/ui/themed-text';
 
 export default function SignInScreen() {
   const router = useRouter();

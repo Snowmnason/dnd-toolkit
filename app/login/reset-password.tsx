@@ -1,10 +1,7 @@
+import { AuthButton, AuthError, AuthInput, AuthSuccess } from '@/components/auth_components';
+import { useResetPasswordConfirm } from '@/lib';
 import { View } from 'react-native';
-import AuthButton from '../../components/auth_components/AuthButton';
-import AuthError from '../../components/auth_components/AuthError';
-import AuthInput from '../../components/auth_components/AuthInput';
-import AuthSuccess from '../../components/auth_components/AuthSuccess';
-import { ThemedText } from '../../components/themed-text';
-import { useResetPasswordConfirm } from '../../lib/auth/useResetPasswordConfirm';
+import { ThemedText } from '../../components/ui/themed-text';
 
 export default function ResetPasswordScreen() {
   const {

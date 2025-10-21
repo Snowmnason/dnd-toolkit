@@ -1,4 +1,4 @@
-import { CoreColors } from '@/constants/corecolors';
+import { AuthStateManager, logger } from "@/lib";
 import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Dimensions, Platform, View } from 'react-native';
@@ -6,8 +6,6 @@ import LoadingOverlay from '../components/LoadingOverlay';
 import TopBar from '../components/TopBar';
 import { AppParamsProvider, useAppParams } from '../contexts/AppParamsContext';
 import { useAppBootstrap } from '../hooks/use-app-bootstrap';
-import { AuthStateManager } from '../lib/auth-state';
-import { logger } from '../lib/utils/logger';
 
 function RootLayoutContent() {
   // Get local search params using the hook at the top level
@@ -242,7 +240,7 @@ function RootLayoutContent() {
     <View style={{
       height: '100%',
       width: '100%',
-      backgroundColor: CoreColors.backgroundDark
+      //backgroundColor: CoreColors.backgroundDark
     }}>
       {/* Global TopBar - shown on most screens */}
       {topBarConfig && (
@@ -260,6 +258,9 @@ function RootLayoutContent() {
       <Stack
         screenOptions={{
           headerShown: false,
+          contentStyle: {
+            backgroundColor: bgColor,
+          },
         }}
       />
     </View>
