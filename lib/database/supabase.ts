@@ -1,9 +1,8 @@
+import { EncryptedStorageAdapter, logger } from '@/lib';
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
-import { EncryptedStorageAdapter } from './encrypted-storage';
-import { logger } from './utils/logger';
 
 // Web storage adapter that uses localStorage (browser) instead of AsyncStorage
 const WebStorageAdapter = {

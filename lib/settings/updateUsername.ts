@@ -1,6 +1,4 @@
-import { validateUsername } from '../auth/validation';
-import { usersDB } from '../database/users';
-import { logger } from '../utils/logger';
+import { logger, usersDB, validateUsername } from '@/lib';
 
 export interface UpdateUsernameResult {
   success: boolean;

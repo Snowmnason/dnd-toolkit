@@ -11,7 +11,7 @@ const storage = {
       return null;
     } else {
       // For mobile, we'll use our encrypted storage
-      const { EncryptedStorage } = await import('./auth/encrypted-storage');
+      const { EncryptedStorage } = await import('./encrypted-storage');
       return await EncryptedStorage.getItem(key);
     }
   },
@@ -23,7 +23,7 @@ const storage = {
       }
     } else {
       // For mobile, we'll use our encrypted storage
-      const { EncryptedStorage } = await import('./auth/encrypted-storage');
+      const { EncryptedStorage } = await import('./encrypted-storage');
       await EncryptedStorage.setItem(key, value);
     }
   },
@@ -35,7 +35,7 @@ const storage = {
       }
     } else {
       // For mobile, we'll use our encrypted storage
-      const { EncryptedStorage } = await import('./auth/encrypted-storage');
+      const { EncryptedStorage } = await import('./encrypted-storage');
       await EncryptedStorage.removeItem(key);
     }
   }
@@ -117,7 +117,7 @@ export const AuthStateManager = {
       }
 
       // Import supabase dynamically to avoid circular dependency
-      const { supabase, isSupabaseConfigured } = await import('./database/supabase');
+      const { supabase, isSupabaseConfigured } = await import('../database/supabase');
       
       // If Supabase isn't configured (like on GitHub Pages without env vars), 
       // fall back to local auth state
@@ -151,7 +151,7 @@ export const AuthStateManager = {
       const authState = await this.getAuthState();
 
       // Import supabase (lazy) and check if configured
-      const { supabase, isSupabaseConfigured } = await import('./database/supabase');
+      const { supabase, isSupabaseConfigured } = await import('../database/supabase');
 
       // If Supabase isn't configured, fall back to local state
       if (!isSupabaseConfigured()) {
@@ -165,7 +165,7 @@ export const AuthStateManager = {
       // Try to fetch the user profile once (may fail)
       let userProfile: any = null;
       try {
-        const { usersDB } = await import('./database/users');
+        const { usersDB } = await import('../database/users');
         userProfile = await usersDB.getCurrentUser();
       } catch (dbError) {
         logger.debug('auth-state', 'Database error checking profile:', dbError);

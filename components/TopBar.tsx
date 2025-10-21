@@ -3,8 +3,8 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { ComponentStyles } from '../constants/theme';
-import SettingsMenu from './SettingsMenu';
-import { ThemedText } from './themed-text';
+import SettingsMenu from './settings/SettingsMenu';
+import { ThemedText } from './ui/themed-text';
 
 interface TopBarProps {
   title?: string;

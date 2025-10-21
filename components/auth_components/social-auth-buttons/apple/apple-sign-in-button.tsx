@@ -15,14 +15,12 @@
  * Supports: iOS (native) + Web (react-apple-signin-auth)
  */
 
-import { supabase } from '@/lib/supabase';
-import { logger } from '@/lib/utils/logger';
+import { AuthStateManager, logger, supabase } from '@/lib';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, Platform } from 'react-native';
-import { AuthStateManager } from '../../../lib/auth-state';
-import PrimaryButton from '../../custom_components/PrimaryButton';
+import PrimaryButton from '../../../custom_components/PrimaryButton';
 
 // Web-specific components (loaded dynamically)
 interface AppleWebComponents {
@@ -35,7 +33,7 @@ async function handleAuthSuccess(data?: any) {
   await AuthStateManager.setHasAccount(true);
   
   // Check if user has profile in database
-  const { usersDB } = await import('../../../lib/database/users');
+  const { usersDB } = await import('@/lib');
   try {
     const userProfile = await usersDB.getCurrentUser();
     if (userProfile && userProfile.username) {

@@ -5,7 +5,7 @@ import { Platform, TextInput, TouchableOpacity, View } from 'react-native';
 import { BorderRadius, Spacing } from '../../constants/theme';
 import { createWorldNameChangeHandler, isValidWorldNameForSubmission, type WorldNameValidationResult } from '../../lib/auth/validation';
 import CustomModal from '../CustomModal';
-import { ThemedText } from '../themed-text';
+import { ThemedText } from '../ui/themed-text';
 
 interface EditWorldModalProps {
   visible: boolean;

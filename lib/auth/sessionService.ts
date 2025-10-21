@@ -1,7 +1,4 @@
-import { AuthStateManager } from '../auth-state';
-import { usersDB } from '../database/users';
-import { supabase } from '../supabase';
-import { logger } from '../utils/logger';
+import { AuthStateManager, logger, supabase, usersDB } from '@/lib';
 
 export interface SessionCheckResult {
   hasValidSession: boolean;

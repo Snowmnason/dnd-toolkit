@@ -1,9 +1,6 @@
+import { checkPendingInvites, getPasswordHintColor, getPasswordRequirementsText, logger, signUpUser, usersDB, validateEmail, validatePassword, validateUsername } from '@/lib';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { usersDB } from '../database/users';
-import { logger } from '../utils/logger';
-import { checkPendingInvites, signUpUser } from './authService';
-import { getPasswordHintColor, getPasswordRequirementsText, validateEmail, validatePassword, validateUsername } from './validation';
 
 type SignUpMode = 'signup' | 'complete-profile';
 

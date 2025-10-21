@@ -1,10 +1,8 @@
-import { supabase } from '@/lib/supabase';
-import { logger } from '@/lib/utils/logger';
+import { AuthStateManager, logger, supabase } from '@/lib';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import { Platform } from 'react-native';
-import { AuthStateManager } from '../../../lib/auth-state';
-import PrimaryButton from '../../custom_components/PrimaryButton';
+import PrimaryButton from '../../../custom_components/PrimaryButton';
 
 async function onAppleButtonPress() {
   try {

@@ -1,17 +1,15 @@
+import { AuthButton } from '@/components/auth_components';
 import { CoreColors } from '@/constants/corecolors';
+import { AuthStateManager, logger, openEmailApp, supabase, usersDB } from '@/lib';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
-import AuthButton from '../../components/auth_components/AuthButton';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
-import CustomModal from '../../components/CustomModal';
-import { ThemedText } from '../../components/themed-text';
-import { AuthStateManager } from '../../lib/auth-state';
-import { openEmailApp } from '../../lib/auth/emailUtils';
-import { usersDB } from '../../lib/database/users';
-import { supabase } from '../../lib/supabase';
-import { logger } from '../../lib/utils/logger';
+import CustomModal from '../../components/modals/CustomModal';
+import { ThemedText } from '../../components/ui/themed-text';
+
+
 
 export default function EmailConfirmationScreen() {
   const router = useRouter();

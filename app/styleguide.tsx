@@ -13,8 +13,8 @@ import TextInput from '../components/custom_components/TextInput';
 import CustomModal from '../components/CustomModal';
 import CredentialConfirmModal from '../components/modals/CredentialConfirmModal';
 import UpdateUsernameModal from '../components/modals/UpdateUsernameModal';
-import { ThemedText } from '../components/themed-text';
-import { ThemedView } from '../components/themed-view';
+import { ThemedText } from '../components/ui/themed-text';
+import { ThemedView } from '../components/ui/themed-view';
 import { CoreColors } from '../constants/corecolors';
 import { ComponentStyles, Spacing } from '../constants/theme';
 

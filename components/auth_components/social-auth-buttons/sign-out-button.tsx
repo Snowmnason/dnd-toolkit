@@ -1,8 +1,6 @@
+import { AuthStateManager, logger, supabase } from '@/lib';
 import React from 'react';
-import { AuthStateManager } from '../../lib/auth-state';
-import { supabase } from '../../lib/supabase';
-import { logger } from '../../lib/utils/logger';
-import PrimaryButton from '../custom_components/PrimaryButton';
+import PrimaryButton from '../../custom_components/PrimaryButton';
 
 async function onSignOutButtonPress() {
   try {

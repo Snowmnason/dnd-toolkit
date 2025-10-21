@@ -2,8 +2,8 @@
  * Safety mechanisms to prevent infinite redirects in authentication flow
  */
 
+import { logger } from '@/lib';
 import { Platform } from 'react-native';
-import { logger } from '../utils/logger';
 
 const REDIRECT_SAFETY_KEY = 'dnd_redirect_attempts';
 const MAX_REDIRECT_ATTEMPTS = 3;
@@ -24,7 +24,7 @@ const getStorage = async () => {
       removeItem: (key: string) => localStorage.removeItem(key)
     };
   } else {
-    const { EncryptedStorage } = await import('../encrypted-storage');
+    const { EncryptedStorage } = await import('./encrypted-storage');
     return {
       getItem: (key: string) => EncryptedStorage.getItem(key),
       setItem: (key: string, value: string) => EncryptedStorage.setItem(key, value),

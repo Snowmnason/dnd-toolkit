@@ -2,8 +2,8 @@
  * Theme Context - React context for theme management
  */
 
-import { ThemeContextType } from '@/constants/theme.types';
 import { classicTheme } from '@/constants/themes';
+import { ThemeContextType } from '@/theme/theme.types';
 import { createContext, useContext } from 'react';
 
 // Create context with default values

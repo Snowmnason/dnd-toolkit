@@ -1,10 +1,9 @@
+import { AuthStateManager, logger } from "@/lib";
 import { Redirect, useRouter } from "expo-router";
 import React from "react";
 import { Platform } from "react-native";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { useAppBootstrap } from "../hooks/use-app-bootstrap";
-import { AuthStateManager } from "../lib/auth-state";
-import { logger } from "../lib/utils/logger";
 
 export default function HomePage() {
   const router = useRouter();

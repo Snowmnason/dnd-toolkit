@@ -1,7 +1,4 @@
-import { usersDB } from '../database/users';
-import { supabase } from '../supabase';
-import { logger } from '../utils/logger';
-import { isExistingUser, validateEmail, validatePassword } from './validation';
+import { isExistingUser, logger, supabase, usersDB, validateEmail, validatePassword } from '@/lib';
 
 export interface SignUpResult {
   success: boolean;
@@ -51,7 +48,7 @@ export const signUpUser = async (
     const sanitizedEmail = emailValidation.sanitized;
 
     // Check if Supabase is configured before attempting signup
-    const { isSupabaseConfigured } = await import('../supabase');
+    const { isSupabaseConfigured } = await import('../database/supabase');
     if (!isSupabaseConfigured()) {
       return {
         success: false,
@@ -138,7 +135,7 @@ export const signInUser = async (
     const sanitizedEmail = emailValidation.sanitized;
 
     // Check if Supabase is configured before attempting signin
-    const { isSupabaseConfigured } = await import('../supabase');
+    const { isSupabaseConfigured } = await import('../database/supabase');
     if (!isSupabaseConfigured()) {
       return {
         success: false,
@@ -169,7 +166,7 @@ export const signInUser = async (
 
     if (data.user) {
       // Set local auth state so route guards work immediately
-      const { AuthStateManager } = await import('../auth-state');
+      const { AuthStateManager } = await import('./auth-state');
       await AuthStateManager.setHasAccount(true);
 
       // Check if user has a complete profile
@@ -254,7 +251,7 @@ export const sendPasswordReset = async (email: string): Promise<ResetPasswordRes
     const sanitizedEmail = emailValidation.sanitized;
 
     // Check if Supabase is configured before attempting password reset
-    const { isSupabaseConfigured } = await import('../supabase');
+    const { isSupabaseConfigured } = await import('../database/supabase');
     if (!isSupabaseConfigured()) {
       return {
         success: false,
@@ -326,7 +323,7 @@ export const sendPasswordReset = async (email: string): Promise<ResetPasswordRes
 export const updatePassword = async (newPassword: string): Promise<ResetPasswordResult> => {
   try {
     // Check if Supabase is configured before attempting password update
-    const { isSupabaseConfigured } = await import('../supabase');
+    const { isSupabaseConfigured } = await import('../database/supabase');
     if (!isSupabaseConfigured()) {
       return {
         success: false,

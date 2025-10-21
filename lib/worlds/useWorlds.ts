@@ -1,6 +1,5 @@
+import { logger, worldsDB, WorldWithAccess } from '@/lib';
 import { useCallback, useEffect, useState } from 'react';
-import { WorldWithAccess, worldsDB } from './database/worlds';
-import { logger } from './utils/logger';
 
 /**
  * Custom hook for managing world data and state

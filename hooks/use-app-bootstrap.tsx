@@ -144,7 +144,7 @@ async function restoreSession() {
       logger.info('bootstrap', 'Session restored successfully');
       
       // Update local auth state to match
-      const { AuthStateManager } = await import('../lib/auth-state');
+      const { AuthStateManager } = await import('../lib/auth/auth-state');
       await AuthStateManager.setSession(session);
     } else {
       logger.info('bootstrap', 'No stored session found');
@@ -154,7 +154,7 @@ async function restoreSession() {
     supabase.auth.onAuthStateChange(async (event: string, session: any) => {
       logger.debug('bootstrap', 'Auth state changed:', event);
       
-      const { AuthStateManager } = await import('../lib/auth-state');
+      const { AuthStateManager } = await import('../lib/auth/auth-state');
       
       if (session) {
         await AuthStateManager.setSession(session);

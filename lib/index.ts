@@ -1,18 +1,35 @@
 /**
- * Lib Module - Main library exports
- * Provides centralized access to all library functionality
+ * Lib Module - Single barrel exporter
+ * Centralizes all exports from lib/* so consumers can import from '@/lib'
  */
 
-// Auth exports
-export * from './auth';
+// ===== Auth =====
+export * from './auth/authService';
+export * from './auth/emailUtils';
+export * from './auth/redirectSafety';
+export * from './auth/sessionService';
+export * from './auth/useResetPasswordConfirm';
+export * from './auth/useSignInForm';
+export * from './auth/useSignUpForm';
+export * from './auth/useWelcomeScreen';
+export * from './auth/validation';
 
-// Database exports
-export * from './database';
+// ===== Database =====
+export * from './database/invites';
+export * from './database/supabase';
+export * from './database/users';
+export * from './database/worlds';
 
-// Utils exports
-export * from './utils';
+// ===== Settings =====
+export * from './settings/deleteAccount';
+export * from './settings/signOut';
+export * from './settings/updateUsername';
 
-// Individual module exports for convenience
-export { AuthStateManager } from './auth-state';
-export { supabase } from './supabase';
+// ===== Utils =====
+export { default as Logger, logger } from './utils/logger';
+
+// ===== Other top-level lib utilities =====
+export * from './auth/auth-state';
+export * from './auth/encrypted-storage';
+export * from './worlds/useWorlds';
 
