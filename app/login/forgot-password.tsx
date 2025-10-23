@@ -1,10 +1,10 @@
-import { AuthButton, AuthInput } from '@/components/auth_components';
+import { AuthError, AuthInput, AuthSuccess } from '@/components/auth_components';
+import { Body, BodyLogin, Button, Caption, Title } from '@/components/ui';
 import { sendPasswordReset, validateEmail } from '@/lib';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 import CustomModal from '../../components/modals/CustomModal';
-import { ThemedText } from '../../components/ui/themed-text';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -67,16 +67,9 @@ export default function ForgotPasswordScreen() {
       
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'transparent' }}>
         
-        <ThemedText 
-          type="title" 
-          style={{ marginBottom: 20, textAlign: 'center', color: '#F5E6D3', fontSize: 32, fontWeight: '700' }}
-        >
-          Forgot Password
-        </ThemedText>
+        <Title>Forgot Password</Title>
         
-        <ThemedText style={{ marginBottom: 40, textAlign: 'center', fontSize: 16, opacity: 0.8, color: '#F5E6D3', lineHeight: 22, paddingHorizontal: 20 }}>
-          Enter your email to receive password reset instructions.
-        </ThemedText>
+        <BodyLogin opacity={0.8}>Enter your email to receive password reset instructions.</BodyLogin>
 
         {/* Form Inputs */}
         <View style={{ width: '100%', maxWidth: 300, marginBottom: 15, backgroundColor: 'transparent' }}>
@@ -95,84 +88,37 @@ export default function ForgotPasswordScreen() {
         </View>
 
         {/* Error Display */}
-        {error && (
-          <View style={{ 
-            width: '100%', 
-            maxWidth: 300, 
-            backgroundColor: 'rgba(220, 53, 69, 0.1)', 
-            borderColor: '#dc3545', 
-            borderWidth: 1, 
-            borderRadius: 8, 
-            padding: 12, 
-            marginBottom: 16 
-          }}>
-            <ThemedText style={{ 
-              color: '#dc3545', 
-              fontSize: 14, 
-              textAlign: 'center',
-              fontWeight: '500'
-            }}>
-              {error}
-            </ThemedText>
-          </View>
-        )}
+        <View style={{ width: '100%', maxWidth: 300 }}>
+          <AuthError error={error} />
+        </View>
 
         {/* Success Display */}
-        {success && (
-          <View style={{ 
-            width: '100%', 
-            maxWidth: 300, 
-            backgroundColor: 'rgba(40, 167, 69, 0.1)', 
-            borderColor: '#28a745', 
-            borderWidth: 1, 
-            borderRadius: 8, 
-            padding: 12, 
-            marginBottom: 16 
-          }}>
-            <ThemedText style={{ 
-              color: '#28a745', 
-              fontSize: 14, 
-              textAlign: 'center',
-              fontWeight: '500'
-            }}>
-              {successMessage}
-            </ThemedText>
-          </View>
-        )}
+        {success && <AuthSuccess message={successMessage} />}
 
         {/* Action Buttons */}
         <View style={{ width: '100%', maxWidth: 300, gap: 16, backgroundColor: 'transparent' }}>
           {/* Reset Password Button */}
-          <AuthButton
-            title="Send New Password Email"
+          <Button
+            variant="auth"
+            text="Send New Password Email"
             onPress={handleForgotPassword}
-            disabled={!isFormValid}
-            loading={loading}
+            disabled={!isFormValid} loading={loading}
           />
           
           {/* Back to Welcome Button */}
-          <ThemedText
-            style={{ 
-              textAlign: 'center', 
-              fontSize: 14, 
-              color: '#D4AF37', 
-              fontWeight: '500',
-              marginTop: 8,
-              textDecorationLine: 'underline'
-            }}
-            onPress={() => router.replace('/login/sign-in')}
-          >
+          <Body align='center' color='D4AF37' deco='underline' style={{ marginTop: 8 }} onPress={() => router.replace('/login/sign-in')} >
             ← Back to Sign In
-          </ThemedText>
+          </Body>
         </View>
 
-        <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
+        <Body variant="semi" fontSize="$sm" color='#F5E6D3' align='center' opacity={0.6}
+          style={{ marginTop: 30, lineHeight: 18, paddingHorizontal: 20 }}>
           Secure authentication powered by Supabase
-        </ThemedText>
-        
-        <ThemedText style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
+        </Body>
+
+        <Caption color='#F5E6D3' align='center' style={{ marginTop: 8, opacity: 0.5, lineHeight: 16, paddingHorizontal: 20 }}>
           © 2025 The Snow Post · Forged for storytellers & adventurers
-        </ThemedText>
+        </Caption>
       </View>
 
       {/* Email Not Found Modal */}

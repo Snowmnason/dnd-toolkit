@@ -2,10 +2,10 @@
  * Theme Provider - Manages theme state and persistence
  */
 
+import { ThemeName } from '@/constants/theme.types';
 import { getTheme } from '@/constants/themes';
 import { ThemeContext } from '@/contexts/ThemeContext';
 import { logger } from '@/lib/utils/logger';
-import { ThemeName } from '@/theme/theme.types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { ReactNode, useEffect, useState } from 'react';
 

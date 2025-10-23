@@ -1,10 +1,10 @@
+import { Caption } from '@/components/ui';
 import { AuthStateManager, logger, supabase, usersDB, worldsDB } from '@/lib';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import CustomLoad from '../../components/custom_components/CustomLoad';
 import CustomModal from '../../components/modals/CustomModal';
-import { ThemedText } from '../../components/ui/themed-text';
 import { useAppParams } from '../../contexts/AppParamsContext';
 
 
@@ -385,9 +385,9 @@ export default function AuthRedirect() {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#2f353d' }}>
         <CustomLoad size="large" />
-        <ThemedText style={{ marginTop: 16, color: '#F5E6D3', textAlign: 'center' }}>
+        <Caption align='center' style={{ marginTop: 16 }}>
           Processing authentication...
-        </ThemedText>
+        </Caption>
       </View>
     );
   }

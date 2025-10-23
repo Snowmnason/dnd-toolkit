@@ -1,20 +1,11 @@
-import { CoreColors } from '@/constants/corecolors';
+import { AuthStateManager, deleteUserAccount, logger, signOutUser, supabase, usersDB } from '@/lib';
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
 import CustomLoad from '../components/custom_components/CustomLoad';
-import PrimaryButton from '../components/custom_components/PrimaryButton';
 import CredentialConfirmModal from '../components/modals/CredentialConfirmModal';
-import { ThemedText } from '../components/ui/themed-text';
-import { ThemedView } from '../components/ui/themed-view';
-import UserProfile from '../components/user-profile';
-import { ComponentStyles, Spacing } from '../constants/theme';
-import { AuthStateManager } from '../lib/auth/auth-state';
-import { usersDB } from '../lib/database/users';
-import { deleteUserAccount, signOutUser } from '../lib/settings';
-import { supabase } from '../lib/supabase';
-import { logger } from '../lib/utils/logger';
+import UserProfile from '../components/settings/user-profile';
 
 export default function SettingsPage() {
   const router = useRouter();

@@ -1,9 +1,5 @@
-import { validateWorldName } from '@/lib/auth/validation';
-import { usersDB } from '@/lib/database/users';
-import { worldsDB } from '@/lib/database/worlds';
-import { logger } from '@/lib/utils/logger';
+import { generateWorldInviteLink, logger, usersDB, validateWorldName, worldsDB } from '@/lib/';
 import { useState } from 'react';
-import { generateWorldInviteLink } from '../lib/auth/authService';
 
 interface UseWorldModalOptions {
   onWorldsChange?: () => void; // Callback to refresh worlds list

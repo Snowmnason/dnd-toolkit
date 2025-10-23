@@ -1,11 +1,9 @@
-import { AuthButton, AuthError, AuthInput } from '@/components/auth_components';
-import { CoreColors } from '@/constants/corecolors';
+import { AuthError, AuthInput } from '@/components/auth_components';
+import { Body, BodyLogin, Button, Caption, SubTitle, Title } from '@/components/ui';
 import { useSignUpForm } from '@/lib';
 import { useRouter } from 'expo-router';
 import { View } from 'react-native';
-import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import CustomModal from '../../components/modals/CustomModal';
-import { ThemedText } from '../../components/ui/themed-text';
 
 export default function SignUpScreen() {
   const router = useRouter();
@@ -44,34 +42,21 @@ export default function SignUpScreen() {
       
       {/* Back Button */}
       <View style={{ position: 'absolute', top: 50, left: 20, zIndex: 10, backgroundColor: 'transparent' }}>
-        <PrimaryButton
-          style={{ 
-            backgroundColor: loading ? 'rgba(139, 69, 19, 0.1)' : 'rgba(139, 69, 19, 0.2)', 
-            paddingHorizontal: 16, 
-            paddingVertical: 8, 
-            borderRadius: 6,
-            opacity: loading ? 0.5 : 1
-          }}
-          textStyle={{ color: CoreColors.textPrimary, fontSize: 14, fontWeight: '500' }}
+        <Button
+          bg='rgba(139,69,19,0.2)'
+          textColor='#F5E6D3'
           onPress={() => router.replace('/login/welcome')}
           disabled={loading}
         >
           ← Back
-        </PrimaryButton>
+        </Button>
       </View>
 
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'transparent' }}>
         
-        <ThemedText 
-          type="title" 
-          style={{ marginBottom: 20, textAlign: 'center', color: '#F5E6D3', fontSize: 32, fontWeight: '700' }}
-        >
-          Create Account
-        </ThemedText>
+        <Title>Create Account</Title>
         
-        <ThemedText style={{ marginBottom: 40, textAlign: 'center', fontSize: 16, opacity: 0.8, color: '#F5E6D3', lineHeight: 22, paddingHorizontal: 20 }}>
-          Join the adventure and sync your worlds across devices
-        </ThemedText>
+        <BodyLogin opacity={0.8}> Join the adventure and sync your worlds across devices </BodyLogin>
 
         {/* Form Inputs */}
         <View style={{ width: '100%', maxWidth: 300, marginBottom: 2, backgroundColor: 'transparent' }}>
@@ -104,18 +89,17 @@ export default function SignUpScreen() {
           />
           {/* Password Requirements */}
           <View style={{ marginBottom: 6, marginTop: -14 }}>
-            <ThemedText 
+            <SubTitle
+              color={getPasswordHintColor()}
+              align='left'
+              fontSize={11}
               style={{ 
-                textAlign: 'left', 
-                fontSize: 11, 
-                color: getPasswordHintColor(), 
-                fontWeight: '500', 
                 lineHeight: 16,
                 opacity: 0.9
               }}
             >
               {getPasswordRequirementsText()}
-            </ThemedText>
+            </SubTitle>
           </View>
           
           <AuthInput
@@ -133,18 +117,16 @@ export default function SignUpScreen() {
           {/* Password Match Indicator */}
           {confirmPassword.length > 0 && (
             <View style={{ marginBottom: 6, marginTop: -14 }}>
-              <ThemedText 
-                style={{ 
-                  textAlign: 'left', 
-                  fontSize: 11, 
-                  color: passwordsMatch ? '#A3D4A0' : '#F5A5A5', 
-                  fontWeight: '500', 
-                  lineHeight: 16,
-                  opacity: 0.9
-                }}
-              >
+              <SubTitle
+              color={passwordsMatch ? '#A3D4A0' : '#F5A5A5'}
+              align='left'
+              fontSize={11}
+              style={{ 
+                lineHeight: 16,
+                opacity: 0.9
+              }}>
                 {getPasswordMatchText()}
-              </ThemedText>
+              </SubTitle>
             </View>
           )}
 
@@ -155,39 +137,32 @@ export default function SignUpScreen() {
         {/* Action Buttons */}
         <View style={{ width: '100%', maxWidth: 300, gap: 16, backgroundColor: 'transparent' }}>
           {/* Create Account Button */}
-          <AuthButton
-            title="Create Account"
+          <Button
+            variant="auth"
+            text="Create Account"
             onPress={handleSignUp}
-            disabled={!isFormValid}
-            loading={loading}
+            disabled={!isFormValid} loading={loading}
           />
 
           {/* Switch to Sign In */}
-          <PrimaryButton
-            style={{ 
-              width: '100%', 
-              backgroundColor: 'rgba(139, 69, 19, 0.15)', 
-              borderWidth: 1, 
-              borderColor: '#8B4513', 
-              paddingVertical: 12, 
-              borderRadius: 8,
-              opacity: loading ? 0.5 : 1
-            }}
-            textStyle={{ color: '#F5E6D3', fontSize: 13, fontWeight: '500' }}
+          <Button
+            bg='rgba(139, 69, 19, 0.15)' borderColor='#8B4513' textColor='#F5E6D3'
+            style={{ width: '100%', paddingVertical: 12, borderRadius: 8 }}
             onPress={() => router.push('/login/sign-in')}
             disabled={loading}
           >
             Already have an account? Sign In
-          </PrimaryButton>
+          </Button>
         </View>
 
-        <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
+        <Body variant="semi" fontSize="$sm" color='#F5E6D3' align='center' opacity={0.6}
+          style={{ marginTop: 30, lineHeight: 18, paddingHorizontal: 20 }}>
           After confirming your email, you&apos;ll choose a username to complete your account setup.
-        </ThemedText>
-        
-        <ThemedText style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
+        </Body>
+
+        <Caption color='#F5E6D3' align='center' style={{ marginTop: 8, opacity: 0.5, lineHeight: 16, paddingHorizontal: 20 }}>
           © 2025 The Snow Post · Forged for storytellers & adventurers
-        </ThemedText>
+        </Caption>
       </View>
 
       {/* Email Already Exists Modal */}

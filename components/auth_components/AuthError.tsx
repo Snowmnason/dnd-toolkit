@@ -1,6 +1,5 @@
+import { Body, Button, ButtonText } from '@/components/ui';
 import { View } from 'react-native';
-import PrimaryButton from '../custom_components/PrimaryButton';
-import { ThemedText } from '../ui/themed-text';
 
 interface AuthErrorProps {
   error: string;
@@ -13,45 +12,52 @@ export default function AuthError({ error, onResendEmail, isResending }: AuthErr
 
   const isSuccess = error.startsWith('✅');
   const isResendError = error === 'RESEND_EMAIL';
-
   if (isResendError && onResendEmail) {
-    return (
-      <View style={{ marginBottom: 8 }}>
-        <View style={{ 
-          backgroundColor: 'rgba(245, 230, 211, 0.1)',
-          padding: 12,
-          borderRadius: 4,
-          borderWidth: 1,
-          borderColor: 'rgba(245, 230, 211, 0.2)'
-        }}>
-          <ThemedText 
-            style={{ 
-              textAlign: 'center', 
-              fontSize: 12, 
-              color: '#F5E6D3', 
-              fontWeight: '500', 
-              lineHeight: 16,
-              opacity: 0.9,
-              marginBottom: 8
+      return (
+        <View style={{ marginBottom: 8 }}>
+          <View
+            style={{
+              backgroundColor: 'rgba(245, 230, 211, 0.1)',
+              padding: 12,
+              borderRadius: 4,
+              borderWidth: 1,
+              borderColor: 'rgba(245, 230, 211, 0.2)',
             }}
           >
-            ❌ Please check your email and click the confirmation link before signing in.
-          </ThemedText>
+            <Body
+              fontSize="$sm"
+              style={{
+                textAlign: 'center',
+                color: '#F5E6D3',
+                fontWeight: '500',
+                lineHeight: 16,
+                opacity: 0.9,
+                marginBottom: 8,
+              }}
+            >
+              ❌ Please check your email and click the confirmation link before signing in.
+            </Body>
           
-          <PrimaryButton
-            style={{ 
-              backgroundColor: '#D4AF37', 
-              paddingVertical: 8, 
-              paddingHorizontal: 12, 
+          <Button
+            style={{
+              backgroundColor: '#D4AF37',
+              paddingVertical: 8,
+              paddingHorizontal: 12,
               borderRadius: 4,
-              alignSelf: 'center'
+              alignSelf: 'center',
             }}
-            textStyle={{ color: '#2f353d', fontSize: 11, fontWeight: '600' }}
             onPress={onResendEmail}
             disabled={isResending}
           >
-            {isResending ? '📧 Sending...' : '📧 Resend Email'}
-          </PrimaryButton>
+            <ButtonText
+              fontSize="$xs"
+              color="#2f353d"
+              variant="semi"
+              style={{ fontWeight: '600' }}
+            >
+              {isResending ? '📧 Sending...' : '📧 Resend Email'}
+            </ButtonText>
+          </Button>
         </View>
       </View>
     );
@@ -59,23 +65,23 @@ export default function AuthError({ error, onResendEmail, isResending }: AuthErr
 
   return (
     <View style={{ marginBottom: 8 }}>
-      <ThemedText 
-        style={{ 
-          textAlign: 'center', 
-          fontSize: 12, 
-          color: isSuccess ? '#A3D4A0' : '#F5E6D3', 
-          fontWeight: '500', 
+      <Body
+        fontSize="$xs"
+        style={{
+          textAlign: 'center',
+          color: isSuccess ? '#82cc7eff' : '#F5E6D3', //'#A3D4A0'
+          fontWeight: '500',
           lineHeight: 16,
           opacity: 0.9,
           backgroundColor: 'rgba(245, 230, 211, 0.1)',
           padding: 8,
           borderRadius: 4,
           borderWidth: 1,
-          borderColor: 'rgba(245, 230, 211, 0.2)'
+          borderColor: 'rgba(245, 230, 211, 0.2)',
         }}
       >
         {isSuccess ? error : `❌ ${error}`}
-      </ThemedText>
+      </Body>
     </View>
   );
 }

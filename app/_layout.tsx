@@ -1,4 +1,5 @@
 import { AuthStateManager, logger } from "@/lib";
+import { ThemeProvider, UseTheme } from "@/theme";
 import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Dimensions, Platform, View } from 'react-native';
@@ -8,6 +9,7 @@ import { AppParamsProvider, useAppParams } from '../contexts/AppParamsContext';
 import { useAppBootstrap } from '../hooks/use-app-bootstrap';
 
 function RootLayoutContent() {
+  const { theme } = UseTheme();
   // Get local search params using the hook at the top level
   const urlParams = useLocalSearchParams();
   const router = useRouter();
@@ -237,10 +239,11 @@ function RootLayoutContent() {
   const topBarConfig = getTopBarConfig();
 
   return (
+
     <View style={{
       height: '100%',
       width: '100%',
-      //backgroundColor: CoreColors.backgroundDark
+      backgroundColor: theme.background || '#2f353d'
     }}>
       {/* Global TopBar - shown on most screens */}
       {topBarConfig && (
@@ -259,7 +262,7 @@ function RootLayoutContent() {
         screenOptions={{
           headerShown: false,
           contentStyle: {
-            backgroundColor: bgColor,
+            backgroundColor: '$background',
           },
         }}
       />
@@ -270,8 +273,10 @@ function RootLayoutContent() {
 // Main export with provider wrapper
 export default function RootLayout() {
   return (
-    <AppParamsProvider>
-      <RootLayoutContent />
-    </AppParamsProvider>
+    <ThemeProvider>
+      <AppParamsProvider>
+        <RootLayoutContent />
+      </AppParamsProvider>
+    </ThemeProvider>
   );
 }

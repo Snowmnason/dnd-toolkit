@@ -1,10 +1,8 @@
-import { AuthButton, AuthInput } from '@/components/auth_components';
+import { AuthError, AuthInput } from '@/components/auth_components';
+import { Body, BodyLogin, Button, Caption, SubTitle, Title } from '@/components/ui';
 import { useSignInForm } from '@/lib';
 import { useRouter } from 'expo-router';
 import { View } from 'react-native';
-import { ThemedText } from '../../components/ui/themed-text';
-
-
 
 export default function SignInScreen() {
   const router = useRouter();
@@ -34,16 +32,11 @@ export default function SignInScreen() {
       
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'transparent' }}>
         
-        <ThemedText 
-          type="title" 
-          style={{ marginBottom: 20, textAlign: 'center', color: '#F5E6D3', fontSize: 32, fontWeight: '700' }}
-        >
-          Welcome Back
-        </ThemedText>
+        <Title>Welcome Back</Title>
         
-        <ThemedText style={{ marginBottom: 40, textAlign: 'center', fontSize: 16, opacity: 0.8, color: '#F5E6D3', lineHeight: 22, paddingHorizontal: 20 }}>
+       <BodyLogin opacity={0.8}>
           Continue the sign-in process to confirm your account and adventures.
-        </ThemedText>
+        </BodyLogin>
 
         {/* Form Inputs */}
         <View style={{ width: '100%', maxWidth: 300, marginBottom: 15, backgroundColor: 'transparent' }}>
@@ -76,71 +69,43 @@ export default function SignInScreen() {
           />
 
           {/* Forgot Password Link - TODO: Add forgot password screen */}
-          <ThemedText
-            style={{ textAlign: 'right', fontSize: 13, color: '#D4AF37', fontWeight: '500', marginBottom: 4, cursor: 'pointer', marginTop: -14 }}
+          <SubTitle color='#D4AF37' cursor='pointer' align='right' style={{ marginBottom: 4, marginTop: -14 }}
             onPress={() => router.push('/login/forgot-password')}
           >
             Forgot Password?
-          </ThemedText>
+          </SubTitle>
 
         </View>
 
         {/* Error Display */}
-        {authError && (
-          <View style={{ 
-            width: '100%', 
-            maxWidth: 300, 
-            backgroundColor: 'rgba(220, 53, 69, 0.1)', 
-            borderColor: '#dc3545', 
-            borderWidth: 1, 
-            borderRadius: 8, 
-            padding: 12, 
-            marginBottom: 16 
-          }}>
-            <ThemedText style={{ 
-              color: '#dc3545', 
-              fontSize: 14, 
-              textAlign: 'center',
-              fontWeight: '500'
-            }}>
-              {authError}
-            </ThemedText>
-          </View>
-        )}
+        <View style={{ width: '100%', maxWidth: 300 }}>
+          <AuthError error={authError} />
+        </View>
 
         {/* Action Buttons */}
         <View style={{ width: '100%', maxWidth: 300, gap: 16, backgroundColor: 'transparent' }}>
           {/* Sign In Button */}
-          <AuthButton
-            title="Sign In"
+          <Button
+            variant="auth"
+            text="Sign In"
             onPress={handleSignIn}
-            disabled={!isFormValid}
-            loading={loading}
+            disabled={!isFormValid} loading={loading}
           />
           
           {/* Back to Welcome Button */}
-          <ThemedText
-            style={{ 
-              textAlign: 'center', 
-              fontSize: 14, 
-              color: '#D4AF37', 
-              fontWeight: '500',
-              marginTop: 8,
-              textDecorationLine: 'underline'
-            }}
-            onPress={() => router.replace('/login/welcome')}
-          >
+          <Body align='center' color='#D4AF37' deco='underline' style={{ marginTop: 8 }} onPress={() => router.replace('/login/welcome')}>
             ← Back to Welcome
-          </ThemedText>
+          </Body>
         </View>
 
-        <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
+        <Body variant="semi" fontSize="$sm" color='#F5E6D3' align='center' opacity={0.6}
+          style={{ marginTop: 30, lineHeight: 18, paddingHorizontal: 20 }}>
           Secure authentication powered by Supabase
-        </ThemedText>
-        
-        <ThemedText style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
+        </Body>
+
+        <Caption color='#F5E6D3' align='center' style={{ marginTop: 8, opacity: 0.5, lineHeight: 16, paddingHorizontal: 20 }}>
           © 2025 The Snow Post · Forged for storytellers & adventurers
-        </ThemedText>
+        </Caption>
       </View>
     </View>
   );

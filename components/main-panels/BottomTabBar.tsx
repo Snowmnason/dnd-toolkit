@@ -1,15 +1,15 @@
-import { TouchableOpacity, View } from 'react-native';
-import { ComponentStyles } from '../../constants/theme';
-import { ThemedText } from '../ui/themed-text';
+import { UseTheme } from '@/theme';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { panelConfigs } from './PanelData';
 
 interface BottomTabBarProps {
   activeTab: string;
   onTabChange: (tabKey: string) => void;
 }
+const { theme } = UseTheme()
 
 export function BottomTabBar({ activeTab, onTabChange }: BottomTabBarProps) {
-  const styles = ComponentStyles.bottomTabBar;
+  
   
   return (
     <View style={styles.container}>
@@ -18,24 +18,58 @@ export function BottomTabBar({ activeTab, onTabChange }: BottomTabBarProps) {
           key={panel.key}
           style={[
             styles.tab,
-            activeTab === panel.key && styles.activeTab,
+            activeTab === panel.key && styles.tabActive,
           ]}
           onPress={() => onTabChange(panel.key)}
         >
-          <ThemedText style={[
-            styles.icon,
-            activeTab === panel.key && styles.activeIcon,
-          ]}>
+          <Text style={styles.icon}>
             {panel.icon}
-          </ThemedText>
-          <ThemedText style={[
-            styles.label,
-            activeTab === panel.key && styles.activeLabel,
-          ]} numberOfLines={1}>
+          </Text>
+          <Text
+            style={[
+              styles.label,
+              activeTab === panel.key && styles.labelActive,
+            ]}
+            numberOfLines={1}
+          >
             {panel.title.split(' ')[0]}
-          </ThemedText>
+          </Text>
         </TouchableOpacity>
       ))}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    height: 60,
+    backgroundColor: '#1f262eff',
+    borderTopWidth: 1,
+    borderTopColor: '#969696ff',
+    paddingBottom: 5,
+    // ...Shadows.panelShadow,
+  },
+  tab: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 5,
+  },
+  tabActive: {
+    backgroundColor: 'rgba(212, 175, 55, 0.13)',
+  },
+  icon: {
+    fontSize: 24,
+    marginBottom: 2,
+  },
+  label: {
+    fontFamily: theme.fontFamily,
+    fontSize: 10,
+    color: '#a77e44', // Text Secondary
+  },
+  labelActive: {
+    color: '#D4AF37',
+    fontWeight: 'bold',
+  },
+});

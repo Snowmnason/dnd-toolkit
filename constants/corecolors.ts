@@ -33,7 +33,7 @@ export const CoreColors = {
   //Button Colors
     //Delete Buttons
   destructive: '#dc3545',
-  destructiveBoarder: '#c82333',
+  destructiveBoarder: '#c82333ff',
   destructiveText: '#F5E6D3',
   destructiveDisabled: '#6c757d',
     // Utility colors

@@ -1,10 +1,8 @@
-import { CoreColors } from '@/constants/corecolors';
+import { UseTheme } from '@/theme';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Platform, TouchableOpacity, View, useWindowDimensions } from 'react-native';
-import { ComponentStyles } from '../constants/theme';
+import { Platform, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import SettingsMenu from './settings/SettingsMenu';
-import { ThemedText } from './ui/themed-text';
 
 interface TopBarProps {
   title?: string;
@@ -15,6 +13,7 @@ interface TopBarProps {
   worldId?: string;
   userRole?: string;
 }
+const { theme } = UseTheme()
 
 export default function TopBar({ 
   title = 'D&D Toolkit', 
@@ -43,47 +42,41 @@ export default function TopBar({
     setShowSettingsMenu(true);
   };
 
-  // Show on all platforms now (not just mobile)
   return (
     <>
-      <View style={{ ...ComponentStyles.topBar.container, paddingTop: isMobile ? 50 : 8 }}>
+      <View style={[
+        styles.container,
+        isMobile ? styles.containerMobile : styles.containerDesktop,
+      ]}>
         {/* Left: Back Button */}
-        <View style={{ width: 40 }}>
+        <View style={styles.sideSlot}>
           {showBackButton && (
             <TouchableOpacity 
               onPress={handleBackPress}
-              style={ComponentStyles.topBar.button}
+              style={styles.iconButton}
             >
-              <ThemedText style={{ color: CoreColors.primary, fontSize: 16, fontWeight: '600' }}>
+              <Text style={styles.iconText}>
                 ←
-              </ThemedText>
+              </Text>
             </TouchableOpacity>
           )}
         </View>
 
         {/* Center: Title */}
-        <ThemedText 
-          style={{ 
-            color: CoreColors.textPrimary, 
-            fontSize: 18, 
-            fontWeight: '700',
-            textAlign: 'center',
-            flex: 1
-          }}
-        >
+        <Text style={styles.title}>
           {title}
-        </ThemedText>
+        </Text>
 
         {/* Right: Hamburger Menu */}
-        <View style={{ width: 40 }}>
+        <View style={styles.sideSlot}>
           {showHamburger && (
             <TouchableOpacity 
               onPress={handleHamburgerPress}
-              style={ComponentStyles.topBar.button}
+              style={styles.iconButton}
             >
-              <ThemedText style={{ color: CoreColors.primary, fontSize: 16, fontWeight: '600' }}>
+              <Text style={styles.iconText}>
                 ☰
-              </ThemedText>
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -121,3 +114,44 @@ export default function TopBar({
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#1f262eff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#969696ff',
+  },
+  containerMobile: {
+    paddingTop: 50,
+  },
+  containerDesktop: {
+    paddingTop: 8,
+  },
+  sideSlot: {
+    width: 40,
+  },
+  iconButton: {
+    padding: 4,
+    borderRadius: 6,
+    backgroundColor: 'rgba(139, 69, 19, 0.2)',
+    alignItems: 'center',
+  },
+  iconText: {
+    color: '#F5E6D3',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  title: {
+    fontFamily: theme.fontFamily,
+    color: '#F5E6D3',
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    flex: 1,
+  },
+});

@@ -3,6 +3,6 @@
  * Centralizes base UI component exports
  */
 
-export { default as BaseButton } from './BaseButton';
-export type { BaseButtonProps } from './BaseButton';
+export * from './AppText';
+export * from './BaseButton';
 
