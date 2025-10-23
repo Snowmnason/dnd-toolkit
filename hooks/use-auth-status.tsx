@@ -1,6 +1,5 @@
+import { logger, supabase } from '@/lib/';
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { logger } from '../lib/utils/logger';
 
 export function useAuthStatus() {
   const [isUserLoggedIn, setIsUserLoggedIn] = useState<boolean | null>(null);

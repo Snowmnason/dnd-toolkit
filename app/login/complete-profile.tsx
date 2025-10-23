@@ -1,10 +1,9 @@
-import { AuthButton, AuthError, AuthInput } from '@/components/auth_components';
+import { AuthError, AuthInput } from '@/components/auth_components';
+import { Body, BodyLogin, Button, Caption, SubTitle, Title } from '@/components/ui';
 import { logger, supabase, usersDB, useSignUpForm } from '@/lib';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, View } from 'react-native';
-import PrimaryButton from '../../components/custom_components/PrimaryButton';
-import { ThemedText } from '../../components/ui/themed-text';
+import { View } from 'react-native';
 
 
 
@@ -112,9 +111,9 @@ export default function CompleteProfileScreen() {
   if (initializing || !user) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#2f353d' }}>
-        <ThemedText style={{ color: '#F5E6D3' }}>
+        <Body color="#F5E6D3" fontSize="$sm">
           {initializing ? 'Checking authentication...' : 'Loading...'}
-        </ThemedText>
+        </Body>
       </View>
     );
   }
@@ -123,29 +122,20 @@ export default function CompleteProfileScreen() {
     <View style={{ flex: 1, backgroundColor: '#2f353d' }}>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'transparent' }}>
         
-        <ThemedText 
-          type="title" 
-          style={{ marginBottom: 20, textAlign: 'center', color: '#F5E6D3', fontSize: 32, fontWeight: '700' }}
-        >
-          Complete Your Profile
-        </ThemedText>
-        
-        <ThemedText style={{ marginBottom: 40, textAlign: 'center', fontSize: 16, opacity: 0.8, color: '#F5E6D3', lineHeight: 22, paddingHorizontal: 20 }}>
+        <Title>Complete Your Profile</Title>
+                
+        <BodyLogin style={{opacity: 0.8}}>
           Choose a username to complete your account setup
-        </ThemedText>
+        </BodyLogin>
 
         {/* Welcome Message */}
         <View style={{ backgroundColor: 'rgba(245, 230, 211, 0.95)', padding: 24, borderRadius: 12, marginBottom: 32, borderWidth: 2, borderColor: '#8B4513', maxWidth: 350 }}>
-          <ThemedText 
-            style={{ textAlign: 'center', color: '#8B4513', fontWeight: '600', marginBottom: 8, fontSize: 16 }}
-          >
+          <BodyLogin color='#8B4513' style={{ marginBottom: 8 }}>
             Welcome, {username ? username : 'Adventurer'}!
-          </ThemedText>
-          <ThemedText 
-            style={{ textAlign: 'center', color: '#8B4513', lineHeight: 20, fontSize: 14 }}
-          >
+          </BodyLogin>
+          <BodyLogin color='#8B4513' style={{ fontSize: 14 }}>
             There will be more added soon to customize your profile more.
-          </ThemedText>
+          </BodyLogin>
         </View>
 
         {/* Form Input */}
@@ -168,18 +158,16 @@ export default function CompleteProfileScreen() {
           {/* Username Requirements */}
           {username.length > 0 && (
             <View style={{ marginBottom: 4, marginTop: -14 }}>
-              <ThemedText 
+              <SubTitle 
                 style={{ 
                   textAlign: 'left', 
-                  fontSize: 11, 
-                  color: usernameValidation.isValid ? '#A3D4A0' : '#F5A5A5', 
-                  fontWeight: '500', 
+                  color: usernameValidation.isValid ? '#82cc7eff' : '#f78888ff',//'#F5A5A5' 
                   lineHeight: 16,
                   opacity: 0.9
                 }}
               >
                 {getUsernameDisplayText()}
-              </ThemedText>
+              </SubTitle>
             </View>
           )}
         </View>
@@ -187,46 +175,27 @@ export default function CompleteProfileScreen() {
         {/* Action Buttons */}
         <View style={{ width: '100%', maxWidth: 300, gap: 16, backgroundColor: 'transparent' }}>
           {/* Complete Profile Button */}
-          <AuthButton
-            title="Complete Profile"
+          <Button
+            variant="auth"
+            text="Complete Profile"
             onPress={handleCompleteProfile}
-            disabled={!isFormValid}
-            loading={loading}
+            disabled={!isFormValid} loading={loading}
           />
 
-          {/* Sign Out Button */}
-          <PrimaryButton
-            style={{ 
-              width: '100%', 
-              backgroundColor: 'rgba(139, 69, 19, 0.15)', 
-              borderWidth: 1, 
-              borderColor: '#8B4513', 
-              paddingVertical: 12, 
-              borderRadius: 8,
-              opacity: loading ? 0.5 : 1
-            }}
-            textStyle={{ color: '#F5E6D3', fontSize: 13, fontWeight: '500' }}
-            onPress={async () => {
-              try {
-                await supabase.auth.signOut();
-                router.replace('/login/welcome');
-              } catch {
-                Alert.alert('Error', 'Failed to sign out');
-              }
-            }}
-            disabled={loading}
-          >
+          {/* Switch to Sign Up */}
+          <Button bg='rgba(139, 69, 19, 0.15)' borderColor='#8B4513' textColor='#F5E6D3' style={{   width: '100%', }} onPress={() => router.push('/login/sign-up')} disabled={loading} >
             Sign Out
-          </PrimaryButton>
+          </Button>
         </View>
 
-        <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
+        <Body variant="semi" fontSize="$sm" color='#F5E6D3' align='center' opacity={0.6}
+          style={{ marginTop: 30, lineHeight: 18, paddingHorizontal: 20 }}>
           Your username will be used for online games and friend connections.
-        </ThemedText>
-        
-        <ThemedText style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
+        </Body>
+
+        <Caption color='#F5E6D3' align='center' style={{ marginTop: 8, opacity: 0.5, lineHeight: 16, paddingHorizontal: 20 }}>
           © 2025 The Snow Post · Forged for storytellers & adventurers
-        </ThemedText>
+        </Caption>
       </View>
     </View>
   );

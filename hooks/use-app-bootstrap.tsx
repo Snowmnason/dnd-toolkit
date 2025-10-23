@@ -125,7 +125,7 @@ async function restoreSession() {
     logger.debug('bootstrap', 'Restoring Supabase session...');
     
     // Import supabase dynamically to avoid circular dependencies
-    const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
+    const { supabase, isSupabaseConfigured } = await import('../lib/database/supabase');
     
     if (!isSupabaseConfigured()) {
       logger.warn('bootstrap', 'Supabase not configured, skipping session restore');

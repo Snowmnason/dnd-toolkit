@@ -1,11 +1,10 @@
+import { Body, Button, Caption, Heading, SubTitle, Title } from '@/components/ui';
 import { useWelcomeScreen } from '@/lib';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { View } from 'react-native';
-import AuthButton from '../../components/auth_components/AuthButton';
 import CustomLoad from '../../components/custom_components/CustomLoad';
-import PrimaryButton from '../../components/custom_components/PrimaryButton';
-import { ThemedText } from '../../components/ui/themed-text';
+
 
 // TODO: Uncomment when ready to enable social authentication
 // import AppleSignInButton from '../../components/social-auth-buttons/apple/apple-sign-in-button';
@@ -23,9 +22,9 @@ export default function WelcomeScreen() {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: "#2f353d" }}>
         <CustomLoad size="large"/>
-        <ThemedText style={{ marginTop: 16, color: '#F5E6D3' }}>
+        <Body style={{ marginTop: 16, color: '#F5E6D3' }}>
           Loading...
-        </ThemedText>
+        </Body>
       </View>
     );
   }
@@ -35,34 +34,27 @@ export default function WelcomeScreen() {
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, backgroundColor: "#2f353d" }}>
         
         {/* App Title */}
-        <ThemedText 
-          type="title" 
-          style={{ textAlign: 'center', marginBottom: 16, fontSize: 48, color: '#F5E6D3' }}
-        >
-          D&D Toolkit
-        </ThemedText>
-        
-        <ThemedText 
-          type="subtitle" 
-          style={{ textAlign: 'center', marginBottom: 48, color: '#F5E6D3', opacity: 0.8 }}
+        <Title> D&D Toolkit </Title>
+
+        <SubTitle align='center' color='#F5E6D3'
+          style={{marginBottom: 48, opacity: 0.8 }}
         >
           Your Adventure Awaits
-        </ThemedText>
+        </SubTitle>
 
         {/* Welcome Message */}
         <View style={{ backgroundColor: 'rgba(245, 230, 211, 0.95)', padding: 24, borderRadius: 12, marginBottom: 32, borderWidth: 2, borderColor: '#8B4513' }}>
-          <ThemedText 
-            type="bodyLarge" 
-            style={{ textAlign: 'center', marginBottom: 16, color: '#8B4513', fontWeight: '600' }}
+          <Heading align='center' color='#8B4513'
+            style={{ marginBottom: 16, }}
           >
             Welcome, Adventurer!
-          </ThemedText>
+          </Heading>
           
-          <ThemedText 
-            style={{ textAlign: 'center', color: '#8B4513', lineHeight: 22, fontSize: 16 }}
+          <Body align='center' color='#8B4513'
+            style={{ lineHeight: 22, fontSize: 16 }}
           >
             Create an account or sign in to start building your campaigns and sync across all your devices.
-          </ThemedText>
+          </Body>
         </View>
 
         {/* Authentication Options */}
@@ -94,38 +86,33 @@ export default function WelcomeScreen() {
           */}
           
           {/* Sign In Button */}
-          <AuthButton
-            title="Sign In"
+          <Button
+          variant='auth'
+            text="Sign In"
             onPress={handleSignIn}
             disabled={isLoading}
             loading={isLoading}
           />
 
           {/* Sign Up Button - matching secondary style from sign-in screen */}
-          <PrimaryButton
+          <Button
+            bg='rgba(139, 69, 19, 0.15)'
+            borderColor='#8B4513'
+            textColor='#F5E6D3'
+            text='Create Account'
             style={{ 
               width: '100%', 
-              backgroundColor: 'rgba(139, 69, 19, 0.15)', 
-              borderWidth: 1, 
-              borderColor: '#8B4513', 
-              paddingVertical: 16, 
-              borderRadius: 8,
-              opacity: isLoading ? 0.5 : 1
             }}
-            textStyle={{ color: '#F5E6D3', fontSize: 16, fontWeight: '600' }}
             onPress={handleSignUp}
             disabled={isLoading}
-          >
-            Create Account
-          </PrimaryButton>
+          />
           {/* Anon sign in */}
-          <ThemedText
+          <Body
+            deco='underline'
+            color={isLoading ? '#BDB76B' : '#D4AF37'}
+            align='center'
             style={{ 
               textAlign: 'center', 
-              fontSize: 14, 
-              color: isLoading ? '#BDB76B' : '#D4AF37', 
-              fontWeight: '500',
-              textDecorationLine: 'underline',
               opacity: isLoading ? 0.5 : 1
             }}
             onPress={() => {
@@ -133,22 +120,20 @@ export default function WelcomeScreen() {
             }}
           >
             Continue without an account
-          </ThemedText>
+          </Body>
           
         </View>
 
         {/* Benefits Info */}
         <View style={{ marginTop: 22, backgroundColor: 'transparent', alignItems: 'center' }}>
-          <ThemedText 
-            type="caption" 
-            style={{ textAlign: 'center', color: '#F5E6D3', opacity: 0.7, fontSize: 12, lineHeight: 18 }}
-          >
+          <Body variant="semi" fontSize="$sm" color='#F5E6D3' align='center' opacity={0.6}
+            style={{ marginTop: 30, lineHeight: 18, paddingHorizontal: 20 }}>
             Cloud sync • Backup your worlds • Access anywhere • Share with friends
-          </ThemedText>
+          </Body>
           
-          <ThemedText style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
+          <Caption color='#F5E6D3' align='center' style={{ marginTop: 8, opacity: 0.5, lineHeight: 16, paddingHorizontal: 20 }}>
             © 2025 The Snow Post · Forged for storytellers & adventurers
-          </ThemedText>
+          </Caption>
         </View>
         
       </View>

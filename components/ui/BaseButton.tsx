@@ -1,166 +1,294 @@
-import { CoreColors } from '@/constants/corecolors';
-import React from 'react';
-import { ActivityIndicator, TextStyle, TouchableOpacity, ViewStyle } from 'react-native';
-import { ThemedText } from './themed-text';
+import { $, S, tone } from '@/theme'
+import * as Haptics from 'expo-haptics'
+import React from 'react'
+import {
+  ActivityIndicator,
+  Platform,
+  StyleProp,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+  ViewStyle,
+} from 'react-native'
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated'
+import { ButtonText } from './AppText'
 
-export interface BaseButtonProps {
-  onPress: () => void;
-  children: React.ReactNode;
-  disabled?: boolean;
-  loading?: boolean;
-  variant?: 'primary' | 'secondary' | 'destructive' | 'ghost';
-  size?: 'small' | 'medium' | 'large';
-  style?: ViewStyle | ViewStyle[];
-  textStyle?: TextStyle | TextStyle[];
-  loadingColor?: string;
+/* ───────────────────────────────
+   🔘 Types
+──────────────────────────────── */
+export type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'destructive'
+  | 'ghost'
+  | 'solid'
+  | 'outlined'
+  | 'cancel'
+  | 'auth'
+
+export type ButtonSize = 'sm' | 'md' | 'lg'
+
+interface ButtonProps {
+  variant?: ButtonVariant
+  size?: ButtonSize
+  disabled?: boolean
+  loading?: boolean
+  text?: string
+  iconLeft?: React.ReactNode
+  iconRight?: React.ReactNode
+  bg?: string
+  textColor?: string
+  borderColor?: string
+  style?: StyleProp<ViewStyle>
+  onPress?: () => void
+  children?: React.ReactNode
 }
 
-/**
- * BaseButton - Foundation button component with automatic disabled state handling
- * 
- * Features:
- * - Automatic opacity and background color for disabled state
- * - Built-in loading state with spinner
- * - Multiple variants (primary, secondary, destructive, ghost)
- * - Size variations (small, medium, large)
- * - Theme-ready architecture
- */
-export default function BaseButton({
-  onPress,
-  children,
+/* ───────────────────────────────
+   🎨 Variant Styles
+──────────────────────────────── */
+function getVariantColors(variant: ButtonVariant) {
+  switch (variant) {
+    case 'secondary':
+      return {
+        background: $('secondaryButtonBg'),
+        border: $('secondaryButtonBorder'),
+        text: $('secondaryButtonText'),
+        hover: tone($('secondaryButtonBg'), 'hover'),
+      }
+    case 'destructive':
+      return {
+        background: $('destructiveButton'),
+        border: tone($('destructiveButton'), 'border'),
+        text: $('destructiveButtonText'),
+        hover: tone($('destructiveButton'), 'hover'),
+      }
+    case 'ghost':
+      return {
+        background: 'transparent',
+        border: 'transparent',
+        text: $('ghostButtonText'),
+        hover: 'transparent',
+      }
+    case 'solid':
+      return {
+        background: $('solidOutButton'),
+        border: 'transparent',
+        text: $('solidOutButtonText'),
+        hover: tone($('solidOutButton'), 'hover'),
+      }
+    case 'outlined':
+      return {
+        background: 'transparent',
+        border: tone($('solidOutButton'), 'border'),
+        text: $('solidOutButtonText'),
+        hover: tone($('solidOutButton'), 'hover'),
+      }
+    case 'cancel':
+      return {
+        background: $('cancelButton'),
+        border: tone($('cancelButton'), 'border'),
+        text: $('cancelButtonText'),
+        hover: tone($('cancelButton'), 'hover'),
+      }
+    case 'primary':
+    default:
+      return {
+        background: $('primaryButtonBg'),
+        border: $('primaryButtonBorder'),
+        text: $('primaryButtonText'),
+        hover: tone($('primaryButtonBg'), 'hover'),
+      }
+  }
+}
+
+/* ───────────────────────────────
+   🪄 Base Button
+──────────────────────────────── */
+export function Button({
+  variant = 'primary',
+  size = 'md',
   disabled = false,
   loading = false,
-  variant = 'primary',
-  size = 'medium',
+  text,
+  iconLeft,
+  iconRight,
+  bg,
+  textColor,
+  borderColor,
   style,
-  textStyle,
-  loadingColor,
-}: BaseButtonProps) {
-  const isDisabled = disabled || loading;
+  onPress,
+  children,
+}: ButtonProps) {
+  const scale = useSharedValue(1)
+  const hovered = useSharedValue(0)
 
-  // Variant styles
-  const getVariantStyle = (): ViewStyle => {
-    switch (variant) {
-      case 'primary':
-        return {
-          backgroundColor: isDisabled ? CoreColors.textSecondary : CoreColors.buttonBackgroundLight,
-          borderColor: CoreColors.secondary,
-          borderWidth: 2,
-        };
-      case 'secondary':
-        return {
-          backgroundColor: isDisabled 
-            ? CoreColors.secondaryButtonDisable
-            : CoreColors.secondaryButtonBackground,
-          borderColor: CoreColors.secondaryButtonBorder,
-          borderWidth: 1,
-        };
-      case 'destructive':
-        return {
-          backgroundColor: isDisabled ? CoreColors.destructiveDisabled : CoreColors.destructive,
-          borderColor: isDisabled ? CoreColors.destructiveDisabled : CoreColors.destructiveBoarder,
-          borderWidth: 1,
-        };
-      case 'ghost':
-        return {
-          backgroundColor: 'transparent',
-          borderColor: 'transparent',
-          borderWidth: 0,
-        };
-      default:
-        return {
-          backgroundColor: isDisabled ? CoreColors.textSecondary : CoreColors.backgroundLight,
-          borderColor: CoreColors.secondary,
-          borderWidth: 2,
-        };
+  const colors = getVariantColors(variant)
+  const sizing = S.button[size]
+  const paddingH = sizing.paddingHorizontal
+  const height = sizing.height
+
+  const getColor = (color: string, type?: 'hover' | 'border') => {
+    if (disabled || loading) return tone(color, 'disabled')
+    if (type === 'hover') return tone(color, 'hover')
+    if (type === 'border') return tone(color, 'border')
+    return color
+  }
+
+  const handlePressIn = () => {
+    if (disabled || loading) return
+    scale.value = withSpring(0.96)
+  }
+
+  const handlePressOut = () => {
+    if (disabled || loading) return
+    scale.value = withSpring(1)
+  }
+
+  const handlePress = () => {
+    if (disabled || loading) return
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     }
-  };
+    onPress?.()
+  }
 
-  // Size styles
-  const getSizeStyle = (): ViewStyle => {
-    switch (size) {
-      case 'small':
-        return {
-          paddingVertical: 8,
-          paddingHorizontal: 12,
-          borderRadius: 6,
-        };
-      case 'large':
-        return {
-          paddingVertical: 16,
-          paddingHorizontal: 24,
-          borderRadius: 10,
-        };
-      case 'medium':
-      default:
-        return {
-          paddingVertical: 12,
-          paddingHorizontal: 16,
-          borderRadius: 8,
-        };
-    }
-  };
+  const handleMouseEnter = () => {
+    if (disabled || loading || Platform.OS !== 'web') return
+    hovered.value = withTiming(1, { duration: 150 })
+  }
 
-  // Text styles
-  const getTextStyle = (): TextStyle => {
-    const baseColor = variant === 'primary' || variant === 'secondary'
-      ? CoreColors.primary
-      : variant === 'destructive'
-      ? CoreColors.textPrimary
-      : CoreColors.textOnLight;
+  const handleMouseLeave = () => {
+    if (disabled || loading || Platform.OS !== 'web') return
+    hovered.value = withTiming(0, { duration: 150 })
+  }
 
-    const fontSize = size === 'small' ? 14 : size === 'large' ? 18 : 16;
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }))
 
-    return {
-      color: baseColor,
-      fontSize,
-      fontWeight: '600',
-    };
-  };
+  const hoverStyle = useAnimatedStyle(() => ({
+    backgroundColor: hovered.value
+      ? getColor(bg ?? colors.hover, 'hover')
+      : getColor(bg ?? colors.background),
+  }))
 
-  // Get loading spinner color based on variant
-  const getLoadingColor = (): string => {
-    if (loadingColor) return loadingColor;
-    
-    switch (variant) {
-      case 'primary':
-      case 'secondary':
-        return CoreColors.primary;
-      case 'destructive':
-        return CoreColors.textPrimary;
-      default:
-        return CoreColors.textOnLight;
-    }
-  };
+  // Smooth fade transition between spinner and text
+  const fadeStyle = useAnimatedStyle(() => ({
+    opacity: withTiming(loading ? 0 : 1, { duration: 150 }),
+  }))
+  const spinnerStyle = useAnimatedStyle(() => ({
+    opacity: withTiming(loading ? 1 : 0, { duration: 150 }),
+  }))
 
   return (
-    <TouchableOpacity
-      style={[
-        {
+    <Animated.View style={[animatedStyle, style]}>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        disabled={disabled || loading}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onPress={handlePress}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        style={{
+          flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          opacity: isDisabled ? 0.6 : 1,
+          height,
+          paddingHorizontal: paddingH,
+          borderRadius: S.radius.md,
+          borderColor: getColor(borderColor ?? colors.border, 'border'),
+          borderWidth: 1,
+        }}
+      >
+        <Animated.View
+          style={[
+            hoverStyle,
+            { ...StyleSheet.absoluteFillObject, borderRadius: S.radius.md },
+          ]}
+        />
+
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {iconLeft && !loading && (
+            <View style={{ marginRight: S.space.xs }}>{iconLeft}</View>
+          )}
+
+          <Animated.View style={fadeStyle}>
+            {text ? (
+              <ButtonText
+                style={{
+                  color: getColor(textColor ?? colors.text),
+                  fontSize: sizing.font,
+                }}
+              >
+                {text}
+              </ButtonText>
+            ) : (
+              children
+            )}
+          </Animated.View>
+
+          <Animated.View style={[spinnerStyle, { position: 'absolute' }]}>
+            {loading && (
+              <ActivityIndicator
+                size="small"
+                color={getColor(textColor ?? colors.text)}
+              />
+            )}
+          </Animated.View>
+
+          {iconRight && !loading && (
+            <View style={{ marginLeft: S.space.xs }}>{iconRight}</View>
+          )}
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  )
+}
+
+/* ───────────────────────────────
+   🔗 Button Group
+──────────────────────────────── */
+interface ButtonGroupProps {
+  direction?: 'horizontal' | 'vertical'
+  spacing?: keyof typeof S.space
+  align?: 'start' | 'center' | 'end' | 'space-between'
+  fullWidth?: boolean
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+}
+
+export function ButtonGroup({
+  direction = 'horizontal',
+  spacing = 'sm',
+  align = 'center',
+  fullWidth = false,
+  children,
+  style,
+}: ButtonGroupProps) {
+  const flexDirection: ViewStyle['flexDirection'] =
+    direction === 'horizontal' ? 'row' : 'column'
+
+  return (
+    <View
+      style={[
+        {
+          flexDirection,
+          justifyContent: align as ViewStyle['justifyContent'],
+          alignItems: align as ViewStyle['alignItems'],
+          gap: S.space[spacing],
+          width: fullWidth ? '100%' : undefined,
         },
-        getVariantStyle(),
-        getSizeStyle(),
         style,
       ]}
-      onPress={onPress}
-      disabled={isDisabled}
-      activeOpacity={0.7}
     >
-      {loading ? (
-        <ActivityIndicator size="small" color={getLoadingColor()} />
-      ) : (
-        <ThemedText
-          style={[
-            getTextStyle(),
-            textStyle,
-          ]}
-        >
-          {children}
-        </ThemedText>
-      )}
-    </TouchableOpacity>
-  );
+      {children}
+    </View>
+  )
 }

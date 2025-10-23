@@ -1,8 +1,8 @@
 import { PropsWithChildren, useState } from 'react';
 import { TouchableOpacity } from 'react-native';
 
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { ThemedText } from '@/components/ui/themed-text';
+import { IconSymbol } from '@/components/built-in/icon-symbol';
+import { Body } from '@/components/ui';
 import { ThemedView } from '@/components/ui/themed-view';
 import { CoreColors } from '@/constants/corecolors';
 import { Spacing } from '@/constants/theme';
@@ -28,7 +28,7 @@ export function Collapsible({ children, title }: PropsWithChildren & { title: st
           style={{ transform: [{ rotate: isOpen ? '90deg' : '0deg' }] }}
         />
 
-        <ThemedText type="defaultSemiBold">{title}</ThemedText>
+        <Body variant='semi'>{title}</Body>
       </TouchableOpacity>
       {isOpen && (
         <ThemedView style={{

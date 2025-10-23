@@ -3,10 +3,11 @@
  * Centralizes authentication-related component exports
  */
 
-export { default as AuthButton } from './AuthButton';
+export * from './AuthComps';
 export { default as AuthError } from './AuthError';
 export { default as AuthInput } from './AuthInput';
 export { default as AuthSuccess } from './AuthSuccess';
+export * from './AuthView';
 
 // Social auth buttons
 export { default as AppleSignInButton } from './social-auth-buttons/apple/apple-sign-in-button';

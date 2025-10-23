@@ -1,7 +1,7 @@
-import { AuthButton, AuthError, AuthInput, AuthSuccess } from '@/components/auth_components';
+import { AuthError, AuthInput, AuthSuccess } from '@/components/auth_components';
+import { Body, BodyLogin, Button, Caption, SubTitle, Title } from '@/components/ui';
 import { useResetPasswordConfirm } from '@/lib';
 import { View } from 'react-native';
-import { ThemedText } from '../../components/ui/themed-text';
 
 export default function ResetPasswordScreen() {
   const {
@@ -48,16 +48,11 @@ export default function ResetPasswordScreen() {
       
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'transparent' }}>
         
-        <ThemedText 
-          type="title" 
-          style={{ marginBottom: 20, textAlign: 'center', color: '#F5E6D3', fontSize: 32, fontWeight: '700' }}
-        >
-          Reset Password
-        </ThemedText>
+        <Title> Reset Password </Title>
         
-        <ThemedText style={{ marginBottom: 40, textAlign: 'center', fontSize: 16, opacity: 0.8, color: '#F5E6D3', lineHeight: 22, paddingHorizontal: 20 }}>
+        <BodyLogin opacity={0.8} >
           {userEmail ? `${userEmail} is ready to reset your password. Please enter a new password below.` : 'Please enter a new password below.'}
-        </ThemedText>
+        </BodyLogin>
 
         {/* Success Message */}
         {success && (
@@ -83,18 +78,16 @@ export default function ResetPasswordScreen() {
           />
           {/* Password Requirements */}
           <View style={{ marginBottom: 6, marginTop: -14 }}>
-            <ThemedText 
+            <SubTitle
+              color={getPasswordHintColor()}
+              align='left'
+              fontSize={11} 
               style={{ 
-                textAlign: 'left', 
-                fontSize: 11, 
-                color: getPasswordHintColor(), 
-                fontWeight: '500', 
                 lineHeight: 16,
                 opacity: 0.9
-              }}
-            >
+              }}>
               {getPasswordRequirementsText()}
-            </ThemedText>
+            </SubTitle>
           </View>
           
           <AuthInput
@@ -111,18 +104,15 @@ export default function ResetPasswordScreen() {
           {/* Password Match Indicator */}
           {confirmPassword.length > 0 && (
             <View style={{ marginBottom: 6, marginTop: -14 }}>
-              <ThemedText 
-                style={{ 
-                  textAlign: 'left', 
-                  fontSize: 11, 
-                  color: doPasswordsMatch ? '#A3D4A0' : '#F5A5A5', 
-                  fontWeight: '500', 
+              <SubTitle
+                color={doPasswordsMatch ? '#A3D4A0' : '#F5A5A5'}
+                align='left'
+                style={{
                   lineHeight: 16,
                   opacity: 0.9
-                }}
-              >
+                }}>
                 {getPasswordMatchText()}
-              </ThemedText>
+              </SubTitle>
             </View>
           )}
 
@@ -133,36 +123,26 @@ export default function ResetPasswordScreen() {
         <View style={{ width: '100%', maxWidth: 300, gap: 16, backgroundColor: 'transparent' }}>
           {/* Reset Password Button */}
           {!success && (
-            <AuthButton
-              title="Reset Password"
+            <Button
+              variant='auth'
+              text="Reset Password"
               onPress={handleResetPassword}
-              disabled={!isFormValid}
-              loading={loading}
+              disabled={!isFormValid} loading={loading}
             />
           )}
           
           {/* Back to Sign In Button */}
-          <ThemedText
-            style={{ 
-              textAlign: 'center', 
-              fontSize: 14, 
-              color: '#D4AF37', 
-              fontWeight: '500',
-              marginTop: success ? 0 : 8,
-              textDecorationLine: 'underline'
-            }}
-            onPress={goToSignIn}
-          >
+          <Body color='#D4AF37' align='center' cursor='pointer' deco='underline' style={{ marginTop: success ? 0 : 8, }} onPress={goToSignIn}>
             {success ? 'Continue to Sign In →' : '← Back to Sign In'}
-          </ThemedText>
+          </Body>
         </View>
 
-        <ThemedText style={{ marginTop: 30, textAlign: 'center', fontSize: 12, opacity: 0.6, color: '#F5E6D3', lineHeight: 18, paddingHorizontal: 20 }}>
+        <BodyLogin opacity={0.6}>
           {success ? 'Your password has been updated successfully!' : 'After changing your password, you\'ll be returned to the sign-in page.'}
-        </ThemedText>
-        <ThemedText style={{ marginTop: 8, textAlign: 'center', fontSize: 11, opacity: 0.5, color: '#F5E6D3', lineHeight: 16, paddingHorizontal: 20 }}>
+        </BodyLogin>
+        <Caption color='#F5E6D3' align='center' style={{ marginTop: 8, opacity: 0.5, lineHeight: 16, paddingHorizontal: 20 }}>
           © 2025 The Snow Post · Forged for storytellers & adventurers
-        </ThemedText>
+        </Caption>
       </View>
     </View>
   );

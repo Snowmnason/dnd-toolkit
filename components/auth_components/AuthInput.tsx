@@ -1,7 +1,5 @@
 import React from 'react';
-import { View } from 'react-native';
-import PrimaryButton from '../custom_components/PrimaryButton';
-import TextInput from '../custom_components/TextInput';
+import { TextInput as RNTextInput, TouchableOpacity, View } from 'react-native';
 
 interface AuthInputProps {
   placeholder: string;
@@ -32,7 +30,7 @@ export default function AuthInput({
 }: AuthInputProps) {
   return (
     <View style={{ position: 'relative', marginBottom: 2 }}>
-      <TextInput
+      <RNTextInput
         placeholder={placeholder}
         value={value}
         onChangeText={onChangeText}
@@ -40,30 +38,43 @@ export default function AuthInput({
         autoCapitalize={autoCapitalize}
         secureTextEntry={secureTextEntry && !showPassword}
         editable={editable}
-        style={showPasswordToggle ? { paddingRight: 50, ...style } : style}
+        placeholderTextColor='#a77e44'
+        style={[
+          {
+            borderWidth: 2,
+            borderColor: '#D4AF37',
+            borderRadius: 6,
+            paddingVertical: 8,
+            paddingHorizontal: 10,
+            backgroundColor: '#F5E6D3',
+            color: '#2f353d',
+            marginBottom: 16,
+          },
+          showPasswordToggle ? { paddingRight: 40 } : null,
+          style,
+        ]}
       />
       
       {/* Password Toggle Button */}
       {showPasswordToggle && onTogglePassword && (
-        <PrimaryButton
-          style={{ 
-            position: 'absolute', 
-            right: 4, 
-            top: 3, 
-            backgroundColor: 'transparent', 
-            paddingHorizontal: 4, 
-            paddingVertical: 4,
-            minWidth: 24,
-            maxWidth: 30,
-            height: 32,
-            opacity: editable ? 1 : 0.5
+        <TouchableOpacity
+          style={{
+              position: 'absolute',
+              right: 4,
+              top: 3,
+              paddingHorizontal: 4,
+              paddingVertical: 4,
+              minWidth: 24,
+              maxWidth: 30,
+              height: 32,
+              opacity: editable ? 1 : 0.5,
           }}
-          textStyle={{ color: '#D4AF37', fontSize: 16 }}
           onPress={onTogglePassword}
           disabled={!editable}
+          activeOpacity={0.7}
         >
           {showPassword ? '👁️' : '👁️‍🗨️'}
-        </PrimaryButton>
+        </TouchableOpacity>
       )}
     </View>
   );
