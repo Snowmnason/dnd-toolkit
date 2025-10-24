@@ -9,6 +9,7 @@ export type ClassicTheme = {
   ─────────────────────────────── */
 export const classicTheme: ClassicTheme = {
   dark: {
+    [TOKENS.primary]: '#8B4513',
     /* backgrounds */
     [TOKENS.background]: '#2f353d',          // Main app background
     [TOKENS.surface]: '#161B22',             // Panels, cards, modals
@@ -36,6 +37,8 @@ export const classicTheme: ClassicTheme = {
     /* overlays & transparency */
     [TOKENS.overlayLight]: 'rgba(255, 255, 255, 0.05)',
     [TOKENS.overlayDark]: 'rgba(0, 0, 0, 0.25)',
+
+    [TOKENS.shadow]: 'rgba(255, 255, 255, 0.1)',    // Standard shadow color
 
     /* buttons */
     // Primary Button
@@ -75,6 +78,7 @@ export const classicTheme: ClassicTheme = {
      ☀️ LIGHT MODE
   ─────────────────────────────── */
   light: {
+    [TOKENS.primary]: '#8B4513',
     /* backgrounds */
     [TOKENS.background]: '#F5E6D3',          // Light cream background
     [TOKENS.surface]: '#e5d7c0',             // Panels, modals
@@ -102,6 +106,8 @@ export const classicTheme: ClassicTheme = {
     /* overlays & transparency */
     [TOKENS.overlayLight]: 'rgba(255, 255, 255, 0.05)',
     [TOKENS.overlayDark]: 'rgba(0, 0, 0, 0.25)',
+
+    [TOKENS.shadow]: 'rgba(0, 0, 0, 0.18)',    // Standard shadow color
 
     /* buttons */
     [TOKENS.primaryButtonBg]: '#2f353d',

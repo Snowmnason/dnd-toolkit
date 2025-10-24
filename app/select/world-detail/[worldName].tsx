@@ -1,5 +1,5 @@
-import LeaveWorldModal from '@/components/create-world/ConfrimLeaveModal';
-import EditWorldModal from '@/components/create-world/EditWorldModal';
+import LeaveWorldModal from '@/components/modals/ConfrimLeaveModal';
+import EditWorldModal from '@/components/modals/EditWorldModal';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image, View } from 'react-native';
 import PrimaryButton from '../../../components/custom_components/PrimaryButton';

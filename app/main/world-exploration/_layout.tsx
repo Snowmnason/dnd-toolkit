@@ -1,15 +1,14 @@
+import { AppView } from '@/components/ui';
 import { Stack } from 'expo-router';
-import { View } from 'react-native';
-import { CoreColors } from '../../../constants/theme';
 
 export default function WorldExplorationLayout() {
   return (
-    <View style={{ flex: 1, backgroundColor: CoreColors.backgroundDark }}>
+    <AppView variant="page">
       <Stack
         screenOptions={{
           headerShown: false,
         }}
       />
-    </View>
+    </AppView>
   );
 }

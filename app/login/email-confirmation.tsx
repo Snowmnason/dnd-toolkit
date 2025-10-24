@@ -1,10 +1,21 @@
-import { Body, BodyLogin, Button, Caption, Title } from '@/components/ui';
+import {
+  AuthActionGroup,
+  AuthBackButtonContainer,
+  AuthBody,
+  AuthBodyFooter,
+  AuthButton, AuthButtonBack,
+  AuthCaption,
+  AuthModal,
+  AuthRoot,
+  AuthTitle
+} from '@/components/auth_components';
+import { Body } from '@/components/ui';
 import { AuthStateManager, logger, openEmailApp, supabase, usersDB } from '@/lib';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
-import CustomModal from '../../components/modals/CustomModal';
+
 
 
 
@@ -113,84 +124,85 @@ export default function EmailConfirmationScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#2f353d' }}>
-      
-      {/* Back Button */}
-      <View style={{ position: 'absolute', top: 50, left: 20, zIndex: 10, backgroundColor: 'transparent' }}>
-        <Button
-          bg='rgba(139,69,19,0.2)'
-          textColor='#F5E6D3'
+    <AuthRoot>
+      {/* 🔙 Back Button */}
+      <AuthBackButtonContainer>
+        <AuthButtonBack
+          text="← Back"
           onPress={() => router.replace('/login/welcome')}
           disabled={loading}
+        />
+      </AuthBackButtonContainer>
+
+      {/* 🧠 Header */}
+      <AuthTitle>Check Your Email</AuthTitle>
+
+      <AuthBody style={{ marginBottom: 30 }}>
+        We sent a confirmation link to:
+      </AuthBody>
+
+      <AuthBody fontSize={18} color="#D4AF37">
+        {userEmail}
+      </AuthBody>
+
+      <AuthBody opacity={0.8}>
+        <Body
+          opacity={0.7}
+          color="#D4AF37"
+          deco="underline"
+          cursor="pointer"
+          onPress={() => openEmailApp(userEmail)}
         >
-          ← Back
-        </Button>
-      </View>
-
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'transparent' }}>
-        
-        <Title>Check Your Email</Title>
-        
-        <BodyLogin style={{ marginBottom: 30, opacity: 0.8 }}>
-          We sent a confirmation link to:
-        </BodyLogin>
-
-        <BodyLogin fontSize={18} color='#D4AF37'>
-          {userEmail}
-        </BodyLogin>
-
-        <BodyLogin opacity={0.8} color='#F5E6D3'>
-          <Body opacity={0.7} color='#D4AF37' deco='underline' cursor='pointer' onPress={() => openEmailApp(userEmail)}>
-            Click the link in your email
-          </Body>
-          <Body opacity={0.7}> to activate your account. You&apos;ll be automatically signed in!</Body>
-        </BodyLogin>
-
-        {/* Action Buttons */}
-        <View style={{ width: '100%', maxWidth: 300, gap: 16, backgroundColor: 'transparent' }}>
-          {/* Resend Email Button */}
-          <Button
-            variant="auth"
-            text={waitingResend}
-            onPress={handleResendEmail}
-            disabled={isCountingDown} loading={loading}
-          />
-
-          {/* Bottom Row: Change Email + Already Confirmed */}
-          <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
-            {/* Change Email Button */}
-            <Button bg='rgba(139, 69, 19, 0.15)' borderColor='#8B4513' textColor='#F5E6D3' style={{ flex: 1 }} onPress={handleChangeEmail}>
-            Use Different Email
-            </Button>
-
-            {/* Already Confirmed Button */}
-            <Button
-              bg='#4285F4'
-              textColor='#FFF'
-              style={{ 
-                flex: 1, 
-                paddingVertical: 12, 
-                borderRadius: 8 
-              }}
-              onPress={() => router.replace('/login/sign-in')}
-            >
-              Already Confirmed?
-            </Button>
-          </View>
-        </View>
-
-        <Body variant="semi" fontSize="$sm" color='#F5E6D3' align='center' opacity={0.6}
-          style={{ marginTop: 30, lineHeight: 18, paddingHorizontal: 20 }}>
-          After confirming your email, you&apos;ll be automatically signed in and can start your adventure!
+          Click the link in your email
         </Body>
+        <Body opacity={0.7}>
+          {' '}
+          to activate your account. You&apos;ll be automatically signed in!
+        </Body>
+      </AuthBody>
 
-        <Caption color='#F5E6D3' align='center' style={{ marginTop: 8, opacity: 0.5, lineHeight: 16, paddingHorizontal: 20 }}>
-          © 2025 The Snow Post · Forged for storytellers & adventurers
-        </Caption>
-      </View>
+      {/* 🔘 Action Buttons */}
+      <AuthActionGroup>
+        {/* Resend Email Button */}
+        <AuthButton
+          text={waitingResend}
+          onPress={handleResendEmail}
+          disabled={isCountingDown}
+          loading={loading}
+        />
 
-      {/* Email Sent Success Modal */}
-      <CustomModal
+        {/* Bottom Row: Change Email + Already Confirmed */}
+        <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
+          {/* Change Email Button */}
+          <AuthButton
+            bg="rgba(139, 69, 19, 0.15)"
+            borderColor="#8B4513"
+            textColor="#F5E6D3"
+            style={{ flex: 1 }}
+            onPress={handleChangeEmail}
+          >
+            Use Different Email
+          </AuthButton>
+
+          {/* Already Confirmed Button */}
+          <AuthButton bg="#4285F4" textColor="#FFF" onPress={() => router.replace('/login/sign-in')}>
+            Already Confirmed?
+          </AuthButton>
+        </View>
+      </AuthActionGroup>
+
+      {/* 🧩 Footer */}
+      <AuthBodyFooter>
+        After confirming your email, you&apos;ll be automatically signed in and can
+        start your adventure!
+      </AuthBodyFooter>
+
+      <AuthCaption>
+        © 2025 The Snow Post · Forged for storytellers & adventurers
+      </AuthCaption>
+
+      {/* 📬 Email Sent Success Modal */}
+      <AuthModal
         visible={showEmailSentModal}
         onClose={() => setShowEmailSentModal(false)}
         title="Email Sent! 📧"
@@ -199,10 +211,10 @@ export default function EmailConfirmationScreen() {
           {
             text: 'Got it!',
             onPress: () => setShowEmailSentModal(false),
-            style: 'primary'
-          }
+            variant: 'primary',
+          },
         ]}
       />
-    </View>
-  );
+    </AuthRoot>
+  )
 }

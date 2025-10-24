@@ -6,6 +6,7 @@
 export * from './AuthComps';
 export { default as AuthError } from './AuthError';
 export { default as AuthInput } from './AuthInput';
+export { default as AuthModal } from './AuthModal';
 export { default as AuthSuccess } from './AuthSuccess';
 export * from './AuthView';
 

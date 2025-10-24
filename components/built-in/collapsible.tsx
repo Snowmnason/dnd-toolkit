@@ -1,22 +1,19 @@
-import { PropsWithChildren, useState } from 'react';
-import { TouchableOpacity } from 'react-native';
-
 import { IconSymbol } from '@/components/built-in/icon-symbol';
 import { Body } from '@/components/ui';
-import { ThemedView } from '@/components/ui/themed-view';
-import { CoreColors } from '@/constants/corecolors';
-import { Spacing } from '@/constants/theme';
+import { $, S } from '@/theme';
+import { PropsWithChildren, useState } from 'react';
+import { TouchableOpacity, View } from 'react-native';
 
 export function Collapsible({ children, title }: PropsWithChildren & { title: string }) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <ThemedView>
+    <View>
       <TouchableOpacity
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          gap: Spacing.xs
+          gap: S.space.xs
         }}
         onPress={() => setIsOpen((value) => !value)}
         activeOpacity={0.8}>
@@ -24,20 +21,20 @@ export function Collapsible({ children, title }: PropsWithChildren & { title: st
           name="chevron.right"
           size={18}
           weight="medium"
-          color={CoreColors.textSecondary}
+          color={$('textSecondary')}
           style={{ transform: [{ rotate: isOpen ? '90deg' : '0deg' }] }}
         />
 
         <Body variant='semi'>{title}</Body>
       </TouchableOpacity>
       {isOpen && (
-        <ThemedView style={{
-          marginTop: Spacing.xs,
-          marginLeft: Spacing.lg
+        <View style={{
+          marginTop: S.space.xs,
+          marginLeft: S.space.lg
         }}>
           {children}
-        </ThemedView>
+        </View>
       )}
-    </ThemedView>
+    </View>
   );
 }

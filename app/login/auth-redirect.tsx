@@ -1,12 +1,11 @@
+import { AuthModal } from '@/components/auth_components';
 import { Caption } from '@/components/ui';
 import { AuthStateManager, logger, supabase, usersDB, worldsDB } from '@/lib';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
-import CustomLoad from '../../components/custom_components/CustomLoad';
-import CustomModal from '../../components/modals/CustomModal';
+import CustomLoad from '../../components/ui/CustomLoad';
 import { useAppParams } from '../../contexts/AppParamsContext';
-
 
 // Storage for pending invites when user isn't logged in
 const PENDING_INVITE_KEY = 'pending_world_invite';
@@ -394,8 +393,8 @@ export default function AuthRedirect() {
 
   return (
     <>
-      {/* World Invite Welcome Modal (for successfully joined worlds) */}
-      <CustomModal
+    {/* 🌍 World Invite Welcome Modal (for successfully joined worlds) */}
+      <AuthModal
         visible={showWelcomeModal}
         onClose={handleWelcomeModalClose}
         title="Welcome to the Adventure! 🎲"
@@ -404,13 +403,13 @@ export default function AuthRedirect() {
           {
             text: 'Continue to Worlds',
             onPress: handleWelcomeModalClose,
-            style: 'primary'
-          }
+            variant: 'primary',
+          },
         ]}
       />
 
-      {/* World Invite Login Required Modal (for non-logged-in users) */}
-      <CustomModal
+      {/* 🌍 World Invite Login Required Modal (for non-logged-in users) */}
+      <AuthModal
         visible={showInviteModal}
         onClose={() => setShowInviteModal(false)}
         title="Join the Adventure! 🎲"
@@ -419,45 +418,45 @@ export default function AuthRedirect() {
           {
             text: 'Sign In',
             onPress: handleInviteModalSignIn,
-            style: 'primary'
+            variant: 'primary',
           },
           {
             text: 'Create Account',
             onPress: handleInviteModalSignUp,
-            style: 'default'
+            variant: 'secondary',
           },
           {
             text: 'Maybe Later',
             onPress: () => {
-              clearPendingInvite();
-              setShowInviteModal(false);
-              router.replace('/login/welcome');
+              clearPendingInvite()
+              setShowInviteModal(false)
+              router.replace('/login/welcome')
             },
-            style: 'cancel'
-          }
+            variant: 'cancel',
+          },
         ]}
       />
 
-      {/* Already a Member Modal */}
-      <CustomModal
+      {/* 🎉 Already a Member Modal */}
+      <AuthModal
         visible={showAlreadyMemberModal && !showWelcomeModal}
         onClose={async () => {
-          setShowAlreadyMemberModal(false);
-          
+          setShowAlreadyMemberModal(false)
+
           // Get userId and include it in navigation
-          const userId = currentUserId || await getCurrentUserId();
-          
+          const userId = currentUserId || (await getCurrentUserId())
+
           if (userId) {
             // Update centralized params context
-            updateParams({ userId });
-            
+            updateParams({ userId })
+
             router.replace({
               pathname: '/select/world-selection',
-              params: { userId }
-            });
+              params: { userId },
+            })
           } else {
             // Fallback if we can't get userId
-            router.replace('/select/world-selection');
+            router.replace('/select/world-selection')
           }
         }}
         title="Already a Member! 🎉"
@@ -466,20 +465,20 @@ export default function AuthRedirect() {
           {
             text: 'Go to Worlds',
             onPress: () => {
-              setShowAlreadyMemberModal(false);
-              router.replace('/select/world-selection');
+              setShowAlreadyMemberModal(false)
+              router.replace('/select/world-selection')
             },
-            style: 'primary'
-          }
+            variant: 'primary',
+          },
         ]}
       />
 
-      {/* Error Modal */}
-      <CustomModal
+      {/* ⚠️ Error Modal */}
+      <AuthModal
         visible={showErrorModal}
         onClose={() => {
-          setShowErrorModal(false);
-          router.replace('/login/welcome');
+          setShowErrorModal(false)
+          router.replace('/login/welcome')
         }}
         title="Oops! ⚠️"
         message={errorMessage}
@@ -487,14 +486,13 @@ export default function AuthRedirect() {
           {
             text: 'OK',
             onPress: () => {
-              setShowErrorModal(false);
-              router.replace('/login/welcome');
+              setShowErrorModal(false)
+              router.replace('/login/welcome')
             },
-            style: 'primary'
-          }
+            variant: 'primary',
+          },
         ]}
-      />
-      
+      />      
       <View style={{ flex: 1, backgroundColor: '#2f353d' }} />
     </>
   );

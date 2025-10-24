@@ -1,9 +1,19 @@
-import { AuthError, AuthInput, AuthSuccess } from '@/components/auth_components';
-import { Body, BodyLogin, Button, Caption, SubTitle, Title } from '@/components/ui';
+import {
+  AuthActionGroup,
+  AuthBody,
+  AuthBodyFooter,
+  AuthButton,
+  AuthCaption, AuthError, AuthForm, AuthInput, AuthRoot, AuthSubTitle,
+  AuthSuccess,
+  AuthTitle
+} from '@/components/auth_components';
 import { useResetPasswordConfirm } from '@/lib';
-import { View } from 'react-native';
+import { useRef } from 'react';
+import { TextInput } from 'react-native';
 
 export default function ResetPasswordScreen() {
+  // Refs for keyboard navigation
+  const confirmPasswordInputRef = useRef<TextInput>(null);
   const {
     // Form data
     password,
@@ -43,107 +53,132 @@ export default function ResetPasswordScreen() {
     return doPasswordsMatch ? '✓ Passwords match' : '✗ Passwords do not match';
   };
 
-  return (
-    <View style={{ flex: 1, backgroundColor: '#2f353d' }}>
-      
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'transparent' }}>
-        
-        <Title> Reset Password </Title>
-        
-        <BodyLogin opacity={0.8} >
-          {userEmail ? `${userEmail} is ready to reset your password. Please enter a new password below.` : 'Please enter a new password below.'}
-        </BodyLogin>
+   return (
+    <AuthRoot>
+      {/* 🔐 Header */}
+      <AuthTitle>Reset Password</AuthTitle>
 
+      <AuthBody>
+        {userEmail
+          ? `${userEmail} is ready to reset your password. Please enter a new password below.`
+          : 'Please enter a new password below.'}
+      </AuthBody>
+
+      {/* 🧾 Form */}
+      <AuthForm>
         {/* Success Message */}
-        {success && (
-          <AuthSuccess message={successMessage} />
+        {success && <AuthSuccess message={successMessage} />}
+
+        {/* Password Input */}
+        <AuthInput
+          placeholder="Password"
+          value={password}
+          onChangeText={handlePasswordChange}
+          secureTextEntry={!showPassword}
+          editable={!loading && !success}
+          showPasswordToggle={true}
+          onTogglePassword={() => setShowPassword(!showPassword)}
+          showPassword={showPassword}
+          returnKeyType="next"
+          onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
+          style={{
+            borderColor:
+              !isPasswordValid && password.length > 0 ? '#dc3545' : undefined,
+            borderWidth:
+              !isPasswordValid && password.length > 0 ? 2 : undefined,
+          }}
+        />
+
+        {/* Password Requirements */}
+        <AuthSubTitle
+          color={getPasswordHintColor()}
+          align="left"
+          fontSize={11}
+          style={{
+            lineHeight: 16,
+            opacity: 0.9,
+            marginBottom: 6,
+            marginTop: -14,
+          }}
+        >
+          {getPasswordRequirementsText()}
+        </AuthSubTitle>
+
+        {/* Confirm Password Input */}
+        <AuthInput
+          ref={confirmPasswordInputRef}
+          placeholder="Confirm Password"
+          value={confirmPassword}
+          onChangeText={handleConfirmPasswordChange}
+          secureTextEntry={!showPassword}
+          editable={!loading && !success}
+          returnKeyType="go"
+          onSubmitEditing={handleResetPassword}
+          style={{
+            borderColor:
+              confirmPassword.length > 0 && password !== confirmPassword
+                ? '#dc3545'
+                : undefined,
+            borderWidth:
+              confirmPassword.length > 0 && password !== confirmPassword
+                ? 2
+                : undefined,
+          }}
+        />
+
+        {/* Password Match Indicator */}
+        {confirmPassword.length > 0 && (
+          <AuthSubTitle
+            color={doPasswordsMatch ? '#A3D4A0' : '#F5A5A5'}
+            align="left"
+            fontSize={11}
+            style={{
+              lineHeight: 16,
+              opacity: 0.9,
+              marginBottom: 6,
+              marginTop: -14,
+            }}
+          >
+            {getPasswordMatchText()}
+          </AuthSubTitle>
         )}
 
-        {/* Form Inputs */}
-        <View style={{ width: '100%', maxWidth: 300, marginBottom: 2, backgroundColor: 'transparent' }}>
+        {/* Authentication Error */}
+        <AuthError error={error} />
+      </AuthForm>
 
-          <AuthInput
-            placeholder="Password"
-            value={password}
-            onChangeText={handlePasswordChange}
-            secureTextEntry={!showPassword}
-            editable={!loading && !success}
-            showPasswordToggle={true}
-            onTogglePassword={() => setShowPassword(!showPassword)}
-            showPassword={showPassword}
-            style={{
-              borderColor: !isPasswordValid && password.length > 0 ? '#dc3545' : undefined,
-              borderWidth: !isPasswordValid && password.length > 0 ? 2 : undefined
-            }}
+      {/* 🔘 Action Buttons */}
+      <AuthActionGroup>
+        {!success && (
+          <AuthButton
+            text="Reset Password"
+            onPress={handleResetPassword}
+            disabled={!isFormValid}
+            loading={loading}
           />
-          {/* Password Requirements */}
-          <View style={{ marginBottom: 6, marginTop: -14 }}>
-            <SubTitle
-              color={getPasswordHintColor()}
-              align='left'
-              fontSize={11} 
-              style={{ 
-                lineHeight: 16,
-                opacity: 0.9
-              }}>
-              {getPasswordRequirementsText()}
-            </SubTitle>
-          </View>
-          
-          <AuthInput
-            placeholder="Confirm Password"
-            value={confirmPassword}
-            onChangeText={handleConfirmPasswordChange}
-            secureTextEntry={!showPassword}
-            editable={!loading && !success}
-            style={{
-              borderColor: confirmPassword.length > 0 && password !== confirmPassword ? '#dc3545' : undefined,
-              borderWidth: confirmPassword.length > 0 && password !== confirmPassword ? 2 : undefined
-            }}
-          />
-          {/* Password Match Indicator */}
-          {confirmPassword.length > 0 && (
-            <View style={{ marginBottom: 6, marginTop: -14 }}>
-              <SubTitle
-                color={doPasswordsMatch ? '#A3D4A0' : '#F5A5A5'}
-                align='left'
-                style={{
-                  lineHeight: 16,
-                  opacity: 0.9
-                }}>
-                {getPasswordMatchText()}
-              </SubTitle>
-            </View>
-          )}
+        )}
 
-          {/* Authentication Error Display */}
-          <AuthError error={error} />
-        </View>
+        <AuthBody
+          color="#D4AF37"
+          align="center"
+          deco="underline"
+          style={{ marginTop: success ? 0 : 8 }}
+          onPress={goToSignIn}
+        >
+          {success ? 'Continue to Sign In →' : '← Back to Sign In'}
+        </AuthBody>
+      </AuthActionGroup>
 
-        <View style={{ width: '100%', maxWidth: 300, gap: 16, backgroundColor: 'transparent' }}>
-          {/* Reset Password Button */}
-          {!success && (
-            <Button
-              variant='auth'
-              text="Reset Password"
-              onPress={handleResetPassword}
-              disabled={!isFormValid} loading={loading}
-            />
-          )}
-          
-          {/* Back to Sign In Button */}
-          <Body color='#D4AF37' align='center' cursor='pointer' deco='underline' style={{ marginTop: success ? 0 : 8, }} onPress={goToSignIn}>
-            {success ? 'Continue to Sign In →' : '← Back to Sign In'}
-          </Body>
-        </View>
+      {/* 🧩 Footer */}
+      <AuthBodyFooter>
+        {success
+          ? 'Your password has been updated successfully!'
+          : "After changing your password, you'll be returned to the sign-in page."}
+      </AuthBodyFooter>
 
-        <BodyLogin opacity={0.6}>
-          {success ? 'Your password has been updated successfully!' : 'After changing your password, you\'ll be returned to the sign-in page.'}
-        </BodyLogin>
-        <Caption color='#F5E6D3' align='center' style={{ marginTop: 8, opacity: 0.5, lineHeight: 16, paddingHorizontal: 20 }}>
-          © 2025 The Snow Post · Forged for storytellers & adventurers
-        </Caption>
-      </View>
-    </View>
-  );
+      <AuthCaption>
+        © 2025 The Snow Post · Forged for storytellers & adventurers
+      </AuthCaption>
+    </AuthRoot>
+  )
 }

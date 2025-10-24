@@ -13,9 +13,12 @@ interface AuthInputProps {
   showPasswordToggle?: boolean;
   onTogglePassword?: () => void;
   showPassword?: boolean;
+  onSubmitEditing?: () => void;
+  returnKeyType?: 'done' | 'next' | 'go' | 'send';
+  submitBehavior?: 'submit' | 'blurAndSubmit' | 'newline';
 }
 
-export default function AuthInput({
+const AuthInput = React.forwardRef<RNTextInput, AuthInputProps>(({
   placeholder,
   value,
   onChangeText,
@@ -27,10 +30,14 @@ export default function AuthInput({
   showPasswordToggle = false,
   onTogglePassword,
   showPassword = false,
-}: AuthInputProps) {
+  onSubmitEditing,
+  returnKeyType = 'next',
+  submitBehavior = 'blurAndSubmit',
+}, ref) => {
   return (
     <View style={{ position: 'relative', marginBottom: 2 }}>
       <RNTextInput
+        ref={ref}
         placeholder={placeholder}
         value={value}
         onChangeText={onChangeText}
@@ -39,6 +46,9 @@ export default function AuthInput({
         secureTextEntry={secureTextEntry && !showPassword}
         editable={editable}
         placeholderTextColor='#a77e44'
+        onSubmitEditing={onSubmitEditing}
+        returnKeyType={returnKeyType}
+        submitBehavior={submitBehavior}
         style={[
           {
             borderWidth: 2,
@@ -78,4 +88,8 @@ export default function AuthInput({
       )}
     </View>
   );
-}
+});
+
+AuthInput.displayName = 'AuthInput';
+
+export default AuthInput;

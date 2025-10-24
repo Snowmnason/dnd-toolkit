@@ -1,10 +1,18 @@
-import { AuthError, AuthInput, AuthSuccess } from '@/components/auth_components';
-import { Body, BodyLogin, Button, Caption, Title } from '@/components/ui';
+import {
+  AuthActionGroup,
+  AuthBody,
+  AuthBodyFooter,
+  AuthButton, AuthButtonBack,
+  AuthCaption, AuthError, AuthForm, AuthInput,
+  AuthModal,
+  AuthRoot,
+  AuthSuccess,
+  AuthTitle
+} from '@/components/auth_components';
 import { sendPasswordReset, validateEmail } from '@/lib';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import CustomModal from '../../components/modals/CustomModal';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -63,66 +71,77 @@ export default function ForgotPasswordScreen() {
 
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#2f353d' }}>
-      
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'transparent' }}>
-        
-        <Title>Forgot Password</Title>
-        
-        <BodyLogin opacity={0.8}>Enter your email to receive password reset instructions.</BodyLogin>
+    <AuthRoot>
+      {/* 🔙 Back Button*/}
+      <View style={{ position: 'absolute', top: 50, left: 20, zIndex: 10 }}>
+        <AuthButtonBack
+          text="← Back"
+          onPress={() => router.replace('/login/sign-in')}
+          disabled={loading}
+        />
+      </View>
 
-        {/* Form Inputs */}
-        <View style={{ width: '100%', maxWidth: 300, marginBottom: 15, backgroundColor: 'transparent' }}>
-          <AuthInput
-            placeholder="Email"
-            value={email}
-            onChangeText={handleEmailChange}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            editable={!loading}
-            style={{
-              borderColor: !emailValidation.isValid && email.length > 0 ? '#dc3545' : undefined,
-              borderWidth: !emailValidation.isValid && email.length > 0 ? 2 : undefined
-            }}
-          />
-        </View>
+      {/* 🧠 Header*/}
+      <AuthTitle>Forgot Password</AuthTitle>
+
+      <AuthBody>Enter your email to receive password reset instructions.</AuthBody>
+
+      {/* 🧾 Form*/}
+      <AuthForm>
+        <AuthInput
+          placeholder="Email"
+          value={email}
+          onChangeText={handleEmailChange}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          editable={!loading}
+          returnKeyType="go"
+          onSubmitEditing={handleForgotPassword}
+          style={{
+            borderColor:
+              !emailValidation.isValid && email.length > 0 ? '#dc3545' : undefined,
+            borderWidth:
+              !emailValidation.isValid && email.length > 0 ? 2 : undefined,
+          }}
+        />
 
         {/* Error Display */}
-        <View style={{ width: '100%', maxWidth: 300 }}>
-          <AuthError error={error} />
-        </View>
+        <AuthError error={error} />
 
         {/* Success Display */}
         {success && <AuthSuccess message={successMessage} />}
+      </AuthForm>
 
-        {/* Action Buttons */}
-        <View style={{ width: '100%', maxWidth: 300, gap: 16, backgroundColor: 'transparent' }}>
-          {/* Reset Password Button */}
-          <Button
-            variant="auth"
-            text="Send New Password Email"
-            onPress={handleForgotPassword}
-            disabled={!isFormValid} loading={loading}
-          />
-          
-          {/* Back to Welcome Button */}
-          <Body align='center' color='D4AF37' deco='underline' style={{ marginTop: 8 }} onPress={() => router.replace('/login/sign-in')} >
-            ← Back to Sign In
-          </Body>
-        </View>
+      {/* 🔘 Buttons*/}
+      <AuthActionGroup>
+        <AuthButton
+          text="Send New Password Email"
+          onPress={handleForgotPassword}
+          disabled={!isFormValid}
+          loading={loading}
+        />
 
-        <Body variant="semi" fontSize="$sm" color='#F5E6D3' align='center' opacity={0.6}
-          style={{ marginTop: 30, lineHeight: 18, paddingHorizontal: 20 }}>
-          Secure authentication powered by Supabase
-        </Body>
+        <AuthBody
+          align="center"
+          color="#D4AF37"
+          deco="underline"
+          onPress={() => router.replace('/login/sign-in')}
+        >
+          ← Back to Sign In
+        </AuthBody>
+      </AuthActionGroup>
 
-        <Caption color='#F5E6D3' align='center' style={{ marginTop: 8, opacity: 0.5, lineHeight: 16, paddingHorizontal: 20 }}>
-          © 2025 The Snow Post · Forged for storytellers & adventurers
-        </Caption>
-      </View>
+      {/* 🧩 Footer*/}
+      <AuthBodyFooter>
+        Secure authentication powered by Supabase
+      </AuthBodyFooter>
 
-      {/* Email Not Found Modal */}
-      <CustomModal
+      <AuthCaption>
+        © 2025 The Snow Post · Forged for storytellers & adventurers
+      </AuthCaption>
+
+      {/* 📬 Email Not Found Modal */}
+      <AuthModal
         visible={showEmailNotFoundModal}
         onClose={() => setShowEmailNotFoundModal(false)}
         title="No Account Found 🤔"
@@ -131,18 +150,18 @@ export default function ForgotPasswordScreen() {
           {
             text: 'Cancel',
             onPress: () => setShowEmailNotFoundModal(false),
-            style: 'cancel'
+            variant: 'cancel',
           },
           {
             text: 'Create Account',
             onPress: () => {
-              setShowEmailNotFoundModal(false);
-              router.push('/login/sign-up');
+              setShowEmailNotFoundModal(false)
+              router.push('/login/sign-up')
             },
-            style: 'primary'
-          }
+            variant: 'primary',
+          },
         ]}
       />
-    </View>
-  );
+    </AuthRoot>
+  )
 }
