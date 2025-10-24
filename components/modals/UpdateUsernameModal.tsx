@@ -1,130 +1,148 @@
-import { CoreColors } from '@/constants/corecolors';
-import React, { useState } from 'react';
-import { View } from 'react-native';
-import { Spacing } from '../../constants/theme';
-import { validateUsername } from '../../lib/auth/validation';
-import AuthError from '../auth_components/AuthError';
-import AuthInput from '../auth_components/AuthInput';
-import CustomModal from '../modals/CustomModal';
-import { ThemedText } from '../ui/themed-text';
+import { AppModal, Body, Button, TextInput } from '@/components/ui'
+import { validateUsername } from '@/lib/auth/validation'
+import { $, S } from '@/theme'
+import React, { useEffect, useState } from 'react'
+import { View } from 'react-native'
 
 interface UpdateUsernameModalProps {
-  visible: boolean;
-  currentUsername: string;
-  onCancel: () => void;
-  onConfirm: (newUsername: string) => Promise<void>;
-  loading?: boolean;
-  errorText?: string;
+  visible: boolean
+  currentUsername: string
+  onCancel: () => void
+  onConfirm: (newUsername: string) => Promise<void>
+  loading?: boolean
+  errorText?: string
 }
 
-export default function UpdateUsernameModal({
+/**
+ * ✏️ UpdateUsernameModal
+ * Themed + validated modal for changing username
+ */
+export function UpdateUsernameModal({
   visible,
   currentUsername,
   onCancel,
   onConfirm,
   loading = false,
-  errorText = ''
+  errorText = '',
 }: UpdateUsernameModalProps) {
-  const [newUsername, setNewUsername] = useState('');
-  
-  const usernameValidation = validateUsername(newUsername);
-  const isValid = usernameValidation.isValid && newUsername !== currentUsername;
+  const [newUsername, setNewUsername] = useState('')
+
+  // ✅ Reset field when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setNewUsername('')
+    }
+  }, [visible])
+
+  const usernameValidation = validateUsername(newUsername)
+  const isValid =
+    usernameValidation.isValid && newUsername.trim() !== currentUsername.trim()
 
   const handleConfirm = async () => {
-    if (isValid) {
-      await onConfirm(newUsername);
+    if (isValid && !loading) {
+      await onConfirm(newUsername.trim())
+      setNewUsername('')
     }
-  };
+  }
 
   const handleCancel = () => {
-    setNewUsername('');
-    onCancel();
-  };
+    setNewUsername('')
+    onCancel()
+  }
 
   const getUsernameHint = () => {
-    if (newUsername.length === 0) return '';
-    if (newUsername === currentUsername) return 'New username must be different';
-    if (!usernameValidation.minLength || !usernameValidation.maxLength) {
-      return 'Username must be 3-20 characters';
-    }
-    if (!usernameValidation.startsWithLetter) {
-      return 'Username must start with a letter';
-    }
-    if (!usernameValidation.validChars) {
-      return 'Only letters, numbers, and underscores allowed';
-    }
-    if (usernameValidation.isValid) {
-      return `✅ "${newUsername}" is available!`;
-    }
-    return 'Invalid username';
-  };
-
-  const buttons = [
-    {
-      text: 'Cancel',
-      onPress: handleCancel,
-      style: 'cancel' as const
-    },
-    {
-      text: loading ? 'Updating...' : 'Update',
-      onPress: handleConfirm,
-      style: 'primary' as const
-    }
-  ];
+    if (newUsername.length === 0) return ''
+    if (newUsername === currentUsername)
+      return 'New username must be different'
+    if (!usernameValidation.minLength || !usernameValidation.maxLength)
+      return 'Username must be 3–20 characters'
+    if (!usernameValidation.startsWithLetter)
+      return 'Username must start with a letter'
+    if (!usernameValidation.validChars)
+      return 'Only letters, numbers, and underscores allowed'
+    if (usernameValidation.isValid)
+      return `✅ "${newUsername}" looks great!`
+    return 'Invalid username'
+  }
 
   return (
-    <CustomModal
+    <AppModal
       visible={visible}
       onClose={handleCancel}
-      title="Update Username"
-      buttons={buttons}
+      heading="Change Username"
+      body={`Your current username is "${currentUsername}".`}
+      borderTone="accent"
     >
-      <View style={{ width: '100%', paddingHorizontal: Spacing.md }}>
-        <ThemedText
+      <View
+        style={{
+          width: '100%',
+          marginTop: S.space.sm,
+          gap: S.space.md,
+        }}
+      >
+        {/* Username Input */}
+        <TextInput
+          value={newUsername}
+          onChangeText={setNewUsername}
+          placeholder="New username"
+          autoCapitalize="none"
+          editable={!loading}
           style={{
-            marginBottom: Spacing.lg,
-            color: CoreColors.textSecondary,
-            textAlign: 'center',
-            fontSize: 14,
-            lineHeight: 20
+            borderColor:
+              newUsername.length > 0 && !isValid
+                ? $('danger')
+                : $('border'),
+            borderWidth: 1.5,
+          }}
+        />
+
+        {/* Validation Hint */}
+        {newUsername.length > 0 && (
+          <Body
+            style={{
+              marginTop: S.space.xs,
+              fontSize: 12,
+              color: isValid ? $('success') : $('danger'),
+              fontWeight: '500',
+              lineHeight: 16,
+            }}
+          >
+            {getUsernameHint()}
+          </Body>
+        )}
+
+        {/* Error Display */}
+        {!!errorText && (
+          <Body
+            style={{
+              color: $('danger'),
+              marginTop: S.space.xs,
+              fontSize: 13,
+              fontWeight: '600',
+            }}
+          >
+            {errorText}
+          </Body>
+        )}
+
+        {/* Buttons */}
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'flex-end',
+            gap: S.space.sm,
+            marginTop: S.space.md,
           }}
         >
-          Current username: <ThemedText style={{ fontWeight: '600' }}>{currentUsername}</ThemedText>
-        </ThemedText>
-
-        {/* Username Input */}
-        <View style={{ marginBottom: Spacing.md }}>
-          <AuthInput
-            placeholder="New username"
-            value={newUsername}
-            onChangeText={setNewUsername}
-            autoCapitalize="none"
-            editable={!loading}
-            style={{
-              borderColor: newUsername.length > 0 && !isValid ? '#dc3545' : undefined,
-              borderWidth: newUsername.length > 0 && !isValid ? 2 : undefined
-            }}
+          <Button text="Cancel" variant="secondary" onPress={handleCancel} />
+          <Button
+            text={loading ? 'Updating...' : 'Update'}
+            variant="primary"
+            disabled={!isValid || loading}
+            onPress={handleConfirm}
           />
-
-          {/* Validation Hint */}
-          {newUsername.length > 0 && (
-            <ThemedText
-              style={{
-                marginTop: Spacing.xs,
-                fontSize: 12,
-                color: isValid ? '#A3D4A0' : '#F5A5A5',
-                fontWeight: '500',
-                lineHeight: 16
-              }}
-            >
-              {getUsernameHint()}
-            </ThemedText>
-          )}
-
-          {/* Error Display */}
-          <AuthError error={errorText} />
         </View>
       </View>
-    </CustomModal>
-  );
+    </AppModal>
+  )
 }

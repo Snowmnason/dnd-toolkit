@@ -1,79 +1,80 @@
-import { CoreColors } from '@/constants/corecolors';
-import React from 'react';
-import { Platform, View } from 'react-native';
-import CustomLoad from './custom_components/CustomLoad';
-import { ThemedText } from './ui/themed-text';
+import { $ } from '@/theme'
+import React from 'react'
+import { Platform } from 'react-native'
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
+import { Body } from './ui/AppText'
+import CustomLoad from './ui/CustomLoad'
 
 interface LoadingOverlayProps {
-  message?: string;
-  error?: Error | null;
-  assetsLoaded?: boolean;
+  message?: string
+  error?: Error | null
+  assetsLoaded?: boolean
 }
 
-export default function LoadingOverlay({ 
-  message = 'Loading...', 
+export default function LoadingOverlay({
+  message = 'Loading...',
   error,
-  assetsLoaded = false 
+  assetsLoaded = false,
 }: LoadingOverlayProps) {
-  // Use React.useEffect to manage focus when this overlay mounts
   React.useEffect(() => {
     if (Platform.OS === 'web') {
-      // Store the currently focused element
-      const activeElement = document.activeElement as HTMLElement;
-      
-      // Remove focus from any focused element to prevent aria-hidden conflicts
-      if (activeElement && activeElement.blur) {
-        activeElement.blur();
-      }
-      
-      // Return a cleanup function to restore focus if needed
-      return () => {
-        // Focus management cleanup if needed
-      };
+      const activeElement = document.activeElement as HTMLElement
+      if (activeElement?.blur) activeElement.blur()
     }
-  }, []);
+  }, [])
 
-  const displayMessage = assetsLoaded ? 'Checking authentication...' : message;
+  const displayMessage = assetsLoaded ? 'Checking authentication...' : message
+
+  // subtle fade-in
+  const opacity = useSharedValue(0)
+  React.useEffect(() => {
+    opacity.value = withTiming(1, { duration: 400 })
+  }, [opacity])
+  const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }))
 
   return (
-    <View 
-      style={{ 
-        flex: 1, 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        backgroundColor: CoreColors.backgroundDark,
-        // Ensure this overlay is on top
-        zIndex: 9999,
-      }}
-      accessible={true}
+    <Animated.View
+      style={[
+        {
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: $('background'),
+          zIndex: 9999,
+        },
+        animatedStyle,
+      ]}
+      accessible
       accessibilityRole="progressbar"
       accessibilityLabel={displayMessage}
-      // Prevent touch events from propagating to elements behind
-      pointerEvents="box-none"
     >
       <CustomLoad />
-      
-      <ThemedText style={{ 
-        marginTop: 20, 
-        color: '#F5E6D3', 
-        textAlign: 'center',
-        fontSize: 16
-      }}>
+
+      <Body
+        style={{
+          marginTop: 20,
+          color: $('textPrimary'),
+          textAlign: 'center',
+          fontSize: 16,
+        }}
+      >
         {displayMessage}
-      </ThemedText>
+      </Body>
 
       {error && (
-        <ThemedText style={{ 
-          marginTop: 10, 
-          color: '#ffa500', 
-          textAlign: 'center',
-          fontSize: 12,
-          opacity: 0.8,
-          paddingHorizontal: 20
-        }}>
+        <Body
+          style={{
+            marginTop: 10,
+            color: $('accent'),
+            textAlign: 'center',
+            fontSize: 12,
+            opacity: 0.8,
+            paddingHorizontal: 20,
+          }}
+        >
           Some assets failed to load but the app will continue...
-        </ThemedText>
+        </Body>
       )}
-    </View>
-  );
+    </Animated.View>
+  )
 }

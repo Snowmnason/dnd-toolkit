@@ -3,9 +3,9 @@ import { Button } from '@/components/ui/BaseButton'
 import { S } from '@/theme'
 import React from 'react'
 
-/* ────────────────────────────────────────────────
+/* ──────────
    🔘 Auth Buttons (extend BaseButton)
-────────────────────────────────────────────────── */
+──────────── */
 
 export function AuthButton({
   style,
@@ -61,9 +61,9 @@ export function AuthButtonBack({
   )
 }
 
-/* ────────────────────────────────────────────────
+/* ──────────
    🔤 Auth Text Components (extend AppText)
-────────────────────────────────────────────────── */
+──────────── */
 
 export function AuthTitle({
   style,
@@ -103,6 +103,30 @@ export function AuthBody({
       color="#F5E6D3"
       align="center"
       opacity={0.8}
+      style={[
+        {
+          textAlign: 'center',
+          lineHeight: 22,
+          paddingHorizontal: S.space.lg,
+          marginBottom: S.space.lg,
+        },
+        style,
+      ]}
+    />
+  )
+}
+export function AuthBodyFooter({
+  style,
+  ...props
+}: React.ComponentProps<typeof Body>) {
+  return (
+    <Body
+      variant='semi'
+      fontSize='$sm'
+      {...props}
+      color="#F5E6D3"
+      align="center"
+      opacity={0.6}
       style={[
         {
           textAlign: 'center',

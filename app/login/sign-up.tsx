@@ -1,12 +1,22 @@
-import { AuthError, AuthInput } from '@/components/auth_components';
-import { Body, BodyLogin, Button, Caption, SubTitle, Title } from '@/components/ui';
+import {
+  AuthActionGroup, AuthBackButtonContainer, AuthBody,
+  AuthBodyFooter,
+  AuthButton, AuthButtonBack,
+  AuthButtonSecondary, AuthCaption, AuthError, AuthForm, AuthInput,
+  AuthModal,
+  AuthRoot, AuthSubTitle, AuthTitle
+} from '@/components/auth_components';
 import { useSignUpForm } from '@/lib';
 import { useRouter } from 'expo-router';
-import { View } from 'react-native';
-import CustomModal from '../../components/modals/CustomModal';
+import { useRef } from 'react';
+import { TextInput } from 'react-native';
 
 export default function SignUpScreen() {
   const router = useRouter();
+  
+  // Refs for keyboard navigation
+  const passwordInputRef = useRef<TextInput>(null);
+  const confirmPasswordInputRef = useRef<TextInput>(null);
   const {
     // Form data
     email,
@@ -38,135 +48,146 @@ export default function SignUpScreen() {
   } = useSignUpForm();
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#2f353d' }}>
-      
+    <AuthRoot>
       {/* Back Button */}
-      <View style={{ position: 'absolute', top: 50, left: 20, zIndex: 10, backgroundColor: 'transparent' }}>
-        <Button
-          bg='rgba(139,69,19,0.2)'
-          textColor='#F5E6D3'
+      <AuthBackButtonContainer>
+        <AuthButtonBack
+          text="← Back"
           onPress={() => router.replace('/login/welcome')}
           disabled={loading}
+        />
+      </AuthBackButtonContainer>
+
+      {/* Header */}
+      <AuthTitle>Create Account</AuthTitle>
+
+      <AuthBody>
+        Join the adventure and sync your worlds across devices
+      </AuthBody>
+
+      {/* Form Inputs */}
+      <AuthForm>
+        <AuthInput
+          placeholder="Email"
+          value={email}
+          onChangeText={handleEmailChange}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          editable={!loading}
+          returnKeyType="next"
+          onSubmitEditing={() => passwordInputRef.current?.focus()}
+          style={{
+            borderColor:
+              !emailValidation.isValid && email.length > 0
+                ? '#dc3545'
+                : undefined,
+            borderWidth:
+              !emailValidation.isValid && email.length > 0 ? 2 : undefined,
+          }}
+        />
+
+        <AuthInput
+          ref={passwordInputRef}
+          placeholder="Password"
+          value={password}
+          onChangeText={handlePasswordChange}
+          secureTextEntry={true}
+          editable={!loading}
+          showPasswordToggle={true}
+          onTogglePassword={() => setShowPassword(!showPassword)}
+          showPassword={showPassword}
+          returnKeyType="next"
+          onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
+          style={{
+            borderColor:
+              !passwordValidation.isValid && password.length > 0
+                ? '#dc3545'
+                : undefined,
+            borderWidth:
+              !passwordValidation.isValid && password.length > 0 ? 2 : undefined,
+          }}
+        />
+
+        {/* Password Requirements */}
+        <AuthSubTitle
+          color={getPasswordHintColor()}
+          align="left"
+          fontSize={11}
+          style={{
+            lineHeight: 16,
+            marginBottom: 6,
+            marginTop: -14,
+            opacity: 0.9,
+          }}
         >
-          ← Back
-        </Button>
-      </View>
+          {getPasswordRequirementsText()}
+        </AuthSubTitle>
 
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'transparent' }}>
-        
-        <Title>Create Account</Title>
-        
-        <BodyLogin opacity={0.8}> Join the adventure and sync your worlds across devices </BodyLogin>
+        <AuthInput
+          ref={confirmPasswordInputRef}
+          placeholder="Confirm Password"
+          value={confirmPassword}
+          onChangeText={handleConfirmPasswordChange}
+          secureTextEntry={true}
+          showPassword={showPassword}
+          editable={!loading}
+          returnKeyType="go"
+          onSubmitEditing={handleSignUp}
+          style={{
+            borderColor:
+              confirmPassword.length > 0 && password !== confirmPassword
+                ? '#dc3545'
+                : undefined,
+            borderWidth:
+              confirmPassword.length > 0 && password !== confirmPassword
+                ? 2
+                : undefined,
+          }}
+        />
 
-        {/* Form Inputs */}
-        <View style={{ width: '100%', maxWidth: 300, marginBottom: 2, backgroundColor: 'transparent' }}>
-          <AuthInput
-            placeholder="Email"
-            value={email}
-            onChangeText={handleEmailChange}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            editable={!loading}
-            style={{
-              borderColor: !emailValidation.isValid && email.length > 0 ? '#dc3545' : undefined,
-              borderWidth: !emailValidation.isValid && email.length > 0 ? 2 : undefined
-            }}
-          />
-
-          <AuthInput
-            placeholder="Password"
-            value={password}
-            onChangeText={handlePasswordChange}
-            secureTextEntry={true}
-            editable={!loading}
-            showPasswordToggle={true}
-            onTogglePassword={() => setShowPassword(!showPassword)}
-            showPassword={showPassword}
-            style={{
-              borderColor: !passwordValidation.isValid && password.length > 0 ? '#dc3545' : undefined,
-              borderWidth: !passwordValidation.isValid && password.length > 0 ? 2 : undefined
-            }}
-          />
-          {/* Password Requirements */}
-          <View style={{ marginBottom: 6, marginTop: -14 }}>
-            <SubTitle
-              color={getPasswordHintColor()}
-              align='left'
-              fontSize={11}
-              style={{ 
-                lineHeight: 16,
-                opacity: 0.9
-              }}
-            >
-              {getPasswordRequirementsText()}
-            </SubTitle>
-          </View>
-          
-          <AuthInput
-            placeholder="Confirm Password"
-            value={confirmPassword}
-            onChangeText={handleConfirmPasswordChange}
-            secureTextEntry={true}
-            showPassword={showPassword}
-            editable={!loading}
-            style={{
-              borderColor: confirmPassword.length > 0 && password !== confirmPassword ? '#dc3545' : undefined,
-              borderWidth: confirmPassword.length > 0 && password !== confirmPassword ? 2 : undefined
-            }}
-          />
-          {/* Password Match Indicator */}
-          {confirmPassword.length > 0 && (
-            <View style={{ marginBottom: 6, marginTop: -14 }}>
-              <SubTitle
-              color={passwordsMatch ? '#A3D4A0' : '#F5A5A5'}
-              align='left'
-              fontSize={11}
-              style={{ 
-                lineHeight: 16,
-                opacity: 0.9
-              }}>
-                {getPasswordMatchText()}
-              </SubTitle>
-            </View>
-          )}
-
-          {/* Authentication Error Display */}
-          <AuthError error={authError} />
-        </View>
-
-        {/* Action Buttons */}
-        <View style={{ width: '100%', maxWidth: 300, gap: 16, backgroundColor: 'transparent' }}>
-          {/* Create Account Button */}
-          <Button
-            variant="auth"
-            text="Create Account"
-            onPress={handleSignUp}
-            disabled={!isFormValid} loading={loading}
-          />
-
-          {/* Switch to Sign In */}
-          <Button
-            bg='rgba(139, 69, 19, 0.15)' borderColor='#8B4513' textColor='#F5E6D3'
-            style={{ width: '100%', paddingVertical: 12, borderRadius: 8 }}
-            onPress={() => router.push('/login/sign-in')}
-            disabled={loading}
+        {/* Password Match Indicator */}
+        {confirmPassword.length > 0 && (
+          <AuthSubTitle
+            color={passwordsMatch ? '#A3D4A0' : '#F5A5A5'}
+            align="left"
+            fontSize={11}
+            style={{ lineHeight: 16, opacity: 0.9, marginBottom: 6, marginTop: -14 }}
           >
-            Already have an account? Sign In
-          </Button>
-        </View>
+            {getPasswordMatchText()}
+          </AuthSubTitle>
+        )}
 
-        <Body variant="semi" fontSize="$sm" color='#F5E6D3' align='center' opacity={0.6}
-          style={{ marginTop: 30, lineHeight: 18, paddingHorizontal: 20 }}>
-          After confirming your email, you&apos;ll choose a username to complete your account setup.
-        </Body>
+        {/* Authentication Error Display */}
+        <AuthError error={authError} />
+      </AuthForm>
 
-        <Caption color='#F5E6D3' align='center' style={{ marginTop: 8, opacity: 0.5, lineHeight: 16, paddingHorizontal: 20 }}>
-          © 2025 The Snow Post · Forged for storytellers & adventurers
-        </Caption>
-      </View>
+      {/* Action Buttons */}
+      <AuthActionGroup>
+        <AuthButton
+          text="Create Account"
+          onPress={handleSignUp}
+          disabled={!isFormValid}
+          loading={loading}
+        />
+
+        <AuthButtonSecondary
+          text="Already have an account? Sign In"
+          onPress={() => router.push('/login/sign-in')}
+          disabled={loading}
+        />
+      </AuthActionGroup>
+
+      {/* Info / Footer */}
+      <AuthBodyFooter>
+        After confirming your email, you’ll choose a username to complete your account setup.
+      </AuthBodyFooter>
+
+      <AuthCaption>
+        © 2025 The Snow Post · Forged for storytellers & adventurers
+      </AuthCaption>
 
       {/* Email Already Exists Modal */}
-      <CustomModal
+      <AuthModal
         visible={showEmailExistsModal}
         onClose={() => setShowEmailExistsModal(false)}
         title="Account Already Exists! 🤔"
@@ -175,18 +196,18 @@ export default function SignUpScreen() {
           {
             text: 'Cancel',
             onPress: () => setShowEmailExistsModal(false),
-            style: 'cancel'
+            variant: 'cancel',
           },
           {
             text: 'Sign In',
             onPress: () => {
-              setShowEmailExistsModal(false);
-              router.push('/login/sign-in');
+              setShowEmailExistsModal(false)
+              router.push('/login/sign-in')
             },
-            style: 'primary'
-          }
+            variant: 'primary',
+          },
         ]}
       />
-    </View>
-  );
+    </AuthRoot>
+  )
 }

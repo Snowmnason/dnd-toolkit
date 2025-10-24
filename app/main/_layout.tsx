@@ -1,9 +1,8 @@
-import { CoreColors } from '@/constants/corecolors';
+import { AppView } from '@/components/ui';
 import { AuthStateManager, logger } from '@/lib';
 import { Stack, useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform, View, useWindowDimensions } from 'react-native';
-import CustomLoad from '../../components/custom_components/CustomLoad';
+import { Platform, useWindowDimensions } from 'react-native';
 import { BottomTabBar } from '../../components/main-panels/BottomTabBar';
 
 export default function MainLayout() {
@@ -73,34 +72,15 @@ export default function MainLayout() {
   }, [pathname]);
 
   if (isCheckingAuth) {
-    return (
-      <View style={{ 
-        flex: 1, 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        backgroundColor: CoreColors.backgroundDark 
-      }}>
-        <CustomLoad />
-      </View>
-    );
+    return <AppView variant="loading" />;
   }
 
-  return (
-    <View style={{ flex: 1, backgroundColor: CoreColors.backgroundDark }}>
-      <View style={{ flex: 1 }}>
-        <Stack 
-          screenOptions={{
-            headerShown: false,
-          }}
-        />
-      </View>
-      {/* Show bottom tab bar only on mobile */}
-      {isMobile && (
-        <BottomTabBar
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-        />
-      )}
-    </View>
-  );
+return (
+  <AppView variant="page">
+    <Stack screenOptions={{ headerShown: false }} />
+    {isMobile && (
+      <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} />
+    )}
+  </AppView>
+);
 }

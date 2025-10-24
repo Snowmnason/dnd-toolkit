@@ -1,4 +1,4 @@
-import { $, S, tone } from '@/theme'
+import { $, S, tone, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React from 'react'
 import {
@@ -125,6 +125,8 @@ export function Button({
   onPress,
   children,
 }: ButtonProps) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { theme: _theme } = UseTheme()
   const scale = useSharedValue(1)
   const hovered = useSharedValue(0)
 
@@ -249,46 +251,5 @@ export function Button({
         </View>
       </TouchableOpacity>
     </Animated.View>
-  )
-}
-
-/* ───────────────────────────────
-   🔗 Button Group
-──────────────────────────────── */
-interface ButtonGroupProps {
-  direction?: 'horizontal' | 'vertical'
-  spacing?: keyof typeof S.space
-  align?: 'start' | 'center' | 'end' | 'space-between'
-  fullWidth?: boolean
-  children: React.ReactNode
-  style?: StyleProp<ViewStyle>
-}
-
-export function ButtonGroup({
-  direction = 'horizontal',
-  spacing = 'sm',
-  align = 'center',
-  fullWidth = false,
-  children,
-  style,
-}: ButtonGroupProps) {
-  const flexDirection: ViewStyle['flexDirection'] =
-    direction === 'horizontal' ? 'row' : 'column'
-
-  return (
-    <View
-      style={[
-        {
-          flexDirection,
-          justifyContent: align as ViewStyle['justifyContent'],
-          alignItems: align as ViewStyle['alignItems'],
-          gap: S.space[spacing],
-          width: fullWidth ? '100%' : undefined,
-        },
-        style,
-      ]}
-    >
-      {children}
-    </View>
   )
 }

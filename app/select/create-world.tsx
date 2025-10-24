@@ -3,11 +3,11 @@ import { createWorldNameChangeHandler, isValidWorldNameForSubmission, type World
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform, ScrollView, View } from 'react-native';
-import CreateWorldModals from '../../components/create-world/CreateWorldModals';
 import MapCanvas from '../../components/create-world/MapCanvas';
-import Dropdown from '../../components/custom_components/Dropdown';
 import PrimaryButton from '../../components/custom_components/PrimaryButton';
 import TextInputComponent from '../../components/custom_components/TextInput';
+import CreateWorldModals from '../../components/modals/CreateWorldModals';
+import Dropdown from '../../components/ui/Dropdown';
 import { ThemedText } from '../../components/ui/themed-text';
 import { ThemedView } from '../../components/ui/themed-view';
 import { ComponentStyles, Spacing, createTextShadow } from '../../constants/theme';

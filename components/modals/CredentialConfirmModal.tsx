@@ -1,129 +1,100 @@
-import { CoreColors } from '@/constants/corecolors';
-import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
-import { Spacing } from '../../constants/theme';
-import PrimaryButton from '../custom_components/PrimaryButton';
-import TextInput from '../custom_components/TextInput';
-import { ThemedText } from '../ui/themed-text';
-import CustomModal from './CustomModal';
+import AuthError from '@/components/auth_components/AuthError'
+import AuthInput from '@/components/auth_components/AuthInput'
+import { AppModal, Button } from '@/components/ui'
+import { S } from '@/theme'
+import React, { useEffect, useState } from 'react'
+import { View } from 'react-native'
 
-export interface CredentialConfirmModalProps {
-  visible: boolean;
-  title: string;
-  message?: string;
-  confirmLabel?: string;
-  destructive?: boolean;
-  loading?: boolean;
-  errorText?: string;
-  onConfirm: (password: string) => void | Promise<void>;
-  onCancel: () => void;
+interface CredentialConfirmModalProps {
+  visible: boolean
+  title: string
+  message: string
+  confirmLabel: string
+  destructive?: boolean
+  loading?: boolean
+  errorText?: string
+  onCancel: () => void
+  onConfirm: (password: string) => Promise<void>
 }
 
 /**
- * CredentialConfirmModal
- * - Self-contained modal that asks the user to enter their password to confirm a sensitive action
- * - Easy to reuse for delete account, change email, change username, etc.
+ * 🔐 CredentialConfirmModal
+ * Used for account-sensitive actions like deleting an account or changing email.
  */
-export default function CredentialConfirmModal({
+export function CredentialConfirmModal({
   visible,
   title,
   message,
-  confirmLabel = 'Confirm',
+  confirmLabel,
   destructive = false,
   loading = false,
-  errorText,
-  onConfirm,
+  errorText = '',
   onCancel,
+  onConfirm,
 }: CredentialConfirmModalProps) {
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [password, setPassword] = useState('')
 
+  // Reset when modal closes
   useEffect(() => {
-    if (!visible) {
-      setPassword('');
-      setShowPassword(false);
-    }
-  }, [visible]);
+    if (!visible) setPassword('')
+  }, [visible])
 
-  // CustomModal handles container spacing; use theme spacing directly for inner elements
+  const handleConfirm = async () => {
+    if (password.trim().length > 0) {
+      await onConfirm(password.trim())
+    }
+  }
 
   return (
-    <CustomModal
+    <AppModal
       visible={visible}
       onClose={onCancel}
-      title={title}
-      message={message}
-      buttons={[]} // We'll use children instead
+      heading={title}
+      body={message}
+      borderTone={destructive ? 'danger' : 'accent'}
     >
-      {/* Password field */}
-  <View style={{ marginBottom: Spacing.sm }}>
-        <TextInput
+      <View
+        style={{
+          width: '100%',
+          marginTop: S.space.sm,
+          gap: S.space.sm,
+        }}
+      >
+        {/* Password Input */}
+        <AuthInput
           placeholder="Enter your password"
           value={password}
           onChangeText={setPassword}
-          secureTextEntry={!showPassword}
-          style={{ marginBottom: 8 }}
+          secureTextEntry
+          editable={!loading}
         />
-        <ThemedText
-          onPress={() => setShowPassword((s) => !s)}
+
+        {/* Error Display */}
+        {!!errorText && <AuthError error={errorText} />}
+
+        {/* Buttons */}
+        <View
           style={{
-            textAlign: 'right',
-            color: CoreColors.textSecondary,
-            fontSize: 12,
-            marginBottom: Spacing.sm,
+            flexDirection: 'row',
+            justifyContent: 'flex-end',
+            gap: S.space.sm,
+            marginTop: S.space.md,
           }}
         >
-          {showPassword ? 'Hide password' : 'Show password'}
-        </ThemedText>
-
-        {!!errorText && (
-          <ThemedText
-            style={{
-              color: CoreColors.destructive,
-              fontSize: 13,
-              marginBottom: Spacing.sm,
-              textAlign: 'center',
-            }}
-          >
-            {errorText}
-          </ThemedText>
-        )}
+          <Button
+            text="Cancel"
+            variant="secondary"
+            onPress={onCancel}
+            disabled={loading}
+          />
+          <Button
+            text={loading ? 'Processing...' : confirmLabel}
+            variant={destructive ? 'destructive' : 'primary'}
+            onPress={handleConfirm}
+            disabled={loading || password.trim().length === 0}
+          />
+        </View>
       </View>
-
-      {/* Action buttons */}
-      <View
-        style={{
-          flexDirection: 'row',
-          gap: Spacing.sm,
-          justifyContent: 'center',
-        }}
-     >
-        <PrimaryButton
-          style={{
-            backgroundColor: CoreColors.cancel,
-            borderColor: CoreColors.cancelBoarder,
-            opacity: loading ? 0.6 : 1,
-          }}
-          textStyle={{ color: CoreColors.cancelText, fontWeight: '500' }}
-          disabled={loading}
-          onPress={onCancel}
-        >
-          Cancel
-        </PrimaryButton>
-
-        <PrimaryButton
-          style={{
-            backgroundColor: destructive ? CoreColors.destructive : CoreColors.primary,
-            borderColor: destructive ? CoreColors.destructiveBoarder : CoreColors.primary,
-            opacity: loading || !password ? 0.6 : 1,
-          }}
-          textStyle={{ color: CoreColors.destructiveText, fontWeight: '600' }}
-          disabled={loading || !password}
-          onPress={() => onConfirm(password)}
-        >
-          {confirmLabel}
-        </PrimaryButton>
-      </View>
-    </CustomModal>
-  );
+    </AppModal>
+  )
 }

@@ -1,8 +1,9 @@
-import { UseTheme } from '@/theme';
+import { $, UseTheme } from '@/theme';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Platform, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import SettingsMenu from './settings/SettingsMenu';
+import { IconButton } from './ui/IconButton';
 
 interface TopBarProps {
   title?: string;
@@ -13,7 +14,6 @@ interface TopBarProps {
   worldId?: string;
   userRole?: string;
 }
-const { theme } = UseTheme()
 
 export default function TopBar({ 
   title = 'D&D Toolkit', 
@@ -28,6 +28,7 @@ export default function TopBar({
   const { width } = useWindowDimensions();
   const isMobile = Platform.OS !== 'web' || width < 900;
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const { theme } = UseTheme();
 
   const handleBackPress = () => {
     if (onBackPress) {
@@ -51,33 +52,31 @@ export default function TopBar({
         {/* Left: Back Button */}
         <View style={styles.sideSlot}>
           {showBackButton && (
-            <TouchableOpacity 
+            <IconButton
+              icon="←"
               onPress={handleBackPress}
-              style={styles.iconButton}
-            >
-              <Text style={styles.iconText}>
-                ←
-              </Text>
-            </TouchableOpacity>
+              color={$('accent')}
+              iconColor={$('surface')}
+              size={32}
+            />
           )}
         </View>
 
         {/* Center: Title */}
-        <Text style={styles.title}>
+        <Text style={[styles.title, { fontFamily: theme.fontFamilyTitle }]}>
           {title}
         </Text>
 
         {/* Right: Hamburger Menu */}
         <View style={styles.sideSlot}>
           {showHamburger && (
-            <TouchableOpacity 
+            <IconButton
+              icon="☰"
               onPress={handleHamburgerPress}
-              style={styles.iconButton}
-            >
-              <Text style={styles.iconText}>
-                ☰
-              </Text>
-            </TouchableOpacity>
+              color={$('accent')}//"rgba(139, 69, 19, 0.2)"
+              iconColor={$('surface')}//"#F5E6D3"
+              size={32}
+            />
           )}
         </View>
       </View>
@@ -122,9 +121,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: '#1f262eff',
+    backgroundColor: '#1f262e',
     borderBottomWidth: 1,
-    borderBottomColor: '#969696ff',
+    borderBottomColor: '#969696',
   },
   containerMobile: {
     paddingTop: 50,
@@ -135,19 +134,7 @@ const styles = StyleSheet.create({
   sideSlot: {
     width: 40,
   },
-  iconButton: {
-    padding: 4,
-    borderRadius: 6,
-    backgroundColor: 'rgba(139, 69, 19, 0.2)',
-    alignItems: 'center',
-  },
-  iconText: {
-    color: '#F5E6D3',
-    fontSize: 16,
-    fontWeight: '600',
-  },
   title: {
-    fontFamily: theme.fontFamily,
     color: '#F5E6D3',
     fontSize: 18,
     fontWeight: '700',

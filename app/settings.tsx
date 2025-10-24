@@ -3,9 +3,8 @@ import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
-import CustomLoad from '../components/custom_components/CustomLoad';
-import CredentialConfirmModal from '../components/modals/CredentialConfirmModal';
 import UserProfile from '../components/settings/user-profile';
+import CustomLoad from '../components/ui/CustomLoad';
 
 export default function SettingsPage() {
   const router = useRouter();

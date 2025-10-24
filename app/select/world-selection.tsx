@@ -1,6 +1,6 @@
-import LeaveWorldModal from '@/components/create-world/ConfrimLeaveModal';
-import EditWorldModal from '@/components/create-world/EditWorldModal';
-import CustomLoad from '@/components/custom_components/CustomLoad';
+import LeaveWorldModal from '@/components/modals/ConfrimLeaveModal';
+import EditWorldModal from '@/components/modals/EditWorldModal';
+import CustomLoad from '@/components/ui/CustomLoad';
 import { CoreColors } from '@/constants/corecolors';
 import { useWorlds } from "@/lib";
 import { useRouter } from 'expo-router';

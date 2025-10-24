@@ -1,5 +1,18 @@
-import { AuthError, AuthInput } from '@/components/auth_components';
-import { Body, BodyLogin, Button, Caption, SubTitle, Title } from '@/components/ui';
+import {
+  AuthActionGroup,
+  AuthBody,
+  AuthBodyFooter,
+  AuthButton,
+  AuthButtonSecondary,
+  AuthCaption,
+  AuthError,
+  AuthForm,
+  AuthInput,
+  AuthRoot,
+  AuthSubTitle,
+  AuthTitle
+} from '@/components/auth_components';
+import { Body } from '@/components/ui';
 import { logger, supabase, usersDB, useSignUpForm } from '@/lib';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -118,85 +131,110 @@ export default function CompleteProfileScreen() {
     );
   }
 
-  return (
-    <View style={{ flex: 1, backgroundColor: '#2f353d' }}>
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, backgroundColor: 'transparent' }}>
-        
-        <Title>Complete Your Profile</Title>
-                
-        <BodyLogin style={{opacity: 0.8}}>
-          Choose a username to complete your account setup
-        </BodyLogin>
+ return (
+    <AuthRoot>
+      {/* 🧠 Header */}
+      <AuthTitle>Complete Your Profile</AuthTitle>
 
-        {/* Welcome Message */}
-        <View style={{ backgroundColor: 'rgba(245, 230, 211, 0.95)', padding: 24, borderRadius: 12, marginBottom: 32, borderWidth: 2, borderColor: '#8B4513', maxWidth: 350 }}>
-          <BodyLogin color='#8B4513' style={{ marginBottom: 8 }}>
+      <AuthBody>
+        Choose a username to complete your account setup.
+      </AuthBody>
+
+      {/* 🏷️ Welcome Message Card */}
+      <View
+        style={{
+          backgroundColor: 'rgba(245, 230, 211, 0.95)',
+          padding: 24,
+          borderRadius: 12,
+          marginBottom: 32,
+          borderWidth: 2,
+          borderColor: '#8B4513',
+          maxWidth: 350,
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: 'rgba(245, 230, 211, 0.95)',
+            padding: 24,
+            borderRadius: 12,
+            marginBottom: 32,
+            borderWidth: 2,
+            borderColor: '#8B4513',
+            maxWidth: 350,
+          }}
+        >
+          <AuthBody.InCard style={{ marginBottom: 8 }}>
             Welcome, {username ? username : 'Adventurer'}!
-          </BodyLogin>
-          <BodyLogin color='#8B4513' style={{ fontSize: 14 }}>
+          </AuthBody.InCard>
+
+          <AuthBody.InCard fontSize={14}>
             There will be more added soon to customize your profile more.
-          </BodyLogin>
+          </AuthBody.InCard>
         </View>
-
-        {/* Form Input */}
-        <View style={{ width: '100%', maxWidth: 300, marginBottom: 15, backgroundColor: 'transparent' }}>
-          <AuthInput
-            placeholder="Username"
-            value={username}
-            onChangeText={handleUsernameChange}
-            autoCapitalize="none"
-            editable={!loading}
-            style={{
-              borderColor: !usernameValidation.isValid && username.length > 0 ? '#dc3545' : undefined,
-              borderWidth: !usernameValidation.isValid && username.length > 0 ? 2 : undefined
-            }}
-          />
-
-          {/* Authentication Error Display */}
-          <AuthError error={authError} />
-
-          {/* Username Requirements */}
-          {username.length > 0 && (
-            <View style={{ marginBottom: 4, marginTop: -14 }}>
-              <SubTitle 
-                style={{ 
-                  textAlign: 'left', 
-                  color: usernameValidation.isValid ? '#82cc7eff' : '#f78888ff',//'#F5A5A5' 
-                  lineHeight: 16,
-                  opacity: 0.9
-                }}
-              >
-                {getUsernameDisplayText()}
-              </SubTitle>
-            </View>
-          )}
-        </View>
-
-        {/* Action Buttons */}
-        <View style={{ width: '100%', maxWidth: 300, gap: 16, backgroundColor: 'transparent' }}>
-          {/* Complete Profile Button */}
-          <Button
-            variant="auth"
-            text="Complete Profile"
-            onPress={handleCompleteProfile}
-            disabled={!isFormValid} loading={loading}
-          />
-
-          {/* Switch to Sign Up */}
-          <Button bg='rgba(139, 69, 19, 0.15)' borderColor='#8B4513' textColor='#F5E6D3' style={{   width: '100%', }} onPress={() => router.push('/login/sign-up')} disabled={loading} >
-            Sign Out
-          </Button>
-        </View>
-
-        <Body variant="semi" fontSize="$sm" color='#F5E6D3' align='center' opacity={0.6}
-          style={{ marginTop: 30, lineHeight: 18, paddingHorizontal: 20 }}>
-          Your username will be used for online games and friend connections.
-        </Body>
-
-        <Caption color='#F5E6D3' align='center' style={{ marginTop: 8, opacity: 0.5, lineHeight: 16, paddingHorizontal: 20 }}>
-          © 2025 The Snow Post · Forged for storytellers & adventurers
-        </Caption>
       </View>
-    </View>
-  );
+
+      {/* 🧾 Form */}
+      <AuthForm>
+        <AuthInput
+          placeholder="Username"
+          value={username}
+          onChangeText={handleUsernameChange}
+          autoCapitalize="none"
+          editable={!loading}
+          returnKeyType="go"
+          onSubmitEditing={handleCompleteProfile}
+          style={{
+            borderColor:
+              !usernameValidation.isValid && username.length > 0
+                ? '#dc3545'
+                : undefined,
+            borderWidth:
+              !usernameValidation.isValid && username.length > 0 ? 2 : undefined,
+          }}
+        />
+
+        <AuthError error={authError} />
+
+        {username.length > 0 && (
+          <AuthSubTitle
+            style={{
+              textAlign: 'left',
+              color: usernameValidation.isValid ? '#82cc7eff' : '#f78888ff',
+              lineHeight: 16,
+              opacity: 0.9,
+              marginBottom: 4,
+              marginTop: -14,
+            }}
+          >
+            {getUsernameDisplayText()}
+          </AuthSubTitle>
+        )}
+      </AuthForm>
+
+      {/* 🔘 Actions */}
+      <AuthActionGroup>
+        <AuthButton
+          text="Complete Profile"
+          onPress={handleCompleteProfile}
+          disabled={!isFormValid}
+          loading={loading}
+        />
+
+        <AuthButtonSecondary
+          text="Sign Out"
+          onPress={() => router.push('/login/sign-up')}
+          disabled={loading}
+        />
+      </AuthActionGroup>
+
+      {/* 🧩 Footer */}
+      <AuthBodyFooter>
+        Your username will be used for online games and friend connections.
+      </AuthBodyFooter>
+
+      <AuthCaption>
+        © 2025 The Snow Post · Forged for storytellers & adventurers
+      </AuthCaption>
+    </AuthRoot>
+  )
 }

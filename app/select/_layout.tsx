@@ -1,10 +1,7 @@
-import { CoreColors } from '@/constants/corecolors';
+import { AppView } from '@/components/ui';
 import { AuthStateManager, logger } from '@/lib';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
-import CustomLoad from '../../components/custom_components/CustomLoad';
-
 
 export default function SelectLayout() {
   const router = useRouter();
@@ -32,24 +29,12 @@ export default function SelectLayout() {
   }, [router]);
 
   if (isCheckingAuth) {
-    return (
-      <View style={{ 
-        flex: 1, 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        backgroundColor: CoreColors.backgroundDark 
-      }}>
-        <CustomLoad />
-      </View>
-    );
+    return <AppView variant="loading" />;
   }
+
   return (
-    <View style={{ flex: 1, backgroundColor: CoreColors.backgroundDark }}>
-      <Stack 
-        screenOptions={{
-          headerShown: false,
-        }}
-      />
-    </View>
+    <AppView variant="page">
+      <Stack screenOptions={{ headerShown: false }} />
+    </AppView>
   );
 }
