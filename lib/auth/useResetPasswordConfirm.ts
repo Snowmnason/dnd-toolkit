@@ -1,7 +1,9 @@
-import { logger, supabase, updatePassword } from '@/lib';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
+import { supabase } from '../database/supabase';
+import { logger } from '../utils/logger';
+import { updatePassword } from './authService';
 
 export const useResetPasswordConfirm = () => {
   const router = useRouter();

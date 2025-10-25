@@ -184,7 +184,7 @@ export const AuthStateManager = {
 
         // If profile missing or mismatch -> force complete-profile path
         if (!matchesAuth) {
-          return { routingDecision: 'complete-profile', profileId: userProfile.id };
+          return { routingDecision: 'complete-profile', profileId: userProfile?.id || null };
         }
 
         // If username is missing or blank -> complete-profile

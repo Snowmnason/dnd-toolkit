@@ -1,4 +1,7 @@
-import { isExistingUser, logger, supabase, usersDB, validateEmail, validatePassword } from '@/lib';
+import { supabase } from '../database/supabase';
+import { usersDB } from '../database/users';
+import { logger } from '../utils/logger';
+import { isExistingUser, validateEmail, validatePassword } from './validation';
 
 export interface SignUpResult {
   success: boolean;

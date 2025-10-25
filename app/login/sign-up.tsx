@@ -1,5 +1,5 @@
 import {
-  AuthActionGroup, AuthBackButtonContainer, AuthBody,
+  AuthActionGroup, AuthBackButtonContainer,
   AuthBodyFooter,
   AuthButton, AuthButtonBack,
   AuthButtonSecondary, AuthCaption, AuthError, AuthForm, AuthInput,
@@ -7,11 +7,13 @@ import {
   AuthRoot, AuthSubTitle, AuthTitle
 } from '@/components/auth_components';
 import { useSignUpForm } from '@/lib';
+import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
 import { useRef } from 'react';
 import { TextInput } from 'react-native';
 
 export default function SignUpScreen() {
+  const S = useScale();
   const router = useRouter();
   
   // Refs for keyboard navigation
@@ -61,9 +63,9 @@ export default function SignUpScreen() {
       {/* Header */}
       <AuthTitle>Create Account</AuthTitle>
 
-      <AuthBody>
+      <AuthSubTitle>
         Join the adventure and sync your worlds across devices
-      </AuthBody>
+      </AuthSubTitle>
 
       {/* Form Inputs */}
       <AuthForm>
@@ -82,7 +84,7 @@ export default function SignUpScreen() {
                 ? '#dc3545'
                 : undefined,
             borderWidth:
-              !emailValidation.isValid && email.length > 0 ? 2 : undefined,
+              !emailValidation.isValid && email.length > 0 ? 3 : undefined,
           }}
         />
 
@@ -112,11 +114,12 @@ export default function SignUpScreen() {
         <AuthSubTitle
           color={getPasswordHintColor()}
           align="left"
-          fontSize={11}
+          fontSize='$caption'
           style={{
             lineHeight: 16,
-            marginBottom: 6,
-            marginTop: -14,
+            marginBottom: S.space.xs,
+            marginTop: (S.space.sm*-1),
+            marginLeft: S.space.xs,
             opacity: 0.9,
           }}
         >

@@ -1,4 +1,5 @@
-import { EncryptedStorageAdapter, logger } from '@/lib';
+import { EncryptedStorageAdapter } from '@/lib/auth/encrypted-storage';
+import { logger } from '@/lib/utils/logger';
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';

@@ -1,12 +1,14 @@
-import { $, S, tone, UseTheme } from '@/theme'
+import { $, tone, useScale, UseTheme, type Sizing } from '@/theme'
 import React from 'react'
 import { View, ViewStyle } from 'react-native'
+
+type RadiusKey = keyof Sizing['radius']
 
 interface CardProps {
   toneVariant?: 'base' | 'accent' | 'alt'
   bordered?: boolean
   padded?: boolean
-  radius?: keyof typeof S.radius
+  radius?: RadiusKey
   shadow?: boolean
   style?: ViewStyle
   children: React.ReactNode
@@ -26,6 +28,7 @@ export function Card({
   style,
   children,
 }: CardProps) {
+  const S = useScale()
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { theme: _theme } = UseTheme()
 

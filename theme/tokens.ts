@@ -1,111 +1,78 @@
-// ─────────────────────────────────────────────
-// 🎨 Global Design Tokens
-// These define the *keys* every theme family must provide.
-// Each theme (Classic, Cyberpunk, etc.) supplies values
-// for all these tokens in both light and dark mode.
-// ─────────────────────────────────────────────
-
 /**
  * 🔑 Design token names shared by all themes.
  * These represent the "vocabulary" of your UI.
  */
 export const TOKENS = {
-    primary: 'primary',            // Primary brand color
-    /* ───────────────────────────────
-        🎨 Background Layers
-    ─────────────────────────────── */
-    background: 'background',        // Main background
-    surface: 'surface',              // Cards, modals, containers
-    elevated: 'elevated',            // Headers, navbars, elevated surfaces
+  primary: 'primary',                 // Primary brand color
 
-    /* ───────────────────────────────
-        ✍️ Text Colors
-    ─────────────────────────────── */
-    textPrimary: 'textPrimary',      // Main readable text
-    textSecondary: 'textSecondary',  // Muted or secondary text
-    textInverse: 'textInverse',      // Text on light or accent backgrounds
+  /* 🎨 Background Layers */
+  background: 'background',           // Main background
+  surface: 'surface',                 // Cards, modals, containers
+  elevated: 'elevated',               // Headers, navbars, elevated surfaces
 
-    /* ───────────────────────────────
-        🔲 Borders
-    ─────────────────────────────── */
-    border: 'border',                // Default border
-    borderSubtle: 'borderSubtle',    // Faint or inner dividers
+  /* ✍️ Text Colors */
+  textPrimary: 'textPrimary',         // Main readable text
+  textSecondary: 'textSecondary',     // Muted or secondary text
+  textInverse: 'textInverse',         // Text on light or accent backgrounds
+  textOnAccent: 'textOnAccent',       // NEW: text on accent BGs
 
-    /* ───────────────────────────────
-        🌟 Accents / Highlights
-    ─────────────────────────────── */
-    accent: 'accent',                // Brand highlight color
-    accentHover: 'accentHover',      // Accent hover / focus
-    accentText: 'accentText',        // Text on accent background
+  /* 🔲 Borders */
+  border: 'border',                   // Default border
+  borderSubtle: 'borderSubtle',       // Faint or inner dividers
 
-    /* ───────────────────────────────
-        ⚠️ Feedback & System States
-    ─────────────────────────────── */
-    success: 'success',              // Positive / confirmed
-    warning: 'warning',              // Attention / caution
-    danger: 'danger',                // Error / destructive
+  /* 🌟 Accents / Highlights */
+  accent: 'accent',                   // Brand highlight color
+  accentHover: 'accentHover',         // Accent hover / focus
+  accentText: 'accentText',           // Text on accent background
+  accentLight: 'accentLight',         // NEW: lighter accent tint
+  accentDark: 'accentDark',           // NEW: darker accent shade
 
-    /* ───────────────────────────────
-        🌫️ Overlays
-    ─────────────────────────────── */
-    overlayLight: 'overlayLight',    // Light overlay on dark surfaces
-    overlayDark: 'overlayDark',      // Dark overlay on light surfaces
+  /* ⚠️ Feedback & System States */
+  success: 'success',                 // Positive / confirmed
+  warning: 'warning',                 // Attention / caution
+  danger: 'danger',                   // Error / destructive
 
-    shadow: 'shadow',                // Standard shadow color
+  /* 🌫️ Overlays */
+  overlayLight: 'overlayLight',       // Light overlay on dark surfaces
+  overlayDark: 'overlayDark',         // Dark overlay on light surfaces
 
-    /* ───────────────────────────────
-        🔘 Buttons
-    ─────────────────────────────── */
-    // Primary Button
-    primaryButtonBg: 'primaryButtonBg',
-    primaryButtonBorder: 'primaryButtonBorder',
-    primaryButtonText: 'primaryButtonText',
-    primaryButtonHover: 'primaryButtonHover',
+  shadow: 'shadow',                   // Standard shadow color
+  glow: 'glow',                       // NEW: soft glow color (for effects)
 
-    // Secondary Button
-    secondaryButtonBg: 'secondaryButtonBg',
-    secondaryButtonBorder: 'secondaryButtonBorder',
-    secondaryButtonText: 'secondaryButtonText',
-    secondaryButtonHover: 'secondaryButtonHover',
+  /* 🔘 Buttons */
+  // Primary Button
+  primaryButtonBg: 'primaryButtonBg',
+  primaryButtonBorder: 'primaryButtonBorder',
+  primaryButtonText: 'primaryButtonText',
+  primaryButtonHover: 'primaryButtonHover',
 
-    // Destructive Button
-    destructiveButton: 'destructiveButton',
-    destructiveButtonText: 'destructiveButtonText',
+  // Secondary Button
+  secondaryButtonBg: 'secondaryButtonBg',
+  secondaryButtonBorder: 'secondaryButtonBorder',
+  secondaryButtonText: 'secondaryButtonText',
+  secondaryButtonHover: 'secondaryButtonHover',
 
-    // Cancel Button
-    cancelButton: 'cancelButton',
-    cancelButtonText: 'cancelButtonText',
+  // Destructive Button
+  destructiveButton: 'destructiveButton',
+  destructiveButtonText: 'destructiveButtonText',
 
-    // Solid / Outlined Buttons
-    solidOutButton: 'solidOutButton',
-    solidOutButtonText: 'solidOutButtonText',
+  // Cancel Button
+  cancelButton: 'cancelButton',
+  cancelButtonText: 'cancelButtonText',
 
-    // Ghost Button
-    ghostButtonText: 'ghostButtonText',
+  // Solid / Outlined Buttons
+  solidOutButton: 'solidOutButton',
+  solidOutButtonText: 'solidOutButtonText',
 
-    /* ───────────────────────────────
-        🔤 Typography
-    ─────────────────────────────── */
-    fontFamilyTitle: 'fontFamilyTitle', // Used for headings or titles
-    fontFamily: 'fontFamily',           // Primary body text
-    fontFamilyPara: 'fontFamilyPara',   // Long-form or paragraph text
-    } as const
+  // Ghost Button
+  ghostButtonText: 'ghostButtonText',
 
-    /**
-     * TokenName is the union of all token keys.
-     * (e.g. "background" | "surface" | "accent" | ...)
-     */
-    export type TokenName = keyof typeof TOKENS
+  /* 🔤 Typography */
+  fontFamilyTitle: 'fontFamilyTitle', // Used for headings or titles
+  fontFamily: 'fontFamily',           // Primary body text
+  fontFamilyPara: 'fontFamilyPara',   // Long-form or paragraph text
+} as const
 
-    /**
-     * Defines the expected structure of a theme mode (light or dark).
-     * Each theme mode must supply a string value for every token.
-     */
-    export type ThemeTokens = Record<TokenName, string>
-
-    /**
-     * Utility function type — returns a token name’s value
-     * from the currently active theme.
-     * Example: $('background') → "#2f353d"
-     */
-    export type ThemeResolver = (token: TokenName) => string
+export type TokenName = keyof typeof TOKENS
+export type ThemeTokens = Record<TokenName, string>
+export type ThemeResolver = (token: TokenName) => string

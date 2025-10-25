@@ -6,10 +6,15 @@ interface BottomTabBarProps {
   activeTab: string;
   onTabChange: (tabKey: string) => void;
 }
-const { theme } = UseTheme()
+
+// 🎨 Fixed palette (matches BottomTabBar)
+const BOTBAR_BG = '#1f262e'
+const BOTBAR_BORDER = '#969696'
+const BOTBAR_TEXT = '#F5E6D3'
+const BOTBAR_ACTIVE = '#D4AF37'
 
 export function BottomTabBar({ activeTab, onTabChange }: BottomTabBarProps) {
-  
+  const { theme } = UseTheme()
   
   return (
     <View style={styles.container}>
@@ -28,6 +33,7 @@ export function BottomTabBar({ activeTab, onTabChange }: BottomTabBarProps) {
           <Text
             style={[
               styles.label,
+              { fontFamily: theme.fontFamily },
               activeTab === panel.key && styles.labelActive,
             ]}
             numberOfLines={1}
@@ -44,9 +50,9 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     height: 60,
-    backgroundColor: '#1f262eff',
+    backgroundColor: BOTBAR_BG,
     borderTopWidth: 1,
-    borderTopColor: '#969696ff',
+    borderTopColor: BOTBAR_BORDER,
     paddingBottom: 5,
     // ...Shadows.panelShadow,
   },
@@ -64,12 +70,11 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   label: {
-    fontFamily: theme.fontFamily,
     fontSize: 10,
-    color: '#a77e44', // Text Secondary
+    color: BOTBAR_TEXT,
   },
   labelActive: {
-    color: '#D4AF37',
+    color: BOTBAR_ACTIVE,
     fontWeight: 'bold',
   },
 });

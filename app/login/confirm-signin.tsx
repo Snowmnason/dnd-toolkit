@@ -13,9 +13,11 @@ import {
   AuthTitle
 } from '@/components/auth_components';
 import { useSignInForm } from '@/lib';
+import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
 
 export default function SignInScreen() {
+  const S = useScale();
   const router = useRouter();
   
   const {
@@ -37,7 +39,6 @@ export default function SignInScreen() {
     setShowPassword,
   } = useSignInForm();
 
-
   return (
     <AuthRoot>
       {/* 🔙 Back Button */}
@@ -52,12 +53,12 @@ export default function SignInScreen() {
       {/* 🧠 Header */}
       <AuthTitle>Welcome Back</AuthTitle>
 
-      <AuthBody>
+      <AuthSubTitle>
         Continue the sign-in process to confirm your account and adventures.
-      </AuthBody>
+      </AuthSubTitle>
 
       {/* 🧾 Form Inputs */}
-      <AuthForm>
+      <AuthForm style={{ marginBottom: authError ? S.space.md : S.space.xxl }}>
         <AuthInput
           placeholder="Email"
           value={email}
@@ -95,7 +96,8 @@ export default function SignInScreen() {
           color="#D4AF37"
           cursor="pointer"
           align="right"
-          style={{ marginBottom: 4, marginTop: -14 }}
+          style={{ marginBottom: S.space.xs,
+                        marginTop: (S.space.sm*-1), }}
           onPress={() => router.push('/login/forgot-password')}
         >
           Forgot Password?
@@ -103,7 +105,7 @@ export default function SignInScreen() {
       </AuthForm>
 
       {/* ❌ Error Display */}
-      <AuthForm>
+      <AuthForm style={{ marginBottom: authError ? S.space.md : 0 }}>
         <AuthError error={authError} />
       </AuthForm>
 

@@ -1,12 +1,17 @@
-import { S, UseTheme, useThemeTokens } from '@/theme'
+import { useScale, UseTheme } from '@/theme'
 import React from 'react'
-import { StyleProp, Text, TextProps, TextStyle } from 'react-native'
+import { Platform, StyleProp, Text, TextProps, TextStyle } from 'react-native'
 
 /* ───────────────────────────────
    🔤 Base AppText
    Handles color + font resolution
+   All typography variants extend this
 ──────────────────────────────── */
-type AppTextProps = TextProps & {
+
+export type TextType = 'primary' | 'secondary' | 'inverse' | 'onAccent' | 'onCard'
+
+export type AppTextProps = TextProps & {
+  textType?: TextType
   fontSize?: string | number
   color?: string
   fontFamily?: string
@@ -17,31 +22,61 @@ type AppTextProps = TextProps & {
   cursor?: 'default' | 'pointer' | 'text'
   align?: 'left' | 'center' | 'right' | 'justify'
   style?: StyleProp<TextStyle>
-  children: React.ReactNode
+  opacity?: number
+  lineHeight?: number
+  children?: React.ReactNode
 }
 
-function AppText({
-  fontSize = '$md',
-  color = '$textPrimary',
+export function AppText({
+  textType = 'primary',
+  fontSize = '$body1',
+  color,
   fontFamily,
   fontWeight,
-  italic,
+  italic = false,
   variant = 'regular',
   deco = 'none',
   cursor = 'default',
+  align = 'left',
+  opacity = 1,
+  lineHeight = 24,
   style,
   children,
-  align = 'left',
   ...rest
 }: AppTextProps) {
   const { theme } = UseTheme()
-  const { resolve } = useThemeTokens()
+  const S = useScale()
 
-  const resolved = resolve({
-    fontSize,
-    color,
-    fontFamily: fontFamily ?? theme.fontFamily,
-  })
+  // Resolve token strings to actual values
+  const resolvedFontSize = (() => {
+    if (typeof fontSize === 'string' && fontSize.startsWith('$')) {
+      const token = fontSize.slice(1) as keyof typeof S.font
+      return S.font[token] ?? fontSize
+    }
+    return fontSize
+  })() as number
+
+  // Resolve color: custom color overrides textType
+  const resolvedColor = (() => {
+    // Custom color takes priority
+    if (color) {
+      // Resolve token if it starts with $
+      if (typeof color === 'string' && color.startsWith('$')) {
+        return theme[color.slice(1) as keyof typeof theme] as string
+      }
+      return color
+    }
+    
+    // Otherwise use textType
+    switch (textType) {
+      case 'primary': return theme.textPrimary
+      case 'secondary': return theme.textSecondary
+      case 'inverse': return theme.textInverse
+      case 'onAccent': return theme.textOnAccent
+      case 'onCard': return theme.accentText
+      default: return theme.textPrimary
+    }
+  })()
 
   const weight = (() => {
     if (fontWeight) return fontWeight
@@ -52,93 +87,152 @@ function AppText({
     }
   })()
 
+  // On native mobile, disable italics to avoid fonts without italic faces rendering poorly
+  const isMobile = Platform.OS === 'ios' || Platform.OS === 'android'
+  const shouldItalic = italic && !isMobile
+
   return (
-<Text
-  {...rest}
-  style={
-    [
-      resolved,
-      { fontWeight: weight, fontStyle: italic ? 'italic' : 'normal' },
-      style,
-    ] as StyleProp<TextStyle>
-  }
-/>
+    <Text
+      {...rest}
+      style={[
+        {
+          fontSize: resolvedFontSize,
+          color: resolvedColor,
+          fontFamily: fontFamily ?? theme.fontFamily,
+          fontWeight: weight,
+          fontStyle: shouldItalic ? 'italic' : 'normal',
+          textAlign: align,
+          textDecorationLine: deco,
+          cursor: cursor,
+          opacity: opacity,
+          lineHeight: lineHeight,
+        },
+        style, // User style can override everything
+      ]}
+    >
+      {children}
+    </Text>
   )
 }
 
+
 /* ───────────────────────────────
    🏷️ Typography Variants
+   All extend AppText with explicit defaults
 ──────────────────────────────── */
 
-/* — Heading — */
-export function Heading({
+/* ───── Title ───── 
+   Largest text, display titles
+   Default: $title (48px), semi-bold, centered, primary color
+*/
+export function Title({
   fontSize = '$title',
-  color = '$textPrimary',
+  fontWeight = '600',
+  variant = 'semi',
+  align = 'center',
+  lineHeight = 56,
   style,
   ...rest
 }: AppTextProps) {
   const { theme } = UseTheme()
+  const S = useScale()
   return (
     <AppText
       fontSize={fontSize}
-      color={color}
       fontFamily={theme.fontFamilyTitle}
-      fontWeight="700"
+      fontWeight={fontWeight}
+      variant={variant}
+      align={align}
+      lineHeight={lineHeight}
       style={[{ marginBottom: S.space.lg }, style]}
       {...rest}
     />
   )
 }
-export function Title(props: AppTextProps) {
-  return <Heading style={[{ textAlign: 'center' }, props.style]} {...props} />
-}
 
-/* — ObjHeading — */
-export function ObjHeading({
-  fontSize = '$lg',
-  color = '$textPrimary',
+/* ───── Heading ───── 
+   Section headings, page titles
+   Default: $heading1 (34px), semi-bold, left-aligned, primary color
+*/
+export function Heading({
+  fontSize = '$heading1',
+  fontWeight = '600',
+  variant = 'semi',
+  lineHeight = 40,
   style,
   ...rest
 }: AppTextProps) {
   const { theme } = UseTheme()
+  const S = useScale()
   return (
     <AppText
       fontSize={fontSize}
-      color={color}
       fontFamily={theme.fontFamilyTitle}
-      fontWeight="600"
+      fontWeight={fontWeight}
+      variant={variant}
+      lineHeight={lineHeight}
+      style={[{ marginBottom: S.space.md }, style]}
+      {...rest}
+    />
+  )
+}
+
+/* ───── ObjHeading ───── 
+   Object/item headings (cards, list items)
+   Default: $heading2 (30px), semi-bold, left-aligned, primary color
+*/
+export function ObjHeading({
+  fontSize = '$heading2',
+  fontWeight = '600',
+  variant = 'semi',
+  lineHeight = 36,
+  style,
+  ...rest
+}: AppTextProps) {
+  const { theme } = UseTheme()
+  const S = useScale()
+  return (
+    <AppText
+      fontSize={fontSize}
+      fontFamily={theme.fontFamilyTitle}
+      fontWeight={fontWeight}
+      variant={variant}
+      lineHeight={lineHeight}
       style={[{ marginBottom: S.space.xs }, style]}
       {...rest}
     />
   )
 }
 
-/* — Body — */
+/* ───── Body ───── 
+   Default body text, most common
+   Default: $body1 (18px), regular, left-aligned, primary color
+*/
 export function Body({
-  fontSize = '$md',
-  color = '$textPrimary',
-  variant = 'regular',
-  opacity = 1, // 👈 add default opacity
+  fontSize = '$body1',
+  lineHeight = 24,
   style,
   ...rest
-}: AppTextProps & { opacity?: number }) { // 👈 extend props type
+}: AppTextProps) {
   const { theme } = UseTheme()
   return (
     <AppText
       fontSize={fontSize}
-      color={color}
-      variant={variant}
       fontFamily={theme.fontFamily}
-      style={[{ opacity }, style]} // 👈 merge opacity
+      lineHeight={lineHeight}
+      style={style}
       {...rest}
     />
   )
 }
 
-/* — Paragraph — */
+/* ───── Paragraph ───── 
+   Long-form readable text
+   Default: $para (16px), regular, left-aligned, primary color, optimized line-height
+*/
 export function Paragraph({
-  fontSize = '$md',
-  color = '$textPrimary',
+  fontSize = '$para',
+  lineHeight = 26,
   style,
   ...rest
 }: AppTextProps) {
@@ -146,18 +240,24 @@ export function Paragraph({
   return (
     <AppText
       fontSize={fontSize}
-      color={color}
       fontFamily={theme.fontFamilyPara}
+      lineHeight={lineHeight}
       style={style}
       {...rest}
     />
   )
 }
 
-/* — SubTitle — */
+/* ───── SubTitle ───── 
+   Subtitle text, secondary info under headings
+   Default: $subtitle (14px), italic, left-aligned, secondary color
+*/
 export function SubTitle({
-  fontSize = '$sm',
-  color = '$textSecondary',
+  fontSize = '$subtitle',
+  textType = 'secondary',
+  italic = true,
+  opacity = 0.8,
+  lineHeight = 20,
   style,
   ...rest
 }: AppTextProps) {
@@ -165,19 +265,26 @@ export function SubTitle({
   return (
     <AppText
       fontSize={fontSize}
-      color={color}
-      italic
+      textType={textType}
       fontFamily={theme.fontFamily}
+      italic={italic}
+      opacity={opacity}
+      lineHeight={lineHeight}
       style={style}
       {...rest}
     />
   )
 }
 
-/* — Caption — */
+/* ───── Caption ───── 
+   Small text, hints, metadata
+   Default: $caption (8px), regular, left-aligned, secondary color
+*/
 export function Caption({
-  fontSize = '$xs',
-  color = '$textSecondary',
+  fontSize = '$caption',
+  textType = 'secondary',
+  opacity = 0.7,
+  lineHeight = 12,
   style,
   ...rest
 }: AppTextProps) {
@@ -185,38 +292,61 @@ export function Caption({
   return (
     <AppText
       fontSize={fontSize}
-      color={color}
+      textType={textType}
       fontFamily={theme.fontFamilyPara}
+      opacity={opacity}
+      lineHeight={lineHeight}
       style={style}
       {...rest}
     />
   )
 }
 
-/* — Link — */
+/* ───────────────────────────────
+   🎯 Specialized Variants
+   Context-specific text with preset styles
+──────────────────────────────── */
+
+/* ───── Link ───── 
+   Clickable/tappable link text
+   Default: $body1 (18px), underlined, accent color, pointer cursor
+*/
 export function Link({
-  fontSize = '$md',
+  fontSize = '$body1',
   color = '$accent',
+  deco = 'underline',
+  cursor = 'pointer',
+  lineHeight = 24,
   style,
+  onPress,
   ...rest
-}: AppTextProps) {
+}: AppTextProps & { onPress?: () => void }) {
   const { theme } = UseTheme()
   return (
     <AppText
       fontSize={fontSize}
       color={color}
       fontFamily={theme.fontFamily}
-      fontWeight="600"
-      style={[{ textDecorationLine: 'underline' }, style]}
+      deco={deco}
+      cursor={cursor}
+      lineHeight={lineHeight}
+      style={style}
+      onPress={onPress}
       {...rest}
     />
   )
 }
 
-/* — ButtonText — */
+/* ───── ButtonText ───── 
+   Text inside buttons
+   Default: $body1 (18px), semi-bold, centered, inherits button text color
+*/
 export function ButtonText({
-  fontSize = '$md',
-  color = '$textPrimary',
+  fontSize = '$body1',
+  fontWeight = '600',
+  variant = 'semi',
+  align = 'center',
+  lineHeight = 22,
   style,
   ...rest
 }: AppTextProps) {
@@ -224,28 +354,15 @@ export function ButtonText({
   return (
     <AppText
       fontSize={fontSize}
-      color={color}
       fontFamily={theme.fontFamily}
-      fontWeight="600"
+      fontWeight={fontWeight}
+      variant={variant}
+      align={align}
+      lineHeight={lineHeight}
       style={style}
       {...rest}
     />
   )
 }
 
-export function BodyLogin({ style, ...props }: React.ComponentProps<typeof Body>) {
-  return (
-    <Body
-      style={[
-        {
-          marginBottom:  40, // fallback to 40 S.space.xl ??
-          textAlign: 'center',
-          paddingHorizontal: S.space.lg ?? 20,
-          lineHeight: 22,
-        },
-        style,
-      ]}
-      {...props}
-    />
-  )
-}
+

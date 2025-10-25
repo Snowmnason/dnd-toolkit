@@ -1,4 +1,5 @@
 import { AuthStateManager, logger } from "@/lib";
+import { ScaleProvider } from "@/providers/ScaleProvider";
 import { ThemeProvider, UseTheme } from "@/theme";
 import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -274,9 +275,11 @@ function RootLayoutContent() {
 export default function RootLayout() {
   return (
     <ThemeProvider>
-      <AppParamsProvider>
-        <RootLayoutContent />
-      </AppParamsProvider>
+      <ScaleProvider>
+        <AppParamsProvider>
+          <RootLayoutContent />
+        </AppParamsProvider>
+      </ScaleProvider>
     </ThemeProvider>
   );
 }

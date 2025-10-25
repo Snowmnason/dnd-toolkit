@@ -1,5 +1,5 @@
 import { AppModal, Button } from '@/components/ui'
-import { S } from '@/theme'
+import { useScale } from '@/theme'
 import React from 'react'
 import { View } from 'react-native'
 
@@ -20,6 +20,7 @@ export function ConfirmLeaveModal({
   worldName,
   onConfirmLeave,
 }: ConfirmLeaveModalProps) {
+  const S = useScale()
   return (
     <AppModal
       visible={visible}

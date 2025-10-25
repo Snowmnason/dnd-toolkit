@@ -1,11 +1,11 @@
-import { $, S, tone, UseTheme } from '@/theme'
-import React, { useEffect } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { $, tone, useScale, UseTheme } from '@/theme';
+import React, { useEffect } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
     useAnimatedStyle,
     useSharedValue,
     withTiming,
-} from 'react-native-reanimated'
+} from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets'; // ✅ new import
 
 type ToastType = 'info' | 'success' | 'error' | 'warning'
@@ -31,6 +31,7 @@ export function AppToast({
 }: AppToastProps) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { theme: _theme } = UseTheme() // keep reactive
+  const S = useScale()
   const opacity = useSharedValue(0)
   const translateY = useSharedValue(30)
   const baseSurface = $('surface')
@@ -61,9 +62,21 @@ const background =
     : tone(baseSurface, 'alt')
 
   return (
-    <Animated.View style={[styles.container, animatedStyle]}>
-      <View style={[styles.toast, { backgroundColor: background }]}>
-        <Text style={[styles.text, { color: $('textPrimary') }]}>{message}</Text>
+    <Animated.View style={[styles.container, { bottom: S.space.xl }, animatedStyle]}>
+      <View
+        style={[
+          styles.toast,
+          {
+            backgroundColor: background,
+            borderRadius: S.radius.md,
+            paddingHorizontal: S.space.lg,
+            paddingVertical: S.space.md,
+          },
+        ]}
+      >
+        <Text style={[styles.text, { color: $('textPrimary'), fontSize: S.font.body1 }]}>
+          {message}
+        </Text>
       </View>
     </Animated.View>
   )
@@ -72,22 +85,16 @@ const background =
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: S.space.xl,
     alignSelf: 'center',
     zIndex: 9999,
   },
   toast: {
-    borderRadius: S.radius.md,
-    paddingHorizontal: S.space.lg,
-    paddingVertical: S.space.md,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 6,
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.15)',
     elevation: 5,
   },
   text: {
-    fontSize: S.font.md,
     fontWeight: '600',
   },
 })
+
+// dynamic spacing and radius applied inline via S

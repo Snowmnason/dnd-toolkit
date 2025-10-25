@@ -1,5 +1,6 @@
+import { useScale } from '@/theme';
 import React from 'react';
-import { TextInput as RNTextInput, TouchableOpacity, View } from 'react-native';
+import { TextInput as RNTextInput, Text, TouchableOpacity, View } from 'react-native';
 
 interface AuthInputProps {
   placeholder: string;
@@ -34,8 +35,9 @@ const AuthInput = React.forwardRef<RNTextInput, AuthInputProps>(({
   returnKeyType = 'next',
   submitBehavior = 'blurAndSubmit',
 }, ref) => {
+  const S = useScale()
   return (
-    <View style={{ position: 'relative', marginBottom: 2 }}>
+    <View style={{ position: 'relative', marginBottom: S.space.xxs }}>
       <RNTextInput
         ref={ref}
         placeholder={placeholder}
@@ -52,15 +54,18 @@ const AuthInput = React.forwardRef<RNTextInput, AuthInputProps>(({
         style={[
           {
             borderWidth: 2,
+            height: S.s(48),
             borderColor: '#D4AF37',
-            borderRadius: 6,
-            paddingVertical: 8,
-            paddingHorizontal: 10,
+            borderRadius: S.radius.lg,
+            paddingVertical: S.space.xs,
+            paddingHorizontal: S.space.sm,
             backgroundColor: '#F5E6D3',
             color: '#2f353d',
-            marginBottom: 16,
+            marginBottom: S.space.sm,
+            fontSize: S.font.para,
+            
           },
-          showPasswordToggle ? { paddingRight: 40 } : null,
+          showPasswordToggle ? { paddingRight: S.s(40) } : null,
           style,
         ]}
       />
@@ -70,20 +75,20 @@ const AuthInput = React.forwardRef<RNTextInput, AuthInputProps>(({
         <TouchableOpacity
           style={{
               position: 'absolute',
-              right: 4,
-              top: 3,
-              paddingHorizontal: 4,
-              paddingVertical: 4,
-              minWidth: 24,
-              maxWidth: 30,
-              height: 32,
+              right: S.space.xs,
+              top: S.space.xxs,
+              paddingHorizontal: S.space.xxs,
+              paddingVertical: S.space.xxs,
+              minWidth: S.s(28),
+              maxWidth: S.s(38),
+              height: S.s(48),
               opacity: editable ? 1 : 0.5,
           }}
           onPress={onTogglePassword}
           disabled={!editable}
           activeOpacity={0.7}
         >
-          {showPassword ? '👁️' : '👁️‍🗨️'}
+          <Text style={{ fontSize: S.s(18) }}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
         </TouchableOpacity>
       )}
     </View>

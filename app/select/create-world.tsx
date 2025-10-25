@@ -1,234 +1,223 @@
-import { CoreColors } from '@/constants/corecolors';
-import { createWorldNameChangeHandler, isValidWorldNameForSubmission, type WorldNameValidationResult } from '@/lib/';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Platform, ScrollView, View } from 'react-native';
-import MapCanvas from '../../components/create-world/MapCanvas';
-import PrimaryButton from '../../components/custom_components/PrimaryButton';
-import TextInputComponent from '../../components/custom_components/TextInput';
-import CreateWorldModals from '../../components/modals/CreateWorldModals';
-import Dropdown from '../../components/ui/Dropdown';
-import { ThemedText } from '../../components/ui/themed-text';
-import { ThemedView } from '../../components/ui/themed-view';
-import { ComponentStyles, Spacing, createTextShadow } from '../../constants/theme';
-import { useAuthStatus } from '../../hooks/use-auth-status';
-import { useSuccessNavigation } from '../../hooks/use-success-navigation';
-import { useWorldCreation } from '../../hooks/use-world-creation';
+import { useRouter } from 'expo-router'
+import React, { useState } from 'react'
+import { Platform, ScrollView } from 'react-native'
 
-const tabletopSystems = ['D&D 5e', 'Pathfinder', 'Call of Cthulhu', 'Custom'];
-const defaultMapImages = ["https://media.wizards.com/2015/images/dnd/resources/Sword-Coast-Map_MedRes.jpg",
-  "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgJm47wbufqY9yqRw_OLFJBtLEYYNGlCMMHWRozByIB4-SvH-6lwXPEI7L4LXhA1la-Ek0w7L_TU1wBkX4P7Z4fKmVQ2XAHuAmiF-4HYOGKWAZofbqc0e3pNca2dvU4HAWDuh8bg4y869M/s1600/Vlaroa1.jpg",
-  "https://talaraska.com/wp-content/uploads/2024/01/text-1-hw-terrain-4275x2600-1.jpg",
-  "https://images.squarespace-cdn.com/content/v1/5dadaf88e03a4e6bb69307dd/904f0cc0-7846-4576-ac91-176528727e4b/Vhaledhon+No+Text+Map+Blog.jpg",
- ];
+import { AppView, Body, Button, Dropdown, Heading, TextInput } from '@/components/ui'
+import { useAuthStatus } from '@/hooks/use-auth-status'
+import { useSuccessNavigation } from '@/hooks/use-success-navigation'
+import { useWorldCreation } from '@/hooks/use-world-creation'
+import { createWorldNameChangeHandler, isValidWorldNameForSubmission, type WorldNameValidationResult } from '@/lib'
+import { $, useScale } from '@/theme'
+
+import MapCanvas from '@/components/create-world/MapCanvas'
+import { CreateWorldModals } from '@/components/modals'; // ✅ updated modal system
+
+// Constants
+const tabletopSystems = ['D&D 5e', 'Pathfinder', 'Call of Cthulhu', 'Custom']
+const systemItems = tabletopSystems.map((t) => ({ label: t, value: t }))
+const defaultMapImages = [
+  'https://media.wizards.com/2015/images/dnd/resources/Sword-Coast-Map_MedRes.jpg',
+  'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgJm47wbufqY9yqRw_OLFJBtLEYYNGlCMMHWRozByIB4-SvH-6lwXPEI7L4LXhA1la-Ek0w7L_TU1wBkX4P7Z4fKmVQ2XAHuAmiF-4HYOGKWAZofbqc0e3pNca2dvU4HAWDuh8bg4y869M/s1600/Vlaroa1.jpg',
+  'https://talaraska.com/wp-content/uploads/2024/01/text-1-hw-terrain-4275x2600-1.jpg',
+  'https://images.squarespace-cdn.com/content/v1/5dadaf88e03a4e6bb69307dd/904f0cc0-7846-4576-ac91-176528727e4b/Vhaledhon+No+Text+Map+Blog.jpg',
+]
 
 export default function CreateWorldScreen() {
-  // Form state
-  const [worldName, setWorldName] = useState('');
-  const [worldNameValidation, setWorldNameValidation] = useState<WorldNameValidationResult | null>(null);
-  const [system, setSystem] = useState(tabletopSystems[0]);
-  const [description, setDescription] = useState('');
-  const [imageImported, setImageImported] = useState(false);
-  
-  // Modal state
-  const [showSignInModal, setShowSignInModal] = useState(false);
-  const [showValidationModal, setShowValidationModal] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  
-  // Fake image URL for testing - replace with your actual image logic
-  const [mapIndex, setMapIndex] = useState(Math.floor(Math.random() * defaultMapImages.length));
-  //const fakeImageUrl = "https://media.wizards.com/2015/images/dnd/resources/Sword-Coast-Map_MedRes.jpg";
-  
-  const router = useRouter();
-  const isDesktop = Platform.OS === 'web' || Platform.OS === 'windows' || Platform.OS === 'macos';
-  
-  // Custom hooks
-  const { isUserLoggedIn } = useAuthStatus();
-  const { isCreating, successWorldName, successWorldId, createWorld } = useWorldCreation();
-  const { navigateToWorld } = useSuccessNavigation({ 
-    showSuccessModal, 
-    successWorldId 
-  });
+  const S = useScale()
+  // Platform detection
+  const isDesktop =
+    Platform.OS === 'web' || Platform.OS === 'windows' || Platform.OS === 'macos'
 
+  // State
+  const [worldName, setWorldName] = useState('')
+  const [worldNameValidation, setWorldNameValidation] =
+    useState<WorldNameValidationResult | null>(null)
+  const [system, setSystem] = useState(tabletopSystems[0])
+  const [description, setDescription] = useState('')
+  const [imageImported, setImageImported] = useState(false)
+  const [mapIndex, setMapIndex] = useState(
+    Math.floor(Math.random() * defaultMapImages.length)
+  )
+
+  // Modal state
+  const [showSignInModal, setShowSignInModal] = useState(false)
+  const [showValidationModal, setShowValidationModal] = useState(false)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+
+  // Hooks
+  const router = useRouter()
+  const { isUserLoggedIn } = useAuthStatus()
+  const { isCreating, successWorldName, successWorldId, createWorld } = useWorldCreation()
+  const { navigateToWorld } = useSuccessNavigation({
+    showSuccessModal,
+    successWorldId,
+  })
+
+  // Logic
   const handleCreateWorld = async () => {
     if (!isValidWorldNameForSubmission(worldName)) {
-      setShowValidationModal(true);
-      return;
+      setShowValidationModal(true)
+      return
     }
 
-    // Check if user is logged in
     if (!isUserLoggedIn) {
-      setShowSignInModal(true);
-      return;
+      setShowSignInModal(true)
+      return
     }
 
     const result = await createWorld({
       name: worldName,
-      description: description,
-      system: system,
-      mapImageUrl: defaultMapImages[mapIndex]
-    });
+      description,
+      system,
+      mapImageUrl: defaultMapImages[mapIndex],
+    })
 
-    if (result.success) {
-      setShowSuccessModal(true);
-    }
-  };
+    if (result.success) setShowSuccessModal(true)
+  }
 
   const handleSuccessNavigate = () => {
-    navigateToWorld();
-  };
+    navigateToWorld()
+  }
 
-  return (
-    <ThemedView style={{ flex: 1, flexDirection: isDesktop ? 'row' : 'column' }}>
-      {/* Left Panel: Form */}
-      <View style={{ flex: 1, padding: Spacing.md }}>
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          <View style={ComponentStyles.card.container}>
-            <ThemedText type="title" style={{
-              textAlign: 'center',
-              fontWeight: '700',
-              color: CoreColors.textPrimary,
-              ...createTextShadow(CoreColors.backgroundDark, { width: 2, height: 2 }, 4)
-            }}>
-              Create New World
-            </ThemedText>
-          </View>
+  // Panels
+  const LeftPanel = (
+      <AppView
+        variant="page"
+        style={{
+          flex: 1,
+          padding: S.space.lg,
+          maxWidth: 700,
+          alignSelf: 'center',
+        }}
+      >
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: S.space.xxl }}
+      >
+        <Heading align="center" style={{ marginBottom: S.space.lg }}>
+          Create New World
+        </Heading>
 
-          {/* World Name */}
-          <ThemedText style={{
-            fontWeight: '600',
-            fontSize: 16,
-            ...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2),
-            marginBottom: Spacing.xs
-          }}>
-            Name of World
-          </ThemedText>
-          <TextInputComponent
-            placeholder="World Name"
-            value={worldName}
-            onChangeText={createWorldNameChangeHandler(setWorldName, setWorldNameValidation)}
-            style={{ marginBottom: Spacing.md }}
-          />
-          
-          {/* Validation errors */}
-          {worldNameValidation && !worldNameValidation.isValid && (
-            <View style={{ marginBottom: Spacing.md }}>
-              {worldNameValidation.errors.map((error, index) => (
-                <ThemedText key={index} style={{
-                  color: '#FF6B6B',
-                  fontSize: 14,
-                  marginBottom: Spacing.xs
-                }}>
-                  ⚠️ {error}
-                </ThemedText>
-              ))}
-            </View>
+        {/* World Name */}
+        <TextInput
+          heading="Name of World"
+          placeholder="World Name"
+          value={worldName}
+          onChangeText={createWorldNameChangeHandler(
+            setWorldName,
+            setWorldNameValidation
           )}
+          style={{ marginBottom: S.space.md }}
+        />
 
-          {/* Tabletop System */}
-          <ThemedText style={{
-            fontWeight: '600',
-            fontSize: 16,
-            ...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2),
-            marginBottom: Spacing.xs
-          }}>
-            Tabletop System
-          </ThemedText>
-          <Dropdown 
-            value={system} 
-            onChange={(value) => {
-              if (value !== null) setSystem(value);
-            }}
-            options={tabletopSystems}
-            placeholder="Select a tabletop system"
+        {/* Validation errors */}
+        {worldNameValidation && !worldNameValidation.isValid && (
+          <AppView style={{ marginBottom: S.space.md }}>
+            {worldNameValidation.errors.map((error, index) => (
+              <Body key={index} color="$destructive" style={{ marginBottom: S.space.xs }}>
+                ⚠️ {error}
+              </Body>
+            ))}
+          </AppView>
+        )}
+
+        {/* Tabletop System */}
+        <Dropdown
+          heading="Tabletop System"
+          value={system}
+          items={systemItems}
+          onChange={(value) => {
+            if (value !== null) setSystem(value)
+          }}
+          placeholder="Select a tabletop system"
+          style={{ marginBottom: S.space.md }}
+        />
+
+        {/* Description */}
+        <TextInput
+          heading="Description"
+          placeholder="Description"
+          value={description}
+          onChangeText={setDescription}
+          multiline
+          style={{
+            height: 100,
+            textAlignVertical: 'top',
+            marginBottom: S.space.lg,
+          }}
+        />
+
+        {/* Import Image (mobile only) */}
+        {!isDesktop && (
+          <Button
+            text="Import Image"
+            variant="secondary"
+            onPress={() => {}}
+            style={{ marginBottom: S.space.lg }}
           />
+        )}
 
-          {/* Description */}
-          <ThemedText style={{
-            fontWeight: '600',
-            fontSize: 16,
-            ...createTextShadow(CoreColors.secondary, { width: 1, height: 1 }, 2),
-            marginBottom: Spacing.xs
-          }}>
-            Description
-          </ThemedText>
-          <TextInputComponent
-            placeholder="Description"
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            style={{
-              height: 100,
-              textAlignVertical: 'top',
-              marginBottom: Spacing.md,
-            }}
-          />
-
-          {/* Import Image (mobile only here) */}
-          {!isDesktop && (
-            <PrimaryButton
-              style={{ marginBottom: Spacing.md }}
-              textStyle={{}}
-              onPress={() => {}}
-            >
-              Import Image
-            </PrimaryButton>
-          )}
-
-          {/* Action Buttons */}
-          <View style={{
+        {/* Action Buttons */}
+        <AppView
+          style={{
             flexDirection: 'row',
             justifyContent: 'space-between',
-            marginTop: Spacing.md,
-          }}>
-            <PrimaryButton 
-              style={{}}
-              textStyle={{}}
-              onPress={() => router.replace('/select/world-selection')}
-            >
-              Cancel
-            </PrimaryButton>
-            <PrimaryButton
-              style={{}}
-              textStyle={{}}
-              disabled={!isValidWorldNameForSubmission(worldName) || isCreating}
-              onPress={handleCreateWorld}
-            >
-              {isCreating ? 'Creating...' : 'Create'}
-            </PrimaryButton>
-          </View>
-        </ScrollView>
-      </View>
-
-      {/* Right Panel (desktop only) */}
-      {isDesktop && (
-        <View style={{
-          flex: 4,
-          borderLeftWidth: 1,
-          borderLeftColor: CoreColors.borderPrimary
-        }}>
-          {/* Canvas placeholder */}
-          <MapCanvas 
-            onPress={() => {
-              setImageImported(false);
-              setMapIndex(Math.floor(Math.random() * defaultMapImages.length));
-            }}
-            imageImported={imageImported}
-            imageUrl={defaultMapImages[mapIndex]}
+            marginTop: S.space.md,
+          }}
+        >
+          <Button
+            text="Cancel"
+            variant="outlined"
+            onPress={() => router.replace('/select/world-selection')}
+            style={{ flex: 1, marginRight: S.space.sm }}
           />
+          <Button
+            text={isCreating ? 'Creating...' : 'Create'}
+            variant="primary"
+            onPress={handleCreateWorld}
+            disabled={!isValidWorldNameForSubmission(worldName) || isCreating}
+            style={{ flex: 1, marginLeft: S.space.sm }}
+          />
+        </AppView>
+      </ScrollView>
+    </AppView>
+  )
 
-          {/* Import image button */}
-          <PrimaryButton 
-            style={{ margin: Spacing.md }} 
-            textStyle={{}}
-            onPress={() => setImageImported(true)}
-          >
-            Import Image
-          </PrimaryButton>
+  const RightPanel = isDesktop ? (
+    <AppView
+      style={{
+        flex: 4,
+        borderLeftWidth: 1,
+        borderLeftColor: $('border'),
+      }}
+    >
+      <MapCanvas
+        onPress={() => {
+          setImageImported(false)
+          setMapIndex(Math.floor(Math.random() * defaultMapImages.length))
+        }}
+        imageImported={imageImported}
+        imageUrl={defaultMapImages[mapIndex]}
+      />
+      <Button
+        text="Import Image"
+        variant="primary"
+        onPress={() => setImageImported(true)}
+        style={{ margin: S.space.lg }}
+      />
+    </AppView>
+  ) : null
 
-          {/* Future drawing tools placeholder */}
-        </View>
-      )}
+  return (
+    <AppView
+      variant="page"
+      style={{
+        flex: 1,
+        flexDirection: isDesktop ? 'row' : 'column',
+      }}
+    >
+      {LeftPanel}
+      {RightPanel}
 
       {/* Modals */}
       <CreateWorldModals
@@ -241,6 +230,6 @@ export default function CreateWorldScreen() {
         successWorldName={successWorldName}
         onSuccessNavigate={handleSuccessNavigate}
       />
-    </ThemedView>
-  );
+    </AppView>
+  )
 }

@@ -1,7 +1,7 @@
-import { IconSymbol } from '@/components/built-in/icon-symbol';
-import { Body, ObjHeading } from '@/components/ui/AppText';
-import { $, S, tone, useThemeTokens } from '@/theme';
-import React, { useMemo, useState } from 'react';
+import { IconSymbol } from '@/components/built-in/icon-symbol'
+import { Body, ObjHeading, TextType } from '@/components/ui/AppText'
+import { $, tone, useScale } from '@/theme'
+import React, { useMemo, useState } from 'react'
 import {
   FlatList,
   Platform,
@@ -9,13 +9,13 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from 'react-native'
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
-} from 'react-native-reanimated';
+} from 'react-native-reanimated'
 
 interface DropdownItem {
   label: string
@@ -29,14 +29,10 @@ interface DropdownProps {
   placeholder?: string
   enableSearch?: boolean
   heading?: string
-  onCard?: boolean
+  textType?: TextType
   style?: any
 }
 
-/**
- * 🎛️ Dropdown
- * Modern animated dropdown with optional search + heading support.
- */
 export default function Dropdown({
   items,
   value,
@@ -44,9 +40,10 @@ export default function Dropdown({
   placeholder = 'Select an option',
   enableSearch = false,
   heading,
-  onCard = false,
+  textType = 'secondary',
   style,
 }: DropdownProps) {
+  const S = useScale()
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState('')
   const rotate = useSharedValue(0)
@@ -54,74 +51,52 @@ export default function Dropdown({
   const opacity = useSharedValue(0)
   const shadow = useSharedValue(0)
 
-  const { resolve } = useThemeTokens()
-  const textColor = resolve({
-    color: onCard ? '$textPrimary' : '$textInverse',
-  }).color
   const borderColor = $('accent')
   const background = $('surface')
 
-  // Animate chevron rotation
   const chevronStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotate.value}deg` }],
   }))
 
-  // Animate dropdown container
-const dropdownAnimStyle = useAnimatedStyle(() => ({
-  opacity: opacity.value,
-  transform: [{ scale: scale.value }],
-  shadowOpacity: 0.1 + shadow.value * 0.15, // smooth depth
-  shadowRadius: 4 + shadow.value * 3,
-  elevation: 1 + shadow.value * 4, // Android
-}))
+  const dropdownAnimStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+    shadowOpacity: 0.1 + shadow.value * 0.15,
+    shadowRadius: 4 + shadow.value * 3,
+    elevation: 1 + shadow.value * 4,
+  }))
 
   const toggleDropdown = () => {
-  const toOpen = !isOpen
-  setIsOpen(toOpen)
-  rotate.value = withTiming(toOpen ? 180 : 0, { duration: 220 })
+    const toOpen = !isOpen
+    setIsOpen(toOpen)
+    rotate.value = withTiming(toOpen ? 180 : 0, { duration: 220 })
 
-  if (toOpen) {
-    opacity.value = withTiming(1, { duration: 100 })
-    scale.value = withSpring(1, {
-      damping: 12,
-      stiffness: 120,
-      mass: 0.6,
-    })
-    shadow.value = withTiming(1, { duration: 200 })
-  } else {
-    opacity.value = withTiming(0, { duration: 150 })
-    scale.value = withSpring(0.9, {
-      damping: 15,
-      stiffness: 120,
-      mass: 0.6,
-    })
-    shadow.value = withTiming(0, { duration: 150 })
+    if (toOpen) {
+      opacity.value = withTiming(1, { duration: 100 })
+      scale.value = withSpring(1, { damping: 12, stiffness: 120, mass: 0.6 })
+      shadow.value = withTiming(1, { duration: 200 })
+    } else {
+      opacity.value = withTiming(0, { duration: 150 })
+      scale.value = withSpring(0.9, { damping: 15, stiffness: 120, mass: 0.6 })
+      shadow.value = withTiming(0, { duration: 150 })
+    }
   }
-}
 
   const filteredItems = useMemo(() => {
     if (!enableSearch || search.trim() === '') return items
-    return items.filter((i) =>
-      i.label.toLowerCase().includes(search.trim().toLowerCase())
-    )
+    return items.filter((i) => i.label.toLowerCase().includes(search.trim().toLowerCase()))
   }, [items, search, enableSearch])
 
-  const selectedLabel =
-    items.find((item) => item.value === value)?.label || placeholder
+  const selectedLabel = items.find((item) => item.value === value)?.label || placeholder
 
   return (
     <View style={[{ width: '100%' }, style]}>
-      {/* Heading */}
       {heading ? (
-        <ObjHeading
-          color={textColor}
-          style={{ marginBottom: S.space.xs, marginLeft: S.space.xs }}
-        >
+        <ObjHeading textType={textType} style={{ marginBottom: S.space.xs, marginLeft: S.space.xs }}>
           {heading}
         </ObjHeading>
       ) : null}
 
-      {/* Dropdown header */}
       <TouchableOpacity
         accessibilityRole="button"
         activeOpacity={0.8}
@@ -131,13 +106,13 @@ const dropdownAnimStyle = useAnimatedStyle(() => ({
           {
             borderColor,
             backgroundColor: background,
+            borderRadius: S.radius.md,
+            paddingVertical: S.space.sm,
+            paddingHorizontal: S.space.md,
           },
         ]}
       >
-        <Body
-          color={value ? textColor : $('textSecondary')}
-          style={{ flex: 1 }}
-        >
+        <Body textType={value ? textType : 'secondary'} style={{ flex: 1 }}>
           {selectedLabel}
         </Body>
         <Animated.View style={chevronStyle}>
@@ -145,13 +120,12 @@ const dropdownAnimStyle = useAnimatedStyle(() => ({
             name="chevron.right"
             size={18}
             weight="medium"
-            color={$('textSecondary')}
+            color={$(`textSecondary`)}
             style={{ transform: [{ rotate: isOpen ? '90deg' : '0deg' }] }}
           />
         </Animated.View>
       </TouchableOpacity>
 
-      {/* Dropdown content */}
       {isOpen && (
         <Animated.View
           style={[
@@ -160,6 +134,8 @@ const dropdownAnimStyle = useAnimatedStyle(() => ({
               borderColor,
               backgroundColor: background,
               shadowColor: $('textInverse'),
+              marginTop: S.space.xs,
+              borderRadius: S.radius.md,
             },
             dropdownAnimStyle,
           ]}
@@ -169,12 +145,15 @@ const dropdownAnimStyle = useAnimatedStyle(() => ({
               placeholder="Search..."
               value={search}
               onChangeText={setSearch}
-              placeholderTextColor={$('textSecondary')}
+              placeholderTextColor={$(`textSecondary`)}
               style={[
                 styles.searchInput,
                 {
                   borderColor,
-                  color: textColor,
+                  color: $('textPrimary'),
+                  borderRadius: S.radius.sm,
+                  paddingHorizontal: S.space.sm,
+                  margin: S.space.sm,
                 },
               ]}
             />
@@ -183,6 +162,15 @@ const dropdownAnimStyle = useAnimatedStyle(() => ({
           <FlatList
             data={filteredItems}
             keyExtractor={(item) => item.value}
+            ItemSeparatorComponent={() => (
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: tone($('accent'), 'hover'),
+                  opacity: 0.2,
+                }}
+              />
+            )}
             renderItem={({ item }) => (
               <TouchableOpacity
                 activeOpacity={0.8}
@@ -194,26 +182,17 @@ const dropdownAnimStyle = useAnimatedStyle(() => ({
                   styles.item,
                   {
                     borderColor,
+                    borderWidth: 1.5,
+                    borderRadius: S.radius.md,
+                    paddingVertical: S.space.sm,
+                    paddingHorizontal: S.space.md,
                   },
                 ]}
               >
-                <Body
-                  color={
-                    item.value === value ? $('accent') : $('textPrimary')
-                  }
-                >
+                <Body color={item.value === value ? $('accent') : $('textPrimary')}>
                   {item.label}
                 </Body>
               </TouchableOpacity>
-            )}
-            ItemSeparatorComponent={() => (
-              <View
-                style={{
-                  height: 1,
-                  backgroundColor: tone($('accent'), 'hover'),
-                  opacity: 0.2,
-                }}
-              />
             )}
           />
         </Animated.View>
@@ -227,29 +206,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderRadius: S.radius.md,
-    paddingVertical: S.space.sm,
-    paddingHorizontal: S.space.md,
   },
   dropdown: {
-    marginTop: S.space.xs,
     borderWidth: 1.5,
-    borderRadius: S.radius.md,
     overflow: 'hidden',
-    shadowOpacity: 0.15,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 6,
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
     elevation: 3,
   },
-  item: {
-    paddingVertical: S.space.sm,
-    paddingHorizontal: S.space.md,
-  },
+  item: {},
   searchInput: {
     borderWidth: 1,
-    borderRadius: S.radius.sm,
     paddingVertical: Platform.OS === 'ios' ? 8 : 6,
-    paddingHorizontal: S.space.sm,
-    margin: S.space.sm,
   },
 })

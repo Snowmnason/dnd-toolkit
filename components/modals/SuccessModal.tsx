@@ -1,7 +1,7 @@
 import { AppModal, Button } from '@/components/ui'; // ✅ unified import
-import { S } from '@/theme'
-import React from 'react'
-import { View } from 'react-native'
+import { useScale } from '@/theme';
+import React from 'react';
+import { View } from 'react-native';
 
 interface SuccessModalProps {
   visible: boolean
@@ -25,6 +25,7 @@ export function SuccessModal({
   confirmLabel = 'Confirm',
   onConfirm,
 }: SuccessModalProps) {
+  const S = useScale()
   return (
     <AppModal
       visible={visible}

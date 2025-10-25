@@ -1,4 +1,4 @@
-import { $ } from '@/theme'
+import { $, UseTheme } from '@/theme'
 import React from 'react'
 import { Platform } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
@@ -11,11 +11,13 @@ interface LoadingOverlayProps {
   assetsLoaded?: boolean
 }
 
-export default function LoadingOverlay({
+function LoadingOverlayContent({
   message = 'Loading...',
   error,
   assetsLoaded = false,
 }: LoadingOverlayProps) {
+  const { theme } = UseTheme()
+
   React.useEffect(() => {
     if (Platform.OS === 'web') {
       const activeElement = document.activeElement as HTMLElement
@@ -23,7 +25,10 @@ export default function LoadingOverlay({
     }
   }, [])
 
-  const displayMessage = assetsLoaded ? 'Checking authentication...' : message
+  const displayMessage = React.useMemo(
+    () => (assetsLoaded ? 'Checking authentication...' : message),
+  [assetsLoaded, message]
+  )
 
   // subtle fade-in
   const opacity = useSharedValue(0)
@@ -39,7 +44,7 @@ export default function LoadingOverlay({
           flex: 1,
           justifyContent: 'center',
           alignItems: 'center',
-          backgroundColor: $('background'),
+          backgroundColor: `${$('background', theme)}E6`, // adds ~90% alpha
           zIndex: 9999,
         },
         animatedStyle,
@@ -53,7 +58,7 @@ export default function LoadingOverlay({
       <Body
         style={{
           marginTop: 20,
-          color: $('textPrimary'),
+          color: $('textPrimary', theme),
           textAlign: 'center',
           fontSize: 16,
         }}
@@ -65,7 +70,7 @@ export default function LoadingOverlay({
         <Body
           style={{
             marginTop: 10,
-            color: $('accent'),
+            color: $('accent', theme),
             textAlign: 'center',
             fontSize: 12,
             opacity: 0.8,
@@ -78,3 +83,48 @@ export default function LoadingOverlay({
     </Animated.View>
   )
 }
+
+// Error boundary wrapper to handle theme provider errors
+class LoadingOverlayErrorBoundary extends React.Component<
+  LoadingOverlayProps,
+  { hasError: boolean }
+> {
+  constructor(props: LoadingOverlayProps) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.warn('LoadingOverlay error (likely ThemeProvider not ready):', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // Fallback UI without theme
+      return (
+        <Animated.View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: '#1a1a1aE6',
+            zIndex: 9999,
+          }}
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel={this.props.message || 'Loading...'}
+        >
+          <CustomLoad />
+        </Animated.View>
+      )
+    }
+
+    return <LoadingOverlayContent {...this.props} />
+  }
+}
+
+export default LoadingOverlayErrorBoundary

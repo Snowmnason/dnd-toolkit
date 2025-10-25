@@ -1,62 +1,98 @@
-import { useRouter } from 'expo-router';
-import { View } from 'react-native';
-import { ComponentStyles } from '../../constants/theme';
-import { useAppParams } from '../../contexts/AppParamsContext';
-import PrimaryButton from '../custom_components/PrimaryButton';
-import { ThemedText } from '../ui/themed-text';
-import { PanelConfig } from './PanelData';
+import { AppView, Button, Heading } from '@/components/ui'
+import { useAppParams } from '@/contexts/AppParamsContext'
+import { $, tone, useScale } from '@/theme'
+import { useRouter } from 'expo-router'
+import React from 'react'
+import { PanelConfig } from './PanelData'
 
 interface PanelViewProps {
-  config: PanelConfig;
-  userId?: string;
-  worldId?: string;
-  userRole?: string;
-  style?: any;
+  config: PanelConfig
+  userId?: string
+  worldId?: string
+  userRole?: string
+  style?: any
+  image?: string
 }
 
-export function PanelView({ config, userId, worldId, userRole, style }: PanelViewProps) {
-  const router = useRouter();
-  const { updateParams } = useAppParams();
-  const styles = ComponentStyles.panelView;
+export function PanelView({
+  config,
+  userId,
+  worldId,
+  userRole,
+  style,
+  image,
+}: PanelViewProps) {
+  const router = useRouter()
+  const S = useScale()
+  const { updateParams } = useAppParams()
 
   const navigateToFeature = (featurePath: string) => {
-    // Update centralized params context before navigation
-    updateParams({
-      userId,
-      worldId,
-      userRole,
-    });
+    updateParams({ userId, worldId, userRole })
 
-    const routeParams: any = {};
-    if (userId) routeParams.userId = userId;
-    if (worldId) routeParams.worldId = worldId;
-    if (userRole) routeParams.userRole = userRole;
+    const routeParams: Record<string, string> = {}
+    if (userId) routeParams.userId = userId
+    if (worldId) routeParams.worldId = worldId
+    if (userRole) routeParams.userRole = userRole
+
     router.push({
       pathname: `/main/${featurePath}` as any,
       params: routeParams,
-    });
-  };
+    })
+  }
+
+  const backgroundImage = image ? { uri: image } : undefined
 
   return (
-    <View style={[styles.panel, style]}>
-        <View style={{ flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5, flex: 1, width: '100%' }}>
-            <ThemedText type="title" style={styles.panelTitle}>
-                {config.title}
-            </ThemedText>
-        </View>
-        {/* Feature Buttons */}
-        <View style={{ flexDirection: 'column', alignItems: 'center', flex: 10, justifyContent: 'center', width: '100%' }}>
+    <AppView
+      variant="panel"
+      backgroundImage={backgroundImage}
+      style={[
+        {
+          flex: 1,
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          minWidth: 260,
+          padding: S.space.lg,
+        },
+        style,
+      ]}
+    >
+      {/* ─────────────── Panel Header ─────────────── */}
+      <Heading
+        align="center"
+        style={{
+          marginBottom: S.space.md,
+          color: $('textPrimary'),
+        }}
+      >
+        {config.title}
+      </Heading>
+
+      {/* ─────────────── Feature Buttons ─────────────── */}
+      <AppView
+        center
+        gap="sm"
+        style={{
+          width: '100%',
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
         {config.items.map((item, index) => (
-            <PrimaryButton
+          <Button
             key={index}
-            style={styles.featureButton}
-            textStyle={styles.featureText}
+            text={item.name}
+            variant="primary"
             onPress={() => navigateToFeature(item.route)}
-            >
-            {item.name}
-            </PrimaryButton>
+            style={{
+              width: '85%',
+              marginVertical: S.space.xs,
+              shadowColor: tone($('shadow'), 'alt'),
+            }}
+          />
         ))}
-      </View>
-    </View>
-  );
+      </AppView>
+    </AppView>
+  )
 }

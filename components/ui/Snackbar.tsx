@@ -1,4 +1,4 @@
-import { $, S, tone } from '@/theme'
+import { $, tone, useScale } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useEffect, useRef } from 'react'
 import { Animated, Pressable, Text } from 'react-native'
@@ -26,6 +26,7 @@ export function SnackBar({
   onAction,
   onHide,
 }: SnackBarProps) {
+  const S = useScale()
   const translateY = useRef(new Animated.Value(100)).current
   const opacity = useRef(new Animated.Value(0)).current
 
@@ -110,7 +111,7 @@ export function SnackBar({
       <Text
         style={{
           color: $('textPrimary'),
-          fontSize: S.font.sm,
+          fontSize: S.font.para,
           flex: 1,
         }}
       >

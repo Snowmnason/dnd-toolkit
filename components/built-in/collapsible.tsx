@@ -1,10 +1,11 @@
 import { IconSymbol } from '@/components/built-in/icon-symbol';
 import { Body } from '@/components/ui';
-import { $, S } from '@/theme';
+import { $, useScale } from '@/theme';
 import { PropsWithChildren, useState } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 
 export function Collapsible({ children, title }: PropsWithChildren & { title: string }) {
+  const S = useScale();
   const [isOpen, setIsOpen] = useState(false);
 
   return (

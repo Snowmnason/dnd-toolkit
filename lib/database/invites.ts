@@ -1,4 +1,5 @@
-import { logger, supabase } from '@/lib';
+import { logger } from '../utils/logger';
+import { supabase } from './supabase';
 
 /**
  * Database operations for invite links

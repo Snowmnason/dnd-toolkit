@@ -1,5 +1,6 @@
 import LoadingOverlay from '@/components/LoadingOverlay'
-import { $, S, UseTheme, tone, } from '@/theme'
+import { $, UseTheme, tone, useScale, } from '@/theme'
+import type { Sizing } from '@/theme/ultils/sizing'
 import React, { ComponentType, ReactNode } from 'react'
 import {
   ImageBackground,
@@ -24,11 +25,13 @@ type AppViewVariant =
   | 'split'
   | 'loading'
 
+type SpaceKey = keyof Sizing['space']
+
 interface AppViewProps extends ViewProps {
     variant?: AppViewVariant
     scroll?: boolean
     center?: boolean
-    gap?: keyof typeof S.space
+  gap?: SpaceKey
     tone?: 'base' | 'alt' | 'accent' | 'surface'
     backgroundImage?: any
     left?: ReactNode
@@ -64,8 +67,12 @@ export function AppView({
 }: AppViewProps) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { theme: _theme } = UseTheme()
-  const { width } = useWindowDimensions()
+  const S = useScale()
+  const { width, height } = useWindowDimensions()
   const isDesktop = Platform.OS === 'web' && width >= 900
+  
+  // Enable scroll if height is constrained (< 600px)
+  const shouldAutoScroll = height < 600
 
   /* Animation stubs — used for future slide/gesture logic */
   const slide = useSharedValue(0)
@@ -186,7 +193,7 @@ export function AppView({
             )}
           </View>
         </>
-      ) : scroll ? (
+      ) : scroll || shouldAutoScroll ? (
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{

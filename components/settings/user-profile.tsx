@@ -1,198 +1,147 @@
-import { logger } from '@/lib/utils/logger';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { TouchableOpacity, View } from 'react-native';
-import { CoreColors } from '../constants/corecolors';
-import { ComponentStyles, Spacing } from '../constants/theme';
-import { updateUsername } from '../lib/settings';
-import PrimaryButton from './custom_components/PrimaryButton';
-import UpdateUsernameModal from './modals/UpdateUsernameModal';
-import { ThemedText } from './themed-text';
+import { UpdateUsernameModal } from '@/components/modals'
+import { Body, Button, Heading, IconButton, SubTitle, Surface } from '@/components/ui'
+import { logger, updateUsername } from '@/lib'
+import { $, tone, useScale } from '@/theme'
+import { Ionicons } from '@expo/vector-icons'
+import { useRouter } from 'expo-router'
+import React, { useEffect, useState } from 'react'
 
 interface UserProfileProps {
   profile?: {
-    id?: string;
-    username?: string;
-  } | null;
+    id?: string
+    username?: string
+  } | null
 }
 
 export default function UserProfile({ profile }: UserProfileProps) {
-  const router = useRouter();
-  const [sessionUser, setSessionUser] = useState<any>(null);
-  const [loadingSession, setLoadingSession] = useState(true);
-  const [showUsernameModal, setShowUsernameModal] = useState(false);
-  const [updatingUsername, setUpdatingUsername] = useState(false);
-  const [usernameError, setUsernameError] = useState('');
+  const router = useRouter()
+  const S = useScale()
+  const [sessionUser, setSessionUser] = useState<any>(null)
+  const [loadingSession, setLoadingSession] = useState(true)
+  const [showUsernameModal, setShowUsernameModal] = useState(false)
+  const [updatingUsername, setUpdatingUsername] = useState(false)
+  const [usernameError, setUsernameError] = useState('')
 
-  // Fetch session user for email
   useEffect(() => {
     const fetchSessionUser = async () => {
       try {
-        const { supabase } = await import('../lib/supabase');
-        const { data: { user } } = await supabase.auth.getUser();
-        setSessionUser(user);
+        const { supabase } = await import('../../lib/database/supabase')
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        setSessionUser(user)
       } catch (error) {
-        logger.error('user-profile', 'Error fetching session user:', error);
+        logger.error('user-profile', 'Error fetching session user:', error)
       } finally {
-        setLoadingSession(false);
+        setLoadingSession(false)
       }
-    };
-
-    fetchSessionUser();
-  }, []);
+    }
+    fetchSessionUser()
+  }, [])
 
   const handleUpdateUsername = async (newUsername: string) => {
-    setUsernameError('');
-    setUpdatingUsername(true);
-    
-    try {
-      const result = await updateUsername(newUsername);
-      
-      if (!result.success) {
-        setUsernameError(result.error || 'Failed to update username');
-        return;
-      }
-      
-      // Success - close modal and refresh page
-      setShowUsernameModal(false);
-      logger.info('user-profile', 'Username updated successfully');
-      
-      // Refresh the page to show new username
-      window.location.reload();
-      
-    } catch (error: any) {
-      logger.error('user-profile', 'Username update error:', error);
-      setUsernameError(error?.message || 'Failed to update username');
-    } finally {
-      setUpdatingUsername(false);
-    }
-  };
+    setUsernameError('')
+    setUpdatingUsername(true)
 
-  if (!profile && !loadingSession) {
-    // This shouldn't happen in normal flow since settings requires authentication
-    // But show a fallback just in case
-    return (
-      <View style={ComponentStyles.card.default}>
-        <ThemedText type="subtitle" style={{
-          marginBottom: Spacing.xs,
-          fontSize: 24,
-          fontWeight: '600',
-          color: CoreColors.textOnLight,
-          textAlign: 'center'
-        }}>
-          Account
-        </ThemedText>
-        <ThemedText style={{
-          marginBottom: Spacing.md,
-          opacity: 0.8,
-          color: CoreColors.textSecondary,
-          textAlign: 'center',
-          fontSize: 16,
-          lineHeight: 22
-        }}>
-          Unable to load profile information
-        </ThemedText>
-        <PrimaryButton
-          style={{
-            alignSelf: 'center',
-            paddingHorizontal: Spacing.lg,
-            minWidth: 140,
-            backgroundColor: CoreColors.primary,
-            borderColor: CoreColors.primaryDark
-          }}
-          textStyle={{
-            color: CoreColors.textPrimary,
-            fontWeight: '600'
-          }}
-          onPress={() => router.replace('/login/welcome')}
-        >
-          Return to Login
-        </PrimaryButton>
-      </View>
-    );
+    try {
+      const result = await updateUsername(newUsername)
+      if (!result.success) {
+        setUsernameError(result.error || 'Failed to update username')
+        return
+      }
+
+      setShowUsernameModal(false)
+      logger.info('user-profile', 'Username updated successfully')
+
+      // Refresh the page to reflect the new username
+      if (typeof window !== 'undefined') {
+        window.location.reload()
+      }
+    } catch (error: any) {
+      logger.error('user-profile', 'Username update error:', error)
+      setUsernameError(error?.message || 'Failed to update username')
+    } finally {
+      setUpdatingUsername(false)
+    }
   }
 
-  // Logged in - show profile info
+  // Fallback when profile missing
+  if (!profile && !loadingSession) {
+    return (
+      <Surface padded bordered radius="md">
+        <Heading align="center" style={{ marginBottom: S.space.xs }}>
+          Account
+        </Heading>
+
+        <Body align="center" color="$textSecondary" style={{ marginBottom: S.space.md, opacity: 0.8 }}>
+          Unable to load profile information.
+        </Body>
+
+        <Button
+          text="Return to Login"
+          variant="primary"
+          onPress={() => router.replace('/login/welcome')}
+          style={{ alignSelf: 'center', minWidth: 140 }}
+        />
+      </Surface>
+    )
+  }
+
+  // ✅ Main Profile Panel
   return (
-    <View style={ComponentStyles.card.default}>
-      <ThemedText type="title" style={{
-        marginBottom: Spacing.sm,
-        fontWeight: '600',
-        color: CoreColors.textOnLight,
-        textAlign: 'center'
-      }}>
+    <Surface padded bordered radius="md">
+      <Heading align="center" style={{ marginBottom: S.space.sm }}>
         Profile
-      </ThemedText>
-      
-      <View style={{
-        gap: Spacing.xs,
-        marginBottom: Spacing.lg,
-        backgroundColor: 'rgba(139, 69, 19, 0.1)',
-        padding: Spacing.md,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: CoreColors.secondary
-      }}>
-        {/* Email Field */}
-        <View style={{ marginBottom: Spacing.sm }}>
-          <ThemedText type="defaultSemiBold" style={{
-            color: CoreColors.textOnLight,
-            marginBottom: 4
-          }}>
-            Email
-          </ThemedText>
-          <ThemedText style={{
-            fontStyle: 'italic'
-          }}>
-            {sessionUser?.email || 'Loading...'}
-          </ThemedText>
-        </View>
-        
-        {/* Username Field - from database profile */}
+      </Heading>
+
+      <Surface
+        variant="accent"
+        bordered
+        padded
+        radius="md"
+        style={{
+          marginBottom: S.space.lg,
+          backgroundColor: tone($('accent'), 'alt'),
+        }}
+      >
+        {/* Email */}
+        <Body variant="semi" style={{ marginBottom: S.space.xs }}>
+          Email
+        </Body>
+        <SubTitle italic>{sessionUser?.email || 'Loading...'}</SubTitle>
+
+        {/* Username */}
         {profile?.username && (
-          <View style={{ marginBottom: Spacing.sm }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <ThemedText type="defaultSemiBold" style={{
-                color: CoreColors.textOnLight,
-                fontSize: 16,
-                marginBottom: 4
-              }}>
-                Username
-              </ThemedText>
-              <TouchableOpacity
+          <Surface variant="base" style={{ marginTop: S.space.md, padding: S.space.sm, borderRadius: S.radius.md }}>
+            <Surface
+              variant="base"
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: S.space.xs,
+              }}
+            >
+              <Body variant="semi">Username</Body>
+              <IconButton
+                icon={<Ionicons name="settings-outline" size={18} color={$(
+                  'textPrimary'
+                )} />}
                 onPress={() => setShowUsernameModal(true)}
-                style={{
-                  padding: 4,
-                  borderRadius: 4,
-                  backgroundColor: 'rgba(139, 69, 19, 0.1)'
-                }}
-              >
-                <Ionicons name="settings-outline" size={18} color={CoreColors.textOnLight} />
-              </TouchableOpacity>
-            </View>
-            <ThemedText style={{
-              fontStyle: 'italic',
-            }}>
-              {profile.username}
-            </ThemedText>
-          </View>
+                size="sm"
+              />
+            </Surface>
+
+            <SubTitle italic>{profile.username}</SubTitle>
+          </Surface>
         )}
-        
-        {/* Show loading state */}
+
         {loadingSession && (
-          <View style={{ marginBottom: Spacing.sm }}>
-            <ThemedText style={{
-              color: CoreColors.textSecondary,
-              fontStyle: 'italic',
-              textAlign: 'center'
-            }}>
-              Loading profile...
-            </ThemedText>
-          </View>
+          <Body italic align="center" color="$textSecondary" style={{ marginTop: S.space.sm }}>
+            Loading profile...
+          </Body>
         )}
-        
-      </View>
+      </Surface>
 
       {/* Username Update Modal */}
       {profile?.username && (
@@ -200,14 +149,14 @@ export default function UserProfile({ profile }: UserProfileProps) {
           visible={showUsernameModal}
           currentUsername={profile.username}
           onCancel={() => {
-            setShowUsernameModal(false);
-            setUsernameError('');
+            setShowUsernameModal(false)
+            setUsernameError('')
           }}
           onConfirm={handleUpdateUsername}
           loading={updatingUsername}
           errorText={usernameError}
         />
       )}
-    </View>
-  );
+    </Surface>
+  )
 }

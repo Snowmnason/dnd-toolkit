@@ -1,6 +1,6 @@
+import { Button } from '@/components/ui';
 import { AuthStateManager, logger, supabase } from '@/lib';
 import React from 'react';
-import PrimaryButton from '../../custom_components/PrimaryButton';
 
 async function onSignOutButtonPress() {
   try {
@@ -20,12 +20,11 @@ async function onSignOutButtonPress() {
 
 export default function SignOutButton() {
   return (
-    <PrimaryButton
+    <Button
       style={{ paddingHorizontal: 20 }}
-      textStyle={{}}
       onPress={onSignOutButtonPress}
     >
       Sign Out
-    </PrimaryButton>
+    </Button>
   );
 }

@@ -1,4 +1,5 @@
 import { Body, Button, ButtonText } from '@/components/ui';
+import { useScale } from '@/theme';
 import { View } from 'react-native';
 
 interface AuthErrorProps {
@@ -8,6 +9,7 @@ interface AuthErrorProps {
 }
 
 export default function AuthError({ error, onResendEmail, isResending }: AuthErrorProps) {
+  const S = useScale()
   if (!error) return null;
 
   const isSuccess = error.startsWith('✅');
@@ -18,21 +20,23 @@ export default function AuthError({ error, onResendEmail, isResending }: AuthErr
           <View
             style={{
               backgroundColor: 'rgba(245, 230, 211, 0.1)',
-              padding: 12,
-              borderRadius: 4,
+              padding: S.space.sm,
+              borderRadius: S.radius.sm,
               borderWidth: 1,
               borderColor: 'rgba(245, 230, 211, 0.2)',
+              width: '95%',
+              alignSelf: 'center',
             }}
           >
             <Body
-              fontSize="$sm"
+              fontSize="$body1"
               style={{
                 textAlign: 'center',
                 color: '#F5E6D3',
                 fontWeight: '500',
-                lineHeight: 16,
+                lineHeight: S.font.body1 + 2,
                 opacity: 0.9,
-                marginBottom: 8,
+                marginBottom: S.space.xs,
               }}
             >
               ❌ Please check your email and click the confirmation link before signing in.
@@ -41,16 +45,16 @@ export default function AuthError({ error, onResendEmail, isResending }: AuthErr
           <Button
             style={{
               backgroundColor: '#D4AF37',
-              paddingVertical: 8,
-              paddingHorizontal: 12,
-              borderRadius: 4,
+              paddingVertical: S.space.xs,
+              paddingHorizontal: S.space.sm,
+              borderRadius: S.radius.sm,
               alignSelf: 'center',
             }}
             onPress={onResendEmail}
             disabled={isResending}
           >
             <ButtonText
-              fontSize="$xs"
+              fontSize="$body1"
               color="#2f353d"
               variant="semi"
               style={{ fontWeight: '600' }}
@@ -66,17 +70,19 @@ export default function AuthError({ error, onResendEmail, isResending }: AuthErr
   return (
     <View style={{ marginBottom: 8 }}>
       <Body
-        fontSize="$xs"
+        fontSize="$para"
         style={{
           textAlign: 'center',
           color: isSuccess ? '#82cc7eff' : '#F5E6D3', //'#A3D4A0'
           fontWeight: '500',
-          lineHeight: 16,
+          lineHeight: S.font.para + 2,
           opacity: 0.9,
           backgroundColor: 'rgba(245, 230, 211, 0.1)',
-          padding: 8,
-          borderRadius: 4,
+          padding: S.space.sm,
+          borderRadius: S.radius.sm,
           borderWidth: 1,
+          width: '95%',
+          alignSelf: 'center',
           borderColor: 'rgba(245, 230, 211, 0.2)',
         }}
       >

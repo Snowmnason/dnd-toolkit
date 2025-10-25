@@ -2,8 +2,8 @@
  * Safety mechanisms to prevent infinite redirects in authentication flow
  */
 
-import { logger } from '@/lib';
 import { Platform } from 'react-native';
+import { logger } from '../utils/logger';
 
 const REDIRECT_SAFETY_KEY = 'dnd_redirect_attempts';
 const MAX_REDIRECT_ATTEMPTS = 3;

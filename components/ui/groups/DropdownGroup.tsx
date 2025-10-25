@@ -1,7 +1,8 @@
-import { Dropdown } from '@/components/ui'
-import { S } from '@/theme'
-import React, { useEffect, useState } from 'react'
+import { useScale, type Sizing } from '@/theme'
+import React, { forwardRef, useImperativeHandle, useState } from 'react'
 import { View } from 'react-native'
+import { ObjHeading } from '../AppText'
+import Dropdown from '../Dropdown'
 
 interface DropdownOption {
   label: string
@@ -10,67 +11,93 @@ interface DropdownOption {
 
 interface DropdownItem {
   key: string
-  label: string
+  heading: string
   options: DropdownOption[]
 }
 
+export interface DropdownGroupRef {
+  getValues: () => Record<string, string>
+}
+
+type SpaceKey = keyof Sizing['space']
+
 interface DropdownGroupProps {
+  title?: string
   items: DropdownItem[]
-  defaultValues?: Record<string, string>        // key → default value
-  onChange?: (values: Record<string, string>) => void
+  defaultValues?: Record<string, string>
   direction?: 'vertical' | 'horizontal'
-  spacing?: keyof typeof S.space
+  spacing?: SpaceKey
   fullWidth?: boolean
 }
 
 /**
- * 🧱 DropdownGroup
- * Inclusive group of dropdowns — each always has one value selected.
- * Returns an object mapping keys to selected values.
+ * 🧱 DropdownGroup (v2)
+ * Each dropdown always has one selected value.
+ * Returns all current values via ref.getValues().
  */
-export function DropdownGroup({
-  items,
-  defaultValues = {},
-  onChange,
-  direction = 'vertical',
-  spacing = 'sm',
-  fullWidth = false,
-}: DropdownGroupProps) {
-  const [values, setValues] = useState<Record<string, string>>(() => {
-    const initial: Record<string, string> = {}
-    items.forEach((item) => {
-      initial[item.key] =
-        defaultValues[item.key] ?? item.options[0]?.value ?? ''
+export const DropdownGroup = forwardRef<DropdownGroupRef, DropdownGroupProps>(
+  (
+    {
+      title,
+      items,
+      defaultValues = {},
+      direction = 'vertical',
+      spacing = 'sm',
+      fullWidth = false,
+    },
+    ref
+  ) => {
+    const S = useScale()
+    const [values, setValues] = useState<Record<string, string>>(() => {
+      const initial: Record<string, string> = {}
+      items.forEach((item) => {
+        initial[item.key] =
+          defaultValues[item.key] ?? item.options[0]?.value ?? ''
+      })
+      return initial
     })
-    return initial
-  })
 
-  // Keep parent synced
-  useEffect(() => {
-    onChange?.(values)
-  }, [values, onChange])
+    const handleSelect = (key: string, newValue: string) => {
+      setValues((prev) => ({ ...prev, [key]: newValue }))
+    }
 
-  const handleSelect = (key: string, newValue: string) => {
-    setValues((prev) => ({ ...prev, [key]: newValue }))
+    // Expose ref method
+    useImperativeHandle(ref, () => ({
+      getValues: () => values,
+    }))
+
+    return (
+      <View
+        style={{
+          flexDirection: direction === 'horizontal' ? 'row' : 'column',
+          gap: S.space[spacing],
+          width: fullWidth ? '100%' : undefined,
+        }}
+      >
+        {title && (
+          <ObjHeading
+            style={{
+              marginBottom: S.space.xs,
+              marginLeft: S.space.xs,
+              opacity: 0.9,
+            }}
+          >
+            {title}
+          </ObjHeading>
+        )}
+
+        {items.map((item) => (
+          <Dropdown
+            key={item.key}
+            heading={item.heading}
+            items={item.options}
+            value={values[item.key] || null}
+            onChange={(val) => handleSelect(item.key, val ?? '')}
+          />
+        ))}
+      </View>
+    )
   }
+)
 
-  return (
-    <View
-      style={{
-        flexDirection: direction === 'horizontal' ? 'row' : 'column',
-        gap: S.space[spacing],
-        width: fullWidth ? '100%' : undefined,
-      }}
-    >
-      {items.map((item) => (
-        <Dropdown
-          key={item.key}
-          heading={item.label}
-          items={item.options}
-          value={values[item.key] || null}
-          onChange={(val) => handleSelect(item.key, val ?? '')}
-        />
-      ))}
-    </View>
-  )
-}
+DropdownGroup.displayName = 'DropdownGroup'

@@ -1,15 +1,15 @@
-import { $, S, tone } from '@/theme'
+import { $, tone, useScale } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useEffect } from 'react'
 import {
-  Animated,
-  BackHandler,
-  Dimensions,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  View,
+    Animated,
+    BackHandler,
+    Dimensions,
+    Modal,
+    Platform,
+    Pressable,
+    StyleSheet,
+    View,
 } from 'react-native'
 import { Body, Heading } from './AppText'
 import { IconButton } from './IconButton'
@@ -46,6 +46,7 @@ export function AppModal({
   children,
 }: AppModalProps) {
   const { width: screenWidth } = Dimensions.get('window')
+  const S = useScale()
 
   // ✅ Platform-based sizing
   const modalWidth =
@@ -168,7 +169,7 @@ export function AppModal({
         </View>
       </Pressable>
 
-      <View pointerEvents="box-none" style={styles.center}>
+      <View style={[styles.center, { pointerEvents: 'box-none' }]}>
         <Animated.View
           style={[
             styles.modalContainer,
@@ -176,6 +177,8 @@ export function AppModal({
               width: modalWidth,
               height: height ?? 'auto',
               backgroundColor: $('surface'),
+              borderRadius: S.radius.lg,
+              padding: S.space.lg,
               borderColor:
               (borderTone === 'success'
                 ? $('success')
@@ -192,7 +195,7 @@ export function AppModal({
             },
           ]}
         >
-          <View style={styles.closeButton}>
+          <View style={[styles.closeButton, { top: S.space.sm, right: S.space.sm }]}>
             <IconButton icon="✕" onPress={onClose} />
           </View>
 
@@ -236,17 +239,11 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     borderWidth: 2,
-    borderRadius: S.radius.lg,
-    padding: S.space.lg,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.25)',
     elevation: 6,
   },
   closeButton: {
     position: 'absolute',
-    top: S.space.sm,
-    right: S.space.sm,
     zIndex: 10,
   },
 })

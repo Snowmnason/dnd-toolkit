@@ -6,6 +6,7 @@ import {
   AuthCaption, AuthError, AuthForm, AuthInput,
   AuthModal,
   AuthRoot,
+  AuthSubTitle,
   AuthSuccess,
   AuthTitle
 } from '@/components/auth_components';
@@ -84,7 +85,7 @@ export default function ForgotPasswordScreen() {
       {/* 🧠 Header*/}
       <AuthTitle>Forgot Password</AuthTitle>
 
-      <AuthBody>Enter your email to receive password reset instructions.</AuthBody>
+      <AuthSubTitle>Enter your email to receive password reset instructions.</AuthSubTitle>
 
       {/* 🧾 Form*/}
       <AuthForm>
@@ -101,7 +102,7 @@ export default function ForgotPasswordScreen() {
             borderColor:
               !emailValidation.isValid && email.length > 0 ? '#dc3545' : undefined,
             borderWidth:
-              !emailValidation.isValid && email.length > 0 ? 2 : undefined,
+              !emailValidation.isValid && email.length > 0 ? 3 : undefined,
           }}
         />
 

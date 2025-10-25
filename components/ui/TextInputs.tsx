@@ -1,10 +1,10 @@
-import { $, S, tone, UseTheme } from '@/theme'
+import { $, tone, useScale, UseTheme } from '@/theme'
 import React, { useState } from 'react'
 import { TextInput as RNTextInput, StyleSheet, TextInputProps, View } from 'react-native'
 import { ObjHeading } from './AppText'
 
 interface BaseInputProps extends TextInputProps {
-  label?: string                     // 👈 Optional ObjHeader
+  heading?: string                   // 👈 Renamed from label
   error?: boolean
   filled?: boolean
 }
@@ -12,21 +12,22 @@ interface BaseInputProps extends TextInputProps {
 /**
  * ✏️ TextInput — for short, single-line text fields
  */
-export function TextInput({ label, error, filled, style, ...rest }: BaseInputProps) {
+export function TextInput({ heading, error, filled, style, ...rest }: BaseInputProps) {
   const { theme } = UseTheme()
+  const S = useScale()
   const [focused, setFocused] = useState(false)
 
   const borderColor = error
-    ? tone($('accent'), 'border')
+    ? tone($('accent', theme), 'border', undefined, undefined, theme)
     : focused
-    ? tone($('accent'), 'accent')
-    : tone($('border'), 'subtle')
+    ? tone($('accent', theme), 'accent', undefined, undefined, theme)
+    : tone($('border', theme), 'subtle', undefined, undefined, theme)
 
   return (
     <View style={{ width: '100%' }}>
-      {label && (
+      {heading && (
         <ObjHeading style={{ marginBottom: S.space.xs }}>
-          {label}
+          {heading}
         </ObjHeading>
       )}
 
@@ -34,20 +35,24 @@ export function TextInput({ label, error, filled, style, ...rest }: BaseInputPro
         style={[
           styles.base,
           {
-            backgroundColor: filled ? tone($('surface'), 'alt') : $('surface'),
+            borderRadius: S.radius.md,
+            paddingHorizontal: S.space.md,
+            paddingVertical: S.space.sm,
+            backgroundColor: filled ? tone($('surface', theme), 'alt', undefined, undefined, theme) : $('surface', theme),
             borderColor,
           },
         ]}
       >
         <RNTextInput
-          placeholderTextColor={tone($('textPrimary'), 'disabled')}
+          placeholderTextColor={tone($('textPrimary', theme), 'disabled', undefined, undefined, theme)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           style={[
             styles.input,
             {
-              color: $('textPrimary'),
+              color: $('textPrimary', theme),
               fontFamily: theme.fontFamily,
+              fontSize: S.font.body1,
             },
             style,
           ]}
@@ -61,8 +66,9 @@ export function TextInput({ label, error, filled, style, ...rest }: BaseInputPro
 /**
  * 📝 DescInput — for longer, multi-line text areas (descriptions, notes)
  */
-export function DescInput({ label, error, filled, style, ...rest }: BaseInputProps) {
+export function DescInput({ heading, error, filled, style, ...rest }: BaseInputProps) {
   const { theme } = UseTheme()
+  const S = useScale()
   const [focused, setFocused] = useState(false)
 
   const borderColor = error
@@ -73,17 +79,19 @@ export function DescInput({ label, error, filled, style, ...rest }: BaseInputPro
 
   return (
     <View style={{ width: '100%' }}>
-      {label && (
+      {heading && (
         <ObjHeading style={{ marginBottom: S.space.xs }}>
-          {label}
+          {heading}
         </ObjHeading>
       )}
 
       <View
         style={[
           styles.base,
-          styles.textarea,
           {
+            borderRadius: S.radius.md,
+            paddingHorizontal: S.space.md,
+            paddingVertical: S.space.md,
             backgroundColor: filled ? tone($('surface'), 'alt') : $('surface'),
             borderColor,
           },
@@ -99,8 +107,9 @@ export function DescInput({ label, error, filled, style, ...rest }: BaseInputPro
             styles.input,
             {
               color: $('textPrimary'),
-              fontFamily: theme.fontFamilyPara, // 👈 uses paragraph font
+              fontFamily: theme.fontFamilyPara, // paragraph font
               height: 120,
+              fontSize: S.font.para,
             },
             style,
           ]}
@@ -114,14 +123,6 @@ export function DescInput({ label, error, filled, style, ...rest }: BaseInputPro
 const styles = StyleSheet.create({
   base: {
     borderWidth: 1,
-    borderRadius: S.radius.md,
-    paddingHorizontal: S.space.md,
-    paddingVertical: S.space.sm,
   },
-  input: {
-    fontSize: S.font.md,
-  },
-  textarea: {
-    paddingVertical: S.space.md,
-  },
+  input: {},
 })

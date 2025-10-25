@@ -1,4 +1,4 @@
-import { $, S, tone } from '@/theme'
+import { $, tone, useScale } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useRef, useState } from 'react'
 import { Animated, Pressable, View } from 'react-native'
@@ -21,6 +21,7 @@ export function Accordion({
   defaultOpen = false,
   bordered = true,
 }: AccordionProps) {
+  const S = useScale()
   const [open, setOpen] = useState(defaultOpen)
   const animation = useRef(new Animated.Value(defaultOpen ? 1 : 0)).current
 

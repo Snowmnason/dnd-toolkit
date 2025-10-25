@@ -1,12 +1,12 @@
 import {
   AuthActionGroup,
   AuthBackButtonContainer,
-  AuthBody,
   AuthBodyFooter,
   AuthButton, AuthButtonBack,
   AuthCaption,
   AuthModal,
   AuthRoot,
+  AuthSubTitle,
   AuthTitle
 } from '@/components/auth_components';
 import { Body } from '@/components/ui';
@@ -137,15 +137,15 @@ export default function EmailConfirmationScreen() {
       {/* 🧠 Header */}
       <AuthTitle>Check Your Email</AuthTitle>
 
-      <AuthBody style={{ marginBottom: 30 }}>
+      <AuthSubTitle style={{ marginBottom: 30 }}>
         We sent a confirmation link to:
-      </AuthBody>
+      </AuthSubTitle>
 
-      <AuthBody fontSize={18} color="#D4AF37">
+      <AuthSubTitle fontSize={18} color="#D4AF37">
         {userEmail}
-      </AuthBody>
+      </AuthSubTitle>
 
-      <AuthBody opacity={0.8}>
+      <AuthSubTitle>
         <Body
           opacity={0.7}
           color="#D4AF37"
@@ -159,7 +159,7 @@ export default function EmailConfirmationScreen() {
           {' '}
           to activate your account. You&apos;ll be automatically signed in!
         </Body>
-      </AuthBody>
+      </AuthSubTitle>
 
       {/* 🔘 Action Buttons */}
       <AuthActionGroup>
@@ -175,19 +175,22 @@ export default function EmailConfirmationScreen() {
         <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
           {/* Change Email Button */}
           <AuthButton
+            text='Use Different Email'
             bg="rgba(139, 69, 19, 0.15)"
             borderColor="#8B4513"
             textColor="#F5E6D3"
-            style={{ flex: 1 }}
+            style={{ flex: 1, width: 'auto' }}
             onPress={handleChangeEmail}
-          >
-            Use Different Email
-          </AuthButton>
+          />
 
           {/* Already Confirmed Button */}
-          <AuthButton bg="#4285F4" textColor="#FFF" onPress={() => router.replace('/login/sign-in')}>
-            Already Confirmed?
-          </AuthButton>
+          <AuthButton
+            bg="#4285F4"
+            text='Already Confirmed?'
+            textColor="#FFF"
+            onPress={() => router.replace('/login/sign-in')}
+            style={{ flex: 1, width: 'auto' }}
+          />
         </View>
       </AuthActionGroup>
 

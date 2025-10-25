@@ -1,7 +1,8 @@
-import { Body, Caption, SubTitle, Title } from '@/components/ui/AppText'
+import { Body, Caption, Link, SubTitle, Title } from '@/components/ui/AppText'
 import { Button } from '@/components/ui/BaseButton'
-import { S } from '@/theme'
+import { useScale } from '@/theme'
 import React from 'react'
+
 
 /* ──────────
    🔘 Auth Buttons (extend BaseButton)
@@ -13,11 +14,11 @@ export function AuthButton({
 }: React.ComponentProps<typeof Button>) {
   return (
     <Button
-      {...props}
       bg="#8B4513"
-      borderColor="#8B4513"
+      borderColor='#D4AF37'
       textColor="#F5E6D3"
       style={[{ width: '100%' }, style]}
+      {...props}
     />
   )
 }
@@ -28,11 +29,11 @@ export function AuthButtonSecondary({
 }: React.ComponentProps<typeof Button>) {
   return (
     <Button
-      {...props}
       bg="rgba(139,69,19,0.15)"
       borderColor="#8B4513"
       textColor="#F5E6D3"
       style={[{ width: '100%' }, style]}
+      {...props}
     />
   )
 }
@@ -41,22 +42,23 @@ export function AuthButtonBack({
   style,
   ...props
 }: React.ComponentProps<typeof Button>) {
+  const S = useScale()
   return (
     <Button
-      {...props}
       bg="rgba(139,69,19,0.2)"
       borderColor="transparent"
       textColor="#F5E6D3"
       style={[
         {
-          height: 36,
-          paddingHorizontal: 16,
+          height: S.button.sm.height,
+          paddingHorizontal: S.button.sm.paddingHorizontal,
           borderRadius: S.radius.sm,
           width: 'auto',
           alignSelf: 'flex-start',
         },
         style,
       ]}
+      {...props}
     />
   )
 }
@@ -69,12 +71,13 @@ export function AuthTitle({
   style,
   ...props
 }: React.ComponentProps<typeof Title>) {
+  const S = useScale()
   return (
     <Title
-      {...props}
       color="#F5E6D3"
       align="center"
-      style={[{ marginBottom: S.space.lg }, style]}
+      style={[{ marginBottom: S.space.lg, }, style]}
+      {...props}
     />
   )
 }
@@ -83,12 +86,23 @@ export function AuthSubTitle({
   style,
   ...props
 }: React.ComponentProps<typeof SubTitle>) {
+  const S = useScale()
   return (
     <SubTitle
-      {...props}
-      color="#D4AF37"
+      fontSize="$body2"
+      color="#F5E6D3"
+      lineHeight={S.font.body2 + 2}
       align="center"
-      style={[{ marginBottom: S.space.md, opacity: 0.9 }, style]}
+      style={[
+        {
+          marginBottom: S.space.xl,
+          opacity: 0.8,
+          alignSelf: 'stretch',
+          flexShrink: 1,
+        },
+        style,
+      ]}
+      {...props}
     />
   )
 }
@@ -97,45 +111,46 @@ export function AuthBody({
   style,
   ...props
 }: React.ComponentProps<typeof Body>) {
+  const S = useScale()
   return (
     <Body
-      {...props}
       color="#F5E6D3"
       align="center"
       opacity={0.8}
       style={[
         {
-          textAlign: 'center',
           lineHeight: 22,
           paddingHorizontal: S.space.lg,
           marginBottom: S.space.lg,
         },
         style,
       ]}
+      {...props}
     />
   )
 }
+
 export function AuthBodyFooter({
   style,
   ...props
 }: React.ComponentProps<typeof Body>) {
+  const S = useScale()
   return (
     <Body
       variant='semi'
-      fontSize='$sm'
-      {...props}
+      fontSize='$subtitle'
       color="#F5E6D3"
       align="center"
       opacity={0.6}
       style={[
         {
-          textAlign: 'center',
           lineHeight: 22,
           paddingHorizontal: S.space.lg,
-          marginBottom: S.space.lg,
+          marginBottom: S.space.sm,
         },
         style,
       ]}
+      {...props}
     />
   )
 }
@@ -144,20 +159,22 @@ AuthBody.InCard = function AuthBodyInCard({
   style,
   ...props
 }: React.ComponentProps<typeof Body>) {
+  const S = useScale()
   return (
     <Body
-      {...props}
+      fontSize="$para"
       color="#8B4513"
       align="center"
-      opacity={0.9}
+      opacity={0.95}
       style={[
         {
-          lineHeight: 20,
+          lineHeight: 22,
           paddingHorizontal: S.space.md,
-          marginBottom: S.space.sm,
+          marginBottom: 0,
         },
         style,
       ]}
+      {...props}
     />
   )
 }
@@ -168,18 +185,36 @@ export function AuthCaption({
 }: React.ComponentProps<typeof Caption>) {
   return (
     <Caption
-      {...props}
       color="#F5E6D3"
       align="center"
+      opacity={0.5}
+      lineHeight={16}
+      style={[
+        style,
+      ]}
+      {...props}
+    />
+  )
+}
+
+export function AuthLink({
+  style,
+  ...props
+}: React.ComponentProps<typeof Link>) {
+  const S = useScale()
+  return (
+    <Link
+      align="center"
+      opacity={0.9}
       style={[
         {
-          marginTop: S.space.md,
-          opacity: 0.5,
-          lineHeight: 16,
-          paddingHorizontal: 20,
+          lineHeight: 22,
+          paddingHorizontal: S.space.lg,
+          marginBottom: S.space.sm,
         },
         style,
       ]}
+      {...props}
     />
   )
 }

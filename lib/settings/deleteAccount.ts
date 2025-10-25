@@ -1,4 +1,8 @@
-import { AuthStateManager, logger, supabase, usersDB, validatePassword } from '@/lib';
+import { AuthStateManager } from '../auth/auth-state';
+import { validatePassword } from '../auth/validation';
+import { supabase } from '../database/supabase';
+import { usersDB } from '../database/users';
+import { logger } from '../utils/logger';
 
 export interface DeleteAccountResult {
   success: boolean;

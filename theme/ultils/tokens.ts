@@ -18,11 +18,18 @@ function mergeTokens(theme: ThemeTokens) {
 
 /* ───────────────────────────────
    $() – explicit token lookup
-   Example: color: $('background')
+   Example: color: $('background', theme)
 ──────────────────────────────── */
-export function $(key: keyof ThemeTokens | keyof typeof S.font | keyof typeof S.space): any {
-  const { theme } = UseTheme()
-  const tokens = mergeTokens(theme)
+export function $(key: keyof ThemeTokens | keyof typeof S.font | keyof typeof S.space, theme?: ThemeTokens): any {
+  // If theme is provided directly, use it
+  if (theme) {
+    const tokens = mergeTokens(theme)
+    return tokens[key as keyof typeof tokens]
+  }
+  
+  // Otherwise, call the hook (only works inside React components)
+  const { theme: hookTheme } = UseTheme()
+  const tokens = mergeTokens(hookTheme)
   return tokens[key as keyof typeof tokens]
 }
 
