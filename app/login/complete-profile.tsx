@@ -14,6 +14,7 @@ import {
 } from '@/components/auth_components';
 import { Body } from '@/components/ui';
 import { logger, supabase, usersDB, useSignUpForm } from '@/lib';
+import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
@@ -21,6 +22,7 @@ import { View } from 'react-native';
 
 
 export default function CompleteProfileScreen() {
+  const S = useScale();
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [initializing, setInitializing] = useState(true);
@@ -124,7 +126,7 @@ export default function CompleteProfileScreen() {
   if (initializing || !user) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#2f353d' }}>
-        <Body color="#F5E6D3" fontSize="$sm">
+        <Body color="#F5E6D3" fontSize="$para">
           {initializing ? 'Checking authentication...' : 'Loading...'}
         </Body>
       </View>
@@ -136,45 +138,35 @@ export default function CompleteProfileScreen() {
       {/* 🧠 Header */}
       <AuthTitle>Complete Your Profile</AuthTitle>
 
-      <AuthBody>
+      <AuthSubTitle>
         Choose a username to complete your account setup.
-      </AuthBody>
+      </AuthSubTitle>
 
       {/* 🏷️ Welcome Message Card */}
       <View
         style={{
           backgroundColor: 'rgba(245, 230, 211, 0.95)',
-          padding: 24,
-          borderRadius: 12,
-          marginBottom: 32,
+          padding: S.space.lg,
+          borderRadius: S.radius.md,
+          marginBottom: S.space.xl,
           borderWidth: 2,
           borderColor: '#8B4513',
-          maxWidth: 350,
+          width: '100%',
+          maxWidth: S.s(400),
+          alignSelf: 'center',
         }}
       >
-        <View
-          style={{
-            backgroundColor: 'rgba(245, 230, 211, 0.95)',
-            padding: 24,
-            borderRadius: 12,
-            marginBottom: 32,
-            borderWidth: 2,
-            borderColor: '#8B4513',
-            maxWidth: 350,
-          }}
-        >
-          <AuthBody.InCard style={{ marginBottom: 8 }}>
-            Welcome, {username ? username : 'Adventurer'}!
-          </AuthBody.InCard>
+        <AuthBody.InCard style={{ marginBottom: S.space.xs }}>
+          Welcome, {username ? username : 'Adventurer'}!
+        </AuthBody.InCard>
 
-          <AuthBody.InCard fontSize={14}>
-            There will be more added soon to customize your profile more.
-          </AuthBody.InCard>
-        </View>
+        <AuthBody.InCard>
+          There will be more added soon to customize your profile more.
+        </AuthBody.InCard>
       </View>
 
       {/* 🧾 Form */}
-      <AuthForm>
+  <AuthForm style={{ marginBottom: authError ? S.space.md : S.space.xxl }}>
         <AuthInput
           placeholder="Username"
           value={username}
@@ -189,7 +181,7 @@ export default function CompleteProfileScreen() {
                 ? '#dc3545'
                 : undefined,
             borderWidth:
-              !usernameValidation.isValid && username.length > 0 ? 2 : undefined,
+              !usernameValidation.isValid && username.length > 0 ? 3 : undefined,
           }}
         />
 
@@ -197,13 +189,14 @@ export default function CompleteProfileScreen() {
 
         {username.length > 0 && (
           <AuthSubTitle
+          fontSize='$para'
             style={{
               textAlign: 'left',
               color: usernameValidation.isValid ? '#82cc7eff' : '#f78888ff',
-              lineHeight: 16,
+              lineHeight: S.font.body2 + 2,
               opacity: 0.9,
-              marginBottom: 4,
-              marginTop: -14,
+              marginBottom: S.space.xs,
+              marginTop: (S.space.sm * -1),
             }}
           >
             {getUsernameDisplayText()}

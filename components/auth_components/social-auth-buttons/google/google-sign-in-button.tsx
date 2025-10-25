@@ -15,12 +15,12 @@
  * Supports: iOS/Android (signInWithOAuth) + Web (@react-oauth/google)
  */
 
+import { Button, ButtonText } from '@/components/ui';
 import { AuthStateManager, logger, supabase } from '@/lib';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useState } from 'react';
 import { Alert, Platform } from 'react-native';
-import PrimaryButton from '../../../custom_components/PrimaryButton';
 
 // Complete auth session setup for mobile
 WebBrowser.maybeCompleteAuthSession();
@@ -217,7 +217,7 @@ function GoogleButtonWeb({ disabled }: { disabled: boolean }) {
 
   if (isLoading) {
     return (
-      <PrimaryButton
+      <Button
         style={{ 
           backgroundColor: '#4285F4', 
           paddingVertical: 16, 
@@ -227,18 +227,21 @@ function GoogleButtonWeb({ disabled }: { disabled: boolean }) {
           justifyContent: 'center',
           opacity: 0.7
         }}
-        textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
         onPress={() => {}}
         disabled={true}
       >
-        🔵 Loading Google...
-      </PrimaryButton>
+        <ButtonText
+          style={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
+        >
+          🔵 Loading Google...
+        </ButtonText>
+      </Button>
     );
   }
 
   if (!googleComponents) {
     return (
-      <PrimaryButton
+      <Button
         style={{ 
           backgroundColor: '#4285F4', 
           paddingVertical: 16, 
@@ -248,12 +251,15 @@ function GoogleButtonWeb({ disabled }: { disabled: boolean }) {
           justifyContent: 'center',
           opacity: 0.5
         }}
-        textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
         onPress={() => {}}
         disabled={true}
       >
-        🔵 Google (Unavailable)
-      </PrimaryButton>
+        <ButtonText
+          style={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
+        >
+          🔵 Google (Unavailable)
+        </ButtonText>
+      </Button>
     );
   }
 
@@ -317,7 +323,7 @@ export default function GoogleSignInButton({ disabled = false, style }: GoogleSi
   };
 
   return (
-    <PrimaryButton
+    <Button
       style={{ 
         backgroundColor: '#4285F4', 
         paddingVertical: 16, 
@@ -327,11 +333,12 @@ export default function GoogleSignInButton({ disabled = false, style }: GoogleSi
         justifyContent: 'center',
         ...style
       }}
-      textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
       onPress={handlePress}
       disabled={disabled || isLoading}
     >
-      🔵 Google
-    </PrimaryButton>
+      <ButtonText style={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}>
+        🔵 Google
+      </ButtonText>
+    </Button>
   );
 }

@@ -1,267 +1,221 @@
-import { AuthStateManager, deleteUserAccount, logger, signOutUser, supabase, usersDB } from '@/lib';
-import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Alert, ScrollView, View } from 'react-native';
-import UserProfile from '../components/settings/user-profile';
-import CustomLoad from '../components/ui/CustomLoad';
+import {
+  AuthStateManager,
+  deleteUserAccount,
+  logger,
+  signOutUser,
+  supabase,
+  usersDB,
+} from '@/lib'
+import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
+import { useRouter } from 'expo-router'
+import { useEffect, useState } from 'react'
+import { Alert, Platform } from 'react-native'
+
+// 🧱 New UI Components
+import { CredentialConfirmModal } from '@/components/modals'
+import {
+  AppLoadingView,
+  AppView,
+  Body,
+  Button,
+  Heading,
+  Surface,
+} from '@/components/ui'
+import UserProfile from '../components/settings/user-profile'
+
+// 🎨 Theme + Loading
+import { useScale } from '@/theme'
 
 export default function SettingsPage() {
-  const router = useRouter();
-  // Removed unused 'user' state
-  const [profile, setProfile] = useState<any>(null); // db profile
-  const [loading, setLoading] = useState(true);
-  const [signingOut, setSigningOut] = useState(false);
-  const [buttonDisabled, setButtonDisabled] = useState(false);
-  const [buttonDeleteDisabled, setButtonDeleteDisabled] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleteError, setDeleteError] = useState('');
-  const [deleting, setDeleting] = useState(false);
+  const router = useRouter()
+  const S = useScale()
+  const [profile, setProfile] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const isMobile = Platform.OS === 'ios' || Platform.OS === 'android';
+
+  // Sign-out + delete state
+  const [signingOut, setSigningOut] = useState(false)
+  const [buttonDisabled, setButtonDisabled] = useState(false)
+  const [buttonDeleteDisabled, setButtonDeleteDisabled] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
-    // Check authentication first
     const checkAuth = async () => {
       try {
-        const isAuth = await AuthStateManager.isAuthenticated();
+        const isAuth = await AuthStateManager.isAuthenticated()
         if (!isAuth) {
-          logger.debug('settings', 'User not authenticated, redirecting');
-          router.replace('/login/welcome');
-          return;
+          logger.debug('settings', 'User not authenticated, redirecting')
+          router.replace('/login/welcome')
+          return
         }
       } catch (error) {
-        logger.error('settings', 'Settings auth check error:', error);
-        router.replace('/login/welcome');
-        return;
+        logger.error('settings', 'Settings auth check error:', error)
+        router.replace('/login/welcome')
+        return
       }
-    };
+    }
 
-    checkAuth();
+    checkAuth()
 
-    // Get current session user
-    supabase.auth.getUser().then((res: { data?: { user?: User | null }; error?: any }) => {
-      // setUser(res.data?.user ?? null); // Removed unused user state
-      setLoading(false);
-    }).catch((err: unknown) => {
-      logger.error('settings', 'Error fetching user on settings mount:', err);
-      setLoading(false);
-    });
-    // Get current db profile
-    usersDB.getCurrentUser().then((profile) => {
-      setProfile(profile ?? null);
-    }).catch((err: unknown) => {
-      logger.error('settings', 'Error fetching profile on settings mount:', err);
-    });
+    supabase.auth
+      .getUser()
+      .then((res: { data?: { user?: User | null }; error?: any }) => {
+        setLoading(false)
+      })
+      .catch((err: unknown) => {
+        logger.error('settings', 'Error fetching user on settings mount:', err)
+        setLoading(false)
+      })
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
-      // event can be 'SIGNED_IN', 'SIGNED_OUT', etc.
-      // Removed setUser since user state is unused
-      
-      // If user signs out, redirect to welcome
-      if (event === 'SIGNED_OUT') {
-        router.replace('/login/welcome');
+    usersDB
+      .getCurrentUser()
+      .then((profile) => {
+        setProfile(profile ?? null)
+      })
+      .catch((err: unknown) => {
+        logger.error('settings', 'Error fetching profile on settings mount:', err)
+      })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event: AuthChangeEvent, _session: Session | null) => {
+        if (event === 'SIGNED_OUT') {
+          router.replace('/login/welcome')
+        }
       }
-    });
+    )
 
-    return () => subscription.unsubscribe();
-  }, [router]); // Removed 'user' from dependencies to prevent redirect loop
+    return () => subscription.unsubscribe()
+  }, [router])
 
   const handleSignOutConfirm = async () => {
-    if (buttonDisabled) return; // Prevent spam clicking
-    
+    if (buttonDisabled) return
+
     if (!signingOut) {
-      // First click - show confirmation state
-      setSigningOut(true);
-      setButtonDisabled(true);
-      
-      // Re-enable button after 2 seconds
-      setTimeout(() => {
-        setButtonDisabled(false);
-      }, 1500);
+      setSigningOut(true)
+      setButtonDisabled(true)
+      setTimeout(() => setButtonDisabled(false), 1500)
     } else {
-      // Second click - actually sign out
-      setButtonDisabled(true);
+      setButtonDisabled(true)
       try {
-        await signOutUser();
-        router.replace('/login/welcome');
+        await signOutUser()
+        router.replace('/login/welcome')
       } catch (error) {
-        logger.error('settings', 'Sign out error:', error);
-        Alert.alert('Error', 'Failed to sign out. Please try again.');
-        setSigningOut(false);
-        setButtonDisabled(false);
+        logger.error('settings', 'Sign out error:', error)
+        Alert.alert('Error', 'Failed to sign out. Please try again.')
+        setSigningOut(false)
+        setButtonDisabled(false)
       }
     }
-  };
+  }
+
   const handleDeleteConfirm = async () => {
-    if (buttonDeleteDisabled) return; // Prevent spam clicking
+    if (buttonDeleteDisabled) return
 
     if (!confirmDelete) {
-      // First click - set confirm state and temporarily disable
-      setConfirmDelete(true);
-      setButtonDeleteDisabled(true);
-      setTimeout(() => {
-        setButtonDeleteDisabled(false);
-      }, 1500);
-      return;
+      setConfirmDelete(true)
+      setButtonDeleteDisabled(true)
+      setTimeout(() => setButtonDeleteDisabled(false), 1500)
+      return
     }
 
-    // Second click - open modal, keep button disabled to prevent double open
-    setButtonDeleteDisabled(true);
-    setShowDeleteModal(true);
-  };
+    setButtonDeleteDisabled(true)
+    setShowDeleteModal(true)
+  }
 
-  // Called when modal confirms with a password
   const handleDeleteAccount = async (password: string) => {
-    setDeleteError('');
-    setDeleting(true);
-    
-    try {
-      // Call the account deletion service
-      const result = await deleteUserAccount(password);
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to delete account');
-      }
+    setDeleteError('')
+    setDeleting(true)
 
-      // Success - close modal and redirect
-      setShowDeleteModal(false);
-      router.replace('/login/welcome');
-      
+    try {
+      const result = await deleteUserAccount(password)
+      if (!result.success) throw new Error(result.error || 'Failed to delete account')
+
+      setShowDeleteModal(false)
+      router.replace('/login/welcome')
     } catch (error: any) {
-      logger.error('settings', 'Delete account error:', error);
-      setDeleteError(error?.message || 'Failed to delete account. Please try again.');
-      
-      // Reset button state on error so user can try again
-      setButtonDeleteDisabled(false);
-      setConfirmDelete(false);
+      logger.error('settings', 'Delete account error:', error)
+      setDeleteError(error?.message || 'Failed to delete account. Please try again.')
+      setButtonDeleteDisabled(false)
+      setConfirmDelete(false)
     } finally {
-      setDeleting(false);
+      setDeleting(false)
     }
-  };
+  }
 
   const handleCloseDeleteModal = () => {
-    setShowDeleteModal(false);
-    setConfirmDelete(false);
-    setButtonDeleteDisabled(false);
-    setDeleteError('');
-  };
+    setShowDeleteModal(false)
+    setConfirmDelete(false)
+    setButtonDeleteDisabled(false)
+    setDeleteError('')
+  }
 
   if (loading) {
     return (
-      <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <CustomLoad size="large" color={CoreColors.primary} />
-        <ThemedText style={{ 
-          marginTop: Spacing.md, 
-          color: CoreColors.textPrimary,
-          fontSize: 16
-        }}>
-          Loading Settings...
-        </ThemedText>
-      </ThemedView>
-    );
+      <AppLoadingView loadMessage="Loading Settings..." />
+    )
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <ScrollView 
-        style={{ flex: 1 }} 
-        contentContainerStyle={{ 
-          padding: Spacing.lg,
-          paddingBottom: Spacing.xl * 2 
-        }}
-      >
+    <AppView variant="page" scroll gap="lg">
+      {/* User Profile */}
+      <Surface padded bordered radius="md" style={{ marginBottom: S.space.lg }}>
+        <UserProfile profile={profile} />
+      </Surface>
 
+      {/* App Settings Section */}
+      <Surface bordered padded radius="md">
+        <Heading align="center" style={{ marginBottom: S.space.sm }}>
+          App Settings
+        </Heading>
+        <Body
+          italic
+          align="center"
+          color="$textSecondary"
+          style={{ opacity: 0.7 }}
+        >
+          🎲 Coming Soon: Theme settings, backup options, and more!
+          <Button variant="secondary" onPress={() => {
+            if(isMobile) {
+              router.replace('../StyleMobile');
+              return;
+            }else {
+              router.replace('../StyleDesktop');
+              return;
+            }}}>Playground</Button>
+        </Body>
+      </Surface>
 
-        {/* User Profile Section */}
-        <View style={{ marginBottom: Spacing.sm }}>
-          <UserProfile profile={profile} />
-        </View>
+      {/* Sign Out Button */}
+      <AppView center gap="md" style={{ marginTop: S.space.xl }}>
+        <Button
+          text={signingOut ? 'Confirm Sign Out' : 'Sign Out'}
+          variant="destructive"
+          onPress={handleSignOutConfirm}
+          disabled={buttonDisabled}
+          loading={false}
+          style={{ minWidth: 200 }}
+        />
+      </AppView>
 
-        {/* App Settings Section */}
-        <View style={ComponentStyles.card.default}>
-          <ThemedText type="subtitle" style={{
-            marginBottom: Spacing.sm,
-            fontSize: 24,
-            fontWeight: '600',
-            color: CoreColors.textOnLight,
-            textAlign: 'center'
-          }}>
-            App Settings
-          </ThemedText>
-          
-          {/* TODO: Add app settings here */}
-          <ThemedText style={{
-            fontStyle: 'italic',
-            opacity: 0.7,
-            textAlign: 'center',
-            color: CoreColors.textSecondary,
-            fontSize: 16,
-            lineHeight: 24
-          }}>
-            🎲 Coming Soon: Theme settings, backup options, and more!
-          </ThemedText>
-        </View>
+      {/* Delete Account Button */}
+      <AppView center gap="md" style={{ marginTop: S.space.lg }}>
+        <Button
+          text={confirmDelete ? 'Confirm Delete' : 'Delete Account'}
+          variant="destructive"
+          onPress={handleDeleteConfirm}
+          disabled={buttonDeleteDisabled}
+          style={{ minWidth: 200 }}
+        />
+      </AppView>
 
-        {/* Action Buttons */}
-        <View style={{
-          marginTop: Spacing.xl,
-          gap: Spacing.md,
-          alignItems: 'center'
-        }}>
-          {/* Sign Out Button */}
-          <PrimaryButton
-            style={{
-              backgroundColor: buttonDisabled ? '#6c757d' : '#dc3545',
-              paddingHorizontal: Spacing.xl,
-              minWidth: 200,
-              borderColor: buttonDisabled ? '#6c757d' : '#c82333',
-              opacity: buttonDisabled ? 0.6 : 1
-            }}
-            textStyle={{ 
-              color: CoreColors.textPrimary,
-              fontWeight: '600'
-            }}
-            onPress={handleSignOutConfirm}
-            disabled={buttonDisabled}
-          >
-            {signingOut ? 'Confirm Sign Out' : 'Sign Out'}
-          </PrimaryButton>
-        </View>
-                <View style={{
-          marginTop: Spacing.xl,
-          gap: Spacing.md,
-          alignItems: 'center'
-        }}>
-          {/* Sign Out Button */}
-          <PrimaryButton
-            style={{
-              backgroundColor: buttonDeleteDisabled ? '#6c757d' : '#dc3545',
-              paddingHorizontal: Spacing.xl,
-              minWidth: 200,
-              borderColor: buttonDeleteDisabled ? '#6c757d' : '#c82333',
-              opacity: buttonDeleteDisabled ? 0.6 : 1
-            }}
-            textStyle={{ 
-              color: CoreColors.textPrimary,
-              fontWeight: '600'
-            }}
-            onPress={handleDeleteConfirm}
-            disabled={buttonDeleteDisabled}
-          >
-            {confirmDelete ? 'Confirm Delete' : 'Delete Account'}
-          </PrimaryButton>
-        </View>
-      </ScrollView>
-
-      {/* Delete confirmation modal */}
-      {/* Note: This is a generic password-confirm modal you can reuse elsewhere */}
+      {/* Delete Confirmation Modal */}
       <CredentialConfirmModal
         visible={showDeleteModal}
         title="Confirm Account Deletion"
-        message={
-          'This action is permanent. Please enter your password to confirm you want to delete your account. '
-        }
+        message="This action is permanent. Please enter your password to confirm."
         confirmLabel="Delete Account"
         destructive
         loading={deleting}
@@ -269,6 +223,6 @@ export default function SettingsPage() {
         onCancel={handleCloseDeleteModal}
         onConfirm={handleDeleteAccount}
       />
-    </ThemedView>
-  );
+    </AppView>
+  )
 }

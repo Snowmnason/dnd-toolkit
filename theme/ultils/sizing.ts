@@ -1,116 +1,53 @@
-import { Dimensions, Platform } from 'react-native'
+import { getScale } from '../../hooks/useScale'
+
+// Static scale for backward compatibility (computed once at load)
+export const scale = getScale()
 
 /* ───────────────────────────────
-   Responsive Scale Logic
-   (expandable in the future)
-──────────────────────────────── */
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const { width } = Dimensions.get('window')
-
-// screenSize & x can later reflect true responsiveness
-const screenSize = 1 // width / 375 can be used later
-const x = 1
-
-// Basic platform check
-const isWeb = Platform.OS === 'web'
-
-// Scale formula (ready for future expansion)
-export const scale = isWeb
-  ? 1 * (screenSize * x)
-  : 0.75 * (screenSize * x)
-
-/* ───────────────────────────────
-   Font Sizes
+   Font Sizes (base values)
 ──────────────────────────────── */
 const fontBase = {
-  xs: 10,
-  sm: 12,
-  md: 16,
-  lg: 20,
-  xl: 24,
-  title: 32,
-}
-
-export const font = {
-  xs: fontBase.xs * scale,
-  sm: fontBase.sm * scale,
-  md: fontBase.md * scale,
-  lg: fontBase.lg * scale,
-  xl: fontBase.xl * scale,
-  title: fontBase.title * scale,
+  caption: 8,
+  subtitle: 14,
+  para: 18,
+  body1: 22,
+  body2: 24,
+  body3: 26,
+  heading1: 36,
+  heading2: 32,
+  heading3: 28,
+  title: 72,
 }
 
 /* ───────────────────────────────
-   Spacing (padding, margin, gaps)
+   Spacing (base values)
 ──────────────────────────────── */
 const spaceBase = {
-  xs: 4,
-  sm: 8,
-  md: 16,
-  lg: 20,
-  xl: 26,
-  xxl: 32,
-}
-
-export const space = {
-  xs: spaceBase.xs * scale,
-  sm: spaceBase.sm * scale,
-  md: spaceBase.md * scale,
-  lg: spaceBase.lg * scale,
-  xl: spaceBase.xl * scale,
-  xxl: spaceBase.xxl * scale,
+  xxs: 4,
+  xs: 8,
+  sm: 12,
+  md: 20,
+  lg: 28,
+  xl: 32,
+  xxl: 36,
 }
 
 /* ───────────────────────────────
-   Button Sizes
+   Button Sizes (base values)
 ──────────────────────────────── */
 const buttonBase = {
-  sm: { height: 32, paddingHorizontal: 10, font: font.sm },
-  md: { height: 44, paddingHorizontal: 14, font: font.md },
-  lg: { height: 56, paddingHorizontal: 18, font: font.lg },
-}
-
-export const button = {
-  sm: {
-    height: buttonBase.sm.height * scale,
-    paddingHorizontal: buttonBase.sm.paddingHorizontal * scale,
-    font: font.sm,
-  },
-  md: {
-    height: buttonBase.md.height * scale,
-    paddingHorizontal: buttonBase.md.paddingHorizontal * scale,
-    font: font.md,
-  },
-  lg: {
-    height: buttonBase.lg.height * scale,
-    paddingHorizontal: buttonBase.lg.paddingHorizontal * scale,
-    font: font.lg,
-  },
+  sm: { height: 32, paddingHorizontal: 10 },
+  md: { height: 44, paddingHorizontal: 14 },
+  lg: { height: 56, paddingHorizontal: 18 },
 }
 
 /* ───────────────────────────────
-   Modal Sizes (legacy compatible)
+   Modal Sizes (base values)
 ──────────────────────────────── */
 const modalBase = {
   sm: { width: 300, height: 250 },
   md: { width: 480, height: 400 },
   lg: { width: 640, height: 520 },
-}
-
-export const modal = {
-  sm: {
-    width: modalBase.sm.width * scale,
-    height: modalBase.sm.height * scale,
-  },
-  md: {
-    width: modalBase.md.width * scale,
-    height: modalBase.md.height * scale,
-  },
-  lg: {
-    width: modalBase.lg.width * scale,
-    height: modalBase.lg.height * scale,
-  },
 }
 
 /* ───────────────────────────────
@@ -133,26 +70,96 @@ export const radius = {
 }
 
 /* ───────────────────────────────
-   Unified Sizing Object
-   (ready for tokens merge)
+   Function to build sizing object from scale
+   This allows dynamic recalculation when scale changes
 ──────────────────────────────── */
-export const S = {
-  scale,
-  font,
-  space,
-  button,
-  modal,
-  border,
-  radius,
+export function buildSizing(scaleValue: number) {
+  const font = {
+    caption: fontBase.caption * scaleValue,
+    subtitle: fontBase.subtitle * scaleValue,
+    para: fontBase.para * scaleValue,
+    body1: fontBase.body1 * scaleValue,
+    body2: fontBase.body2 * scaleValue,
+    body3: fontBase.body3 * scaleValue,
+    heading1: fontBase.heading1 * scaleValue,
+    heading2: fontBase.heading2 * scaleValue,
+    heading3: fontBase.heading3 * scaleValue,
+    title: fontBase.title * scaleValue,
+  }
+
+  const space = {
+    xxs: spaceBase.xxs * scaleValue,
+    xs: spaceBase.xs * scaleValue,
+    sm: spaceBase.sm * scaleValue,
+    md: spaceBase.md * scaleValue,
+    lg: spaceBase.lg * scaleValue,
+    xl: spaceBase.xl * scaleValue,
+    xxl: spaceBase.xxl * scaleValue,
+  }
+
+  const button = {
+    sm: {
+      height: buttonBase.sm.height * scaleValue,
+      paddingHorizontal: buttonBase.sm.paddingHorizontal * scaleValue,
+      font: font.para,
+    },
+    md: {
+      height: buttonBase.md.height * scaleValue,
+      paddingHorizontal: buttonBase.md.paddingHorizontal * scaleValue,
+      font: font.body1,
+    },
+    lg: {
+      height: buttonBase.lg.height * scaleValue,
+      paddingHorizontal: buttonBase.lg.paddingHorizontal * scaleValue,
+      font: font.body2,
+    },
+  }
+
+  const modal = {
+    sm: {
+      width: modalBase.sm.width * scaleValue,
+      height: modalBase.sm.height * scaleValue,
+    },
+    md: {
+      width: modalBase.md.width * scaleValue,
+      height: modalBase.md.height * scaleValue,
+    },
+    lg: {
+      width: modalBase.lg.width * scaleValue,
+      height: modalBase.lg.height * scaleValue,
+    },
+  }
+
+  return {
+    scale: scaleValue,
+    font,
+    space,
+    button,
+    modal,
+    border,
+    radius,
+    s: (value: number) => value * scaleValue,
+  }
 }
+
+/* ───────────────────────────────
+   Static S object (backward compatibility)
+──────────────────────────────── */
+export const S = buildSizing(scale)
 
 /* ───────────────────────────────
    Type Exports
 ──────────────────────────────── */
-export type Sizing = typeof S
-export type FontSizes = keyof typeof font
-export type SpacingSizes = keyof typeof space
-export type ButtonSizes = keyof typeof button
-export type ModalSizes = keyof typeof modal
+export type Sizing = ReturnType<typeof buildSizing>
+export type FontSizes = keyof typeof fontBase
+export type SpacingSizes = keyof typeof spaceBase
+export type ButtonSizes = keyof typeof buttonBase
+export type ModalSizes = keyof typeof modalBase
 export type BorderSizes = keyof typeof border
 export type RadiusSizes = keyof typeof radius
+
+// Legacy exports for backward compatibility
+export const font = S.font
+export const space = S.space
+export const button = S.button
+export const modal = S.modal

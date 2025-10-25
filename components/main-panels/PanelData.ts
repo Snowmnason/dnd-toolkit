@@ -1,21 +1,24 @@
 // Shared panel configuration for both desktop and mobile
 export interface PanelItem {
-  name: string;
-  route: string;
+  name: string
+  route: string
 }
 
 export interface PanelConfig {
-  key: string;
-  title: string;
-  icon: string; // Will be replaced with proper icons later
-  items: PanelItem[];
+  key: string
+  title: string
+  icon: string               // Placeholder icon emoji
+  items: PanelItem[]
+  toneVariant?: 'base' | 'accent' | 'surface' | 'alt' // optional color variant
+  image?: string | null      // optional background image URL
 }
 
 export const panelConfigs: PanelConfig[] = [
   {
     key: 'characters',
     title: 'Characters & NPCs',
-    icon: '👥', // Placeholder - replace with actual icon component
+    icon: '👥',
+    image: null,
     items: [
       { name: 'Character Sheets', route: 'characters-npcs/character-sheets' },
       { name: 'Party Overview', route: 'characters-npcs/party-overview' },
@@ -26,7 +29,8 @@ export const panelConfigs: PanelConfig[] = [
   {
     key: 'items',
     title: 'Items & Treasure',
-    icon: '💎', // Placeholder
+    icon: '💎',
+    image: null,
     items: [
       { name: 'Inventory', route: 'items-treasure/inventory' },
       { name: 'Party Loot', route: 'items-treasure/party-loot' },
@@ -37,7 +41,8 @@ export const panelConfigs: PanelConfig[] = [
   {
     key: 'world',
     title: 'World & Exploration',
-    icon: '🗺️', // Placeholder
+    icon: '🗺️',
+    image: null,
     items: [
       { name: 'Dungeon/Town Creator', route: 'world-exploration/dungeon-town-creator' },
       { name: 'Battle Map Maker', route: 'world-exploration/battle-map-maker' },
@@ -48,7 +53,8 @@ export const panelConfigs: PanelConfig[] = [
   {
     key: 'combat',
     title: 'Combat & Events',
-    icon: '⚔️', // Placeholder
+    icon: '⚔️',
+    image: null,
     items: [
       { name: 'Encounter Builder', route: 'combat-events/encounter-builder' },
       { name: 'Initiative Tracker', route: 'combat-events/initiative-tracker' },
@@ -59,7 +65,8 @@ export const panelConfigs: PanelConfig[] = [
   {
     key: 'story',
     title: 'Story & Notes',
-    icon: '📖', // Placeholder
+    icon: '📖',
+    image: null,
     items: [
       { name: 'Quest Log', route: 'story-notes/quest-log' },
       { name: 'Journal', route: 'story-notes/journal' },
@@ -67,4 +74,4 @@ export const panelConfigs: PanelConfig[] = [
       { name: 'Handouts', route: 'story-notes/handouts' },
     ],
   },
-];
+]

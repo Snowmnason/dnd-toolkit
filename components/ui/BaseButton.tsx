@@ -1,4 +1,4 @@
-import { $, S, tone, UseTheme } from '@/theme'
+import { $, tone, useScale, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React from 'react'
 import {
@@ -52,57 +52,57 @@ interface ButtonProps {
 /* ───────────────────────────────
    🎨 Variant Styles
 ──────────────────────────────── */
-function getVariantColors(variant: ButtonVariant) {
+function getVariantColors(variant: ButtonVariant, theme: any) {
   switch (variant) {
     case 'secondary':
       return {
-        background: $('secondaryButtonBg'),
-        border: $('secondaryButtonBorder'),
-        text: $('secondaryButtonText'),
-        hover: tone($('secondaryButtonBg'), 'hover'),
+        background: $('secondaryButtonBg', theme),
+        border: $('secondaryButtonBorder', theme),
+        text: $('secondaryButtonText', theme),
+        //hover: tone($('secondaryButtonBg', theme), 'hover', undefined, undefined, theme),
       }
     case 'destructive':
       return {
-        background: $('destructiveButton'),
-        border: tone($('destructiveButton'), 'border'),
-        text: $('destructiveButtonText'),
-        hover: tone($('destructiveButton'), 'hover'),
+        background: $('destructiveButton', theme),
+        border: tone($('destructiveButton', theme), 'border', undefined, undefined, theme),
+        text: $('destructiveButtonText', theme),
+        //hover: tone($('destructiveButton', theme), 'hover', undefined, undefined, theme),
       }
     case 'ghost':
       return {
         background: 'transparent',
         border: 'transparent',
-        text: $('ghostButtonText'),
-        hover: 'transparent',
+        text: $('ghostButtonText', theme),
+        //hover: 'transparent',
       }
     case 'solid':
       return {
-        background: $('solidOutButton'),
+        background: $('solidOutButton', theme),
         border: 'transparent',
-        text: $('solidOutButtonText'),
-        hover: tone($('solidOutButton'), 'hover'),
+        text: $('solidOutButtonText', theme),
+        //hover: tone($('solidOutButton', theme), 'hover', undefined, undefined, theme),
       }
     case 'outlined':
       return {
         background: 'transparent',
-        border: tone($('solidOutButton'), 'border'),
-        text: $('solidOutButtonText'),
-        hover: tone($('solidOutButton'), 'hover'),
+        border: tone($('solidOutButton', theme), 'border', undefined, undefined, theme),
+        text: $('solidOutButtonText', theme),
+        //hover: tone($('solidOutButton', theme), 'hover', undefined, undefined, theme),
       }
     case 'cancel':
       return {
-        background: $('cancelButton'),
-        border: tone($('cancelButton'), 'border'),
-        text: $('cancelButtonText'),
-        hover: tone($('cancelButton'), 'hover'),
+        background: $('cancelButton', theme),
+        border: tone($('cancelButton', theme), 'border', undefined, undefined, theme),
+        text: $('cancelButtonText', theme),
+        //hover: tone($('cancelButton', theme), 'hover', undefined, undefined, theme),
       }
     case 'primary':
     default:
       return {
-        background: $('primaryButtonBg'),
-        border: $('primaryButtonBorder'),
-        text: $('primaryButtonText'),
-        hover: tone($('primaryButtonBg'), 'hover'),
+        background: $('primaryButtonBg', theme),
+        border: $('primaryButtonBorder', theme),
+        text: $('primaryButtonText', theme),
+        //hover: tone($('primaryButtonBg', theme), 'hover', undefined, undefined, theme),
       }
   }
 }
@@ -125,22 +125,32 @@ export function Button({
   onPress,
   children,
 }: ButtonProps) {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { theme: _theme } = UseTheme()
+  const { theme } = UseTheme()
+  const S = useScale()
   const scale = useSharedValue(1)
   const hovered = useSharedValue(0)
 
-  const colors = getVariantColors(variant)
+  const colors = getVariantColors(variant, theme)
   const sizing = S.button[size]
   const paddingH = sizing.paddingHorizontal
   const height = sizing.height
 
-  const getColor = (color: string, type?: 'hover' | 'border') => {
-    if (disabled || loading) return tone(color, 'disabled')
-    if (type === 'hover') return tone(color, 'hover')
-    if (type === 'border') return tone(color, 'border')
-    return color
-  }
+  // Pre-compute all color values with theme to avoid calling hooks in worklets
+  const backgroundColor = disabled || loading 
+    ? tone(bg ?? colors.background, 'disabled', undefined, undefined, theme)
+    : (bg ?? colors.background)
+  
+  const backgroundColorHover = disabled || loading
+    ? tone(bg ?? colors.background, 'disabled', undefined, undefined, theme)
+    : tone(bg ?? colors.background, 'hover', undefined, undefined, theme)
+  
+  const borderColorValue = disabled || loading
+    ? tone(borderColor ?? colors.border, 'disabled', undefined, undefined, theme)
+    : tone(borderColor ?? colors.border, 'border', undefined, undefined, theme)
+  
+  const textColorValue = disabled || loading
+    ? tone(textColor ?? colors.text, 'disabled', undefined, undefined, theme)
+    : (textColor ?? colors.text)
 
   const handlePressIn = () => {
     if (disabled || loading) return
@@ -162,12 +172,12 @@ export function Button({
 
   const handleMouseEnter = () => {
     if (disabled || loading || Platform.OS !== 'web') return
-    hovered.value = withTiming(1, { duration: 150 })
+    hovered.value = withTiming(1, { duration: 50 })
   }
 
   const handleMouseLeave = () => {
     if (disabled || loading || Platform.OS !== 'web') return
-    hovered.value = withTiming(0, { duration: 150 })
+    hovered.value = withTiming(0, { duration: 50 })
   }
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -175,9 +185,7 @@ export function Button({
   }))
 
   const hoverStyle = useAnimatedStyle(() => ({
-    backgroundColor: hovered.value
-      ? getColor(bg ?? colors.hover, 'hover')
-      : getColor(bg ?? colors.background),
+    backgroundColor: hovered.value ? backgroundColorHover : backgroundColor,
   }))
 
   // Smooth fade transition between spinner and text
@@ -205,14 +213,14 @@ export function Button({
           height,
           paddingHorizontal: paddingH,
           borderRadius: S.radius.md,
-          borderColor: getColor(borderColor ?? colors.border, 'border'),
-          borderWidth: 1,
+          borderColor: borderColorValue,
+          borderWidth: 2,
         }}
       >
         <Animated.View
           style={[
             hoverStyle,
-            { ...StyleSheet.absoluteFillObject, borderRadius: S.radius.md },
+            { ...StyleSheet.absoluteFillObject, borderRadius: (S.radius.md - 2) },
           ]}
         />
 
@@ -225,7 +233,7 @@ export function Button({
             {text ? (
               <ButtonText
                 style={{
-                  color: getColor(textColor ?? colors.text),
+                  color: textColorValue,
                   fontSize: sizing.font,
                 }}
               >
@@ -240,7 +248,7 @@ export function Button({
             {loading && (
               <ActivityIndicator
                 size="small"
-                color={getColor(textColor ?? colors.text)}
+                color={textColorValue}
               />
             )}
           </Animated.View>

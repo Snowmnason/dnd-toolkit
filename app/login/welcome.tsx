@@ -1,8 +1,9 @@
-import { AuthActionGroup, AuthBody, AuthBodyFooter, AuthButton, AuthButtonSecondary, AuthCaption, AuthRoot, AuthSubTitle, AuthTitle } from '@/components/auth_components';
+import { AuthActionGroup, AuthBody, AuthBodyFooter, AuthButton, AuthButtonSecondary, AuthCaption, AuthLink, AuthRoot, AuthSubTitle, AuthTitle } from '@/components/auth_components';
 import { useWelcomeScreen } from '@/lib';
+import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import CustomLoad from '../../components/ui/CustomLoad';
 
 
@@ -10,7 +11,9 @@ import CustomLoad from '../../components/ui/CustomLoad';
 // import AppleSignInButton from '../../components/social-auth-buttons/apple/apple-sign-in-button';
 // import GoogleSignInButton from '../../components/social-auth-buttons/google/google-sign-in-button';
 export default function WelcomeScreen() {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const S = useScale();
+  const isMobile = Platform.OS === 'ios' || Platform.OS === 'android';
+   
   const router = useRouter();
   const {
     isLoading,
@@ -38,25 +41,26 @@ export default function WelcomeScreen() {
       <View
         style={{
           backgroundColor: 'rgba(245, 230, 211, 0.95)',
-          padding: 24,
+          padding: S.space.lg,
           borderRadius: 12,
-          marginBottom: 32,
+          marginBottom: S.space.xxl,
           borderWidth: 2,
           borderColor: '#8B4513',
-          maxWidth: 350,
+          justifyContent: 'center',
+          alignItems: 'center',
         }}
       >
-        <AuthTitle style={{ color: '#8B4513', marginBottom: 16, fontSize: 22 }}>
+        <AuthBody.InCard fontSize={S.font.heading2} style={{ marginBottom: S.space.lg, fontWeight: '600' }}>
           Welcome, Adventurer!
-        </AuthTitle>
+        </AuthBody.InCard>
 
-        <AuthBody.InCard>
+        <AuthBody.InCard fontSize={S.font.body1} style={{  }}>
           Create an account or sign in to start building your campaigns and sync across all your devices.
         </AuthBody.InCard>
       </View>
 
       {/* 🔐 Authentication Options*/}
-      <AuthActionGroup style={{ marginBottom: 24 }}>
+      <AuthActionGroup style={{ marginBottom: S.space.md,  }}>
         {/* 
           TODO: Social Auth Buttons - Uncomment when ready to enable
           
@@ -90,20 +94,25 @@ export default function WelcomeScreen() {
         />
 
         {/* Continue Without Account */}
-        <AuthBody
-          deco="underline"
+        <AuthLink
           color={isLoading ? '#BDB76B' : '#D4AF37'}
-          opacity={isLoading ? 0.5 : 1}
           onPress={() => {
+            if(isMobile) {
+              router.replace('../StyleMobile');
+              return;
+            }else {
+              router.replace('../StyleDesktop');
+              return;
+            }
             // TODO: Implement anonymous auth
           }}
         >
           Continue without an account
-        </AuthBody>
+        </AuthLink>
       </AuthActionGroup>
 
       {/* 🌤️ Info / Footer */}
-      <View style={{ alignItems: 'center', marginTop: 22 }}>
+      <View style={{ alignItems: 'center', marginTop: 8 }}>
         <AuthBodyFooter>
           Cloud sync • Backup your worlds • Access anywhere • Share with friends
         </AuthBodyFooter>

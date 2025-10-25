@@ -1,20 +1,19 @@
-import { ThemedText } from '../../../components/ui/themed-text';
-import { ThemedView } from '../../../components/ui/themed-view';
+import { AppView, Body, Title } from '@/components/ui';
 
 export default function CharacterSheetsPage() {
   return (
-    <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-      <ThemedText type="title" style={{ marginBottom: 20, textAlign: 'center', color: '#F5E6D3' }}>
+    <AppView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+      <Title style={{ marginBottom: 20 }}>
         Character Sheets
-      </ThemedText>
-      <ThemedText style={{ marginBottom: 40, textAlign: 'center', fontSize: 18, color: '#F5E6D3' }}>
+      </Title>
+      <Body style={{ marginBottom: 40, textAlign: 'center', fontSize: 18 }}>
         Manage your partys character sheets and track character progression.
-      </ThemedText>
+      </Body>
       
       {/* Placeholder content */}
-      <ThemedText style={{ textAlign: 'center', fontStyle: 'italic', marginBottom: 40, color: '#F5E6D3' }}>
+      <Body style={{ textAlign: 'center', fontStyle: 'italic', marginBottom: 40 }}>
         🎭 Coming Soon: Character sheet builder, stat tracking, and level progression tools.
-      </ThemedText>
-    </ThemedView>
+      </Body>
+    </AppView>
   );
 }

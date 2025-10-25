@@ -8,10 +8,12 @@ import {
   AuthTitle
 } from '@/components/auth_components';
 import { useResetPasswordConfirm } from '@/lib';
+import { useScale } from '@/theme';
 import { useRef } from 'react';
 import { TextInput } from 'react-native';
 
 export default function ResetPasswordScreen() {
+  const S = useScale();
   // Refs for keyboard navigation
   const confirmPasswordInputRef = useRef<TextInput>(null);
   const {
@@ -58,11 +60,11 @@ export default function ResetPasswordScreen() {
       {/* 🔐 Header */}
       <AuthTitle>Reset Password</AuthTitle>
 
-      <AuthBody>
+      <AuthSubTitle>
         {userEmail
           ? `${userEmail} is ready to reset your password. Please enter a new password below.`
           : 'Please enter a new password below.'}
-      </AuthBody>
+      </AuthSubTitle>
 
       {/* 🧾 Form */}
       <AuthForm>
@@ -85,7 +87,7 @@ export default function ResetPasswordScreen() {
             borderColor:
               !isPasswordValid && password.length > 0 ? '#dc3545' : undefined,
             borderWidth:
-              !isPasswordValid && password.length > 0 ? 2 : undefined,
+              !isPasswordValid && password.length > 0 ? 3 : undefined,
           }}
         />
 
@@ -93,13 +95,14 @@ export default function ResetPasswordScreen() {
         <AuthSubTitle
           color={getPasswordHintColor()}
           align="left"
-          fontSize={11}
-          style={{
-            lineHeight: 16,
-            opacity: 0.9,
-            marginBottom: 6,
-            marginTop: -14,
-          }}
+          fontSize='$caption'
+            style={{
+              lineHeight: 16,
+              marginBottom: S.space.xs,
+              marginTop: (S.space.sm*-1),
+              marginLeft: S.space.xs,
+              opacity: 0.9,
+            }}
         >
           {getPasswordRequirementsText()}
         </AuthSubTitle>

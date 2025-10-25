@@ -1,4 +1,6 @@
-import { logger, supabase, validateUsername } from '@/lib';
+import { validateUsername } from '../auth/validation';
+import { logger } from '../utils/logger';
+import { supabase } from './supabase';
 
 export interface User {
   id: string;
@@ -93,6 +95,18 @@ export const usersDB = {
     });
     
     if (authError) {
+      // In a fresh app session with no existing auth, Supabase returns AuthSessionMissingError.
+      // Treat this as "not authenticated yet" instead of an error so callers can handle nulls.
+      const name = (authError as any)?.name ?? ''
+      const msg = (authError.message || '').toLowerCase()
+      const isSessionMissing = name === 'AuthSessionMissingError' || msg.includes('session missing')
+
+      if (isSessionMissing) {
+        logger.debug('usersDB', 'No auth session present yet (fresh session)');
+        return null
+      }
+
+      // Other auth errors are unexpected and should bubble up
       logger.error('usersDB', 'Auth error in getCurrentUser:', authError);
       throw new Error(authError.message || 'Authentication error');
     }
@@ -102,7 +116,7 @@ export const usersDB = {
       return null;
     }
 
-    logger.debug('usersDB', 'Fetching user profile from database for auth_id:', authUser.id);
+  logger.debug('usersDB', 'Fetching user profile from database for auth_id:', authUser.id);
 
     const { data, error } = await supabase
       .from('users')

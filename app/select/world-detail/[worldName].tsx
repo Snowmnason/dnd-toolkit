@@ -1,40 +1,35 @@
-import LeaveWorldModal from '@/components/modals/ConfrimLeaveModal';
-import EditWorldModal from '@/components/modals/EditWorldModal';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Image, View } from 'react-native';
-import PrimaryButton from '../../../components/custom_components/PrimaryButton';
-import { ThemedText } from '../../../components/ui/themed-text';
-import { ThemedView } from '../../../components/ui/themed-view';
-import { Spacing } from '../../../constants/theme';
-import { useAppParams } from '../../../contexts/AppParamsContext';
-import { useWorldModal } from '../../../hooks/use-world-modal';
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import React from 'react'
+import { Image } from 'react-native'
+import Animated, { FadeInRight } from 'react-native-reanimated'
 
-type WorldDetailParams = Record<string, string | string[]>;
+import { ConfirmLeaveModal, EditWorldModal } from '@/components/modals'
+import { AppView, Body, Button, Heading } from '@/components/ui'
+import { useAppParams } from '@/contexts/AppParamsContext'
+import { useWorldModal } from '@/hooks/use-world-modal'
+import { $, useScale } from '@/theme'
 
 export default function WorldDetail() {
-  const urlParams = useLocalSearchParams<WorldDetailParams>();
-  const router = useRouter();
-  const { params: contextParams, updateParams } = useAppParams();
-  
-  // Extract and validate parameters - prefer URL params for display, but use context for navigation
-  const worldName = typeof urlParams.name === 'string' ? urlParams.name : '';
-  const userId = contextParams.userId;
-  const worldId = contextParams.worldId;
-  const userRole = contextParams.userRole;
-  const mapUrl = typeof urlParams.mapImage === 'string' ? urlParams.mapImage : undefined;
-  
-  // Determine map image source
-  const selectedMapImage = mapUrl ? { uri: mapUrl } : require('../../../assets/images/Miku.png');
-  
-  // Navigate back to world selection after delete/leave
+  const S = useScale()
+  const router = useRouter()
+  const { params: contextParams, updateParams } = useAppParams()
+  const urlParams = useLocalSearchParams<Record<string, string | string[]>>()
+
+  const worldName = typeof urlParams.name === 'string' ? urlParams.name : ''
+  const mapUrl = typeof urlParams.mapImage === 'string' ? urlParams.mapImage : undefined
+  const userId = contextParams.userId
+  const worldId = contextParams.worldId
+  const userRole = contextParams.userRole
+
+  const selectedMapImage = mapUrl ? { uri: mapUrl } : require('../../../assets/images/Miku.png')
+
   const handleNavigateBackToSelection = () => {
     router.replace({
       pathname: '/select/world-selection',
       params: userId ? { userId } : {},
-    });
-  };
-  
-  // Use the custom hook for modal functionality
+    })
+  }
+
   const {
     editModalVisible,
     leaveModalVisible,
@@ -50,93 +45,114 @@ export default function WorldDetail() {
     createRemoveFromWorldHandler,
     generatingLink,
   } = useWorldModal({
-    onWorldsChange: handleNavigateBackToSelection, // Navigate back after delete/leave
-  });
-  
-  // Helper function to build route parameters
-  const buildRouteParams = () => {
-    const routeParams: Record<string, string> = {};
-    if (userId) routeParams.userId = userId;
-    if (worldId) routeParams.worldId = worldId;
-    if (userRole) routeParams.userRole = userRole;
-    return routeParams;
-  };
-  
-  // Navigation handlers
-  const handleOpenWorld = () => {
-    // Update centralized params context
-    updateParams({
-      userId,
-      worldId,
-      userRole,
-    });
+    onWorldsChange: handleNavigateBackToSelection,
+  })
 
+  const buildRouteParams = () => {
+    const routeParams: Record<string, string> = {}
+    if (userId) routeParams.userId = userId
+    if (worldId) routeParams.worldId = worldId
+    if (userRole) routeParams.userRole = userRole
+    return routeParams
+  }
+
+  const handleOpenWorld = () => {
+    updateParams({ userId, worldId, userRole })
     router.replace({
       pathname: '/main/mobile',
       params: buildRouteParams(),
-    });
-  };
+    })
+  }
 
   return (
-    <ThemedView style={{ flex: 1, alignItems: 'center', padding: Spacing.md }}>
-      <View style={{ flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center' }}>
-        <EditWorldModal
-            visible={editModalVisible}
-            onClose={closeEditModal}
-            worldName={modalWorldName}
-            originalWorldName={worldName}
-            onWorldNameChange={setModalWorldName}
-            onConfirmWorldName={() => handleConfirmWorldName(worldId, modalWorldName, userId)}
-            onGenerateInviteLink={createGenerateInviteLinkHandler(worldId, worldName)}
-            onDeleteWorld={createDeleteWorldHandler(worldId, userId)}
-            generatingLink={generatingLink}
-          />
-        <LeaveWorldModal
-            visible={leaveModalVisible} 
-            onClose={closeLeaveModal}
-            worldName={modalWorldName}
-            onLeaveWorld={createRemoveFromWorldHandler(worldId, userId)}
-          />
-        <ThemedText type="title" style={{
-          marginBottom: Spacing.md,
-          textAlign: 'center',
-          fontWeight: '600',
-          fontSize: 58
-        }}>
+    <AppView
+      variant="page"
+      center
+      style={{ flex: 1, padding: S.space.md }}   // ← replaces `padded`
+    >
+      {/* Modals */}
+      <EditWorldModal
+        visible={!!editModalVisible}
+        onClose={closeEditModal}
+        worldName={modalWorldName}
+        originalWorldName={worldName}
+        onWorldNameChange={setModalWorldName}
+        onConfirmWorldName={() => handleConfirmWorldName(worldId, modalWorldName, userId)}
+        onGenerateInviteLink={createGenerateInviteLinkHandler(worldId, worldName)}
+        onDeleteWorld={createDeleteWorldHandler(worldId, userId)}
+        generatingLink={generatingLink}
+      />
+      <ConfirmLeaveModal
+        visible={!!leaveModalVisible}
+        onClose={closeLeaveModal}
+        worldName={modalWorldName}
+        onConfirmLeave={createRemoveFromWorldHandler(worldId, userId)}
+      />
+
+      {/* Animated world content */}
+      <Animated.View
+        entering={FadeInRight.duration(450).springify().damping(18)}
+        style={{
+          width: '100%',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flex: 1,
+        }}
+      >
+        <Heading
+          align="center"
+          style={{
+            marginBottom: S.space.md,
+            fontSize: 48,
+            color: $('textPrimary'),
+          }}
+        >
           {worldName}
-        </ThemedText>
+        </Heading>
+
         <Image
           source={selectedMapImage}
           resizeMode="contain"
-          style={{ width: '100%', height: '70%', borderRadius: 12, zIndex: 1 }}
+          style={{
+            width: '100%',
+            height: '70%',
+            borderRadius: S.radius.lg,
+            marginBottom: S.space.lg,
+          }}
         />
-        <View style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          width: '60%',
-          marginBottom: Spacing.md,
-        }}>
-          {/* Show Edit for owners, Leave for non-owners */}
-          <PrimaryButton 
-            style={{}}
-            textStyle={{}}
-            //disabled={true} //TODO enable when edit modal is fixed
-            onPress={userRole === 'owner' 
-              ? () => openEditModal(worldName) 
-              : () => openLeaveModal(worldName)
+
+        {/* Button row: replace `row` with flexDirection */}
+        <AppView
+          gap="md"
+          style={{
+            width: '65%',
+            flexDirection: 'row',               // ← replaces `row`
+            justifyContent: 'space-between',
+            marginBottom: S.space.lg,
+          }}
+        >
+          <Button
+            text={userRole === 'owner' ? 'Edit' : 'Leave'}
+            variant="outlined"
+            onPress={
+              userRole === 'owner'
+                ? () => openEditModal(worldName)
+                : () => openLeaveModal(worldName)
             }
-          >
-            {userRole === 'owner' ? 'Edit' : 'Leave'}
-          </PrimaryButton>
-          <PrimaryButton
-            style={{}}
-            textStyle={{}}
+            style={{ flex: 1 }}
+          />
+          <Button
+            text="Open"
+            variant="primary"
             onPress={handleOpenWorld}
-          >
-            Open
-          </PrimaryButton>
-        </View>
-      </View>
-    </ThemedView>
-  );
+            style={{ flex: 1 }}
+          />
+        </AppView>
+
+        <Body align="center" color="$textSecondary" style={{ opacity: 0.8 }}>
+          Tap “Open” to enter your world.
+        </Body>
+      </Animated.View>
+    </AppView>
+  )
 }

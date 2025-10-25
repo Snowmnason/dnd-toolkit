@@ -1,11 +1,14 @@
-import { $, S, tone, UseTheme } from '@/theme'
+import { $, tone, useScale, UseTheme } from '@/theme'
+import type { Sizing } from '@/theme/ultils/sizing'
 import React from 'react'
 import { View, ViewStyle } from 'react-native'
+
+type RadiusKey = keyof Sizing['radius']
 
 interface SurfaceProps {
   variant?: 'base' | 'surface' | 'elevated' | 'accent'
   padded?: boolean
-  radius?: keyof typeof S.radius
+  radius?: RadiusKey
   bordered?: boolean
   style?: ViewStyle
   children: React.ReactNode
@@ -26,6 +29,7 @@ export function Surface({
 }: SurfaceProps) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { theme: _theme } = UseTheme()
+  const S = useScale()
 
   // Dynamic background tone
   const bg =

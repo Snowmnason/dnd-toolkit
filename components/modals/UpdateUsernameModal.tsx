@@ -1,6 +1,6 @@
 import { AppModal, Body, Button, TextInput } from '@/components/ui'
 import { validateUsername } from '@/lib/auth/validation'
-import { $, S } from '@/theme'
+import { $, useScale } from '@/theme'
 import React, { useEffect, useState } from 'react'
 import { View } from 'react-native'
 
@@ -25,6 +25,7 @@ export function UpdateUsernameModal({
   loading = false,
   errorText = '',
 }: UpdateUsernameModalProps) {
+  const S = useScale()
   const [newUsername, setNewUsername] = useState('')
 
   // ✅ Reset field when modal closes

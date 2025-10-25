@@ -1,15 +1,17 @@
 import {
-  AuthActionGroup, AuthBackButtonContainer, AuthBody,
+  AuthActionGroup, AuthBackButtonContainer,
   AuthBodyFooter,
   AuthButton, AuthButtonBack,
   AuthButtonSecondary, AuthCaption, AuthError, AuthForm, AuthInput, AuthRoot, AuthSubTitle, AuthTitle
 } from '@/components/auth_components';
 import { logger, supabase, useSignInForm } from '@/lib';
+import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { TextInput } from 'react-native';
 
 export default function SignInScreen() {
+  const S = useScale();
   const router = useRouter();
   const [isResendingEmail, setIsResendingEmail] = useState(false);
   
@@ -70,7 +72,7 @@ export default function SignInScreen() {
       {/* 🧙 Header */}
       <AuthTitle>Welcome Back</AuthTitle>
 
-      <AuthBody>Sign in to access your saved worlds and characters</AuthBody>
+      <AuthSubTitle fontSize='$para'>Sign in to access your saved worlds and characters</AuthSubTitle>
 
       {/* 🧾 Form*/}
       <AuthForm>
@@ -89,7 +91,7 @@ export default function SignInScreen() {
                 ? '#dc3545'
                 : undefined,
             borderWidth:
-              !emailValidation.isValid && email.length > 0 ? 2 : undefined,
+              !emailValidation.isValid && email.length > 0 ? 3 : undefined,
           }}
         />
 
@@ -128,7 +130,7 @@ export default function SignInScreen() {
         <AuthSubTitle
           color="#D4AF37"
           align="right"
-          style={{ marginBottom: 4, marginTop: -14 }}
+          style={{ marginBottom: 4, marginTop: (S.space.sm*-1) }}
           onPress={() => router.push('/login/forgot-password')}
         >
           Forgot Password?
@@ -162,29 +164,3 @@ export default function SignInScreen() {
     </AuthRoot>
   )
 }
-
-/*
-        <Button variant="ghost"
-          style={{
-            backgroundColor: loading
-              ? 'rgba(139,69,19,0.1)'
-              : 'rgba(139,69,19,0.2)',
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            borderRadius: 6,
-            opacity: loading ? 0.5 : 1,
-          }}
-          onPress={() => router.replace('/login/welcome')}
-          disabled={loading}
-        >
-          <ButtonText
-            style={{
-              color: '#F5E6D3',
-              fontSize: 14,
-              fontWeight: '500',
-            }}
-          >
-            ← Back
-          </ButtonText>
-        </Button>
-        */

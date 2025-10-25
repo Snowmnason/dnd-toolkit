@@ -16,6 +16,7 @@ export { default as CustomLoad } from './CustomLoad';
 export { default as Dropdown } from './Dropdown';
 export * from './IconButton';
 export * from './InteractiveCard';
+export * from './RadioButton';
 export * from './Snackbar';
 export * from './Surface';
 export * from './Switch';
@@ -23,11 +24,10 @@ export * from './Tabs';
 export * from './TextInputs';
 
 // Groups
-export * from './groups/ButtonGroup';
+export * from './groups//ButtonGroup';
 export * from './groups/DropdownGroup';
+export * from './groups/RadioButtonGroup';
 export * from './groups/SwitchGroup';
 export * from './groups/TextInputGroup';
 export * from './groups/ToggleGroup';
-
-
 

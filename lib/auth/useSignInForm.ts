@@ -1,6 +1,7 @@
-import { isSignInFormValid, signInUser, validateEmail } from '@/lib';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { signInUser } from './authService';
+import { isSignInFormValid, validateEmail } from './validation';
 
 export const useSignInForm = () => {
   const router = useRouter();

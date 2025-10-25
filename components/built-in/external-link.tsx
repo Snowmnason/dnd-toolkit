@@ -1,4 +1,4 @@
-import { CoreColors } from '@/constants/corecolors';
+import { $ } from '@/theme';
 import { Href, Link } from 'expo-router';
 import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser';
 import { type ComponentProps } from 'react';
@@ -13,7 +13,7 @@ export function ExternalLink({ href, style, ...rest }: Props) {
       href={href}
       style={[
         {
-          color: CoreColors.primary,
+          color: $('primary'),
           textDecorationLine: 'underline',
         },
         style

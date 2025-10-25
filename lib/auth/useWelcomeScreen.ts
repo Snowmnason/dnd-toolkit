@@ -1,7 +1,8 @@
-import { logger, prepareAuthNavigation } from '@/lib';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert } from 'react-native';
+import { logger } from '../utils/logger';
+import { prepareAuthNavigation } from './sessionService';
 
 
 export const useWelcomeScreen = () => {

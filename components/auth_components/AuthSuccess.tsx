@@ -1,4 +1,5 @@
 import { Body } from '@/components/ui';
+import { useScale } from '@/theme';
 import React from 'react';
 import { View } from 'react-native';
 
@@ -7,6 +8,7 @@ interface AuthSuccessProps {
 }
 
 const AuthSuccess: React.FC<AuthSuccessProps> = ({ message }) => {
+  const S = useScale()
   if (!message) return null;
 
   return (
@@ -15,20 +17,20 @@ const AuthSuccess: React.FC<AuthSuccessProps> = ({ message }) => {
         backgroundColor: 'rgba(163, 212, 160, 0.1)',
         borderColor: '#82cc7eff',//'#A3D4A0'
         borderWidth: 1,
-        borderRadius: 8,
-        padding: 12,
-        marginBottom: 16,
-        width: '100%',
-        maxWidth: 300
+        borderRadius: S.radius.sm,
+        padding: S.space.sm,
+        marginBottom: S.space.md,
+        width: '95%',
+        alignSelf: 'center',
       }}
     >
     <Body
-      fontSize="$sm"
+      fontSize="$para"
       color='#82cc7eff'//'#A3D4A0'
       style={{
         textAlign: 'center',
         fontWeight: '500',
-        lineHeight: 20,
+        lineHeight: S.font.para + 2,
       }}
     >
       ✓ {message}

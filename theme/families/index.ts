@@ -1,1 +1,2 @@
-export * from './Classic';
+export { classicTheme } from './Classic'
+export { cyberpunkTheme } from './Cyberpunk'

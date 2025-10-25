@@ -1,11 +1,11 @@
 import { AppModal, Body, Button } from '@/components/ui'
 import {
-  createWorldNameChangeHandler,
-  isValidWorldNameForSubmission,
-  type WorldNameValidationResult,
+    createWorldNameChangeHandler,
+    isValidWorldNameForSubmission,
+    type WorldNameValidationResult,
 } from '@/lib/auth/validation'
 import { logger } from '@/lib/utils/logger'
-import { $, S } from '@/theme'
+import { $, useScale } from '@/theme'
 import React, { useState } from 'react'
 import { Platform, TextInput, View } from 'react-native'
 
@@ -36,6 +36,7 @@ export function EditWorldModal({
   onDeleteWorld,
   generatingLink,
 }: EditWorldModalProps) {
+  const S = useScale()
   const [worldNameValidation, setWorldNameValidation] =
     useState<WorldNameValidationResult | null>(null)
   const [deleting, setDeleting] = useState(false)

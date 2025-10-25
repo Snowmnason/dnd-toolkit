@@ -15,12 +15,13 @@
  * Supports: iOS (native) + Web (react-apple-signin-auth)
  */
 
+import { Button, ButtonText } from '@/components/ui';
 import { AuthStateManager, logger, supabase } from '@/lib';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, Platform } from 'react-native';
-import PrimaryButton from '../../../custom_components/PrimaryButton';
+
 
 // Web-specific components (loaded dynamically)
 interface AppleWebComponents {
@@ -168,7 +169,7 @@ function AppleButtonWeb({ disabled }: { disabled: boolean }) {
 
   if (isLoading) {
     return (
-      <PrimaryButton
+      <Button
         style={{ 
           backgroundColor: '#000', 
           paddingVertical: 16, 
@@ -178,18 +179,19 @@ function AppleButtonWeb({ disabled }: { disabled: boolean }) {
           justifyContent: 'center',
           opacity: 0.7
         }}
-        textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
         onPress={() => {}}
         disabled={true}
       >
-        🍎 Loading Apple...
-      </PrimaryButton>
+        <ButtonText style={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}>
+          🍎 Loading Apple...
+        </ButtonText>
+      </Button>
     );
   }
 
   if (!appleComponents) {
     return (
-      <PrimaryButton
+      <Button
         style={{ 
           backgroundColor: '#000', 
           paddingVertical: 16, 
@@ -197,14 +199,15 @@ function AppleButtonWeb({ disabled }: { disabled: boolean }) {
           flexDirection: 'row', 
           alignItems: 'center', 
           justifyContent: 'center',
-          opacity: 0.5
+          opacity: 0.7
         }}
-        textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
         onPress={() => {}}
         disabled={true}
       >
-        🍎 Apple (Unavailable)
-      </PrimaryButton>
+        <ButtonText style={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}>
+          🍎 Apple (Unavailable)
+        </ButtonText>
+      </Button>
     );
   }
 
@@ -292,7 +295,7 @@ export default function AppleSignInButton({ disabled = false, style }: AppleSign
     };
 
     return (
-      <PrimaryButton
+      <Button
         style={{ 
           backgroundColor: '#000', 
           paddingVertical: 16, 
@@ -300,20 +303,21 @@ export default function AppleSignInButton({ disabled = false, style }: AppleSign
           flexDirection: 'row', 
           alignItems: 'center', 
           justifyContent: 'center',
-          ...style
+          opacity: 0.7
         }}
-        textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
         onPress={handlePress}
-        disabled={disabled || isLoading}
+        disabled={true}
       >
-        🍎 Apple
-      </PrimaryButton>
+        <ButtonText style={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}>
+          🍎 Apple
+        </ButtonText>
+      </Button>
     );
   }
 
   // Android or iOS unavailable - show disabled button for consistent UI
   return (
-    <PrimaryButton
+    <Button
       style={{ 
         backgroundColor: '#000', 
         paddingVertical: 16, 
@@ -324,11 +328,10 @@ export default function AppleSignInButton({ disabled = false, style }: AppleSign
         opacity: 0.3, // Clearly disabled appearance
         ...style
       }}
-      textStyle={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}
       onPress={() => {}}
       disabled={true}
     >
-      🍎 Apple
-    </PrimaryButton>
+      <ButtonText style={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}>🍎 Apple</ButtonText>
+    </Button>
   );
 }

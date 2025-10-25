@@ -1,3 +1,4 @@
+import { $ } from '@/theme';
 import { Stack } from 'expo-router';
 import { View } from 'react-native';
 
@@ -8,7 +9,7 @@ export default function LoginLayout() {
         screenOptions={{
           headerShown: false,
           contentStyle: {
-            backgroundColor: '#2f353d', ///MAYBE REPLACE WITH THEME TOKEN
+            backgroundColor: $('background') || '#2f353d', ///MAYBE REPLACE WITH THEME TOKEN
           },
         }}
       />

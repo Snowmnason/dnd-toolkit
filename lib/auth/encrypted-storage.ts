@@ -1,8 +1,8 @@
-import { logger } from '@/lib';
 import * as aesjs from 'aes-js';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import 'react-native-get-random-values';
+import { logger } from '../utils/logger';
 
 // Type-safe import for AsyncStorage
 let AsyncStorage: any;

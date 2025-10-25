@@ -1,7 +1,7 @@
 import AuthError from '@/components/auth_components/AuthError'
 import AuthInput from '@/components/auth_components/AuthInput'
 import { AppModal, Button } from '@/components/ui'
-import { S } from '@/theme'
+import { useScale } from '@/theme'
 import React, { useEffect, useState } from 'react'
 import { View } from 'react-native'
 
@@ -32,6 +32,7 @@ export function CredentialConfirmModal({
   onCancel,
   onConfirm,
 }: CredentialConfirmModalProps) {
+  const S = useScale()
   const [password, setPassword] = useState('')
 
   // Reset when modal closes

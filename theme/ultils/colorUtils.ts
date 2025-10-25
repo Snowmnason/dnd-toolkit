@@ -1,5 +1,6 @@
 import Color from 'color'
-import { UseTheme } from '../index'
+import { UseTheme } from '../ThemeProvider'
+import { ThemeTokens } from '../tokens'
 
 function adjustBrightness(hex: string, delta: number) {
   const c = Color(hex)
@@ -32,18 +33,22 @@ export function tone(
     | 'hover'
     | 'border'
     | 'disabled'
+    | 'changeOpacity'
     | 'alt'
     | 'accent'
     | 'subtle' = 'base',
-  variant?: 'solid' | 'outlined' | 'ghost'
+  variant?: 'solid' | 'outlined' | 'ghost',
+  amount: number = 0.5,
+  theme?: ThemeTokens
 ) {
-  const { theme } = UseTheme()
+  // If theme is provided directly, use it; otherwise call the hook
+  const themeToUse = theme || UseTheme().theme
   const c = Color(base)
-  const darkMode = isThemeDark(theme.background ?? '#222')
+  const darkMode = isThemeDark(themeToUse.background ?? '#222')
 
   switch (mode) {
     case 'hover':
-      return c.lighten(0.08).hex()
+      return c.lighten(0.3).hex()
 
     case 'border':
       return c.darken(0.12).hex()
@@ -54,7 +59,7 @@ export function tone(
 
     case 'disabled':
       if (variant === 'outlined' || variant === 'ghost') {
-        return c.desaturate(0.4).lighten(0.3).hex()
+        return c.desaturate(0.6).lighten(0.3).hex()
       }
       return c.alpha(Math.min(c.alpha(), 0.5)).string()
 
@@ -64,9 +69,12 @@ export function tone(
     }
 
     case 'accent': {
-      const accentColor = theme.accent ?? '#8B4513'
+      const accentColor = themeToUse.accent ?? '#8B4513'
       return mixColors(base, accentColor, 0.25)
     }
+
+    case 'changeOpacity':
+      return c.alpha(amount).string()
 
     default:
       return c.hex()

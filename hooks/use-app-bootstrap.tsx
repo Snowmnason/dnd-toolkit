@@ -1,3 +1,4 @@
+import { preloadThemes } from '@/theme';
 import { Asset } from 'expo-asset';
 import * as Font from 'expo-font';
 import { useEffect, useState } from 'react';
@@ -44,6 +45,7 @@ export function useAppBootstrap() {
           loadFonts(),
           loadImages(),
           loadPlatformAssets(),
+          preloadThemes(),
         ];
 
         // Step 2: Restore Supabase session in parallel with assets

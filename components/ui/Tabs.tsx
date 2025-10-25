@@ -1,4 +1,4 @@
-import { $, S, tone } from '@/theme'
+import { $, tone, useScale } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useEffect, useState } from 'react'
 import { Animated, LayoutChangeEvent, Pressable, View } from 'react-native'
@@ -26,6 +26,7 @@ export function Tabs({
   onChange,
   fullWidth = false,
 }: TabsProps) {
+  const S = useScale()
   const [active, setActive] = useState(defaultActive ?? tabs[0]?.key)
   const [underlineX] = useState(new Animated.Value(0))
   const [underlineWidth] = useState(new Animated.Value(0))
