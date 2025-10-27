@@ -14,6 +14,7 @@ export const cyberpunkTheme: CyberpunkTheme = {
     [TOKENS.background]: '#060014',
     [TOKENS.surface]: '#0d0024',
     [TOKENS.elevated]: '#15003d',
+    [TOKENS.bgInverse]: '#e3f2fd',
 
     // Text
     [TOKENS.textPrimary]: '#e3f2fd',
@@ -61,8 +62,6 @@ export const cyberpunkTheme: CyberpunkTheme = {
     [TOKENS.cancelButton]: '#33334d',
     [TOKENS.cancelButtonText]: '#80ffff',
     [TOKENS.solidOutButton]: '#00ffff',
-    [TOKENS.solidOutButtonText]: '#000000',
-    [TOKENS.ghostButtonText]: '#80ffff',
 
     // Typography
     [TOKENS.fontFamilyTitle]: 'Orbitron, sans-serif',
@@ -77,6 +76,7 @@ export const cyberpunkTheme: CyberpunkTheme = {
     [TOKENS.background]: '#f2f7ff',
     [TOKENS.surface]: '#ffffff',
     [TOKENS.elevated]: '#e6ecff',
+    [TOKENS.bgInverse]: '#120033',
 
     // Text
     [TOKENS.textPrimary]: '#120033',
@@ -124,8 +124,6 @@ export const cyberpunkTheme: CyberpunkTheme = {
     [TOKENS.cancelButton]: '#cccccc',
     [TOKENS.cancelButtonText]: '#333333',
     [TOKENS.solidOutButton]: '#ff0088',
-    [TOKENS.solidOutButtonText]: '#ffffff',
-    [TOKENS.ghostButtonText]: '#ff0088',
 
     // Typography
     [TOKENS.fontFamilyTitle]: 'Orbitron, sans-serif',

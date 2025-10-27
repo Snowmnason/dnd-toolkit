@@ -43,11 +43,19 @@ const storage = {
 
 // Storage keys
 const STORAGE_KEYS = {
-  HAS_ACCOUNT: 'dnd_has_account'
+  HAS_ACCOUNT: 'dnd_has_account',
+  USER_DATA: 'dnd_user_data'
 };
 
 export interface AuthState {
   hasAccount: boolean;
+}
+
+export interface StoredUserData {
+  id: string;
+  auth_id: string;
+  username: string;
+  created_at: string;
 }
 
 export const AuthStateManager = {
@@ -64,6 +72,41 @@ export const AuthStateManager = {
       return {
         hasAccount: false
       };
+    }
+  },
+
+  // Save user data to local storage
+  async saveUserData(userData: StoredUserData): Promise<void> {
+    try {
+      await storage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(userData));
+      logger.debug('auth-state', 'User data saved to storage:', { id: userData.id, username: userData.username });
+    } catch (error) {
+      logger.error('auth-state', 'Error saving user data:', error);
+    }
+  },
+
+  // Get user data from local storage
+  async getUserData(): Promise<StoredUserData | null> {
+    try {
+      const userData = await storage.getItem(STORAGE_KEYS.USER_DATA);
+      if (userData) {
+        return JSON.parse(userData);
+      }
+      return null;
+    } catch (error) {
+      logger.error('auth-state', 'Error getting user data:', error);
+      return null;
+    }
+  },
+
+  // Get userId from local storage (convenience method)
+  async getUserId(): Promise<string | null> {
+    try {
+      const userData = await this.getUserData();
+      return userData?.id || null;
+    } catch (error) {
+      logger.error('auth-state', 'Error getting user ID:', error);
+      return null;
     }
   },
 
@@ -100,8 +143,10 @@ export const AuthStateManager = {
   async clearAuthState(): Promise<void> {
     try {
       await storage.removeItem(STORAGE_KEYS.HAS_ACCOUNT);
-    } catch {
-      logger.error('auth-state', '', );
+      await storage.removeItem(STORAGE_KEYS.USER_DATA);
+      logger.debug('auth-state', 'Auth state cleared');
+    } catch (error) {
+      logger.error('auth-state', 'Error clearing auth state:', error);
     }
   },
 

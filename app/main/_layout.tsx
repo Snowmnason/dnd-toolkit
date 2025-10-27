@@ -40,9 +40,8 @@ export default function MainLayout() {
   const handleTabChange = (tabKey: string) => {
     setActiveTab(tabKey)
 
-    const userId = typeof params.userId === 'string' ? params.userId : undefined
     const worldId = typeof params.worldId === 'string' ? params.worldId : undefined
-    const routeParams: any = { tab: tabKey, userId, worldId }
+    const routeParams: any = { tab: tabKey, worldId }
 
     // Preload the screen if not already cached
     if (!tabCache[tabKey]) {

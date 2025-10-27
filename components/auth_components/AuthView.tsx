@@ -22,6 +22,7 @@ export const AuthRoot = ({ style, ...props }: ViewProps) => {
           alignItems: 'center',
           justifyContent: 'center',
           paddingHorizontal: S.space.lg,
+          backgroundColor: '#2f353d',
         },
         style,
       ]}

@@ -6,7 +6,6 @@ import React from 'react'
 
 export default function MainScreenDesktop() {
   const params = useLocalSearchParams()
-  const userId = typeof params.userId === 'string' ? params.userId : undefined
   const worldId = typeof params.worldId === 'string' ? params.worldId : undefined
   const userRole = typeof params.userRole === 'string' ? params.userRole : undefined
 
@@ -23,7 +22,6 @@ export default function MainScreenDesktop() {
         <PanelView
           key={panel.key}
           config={panel}
-          userId={userId}
           worldId={worldId}
           userRole={userRole}
           image={panel.image ?? undefined}

@@ -24,7 +24,7 @@ export default function HomePage() {
       setIsRouting(true);
 
       logger.debug('routing', 'Starting routing decision...');
-      const {routingDecision, profileId} = await AuthStateManager.getRoutingDecision();
+      const {routingDecision} = await AuthStateManager.getRoutingDecision();
       logger.info('routing', 'Routing decision:', routingDecision);
 
       // ⏳ Add a small delay so RootLayout has time to mount
@@ -41,17 +41,11 @@ export default function HomePage() {
               break;
             case 'complete-profile':
               logger.debug('routing', 'Navigating to complete-profile');
-               router.replace({
-                pathname: "/login/complete-profile",
-                params: { userId: profileId }
-              });
+               router.replace('/login/complete-profile');
               break;
             case 'main':
               logger.debug('routing', 'Navigating to world-selection (main)');
-              router.replace({
-                pathname: "/select/world-selection",
-                params: { userId: profileId }
-              });
+              router.replace('/select/world-selection');
               break;
             default:
               logger.debug('routing', 'Fallback to welcome');

@@ -25,15 +25,13 @@ export function useAppNavigation() {
         ...additionalParams,
       };
 
-      // Add context params if they exist
-      if (params.userId) routeParams.userId = params.userId;
+      // Add world context params if they exist (userId is now in storage, not URL)
       if (params.worldId) routeParams.worldId = params.worldId;
       if (params.userRole) routeParams.userRole = params.userRole;
 
       // Update context if requested
       if (updateContext) {
         updateParams({
-          userId: params.userId,
           worldId: params.worldId,
           userRole: params.userRole,
           ...additionalParams,
@@ -61,15 +59,13 @@ export function useAppNavigation() {
         ...additionalParams,
       };
 
-      // Add context params if they exist
-      if (params.userId) routeParams.userId = params.userId;
+      // Add world context params if they exist (userId is now in storage, not URL)
       if (params.worldId) routeParams.worldId = params.worldId;
       if (params.userRole) routeParams.userRole = params.userRole;
 
       // Update context if requested
       if (updateContext) {
         updateParams({
-          userId: params.userId,
           worldId: params.worldId,
           userRole: params.userRole,
           ...additionalParams,

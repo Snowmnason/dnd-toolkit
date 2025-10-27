@@ -29,7 +29,8 @@ export * from './settings/updateUsername';
 export { default as Logger, logger } from './utils/logger';
 
 // ===== Other top-level lib utilities =====
-export * from './auth/auth-state';
+export * from './auth-state';
 export * from './auth/encrypted-storage';
 export * from './worlds/useWorlds';
+
 

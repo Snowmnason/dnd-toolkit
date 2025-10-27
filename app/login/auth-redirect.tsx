@@ -65,9 +65,17 @@ export default function AuthRedirect() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const lastProcessedRef = useRef<string | null>(null);
 
-  // Helper function to get current user ID using usersDB
+  // Helper function to get current user ID (checks storage first)
   const getCurrentUserId = async (): Promise<string | null> => {
     try {
+      // Try storage first
+      const userId = await AuthStateManager.getUserId();
+      if (userId) {
+        logger.debug('auth-redirect', 'User ID loaded from storage:', userId);
+        return userId;
+      }
+      
+      // Fallback to database
       const userProfile = await usersDB.getCurrentUser();
       return userProfile?.id || null;
     } catch (error) {
@@ -130,19 +138,27 @@ export default function AuthRedirect() {
 
         // If we established a session but no explicit action provided, default based on context
         if (!action && hasValidSession) {
-          // Get userId and redirect to complete-profile or world-selection
-          const userProfile = await usersDB.getCurrentUser();
-          const userId = userProfile?.id;
+          // Check storage first, then database
+          let userId = await AuthStateManager.getUserId();
+          let userProfile = null;
+          
           if (userId) {
+            // User data in storage, use it
+            userProfile = await AuthStateManager.getUserData();
+            logger.debug('auth-redirect', 'User profile loaded from storage');
+          } else {
+            // Not in storage, fetch from database
+            userProfile = await usersDB.getCurrentUser();
+            userId = userProfile?.id || null;
+          }
+          
+          if (userProfile) {
             // Update centralized params context
-            updateParams({ userId });
+            updateParams({ userId: userProfile.id });
             // Check if user has completed profile
             if (userProfile.username) {
               // Profile complete, go to world selection
-              router.replace({
-                pathname: '/select/world-selection',
-                params: { userId }
-              });
+              router.replace('/select/world-selection');
             } else {
               // Profile incomplete, go to complete profile
               router.replace('/login/complete-profile');
@@ -353,21 +369,15 @@ export default function AuthRedirect() {
   const handleWelcomeModalClose = async () => {
     setShowWelcomeModal(false);
     
-    // Get userId and include it in navigation
+    // Get userId and update context
     const userId = currentUserId || await getCurrentUserId();
     
     if (userId) {
       // Update centralized params context
       updateParams({ userId });
-      
-      router.replace({
-        pathname: '/select/world-selection',
-        params: { userId }
-      });
-    } else {
-      // Fallback if we can't get userId
-      router.replace('/select/world-selection');
     }
+    
+    router.replace('/select/world-selection');
   };
 
   const handleInviteModalSignIn = () => {
@@ -443,21 +453,15 @@ export default function AuthRedirect() {
         onClose={async () => {
           setShowAlreadyMemberModal(false)
 
-          // Get userId and include it in navigation
+          // Get userId and update context
           const userId = currentUserId || (await getCurrentUserId())
 
           if (userId) {
             // Update centralized params context
             updateParams({ userId })
-
-            router.replace({
-              pathname: '/select/world-selection',
-              params: { userId },
-            })
-          } else {
-            // Fallback if we can't get userId
-            router.replace('/select/world-selection')
           }
+
+          router.replace('/select/world-selection')
         }}
         title="Already a Member! 🎉"
         message={`You're already part of "${worldName}"! No need to join again.`}

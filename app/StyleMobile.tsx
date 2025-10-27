@@ -64,11 +64,13 @@ export default function StyleMobile() {
 
 
   return (
-    <ScrollView>
+    <>
       <ScrollView
-        contentContainerStyle={{
+          contentContainerStyle={{
+          padding: S.space.md,
           gap: S.space.lg,
           paddingBottom: S.space.xxl,
+          backgroundColor: $('background')
         }}
         showsVerticalScrollIndicator={false}
       >
@@ -511,6 +513,6 @@ export default function StyleMobile() {
         tone="success"
         onHide={() => setSnackVisible(false)}
       />
-    </ScrollView>
+    </>
   )
 }

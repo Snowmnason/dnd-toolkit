@@ -7,12 +7,13 @@ export type ClassicTheme = {
 
 export const classicTheme: ClassicTheme = {
   dark: {
-    [TOKENS.primary]: '#D4AF37',               // gold brand
+    [TOKENS.primary]: '#8B4513',               // gold brand
 
     // Backgrounds
     [TOKENS.background]: '#2f353d',
     [TOKENS.surface]: '#161B22',
     [TOKENS.elevated]: '#1d222a',
+    [TOKENS.bgInverse]: '#F5E6D3',
 
     // Text
     [TOKENS.textPrimary]: '#F5E6D3',
@@ -60,8 +61,6 @@ export const classicTheme: ClassicTheme = {
     [TOKENS.cancelButton]: 'rgba(113,126,137,1)',
     [TOKENS.cancelButtonText]: '#0f1b27ff',
     [TOKENS.solidOutButton]: '#D4AF37',
-    [TOKENS.solidOutButtonText]: '#2f353d',
-    [TOKENS.ghostButtonText]: '#383945ff',
 
     // Typography
     [TOKENS.fontFamilyTitle]: 'GrenzeGotisch',
@@ -76,6 +75,7 @@ export const classicTheme: ClassicTheme = {
     [TOKENS.background]: '#F5E6D3',
     [TOKENS.surface]: '#e5d7c0',
     [TOKENS.elevated]: '#dcc7a7',
+    [TOKENS.bgInverse]: '#2f353d',
 
     // Text
     [TOKENS.textPrimary]: '#2f353d',
@@ -123,8 +123,6 @@ export const classicTheme: ClassicTheme = {
     [TOKENS.cancelButton]: 'rgba(113,126,137,1)',
     [TOKENS.cancelButtonText]: '#0f1b27ff',
     [TOKENS.solidOutButton]: '#D4AF37',
-    [TOKENS.solidOutButtonText]: '#2f353d',
-    [TOKENS.ghostButtonText]: '#383945ff',
 
     // Typography
     [TOKENS.fontFamilyTitle]: 'GrenzeGotisch',

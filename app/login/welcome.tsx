@@ -3,7 +3,7 @@ import { useWelcomeScreen } from '@/lib';
 import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Platform, View } from 'react-native';
+import { Platform, useWindowDimensions, View } from 'react-native';
 import CustomLoad from '../../components/ui/CustomLoad';
 
 
@@ -12,7 +12,8 @@ import CustomLoad from '../../components/ui/CustomLoad';
 // import GoogleSignInButton from '../../components/social-auth-buttons/google/google-sign-in-button';
 export default function WelcomeScreen() {
   const S = useScale();
-  const isMobile = Platform.OS === 'ios' || Platform.OS === 'android';
+  const { width } = useWindowDimensions();
+  const isMobile = (Platform.OS === 'ios' || Platform.OS === 'android') || (Platform.OS === 'web' && width < 900);
    
   const router = useRouter();
   const {

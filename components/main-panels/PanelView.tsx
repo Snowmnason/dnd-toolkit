@@ -8,7 +8,6 @@ import { PanelConfig } from './PanelData'
 
 interface PanelViewProps {
   config: PanelConfig
-  userId?: string
   worldId?: string
   userRole?: string
   style?: any
@@ -17,7 +16,6 @@ interface PanelViewProps {
 
 export function PanelView({
   config,
-  userId,
   worldId,
   userRole,
   style,
@@ -29,10 +27,9 @@ export function PanelView({
   const { updateParams } = useAppParams()
 
   const navigateToFeature = (featurePath: string) => {
-    updateParams({ userId, worldId, userRole })
+    updateParams({ worldId, userRole })
 
     const routeParams: Record<string, string> = {}
-    if (userId) routeParams.userId = userId
     if (worldId) routeParams.worldId = worldId
     if (userRole) routeParams.userRole = userRole
 

@@ -28,17 +28,12 @@ function RootLayoutContent() {
 
   // Update context params when URL params change
   useEffect(() => {
-    const currentUserId = typeof urlParams.userId === 'string' ? urlParams.userId : undefined;
     const currentWorldId = typeof urlParams.worldId === 'string' ? urlParams.worldId : undefined;
     const currentUserRole = typeof urlParams.userRole === 'string' ? urlParams.userRole : undefined;
 
-    // Only update if values are different from context
+    // Only update if values are different from context (userId is loaded from storage, not URL)
     let shouldUpdate = false;
-    const updates: { userId?: string; worldId?: string; userRole?: string } = {};
-    if (currentUserId && currentUserId !== params.userId) {
-      updates.userId = currentUserId;
-      shouldUpdate = true;
-    }
+    const updates: { worldId?: string; userRole?: string } = {};
     if (currentWorldId && currentWorldId !== params.worldId) {
       updates.worldId = currentWorldId;
       shouldUpdate = true;
@@ -139,12 +134,7 @@ function RootLayoutContent() {
         // Handle create-world and world-detail back navigation
         if (segments.some(segment => segment === 'create-world') || segments.some(segment => segment === 'world-detail')) {
           config.onBackPress = () => {
-            const routeParams: any = {};
-            routeParams.userId = userId;
-            router.replace({
-              pathname: '/select/world-selection',
-              params: routeParams,
-            });
+            router.replace('/select/world-selection');
             return true; // Prevent default
           };
         }
@@ -159,12 +149,7 @@ function RootLayoutContent() {
         // Handle desktop/mobile routes - always go back to world-selection
         if (secondSegment === 'desktop' || secondSegment === 'mobile') {
           config.onBackPress = () => {
-            const routeParams: any = {};
-            routeParams.userId = userId;
-            router.replace({
-              pathname: '/select/world-selection',
-              params: routeParams,
-            });
+            router.replace('/select/world-selection');
             return true; // Prevent default
           };
         }
@@ -172,7 +157,6 @@ function RootLayoutContent() {
         // Helper function to create feature screen back handler
         const createFeatureBackHandler = (tabKey: string) => () => {
           const routeParams: any = {};
-          routeParams.userId = userId;
           routeParams.worldId = worldId;
           routeParams.userRole = userRole;
           
@@ -220,12 +204,7 @@ function RootLayoutContent() {
         config.title = 'Settings';
         config.showHamburger = false;
         config.onBackPress = () => {
-          const routeParams: any = {};
-          if (userId) routeParams.userId = userId;
-          router.replace({
-            pathname: '/select/world-selection',
-            params: routeParams,
-          });
+          router.replace('/select/world-selection');
           return true; // Prevent default
         };
         break;

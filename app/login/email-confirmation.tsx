@@ -1,13 +1,13 @@
 import {
-  AuthActionGroup,
-  AuthBackButtonContainer,
-  AuthBodyFooter,
-  AuthButton, AuthButtonBack,
-  AuthCaption,
-  AuthModal,
-  AuthRoot,
-  AuthSubTitle,
-  AuthTitle
+    AuthActionGroup,
+    AuthBackButtonContainer,
+    AuthBodyFooter,
+    AuthButton, AuthButtonBack,
+    AuthCaption,
+    AuthModal,
+    AuthRoot,
+    AuthSubTitle,
+    AuthTitle
 } from '@/components/auth_components';
 import { Body } from '@/components/ui';
 import { AuthStateManager, logger, openEmailApp, supabase, usersDB } from '@/lib';
@@ -53,11 +53,8 @@ export default function EmailConfirmationScreen() {
         try {
           const profile = await usersDB.getCurrentUser();
           if (profile && profile.username) {
-            // Profile is complete, go to world selection with userId
-            router.replace({
-              pathname: '/select/world-selection',
-              params: { userId: profile.id }
-            });
+            // Profile is complete, go to world selection
+            router.replace('/select/world-selection');
           } else {
             // Profile needs completion
             router.replace('/login/complete-profile');
