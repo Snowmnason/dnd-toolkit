@@ -167,9 +167,7 @@ export default function LandingPage() {
           text="Create New World"
           variant="primary"
           onPress={() => {
-            const routeParams: Record<string, string> = {}
-            if (userId) routeParams.userId = userId
-            router.push({ pathname: '/select/create-world', params: routeParams })
+            router.push('/select/create-world')
           }}
           style={{ borderRadius: S.radius.lg }}
         />
@@ -182,8 +180,7 @@ export default function LandingPage() {
     <AppPage
       style={{
         flex: 2,
-        justifyContent: 'center',
-        alignItems: 'center',
+        
       }}
     >
       {/* Map Preview */}
@@ -223,7 +220,7 @@ export default function LandingPage() {
               right: S.space.xl,
               bottom: S.space.xl,
               flexDirection: 'row',
-              justifyContent: 'space-between',
+              //justifyContent: 'space-between',
             }}
           >
             <Button
@@ -267,35 +264,34 @@ export default function LandingPage() {
   )
 
   // Desktop split layout; mobile uses only the left logic which navigates to detail
-  if (isDesktop) {
-    return (
-      <AppSplit left={LeftPanel} right={RightPanel}>
-        {/* Modals rendered outside the split panels */}
-        <EditWorldModal
-          visible={!!editModalVisible}
-          onClose={closeEditModal}
-          worldName={modalWorldName}
-          originalWorldName={selectedWorld?.name}
-          onWorldNameChange={setModalWorldName}
-          onConfirmWorldName={() => handleConfirmWorldName(selectedWorld?.world_id, modalWorldName, userId)}
-          onGenerateInviteLink={createGenerateInviteLinkHandler(selectedWorld?.world_id, selectedWorld?.name)}
-          onDeleteWorld={createDeleteWorldHandler(selectedWorld?.world_id, userId)}
-          generatingLink={generatingLink}
-        />
-        <ConfirmLeaveModal
-          visible={!!leaveModalVisible}
-          onClose={closeLeaveModal}
-          worldName={modalWorldName}
-          onConfirmLeave={createRemoveFromWorldHandler(selectedWorld?.world_id, userId)}
-        />
-      </AppSplit>
-    )
-  }
-
-  // Mobile: single column view reusing left content
   return (
-    <AppPage style={{ flex: 1, paddingHorizontal: S.space.md, paddingTop: S.space.sm }}>
-      {LeftPanel}
-    </AppPage>
+    <>
+      {isDesktop ? (
+        <AppSplit left={LeftPanel} right={RightPanel} />
+      ) : (
+        <AppPage style={{ flex: 1, paddingHorizontal: S.space.md, paddingTop: S.space.sm }}>
+          {LeftPanel}
+        </AppPage>
+      )}
+
+      {/* Modals rendered unconditionally to avoid hook order issues */}
+      <EditWorldModal
+        visible={!!editModalVisible}
+        onClose={closeEditModal}
+        worldName={modalWorldName}
+        originalWorldName={selectedWorld?.name}
+        onWorldNameChange={setModalWorldName}
+        onConfirmWorldName={() => handleConfirmWorldName(selectedWorld?.world_id, modalWorldName, userId)}
+        onGenerateInviteLink={createGenerateInviteLinkHandler(selectedWorld?.world_id, selectedWorld?.name)}
+        onDeleteWorld={createDeleteWorldHandler(selectedWorld?.world_id, userId)}
+        generatingLink={generatingLink}
+      />
+      <ConfirmLeaveModal
+        visible={!!leaveModalVisible}
+        onClose={closeLeaveModal}
+        worldName={modalWorldName}
+        onConfirmLeave={createRemoveFromWorldHandler(selectedWorld?.world_id, userId)}
+      />
+    </>
   )
 }

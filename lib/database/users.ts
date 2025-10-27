@@ -69,6 +69,14 @@ export const usersDB = {
       created_at: data.created_at
     });
     
+    // Save user data to local storage
+    try {
+      const { AuthStateManager } = await import('../auth-state');
+      await AuthStateManager.saveUserData(data);
+    } catch (storageError) {
+      logger.warn('usersDB', 'Failed to save user data to storage (non-critical):', storageError);
+    }
+    
     return data;
   },
 
@@ -86,6 +94,23 @@ export const usersDB = {
   async getCurrentUser(): Promise<User | null> {
     logger.debug('usersDB', 'Starting getCurrentUser');
     
+    // First, try to get from local storage to avoid DB call
+    try {
+      const { AuthStateManager } = await import('../auth-state');
+      const cachedUser = await AuthStateManager.getUserData();
+      
+      if (cachedUser) {
+        logger.debug('usersDB', 'User profile loaded from storage (avoiding DB call):', {
+          id: cachedUser.id,
+          username: cachedUser.username
+        });
+        return cachedUser;
+      }
+    } catch (storageError) {
+      logger.warn('usersDB', 'Could not load from storage, fetching from DB:', storageError);
+    }
+    
+    // If not in storage, fetch from database
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
     
     logger.debug('usersDB', 'Auth user fetch result:', {
@@ -150,6 +175,16 @@ export const usersDB = {
       created_at: data?.created_at
     });
     
+    // Save user data to local storage to avoid future database calls
+    if (data) {
+      try {
+        const { AuthStateManager } = await import('../auth-state');
+        await AuthStateManager.saveUserData(data);
+      } catch (storageError) {
+        logger.warn('usersDB', 'Failed to save user data to storage (non-critical):', storageError);
+      }
+    }
+    
     return data;
   },
 
@@ -182,6 +217,14 @@ export const usersDB = {
     if (error) {
       logger.error('users', 'Error updating user profile:', error);
       throw new Error(error.message || 'Failed to update user profile');
+    }
+    
+    // Save updated user data to local storage
+    try {
+      const { AuthStateManager } = await import('../auth-state');
+      await AuthStateManager.saveUserData(data);
+    } catch (storageError) {
+      logger.warn('usersDB', 'Failed to save updated user data to storage (non-critical):', storageError);
     }
     
     return data;

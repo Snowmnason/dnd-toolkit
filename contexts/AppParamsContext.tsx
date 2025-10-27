@@ -1,4 +1,6 @@
-import React, { createContext, ReactNode, useCallback, useContext, useState } from 'react';
+import { logger } from '@/lib';
+import { AuthStateManager } from '@/lib/auth-state';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 
 interface AppParams {
   userId?: string;
@@ -24,6 +26,22 @@ export function AppParamsProvider({ children }: { children: ReactNode }) {
     worldId: undefined,
     userRole: undefined,
   });
+
+  // Load userId from storage on mount
+  useEffect(() => {
+    async function loadUserId() {
+      try {
+        const userId = await AuthStateManager.getUserId();
+        if (userId) {
+          setParams(prev => ({ ...prev, userId }));
+          logger.debug('AppParamsContext', 'Loaded userId from storage:', userId);
+        }
+      } catch (error) {
+        logger.error('AppParamsContext', 'Error loading userId from storage:', error);
+      }
+    }
+    loadUserId();
+  }, []);
 
   const setUserId = useCallback((userId: string | undefined) => {
     setParams(prev => ({ ...prev, userId }));

@@ -107,8 +107,6 @@ export function AppPage({
   const { theme } = UseTheme()
   
   const variantStyles: ViewStyle = {
-    justifyContent: center ? 'center' : undefined,
-    alignItems: center ? 'center' : undefined,
     backgroundColor: $('background', theme),
   }
   

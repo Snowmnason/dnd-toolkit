@@ -6,7 +6,6 @@ import React from 'react'
 
 export default function MainScreenMobile() {
   const params = useLocalSearchParams()
-  const userId = typeof params.userId === 'string' ? params.userId : undefined
   const worldId = typeof params.worldId === 'string' ? params.worldId : undefined
   const userRole = typeof params.userRole === 'string' ? params.userRole : undefined
   const tab = typeof params.tab === 'string' ? params.tab : 'characters'
@@ -18,7 +17,6 @@ export default function MainScreenMobile() {
     <AppPage style={{ flex: 1 }}>
       <PanelView
         config={activePanel}
-        userId={userId}
         worldId={worldId}
         userRole={userRole}
         image={activePanel.image ?? undefined}

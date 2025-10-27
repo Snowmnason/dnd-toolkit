@@ -72,21 +72,21 @@ function getVariantColors(variant: ButtonVariant, theme: any) {
       return {
         background: 'transparent',
         border: 'transparent',
-        text: $('ghostButtonText', theme),
+        text: $('primary', theme),
         //hover: 'transparent',
       }
     case 'solid':
       return {
         background: $('solidOutButton', theme),
         border: 'transparent',
-        text: $('solidOutButtonText', theme),
+        text: $('primary', theme),
         //hover: tone($('solidOutButton', theme), 'hover', undefined, undefined, theme),
       }
     case 'outlined':
       return {
         background: 'transparent',
         border: tone($('solidOutButton', theme), 'border', undefined, undefined, theme),
-        text: $('solidOutButtonText', theme),
+        text: $('primary', theme),
         //hover: tone($('solidOutButton', theme), 'hover', undefined, undefined, theme),
       }
     case 'cancel':

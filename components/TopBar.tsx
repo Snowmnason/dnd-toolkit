@@ -109,7 +109,6 @@ export default function TopBar({
         onAccountSettings={() => {
           setShowSettingsMenu(false)
           const routeParams: any = {}
-          if (userId) routeParams.userId = userId
           if (worldId) routeParams.worldId = worldId
           if (userRole) routeParams.userRole = userRole
 
@@ -120,13 +119,7 @@ export default function TopBar({
         }}
         onReturnToWorldSelection={() => {
           setShowSettingsMenu(false)
-          const routeParams: any = {}
-          if (userId) routeParams.userId = userId
-
-          router.replace({
-            pathname: '/select/world-selection',
-            params: routeParams,
-          })
+          router.replace('/select/world-selection')
         }}
       />
     </>

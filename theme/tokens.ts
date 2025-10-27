@@ -9,6 +9,7 @@ export const TOKENS = {
   background: 'background',           // Main background
   surface: 'surface',                 // Cards, modals, containers
   elevated: 'elevated',               // Headers, navbars, elevated surfaces
+  bgInverse: 'bgInverse',             // Great for interactive elements
 
   /* ✍️ Text Colors */
   textPrimary: 'textPrimary',         // Main readable text
@@ -62,10 +63,6 @@ export const TOKENS = {
 
   // Solid / Outlined Buttons
   solidOutButton: 'solidOutButton',
-  solidOutButtonText: 'solidOutButtonText',
-
-  // Ghost Button
-  ghostButtonText: 'ghostButtonText',
 
   /* 🔤 Typography */
   fontFamilyTitle: 'fontFamilyTitle', // Used for headings or titles

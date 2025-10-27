@@ -1,16 +1,16 @@
 import {
-  AuthActionGroup,
-  AuthBody,
-  AuthBodyFooter,
-  AuthButton,
-  AuthButtonSecondary,
-  AuthCaption,
-  AuthError,
-  AuthForm,
-  AuthInput,
-  AuthRoot,
-  AuthSubTitle,
-  AuthTitle
+    AuthActionGroup,
+    AuthBody,
+    AuthBodyFooter,
+    AuthButton,
+    AuthButtonSecondary,
+    AuthCaption,
+    AuthError,
+    AuthForm,
+    AuthInput,
+    AuthRoot,
+    AuthSubTitle,
+    AuthTitle
 } from '@/components/auth_components';
 import { Body } from '@/components/ui';
 import { logger, supabase, usersDB, useSignUpForm } from '@/lib';
@@ -86,10 +86,7 @@ export default function CompleteProfileScreen() {
 
         if (hasValidProfile) {
           logger.info('complete-profile', 'User already has complete profile, redirecting to world selection');
-          router.replace({
-            pathname: '/select/world-selection',
-            params: { userId: existingProfile.id }
-          });
+          router.replace('/select/world-selection');
           return;
         }
         logger.info('complete-profile', 'User needs to complete profile, staying on this screen');

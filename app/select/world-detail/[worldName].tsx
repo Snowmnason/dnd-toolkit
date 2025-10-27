@@ -24,10 +24,7 @@ export default function WorldDetail() {
   const selectedMapImage = mapUrl ? { uri: mapUrl } : require('../../../assets/images/Miku.png')
 
   const handleNavigateBackToSelection = () => {
-    router.replace({
-      pathname: '/select/world-selection',
-      params: userId ? { userId } : {},
-    })
+    router.replace('/select/world-selection')
   }
 
   const {
@@ -50,14 +47,13 @@ export default function WorldDetail() {
 
   const buildRouteParams = () => {
     const routeParams: Record<string, string> = {}
-    if (userId) routeParams.userId = userId
     if (worldId) routeParams.worldId = worldId
     if (userRole) routeParams.userRole = userRole
     return routeParams
   }
 
   const handleOpenWorld = () => {
-    updateParams({ userId, worldId, userRole })
+    updateParams({ worldId, userRole })
     router.replace({
       pathname: '/main/mobile',
       params: buildRouteParams(),

@@ -63,7 +63,7 @@ function DropdownItemComponent({
           paddingVertical: S.space.sm,
           paddingHorizontal: S.space.md,
           backgroundColor: isHovered
-            ? tone($('surface', theme), 'hover', undefined, undefined, theme)
+            ? tone($('bgInverse', theme), 'hover', undefined, undefined, theme)
             : isSelected
             ? tone(accentColor, 'subtle', undefined, undefined, theme)
             : 'transparent',
@@ -116,7 +116,7 @@ export default function Dropdown({
   const shadow = useSharedValue(0)
 
   const borderColor = $('accent', theme)
-  const background = $('surface', theme)
+  const background = $('bgInverse', theme)
 
   const chevronStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotate.value}deg` }],
@@ -156,8 +156,8 @@ export default function Dropdown({
   const selectedLabel = items.find((item) => item.value === value)?.label || placeholder
 
   // Pre-compute colors outside of render callbacks
-  const textPrimaryColor = $('textPrimary', theme)
-  const accentColor = $('accent', theme)
+  const textPrimaryColor = $('textInverse', theme)
+  const accentColor = $('accentDark', theme)
   const separatorColor = tone($('accent', theme), 'hover', undefined, undefined, theme)
   const SAFE_AREA = 24
   const headerRef = useRef<View>(null)
@@ -204,7 +204,7 @@ export default function Dropdown({
           },
         ]}
       >
-        <Body textType={value ? textType : 'secondary'} style={{ flex: 1 }}>
+        <Body textType={value ? textType : 'inverse'} style={{ flex: 1 }}>
           {selectedLabel}
         </Body>
         <Animated.View style={chevronStyle}>
@@ -212,7 +212,7 @@ export default function Dropdown({
             name="chevron.right"
             size={18}
             weight="medium"
-            color={$(`textSecondary`, theme)}
+            color={$(`textInverse`, theme)}
             style={{ transform: [{ rotate: isOpen ? '90deg' : '0deg' }] }}
           />
         </Animated.View>
@@ -241,7 +241,7 @@ export default function Dropdown({
                   {
                     borderColor,
                     backgroundColor: background,
-                    shadowColor: $('textInverse', theme),
+                    boxShadow: `0 4px 12px rgba(0, 0, 0, ${0.1 + $('textInverse', theme) * 0.15})`,
                     borderRadius: S.radius.md,
                     maxHeight: computedMaxHeight,
                     elevation: 12,
@@ -268,7 +268,7 @@ export default function Dropdown({
                 placeholder="Search..."
                 value={search}
                 onChangeText={setSearch}
-                placeholderTextColor={$(`textSecondary`)}
+                placeholderTextColor={$(`textInverse`, theme)}
                 style={[
                   styles.searchInput,
                   {

@@ -39,20 +39,20 @@ export function TextInput({ heading, error, filled, underline, style, ...rest }:
             borderRadius: S.radius.md,
             paddingHorizontal: S.space.md,
             paddingVertical: S.space.sm,
-            backgroundColor: filled ? tone($('surface', theme), 'alt', undefined, undefined, theme) : $('surface', theme),
+            backgroundColor: filled ? tone($('bgInverse', theme), 'alt', undefined, undefined, theme) : $('bgInverse', theme),
             borderColor,
           },
         ]}
       >
         <RNTextInput
-          placeholderTextColor={tone($('textPrimary', theme), 'disabled', undefined, undefined, theme)}
+          placeholderTextColor={tone($('textInverse', theme), 'disabled', undefined, undefined, theme)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           underlineColorAndroid="transparent"
           style={[
             styles.input,
             {
-              color: $('textPrimary', theme),
+              color: $('textInverse', theme),
               fontFamily: theme.fontFamily,
               fontSize: S.font.body1,
               borderColor: 'transparent',
@@ -102,7 +102,7 @@ export function DescInput({ heading, error, filled, style, maxHeightDelta = 0, m
             borderRadius: S.radius.md,
             paddingHorizontal: S.space.md,
             paddingVertical: S.space.md,
-            backgroundColor: filled ? tone($('surface', theme), 'alt', undefined, undefined, theme) : $('surface', theme),
+            backgroundColor: filled ? tone($('bgInverse', theme), 'alt', undefined, undefined, theme) : $('bgInverse', theme),
             borderColor,
           },
         ]}
@@ -110,7 +110,7 @@ export function DescInput({ heading, error, filled, style, maxHeightDelta = 0, m
         <RNTextInput
           multiline
           textAlignVertical="top"
-          placeholderTextColor={tone($('textPrimary', theme), 'disabled', undefined, undefined, theme)}
+          placeholderTextColor={tone($('textInverse', theme), 'disabled', undefined, undefined, theme)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           underlineColorAndroid="transparent"
