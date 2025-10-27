@@ -1,6 +1,6 @@
 import { AppModal, Button } from '@/components/ui'
 import { Body } from '@/components/ui/AppText'
-import { $, useScale } from '@/theme'
+import { $, useScale, UseTheme } from '@/theme'
 import React from 'react'
 import { View } from 'react-native'
 
@@ -33,6 +33,7 @@ export default function AuthModal({
   tone = 'accent',
 }: AuthModalProps) {
   const S = useScale()
+  const { theme } = UseTheme()
   return (
     <AppModal
       visible={visible}
@@ -50,7 +51,7 @@ export default function AuthModal({
           {message && (
             <Body
               align="center"
-              color={$('textPrimary')}
+              color={$('textPrimary', theme)}
               style={{
                 opacity: 0.9,
                 marginBottom: S.space.sm,

@@ -1,4 +1,4 @@
-import { $, useScale, type Sizing } from '@/theme'
+import { $, useScale, UseTheme, type Sizing } from '@/theme'
 import React, { forwardRef, useImperativeHandle, useState } from 'react'
 import { View } from 'react-native'
 import { ObjHeading } from '../AppText'
@@ -45,6 +45,7 @@ export const TextInputGroup = forwardRef<TextInputGroupRef, TextInputGroupProps>
     ref
   ) => {
     const S = useScale()
+    const { theme } = UseTheme()
     const [values, setValues] = useState<Record<string, string>>(() => {
       const initial: Record<string, string> = {}
       items.forEach((item) => {
@@ -66,7 +67,7 @@ export const TextInputGroup = forwardRef<TextInputGroupRef, TextInputGroupProps>
       <View
         style={{
           borderWidth: outlined ? 1.5 : 0,
-          borderColor: outlined ? $('border') : 'transparent',
+          borderColor: outlined ? $('border', theme) : 'transparent',
           borderRadius: outlined ? S.radius.md : 0,
           backgroundColor: outlined ? 'transparent' : undefined,
           padding: outlined ? S.space.sm : 0,
@@ -81,7 +82,7 @@ export const TextInputGroup = forwardRef<TextInputGroupRef, TextInputGroupProps>
               top: outlined ? -S.space.md : 0,
               left: outlined ? S.space.sm : 0,
               paddingHorizontal: outlined ? S.space.xs : 0,
-              backgroundColor: outlined ? $('background') : 'transparent',
+              backgroundColor: outlined ? $('background', theme) : 'transparent',
               marginBottom: outlined ? S.space.xs : S.space.sm,
             }}
           >

@@ -1,5 +1,5 @@
 import { AppModal, Body, Button } from '@/components/ui'
-import { $, useScale } from '@/theme'
+import { $, useScale, UseTheme } from '@/theme'
 import React from 'react'
 import { View } from 'react-native'
 
@@ -28,6 +28,7 @@ export function CreateWorldModals({
   successWorldName,
   onSuccessNavigate,
 }: CreateWorldModalsProps) {
+  const { theme } = UseTheme()
   const S = useScale()
   return (
     <>
@@ -96,7 +97,7 @@ export function CreateWorldModals({
         <Body
           style={{
             marginTop: S.space.sm,
-            color: $('textSecondary'),
+            color: $('textSecondary', theme),
             textAlign: 'right',
             fontSize: 12,
           }}

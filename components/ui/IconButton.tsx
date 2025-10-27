@@ -1,4 +1,4 @@
-import { $ } from '@/theme'
+import { $, UseTheme } from '@/theme'
 import React, { ReactNode, useState } from 'react'
 import {
   GestureResponderEvent,
@@ -17,6 +17,7 @@ interface IconButtonProps {
   /** accent background when true */
   selected?: boolean
   style?: ViewStyle
+  fontColor?: string
 }
 
 /**
@@ -32,7 +33,9 @@ export function IconButton({
   disabled = false,
   selected = false,
   style,
+  fontColor,
 }: IconButtonProps) {
+  const { theme } = UseTheme()
   const [hovered, setHovered] = useState(false)
 
   const getSize = (): number => {
@@ -51,7 +54,7 @@ export function IconButton({
   const buttonSize = getSize()
   const isHot = !disabled && (hovered || selected)
 
-  const backgroundColor = isHot ? $('accent') : 'transparent'
+  const backgroundColor = isHot ? $('accent', theme) : 'transparent'
 
   return (
     <Pressable
@@ -77,6 +80,7 @@ export function IconButton({
           style={[
             styles.icon,
             {
+              color: fontColor,
               fontSize: buttonSize / 2,
             },
           ]}

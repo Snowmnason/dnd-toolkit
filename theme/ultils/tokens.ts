@@ -19,15 +19,19 @@ function mergeTokens(theme: ThemeTokens) {
 /* ───────────────────────────────
    $() – explicit token lookup
    Example: color: $('background', theme)
+   
+   IMPORTANT: Always pass theme parameter for React reactivity!
+   Components must call UseTheme() and pass theme to $()
 ──────────────────────────────── */
 export function $(key: keyof ThemeTokens | keyof typeof S.font | keyof typeof S.space, theme?: ThemeTokens): any {
-  // If theme is provided directly, use it
+  // If theme is provided directly, use it (REQUIRED for reactivity)
   if (theme) {
     const tokens = mergeTokens(theme)
     return tokens[key as keyof typeof tokens]
   }
   
-  // Otherwise, call the hook (only works inside React components)
+  // Fallback: call the hook (works but won't trigger re-renders properly)
+  // This is kept for backward compatibility but should be avoided
   const { theme: hookTheme } = UseTheme()
   const tokens = mergeTokens(hookTheme)
   return tokens[key as keyof typeof tokens]

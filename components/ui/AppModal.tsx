@@ -1,15 +1,15 @@
-import { $, tone, useScale } from '@/theme'
+import { $, tone, useScale, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useEffect } from 'react'
 import {
-    Animated,
-    BackHandler,
-    Dimensions,
-    Modal,
-    Platform,
-    Pressable,
-    StyleSheet,
-    View,
+  Animated,
+  BackHandler,
+  Dimensions,
+  Modal,
+  Platform,
+  StyleSheet,
+  TouchableOpacity,
+  View
 } from 'react-native'
 import { Body, Heading } from './AppText'
 import { IconButton } from './IconButton'
@@ -47,6 +47,7 @@ export function AppModal({
 }: AppModalProps) {
   const { width: screenWidth } = Dimensions.get('window')
   const S = useScale()
+  const { theme } = UseTheme()
 
   // ✅ Platform-based sizing
   const modalWidth =
@@ -77,12 +78,12 @@ export function AppModal({
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 250,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.spring(slideAnim, {
           toValue: 0,
           friction: 6,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start()
 
@@ -91,11 +92,11 @@ export function AppModal({
         // Slight delay so it feels natural
         setTimeout(() => {
           Animated.sequence([
-            Animated.timing(shake, { toValue: -10, duration: 80, useNativeDriver: true }),
-            Animated.timing(shake, { toValue: 10, duration: 80, useNativeDriver: true }),
-            Animated.timing(shake, { toValue: -6, duration: 60, useNativeDriver: true }),
-            Animated.timing(shake, { toValue: 6, duration: 60, useNativeDriver: true }),
-            Animated.timing(shake, { toValue: 0, duration: 50, useNativeDriver: true }),
+            Animated.timing(shake, { toValue: -10, duration: 80, useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(shake, { toValue: 10, duration: 80, useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(shake, { toValue: -6, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(shake, { toValue: 6, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
+            Animated.timing(shake, { toValue: 0, duration: 50, useNativeDriver: Platform.OS !== 'web' }),
           ]).start()
 
           // Optional haptic feedback during shake (extra tactile "panic")
@@ -110,12 +111,12 @@ export function AppModal({
         Animated.timing(fadeAnim, {
           toValue: 0,
           duration: 200,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(slideAnim, {
           toValue: 30,
           duration: 200,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start()
     }
@@ -153,65 +154,65 @@ export function AppModal({
   const overlayColor = dimColor
     ? dimColor
     : accentOverlay
-    ? tone($('accent'), 'alt')
-    : 'rgba(0,0,0,0.45)'
+    ? tone($('accent', theme), 'changeOpacity', undefined, .35, theme)
+    : 'rgba(0, 0, 0, 0.45)'
 
   return (
     <Modal transparent visible={visible} animationType="none">
-      <Pressable
+      <TouchableOpacity
+        activeOpacity={1}
         onPress={handleOutsidePress}
         style={[styles.backdrop, { backgroundColor: overlayColor }]}
       >
-        <View style={styles.safetyZone}>
-          <Pressable style={{ flex: 1 }} onPress={() => {}}>
-            {/* absorbs near-clicks */}
-          </Pressable>
+        <View style={styles.center}>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Animated.View
+              style={[
+                styles.modalContainer,
+                {
+                  width: modalWidth,
+                  height: height ?? 'auto',
+                  backgroundColor: $('surface', theme),
+                  borderRadius: S.radius.lg,
+                  padding: S.space.lg,
+                  borderColor:
+                  (borderTone === 'success'
+                    ? $('success', theme)
+                    : borderTone === 'warning'
+                    ? $('warning', theme)
+                    : borderTone === 'danger'
+                    ? $('danger', theme)
+                    : $('accent', theme)),
+                  opacity: fadeAnim,
+                  transform: [
+                    { translateY: slideAnim },
+                    { translateX: shake }, // 👈 added
+                  ],
+                },
+              ]}
+            >
+              <View style={[styles.closeButton, { top: S.space.sm, right: S.space.sm }]}>
+                <IconButton icon="✕" fontColor={$('textPrimary', theme)} onPress={onClose} />
+              </View>
+
+              <Heading align="center" style={{ marginBottom: body ? S.space.sm : S.space.md }}>
+                {heading}
+              </Heading>
+
+              {body && (
+                <Body align="center" style={{ marginBottom: children ? S.space.md : 0 }}>
+                  {body}
+                </Body>
+              )}
+
+              {children}
+            </Animated.View>
+          </TouchableOpacity>
         </View>
-      </Pressable>
-
-      <View style={[styles.center, { pointerEvents: 'box-none' }]}>
-        <Animated.View
-          style={[
-            styles.modalContainer,
-            {
-              width: modalWidth,
-              height: height ?? 'auto',
-              backgroundColor: $('surface'),
-              borderRadius: S.radius.lg,
-              padding: S.space.lg,
-              borderColor:
-              (borderTone === 'success'
-                ? $('success')
-                : borderTone === 'warning'
-                ? $('warning')
-                : borderTone === 'danger'
-                ? $('danger')
-                : $('accent')),
-              opacity: fadeAnim,
-              transform: [
-                { translateY: slideAnim },
-                { translateX: shake }, // 👈 added
-              ],
-            },
-          ]}
-        >
-          <View style={[styles.closeButton, { top: S.space.sm, right: S.space.sm }]}>
-            <IconButton icon="✕" onPress={onClose} />
-          </View>
-
-          <Heading align="center" style={{ marginBottom: body ? S.space.sm : S.space.md }}>
-            {heading}
-          </Heading>
-
-          {body && (
-            <Body align="center" style={{ marginBottom: children ? S.space.md : 0 }}>
-              {body}
-            </Body>
-          )}
-
-          {children}
-        </Animated.View>
-      </View>
+      </TouchableOpacity>
     </Modal>
   )
 }

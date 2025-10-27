@@ -1,18 +1,19 @@
 import { $, tone, useScale, UseTheme } from '@/theme'
 import React, { useState } from 'react'
-import { TextInput as RNTextInput, StyleSheet, TextInputProps, View } from 'react-native'
+import { Platform, TextInput as RNTextInput, StyleSheet, TextInputProps, View } from 'react-native'
 import { ObjHeading } from './AppText'
 
 interface BaseInputProps extends TextInputProps {
   heading?: string                   // 👈 Renamed from label
   error?: boolean
   filled?: boolean
+  underline?: boolean
 }
 
 /**
  * ✏️ TextInput — for short, single-line text fields
  */
-export function TextInput({ heading, error, filled, style, ...rest }: BaseInputProps) {
+export function TextInput({ heading, error, filled, underline, style, ...rest }: BaseInputProps) {
   const { theme } = UseTheme()
   const S = useScale()
   const [focused, setFocused] = useState(false)
@@ -47,12 +48,21 @@ export function TextInput({ heading, error, filled, style, ...rest }: BaseInputP
           placeholderTextColor={tone($('textPrimary', theme), 'disabled', undefined, undefined, theme)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
+          underlineColorAndroid="transparent"
           style={[
             styles.input,
             {
               color: $('textPrimary', theme),
               fontFamily: theme.fontFamily,
               fontSize: S.font.body1,
+              borderColor: 'transparent',
+              borderWidth: 0,
+              // Remove default web focus ring/outline
+              ...(Platform.OS === 'web' ? {
+                outlineStyle: 'none',
+                outlineWidth: 0,
+                outlineColor: 'transparent',
+              } as any : {}),
             },
             style,
           ]}
@@ -66,16 +76,16 @@ export function TextInput({ heading, error, filled, style, ...rest }: BaseInputP
 /**
  * 📝 DescInput — for longer, multi-line text areas (descriptions, notes)
  */
-export function DescInput({ heading, error, filled, style, ...rest }: BaseInputProps) {
+export function DescInput({ heading, error, filled, style, maxHeightDelta = 0, minLines = 3, accentScrollbar = true, ...rest }: BaseInputProps & { maxHeightDelta?: number; minLines?: number; accentScrollbar?: boolean }) {
   const { theme } = UseTheme()
   const S = useScale()
   const [focused, setFocused] = useState(false)
 
   const borderColor = error
-    ? tone($('accent'), 'border')
+    ? tone($('accent', theme), 'border', undefined, undefined, theme)
     : focused
-    ? tone($('accent'), 'accent')
-    : tone($('border'), 'subtle')
+    ? tone($('accent', theme), 'accent', undefined, undefined, theme)
+    : tone($('border', theme), 'subtle', undefined, undefined, theme)
 
   return (
     <View style={{ width: '100%' }}>
@@ -92,7 +102,7 @@ export function DescInput({ heading, error, filled, style, ...rest }: BaseInputP
             borderRadius: S.radius.md,
             paddingHorizontal: S.space.md,
             paddingVertical: S.space.md,
-            backgroundColor: filled ? tone($('surface'), 'alt') : $('surface'),
+            backgroundColor: filled ? tone($('surface', theme), 'alt', undefined, undefined, theme) : $('surface', theme),
             borderColor,
           },
         ]}
@@ -100,16 +110,37 @@ export function DescInput({ heading, error, filled, style, ...rest }: BaseInputP
         <RNTextInput
           multiline
           textAlignVertical="top"
-          placeholderTextColor={tone($('textPrimary'), 'disabled')}
+          placeholderTextColor={tone($('textPrimary', theme), 'disabled', undefined, undefined, theme)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
+          underlineColorAndroid="transparent"
           style={[
             styles.input,
             {
-              color: $('textPrimary'),
+              color: $('textPrimary', theme),
               fontFamily: theme.fontFamilyPara, // paragraph font
-              height: 120,
               fontSize: S.font.para,
+              lineHeight: Math.round(S.font.para * 1.4),
+              // Size constraints
+              minHeight: Math.round(S.font.para * 1.4) * Math.max(1, minLines),
+              maxHeight: 240 + maxHeightDelta,
+              // Remove inner borders/outline
+              borderColor: 'transparent',
+              borderWidth: 0,
+              ...(Platform.OS === 'web'
+                ? ({
+                    outlineStyle: 'none',
+                    outlineWidth: 0,
+                    outlineColor: 'transparent',
+                    // Best-effort custom scrollbar on web
+                    ...(accentScrollbar
+                      ? ({
+                          scrollbarWidth: 'thin',
+                          scrollbarColor: `${$('accent', theme)} transparent`,
+                        } as any)
+                      : {}),
+                  } as any)
+                : {}),
             },
             style,
           ]}

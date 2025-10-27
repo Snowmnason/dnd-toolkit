@@ -5,7 +5,7 @@ import {
     type WorldNameValidationResult,
 } from '@/lib/auth/validation'
 import { logger } from '@/lib/utils/logger'
-import { $, useScale } from '@/theme'
+import { $, useScale, UseTheme } from '@/theme'
 import React, { useState } from 'react'
 import { Platform, TextInput, View } from 'react-native'
 
@@ -37,6 +37,7 @@ export function EditWorldModal({
   generatingLink,
 }: EditWorldModalProps) {
   const S = useScale()
+  const { theme } = UseTheme()
   const [worldNameValidation, setWorldNameValidation] =
     useState<WorldNameValidationResult | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -105,15 +106,15 @@ export function EditWorldModal({
           style={{
             flex: 1,
             borderWidth: 1,
-            borderColor: $('border'),
+            borderColor: $('border', theme),
             borderRadius: S.radius.md,
             padding: S.space.sm,
-            color: $('textPrimary'),
-            backgroundColor: $('surface'),
+            color: $('textPrimary', theme),
+            backgroundColor: $('surface', theme),
             fontSize: isDesktop ? 18 : 16,
           }}
           placeholder="Enter world name..."
-          placeholderTextColor={$('textSecondary')}
+          placeholderTextColor={$('textSecondary', theme)}
           value={worldName}
           onChangeText={createWorldNameChangeHandler(
             onWorldNameChange,
@@ -135,7 +136,7 @@ export function EditWorldModal({
             <Body
               key={i}
               style={{
-                color: $('danger'),
+                color: $('danger', theme),
                 fontSize: 14,
                 marginBottom: S.space.xs,
               }}
@@ -166,7 +167,7 @@ export function EditWorldModal({
       <Body
         style={{
           fontSize: 14,
-          color: $('textSecondary'),
+          color: $('textSecondary', theme),
           textAlign: 'center',
           marginBottom: S.space.md,
         }}

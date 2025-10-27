@@ -1,4 +1,4 @@
-import { $, tone, useScale } from '@/theme'
+import { $, tone, useScale, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useState } from 'react'
 import { Animated, Easing, Pressable, View } from 'react-native'
@@ -30,8 +30,22 @@ export function Switch({
   rightLabel,
 }: SwitchProps) {
   const S = useScale()
+  const { theme } = UseTheme()
   const [isOn, setIsOn] = useState(checked)
   const anim = React.useRef(new Animated.Value(checked ? 1 : 0)).current
+
+  // Sync internal state with external checked prop
+  React.useEffect(() => {
+    if (checked !== isOn) {
+      setIsOn(checked)
+      Animated.timing(anim, {
+        toValue: checked ? 1 : 0,
+        duration: 200,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: false,
+      }).start()
+    }
+  }, [checked, isOn, anim])
 
   const toggle = () => {
     if (disabled) return
@@ -47,14 +61,20 @@ export function Switch({
     }).start()
   }
 
+  // Scale-aware dimensions
+  const trackWidth = S.space.lg * 1.5  // ~40-48px depending on scale
+  const trackHeight = S.space.md       // ~24-28px depending on scale
+  const thumbSize = trackHeight - 4    // thumb is 4px smaller than track height
+  const thumbTravel = trackWidth - thumbSize - 4  // travel distance (accounting for 2px padding on each side)
+
   const thumbTranslate = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: [2, 22],
+    outputRange: [2, thumbTravel],
   })
 
   const trackColor = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: [tone($('borderSubtle'), 'alt'), $('accent')],
+    outputRange: [tone($('borderSubtle', theme), 'alt', undefined, undefined, theme), $('accent', theme)],
   })
 
   return (
@@ -79,7 +99,7 @@ export function Switch({
       >
         {/* Left Label */}
         {leftLabel && (
-          <Body style={{ color: $('textSecondary'), fontSize: 14 }}>
+          <Body style={{ color: $('textSecondary', theme), fontSize: 14 }}>
             {leftLabel}
           </Body>
         )}
@@ -87,9 +107,9 @@ export function Switch({
         {/* Switch */}
         <Animated.View
           style={{
-            width: 40,
-            height: 24,
-            borderRadius: 24,
+            width: trackWidth,
+            height: trackHeight,
+            borderRadius: trackHeight,
             backgroundColor: trackColor,
             justifyContent: 'center',
             paddingHorizontal: 2,
@@ -97,22 +117,19 @@ export function Switch({
         >
           <Animated.View
             style={{
-              width: 20,
-              height: 20,
-              borderRadius: 10,
-              backgroundColor: $('surface'),
+              width: thumbSize,
+              height: thumbSize,
+              borderRadius: thumbSize / 2,
+              backgroundColor: $('surface', theme),
               transform: [{ translateX: thumbTranslate }],
-              shadowColor: '#000',
-              shadowOpacity: 0.25,
-              shadowRadius: 2,
-              shadowOffset: { width: 0, height: 1 },
+              boxShadow: `0px 1px 2px #000`,
             }}
           />
         </Animated.View>
 
         {/* Right Label */}
         {rightLabel && (
-          <Body style={{ color: $('textSecondary'), fontSize: 14 }}>
+          <Body style={{ color: $('textSecondary', theme), fontSize: 14 }}>
             {rightLabel}
           </Body>
         )}

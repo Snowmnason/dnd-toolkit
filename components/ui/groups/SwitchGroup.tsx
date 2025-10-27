@@ -1,6 +1,6 @@
 import { ObjHeading } from '@/components/ui/AppText'
 import { Switch } from '@/components/ui/Switch'
-import { $, useScale } from '@/theme'
+import { $, useScale, UseTheme } from '@/theme'
 import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import { View } from 'react-native'
 
@@ -46,6 +46,7 @@ export const SwitchGroup = forwardRef<SwitchGroupRef, SwitchGroupProps>(
     ref
   ) => {
     const S = useScale()
+    const { theme } = UseTheme()
     const [activeKeys, setActiveKeys] = useState<string[]>(defaultActive)
     const activeOrder = useRef<string[]>(defaultActive)
 
@@ -54,26 +55,43 @@ export const SwitchGroup = forwardRef<SwitchGroupRef, SwitchGroupProps>(
         let next = [...prev]
 
         if (exclusive) {
+          // In exclusive mode, only one can be active at a time
+          // If turning on, set to this key only
+          // If turning off the active one, allow deactivation
           next = newValue ? [key] : []
-        } else if (maxActive && newValue) {
-          const stillActive = next.filter((k) => k !== key)
-          activeOrder.current = activeOrder.current.filter((k) =>
-            stillActive.includes(k)
-          )
-          activeOrder.current.push(key)
-
-          if (stillActive.length >= maxActive) {
-            const oldest = activeOrder.current.shift()
-            next = stillActive.filter((k) => k !== oldest)
+        } else if (maxActive !== undefined) {
+          // Max active mode - limit number of active switches
+          if (newValue) {
+            // Trying to turn ON a switch
+            if (!prev.includes(key)) {
+              // Not currently active, so we're adding it
+              if (prev.length >= maxActive) {
+                // Already at max, remove the oldest one
+                const rest = activeOrder.current.slice(1)
+                next = [...rest, key]
+                activeOrder.current = [...rest, key]
+              } else {
+                // Not at max yet, just add it
+                next = [...prev, key]
+                activeOrder.current = [...activeOrder.current, key]
+              }
+            }
           } else {
-            next = [...stillActive, key]
+            // Turning OFF a switch
+            next = prev.filter((k) => k !== key)
+            activeOrder.current = activeOrder.current.filter((k) => k !== key)
           }
         } else {
-          if (newValue) next.push(key)
-          else next = next.filter((k) => k !== key)
+          // Normal mode - no restrictions
+          if (newValue) {
+            if (!prev.includes(key)) {
+              next.push(key)
+            }
+          } else {
+            next = next.filter((k) => k !== key)
+          }
         }
 
-        activeOrder.current = next
         return next
       })
     }
@@ -87,7 +105,7 @@ export const SwitchGroup = forwardRef<SwitchGroupRef, SwitchGroupProps>(
       <View
         style={{
           borderWidth: outlined ? 1.5 : 0,
-          borderColor: outlined ? $('border') : 'transparent',
+          borderColor: outlined ? $('border', theme) : 'transparent',
           borderRadius: outlined ? S.radius.md : 0,
           backgroundColor: outlined ? 'transparent' : undefined,
           padding: outlined ? S.space.sm : 0,
@@ -102,7 +120,7 @@ export const SwitchGroup = forwardRef<SwitchGroupRef, SwitchGroupProps>(
               top: outlined ? -S.space.md : 0,
               left: outlined ? S.space.sm : 0,
               paddingHorizontal: outlined ? S.space.xs : 0,
-              backgroundColor: outlined ? $('background') : 'transparent',
+              backgroundColor: outlined ? $('background', theme) : 'transparent',
               marginBottom: outlined ? S.space.xs : S.space.sm,
             }}
           >

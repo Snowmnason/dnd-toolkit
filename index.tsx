@@ -10,6 +10,18 @@ if (Platform.OS === 'web') {
   (window as any).SkiaReady = false;
 }
 
+// Ensure the initial page background is dark immediately on web to avoid white flash
+if (Platform.OS === 'web') {
+  try {
+    if (typeof document !== 'undefined') {
+      document.documentElement.style.backgroundColor = '#2f353d';
+      if (document.body) {
+        document.body.style.backgroundColor = '#2f353d';
+      }
+    }
+  } catch {}
+}
+
 // For web, we need to load Skia BEFORE React renders anything
 async function initializeWebApp() {
   if (Platform.OS === 'web') {

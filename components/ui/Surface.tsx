@@ -27,24 +27,23 @@ export function Surface({
   style,
   children,
 }: SurfaceProps) {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { theme: _theme } = UseTheme()
+  const { theme } = UseTheme()
   const S = useScale()
 
   // Dynamic background tone
   const bg =
     variant === 'base'
-      ? $('background')
+      ? $('background', theme)
       : variant === 'accent'
-      ? tone($('accent'), 'alt')
+      ? tone($('accent', theme), 'alt', undefined, undefined, theme)
       : variant === 'elevated'
-      ? tone($('surface'), 'alt')
-      : $('surface')
+      ? tone($('surface', theme), 'alt', undefined, undefined, theme)
+      : $('surface', theme)
 
   // Theme-aware shadow color (slightly tinted)
-  const shadowColor = $('shadow')
+  const shadowColor = $('shadow', theme)
 
-  const borderColor = bordered ? tone($('border'), 'subtle') : 'transparent'
+  const borderColor = bordered ? tone($('border', theme), 'subtle', undefined, undefined, theme) : 'transparent'
 
   return (
     <View
@@ -55,10 +54,7 @@ export function Surface({
           padding: padded ? S.space.md : 0,
           borderWidth: bordered ? 1 : 0,
           borderColor,
-          shadowColor,
-          shadowOpacity: 0.4,
-          shadowRadius: 6,
-          shadowOffset: { width: 0, height: 3 },
+          boxShadow: `0px 3px 6px ${shadowColor}66`,
           elevation: 2,
         },
         style,

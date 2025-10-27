@@ -3,11 +3,11 @@ import {
   Accordion,
   AppModal,
   AppToast,
+  AppTooltip,
   Body,
   Button,
   ButtonGroup,
   Caption,
-  Card,
   CustomLoad,
   DescInput,
   Dropdown,
@@ -27,39 +27,45 @@ import {
   TextInput,
   TextInputGroup,
   Title,
-  ToggleGroup,
+  ToggleGroup
 } from '@/components/ui'
-import { AppSplitView } from '@/components/ui/AppView'
+import { AppSplit } from '@/components/ui/AppView'
 import { $, useScale } from '@/theme'
 import React, { useState } from 'react'
-import { Text, View } from 'react-native'
+import { ScrollView, Text, View } from 'react-native'
 
 export default function StyleDesktop() {
   const S = useScale()
-  // Button states
+  
+  // Simple display states (not controlling components, just for right panel display)
   const [primaryClicks, setPrimaryClicks] = useState(0)
   const [iconButtonClicks, setIconButtonClicks] = useState('')
-  const buttonGroupRef = React.useRef<any>(null)
-  
-  // Input states
   const [textInputValue, setTextInputValue] = useState('')
   const [descInputValue, setDescInputValue] = useState('')
-  const textInputGroupRef = React.useRef<any>(null)
-  
-  // Dropdown states
   const [dropdownValue, setDropdownValue] = useState<string | null>(null)
-  const dropdownGroupRef = React.useRef<any>(null)
-  
-  // Switch states
   const [switchOn, setSwitchOn] = useState(false)
-  const switchGroupRef = React.useRef<any>(null)
+  const [tabValue, setTabValue] = useState('overview')
   
-  // Radio & Toggle states
+  // Display-only states for group values (populated when "Get Values" is clicked)
+  const [buttonGroupValue, setButtonGroupValue] = useState<string>('')
+  const [textInputGroupValues, setTextInputGroupValues] = useState<any>({})
+  const [dropdownGroupValues, setDropdownGroupValues] = useState<any>({})
+  const [switchGroupValues, setSwitchGroupValues] = useState<any>({})
+  const [switchGroupExclusiveValue, setSwitchGroupExclusiveValue] = useState<string>('')
+  const [switchGroupMaxValues, setSwitchGroupMaxValues] = useState<any>({})
+  const [radioGroupValue, setRadioGroupValue] = useState<string>('')
+  const [toggleGroupValues, setToggleGroupValues] = useState<any>({})
+  const [colorTabValue, setColorTabValue] = useState('textPrimary')
+  
+  // Refs to access group components
+  const buttonGroupRef = React.useRef<any>(null)
+  const textInputGroupRef = React.useRef<any>(null)
+  const dropdownGroupRef = React.useRef<any>(null)
+  const switchGroupRef = React.useRef<any>(null)
+  const switchGroupExclusiveRef = React.useRef<any>(null)
+  const switchGroupMaxRef = React.useRef<any>(null)
   const radioGroupRef = React.useRef<any>(null)
   const toggleGroupRef = React.useRef<any>(null)
-  
-  // Tab state
-  const [tabValue, setTabValue] = useState('overview')
   
   // Modal/Toast/Snackbar states
   const [modalVisible, setModalVisible] = useState(false)
@@ -68,287 +74,599 @@ export default function StyleDesktop() {
   const [snackVisible, setSnackVisible] = useState(false)
 
   return (
-    <AppSplitView
+    <AppSplit
       left={
-        <View style={{ gap: S.space.lg }}>
+        <ScrollView style={{  }}>
           <ThemeSelector />
 
-          <Card>
+          <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Typography Components</Heading>
-            <Title>Desktop Title</Title>
-            <ObjHeading>Object Heading</ObjHeading>
-            <Body>Body text for content.</Body>
-            <Paragraph>Paragraph component.</Paragraph>
-            <SubTitle>Subtitle text</SubTitle>
-            <Caption>Caption text</Caption>
-            <Link>Link text</Link>
-          </Card>
+            <View style={{ gap: S.space.sm, marginTop: S.space.md }}>
+              <Title>Desktop Title</Title>
+              <ObjHeading>Object Heading</ObjHeading>
+              <Body>Body text for content.</Body>
+              <Paragraph>Paragraph component.</Paragraph>
+              <SubTitle>Subtitle text</SubTitle>
+              <Caption>Caption text</Caption>
+              <Link>Link text</Link>
+            </View>
+          </Surface>
 
-          <Card>
-            <Heading>Button Tests</Heading>
-            <Button variant="primary" text={`Primary (${primaryClicks})`} onPress={() => setPrimaryClicks(c => c + 1)} />
-            <Caption>Primary clicks: {primaryClicks}</Caption>
-            
-            <Button text="Open Modal" onPress={() => setModalVisible(true)} />
-            <Button text="Show Toast" onPress={() => setToastVisible(true)} />
-            <Button text="Show Snackbar" onPress={() => setSnackVisible(true)} />
-          </Card>
+          <Surface style={{ marginTop: S.space.lg }}>
+            <Heading>Button Variants</Heading>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <Button variant="primary" text={`Primary`} onPress={() => setPrimaryClicks(c => c + 1)} />
+              <Button variant="secondary" text="Secondary" onPress={() => {}} />
+              <Button variant="solid" text="Solid" onPress={() => {}} />
+              <Button variant="outlined" text="Outlined" onPress={() => {}} />
+              <Button variant="ghost" text="Ghost" onPress={() => {}} />
+              <Button variant="destructive" text="Destructive" onPress={() => {}} />
+              <Button variant="cancel" text="Cancel" onPress={() => {}} />
+              <Caption>Primary clicks: {primaryClicks}</Caption>
+            </View>
+          </Surface>
 
-          <Card>
+          <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Icon Buttons</Heading>
-            <View style={{ flexDirection: 'row', gap: S.space.sm }}>
+            <View style={{ flexDirection: 'row', gap: S.space.sm, marginTop: S.space.md }}>
               <IconButton icon="🗡️" onPress={() => setIconButtonClicks('Sword')} />
               <IconButton icon="🏹" onPress={() => setIconButtonClicks('Bow')} />
               <IconButton icon="🪄" onPress={() => setIconButtonClicks('Wand')} />
             </View>
-            <Caption>Last icon clicked: {iconButtonClicks || 'None'}</Caption>
-          </Card>
+            <Caption style={{ marginTop: S.space.sm }}>Last icon clicked: {iconButtonClicks || 'None'}</Caption>
+          </Surface>
 
-          <Card>
+          <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Button Group</Heading>
-            <ButtonGroup
-              ref={buttonGroupRef}
-              items={[
-                { key: 'melee', label: 'Melee' },
-                { key: 'ranged', label: 'Ranged' },
-                { key: 'magic', label: 'Magic' },
-              ]}
-              direction="horizontal"
-            />
-            <Button 
-              variant="outlined" 
-              text="Get Selected" 
-              onPress={() => {
-                const value = buttonGroupRef.current?.getValue()
-                alert(`ButtonGroup selected: ${value || 'None'}`)
-              }} 
-            />
-          </Card>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <ButtonGroup
+                ref={buttonGroupRef}
+                items={[
+                  { key: 'melee', label: 'Melee' },
+                  { key: 'ranged', label: 'Ranged' },
+                  { key: 'magic', label: 'Magic' },
+                ]}
+                direction="horizontal"
+              />
+              <Button 
+                variant="outlined" 
+                text="Get Selected" 
+                onPress={() => {
+                  const value = buttonGroupRef.current?.getValue()
+                  setButtonGroupValue(value || '')
+                }} 
+              />
+            </View>
+          </Surface>
 
-          <Card>
+          <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Text Inputs</Heading>
-            <TextInput 
-              heading="Search" 
-              placeholder="Type here..." 
-              value={textInputValue}
-              onChangeText={setTextInputValue}
-            />
-            <Caption>TextInput value: {textInputValue || '(empty)'}</Caption>
-            
-            <DescInput 
-              heading="Notes" 
-              placeholder="Enter description..."
-              value={descInputValue}
-              onChangeText={setDescInputValue}
-            />
-            <Caption>DescInput value: {descInputValue || '(empty)'}</Caption>
-          </Card>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <TextInput 
+                heading="Search" 
+                placeholder="Type here..." 
+                value={textInputValue}
+                onChangeText={setTextInputValue}
+              />
+              <Caption>TextInput value: {textInputValue || '(empty)'}</Caption>
+              
+              <DescInput 
+                heading="Notes" 
+                placeholder="Enter description..."
+                value={descInputValue}
+                onChangeText={setDescInputValue}
+              />
+              <Caption>DescInput value: {descInputValue || '(empty)'}</Caption>
+            </View>
+          </Surface>
 
-          <Card>
+          <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Input Group</Heading>
-            <TextInputGroup
-              ref={textInputGroupRef}
-              items={[
-                { key: 'name', heading: 'Name', placeholder: 'Character name' },
-                { key: 'level', heading: 'Level', placeholder: 'Level' },
-              ]}
-            />
-            <Button 
-              variant="outlined" 
-              text="Get All Values" 
-              onPress={() => {
-                const values = textInputGroupRef.current?.getValues()
-                alert(`TextInputGroup values:\n${JSON.stringify(values, null, 2)}`)
-              }} 
-            />
-          </Card>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <TextInputGroup
+                ref={textInputGroupRef}
+                items={[
+                  { key: 'name', heading: 'Name', placeholder: 'Character name' },
+                  { key: 'level', heading: 'Level', placeholder: 'Level' },
+                ]}
+              />
+              <Button 
+                variant="outlined" 
+                text="Get All Values" 
+                onPress={() => {
+                  const values = textInputGroupRef.current?.getValues()
+                  setTextInputGroupValues(values || {})
+                }} 
+              />
+            </View>
+          </Surface>
 
-          <Card>
+          <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Dropdown</Heading>
-            <Dropdown
-              heading="Select Race"
-              items={[
-                { label: 'Human', value: 'human' },
-                { label: 'Elf', value: 'elf' },
-                { label: 'Dwarf', value: 'dwarf' },
-              ]}
-              value={dropdownValue}
-              onChange={setDropdownValue}
-            />
-            <Caption>Selected race: {dropdownValue || 'None'}</Caption>
-          </Card>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <Dropdown
+                enableSearch={true}
+                heading="Select Class"
+                items={[
+                  { label: 'Barbarian', value: 'barbarian' },
+                  { label: 'Bard', value: 'bard' },
+                  { label: 'Cleric', value: 'cleric' },
+                  { label: 'Druid', value: 'druid' },
+                  { label: 'Fighter', value: 'fighter' },
+                  { label: 'Monk', value: 'monk' },
+                  { label: 'Paladin', value: 'paladin' },
+                  { label: 'Ranger', value: 'ranger' },
+                  { label: 'Rogue', value: 'rogue' },
+                  { label: 'Sorcerer', value: 'sorcerer' },
+                  { label: 'Warlock', value: 'warlock' },
+                  { label: 'Wizard', value: 'wizard' },
+                ]}
+                value={dropdownValue}
+                onChange={setDropdownValue}
+              />
+              <Caption>Selected class: {dropdownValue || 'None'}</Caption>
+            </View>
+          </Surface>
 
-          <Card>
+          <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Dropdown Group</Heading>
-            <DropdownGroup
-              ref={dropdownGroupRef}
-              items={[
-                {
-                  key: 'alignment',
-                  heading: 'Alignment',
-                  options: [
-                    { label: 'Lawful Good', value: 'lg' },
-                    { label: 'Chaotic Evil', value: 'ce' },
-                  ],
-                },
-                {
-                  key: 'deity',
-                  heading: 'Deity',
-                  options: [
-                    { label: 'Pelor', value: 'pelor' },
-                    { label: 'Lolth', value: 'lolth' },
-                  ],
-                },
-              ]}
-            />
-            <Button 
-              variant="outlined" 
-              text="Get All Values" 
-              onPress={() => {
-                const values = dropdownGroupRef.current?.getValues()
-                alert(`DropdownGroup values:\n${JSON.stringify(values, null, 2)}`)
-              }} 
-            />
-          </Card>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <DropdownGroup
+                ref={dropdownGroupRef}
+                items={[
+                  {
+                    key: 'background',
+                    heading: 'Background',
+                    options: [
+                      { label: 'Acolyte', value: 'acolyte' },
+                      { label: 'Criminal', value: 'criminal' },
+                      { label: 'Folk Hero', value: 'folk-hero' },
+                      { label: 'Noble', value: 'noble' },
+                      { label: 'Sage', value: 'sage' },
+                      { label: 'Soldier', value: 'soldier' },
+                    ],
+                  },
+                  {
+                    key: 'skill',
+                    heading: 'Skill Proficiency',
+                    options: [
+                      { label: 'Acrobatics', value: 'acrobatics' },
+                      { label: 'Arcana', value: 'arcana' },
+                      { label: 'Athletics', value: 'athletics' },
+                      { label: 'Deception', value: 'deception' },
+                      { label: 'History', value: 'history' },
+                      { label: 'Insight', value: 'insight' },
+                      { label: 'Intimidation', value: 'intimidation' },
+                      { label: 'Investigation', value: 'investigation' },
+                    ],
+                  },
+                ]}
+              />
+              <Button 
+                variant="outlined" 
+                text="Get All Values" 
+                onPress={() => {
+                  const values = dropdownGroupRef.current?.getValues()
+                  setDropdownGroupValues(values || {})
+                }} 
+              />
+            </View>
+          </Surface>
 
-          <Card>
+          <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Switch</Heading>
-            <Switch heading="Dark Mode" checked={switchOn} onChange={setSwitchOn} />
-            <Caption>Switch is: {switchOn ? 'ON' : 'OFF'}</Caption>
-          </Card>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <Switch heading="Dark Mode" checked={switchOn} onChange={setSwitchOn} />
+              <Caption>Switch is: {switchOn ? 'ON' : 'OFF'}</Caption>
+            </View>
+          </Surface>
 
-          <Card>
+          <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Switch Group</Heading>
-            <SwitchGroup
-              ref={switchGroupRef}
-              title="Features"
-              items={[
-                { key: 'auto-save', heading: 'Auto Save' },
-                { key: 'notifications', heading: 'Notifications' },
-              ]}
-            />
-            <Button 
-              variant="outlined" 
-              text="Get All Values" 
-              onPress={() => {
-                const values = switchGroupRef.current?.getValues()
-                alert(`SwitchGroup values:\n${JSON.stringify(values, null, 2)}`)
-              }} 
-            />
-          </Card>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <SwitchGroup
+                ref={switchGroupRef}
+                title="Features"
+                items={[
+                  { key: 'auto-save', heading: 'Auto Save' },
+                  { key: 'notifications', heading: 'Notifications' },
+                ]}
+              />
+              <Button 
+                variant="outlined" 
+                text="Get All Values" 
+                onPress={() => {
+                  const values = switchGroupRef.current?.getValues() || []
+                  const valuesObj = values.reduce((acc: any, key: string) => ({ ...acc, [key]: true }), {})
+                  setSwitchGroupValues(valuesObj)
+                }} 
+              />
+            </View>
+          </Surface>
 
-          <Card>
+          <Surface style={{ marginTop: S.space.lg }}>
+            <Heading>Switch Group (Exclusive)</Heading>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <SwitchGroup
+                ref={switchGroupExclusiveRef}
+                title="Difficulty"
+                exclusive
+                items={[
+                  { key: 'easy', heading: 'Easy' },
+                  { key: 'normal', heading: 'Normal' },
+                  { key: 'hard', heading: 'Hard' },
+                ]}
+              />
+              <Button 
+                variant="outlined" 
+                text="Get Selected" 
+                onPress={() => {
+                  const values = switchGroupExclusiveRef.current?.getValues()
+                  setSwitchGroupExclusiveValue(values?.[0] || '')
+                }} 
+              />
+            </View>
+          </Surface>
+
+          <Surface style={{ marginTop: S.space.lg }}>
+            <Heading>Switch Group (Max 3)</Heading>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <SwitchGroup
+                ref={switchGroupMaxRef}
+                title="Spell Schools"
+                maxActive={3}
+                items={[
+                  { key: 'abjuration', heading: 'Abjuration' },
+                  { key: 'conjuration', heading: 'Conjuration' },
+                  { key: 'divination', heading: 'Divination' },
+                  { key: 'enchantment', heading: 'Enchantment' },
+                  { key: 'evocation', heading: 'Evocation' },
+                ]}
+              />
+              <Button 
+                variant="outlined" 
+                text="Get All Values" 
+                onPress={() => {
+                  const values = switchGroupMaxRef.current?.getValues() || []
+                  const valuesObj = values.reduce((acc: any, key: string) => ({ ...acc, [key]: true }), {})
+                  setSwitchGroupMaxValues(valuesObj)
+                }} 
+              />
+            </View>
+          </Surface>
+
+          <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Radio Button Group</Heading>
-            <RadioButtonGroup
-              ref={radioGroupRef}
-              title="Faction"
-              direction="horizontal"
-              items={[
-                { key: 'order', label: 'Order' },
-                { key: 'chaos', label: 'Chaos' },
-              ]}
-            />
-            <Button 
-              variant="outlined" 
-              text="Get Selected" 
-              onPress={() => {
-                const value = radioGroupRef.current?.getValue()
-                alert(`RadioButtonGroup selected: ${value || 'None'}`)
-              }} 
-            />
-          </Card>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <RadioButtonGroup
+                ref={radioGroupRef}
+                title="Faction"
+                direction="horizontal"
+                items={[
+                  { key: 'order', label: 'Order' },
+                  { key: 'chaos', label: 'Chaos' },
+                ]}
+              />
+              <Button 
+                variant="outlined" 
+                text="Get Selected" 
+                onPress={() => {
+                  const value = radioGroupRef.current?.getValue()
+                  setRadioGroupValue(value || '')
+                }} 
+              />
+            </View>
+          </Surface>
 
-          <Card>
+          <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Toggle Group</Heading>
-            <ToggleGroup
-              ref={toggleGroupRef}
-              title="Tools"
-              items={[
-                { key: 'map', icon: <Text>🗺️</Text> },
-                { key: 'quill', icon: <Text>🪶</Text> },
-                { key: 'potion', icon: <Text>🧪</Text> },
-              ]}
-            />
-            <Button 
-              variant="outlined" 
-              text="Get All Values" 
-              onPress={() => {
-                const values = toggleGroupRef.current?.getValues()
-                alert(`ToggleGroup values:\n${JSON.stringify(values, null, 2)}`)
-              }} 
-            />
-          </Card>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <ToggleGroup
+                ref={toggleGroupRef}
+                title="Tools"
+                items={[
+                  { key: 'map', icon: <Text>🗺️</Text> },
+                  { key: 'quill', icon: <Text>🪶</Text> },
+                  { key: 'potion', icon: <Text>🧪</Text> },
+                ]}
+              />
+              <Button 
+                variant="outlined" 
+                text="Get All Values" 
+                onPress={() => {
+                  const values = toggleGroupRef.current?.getValues()
+                  setToggleGroupValues(values || {})
+                }} 
+              />
+            </View>
+          </Surface>
 
-          <Card>
+          <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Tabs</Heading>
-            <Tabs
-              tabs={[
-                { key: 'overview', label: 'Overview' },
-                { key: 'stats', label: 'Stats' },
-                { key: 'settings', label: 'Settings' },
-              ]}
-              onChange={setTabValue}
-            />
-            <Caption>Current tab: {tabValue}</Caption>
-          </Card>
+            <View style={{  marginTop: S.space.md }}>
+              <Tabs
+                bottomSpace={tabValue !== 'headings'}
+                tabs={[
+                  { key: 'overview', label: 'Overview' },
+                  { key: 'headings', label: 'Headings' },
+                  { key: 'body', label: 'Body' },
+                  { key: 'other', label: 'Other' },
+                ]}
+                onChange={setTabValue}
+              />
+              {/* ⚠️ Content container below - marginTop creates spacing between tabs and content */}
+              <View style={{ gap: S.space.sm, marginTop: S.space.md }}>
+                {tabValue === 'overview' && (
+                  <>
+                    <Body style={{ marginBottom: S.space.md }}>
+                      This tab demonstrates all available font sizes and their visual hierarchy. 
+                      Each heading level and text style is designed to work together for consistent typography.
+                    </Body>
+                  </>
+                )}
+                {tabValue === 'headings' && (
+                  <>
+                    {/* Nested tabs with bottomSpace={false} to prevent weird spacing */}
+                    <Tabs
+                      bottomSpace={false}
+                      tabs={[
+                        { key: 'textPrimary', label: 'Primary' },
+                        { key: 'textSecondary', label: 'Secondary' },
+                        { key: 'textInverse', label: 'Inverse' },
+                        { key: 'textOnAccent', label: 'On Accent' },
+                      ]}
+                      onChange={setColorTabValue}
+                    />
+                    <View 
+                      style={{ 
+                        padding: S.space.md, 
+                        borderRadius: S.radius.md,
+                        backgroundColor: 
+                          colorTabValue === 'textPrimary' ? $('background') :
+                          colorTabValue === 'textSecondary' ? $('surface') :
+                          colorTabValue === 'textInverse' ? $('textPrimary') :
+                          $('accent')
+                      }}
+                    >
+                      <Heading 
+                        fontSize='$heading1' 
+                        color={
+                          colorTabValue === 'textPrimary' ? '$textPrimary' :
+                          colorTabValue === 'textSecondary' ? '$textSecondary' :
+                          colorTabValue === 'textInverse' ? '$textInverse' :
+                          '$textOnAccent'
+                        }
+                      >
+                        Heading 1
+                      </Heading>
+                      <Heading 
+                        fontSize='$heading2' 
+                        color={
+                          colorTabValue === 'textPrimary' ? '$textPrimary' :
+                          colorTabValue === 'textSecondary' ? '$textSecondary' :
+                          colorTabValue === 'textInverse' ? '$textInverse' :
+                          '$textOnAccent'
+                        }
+                      >
+                        Heading 2
+                      </Heading>
+                      <Heading 
+                        fontSize='$heading3' 
+                        color={
+                          colorTabValue === 'textPrimary' ? '$textPrimary' :
+                          colorTabValue === 'textSecondary' ? '$textSecondary' :
+                          colorTabValue === 'textInverse' ? '$textInverse' :
+                          '$textOnAccent'
+                        }
+                      >
+                        Heading 3
+                      </Heading>
+                      <ObjHeading 
+                        color={
+                          colorTabValue === 'textPrimary' ? '$textPrimary' :
+                          colorTabValue === 'textSecondary' ? '$textSecondary' :
+                          colorTabValue === 'textInverse' ? '$textInverse' :
+                          '$textOnAccent'
+                        }
+                      >
+                        Object Heading
+                      </ObjHeading>
+                      <SubTitle 
+                        color={
+                          colorTabValue === 'textPrimary' ? '$textPrimary' :
+                          colorTabValue === 'textSecondary' ? '$textSecondary' :
+                          colorTabValue === 'textInverse' ? '$textInverse' :
+                          '$textOnAccent'
+                        }
+                      >
+                        SubTitle
+                      </SubTitle>
+                    </View>
+                  </>
+                )}
+                {tabValue === 'body' && (
+                  <>
+                    <Body fontSize="$body1">Body 1 text example for normal content.</Body>
+                    <Body fontSize="$body2">Body 2 text example for normal content.</Body>
+                    <Body fontSize="$body3">Body 3 text example for normal content.</Body>
+                    <Paragraph>Paragraph component for longer text blocks with proper line height and spacing.</Paragraph>
+                  </>
+                )}
+                {tabValue === 'other' && (
+                  <>
+                    <Link>Link text for navigation</Link>
+                    <Caption>Caption text for small notes</Caption>
+                  </>
+                )}
+              </View>
+            </View>
+          </Surface>
 
-          <Accordion title="About this UI" defaultOpen>
-            <Body>
-              A comprehensive interactive test environment for every reusable component in the design system.
-            </Body>
-            <Caption>Toggle accordion to test expand/collapse behavior</Caption>
-          </Accordion>
+          <Surface style={{ marginTop: S.space.lg }}>
+            <Accordion title="Accordion Component" defaultOpen>
+              <Body>
+                The accordion component allows you to collapse and expand content sections. 
+                This is particularly useful for organizing large amounts of information in a compact, 
+                user-friendly way. Click the header to toggle the visibility of this content. 
+                You can use accordions for FAQs, settings panels, or any hierarchical content structure 
+                where users might want to focus on specific sections at a time.
+              </Body>
+              <Caption style={{ marginTop: S.space.sm }}>
+                Toggle the accordion header to test expand/collapse behavior and animations.
+              </Caption>
+            </Accordion>
+          </Surface>
 
-          <Card>
-            <Text style={{ color: $('textPrimary'), fontWeight: '700' }}>Loading Spinner</Text>
-            <View style={{ flexDirection: 'row', gap: S.space.md }}>
+          <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.lg }}>
+            <Heading>Modals, Toasts & Snackbars</Heading>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <Button text="Open Modal" onPress={() => setModalVisible(true)} />
+              <Button text="Open Custom Modal" onPress={() => setModal2Visible(true)} />
+              <Button text="Show Toast" onPress={() => setToastVisible(true)} />
+              <Button text="Show Snackbar" onPress={() => setSnackVisible(true)} />
+            </View>
+          </Surface>
+
+          <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.lg }}>
+            <Heading>Loading Spinner</Heading>
+            <View style={{ flexDirection: 'row', gap: S.space.md, marginTop: S.space.md }}>
               <CustomLoad size="small" />
               <CustomLoad size="large" />
             </View>
-          </Card>
-        </View>
+          </Surface>
+
+          <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.xl }}>
+            <Heading>Tooltips</Heading>
+            <View style={{ gap: S.space.md, marginTop: S.space.md, alignItems: 'flex-start' }}>
+              <AppTooltip text="This is a helpful tooltip!">
+                <Button variant="outlined" text="Hover or Press Me" onPress={() => {}} />
+              </AppTooltip>
+              
+              <AppTooltip text="Tooltips work on any component" delay={300}>
+                <Body>Hover over this text</Body>
+              </AppTooltip>
+              
+              <AppTooltip text="Quick tooltip" delay={100}>
+                <IconButton icon="ℹ️" onPress={() => {}} />
+              </AppTooltip>
+            </View>
+          </Surface>
+        </ScrollView>
       }
       right={
-        <View style={{ gap: S.space.lg }}>
+        <ScrollView style={{ padding: S.space.md }}>
           <Surface>
             <Title>Component State Overview</Title>
             <Body>This panel displays the current state of all interactive components on the left.</Body>
           </Surface>
 
-          <Card>
+          <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Button States</Heading>
-            <Body>Primary button clicks: {primaryClicks}</Body>
-            <Body>Last icon clicked: {iconButtonClicks || 'None'}</Body>
-          </Card>
+            <View style={{ gap: S.space.xs, marginTop: S.space.md }}>
+              <Body>Primary button clicks: {primaryClicks}</Body>
+              <Body>Last icon clicked: {iconButtonClicks || 'None'}</Body>
+              <Body>Button group: {buttonGroupValue || 'None'}</Body>
+            </View>
+          </Surface>
 
-          <Card>
+          <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Input States</Heading>
-            <Body>TextInput: {textInputValue || '(empty)'}</Body>
-            <Body>DescInput: {descInputValue || '(empty)'}</Body>
-          </Card>
+            <View style={{ gap: S.space.xs, marginTop: S.space.md }}>
+              <Body>TextInput: {textInputValue || '(empty)'}</Body>
+              <Body>DescInput: {descInputValue || '(empty)'}</Body>
+              {Object.keys(textInputGroupValues).length > 0 && (
+                <>
+                  <SubTitle style={{ marginTop: S.space.sm }}>Input Group:</SubTitle>
+                  {Object.entries(textInputGroupValues).map(([key, value]) => (
+                    <Body key={key}>{key}: {value as string || '(empty)'}</Body>
+                  ))}
+                </>
+              )}
+            </View>
+          </Surface>
 
-          <Card>
+          <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Selection States</Heading>
-            <Body>Dropdown: {dropdownValue || 'None'}</Body>
-            <Body>Active Tab: {tabValue}</Body>
-            <Body>Switch: {switchOn ? 'ON' : 'OFF'}</Body>
-          </Card>
+            <View style={{ gap: S.space.xs, marginTop: S.space.md }}>
+              <Body>Dropdown: {dropdownValue || 'None'}</Body>
+              {Object.keys(dropdownGroupValues).length > 0 && (
+                <>
+                  <SubTitle style={{ marginTop: S.space.sm }}>Dropdown Group:</SubTitle>
+                  {Object.entries(dropdownGroupValues).map(([key, value]) => (
+                    <Body key={key}>{key}: {value as string || 'None'}</Body>
+                  ))}
+                </>
+              )}
+              <Body style={{ marginTop: S.space.sm }}>Active Tab: {tabValue}</Body>
+            </View>
+          </Surface>
 
-          <Card>
-            <Heading>Additional Tests</Heading>
-            <Button text="Open Second Modal" onPress={() => setModal2Visible(true)} />
-            <Button variant="outlined" text="Test All Refs" onPress={() => {
-              const buttonGroup = buttonGroupRef.current?.getValue()
-              const inputGroup = textInputGroupRef.current?.getValues()
-              const dropdownGroup = dropdownGroupRef.current?.getValues()
-              const switchGroup = switchGroupRef.current?.getValues()
-              const radioGroup = radioGroupRef.current?.getValue()
-              const toggleGroup = toggleGroupRef.current?.getValues()
-              
-              alert(`All Ref Values:\n\nButtonGroup: ${buttonGroup}\nRadioGroup: ${radioGroup}\n\nInputGroup: ${JSON.stringify(inputGroup, null, 2)}\n\nDropdownGroup: ${JSON.stringify(dropdownGroup, null, 2)}\n\nSwitchGroup: ${JSON.stringify(switchGroup, null, 2)}\n\nToggleGroup: ${JSON.stringify(toggleGroup, null, 2)}`)
-            }} />
-          </Card>
-        </View>
+          <Surface style={{ marginTop: S.space.lg }}>
+            <Heading>Switch States</Heading>
+            <View style={{ gap: S.space.xs, marginTop: S.space.md }}>
+              <Body>Switch: {switchOn ? 'ON' : 'OFF'}</Body>
+              {Object.keys(switchGroupValues).length > 0 && (
+                <>
+                  <SubTitle style={{ marginTop: S.space.sm }}>Switch Group:</SubTitle>
+                  {Object.entries(switchGroupValues).map(([key, value]) => (
+                    <Body key={key}>{key}: {value ? 'ON' : 'OFF'}</Body>
+                  ))}
+                </>
+              )}
+              {switchGroupExclusiveValue && (
+                <Body style={{ marginTop: S.space.sm }}>Exclusive: {switchGroupExclusiveValue}</Body>
+              )}
+              {Object.keys(switchGroupMaxValues).length > 0 && (
+                <>
+                  <SubTitle style={{ marginTop: S.space.sm }}>Max 3 Group:</SubTitle>
+                  {Object.entries(switchGroupMaxValues).map(([key, value]) => (
+                    <Body key={key}>{key}: {value ? 'ON' : 'OFF'}</Body>
+                  ))}
+                </>
+              )}
+            </View>
+          </Surface>
+
+          <Surface style={{ marginTop: S.space.lg }}>
+            <Heading>Radio & Toggle States</Heading>
+            <View style={{ gap: S.space.xs, marginTop: S.space.md }}>
+              <Body>Radio Group: {radioGroupValue || 'None'}</Body>
+              {Object.keys(toggleGroupValues).length > 0 && (
+                <>
+                  <SubTitle style={{ marginTop: S.space.sm }}>Toggle Group:</SubTitle>
+                  {Object.entries(toggleGroupValues).map(([key, value]) => (
+                    <Body key={key}>{key}: {value ? 'ON' : 'OFF'}</Body>
+                  ))}
+                </>
+              )}
+            </View>
+          </Surface>
+
+          <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.xl }}>
+            <Heading>Test All Components</Heading>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <Button variant="outlined" text="Refresh All Values" onPress={() => {
+                setButtonGroupValue(buttonGroupRef.current?.getValue() || '')
+                setTextInputGroupValues(textInputGroupRef.current?.getValues() || {})
+                setDropdownGroupValues(dropdownGroupRef.current?.getValues() || {})
+                
+                const switchVals = switchGroupRef.current?.getValues() || []
+                setSwitchGroupValues(switchVals.reduce((acc: any, key: string) => ({ ...acc, [key]: true }), {}))
+                
+                const exclusiveVals = switchGroupExclusiveRef.current?.getValues() || []
+                setSwitchGroupExclusiveValue(exclusiveVals[0] || '')
+                
+                const maxVals = switchGroupMaxRef.current?.getValues() || []
+                setSwitchGroupMaxValues(maxVals.reduce((acc: any, key: string) => ({ ...acc, [key]: true }), {}))
+                
+                setRadioGroupValue(radioGroupRef.current?.getValue() || '')
+                
+                const toggleVals = toggleGroupRef.current?.getValues() || []
+                setToggleGroupValues(toggleVals.reduce((acc: any, key: string) => ({ ...acc, [key]: true }), {}))
+              }} />
+            </View>
+          </Surface>
+        </ScrollView>
       }
     >
       <AppModal
@@ -382,6 +700,6 @@ export default function StyleDesktop() {
         tone="success"
         onHide={() => setSnackVisible(false)}
       />
-    </AppSplitView>
+    </AppSplit>
   )
 }

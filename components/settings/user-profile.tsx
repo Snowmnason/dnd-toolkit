@@ -1,7 +1,7 @@
 import { UpdateUsernameModal } from '@/components/modals'
 import { Body, Button, Heading, IconButton, SubTitle, Surface } from '@/components/ui'
 import { logger, updateUsername } from '@/lib'
-import { $, tone, useScale } from '@/theme'
+import { $, tone, useScale, UseTheme } from '@/theme'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import React, { useEffect, useState } from 'react'
@@ -14,6 +14,7 @@ interface UserProfileProps {
 }
 
 export default function UserProfile({ profile }: UserProfileProps) {
+  const { theme } = UseTheme()
   const router = useRouter()
   const S = useScale()
   const [sessionUser, setSessionUser] = useState<any>(null)
@@ -101,7 +102,7 @@ export default function UserProfile({ profile }: UserProfileProps) {
         radius="md"
         style={{
           marginBottom: S.space.lg,
-          backgroundColor: tone($('accent'), 'alt'),
+          backgroundColor: tone($('accent', theme), 'alt', undefined, undefined, theme),
         }}
       >
         {/* Email */}

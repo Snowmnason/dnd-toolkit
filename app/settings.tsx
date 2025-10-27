@@ -1,10 +1,10 @@
 import {
-  AuthStateManager,
-  deleteUserAccount,
-  logger,
-  signOutUser,
-  supabase,
-  usersDB,
+    AuthStateManager,
+    deleteUserAccount,
+    logger,
+    signOutUser,
+    supabase,
+    usersDB,
 } from '@/lib'
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
 import { useRouter } from 'expo-router'
@@ -14,12 +14,12 @@ import { Alert, Platform } from 'react-native'
 // 🧱 New UI Components
 import { CredentialConfirmModal } from '@/components/modals'
 import {
-  AppLoadingView,
-  AppView,
-  Body,
-  Button,
-  Heading,
-  Surface,
+    AppLoading,
+    AppPage,
+    Body,
+    Button,
+    Heading,
+    Surface,
 } from '@/components/ui'
 import UserProfile from '../components/settings/user-profile'
 
@@ -154,12 +154,12 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <AppLoadingView loadMessage="Loading Settings..." />
+      <AppLoading loadMessage="Loading Settings..." />
     )
   }
 
   return (
-    <AppView variant="page" scroll gap="lg">
+    <AppPage gap="lg">
       {/* User Profile */}
       <Surface padded bordered radius="md" style={{ marginBottom: S.space.lg }}>
         <UserProfile profile={profile} />
@@ -189,7 +189,7 @@ export default function SettingsPage() {
       </Surface>
 
       {/* Sign Out Button */}
-      <AppView center gap="md" style={{ marginTop: S.space.xl }}>
+      <AppPage center gap="md" style={{ marginTop: S.space.xl }}>
         <Button
           text={signingOut ? 'Confirm Sign Out' : 'Sign Out'}
           variant="destructive"
@@ -198,10 +198,10 @@ export default function SettingsPage() {
           loading={false}
           style={{ minWidth: 200 }}
         />
-      </AppView>
+      </AppPage>
 
       {/* Delete Account Button */}
-      <AppView center gap="md" style={{ marginTop: S.space.lg }}>
+      <AppPage center gap="md" style={{ marginTop: S.space.lg }}>
         <Button
           text={confirmDelete ? 'Confirm Delete' : 'Delete Account'}
           variant="destructive"
@@ -209,7 +209,7 @@ export default function SettingsPage() {
           disabled={buttonDeleteDisabled}
           style={{ minWidth: 200 }}
         />
-      </AppView>
+      </AppPage>
 
       {/* Delete Confirmation Modal */}
       <CredentialConfirmModal
@@ -223,6 +223,6 @@ export default function SettingsPage() {
         onCancel={handleCloseDeleteModal}
         onConfirm={handleDeleteAccount}
       />
-    </AppView>
+    </AppPage>
   )
 }

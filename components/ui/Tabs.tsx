@@ -1,7 +1,7 @@
-import { $, tone, useScale } from '@/theme'
+import { $, tone, useScale, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useEffect, useState } from 'react'
-import { Animated, LayoutChangeEvent, Pressable, View } from 'react-native'
+import { Animated, LayoutChangeEvent, Platform, Pressable, ScrollView, View } from 'react-native'
 import { Body } from './AppText'
 
 interface TabItem {
@@ -14,6 +14,7 @@ interface TabsProps {
   defaultActive?: string
   onChange?: (key: string) => void
   fullWidth?: boolean
+  bottomSpace?: boolean // Add space below tabs for content separation
 }
 
 /**
@@ -25,7 +26,9 @@ export function Tabs({
   defaultActive,
   onChange,
   fullWidth = false,
+  bottomSpace = true,
 }: TabsProps) {
+  const { theme } = UseTheme()
   const S = useScale()
   const [active, setActive] = useState(defaultActive ?? tabs[0]?.key)
   const [underlineX] = useState(new Animated.Value(0))
@@ -34,7 +37,6 @@ export function Tabs({
 
   useEffect(() => {
     onChange?.(active)
-    Haptics.selectionAsync()
     const layout = tabLayouts[active]
     if (layout) {
       Animated.parallel([
@@ -58,38 +60,60 @@ export function Tabs({
   }
 
   return (
-    <View>
+    <View style={{ marginBottom: bottomSpace ? S.space.md : 0 }}>
       <View
         style={{
-          flexDirection: 'row',
-          justifyContent: fullWidth ? 'space-around' : 'flex-start',
           borderBottomWidth: 1,
-          borderBottomColor: tone($('border'), 'subtle'),
+          borderBottomColor: tone($('border', theme), 'subtle', undefined, undefined, theme),
         }}
       >
-        {tabs.map((tab) => {
-          const isActive = active === tab.key
-          return (
-            <Pressable
-              key={tab.key}
-              onPress={() => setActive(tab.key)}
-              onLayout={(e) => handleLayout(tab.key, e)}
-              style={{
-                paddingVertical: S.space.sm,
-                paddingHorizontal: S.space.md,
-              }}
-            >
-              <Body
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={true}
+          contentContainerStyle={{
+            flexDirection: 'row',
+            justifyContent: fullWidth ? 'space-around' : 'flex-start',
+            flexGrow: fullWidth ? 1 : 0,
+          }}
+          style={
+            Platform.OS === 'web'
+              ? ({
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: `${tone($('textSecondary', theme), 'changeOpacity', undefined, 0.8, theme)} transparent`,
+                } as any)
+              : {}
+          }
+        >
+          {tabs.map((tab) => {
+            const isActive = active === tab.key
+            return (
+              <Pressable
+                key={tab.key}
+                onPress={() => {
+                  // Trigger haptics only on explicit user interaction and only on native
+                  if (Platform.OS === 'ios' || Platform.OS === 'android') {
+                    Haptics.selectionAsync()
+                  }
+                  setActive(tab.key)
+                }}
+                onLayout={(e) => handleLayout(tab.key, e)}
                 style={{
-                  color: isActive ? $('accent') : $('textSecondary'),
-                  fontWeight: isActive ? '600' : '400',
+                  paddingVertical: S.space.sm,
+                  paddingHorizontal: S.space.md,
                 }}
               >
-                {tab.label}
-              </Body>
-            </Pressable>
-          )
-        })}
+                <Body
+                  style={{
+                    color: isActive ? $('accent', theme) : $('textSecondary', theme),
+                    fontWeight: isActive ? '600' : '400',
+                  }}
+                >
+                  {tab.label}
+                </Body>
+              </Pressable>
+            )
+          })}
+        </ScrollView>
       </View>
 
       {/* underline */}
@@ -100,7 +124,7 @@ export function Tabs({
           left: underlineX,
           width: underlineWidth,
           height: 2,
-          backgroundColor: $('accent'),
+          backgroundColor: $('accent', theme),
           borderRadius: 1,
         }}
       />

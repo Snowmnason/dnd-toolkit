@@ -1,8 +1,8 @@
-import { AppView, Body, Title } from '@/components/ui';
+import { AppPage, Body, Title } from '@/components/ui';
 
 export default function BattleMapMakerPage() {
   return (
-    <AppView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+    <AppPage style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
       <Title style={{ marginBottom: 20 }}>
         Battle Map Maker
       </Title>
@@ -14,6 +14,6 @@ export default function BattleMapMakerPage() {
       <Body style={{ textAlign: 'center', fontStyle: 'italic', marginBottom: 40 }}>
         ⚔️ Coming Soon: Grid-based map editor, terrain tools, and token placement.
       </Body>
-    </AppView>
+    </AppPage>
   );
 }

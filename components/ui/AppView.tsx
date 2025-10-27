@@ -10,221 +10,213 @@ import {
   View,
   ViewProps,
   ViewStyle,
-  useWindowDimensions,
+  useWindowDimensions
 } from 'react-native'
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated'
 
-// 🪶 Type definitions
-type AppViewVariant =
-  | 'page'
-  | 'panel'
-  | 'split'
-  | 'loading'
+/* ───────────────────────────────
+   🪶 Base AppView Props
+──────────────────────────────── */
 
 type SpaceKey = keyof Sizing['space']
 
-interface AppViewProps extends ViewProps {
-    variant?: AppViewVariant
-    scroll?: boolean
-    center?: boolean
+export interface AppViewProps extends ViewProps {
+  center?: boolean
   gap?: SpaceKey
-    tone?: 'base' | 'alt' | 'accent' | 'surface'
-    backgroundImage?: any
-    left?: ReactNode
-    right?: ReactNode
-    children?: ReactNode
-    style?: StyleProp<ViewStyle>
+  tone?: 'base' | 'alt' | 'accent' | 'surface'
+  backgroundImage?: any
+  children?: ReactNode
+  style?: StyleProp<ViewStyle>
+  showScrollIndicator?: boolean
+}
 
-    loadMessage?: string
-    error?: Error | null
-    assetsLoaded?: boolean
+export interface AppSplitViewProps extends AppViewProps {
+  left?: ReactNode
+  right?: ReactNode
+}
+
+export interface AppLoadingViewProps extends ViewProps {
+  loadMessage?: string
+  error?: Error | null
+  assetsLoaded?: boolean
 }
 
 /* ───────────────────────────────────────────────
-   🧱 AppView — Base layout container
-   Handles theming, spacing, scrolling, and layout
+   🧱 Base AppView — Internal shared layout logic
 ──────────────────────────────────────────────── */
-export function AppView({
-  variant = 'page',
-  scroll = false,
+function BaseAppView({
   center = false,
   gap = 'md',
   tone: toneVariant = 'base',
   backgroundImage,
-  left,
-  right,
+  showScrollIndicator = false,
   style,
   children,
-
-  loadMessage,
-  assetsLoaded = false,
-  error,
+  variantStyles,
   ...rest
-}: AppViewProps) {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { theme: _theme } = UseTheme()
+}: AppViewProps & { variantStyles?: ViewStyle }) {
+  const { theme } = UseTheme()
   const S = useScale()
-  const { width, height } = useWindowDimensions()
-  const isDesktop = Platform.OS === 'web' && width >= 900
-  
-  // Enable scroll if height is constrained (< 600px)
-  const shouldAutoScroll = height < 600
-
-  /* Animation stubs — used for future slide/gesture logic */
-  const slide = useSharedValue(0)
-  const slideAnim = useAnimatedStyle(() => ({
-    transform: [{ translateX: withTiming(slide.value * -width) }],
-  }))
-
-    if (variant === 'loading') {
-    return (
-      <LoadingOverlay
-        message={loadMessage ?? 'Loading...'}
-        error={error}
-        assetsLoaded={assetsLoaded}
-      />
-    )
-  }
 
   /* Base styles shared across all variants */
   const base: ViewStyle = {
     flex: 1,
     padding: S.space[gap],
-    backgroundColor: $('background'),
+    backgroundColor: $('background', theme),
   }
 
-  /* Variant definitions */
-  const variants: Record<AppViewVariant, ViewStyle> = {
-    page: {
-      justifyContent: center ? 'center' : undefined,
-      alignItems: center ? 'center' : undefined,
-      backgroundColor: $('background'),
-    },
-    panel: {
-      flex: 1,
-        backgroundColor:
-        toneVariant === 'alt'
-            ? tone($('background'), 'alt')
-            : toneVariant === 'accent'
-            ? tone($('background'), 'accent')
-            : toneVariant === 'surface'
-            ? $('surface')
-            : $('background'),
-      borderRadius: S.radius.lg,
-      overflow: 'hidden',
-    },
-    split: {
-      flex: 1,
-      flexDirection: isDesktop ? 'row' : 'column',
-      backgroundColor: $('background'),
-    },
-    loading: {
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: $('background'),
-    },
-  }
-
-  /* Handle background image layering (for panel variant) */
-    const Wrapper = (backgroundImage
+  /* Handle background image layering */
+  const Wrapper = (backgroundImage
     ? ImageBackground
     : View) as ComponentType<any>
 
-    const wrapperProps = backgroundImage
+  const wrapperProps = backgroundImage
     ? { source: backgroundImage, resizeMode: 'cover' as const }
     : {}
 
-  /* Core content renderer */
-  const Content = (
-    <Animated.View
-      style={[
-        base,
-        variants[variant],
-        slideAnim,
-        style,
-      ]}
-      {...rest}
-    >
-      {/* Split variant logic */}
-      {variant === 'split' ? (
-        <>
-          <View
-            style={{
-              flex: isDesktop ? 1 : undefined,
-              width: isDesktop ? '35%' : '100%',
-              borderRightWidth: isDesktop ? 1 : 0,
-              borderRightColor: tone($('border'), 'subtle'),
-              paddingRight: isDesktop ? S.space.md : 0,
-            }}
-          >
-            {scroll ? (
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: S.space.xl }}
-              >
-                {left}
-              </ScrollView>
-            ) : (
-              left
-            )}
-          </View>
-
-          <View
-            style={{
-              flex: isDesktop ? 2 : undefined,
-              width: isDesktop ? '65%' : '100%',
-              paddingLeft: isDesktop ? S.space.md : 0,
-              marginTop: isDesktop ? 0 : S.space.lg,
-            }}
-          >
-            {scroll ? (
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: S.space.xl }}
-              >
-                {right ?? children}
-              </ScrollView>
-            ) : (
-              right ?? children
-            )}
-          </View>
-        </>
-      ) : scroll || shouldAutoScroll ? (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            flexGrow: 1,
-            justifyContent: center ? 'center' : undefined,
-            paddingBottom: S.space.xl,
-          }}
-        >
-          {children}
-        </ScrollView>
-      ) : (
-        children
-      )}
-    </Animated.View>
+  return (
+    <Wrapper {...wrapperProps} style={{ flex: 1 }}>
+      <ScrollView
+        style={[base, variantStyles, style]}
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: center ? 'center' : undefined,
+          alignItems: center ? 'center' : undefined,
+        }}
+        showsVerticalScrollIndicator={showScrollIndicator}
+        {...rest}
+      >
+        {children}
+      </ScrollView>
+    </Wrapper>
   )
-
-  /* Return wrapped (with optional image) */
-  return <Wrapper {...wrapperProps}>{Content}</Wrapper>
 }
 
-/* Optional: named aliases for clarity */
+/* ───────────────────────────────
+   📄 Layout Variants
+   All extend BaseAppView with specific styles
+──────────────────────────────── */
 
-export const AppPanel = (props: AppViewProps) => (
-  <AppView {...props} variant="panel" />
-)
+/* ───── AppPage ───── 
+   Default page container
+   Optionally centered content, standard padding
+*/
+export function AppPage({
+  center = false,
+  ...rest
+}: AppViewProps) {
+  const { theme } = UseTheme()
+  
+  const variantStyles: ViewStyle = {
+    justifyContent: center ? 'center' : undefined,
+    alignItems: center ? 'center' : undefined,
+    backgroundColor: $('background', theme),
+  }
+  
+  return <BaseAppView center={center} variantStyles={variantStyles} {...rest} />
+}
 
-export const AppSplitView = (props: AppViewProps) => (
-  <AppView {...props} variant="split" />
-)
+/* ───── AppPanel ───── 
+   Elevated panel container
+   Rounded corners, themed background, overflow hidden
+*/
+export function AppPanel({
+  tone: toneVariant = 'base',
+  ...rest
+}: AppViewProps) {
+  const S = useScale()
+  const { theme } = UseTheme()
+  
+  const variantStyles: ViewStyle = {
+    backgroundColor:
+      toneVariant === 'alt'
+        ? tone($('background', theme), 'alt', undefined, undefined, theme)
+        : toneVariant === 'accent'
+        ? tone($('background', theme), 'accent', undefined, undefined, theme)
+        : toneVariant === 'surface'
+        ? $('surface', theme)
+        : $('background', theme),
+    borderRadius: S.radius.lg,
+    overflow: 'hidden',
+  }
+  
+  return <BaseAppView tone={toneVariant} variantStyles={variantStyles} {...rest} />
+}
 
+/* ───── AppSplit ───── 
+   Two-column split layout (responsive)
+   Desktop: 35% left / 65% right side-by-side
+   Mobile: stacked vertically
+*/
+export function AppSplit({
+  left,
+  right,
+  children,
+  gap = 'md',
+  showScrollIndicator = false,
+  ...rest
+}: AppSplitViewProps) {
+  const S = useScale()
+  const { theme } = UseTheme()
+  const { width } = useWindowDimensions()
+  const isDesktop = Platform.OS === 'web' && width >= 900
+  
+  return (
+    <View
+      style={{
+        flex: 1,
+        flexDirection: isDesktop ? 'row' : 'column',
+        backgroundColor: $('background', theme),
+        padding: S.space[gap],
+      }}
+      {...rest}
+    >
+      <ScrollView
+        style={{
+          flex: isDesktop ? 1 : undefined,
+          width: isDesktop ? '35%' : '100%',
+          borderRightWidth: isDesktop ? 1 : 0,
+          borderRightColor: tone($('border', theme), 'subtle', undefined, undefined, theme),
+          paddingRight: isDesktop ? S.space.md : 0,
+        }}
+        showsVerticalScrollIndicator={showScrollIndicator}
+      >
+        {left}
+      </ScrollView>
 
-export const AppLoadingView = (props: AppViewProps) => (
-  <AppView {...props} variant="loading" center scroll={false} />
-)
+      <ScrollView
+        style={{
+          flex: isDesktop ? 3 : undefined,
+          width: isDesktop ? '65%' : '100%',
+          paddingLeft: isDesktop ? S.space.md : 0,
+          marginTop: isDesktop ? 0 : S.space.lg,
+        }}
+        showsVerticalScrollIndicator={showScrollIndicator}
+      >
+        {right}
+      </ScrollView>
+      
+      {/* Render modals, toasts, and other overlays */}
+      {children}
+    </View>
+  )
+}
+
+/* ───── AppLoading ───── 
+   Loading state overlay
+   Shows LoadingOverlay component with message/error
+*/
+export function AppLoading({
+  loadMessage = 'Loading...',
+  error = null,
+  assetsLoaded = false,
+  ...rest
+}: AppLoadingViewProps) {
+  return (
+    <LoadingOverlay
+      message={loadMessage}
+      error={error}
+      assetsLoaded={assetsLoaded}
+      {...rest}
+    />
+  )
+}

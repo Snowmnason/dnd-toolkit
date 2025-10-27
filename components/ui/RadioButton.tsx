@@ -1,4 +1,4 @@
-import { $, tone, useScale } from '@/theme'
+import { $, tone, useScale, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useEffect, useRef } from 'react'
 import { Animated, Pressable, View } from 'react-native'
@@ -25,6 +25,7 @@ export function RadioButton({
   color = $('accent'),
   size = 22,
 }: RadioButtonProps) {
+  const { theme } = UseTheme()
   const S = useScale()
   const anim = useRef(new Animated.Value(checked ? 1 : 0)).current
 
@@ -64,10 +65,10 @@ export function RadioButton({
           height: size,
           borderRadius: size / 2,
           borderWidth: 2,
-          borderColor: checked ? color : tone($('border'), 'subtle'),
+          borderColor: checked ? color : tone($('border', theme), 'subtle', undefined, undefined, theme),
           justifyContent: 'center',
           alignItems: 'center',
-          backgroundColor: $('surface'),
+          backgroundColor: $('surface', theme),
         }}
       >
         <Animated.View
@@ -84,7 +85,7 @@ export function RadioButton({
       {label && (
         <Body
           style={{
-            color: $('textPrimary'),
+            color: $('textPrimary', theme),
             fontSize: 15,
           }}
         >

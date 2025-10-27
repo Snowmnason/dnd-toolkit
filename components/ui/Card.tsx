@@ -29,19 +29,26 @@ export function Card({
   children,
 }: CardProps) {
   const S = useScale()
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { theme: _theme } = UseTheme()
+  const { theme } = UseTheme()
 
-  // Tone-based background
+  // Tone-based background - calculate directly for reactivity
   const bg =
     toneVariant === 'accent'
-      ? tone($('accent'), 'alt')
+      ? tone($('accent', theme), 'alt', undefined, undefined, theme)
       : toneVariant === 'alt'
-      ? tone($('surface'), 'alt')
-      : $('surface')
+      ? tone($('surface', theme), 'alt', undefined, undefined, theme)
+      : $('surface', theme)
 
   // Unified shadow tone (light on dark, dark on light)
-  const shadowColor = $('shadow')
+  const shadowColor = $('shadow', theme)
+
+  // Border color
+  const borderColor = bordered 
+    ? tone($('border', theme), 'subtle', undefined, undefined, theme) 
+    : 'transparent'
+
+  // Box shadow - works on web and modern React Native
+  const boxShadow = shadow ? `0px 3px 6px ${shadowColor}66` : 'none'
 
   return (
     <View
@@ -50,13 +57,9 @@ export function Card({
           backgroundColor: bg,
           borderRadius: S.radius[radius],
           borderWidth: bordered ? 1 : 0,
-          borderColor: bordered ? tone($('border'), 'subtle') : 'transparent',
+          borderColor: borderColor,
           padding: padded ? S.space.md : 0,
-          shadowColor: shadow ? shadowColor : 'transparent',
-          shadowOpacity: shadow ? 0.35 : 0,
-          shadowRadius: shadow ? 6 : 0,
-          shadowOffset: shadow ? { width: 0, height: 3 } : { width: 0, height: 0 },
-          elevation: shadow ? 3 : 0,
+          ...(shadow && { boxShadow: boxShadow }),
         },
         style,
       ]}

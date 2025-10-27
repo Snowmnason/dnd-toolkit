@@ -2,9 +2,9 @@ import { $, tone, useScale, UseTheme } from '@/theme';
 import React, { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets'; // ✅ new import
 
@@ -29,23 +29,30 @@ export function AppToast({
   duration = 2500,
   onHide,
 }: AppToastProps) {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { theme: _theme } = UseTheme() // keep reactive
+  const { theme } = UseTheme()
   const S = useScale()
   const opacity = useSharedValue(0)
   const translateY = useSharedValue(30)
-  const baseSurface = $('surface')
+  const baseSurface = $('surface', theme)
 
   useEffect(() => {
     if (visible) {
+      // Animate in: fade + slide up
       opacity.value = withTiming(1, { duration: 200 })
       translateY.value = withTiming(0, { duration: 200 })
+      
       const timeout = setTimeout(() => {
-        opacity.value = withTiming(0, { duration: 200 }, () => {
+        // Animate out: fade + slide down (reverse)
+        opacity.value = withTiming(0, { duration: 200 })
+        translateY.value = withTiming(30, { duration: 200 }, () => {
           if (onHide) scheduleOnRN(onHide)
         })
       }, duration)
       return () => clearTimeout(timeout)
+    } else {
+      // Reset to initial state when not visible
+      opacity.value = 0
+      translateY.value = 30
     }
   }, [visible, duration, onHide, opacity, translateY]) // ✅ include deps
 
@@ -74,7 +81,7 @@ const background =
           },
         ]}
       >
-        <Text style={[styles.text, { color: $('textPrimary'), fontSize: S.font.body1 }]}>
+        <Text style={[styles.text, { color: $('textPrimary', theme), fontSize: S.font.body1 }]}>
           {message}
         </Text>
       </View>

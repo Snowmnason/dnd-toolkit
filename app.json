@@ -31,7 +31,9 @@
       "favicon": "./assets/images/icon.jpg",
       "bundler": "metro",
       "name": "D&D Toolkit",
-      "basePath": "."
+      "basePath": ".",
+      "backgroundColor": "#2f353d",
+      "themeColor": "#2f353d"
     },
     "plugins": [
       [
@@ -48,9 +50,9 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#2f353d",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#2f353d"
           }
         }
       ],

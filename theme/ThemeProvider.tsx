@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import React, {
   createContext,
   ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -27,10 +28,37 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
 /**
  * 🌈 ThemeProvider
  * Wraps the entire app and manages the active theme family + mode.
+ * Automatically loads and persists theme preferences from AsyncStorage.
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [family, setFamily] = useState<ThemeFamily>('classic')
-  const [mode, setMode] = useState<ThemeMode>('dark')
+  const [family, setFamilyState] = useState<ThemeFamily>('classic')
+  const [mode, setModeState] = useState<ThemeMode>('dark')
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Load saved theme preferences on mount
+  useEffect(() => {
+    const loadThemePreferences = async () => {
+      try {
+        const [savedFamily, savedMode] = await Promise.all([
+          AsyncStorage.getItem('activeTheme'),
+          AsyncStorage.getItem('themeMode'),
+        ])
+
+        if (savedFamily && allThemes[savedFamily as ThemeFamily]) {
+          setFamilyState(savedFamily as ThemeFamily)
+        }
+        if (savedMode && (savedMode === 'light' || savedMode === 'dark')) {
+          setModeState(savedMode as ThemeMode)
+        }
+      } catch (error) {
+        console.warn('[ThemeProvider] Failed to load theme preferences:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadThemePreferences()
+  }, [])
 
   // Resolve active theme tokens from family + mode
   const theme: ThemeTokens = useMemo(() => {
@@ -38,25 +66,51 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return selectedFamily?.[mode] ?? allThemes.classic.dark
   }, [family, mode])
 
-  /** Update both family + mode */
-  const setTheme = (f: ThemeFamily, m: ThemeMode) => {
+  /** Update family and persist */
+  const setFamily = useCallback((f: ThemeFamily) => {
     if (!allThemes[f]) {
       console.warn(`[ThemeProvider] Unknown theme: "${f}", falling back to classic.`)
-      setFamily('classic')
+      setFamilyState('classic')
+      AsyncStorage.setItem('activeTheme', 'classic')
     } else {
-      setFamily(f)
+      setFamilyState(f)
+      AsyncStorage.setItem('activeTheme', f)
     }
-    setMode(m)
+  }, [])
+
+  /** Update mode and persist */
+  const setMode = useCallback((m: ThemeMode) => {
+    setModeState(m)
+    AsyncStorage.setItem('themeMode', m)
+  }, [])
+
+  /** Update both family + mode and persist */
+  const setTheme = useCallback((f: ThemeFamily, m: ThemeMode) => {
+    if (!allThemes[f]) {
+      console.warn(`[ThemeProvider] Unknown theme: "${f}", falling back to classic.`)
+      setFamilyState('classic')
+      AsyncStorage.setItem('activeTheme', 'classic')
+    } else {
+      setFamilyState(f)
+      AsyncStorage.setItem('activeTheme', f)
+    }
+    setModeState(m)
+    AsyncStorage.setItem('themeMode', m)
+  }, [])
+
+  // Memoize context value to prevent unnecessary re-renders of all consumers
+  const contextValue = useMemo(
+    () => ({ theme, family, mode, setFamily, setMode, setTheme }),
+    [theme, family, mode, setFamily, setMode, setTheme]
+  )
+
+  // Don't render children until theme is loaded to prevent flash of wrong theme
+  if (isLoading) {
+    return null
   }
 
-  /** Optional: persist preferences automatically */
-  useEffect(() => {
-    AsyncStorage.setItem('activeTheme', family)
-    AsyncStorage.setItem('themeMode', mode)
-  }, [family, mode])
-
   return (
-    <ThemeContext.Provider value={{ theme, family, mode, setFamily, setMode, setTheme }}>
+    <ThemeContext.Provider value={contextValue}>
       {children}
     </ThemeContext.Provider>
   )

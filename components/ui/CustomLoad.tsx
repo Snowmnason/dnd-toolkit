@@ -18,8 +18,7 @@ export default function CustomLoad({
   ...props
 }: CustomLoadProps) {
   const [failed, setFailed] = useState(false)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { theme: _theme } = UseTheme()
+  const { theme } = UseTheme()
   const opacity = useSharedValue(0)
 
   useEffect(() => {
@@ -41,10 +40,10 @@ export default function CustomLoad({
   const activitySize = getSizeValue() <= 30 ? 'small' : 'large'
   const color =
     variant === 'accent'
-      ? $('accent')
+      ? $('accent', theme)
       : variant === 'minimal'
-      ? $('textPrimary')
-      : $('primary')
+      ? $('textPrimary', theme)
+      : $('primary', theme)
 
   return (
     <Animated.View style={animatedStyle}>
