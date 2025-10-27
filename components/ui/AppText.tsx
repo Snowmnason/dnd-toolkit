@@ -1,4 +1,4 @@
-import { useScale, UseTheme } from '@/theme'
+import { $, useScale, UseTheme } from '@/theme'
 import React from 'react'
 import { Platform, StyleProp, Text, TextProps, TextStyle } from 'react-native'
 
@@ -47,45 +47,62 @@ export function AppText({
   const { theme } = UseTheme()
   const S = useScale()
 
-  // Resolve token strings to actual values
   const resolvedFontSize = (() => {
     if (typeof fontSize === 'string' && fontSize.startsWith('$')) {
       const token = fontSize.slice(1) as keyof typeof S.font
-      return S.font[token] ?? fontSize
+      const tokenValue = S.font[token]
+      if (typeof tokenValue === 'number') {
+        return tokenValue
+      }
     }
-    return fontSize
-  })() as number
+    return Number(fontSize)
+  })()
 
-  // Resolve color: custom color overrides textType
   const resolvedColor = (() => {
-    // Custom color takes priority
     if (color) {
-      // Resolve token if it starts with $
       if (typeof color === 'string' && color.startsWith('$')) {
-        return theme[color.slice(1) as keyof typeof theme] as string
+        const token = color.slice(1) as keyof typeof theme
+        const tokenValue = theme[token]
+        if (typeof tokenValue === 'string') {
+          return tokenValue
+        }
       }
       return color
     }
-    
-    // Otherwise use textType
+
     switch (textType) {
-      case 'primary': return theme.textPrimary
-      case 'secondary': return theme.textSecondary
-      case 'inverse': return theme.textInverse
-      case 'onAccent': return theme.textOnAccent
-      case 'onCard': return theme.accentText
-      default: return theme.textPrimary
+      case 'primary':
+        return $('textPrimary', theme)
+      case 'secondary':
+        return $('textSecondary', theme)
+      case 'inverse':
+        return $('textInverse', theme)
+      case 'onAccent':
+        return $('textOnAccent', theme)
+      case 'onCard':
+        return $('accentText', theme)
+      default:
+        return $('textPrimary', theme)
     }
   })()
 
-  const weight = (() => {
-    if (fontWeight) return fontWeight
+  //const resolvedFontFamily = fontFamily ?? theme.fontFamily
+
+  let weight: TextStyle['fontWeight']
+  if (fontWeight) {
+    weight = fontWeight
+  } else {
     switch (variant) {
-      case 'semi': return '600'
-      case 'bold': return '700'
-      default: return '400'
+      case 'semi': 
+        weight = '600'
+        break
+      case 'bold': 
+        weight = '700'
+        break
+      default: 
+        weight = '400'
     }
-  })()
+  }
 
   // On native mobile, disable italics to avoid fonts without italic faces rendering poorly
   const isMobile = Platform.OS === 'ios' || Platform.OS === 'android'
@@ -98,7 +115,7 @@ export function AppText({
         {
           fontSize: resolvedFontSize,
           color: resolvedColor,
-          fontFamily: fontFamily ?? theme.fontFamily,
+          fontFamily: $('fontFamily', theme),
           fontWeight: weight,
           fontStyle: shouldItalic ? 'italic' : 'normal',
           textAlign: align,

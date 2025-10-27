@@ -1,10 +1,10 @@
 import { ObjHeading } from '@/components/ui/AppText'
-import { $, useScale, type Sizing } from '@/theme'
+import { $, useScale, UseTheme, type Sizing } from '@/theme'
 import React, {
-    forwardRef,
-    useEffect,
-    useImperativeHandle,
-    useState,
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useState,
 } from 'react'
 import { TouchableOpacity, View } from 'react-native'
 
@@ -66,6 +66,7 @@ export const ToggleGroup = forwardRef<ToggleGroupRef, ToggleGroupProps>(
     ref
   ) => {
     const S = useScale()
+    const { theme } = UseTheme()
     const [internalActive, setInternalActive] = useState(defaultActive)
     const activeItems = active ?? internalActive
 
@@ -108,7 +109,7 @@ export const ToggleGroup = forwardRef<ToggleGroupRef, ToggleGroupProps>(
       <View
         style={{
           borderWidth: outlined ? 1.5 : 0,
-          borderColor: outlined ? $('border') : 'transparent',
+          borderColor: outlined ? $('border', theme) : 'transparent',
           borderRadius: outlined ? S.radius.md : 0,
           padding: outlined ? S.space.sm : 0,
           backgroundColor: 'transparent',
@@ -122,7 +123,7 @@ export const ToggleGroup = forwardRef<ToggleGroupRef, ToggleGroupProps>(
               top: outlined ? -S.space.md : 0,
               left: outlined ? S.space.sm : 0,
               paddingHorizontal: outlined ? S.space.xs : 0,
-              backgroundColor: outlined ? $('background') : 'transparent',
+              backgroundColor: outlined ? $('background', theme) : 'transparent',
               marginBottom: outlined ? S.space.xs : S.space.sm,
             }}
           >
@@ -143,8 +144,8 @@ export const ToggleGroup = forwardRef<ToggleGroupRef, ToggleGroupProps>(
         >
           {items.map((item) => {
             const isActive = activeItems.includes(item.key)
-            const backgroundColor = isActive ? $('accent') : 'transparent'
-            const borderColor = $('accent')
+            const backgroundColor = isActive ? $('accent', theme) : 'transparent'
+            const borderColor = $('accent', theme)
 
             return (
               <TouchableOpacity

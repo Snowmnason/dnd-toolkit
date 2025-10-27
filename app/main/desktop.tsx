@@ -1,6 +1,6 @@
 import { panelConfigs } from '@/components/main-panels/PanelData'
 import { PanelView } from '@/components/main-panels/PanelView'
-import { AppView } from '@/components/ui'
+import { AppPage } from '@/components/ui'
 import { useLocalSearchParams } from 'expo-router'
 import React from 'react'
 
@@ -11,9 +11,7 @@ export default function MainScreenDesktop() {
   const userRole = typeof params.userRole === 'string' ? params.userRole : undefined
 
   return (
-    //<AppView variant="page" scroll style={{ flexDirection: 'row' }}>
-    <AppView
-      variant="page"
+    <AppPage
       style={{
         flexDirection: 'row',
         flex: 1,
@@ -31,6 +29,6 @@ export default function MainScreenDesktop() {
           image={panel.image ?? undefined}
         />
       ))}
-    </AppView>
+    </AppPage>
   )
 }

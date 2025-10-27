@@ -1,6 +1,6 @@
 import { AppModal, Body, Button, TextInput } from '@/components/ui'
 import { validateUsername } from '@/lib/auth/validation'
-import { $, useScale } from '@/theme'
+import { $, useScale, UseTheme } from '@/theme'
 import React, { useEffect, useState } from 'react'
 import { View } from 'react-native'
 
@@ -26,6 +26,7 @@ export function UpdateUsernameModal({
   errorText = '',
 }: UpdateUsernameModalProps) {
   const S = useScale()
+  const { theme } = UseTheme()
   const [newUsername, setNewUsername] = useState('')
 
   // ✅ Reset field when modal closes
@@ -91,8 +92,8 @@ export function UpdateUsernameModal({
           style={{
             borderColor:
               newUsername.length > 0 && !isValid
-                ? $('danger')
-                : $('border'),
+                ? $('danger', theme)
+                : $('border', theme),
             borderWidth: 1.5,
           }}
         />
@@ -103,7 +104,7 @@ export function UpdateUsernameModal({
             style={{
               marginTop: S.space.xs,
               fontSize: 12,
-              color: isValid ? $('success') : $('danger'),
+              color: isValid ? $('success', theme) : $('danger', theme),
               fontWeight: '500',
               lineHeight: 16,
             }}
@@ -116,7 +117,7 @@ export function UpdateUsernameModal({
         {!!errorText && (
           <Body
             style={{
-              color: $('danger'),
+              color: $('danger', theme),
               marginTop: S.space.xs,
               fontSize: 13,
               fontWeight: '600',

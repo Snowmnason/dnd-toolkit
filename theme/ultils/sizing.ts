@@ -7,7 +7,7 @@ export const scale = getScale()
    Font Sizes (base values)
 ──────────────────────────────── */
 const fontBase = {
-  caption: 8,
+  caption: 10,
   subtitle: 14,
   para: 18,
   body1: 22,
@@ -16,7 +16,7 @@ const fontBase = {
   heading1: 36,
   heading2: 32,
   heading3: 28,
-  title: 72,
+  title: 68,
 }
 
 /* ───────────────────────────────

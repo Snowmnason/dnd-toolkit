@@ -1,8 +1,9 @@
-import { AppView, Button, Heading } from '@/components/ui'
+import { AppPage, Button, Heading } from '@/components/ui'
 import { useAppParams } from '@/contexts/AppParamsContext'
-import { $, tone, useScale } from '@/theme'
+import { $, tone, useScale, UseTheme } from '@/theme'
 import { useRouter } from 'expo-router'
 import React from 'react'
+import { View } from 'react-native'
 import { PanelConfig } from './PanelData'
 
 interface PanelViewProps {
@@ -22,6 +23,7 @@ export function PanelView({
   style,
   image,
 }: PanelViewProps) {
+  const { theme } = UseTheme()
   const router = useRouter()
   const S = useScale()
   const { updateParams } = useAppParams()
@@ -43,8 +45,7 @@ export function PanelView({
   const backgroundImage = image ? { uri: image } : undefined
 
   return (
-    <AppView
-      variant="panel"
+    <AppPage
       backgroundImage={backgroundImage}
       style={[
         {
@@ -62,21 +63,20 @@ export function PanelView({
         align="center"
         style={{
           marginBottom: S.space.md,
-          color: $('textPrimary'),
+          color: $('textPrimary', theme),
         }}
       >
         {config.title}
       </Heading>
 
       {/* ─────────────── Feature Buttons ─────────────── */}
-      <AppView
-        center
-        gap="sm"
+      <View
         style={{
           width: '100%',
           flex: 1,
           justifyContent: 'center',
           alignItems: 'center',
+          gap: S.space.sm,
         }}
       >
         {config.items.map((item, index) => (
@@ -88,11 +88,11 @@ export function PanelView({
             style={{
               width: '85%',
               marginVertical: S.space.xs,
-              shadowColor: tone($('shadow'), 'alt'),
+              shadowColor: tone($('shadow', theme), 'alt', undefined, undefined, theme),
             }}
           />
         ))}
-      </AppView>
-    </AppView>
+      </View>
+    </AppPage>
   )
 }

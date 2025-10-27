@@ -1,8 +1,8 @@
-import { AppView, Body, Title } from '@/components/ui';
+import { AppPage, Body, Title } from '@/components/ui';
 
 export default function TreasureGeneratorPage() {
   return (
-    <AppView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+    <AppPage style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
       <Title style={{ marginBottom: 20 }}>
         Treasure Generator
       </Title>
@@ -14,6 +14,6 @@ export default function TreasureGeneratorPage() {
       <Body style={{ textAlign: 'center', fontStyle: 'italic', marginBottom: 40 }}>
         ✨ Coming Soon: Random treasure tables, magic item generator, and custom loot creation.
       </Body>
-    </AppView>
+    </AppPage>
   );
 }

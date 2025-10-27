@@ -1,7 +1,7 @@
-import { AppModal, AppView, Button } from '@/components/ui'
-import { $, tone, useScale } from '@/theme'
+import { AppModal, Button } from '@/components/ui'
+import { $, tone, useScale, UseTheme } from '@/theme'
 import React from 'react'
-import { Platform } from 'react-native'
+import { Platform, View } from 'react-native'
 
 interface SettingsMenuProps {
   visible: boolean
@@ -16,6 +16,7 @@ export default function SettingsModal({
   onAccountSettings,
   onReturnToWorldSelection,
 }: SettingsMenuProps) {
+  const { theme } = UseTheme()
   const S = useScale()
   const isDesktop =
     Platform.OS === 'web' ||
@@ -31,10 +32,10 @@ export default function SettingsModal({
       borderTone="accent"
       width={280 * scale}
     >
-      <AppView
-        gap="sm"
+      <View
         style={{
           minWidth: 260 * scale,
+          gap: S.space.sm,
         }}
       >
         {/* Account Settings */}
@@ -47,7 +48,7 @@ export default function SettingsModal({
           }}
           style={{
             paddingVertical: S.space.md * scale,
-            borderColor: tone($('border'), 'subtle'),
+            borderColor: tone($('border', theme), 'subtle', undefined, undefined, theme),
             borderWidth: 1,
           }}
         />
@@ -61,7 +62,7 @@ export default function SettingsModal({
             onReturnToWorldSelection()
           }}
           style={{
-            backgroundColor: tone($('accent'), 'alt'),
+            backgroundColor: tone($('accent', theme), 'alt', undefined, undefined, theme),
             paddingVertical: S.space.md * scale,
           }}
         />
@@ -75,7 +76,7 @@ export default function SettingsModal({
             paddingVertical: S.space.md * scale,
           }}
         />
-      </AppView>
+      </View>
     </AppModal>
   )
 }

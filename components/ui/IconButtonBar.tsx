@@ -1,12 +1,12 @@
-import { $, tone } from '@/theme'
+import { $, tone, UseTheme } from '@/theme'
 import React, { ReactNode, useState } from 'react'
 import {
-    GestureResponderEvent,
-    Platform,
-    Pressable,
-    StyleSheet,
-    Text,
-    ViewStyle,
+  GestureResponderEvent,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  ViewStyle,
 } from 'react-native'
 
 interface IconButtonBarProps {
@@ -17,6 +17,7 @@ interface IconButtonBarProps {
   size?: number             // full diameter
   disabled?: boolean
   style?: ViewStyle
+  fontsize?: number
 }
 
 /**
@@ -26,20 +27,24 @@ interface IconButtonBarProps {
 export function IconButtonBar({
   icon,
   onPress,
-  color = $('accent'),
-  iconColor = $('surface'),
+  color,
+  iconColor,
   size = 38,
   disabled = false,
   style,
+  fontsize = size / 2,
 }: IconButtonBarProps) {
+  const { theme } = UseTheme()
+  const effectiveColor = color || $('accent', theme)
+  const effectiveIconColor = iconColor || $('surface', theme)
   const [hovered, setHovered] = useState(false)
   const [pressed, setPressed] = useState(false)
 
   // base 40%, hover 80%, press 100%
   const getBg = () => {
-    if (pressed) return tone(color, 'changeOpacity', undefined, 1)
-    if (hovered) return tone(color, 'changeOpacity', undefined, 0.8)
-    return tone(color, 'changeOpacity', undefined, 0.4)
+    if (pressed) return tone(effectiveColor, 'changeOpacity', undefined, 1, theme)
+    if (hovered) return tone(effectiveColor, 'changeOpacity', undefined, 0.8, theme)
+    return tone(effectiveColor, 'changeOpacity', undefined, 0.4, theme)
   }
 
   return (
@@ -56,7 +61,7 @@ export function IconButtonBar({
         {
           width: size,
           height: size,
-          borderRadius: size / 2,
+          borderRadius: 3,
           backgroundColor: getBg(),
           opacity: disabled ? 0.5 : 1,
         },
@@ -66,8 +71,8 @@ export function IconButtonBar({
       {typeof icon === 'string' ? (
         <Text
           style={{
-            fontSize: size / 2,
-            color: iconColor,
+            fontSize: fontsize,
+            color: effectiveIconColor,
             textAlign: 'center',
           }}
         >

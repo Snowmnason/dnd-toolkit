@@ -1,4 +1,4 @@
-import { $, UseTheme } from '@/theme'
+import { $, S, UseTheme } from '@/theme'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import {
@@ -69,9 +69,10 @@ export default function TopBar({
             <IconButtonBar
               icon="←"
               onPress={handleBackPress}
-              color={$('accent')}
-              iconColor={$('surface')}
-              size={32}
+              color={$('accent', theme)}
+              iconColor={$('surface', theme)}
+              size={42}
+              fontsize={42}
             />
           )}
         </View>
@@ -80,7 +81,7 @@ export default function TopBar({
         <Text
           style={[
             styles.title,
-            { fontFamily: theme.fontFamilyTitle },
+            { fontFamily: theme.fontFamilyTitle, fontSize: S.font.heading3 },
           ]}
           numberOfLines={1}
         >
@@ -93,9 +94,9 @@ export default function TopBar({
             <IconButtonBar
               icon="☰"
               onPress={handleHamburgerPress}
-              color={$('accent')}
-              iconColor={$('surface')}
-              size={32}
+              color={$('accent', theme)}
+              iconColor={$('surface', theme)}
+              size={42}
             />
           )}
         </View>
@@ -156,7 +157,6 @@ const styles = StyleSheet.create({
   },
   title: {
     color: TOPBAR_TEXT,
-    fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
     flex: 1,

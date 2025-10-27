@@ -1,5 +1,5 @@
 import { useThemeSwitcher } from '@/hooks/useThemeSwitcher'
-import { $, allThemes, ThemeFamily, ThemeMode, useScale } from '@/theme'
+import { $, allThemes, ThemeFamily, ThemeMode, useScale, UseTheme } from '@/theme'
 import React from 'react'
 import { Text, TouchableOpacity, View } from 'react-native'
 
@@ -9,6 +9,7 @@ import { Text, TouchableOpacity, View } from 'react-native'
  */
 export function ThemeSelector() {
   const { activeTheme, mode, changeTheme, toggleMode } = useThemeSwitcher()
+  const { theme: currentTheme } = UseTheme()
   const S = useScale()
 
   const handleSelect = (themeName: ThemeFamily, themeMode: ThemeMode) => {
@@ -26,7 +27,7 @@ export function ThemeSelector() {
         justifyContent: 'space-around',
         flexWrap: 'wrap',
         gap: S.space.lg,
-        marginTop: S.space.lg,
+        //marginTop: S.space.lg,
       }}
     >
       {Object.entries(allThemes).map(([key, theme]) => {
@@ -44,7 +45,7 @@ export function ThemeSelector() {
             {/* ─────────── Theme Name ─────────── */}
             <Text
               style={{
-                color: $('textPrimary'),
+                color: $('textPrimary', currentTheme),
                 fontWeight: isActiveFamily ? 'bold' : '600',
                 marginBottom: S.space.sm,
               }}
@@ -68,8 +69,8 @@ export function ThemeSelector() {
                       isActiveFamily && mode === m ? 3 : 1,
                     borderColor:
                       isActiveFamily && mode === m
-                        ? $('accent')
-                        : $('border'),
+                        ? $('accent', currentTheme)
+                        : $('border', currentTheme),
                   }}
                 />
               ))}

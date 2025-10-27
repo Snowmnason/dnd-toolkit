@@ -1,4 +1,4 @@
-import { AppView } from '@/components/ui';
+import { AppLoading, AppPage } from '@/components/ui';
 import { AuthStateManager, logger } from '@/lib';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -29,12 +29,12 @@ export default function SelectLayout() {
   }, [router]);
 
   if (isCheckingAuth) {
-    return <AppView variant="loading" />;
+    return <AppLoading />;
   }
 
   return (
-    <AppView variant="page">
+    <AppPage>
       <Stack screenOptions={{ headerShown: false }} />
-    </AppView>
+    </AppPage>
   );
 }

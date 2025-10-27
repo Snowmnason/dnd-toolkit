@@ -1,6 +1,6 @@
 import { panelConfigs } from '@/components/main-panels/PanelData'
 import { PanelView } from '@/components/main-panels/PanelView'
-import { AppView } from '@/components/ui'
+import { AppPage } from '@/components/ui'
 import { useLocalSearchParams } from 'expo-router'
 import React from 'react'
 
@@ -15,7 +15,7 @@ export default function MainScreenMobile() {
   const activePanel = panelConfigs.find((p) => p.key === tab) || panelConfigs[0]
 
   return (
-    <AppView variant="page" style={{ flex: 1 }}>
+    <AppPage style={{ flex: 1 }}>
       <PanelView
         config={activePanel}
         userId={userId}
@@ -23,6 +23,6 @@ export default function MainScreenMobile() {
         userRole={userRole}
         image={activePanel.image ?? undefined}
       />
-    </AppView>
+    </AppPage>
   )
 }

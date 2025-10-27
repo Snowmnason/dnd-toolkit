@@ -1,10 +1,12 @@
 import { IconSymbol } from '@/components/built-in/icon-symbol'
 import { Body, ObjHeading, TextType } from '@/components/ui/AppText'
-import { $, tone, useScale } from '@/theme'
-import React, { useMemo, useState } from 'react'
+import { $, tone, useScale, UseTheme } from '@/theme'
+import React, { useMemo, useRef, useState } from 'react'
 import {
   FlatList,
+  Modal,
   Platform,
+  Pressable,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -22,6 +24,60 @@ interface DropdownItem {
   value: string
 }
 
+interface DropdownItemProps {
+  item: DropdownItem
+  isSelected: boolean
+  onPress: () => void
+  borderColor: string
+  accentColor: string
+  textPrimaryColor: string
+  S: ReturnType<typeof useScale>
+  theme: any
+}
+
+function DropdownItemComponent({
+  item,
+  isSelected,
+  onPress,
+  borderColor,
+  accentColor,
+  textPrimaryColor,
+  S,
+  theme,
+}: DropdownItemProps) {
+  const [isHovered, setIsHovered] = useState(false)
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={onPress}
+      onPressIn={() => setIsHovered(true)}
+      onPressOut={() => setIsHovered(false)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={[
+        {
+          borderColor,
+          borderWidth: 1.5,
+          borderRadius: S.radius.md,
+          paddingVertical: S.space.sm,
+          paddingHorizontal: S.space.md,
+          backgroundColor: isHovered
+            ? tone($('surface', theme), 'hover', undefined, undefined, theme)
+            : isSelected
+            ? tone(accentColor, 'subtle', undefined, undefined, theme)
+            : 'transparent',
+          transform: isHovered ? [{ scale: 1.02 }] : [{ scale: 1 }],
+        },
+      ]}
+    >
+      <Body color={isSelected ? accentColor : textPrimaryColor}>
+        {item.label}
+      </Body>
+    </TouchableOpacity>
+  )
+}
+
 interface DropdownProps {
   items: DropdownItem[]
   value: string | null
@@ -31,6 +87,12 @@ interface DropdownProps {
   heading?: string
   textType?: TextType
   style?: any
+  /**
+   * Additive adjustment applied to the dropdown's max height.
+   * Positive values increase, negative values decrease.
+   * Example: -10 shrinks by 10, 20 grows by 20.
+   */
+  maxHeightDelta?: number
 }
 
 export default function Dropdown({
@@ -42,8 +104,10 @@ export default function Dropdown({
   heading,
   textType = 'secondary',
   style,
+  maxHeightDelta = 0,
 }: DropdownProps) {
   const S = useScale()
+  const { theme } = UseTheme()
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState('')
   const rotate = useSharedValue(0)
@@ -51,8 +115,8 @@ export default function Dropdown({
   const opacity = useSharedValue(0)
   const shadow = useSharedValue(0)
 
-  const borderColor = $('accent')
-  const background = $('surface')
+  const borderColor = $('accent', theme)
+  const background = $('surface', theme)
 
   const chevronStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotate.value}deg` }],
@@ -72,13 +136,15 @@ export default function Dropdown({
     rotate.value = withTiming(toOpen ? 180 : 0, { duration: 220 })
 
     if (toOpen) {
-      opacity.value = withTiming(1, { duration: 100 })
-      scale.value = withSpring(1, { damping: 12, stiffness: 120, mass: 0.6 })
+      opacity.value = withTiming(1, { duration: 120 })
+      scale.value = withSpring(1, { damping: 10, stiffness: 150, mass: 0.5 })
       shadow.value = withTiming(1, { duration: 200 })
     } else {
       opacity.value = withTiming(0, { duration: 150 })
       scale.value = withSpring(0.9, { damping: 15, stiffness: 120, mass: 0.6 })
       shadow.value = withTiming(0, { duration: 150 })
+      // Clear search when closing
+      setSearch('')
     }
   }
 
@@ -89,8 +155,23 @@ export default function Dropdown({
 
   const selectedLabel = items.find((item) => item.value === value)?.label || placeholder
 
+  // Pre-compute colors outside of render callbacks
+  const textPrimaryColor = $('textPrimary', theme)
+  const accentColor = $('accent', theme)
+  const separatorColor = tone($('accent', theme), 'hover', undefined, undefined, theme)
+  const SAFE_AREA = 24
+  const headerRef = useRef<View>(null)
+  const [anchor, setAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
+  const [searchHeight, setSearchHeight] = useState(0)
+
+  // We open with index 0 aligned to the button (no translation needed)
+
+  // Base max height plus optional additive delta
+  const baseMaxHeight = S.space.xxl * 10
+  const computedMaxHeight = Math.max(100, baseMaxHeight + (maxHeightDelta))
+
   return (
-    <View style={[{ width: '100%' }, style]}>
+  <View style={[{ width: '100%', position: 'relative' }, style]}>
       {heading ? (
         <ObjHeading textType={textType} style={{ marginBottom: S.space.xs, marginLeft: S.space.xs }}>
           {heading}
@@ -98,9 +179,20 @@ export default function Dropdown({
       ) : null}
 
       <TouchableOpacity
+        ref={headerRef}
         accessibilityRole="button"
         activeOpacity={0.8}
-        onPress={toggleDropdown}
+        onPress={() => {
+          const toOpen = !isOpen
+          toggleDropdown()
+          if (!toOpen) return
+          // Measure on next frame so layout is settled
+          requestAnimationFrame(() => {
+            headerRef.current?.measureInWindow?.((x, y, width, height) => {
+              setAnchor({ x, y, width, height })
+            })
+          })
+        }}
         style={[
           styles.header,
           {
@@ -120,82 +212,110 @@ export default function Dropdown({
             name="chevron.right"
             size={18}
             weight="medium"
-            color={$(`textSecondary`)}
+            color={$(`textSecondary`, theme)}
             style={{ transform: [{ rotate: isOpen ? '90deg' : '0deg' }] }}
           />
         </Animated.View>
       </TouchableOpacity>
 
-      {isOpen && (
-        <Animated.View
-          style={[
-            styles.dropdown,
-            {
-              borderColor,
-              backgroundColor: background,
-              shadowColor: $('textInverse'),
-              marginTop: S.space.xs,
-              borderRadius: S.radius.md,
-            },
-            dropdownAnimStyle,
-          ]}
-        >
+      {isOpen && anchor && (
+        <Modal transparent animationType="fade">
+          <View style={{ flex: 1 }}>
+            {/* Full-screen backdrop closes dropdown when pressed anywhere */}
+            <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setIsOpen(false)} />
+
+            {/* Positioned container with safety padding so clicks near dropdown won't close */}
+            <View
+              pointerEvents="box-none"
+              style={{
+                position: 'absolute',
+                top: Math.max(anchor.y - SAFE_AREA, 0),
+                left: Math.max(anchor.x - SAFE_AREA, 0),
+                width: anchor.width + SAFE_AREA * 2,
+                padding: SAFE_AREA,
+              }}
+            >
+              <Animated.View
+                style={[
+                  styles.dropdown,
+                  {
+                    borderColor,
+                    backgroundColor: background,
+                    shadowColor: $('textInverse', theme),
+                    borderRadius: S.radius.md,
+                    maxHeight: computedMaxHeight,
+                    elevation: 12,
+                    transformOrigin: 'top center',
+                  },
+                  dropdownAnimStyle,
+                ]}
+              >
           {enableSearch && (
-            <TextInput
-              placeholder="Search..."
-              value={search}
-              onChangeText={setSearch}
-              placeholderTextColor={$(`textSecondary`)}
-              style={[
-                styles.searchInput,
-                {
-                  borderColor,
-                  color: $('textPrimary'),
-                  borderRadius: S.radius.sm,
-                  paddingHorizontal: S.space.sm,
-                  margin: S.space.sm,
-                },
-              ]}
-            />
+            <View
+              onLayout={(e) => setSearchHeight(e.nativeEvent.layout.height)}
+              style={{ 
+                position: 'absolute', 
+                top: 0, 
+                left: 0, 
+                right: 0, 
+                paddingHorizontal: S.space.md,
+                paddingVertical: S.space.sm,
+                zIndex: 15,
+                backgroundColor: background,
+              }}
+            >
+              <TextInput
+                placeholder="Search..."
+                value={search}
+                onChangeText={setSearch}
+                placeholderTextColor={$(`textSecondary`)}
+                style={[
+                  styles.searchInput,
+                  {
+                    borderColor,
+                    color: $('textPrimary', theme),
+                    //borderRadius: S.radius.sm,
+                    paddingHorizontal: S.space.md,
+                  },
+                ]}
+              />
+            </View>
           )}
 
           <FlatList
             data={filteredItems}
             keyExtractor={(item) => item.value}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={enableSearch ? { paddingTop: searchHeight } : undefined}
             ItemSeparatorComponent={() => (
               <View
                 style={{
                   height: 1,
-                  backgroundColor: tone($('accent'), 'hover'),
+                  backgroundColor: separatorColor,
                   opacity: 0.2,
                 }}
               />
             )}
             renderItem={({ item }) => (
-              <TouchableOpacity
-                activeOpacity={0.8}
+              <DropdownItemComponent
+                item={item}
+                isSelected={item.value === value}
                 onPress={() => {
                   onChange(item.value)
                   toggleDropdown()
                 }}
-                style={[
-                  styles.item,
-                  {
-                    borderColor,
-                    borderWidth: 1.5,
-                    borderRadius: S.radius.md,
-                    paddingVertical: S.space.sm,
-                    paddingHorizontal: S.space.md,
-                  },
-                ]}
-              >
-                <Body color={item.value === value ? $('accent') : $('textPrimary')}>
-                  {item.label}
-                </Body>
-              </TouchableOpacity>
+                borderColor={borderColor}
+                accentColor={accentColor}
+                textPrimaryColor={textPrimaryColor}
+                S={S}
+                theme={theme}
+              />
             )}
           />
-        </Animated.View>
+              </Animated.View>
+            </View>
+          </View>
+        </Modal>
       )}
     </View>
   )

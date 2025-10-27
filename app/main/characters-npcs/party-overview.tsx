@@ -1,8 +1,8 @@
-import { AppView, Body, Title } from '@/components/ui';
+import { AppPage, Body, Title } from '@/components/ui';
 
 export default function PartyOverviewPage() {
   return (
-    <AppView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+    <AppPage style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
       <Title style={{ marginBottom: 20 }}>
         Party Overview
       </Title>
@@ -14,6 +14,6 @@ export default function PartyOverviewPage() {
       <Body style={{ textAlign: 'center', fontStyle: 'italic', marginBottom: 40 }}>
         👥 Coming Soon: Party health tracking, resource management, and group statistics.
       </Body>
-    </AppView>
+    </AppPage>
   );
 }

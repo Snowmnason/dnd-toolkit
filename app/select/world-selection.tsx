@@ -1,5 +1,5 @@
 import { ConfirmLeaveModal, EditWorldModal } from '@/components/modals'
-import { AppLoadingView, AppView, Body, Button, Card, Heading } from '@/components/ui'
+import { AppLoading, AppPage, AppSplit, Body, Button, Card, Heading } from '@/components/ui'
 import { useAppParams } from '@/contexts/AppParamsContext'
 import { useWorldModal } from '@/hooks/use-world-modal'
 import { useWorlds } from '@/lib'
@@ -54,24 +54,24 @@ export default function LandingPage() {
 
   // Loading state (use your modern loader view)
   if (isLoading) {
-    return <AppLoadingView loadMessage="Loading your worlds..." />
+    return <AppLoading loadMessage="Loading your worlds..." />
   }
 
   // Error state
   if (error) {
     return (
-      <AppView variant="page" center gap="md">
+      <AppPage center gap="md">
         <Body align="center" color="$destructive">
           {error}
         </Body>
         <Button variant='outlined' text="Try Again" onPress={retry} />
-      </AppView>
+      </AppPage>
     )
   }
 
   // Build Left Panel content
   const LeftPanel = (
-    <AppView
+    <AppPage
       style={{
         flex: 1,
         position: 'relative',
@@ -90,11 +90,11 @@ export default function LandingPage() {
         showsVerticalScrollIndicator={false}
       >
         {worlds.length === 0 ? (
-          <AppView center style={{ padding: S.space.lg }}>
+          <AppPage center style={{ padding: S.space.lg }}>
             <Body align="center" color="$textSecondary">
               No worlds yet. Create your first world to get started!
             </Body>
-          </AppView>
+          </AppPage>
         ) : (
           worlds.map((world) => {
             const isSelected = selectedWorld?.world_id === world.world_id
@@ -155,7 +155,7 @@ export default function LandingPage() {
       </ScrollView>
 
       {/* Create New World button (bottom-aligned) */}
-      <AppView
+      <AppPage
         style={{
           position: 'absolute',
           left: S.space.md,
@@ -173,38 +173,19 @@ export default function LandingPage() {
           }}
           style={{ borderRadius: S.radius.lg }}
         />
-      </AppView>
-    </AppView>
+      </AppPage>
+    </AppPage>
   )
 
   // Build Right Panel content (desktop only)
   const RightPanel = isDesktop ? (
-    <AppView
+    <AppPage
       style={{
         flex: 2,
         justifyContent: 'center',
         alignItems: 'center',
       }}
     >
-      {/* Modals */}
-      <EditWorldModal
-        visible={!!editModalVisible}
-        onClose={closeEditModal}
-        worldName={modalWorldName}
-        originalWorldName={selectedWorld?.name}
-        onWorldNameChange={setModalWorldName}
-        onConfirmWorldName={() => handleConfirmWorldName(selectedWorld?.world_id, modalWorldName, userId)}
-        onGenerateInviteLink={createGenerateInviteLinkHandler(selectedWorld?.world_id, selectedWorld?.name)}
-        onDeleteWorld={createDeleteWorldHandler(selectedWorld?.world_id, userId)}
-        generatingLink={generatingLink}
-      />
-      <ConfirmLeaveModal
-        visible={!!leaveModalVisible}
-        onClose={closeLeaveModal}
-        worldName={modalWorldName}
-        onConfirmLeave={createRemoveFromWorldHandler(selectedWorld?.world_id, userId)}
-      />
-
       {/* Map Preview */}
       <Image
         source={mapImage ? { uri: mapImage } : noImageSelected}
@@ -235,7 +216,7 @@ export default function LandingPage() {
           </Card>
 
           {/* Bottom action buttons */}
-          <AppView
+          <AppPage
             style={{
               position: 'absolute',
               left: S.space.xl,
@@ -276,24 +257,45 @@ export default function LandingPage() {
               }}
               style={{ minWidth: 140 }}
             />
-          </AppView>
+          </AppPage>
         </>
       )}
-    </AppView>
+    </AppPage>
   ) : (
     // On mobile, we keep it simple: left panel logic navigates to world-detail
-    <AppView />
+    <AppPage />
   )
 
   // Desktop split layout; mobile uses only the left logic which navigates to detail
   if (isDesktop) {
-    return <AppView variant="split" scroll left={LeftPanel} right={RightPanel} />
+    return (
+      <AppSplit left={LeftPanel} right={RightPanel}>
+        {/* Modals rendered outside the split panels */}
+        <EditWorldModal
+          visible={!!editModalVisible}
+          onClose={closeEditModal}
+          worldName={modalWorldName}
+          originalWorldName={selectedWorld?.name}
+          onWorldNameChange={setModalWorldName}
+          onConfirmWorldName={() => handleConfirmWorldName(selectedWorld?.world_id, modalWorldName, userId)}
+          onGenerateInviteLink={createGenerateInviteLinkHandler(selectedWorld?.world_id, selectedWorld?.name)}
+          onDeleteWorld={createDeleteWorldHandler(selectedWorld?.world_id, userId)}
+          generatingLink={generatingLink}
+        />
+        <ConfirmLeaveModal
+          visible={!!leaveModalVisible}
+          onClose={closeLeaveModal}
+          worldName={modalWorldName}
+          onConfirmLeave={createRemoveFromWorldHandler(selectedWorld?.world_id, userId)}
+        />
+      </AppSplit>
+    )
   }
 
   // Mobile: single column view reusing left content
   return (
-    <AppView variant="page" style={{ flex: 1, paddingHorizontal: S.space.md, paddingTop: S.space.sm }}>
+    <AppPage style={{ flex: 1, paddingHorizontal: S.space.md, paddingTop: S.space.sm }}>
       {LeftPanel}
-    </AppView>
+    </AppPage>
   )
 }

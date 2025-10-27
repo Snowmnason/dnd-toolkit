@@ -1,4 +1,4 @@
-import { $, tone, useScale } from '@/theme'
+import { $, tone, useScale, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useEffect, useRef } from 'react'
 import { Animated, Pressable, Text } from 'react-native'
@@ -26,6 +26,7 @@ export function SnackBar({
   onAction,
   onHide,
 }: SnackBarProps) {
+  const { theme } = UseTheme()
   const S = useScale()
   const translateY = useRef(new Animated.Value(100)).current
   const opacity = useRef(new Animated.Value(0)).current
@@ -33,12 +34,12 @@ export function SnackBar({
   // tone color mapping
   const bgColor =
     toneType === 'success'
-      ? tone($('accent'), 'alt')
+      ? tone($('accent', theme), 'alt', undefined, undefined, theme)
       : toneType === 'error'
-      ? tone($('destructiveButton'), 'alt')
+      ? tone($('destructiveButton', theme), 'alt', undefined, undefined, theme)
       : toneType === 'warning'
-      ? tone($('warning'), 'alt')
-      : tone($('surface'), 'accent')
+      ? tone($('warning', theme), 'alt', undefined, undefined, theme)
+      : tone($('surface', theme), 'accent', undefined, undefined, theme)
 
   // Slide animation
   useEffect(() => {
@@ -65,22 +66,28 @@ export function SnackBar({
           : Haptics.NotificationFeedbackType.Warning
       )
 
-      // Auto-hide
-      const timer = setTimeout(() => onHide?.(), duration)
+      // Auto-hide with reverse animation
+      const timer = setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(opacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(translateY, {
+            toValue: 100,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          onHide?.()
+        })
+      }, duration)
       return () => clearTimeout(timer)
     } else {
-      Animated.parallel([
-        Animated.timing(opacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(translateY, {
-          toValue: 100,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start()
+      // Reset to initial state when not visible
+      translateY.setValue(100)
+      opacity.setValue(0)
     }
   }, [visible, toneType, duration, onHide, opacity, translateY])
 
@@ -102,7 +109,7 @@ export function SnackBar({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        shadowColor: $('shadow'),
+        shadowColor: $('shadow', theme),
         shadowOpacity: 0.35,
         shadowRadius: 8,
         elevation: 3,
@@ -110,7 +117,7 @@ export function SnackBar({
     >
       <Text
         style={{
-          color: $('textPrimary'),
+          color: $('textPrimary', theme),
           fontSize: S.font.para,
           flex: 1,
         }}
@@ -127,7 +134,7 @@ export function SnackBar({
         >
           <Text
             style={{
-              color: $('accent'),
+              color: $('accent', theme),
               fontWeight: '600',
               marginLeft: S.space.md,
             }}

@@ -1,6 +1,6 @@
 import { ObjHeading } from '@/components/ui/AppText'
 import { RadioButton } from '@/components/ui/RadioButton'
-import { $, useScale, type Sizing } from '@/theme'
+import { $, useScale, UseTheme, type Sizing } from '@/theme'
 import React, { forwardRef, useImperativeHandle, useState } from 'react'
 import { View } from 'react-native'
 
@@ -45,6 +45,7 @@ export const RadioButtonGroup = forwardRef<RadioButtonGroupRef, RadioButtonGroup
     ref
   ) => {
     const S = useScale()
+    const { theme } = UseTheme()
     const [selected, setSelected] = useState<string | null>(
       defaultSelected ?? items[0]?.key ?? null
     )
@@ -57,7 +58,7 @@ export const RadioButtonGroup = forwardRef<RadioButtonGroupRef, RadioButtonGroup
       <View
         style={{
           borderWidth: outlined ? 1.5 : 0,
-          borderColor: outlined ? $('border') : 'transparent',
+          borderColor: outlined ? $('border', theme) : 'transparent',
           borderRadius: outlined ? S.radius.md : 0,
           padding: outlined ? S.space.sm : 0,
           width: '100%',
@@ -71,7 +72,7 @@ export const RadioButtonGroup = forwardRef<RadioButtonGroupRef, RadioButtonGroup
               top: outlined ? -S.space.md : 0,
               left: outlined ? S.space.sm : 0,
               paddingHorizontal: outlined ? S.space.xs : 0,
-              backgroundColor: outlined ? $('background') : 'transparent',
+              backgroundColor: outlined ? $('background', theme) : 'transparent',
               marginBottom: outlined ? S.space.xs : S.space.sm,
             }}
           >

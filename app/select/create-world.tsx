@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router'
 import React, { useState } from 'react'
 import { Platform, ScrollView } from 'react-native'
 
-import { AppView, Body, Button, Dropdown, Heading, TextInput } from '@/components/ui'
+import { AppPage, Body, Button, Dropdown, Heading, TextInput } from '@/components/ui'
 import { useAuthStatus } from '@/hooks/use-auth-status'
 import { useSuccessNavigation } from '@/hooks/use-success-navigation'
 import { useWorldCreation } from '@/hooks/use-world-creation'
@@ -81,8 +81,7 @@ export default function CreateWorldScreen() {
 
   // Panels
   const LeftPanel = (
-      <AppView
-        variant="page"
+      <AppPage
         style={{
           flex: 1,
           padding: S.space.lg,
@@ -112,13 +111,13 @@ export default function CreateWorldScreen() {
 
         {/* Validation errors */}
         {worldNameValidation && !worldNameValidation.isValid && (
-          <AppView style={{ marginBottom: S.space.md }}>
+          <AppPage style={{ marginBottom: S.space.md }}>
             {worldNameValidation.errors.map((error, index) => (
               <Body key={index} color="$destructive" style={{ marginBottom: S.space.xs }}>
                 ⚠️ {error}
               </Body>
             ))}
-          </AppView>
+          </AppPage>
         )}
 
         {/* Tabletop System */}
@@ -158,7 +157,7 @@ export default function CreateWorldScreen() {
         )}
 
         {/* Action Buttons */}
-        <AppView
+        <AppPage
           style={{
             flexDirection: 'row',
             justifyContent: 'space-between',
@@ -178,13 +177,13 @@ export default function CreateWorldScreen() {
             disabled={!isValidWorldNameForSubmission(worldName) || isCreating}
             style={{ flex: 1, marginLeft: S.space.sm }}
           />
-        </AppView>
+        </AppPage>
       </ScrollView>
-    </AppView>
+    </AppPage>
   )
 
   const RightPanel = isDesktop ? (
-    <AppView
+    <AppPage
       style={{
         flex: 4,
         borderLeftWidth: 1,
@@ -205,12 +204,11 @@ export default function CreateWorldScreen() {
         onPress={() => setImageImported(true)}
         style={{ margin: S.space.lg }}
       />
-    </AppView>
+    </AppPage>
   ) : null
 
   return (
-    <AppView
-      variant="page"
+    <AppPage
       style={{
         flex: 1,
         flexDirection: isDesktop ? 'row' : 'column',
@@ -230,6 +228,6 @@ export default function CreateWorldScreen() {
         successWorldName={successWorldName}
         onSuccessNavigate={handleSuccessNavigate}
       />
-    </AppView>
+    </AppPage>
   )
 }

@@ -1,8 +1,8 @@
-import { AppView, Body, Title } from '@/components/ui';
+import { AppPage, Body, Title } from '@/components/ui';
 
 export default function WorldMapPage() {
   return (
-    <AppView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+    <AppPage style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
       <Title style={{ marginBottom: 20 }}>
         World Map
       </Title>
@@ -14,6 +14,6 @@ export default function WorldMapPage() {
       <Body style={{ textAlign: 'center', fontStyle: 'italic', marginBottom: 40 }}>
         🗺️ Coming Soon: Interactive world maps, location markers, and travel tracking.
       </Body>
-    </AppView>
+    </AppPage>
   );
 }

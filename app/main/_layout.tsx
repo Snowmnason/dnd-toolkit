@@ -1,4 +1,4 @@
-import { AppView } from '@/components/ui'
+import { AppLoading, AppPage } from '@/components/ui'
 import { AuthStateManager, logger } from '@/lib'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
@@ -79,14 +79,14 @@ export default function MainLayout() {
   }
 
   if (isCheckingAuth) {
-    return <AppView variant="loading" />
+    return <AppLoading />
   }
 
   return (
-    <AppView variant="page">
+    <AppPage>
       {/* Cached tab screens */}
       {Object.entries(tabCache).map(([key, element]) => (
-        <AppView
+        <AppPage
           key={key}
           style={{
             display: key === activeTab ? 'flex' : 'none',
@@ -94,7 +94,7 @@ export default function MainLayout() {
           }}
         >
           {element}
-        </AppView>
+        </AppPage>
       ))}
 
       {/* Default stack for non-tab routes */}
@@ -107,6 +107,6 @@ export default function MainLayout() {
           onTabChange={handleTabChange}
         />
       )}
-    </AppView>
+    </AppPage>
   )
 }

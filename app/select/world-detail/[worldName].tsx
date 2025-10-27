@@ -4,7 +4,7 @@ import { Image } from 'react-native'
 import Animated, { FadeInRight } from 'react-native-reanimated'
 
 import { ConfirmLeaveModal, EditWorldModal } from '@/components/modals'
-import { AppView, Body, Button, Heading } from '@/components/ui'
+import { AppPage, Body, Button, Heading } from '@/components/ui'
 import { useAppParams } from '@/contexts/AppParamsContext'
 import { useWorldModal } from '@/hooks/use-world-modal'
 import { $, useScale } from '@/theme'
@@ -65,8 +65,7 @@ export default function WorldDetail() {
   }
 
   return (
-    <AppView
-      variant="page"
+    <AppPage
       center
       style={{ flex: 1, padding: S.space.md }}   // ← replaces `padded`
     >
@@ -122,7 +121,7 @@ export default function WorldDetail() {
         />
 
         {/* Button row: replace `row` with flexDirection */}
-        <AppView
+        <AppPage
           gap="md"
           style={{
             width: '65%',
@@ -147,12 +146,12 @@ export default function WorldDetail() {
             onPress={handleOpenWorld}
             style={{ flex: 1 }}
           />
-        </AppView>
+        </AppPage>
 
         <Body align="center" color="$textSecondary" style={{ opacity: 0.8 }}>
-          Tap “Open” to enter your world.
+          Tap &quot;Open&quot; to enter your world.
         </Body>
       </Animated.View>
-    </AppView>
+    </AppPage>
   )
 }

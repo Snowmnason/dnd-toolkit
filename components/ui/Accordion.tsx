@@ -1,4 +1,4 @@
-import { $, tone, useScale } from '@/theme'
+import { $, tone, useScale, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useRef, useState } from 'react'
 import { Animated, Pressable, View } from 'react-native'
@@ -22,7 +22,9 @@ export function Accordion({
   bordered = true,
 }: AccordionProps) {
   const S = useScale()
+  const { theme } = UseTheme()
   const [open, setOpen] = useState(defaultOpen)
+  const [contentHeight, setContentHeight] = useState(0)
   const animation = useRef(new Animated.Value(defaultOpen ? 1 : 0)).current
 
   const toggle = () => {
@@ -37,7 +39,7 @@ export function Accordion({
 
   const height = animation.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 1000],
+    outputRange: [0, contentHeight + 50], // content height + 50px padding
   })
   const opacity = animation.interpolate({
     inputRange: [0, 1],
@@ -49,9 +51,9 @@ export function Accordion({
       style={{
         marginBottom: S.space.md,
         borderWidth: bordered ? 1 : 0,
-        borderColor: bordered ? tone($('border'), 'subtle') : 'transparent',
+        borderColor: bordered ? tone($('border', theme), 'subtle', undefined, undefined, theme) : 'transparent',
         borderRadius: S.radius.md,
-        backgroundColor: tone($('surface'), 'alt'),
+        backgroundColor: tone($('surface', theme), 'alt', undefined, undefined, theme),
         overflow: 'hidden',
       }}
     >
@@ -66,7 +68,7 @@ export function Accordion({
         }}
       >
         <ObjHeading>{title}</ObjHeading>
-        <Body style={{ color: $('accent') }}>{open ? '−' : '+'}</Body>
+        <Body style={{ color: $('accent', theme) }}>{open ? '−' : '+'}</Body>
       </Pressable>
 
       <Animated.View
@@ -78,7 +80,16 @@ export function Accordion({
           paddingBottom: open ? S.space.md : 0,
         }}
       >
-        {children}
+        <View
+          onLayout={(event) => {
+            const measuredHeight = event.nativeEvent.layout.height
+            if (measuredHeight > 0 && measuredHeight !== contentHeight) {
+              setContentHeight(measuredHeight)
+            }
+          }}
+        >
+          {children}
+        </View>
       </Animated.View>
     </View>
   )
