@@ -94,7 +94,7 @@ export function UpdateUsernameModal({
               newUsername.length > 0 && !isValid
                 ? $('danger', theme)
                 : $('border', theme),
-            borderWidth: 1.5,
+            borderWidth: S.s(1.5),
           }}
         />
 
@@ -103,10 +103,10 @@ export function UpdateUsernameModal({
           <Body
             style={{
               marginTop: S.space.xs,
-              fontSize: 12,
+              fontSize: S.s(12),
               color: isValid ? $('success', theme) : $('danger', theme),
               fontWeight: '500',
-              lineHeight: 16,
+              lineHeight: S.s(16),
             }}
           >
             {getUsernameHint()}
@@ -119,7 +119,7 @@ export function UpdateUsernameModal({
             style={{
               color: $('danger', theme),
               marginTop: S.space.xs,
-              fontSize: 13,
+              fontSize: S.s(13),
               fontWeight: '600',
             }}
           >

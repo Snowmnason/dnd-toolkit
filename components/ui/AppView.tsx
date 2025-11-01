@@ -1,17 +1,17 @@
 import LoadingOverlay from '@/components/LoadingOverlay'
+import { usePlatform } from '@/contexts/PlatformContext'
 import { $, UseTheme, tone, useScale, } from '@/theme'
 import type { Sizing } from '@/theme/ultils/sizing'
-import React, { ComponentType, ReactNode } from 'react'
+import React, { ComponentType, ReactNode, useEffect } from 'react'
 import {
   ImageBackground,
-  Platform,
   ScrollView,
   StyleProp,
   View,
   ViewProps,
   ViewStyle,
-  useWindowDimensions
 } from 'react-native'
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
 
 /* ───────────────────────────────
    🪶 Base AppView Props
@@ -33,6 +33,10 @@ export interface AppViewProps extends ViewProps {
 export interface AppSplitViewProps extends AppViewProps {
   left?: ReactNode
   right?: ReactNode
+  /** Enable slide-in animation for right panel on non-desktop */
+  animateRightSlide?: boolean
+  /** Controls visibility of right panel when animation is enabled */
+  rightVisible?: boolean
 }
 
 export interface AppLoadingViewProps extends ViewProps {
@@ -173,12 +177,37 @@ export function AppSplit({
   children,
   gap = 'md',
   showScrollIndicator = false,
+  animateRightSlide = false,
+  rightVisible = true,
   ...rest
 }: AppSplitViewProps) {
   const S = useScale()
   const { theme } = UseTheme()
-  const { width } = useWindowDimensions()
-  const isDesktop = Platform.OS === 'web' && width >= 900
+  const { isDesktop, width } = usePlatform()
+
+  // Shared value to animate right panel in/out on mobile
+  const slideProgress = useSharedValue(rightVisible ? 1 : 0)
+
+  useEffect(() => {
+    // Animate only when enabled and not desktop
+    if (!animateRightSlide || isDesktop) {
+      slideProgress.value = rightVisible ? 1 : 0
+      return
+    }
+    slideProgress.value = withTiming(rightVisible ? 1 : 0, {
+      duration: 350,
+      easing: Easing.out(Easing.cubic),
+    })
+  }, [rightVisible, animateRightSlide, isDesktop, slideProgress])
+
+  // Animated style for right panel on mobile (slides from right)
+  const rightAnimatedStyle = useAnimatedStyle(() => {
+    if (isDesktop || !animateRightSlide) return {}
+    const translateX = (1 - slideProgress.value) * width
+    return {
+      transform: [{ translateX }],
+    }
+  }, [isDesktop, animateRightSlide])
   
   return (
     <View
@@ -190,37 +219,56 @@ export function AppSplit({
       }}
       {...rest}
     >
-      <ScrollView
-        style={{
-          flex: isDesktop ? 1 : 1,
-          width: isDesktop ? '35%' : '100%',
-          borderRightWidth: isDesktop ? 1 : 0,
-          borderRightColor: tone($('border', theme), 'subtle', undefined, undefined, theme),
-          paddingRight: isDesktop ? S.space.md : 0,
-        }}
-        contentContainerStyle={{
-          flexGrow: 1,
-        }}
-        showsVerticalScrollIndicator={showScrollIndicator}
-      >
-        {left}
-      </ScrollView>
-
-      {right && (
+      {left && (
         <ScrollView
           style={{
-            flex: isDesktop ? 3 : undefined,
-            width: isDesktop ? '65%' : '100%',
-            paddingLeft: isDesktop ? S.space.md : 0,
-            //marginTop: isDesktop ? 0 : S.space.lg,
+            flex: isDesktop ? 1 : 1,
+            width: isDesktop ? '35%' : '100%',
+            borderRightWidth: isDesktop ? 1 : 0,
+            borderRightColor: tone($('border', theme), 'subtle', undefined, undefined, theme),
+            paddingRight: isDesktop ? S.space.md : 0,
           }}
           contentContainerStyle={{
             flexGrow: 1,
           }}
           showsVerticalScrollIndicator={showScrollIndicator}
         >
-          {right}
+          {left}
         </ScrollView>
+      )}
+
+      {right && (
+        isDesktop ? (
+          <View
+            style={{
+              flex: 3,
+              width: '65%',
+              paddingLeft: S.space.md,
+            }}
+          >
+            {right}
+          </View>
+        ) : (
+          <Animated.View
+            style={[
+              {
+                position: 'absolute',
+                left: S.space[gap],
+                right: S.space[gap],
+                top: S.space[gap],
+                bottom: S.space[gap],
+                backgroundColor: $('background', theme),
+                // Ensure it overlays the left content during slide
+                zIndex: 10,
+              },
+              rightAnimatedStyle,
+            ]}
+            // Disable interactions when hidden
+            pointerEvents={rightVisible ? 'auto' : 'none'}
+          >
+            {right}
+          </Animated.View>
+        )
       )}
       
       {/* Render modals, toasts, and other overlays */}

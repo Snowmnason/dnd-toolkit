@@ -1,27 +1,27 @@
 import { AppPage, Body, Button } from '@/components/ui'
 import { useAppParams } from '@/contexts/AppParamsContext'
+import { usePlatform } from '@/contexts/PlatformContext'
 import { WorldWithAccess } from '@/lib/database/worlds'
 import { useScale } from '@/theme'
 import { useRouter } from 'expo-router'
 import React from 'react'
-import { Platform, ScrollView, useWindowDimensions } from 'react-native'
+import { ScrollView } from 'react-native'
 
 interface WorldListPanelProps {
   worlds: WorldWithAccess[]
   selectedWorld: WorldWithAccess | null
   setSelectedWorld: React.Dispatch<React.SetStateAction<WorldWithAccess | null>>
   setMapImage: (url: string | null) => void
+  onMobileWorldSelect?: (world: WorldWithAccess) => void
 }
 
-export function WorldListPanel({ worlds, selectedWorld, setSelectedWorld, setMapImage }: WorldListPanelProps) {
+export function WorldListPanel({ worlds, selectedWorld, setSelectedWorld, setMapImage, onMobileWorldSelect }: WorldListPanelProps) {
   const S = useScale()
   const router = useRouter()
-  const { params, updateParams } = useAppParams()
-  const userId = params.userId
+  const { updateParams } = useAppParams()
 
-  const { width } = useWindowDimensions()
-  const isMobile = Platform.OS === 'ios' || Platform.OS === 'android'
-  const isDesktop = !isMobile && width >= 900
+  // Centralized platform detection
+  const { isDesktop } = usePlatform()
 
   return (
     <>
@@ -65,22 +65,16 @@ export function WorldListPanel({ worlds, selectedWorld, setSelectedWorld, setMap
                       return newSelection
                     })
                   } else {
-                    // Update centralized params context for mobile route
+                    // Update centralized params context
                     updateParams({
-                      userId,
                       worldId: world.world_id,
                       userRole: world.user_role,
                     })
 
-                    // Construct a minimal, readable query
-                    const routeParams: Record<string, string> = {}
-                    if (world.name) routeParams.name = world.name
-                    if (world.map_image_url) routeParams.mapImage = world.map_image_url
-                    if (world.user_role) routeParams.userRole = world.user_role
-
-                    const qs = new URLSearchParams(routeParams).toString()
-                    const route = `/select/world-detail/${encodeURIComponent(world.world_id)}?${qs}`
-                    router.push(route as any)
+                    // Mobile: Use callback to switch panels instead of routing
+                    if (onMobileWorldSelect) {
+                      onMobileWorldSelect(world)
+                    }
                   }
                 }}
                 style={{

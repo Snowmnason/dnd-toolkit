@@ -1,16 +1,16 @@
-import { useRouter } from 'expo-router'
 import React, { useState } from 'react'
-import { Platform, ScrollView } from 'react-native'
+import { View } from 'react-native'
 
-import { AppPage, Body, Button, Dropdown, Heading, TextInput } from '@/components/ui'
+import { CreateWorldModals } from '@/components/modals'
+import { AppSplit, Button } from '@/components/ui'
+import { usePlatform } from '@/contexts/PlatformContext'
 import { useAuthStatus } from '@/hooks/use-auth-status'
 import { useSuccessNavigation } from '@/hooks/use-success-navigation'
 import { useWorldCreation } from '@/hooks/use-world-creation'
-import { createWorldNameChangeHandler, isValidWorldNameForSubmission, type WorldNameValidationResult } from '@/lib'
-import { $, useScale } from '@/theme'
-
-import MapCanvas from '@/components/create-world/MapCanvas'
-import { CreateWorldModals } from '@/components/modals'; // ✅ updated modal system
+import { isValidWorldNameForSubmission, type WorldNameValidationResult } from '@/lib'
+import { CreateLeftPanel } from '@/Screens/select/create-world/CreateLeftPanel'
+import MapCanvas from '@/Screens/select/create-world/MapCanvas'
+import { useScale } from '@/theme'
 
 // Constants
 const tabletopSystems = ['D&D 5e', 'Pathfinder', 'Call of Cthulhu', 'Custom']
@@ -24,9 +24,9 @@ const defaultMapImages = [
 
 export default function CreateWorldScreen() {
   const S = useScale()
-  // Platform detection
-  const isDesktop =
-    Platform.OS === 'web' || Platform.OS === 'windows' || Platform.OS === 'macos'
+  
+  // Centralized platform detection
+  const { isDesktop } = usePlatform()
 
   // State
   const [worldName, setWorldName] = useState('')
@@ -45,7 +45,6 @@ export default function CreateWorldScreen() {
   const [showSuccessModal, setShowSuccessModal] = useState(false)
 
   // Hooks
-  const router = useRouter()
   const { isUserLoggedIn } = useAuthStatus()
   const { isCreating, successWorldName, successWorldId, createWorld } = useWorldCreation()
   const { navigateToWorld } = useSuccessNavigation({
@@ -79,115 +78,28 @@ export default function CreateWorldScreen() {
     navigateToWorld()
   }
 
-  // Panels
+  // Left Panel Component
   const LeftPanel = (
-      <AppPage
-        style={{
-          flex: 1,
-          padding: S.space.lg,
-          maxWidth: 700,
-          alignSelf: 'center',
-        }}
-      >
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: S.space.xxl }}
-      >
-        <Heading align="center" style={{ marginBottom: S.space.lg }}>
-          Create New World
-        </Heading>
-
-        {/* World Name */}
-        <TextInput
-          heading="Name of World"
-          placeholder="World Name"
-          value={worldName}
-          onChangeText={createWorldNameChangeHandler(
-            setWorldName,
-            setWorldNameValidation
-          )}
-          style={{ marginBottom: S.space.md }}
-        />
-
-        {/* Validation errors */}
-        {worldNameValidation && !worldNameValidation.isValid && (
-          <AppPage style={{ marginBottom: S.space.md }}>
-            {worldNameValidation.errors.map((error, index) => (
-              <Body key={index} color="$destructive" style={{ marginBottom: S.space.xs }}>
-                ⚠️ {error}
-              </Body>
-            ))}
-          </AppPage>
-        )}
-
-        {/* Tabletop System */}
-        <Dropdown
-          heading="Tabletop System"
-          value={system}
-          items={systemItems}
-          onChange={(value) => {
-            if (value !== null) setSystem(value)
-          }}
-          placeholder="Select a tabletop system"
-          style={{ marginBottom: S.space.md }}
-        />
-
-        {/* Description */}
-        <TextInput
-          heading="Description"
-          placeholder="Description"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          style={{
-            height: 100,
-            textAlignVertical: 'top',
-            marginBottom: S.space.lg,
-          }}
-        />
-
-        {/* Import Image (mobile only) */}
-        {!isDesktop && (
-          <Button
-            text="Import Image"
-            variant="secondary"
-            onPress={() => {}}
-            style={{ marginBottom: S.space.lg }}
-          />
-        )}
-
-        {/* Action Buttons */}
-        <AppPage
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            marginTop: S.space.md,
-          }}
-        >
-          <Button
-            text="Cancel"
-            variant="outlined"
-            onPress={() => router.replace('/select/world-selection')}
-            style={{ flex: 1, marginRight: S.space.sm }}
-          />
-          <Button
-            text={isCreating ? 'Creating...' : 'Create'}
-            variant="primary"
-            onPress={handleCreateWorld}
-            disabled={!isValidWorldNameForSubmission(worldName) || isCreating}
-            style={{ flex: 1, marginLeft: S.space.sm }}
-          />
-        </AppPage>
-      </ScrollView>
-    </AppPage>
+    <CreateLeftPanel
+      worldName={worldName}
+      setWorldName={setWorldName}
+      worldNameValidation={worldNameValidation}
+      setWorldNameValidation={setWorldNameValidation}
+      system={system}
+      setSystem={setSystem}
+      systemItems={systemItems}
+      description={description}
+      setDescription={setDescription}
+      isCreating={isCreating}
+      handleCreateWorld={handleCreateWorld}
+    />
   )
 
+  // Right Panel Component
   const RightPanel = isDesktop ? (
-    <AppPage
+    <View
       style={{
-        flex: 4,
-        borderLeftWidth: 1,
-        borderLeftColor: $('border'),
+        flex: 3,
       }}
     >
       <MapCanvas
@@ -204,19 +116,11 @@ export default function CreateWorldScreen() {
         onPress={() => setImageImported(true)}
         style={{ margin: S.space.lg }}
       />
-    </AppPage>
+    </View>
   ) : null
 
   return (
-    <AppPage
-      style={{
-        flex: 1,
-        flexDirection: isDesktop ? 'row' : 'column',
-      }}
-    >
-      {LeftPanel}
-      {RightPanel}
-
+    <AppSplit left={LeftPanel} right={RightPanel}>
       {/* Modals */}
       <CreateWorldModals
         showSignInModal={showSignInModal}
@@ -228,6 +132,6 @@ export default function CreateWorldScreen() {
         successWorldName={successWorldName}
         onSuccessNavigate={handleSuccessNavigate}
       />
-    </AppPage>
+    </AppSplit>
   )
 }

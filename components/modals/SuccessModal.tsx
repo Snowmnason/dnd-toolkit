@@ -46,7 +46,7 @@ export function SuccessModal({
           text={confirmLabel}
           onPress={onConfirm ?? onClose}
           variant="primary" // ✅ unified button variant
-          style={{ minWidth: 120 }}
+          style={{ minWidth: S.s(120) }}
         />
       </View>
     </AppModal>

@@ -3,10 +3,11 @@ import { ScaleProvider } from "@/providers/ScaleProvider";
 import { ThemeProvider, UseTheme } from "@/theme";
 import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Dimensions, Platform, View } from 'react-native';
+import { View } from 'react-native';
 import LoadingOverlay from '../components/LoadingOverlay';
 import TopBar from '../components/TopBar';
 import { AppParamsProvider, useAppParams } from '../contexts/AppParamsContext';
+import { PlatformProvider, usePlatform } from '../contexts/PlatformContext';
 import { useAppBootstrap } from '../hooks/use-app-bootstrap';
 
 function RootLayoutContent() {
@@ -16,8 +17,7 @@ function RootLayoutContent() {
   const router = useRouter();
   const segments = useSegments();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const { width } = Dimensions.get('window');
-  const isMobile = Platform.OS !== 'web' || width < 900;
+  const { isMobile } = usePlatform();
   
   // Use centralized params context
   const { params, updateParams, clearWorldParams, clearAllParams } = useAppParams();
@@ -131,8 +131,8 @@ function RootLayoutContent() {
       case 'select':
         config.title = 'Select World';
         
-        // Handle create-world and world-detail back navigation
-        if (segments.some(segment => segment === 'create-world') || segments.some(segment => segment === 'world-detail')) {
+        // Handle create-world back navigation
+        if (segments.some(segment => segment === 'create-world')) {
           config.onBackPress = () => {
             router.replace('/select/world-selection');
             return true; // Prevent default
@@ -146,8 +146,8 @@ function RootLayoutContent() {
         // Handle feature-specific titles based on second segment
         const secondSegment = segments[1];
         
-        // Handle desktop/mobile routes - always go back to world-selection
-        if (secondSegment === 'desktop' || secondSegment === 'mobile') {
+        // Handle main-landing route - always go back to world-selection
+        if (secondSegment === 'main-landing') {
           config.onBackPress = () => {
             router.replace('/select/world-selection');
             return true; // Prevent default
@@ -160,7 +160,7 @@ function RootLayoutContent() {
           routeParams.worldId = worldId;
           routeParams.userRole = userRole;
           
-          const pathname = isMobile ? '/main/mobile' : '/main/desktop';
+          const pathname = '/main/main-landing';
           
           if (isMobile) {
             routeParams.tab = tabKey;
@@ -255,9 +255,11 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <ScaleProvider>
-        <AppParamsProvider>
-          <RootLayoutContent />
-        </AppParamsProvider>
+        <PlatformProvider>
+          <AppParamsProvider>
+            <RootLayoutContent />
+          </AppParamsProvider>
+        </PlatformProvider>
       </ScaleProvider>
     </ThemeProvider>
   );

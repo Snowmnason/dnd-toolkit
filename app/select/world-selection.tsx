@@ -1,33 +1,26 @@
 import { ConfirmLeaveModal, EditWorldModal } from '@/components/modals'
-import { AppLoading, AppPage, AppSplit, Body, Button, Card, Heading } from '@/components/ui'
+import { AppLoading, AppPage, AppSplit, Body, Button } from '@/components/ui'
 import { useAppParams } from '@/contexts/AppParamsContext'
+import { usePanelNavigation } from '@/hooks/use-panel-navigation'
 import { useWorldModal } from '@/hooks/use-world-modal'
 import { useWorlds } from '@/lib'
-import { $, tone, useScale } from '@/theme'
-import { useRouter } from 'expo-router'
+import { WorldListPanel } from '@/Screens/select/world-selection/WorldListPanel'
+import { WorldRightPanel } from '@/Screens/select/world-selection/WorldRightPanel'
 import React, { useState } from 'react'
-import { Image, Platform, ScrollView, useWindowDimensions } from 'react-native'
 
 // Fallback image
 const noImageSelected = require('../../assets/images/Miku.png')
 
 export default function LandingPage() {
   // Centralized params
-  const { params, updateParams } = useAppParams()
-  const S = useScale()
+  const { params } = useAppParams()
   const userId = params.userId
 
-  const { width } = useWindowDimensions()
-  const isDesktop =
-    Platform.OS === 'web' ||
-    Platform.OS === 'macos' ||
-    Platform.OS === 'windows' ||
-    width >= 900
+  // Panel navigation hook - manages left/right panel switching
+  const { showRightPanel, goToRightPanel, goToLeftPanel, isDesktop } = usePanelNavigation()
 
   const { selectedWorld, setSelectedWorld, worlds, isLoading, error, retry, refetch } = useWorlds(userId)
   const [mapImage, setMapImage] = useState<string | null>(null)
-
-  const router = useRouter()
 
   // Modal controls via hook
   const {
@@ -69,210 +62,54 @@ export default function LandingPage() {
     )
   }
 
-  // Build Left Panel content
+  // Handler for mobile world selection - shows right panel instead of navigating
+  const handleMobileWorldSelect = (world: typeof worlds[0]) => {
+    setSelectedWorld(world)
+    setMapImage(world.map_image_url || null)
+    goToRightPanel()
+  }
+
+  // Handler to go back to left panel on mobile
+  const handleMobileBackToList = () => {
+    goToLeftPanel()
+    setSelectedWorld(null)
+    setMapImage(null)
+  }
+
+  // Left Panel Component - Always rendered to avoid hook order issues
   const LeftPanel = (
-    <AppPage
-      style={{
-        flex: 1,
-        position: 'relative',
-        minWidth: isDesktop ? 100 : undefined,
-        maxWidth: isDesktop ? 400 : undefined,
-        paddingTop: isDesktop ? S.space.sm : 0,
-      }}
-    >
-      {/* World List */}
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          paddingBottom: S.space.xxl * 2, // make room for bottom button
-          paddingHorizontal: S.space.md,
-        }}
-        showsVerticalScrollIndicator={false}
-      >
-        {worlds.length === 0 ? (
-          <AppPage center style={{ padding: S.space.lg }}>
-            <Body align="center" color="$textSecondary">
-              No worlds yet. Create your first world to get started!
-            </Body>
-          </AppPage>
-        ) : (
-          worlds.map((world) => {
-            const isSelected = selectedWorld?.world_id === world.world_id
-            const isOwner = world.user_role === 'owner'
-
-            // Variant rules
-            const variant = isSelected
-              ? 'solid'
-              : isOwner
-              ? 'primary'
-              : 'secondary'
-
-            return (
-              <Button
-                key={world.world_id}
-                text={world.name}
-                variant={variant as any}
-                onPress={() => {
-                  setMapImage(world.map_image_url || null)
-                  if (isDesktop) {
-                    setSelectedWorld((prev) => {
-                      const newSelection = prev?.world_id === world.world_id ? null : world
-                      setMapImage(newSelection ? world.map_image_url || null : null)
-                      return newSelection
-                    })
-                  } else {
-                    // Update centralized params context for mobile route
-                    updateParams({
-                      userId,
-                      worldId: world.world_id,
-                      userRole: world.user_role,
-                    })
-
-                    // Construct a minimal, readable query
-                    const routeParams: Record<string, string> = {}
-                    if (world.name) routeParams.name = world.name
-                    if (world.map_image_url) routeParams.mapImage = world.map_image_url
-
-                    const qs = new URLSearchParams(routeParams).toString()
-                    const route = `/select/world-detail/${encodeURIComponent(world.world_id)}?${qs}`
-                    router.push(route as any)
-                  }
-                }}
-                style={{
-                  width: '100%',
-                  marginBottom: S.space.sm,
-                  borderWidth: 1.5,
-                  borderColor: isSelected
-                    ? tone($('primaryButtonBorder'), 'hover')
-                    : isOwner
-                    ? $('primaryButtonBorder')
-                    : $('secondaryButtonBorder'),
-                }}
-              />
-            )
-          })
-        )}
-      </ScrollView>
-
-      {/* Create New World button (bottom-aligned) */}
-      <AppPage
-        style={{
-          position: 'absolute',
-          left: S.space.md,
-          right: S.space.md,
-          bottom: S.space.md,
-        }}
-      >
-        <Button
-          text="Create New World"
-          variant="primary"
-          onPress={() => {
-            router.push('/select/create-world')
-          }}
-          style={{ borderRadius: S.radius.lg }}
-        />
-      </AppPage>
-    </AppPage>
+    <WorldListPanel
+      worlds={worlds}
+      selectedWorld={selectedWorld}
+      setSelectedWorld={setSelectedWorld}
+      setMapImage={setMapImage}
+      onMobileWorldSelect={!isDesktop ? handleMobileWorldSelect : undefined}
+    />
   )
 
-  // Build Right Panel content (desktop only)
-  const RightPanel = isDesktop ? (
-    <AppPage
-      style={{
-        flex: 2,
-        
-      }}
-    >
-      {/* Map Preview */}
-      <Image
-        source={mapImage ? { uri: mapImage } : noImageSelected}
-        resizeMode="contain"
-        style={{ width: '100%', height: '100%' }}
-      />
-
-      {/* Title overlay in a semi-transparent Card (does not block image) */}
-      {selectedWorld && (
-        <>
-          <Card
-            shadow
-            bordered
-            toneVariant="base"
-            style={{
-              position: 'absolute',
-              top: S.space.lg,
-              left: S.space.lg,
-              right: S.space.lg,
-              padding: S.space.sm,
-              backgroundColor: 'rgba(0,0,0,0.3)', // translucent backing
-              borderColor: tone($('border'), 'subtle'),
-            }}
-          >
-            <Heading align="center" style={{ color: $('textPrimary'), marginBottom: 0 }}>
-              {selectedWorld.name}
-            </Heading>
-          </Card>
-
-          {/* Bottom action buttons */}
-          <AppPage
-            style={{
-              position: 'absolute',
-              left: S.space.xl,
-              right: S.space.xl,
-              bottom: S.space.xl,
-              flexDirection: 'row',
-              //justifyContent: 'space-between',
-            }}
-          >
-            <Button
-              text={selectedWorld.user_role === 'owner' ? 'Edit' : 'Leave'}
-              variant="outlined"
-              onPress={
-                selectedWorld.user_role === 'owner'
-                  ? () => openEditModal(selectedWorld.name)
-                  : () => openLeaveModal(selectedWorld.name)
-              }
-              style={{ minWidth: 140 }}
-            />
-            <Button
-              text="Open"
-              variant="outlined"
-              onPress={() => {
-                if (!selectedWorld) return
-                updateParams({
-                  userId,
-                  worldId: selectedWorld.world_id,
-                  userRole: selectedWorld.user_role,
-                })
-                router.push({
-                  pathname: '/main/desktop',
-                  params: {
-                    userId: userId || '',
-                    worldId: selectedWorld.world_id,
-                    userRole: selectedWorld.user_role,
-                  },
-                })
-              }}
-              style={{ minWidth: 140 }}
-            />
-          </AppPage>
-        </>
-      )}
-    </AppPage>
-  ) : (
-    // On mobile, we keep it simple: left panel logic navigates to world-detail
-    <AppPage />
+  // Right Panel Component - Always rendered to avoid hook order issues
+  const RightPanel = (
+    <WorldRightPanel
+      selectedWorld={selectedWorld}
+      mapImage={mapImage}
+      noImageSelected={noImageSelected}
+      onEditOrLeave={
+        selectedWorld?.user_role === 'owner'
+          ? () => openEditModal(selectedWorld.name)
+          : () => openLeaveModal(selectedWorld?.name || '')
+      }
+      onMobileBack={!isDesktop ? handleMobileBackToList : undefined}
+    />
   )
 
-  // Desktop split layout; mobile uses only the left logic which navigates to detail
   return (
     <>
-      {isDesktop ? (
-        <AppSplit left={LeftPanel} right={RightPanel} />
-      ) : (
-        <AppPage style={{ flex: 1, paddingHorizontal: S.space.md, paddingTop: S.space.sm }}>
-          {LeftPanel}
-        </AppPage>
-      )}
+      <AppSplit 
+        left={LeftPanel}
+        right={RightPanel}
+        animateRightSlide={!isDesktop}
+        rightVisible={showRightPanel}
+      />
 
       {/* Modals rendered unconditionally to avoid hook order issues */}
       <EditWorldModal

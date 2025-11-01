@@ -2,7 +2,7 @@ import { AppLoading, AppPage } from '@/components/ui'
 import { AuthStateManager, logger } from '@/lib'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { Platform, useWindowDimensions } from 'react-native'
+import { Platform, useWindowDimensions, View } from 'react-native'
 import { BottomTabBar } from '../../Screens/main-panels/BottomTabBar'
 
 export default function MainLayout() {
@@ -45,7 +45,7 @@ export default function MainLayout() {
 
     // Preload the screen if not already cached
     if (!tabCache[tabKey]) {
-      const route = `/main/mobile/${getTabRoute(tabKey)}`
+      const route = `/main/main-landing/${getTabRoute(tabKey)}`
       setTabCache((prev) => ({
         ...prev,
         [tabKey]: <Stack.Screen key={tabKey} name={route} />,
@@ -54,7 +54,7 @@ export default function MainLayout() {
 
     // Navigate for consistency (keeps URL updated)
     router.replace({
-      pathname: `/main/mobile`,
+      pathname: `/main/main-landing`,
       params: routeParams,
     })
   }
@@ -82,7 +82,7 @@ export default function MainLayout() {
   }
 
   return (
-    <AppPage>
+    <View style={{ flex: 1 }}>
       {/* Cached tab screens */}
       {Object.entries(tabCache).map(([key, element]) => (
         <AppPage
@@ -106,6 +106,6 @@ export default function MainLayout() {
           onTabChange={handleTabChange}
         />
       )}
-    </AppPage>
+    </View>
   )
 }
