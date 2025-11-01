@@ -85,6 +85,7 @@ interface DropdownProps {
   placeholder?: string
   enableSearch?: boolean
   heading?: string
+  textTypeHeading?: TextType
   textType?: TextType
   style?: any
   /**
@@ -102,6 +103,7 @@ export default function Dropdown({
   placeholder = 'Select an option',
   enableSearch = false,
   heading,
+  textTypeHeading = 'primary',
   textType = 'secondary',
   style,
   maxHeightDelta = 0,
@@ -173,7 +175,7 @@ export default function Dropdown({
   return (
   <View style={[{ width: '100%', position: 'relative' }, style]}>
       {heading ? (
-        <ObjHeading textType={textType} style={{ marginBottom: S.space.xs, marginLeft: S.space.xs }}>
+        <ObjHeading textType={textTypeHeading} style={{ marginBottom: S.space.xs, marginLeft: S.space.xs }}>
           {heading}
         </ObjHeading>
       ) : null}

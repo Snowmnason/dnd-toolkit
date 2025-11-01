@@ -1,7 +1,6 @@
 import { $, UseTheme } from '@/theme'
 import React from 'react'
-import { Platform } from 'react-native'
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
+import { Platform, View } from 'react-native'
 import { Body } from './ui/AppText'
 import CustomLoad from './ui/CustomLoad'
 
@@ -30,24 +29,16 @@ function LoadingOverlayContent({
   [assetsLoaded, message]
   )
 
-  // subtle fade-in
-  const opacity = useSharedValue(0)
-  React.useEffect(() => {
-    opacity.value = withTiming(1, { duration: 400 })
-  }, [opacity])
-  const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }))
-
   return (
-    <Animated.View
+    <View
       style={[
         {
           flex: 1,
           justifyContent: 'center',
           alignItems: 'center',
-          backgroundColor: `${$('background', theme)}E6`, // adds ~90% alpha
+          backgroundColor: $('background', theme), // fully opaque for consistency
           zIndex: 9999,
         },
-        animatedStyle,
       ]}
       accessible
       accessibilityRole="progressbar"
@@ -80,7 +71,7 @@ function LoadingOverlayContent({
           Some assets failed to load but the app will continue...
         </Body>
       )}
-    </Animated.View>
+    </View>
   )
 }
 
@@ -104,14 +95,14 @@ class LoadingOverlayErrorBoundary extends React.Component<
 
   render() {
     if (this.state.hasError) {
-      // Fallback UI without theme
+      // Fallback UI without theme - use same opacity pattern
       return (
-        <Animated.View
+        <View
           style={{
             flex: 1,
             justifyContent: 'center',
             alignItems: 'center',
-            backgroundColor: '#1a1a1aE6',
+            backgroundColor: 'transparent',
             zIndex: 9999,
           }}
           accessible
@@ -119,7 +110,7 @@ class LoadingOverlayErrorBoundary extends React.Component<
           accessibilityLabel={this.props.message || 'Loading...'}
         >
           <CustomLoad />
-        </Animated.View>
+        </View>
       )
     }
 

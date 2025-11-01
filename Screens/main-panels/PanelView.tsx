@@ -46,14 +46,17 @@ export function PanelView({
       backgroundImage={backgroundImage}
       style={[
         {
-          flex: 1,
-          justifyContent: 'space-between',
-          alignItems: 'center',
           minWidth: 260,
-          padding: S.space.lg,
+          backgroundColor: image ? 'rgba(0,0,0,0.3)' : $('background', theme),
         },
         style,
       ]}
+      contentContainerStyle={{
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderRightWidth: 2,
+        borderRightColor: tone($('border', theme), 'subtle'),
+      }}
     >
       {/* ─────────────── Panel Header ─────────────── */}
       <Heading

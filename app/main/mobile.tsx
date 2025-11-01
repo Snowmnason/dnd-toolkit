@@ -1,5 +1,5 @@
-import { panelConfigs } from '@/components/main-panels/PanelData'
-import { PanelView } from '@/components/main-panels/PanelView'
+import { panelConfigs } from '@/Screens/main-panels/PanelData'
+import { PanelView } from '@/Screens/main-panels/PanelView'
 import { AppPage } from '@/components/ui'
 import { useLocalSearchParams } from 'expo-router'
 import React from 'react'

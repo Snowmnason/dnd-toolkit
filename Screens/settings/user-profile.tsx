@@ -1,10 +1,11 @@
 import { UpdateUsernameModal } from '@/components/modals'
 import { Body, Button, Heading, IconButton, SubTitle, Surface } from '@/components/ui'
 import { logger, updateUsername } from '@/lib'
-import { $, tone, useScale, UseTheme } from '@/theme'
+import { $, useScale } from '@/theme'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import React, { useEffect, useState } from 'react'
+import { View } from 'react-native'
 
 interface UserProfileProps {
   profile?: {
@@ -14,7 +15,6 @@ interface UserProfileProps {
 }
 
 export default function UserProfile({ profile }: UserProfileProps) {
-  const { theme } = UseTheme()
   const router = useRouter()
   const S = useScale()
   const [sessionUser, setSessionUser] = useState<any>(null)
@@ -90,39 +90,24 @@ export default function UserProfile({ profile }: UserProfileProps) {
 
   // ✅ Main Profile Panel
   return (
-    <Surface padded bordered radius="md">
-      <Heading align="center" style={{ marginBottom: S.space.sm }}>
-        Profile
-      </Heading>
+    <View >
 
-      <Surface
-        variant="accent"
-        bordered
-        padded
-        radius="md"
+      <View
         style={{
           marginBottom: S.space.lg,
-          backgroundColor: tone($('accent', theme), 'alt', undefined, undefined, theme),
         }}
       >
-        {/* Email */}
-        <Body variant="semi" style={{ marginBottom: S.space.xs }}>
-          Email
-        </Body>
-        <SubTitle italic>{sessionUser?.email || 'Loading...'}</SubTitle>
+          {/* Email */}
+          <Body variant="semi" style={{ marginBottom: S.space.xs }}>
+            Email
+          </Body>
+          <SubTitle italic>{sessionUser?.email || 'Loading...'}</SubTitle>
+      </View>
 
         {/* Username */}
         {profile?.username && (
-          <Surface variant="base" style={{ marginTop: S.space.md, padding: S.space.sm, borderRadius: S.radius.md }}>
-            <Surface
-              variant="base"
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: S.space.xs,
-              }}
-            >
+          <View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: S.space.xs }}>
               <Body variant="semi">Username</Body>
               <IconButton
                 icon={<Ionicons name="settings-outline" size={18} color={$(
@@ -131,10 +116,9 @@ export default function UserProfile({ profile }: UserProfileProps) {
                 onPress={() => setShowUsernameModal(true)}
                 size="sm"
               />
-            </Surface>
-
+            </View>
             <SubTitle italic>{profile.username}</SubTitle>
-          </Surface>
+          </View>
         )}
 
         {loadingSession && (
@@ -142,7 +126,7 @@ export default function UserProfile({ profile }: UserProfileProps) {
             Loading profile...
           </Body>
         )}
-      </Surface>
+
 
       {/* Username Update Modal */}
       {profile?.username && (
@@ -158,6 +142,6 @@ export default function UserProfile({ profile }: UserProfileProps) {
           errorText={usernameError}
         />
       )}
-    </Surface>
+    </View>
   )
 }
