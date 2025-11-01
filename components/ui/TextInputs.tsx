@@ -1,19 +1,20 @@
 import { $, tone, useScale, UseTheme } from '@/theme'
 import React, { useState } from 'react'
 import { Platform, TextInput as RNTextInput, StyleSheet, TextInputProps, View } from 'react-native'
-import { ObjHeading } from './AppText'
+import { ObjHeading, TextType } from './AppText'
 
 interface BaseInputProps extends TextInputProps {
   heading?: string                   // 👈 Renamed from label
   error?: boolean
   filled?: boolean
-  underline?: boolean
+  underline?: boolean,
+  textTypeHeading?: TextType
 }
 
 /**
  * ✏️ TextInput — for short, single-line text fields
  */
-export function TextInput({ heading, error, filled, underline, style, ...rest }: BaseInputProps) {
+export function TextInput({ heading, error, filled, underline, textTypeHeading='primary', style, ...rest }: BaseInputProps) {
   const { theme } = UseTheme()
   const S = useScale()
   const [focused, setFocused] = useState(false)
@@ -27,7 +28,7 @@ export function TextInput({ heading, error, filled, underline, style, ...rest }:
   return (
     <View style={{ width: '100%' }}>
       {heading && (
-        <ObjHeading style={{ marginBottom: S.space.xs }}>
+        <ObjHeading textType={textTypeHeading} style={{ marginBottom: S.space.xs }}>
           {heading}
         </ObjHeading>
       )}
@@ -76,7 +77,7 @@ export function TextInput({ heading, error, filled, underline, style, ...rest }:
 /**
  * 📝 DescInput — for longer, multi-line text areas (descriptions, notes)
  */
-export function DescInput({ heading, error, filled, style, maxHeightDelta = 0, minLines = 3, accentScrollbar = true, ...rest }: BaseInputProps & { maxHeightDelta?: number; minLines?: number; accentScrollbar?: boolean }) {
+export function DescInput({ heading, error, filled, style, textTypeHeading='primary', maxHeightDelta = 0, minLines = 3, accentScrollbar = true, ...rest }: BaseInputProps & { maxHeightDelta?: number; minLines?: number; accentScrollbar?: boolean }) {
   const { theme } = UseTheme()
   const S = useScale()
   const [focused, setFocused] = useState(false)
@@ -90,7 +91,7 @@ export function DescInput({ heading, error, filled, style, maxHeightDelta = 0, m
   return (
     <View style={{ width: '100%' }}>
       {heading && (
-        <ObjHeading style={{ marginBottom: S.space.xs }}>
+        <ObjHeading textType={textTypeHeading} style={{ marginBottom: S.space.xs }}>
           {heading}
         </ObjHeading>
       )}

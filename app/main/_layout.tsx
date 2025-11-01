@@ -3,7 +3,7 @@ import { AuthStateManager, logger } from '@/lib'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Platform, useWindowDimensions } from 'react-native'
-import { BottomTabBar } from '../../components/main-panels/BottomTabBar'
+import { BottomTabBar } from '../../Screens/main-panels/BottomTabBar'
 
 export default function MainLayout() {
   const router = useRouter()

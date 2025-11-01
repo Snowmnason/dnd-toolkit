@@ -1,7 +1,7 @@
 import { AppModal, Button } from '@/components/ui'
-import { $, tone, useScale, UseTheme } from '@/theme'
+import { useScale } from '@/theme'
 import React from 'react'
-import { Platform, View } from 'react-native'
+import { View } from 'react-native'
 
 interface SettingsMenuProps {
   visible: boolean
@@ -16,13 +16,7 @@ export default function SettingsModal({
   onAccountSettings,
   onReturnToWorldSelection,
 }: SettingsMenuProps) {
-  const { theme } = UseTheme()
   const S = useScale()
-  const isDesktop =
-    Platform.OS === 'web' ||
-    Platform.OS === 'windows' ||
-    Platform.OS === 'macos'
-  const scale = isDesktop ? 1.25 : 1.0
 
   return (
     <AppModal
@@ -30,14 +24,8 @@ export default function SettingsModal({
       onClose={onClose}
       heading="Settings"
       borderTone="accent"
-      width={280 * scale}
     >
-      <View
-        style={{
-          minWidth: 260 * scale,
-          gap: S.space.sm,
-        }}
-      >
+      <View style={{ gap: S.space.md }}>
         {/* Account Settings */}
         <Button
           text="Account Settings"
@@ -45,11 +33,6 @@ export default function SettingsModal({
           onPress={() => {
             onClose()
             onAccountSettings()
-          }}
-          style={{
-            paddingVertical: S.space.md * scale,
-            borderColor: tone($('border', theme), 'subtle', undefined, undefined, theme),
-            borderWidth: 1,
           }}
         />
 
@@ -61,10 +44,6 @@ export default function SettingsModal({
             onClose()
             onReturnToWorldSelection()
           }}
-          style={{
-            backgroundColor: tone($('accent', theme), 'alt', undefined, undefined, theme),
-            paddingVertical: S.space.md * scale,
-          }}
         />
 
         {/* Cancel */}
@@ -72,9 +51,6 @@ export default function SettingsModal({
           text="Cancel"
           variant="cancel"
           onPress={onClose}
-          style={{
-            paddingVertical: S.space.md * scale,
-          }}
         />
       </View>
     </AppModal>

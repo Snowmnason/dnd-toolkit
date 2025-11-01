@@ -1,8 +1,8 @@
 import { AppModal, Body, Button } from '@/components/ui'
 import {
-    createWorldNameChangeHandler,
-    isValidWorldNameForSubmission,
-    type WorldNameValidationResult,
+  createWorldNameChangeHandler,
+  isValidWorldNameForSubmission,
+  type WorldNameValidationResult,
 } from '@/lib/auth/validation'
 import { logger } from '@/lib/utils/logger'
 import { $, useScale, UseTheme } from '@/theme'
@@ -187,7 +187,7 @@ export function EditWorldModal({
         }}
       />
 
-      {/* Close Button */}
+      {/* Close Button 
       <View
         style={{
           flexDirection: 'row',
@@ -196,7 +196,7 @@ export function EditWorldModal({
         }}
       >
         <Button text="Close" variant="secondary" onPress={onClose} />
-      </View>
+      </View>*/}
     </AppModal>
   )
 }

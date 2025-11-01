@@ -1,27 +1,27 @@
 import {
-    AuthStateManager,
-    deleteUserAccount,
-    logger,
-    signOutUser,
-    supabase,
-    usersDB,
+  AuthStateManager,
+  deleteUserAccount,
+  logger,
+  signOutUser,
+  supabase,
+  usersDB,
 } from '@/lib'
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { Alert, Platform } from 'react-native'
+import { Alert, Platform, View } from 'react-native'
 
 // 🧱 New UI Components
 import { CredentialConfirmModal } from '@/components/modals'
 import {
-    AppLoading,
-    AppPage,
-    Body,
-    Button,
-    Heading,
-    Surface,
+  AppLoading,
+  AppPage,
+  Body,
+  Button,
+  Heading,
+  Surface,
 } from '@/components/ui'
-import UserProfile from '../components/settings/user-profile'
+import UserProfile from '../Screens/settings/user-profile'
 
 // 🎨 Theme + Loading
 import { useScale } from '@/theme'
@@ -161,55 +161,67 @@ export default function SettingsPage() {
   return (
     <AppPage gap="lg">
       {/* User Profile */}
+      <Heading align="center" style={{ marginBottom: S.space.sm }}>
+        Profile
+      </Heading>
       <Surface padded bordered radius="md" style={{ marginBottom: S.space.lg }}>
         <UserProfile profile={profile} />
       </Surface>
 
       {/* App Settings Section */}
+      <Heading align="center" style={{ marginBottom: S.space.sm }}>
+        App Settings
+      </Heading>
       <Surface bordered padded radius="md">
-        <Heading align="center" style={{ marginBottom: S.space.sm }}>
-          App Settings
-        </Heading>
         <Body
           italic
           align="center"
           color="$textSecondary"
-          style={{ opacity: 0.7 }}
+          style={{ opacity: 0.7, marginBottom: S.space.md }}
         >
           🎲 Coming Soon: Theme settings, backup options, and more!
-          <Button variant="secondary" onPress={() => {
+        </Body>
+        <Button 
+          variant="secondary" 
+          text="Playground"
+          onPress={() => {
             if(isMobile) {
               router.replace('../StyleMobile');
-              return;
-            }else {
+            } else {
               router.replace('../StyleDesktop');
-              return;
-            }}}>Playground</Button>
-        </Body>
+            }
+          }}
+          style={{ alignSelf: 'center' }}
+        />
       </Surface>
 
-      {/* Sign Out Button */}
-      <AppPage center gap="md" style={{ marginTop: S.space.xl }}>
-        <Button
-          text={signingOut ? 'Confirm Sign Out' : 'Sign Out'}
-          variant="destructive"
-          onPress={handleSignOutConfirm}
-          disabled={buttonDisabled}
-          loading={false}
-          style={{ minWidth: 200 }}
-        />
-      </AppPage>
+      {/* Account Actions */}
+      
+        <Heading align="center" style={{ marginBottom: S.space.md, marginTop: S.space.md }}>
+          Account Actions
+        </Heading>
+        <Surface bordered padded radius="md">
+        <View style={{ gap: S.space.sm, alignItems: 'center' }}>
+          {/* Sign Out Button */}
+          <Button
+            text={signingOut ? 'Confirm Sign Out' : 'Sign Out'}
+            variant="destructive"
+            onPress={handleSignOutConfirm}
+            disabled={buttonDisabled}
+            loading={false}
+            style={{ minWidth: 200 }}
+          />
 
-      {/* Delete Account Button */}
-      <AppPage center gap="md" style={{ marginTop: S.space.lg }}>
-        <Button
-          text={confirmDelete ? 'Confirm Delete' : 'Delete Account'}
-          variant="destructive"
-          onPress={handleDeleteConfirm}
-          disabled={buttonDeleteDisabled}
-          style={{ minWidth: 200 }}
-        />
-      </AppPage>
+          {/* Delete Account Button */}
+          <Button
+            text={confirmDelete ? 'Confirm Delete' : 'Delete Account'}
+            variant="destructive"
+            onPress={handleDeleteConfirm}
+            disabled={buttonDeleteDisabled}
+            style={{ minWidth: 200 }}
+          />
+        </View>
+      </Surface>
 
       {/* Delete Confirmation Modal */}
       <CredentialConfirmModal

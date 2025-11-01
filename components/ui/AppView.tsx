@@ -26,6 +26,7 @@ export interface AppViewProps extends ViewProps {
   backgroundImage?: any
   children?: ReactNode
   style?: StyleProp<ViewStyle>
+  contentContainerStyle?: StyleProp<ViewStyle>
   showScrollIndicator?: boolean
 }
 
@@ -50,12 +51,29 @@ function BaseAppView({
   backgroundImage,
   showScrollIndicator = false,
   style,
+  contentContainerStyle,
   children,
   variantStyles,
   ...rest
 }: AppViewProps & { variantStyles?: ViewStyle }) {
   const { theme } = UseTheme()
   const S = useScale()
+
+  /* Separate child layout properties from ScrollView style properties */
+  const layoutProps = ['justifyContent', 'alignItems', 'alignContent', 'flexDirection', 'flexWrap']
+  const extractedContentStyle: ViewStyle = {}
+  const scrollViewStyle: ViewStyle = {}
+
+  // Extract layout props from style if it's an object
+  if (style && typeof style === 'object' && !Array.isArray(style)) {
+    Object.entries(style).forEach(([key, value]) => {
+      if (layoutProps.includes(key)) {
+        extractedContentStyle[key as keyof ViewStyle] = value as any
+      } else {
+        scrollViewStyle[key as keyof ViewStyle] = value as any
+      }
+    })
+  }
 
   /* Base styles shared across all variants */
   const base: ViewStyle = {
@@ -76,12 +94,16 @@ function BaseAppView({
   return (
     <Wrapper {...wrapperProps} style={{ flex: 1 }}>
       <ScrollView
-        style={[base, variantStyles, style]}
-        contentContainerStyle={{
-          flexGrow: 1,
-          justifyContent: center ? 'center' : undefined,
-          alignItems: center ? 'center' : undefined,
-        }}
+        style={[base, variantStyles, scrollViewStyle]}
+        contentContainerStyle={[
+          {
+            flexGrow: 1,
+            justifyContent: center ? 'center' : undefined,
+            alignItems: center ? 'center' : undefined,
+          },
+          extractedContentStyle,
+          contentContainerStyle,
+        ]}
         showsVerticalScrollIndicator={showScrollIndicator}
         {...rest}
       >
@@ -170,28 +192,36 @@ export function AppSplit({
     >
       <ScrollView
         style={{
-          flex: isDesktop ? 1 : undefined,
+          flex: isDesktop ? 1 : 1,
           width: isDesktop ? '35%' : '100%',
           borderRightWidth: isDesktop ? 1 : 0,
           borderRightColor: tone($('border', theme), 'subtle', undefined, undefined, theme),
           paddingRight: isDesktop ? S.space.md : 0,
+        }}
+        contentContainerStyle={{
+          flexGrow: 1,
         }}
         showsVerticalScrollIndicator={showScrollIndicator}
       >
         {left}
       </ScrollView>
 
-      <ScrollView
-        style={{
-          flex: isDesktop ? 3 : undefined,
-          width: isDesktop ? '65%' : '100%',
-          paddingLeft: isDesktop ? S.space.md : 0,
-          marginTop: isDesktop ? 0 : S.space.lg,
-        }}
-        showsVerticalScrollIndicator={showScrollIndicator}
-      >
-        {right}
-      </ScrollView>
+      {right && (
+        <ScrollView
+          style={{
+            flex: isDesktop ? 3 : undefined,
+            width: isDesktop ? '65%' : '100%',
+            paddingLeft: isDesktop ? S.space.md : 0,
+            //marginTop: isDesktop ? 0 : S.space.lg,
+          }}
+          contentContainerStyle={{
+            flexGrow: 1,
+          }}
+          showsVerticalScrollIndicator={showScrollIndicator}
+        >
+          {right}
+        </ScrollView>
+      )}
       
       {/* Render modals, toasts, and other overlays */}
       {children}

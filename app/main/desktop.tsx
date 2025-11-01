@@ -1,8 +1,8 @@
-import { panelConfigs } from '@/components/main-panels/PanelData'
-import { PanelView } from '@/components/main-panels/PanelView'
-import { AppPage } from '@/components/ui'
+import { panelConfigs } from '@/Screens/main-panels/PanelData'
+import { PanelView } from '@/Screens/main-panels/PanelView'
 import { useLocalSearchParams } from 'expo-router'
 import React from 'react'
+import { View } from 'react-native'
 
 export default function MainScreenDesktop() {
   const params = useLocalSearchParams()
@@ -10,12 +10,10 @@ export default function MainScreenDesktop() {
   const userRole = typeof params.userRole === 'string' ? params.userRole : undefined
 
   return (
-    <AppPage
+    <View
       style={{
         flexDirection: 'row',
         flex: 1,
-        justifyContent: 'space-evenly',
-        alignItems: 'stretch',
       }}
     >
       {panelConfigs.map((panel) => (
@@ -27,6 +25,6 @@ export default function MainScreenDesktop() {
           image={panel.image ?? undefined}
         />
       ))}
-    </AppPage>
+    </View>
   )
 }

@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import React from 'react'
-import { Image } from 'react-native'
+import React, { useEffect } from 'react'
+import { Image, View } from 'react-native'
 import Animated, { FadeInRight } from 'react-native-reanimated'
 
 import { ConfirmLeaveModal, EditWorldModal } from '@/components/modals'
@@ -17,15 +17,36 @@ export default function WorldDetail() {
 
   const worldName = typeof urlParams.name === 'string' ? urlParams.name : ''
   const mapUrl = typeof urlParams.mapImage === 'string' ? urlParams.mapImage : undefined
-  const userId = contextParams.userId
-  const worldId = contextParams.worldId
-  const userRole = contextParams.userRole
+  // Pull from URL if present (fallback to context)
+  const urlUserRole = typeof urlParams.userRole === 'string' ? urlParams.userRole : undefined
+  const urlWorldId = typeof urlParams.worldId === 'string' ? urlParams.worldId : undefined
+  const urlUserId = typeof urlParams.userId === 'string' ? urlParams.userId : undefined
+
+  const userId = contextParams.userId ?? urlUserId
+  const worldId = contextParams.worldId ?? urlWorldId
+  const userRole = contextParams.userRole ?? urlUserRole
 
   const selectedMapImage = mapUrl ? { uri: mapUrl } : require('../../../assets/images/Miku.png')
 
   const handleNavigateBackToSelection = () => {
     router.replace('/select/world-selection')
   }
+
+  // Persist URL-provided params into context so downstream pages have them
+  useEffect(() => {
+    const needsUpdate =
+      (!!urlUserId && contextParams.userId !== urlUserId) ||
+      (!!urlWorldId && contextParams.worldId !== urlWorldId) ||
+      (!!urlUserRole && contextParams.userRole !== urlUserRole)
+    if (needsUpdate) {
+      updateParams({
+        userId: urlUserId ?? contextParams.userId,
+        worldId: urlWorldId ?? contextParams.worldId,
+        userRole: urlUserRole ?? contextParams.userRole,
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlUserId, urlWorldId, urlUserRole])
 
   const {
     editModalVisible,
@@ -116,33 +137,35 @@ export default function WorldDetail() {
           }}
         />
 
-        {/* Button row: replace `row` with flexDirection */}
-        <AppPage
-          gap="md"
+        {/* Button row: full-width, ends spaced, larger buttons */}
+        <View
           style={{
-            width: '65%',
-            flexDirection: 'row',               // ← replaces `row`
+            width: '100%',
+            flexDirection: 'row',
             justifyContent: 'space-between',
+            alignItems: 'center',
             marginBottom: S.space.lg,
           }}
         >
           <Button
             text={userRole === 'owner' ? 'Edit' : 'Leave'}
             variant="outlined"
+            size="lg"
             onPress={
               userRole === 'owner'
                 ? () => openEditModal(worldName)
                 : () => openLeaveModal(worldName)
             }
-            style={{ flex: 1 }}
+            style={{ width: '48%' }}
           />
           <Button
             text="Open"
             variant="primary"
+            size="lg"
             onPress={handleOpenWorld}
-            style={{ flex: 1 }}
+            style={{ width: '48%' }}
           />
-        </AppPage>
+        </View>
 
         <Body align="center" color="$textSecondary" style={{ opacity: 0.8 }}>
           Tap &quot;Open&quot; to enter your world.
