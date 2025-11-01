@@ -1,5 +1,6 @@
 import { AppPage, Button, Heading } from '@/components/ui'
 import { useAppParams } from '@/contexts/AppParamsContext'
+import { usePlatform } from '@/contexts/PlatformContext'
 import { $, tone, useScale, UseTheme } from '@/theme'
 import { useRouter } from 'expo-router'
 import React from 'react'
@@ -25,6 +26,8 @@ export function PanelView({
   const router = useRouter()
   const S = useScale()
   const { updateParams } = useAppParams()
+  // Centralized platform detection
+  const { isDesktop } = usePlatform()
 
   const navigateToFeature = (featurePath: string) => {
     updateParams({ worldId, userRole })
@@ -54,7 +57,7 @@ export function PanelView({
       contentContainerStyle={{
         justifyContent: 'space-between',
         alignItems: 'center',
-        borderRightWidth: 2,
+        borderRightWidth: isDesktop ? 2 : 0,
         borderRightColor: tone($('border', theme), 'subtle'),
       }}
     >

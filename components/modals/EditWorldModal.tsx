@@ -1,8 +1,8 @@
 import { AppModal, Body, Button } from '@/components/ui'
 import {
-  createWorldNameChangeHandler,
-  isValidWorldNameForSubmission,
-  type WorldNameValidationResult,
+    createWorldNameChangeHandler,
+    isValidWorldNameForSubmission,
+    type WorldNameValidationResult,
 } from '@/lib/auth/validation'
 import { logger } from '@/lib/utils/logger'
 import { $, useScale, UseTheme } from '@/theme'
@@ -111,7 +111,7 @@ export function EditWorldModal({
             padding: S.space.sm,
             color: $('textPrimary', theme),
             backgroundColor: $('surface', theme),
-            fontSize: isDesktop ? 18 : 16,
+            fontSize: isDesktop ? S.s(18) : S.s(16),
           }}
           placeholder="Enter world name..."
           placeholderTextColor={$('textSecondary', theme)}
@@ -137,7 +137,7 @@ export function EditWorldModal({
               key={i}
               style={{
                 color: $('danger', theme),
-                fontSize: 14,
+                    fontSize: S.s(14),
                 marginBottom: S.space.xs,
               }}
             >
@@ -166,7 +166,7 @@ export function EditWorldModal({
 
       <Body
         style={{
-          fontSize: 14,
+          fontSize: S.s(14),
           color: $('textSecondary', theme),
           textAlign: 'center',
           marginBottom: S.space.md,

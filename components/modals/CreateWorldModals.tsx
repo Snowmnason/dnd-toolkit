@@ -99,7 +99,7 @@ export function CreateWorldModals({
             marginTop: S.space.sm,
             color: $('textSecondary', theme),
             textAlign: 'right',
-            fontSize: 12,
+            fontSize: S.s(12),
           }}
         >
           Adventure awaits!

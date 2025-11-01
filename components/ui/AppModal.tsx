@@ -1,3 +1,4 @@
+import { usePlatform } from '@/contexts/PlatformContext'
 import { $, tone, useScale, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useEffect } from 'react'
@@ -5,11 +6,12 @@ import {
   Animated,
   BackHandler,
   Dimensions,
+  Easing,
   Modal,
   Platform,
   StyleSheet,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native'
 import { Body, Heading } from './AppText'
 import { IconButton } from './IconButton'
@@ -48,23 +50,34 @@ export function AppModal({
   const { width: screenWidth } = Dimensions.get('window')
   const S = useScale()
   const { theme } = UseTheme()
+  const { isMobile } = usePlatform()
+  const isWeb = Platform.select({ web: true, default: false }) as boolean
 
   // ✅ Platform-based sizing
-  const modalWidth =
-    width ??
-    (Platform.OS === 'ios' || Platform.OS === 'android'
-      ? screenWidth * 0.9 // mobile
-      : Math.min(screenWidth * 0.6, 600)) // web / desktop
+  const modalWidth = width ?? (isMobile ? screenWidth * 0.9 : Math.min(screenWidth * 0.9, 700))
 
   const fadeAnim = React.useRef(new Animated.Value(0)).current
-  const slideAnim = React.useRef(new Animated.Value(30)).current
+  // Web: slide down (start above). Native: slide up (start below).
+  const initialTranslateY = isWeb ? -S.space.xxl * 3 : S.space.lg
+  const slideAnim = React.useRef(new Animated.Value(initialTranslateY)).current
+  // Subtle scale for web during slide (gives depth); native stays at 1
+  const initialScale = isWeb ? 0.96 : 1
+  const scaleAnim = React.useRef(new Animated.Value(initialScale)).current
   const shake = React.useRef(new Animated.Value(0)).current
+  // Keep modal mounted long enough to play exit animation
+  const [rendered, setRendered] = React.useState(visible)
 
   // 🔹 Fade + slide + (optional shake) animation
   useEffect(() => {
     if (visible) {
+      // Ensure it's mounted before animating in
+      setRendered(true)
+      // Reset positions for a fresh entrance
+      slideAnim.setValue(initialTranslateY)
+      fadeAnim.setValue(0)
+      scaleAnim.setValue(initialScale)
       // ✅ Haptic feedback on open
-      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+      if (isMobile) {
         // Light open haptic, stronger if destructive
         const hapticStyle =
           borderTone === 'danger'
@@ -78,14 +91,33 @@ export function AppModal({
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 250,
-          useNativeDriver: Platform.OS !== 'web',
+          useNativeDriver: isMobile,
         }),
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          friction: 6,
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-      ]).start()
+        isWeb
+          ? Animated.timing(slideAnim, {
+              toValue: 0,
+              duration: 280,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: false,
+            })
+          : Animated.spring(slideAnim, {
+              toValue: 0,
+              friction: 6,
+              useNativeDriver: isMobile,
+            }),
+        isWeb
+          ? Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 280,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: false,
+            })
+          : Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 1,
+              useNativeDriver: isMobile,
+            }),
+  ]).start()
 
       // 💥 Optional "panic" shake if destructive
       if (borderTone === 'danger' && animateOnDestruction) {
@@ -100,7 +132,7 @@ export function AppModal({
           ]).start()
 
           // Optional haptic feedback during shake (extra tactile "panic")
-          if (Platform.OS === 'ios' || Platform.OS === 'android') {
+          if (isMobile) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)
           }
         }, 300)
@@ -110,17 +142,39 @@ export function AppModal({
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
-          duration: 200,
-          useNativeDriver: Platform.OS !== 'web',
+          duration: 180,
+          useNativeDriver: isMobile,
         }),
-        Animated.timing(slideAnim, {
-          toValue: 30,
-          duration: 200,
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-      ]).start()
+        isWeb
+          ? Animated.timing(slideAnim, {
+              toValue: initialTranslateY,
+              duration: 220,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: false,
+            })
+          : Animated.timing(slideAnim, {
+              toValue: initialTranslateY,
+              duration: 200,
+              useNativeDriver: isMobile,
+            }),
+        isWeb
+          ? Animated.timing(scaleAnim, {
+              toValue: initialScale,
+              duration: 200,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: false,
+            })
+          : Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 1,
+              useNativeDriver: isMobile,
+            }),
+      ]).start(() => {
+        // After exit animation completes, unmount
+        setRendered(false)
+      })
     }
-  }, [visible, fadeAnim, slideAnim, borderTone, animateOnDestruction, shake])
+  }, [visible, fadeAnim, slideAnim, scaleAnim, borderTone, animateOnDestruction, shake, isMobile, isWeb, initialTranslateY, initialScale])
 
 
   const handleOutsidePress = () => {
@@ -149,7 +203,7 @@ export function AppModal({
     }
   }, [visible, onClose])
 
-  if (!visible) return null
+  if (!rendered) return null
 
   const overlayColor = dimColor
     ? dimColor
@@ -158,7 +212,7 @@ export function AppModal({
     : 'rgba(0, 0, 0, 0.45)'
 
   return (
-    <Modal transparent visible={visible} animationType="none">
+  <Modal transparent visible={rendered} animationType="none">
       <TouchableOpacity
         activeOpacity={1}
         onPress={handleOutsidePress}
@@ -189,6 +243,7 @@ export function AppModal({
                   opacity: fadeAnim,
                   transform: [
                     { translateY: slideAnim },
+                    { scale: scaleAnim },
                     { translateX: shake }, // 👈 added
                   ],
                 },

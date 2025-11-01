@@ -49,11 +49,11 @@ export function BottomTabBar({ activeTab, onTabChange }: BottomTabBarProps) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    height: 60,
+    height: 80,
     backgroundColor: BOTBAR_BG,
     borderTopWidth: 1,
     borderTopColor: BOTBAR_BORDER,
-    paddingBottom: 5,
+
     // ...Shadows.panelShadow,
   },
   tab: {
