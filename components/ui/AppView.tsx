@@ -4,6 +4,7 @@ import { $, Sizing, UseTheme, tone, useScale } from '@/theme'
 import React, { ComponentType, ReactNode, useEffect } from 'react'
 import {
   ImageBackground,
+  Platform,
   ScrollView,
   StyleProp,
   View,
@@ -261,9 +262,11 @@ export function AppSplit({
                 zIndex: 10,
               },
               rightAnimatedStyle,
+              // On web, use style.pointerEvents to avoid deprecation
+              Platform.OS === 'web' ? { pointerEvents: rightVisible ? 'auto' : 'none' } : {},
             ]}
-            // Disable interactions when hidden
-            pointerEvents={rightVisible ? 'auto' : 'none'}
+            // On native, keep prop pointerEvents; on web, omit to avoid deprecation warning
+            {...(Platform.OS !== 'web' ? { pointerEvents: (rightVisible ? 'auto' : 'none') as any } : {})}
           >
             {right}
           </Animated.View>

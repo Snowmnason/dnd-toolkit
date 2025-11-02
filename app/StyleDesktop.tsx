@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { ThemeSelector } from '@/Screens/settings/ThemeSelector'
 import {
   Accordion,
@@ -606,32 +607,6 @@ export default function StyleDesktop() {
                 </>
               )}
               <Body style={{ marginTop: S.space.sm }}>Active Tab: {tabValue}</Body>
-            </View>
-          </Surface>
-
-          <Surface style={{ marginTop: S.space.lg }}>
-            <Heading>Switch States</Heading>
-            <View style={{ gap: S.space.xs, marginTop: S.space.md }}>
-              <Body>Switch: {switchOn ? 'ON' : 'OFF'}</Body>
-              {Object.keys(switchGroupValues).length > 0 && (
-                <>
-                  <SubTitle style={{ marginTop: S.space.sm }}>Switch Group:</SubTitle>
-                  {Object.entries(switchGroupValues).map(([key, value]) => (
-                    <Body key={key}>{key}: {value ? 'ON' : 'OFF'}</Body>
-                  ))}
-                </>
-              )}
-              {switchGroupExclusiveValue && (
-                <Body style={{ marginTop: S.space.sm }}>Exclusive: {switchGroupExclusiveValue}</Body>
-              )}
-              {Object.keys(switchGroupMaxValues).length > 0 && (
-                <>
-                  <SubTitle style={{ marginTop: S.space.sm }}>Max 3 Group:</SubTitle>
-                  {Object.entries(switchGroupMaxValues).map(([key, value]) => (
-                    <Body key={key}>{key}: {value ? 'ON' : 'OFF'}</Body>
-                  ))}
-                </>
-              )}
             </View>
           </Surface>
 

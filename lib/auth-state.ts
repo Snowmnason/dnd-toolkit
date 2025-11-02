@@ -1,5 +1,5 @@
-import { logger } from '@/lib';
 import { Platform } from 'react-native';
+import { logger } from './utils/logger';
 
 // Simple storage interface for cross-platform compatibility
 const storage = {

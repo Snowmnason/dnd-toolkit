@@ -119,18 +119,31 @@ export default function Dropdown({
 
   const borderColor = $('accent', theme)
   const background = $('bgInverse', theme)
+  // Pre-compute theme colors before any animated styles that reference them
+  const textPrimaryColor = $('textInverse', theme)
+  const shadowColor = $('shadow', theme)
+  const accentColor = $('accentDark', theme)
+  const separatorColor = tone($('accent', theme), 'hover', undefined, undefined, theme)
 
   const chevronStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotate.value}deg` }],
   }))
 
-  const dropdownAnimStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ scale: scale.value }],
-    shadowOpacity: 0.1 + shadow.value * 0.15,
-    shadowRadius: 4 + shadow.value * 3,
-    elevation: 1 + shadow.value * 4,
-  }))
+  const dropdownAnimStyle = useAnimatedStyle(() => {
+    const style: any = {
+      opacity: opacity.value,
+      transform: [{ scale: scale.value }],
+    }
+    if (Platform.OS === 'web') {
+      // Use our unified "combined" shadow on web
+      // Two-layer shadow similar to ElevatedView 'combined'
+      style.boxShadow = `0px 4px 4px ${shadowColor}, 0px 12px 12px ${shadowColor}`
+    } else {
+      // Native platforms: keep elevation (shadow* props are fine on native)
+      style.elevation = 1 + shadow.value * 4
+    }
+    return style
+  })
 
   const toggleDropdown = () => {
     const toOpen = !isOpen
@@ -156,11 +169,6 @@ export default function Dropdown({
   }, [items, search, enableSearch])
 
   const selectedLabel = items.find((item) => item.value === value)?.label || placeholder
-
-  // Pre-compute colors outside of render callbacks
-  const textPrimaryColor = $('textInverse', theme)
-  const accentColor = $('accentDark', theme)
-  const separatorColor = tone($('accent', theme), 'hover', undefined, undefined, theme)
   const SAFE_AREA = 24
   const headerRef = useRef<View>(null)
   const [anchor, setAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
@@ -228,7 +236,8 @@ export default function Dropdown({
 
             {/* Positioned container with safety padding so clicks near dropdown won't close */}
             <View
-              pointerEvents="box-none"
+              // On native, use pointerEvents prop; on web, omit and rely on layout
+              {...(Platform.OS !== 'web' ? { pointerEvents: 'box-none' as any } : {})}
               style={{
                 position: 'absolute',
                 top: Math.max(anchor.y - SAFE_AREA, 0),
@@ -243,10 +252,10 @@ export default function Dropdown({
                   {
                     borderColor,
                     backgroundColor: background,
-                    boxShadow: `0 4px 12px rgba(0, 0, 0, ${0.1 + $('textInverse', theme) * 0.15})`,
+                    // Web shadow handled in dropdownAnimStyle; fallback here for non-animated cases
+                    ...(Platform.OS === 'web' ? { boxShadow: `0px 4px 4px ${shadowColor}, 0px 12px 12px ${shadowColor}` } : {}),
                     borderRadius: S.radius.md,
                     maxHeight: computedMaxHeight,
-                    elevation: 12,
                     transformOrigin: 'top center',
                   },
                   dropdownAnimStyle,

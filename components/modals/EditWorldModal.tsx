@@ -1,12 +1,12 @@
 import { AppModal, Body, Button } from '@/components/ui'
 import {
-    createWorldNameChangeHandler,
-    isValidWorldNameForSubmission,
-    type WorldNameValidationResult,
+  createWorldNameChangeHandler,
+  isValidWorldNameForSubmission,
+  type WorldNameValidationResult,
 } from '@/lib/auth/validation'
 import { logger } from '@/lib/utils/logger'
 import { $, useScale, UseTheme } from '@/theme'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Platform, TextInput, View } from 'react-native'
 
 interface EditWorldModalProps {
@@ -79,6 +79,15 @@ export function EditWorldModal({
   }
 
   const validName = isValidWorldNameForSubmission(worldName, originalWorldName)
+
+  // Reset transient state whenever modal closes to avoid stale flags affecting next open
+  useEffect(() => {
+    if (!visible) {
+      setDeleting(false)
+      setDeleteDisabled(false)
+      setWorldNameValidation(null)
+    }
+  }, [visible])
 
   return (
     <AppModal
