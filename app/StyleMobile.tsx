@@ -1,34 +1,35 @@
 import { ThemeSelector } from '@/Screens/settings/ThemeSelector'
 import {
-    Accordion,
-    AppModal,
-    AppToast,
-    AppTooltip,
-    Body,
-    Button,
-    ButtonGroup,
-    Caption,
-    Card,
-    CustomLoad,
-    DescInput,
-    Dropdown,
-    DropdownGroup,
-    Heading,
-    IconButton,
-    Link,
-    ObjHeading,
-    Paragraph,
-    RadioButtonGroup,
-    SnackBar,
-    SubTitle,
-    Switch,
-    SwitchGroup,
-    Tabs,
-    TextInput,
-    TextInputGroup,
-    Title,
-    ToggleGroup
+  Accordion,
+  AppModal,
+  AppToast,
+  AppTooltip,
+  Body,
+  Button,
+  ButtonGroup,
+  Caption,
+  Card,
+  CustomLoad,
+  DescInput,
+  Dropdown,
+  DropdownGroup,
+  Heading,
+  IconButton,
+  Link,
+  ObjHeading,
+  Paragraph,
+  RadioButtonGroup,
+  SnackBar,
+  SubTitle,
+  Switch,
+  SwitchGroup,
+  Tabs,
+  TextInput,
+  TextInputGroup,
+  Title,
+  ToggleGroup
 } from '@/components/ui'
+import { GradientDemo } from '@/components/ui/__demo__/GradientDemo'
 import { $, useScale } from '@/theme'
 import React, { useState } from 'react'
 import { ScrollView, Text, View } from 'react-native'
@@ -462,6 +463,11 @@ export default function StyleMobile() {
             <CustomLoad size="small" />
             <CustomLoad size="large" />
           </View>
+        </Card>
+
+        <Card>
+          <Heading>Gradient Demo</Heading>
+          <GradientDemo />
         </Card>
 
         <Card style={{ marginBottom: S.space.xl }}>

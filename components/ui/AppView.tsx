@@ -1,7 +1,6 @@
 import LoadingOverlay from '@/components/LoadingOverlay'
 import { usePlatform } from '@/contexts/PlatformContext'
-import { $, UseTheme, tone, useScale, } from '@/theme'
-import type { Sizing } from '@/theme/ultils/sizing'
+import { $, Sizing, UseTheme, tone, useScale } from '@/theme'
 import React, { ComponentType, ReactNode, useEffect } from 'react'
 import {
   ImageBackground,
