@@ -3,15 +3,15 @@ import { $, tone, useScale, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useEffect } from 'react'
 import {
-  Animated,
-  BackHandler,
-  Dimensions,
-  Easing,
-  Modal,
-  Platform,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    Animated,
+    BackHandler,
+    Dimensions,
+    Easing,
+    Modal,
+    Platform,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from 'react-native'
 import { Body, Heading } from './AppText'
 import { IconButton } from './IconButton'
@@ -67,7 +67,7 @@ export function AppModal({
   // Keep modal mounted long enough to play exit animation
   const [rendered, setRendered] = React.useState(visible)
 
-  // 🔹 Fade + slide + (optional shake) animation
+  // 🔹 Fade + slide (+scale on web) entry/exit animation
   useEffect(() => {
     if (visible) {
       // Ensure it's mounted before animating in
@@ -78,7 +78,6 @@ export function AppModal({
       scaleAnim.setValue(initialScale)
       // ✅ Haptic feedback on open
       if (isMobile) {
-        // Light open haptic, stronger if destructive
         const hapticStyle =
           borderTone === 'danger'
             ? Haptics.ImpactFeedbackStyle.Medium
@@ -117,26 +116,7 @@ export function AppModal({
               duration: 1,
               useNativeDriver: isMobile,
             }),
-  ]).start()
-
-      // 💥 Optional "panic" shake if destructive
-      if (borderTone === 'danger' && animateOnDestruction) {
-        // Slight delay so it feels natural
-        setTimeout(() => {
-          Animated.sequence([
-            Animated.timing(shake, { toValue: -10, duration: 80, useNativeDriver: Platform.OS !== 'web' }),
-            Animated.timing(shake, { toValue: 10, duration: 80, useNativeDriver: Platform.OS !== 'web' }),
-            Animated.timing(shake, { toValue: -6, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
-            Animated.timing(shake, { toValue: 6, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
-            Animated.timing(shake, { toValue: 0, duration: 50, useNativeDriver: Platform.OS !== 'web' }),
-          ]).start()
-
-          // Optional haptic feedback during shake (extra tactile "panic")
-          if (isMobile) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)
-          }
-        }, 300)
-      }
+      ]).start()
     } else {
       // Fade + slide out
       Animated.parallel([
@@ -174,7 +154,30 @@ export function AppModal({
         setRendered(false)
       })
     }
-  }, [visible, fadeAnim, slideAnim, scaleAnim, borderTone, animateOnDestruction, shake, isMobile, isWeb, initialTranslateY, initialScale])
+  }, [visible, fadeAnim, slideAnim, scaleAnim, isMobile, isWeb, initialTranslateY, initialScale, borderTone])
+
+  // 💥 Optional "panic" shake handled separately to avoid resetting entry animation
+  useEffect(() => {
+    if (!visible) return
+    if (borderTone !== 'danger' || !animateOnDestruction) return
+
+    // Slight delay so it feels natural
+    const timer = setTimeout(() => {
+      Animated.sequence([
+        Animated.timing(shake, { toValue: -10, duration: 80, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(shake, { toValue: 10, duration: 80, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(shake, { toValue: -6, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(shake, { toValue: 6, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(shake, { toValue: 0, duration: 50, useNativeDriver: Platform.OS !== 'web' }),
+      ]).start()
+
+      if (isMobile) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)
+      }
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [visible, animateOnDestruction, borderTone, isMobile, shake])
 
 
   const handleOutsidePress = () => {
