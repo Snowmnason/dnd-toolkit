@@ -1,35 +1,36 @@
 import { ThemeSelector } from '@/Screens/settings/ThemeSelector'
 import {
-    Accordion,
-    AppModal,
-    AppToast,
-    AppTooltip,
-    Body,
-    Button,
-    ButtonGroup,
-    Caption,
-    CustomLoad,
-    DescInput,
-    Dropdown,
-    DropdownGroup,
-    Heading,
-    IconButton,
-    Link,
-    ObjHeading,
-    Paragraph,
-    RadioButtonGroup,
-    SnackBar,
-    SubTitle,
-    Surface,
-    Switch,
-    SwitchGroup,
-    Tabs,
-    TextInput,
-    TextInputGroup,
-    Title,
-    ToggleGroup
+  Accordion,
+  AppModal,
+  AppToast,
+  AppTooltip,
+  Body,
+  Button,
+  ButtonGroup,
+  Caption,
+  CustomLoad,
+  DescInput,
+  Dropdown,
+  DropdownGroup,
+  Heading,
+  IconButton,
+  Link,
+  ObjHeading,
+  Paragraph,
+  RadioButtonGroup,
+  SnackBar,
+  SubTitle,
+  Surface,
+  Switch,
+  SwitchGroup,
+  Tabs,
+  TextInput,
+  TextInputGroup,
+  Title,
+  ToggleGroup
 } from '@/components/ui'
 import { AppSplit } from '@/components/ui/AppView'
+import { GradientDemo } from '@/components/ui/__demo__/GradientDemo'
 import { $, useScale } from '@/theme'
 import React, { useState } from 'react'
 import { ScrollView, Text, View } from 'react-native'
@@ -551,6 +552,8 @@ export default function StyleDesktop() {
               </AppTooltip>
             </View>
           </Surface>
+
+          
         </ScrollView>
       }
       right={
@@ -558,6 +561,11 @@ export default function StyleDesktop() {
           <Surface>
             <Title>Component State Overview</Title>
             <Body>This panel displays the current state of all interactive components on the left.</Body>
+          </Surface>
+
+          <Surface style={{ marginTop: S.space.lg }}>
+            <Heading>Gradient Demo</Heading>
+            <GradientDemo />
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg }}>

@@ -40,7 +40,7 @@ export const classicTheme: ClassicTheme = {
     // Overlays & effects
     [TOKENS.overlayLight]: 'rgba(255,255,255,0.05)',
     [TOKENS.overlayDark]: 'rgba(0,0,0,0.25)',
-    [TOKENS.shadow]: 'rgba(0,0,0,0.25)',
+    [TOKENS.shadow]: 'rgba(66, 66, 66, 0.25)',
     [TOKENS.glow]: 'rgba(212,175,55,0.28)',    // warm gold aura
 
     // Buttons — primary
