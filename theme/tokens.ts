@@ -8,14 +8,12 @@ export const TOKENS = {
   /* 🎨 Background Layers */
   background: 'background',           // Main background
   surface: 'surface',                 // Cards, modals, containers
-  elevated: 'elevated',               // Headers, navbars, elevated surfaces
   bgInverse: 'bgInverse',             // Great for interactive elements
 
   /* ✍️ Text Colors */
   textPrimary: 'textPrimary',         // Main readable text
   textSecondary: 'textSecondary',     // Muted or secondary text
   textInverse: 'textInverse',         // Text on light or accent backgrounds
-  textOnAccent: 'textOnAccent',       // NEW: text on accent BGs
 
   /* 🔲 Borders */
   border: 'border',                   // Default border
@@ -23,10 +21,6 @@ export const TOKENS = {
 
   /* 🌟 Accents / Highlights */
   accent: 'accent',                   // Brand highlight color
-  accentHover: 'accentHover',         // Accent hover / focus
-  accentText: 'accentText',           // Text on accent background
-  accentLight: 'accentLight',         // NEW: lighter accent tint
-  accentDark: 'accentDark',           // NEW: darker accent shade
 
   /* ⚠️ Feedback & System States */
   success: 'success',                 // Positive / confirmed
@@ -34,12 +28,8 @@ export const TOKENS = {
   danger: 'danger',                   // Error / destructive
   info: 'info',                       // Informational / neutral
 
-  /* 🌫️ Overlays */
-  overlayLight: 'overlayLight',       // Light overlay on dark surfaces
-  overlayDark: 'overlayDark',         // Dark overlay on light surfaces
-
+  /* 🌫️ Effects */
   shadow: 'shadow',                   // Standard shadow color
-  glow: 'glow',                       // NEW: soft glow color (for effects)
 
   /* 🔘 Buttons */
   primaryButtonText: 'primaryButtonText',
