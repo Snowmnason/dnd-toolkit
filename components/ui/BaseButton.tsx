@@ -211,13 +211,13 @@ export function Button({
   const handleMouseEnter = () => {
     if (disabled || loading || Platform.OS !== 'web') return
     // Smooth hover fade-in
-    hovered.value = withTiming(1, { duration: 400 })
+    hovered.value = withTiming(1, { duration: 180 })
   }
 
   const handleMouseLeave = () => {
     if (disabled || loading || Platform.OS !== 'web') return
     // Smooth hover fade-out
-    hovered.value = withTiming(0, { duration: 320 })
+    hovered.value = withTiming(0, { duration: 120 })
   }
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -249,6 +249,10 @@ export function Button({
       borderRadius: S.radius.md - 2,
       opacity: hovered.value,
       zIndex: 9,
+      // Web paint hint + move pointer-events to style to avoid RNW deprecation warning
+      ...(Platform.OS === 'web'
+        ? ({ willChange: 'opacity', pointerEvents: 'none' } as any)
+        : {}),
     }
   })
 
@@ -336,8 +340,8 @@ export function Button({
               }}
             />
             
-            {/* Hover color overlay - slides from left to right over gradient */}
-            <Animated.View pointerEvents="none" style={hoverOverlayStyle} />
+            {/* Hover color overlay */}
+            <Animated.View style={hoverOverlayStyle} />
             
             {/* Content layer - always on top */}
             <View style={{

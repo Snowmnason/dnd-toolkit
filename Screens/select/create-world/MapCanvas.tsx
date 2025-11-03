@@ -120,8 +120,8 @@ export default function MapCanvas({
               borderRadius: S.radius.md,
               width: '100%',
               height: '100%',
-              resizeMode: 'contain',
             }}
+            resizeMode="contain"
           />
         )}
       </View>
@@ -137,13 +137,10 @@ export default function MapCanvas({
           borderRadius: S.radius.lg,
           paddingVertical: S.space.sm,
           paddingHorizontal: S.space.md,
-          shadowColor: '#000',
-          shadowOpacity: 0.3,
-          shadowRadius: 6,
+          boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
         }}
       >
         <ToggleGroup
-          title="Tools"
           items={tools}
           active={selectedTool ? [selectedTool] : []}   // ✅ array of active keys
           onChange={(keys) => handleToolSelect(keys[0] || '')}  // ✅ pick first
