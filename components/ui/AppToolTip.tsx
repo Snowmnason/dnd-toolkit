@@ -1,4 +1,4 @@
-import { $, tone, useScale, UseTheme } from '@/theme'
+import { $, useScale, UseTheme } from '@/theme'
 import React, { useState } from 'react'
 import {
   Platform,
@@ -12,10 +12,13 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated'
+import { GradientView } from './Resuables/GradientView'
+import { getShadowStyle } from './Resuables/shadows'
 
 interface AppTooltipProps {
   text: string
   delay?: number
+  gradientIntensity?: 'subtle' | 'moderate' | 'dramatic'
   children: React.ReactNode
 }
 
@@ -23,7 +26,12 @@ interface AppTooltipProps {
  * 💬 AppTooltip
  * Cross-platform tooltip for hover (web) or press-hold (mobile).
  */
-export function AppTooltip({ text, delay = 500, children }: AppTooltipProps) {
+export function AppTooltip({ 
+  text, 
+  delay = 500, 
+  gradientIntensity = 'moderate',
+  children 
+}: AppTooltipProps) {
   const { theme } = UseTheme()
   const S = useScale()
   const [visible, setVisible] = useState(false)
@@ -58,19 +66,19 @@ export function AppTooltip({ text, delay = 500, children }: AppTooltipProps) {
       bottom: '100%',
       left: '50%',
       transform: [{ translateX: -50 }],
-      paddingHorizontal: S.space.sm,
-      paddingVertical: S.space.xs,
       borderRadius: S.radius.sm,
-      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-      elevation: 3,
+      ...getShadowStyle('softer'),
       marginBottom: S.space.xs,
       zIndex: 100,
+      overflow: 'hidden',
     },
     text: {
       fontSize: S.font.caption,
       textAlign: 'center',
     },
   }), [S])
+
+  const baseColor = $('surfaceAlt' as any)
 
   return (
     <Pressable
@@ -82,12 +90,18 @@ export function AppTooltip({ text, delay = 500, children }: AppTooltipProps) {
       <View>
         {children}
         {visible && (
-          <Animated.View style={[
-            styles.tooltip, 
-            animatedStyle,
-            { backgroundColor: tone($('surface', theme), 'alt', undefined, undefined, theme) }
-          ]}>
-            <Text style={[styles.text, { color: $('textPrimary', theme) }]}>{text}</Text>
+          <Animated.View style={[styles.tooltip, animatedStyle]}>
+            <GradientView
+              baseColor={baseColor}
+              intensity={gradientIntensity}
+              borderRadius={S.radius.sm}
+              style={{ 
+                paddingHorizontal: S.space.sm,
+                paddingVertical: S.space.xs,
+              }}
+            >
+              <Text style={[styles.text, { color: $('textPrimary', theme) }]}>{text}</Text>
+            </GradientView>
           </Animated.View>
         )}
       </View>

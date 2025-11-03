@@ -1,12 +1,14 @@
-import { $, tone, useScale, UseTheme } from '@/theme';
+import { $, useScale, UseTheme } from '@/theme';
 import React, { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets'; // ✅ new import
+import { GradientView } from './Resuables/GradientView';
+import { getShadowStyle } from './Resuables/shadows';
 
 type ToastType = 'info' | 'success' | 'error' | 'warning'
 
@@ -32,19 +34,18 @@ export function AppToast({
   const { theme } = UseTheme()
   const S = useScale()
   const opacity = useSharedValue(0)
-  const translateY = useSharedValue(30)
-  const baseSurface = $('surface', theme)
+  const translateY = useSharedValue(-30)
 
   useEffect(() => {
     if (visible) {
-      // Animate in: fade + slide up
+      // Animate in: fade + slide down from top
       opacity.value = withTiming(1, { duration: 200 })
       translateY.value = withTiming(0, { duration: 200 })
       
       const timeout = setTimeout(() => {
-        // Animate out: fade + slide down (reverse)
+        // Animate out: fade + slide up (reverse)
         opacity.value = withTiming(0, { duration: 200 })
-        translateY.value = withTiming(30, { duration: 200 }, () => {
+        translateY.value = withTiming(-30, { duration: 200 }, () => {
           if (onHide) scheduleOnRN(onHide)
         })
       }, duration)
@@ -52,7 +53,7 @@ export function AppToast({
     } else {
       // Reset to initial state when not visible
       opacity.value = 0
-      translateY.value = 30
+      translateY.value = -30
     }
   }, [visible, duration, onHide, opacity, translateY]) // ✅ include deps
 
@@ -61,30 +62,35 @@ export function AppToast({
     transform: [{ translateY: translateY.value }],
   }))
 
-const background =
-  type === 'success'
-    ? tone(baseSurface, 'accent')
-    : type === 'error'
-    ? tone(baseSurface, 'border')
-    : tone(baseSurface, 'alt')
+  const background =
+    type === 'success'
+      ? $('success', theme)
+      : type === 'error'
+      ? $('danger', theme)
+      : type === 'warning'
+      ? $('warning', theme)
+      : $('info', theme)
 
   return (
-    <Animated.View style={[styles.container, { bottom: S.space.xl }, animatedStyle]}>
-      <View
-        style={[
-          styles.toast,
-          {
-            backgroundColor: background,
-            borderRadius: S.radius.md,
-            paddingHorizontal: S.space.lg,
-            paddingVertical: S.space.md,
-          },
-        ]}
+  <Animated.View style={[styles.container, { top: S.space.xl, right: S.space.xl }, animatedStyle]}>
+      <GradientView
+        baseColor={background}
+        intensity="moderate"
+        direction='top-to-bottom'
+        fadeToTransparent={true}
+        borderRadius={S.radius.md}
+        style={{
+          borderColor: background,
+          borderWidth: 3,
+          paddingHorizontal: S.space.lg,
+          paddingVertical: S.space.md,
+          ...getShadowStyle('softer'),
+        }}
       >
-        <Text style={[styles.text, { color: $('textPrimary', theme), fontSize: S.font.body1 }]}>
+        <Text style={[styles.text, { color: $('textPrimary', theme), fontSize: S.font.subtitle }]}>
           {message}
         </Text>
-      </View>
+      </GradientView>
     </Animated.View>
   )
 }
@@ -92,12 +98,10 @@ const background =
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    alignSelf: 'center',
     zIndex: 9999,
   },
   toast: {
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.15)',
-    elevation: 5,
+    ...getShadowStyle('softer'),
   },
   text: {
     fontWeight: '600',

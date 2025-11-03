@@ -24,13 +24,14 @@ export default function MainLanding() {
           flex: 1,
         }}
       >
-        {panelConfigs.map((panel) => (
+        {panelConfigs.map((panel, i) => (
           <PanelView
             key={panel.key}
             config={panel}
             worldId={worldId}
             userRole={userRole}
             image={panel.image ?? undefined}
+            showRightBorder={i !== panelConfigs.length - 1}
           />
         ))}
       </View>

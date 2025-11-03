@@ -35,7 +35,8 @@ export function IconButtonBar({
   fontsize = size / 2,
 }: IconButtonBarProps) {
   const { theme } = UseTheme()
-  const effectiveColor = color || $('accent', theme)
+  // For tone() operations, we need the actual color value, not CSS var
+  const effectiveColor = color || theme.accent
   const effectiveIconColor = iconColor || $('surface', theme)
   const [hovered, setHovered] = useState(false)
   const [pressed, setPressed] = useState(false)

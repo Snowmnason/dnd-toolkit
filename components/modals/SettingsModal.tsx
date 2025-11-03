@@ -39,7 +39,7 @@ export default function SettingsModal({
         {/* Return to World Selection */}
         <Button
           text="Return to World Selection"
-          variant="solid"
+          variant="outlined"
           onPress={() => {
             onClose()
             onReturnToWorldSelection()

@@ -1,4 +1,4 @@
-import { $, tone, useScale, UseTheme } from '@/theme'
+import { $, useScale, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useEffect, useRef } from 'react'
 import { Animated, Pressable, View } from 'react-native'
@@ -65,7 +65,7 @@ export function RadioButton({
           height: size,
           borderRadius: size / 2,
           borderWidth: 2,
-          borderColor: checked ? color : tone($('border', theme), 'subtle', undefined, undefined, theme),
+          borderColor: checked ? color : $('borderSubtle' as any, theme),
           justifyContent: 'center',
           alignItems: 'center',
           backgroundColor: $('surface', theme),

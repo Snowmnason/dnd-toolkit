@@ -1,15 +1,11 @@
 import { $, tone, useScale, UseTheme, type Sizing } from '@/theme'
-import { createGradientStops } from '@/theme/ultils/colorUtils'
 import * as Haptics from 'expo-haptics'
 import React from 'react'
 import { Animated, Platform, Pressable, View, ViewStyle } from 'react-native'
+import { GradientView } from './Resuables/GradientView'
+import { getShadowStyle, ShadowMode } from './Resuables/shadows'
 
 type RadiusKey = keyof Sizing['radius']
-
-/**
- * Shadow styles for elevated components
- */
-type ShadowMode = 'combined' | 'harder' | 'softer' | 'none'
 
 /**
  * Gradient configuration
@@ -27,6 +23,7 @@ interface ElevatedViewBaseProps {
   fillWidth?: boolean
   opacity?: number
   gradient?: boolean
+  gradientOpacity?: number
   gradientIntensity?: GradientIntensity
   gradientDirection?: GradientDirection
   style?: ViewStyle
@@ -48,6 +45,7 @@ export function ElevatedView({
   fillWidth = false,
   opacity,
   gradient = false,
+  gradientOpacity,
   gradientIntensity = 'dramatic',
   gradientDirection = 'top-to-bottom',
   style,
@@ -65,117 +63,63 @@ export function ElevatedView({
       ? tone($('surface', theme), 'alt', undefined, undefined, theme)
       : $('surface', theme)
 
-  const shadowColor = $('shadow', theme)
-
   const borderColor = bordered 
-    ? tone($('border', theme), 'subtle', undefined, undefined, theme) 
+    ? $('borderSubtle' as any, theme)
     : 'transparent'
 
   const borderWidth = customBorderWidth ?? (bordered ? 1 : 0)
 
-  // Compute shadow style inline
-  let shadowStyle: ViewStyle = {}
-  if (shadow !== 'none') {
-    switch (shadow) {
-      case 'combined':
-        shadowStyle = {
-          boxShadow: `0px 4px 4px ${shadowColor}, 0px 12px 12px ${shadowColor}`,
-          elevation: 3,
-        }
-        break
-      case 'harder':
-        shadowStyle = {
-          boxShadow: `0px 4px 4px ${shadowColor}`,
-          elevation: 2,
-        }
-        break
-      case 'softer':
-        shadowStyle = {
-          boxShadow: `0px 12px 12px ${shadowColor}`,
-          elevation: 1,
-        }
-        break
-    }
+  // Get shadow style from reusable utility (theme-aware)
+  const shadowStyle = getShadowStyle(shadow)
+
+  // Get the base color for gradient (CSS var on web, resolved on native)
+  const baseColor = Platform.OS === 'web'
+    ? (toneVariant === 'base'
+        ? $('background')
+        : toneVariant === 'accent'
+        ? $('accentAlt' as any)
+        : toneVariant === 'elevated' || toneVariant === 'alt'
+        ? $('surfaceAlt' as any)
+        : $('surface'))
+    : bg
+
+  const containerStyle: ViewStyle = {
+    borderRadius: S.radius[radius],
+    borderWidth,
+    borderColor,
+    padding: padded ? S.space.md : 0,
+    ...(fillWidth && { width: '100%' }),
+    ...(opacity !== undefined && { opacity }),
+    ...shadowStyle,
+    overflow: 'hidden',
   }
 
-  // Compute background style inline
-  let backgroundStyle: ViewStyle = {}
-  if (!gradient) {
-    backgroundStyle = { backgroundColor: bg }
-  } else {
-    const stops = createGradientStops(bg, gradientDirection, gradientIntensity)
-    
-    if (Platform.OS === 'web') {
-      const direction = gradientDirection === 'top-to-bottom' ? '180deg' : '0deg'
-      backgroundStyle = {
-        backgroundImage: `linear-gradient(${direction}, ${stops.join(', ')})`,
-      } as ViewStyle
-    } else {
-      backgroundStyle = { backgroundColor: bg }
-    }
-  }
-
-  // Render gradient overlay for native
-  const gradientOverlayContent = React.useMemo(() => {
-    if (!gradient || Platform.OS === 'web') return null
-
-    const stops = createGradientStops(bg, gradientDirection, gradientIntensity)
-    const [start, , end] = stops.map(stop => stop.split(' ')[0])
-
+  if (gradient) {
+    // Use GradientView for gradient backgrounds
     return (
-      <>
-        <View
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '50%',
-            backgroundColor: start,
-            opacity: 0.6,
-            borderTopLeftRadius: S.radius[radius],
-            borderTopRightRadius: S.radius[radius],
-          }}
-        />
-        <View
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: '50%',
-            backgroundColor: end,
-            opacity: 0.6,
-            borderBottomLeftRadius: S.radius[radius],
-            borderBottomRightRadius: S.radius[radius],
-          }}
-        />
-      </>
+      <GradientView
+        baseColor={baseColor}
+        gradientOpacity={gradientOpacity}
+        intensity={gradientIntensity}
+        direction={gradientDirection}
+        borderRadius={S.radius[radius]}
+        style={{ ...containerStyle, ...style } as ViewStyle}
+      >
+        {children}
+      </GradientView>
     )
-  }, [gradient, bg, gradientDirection, gradientIntensity, S.radius, radius])
+  }
 
-
+  // Non-gradient: simple colored background
   return (
     <View
       style={[
-        {
-          borderRadius: S.radius[radius],
-          borderWidth,
-          borderColor,
-          padding: padded ? S.space.md : 0,
-          ...(fillWidth && { width: '100%' }),
-          ...(opacity !== undefined && { opacity }),
-          ...backgroundStyle,
-          ...shadowStyle,
-          overflow: 'hidden',
-        },
+        containerStyle,
+        { backgroundColor: baseColor as any },
         style,
       ]}
     >
-      {gradientOverlayContent}
-      <View style={{ position: 'relative', zIndex: 1 }}>
-        {children}
-      </View>
+      {children}
     </View>
   )
 }
@@ -191,6 +135,7 @@ interface CardProps {
   radius?: RadiusKey
   shadow?: boolean
   gradient?: boolean
+  gradientOpacity?: number
   gradientIntensity?: GradientIntensity
   gradientDirection?: GradientDirection
   style?: ViewStyle
@@ -211,7 +156,8 @@ export function Card({
   padded = true,
   radius = 'md',
   shadow = true,
-  gradient = false,
+  gradient = true,
+  gradientOpacity,
   gradientIntensity = 'dramatic',
   gradientDirection = 'top-to-bottom',
   style,
@@ -230,6 +176,7 @@ export function Card({
       shadow={shadow ? 'combined' : 'none'}
       fillWidth={false}
       gradient={gradient}
+      gradientOpacity={gradientOpacity}
       gradientIntensity={gradientIntensity}
       gradientDirection={gradientDirection}
       style={style}
@@ -251,6 +198,7 @@ interface SurfaceProps {
   fillWidth?: boolean
   opacity?: number
   gradient?: boolean
+  gradientOpacity?: number
   gradientIntensity?: GradientIntensity
   gradientDirection?: GradientDirection
   style?: ViewStyle
@@ -273,7 +221,8 @@ export function Surface({
   bordered = true,
   fillWidth = true,
   opacity,
-  gradient = false,
+  gradient = true,
+  gradientOpacity,
   gradientIntensity = 'subtle',
   gradientDirection = 'top-to-bottom',
   style,
@@ -290,6 +239,7 @@ export function Surface({
       fillWidth={fillWidth}
       opacity={opacity}
       gradient={gradient}
+      gradientOpacity={gradientOpacity}
       gradientIntensity={gradientIntensity}
       gradientDirection={gradientDirection}
       style={style}

@@ -9,6 +9,7 @@ import {
   Button,
   ButtonGroup,
   Caption,
+  Card,
   CustomLoad,
   DescInput,
   Dropdown,
@@ -31,13 +32,14 @@ import {
   ToggleGroup
 } from '@/components/ui'
 import { AppSplit } from '@/components/ui/AppView'
-import { GradientDemo } from '@/components/ui/__demo__/GradientDemo'
-import { $, useScale } from '@/theme'
+
+import { $, UseTheme, useScale } from '@/theme'
 import React, { useState } from 'react'
 import { ScrollView, Text, View } from 'react-native'
 
 export default function StyleDesktop() {
   const S = useScale()
+  const { theme } = UseTheme()
   
   // Simple display states (not controlling components, just for right panel display)
   const [primaryClicks, setPrimaryClicks] = useState(0)
@@ -73,6 +75,9 @@ export default function StyleDesktop() {
   const [modalVisible, setModalVisible] = useState(false)
   const [modal2Visible, setModal2Visible] = useState(false)
   const [toastVisible, setToastVisible] = useState(false)
+  const [toastVisible1, setToastVisible1] = useState(false)
+  const [toastVisible2, setToastVisible2] = useState(false)
+  const [toastVisible3, setToastVisible3] = useState(false)
   const [snackVisible, setSnackVisible] = useState(false)
 
   return (
@@ -424,10 +429,10 @@ export default function StyleDesktop() {
                         padding: S.space.md, 
                         borderRadius: S.radius.md,
                         backgroundColor: 
-                          colorTabValue === 'textPrimary' ? $('background') :
-                          colorTabValue === 'textSecondary' ? $('surface') :
-                          colorTabValue === 'textInverse' ? $('textPrimary') :
-                          $('accent')
+                          colorTabValue === 'textPrimary' ? $('background', theme) :
+                          colorTabValue === 'textSecondary' ? $('surface', theme) :
+                          colorTabValue === 'textInverse' ? $('textPrimary', theme) :
+                          $('accent', theme)
                       }}
                     >
                       <Heading 
@@ -524,7 +529,10 @@ export default function StyleDesktop() {
             <View style={{ gap: S.space.md, marginTop: S.space.md }}>
               <Button text="Open Modal" onPress={() => setModalVisible(true)} />
               <Button text="Open Custom Modal" onPress={() => setModal2Visible(true)} />
-              <Button text="Show Toast" onPress={() => setToastVisible(true)} />
+              <Button text="Show Toast Info" onPress={() => setToastVisible(true)} />
+              <Button text="Show Toast Success" onPress={() => setToastVisible1(true)} />
+              <Button text="Show Toast Warning" onPress={() => setToastVisible2(true)} />
+              <Button text="Show Toast Error" onPress={() => setToastVisible3(true)} />
               <Button text="Show Snackbar" onPress={() => setSnackVisible(true)} />
             </View>
           </Surface>
@@ -566,7 +574,81 @@ export default function StyleDesktop() {
 
           <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Gradient Demo</Heading>
-            <GradientDemo />
+            <Heading>🌈 Gradient System Demo</Heading>
+                  <Body style={{ marginBottom: S.space.xl }}>
+                    Tight, dramatic gradients from light to dark
+                  </Body>
+            
+                  {/* Cards with Gradients */}
+                  <Heading style={{ marginTop: S.space.xl, marginBottom: S.space.md }}>
+                    Cards (Dramatic Gradient by Default)
+                  </Heading>
+            
+                  <View style={{ marginBottom: S.space.lg, gap: S.space.md }}>
+                    <Card gradient>
+                      <SubTitle>Dramatic Top-to-Bottom (Default)</SubTitle>
+                      <Body>Tight transition at 70% for strong depth effect</Body>
+                    </Card>
+            
+                    <Card gradient gradientDirection="bottom-to-top">
+                      <SubTitle>Dramatic Bottom-to-Top</SubTitle>
+                      <Body>Inverted gradient for alternative styling</Body>
+                    </Card>
+            
+                    <Card gradient gradientIntensity="moderate">
+                      <SubTitle>Moderate Intensity</SubTitle>
+                      <Body>Softer transition, less contrast</Body>
+                    </Card>
+            
+                    <Card gradient gradientIntensity="subtle">
+                      <SubTitle>Subtle Intensity</SubTitle>
+                      <Body>Very gentle gradient, barely noticeable</Body>
+                    </Card>
+            
+                    <Card gradient toneVariant="accent">
+                      <SubTitle>Accent Variant with Gradient</SubTitle>
+                      <Body>Gradient applied to accent-toned background</Body>
+                    </Card>
+                  </View>
+            
+                  {/* Surfaces with Gradients */}
+                  <Heading style={{ marginTop: S.space.xl, marginBottom: S.space.md }}>
+                    Surfaces (Subtle Gradient by Default)
+                  </Heading>
+            
+                  <View style={{ marginBottom: S.space.lg, gap: S.space.md }}>
+                    <Surface gradient>
+                      <SubTitle>Subtle Top-to-Bottom (Default)</SubTitle>
+                      <Body>Gentle gradient for large background panels</Body>
+                    </Surface>
+            
+                    <Surface gradient gradientIntensity="dramatic">
+                      <SubTitle>Dramatic Surface</SubTitle>
+                      <Body>More pronounced gradient on surface</Body>
+                    </Surface>
+            
+                    <Surface gradient variant="elevated">
+                      <SubTitle>Elevated Variant with Gradient</SubTitle>
+                      <Body>Gradient on elevated surface tone</Body>
+                    </Surface>
+                  </View>
+            
+                  {/* Comparison */}
+                  <Heading style={{ marginTop: S.space.xl, marginBottom: S.space.md }}>
+                    Side-by-Side Comparison
+                  </Heading>
+            
+                  <View style={{ flexDirection: 'row', gap: S.space.md, marginBottom: S.space.xxl }}>
+                    <Card style={{ flex: 1 }}>
+                      <SubTitle>No Gradient</SubTitle>
+                      <Body>Flat background</Body>
+                    </Card>
+            
+                    <Card gradient style={{ flex: 1 }}>
+                      <SubTitle>With Gradient</SubTitle>
+                      <Body>Dramatic depth</Body>
+                    </Card>
+                  </View>
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg }}>
@@ -671,10 +753,30 @@ export default function StyleDesktop() {
       </AppModal>
 
       <AppToast
-        message="Hello from Desktop!"
+        message="Hello from Desktop! Info"
         visible={toastVisible}
         type="info"
         onHide={() => setToastVisible(false)}
+      />
+      <AppToast
+        message="Hello from Desktop! Success"
+        visible={toastVisible1}
+        type="success"
+        onHide={() => setToastVisible1(false)}
+      />
+
+      <AppToast
+        message="Hello from Desktop! Warning"
+        visible={toastVisible2}
+        type="warning"
+        onHide={() => setToastVisible2(false)}
+      />
+
+      <AppToast
+        message="Hello from Desktop! Error"
+        visible={toastVisible3}
+        type="error"
+        onHide={() => setToastVisible3(false)}
       />
 
       <SnackBar

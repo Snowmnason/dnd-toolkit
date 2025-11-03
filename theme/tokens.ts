@@ -32,6 +32,7 @@ export const TOKENS = {
   success: 'success',                 // Positive / confirmed
   warning: 'warning',                 // Attention / caution
   danger: 'danger',                   // Error / destructive
+  info: 'info',                       // Informational / neutral
 
   /* 🌫️ Overlays */
   overlayLight: 'overlayLight',       // Light overlay on dark surfaces
@@ -41,28 +42,15 @@ export const TOKENS = {
   glow: 'glow',                       // NEW: soft glow color (for effects)
 
   /* 🔘 Buttons */
-  // Primary Button
-  primaryButtonBg: 'primaryButtonBg',
-  primaryButtonBorder: 'primaryButtonBorder',
   primaryButtonText: 'primaryButtonText',
-  primaryButtonHover: 'primaryButtonHover',
-
-  // Secondary Button
-  secondaryButtonBg: 'secondaryButtonBg',
-  secondaryButtonBorder: 'secondaryButtonBorder',
-  secondaryButtonText: 'secondaryButtonText',
-  secondaryButtonHover: 'secondaryButtonHover',
 
   // Destructive Button
   destructiveButton: 'destructiveButton',
-  destructiveButtonText: 'destructiveButtonText',
+  destructiveButtonText: 'destructiveButtonText', //Always Light Text
 
   // Cancel Button
   cancelButton: 'cancelButton',
-  cancelButtonText: 'cancelButtonText',
-
-  // Solid / Outlined Buttons
-  solidOutButton: 'solidOutButton',
+  cancelButtonText: 'cancelButtonText', //Always Dark Text
 
   /* 🔤 Typography */
   fontFamilyTitle: 'fontFamilyTitle', // Used for headings or titles

@@ -2,7 +2,7 @@ import { Button, Card, Heading } from '@/components/ui'
 import { useAppParams } from '@/contexts/AppParamsContext'
 import { usePlatform } from '@/contexts/PlatformContext'
 import { WorldWithAccess } from '@/lib/database/worlds'
-import { $, tone, useScale, UseTheme } from '@/theme'
+import { $, useScale, UseTheme } from '@/theme'
 import { useRouter } from 'expo-router'
 import React from 'react'
 import { Image, View } from 'react-native'
@@ -46,14 +46,15 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
             shadow
             bordered
             toneVariant="base"
+            gradientOpacity={.8}
             style={{
               position: 'absolute',
               top: S.space.lg,
               left: S.space.lg,
               right: S.space.lg,
               padding: S.space.sm,
-              backgroundColor: 'rgba(0,0,0,0.3)', // translucent backing
-              borderColor: tone($('border', theme), 'subtle', undefined, undefined, theme),
+              //backgroundColor: 'rgba(0,0,0,0.3)', // translucent backing
+              borderColor: $('borderSubtle' as any, theme),
             }}
           >
             <Heading align="center" style={{ color: $('textPrimary', theme), marginBottom: 0 }}>

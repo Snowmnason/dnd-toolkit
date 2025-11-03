@@ -1,7 +1,7 @@
 import { AppPage, Button, Heading } from '@/components/ui'
 import { useAppParams } from '@/contexts/AppParamsContext'
 import { usePlatform } from '@/contexts/PlatformContext'
-import { $, tone, useScale, UseTheme } from '@/theme'
+import { $, useScale } from '@/theme'
 import { useRouter } from 'expo-router'
 import React from 'react'
 import { View } from 'react-native'
@@ -13,6 +13,8 @@ interface PanelViewProps {
   userRole?: string
   style?: any
   image?: string
+  /** Show right-hand divider border (desktop only). Useful to hide on last panel. */
+  showRightBorder?: boolean
 }
 
 export function PanelView({
@@ -21,8 +23,8 @@ export function PanelView({
   userRole,
   style,
   image,
+  showRightBorder = true,
 }: PanelViewProps) {
-  const { theme } = UseTheme()
   const router = useRouter()
   const S = useScale()
   const { updateParams } = useAppParams()
@@ -50,15 +52,15 @@ export function PanelView({
       style={[
         {
           minWidth: 260,
-          backgroundColor: image ? 'rgba(0,0,0,0.3)' : $('background', theme),
+          backgroundColor: image ? 'rgba(0,0,0,0.3)' : $('background'),
         },
         style,
       ]}
       contentContainerStyle={{
         justifyContent: 'space-between',
         alignItems: 'center',
-        borderRightWidth: isDesktop ? 2 : 0,
-        borderRightColor: tone($('border', theme), 'subtle'),
+        borderRightWidth: isDesktop && showRightBorder ? 2 : 0,
+        borderRightColor: $('borderSubtle' as any),
       }}
     >
       {/* ─────────────── Panel Header ─────────────── */}
@@ -66,7 +68,7 @@ export function PanelView({
         align="center"
         style={{
           marginBottom: S.space.md,
-          color: $('textPrimary', theme),
+          color: $('textPrimary'),
         }}
       >
         {config.title}
@@ -91,7 +93,7 @@ export function PanelView({
             style={{
               width: '85%',
               marginVertical: S.space.xs,
-              shadowColor: tone($('shadow', theme), 'alt', undefined, undefined, theme),
+              shadowColor: $('shadow' as any),
             }}
           />
         ))}
