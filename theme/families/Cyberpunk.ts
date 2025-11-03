@@ -13,14 +13,12 @@ export const cyberpunkTheme: CyberpunkTheme = {
     // Backgrounds
     [TOKENS.background]: '#060014',
     [TOKENS.surface]: '#0d0024',
-    [TOKENS.elevated]: '#15003d',
     [TOKENS.bgInverse]: '#e3f2fd',
 
     // Text
     [TOKENS.textPrimary]: '#e3f2fd',
     [TOKENS.textSecondary]: '#89aaff',
     [TOKENS.textInverse]: '#060014',
-    [TOKENS.textOnAccent]: '#000000',
 
     // Borders
     [TOKENS.border]: '#2a0072',
@@ -28,10 +26,6 @@ export const cyberpunkTheme: CyberpunkTheme = {
 
     // Accent
     [TOKENS.accent]: '#00ffff',
-    [TOKENS.accentHover]: '#66ffff',
-    [TOKENS.accentText]: '#0a0a0a',
-    [TOKENS.accentLight]: '#80ffff',
-    [TOKENS.accentDark]: '#00a3a3',
 
     // Feedback
     [TOKENS.success]: '#00ffa3',
@@ -39,11 +33,8 @@ export const cyberpunkTheme: CyberpunkTheme = {
     [TOKENS.danger]: '#ff4081',
     [TOKENS.info]: '#339af0',
 
-    // Overlays & effects
-    [TOKENS.overlayLight]: 'rgba(255,255,255,0.05)',
-    [TOKENS.overlayDark]: 'rgba(0,0,0,0.5)',
+    // Effects
     [TOKENS.shadow]: 'rgba(0,255,255,0.25)',
-    [TOKENS.glow]: 'rgba(0,255,255,0.6)',     // cyan glow
 
     // Buttons — primary
     [TOKENS.primaryButtonText]: '#000000',
@@ -66,14 +57,12 @@ export const cyberpunkTheme: CyberpunkTheme = {
     // Backgrounds
     [TOKENS.background]: '#f2f7ff',
     [TOKENS.surface]: '#ffffff',
-    [TOKENS.elevated]: '#e6ecff',
     [TOKENS.bgInverse]: '#120033',
 
     // Text
     [TOKENS.textPrimary]: '#120033',
     [TOKENS.textSecondary]: '#4d0099',
     [TOKENS.textInverse]: '#ffffff',
-    [TOKENS.textOnAccent]: '#ffffff',
 
     // Borders
     [TOKENS.border]: '#ccd6ff',
@@ -81,10 +70,6 @@ export const cyberpunkTheme: CyberpunkTheme = {
 
     // Accent
     [TOKENS.accent]: '#ff0088',
-    [TOKENS.accentHover]: '#ff4db4',
-    [TOKENS.accentText]: '#ffffff',
-    [TOKENS.accentLight]: '#ff99cc',
-    [TOKENS.accentDark]: '#cc006a',
 
     // Feedback
     [TOKENS.success]: '#00b894',
@@ -92,11 +77,8 @@ export const cyberpunkTheme: CyberpunkTheme = {
     [TOKENS.danger]: '#ff1744',
     [TOKENS.info]: '#339af0',
 
-    // Overlays & effects
-    [TOKENS.overlayLight]: 'rgba(255,255,255,0.05)',
-    [TOKENS.overlayDark]: 'rgba(0,0,0,0.15)',
+    // Effects
     [TOKENS.shadow]: 'rgba(0,0,0,0.15)',
-    [TOKENS.glow]: 'rgba(255,0,136,0.4)',     // pink glow
 
     // Buttons — primary
     [TOKENS.primaryButtonText]: '#fff',

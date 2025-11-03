@@ -14,7 +14,7 @@ type GradientIntensity = 'subtle' | 'moderate' | 'dramatic'
 type GradientDirection = 'top-to-bottom' | 'bottom-to-top'
 
 interface ElevatedViewBaseProps {
-  toneVariant?: 'base' | 'surface' | 'accent' | 'alt' | 'elevated'
+  toneVariant?: 'base' | 'surface' | 'accent' | 'alt'
   bordered?: boolean
   borderWidth?: number
   padded?: boolean
@@ -59,7 +59,7 @@ export function ElevatedView({
       ? $('background', theme)
       : toneVariant === 'accent'
       ? tone($('accent', theme), 'alt', undefined, undefined, theme)
-      : toneVariant === 'elevated' || toneVariant === 'alt'
+      : toneVariant === 'alt'
       ? tone($('surface', theme), 'alt', undefined, undefined, theme)
       : $('surface', theme)
 
@@ -78,7 +78,7 @@ export function ElevatedView({
         ? $('background')
         : toneVariant === 'accent'
         ? $('accentAlt' as any)
-        : toneVariant === 'elevated' || toneVariant === 'alt'
+        : toneVariant === 'alt'
         ? $('surfaceAlt' as any)
         : $('surface'))
     : bg
@@ -191,7 +191,7 @@ export function Card({
 // =============================================================================
 
 interface SurfaceProps {
-  variant?: 'base' | 'surface' | 'elevated' | 'accent'
+  variant?: 'base' | 'surface' | 'alt' | 'accent'
   padded?: boolean
   radius?: RadiusKey
   bordered?: boolean

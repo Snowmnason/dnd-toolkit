@@ -1,4 +1,4 @@
-import { $, useScale, UseTheme } from '@/theme'
+import { $, tone, useScale, UseTheme } from '@/theme'
 import React from 'react'
 import { Platform, StyleProp, Text, TextProps, TextStyle } from 'react-native'
 
@@ -78,9 +78,9 @@ export function AppText({
       case 'inverse':
         return $('textInverse', theme)
       case 'onAccent':
-        return $('textOnAccent', theme)
+        return tone($('textInverse', theme), 'border', undefined, undefined, theme)
       case 'onCard':
-        return $('accentText', theme)
+        return $('accent', theme)
       default:
         return $('textPrimary', theme)
     }

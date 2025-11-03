@@ -20,11 +20,10 @@ import { ThemeTokens, TokenName } from '../tokens'
 export function $(token: TokenName, theme?: ThemeTokens): string {
   // Check if this is a color token (exists in ThemeTokens)
   const isColorToken = [
-    'primary', 'background', 'surface', 'elevated', 'bgInverse',
-    'textPrimary', 'textSecondary', 'textInverse', 'textOnAccent',
-    'border', 'borderSubtle', 'accent', 'accentHover', 'accentText',
-    'accentLight', 'accentDark', 'success', 'warning', 'danger',
-    'overlayLight', 'overlayDark', 'shadow', 'glow',
+    'primary', 'background', 'surface', 'bgInverse',
+    'textPrimary', 'textSecondary', 'textInverse',
+    'border', 'borderSubtle', 'accent', 'success', 'warning', 'danger',
+    'shadow',
     'primaryButtonBg', 'primaryButtonBorder', 'primaryButtonText', 'primaryButtonHover',
     'secondaryButtonBg', 'secondaryButtonBorder', 'secondaryButtonText', 'secondaryButtonHover',
     'destructiveButton', 'destructiveButtonText',

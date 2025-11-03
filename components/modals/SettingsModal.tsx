@@ -1,13 +1,13 @@
-import { AppModal, Button } from '@/components/ui'
-import { useScale } from '@/theme'
-import React from 'react'
-import { View } from 'react-native'
+import { AppModal, Button } from "@/components/ui";
+import { useScale } from "@/theme";
+import React from "react";
+import { View } from "react-native";
 
 interface SettingsMenuProps {
-  visible: boolean
-  onClose: () => void
-  onAccountSettings: () => void
-  onReturnToWorldSelection: () => void
+  visible: boolean;
+  onClose: () => void;
+  onAccountSettings: () => void;
+  onReturnToWorldSelection: () => void;
 }
 
 export default function SettingsModal({
@@ -16,7 +16,7 @@ export default function SettingsModal({
   onAccountSettings,
   onReturnToWorldSelection,
 }: SettingsMenuProps) {
-  const S = useScale()
+  const S = useScale();
 
   return (
     <AppModal
@@ -31,8 +31,8 @@ export default function SettingsModal({
           text="Account Settings"
           variant="secondary"
           onPress={() => {
-            onClose()
-            onAccountSettings()
+            onClose();
+            onAccountSettings();
           }}
         />
 
@@ -41,18 +41,14 @@ export default function SettingsModal({
           text="Return to World Selection"
           variant="outlined"
           onPress={() => {
-            onClose()
-            onReturnToWorldSelection()
+            onClose();
+            onReturnToWorldSelection();
           }}
         />
 
         {/* Cancel */}
-        <Button
-          text="Cancel"
-          variant="cancel"
-          onPress={onClose}
-        />
+        <Button text="Cancel" variant="cancel" onPress={onClose} />
       </View>
     </AppModal>
-  )
+  );
 }

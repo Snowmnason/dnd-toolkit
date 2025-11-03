@@ -30,7 +30,7 @@ interface DropdownItemProps {
   isSelected: boolean
   onPress: () => void
   borderColor: string
-  accentColor: string
+  selectedColor: string
   textPrimaryColor: string
   S: ReturnType<typeof useScale>
   theme: any
@@ -41,7 +41,7 @@ function DropdownItemComponent({
   isSelected,
   onPress,
   borderColor,
-  accentColor,
+  selectedColor,
   textPrimaryColor,
   S,
   theme,
@@ -66,13 +66,13 @@ function DropdownItemComponent({
           backgroundColor: isHovered
             ? tone($('bgInverse', theme), 'hover', undefined, undefined, theme)
             : isSelected
-            ? tone(accentColor, 'subtle', undefined, undefined, theme)
+            ? tone(selectedColor, 'subtle', undefined, undefined, theme)
             : 'transparent',
           transform: isHovered ? [{ scale: 1.02 }] : [{ scale: 1 }],
         },
       ]}
     >
-      <Body color={isSelected ? accentColor : textPrimaryColor}>
+      <Body color={isSelected ? selectedColor : textPrimaryColor}>
         {item.label}
       </Body>
     </TouchableOpacity>
@@ -124,7 +124,7 @@ export default function Dropdown({
   // Pre-compute theme colors before any animated styles that reference them
   const textPrimaryColor = $('textInverse', theme)
   const shadowColor = $('shadow', theme)
-  const accentColor = $('accentDark', theme)
+  const selectedColor = $('background', theme)
   const separatorColor = tone($('accent', theme), 'hover', undefined, undefined, theme)
 
   const chevronStyle = useAnimatedStyle(() => ({
@@ -331,7 +331,7 @@ export default function Dropdown({
                   closeDropdown()
                 }}
                 borderColor={borderColor}
-                accentColor={accentColor}
+                selectedColor={selectedColor}
                 textPrimaryColor={textPrimaryColor}
                 S={S}
                 theme={theme}

@@ -1,34 +1,34 @@
 import { ThemeSelector } from '@/Screens/settings/ThemeSelector'
 import {
-  Accordion,
-  AppModal,
-  AppToast,
-  AppTooltip,
-  Body,
-  Button,
-  ButtonGroup,
-  Caption,
-  Card,
-  CustomLoad,
-  DescInput,
-  Dropdown,
-  DropdownGroup,
-  Heading,
-  IconButton,
-  Link,
-  ObjHeading,
-  Paragraph,
-  RadioButtonGroup,
-  SnackBar,
-  SubTitle,
-  Surface,
-  Switch,
-  SwitchGroup,
-  Tabs,
-  TextInput,
-  TextInputGroup,
-  Title,
-  ToggleGroup
+    Accordion,
+    AppModal,
+    AppToast,
+    AppTooltip,
+    Body,
+    Button,
+    ButtonGroup,
+    Caption,
+    Card,
+    CustomLoad,
+    DescInput,
+    Dropdown,
+    DropdownGroup,
+    Heading,
+    IconButton,
+    Link,
+    ObjHeading,
+    Paragraph,
+    RadioButtonGroup,
+    SnackBar,
+    SubTitle,
+    Surface,
+    Switch,
+    SwitchGroup,
+    Tabs,
+    TextInput,
+    TextInputGroup,
+    Title,
+    ToggleGroup
 } from '@/components/ui'
 import { $, useScale } from '@/theme'
 import React, { useState } from 'react'
@@ -520,7 +520,7 @@ export default function StyleMobile() {
                     <Body>More pronounced gradient on surface</Body>
                   </Surface>
           
-                  <Surface gradient variant="elevated">
+                  <Surface gradient variant="alt">
                     <SubTitle>Elevated Variant with Gradient</SubTitle>
                     <Body>Gradient on elevated surface tone</Body>
                   </Surface>
