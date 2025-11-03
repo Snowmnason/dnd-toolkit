@@ -1,7 +1,9 @@
-import { $, tone, useScale, UseTheme } from '@/theme'
+import { $, useScale, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useEffect, useRef } from 'react'
 import { Animated, Pressable, Text } from 'react-native'
+import { GradientView } from './Resuables/GradientView'
+import { getShadowStyle } from './Resuables/shadows'
 
 interface SnackBarProps {
   visible: boolean
@@ -31,15 +33,15 @@ export function SnackBar({
   const translateY = useRef(new Animated.Value(100)).current
   const opacity = useRef(new Animated.Value(0)).current
 
-  // tone color mapping
+  // feedback color mapping
   const bgColor =
     toneType === 'success'
-      ? tone($('accent', theme), 'alt', undefined, undefined, theme)
+      ? $('success', theme)
       : toneType === 'error'
-      ? tone($('destructiveButton', theme), 'alt', undefined, undefined, theme)
+      ? $('danger', theme)
       : toneType === 'warning'
-      ? tone($('warning', theme), 'alt', undefined, undefined, theme)
-      : tone($('surface', theme), 'accent', undefined, undefined, theme)
+      ? $('warning', theme)
+      : $('info', theme)
 
   // Slide animation
   useEffect(() => {
@@ -102,47 +104,50 @@ export function SnackBar({
         right: S.space.lg,
         transform: [{ translateY }],
         opacity,
-        backgroundColor: bgColor,
-        borderRadius: S.radius.lg,
-        paddingVertical: S.space.sm,
-        paddingHorizontal: S.space.md,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        shadowColor: $('shadow', theme),
-        shadowOpacity: 0.35,
-        shadowRadius: 8,
-        elevation: 3,
       }}
     >
-      <Text
+      <GradientView
+        baseColor={bgColor}
+        intensity="moderate"
+        borderRadius={S.radius.lg}
         style={{
-          color: $('textPrimary', theme),
-          fontSize: S.font.para,
-          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingVertical: S.space.sm,
+          paddingHorizontal: S.space.md,
+          ...getShadowStyle('softer'),
         }}
       >
-        {message}
-      </Text>
-
-      {actionText && (
-        <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-            onAction?.()
+        <Text
+          style={{
+            color: $('textPrimary', theme),
+            fontSize: S.font.para,
+            flex: 1,
           }}
         >
-          <Text
-            style={{
-              color: $('accent', theme),
-              fontWeight: '600',
-              marginLeft: S.space.md,
+          {message}
+        </Text>
+
+        {actionText && (
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+              onAction?.()
             }}
           >
-            {actionText}
-          </Text>
-        </Pressable>
-      )}
+            <Text
+              style={{
+                color: $('accent', theme),
+                fontWeight: '600',
+                marginLeft: S.space.md,
+              }}
+            >
+              {actionText}
+            </Text>
+          </Pressable>
+        )}
+      </GradientView>
     </Animated.View>
   )
 }

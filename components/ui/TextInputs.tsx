@@ -23,7 +23,7 @@ export function TextInput({ heading, error, filled, underline, textTypeHeading='
     ? tone($('accent', theme), 'border', undefined, undefined, theme)
     : focused
     ? tone($('accent', theme), 'accent', undefined, undefined, theme)
-    : tone($('border', theme), 'subtle', undefined, undefined, theme)
+    : $('borderSubtle' as any, theme)
 
   return (
     <View style={{ width: '100%' }}>
@@ -86,7 +86,7 @@ export function DescInput({ heading, error, filled, style, textTypeHeading='prim
     ? tone($('accent', theme), 'border', undefined, undefined, theme)
     : focused
     ? tone($('accent', theme), 'accent', undefined, undefined, theme)
-    : tone($('border', theme), 'subtle', undefined, undefined, theme)
+    : $('borderSubtle' as any, theme)
 
   return (
     <View style={{ width: '100%' }}>

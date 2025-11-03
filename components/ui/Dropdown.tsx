@@ -18,6 +18,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated'
+import { scheduleOnRN } from 'react-native-worklets'
 
 interface DropdownItem {
   label: string
@@ -104,13 +105,14 @@ export default function Dropdown({
   enableSearch = false,
   heading,
   textTypeHeading = 'primary',
-  textType = 'secondary',
+  textType = 'inverse',
   style,
   maxHeightDelta = 0,
 }: DropdownProps) {
   const S = useScale()
   const { theme } = UseTheme()
   const [isOpen, setIsOpen] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
   const [search, setSearch] = useState('')
   const rotate = useSharedValue(0)
   const scale = useSharedValue(0.9)
@@ -145,23 +147,33 @@ export default function Dropdown({
     return style
   })
 
-  const toggleDropdown = () => {
-    const toOpen = !isOpen
-    setIsOpen(toOpen)
-    rotate.value = withTiming(toOpen ? 180 : 0, { duration: 220 })
-
-    if (toOpen) {
-      opacity.value = withTiming(1, { duration: 120 })
-      scale.value = withSpring(1, { damping: 10, stiffness: 150, mass: 0.5 })
-      shadow.value = withTiming(1, { duration: 200 })
-    } else {
-      opacity.value = withTiming(0, { duration: 150 })
-      scale.value = withSpring(0.9, { damping: 15, stiffness: 120, mass: 0.6 })
-      shadow.value = withTiming(0, { duration: 150 })
-      // Clear search when closing
-      setSearch('')
-    }
+  const openDropdown = () => {
+    setIsMounted(true)
+    setIsOpen(true)
+    rotate.value = withTiming(180, { duration: 220 })
+    opacity.value = withTiming(1, { duration: 120 })
+    scale.value = withSpring(1, { damping: 10, stiffness: 250, mass: 0.5 })
+    shadow.value = withTiming(1, { duration: 200 })
   }
+
+  const closeDropdown = () => {
+    setIsOpen(false)
+    // Use spring for a nicer reverse on the chevron as well
+    rotate.value = withSpring(0, { damping: 12, stiffness: 140, mass: 0.6 })
+    // Reverse animations and unmount after fade completes
+    opacity.value = withTiming(0, { duration: 150 }, (finished) => {
+      if (finished) {
+        scheduleOnRN(() => {
+          setIsMounted(false)
+          setSearch('')
+        })
+      }
+    })
+    scale.value = withSpring(0.9, { damping: 15, stiffness: 120, mass: 0.6 })
+    shadow.value = withTiming(0, { duration: 150 })
+  }
+
+  // Note: toggleDropdown was replaced by explicit open/close calls
 
   const filteredItems = useMemo(() => {
     if (!enableSearch || search.trim() === '') return items
@@ -194,14 +206,17 @@ export default function Dropdown({
         activeOpacity={0.8}
         onPress={() => {
           const toOpen = !isOpen
-          toggleDropdown()
-          if (!toOpen) return
-          // Measure on next frame so layout is settled
-          requestAnimationFrame(() => {
-            headerRef.current?.measureInWindow?.((x, y, width, height) => {
-              setAnchor({ x, y, width, height })
+          if (toOpen) {
+            openDropdown()
+            // Measure on next frame so layout is settled
+            requestAnimationFrame(() => {
+              headerRef.current?.measureInWindow?.((x, y, width, height) => {
+                setAnchor({ x, y, width, height })
+              })
             })
-          })
+          } else {
+            closeDropdown()
+          }
         }}
         style={[
           styles.header,
@@ -228,11 +243,11 @@ export default function Dropdown({
         </Animated.View>
       </TouchableOpacity>
 
-      {isOpen && anchor && (
+      {isMounted && anchor && (
         <Modal transparent animationType="fade">
           <View style={{ flex: 1 }}>
             {/* Full-screen backdrop closes dropdown when pressed anywhere */}
-            <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setIsOpen(false)} />
+            <Pressable style={StyleSheet.absoluteFillObject} onPress={closeDropdown} />
 
             {/* Positioned container with safety padding so clicks near dropdown won't close */}
             <View
@@ -313,7 +328,7 @@ export default function Dropdown({
                 isSelected={item.value === value}
                 onPress={() => {
                   onChange(item.value)
-                  toggleDropdown()
+                  closeDropdown()
                 }}
                 borderColor={borderColor}
                 accentColor={accentColor}

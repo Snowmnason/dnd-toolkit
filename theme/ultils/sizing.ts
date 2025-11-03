@@ -16,7 +16,7 @@ const fontBase = {
   heading1: 36,
   heading2: 32,
   heading3: 28,
-  title: 68,
+  title: 58,
 }
 
 /* ───────────────────────────────

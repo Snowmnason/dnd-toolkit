@@ -9,7 +9,8 @@ import React, {
   useState,
 } from 'react'
 import { allThemes, ThemeFamilyName } from './themeRegistry'
-import { ThemeTokens } from './tokens'
+import { ThemeTokens, TokenName } from './tokens'
+import { tone } from './ultils/colorUtils'
 
 export type ThemeFamily = ThemeFamilyName
 export type ThemeMode = 'light' | 'dark'
@@ -103,6 +104,29 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     () => ({ theme, family, mode, setFamily, setMode, setTheme }),
     [theme, family, mode, setFamily, setMode, setTheme]
   )
+
+  // On web, sync ALL theme tokens to CSS variables for instant visual updates in RN Web
+  // This allows components to reference `var(--token)` and update without remounts
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    try {
+      const root = document.documentElement
+      const set = (name: string, value: string) => root.style.setProperty(name, value)
+
+      // Sync every theme token to a CSS variable: --background, --surface, etc.
+      Object.entries(theme).forEach(([key, value]) => {
+        if (!value) return
+        set(`--${key}` as `--${TokenName}`, value)
+      })
+
+      // Convenience aliases for older callers (keep for backward-compat)
+      set('--bg', theme.background)
+      set('--surfaceAlt', tone(theme.surface, 'alt', undefined, undefined, theme))
+      set('--accentAlt', tone(theme.accent, 'alt', undefined, undefined, theme))
+    } catch {
+      // no-op on native or if document is not accessible
+    }
+  }, [theme])
 
   // Don't render children until theme is loaded to prevent flash of wrong theme
   if (isLoading) {

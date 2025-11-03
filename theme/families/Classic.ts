@@ -36,6 +36,7 @@ export const classicTheme: ClassicTheme = {
     [TOKENS.success]: '#82cc7e',
     [TOKENS.warning]: '#E9B949',
     [TOKENS.danger]: '#dc3545',
+    [TOKENS.info]: '#339af0',
 
     // Overlays & effects
     [TOKENS.overlayLight]: 'rgba(255,255,255,0.05)',
@@ -44,23 +45,13 @@ export const classicTheme: ClassicTheme = {
     [TOKENS.glow]: 'rgba(212,175,55,0.28)',    // warm gold aura
 
     // Buttons — primary
-    [TOKENS.primaryButtonBg]: '#F5E6D3',
-    [TOKENS.primaryButtonBorder]: '#D4AF37',
     [TOKENS.primaryButtonText]: '#8B4513',
-    [TOKENS.primaryButtonHover]: 'rgba(139,69,19,0.25)',
-
-    // Buttons — secondary
-    [TOKENS.secondaryButtonBg]: 'rgba(139,69,19,0.15)',
-    [TOKENS.secondaryButtonBorder]: '#8B4513',
-    [TOKENS.secondaryButtonText]: '#F5E6D3',
-    [TOKENS.secondaryButtonHover]: 'rgba(139,69,19,0.25)',
 
     // Buttons — destructive/cancel/outlined/ghost
     [TOKENS.destructiveButton]: '#dc3545',
     [TOKENS.destructiveButtonText]: '#F5E6D3',
     [TOKENS.cancelButton]: 'rgba(113,126,137,1)',
     [TOKENS.cancelButtonText]: '#0f1b27ff',
-    [TOKENS.solidOutButton]: '#D4AF37',
 
     // Typography
     [TOKENS.fontFamilyTitle]: 'GrenzeGotisch',
@@ -69,7 +60,7 @@ export const classicTheme: ClassicTheme = {
   },
 
   light: {
-    [TOKENS.primary]: '#8B4513',               // deep brown brand
+    [TOKENS.primary]: 'rgba(139, 69, 19, 1)',               // deep brown brand
 
     // Backgrounds
     [TOKENS.background]: '#F5E6D3',
@@ -98,6 +89,7 @@ export const classicTheme: ClassicTheme = {
     [TOKENS.success]: '#4CAF50',
     [TOKENS.warning]: '#E9B949',
     [TOKENS.danger]: '#dc3545',
+    [TOKENS.info]: '#339af0',
 
     // Overlays & effects
     [TOKENS.overlayLight]: 'rgba(255,255,255,0.05)',
@@ -106,23 +98,13 @@ export const classicTheme: ClassicTheme = {
     [TOKENS.glow]: 'rgba(212,175,55,0.35)',    // brighter gold aura
 
     // Buttons — primary
-    [TOKENS.primaryButtonBg]: '#2f353d',
-    [TOKENS.primaryButtonBorder]: '#D4AF37',
     [TOKENS.primaryButtonText]: '#F5E6D3',
-    [TOKENS.primaryButtonHover]: 'rgba(47,53,61,0.25)',
-
-    // Buttons — secondary
-    [TOKENS.secondaryButtonBg]: 'rgba(47,53,61,0.15)',
-    [TOKENS.secondaryButtonBorder]: '#2f353d',
-    [TOKENS.secondaryButtonText]: '#2f353d',
-    [TOKENS.secondaryButtonHover]: 'rgba(47,53,61,0.25)',
 
     // Buttons — destructive/cancel/outlined/ghost
     [TOKENS.destructiveButton]: '#dc3545',
     [TOKENS.destructiveButtonText]: '#F5E6D3',
     [TOKENS.cancelButton]: 'rgba(113,126,137,1)',
     [TOKENS.cancelButtonText]: '#0f1b27ff',
-    [TOKENS.solidOutButton]: '#D4AF37',
 
     // Typography
     [TOKENS.fontFamilyTitle]: 'GrenzeGotisch',

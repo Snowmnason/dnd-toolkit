@@ -1,4 +1,4 @@
-import { $, tone, useScale, UseTheme } from '@/theme'
+import { $, useScale, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useRef, useState } from 'react'
 import { Animated, Pressable, View } from 'react-native'
@@ -51,9 +51,9 @@ export function Accordion({
       style={{
         marginBottom: S.space.md,
         borderWidth: bordered ? 1 : 0,
-        borderColor: bordered ? tone($('border', theme), 'subtle', undefined, undefined, theme) : 'transparent',
+        borderColor: bordered ? $('borderSubtle' as any, theme) : 'transparent',
         borderRadius: S.radius.md,
-        backgroundColor: tone($('surface', theme), 'alt', undefined, undefined, theme),
+        backgroundColor: $('surfaceAlt' as any, theme),
         overflow: 'hidden',
       }}
     >

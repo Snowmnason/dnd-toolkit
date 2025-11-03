@@ -1,4 +1,4 @@
-import { AppPage, Body, Button } from '@/components/ui'
+import { Body, Button } from '@/components/ui'
 import { useAppParams } from '@/contexts/AppParamsContext'
 import { usePlatform } from '@/contexts/PlatformContext'
 import { WorldWithAccess } from '@/lib/database/worlds'
@@ -34,11 +34,9 @@ export function WorldListPanel({ worlds, selectedWorld, setSelectedWorld, setMap
         showsVerticalScrollIndicator={false}
       >
         {worlds.length === 0 ? (
-          <AppPage center style={{ padding: S.space.lg }}>
-            <Body align="center" color="$textSecondary">
-              No worlds yet. Create your first world to get started!
-            </Body>
-          </AppPage>
+          <Body align="center" color="$textSecondary" style={{ marginTop: S.space.md, padding: S.space.lg }}>
+            No worlds yet. Create your first world to get started!
+          </Body>
         ) : (
           worlds.map((world) => {
             const isSelected = selectedWorld?.world_id === world.world_id
@@ -88,23 +86,20 @@ export function WorldListPanel({ worlds, selectedWorld, setSelectedWorld, setMap
       </ScrollView>
 
       {/* Create New World button (bottom-aligned) */}
-      <AppPage
-        style={{
-          position: 'absolute',
-          left: S.space.md,
-          right: S.space.md,
-          bottom: S.space.xs,
-        }}
-      >
         <Button
           text="Create New World"
           variant="primary"
           onPress={() => {
             router.push('/select/create-world')
           }}
-          style={{ borderRadius: S.radius.lg }}
+          style={{ borderRadius: S.radius.lg,
+            position: 'absolute',
+            left: S.space.md,
+            right: S.space.md,
+            bottom: S.space.xs,
+           }}
         />
-      </AppPage>
+
     </>
   )
 }

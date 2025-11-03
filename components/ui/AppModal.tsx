@@ -3,18 +3,20 @@ import { $, tone, useScale, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useEffect } from 'react'
 import {
-    Animated,
-    BackHandler,
-    Dimensions,
-    Easing,
-    Modal,
-    Platform,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Animated,
+  BackHandler,
+  Dimensions,
+  Easing,
+  Modal,
+  Platform,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from 'react-native'
 import { Body, Heading } from './AppText'
+import { Card } from './ElevatedView'
 import { IconButton } from './IconButton'
+import { getShadowStyle } from './Resuables/shadows'
 
 type BorderTone = 'accent' | 'success' | 'warning' | 'danger'
 
@@ -31,6 +33,18 @@ interface AppModalProps {
   height?: number | 'auto'
   children?: React.ReactNode
   animateOnDestruction?: boolean
+  /** When enabled, wraps modal content in a Card for gradient/shadow styling without altering padding */
+  cardContainer?:
+    | boolean
+    | {
+        toneVariant?: 'base' | 'accent' | 'alt'
+        gradient?: boolean
+        gradientIntensity?: 'subtle' | 'moderate' | 'dramatic'
+        gradientDirection?: 'top-to-bottom' | 'bottom-to-top'
+        shadow?: boolean
+        bordered?: boolean
+        radius?: 'sm' | 'md' | 'lg'
+      }
 }
 
 export function AppModal({
@@ -45,6 +59,7 @@ export function AppModal({
   width,
   height,
   animateOnDestruction = false,
+  cardContainer = true,
   children,
 }: AppModalProps) {
   const { width: screenWidth } = Dimensions.get('window')
@@ -52,6 +67,17 @@ export function AppModal({
   const { theme } = UseTheme()
   const { isMobile } = usePlatform()
   const isWeb = Platform.select({ web: true, default: false }) as boolean
+  // Normalize optional Card config so we can use simple defaults in JSX
+  const cardConfig = typeof cardContainer === 'object' ? cardContainer : undefined
+  const {
+    radius: cardRadius = 'lg',
+    toneVariant: cardToneVariant = 'base',
+    gradient: cardGradient = true,
+    gradientIntensity: cardGradientIntensity = 'moderate',
+    gradientDirection: cardGradientDirection = 'top-to-bottom',
+    shadow: cardShadow = true,
+    bordered: cardBordered = true,
+  } = cardConfig ?? {}
 
   // ✅ Platform-based sizing
   const modalWidth = width ?? (isMobile ? screenWidth * 0.9 : Math.min(screenWidth * 0.9, 700))
@@ -229,44 +255,91 @@ export function AppModal({
             <Animated.View
               style={[
                 styles.modalContainer,
-                {
-                  width: modalWidth,
-                  height: height ?? 'auto',
-                  backgroundColor: $('surface', theme),
-                  borderRadius: S.radius.lg,
-                  padding: S.space.lg,
-                  borderColor:
-                  (borderTone === 'success'
-                    ? $('success', theme)
-                    : borderTone === 'warning'
-                    ? $('warning', theme)
-                    : borderTone === 'danger'
-                    ? $('danger', theme)
-                    : $('accent', theme)),
-                  opacity: fadeAnim,
-                  transform: [
-                    { translateY: slideAnim },
-                    { scale: scaleAnim },
-                    { translateX: shake }, // 👈 added
-                  ],
-                },
+                cardContainer
+                  ? {
+                      width: modalWidth,
+                      height: height ?? 'auto',
+                      // Let Card provide background/shadow/padding
+                      backgroundColor: 'transparent',
+                      borderWidth: 0,
+                      padding: 0,
+                      borderRadius: S.radius.lg,
+                      opacity: fadeAnim,
+                      transform: [
+                        { translateY: slideAnim },
+                        { scale: scaleAnim },
+                        { translateX: shake },
+                      ],
+                    }
+                  : {
+                      width: modalWidth,
+                      height: height ?? 'auto',
+                      backgroundColor: $('surface', theme),
+                      borderRadius: S.radius.lg,
+                      padding: S.space.lg,
+                      borderColor:
+                        borderTone === 'success'
+                          ? $('success', theme)
+                          : borderTone === 'warning'
+                          ? $('warning', theme)
+                          : borderTone === 'danger'
+                          ? $('danger', theme)
+                          : $('accent', theme),
+                      opacity: fadeAnim,
+                      transform: [
+                        { translateY: slideAnim },
+                        { scale: scaleAnim },
+                        { translateX: shake },
+                      ],
+                    },
               ]}
             >
-              <View style={[styles.closeButton, { top: S.space.sm, right: S.space.sm }]}>
-                <IconButton icon="✕" fontColor={$('textPrimary', theme)} onPress={onClose} />
-              </View>
+              {cardContainer ? (
+                <Card
+                  radius={cardRadius}
+                  toneVariant={cardToneVariant}
+                  gradient={cardGradient}
+                  gradientIntensity={cardGradientIntensity}
+                  gradientDirection={cardGradientDirection}
+                  shadow={cardShadow}
+                  bordered={cardBordered}
+                  padded={false}
+                  style={{ borderWidth: 0 }}
+                >
+                  <View style={[styles.closeButton, { top: S.space.sm, right: S.space.sm }]}> 
+                    <IconButton icon="✕" fontColor={$('textPrimary', theme)} onPress={onClose} />
+                  </View>
+                  <View style={{ padding: S.space.lg }}>
+                    <Heading align="center" style={{ marginBottom: body ? S.space.sm : S.space.md }}>
+                      {heading}
+                    </Heading>
+                    {body && (
+                      <Body align="center" style={{ marginBottom: children ? S.space.md : 0 }}>
+                        {body}
+                      </Body>
+                    )}
+                    {children}
+                  </View>
+                </Card>
+              ) : (
+                <>
+                  <View style={[styles.closeButton, { top: S.space.sm, right: S.space.sm }]}> 
+                    <IconButton icon="✕" fontColor={$('textPrimary', theme)} onPress={onClose} />
+                  </View>
 
-              <Heading align="center" style={{ marginBottom: body ? S.space.sm : S.space.md }}>
-                {heading}
-              </Heading>
+                  <Heading align="center" style={{ marginBottom: body ? S.space.sm : S.space.md }}>
+                    {heading}
+                  </Heading>
 
-              {body && (
-                <Body align="center" style={{ marginBottom: children ? S.space.md : 0 }}>
-                  {body}
-                </Body>
+                  {body && (
+                    <Body align="center" style={{ marginBottom: children ? S.space.md : 0 }}>
+                      {body}
+                    </Body>
+                  )}
+
+                  {children}
+                </>
               )}
-
-              {children}
             </Animated.View>
           </TouchableOpacity>
         </View>
@@ -298,8 +371,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     borderWidth: 2,
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.25)',
-    elevation: 6,
+    ...getShadowStyle('combined'),
   },
   closeButton: {
     position: 'absolute',

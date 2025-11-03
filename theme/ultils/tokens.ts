@@ -1,5 +1,6 @@
 import { ThemeTokens } from '@/theme/tokens'
 import { UseTheme } from '../ThemeProvider'
+import { $ as cssVarDollar } from './cssVars'
 import { S } from './sizing'
 
 /* ───────────────────────────────
@@ -17,24 +18,24 @@ function mergeTokens(theme: ThemeTokens) {
 }
 
 /* ───────────────────────────────
-   $() – explicit token lookup
+   $() – Web-optimized token lookup
    Example: color: $('background', theme)
    
-   IMPORTANT: Always pass theme parameter for React reactivity!
-   Components must call UseTheme() and pass theme to $()
+   - On web: returns CSS variables for color tokens (instant theme updates)
+   - On native: returns resolved token values
+   - All platforms: returns direct values for sizing tokens
+   
+   Theme parameter is optional; if omitted, fetches from context.
 ──────────────────────────────── */
 export function $(key: keyof ThemeTokens | keyof typeof S.font | keyof typeof S.space, theme?: ThemeTokens): any {
-  // If theme is provided directly, use it (REQUIRED for reactivity)
-  if (theme) {
-    const tokens = mergeTokens(theme)
-    return tokens[key as keyof typeof tokens]
+  // Check if this is a sizing/spacing token (not a color)
+  const sizingTokens = { ...S.font, ...S.space, ...S.radius, ...S.border }
+  if (key in sizingTokens) {
+    return sizingTokens[key as keyof typeof sizingTokens]
   }
   
-  // Fallback: call the hook (works but won't trigger re-renders properly)
-  // This is kept for backward compatibility but should be avoided
-  const { theme: hookTheme } = UseTheme()
-  const tokens = mergeTokens(hookTheme)
-  return tokens[key as keyof typeof tokens]
+  // For color tokens, use the web-optimized cssVar helper
+  return cssVarDollar(key as any, theme)
 }
 
 /* ───────────────────────────────

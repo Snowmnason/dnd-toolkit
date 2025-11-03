@@ -16,6 +16,8 @@ export { default as Dropdown } from './Dropdown';
 export * from './ElevatedView'; // Now exports ElevatedView, Card, Surface, and InteractiveCard
 export * from './IconButton';
 export * from './RadioButton';
+export * from './Resuables/GradientView';
+export * from './Resuables/shadows';
 export * from './Snackbar';
 export * from './Switch';
 export * from './Tabs';

@@ -1,6 +1,6 @@
 import LoadingOverlay from '@/components/LoadingOverlay'
 import { usePlatform } from '@/contexts/PlatformContext'
-import { $, Sizing, UseTheme, tone, useScale } from '@/theme'
+import { $, Sizing, useScale } from '@/theme'
 import React, { ComponentType, ReactNode, useEffect } from 'react'
 import {
   ImageBackground,
@@ -60,7 +60,7 @@ function BaseAppView({
   variantStyles,
   ...rest
 }: AppViewProps & { variantStyles?: ViewStyle }) {
-  const { theme } = UseTheme()
+  // theme not required; $() returns CSS vars on web and values on native
   const S = useScale()
 
   /* Separate child layout properties from ScrollView style properties */
@@ -83,7 +83,7 @@ function BaseAppView({
   const base: ViewStyle = {
     flex: 1,
     padding: S.space[gap],
-    backgroundColor: $('background', theme),
+    backgroundColor: $('background'),
   }
 
   /* Handle background image layering */
@@ -130,10 +130,10 @@ export function AppPage({
   center = false,
   ...rest
 }: AppViewProps) {
-  const { theme } = UseTheme()
+  // no-op; $() handles CSS vars on web
   
   const variantStyles: ViewStyle = {
-    backgroundColor: $('background', theme),
+    backgroundColor: $('background'),
   }
   
   return <BaseAppView center={center} variantStyles={variantStyles} {...rest} />
@@ -148,17 +148,17 @@ export function AppPanel({
   ...rest
 }: AppViewProps) {
   const S = useScale()
-  const { theme } = UseTheme()
+  // no-op; $() handles CSS vars on web
   
   const variantStyles: ViewStyle = {
     backgroundColor:
       toneVariant === 'alt'
-        ? tone($('background', theme), 'alt', undefined, undefined, theme)
+        ? $('surfaceAlt' as any)
         : toneVariant === 'accent'
-        ? tone($('background', theme), 'accent', undefined, undefined, theme)
+        ? $('accentAlt' as any)
         : toneVariant === 'surface'
-        ? $('surface', theme)
-        : $('background', theme),
+        ? $('surface')
+        : $('background'),
     borderRadius: S.radius.lg,
     overflow: 'hidden',
   }
@@ -182,7 +182,7 @@ export function AppSplit({
   ...rest
 }: AppSplitViewProps) {
   const S = useScale()
-  const { theme } = UseTheme()
+  // no-op; $() handles CSS vars on web
   const { isDesktop, width } = usePlatform()
 
   // Shared value to animate right panel in/out on mobile
@@ -214,7 +214,7 @@ export function AppSplit({
       style={{
         flex: 1,
         flexDirection: isDesktop ? 'row' : 'column',
-        backgroundColor: $('background', theme),
+        backgroundColor: $('background'),
         padding: S.space[gap],
       }}
       {...rest}
@@ -225,7 +225,7 @@ export function AppSplit({
             flex: isDesktop ? 1 : 1,
             width: isDesktop ? '35%' : '100%',
             borderRightWidth: isDesktop ? 1 : 0,
-            borderRightColor: tone($('border', theme), 'subtle', undefined, undefined, theme),
+            borderRightColor: $('borderSubtle' as any),
             paddingRight: isDesktop ? S.space.md : 0,
           }}
           contentContainerStyle={{
@@ -257,7 +257,7 @@ export function AppSplit({
                 right: S.space[gap],
                 top: S.space[gap],
                 bottom: S.space[gap],
-                backgroundColor: $('background', theme),
+                  backgroundColor: $('background'),
                 // Ensure it overlays the left content during slide
                 zIndex: 10,
               },

@@ -64,7 +64,7 @@ export function Tabs({
       <View
         style={{
           borderBottomWidth: 1,
-          borderBottomColor: tone($('border', theme), 'subtle', undefined, undefined, theme),
+          borderBottomColor: $('borderSubtle' as any, theme),
         }}
       >
         <ScrollView
