@@ -1,5 +1,4 @@
 import Color from 'color'
-import { UseTheme } from '../ThemeProvider'
 import { ThemeTokens } from '../tokens'
 
 function adjustBrightness(hex: string, delta: number) {
@@ -83,9 +82,10 @@ export function tone(
   if (mode === 'border') return c.darken(0.12).hex()
   if (mode === 'changeOpacity') return c.alpha(amount).string()
 
-  // Lazy theme resolution only when needed
-  const themeToUse = theme ?? UseTheme().theme
-  const darkMode = isThemeDark(themeToUse.background ?? '#222')
+  // Determine dark mode without importing ThemeProvider to avoid require cycles
+  // Prefer explicit theme if provided; otherwise infer from base color
+  const inferredBg = theme?.background ?? base ?? '#222'
+  const darkMode = isThemeDark(inferredBg)
 
   switch (mode) {
     case 'subtle':
@@ -102,7 +102,7 @@ export function tone(
       return adjustBrightness(base, darkMode ? 0.08 : -0.06)
 
     case 'accent':
-      return mixColors(base, themeToUse.accent ?? '#8B4513', 0.25)
+      return mixColors(base, theme?.accent ?? '#8B4513', 0.25)
 
     default:
       return c.hex()

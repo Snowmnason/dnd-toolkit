@@ -3,9 +3,10 @@ import { useAppParams } from '@/contexts/AppParamsContext'
 import { usePlatform } from '@/contexts/PlatformContext'
 import { WorldWithAccess } from '@/lib/database/worlds'
 import { $, useScale, UseTheme } from '@/theme'
+import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import React from 'react'
-import { Image, View } from 'react-native'
+import { View } from 'react-native'
 
 interface WorldRightPanelProps {
   selectedWorld: WorldWithAccess | null
@@ -21,23 +22,31 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
   const router = useRouter()
   const { updateParams } = useAppParams()
   const { isDesktop } = usePlatform()
+  // Optional flag to disable the large backdrop image if it's causing perf issues
+  const DISABLE_BACKDROP = process.env.EXPO_PUBLIC_DISABLE_WORLD_MAP_IMAGE === '1'
 
   return (
     <View style={{ flex: 1, position: 'relative' }}>
       {/* Map Preview - fills entire container */}
-      <Image
-        source={mapImage ? { uri: mapImage } : noImageSelected}
-        resizeMode={isDesktop ? "cover" : "contain"}
-        style={{ 
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100%',
-          height: '100%',
-        }}
-      />
+      {!DISABLE_BACKDROP && (
+        <Image
+          source={mapImage ? { uri: mapImage } : noImageSelected}
+          contentFit={isDesktop ? 'cover' : 'contain'}
+          priority="low"
+          cachePolicy="memory-disk"
+          transition={120}
+          recyclingKey="world-right-panel-bg"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100%',
+            height: '100%',
+          }}
+        />
+      )}
 
       {/* Title overlay in a semi-transparent Card (does not block image) */}
       {selectedWorld && (
@@ -78,7 +87,7 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
               text={selectedWorld.user_role === 'owner' ? 'Edit' : 'Leave'}
               variant="secondary"
               onPress={onEditOrLeave}
-              style={{ minWidth: 140, maxWidth: '20%' }}
+              style={{ width: 160 }}
             />
             <Button
               text="Open"
@@ -97,7 +106,7 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
                   },
                 })
               }}
-              style={{ minWidth: 140, maxWidth: '20%' }}
+              style={{ width: 160 }}
             />
           </View>
         </>

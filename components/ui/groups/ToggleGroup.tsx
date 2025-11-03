@@ -1,4 +1,4 @@
-import { ObjHeading } from '@/components/ui/AppText'
+import { Body, ObjHeading } from '@/components/ui/AppText'
 import { $, useScale, UseTheme, type Sizing } from '@/theme'
 import React, {
   forwardRef,
@@ -165,7 +165,11 @@ export const ToggleGroup = forwardRef<ToggleGroupRef, ToggleGroupProps>(
                   minHeight: 44,
                 }}
               >
-                {item.icon}
+                {typeof item.icon === 'string' ? (
+                  <Body>{item.icon}</Body>
+                ) : (
+                  item.icon
+                )}
               </TouchableOpacity>
             )
           })}
