@@ -19,6 +19,35 @@ const fontBase = {
   title: 58,
 }
 
+/**
+ * Font scale curves per token
+ * Values in [0..1]. 1 = scale fully with global scale, 0 = fixed size.
+ * Larger text tends to wrap earlier, so scale it a bit less by default.
+ */
+export const fontCurves: Record<keyof typeof fontBase, number> = {
+  caption: 1.0,
+  subtitle: 1.0,
+  para: 0.95,
+  body1: 0.92,
+  body2: 0.9,
+  body3: 0.88,
+  heading1: 0.85,
+  heading2: 0.88,
+  heading3: 0.9,
+  title: 0.85,
+}
+
+/**
+ * Fine nudges (in px/points) applied AFTER scaling.
+ * Use small negative values (-1, -2) to tuck sizes that tend to wrap.
+ * You can mutate these at runtime if needed (e.g., from a settings screen).
+ */
+export const fontNudges: Partial<Record<keyof typeof fontBase, number>> = {
+  // Example tweaks (leave empty by default):
+  // body1: -1,
+  // body2: -2,
+}
+
 /* ───────────────────────────────
    Spacing (base values)
 ──────────────────────────────── */
@@ -74,17 +103,25 @@ export const radius = {
    This allows dynamic recalculation when scale changes
 ──────────────────────────────── */
 export function buildSizing(scaleValue: number) {
+  // Helper that applies a non-linear curve and optional nudge per token
+  const sized = (base: number, key: keyof typeof fontBase) => {
+    const curve = fontCurves[key] ?? 1
+    const effectiveScale = 1 + (scaleValue - 1) * curve
+    const nudge = fontNudges[key] ?? 0
+    return Math.round(base * effectiveScale + nudge)
+  }
+
   const font = {
-    caption: fontBase.caption * scaleValue,
-    subtitle: fontBase.subtitle * scaleValue,
-    para: fontBase.para * scaleValue,
-    body1: fontBase.body1 * scaleValue,
-    body2: fontBase.body2 * scaleValue,
-    body3: fontBase.body3 * scaleValue,
-    heading1: fontBase.heading1 * scaleValue,
-    heading2: fontBase.heading2 * scaleValue,
-    heading3: fontBase.heading3 * scaleValue,
-    title: fontBase.title * scaleValue,
+    caption: sized(fontBase.caption, 'caption'),
+    subtitle: sized(fontBase.subtitle, 'subtitle'),
+    para: sized(fontBase.para, 'para'),
+    body1: sized(fontBase.body1, 'body1'),
+    body2: sized(fontBase.body2, 'body2'),
+    body3: sized(fontBase.body3, 'body3'),
+    heading1: sized(fontBase.heading1, 'heading1'),
+    heading2: sized(fontBase.heading2, 'heading2'),
+    heading3: sized(fontBase.heading3, 'heading3'),
+    title: sized(fontBase.title, 'title'),
   }
 
   const space = {

@@ -1,3 +1,4 @@
+
 import { TOKENS, ThemeTokens } from "@/theme/tokens";
 
 export type ClassicTheme = {
@@ -7,15 +8,15 @@ export type ClassicTheme = {
 
 export const classicTheme: ClassicTheme = {
   dark: {
-    [TOKENS.primary]: "#8b4513ff", // gold brand
+    [TOKENS.primary]: "#056113ff", // gold brand
 
     // Backgrounds
-    [TOKENS.background]: "#2f353d",
-    [TOKENS.surface]: "#161B22",
-    [TOKENS.bgInverse]: "#F5E6D3",
+    [TOKENS.background]: "#2a3544",
+    [TOKENS.surface]: "#0c1b2f",
+    [TOKENS.bgInverse]: "#eaeef2",//"#F5E6D3",
 
     // Text
-    [TOKENS.textPrimary]: "#F5E6D3",
+    [TOKENS.textPrimary]: "#eaeef2",//"#F5E6D3",
     [TOKENS.textSecondary]: "#8B7355",
     [TOKENS.textInverse]: "#2f353d",
 
@@ -24,7 +25,7 @@ export const classicTheme: ClassicTheme = {
     [TOKENS.borderSubtle]: "#3b3b3b",
 
     // Accent
-    [TOKENS.accent]: "#D4AF37", // gold
+    [TOKENS.accent]: "#511f6bff", // gold
 
     // Feedback
     [TOKENS.success]: "#82cc7e",
@@ -40,7 +41,7 @@ export const classicTheme: ClassicTheme = {
 
     // Buttons — destructive/cancel/outlined/ghost
     [TOKENS.destructiveButton]: "#dc3545",
-    [TOKENS.destructiveButtonText]: "#F5E6D3",
+    [TOKENS.destructiveButtonText]: "#eaeef2",//"#F5E6D3",
     [TOKENS.cancelButton]: "rgba(113,126,137,1)",
     [TOKENS.cancelButtonText]: "#0f1b27ff",
 
@@ -54,14 +55,14 @@ export const classicTheme: ClassicTheme = {
     [TOKENS.primary]: "#8b4513ff", // deep brown brand
 
     // Backgrounds
-    [TOKENS.background]: "#F5E6D3",
-    [TOKENS.surface]: "#e5d7c0",
+    [TOKENS.background]: "#eaeef2",
+    [TOKENS.surface]: "#c7d7ed",
     [TOKENS.bgInverse]: "#2f353d",
 
     // Text
     [TOKENS.textPrimary]: "#2f353d",
     [TOKENS.textSecondary]: "#654321",
-    [TOKENS.textInverse]: "#F5E6D3",
+    [TOKENS.textInverse]: "#eaeef2",
 
     // Borders
     [TOKENS.border]: "#8B4513",
@@ -80,11 +81,11 @@ export const classicTheme: ClassicTheme = {
     [TOKENS.shadow]: "rgba(0,0,0,0.18)",
 
     // Buttons — primary
-    [TOKENS.primaryButtonText]: "#F5E6D3",
+    [TOKENS.primaryButtonText]: "#eaeef2",
 
     // Buttons — destructive/cancel/outlined/ghost
     [TOKENS.destructiveButton]: "#dc3545",
-    [TOKENS.destructiveButtonText]: "#F5E6D3",
+    [TOKENS.destructiveButtonText]: "#eaeef2",
     [TOKENS.cancelButton]: "rgba(113,126,137,1)",
     [TOKENS.cancelButtonText]: "#0f1b27ff",
 

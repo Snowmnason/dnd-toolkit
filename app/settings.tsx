@@ -1,3 +1,4 @@
+import { usePlatform } from "@/contexts/PlatformContext";
 import {
   AuthStateManager,
   deleteUserAccount,
@@ -5,14 +6,14 @@ import {
   signOutUser,
   supabase,
   usersDB,
-} from '@/lib'
-import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
-import { useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
-import { Alert, Platform, View } from 'react-native'
+} from "@/lib";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
+import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { Alert, View } from "react-native";
 
 // 🧱 New UI Components
-import { CredentialConfirmModal } from '@/components/modals'
+import { CredentialConfirmModal } from "@/components/modals";
 import {
   AppLoading,
   AppPage,
@@ -20,142 +21,150 @@ import {
   Button,
   Heading,
   Surface,
-} from '@/components/ui'
-import UserProfile from '../Screens/settings/user-profile'
+} from "@/components/ui";
+import UserProfile from "../Screens/settings/user-profile";
 
 // 🎨 Theme + Loading
-import { useScale } from '@/theme'
+import { ThemeSelector } from "@/Screens/settings/ThemeSelector";
+import { useScale } from "@/theme";
 
 export default function SettingsPage() {
-  const router = useRouter()
-  const S = useScale()
-  const [profile, setProfile] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const isMobile = Platform.OS === 'ios' || Platform.OS === 'android';
+  const router = useRouter();
+  const S = useScale();
+  const { isMobile } = usePlatform();
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   // Sign-out + delete state
-  const [signingOut, setSigningOut] = useState(false)
-  const [buttonDisabled, setButtonDisabled] = useState(false)
-  const [buttonDeleteDisabled, setButtonDeleteDisabled] = useState(false)
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const [deleteError, setDeleteError] = useState('')
-  const [deleting, setDeleting] = useState(false)
+  const [signingOut, setSigningOut] = useState(false);
+  const [buttonDisabled, setButtonDisabled] = useState(false);
+  const [buttonDeleteDisabled, setButtonDeleteDisabled] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const isAuth = await AuthStateManager.isAuthenticated()
+        const isAuth = await AuthStateManager.isAuthenticated();
         if (!isAuth) {
-          logger.debug('settings', 'User not authenticated, redirecting')
-          router.replace('/login/welcome')
-          return
+          logger.debug("settings", "User not authenticated, redirecting");
+          router.replace("/login/welcome");
+          return;
         }
       } catch (error) {
-        logger.error('settings', 'Settings auth check error:', error)
-        router.replace('/login/welcome')
-        return
+        logger.error("settings", "Settings auth check error:", error);
+        router.replace("/login/welcome");
+        return;
       }
-    }
+    };
 
-    checkAuth()
+    checkAuth();
 
     supabase.auth
       .getUser()
       .then((res: { data?: { user?: User | null }; error?: any }) => {
-        setLoading(false)
+        setLoading(false);
       })
       .catch((err: unknown) => {
-        logger.error('settings', 'Error fetching user on settings mount:', err)
-        setLoading(false)
-      })
+        logger.error("settings", "Error fetching user on settings mount:", err);
+        setLoading(false);
+      });
 
     usersDB
       .getCurrentUser()
       .then((profile) => {
-        setProfile(profile ?? null)
+        setProfile(profile ?? null);
       })
       .catch((err: unknown) => {
-        logger.error('settings', 'Error fetching profile on settings mount:', err)
-      })
+        logger.error(
+          "settings",
+          "Error fetching profile on settings mount:",
+          err
+        );
+      });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
       (event: AuthChangeEvent, _session: Session | null) => {
-        if (event === 'SIGNED_OUT') {
-          router.replace('/login/welcome')
+        if (event === "SIGNED_OUT") {
+          router.replace("/login/welcome");
         }
       }
-    )
+    );
 
-    return () => subscription.unsubscribe()
-  }, [router])
+    return () => subscription.unsubscribe();
+  }, [router]);
 
   const handleSignOutConfirm = async () => {
-    if (buttonDisabled) return
+    if (buttonDisabled) return;
 
     if (!signingOut) {
-      setSigningOut(true)
-      setButtonDisabled(true)
-      setTimeout(() => setButtonDisabled(false), 1500)
+      setSigningOut(true);
+      setButtonDisabled(true);
+      setTimeout(() => setButtonDisabled(false), 1500);
     } else {
-      setButtonDisabled(true)
+      setButtonDisabled(true);
       try {
-        await signOutUser()
-        router.replace('/login/welcome')
+        await signOutUser();
+        router.replace("/login/welcome");
       } catch (error) {
-        logger.error('settings', 'Sign out error:', error)
-        Alert.alert('Error', 'Failed to sign out. Please try again.')
-        setSigningOut(false)
-        setButtonDisabled(false)
+        logger.error("settings", "Sign out error:", error);
+        Alert.alert("Error", "Failed to sign out. Please try again.");
+        setSigningOut(false);
+        setButtonDisabled(false);
       }
     }
-  }
+  };
 
   const handleDeleteConfirm = async () => {
-    if (buttonDeleteDisabled) return
+    if (buttonDeleteDisabled) return;
 
     if (!confirmDelete) {
-      setConfirmDelete(true)
-      setButtonDeleteDisabled(true)
-      setTimeout(() => setButtonDeleteDisabled(false), 1500)
-      return
+      setConfirmDelete(true);
+      setButtonDeleteDisabled(true);
+      setTimeout(() => setButtonDeleteDisabled(false), 1500);
+      return;
     }
 
-    setButtonDeleteDisabled(true)
-    setShowDeleteModal(true)
-  }
+    setButtonDeleteDisabled(true);
+    setShowDeleteModal(true);
+  };
 
   const handleDeleteAccount = async (password: string) => {
-    setDeleteError('')
-    setDeleting(true)
+    setDeleteError("");
+    setDeleting(true);
 
     try {
-      const result = await deleteUserAccount(password)
-      if (!result.success) throw new Error(result.error || 'Failed to delete account')
+      const result = await deleteUserAccount(password);
+      if (!result.success)
+        throw new Error(result.error || "Failed to delete account");
 
-      setShowDeleteModal(false)
-      router.replace('/login/welcome')
+      setShowDeleteModal(false);
+      router.replace("/login/welcome");
     } catch (error: any) {
-      logger.error('settings', 'Delete account error:', error)
-      setDeleteError(error?.message || 'Failed to delete account. Please try again.')
-      setButtonDeleteDisabled(false)
-      setConfirmDelete(false)
+      logger.error("settings", "Delete account error:", error);
+      setDeleteError(
+        error?.message || "Failed to delete account. Please try again."
+      );
+      setButtonDeleteDisabled(false);
+      setConfirmDelete(false);
     } finally {
-      setDeleting(false)
+      setDeleting(false);
     }
-  }
+  };
 
   const handleCloseDeleteModal = () => {
-    setShowDeleteModal(false)
-    setConfirmDelete(false)
-    setButtonDeleteDisabled(false)
-    setDeleteError('')
-  }
+    setShowDeleteModal(false);
+    setConfirmDelete(false);
+    setButtonDeleteDisabled(false);
+    setDeleteError("");
+  };
 
   if (loading) {
-    return (
-      <AppLoading loadMessage="Loading Settings..." />
-    )
+    return <AppLoading loadMessage="Loading Settings..." />;
   }
 
   return (
@@ -167,6 +176,15 @@ export default function SettingsPage() {
       <Surface padded bordered radius="md" style={{ marginBottom: S.space.lg }}>
         <UserProfile profile={profile} />
       </Surface>
+
+      {/* Theme Selector Section */}
+      <Heading align="center" style={{ marginBottom: S.space.sm }}>
+        Theme Selector
+      </Heading>
+      <Surface bordered padded radius="md" style={{ marginBottom: S.space.lg }}>
+        <ThemeSelector />
+      </Surface>
+
 
       {/* App Settings Section */}
       <Heading align="center" style={{ marginBottom: S.space.sm }}>
@@ -181,30 +199,33 @@ export default function SettingsPage() {
         >
           🎲 Coming Soon: Theme settings, backup options, and more!
         </Body>
-        <Button 
-          variant="secondary" 
+        <Button
+          variant="secondary"
           text="Playground"
           onPress={() => {
-            if(isMobile) {
-              router.replace('../StyleMobile');
+            if (isMobile) {
+              router.push("/StyleMobile");
             } else {
-              router.replace('../StyleDesktop');
+              router.push("/StyleDesktop");
             }
           }}
-          style={{ alignSelf: 'center' }}
+          style={{ alignSelf: "center" }}
         />
       </Surface>
 
       {/* Account Actions */}
-      
-        <Heading align="center" style={{ marginBottom: S.space.md, marginTop: S.space.md }}>
-          Account Actions
-        </Heading>
-        <Surface bordered padded radius="md">
-        <View style={{ gap: S.space.sm, alignItems: 'center' }}>
+
+      <Heading
+        align="center"
+        style={{ marginBottom: S.space.md, marginTop: S.space.md }}
+      >
+        Account Actions
+      </Heading>
+      <Surface bordered padded radius="md">
+        <View style={{ gap: S.space.sm, alignItems: "center" }}>
           {/* Sign Out Button */}
           <Button
-            text={signingOut ? 'Confirm Sign Out' : 'Sign Out'}
+            text={signingOut ? "Confirm Sign Out" : "Sign Out"}
             variant="destructive"
             onPress={handleSignOutConfirm}
             disabled={buttonDisabled}
@@ -214,7 +235,7 @@ export default function SettingsPage() {
 
           {/* Delete Account Button */}
           <Button
-            text={confirmDelete ? 'Confirm Delete' : 'Delete Account'}
+            text={confirmDelete ? "Confirm Delete" : "Delete Account"}
             variant="destructive"
             onPress={handleDeleteConfirm}
             disabled={buttonDeleteDisabled}
@@ -236,5 +257,5 @@ export default function SettingsPage() {
         onConfirm={handleDeleteAccount}
       />
     </AppPage>
-  )
+  );
 }

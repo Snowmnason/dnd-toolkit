@@ -1,21 +1,38 @@
-import { preloadThemes } from '@/theme';
-import { Asset } from 'expo-asset';
-import * as Font from 'expo-font';
-import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
-import { logger } from '../lib/utils/logger';
+import { preloadThemes } from "@/theme";
+import { Asset } from "expo-asset";
+import * as Font from "expo-font";
+import { useEffect, useState } from "react";
+import { Platform } from "react-native";
+import { logger } from "../lib/utils/logger";
+
+// Gate bootstrap logs to keep console clean by default
+const BOOTSTRAP_LOGS = false;
+const blog = {
+  debug: (...args: any[]) => {
+    if (BOOTSTRAP_LOGS) logger.debug(...args);
+  },
+  info: (...args: any[]) => {
+    if (BOOTSTRAP_LOGS) logger.info(...args);
+  },
+  warn: (...args: any[]) => {
+    if (BOOTSTRAP_LOGS) logger.warn(...args);
+  },
+  error: (...args: any[]) => {
+    if (BOOTSTRAP_LOGS) logger.error(...args);
+  },
+};
 
 // Put all shared fonts here
 const customFonts = {
-  GrenzeGotisch: require('../assets/fonts/GrenzeGotisch.ttf'),
-  GrenzeGotischBlack: require('../assets/fonts/GrenzeGotisch-Black.ttf'),
-  GrenzeGotischExtraBold: require('../assets/fonts/GrenzeGotisch-ExtraBold.ttf'),
+  GrenzeGotisch: require("../assets/fonts/GrenzeGotisch.ttf"),
+  Cyberpunk: require("../assets/fonts/Cyberpunk.ttf"),
+  Eurostile: require("../assets/fonts/Eurostile.ttf"),
 };
 
 // Put all shared images here
 const preloadImages = [
-  require('../assets/images/Miku.png'),
-  require('../assets/images/load.gif'),
+  require("../assets/images/Miku.png"),
+  require("../assets/images/load.gif"),
 ];
 
 export interface AppBootstrapState {
@@ -38,7 +55,7 @@ export function useAppBootstrap() {
 
     async function bootstrap() {
       try {
-        logger.debug('bootstrap', 'Starting app bootstrap...');
+        blog.debug("bootstrap", "Starting app bootstrap...");
 
         // Step 1: Load assets in parallel
         const assetPromises = [
@@ -52,24 +69,21 @@ export function useAppBootstrap() {
         const sessionPromise = restoreSession();
 
         // Wait for both assets and session
-        await Promise.all([
-          Promise.all(assetPromises),
-          sessionPromise,
-        ]);
+        await Promise.all([Promise.all(assetPromises), sessionPromise]);
 
         if (isMounted) {
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
             assetsLoaded: true,
             sessionRestored: true,
             isReady: true,
           }));
-          logger.info('bootstrap', 'App bootstrap completed successfully');
+          blog.info("bootstrap", "App bootstrap completed successfully");
         }
       } catch (error) {
-        logger.error('bootstrap', 'Bootstrap error:', error);
+        blog.error("bootstrap", "Bootstrap error:", error);
         if (isMounted) {
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
             error: error as Error,
             // Still mark as ready to allow app to continue
@@ -94,9 +108,9 @@ export function useAppBootstrap() {
 async function loadFonts() {
   try {
     await Font.loadAsync(customFonts);
-    logger.debug('bootstrap', 'Fonts loaded successfully');
+    blog.debug("bootstrap", "Fonts loaded successfully");
   } catch (error) {
-    logger.warn('bootstrap', 'Font loading error (non-critical):', error);
+    blog.warn("bootstrap", "Font loading error (non-critical):", error);
     // Continue anyway - fonts are not critical
   }
 }
@@ -104,69 +118,76 @@ async function loadFonts() {
 async function loadImages() {
   try {
     await Asset.loadAsync(preloadImages);
-    logger.debug('bootstrap', 'Images loaded successfully');
+    blog.debug("bootstrap", "Images loaded successfully");
   } catch (error) {
-    logger.warn('bootstrap', 'Image loading error (non-critical):', error);
+    blog.warn("bootstrap", "Image loading error (non-critical):", error);
     // Continue anyway - these images are not critical
   }
 }
 
 async function loadPlatformAssets() {
-  if (Platform.OS === 'web') {
+  if (Platform.OS === "web") {
     // Skia is now loaded in index.tsx before React renders
     // Just add a small delay for web stability
-    await new Promise(resolve => setTimeout(resolve, 200));
-    logger.debug('bootstrap', 'Web platform assets ready');
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    blog.debug("bootstrap", "Web platform assets ready");
   } else {
-    logger.debug('bootstrap', 'Mobile platform ready');
+    blog.debug("bootstrap", "Mobile platform ready");
   }
 }
 
 async function restoreSession() {
   try {
-    logger.debug('bootstrap', 'Restoring Supabase session...');
-    
+    blog.debug("bootstrap", "Restoring Supabase session...");
+
     // Import supabase dynamically to avoid circular dependencies
-    const { supabase, isSupabaseConfigured } = await import('../lib/database/supabase');
-    
+    const { supabase, isSupabaseConfigured } = await import(
+      "../lib/database/supabase"
+    );
+
     if (!isSupabaseConfigured()) {
-      logger.warn('bootstrap', 'Supabase not configured, skipping session restore');
+      blog.warn(
+        "bootstrap",
+        "Supabase not configured, skipping session restore"
+      );
       return;
     }
 
     // Get the current session (this will restore from storage if available)
-    const { data: { session }, error } = await supabase.auth.getSession();
-    
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+
     if (error) {
-      logger.warn('bootstrap', 'Session restore error:', error);
+      blog.warn("bootstrap", "Session restore error:", error);
       return;
     }
 
     if (session) {
-      logger.info('bootstrap', 'Session restored successfully');
-      
+      blog.info("bootstrap", "Session restored successfully");
+
       // Update local auth state to match
-      const { AuthStateManager } = await import('../lib/auth/auth-state');
+      const { AuthStateManager } = await import("../lib/auth/auth-state");
       await AuthStateManager.setSession(session);
     } else {
-      logger.info('bootstrap', 'No stored session found');
+      blog.info("bootstrap", "No stored session found");
     }
 
     // Set up auth state change listener for future changes
     supabase.auth.onAuthStateChange(async (event: string, session: any) => {
-      logger.debug('bootstrap', 'Auth state changed:', event);
-      
-      const { AuthStateManager } = await import('../lib/auth/auth-state');
-      
+      blog.debug("bootstrap", "Auth state changed:", event);
+
+      const { AuthStateManager } = await import("../lib/auth/auth-state");
+
       if (session) {
         await AuthStateManager.setSession(session);
       } else {
         await AuthStateManager.clearAuthState();
       }
     });
-
   } catch (error) {
-    logger.error('bootstrap', 'Session restore error:', error);
+    blog.error("bootstrap", "Session restore error:", error);
     // Don't throw - app can still function without session
   }
 }

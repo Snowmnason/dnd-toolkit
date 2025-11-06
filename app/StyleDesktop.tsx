@@ -1,37 +1,39 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { ThemeSelector } from '@/Screens/settings/ThemeSelector'
 import {
-    Accordion,
-    AppModal,
-    AppToast,
-    AppTooltip,
-    Body,
-    Button,
-    ButtonGroup,
-    Caption,
-    Card,
-    CustomLoad,
-    DescInput,
-    Dropdown,
-    DropdownGroup,
-    Heading,
-    IconButton,
-    Link,
-    ObjHeading,
-    Paragraph,
-    RadioButtonGroup,
-    SnackBar,
-    SubTitle,
-    Surface,
-    Switch,
-    SwitchGroup,
-    Tabs,
-    TextInput,
-    TextInputGroup,
-    Title,
-    ToggleGroup
+  Accordion,
+  AppModal,
+  AppToast,
+  AppTooltip,
+  Body,
+  Button,
+  ButtonGroup,
+  Caption,
+  Card,
+  CustomLoad,
+  DescInput,
+  Dropdown,
+  DropdownGroup,
+  Heading,
+  IconButton,
+  Link,
+  NotificationContainer,
+  ObjHeading,
+  Paragraph,
+  RadioButtonGroup,
+  SnackBar,
+  SubTitle,
+  Surface,
+  Switch,
+  SwitchGroup,
+  Tabs,
+  TextInput,
+  TextInputGroup,
+  Title,
+  ToggleGroup
 } from '@/components/ui'
 import { AppSplit } from '@/components/ui/AppView'
+import { useNotifications } from '@/hooks/use-notifications'
 
 import { $, UseTheme, useScale } from '@/theme'
 import React, { useState } from 'react'
@@ -40,6 +42,7 @@ import { ScrollView, Text, View } from 'react-native'
 export default function StyleDesktop() {
   const S = useScale()
   const { theme } = UseTheme()
+  const { showNotification } = useNotifications()
   
   // Simple display states (not controlling components, just for right panel display)
   const [primaryClicks, setPrimaryClicks] = useState(0)
@@ -96,6 +99,70 @@ export default function StyleDesktop() {
               <SubTitle>Subtitle text</SubTitle>
               <Caption>Caption text</Caption>
               <Link>Link text</Link>
+            </View>
+          </Surface>
+          <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.lg }}>
+            <Heading>Notifications (In-App)</Heading>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <Button 
+                text="Show Message Notification" 
+                onPress={() => showNotification({
+                  type: 'message',
+                  title: 'New Message',
+                  message: 'Sarah sent you a message about the campaign',
+                  timestamp: new Date(),
+                  onPress: () => console.log('Notification tapped!')
+                })} 
+              />
+              <Button 
+                text="Show Update Notification" 
+                onPress={() => showNotification({
+                  type: 'update',
+                  title: 'World Updated',
+                  message: 'John added a new location to the world map',
+                  timestamp: new Date(Date.now() - 300000), // 5 minutes ago
+                })} 
+              />
+              <Button 
+                text="Show Alert Notification" 
+                onPress={() => showNotification({
+                  type: 'alert',
+                  title: 'Connection Lost',
+                  message: 'Unable to sync with server. Retrying...',
+                })} 
+              />
+              <Button 
+                text="Show Info Notification" 
+                onPress={() => showNotification({
+                  type: 'info',
+                  title: 'Tip',
+                  message: 'You can customize your theme in settings',
+                })} 
+              />
+              <Button 
+                variant="outlined"
+                text="Show Multiple" 
+                onPress={() => {
+                  showNotification({
+                    type: 'message',
+                    title: 'Player 1',
+                    message: 'Ready to start!',
+                    timestamp: new Date()
+                  })
+                  setTimeout(() => showNotification({
+                    type: 'update',
+                    title: 'Campaign Updated',
+                    message: 'New quest available',
+                    timestamp: new Date()
+                  }), 500)
+                  setTimeout(() => showNotification({
+                    type: 'info',
+                    title: 'System',
+                    message: 'All players are online',
+                    timestamp: new Date()
+                  }), 1000)
+                }} 
+              />
             </View>
           </Surface>
 
@@ -417,7 +484,7 @@ export default function StyleDesktop() {
                     <Tabs
                       bottomSpace={false}
                       tabs={[
-                        { key: 'textPrimary', label: 'Primary' },
+                      
                         { key: 'textSecondary', label: 'Secondary' },
                         { key: 'textInverse', label: 'Inverse' },
                         { key: 'textOnAccent', label: 'On Accent' },
@@ -734,6 +801,9 @@ export default function StyleDesktop() {
         </ScrollView>
       }
     >
+      {/* Notification Container - renders all active notifications */}
+      <NotificationContainer />
+
       <AppModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}

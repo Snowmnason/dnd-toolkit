@@ -105,7 +105,7 @@ export const SwitchGroup = forwardRef<SwitchGroupRef, SwitchGroupProps>(
       <View
         style={{
           borderWidth: outlined ? 1.5 : 0,
-          borderColor: outlined ? $('border', theme) : 'transparent',
+          borderColor: outlined ? $('border') : 'transparent',
           borderRadius: outlined ? S.radius.md : 0,
           backgroundColor: outlined ? 'transparent' : undefined,
           padding: outlined ? S.space.sm : 0,
