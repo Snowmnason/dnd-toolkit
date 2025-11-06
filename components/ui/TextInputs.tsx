@@ -1,5 +1,5 @@
 import { $, tone, useScale, UseTheme } from '@/theme'
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Platform, TextInput as RNTextInput, StyleSheet, TextInputProps, View } from 'react-native'
 import { ObjHeading, TextType } from './AppText'
 
@@ -118,7 +118,7 @@ export function DescInput({ heading, error, filled, style, textTypeHeading='prim
           style={[
             styles.input,
             {
-              color: $('textPrimary', theme),
+              color: $('textInverse', theme),
               fontFamily: theme.fontFamilyPara, // paragraph font
               fontSize: S.font.para,
               lineHeight: Math.round(S.font.para * 1.4),

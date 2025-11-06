@@ -1,10 +1,10 @@
 import { Body, ObjHeading } from '@/components/ui/AppText'
 import { $, useScale, UseTheme, type Sizing } from '@/theme'
 import React, {
-  forwardRef,
-  useEffect,
-  useImperativeHandle,
-  useState,
+    forwardRef,
+    useEffect,
+    useImperativeHandle,
+    useState,
 } from 'react'
 import { TouchableOpacity, View } from 'react-native'
 
@@ -109,7 +109,7 @@ export const ToggleGroup = forwardRef<ToggleGroupRef, ToggleGroupProps>(
       <View
         style={{
           borderWidth: outlined ? 1.5 : 0,
-          borderColor: outlined ? $('border', theme) : 'transparent',
+          borderColor: outlined ? $('border') : 'transparent',
           borderRadius: outlined ? S.radius.md : 0,
           padding: outlined ? S.space.sm : 0,
           backgroundColor: 'transparent',

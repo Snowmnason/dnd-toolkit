@@ -1,41 +1,44 @@
 import { ThemeSelector } from '@/Screens/settings/ThemeSelector'
 import {
-    Accordion,
-    AppModal,
-    AppToast,
-    AppTooltip,
-    Body,
-    Button,
-    ButtonGroup,
-    Caption,
-    Card,
-    CustomLoad,
-    DescInput,
-    Dropdown,
-    DropdownGroup,
-    Heading,
-    IconButton,
-    Link,
-    ObjHeading,
-    Paragraph,
-    RadioButtonGroup,
-    SnackBar,
-    SubTitle,
-    Surface,
-    Switch,
-    SwitchGroup,
-    Tabs,
-    TextInput,
-    TextInputGroup,
-    Title,
-    ToggleGroup
+  Accordion,
+  AppModal,
+  AppToast,
+  AppTooltip,
+  Body,
+  Button,
+  ButtonGroup,
+  Caption,
+  Card,
+  CustomLoad,
+  DescInput,
+  Dropdown,
+  DropdownGroup,
+  Heading,
+  IconButton,
+  Link,
+  NotificationContainer,
+  ObjHeading,
+  Paragraph,
+  RadioButtonGroup,
+  SnackBar,
+  SubTitle,
+  Surface,
+  Switch,
+  SwitchGroup,
+  Tabs,
+  TextInput,
+  TextInputGroup,
+  Title,
+  ToggleGroup
 } from '@/components/ui'
+import { useNotifications } from '@/hooks/use-notifications'
 import { $, useScale } from '@/theme'
 import React, { useState } from 'react'
 import { ScrollView, Text, View } from 'react-native'
 
 export default function StyleMobile() {
   const S = useScale()
+  const { showNotification } = useNotifications()
   
   // Simple display states
   const [primaryClicks, setPrimaryClicks] = useState(0)
@@ -458,6 +461,73 @@ export default function StyleMobile() {
         </Card>
 
         <Card>
+          <Heading>Notifications (In-App)</Heading>
+          <Body style={{ marginBottom: S.space.md }}>
+            Notifications appear at the top (keyboard-safe on mobile!)
+          </Body>
+          <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+            <Button 
+              text="Message Notification" 
+              onPress={() => showNotification({
+                type: 'message',
+                title: 'New Message',
+                message: 'Sarah sent you a message',
+                timestamp: new Date()
+              })} 
+            />
+            <Button 
+              text="Update Notification" 
+              onPress={() => showNotification({
+                type: 'update',
+                title: 'World Updated',
+                message: 'John added a new location',
+                timestamp: new Date(Date.now() - 300000)
+              })} 
+            />
+            <Button 
+              text="Alert Notification" 
+              onPress={() => showNotification({
+                type: 'alert',
+                title: 'Connection Lost',
+                message: 'Unable to sync. Retrying...'
+              })} 
+            />
+            <Button 
+              text="Info Notification" 
+              onPress={() => showNotification({
+                type: 'info',
+                title: 'Tip',
+                message: 'Customize theme in settings'
+              })} 
+            />
+            <Button 
+              variant="outlined"
+              text="Show Stack (3)" 
+              onPress={() => {
+                showNotification({
+                  type: 'message',
+                  title: 'Player 1',
+                  message: 'Ready!',
+                  timestamp: new Date()
+                })
+                setTimeout(() => showNotification({
+                  type: 'update',
+                  title: 'Quest Available',
+                  message: 'New content unlocked',
+                  timestamp: new Date()
+                }), 400)
+                setTimeout(() => showNotification({
+                  type: 'info',
+                  title: 'System',
+                  message: 'All players online',
+                  timestamp: new Date()
+                }), 800)
+              }} 
+            />
+          </View>
+        </Card>
+
+        <Card>
           <Heading>Loading Spinner</Heading>
           <View style={{ flexDirection: 'row', gap: S.space.md, marginTop: S.space.md }}>
             <CustomLoad size="small" />
@@ -593,6 +663,9 @@ export default function StyleMobile() {
         tone="success"
         onHide={() => setSnackVisible(false)}
       />
+
+      {/* Notification Container - renders all active notifications */}
+      <NotificationContainer />
     </>
   )
 }

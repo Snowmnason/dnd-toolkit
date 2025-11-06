@@ -45,6 +45,17 @@ export function $(token: TokenName, theme?: ThemeTokens): string {
   }
 
   // For all other cases, resolve from context
-  const t = UseTheme().theme
-  return t[token]
+  // Try to get theme; if provider not available, return CSS var or fallback
+  try {
+    const t = UseTheme().theme
+    return t[token]
+  } catch {
+    // Provider not available (e.g., during module load time)
+    // Return CSS var for web, generic fallback for native
+    if (isColorToken && Platform.OS === 'web') {
+      return `var(--${token})`
+    }
+    // Return empty string or a safe fallback (native at module load time)
+    return '#000000' // Safe fallback color
+  }
 }

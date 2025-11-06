@@ -18,8 +18,17 @@ export default function CustomLoad({
   ...props
 }: CustomLoadProps) {
   const [failed, setFailed] = useState(false)
-  const { theme } = UseTheme()
   const opacity = useSharedValue(0)
+  
+  // Try to get theme; fall back to hardcoded colors if provider not available
+  let themeContext: any = null;
+  try {
+    themeContext = UseTheme()
+  } catch {
+    // Theme provider not available (e.g., during early initialization)
+  }
+  
+  const theme = themeContext?.theme
 
   useEffect(() => {
     opacity.value = withTiming(1, { duration: 300 })
@@ -38,12 +47,25 @@ export default function CustomLoad({
   }
 
   const activitySize = getSizeValue() <= 30 ? 'small' : 'large'
-  const color =
-    variant === 'accent'
-      ? $('accent', theme)
-      : variant === 'minimal'
-      ? $('textPrimary', theme)
-      : $('primary', theme)
+  
+  // Fallback colors if theme not available
+  const fallbackColors = {
+    accent: '#D4AF37',
+    textPrimary: '#F5E6D3',
+    primary: '#8b4513ff',
+  }
+  
+  const color = theme
+    ? (variant === 'accent'
+        ? $('accent', theme)
+        : variant === 'minimal'
+        ? $('textPrimary', theme)
+        : $('primary', theme))
+    : (variant === 'accent'
+        ? fallbackColors.accent
+        : variant === 'minimal'
+        ? fallbackColors.textPrimary
+        : fallbackColors.primary)
 
   return (
     <Animated.View style={animatedStyle}>

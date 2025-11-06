@@ -46,8 +46,8 @@ export const cyberpunkTheme: CyberpunkTheme = {
     [TOKENS.cancelButtonText]: '#80ffff',
 
     // Typography
-    [TOKENS.fontFamilyTitle]: 'Orbitron, sans-serif',
-    [TOKENS.fontFamily]: 'Rajdhani, sans-serif',
+    [TOKENS.fontFamilyTitle]: 'Cyberpunk',
+    [TOKENS.fontFamily]: 'Eurostile',
     [TOKENS.fontFamilyPara]: 'Roboto, sans-serif',
   },
 
@@ -90,8 +90,8 @@ export const cyberpunkTheme: CyberpunkTheme = {
     [TOKENS.cancelButtonText]: '#333333',
 
     // Typography
-    [TOKENS.fontFamilyTitle]: 'Orbitron, sans-serif',
-    [TOKENS.fontFamily]: 'Rajdhani, sans-serif',
+    [TOKENS.fontFamilyTitle]: 'Cyberpunk',
+    [TOKENS.fontFamily]: 'Eurostile',
     [TOKENS.fontFamilyPara]: 'Roboto, sans-serif',
   },
 }
