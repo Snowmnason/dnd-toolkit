@@ -1,4 +1,4 @@
-import { $ } from '@/theme'
+import { ThemeTokens } from '@/theme/tokens'
 import { Platform, ViewStyle } from 'react-native'
 
 /**
@@ -9,21 +9,29 @@ export type ShadowMode = 'combined' | 'harder' | 'softer' | 'none'
 /**
  * 🌑 getShadowStyle
  * Returns pre-configured shadow styles for web and native using theme-aware shadow color.
+ * Call this inside components. Can pass theme to avoid calling UseTheme hook.
  * 
  * @param mode - Shadow intensity/configuration
+ * @param theme - Optional theme; if not provided, will use default shadow color
  * 
  * @example
  * <View style={getShadowStyle('combined')}>
  *   <Text>Elevated content</Text>
  * </View>
  */
-export function getShadowStyle(mode: ShadowMode = 'combined'): ViewStyle {
+export function getShadowStyle(mode: ShadowMode = 'combined', theme?: ThemeTokens): ViewStyle {
   if (mode === 'none') {
     return {}
   }
 
-  // Always use theme shadow token for consistent theme-aware shadows
-  const color = $('shadow')
+  // Get shadow color from theme or use defaults
+  let color: string
+  if (theme) {
+    color = theme.shadow as string
+  } else {
+    // Default shadow colors (matches dark theme)
+    color = Platform.OS === 'web' ? 'rgba(66, 66, 66, 0.25)' : 'rgba(66, 66, 66, 0.25)'
+  }
 
   switch (mode) {
     case 'combined':
@@ -72,13 +80,3 @@ export function getShadowStyle(mode: ShadowMode = 'combined'): ViewStyle {
       return {}
   }
 }
-
-/**
- * Pre-exported shadow styles for convenience
- */
-export const shadows = {
-  combined: getShadowStyle('combined'),
-  harder: getShadowStyle('harder'),
-  softer: getShadowStyle('softer'),
-  none: {},
-} as const
