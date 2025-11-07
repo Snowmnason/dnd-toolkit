@@ -9,7 +9,6 @@ import { Platform, StyleProp, Text, TextProps, TextStyle } from 'react-native'
 ──────────────────────────────── */
 
 export type TextType = 'primary' | 'secondary' | 'inverse' | 'onAccent' | 'onCard'
-
 export type AppTextProps = TextProps & {
   textType?: TextType
   fontSize?: string | number
@@ -115,7 +114,8 @@ export function AppText({
         {
           fontSize: resolvedFontSize,
           color: resolvedColor,
-          fontFamily: $('fontFamily', theme),
+          // Respect explicit fontFamily prop; fallback to theme default
+          fontFamily: fontFamily ?? $('fontFamily'),
           fontWeight: weight,
           fontStyle: shouldItalic ? 'italic' : 'normal',
           textAlign: align,
@@ -151,12 +151,11 @@ export function Title({
   style,
   ...rest
 }: AppTextProps) {
-  const { theme } = UseTheme()
   const S = useScale()
   return (
     <AppText
       fontSize={fontSize}
-      fontFamily={theme.fontFamilyTitle}
+      fontFamily={$(`fontFamilyTitle`)}
       fontWeight={fontWeight}
       variant={variant}
       align={align}
@@ -179,12 +178,11 @@ export function Heading({
   style,
   ...rest
 }: AppTextProps) {
-  const { theme } = UseTheme()
   const S = useScale()
   return (
     <AppText
       fontSize={fontSize}
-      fontFamily={theme.fontFamilyTitle}
+      fontFamily={$(`fontFamilyTitle`)}
       fontWeight={fontWeight}
       variant={variant}
       lineHeight={lineHeight}
@@ -206,12 +204,11 @@ export function ObjHeading({
   style,
   ...rest
 }: AppTextProps) {
-  const { theme } = UseTheme()
   const S = useScale()
   return (
     <AppText
       fontSize={fontSize}
-      fontFamily={theme.fontFamilyTitle}
+      fontFamily={$(`fontFamilyTitle`)}
       fontWeight={fontWeight}
       variant={variant}
       lineHeight={lineHeight}
@@ -231,11 +228,10 @@ export function Body({
   style,
   ...rest
 }: AppTextProps) {
-  const { theme } = UseTheme()
   return (
     <AppText
       fontSize={fontSize}
-      fontFamily={theme.fontFamily}
+      fontFamily={$(`fontFamily`)}
       lineHeight={lineHeight}
       style={style}
       {...rest}
@@ -253,11 +249,10 @@ export function Paragraph({
   style,
   ...rest
 }: AppTextProps) {
-  const { theme } = UseTheme()
   return (
     <AppText
       fontSize={fontSize}
-      fontFamily={theme.fontFamilyPara}
+      fontFamily={$(`fontFamilyPara`)}
       lineHeight={lineHeight}
       style={style}
       {...rest}
@@ -278,12 +273,11 @@ export function SubTitle({
   style,
   ...rest
 }: AppTextProps) {
-  const { theme } = UseTheme()
   return (
     <AppText
       fontSize={fontSize}
       textType={textType}
-      fontFamily={theme.fontFamily}
+      fontFamily={$(`fontFamily`)}
       italic={italic}
       opacity={opacity}
       lineHeight={lineHeight}
@@ -305,12 +299,11 @@ export function Caption({
   style,
   ...rest
 }: AppTextProps) {
-  const { theme } = UseTheme()
   return (
     <AppText
       fontSize={fontSize}
       textType={textType}
-      fontFamily={theme.fontFamilyPara}
+      fontFamily={$(`fontFamilyPara`)}
       opacity={opacity}
       lineHeight={lineHeight}
       style={style}
@@ -338,12 +331,11 @@ export function Link({
   onPress,
   ...rest
 }: AppTextProps & { onPress?: () => void }) {
-  const { theme } = UseTheme()
   return (
     <AppText
       fontSize={fontSize}
       color={color}
-      fontFamily={theme.fontFamily}
+      fontFamily={$(`fontFamily`)}
       deco={deco}
       cursor={cursor}
       lineHeight={lineHeight}
@@ -367,11 +359,10 @@ export function ButtonText({
   style,
   ...rest
 }: AppTextProps) {
-  const { theme } = UseTheme()
   return (
     <AppText
       fontSize={fontSize}
-      fontFamily={theme.fontFamily}
+      fontFamily={$(`fontFamily`)}
       fontWeight={fontWeight}
       variant={variant}
       align={align}

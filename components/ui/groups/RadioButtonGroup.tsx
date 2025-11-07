@@ -58,7 +58,7 @@ export const RadioButtonGroup = forwardRef<RadioButtonGroupRef, RadioButtonGroup
       <View
         style={{
           borderWidth: outlined ? 1.5 : 0,
-          borderColor: outlined ? $('border', theme) : 'transparent',
+          borderColor: outlined ? $('border') : 'transparent',
           borderRadius: outlined ? S.radius.md : 0,
           padding: outlined ? S.space.sm : 0,
           width: '100%',

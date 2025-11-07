@@ -51,7 +51,7 @@ export function Accordion({
       style={{
         marginBottom: S.space.md,
         borderWidth: bordered ? 1 : 0,
-        borderColor: bordered ? $('borderSubtle' as any, theme) : 'transparent',
+  borderColor: bordered ? $('borderSubtle' as any) : 'transparent',
         borderRadius: S.radius.md,
         backgroundColor: $('surfaceAlt' as any, theme),
         overflow: 'hidden',

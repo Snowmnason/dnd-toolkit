@@ -65,7 +65,7 @@ export function RadioButton({
           height: size,
           borderRadius: size / 2,
           borderWidth: 2,
-          borderColor: checked ? color : $('borderSubtle' as any, theme),
+          borderColor: checked ? color : $('borderSubtle' as any),
           justifyContent: 'center',
           alignItems: 'center',
           backgroundColor: $('surface', theme),
