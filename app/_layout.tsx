@@ -9,6 +9,7 @@ import TopBar from '../components/TopBar';
 import { AppParamsProvider, useAppParams } from '../contexts/AppParamsContext';
 import { PlatformProvider, usePlatform } from '../contexts/PlatformContext';
 import { useAppBootstrap } from '../hooks/use-app-bootstrap';
+import { NotificationProvider } from '../hooks/use-notifications';
 
 function RootLayoutContent() {
   const { theme } = UseTheme();
@@ -246,6 +247,7 @@ function RootLayoutContent() {
           },
         }}
       />
+      {/* Notifications are rendered on specific pages (StyleDesktop/Mobile) */}
     </View>
   );
 }
@@ -257,7 +259,9 @@ export default function RootLayout() {
       <ScaleProvider>
         <PlatformProvider>
           <AppParamsProvider>
-            <RootLayoutContent />
+            <NotificationProvider>
+              <RootLayoutContent />
+            </NotificationProvider>
           </AppParamsProvider>
         </PlatformProvider>
       </ScaleProvider>
