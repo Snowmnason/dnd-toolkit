@@ -3,19 +3,19 @@ import { usePlatform } from "@/contexts/PlatformContext";
 import { $, Sizing, useScale } from "@/theme";
 import { ComponentType, ReactNode, useEffect, useMemo } from "react";
 import {
-  ImageBackground,
-  Platform,
-  ScrollView,
-  StyleProp,
-  View,
-  ViewProps,
-  ViewStyle,
+    ImageBackground,
+    Platform,
+    ScrollView,
+    StyleProp,
+    View,
+    ViewProps,
+    ViewStyle,
 } from "react-native";
 import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    Easing,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from "react-native-reanimated";
 import { ViewCust } from "./base/ViewCust";
 
@@ -167,25 +167,30 @@ export function AppSplit({
   }, [isDesktop, animateRightSlide]);
 
   return (
-    <ViewCust
-      fd={isDesktop ? "row" : "column"}
-      bg={$("background")}
-      p={gap}
+    <View
+      style={[
+        {
+          flex: 1,
+          flexDirection: isDesktop ? "row" : "column",
+          backgroundColor: $("background"),
+          padding: S.space[gap],
+        },
+      ]}
       {...rest}
     >
       {left && (
         <ViewCust
-          flex={isDesktop ? 1 : 1}
           scroll
           showScrollIndicator={showScrollIndicator}
-          pr={isDesktop ? "md" : undefined}
-          style={{
-            width: isDesktop ? "35%" : "100%",
-            borderRightWidth: isDesktop ? 1 : 0,
-            borderRightColor: $("borderSubtle" as any),
-          }}
           contentContainerStyle={{
             flexGrow: 1,
+          }}
+          style={{
+            flex: isDesktop ? 1 : 1,
+            width: isDesktop ? "35%" : "100%",
+            paddingRight: isDesktop ? S.space.md : undefined,
+            borderRightWidth: isDesktop ? 1 : 0,
+            borderRightColor: $("borderSubtle" as any),
           }}
         >
           {left}
@@ -194,15 +199,15 @@ export function AppSplit({
 
       {right &&
         (isDesktop ? (
-          <ViewCust
-            flex={3}
-            pl="md"
+          <View
             style={{
+              flex: 3,
               width: "65%",
+              paddingLeft: S.space.md,
             }}
           >
             {right}
-          </ViewCust>
+          </View>
         ) : (
           <Animated.View
             style={[
@@ -233,7 +238,7 @@ export function AppSplit({
 
       {/* Render modals, toasts, and other overlays */}
       {children}
-    </ViewCust>
+    </View>
   );
 }
 

@@ -1,7 +1,8 @@
-import { $, Sizing, tone, UseTheme } from "@/theme"
+import { $, Sizing, tone, useScale, UseTheme } from "@/theme"
 import { ReactNode, useMemo } from "react"
-import { StyleProp, ViewProps, ViewStyle } from "react-native"
+import { StyleProp, View, ViewProps, ViewStyle } from "react-native"
 import { ViewCust } from "../base/ViewCust"
+import { getShadowStyle } from "./shadows"
 /* ───────────────────────────────
    🎨 ComponentView
    Reusable container for toast, tooltip, notification, etc.
@@ -37,6 +38,7 @@ export function ComponentView({
   ...rest
 }: ComponentViewProps) {
   const { theme } = UseTheme();
+  const S = useScale();
 
   // Map borderTone to background color if not explicitly provided
   const bgColor = useMemo(() =>
@@ -57,31 +59,30 @@ export function ComponentView({
   [bgColor, theme]);
 
   return (
-    <ViewCust
-      bg={bgColor}
-      br="md"
-      p="md"
-      shadow={shadow}
+    <View
       style={[
         {
+          backgroundColor: bgColor,
+          borderRadius: S.radius.md,
+          padding: S.space.md,
           borderWidth: 3,
           borderColor: borderColorValue,
-          // Center content by default
           justifyContent: 'center',
           alignItems: 'center',
+          ...getShadowStyle(shadow),
         },
         style,
       ]}
       {...rest}
     >
       {children}
-    </ViewCust>
+    </View>
   );
 }
 
 /* ───────────────────────────────
    🔘 IconButtonView
-   Simple circular icon button container extending ViewCust
+   Simple circular icon button container
    - Just a centered circular View
    - No animations - parent component handles them
 ──────────────────────────────── */
@@ -97,7 +98,6 @@ export interface IconButtonViewProps {
 
 /**
  * 🔘 IconButtonView - Simple circular button container
- * Extends ViewCust concept: centered circular View
  * Parent (IconButton) handles all animations
  */
 export function IconButtonView({
@@ -107,21 +107,21 @@ export function IconButtonView({
   style,
 }: IconButtonViewProps) {
   return (
-    <ViewCust
-      ai="center"
-      jc="center"
-      bg={backgroundColor}
+    <View
       style={[
         {
           width: size,
           height: size,
           borderRadius: size / 2,
+          backgroundColor,
+          alignItems: 'center',
+          justifyContent: 'center',
         },
         style,
       ]}
     >
       {children}
-    </ViewCust>
+    </View>
   );
 }
 
@@ -183,6 +183,8 @@ export function ButtonView({
   style,
   children,
 }: ButtonViewProps) {
+  const S = useScale();
+  
   // Detect if backgroundColor is a CSS variable - gradients don't work with CSS vars
   const isCSSVar = backgroundColor?.includes('var(')
   const shouldUseGradient = gradient && !isCSSVar
@@ -191,22 +193,21 @@ export function ButtonView({
     <ViewCust
       gradient={shouldUseGradient}
       gradientColor={shouldUseGradient ? backgroundColor : undefined}
-      bg={!shouldUseGradient ? backgroundColor : undefined}
       gradientDirection={gradientDirection}
       gradientTransitionPoint={gradientTransitionPoint}
       gradientIntensity={gradientIntensity}
-      fillWidth={false}
-      shadow={shadow}
-      radius={borderRadius}
-      borderColor={borderColor}
-      borderWidth={borderWidth}
       style={[
         {
+          backgroundColor: !shouldUseGradient ? backgroundColor : undefined,
           height,
           paddingHorizontal,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
+          borderRadius: S.radius[borderRadius],
+          borderColor,
+          borderWidth,
+          ...getShadowStyle(shadow),
         },
         style,
       ]}
@@ -277,10 +278,9 @@ export function TabView({
       gradientDirection={gradientDirection}
       gradientTransitionPoint={gradientTransitionPoint}
       gradientIntensity={gradientIntensity}
-      bg={!shouldUseGradient ? backgroundColor : undefined}
-      fillWidth={false}
       style={[
         {
+          backgroundColor: !shouldUseGradient ? backgroundColor : undefined,
           borderRadius,
           paddingVertical,
           paddingHorizontal,

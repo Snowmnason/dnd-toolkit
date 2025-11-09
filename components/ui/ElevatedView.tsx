@@ -1,8 +1,9 @@
-import { $, tone, UseTheme, type Sizing } from '@/theme'
+import { $, tone, useScale, UseTheme, type Sizing } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React from 'react'
 import { Animated, Pressable, ViewStyle } from 'react-native'
 import { ViewCust } from './base/ViewCust'
+import { getShadowStyle } from './Resuables/shadows'
 
 type RadiusKey = keyof Sizing['radius']
 
@@ -48,6 +49,7 @@ export function Card({
   children,
 }: CardProps) {
   const { theme } = UseTheme()
+  const S = useScale()
 
   // Map tone to background color - theme-aware
   const bgColor = toneVariant === 'base'
@@ -61,19 +63,22 @@ export function Card({
 
   return (
     <ViewCust
-      bg={bgColor}
-      p={paddingValue}
-      radius={radius}
-      borderWidth={bordered ? 3 : 0}
-      borderColor={bordered ? $('borderSubtle', theme) : 'transparent'}
-      shadow={shadow ? 'combined' : 'none'}
-      fillWidth={false}
       gradient={gradient}
       gradientColor={gradient ? bgColor : undefined}
       gradientDirection={gradientDirection}
       gradientIntensity={gradientIntensity}
       gradientTransitionPoint={gradientTransitionPoint}
-      style={style}
+      style={[
+        {
+          backgroundColor: !gradient ? bgColor : undefined,
+          padding: paddingValue ? S.space[paddingValue] : undefined,
+          borderRadius: S.radius[radius],
+          borderWidth: bordered ? 3 : 0,
+          borderColor: bordered ? $('borderSubtle', theme) : 'transparent',
+          ...getShadowStyle(shadow ? 'combined' : 'none'),
+        },
+        style,
+      ]}
     >
       {children}
     </ViewCust>
@@ -125,6 +130,7 @@ export function Surface({
   children,
 }: SurfaceProps) {
   const { theme } = UseTheme()
+  const S = useScale()
 
   // Map variant to background color - theme-aware
   const bgColor = variant === 'base'
@@ -140,20 +146,24 @@ export function Surface({
 
   return (
     <ViewCust
-      bg={bgColor}
-      p={paddingValue}
-      radius={radius}
-      borderWidth={bordered ? 2 : 0}
-      borderColor={bordered ? $('borderSubtle', theme) : 'transparent'}
-      shadow="softer"
-      fillWidth={fillWidth}
-      opacity={opacity}
       gradient={gradient}
       gradientColor={gradient ? bgColor : undefined}
       gradientDirection={gradientDirection}
       gradientIntensity={gradientIntensity}
       gradientTransitionPoint={gradientTransitionPoint}
-      style={style}
+      style={[
+        {
+          backgroundColor: !gradient ? bgColor : undefined,
+          padding: paddingValue ? S.space[paddingValue] : undefined,
+          borderRadius: S.radius[radius],
+          borderWidth: bordered ? 2 : 0,
+          borderColor: bordered ? $('borderSubtle', theme) : 'transparent',
+          width: fillWidth ? '100%' : undefined,
+          opacity,
+          ...getShadowStyle('softer'),
+        },
+        style,
+      ]}
     >
       {children}
     </ViewCust>
