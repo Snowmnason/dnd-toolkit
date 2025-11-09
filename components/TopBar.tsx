@@ -1,4 +1,4 @@
-import { $, S, UseTheme } from '@/theme'
+import { S, UseTheme } from '@/theme'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import {
@@ -10,7 +10,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import SettingsMenu from './modals/SettingsModal'
-import { IconButtonBar } from './ui/IconButtonBar'
+import { IconButton } from './ui/IconButton'
 
 // 🎨 Fixed palette (matches BottomTabBar)
 const TOPBAR_BG = '#1f262e'
@@ -66,13 +66,12 @@ export default function TopBar({
         {/* Left: Back Button */}
         <View style={styles.sideSlot}>
           {showBackButton && (
-            <IconButtonBar
-              icon="←"
+            <IconButton
+              variant="text"
+              content="←"
+              textColor={TOPBAR_TEXT}
               onPress={handleBackPress}
-              color={$('accent', theme)}
-              iconColor={$('surface', theme)}
-              size={42}
-              fontsize={42}
+              size="lg"
             />
           )}
         </View>
@@ -91,12 +90,12 @@ export default function TopBar({
         {/* Right: Hamburger Menu */}
         <View style={styles.sideSlot}>
           {showHamburger && (
-            <IconButtonBar
-              icon="☰"
+            <IconButton
+              variant="text"
+              content="☰"
+              textColor={TOPBAR_TEXT}
               onPress={handleHamburgerPress}
-              color={$('accent', theme)}
-              iconColor={$('surface', theme)}
-              size={42}
+              size="lg"
             />
           )}
         </View>

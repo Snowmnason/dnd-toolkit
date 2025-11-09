@@ -1,42 +1,62 @@
-import { $, UseTheme } from '@/theme'
-import React, { ReactNode, useState } from 'react'
+import { $ } from '@/theme'
+import * as Haptics from 'expo-haptics'
+import { ReactNode, useMemo } from 'react'
 import {
   GestureResponderEvent,
   Platform,
   Pressable,
-  StyleSheet,
-  Text,
   ViewStyle,
 } from 'react-native'
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated'
+import { AppTooltip } from './AppToolTip'
+import { IconButtonView } from './Resuables/ComponentViews'
 
-interface IconButtonProps {
-  icon: ReactNode | string
+/* ───────────────────────────────
+   🎨 Types & Variants
+──────────────────────────────── */
+
+export type IconButtonVariant = 'text' | 'icon' | 'svg'
+
+export interface IconButtonProps {
+  /** Content variant: 'text' (string), 'icon' (ReactNode), 'svg' (SVG component) */
+  variant?: IconButtonVariant
+  content: ReactNode | string
   onPress?: (event: GestureResponderEvent) => void
   size?: 'sm' | 'md' | 'lg' | number
   disabled?: boolean
-  /** accent background when true */
   selected?: boolean
+  tooltip?: string
   style?: ViewStyle
-  fontColor?: string
+  textColor?: string
 }
 
-/**
- * 🔘 IconButton
- * - Transparent by default
- * - Accent background on hover or selected
- * - No color injection; icon renders exactly as given
- */
+/* ───────────────────────────────
+   🔘 IconButton - Main Component
+   
+   Variants:
+   - 'text' (default): Renders string as Text
+   - 'icon': Renders ReactNode directly (icons from libraries)
+   - 'svg': Renders SVG components
+──────────────────────────────── */
+
 export function IconButton({
-  icon,
+  variant = 'text',
+  content,
   onPress,
   size = 'md',
   disabled = false,
   selected = false,
+  tooltip,
   style,
-  fontColor,
+  textColor,
 }: IconButtonProps) {
-  const { theme } = UseTheme()
-  const [hovered, setHovered] = useState(false)
+  // Reanimated shared values
+  const scale = useSharedValue(1)
+  const bgOpacity = useSharedValue(selected ? 1 : 0)
 
   const getSize = (): number => {
     switch (size) {
@@ -52,55 +72,131 @@ export function IconButton({
   }
 
   const buttonSize = getSize()
-  const isHot = !disabled && (hovered || selected)
+  const accentColor = useMemo(() => $('accent'), [])
 
-  const backgroundColor = isHot ? $('accent', theme) : 'transparent'
+  // Handlers
+  const handlePressIn = () => {
+    if (disabled) return
+    scale.value = withTiming(0.88, { duration: 100 })
+  }
 
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={disabled ? undefined : onPress}
-      onHoverIn={() => !disabled && setHovered(true)}
-      onHoverOut={() => !disabled && setHovered(false)}
-      disabled={disabled}
-      style={[
-        styles.base,
-        {
-          width: buttonSize,
-          height: buttonSize,
-          borderRadius: buttonSize / 2,
-          backgroundColor,
+  const handlePressOut = () => {
+    if (disabled) return
+    scale.value = withTiming(1, { duration: 100 })
+  }
+
+  const handlePress = (event: GestureResponderEvent) => {
+    if (disabled) return
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    }
+    onPress?.(event)
+  }
+
+  const handleMouseEnter = () => {
+    if (disabled || selected) return
+    bgOpacity.value = withTiming(1, { duration: 150 })
+  }
+
+  const handleMouseLeave = () => {
+    if (disabled || selected) return
+    bgOpacity.value = withTiming(0, { duration: 100 })
+  }
+
+  // Animated styles
+  const scaleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }))
+
+  const bgStyle = useAnimatedStyle(() => ({
+    opacity: bgOpacity.value,
+    backgroundColor: accentColor,
+  }))
+
+  // Render content based on variant
+  const renderContent = () => {
+    switch (variant) {
+      case 'text': {
+        const fontSize = buttonSize / 2
+        return (
+          <Animated.Text
+            style={{
+              color: textColor || accentColor,
+              fontSize,
+              textAlign: 'center',
+              fontWeight: '600',
+            }}
+          >
+            {content}
+          </Animated.Text>
+        )
+      }
+      case 'icon':
+      case 'svg':
+      default: {
+        // For icon and SVG variants, render as ReactNode
+        return content as ReactNode
+      }
+    }
+  }
+
+  const pressableProps: any = {
+    accessibilityRole: 'button',
+    disabled,
+    onPressIn: handlePressIn,
+    onPressOut: handlePressOut,
+    onPress: handlePress,
+  }
+
+  // Add hover handlers for web only
+  if (Platform.OS === 'web') {
+    pressableProps.onMouseEnter = handleMouseEnter
+    pressableProps.onMouseLeave = handleMouseLeave
+  }
+
+  const button = (
+    <Animated.View style={scaleStyle}>
+      <Pressable
+        {...pressableProps}
+        style={{
           opacity: disabled ? 0.5 : 1,
-        },
-        style,
-      ]}
-    >
-      {typeof icon === 'string' ? (
-        <Text
+        }}
+      >
+        {/* Background layer - animated */}
+        <Animated.View
           style={[
-            styles.icon,
             {
-              color: fontColor,
-              fontSize: buttonSize / 2,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              borderRadius: buttonSize / 2,
             },
+            bgStyle,
           ]}
-        >
-          {icon}
-        </Text>
-      ) : (
-        icon
-      )}
-    </Pressable>
-  )
-}
+        />
 
-const styles = StyleSheet.create({
-  base: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...(Platform.OS === 'web' ? { cursor: 'pointer' as const } : {}),
-  },
-  icon: {
-    textAlign: 'center',
-  },
-})
+        {/* IconButtonView - centered content */}
+        <IconButtonView
+          size={buttonSize}
+          backgroundColor="transparent"
+          style={[{ zIndex: 10 }, style]}
+        >
+          {renderContent()}
+        </IconButtonView>
+      </Pressable>
+    </Animated.View>
+  )
+
+  // Wrap with tooltip if provided
+  if (tooltip) {
+    return (
+      <AppTooltip text={tooltip} enableMobilePress={true}>
+        {button}
+      </AppTooltip>
+    )
+  }
+
+  return button
+}

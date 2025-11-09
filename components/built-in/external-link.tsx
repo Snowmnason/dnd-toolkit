@@ -1,4 +1,4 @@
-import { $, UseTheme } from '@/theme';
+import { $ } from '@/theme';
 import { Href, Link } from 'expo-router';
 import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser';
 import { type ComponentProps } from 'react';
@@ -6,7 +6,6 @@ import { type ComponentProps } from 'react';
 type Props = Omit<ComponentProps<typeof Link>, 'href'> & { href: Href & string };
 
 export function ExternalLink({ href, style, ...rest }: Props) {
-  const { theme } = UseTheme()
   return (
     <Link
       target="_blank"
@@ -14,7 +13,7 @@ export function ExternalLink({ href, style, ...rest }: Props) {
       href={href}
       style={[
         {
-          color: $('primary', theme),
+          color: $('primary'),
           textDecorationLine: 'underline',
         },
         style

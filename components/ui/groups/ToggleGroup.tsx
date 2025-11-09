@@ -1,12 +1,13 @@
 import { Body, ObjHeading } from '@/components/ui/AppText'
 import { $, useScale, UseTheme, type Sizing } from '@/theme'
 import React, {
-    forwardRef,
-    useEffect,
-    useImperativeHandle,
-    useState,
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useState,
 } from 'react'
 import { TouchableOpacity, View } from 'react-native'
+import { GroupView } from '../Resuables/SpecializedViews'
 
 interface ToggleItem {
   key: string
@@ -42,6 +43,8 @@ interface ToggleGroupProps {
   spacing?: SpaceKey
   /** Add subtle border + floating title */
   outlined?: boolean
+  /** Background color */
+  background?: string
 }
 
 /**
@@ -62,6 +65,7 @@ export const ToggleGroup = forwardRef<ToggleGroupRef, ToggleGroupProps>(
       direction = 'horizontal',
       spacing = 'sm',
       outlined = false,
+      background = 'transparent',
     },
     ref
   ) => {
@@ -106,14 +110,13 @@ export const ToggleGroup = forwardRef<ToggleGroupRef, ToggleGroupProps>(
     }, [defaultActive])
 
     return (
-      <View
-        style={{
-          borderWidth: outlined ? 1.5 : 0,
-          borderColor: outlined ? $('border') : 'transparent',
-          borderRadius: outlined ? S.radius.md : 0,
-          padding: outlined ? S.space.sm : 0,
-          backgroundColor: 'transparent',
-        }}
+      <GroupView
+        borderWidth={outlined ? 1.5 : 0}
+        borderColor={outlined ? $('border') : 'transparent'}
+        borderRadius={outlined ? 'md' : undefined}
+        padding={outlined ? 'sm' : undefined}
+        backgroundColor={background}
+        direction="column"
       >
         {/* ─────────────── Title ─────────────── */}
         {title && (
@@ -135,10 +138,8 @@ export const ToggleGroup = forwardRef<ToggleGroupRef, ToggleGroupProps>(
         <View
           style={{
             flexDirection: direction === 'horizontal' ? 'row' : 'column',
-            alignItems:
-              direction === 'horizontal' ? 'center' : 'flex-start',
-            justifyContent:
-              direction === 'horizontal' ? 'space-evenly' : 'flex-start',
+            alignItems: direction === 'horizontal' ? 'center' : 'flex-start',
+            justifyContent: direction === 'horizontal' ? 'space-evenly' : 'flex-start',
             gap: S.space[spacing],
           }}
         >
@@ -174,7 +175,7 @@ export const ToggleGroup = forwardRef<ToggleGroupRef, ToggleGroupProps>(
             )
           })}
         </View>
-      </View>
+      </GroupView>
     )
   }
 )

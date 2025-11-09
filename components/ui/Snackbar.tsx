@@ -1,8 +1,14 @@
 import { $, useScale, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
-import React, { useEffect, useRef } from 'react'
-import { Animated, Pressable, Text } from 'react-native'
-import { GradientView } from './Resuables/GradientView'
+import { useEffect, useState } from 'react'
+import { Keyboard, Pressable, Text, View } from 'react-native'
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated'
+import { Paragraph } from './AppText'
 import { getShadowStyle } from './Resuables/shadows'
 
 interface SnackBarProps {
@@ -10,14 +16,16 @@ interface SnackBarProps {
   message: string
   tone?: 'success' | 'warning' | 'error' | 'info'
   duration?: number
-  actionText?: string
-  onAction?: () => void
+  actionText?: string // Optional action text (e.g., "Undo", "Retry")
+  onAction?: () => void // Optional action handler
   onHide?: () => void
 }
 
 /**
  * 🍫 SnackBar
- * Bottom-anchored alert bar with optional action button and tone support.
+ * Platform-aware alert bar with optional action button and tone support.
+ * - Always bottom-anchored (traditional snackbar)
+ * - Action button is optional (e.g., "Undo", "Retry", "Saved")
  */
 export function SnackBar({
   visible,
@@ -30,8 +38,26 @@ export function SnackBar({
 }: SnackBarProps) {
   const { theme } = UseTheme()
   const S = useScale()
-  const translateY = useRef(new Animated.Value(100)).current
-  const opacity = useRef(new Animated.Value(0)).current
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
+  
+  // Reanimated shared values
+  const translateY = useSharedValue(100)
+  const opacity = useSharedValue(0)
+
+  // Keyboard listeners for mobile keyboard awareness
+  useEffect(() => {
+    const showListener = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height)
+    })
+    const hideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0)
+    })
+    
+    return () => {
+      showListener.remove()
+      hideListener.remove()
+    }
+  }, [])
 
   // feedback color mapping
   const bgColor =
@@ -43,21 +69,18 @@ export function SnackBar({
       ? $('warning', theme)
       : $('info', theme)
 
+  // Animated style
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+    opacity: opacity.value,
+  }))
+
   // Slide animation
   useEffect(() => {
     if (visible) {
-      Animated.parallel([
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-        Animated.spring(translateY, {
-          toValue: 0,
-          friction: 6,
-          useNativeDriver: true,
-        }),
-      ]).start()
+      // Animate in
+      opacity.value = withTiming(1, { duration: 250 })
+      translateY.value = withSpring(0, { damping: 60 })
 
       // Haptic feedback
       Haptics.notificationAsync(
@@ -70,26 +93,16 @@ export function SnackBar({
 
       // Auto-hide with reverse animation
       const timer = setTimeout(() => {
-        Animated.parallel([
-          Animated.timing(opacity, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(translateY, {
-            toValue: 100,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-        ]).start(() => {
+        opacity.value = withTiming(0, { duration: 200 })
+        translateY.value = withTiming(100, { duration: 200 }, () => {
           onHide?.()
         })
       }, duration)
       return () => clearTimeout(timer)
     } else {
       // Reset to initial state when not visible
-      translateY.setValue(100)
-      opacity.setValue(0)
+      translateY.value = 100
+      opacity.value = 0
     }
   }, [visible, toneType, duration, onHide, opacity, translateY])
 
@@ -97,57 +110,53 @@ export function SnackBar({
 
   return (
     <Animated.View
-      style={{
-        position: 'absolute',
-        bottom: S.space.xl,
-        left: S.space.lg,
-        right: S.space.lg,
-        transform: [{ translateY }],
-        opacity,
-      }}
+      style={[
+        {
+          position: 'absolute',
+          bottom: keyboardHeight + S.space.xl,
+          left: S.space.lg,
+          right: S.space.lg,
+        },
+        animatedStyle,
+      ]}
     >
-      <GradientView
-        baseColor={bgColor}
-        intensity="moderate"
-        borderRadius={S.radius.lg}
+      <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
+          backgroundColor: bgColor,
           paddingVertical: S.space.sm,
           paddingHorizontal: S.space.md,
+          borderRadius: S.radius.lg,
           ...getShadowStyle('softer'),
         }}
       >
-        <Text
-          style={{
-            color: $('textPrimary', theme),
-            fontSize: S.font.para,
-            flex: 1,
-          }}
-        >
+        <Paragraph style={{ flex: 1 }}>
           {message}
-        </Text>
+        </Paragraph>
 
-        {actionText && (
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-              onAction?.()
-            }}
-          >
-            <Text
-              style={{
-                color: $('accent', theme),
-                fontWeight: '600',
-                marginLeft: S.space.md,
+        {/* Fixed action column - always reserve space */}
+        <View style={{ alignItems: 'flex-end', minWidth: 80 }}>
+          {actionText && onAction && (
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                onAction()
               }}
             >
-              {actionText}
-            </Text>
-          </Pressable>
-        )}
-      </GradientView>
+              <Text
+                style={{
+                  color: $('accent', theme),
+                  fontWeight: '600',
+                }}
+              >
+                {actionText}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
     </Animated.View>
   )
 }

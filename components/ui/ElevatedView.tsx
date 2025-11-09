@@ -1,128 +1,10 @@
-import { $, tone, useScale, UseTheme, type Sizing } from '@/theme'
+import { $, tone, UseTheme, type Sizing } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React from 'react'
-import { Animated, Platform, Pressable, View, ViewStyle } from 'react-native'
-import { GradientView } from './Resuables/GradientView'
-import { getShadowStyle, ShadowMode } from './Resuables/shadows'
+import { Animated, Pressable, ViewStyle } from 'react-native'
+import { ViewCust } from './base/ViewCust'
 
 type RadiusKey = keyof Sizing['radius']
-
-/**
- * Gradient configuration
- */
-type GradientIntensity = 'subtle' | 'moderate' | 'dramatic'
-type GradientDirection = 'top-to-bottom' | 'bottom-to-top'
-
-interface ElevatedViewBaseProps {
-  toneVariant?: 'base' | 'surface' | 'accent' | 'alt'
-  bordered?: boolean
-  borderWidth?: number
-  padded?: boolean
-  radius?: RadiusKey
-  shadow?: ShadowMode
-  fillWidth?: boolean
-  opacity?: number
-  gradient?: boolean
-  gradientOpacity?: number
-  gradientIntensity?: GradientIntensity
-  gradientDirection?: GradientDirection
-  style?: ViewStyle
-  children: React.ReactNode
-}
-
-/**
- * 🏗️ ElevatedView (Base Component)
- * Unified foundation for Surface and Card with theme-aware styling,
- * flexible shadows, and responsive layout options.
- */
-export function ElevatedView({
-  toneVariant = 'surface',
-  bordered = true,
-  borderWidth: customBorderWidth,
-  padded = true,
-  radius = 'md',
-  shadow = 'combined',
-  fillWidth = false,
-  opacity,
-  gradient = false,
-  gradientOpacity,
-  gradientIntensity = 'dramatic',
-  gradientDirection = 'top-to-bottom',
-  style,
-  children,
-}: ElevatedViewBaseProps) {
-  const S = useScale()
-  const { theme } = UseTheme()
-
-  // Compute styles directly inline to ensure they update with theme
-  const bg = toneVariant === 'base'
-      ? $('background', theme)
-      : toneVariant === 'accent'
-      ? tone($('accent', theme), 'alt', undefined, undefined, theme)
-      : toneVariant === 'alt'
-      ? tone($('surface', theme), 'alt', undefined, undefined, theme)
-      : $('surface', theme)
-
-  const borderColor = bordered 
-    ? $('borderSubtle' as any, theme)
-    : 'transparent'
-
-  const borderWidth = customBorderWidth ?? (bordered ? 1 : 0)
-
-  // Get shadow style from reusable utility (theme-aware)
-  const shadowStyle = getShadowStyle(shadow)
-
-  // Get the base color for gradient (CSS var on web, resolved on native)
-  const baseColor = Platform.OS === 'web'
-    ? (toneVariant === 'base'
-        ? $('background')
-        : toneVariant === 'accent'
-        ? $('accentAlt' as any)
-        : toneVariant === 'alt'
-        ? $('surfaceAlt' as any)
-        : $('surface'))
-    : bg
-
-  const containerStyle: ViewStyle = {
-    borderRadius: S.radius[radius],
-    borderWidth,
-    borderColor,
-    padding: padded ? S.space.md : 0,
-    ...(fillWidth && { width: '100%' }),
-    ...(opacity !== undefined && { opacity }),
-    ...shadowStyle,
-    overflow: 'hidden',
-  }
-
-  if (gradient) {
-    // Use GradientView for gradient backgrounds
-    return (
-      <GradientView
-        baseColor={baseColor}
-        gradientOpacity={gradientOpacity}
-        intensity={gradientIntensity}
-        direction={gradientDirection}
-        borderRadius={S.radius[radius]}
-        style={{ ...containerStyle, ...style } as ViewStyle}
-      >
-        {children}
-      </GradientView>
-    )
-  }
-
-  // Non-gradient: simple colored background
-  return (
-    <View
-      style={[
-        containerStyle,
-        { backgroundColor: baseColor as any },
-        style,
-      ]}
-    >
-      {children}
-    </View>
-  )
-}
 
 // =============================================================================
 // CARD COMPONENT - Discrete content containers
@@ -132,12 +14,13 @@ interface CardProps {
   toneVariant?: 'base' | 'accent' | 'alt'
   bordered?: boolean
   padded?: boolean
+  padding?: keyof Sizing['space']
   radius?: RadiusKey
   shadow?: boolean
   gradient?: boolean
-  gradientOpacity?: number
-  gradientIntensity?: GradientIntensity
-  gradientDirection?: GradientDirection
+  gradientDirection?: number
+  gradientIntensity?: number
+  gradientTransitionPoint?: number
   style?: ViewStyle
   children: React.ReactNode
 }
@@ -154,35 +37,46 @@ export function Card({
   toneVariant = 'base',
   bordered = true,
   padded = true,
+  padding,
   radius = 'md',
   shadow = true,
   gradient = true,
-  gradientOpacity,
-  gradientIntensity = 'dramatic',
-  gradientDirection = 'top-to-bottom',
+  gradientDirection = 180,
+  gradientIntensity = 30,
+  gradientTransitionPoint = 30,
   style,
   children,
 }: CardProps) {
-  // Map Card's toneVariant to ElevatedView's naming
-  const mappedVariant = toneVariant === 'base' ? 'surface' : toneVariant
+  const { theme } = UseTheme()
+
+  // Map tone to background color - theme-aware
+  const bgColor = toneVariant === 'base'
+    ? $('surface', theme)
+    : toneVariant === 'accent'
+    ? tone($('accent', theme), 'alt', undefined, undefined, theme)
+    : tone($('surface', theme), 'alt', undefined, undefined, theme)
+
+  // Use custom padding if provided, otherwise use padded boolean with 'md'
+  const paddingValue = padding || (padded ? 'md' : undefined)
 
   return (
-    <ElevatedView
-      toneVariant={mappedVariant}
-      bordered={bordered}
-      borderWidth={3}
-      padded={padded}
+    <ViewCust
+      bg={bgColor}
+      p={paddingValue}
       radius={radius}
+      borderWidth={bordered ? 3 : 0}
+      borderColor={bordered ? $('borderSubtle', theme) : 'transparent'}
       shadow={shadow ? 'combined' : 'none'}
       fillWidth={false}
       gradient={gradient}
-      gradientOpacity={gradientOpacity}
-      gradientIntensity={gradientIntensity}
+      gradientColor={gradient ? bgColor : undefined}
       gradientDirection={gradientDirection}
+      gradientIntensity={gradientIntensity}
+      gradientTransitionPoint={gradientTransitionPoint}
       style={style}
     >
       {children}
-    </ElevatedView>
+    </ViewCust>
   )
 }
 
@@ -193,14 +87,15 @@ export function Card({
 interface SurfaceProps {
   variant?: 'base' | 'surface' | 'alt' | 'accent'
   padded?: boolean
+  padding?: keyof Sizing['space']
   radius?: RadiusKey
   bordered?: boolean
   fillWidth?: boolean
   opacity?: number
   gradient?: boolean
-  gradientOpacity?: number
-  gradientIntensity?: GradientIntensity
-  gradientDirection?: GradientDirection
+  gradientDirection?: number
+  gradientIntensity?: number
+  gradientTransitionPoint?: number
   style?: ViewStyle
   children: React.ReactNode
 }
@@ -217,35 +112,51 @@ interface SurfaceProps {
 export function Surface({
   variant = 'surface',
   padded = true,
+  padding,
   radius = 'md',
   bordered = true,
   fillWidth = true,
   opacity,
   gradient = true,
-  gradientOpacity,
-  gradientIntensity = 'subtle',
-  gradientDirection = 'top-to-bottom',
+  gradientDirection = 180,
+  gradientIntensity = 30,
+  gradientTransitionPoint = 30,
   style,
   children,
 }: SurfaceProps) {
+  const { theme } = UseTheme()
+
+  // Map variant to background color - theme-aware
+  const bgColor = variant === 'base'
+    ? $('background', theme)
+    : variant === 'accent'
+    ? tone($('accent', theme), 'alt', undefined, undefined, theme)
+    : variant === 'alt'
+    ? tone($('surface', theme), 'alt', undefined, undefined, theme)
+    : $('surface', theme)
+
+  // Use custom padding if provided, otherwise use padded boolean with 'md'
+  const paddingValue = padding || (padded ? 'md' : undefined)
+
   return (
-    <ElevatedView
-      toneVariant={variant}
-      bordered={bordered}
-      borderWidth={2}
-      padded={padded}
+    <ViewCust
+      bg={bgColor}
+      p={paddingValue}
       radius={radius}
+      borderWidth={bordered ? 2 : 0}
+      borderColor={bordered ? $('borderSubtle', theme) : 'transparent'}
       shadow="softer"
       fillWidth={fillWidth}
       opacity={opacity}
       gradient={gradient}
-      gradientOpacity={gradientOpacity}
-      gradientIntensity={gradientIntensity}
+      gradientColor={gradient ? bgColor : undefined}
       gradientDirection={gradientDirection}
+      gradientIntensity={gradientIntensity}
+      gradientTransitionPoint={gradientTransitionPoint}
       style={style}
     >
       {children}
-    </ElevatedView>
+    </ViewCust>
   )
 }
 

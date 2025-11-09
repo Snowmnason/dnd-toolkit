@@ -62,6 +62,23 @@ const spaceBase = {
 }
 
 /* ───────────────────────────────
+   Line Height (base values)
+   Paired with corresponding font sizes for consistent typography
+──────────────────────────────── */
+const lineHeightBase = {
+  caption: 12,     // for $caption (10px)
+  subtitle: 20,    // for $subtitle (14px)
+  para: 26,        // for $para (18px)
+  body1: 24,       // for $body1 (22px)
+  body2: 28,       // for $body2 (24px)
+  body3: 32,       // for $body3 (26px)
+  heading3: 32,    // for $heading3 (28px)
+  heading2: 36,    // for $heading2 (32px)
+  heading1: 40,    // for $heading1 (36px)
+  title: 56,       // for $title (58px)
+}
+
+/* ───────────────────────────────
    Button Sizes (base values)
 ──────────────────────────────── */
 const buttonBase = {
@@ -134,6 +151,19 @@ export function buildSizing(scaleValue: number) {
     xxl: spaceBase.xxl * scaleValue,
   }
 
+  const lineHeight = {
+    caption: lineHeightBase.caption * 1,
+    subtitle: lineHeightBase.subtitle * 1,
+    para: lineHeightBase.para * 1,
+    body1: lineHeightBase.body1 * 1,
+    body2: lineHeightBase.body2 * 1,
+    body3: lineHeightBase.body3 * 1,
+    heading3: lineHeightBase.heading3 * 1,
+    heading2: lineHeightBase.heading2 * 1,
+    heading1: lineHeightBase.heading1 * 1,
+    title: lineHeightBase.title * 1,
+  }
+
   const button = {
     sm: {
       height: buttonBase.sm.height * scaleValue,
@@ -171,6 +201,7 @@ export function buildSizing(scaleValue: number) {
     scale: scaleValue,
     font,
     space,
+    lineHeight,
     button,
     modal,
     border,
@@ -190,6 +221,7 @@ export const S = buildSizing(scale)
 export type Sizing = ReturnType<typeof buildSizing>
 export type FontSizes = keyof typeof fontBase
 export type SpacingSizes = keyof typeof spaceBase
+export type LineHeightSizes = keyof typeof lineHeightBase
 export type ButtonSizes = keyof typeof buttonBase
 export type ModalSizes = keyof typeof modalBase
 export type BorderSizes = keyof typeof border
@@ -198,5 +230,6 @@ export type RadiusSizes = keyof typeof radius
 // Legacy exports for backward compatibility
 export const font = S.font
 export const space = S.space
+export const lineHeight = S.lineHeight
 export const button = S.button
 export const modal = S.modal

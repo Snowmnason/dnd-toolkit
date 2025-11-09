@@ -1,5 +1,5 @@
 import { $, tone, useScale, UseTheme } from '@/theme'
-import React from 'react'
+import React, { useMemo } from 'react'
 import { Platform, StyleProp, Text, TextProps, TextStyle } from 'react-native'
 
 /* ───────────────────────────────
@@ -57,7 +57,7 @@ export function AppText({
     return Number(fontSize)
   })()
 
-  const resolvedColor = (() => {
+  const resolvedColor = useMemo(() => {
     if (color) {
       if (typeof color === 'string' && color.startsWith('$')) {
         const token = color.slice(1) as keyof typeof theme
@@ -71,19 +71,19 @@ export function AppText({
 
     switch (textType) {
       case 'primary':
-        return $('textPrimary', theme)
+        return $('textPrimary')
       case 'secondary':
-        return $('textSecondary', theme)
+        return $('textSecondary')
       case 'inverse':
-        return $('textInverse', theme)
+        return $('textInverse')
       case 'onAccent':
         return tone($('textInverse', theme), 'border', undefined, undefined, theme)
       case 'onCard':
-        return $('accent', theme)
+        return $('accent')
       default:
-        return $('textPrimary', theme)
+        return $('textPrimary')
     }
-  })()
+  }, [color, textType, theme])
 
   //const resolvedFontFamily = fontFamily ?? theme.fontFamily
 
@@ -107,6 +107,9 @@ export function AppText({
   const isMobile = Platform.OS === 'ios' || Platform.OS === 'android'
   const shouldItalic = italic && !isMobile
 
+  // Scale lineHeight proportionally with scale factor for consistent typography
+  const scaledLineHeight = typeof lineHeight === 'number' ? lineHeight * S.scale : lineHeight
+
   return (
     <Text
       {...rest}
@@ -122,7 +125,7 @@ export function AppText({
           textDecorationLine: deco,
           cursor: cursor,
           opacity: opacity,
-          lineHeight: lineHeight,
+          lineHeight: scaledLineHeight,
         },
         style, // User style can override everything
       ]}
@@ -147,11 +150,12 @@ export function Title({
   fontWeight = '600',
   variant = 'semi',
   align = 'center',
-  lineHeight = 56,
+  lineHeight,
   style,
   ...rest
 }: AppTextProps) {
   const S = useScale()
+  const resolvedLineHeight = lineHeight ?? S.lineHeight.title
   return (
     <AppText
       fontSize={fontSize}
@@ -159,7 +163,7 @@ export function Title({
       fontWeight={fontWeight}
       variant={variant}
       align={align}
-      lineHeight={lineHeight}
+      lineHeight={resolvedLineHeight}
       style={[{ marginBottom: S.space.lg }, style]}
       {...rest}
     />
@@ -174,18 +178,19 @@ export function Heading({
   fontSize = '$heading1',
   fontWeight = '600',
   variant = 'semi',
-  lineHeight = 40,
+  lineHeight,
   style,
   ...rest
 }: AppTextProps) {
   const S = useScale()
+  const resolvedLineHeight = lineHeight ?? S.lineHeight.heading1
   return (
     <AppText
       fontSize={fontSize}
       fontFamily={$(`fontFamilyTitle`)}
       fontWeight={fontWeight}
       variant={variant}
-      lineHeight={lineHeight}
+      lineHeight={resolvedLineHeight}
       style={[{ marginBottom: S.space.md }, style]}
       {...rest}
     />
@@ -200,18 +205,19 @@ export function ObjHeading({
   fontSize = '$heading2',
   fontWeight = '600',
   variant = 'semi',
-  lineHeight = 36,
+  lineHeight,
   style,
   ...rest
 }: AppTextProps) {
   const S = useScale()
+  const resolvedLineHeight = lineHeight ?? S.lineHeight.heading2
   return (
     <AppText
       fontSize={fontSize}
       fontFamily={$(`fontFamilyTitle`)}
       fontWeight={fontWeight}
       variant={variant}
-      lineHeight={lineHeight}
+      lineHeight={resolvedLineHeight}
       style={[{ marginBottom: S.space.xs }, style]}
       {...rest}
     />
@@ -224,15 +230,17 @@ export function ObjHeading({
 */
 export function Body({
   fontSize = '$body1',
-  lineHeight = 24,
+  lineHeight,
   style,
   ...rest
 }: AppTextProps) {
+  const S = useScale()
+  const resolvedLineHeight = lineHeight ?? S.lineHeight.body1
   return (
     <AppText
       fontSize={fontSize}
       fontFamily={$(`fontFamily`)}
-      lineHeight={lineHeight}
+      lineHeight={resolvedLineHeight}
       style={style}
       {...rest}
     />
@@ -245,15 +253,17 @@ export function Body({
 */
 export function Paragraph({
   fontSize = '$para',
-  lineHeight = 26,
+  lineHeight,
   style,
   ...rest
 }: AppTextProps) {
+  const S = useScale()
+  const resolvedLineHeight = lineHeight ?? S.lineHeight.para
   return (
     <AppText
       fontSize={fontSize}
       fontFamily={$(`fontFamilyPara`)}
-      lineHeight={lineHeight}
+      lineHeight={resolvedLineHeight}
       style={style}
       {...rest}
     />
@@ -269,10 +279,12 @@ export function SubTitle({
   textType = 'secondary',
   italic = true,
   opacity = 0.8,
-  lineHeight = 20,
+  lineHeight,
   style,
   ...rest
 }: AppTextProps) {
+  const S = useScale()
+  const resolvedLineHeight = lineHeight ?? S.lineHeight.subtitle
   return (
     <AppText
       fontSize={fontSize}
@@ -280,7 +292,7 @@ export function SubTitle({
       fontFamily={$(`fontFamily`)}
       italic={italic}
       opacity={opacity}
-      lineHeight={lineHeight}
+      lineHeight={resolvedLineHeight}
       style={style}
       {...rest}
     />
@@ -295,17 +307,19 @@ export function Caption({
   fontSize = '$caption',
   textType = 'secondary',
   opacity = 0.7,
-  lineHeight = 12,
+  lineHeight,
   style,
   ...rest
 }: AppTextProps) {
+  const S = useScale()
+  const resolvedLineHeight = lineHeight ?? S.lineHeight.caption
   return (
     <AppText
       fontSize={fontSize}
       textType={textType}
       fontFamily={$(`fontFamilyPara`)}
       opacity={opacity}
-      lineHeight={lineHeight}
+      lineHeight={resolvedLineHeight}
       style={style}
       {...rest}
     />
@@ -326,11 +340,13 @@ export function Link({
   color = '$accent',
   deco = 'underline',
   cursor = 'pointer',
-  lineHeight = 24,
+  lineHeight,
   style,
   onPress,
   ...rest
 }: AppTextProps & { onPress?: () => void }) {
+  const S = useScale()
+  const resolvedLineHeight = lineHeight ?? S.lineHeight.body1
   return (
     <AppText
       fontSize={fontSize}
@@ -338,7 +354,7 @@ export function Link({
       fontFamily={$(`fontFamily`)}
       deco={deco}
       cursor={cursor}
-      lineHeight={lineHeight}
+      lineHeight={resolvedLineHeight}
       style={style}
       onPress={onPress}
       {...rest}
@@ -355,10 +371,12 @@ export function ButtonText({
   fontWeight = '600',
   variant = 'semi',
   align = 'center',
-  lineHeight = 22,
+  lineHeight,
   style,
   ...rest
 }: AppTextProps) {
+  const S = useScale()
+  const resolvedLineHeight = lineHeight ?? S.lineHeight.body1
   return (
     <AppText
       fontSize={fontSize}
@@ -366,7 +384,7 @@ export function ButtonText({
       fontWeight={fontWeight}
       variant={variant}
       align={align}
-      lineHeight={lineHeight}
+      lineHeight={resolvedLineHeight}
       style={style}
       {...rest}
     />

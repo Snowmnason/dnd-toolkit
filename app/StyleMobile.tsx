@@ -110,9 +110,9 @@ export default function StyleMobile() {
         <Card>
           <Heading>Icon Buttons</Heading>
           <View style={{ flexDirection: 'row', gap: S.space.sm, marginTop: S.space.md }}>
-            <IconButton icon="🗡️" onPress={() => setIconButtonClicks('Sword')} />
-            <IconButton icon="🏹" onPress={() => setIconButtonClicks('Bow')} />
-            <IconButton icon="🪄" onPress={() => setIconButtonClicks('Wand')} />
+            <IconButton content="🗡️" onPress={() => setIconButtonClicks('Sword')} />
+            <IconButton content="🏹" onPress={() => setIconButtonClicks('Bow')} />
+            <IconButton content="🪄" onPress={() => setIconButtonClicks('Wand')} />
           </View>
           <Caption style={{ marginTop: S.space.sm }}>Last icon clicked: {iconButtonClicks || 'None'}</Caption>
         </Card>
@@ -553,17 +553,17 @@ export default function StyleMobile() {
                     <Body>Tight transition at 70% for strong depth effect</Body>
                   </Card>
           
-                  <Card gradient gradientDirection="bottom-to-top">
+                  <Card gradient gradientDirection={0}>
                     <SubTitle>Dramatic Bottom-to-Top</SubTitle>
                     <Body>Inverted gradient for alternative styling</Body>
                   </Card>
           
-                  <Card gradient gradientIntensity="moderate">
+                  <Card gradient gradientIntensity={20}>
                     <SubTitle>Moderate Intensity</SubTitle>
                     <Body>Softer transition, less contrast</Body>
                   </Card>
           
-                  <Card gradient gradientIntensity="subtle">
+                  <Card gradient gradientIntensity={10}>
                     <SubTitle>Subtle Intensity</SubTitle>
                     <Body>Very gentle gradient, barely noticeable</Body>
                   </Card>
@@ -585,7 +585,7 @@ export default function StyleMobile() {
                     <Body>Gentle gradient for large background panels</Body>
                   </Surface>
           
-                  <Surface gradient gradientIntensity="dramatic">
+                  <Surface gradient gradientIntensity={30}>
                     <SubTitle>Dramatic Surface</SubTitle>
                     <Body>More pronounced gradient on surface</Body>
                   </Surface>
@@ -626,7 +626,7 @@ export default function StyleMobile() {
             </AppTooltip>
             
             <AppTooltip text="Quick tooltip" delay={100}>
-              <IconButton icon="ℹ️" onPress={() => {}} />
+              <IconButton content="ℹ️" onPress={() => {}} />
             </AppTooltip>
           </View>
         </Card>

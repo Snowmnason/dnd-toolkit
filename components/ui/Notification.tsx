@@ -1,12 +1,17 @@
 import { usePlatform } from '@/contexts/PlatformContext'
-import { $, useScale, UseTheme } from '@/theme'
+import { $, useScale } from '@/theme'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
-import { useEffect, useRef } from 'react'
-import { Animated, Platform, Pressable, StyleSheet, View } from 'react-native'
+import { useEffect, useMemo } from 'react'
+import { Platform, Pressable, View } from 'react-native'
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Body, Caption } from './AppText'
-import { GradientView } from './Resuables/gradients'
 import { getShadowStyle } from './Resuables/shadows'
 
 export type NotificationType = 'message' | 'update' | 'alert' | 'info'
@@ -44,15 +49,13 @@ export function Notification({
   onDismiss,
   index = 0,
 }: NotificationProps) {
-  const { theme } = UseTheme()
   const S = useScale()
   const { isMobile } = usePlatform()
   const insets = useSafeAreaInsets()
-  // Solid surface background
-  
-  const translateY = useRef(new Animated.Value(-200)).current
-  const opacity = useRef(new Animated.Value(0)).current
-  const nativeDriver = Platform.OS !== 'web'
+
+  // Reanimated shared values
+  const translateY = useSharedValue(-200)
+  const opacity = useSharedValue(0)
 
   // Icon based on type
   const iconName = 
@@ -61,28 +64,22 @@ export function Notification({
     type === 'alert' ? 'warning' :
     'information-circle'
 
-  const iconColor = 
-    type === 'message' ? $('accent', theme) :
-    type === 'update' ? $('info', theme) :
-    type === 'alert' ? $('warning', theme) :
-    $('textSecondary', theme)
+  const iconColor = useMemo(() => 
+    type === 'message' ? $('accent') :
+    type === 'update' ? $('info') :
+    type === 'alert' ? $('warning') :
+    $('textSecondary'),
+  [type])
+
+  const surfaceColor = useMemo(() => $('surface'), [])
+  const borderColor = useMemo(() => $('borderSubtle' as any), [])
+  const dismissIconColor = useMemo(() => $('textSecondary'), [])
 
   // Slide animation
   useEffect(() => {
     if (visible) {
-      Animated.parallel([
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: nativeDriver,
-        }),
-        Animated.spring(translateY, {
-          toValue: 0,
-          friction: 8,
-          tension: 80,
-          useNativeDriver: nativeDriver,
-        }),
-      ]).start()
+      translateY.value = withSpring(0, { damping: 10, stiffness: 200, mass: 0.8 })
+      opacity.value = withTiming(1, { duration: 300 })
 
       // Haptic feedback (native only)
       if (Platform.OS !== 'web') {
@@ -94,20 +91,15 @@ export function Notification({
       }
     } else {
       // Animate out
-      Animated.parallel([
-        Animated.timing(opacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: nativeDriver,
-        }),
-        Animated.timing(translateY, {
-          toValue: -200,
-          duration: 200,
-          useNativeDriver: nativeDriver,
-        }),
-      ]).start()
+      opacity.value = withTiming(0, { duration: 200 })
+      translateY.value = withTiming(-200, { duration: 200 })
     }
-  }, [visible, type, opacity, translateY, nativeDriver])
+  }, [visible, type, translateY, opacity])
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+    opacity: opacity.value,
+  }))
 
   if (!visible) return null
 
@@ -130,61 +122,57 @@ export function Notification({
   }
 
   // Calculate vertical offset for stacking
-  const stackOffset = index * (isMobile ? 90 : 100) // Slightly tighter on mobile
-  const baseTop = (isMobile ? insets.top + 12 : 80)
+  const stackOffset = index * (isMobile ? 90 : 100)
+  const baseTop = isMobile ? insets.top + 12 : 80
 
   return (
     <Animated.View
       style={[
-        styles.container,
-        isMobile ? styles.containerMobile : styles.containerDesktop,
         {
-          // Use base top + stackOffset to avoid Animated.add(number) on native
+          position: 'absolute',
           top: baseTop + stackOffset,
-          // On mobile span with insets; on desktop keep right-anchored
-          left: isMobile ? S.space.lg : undefined,
-          right: isMobile ? S.space.lg : undefined,
-          transform: [
-            { translateY }
-          ],
-          opacity,
-          // Stacking z-index: higher index = lower z-index (appear behind)
+          left: isMobile ? S.space.lg : '5%',
+          right: isMobile ? S.space.lg : '5%',
           zIndex: 9999 - index,
-          // Avoid blocking touches outside the banner
           pointerEvents: 'box-none' as const,
         },
+        animatedStyle,
       ]}
     >
       <Pressable onPress={handlePress} disabled={!onPress}>
-        <GradientView
-          enabled={true}
-          color={$('surface', theme) as any}
-          direction={0}
-          transitionPoint={30}
-          intensity={15}
-          opacity={0.2}
-          style={[
-            styles.notification,
-            {
-              borderRadius: S.radius.lg,
+        <View
+          style={{
+            backgroundColor: surfaceColor,
+            opacity: 0.95,
+            borderRadius: S.radius.lg,
+            borderWidth: 2,
+            borderColor: borderColor,
+            ...getShadowStyle('combined'),
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'flex-start',
+              gap: S.space.sm,
               paddingHorizontal: S.space.md,
               paddingVertical: S.space.sm,
-              minWidth: isMobile ? undefined : 320,
-              maxWidth: isMobile ? undefined : 400,
-              ...getShadowStyle('combined'),
-              borderWidth: 2,
-              borderColor: $('borderSubtle' as any, theme),
-            },
-          ]}
-        >
-          <View style={styles.content}>
+            }}
+          >
             {/* Icon */}
-            <View style={[styles.iconContainer, { marginRight: S.space.sm }]}>
+            <View
+              style={{
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingTop: 2,
+                minWidth: 24,
+              }}
+            >
               <Ionicons name={iconName as any} size={24} color={iconColor} />
             </View>
 
             {/* Text content */}
-            <View style={styles.textContainer}>
+            <View style={{ flex: 1 }}>
               <Body
                 fontWeight="600"
                 textType="primary"
@@ -214,17 +202,17 @@ export function Notification({
             {/* Dismiss button */}
             <Pressable
               onPress={handleDismiss}
-              style={[styles.dismissButton, { padding: S.space.xs }]}
+              style={{ padding: S.space.xs, marginLeft: 'auto' }}
               hitSlop={8}
             >
               <Ionicons
                 name="close"
                 size={18}
-                color={$('textSecondary', theme)}
+                color={dismissIconColor}
               />
             </Pressable>
           </View>
-        </GradientView>
+        </View>
       </Pressable>
     </Animated.View>
   )
@@ -244,35 +232,3 @@ function formatTimestamp(date: Date): string {
   if (diffHours < 24) return `${diffHours}h ago`
   return date.toLocaleDateString()
 }
-
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-  },
-  containerDesktop: {
-    top: 80, // Below top bar
-    right: 16,
-  },
-  containerMobile: {
-    top: 60, // Below mobile header
-    left: 16,
-    right: 16,
-  },
-  notification: {
-    flexDirection: 'column',
-  },
-  content: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  iconContainer: {
-    paddingTop: 2, // Align with text baseline
-  },
-  textContainer: {
-    flex: 1,
-    marginRight: 8,
-  },
-  dismissButton: {
-    marginLeft: 'auto',
-  },
-})

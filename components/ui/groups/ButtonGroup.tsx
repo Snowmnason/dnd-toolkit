@@ -1,8 +1,9 @@
 import { $, useScale, UseTheme, type Sizing } from '@/theme'
-import React, { forwardRef, useImperativeHandle, useState } from 'react'
+import { forwardRef, useImperativeHandle, useState } from 'react'
 import { StyleProp, View, ViewStyle } from 'react-native'
 import { ObjHeading } from '../AppText'
 import { Button } from '../BaseButton'
+import { GroupView } from '../Resuables/SpecializedViews'
 
 interface ButtonGroupItem {
   key: string
@@ -24,6 +25,7 @@ interface ButtonGroupProps {
   spacing?: SpaceKey
   fullWidth?: boolean
   outlined?: boolean
+  background?: string
   style?: StyleProp<ViewStyle>
 }
 
@@ -42,6 +44,7 @@ export const ButtonGroup = forwardRef<ButtonGroupRef, ButtonGroupProps>(
       spacing = 'sm',
       fullWidth = false,
       outlined = false,
+      background = 'transparent',
       style,
     },
     ref
@@ -55,19 +58,18 @@ export const ButtonGroup = forwardRef<ButtonGroupRef, ButtonGroupProps>(
       getValue: () => selected,
     }))
 
-    const flexDirection: ViewStyle['flexDirection'] =
-      direction === 'horizontal' ? 'row' : 'column'
-
     return (
       <View
         style={[
           {
+            width: '100%',
+            flexDirection: 'column',
             borderWidth: outlined ? 1.5 : 0,
             borderColor: outlined ? $('border') : 'transparent',
             borderRadius: outlined ? S.radius.md : 0,
-            backgroundColor: outlined ? 'transparent' : undefined,
-            padding: outlined ? S.space.sm : 0,
-            width: '100%',
+            paddingHorizontal: outlined ? S.space.sm : 0,
+            paddingVertical: outlined ? S.space.sm : 0,
+            backgroundColor: background,
           },
           style,
         ]}
@@ -89,12 +91,10 @@ export const ButtonGroup = forwardRef<ButtonGroupRef, ButtonGroupProps>(
         )}
 
         {/* Buttons */}
-        <View
-          style={{
-            flexDirection,
-            gap: S.space[spacing],
-            width: fullWidth ? '100%' : undefined,
-          }}
+        <GroupView
+          direction={direction === 'horizontal' ? 'row' : 'column'}
+          gap={spacing}
+          style={{ width: fullWidth ? '100%' : undefined }}
         >
           {items.map((item) => {
             const isActive = selected === item.key
@@ -111,7 +111,7 @@ export const ButtonGroup = forwardRef<ButtonGroupRef, ButtonGroupProps>(
               />
             )
           })}
-        </View>
+        </GroupView>
       </View>
     )
   }

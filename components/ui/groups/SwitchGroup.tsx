@@ -1,8 +1,9 @@
 import { ObjHeading } from '@/components/ui/AppText'
 import { Switch } from '@/components/ui/Switch'
 import { $, useScale, UseTheme } from '@/theme'
-import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import { View } from 'react-native'
+import { GroupView } from '../Resuables/SpecializedViews'
 
 interface SwitchItem {
   key: string
@@ -24,6 +25,7 @@ interface SwitchGroupProps {
   direction?: 'vertical' | 'horizontal'
   disabledKeys?: string[]
   outlined?: boolean         // optional border
+  background?: string
 }
 
 /**
@@ -42,6 +44,7 @@ export const SwitchGroup = forwardRef<SwitchGroupRef, SwitchGroupProps>(
       direction = 'vertical',
       disabledKeys = [],
       outlined = false,
+      background = 'transparent',
     },
     ref
   ) => {
@@ -102,15 +105,14 @@ export const SwitchGroup = forwardRef<SwitchGroupRef, SwitchGroupProps>(
     }))
 
     return (
-      <View
-        style={{
-          borderWidth: outlined ? 1.5 : 0,
-          borderColor: outlined ? $('border') : 'transparent',
-          borderRadius: outlined ? S.radius.md : 0,
-          backgroundColor: outlined ? 'transparent' : undefined,
-          padding: outlined ? S.space.sm : 0,
-          width: '100%',
-        }}
+      <GroupView
+        borderWidth={outlined ? 1.5 : 0}
+        borderColor={outlined ? $('border') : 'transparent'}
+        borderRadius={outlined ? 'md' : undefined}
+        padding={outlined ? 'sm' : undefined}
+        backgroundColor={background}
+        direction="column"
+        style={{ width: '100%' }}
       >
         {/* Group Title */}
         {title && (
@@ -132,7 +134,7 @@ export const SwitchGroup = forwardRef<SwitchGroupRef, SwitchGroupProps>(
         <View
           style={{
             flexDirection: direction === 'horizontal' ? 'row' : 'column',
-            gap: S.space.sm,
+            gap: 8,
           }}
         >
           {items.map((item) => (
@@ -147,7 +149,7 @@ export const SwitchGroup = forwardRef<SwitchGroupRef, SwitchGroupProps>(
             />
           ))}
         </View>
-      </View>
+      </GroupView>
     )
   }
 )

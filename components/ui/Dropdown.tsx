@@ -1,7 +1,7 @@
 import { IconSymbol } from '@/components/built-in/icon-symbol'
 import { Body, ObjHeading, TextType } from '@/components/ui/AppText'
 import { $, tone, useScale, UseTheme } from '@/theme'
-import React, { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   FlatList,
   Modal,
@@ -30,10 +30,7 @@ interface DropdownItemProps {
   isSelected: boolean
   onPress: () => void
   borderColor: string
-  selectedColor: string
-  textPrimaryColor: string
   S: ReturnType<typeof useScale>
-  theme: any
 }
 
 function DropdownItemComponent({
@@ -41,41 +38,77 @@ function DropdownItemComponent({
   isSelected,
   onPress,
   borderColor,
-  selectedColor,
-  textPrimaryColor,
   S,
-  theme,
 }: DropdownItemProps) {
-  const [isHovered, setIsHovered] = useState(false)
+  const hoverScale = useSharedValue(1)
+  const hoverOpacity = useSharedValue(0)
+
+  const handlePressIn = () => {
+    hoverScale.value = withTiming(1.02, { duration: 80 })
+    hoverOpacity.value = withTiming(1, { duration: 80 })
+  }
+
+  const handlePressOut = () => {
+    hoverScale.value = withTiming(1, { duration: 80 })
+    hoverOpacity.value = withTiming(0, { duration: 80 })
+  }
+
+  const hoverStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: hoverScale.value }],
+  }))
+
+  // Simple colors - no tone magic
+  // Selected: use background color (blue-ish)
+  // Hovered: use accent color (gold-ish)
+  // Default: transparent or subtle
+  const selectedBg = useMemo(() => $('background'), [])
+  const hoverBg = useMemo(() => $('accent'), [])
+  
+  // When selected: use default text color. When not selected: use inverse (light) text
+  const selectedTextColor = useMemo(() => $('textPrimary'), [])
+  const defaultTextColor = useMemo(() => $('textInverse'), [])
+
+  // Background color animation based on hover state
+  const hoverColorStyle = useAnimatedStyle(() => {
+    // On hover (hoverOpacity > 0.5), use hoverBg
+    // On selected, use selectedBg  
+    // Otherwise transparent
+    if (isSelected) {
+      return { backgroundColor: selectedBg }
+    }
+    if (hoverOpacity.value > 0.5) {
+      return { backgroundColor: hoverBg }
+    }
+    return { backgroundColor: 'transparent' }
+  })
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={onPress}
-      onPressIn={() => setIsHovered(true)}
-      onPressOut={() => setIsHovered(false)}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      style={[
-        {
-          borderColor,
-          borderWidth: 1.5,
-          borderRadius: S.radius.md,
-          paddingVertical: S.space.sm,
-          paddingHorizontal: S.space.md,
-          backgroundColor: isHovered
-            ? tone($('bgInverse', theme), 'hover', undefined, undefined, theme)
-            : isSelected
-            ? tone(selectedColor, 'subtle', undefined, undefined, theme)
-            : 'transparent',
-          transform: isHovered ? [{ scale: 1.02 }] : [{ scale: 1 }],
-        },
-      ]}
+    <Animated.View 
+      style={[hoverStyle, hoverColorStyle]} 
+      key={item.value}
     >
-      <Body color={isSelected ? selectedColor : textPrimaryColor}>
-        {item.label}
-      </Body>
-    </TouchableOpacity>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onMouseEnter={handlePressIn}
+        onMouseLeave={handlePressOut}
+        style={[
+          {
+            borderColor,
+            borderWidth: 1.5,
+            borderRadius: S.radius.md,
+            paddingVertical: S.space.xs,
+            paddingHorizontal: S.space.sm,
+          },
+        ]}
+      >
+        <Body color={isSelected ? selectedTextColor : defaultTextColor}>
+          {item.label}
+        </Body>
+      </TouchableOpacity>
+    </Animated.View>
   )
 }
 
@@ -119,12 +152,11 @@ export default function Dropdown({
   const opacity = useSharedValue(0)
   const shadow = useSharedValue(0)
 
-  const borderColor = $('accent', theme)
-  const background = $('bgInverse', theme)
-  // Pre-compute theme colors before any animated styles that reference them
-  const textPrimaryColor = $('textInverse', theme)
-  const shadowColor = $('shadow', theme)
-  const selectedColor = $('background', theme)
+  const borderColor = $('accent')  // Direct style usage - use CSS vars
+  const background = $('bgInverse')  // Direct style usage - use CSS vars
+  const shadowColor = $('shadow')  // Direct style usage - use CSS vars
+  const textInverseColor = useMemo(() => $('textInverse'), [])
+  // For tone(), we need resolved hex values because tone() processes colors with a library
   const separatorColor = tone($('accent', theme), 'hover', undefined, undefined, theme)
 
   const chevronStyle = useAnimatedStyle(() => ({
@@ -237,7 +269,7 @@ export default function Dropdown({
             name="chevron.right"
             size={18}
             weight="medium"
-            color={$(`textInverse`, theme)}
+            color={textInverseColor}
             style={{ transform: [{ rotate: isOpen ? '90deg' : '0deg' }] }}
           />
         </Animated.View>
@@ -247,12 +279,14 @@ export default function Dropdown({
         <Modal transparent animationType="fade">
           <View style={{ flex: 1 }}>
             {/* Full-screen backdrop closes dropdown when pressed anywhere */}
-            <Pressable style={StyleSheet.absoluteFillObject} onPress={closeDropdown} />
+            <Pressable 
+              style={StyleSheet.absoluteFillObject} 
+              onPress={closeDropdown}
+            />
 
             {/* Positioned container with safety padding so clicks near dropdown won't close */}
             <View
-              // On native, use pointerEvents prop; on web, omit and rely on layout
-              {...(Platform.OS !== 'web' ? { pointerEvents: 'box-none' as any } : {})}
+              pointerEvents="box-none"
               style={{
                 position: 'absolute',
                 top: Math.max(anchor.y - SAFE_AREA, 0),
@@ -267,14 +301,14 @@ export default function Dropdown({
                   {
                     borderColor,
                     backgroundColor: background,
-                    // Web shadow handled in dropdownAnimStyle; fallback here for non-animated cases
-                    ...(Platform.OS === 'web' ? { boxShadow: `0px 4px 4px ${shadowColor}, 0px 12px 12px ${shadowColor}` } : {}),
+                    boxShadow: `0px 4px 4px ${shadowColor}, 0px 12px 12px ${shadowColor}`,
                     borderRadius: S.radius.md,
                     maxHeight: computedMaxHeight,
                     transformOrigin: 'top center',
                   },
                   dropdownAnimStyle,
                 ]}
+                pointerEvents="auto"
               >
           {enableSearch && (
             <View
@@ -284,8 +318,8 @@ export default function Dropdown({
                 top: 0, 
                 left: 0, 
                 right: 0, 
-                paddingHorizontal: S.space.md,
-                paddingVertical: S.space.sm,
+                paddingHorizontal: S.space.xs,
+                paddingVertical: S.space.xs,
                 zIndex: 15,
                 backgroundColor: background,
               }}
@@ -294,14 +328,16 @@ export default function Dropdown({
                 placeholder="Search..."
                 value={search}
                 onChangeText={setSearch}
-                placeholderTextColor={$(`textInverse`, theme)}
+                placeholderTextColor={textInverseColor}
                 style={[
                   styles.searchInput,
                   {
                     borderColor,
-                    color: $('textPrimary', theme),
-                    //borderRadius: S.radius.sm,
+                    color: textInverseColor,
                     paddingHorizontal: S.space.md,
+                    paddingVertical: S.space.xs,
+                    fontSize: S.font.body1,
+                    fontFamily: Platform.OS === 'web' ? (theme?.fontFamily || 'system-ui, -apple-system, sans-serif') : undefined,
                   },
                 ]}
               />
@@ -311,8 +347,9 @@ export default function Dropdown({
           <FlatList
             data={filteredItems}
             keyExtractor={(item) => item.value}
+            scrollEnabled={true}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={enableSearch ? { paddingTop: searchHeight } : undefined}
+            contentContainerStyle={enableSearch ? { paddingTop: searchHeight } : {  }}
             ItemSeparatorComponent={() => (
               <View
                 style={{
@@ -331,17 +368,14 @@ export default function Dropdown({
                   closeDropdown()
                 }}
                 borderColor={borderColor}
-                selectedColor={selectedColor}
-                textPrimaryColor={textPrimaryColor}
                 S={S}
-                theme={theme}
               />
             )}
           />
               </Animated.View>
             </View>
           </View>
-        </Modal>
+          </Modal>
       )}
     </View>
   )
@@ -358,6 +392,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
     elevation: 3,
+    flex: 1,
   },
   item: {},
   searchInput: {
