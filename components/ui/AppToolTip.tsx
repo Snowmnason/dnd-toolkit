@@ -1,10 +1,9 @@
-import { $, useScale, UseTheme } from '@/theme'
-import React, { useState } from 'react'
+import { useScale } from '@/theme'
+import React, { useRef, useState } from 'react'
 import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native'
 import Animated, {
@@ -12,35 +11,44 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated'
-import { GradientView } from './Resuables/GradientView'
-import { getShadowStyle } from './Resuables/shadows'
+import { Card } from './ElevatedView'
+
+import { Caption } from './AppText'
 
 interface AppTooltipProps {
   text: string
   delay?: number
-  gradientIntensity?: 'subtle' | 'moderate' | 'dramatic'
+  /** Enable long-press tooltip on mobile */
+  enableMobilePress?: boolean
   children: React.ReactNode
 }
 
 /**
  * 💬 AppTooltip
- * Cross-platform tooltip for hover (web) or press-hold (mobile).
+ * Cross-platform tooltip:
+ * - Web: hover to show
+ * - Mobile: press-hold to show (if enableMobilePress=true)
+ * Uses ComponentView for consistent styling and Reanimated for animations.
  */
 export function AppTooltip({ 
   text, 
   delay = 500, 
-  gradientIntensity = 'moderate',
+  enableMobilePress = true,
   children 
 }: AppTooltipProps) {
-  const { theme } = UseTheme()
   const S = useScale()
   const [visible, setVisible] = useState(false)
   const opacity = useSharedValue(0)
   const translateY = useSharedValue(6)
-  let timer: ReturnType<typeof setTimeout> | null = null
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const show = () => {
-    timer = setTimeout(() => {
+    // Clear any existing timers
+    if (timerRef.current) clearTimeout(timerRef.current)
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current)
+
+    timerRef.current = setTimeout(() => {
       setVisible(true)
       opacity.value = withTiming(1, { duration: 200 })
       translateY.value = withTiming(0, { duration: 200 })
@@ -48,11 +56,34 @@ export function AppTooltip({
   }
 
   const hide = () => {
-    if (timer) clearTimeout(timer)
+    if (timerRef.current) clearTimeout(timerRef.current)
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current)
+    
     opacity.value = withTiming(0, { duration: 150 })
     translateY.value = withTiming(6, { duration: 150 }, () => {
       setVisible(false)
     })
+  }
+
+  // Mobile: show tooltip on long press (after 500ms hold)
+  const handlePressIn = () => {
+    if (Platform.OS === 'web' || !enableMobilePress) return
+    
+    pressTimerRef.current = setTimeout(() => {
+      show()
+    }, 300) // Trigger after 300ms hold
+  }
+
+  const handlePressOut = () => {
+    if (Platform.OS === 'web' || !enableMobilePress) return
+    
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current)
+    }
+    // Keep showing for a moment before hiding
+    setTimeout(() => {
+      hide()
+    }, 1500)
   }
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -61,52 +92,45 @@ export function AppTooltip({
   }))
 
   const styles = React.useMemo(() => StyleSheet.create({
-    tooltip: {
+    container: {
+      position: 'relative',
+    },
+    tooltipWrapper: {
       position: 'absolute',
       bottom: '100%',
       left: '50%',
       transform: [{ translateX: -50 }],
-      borderRadius: S.radius.sm,
-      ...getShadowStyle('softer'),
       marginBottom: S.space.xs,
       zIndex: 100,
-      overflow: 'hidden',
-    },
-    text: {
-      fontSize: S.font.caption,
-      textAlign: 'center',
+      // Ensure tooltip content doesn't get clipped
+      pointerEvents: 'none',
     },
   }), [S])
-
-  const baseColor = $('surfaceAlt' as any)
 
   return (
     <Pressable
       onHoverIn={Platform.OS === 'web' ? show : undefined}
       onHoverOut={Platform.OS === 'web' ? hide : undefined}
-      onPressIn={Platform.OS !== 'web' ? show : undefined}
-      onPressOut={Platform.OS !== 'web' ? hide : undefined}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      style={styles.container}
     >
       <View>
         {children}
         {visible && (
-          <Animated.View style={[styles.tooltip, animatedStyle]}>
-            <GradientView
-              baseColor={baseColor}
-              intensity={gradientIntensity}
-              borderRadius={S.radius.sm}
-              style={{ 
-                paddingHorizontal: S.space.sm,
-                paddingVertical: S.space.xs,
-              }}
-            >
-              <Text style={[styles.text, { color: $('textPrimary', theme) }]}>{text}</Text>
-            </GradientView>
+          <Animated.View style={[styles.tooltipWrapper, animatedStyle]}>
+            <Card padding="xs">
+              <Caption
+                fontSize="$caption"
+                textType="primary"
+                align="center"
+              >
+                {text}
+              </Caption>
+            </Card>
           </Animated.View>
         )}
       </View>
     </Pressable>
   )
 }
-
-// styles now created per-scale inside component

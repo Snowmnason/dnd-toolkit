@@ -5,7 +5,6 @@ import { WorldWithAccess } from '@/lib/database/worlds'
 import { $, useScale, UseTheme } from '@/theme'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
-import React from 'react'
 import { View } from 'react-native'
 
 interface WorldRightPanelProps {
@@ -55,15 +54,13 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
             shadow
             bordered
             toneVariant="base"
-            gradientOpacity={.8}
             style={{
               position: 'absolute',
               top: S.space.lg,
               left: S.space.lg,
               right: S.space.lg,
               padding: S.space.sm,
-              //backgroundColor: 'rgba(0,0,0,0.3)', // translucent backing
-              borderColor: $('borderSubtle' as any, theme),
+              borderColor: $('borderSubtle' as any),
             }}
           >
             <Heading align="center" style={{ color: $('textPrimary', theme), marginBottom: 0 }}>

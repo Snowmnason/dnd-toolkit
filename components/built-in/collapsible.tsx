@@ -1,12 +1,11 @@
 import { IconSymbol } from '@/components/built-in/icon-symbol';
 import { Body } from '@/components/ui';
-import { $, useScale, UseTheme } from '@/theme';
+import { $, useScale } from '@/theme';
 import { PropsWithChildren, useState } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 
 export function Collapsible({ children, title }: PropsWithChildren & { title: string }) {
   const S = useScale();
-  const { theme } = UseTheme();
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -23,7 +22,7 @@ export function Collapsible({ children, title }: PropsWithChildren & { title: st
           name="chevron.right"
           size={18}
           weight="medium"
-          color={$('textSecondary', theme)}
+          color={$('textSecondary')}
           style={{ transform: [{ rotate: isOpen ? '90deg' : '0deg' }] }}
         />
 

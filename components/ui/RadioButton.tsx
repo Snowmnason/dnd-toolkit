@@ -1,16 +1,21 @@
-import { $, useScale, UseTheme } from '@/theme'
-import * as Haptics from 'expo-haptics'
-import React, { useEffect, useRef } from 'react'
-import { Animated, Pressable, View } from 'react-native'
-import { Body } from './AppText'
+import { $ } from "@/theme";
+import * as Haptics from "expo-haptics";
+import { useEffect, useMemo } from "react";
+import { Platform, Pressable, View } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+import { Body } from "./AppText";
 
 interface RadioButtonProps {
-  checked?: boolean
-  onChange?: (value: boolean) => void
-  label?: string
-  disabled?: boolean
-  color?: string                 // accent override
-  size?: number                  // circle diameter
+  checked?: boolean;
+  onChange?: (value: boolean) => void;
+  label?: string;
+  disabled?: boolean;
+  color?: string; // accent override
+  size?: number; // circle diameter
 }
 
 /**
@@ -22,76 +27,79 @@ export function RadioButton({
   onChange,
   label,
   disabled = false,
-  color = $('accent'),
+  color,
   size = 22,
 }: RadioButtonProps) {
-  const { theme } = UseTheme()
-  const S = useScale()
-  const anim = useRef(new Animated.Value(checked ? 1 : 0)).current
+  // Use provided color or fall back to accent - with theme dependency
+  const buttonColor = useMemo(() => color || $("accent"), [color]);
+  const surfaceBg = useMemo(() => $("surface"), []);
+  const borderColor = useMemo(() => $("borderSubtle" as any), []);
+  const textColor = useMemo(() => $("textPrimary"), []);
+
+  // Reanimated shared values
+  const innerScale = useSharedValue(checked ? 1 : 0);
 
   useEffect(() => {
-    Animated.timing(anim, {
-      toValue: checked ? 1 : 0,
-      duration: 180,
-      useNativeDriver: false,
-    }).start()
-  }, [checked, anim])
+    innerScale.value = withTiming(checked ? 1 : 0, { duration: 180 });
+  }, [checked, innerScale]);
 
-  const innerScale = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  })
+  const innerAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: innerScale.value }],
+  }));
 
   const handlePress = () => {
-    if (disabled) return
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-    onChange?.(!checked)
-  }
+    if (disabled) return;
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    onChange?.(!checked);
+  };
 
   return (
     <Pressable
       onPress={handlePress}
       disabled={disabled}
       style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: S.space.sm,
         opacity: disabled ? 0.6 : 1,
       }}
     >
-      <View
-        style={{
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          borderWidth: 2,
-          borderColor: checked ? color : $('borderSubtle' as any),
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: $('surface', theme),
-        }}
-      >
-        <Animated.View
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <View
           style={{
-            width: size / 2.4,
-            height: size / 2.4,
-            borderRadius: size / 4.8,
-            backgroundColor: color,
-            transform: [{ scale: innerScale }],
-          }}
-        />
-      </View>
-
-      {label && (
-        <Body
-          style={{
-            color: $('textPrimary', theme),
-            fontSize: 15,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: surfaceBg,
+            borderWidth: 2,
+            borderColor: checked ? buttonColor : borderColor,
+            width: size,
+            height: size,
+            borderRadius: size / 2,
           }}
         >
-          {label}
-        </Body>
-      )}
+          <Animated.View
+            style={[
+              {
+                width: size / 2.4,
+                height: size / 2.4,
+                borderRadius: size / 4.8,
+                backgroundColor: buttonColor,
+              },
+              innerAnimStyle,
+            ]}
+          />
+        </View>
+
+        {label && (
+          <Body
+            style={{
+              color: textColor,
+              fontSize: 15,
+            }}
+          >
+            {label}
+          </Body>
+        )}
+      </View>
     </Pressable>
-  )
+  );
 }

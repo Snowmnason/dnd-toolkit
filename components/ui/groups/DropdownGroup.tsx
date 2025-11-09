@@ -1,8 +1,8 @@
 import { useScale, type Sizing } from '@/theme'
-import React, { forwardRef, useImperativeHandle, useState } from 'react'
-import { View } from 'react-native'
+import { forwardRef, useImperativeHandle, useState } from 'react'
 import { ObjHeading } from '../AppText'
 import Dropdown from '../Dropdown'
+import { GroupView } from '../Resuables/SpecializedViews'
 
 interface DropdownOption {
   label: string
@@ -28,6 +28,7 @@ interface DropdownGroupProps {
   direction?: 'vertical' | 'horizontal'
   spacing?: SpaceKey
   fullWidth?: boolean
+  background?: string
 }
 
 /**
@@ -44,6 +45,7 @@ export const DropdownGroup = forwardRef<DropdownGroupRef, DropdownGroupProps>(
       direction = 'vertical',
       spacing = 'sm',
       fullWidth = false,
+      background = 'transparent',
     },
     ref
   ) => {
@@ -67,12 +69,11 @@ export const DropdownGroup = forwardRef<DropdownGroupRef, DropdownGroupProps>(
     }))
 
     return (
-      <View
-        style={{
-          flexDirection: direction === 'horizontal' ? 'row' : 'column',
-          gap: S.space[spacing],
-          width: fullWidth ? '100%' : undefined,
-        }}
+      <GroupView
+        direction={direction === 'horizontal' ? 'row' : 'column'}
+        gap={spacing}
+        backgroundColor={background}
+        style={{ width: fullWidth ? '100%' : undefined }}
       >
         {title && (
           <ObjHeading
@@ -95,7 +96,7 @@ export const DropdownGroup = forwardRef<DropdownGroupRef, DropdownGroupProps>(
             onChange={(val) => handleSelect(item.key, val ?? '')}
           />
         ))}
-      </View>
+      </GroupView>
     )
   }
 )

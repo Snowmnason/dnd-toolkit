@@ -84,7 +84,7 @@ export default function StyleDesktop() {
   const [snackVisible, setSnackVisible] = useState(false)
 
   return (
-    <AppSplit
+    <AppSplit 
       left={
         <ScrollView style={{  }}>
           <ThemeSelector />
@@ -183,9 +183,9 @@ export default function StyleDesktop() {
           <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Icon Buttons</Heading>
             <View style={{ flexDirection: 'row', gap: S.space.sm, marginTop: S.space.md }}>
-              <IconButton icon="🗡️" onPress={() => setIconButtonClicks('Sword')} />
-              <IconButton icon="🏹" onPress={() => setIconButtonClicks('Bow')} />
-              <IconButton icon="🪄" onPress={() => setIconButtonClicks('Wand')} />
+              <IconButton content="🗡️" onPress={() => setIconButtonClicks('Sword')} />
+              <IconButton content="🏹" onPress={() => setIconButtonClicks('Bow')} />
+              <IconButton content="🪄" onPress={() => setIconButtonClicks('Wand')} />
             </View>
             <Caption style={{ marginTop: S.space.sm }}>Last icon clicked: {iconButtonClicks || 'None'}</Caption>
           </Surface>
@@ -496,10 +496,10 @@ export default function StyleDesktop() {
                         padding: S.space.md, 
                         borderRadius: S.radius.md,
                         backgroundColor: 
-                          colorTabValue === 'textPrimary' ? $('background', theme) :
-                          colorTabValue === 'textSecondary' ? $('surface', theme) :
-                          colorTabValue === 'textInverse' ? $('textPrimary', theme) :
-                          $('accent', theme)
+                          colorTabValue === 'textPrimary' ? $('background') :
+                          colorTabValue === 'textSecondary' ? $('surface') :
+                          colorTabValue === 'textInverse' ? $('textPrimary') :
+                          $('accent')
                       }}
                     >
                       <Heading 
@@ -624,7 +624,7 @@ export default function StyleDesktop() {
               </AppTooltip>
               
               <AppTooltip text="Quick tooltip" delay={100}>
-                <IconButton icon="ℹ️" onPress={() => {}} />
+                <IconButton content="ℹ️" onPress={() => {}} />
               </AppTooltip>
             </View>
           </Surface>
@@ -657,17 +657,17 @@ export default function StyleDesktop() {
                       <Body>Tight transition at 70% for strong depth effect</Body>
                     </Card>
             
-                    <Card gradient gradientDirection="bottom-to-top">
+                    <Card gradient gradientDirection={0}>
                       <SubTitle>Dramatic Bottom-to-Top</SubTitle>
                       <Body>Inverted gradient for alternative styling</Body>
                     </Card>
             
-                    <Card gradient gradientIntensity="moderate">
+                    <Card gradient gradientIntensity={20}>
                       <SubTitle>Moderate Intensity</SubTitle>
                       <Body>Softer transition, less contrast</Body>
                     </Card>
             
-                    <Card gradient gradientIntensity="subtle">
+                    <Card gradient gradientIntensity={10}>
                       <SubTitle>Subtle Intensity</SubTitle>
                       <Body>Very gentle gradient, barely noticeable</Body>
                     </Card>
@@ -689,7 +689,7 @@ export default function StyleDesktop() {
                       <Body>Gentle gradient for large background panels</Body>
                     </Surface>
             
-                    <Surface gradient gradientIntensity="dramatic">
+                    <Surface gradient gradientIntensity={30}>
                       <SubTitle>Dramatic Surface</SubTitle>
                       <Body>More pronounced gradient on surface</Body>
                     </Surface>

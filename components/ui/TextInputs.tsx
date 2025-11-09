@@ -1,5 +1,5 @@
 import { $, tone, useScale, UseTheme } from '@/theme'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Platform, TextInput as RNTextInput, StyleSheet, TextInputProps, View } from 'react-native'
 import { ObjHeading, TextType } from './AppText'
 
@@ -9,21 +9,68 @@ interface BaseInputProps extends TextInputProps {
   filled?: boolean
   underline?: boolean,
   textTypeHeading?: TextType
+  onTabPress?: () => void            // Called when Tab key is pressed
+  onEnterPress?: () => void          // Called when Enter key is pressed (single-line)
+  enableTabNavigation?: boolean      // Default: false. If true, Tab/Enter moves to next field
+  keyboardOffset?: number            // Extra offset for keyboard on mobile (default: 0)
 }
 
 /**
  * ✏️ TextInput — for short, single-line text fields
  */
-export function TextInput({ heading, error, filled, underline, textTypeHeading='primary', style, ...rest }: BaseInputProps) {
+export function TextInput({ 
+  heading, 
+  error, 
+  filled, 
+  underline, 
+  textTypeHeading='primary',
+  onTabPress,
+  onEnterPress,
+  enableTabNavigation = false,
+  keyboardOffset = 0,
+  style, 
+  ...rest 
+}: BaseInputProps) {
   const { theme } = UseTheme()
   const S = useScale()
   const [focused, setFocused] = useState(false)
 
-  const borderColor = error
-    ? tone($('accent', theme), 'border', undefined, undefined, theme)
-    : focused
-    ? tone($('accent', theme), 'accent', undefined, undefined, theme)
-    : $('borderSubtle' as any, theme)
+  const borderColor = useMemo(() =>
+    error
+      ? tone($('accent', theme), 'border', undefined, undefined, theme)
+      : focused
+      ? tone($('accent', theme), 'accent', undefined, undefined, theme)
+      : tone($('borderSubtle' as any, theme), 'base', undefined, undefined, theme),
+  [error, focused, theme])
+
+  const backgroundColor = useMemo(() =>
+    filled 
+      ? tone($('bgInverse', theme), 'alt', undefined, undefined, theme)
+      : $('bgInverse'),
+  [filled, theme])
+
+  const disabledTextColor = useMemo(() =>
+    tone($('textInverse', theme), 'disabled', undefined, undefined, theme),
+  [theme])
+
+  const handleKeyPress = (e: any) => {
+    // Handle Tab key
+    if (e.nativeEvent.key === 'Tab' || (Platform.OS === 'web' && e.key === 'Tab')) {
+      if (enableTabNavigation) {
+        e.preventDefault()
+        onTabPress?.()
+      }
+    }
+    // Handle Enter key
+    if (e.nativeEvent?.key === 'Enter' || (Platform.OS === 'web' && e.key === 'Enter')) {
+      if (enableTabNavigation) {
+        e.preventDefault()
+        onEnterPress?.()
+      } else {
+        onEnterPress?.()
+      }
+    }
+  }
 
   return (
     <View style={{ width: '100%' }}>
@@ -40,15 +87,16 @@ export function TextInput({ heading, error, filled, underline, textTypeHeading='
             borderRadius: S.radius.md,
             paddingHorizontal: S.space.md,
             paddingVertical: S.space.sm,
-            backgroundColor: filled ? tone($('bgInverse', theme), 'alt', undefined, undefined, theme) : $('bgInverse', theme),
+            backgroundColor,
             borderColor,
           },
         ]}
       >
         <RNTextInput
-          placeholderTextColor={tone($('textInverse', theme), 'disabled', undefined, undefined, theme)}
+          placeholderTextColor={disabledTextColor}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
+          onKeyPress={handleKeyPress}
           underlineColorAndroid="transparent"
           style={[
             styles.input,
@@ -77,16 +125,52 @@ export function TextInput({ heading, error, filled, underline, textTypeHeading='
 /**
  * 📝 DescInput — for longer, multi-line text areas (descriptions, notes)
  */
-export function DescInput({ heading, error, filled, style, textTypeHeading='primary', maxHeightDelta = 0, minLines = 3, accentScrollbar = true, ...rest }: BaseInputProps & { maxHeightDelta?: number; minLines?: number; accentScrollbar?: boolean }) {
+export function DescInput({ 
+  heading, 
+  error, 
+  filled, 
+  style, 
+  textTypeHeading='primary', 
+  maxHeightDelta = 0, 
+  minLines = 3, 
+  accentScrollbar = true,
+  onTabPress,
+  onEnterPress,
+  enableTabNavigation = false,
+  keyboardOffset = 0,
+  ...rest 
+}: BaseInputProps & { maxHeightDelta?: number; minLines?: number; accentScrollbar?: boolean }) {
   const { theme } = UseTheme()
   const S = useScale()
   const [focused, setFocused] = useState(false)
 
-  const borderColor = error
-    ? tone($('accent', theme), 'border', undefined, undefined, theme)
-    : focused
-    ? tone($('accent', theme), 'accent', undefined, undefined, theme)
-    : $('borderSubtle' as any, theme)
+  const borderColor = useMemo(() =>
+    error
+      ? tone($('accent', theme), 'border', undefined, undefined, theme)
+      : focused
+      ? tone($('accent', theme), 'accent', undefined, undefined, theme)
+      : tone($('borderSubtle' as any, theme), 'base', undefined, undefined, theme),
+  [error, focused, theme])
+
+  const backgroundColor = useMemo(() =>
+    filled ? tone($('bgInverse', theme), 'alt', undefined, undefined, theme) : $('bgInverse'),
+  [filled, theme])
+
+  const disabledTextColor = useMemo(() =>
+    tone($('textInverse', theme), 'disabled', undefined, undefined, theme),
+  [theme])
+
+  const textColor = useMemo(() => $('textInverse'), [])
+
+  const handleKeyPress = (e: any) => {
+    // Handle Tab key
+    if (e.nativeEvent.key === 'Tab' || (Platform.OS === 'web' && e.key === 'Tab')) {
+      if (enableTabNavigation) {
+        e.preventDefault()
+        onTabPress?.()
+      }
+    }
+  }
 
   return (
     <View style={{ width: '100%' }}>
@@ -103,7 +187,7 @@ export function DescInput({ heading, error, filled, style, textTypeHeading='prim
             borderRadius: S.radius.md,
             paddingHorizontal: S.space.md,
             paddingVertical: S.space.md,
-            backgroundColor: filled ? tone($('bgInverse', theme), 'alt', undefined, undefined, theme) : $('bgInverse', theme),
+            backgroundColor,
             borderColor,
           },
         ]}
@@ -111,14 +195,15 @@ export function DescInput({ heading, error, filled, style, textTypeHeading='prim
         <RNTextInput
           multiline
           textAlignVertical="top"
-          placeholderTextColor={tone($('textInverse', theme), 'disabled', undefined, undefined, theme)}
+          placeholderTextColor={disabledTextColor}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
+          onKeyPress={handleKeyPress}
           underlineColorAndroid="transparent"
           style={[
             styles.input,
             {
-              color: $('textInverse', theme),
+              color: textColor,
               fontFamily: theme.fontFamilyPara, // paragraph font
               fontSize: S.font.para,
               lineHeight: Math.round(S.font.para * 1.4),

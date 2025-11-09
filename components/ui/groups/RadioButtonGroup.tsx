@@ -1,8 +1,9 @@
 import { ObjHeading } from '@/components/ui/AppText'
 import { RadioButton } from '@/components/ui/RadioButton'
 import { $, useScale, UseTheme, type Sizing } from '@/theme'
-import React, { forwardRef, useImperativeHandle, useState } from 'react'
+import { forwardRef, useImperativeHandle, useState } from 'react'
 import { View } from 'react-native'
+import { GroupView } from '../Resuables/SpecializedViews'
 
 interface RadioButtonItem {
   key: string
@@ -24,6 +25,7 @@ interface RadioButtonGroupProps {
   spacing?: SpaceKey
   fullWidth?: boolean
   outlined?: boolean
+  background?: string
 }
 
 /**
@@ -41,6 +43,7 @@ export const RadioButtonGroup = forwardRef<RadioButtonGroupRef, RadioButtonGroup
       spacing = 'sm',
       fullWidth = false,
       outlined = false,
+      background = 'transparent',
     },
     ref
   ) => {
@@ -55,14 +58,14 @@ export const RadioButtonGroup = forwardRef<RadioButtonGroupRef, RadioButtonGroup
     }))
 
     return (
-      <View
-        style={{
-          borderWidth: outlined ? 1.5 : 0,
-          borderColor: outlined ? $('border') : 'transparent',
-          borderRadius: outlined ? S.radius.md : 0,
-          padding: outlined ? S.space.sm : 0,
-          width: '100%',
-        }}
+      <GroupView
+        borderWidth={outlined ? 1.5 : 0}
+        borderColor={outlined ? $('border') : 'transparent'}
+        borderRadius={outlined ? 'md' : undefined}
+        padding={outlined ? 'sm' : undefined}
+        backgroundColor={background}
+        direction="column"
+        style={{ width: fullWidth ? '100%' : undefined }}
       >
         {/* Title */}
         {title && (
@@ -98,7 +101,7 @@ export const RadioButtonGroup = forwardRef<RadioButtonGroupRef, RadioButtonGroup
             />
           ))}
         </View>
-      </View>
+      </GroupView>
     )
   }
 )

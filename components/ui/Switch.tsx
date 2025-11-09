@@ -1,7 +1,12 @@
 import { $, tone, useScale, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
-import React, { useState } from 'react'
-import { Animated, Easing, Pressable, View } from 'react-native'
+import { useEffect, useState } from 'react'
+import { Pressable, View } from 'react-native'
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated'
 import { Body, ObjHeading } from './AppText'
 
 interface SwitchProps {
@@ -32,20 +37,17 @@ export function Switch({
   const S = useScale()
   const { theme } = UseTheme()
   const [isOn, setIsOn] = useState(checked)
-  const anim = React.useRef(new Animated.Value(checked ? 1 : 0)).current
+  
+  // Reanimated shared values
+  const animProgress = useSharedValue(checked ? 1 : 0)
 
   // Sync internal state with external checked prop
-  React.useEffect(() => {
+  useEffect(() => {
     if (checked !== isOn) {
       setIsOn(checked)
-      Animated.timing(anim, {
-        toValue: checked ? 1 : 0,
-        duration: 200,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: false,
-      }).start()
+      animProgress.value = withTiming(checked ? 1 : 0, { duration: 200 })
     }
-  }, [checked, isOn, anim])
+  }, [checked, isOn, animProgress])
 
   const toggle = () => {
     if (disabled) return
@@ -53,28 +55,33 @@ export function Switch({
     setIsOn(newState)
     onChange?.(newState)
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-    Animated.timing(anim, {
-      toValue: newState ? 1 : 0,
-      duration: 200,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: false,
-    }).start()
+    animProgress.value = withTiming(newState ? 1 : 0, { duration: 200 })
   }
 
   // Scale-aware dimensions
   const trackWidth = S.space.lg * 1.5  // ~40-48px depending on scale
   const trackHeight = S.space.md       // ~24-28px depending on scale
   const thumbSize = trackHeight - 4    // thumb is 4px smaller than track height
-  const thumbTravel = trackWidth - thumbSize - 4  // travel distance (accounting for 2px padding on each side)
+  const thumbTravel = trackWidth - thumbSize - 8  // travel distance (accounting for 2px padding on each side)
 
-  const thumbTranslate = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [2, thumbTravel],
-  })
+  // Animated styles
+  const thumbTransformStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateX: animProgress.value * thumbTravel + 2,
+      },
+    ],
+  }))
 
-  const trackColor = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [tone($('borderSubtle', theme), 'alt', undefined, undefined, theme), $('accent', theme)],
+  // Pre-compute off and on colors outside animated style
+  const offColor = tone($('borderSubtle', theme), 'alt', undefined, undefined, theme)
+  const onColor = tone($('accent', theme), 'base', undefined, undefined, theme)
+
+  const trackColorStyle = useAnimatedStyle(() => {
+    // Simple color interpolation (0 = off, 1 = on)
+    return {
+      backgroundColor: animProgress.value === 0 ? offColor : onColor,
+    }
   })
 
   return (
@@ -99,37 +106,41 @@ export function Switch({
       >
         {/* Left Label */}
         {leftLabel && (
-          <Body style={{ color: $('textSecondary', theme), fontSize: 14 }}>
+          <Body style={{ color: $('textSecondary'), fontSize: 14 }}>
             {leftLabel}
           </Body>
         )}
 
-        {/* Switch */}
+        {/* Switch Track */}
         <Animated.View
-          style={{
-            width: trackWidth,
-            height: trackHeight,
-            borderRadius: trackHeight,
-            backgroundColor: trackColor,
-            justifyContent: 'center',
-            paddingHorizontal: 2,
-          }}
+          style={[
+            {
+              width: trackWidth,
+              height: trackHeight,
+              borderRadius: trackHeight,
+              justifyContent: 'center',
+              paddingHorizontal: 2,
+            },
+            trackColorStyle,
+          ]}
         >
+          {/* Switch Thumb */}
           <Animated.View
-            style={{
-              width: thumbSize,
-              height: thumbSize,
-              borderRadius: thumbSize / 2,
-              backgroundColor: $('surface', theme),
-              transform: [{ translateX: thumbTranslate }],
-              boxShadow: `0px 1px 2px #000`,
-            }}
+            style={[
+              {
+                width: thumbSize,
+                height: thumbSize,
+                borderRadius: thumbSize / 2,
+                backgroundColor: $('surface'),
+              },
+              thumbTransformStyle,
+            ]}
           />
         </Animated.View>
 
         {/* Right Label */}
         {rightLabel && (
-          <Body style={{ color: $('textSecondary', theme), fontSize: 14 }}>
+          <Body style={{ color: $('textSecondary'), fontSize: 14 }}>
             {rightLabel}
           </Body>
         )}

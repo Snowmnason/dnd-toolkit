@@ -3,26 +3,27 @@ import { forwardRef, useImperativeHandle, useState } from 'react'
 import { View } from 'react-native'
 import { ObjHeading } from '../AppText'
 import { GroupView } from '../Resuables/SpecializedViews'
-import { DescInput, TextInput } from '../TextInputs'
+import { DescInput } from '../TextInputs'
 
-interface TextInputItem {
+interface TextDescItem {
   key: string
   heading: string // 👈 individual input heading
   placeholder?: string
   defaultValue?: string
-  multiline?: boolean
-  type?: 'input' | 'desc' // 👈 specify input type
+  maxHeightDelta?: number
+  minLines?: number
+  accentScrollbar?: boolean
 }
 
-export interface TextInputGroupRef {
+export interface TextDescGroupRef {
   getValues: () => Record<string, string>
 }
 
 type SpaceKey = keyof Sizing['space']
 
-interface TextInputGroupProps {
+interface TextDescGroupProps {
   title?: string // 👈 group title
-  items: TextInputItem[]
+  items: TextDescItem[]
   direction?: 'vertical' | 'horizontal'
   spacing?: SpaceKey
   fullWidth?: boolean
@@ -32,11 +33,11 @@ interface TextInputGroupProps {
 }
 
 /**
- * ✍️ TextInputGroup (ref-based)
- * Group of text inputs with internal state, accessible via ref.getValues().
- * Consistent with DropdownGroup styling + props.
+ * 📝 TextDescGroup (ref-based)
+ * Group of multi-line text inputs (DescInput) with internal state, accessible via ref.getValues().
+ * Tab navigates between inputs, Enter on last input triggers callback.
  */
-export const TextInputGroup = forwardRef<TextInputGroupRef, TextInputGroupProps>(
+export const TextDescGroup = forwardRef<TextDescGroupRef, TextDescGroupProps>(
   (
     {
       title,
@@ -108,33 +109,32 @@ export const TextInputGroup = forwardRef<TextInputGroupRef, TextInputGroupProps>
           </ObjHeading>
         )}
 
-        {/* Text Inputs */}
+        {/* Text Descriptions */}
         <View
           style={{
             flexDirection: direction === 'horizontal' ? 'row' : 'column',
             gap: S.space[spacing],
           }}
         >
-          {items.map((item, index) => {
-            const InputComponent = item.type === 'desc' ? DescInput : TextInput
-            return (
-              <InputComponent
-                key={item.key}
-                heading={item.heading}
-                value={values[item.key]}
-                onChangeText={(text) => handleChange(item.key, text)}
-                placeholder={item.placeholder}
-                multiline={item.multiline}
-                enableTabNavigation
-                onTabPress={() => handleTabPress(index)}
-                onEnterPress={() => handleEnterPress(index)}
-              />
-            )
-          })}
+          {items.map((item, index) => (
+            <DescInput
+              key={item.key}
+              heading={item.heading}
+              value={values[item.key]}
+              onChangeText={(text) => handleChange(item.key, text)}
+              placeholder={item.placeholder}
+              maxHeightDelta={item.maxHeightDelta}
+              minLines={item.minLines}
+              accentScrollbar={item.accentScrollbar}
+              enableTabNavigation
+              onTabPress={() => handleTabPress(index)}
+              onEnterPress={() => handleEnterPress(index)}
+            />
+          ))}
         </View>
       </GroupView>
     )
   }
 )
 
-TextInputGroup.displayName = 'TextInputGroup'
+TextDescGroup.displayName = 'TextDescGroup'
