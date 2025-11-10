@@ -45,13 +45,15 @@ export function TextInput({
 
   const backgroundColor = useMemo(() =>
     filled 
-      ? tone($('bgInverse', theme), 'alt', undefined, undefined, theme)
-      : $('bgInverse'),
+      ? tone(theme.bgInverse as string, 'alt', undefined, undefined, theme)
+      : theme.bgInverse as string,
   [filled, theme])
 
   const disabledTextColor = useMemo(() =>
-    tone($('textInverse', theme), 'disabled', undefined, undefined, theme),
+    tone(theme.textInverse as string, 'disabled', undefined, undefined, theme),
   [theme])
+
+  const textColor = useMemo(() => theme.textInverse as string, [theme])
 
   const handleKeyPress = (e: any) => {
     // Handle Tab key
@@ -101,7 +103,7 @@ export function TextInput({
           style={[
             styles.input,
             {
-              color: $('textInverse', theme),
+              color: textColor,
               fontFamily: theme.fontFamily,
               fontSize: S.font.body1,
               borderColor: 'transparent',
@@ -153,14 +155,14 @@ export function DescInput({
   [error, focused, theme])
 
   const backgroundColor = useMemo(() =>
-    filled ? tone($('bgInverse', theme), 'alt', undefined, undefined, theme) : $('bgInverse'),
+    filled ? tone(theme.bgInverse as string, 'alt', undefined, undefined, theme) : theme.bgInverse as string,
   [filled, theme])
 
   const disabledTextColor = useMemo(() =>
-    tone($('textInverse', theme), 'disabled', undefined, undefined, theme),
+    tone(theme.textInverse as string, 'disabled', undefined, undefined, theme),
   [theme])
 
-  const textColor = useMemo(() => $('textInverse'), [])
+  const textColor = useMemo(() => theme.textInverse as string, [theme])
 
   const handleKeyPress = (e: any) => {
     // Handle Tab key

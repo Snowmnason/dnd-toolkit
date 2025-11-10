@@ -291,6 +291,8 @@ export function Button(props: ButtonProps) {
       {text ? (
         <Animated.View style={[{ flex: 1, height: '100%', justifyContent: 'center', alignItems: 'center', padding: S.space.xs }, textFadeStyle]}>
           <ButtonText
+            numberOfLines={1}
+            ellipsizeMode="clip"
             style={{
               color: textColorValue,
               fontSize: sizing.font,

@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import {
+  Platform,
   ScrollView,
   StyleProp,
   View,
@@ -135,7 +136,7 @@ export function ViewCust({
             {children}
           </ScrollView>
         ) : (
-          <View style={{ backgroundColor: 'transparent', ...innerStyle }} {...rest}>
+          <View style={{ backgroundColor: 'transparent', border: 'none', ...innerStyle }} {...rest}>
             {children}
           </View>
         )}
@@ -147,7 +148,11 @@ export function ViewCust({
   if (scroll) {
     return (
       <ScrollView
-        style={style}
+        style={[
+          style,
+          // On web, allow horizontal overflow so shadows aren't clipped
+          Platform.OS === 'web' ? { overflowX: 'visible' as any } : undefined
+        ]}
         contentContainerStyle={contentContainerStyle}
         showsVerticalScrollIndicator={showScrollIndicator}
         {...rest}

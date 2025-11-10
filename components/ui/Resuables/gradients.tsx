@@ -423,6 +423,8 @@ export function GradientView({
       backgroundClip: 'padding-box', // Prevent gradient from bleeding under border
       opacity: opacity,
       borderStyle: 'solid', // Required for borders to show on web
+      backgroundSize: '100% 100%', // Ensure gradient fills entire element
+      backgroundRepeat: 'no-repeat', // Don't repeat the gradient
     }
     
     // Handle style prop - could be array or object
