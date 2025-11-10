@@ -44,7 +44,7 @@ export function Card({
   gradient = true,
   gradientDirection = 180,
   gradientIntensity = 30,
-  gradientTransitionPoint = 30,
+  gradientTransitionPoint = 70,
   style,
   children,
 }: CardProps) {
@@ -123,9 +123,9 @@ export function Surface({
   fillWidth = true,
   opacity,
   gradient = true,
-  gradientDirection = 180,
-  gradientIntensity = 30,
-  gradientTransitionPoint = 30,
+  gradientDirection = 160,
+  gradientIntensity = 10,
+  gradientTransitionPoint = 65,
   style,
   children,
 }: SurfaceProps) {
