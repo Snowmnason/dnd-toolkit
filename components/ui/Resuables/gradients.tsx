@@ -1,3 +1,4 @@
+import { gradientVariant } from '@/theme'
 import React from 'react'
 import { Platform, View } from 'react-native'
 
@@ -97,6 +98,13 @@ function isLightColor(color: string): boolean {
   // Calculate luminance
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
   return luminance > 0.5
+}
+
+/**
+ * Check if theme is in dark mode by analyzing background color
+ */
+function isDarkMode(color: string): boolean {
+  return !isLightColor(color)
 }
 
 /**
@@ -349,10 +357,13 @@ export function GradientView({
   if (color4) gradientColors.push(color4)
   if (color5) gradientColors.push(color5)
   
-  // If only one color, auto-generate second color
+  // If only one color, auto-generate second color using gradientVariant() for better color quality
   if (gradientColors.length === 1) {
-    const amount = isLightColor(color) ? -intensity : intensity
-    gradientColors.push(adjustColor(color, amount))
+    // Use custom gradient variant that adjusts more aggressively for dark colors
+    // Dark colors get 50% lighter, medium 20% lighter, light colors 15% darker
+    // This creates visible, rich gradients especially in dark mode
+    const adjustedColor = gradientVariant(color)
+    gradientColors.push(adjustedColor)
   }
   
   // For 2-color gradients with custom transition point (native only)

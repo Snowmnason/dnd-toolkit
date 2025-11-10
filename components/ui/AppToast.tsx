@@ -6,7 +6,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { SubTitle } from "./AppText";
+import { Body } from "./AppText";
 import { ComponentView } from "./Resuables/ComponentViews";
 
 type ToastType = "info" | "success" | "error" | "warning";
@@ -83,7 +83,7 @@ export function AppToast({
         borderTone={borderTone as "success" | "danger" | "warning" | "info"}
         shadow="softer"
       >
-        <SubTitle align="center">{message}</SubTitle>
+        <Body align="center">{message}</Body>
       </ComponentView>
     </Animated.View>
   );
