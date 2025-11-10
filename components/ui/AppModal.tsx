@@ -56,7 +56,7 @@ export function AppModal({
   body = null,
   disableOutsideClose = false,
   dimColor,
-  borderTone = "accent",
+  borderTone,
   accentOverlay = false,
   width,
   height,
@@ -106,13 +106,15 @@ export function AppModal({
   const textPrimaryColor = useMemo(() => $("textPrimary"), [])
   const borderColorValue = useMemo(() => 
     borderTone === "success"
-      ? $("success")
+      ? $("success", theme)
       : borderTone === "warning"
-      ? $("warning")
+      ? $("warning", theme)
       : borderTone === "danger"
-      ? $("danger")
-      : $("accent"),
-  [borderTone])
+      ? $("danger", theme)
+      : borderTone === "accent"
+      ? $("accent", theme)
+      : $("primary", theme), // Default to primary color
+  [borderTone, theme])
 
   // 🔹 Fade + slide (+scale on web) entry/exit animation
   useEffect(() => {
@@ -285,6 +287,7 @@ export function AppModal({
                     gradient={cardGradient}
                     shadow={cardShadow}
                     bordered={cardBordered}
+                    borderColor={borderColorValue}
                     padded={false}
                   >
                     <View
@@ -325,7 +328,7 @@ export function AppModal({
                       borderRadius: S.radius.lg,
                       padding: S.space.lg,
                       borderColor: borderColorValue,
-                      borderWidth: 2,
+                      borderWidth: 3.5,
                     }}
                   >
                     <View
@@ -389,7 +392,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalContainer: {
-    borderWidth: 2,
     // Note: shadow styles are applied inline via getShadowStyle() in component
   },
   closeButton: {

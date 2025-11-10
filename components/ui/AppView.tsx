@@ -3,19 +3,19 @@ import { usePlatform } from "@/contexts/PlatformContext";
 import { $, Sizing, useScale } from "@/theme";
 import { ComponentType, ReactNode, useEffect, useMemo } from "react";
 import {
-    ImageBackground,
-    Platform,
-    ScrollView,
-    StyleProp,
-    View,
-    ViewProps,
-    ViewStyle,
+  ImageBackground,
+  Platform,
+  ScrollView,
+  StyleProp,
+  View,
+  ViewProps,
+  ViewStyle,
 } from "react-native";
 import Animated, {
-    Easing,
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import { ViewCust } from "./base/ViewCust";
 
@@ -61,8 +61,8 @@ export interface AppLoadingViewProps extends ViewProps {
    Full-featured page container with ScrollView
    Opinionated defaults: scrolling, padding, background image support
 */
-export function AppPage({ 
-  center = false, 
+export function AppPage({
+  center = false,
   gap = "md",
   tone = "base",
   backgroundColor: customBgColor,
@@ -71,20 +71,23 @@ export function AppPage({
   style,
   contentContainerStyle,
   children,
-  ...rest 
+  ...rest
 }: AppViewProps) {
   const S = useScale();
 
   // Determine background color: custom color takes precedence over tone
-  const backgroundColor = useMemo(() => customBgColor ||
-    (tone === "alt"
-      ? $("surfaceAlt" as any)
-      : tone === "accent"
-      ? $("accentAlt" as any)
-      : tone === "surface"
-      ? $("surface")
-      : $("background")),
-  [customBgColor, tone]);
+  const backgroundColor = useMemo(
+    () =>
+      customBgColor ||
+      (tone === "alt"
+        ? $("surfaceAlt" as any)
+        : tone === "accent"
+        ? $("accentAlt" as any)
+        : tone === "surface"
+        ? $("surface")
+        : $("background")),
+    [customBgColor, tone]
+  );
 
   /* Handle background image layering */
   const Wrapper = (

@@ -14,6 +14,7 @@ type RadiusKey = keyof Sizing['radius']
 interface CardProps {
   toneVariant?: 'base' | 'accent' | 'alt'
   bordered?: boolean
+  borderColor?: string
   padded?: boolean
   padding?: keyof Sizing['space']
   radius?: RadiusKey
@@ -37,14 +38,15 @@ interface CardProps {
 export function Card({
   toneVariant = 'base',
   bordered = true,
+  borderColor,
   padded = true,
   padding,
   radius = 'md',
   shadow = true,
   gradient = true,
-  gradientDirection = 180,
-  gradientIntensity = 30,
-  gradientTransitionPoint = 70,
+  gradientDirection = 160,
+  gradientIntensity = 10,
+  gradientTransitionPoint = 65,
   style,
   children,
 }: CardProps) {
@@ -61,6 +63,9 @@ export function Card({
   // Use custom padding if provided, otherwise use padded boolean with 'md'
   const paddingValue = padding || (padded ? 'md' : undefined)
 
+  // Use custom border color if provided, otherwise use default
+  const borderColorValue = borderColor || (bordered ? $('borderSubtle', theme) : 'transparent')
+
   return (
     <ViewCust
       gradient={gradient}
@@ -74,7 +79,7 @@ export function Card({
           padding: paddingValue ? S.space[paddingValue] : undefined,
           borderRadius: S.radius[radius],
           borderWidth: bordered ? 3 : 0,
-          borderColor: bordered ? $('borderSubtle', theme) : 'transparent',
+          borderColor: borderColorValue,
           ...getShadowStyle(shadow ? 'combined' : 'none'),
         },
         style,

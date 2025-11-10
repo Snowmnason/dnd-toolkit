@@ -1,4 +1,4 @@
-import { $ } from "@/theme";
+import { $, useScale } from "@/theme";
 import * as Haptics from "expo-haptics";
 import { useEffect, useMemo } from "react";
 import { Platform, Pressable, View } from "react-native";
@@ -28,13 +28,18 @@ export function RadioButton({
   label,
   disabled = false,
   color,
-  size = 22,
+  size = 24,
 }: RadioButtonProps) {
+  const S = useScale();
+  
+  // Apply scaling to size
+  const scaledSize = size * S.scale;
+  
   // Use provided color or fall back to accent - with theme dependency
   const buttonColor = useMemo(() => color || $("accent"), [color]);
   const surfaceBg = useMemo(() => $("surface"), []);
   const borderColor = useMemo(() => $("borderSubtle" as any), []);
-  const textColor = useMemo(() => $("textPrimary"), []);
+  //const textColor = useMemo(() => $("textPrimary"), []);
 
   // Reanimated shared values
   const innerScale = useSharedValue(checked ? 1 : 0);
@@ -63,7 +68,7 @@ export function RadioButton({
         opacity: disabled ? 0.6 : 1,
       }}
     >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: S.space.xs }}>
         <View
           style={{
             alignItems: "center",
@@ -71,17 +76,17 @@ export function RadioButton({
             backgroundColor: surfaceBg,
             borderWidth: 2,
             borderColor: checked ? buttonColor : borderColor,
-            width: size,
-            height: size,
-            borderRadius: size / 2,
+            width: scaledSize,
+            height: scaledSize,
+            borderRadius: scaledSize / 2,
           }}
         >
           <Animated.View
             style={[
               {
-                width: size / 2.4,
-                height: size / 2.4,
-                borderRadius: size / 4.8,
+                width: scaledSize / 2.4,
+                height: scaledSize / 2.4,
+                borderRadius: scaledSize / 4.8,
                 backgroundColor: buttonColor,
               },
               innerAnimStyle,
@@ -92,8 +97,7 @@ export function RadioButton({
         {label && (
           <Body
             style={{
-              color: textColor,
-              fontSize: 15,
+              fontSize: scaledSize * 0.68,
             }}
           >
             {label}
