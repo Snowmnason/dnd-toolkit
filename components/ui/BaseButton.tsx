@@ -103,7 +103,7 @@ function getVariantColors(variant: ButtonVariant, theme: any): VariantColorConfi
   switch (variant) {
     case 'secondary':
       return {
-        background: withOpacity($('primary', theme), 0.15),
+        background: withOpacity($('primary', theme), 0.45),
         border: $('primary', theme),
         text: $('textPrimary', theme),
       }

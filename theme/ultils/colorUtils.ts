@@ -30,7 +30,44 @@ function mixColors(base: string, blend: string, ratio: number) {
     const c2 = Color(blend)
     return c1.mix(c2, ratio).hex()
   } catch {
-    // If color parsing fails, return base color
+    // If color parsing fails, return the base color
+    return base
+  }
+}
+
+/**
+ * Create a gradient-friendly variation of a color
+ * Lightens dark colors more aggressively, darkens light colors subtly
+ * Preserves saturation AND alpha channel for rich, visible gradients
+ */
+export function gradientVariant(base: string): string {
+  if (isCSSVariable(base)) return base
+  
+  try {
+    const c = Color(base)
+    const luminance = c.luminosity()
+    const originalAlpha = c.alpha()
+    
+    let adjusted
+    // For dark colors (< 0.3 luminance), lighten more aggressively
+    if (luminance < 0.3) {
+      adjusted = c.lighten(0.5) // 50% lighter for dark colors
+    }
+    // For medium colors (0.3 - 0.6), moderate adjustment
+    else if (luminance < 0.6) {
+      adjusted = c.lighten(0.2) // 20% lighter for medium colors
+    }
+    // For light colors (> 0.6), darken slightly
+    else {
+      adjusted = c.darken(0.15) // 15% darker for light colors
+    }
+    
+    // Preserve the original alpha channel
+    if (originalAlpha < 1) {
+      return adjusted.alpha(originalAlpha).string()
+    }
+    return adjusted.hex()
+  } catch {
     return base
   }
 }
