@@ -168,7 +168,7 @@ export function Button(props: ButtonProps) {
     gradient = true,
     gradientDirection = 180,
     gradientIntensity = 25,
-    gradientTransitionPoint = 60,
+    gradientTransitionPoint = 80,
     style,
     onPress,
     children,

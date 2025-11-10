@@ -31,7 +31,15 @@ export interface GradientViewConfig {
   direction?: number
   /** Custom color stop positions (0-100). Must match number of colors provided */
   locations?: number[]
-  /** Position where color transitions from color2 to color (0-100). Default: 30. Ignored if locations provided */
+  /** 
+   * Position of the transition midpoint between color1 and color2 (0-100). Default: 50.
+   * - 0% = transition starts at top (color1) → ends at bottom (color2)
+   * - 25% = tight gradient at top quarter
+   * - 50% = smooth transition across entire element (DEFAULT)
+   * - 75% = tight gradient at bottom quarter
+   * - 100% = transition starts at bottom (color2) → ends at top (color1)
+   * Ignored if locations provided.
+   */
   transitionPoint?: number
   /** How much to adjust the generated color2 (positive=lighter, negative=darker). Default: 20 */
   intensity?: number
@@ -281,14 +289,9 @@ export function GradientView({
   color5,
   direction = 180,
   locations,
-  transitionPoint = 30,
+  transitionPoint = 50,
   intensity = 30,
   opacity,
-  borderGradient = false,
-  borderGradientColor,
-  borderGradientColor2,
-  borderGradientDirection = 180,
-  borderGradientOpacityFollowsBg = false,
   style,
   children,
 }: {
@@ -303,11 +306,6 @@ export function GradientView({
   transitionPoint?: number
   intensity?: number
   opacity?: number
-  borderGradient?: boolean
-  borderGradientColor?: string
-  borderGradientColor2?: string
-  borderGradientDirection?: number
-  borderGradientOpacityFollowsBg?: boolean
   style?: any
   children?: React.ReactNode
 }) {
@@ -343,7 +341,7 @@ export function GradientView({
   }
 
   // Build colors array
-  const gradientColors: string[] = [color]
+  let gradientColors: string[] = [color]
   
   // Add provided colors
   if (color2) gradientColors.push(color2)
@@ -355,6 +353,13 @@ export function GradientView({
   if (gradientColors.length === 1) {
     const amount = isLightColor(color) ? -intensity : intensity
     gradientColors.push(adjustColor(color, amount))
+  }
+  
+  // For 2-color gradients with custom transition point (native only)
+  // Expand to 4 colors to create the midpoint effect
+  const use4ColorPattern = Platform.OS !== 'web' && gradientColors.length === 2 && !locations
+  if (use4ColorPattern) {
+    gradientColors = [gradientColors[0], gradientColors[0], gradientColors[1], gradientColors[1]]
   }
   
   // Validate colors - all must be valid strings
@@ -376,10 +381,10 @@ export function GradientView({
     // Custom locations provided - convert from 0-100 to 0-1
     nativeLocations = locations.map(loc => loc / 100).filter(n => !isNaN(n))
     if (nativeLocations.length === 0) nativeLocations = undefined
-  } else if (gradientColors.length === 2 && !locations) {
-    // Simple 2-color gradient with transition point
-    const transitionRatio = Math.max(0, Math.min(100, transitionPoint)) / 100
-    nativeLocations = [0, transitionRatio]
+  } else if (use4ColorPattern) {
+    // Using 4-color pattern for midpoint effect
+    const mid = Math.max(0, Math.min(100, transitionPoint))
+    nativeLocations = [0, Math.max(0, mid - 25) / 100, Math.min(100, mid + 25) / 100, 1]
   } else if (gradientColors.length > 2) {
     // Auto-distribute evenly
     const step = 1 / (gradientColors.length - 1)
@@ -391,22 +396,6 @@ export function GradientView({
     nativeLocations = undefined
   }
 
-  // Helper to generate gradient direction for borders (convert custom degrees to CSS degrees)
-  const getGradientAngle = (dir: number) => {
-    // direction is in degrees: 0=bottom-to-top, 90=left-to-right, 180=top-to-bottom, 270=right-to-left
-    // Convert to standard CSS: 0deg=top, 90deg=right, 180deg=bottom, 270deg=left
-    return (dir + 90) % 360;
-  }
-
-  // Border gradient style for web (creates a gradient border effect)
-  const borderGradientStyle = borderGradient && borderGradientColor && Platform.OS === 'web' ? {
-    backgroundImage: `linear-gradient(${getGradientAngle(borderGradientDirection)}deg, ${borderGradientColor}, ${borderGradientColor2 || borderGradientColor})`,
-    backgroundClip: 'padding-box' as any,
-    border: `2px solid transparent`,
-    backgroundOrigin: 'border-box' as any,
-    opacity: borderGradientOpacityFollowsBg ? opacity : undefined,
-  } : {};
-
   // WEB PLATFORM - Use CSS
   if (Platform.OS === 'web') {
     const cssAngle = directionToCSSAngle(direction)
@@ -416,8 +405,10 @@ export function GradientView({
       // Custom locations provided
       colorStops = gradientColors.map((c, i) => `${c} ${locations[i]}%`)
     } else if (gradientColors.length === 2 && !locations) {
-      // Simple 2-color with transition point
-      colorStops = [`${gradientColors[0]} 0%`, `${gradientColors[1]} ${transitionPoint}%`, `${gradientColors[1]} 100%`]
+      // Simple 2-color with transition midpoint
+      // transitionPoint is where the colors meet 50/50
+      // Create a smooth gradient with the midpoint at the specified position
+      colorStops = [`${gradientColors[0]} 0%`, `${gradientColors[0]} ${Math.max(0, transitionPoint - 25)}%`, `${gradientColors[1]} ${Math.min(100, transitionPoint + 25)}%`, `${gradientColors[1]} 100%`]
     } else {
       // Auto-distribute evenly
       const step = 100 / (gradientColors.length - 1)
@@ -429,9 +420,9 @@ export function GradientView({
     // Merge style arrays into single object for web
     let mergedStyle: any = {
       backgroundImage: gradientString,
-      backgroundColor: color,
+      backgroundClip: 'padding-box', // Prevent gradient from bleeding under border
       opacity: opacity,
-      ...borderGradientStyle,
+      borderStyle: 'solid', // Required for borders to show on web
     }
     
     // Handle style prop - could be array or object
