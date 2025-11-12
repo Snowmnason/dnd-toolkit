@@ -118,7 +118,14 @@ export function AppTooltip({
         {children}
         {visible && (
           <Animated.View style={[styles.tooltipWrapper, animatedStyle]}>
-            <Card padding="xs">
+            <Card
+              padding="xs"
+              gradient
+              gradientIntensity={25}
+              gradientTransitionPoint={70}
+              gradientDirection={180}
+              radius="sm"
+            >
               <SubTitle textType="primary" align="center">
                 {text}
               </SubTitle>
