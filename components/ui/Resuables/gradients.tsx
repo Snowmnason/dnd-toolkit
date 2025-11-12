@@ -47,67 +47,6 @@ export interface GradientViewConfig {
 }
 
 /**
- * Lighten or darken a hex color by a percentage
- */
-function adjustColor(color: string, amount: number): string {
-  // Handle CSS variables or non-hex - return as-is
-  if (!color || !color.startsWith('#')) return color
-
-  let hex = color.replace('#', '')
-  if (hex.length === 3) {
-    hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2]
-  }
-
-  const r = parseInt(hex.slice(0, 2), 16)
-  const g = parseInt(hex.slice(2, 4), 16)
-  const b = parseInt(hex.slice(4, 6), 16)
-
-  // Lighten if positive, darken if negative
-  const adjust = (val: number) => {
-    if (amount > 0) {
-      // Lighten: move toward 255
-      return Math.min(255, Math.round(val + (255 - val) * (amount / 100)))
-    } else {
-      // Darken: move toward 0
-      return Math.max(0, Math.round(val + val * (amount / 100)))
-    }
-  }
-
-  const newR = adjust(r)
-  const newG = adjust(g)
-  const newB = adjust(b)
-
-  return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`
-}
-
-/**
- * Check if color is light or dark
- */
-function isLightColor(color: string): boolean {
-  if (!color || !color.startsWith('#')) return false
-
-  let hex = color.replace('#', '')
-  if (hex.length === 3) {
-    hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2]
-  }
-
-  const r = parseInt(hex.slice(0, 2), 16)
-  const g = parseInt(hex.slice(2, 4), 16)
-  const b = parseInt(hex.slice(4, 6), 16)
-
-  // Calculate luminance
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  return luminance > 0.5
-}
-
-/**
- * Check if theme is in dark mode by analyzing background color
- */
-function isDarkMode(color: string): boolean {
-  return !isLightColor(color)
-}
-
-/**
  * ��� gradient()
  * Platform-aware gradient generator
  * - Web: Returns backgroundImage style with CSS linear-gradient

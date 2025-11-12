@@ -82,6 +82,10 @@ export function AppToast({
       <ComponentView
         borderTone={borderTone as "success" | "danger" | "warning" | "info"}
         shadow="softer"
+        gradient={true}
+        gradientIntensity={35}
+        gradientTransitionPoint={65}
+        gradientDirection={165}
       >
         <Body align="center">{message}</Body>
       </ComponentView>

@@ -1,16 +1,16 @@
-import { $, useScale, UseTheme } from '@/theme'
+import { useScale } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import { useEffect, useState } from 'react'
-import { Keyboard, Pressable, Text, View } from 'react-native'
+import { Keyboard, View } from 'react-native'
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
 } from 'react-native-reanimated'
-import { Paragraph } from './AppText'
+import { Body, Link } from './AppText'
+import { ComponentView } from './Resuables/ComponentViews'
 import { getShadowStyle } from './Resuables/shadows'
-
 interface SnackBarProps {
   visible: boolean
   message: string
@@ -36,7 +36,6 @@ export function SnackBar({
   onAction,
   onHide,
 }: SnackBarProps) {
-  const { theme } = UseTheme()
   const S = useScale()
   const [keyboardHeight, setKeyboardHeight] = useState(0)
   
@@ -59,15 +58,15 @@ export function SnackBar({
     }
   }, [])
 
-  // feedback color mapping
-  const bgColor =
+  // Map toast type to borderTone
+  const borderTone =
     toneType === 'success'
-      ? $('success', theme)
+      ? 'success'
       : toneType === 'error'
-      ? $('danger', theme)
+      ? 'danger'
       : toneType === 'warning'
-      ? $('warning', theme)
-      : $('info', theme)
+      ? 'warning'
+      : 'info'
 
   // Animated style
   const animatedStyle = useAnimatedStyle(() => ({
@@ -120,43 +119,35 @@ export function SnackBar({
         animatedStyle,
       ]}
     >
-      <View
+      <ComponentView
+        gradient
+        borderTone={borderTone as 'success' | 'danger' | 'warning' | 'info'}
+        gradientIntensity={35}
+        gradientTransitionPoint={65}
+        gradientDirection={181}
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          backgroundColor: bgColor,
           paddingVertical: S.space.sm,
           paddingHorizontal: S.space.md,
           borderRadius: S.radius.lg,
           ...getShadowStyle('softer'),
         }}
       >
-        <Paragraph style={{ flex: 1 }}>
+        <Body textType='inverse' style={{ flex: 1 }}>
           {message}
-        </Paragraph>
+        </Body>
 
         {/* Fixed action column - always reserve space */}
         <View style={{ alignItems: 'flex-end', minWidth: 80 }}>
           {actionText && onAction && (
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-                onAction()
-              }}
-            >
-              <Text
-                style={{
-                  color: $('accent', theme),
-                  fontWeight: '600',
-                }}
-              >
-                {actionText}
-              </Text>
-            </Pressable>
+            <Link onPress={onAction}>
+              {actionText}
+            </Link>
           )}
         </View>
-      </View>
+      </ComponentView>
     </Animated.View>
   )
 }

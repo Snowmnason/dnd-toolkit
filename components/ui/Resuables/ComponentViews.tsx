@@ -16,6 +16,14 @@ export interface ComponentViewProps extends ViewProps {
   borderTone?: 'accent' | 'success' | 'warning' | 'danger' | 'info'
   /** Shadow intensity */
   shadow?: 'softer' | 'combined' | 'harder' | 'none'
+  /** Enable gradient (default: true) */
+  gradient?: boolean
+  /** Gradient intensity (default: 30) */
+  gradientIntensity?: number
+  /** Gradient transition point 0-100 (default: 65) */
+  gradientTransitionPoint?: number
+  /** Gradient direction in degrees (default: 180) */
+  gradientDirection?: number
   /** Optional children */
   children?: ReactNode
   style?: StyleProp<ViewStyle>
@@ -33,6 +41,10 @@ export function ComponentView({
   color,
   borderTone = 'accent',
   shadow = 'softer',
+  gradient = true,
+  gradientIntensity = 30,
+  gradientTransitionPoint = 65,
+  gradientDirection = 180,
   children,
   style,
   ...rest
@@ -41,28 +53,33 @@ export function ComponentView({
   const S = useScale();
 
   // Map borderTone to background color if not explicitly provided
+  // Use theme object to get resolved hex colors for gradients
   const bgColor = useMemo(() =>
     color ||
     (borderTone === 'success'
-      ? $('success')
+      ? $('success', theme)
       : borderTone === 'danger'
-      ? $('danger')
+      ? $('danger', theme)
       : borderTone === 'warning'
-      ? $('warning')
+      ? $('warning', theme)
       : borderTone === 'info'
-      ? $('info')
-      : $('accent')),
-  [color, borderTone]);
+      ? $('info', theme)
+      : $('accent', theme)),
+  [color, borderTone, theme]);
 
   const borderColorValue = useMemo(() => 
     tone(bgColor, 'border', undefined, undefined, theme),
   [bgColor, theme]);
 
   return (
-    <View
+    <ViewCust
+      gradient={gradient}
+      gradientColor={bgColor}
+      gradientIntensity={gradientIntensity}
+      gradientTransitionPoint={gradientTransitionPoint}
+      gradientDirection={gradientDirection}
       style={[
         {
-          backgroundColor: bgColor,
           borderRadius: S.radius.md,
           padding: S.space.md,
           borderWidth: 3,
@@ -76,7 +93,7 @@ export function ComponentView({
       {...rest}
     >
       {children}
-    </View>
+    </ViewCust>
   );
 }
 
