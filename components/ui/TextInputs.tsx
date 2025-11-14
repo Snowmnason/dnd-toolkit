@@ -31,9 +31,9 @@ export function TextInput({
   style, 
   ...rest 
 }: BaseInputProps) {
+  const [focused, setFocused] = useState(false)
   const { theme } = UseTheme()
   const S = useScale()
-  const [focused, setFocused] = useState(false)
 
   const borderColor = useMemo(() =>
     error
@@ -142,9 +142,9 @@ export function DescInput({
   keyboardOffset = 0,
   ...rest 
 }: BaseInputProps & { maxHeightDelta?: number; minLines?: number; accentScrollbar?: boolean }) {
+  const [focused, setFocused] = useState(false)
   const { theme } = UseTheme()
   const S = useScale()
-  const [focused, setFocused] = useState(false)
 
   const borderColor = useMemo(() =>
     error

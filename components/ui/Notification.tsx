@@ -1,15 +1,8 @@
 import { usePlatform } from '@/contexts/PlatformContext'
-import { $, useScale } from '@/theme'
+import { $, S, UseTheme } from '@/theme'
 import { Ionicons } from '@expo/vector-icons'
-import * as Haptics from 'expo-haptics'
-import { useEffect, useMemo } from 'react'
-import { Platform, Pressable, View } from 'react-native'
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated'
+import { useMemo } from 'react'
+import { Pressable, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Body, Caption } from './AppText'
 import { getShadowStyle } from './Resuables/shadows'
@@ -34,28 +27,27 @@ interface NotificationProps extends NotificationData {
 
 /**
  * 🔔 Notification
+ * SIMPLIFIED - No animations, just appears/disappears
  * Platform-aware notification banner for messages, updates, and alerts.
  * - Desktop: Top-right corner, stacks vertically
  * - Mobile: Top-center (keyboard-safe), stacks vertically
  */
 export function Notification({
+  id,
   visible,
   type,
   title,
   message,
   timestamp,
-  avatar,
   onPress,
   onDismiss,
   index = 0,
 }: NotificationProps) {
-  const S = useScale()
+  const { theme } = UseTheme()
   const { isMobile } = usePlatform()
   const insets = useSafeAreaInsets()
 
-  // Reanimated shared values
-  const translateY = useSharedValue(-200)
-  const opacity = useSharedValue(0)
+  console.log(`[Notification] visible: ${visible}, id=${id}`)
 
   // Icon based on type
   const iconName = 
@@ -64,89 +56,51 @@ export function Notification({
     type === 'alert' ? 'warning' :
     'information-circle'
 
-  const iconColor = useMemo(() => 
-    type === 'message' ? $('accent') :
-    type === 'update' ? $('info') :
-    type === 'alert' ? $('warning') :
-    $('textSecondary'),
-  [type])
-
-  const surfaceColor = useMemo(() => $('surface'), [])
-  const borderColor = useMemo(() => $('borderSubtle' as any), [])
-  const dismissIconColor = useMemo(() => $('textSecondary'), [])
-
-  // Slide animation
-  useEffect(() => {
-    if (visible) {
-      translateY.value = withSpring(0, { damping: 10, stiffness: 200, mass: 0.8 })
-      opacity.value = withTiming(1, { duration: 300 })
-
-      // Haptic feedback (native only)
-      if (Platform.OS !== 'web') {
-        if (type === 'alert') {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)
-        } else {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-        }
-      }
-    } else {
-      // Animate out
-      opacity.value = withTiming(0, { duration: 200 })
-      translateY.value = withTiming(-200, { duration: 200 })
-    }
-  }, [visible, type, translateY, opacity])
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-    opacity: opacity.value,
-  }))
+  // Memoize all colors to prevent re-renders
+  const colors = useMemo(() => ({
+    icon: type === 'message' ? $('accent', theme) :
+          type === 'update' ? $('info', theme) :
+          type === 'alert' ? $('warning', theme) :
+          $('textSecondary', theme),
+    surface: $('surface', theme),
+    border: $('borderSubtle', theme),
+    dismissIcon: $('textSecondary', theme),
+  }), [type, theme])
 
   if (!visible) return null
 
   const handlePress = () => {
-    if (onPress) {
-      if (Platform.OS !== 'web') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-      }
-      onPress()
-    }
+    onPress?.()
   }
 
   const handleDismiss = () => {
-    if (onDismiss) {
-      if (Platform.OS !== 'web') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-      }
-      onDismiss()
-    }
+    onDismiss?.()
   }
 
   // Calculate vertical offset for stacking
   const stackOffset = index * (isMobile ? 90 : 100)
   const baseTop = isMobile ? insets.top + 12 : 80
 
+  console.log(`[Notification] Rendering id=${id}, type=${type}`)
+
   return (
-    <Animated.View
-      style={[
-        {
-          position: 'absolute',
-          top: baseTop + stackOffset,
-          left: isMobile ? S.space.lg : '5%',
-          right: isMobile ? S.space.lg : '5%',
-          zIndex: 9999 - index,
-          pointerEvents: 'box-none' as const,
-        },
-        animatedStyle,
-      ]}
+    <View
+      style={{
+        position: 'absolute',
+        top: baseTop + stackOffset,
+        left: isMobile ? S.space.lg : '5%',
+        right: isMobile ? S.space.lg : '5%',
+        zIndex: 9999 - index,
+        pointerEvents: 'box-none' as const,
+      }}
     >
       <Pressable onPress={handlePress} disabled={!onPress}>
         <View
           style={{
-            backgroundColor: surfaceColor,
-            opacity: 0.95,
+            backgroundColor: colors.surface,
             borderRadius: S.radius.lg,
             borderWidth: 2,
-            borderColor: borderColor,
+            borderColor: colors.border,
             ...getShadowStyle('combined'),
           }}
         >
@@ -168,7 +122,7 @@ export function Notification({
                 minWidth: 24,
               }}
             >
-              <Ionicons name={iconName as any} size={24} color={iconColor} />
+              <Ionicons name={iconName as any} size={24} color={colors.icon} />
             </View>
 
             {/* Text content */}
@@ -208,13 +162,13 @@ export function Notification({
               <Ionicons
                 name="close"
                 size={18}
-                color={dismissIconColor}
+                color={colors.dismissIcon}
               />
             </Pressable>
           </View>
         </View>
       </Pressable>
-    </Animated.View>
+    </View>
   )
 }
 

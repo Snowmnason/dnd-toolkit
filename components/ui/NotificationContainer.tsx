@@ -1,18 +1,33 @@
 import { Notification } from '@/components/ui/Notification'
 import { useNotifications } from '@/hooks/use-notifications'
-import React from 'react'
-import { View } from 'react-native'
+import { memo, useEffect } from 'react'
 
 /**
  * 📢 NotificationContainer
- * Renders all active notifications from the queue
- * Place this at the root of your app (in _layout or App.tsx)
+ * Renders all active notifications from the queue.
+ * 
+ * KEY: Only wraps the notifications themselves, NOT a full-screen container.
+ * This prevents the invisible box from blocking user interactions.
+ * Notifications are positioned absolutely but don't create a blocking overlay.
  */
-export function NotificationContainer() {
+function NotificationContainerInner() {
   const { notifications } = useNotifications()
 
+  useEffect(() => {
+    console.log(`[NotificationContainer] Mount`)
+    return () => console.log(`[NotificationContainer] Unmount`)
+  }, [])
+
+  useEffect(() => {
+    console.log(`[NotificationContainer] Notifications updated:`, notifications.length, notifications.map(n => n.id))
+  }, [notifications])
+
+  console.log(`[NotificationContainer] Rendering with ${notifications.length} notifications`)
+
+  // Only return notifications - no full-screen wrapper
+  // Each notification handles its own positioning and pointer events
   return (
-    <View style={{ pointerEvents: 'box-none' }}>
+    <>
       {notifications.map((notification, index) => (
         <Notification
           key={notification.id}
@@ -21,6 +36,9 @@ export function NotificationContainer() {
           index={index}
         />
       ))}
-    </View>
+    </>
   )
 }
+
+// Export memoized version to prevent re-renders from parent
+export const NotificationContainer = memo(NotificationContainerInner)
