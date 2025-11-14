@@ -49,6 +49,4 @@ app-example
 .env.development
 
 # MD files
-ZDATABASE TABLES.md
 zRoadmap.md
-zzDATABASE_INDEXES.md
