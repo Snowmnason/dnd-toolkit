@@ -23,10 +23,11 @@ const blog = {
 };
 
 // Put all shared fonts here
+// Note: Eurostile is only loaded on-demand when Cyberpunk theme is selected
+// to avoid unnecessary font download warnings on web
 const customFonts = {
   GrenzeGotisch: require("../assets/fonts/GrenzeGotisch.ttf"),
   Cyberpunk: require("../assets/fonts/Cyberpunk.ttf"),
-  Eurostile: require("../assets/fonts/Eurostile.ttf"),
 };
 
 // Put all shared images here
