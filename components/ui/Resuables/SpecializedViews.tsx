@@ -26,6 +26,12 @@ export interface GroupViewProps {
   backgroundColor?: string
   /** Flex direction */
   direction?: 'row' | 'column'
+  /** Enable wrapping for row layouts */
+  wrap?: boolean
+  /** Justify content alignment */
+  justifyContent?: 'flex-start' | 'center' | 'flex-end' | 'space-between' | 'space-around' | 'space-evenly'
+  /** Align items */
+  alignItems?: 'flex-start' | 'center' | 'flex-end' | 'stretch'
   /** Additional styles */
   style?: StyleProp<ViewStyle>
   /** Group content */
@@ -44,6 +50,9 @@ export function GroupView({
   borderRadius = 'md',
   backgroundColor = 'transparent',
   direction = 'column',
+  wrap = false,
+  justifyContent,
+  alignItems,
   style,
   children,
 }: GroupViewProps) {
@@ -54,12 +63,15 @@ export function GroupView({
       style={[
         {
           flexDirection: direction,
+          flexWrap: wrap ? 'wrap' : 'nowrap',
           gap: S.space[gap],
           padding: padding ? S.space[padding] : undefined,
           borderWidth,
           borderColor,
           borderRadius: S.radius[borderRadius],
           backgroundColor,
+          justifyContent,
+          alignItems,
         },
         style,
       ]}

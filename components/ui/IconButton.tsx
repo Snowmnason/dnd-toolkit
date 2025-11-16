@@ -72,7 +72,6 @@ export function IconButton({
   }
 
   const buttonSize = getSize()
-  const accentColor = $('accent')
 
   // Handlers
   const handlePressIn = () => {
@@ -110,11 +109,12 @@ export function IconButton({
 
   const bgStyle = useAnimatedStyle(() => ({
     opacity: bgOpacity.value,
-    backgroundColor: accentColor,
+    backgroundColor: 'var(--accent)',
   }))
 
   // Render content based on variant
   const renderContent = () => {
+    const accentColor = Platform.OS === 'web' ? 'var(--accent)' : $('accent')
     switch (variant) {
       case 'text': {
         const fontSize = buttonSize / 2

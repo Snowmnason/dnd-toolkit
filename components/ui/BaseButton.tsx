@@ -2,18 +2,18 @@ import { $, tone, useScale, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useMemo } from 'react'
 import {
-    ActivityIndicator,
-    Platform,
-    StyleProp,
-    TouchableOpacity,
-    View,
-    ViewStyle,
+  ActivityIndicator,
+  Platform,
+  StyleProp,
+  TouchableOpacity,
+  View,
+  ViewStyle,
 } from 'react-native'
 import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withSpring,
-    withTiming,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
 } from 'react-native-reanimated'
 import { ButtonText } from './AppText'
 import { ButtonView } from './Resuables/ComponentViews'
@@ -49,6 +49,7 @@ export interface ButtonProps {
   gradientDirection?: number
   gradientIntensity?: number
   gradientTransitionPoint?: number
+  minWidth?: number | string
   style?: StyleProp<ViewStyle>
   onPress?: () => void
   children?: React.ReactNode
@@ -169,6 +170,7 @@ export function Button(props: ButtonProps) {
     gradientDirection = 180,
     gradientIntensity = 25,
     gradientTransitionPoint = 80,
+    minWidth,
     style,
     onPress,
     children,
@@ -365,6 +367,7 @@ export function Button(props: ButtonProps) {
             gradientDirection={gradientDirection}
             gradientTransitionPoint={gradientTransitionPoint}
             gradientIntensity={gradientIntensity}
+            style={minWidth ? { minWidth: minWidth as number } : undefined}
           >
             {contentView}
           </ButtonView>
