@@ -94,6 +94,9 @@ export const ButtonGroup = forwardRef<ButtonGroupRef, ButtonGroupProps>(
         <GroupView
           direction={direction === 'horizontal' ? 'row' : 'column'}
           gap={spacing}
+          wrap={direction === 'horizontal'}
+          justifyContent={fullWidth ? 'space-evenly' : 'flex-start'}
+          alignItems={direction === 'horizontal' ? 'center' : 'stretch'}
           style={{ width: fullWidth ? '100%' : undefined }}
         >
           {items.map((item) => {
@@ -104,8 +107,9 @@ export const ButtonGroup = forwardRef<ButtonGroupRef, ButtonGroupProps>(
                 text={item.label}
                 variant={isActive ? item.variant ?? 'primary' : 'secondary'}
                 onPress={() => setSelected(item.key)}
+                minWidth={100}
                 style={{
-                  flex: fullWidth ? 1 : undefined,
+                  flex: fullWidth && direction === 'vertical' ? 1 : undefined,
                   opacity: isActive ? 1 : 0.85,
                 }}
               />
