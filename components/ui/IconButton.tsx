@@ -1,6 +1,6 @@
 import { $ } from '@/theme'
 import * as Haptics from 'expo-haptics'
-import { ReactNode, useMemo } from 'react'
+import { ReactNode } from 'react'
 import {
   GestureResponderEvent,
   Platform,
@@ -72,7 +72,7 @@ export function IconButton({
   }
 
   const buttonSize = getSize()
-  const accentColor = useMemo(() => $('accent'), [])
+  const accentColor = $('accent')
 
   // Handlers
   const handlePressIn = () => {

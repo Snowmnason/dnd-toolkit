@@ -405,12 +405,12 @@ export function GradientView({
     )
   }
 
-  // NATIVE PLATFORMS (iOS/Android) - Use react-native-linear-gradient
+  // NATIVE PLATFORMS (iOS/Android) - Use expo-linear-gradient
   // Dynamically import to avoid web bundler errors
   if ((Platform.OS as any) !== 'web') {
     try {
       // @ts-ignore - Dynamic require for platform-specific module
-      const NativeLinearGradient = require('react-native-linear-gradient').default
+      const { LinearGradient: NativeLinearGradient } = require('expo-linear-gradient')
       
       // Build native style - handle array merging
       let nativeStyle: any = { opacity }

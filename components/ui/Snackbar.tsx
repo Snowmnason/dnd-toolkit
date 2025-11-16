@@ -1,12 +1,13 @@
 import { useScale } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import { useEffect, useState } from 'react'
-import { Keyboard, View } from 'react-native'
+import { Keyboard, Platform, View } from 'react-native'
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+    withTiming,
 } from 'react-native-reanimated'
 import { Body, Link } from './AppText'
 import { ComponentView } from './Resuables/ComponentViews'
@@ -82,19 +83,21 @@ export function SnackBar({
       translateY.value = withSpring(0, { damping: 60 })
 
       // Haptic feedback
-      Haptics.notificationAsync(
-        toneType === 'success'
-          ? Haptics.NotificationFeedbackType.Success
-          : toneType === 'error'
-          ? Haptics.NotificationFeedbackType.Error
-          : Haptics.NotificationFeedbackType.Warning
-      )
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(
+          toneType === 'success'
+            ? Haptics.NotificationFeedbackType.Success
+            : toneType === 'error'
+            ? Haptics.NotificationFeedbackType.Error
+            : Haptics.NotificationFeedbackType.Warning
+        )
+      }
 
       // Auto-hide with reverse animation
       const timer = setTimeout(() => {
         opacity.value = withTiming(0, { duration: 200 })
         translateY.value = withTiming(100, { duration: 200 }, () => {
-          onHide?.()
+          if (onHide) runOnJS(onHide)()
         })
       }, duration)
       return () => clearTimeout(timer)

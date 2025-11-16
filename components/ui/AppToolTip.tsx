@@ -2,9 +2,10 @@ import { useScale } from "@/theme";
 import React, { useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, View } from "react-native";
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from "react-native-reanimated";
 import { Card } from "./ElevatedView";
 
@@ -56,7 +57,8 @@ export function AppTooltip({
 
     opacity.value = withTiming(0, { duration: 150 });
     translateY.value = withTiming(6, { duration: 150 }, () => {
-      setVisible(false);
+      // run on JS thread to update React state
+      runOnJS(setVisible)(false);
     });
   };
 

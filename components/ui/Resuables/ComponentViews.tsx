@@ -1,4 +1,4 @@
-import { $, Sizing, tone, useScale, UseTheme } from "@/theme"
+import { Sizing, tone, useScale, UseTheme } from "@/theme"
 import { ReactNode, useMemo } from "react"
 import { StyleProp, View, ViewProps, ViewStyle } from "react-native"
 import { ViewCust } from "../base/ViewCust"
@@ -52,20 +52,23 @@ export function ComponentView({
   const { theme } = UseTheme();
   const S = useScale();
 
-  // Map borderTone to background color if not explicitly provided
-  // Use theme object to get resolved hex colors for gradients
-  const bgColor = useMemo(() =>
-    color ||
-    (borderTone === 'success'
-      ? $('success', theme)
-      : borderTone === 'danger'
-      ? $('danger', theme)
-      : borderTone === 'warning'
-      ? $('warning', theme)
-      : borderTone === 'info'
-      ? $('info', theme)
-      : $('accent', theme)),
-  [color, borderTone, theme]);
+  // Map borderTone to background color with theme dependency
+  const bgColor = useMemo(() => {
+    if (color) return color;
+    
+    switch (borderTone) {
+      case 'success':
+        return theme.success;
+      case 'danger':
+        return theme.danger;
+      case 'warning':
+        return theme.warning;
+      case 'info':
+        return theme.info;
+      default:
+        return theme.accent;
+    }
+  }, [color, borderTone, theme]);
 
   const borderColorValue = useMemo(() => 
     tone(bgColor, 'border', undefined, undefined, theme),
@@ -191,7 +194,7 @@ export function ButtonView({
   borderRadius = 'md',
   backgroundColor,
   borderColor,
-  borderWidth = 3.5,
+  borderWidth = 2,
   gradient = true,
   gradientDirection = 180,
   gradientTransitionPoint = 50,

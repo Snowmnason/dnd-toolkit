@@ -1,0 +1,18 @@
+{
+  "$schema": "./feature-flags.schema.json",
+  "description": "Feature flags for development and testing. Toggle features on/off without code changes.",
+  "flags": {
+    "splashScreen": {
+      "enabled": true,
+      "description": "Show splash screen on app load (after bootstrap + 1s buffer)"
+    },
+    "debugLogs": {
+      "enabled": false,
+      "description": "Enable verbose debug logging throughout the app"
+    },
+    "skipAuth": {
+      "enabled": false,
+      "description": "Skip authentication checks (for local testing only)"
+    }
+  }
+}

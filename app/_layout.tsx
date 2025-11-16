@@ -1,14 +1,16 @@
-import { AuthStateManager, logger } from "@/lib";
+import { AuthStateManager } from "@/lib";
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { ThemeProvider, UseTheme } from "@/theme";
 import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import LoadingOverlay from '../components/LoadingOverlay';
+import { SplashScreen } from '../components/SplashScreen';
 import TopBar from '../components/TopBar';
 import { AppParamsProvider, useAppParams } from '../contexts/AppParamsContext';
 import { PlatformProvider, usePlatform } from '../contexts/PlatformContext';
 import { useAppBootstrap } from '../hooks/use-app-bootstrap';
+import { useSplashScreen } from '../hooks/use-splash-screen';
 
 function RootLayoutContent() {
   const { theme } = UseTheme();
@@ -25,6 +27,16 @@ function RootLayoutContent() {
   
   // Use the bootstrap hook to ensure assets and session are loaded
   const bootstrap = useAppBootstrap();
+  
+  // Splash screen management (feature flag controlled)
+  const splash = useSplashScreen();
+
+  // Protected routes that require authentication
+  const protectedRoutes = ['select', 'main', 'settings'] as const;
+  const firstSegmentForProtection = typeof segments[0] === 'string' ? segments[0] : '';
+  const isProtectedRoute = protectedRoutes.includes(firstSegmentForProtection as any);
+
+  // (logging removed)
 
   // Update context params when URL params change
   useEffect(() => {
@@ -57,10 +69,6 @@ function RootLayoutContent() {
     }
   }, [urlParams, segments, updateParams, clearAllParams, clearWorldParams, params.userId, params.worldId, params.userRole]);
 
-  // Protected routes that require authentication
-  const protectedRoutes = ['select', 'main', 'settings'];
-  const isProtectedRoute = protectedRoutes.includes(segments[0]);
-
   // Check authentication status ONLY after bootstrap is complete
   useEffect(() => {
     // Don't proceed until bootstrap is complete
@@ -80,11 +88,9 @@ function RootLayoutContent() {
 
         // Only redirect if trying to access protected route without authentication
         if (isProtectedRoute && !authenticated) {
-          logger.debug('app-layout', 'Unauthorized access attempt, redirecting to welcome');
           router.replace('/login/welcome');
         }
-      } catch (error) {
-        logger.error('app-layout', 'Auth check error:', error);
+      } catch {
         // On error, only redirect protected routes, let login routes work normally
         if (isProtectedRoute) {
           router.replace('/login/welcome');
@@ -97,6 +103,12 @@ function RootLayoutContent() {
     checkAuth();
   }, [segments, router, isProtectedRoute, bootstrap.isReady]);
 
+  // Show splash screen (if enabled via feature flag)
+  // Splash screen displays BEFORE any other content
+  if (splash.showSplash) {
+    return <SplashScreen />;
+  }
+
   // Show loading while bootstrap is happening OR while checking auth for protected routes
   if (!bootstrap.isReady || (isCheckingAuth && isProtectedRoute)) {
     return (
@@ -108,9 +120,11 @@ function RootLayoutContent() {
     );
   }
 
-  // Determine if we should show the TopBar - only hide on login/welcome routes
-  const hideTopBar = segments.some(segment => segment === 'login') ||
-                    segments.some(segment => segment === 'welcome');
+  // Determine if we should show the TopBar - hide on login routes and index route
+  // Hide TopBar when: on login flow, on welcome screen, or on root/index (loading screen)
+  const firstSegment = typeof segments[0] === 'string' ? segments[0] : '';
+  const isRootRoute = segments[0] === undefined;
+  const hideTopBar = isRootRoute || firstSegment === 'login';
 
   // Determine TopBar configuration based on current route
   const getTopBarConfig = () => {

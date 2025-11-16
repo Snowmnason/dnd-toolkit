@@ -57,6 +57,13 @@ export function AppText({
     return Number(fontSize)
   })()
 
+  // Resolve theme colors at top level
+  const textPrimaryColor = $('textPrimary')
+  const textSecondaryColor = $('textSecondary')
+  const textInverseColor = $('textInverse')
+  const textInverseThemed = $('textInverse', theme)
+  const accentColor = $('accent')
+
   const resolvedColor = useMemo(() => {
     if (color) {
       if (typeof color === 'string' && color.startsWith('$')) {
@@ -71,19 +78,19 @@ export function AppText({
 
     switch (textType) {
       case 'primary':
-        return $('textPrimary')
+        return textPrimaryColor
       case 'secondary':
-        return $('textSecondary')
+        return textSecondaryColor
       case 'inverse':
-        return $('textInverse')
+        return textInverseColor
       case 'onAccent':
-        return tone($('textInverse', theme), 'border', undefined, undefined, theme)
+        return tone(textInverseThemed, 'border', undefined, undefined, theme)
       case 'onCard':
-        return $('accent')
+        return accentColor
       default:
-        return $('textPrimary')
+        return textPrimaryColor
     }
-  }, [color, textType, theme])
+  }, [color, textType, theme, textPrimaryColor, textSecondaryColor, textInverseColor, textInverseThemed, accentColor])
 
   //const resolvedFontFamily = fontFamily ?? theme.fontFamily
 

@@ -1,11 +1,11 @@
-import { $, useScale } from "@/theme";
+import { $, useScale, UseTheme } from "@/theme";
 import * as Haptics from "expo-haptics";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { Platform, Pressable, View } from "react-native";
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from "react-native-reanimated";
 import { Body } from "./AppText";
 
@@ -30,19 +30,23 @@ export function RadioButton({
   color,
   size = 24,
 }: RadioButtonProps) {
+  // All hooks must be called in the same order every render
   const S = useScale();
+  const { theme } = UseTheme();
+  
+  // Reanimated shared values (must be before $() calls to maintain hook order)
+  const innerScale = useSharedValue(checked ? 1 : 0);
+  
+  // Resolve colors (call hooks at top level)
+  const accentColor = $("accent", theme);
+  const surfaceBg = $("surface", theme);
+  const borderColorValue = $("borderSubtle" as any, theme);
   
   // Apply scaling to size
   const scaledSize = size * S.scale;
   
-  // Use provided color or fall back to accent - with theme dependency
-  const buttonColor = useMemo(() => color || $("accent"), [color]);
-  const surfaceBg = useMemo(() => $("surface"), []);
-  const borderColor = useMemo(() => $("borderSubtle" as any), []);
-  //const textColor = useMemo(() => $("textPrimary"), []);
-
-  // Reanimated shared values
-  const innerScale = useSharedValue(checked ? 1 : 0);
+  // Use provided color or fall back to accent
+  const buttonColor = color || accentColor;
 
   useEffect(() => {
     innerScale.value = withTiming(checked ? 1 : 0, { duration: 180 });
@@ -75,7 +79,7 @@ export function RadioButton({
             justifyContent: "center",
             backgroundColor: surfaceBg,
             borderWidth: 2,
-            borderColor: checked ? buttonColor : borderColor,
+            borderColor: checked ? buttonColor : borderColorValue,
             width: scaledSize,
             height: scaledSize,
             borderRadius: scaledSize / 2,

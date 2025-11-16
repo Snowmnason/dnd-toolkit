@@ -37,7 +37,7 @@ export const RadioButtonGroup = forwardRef<RadioButtonGroupRef, RadioButtonGroup
   (
     {
       title,
-      items,
+      items = [],
       defaultSelected,
       direction = 'vertical',
       spacing = 'sm',
@@ -49,9 +49,13 @@ export const RadioButtonGroup = forwardRef<RadioButtonGroupRef, RadioButtonGroup
   ) => {
     const S = useScale()
     const { theme } = UseTheme()
+    // Call all hooks before any potential throwing computations
     const [selected, setSelected] = useState<string | null>(
-      defaultSelected ?? items[0]?.key ?? null
+      defaultSelected ?? items?.[0]?.key ?? null
     )
+    // Resolve tokens (pure functions) after hooks to avoid hook order mismatch if they throw
+    const borderTokenColor = $('border', theme)
+    const titleBgColor = $('background', theme)
 
     useImperativeHandle(ref, () => ({
       getValue: () => selected,
@@ -60,7 +64,7 @@ export const RadioButtonGroup = forwardRef<RadioButtonGroupRef, RadioButtonGroup
     return (
       <GroupView
         borderWidth={outlined ? 1.5 : 0}
-        borderColor={outlined ? $('border') : 'transparent'}
+        borderColor={outlined ? borderTokenColor : 'transparent'}
         borderRadius={outlined ? 'md' : undefined}
         padding={outlined ? 'sm' : undefined}
         backgroundColor={background}
@@ -75,7 +79,7 @@ export const RadioButtonGroup = forwardRef<RadioButtonGroupRef, RadioButtonGroup
               top: outlined ? -S.space.md : 0,
               left: outlined ? S.space.sm : 0,
               paddingHorizontal: outlined ? S.space.xs : 0,
-              backgroundColor: outlined ? $('background', theme) : 'transparent',
+              backgroundColor: outlined ? titleBgColor : 'transparent',
               marginBottom: outlined ? S.space.xs : S.space.sm,
             }}
           >
