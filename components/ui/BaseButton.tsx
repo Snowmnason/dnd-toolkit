@@ -2,18 +2,18 @@ import { $, tone, useScale, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useMemo } from 'react'
 import {
-  ActivityIndicator,
-  Platform,
-  StyleProp,
-  TouchableOpacity,
-  View,
-  ViewStyle,
+    ActivityIndicator,
+    Platform,
+    StyleProp,
+    TouchableOpacity,
+    View,
+    ViewStyle,
 } from 'react-native'
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+    withTiming,
 } from 'react-native-reanimated'
 import { ButtonText } from './AppText'
 import { ButtonView } from './Resuables/ComponentViews'
@@ -177,11 +177,8 @@ export function Button(props: ButtonProps) {
   const { theme } = UseTheme()
   const S = useScale()
 
-  // Get variant colors
-  const variantColors = useMemo(
-    () => getVariantColors(variant, theme),
-    [variant, theme]
-  )
+  // Get variant colors (calls $() internally, must be at top level)
+  const variantColors = getVariantColors(variant, theme)
 
   // Reanimated shared values
   const scale = useSharedValue(1)

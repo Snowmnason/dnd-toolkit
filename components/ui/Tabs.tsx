@@ -1,17 +1,17 @@
 import { $, useScale, UseTheme } from "@/theme";
 import * as Haptics from "expo-haptics";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  LayoutChangeEvent,
-  Platform,
-  Pressable,
-  ScrollView,
-  View,
+    LayoutChangeEvent,
+    Platform,
+    Pressable,
+    ScrollView,
+    View,
 } from "react-native";
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from "react-native-reanimated";
 import { Body } from "./AppText";
 import { TabView } from "./Resuables/ComponentViews";
@@ -46,18 +46,18 @@ export function Tabs({
   const scrollViewRef = React.useRef<ScrollView>(null);
   const [isScrollable, setIsScrollable] = useState(false);
 
-  // Track tab positions for underline animation
+  // Track tab positions for underline animation (store layout data, not events)
   const [tabLayouts, setTabLayouts] = useState<
-    Record<string, LayoutChangeEvent>
+    Record<string, { x: number; width: number }>
   >({});
   const underlineX = useSharedValue(0);
   const underlineWidth = useSharedValue(0);
 
-  // Memoized colors with theme dependency - get resolved colors from theme object
-  const borderColor = useMemo(() => $("borderSubtle" as any), []);
-  const backgroundGradientResolved = useMemo(() => theme.background as string, [theme]);
-  const accentColor = useMemo(() => $("accent"), []);
-  const textSecondaryColor = useMemo(() => $("textSecondary"), []);
+  // Resolved colors from theme
+  const borderColor = $("borderSubtle" as any);
+  const backgroundGradientResolved = theme.background as string;
+  const accentColor = $("accent");
+  const textSecondaryColor = $("textSecondary");
 
 
 
@@ -69,10 +69,10 @@ export function Tabs({
   useEffect(() => {
     const activeLayout = tabLayouts[active];
     if (activeLayout) {
-      underlineX.value = withTiming(activeLayout.nativeEvent.layout.x, {
+      underlineX.value = withTiming(activeLayout.x, {
         duration: 300,
       });
-      underlineWidth.value = withTiming(activeLayout.nativeEvent.layout.width, {
+      underlineWidth.value = withTiming(activeLayout.width, {
         duration: 300,
       });
     }
@@ -86,7 +86,9 @@ export function Tabs({
   }));
 
   const handleLayout = (key: string, e: LayoutChangeEvent) => {
-    setTabLayouts((prev) => ({ ...prev, [key]: e }));
+    // Extract layout data immediately to avoid synthetic event pooling issues
+    const { x, width } = e.nativeEvent.layout;
+    setTabLayouts((prev) => ({ ...prev, [key]: { x, width } }));
   };
 
   // Check if content is scrollable and enable horizontal mouse wheel scrolling on web

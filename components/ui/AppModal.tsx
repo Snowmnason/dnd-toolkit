@@ -15,7 +15,6 @@ import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { Body, Heading } from "./AppText";
@@ -95,26 +94,29 @@ export function AppModal({
   // Keep modal mounted long enough to play exit animation
   const [rendered, setRendered] = React.useState(visible);
 
-  // Memoized colors with theme dependency
-  const overlayColorValue = useMemo(() => {
-    if (dimColor) return dimColor
-    if (accentOverlay) return tone($("accent", theme), "changeOpacity", undefined, 0.35, theme)
-    return "rgba(0, 0, 0, 0.45)"
-  }, [dimColor, accentOverlay, theme])
+  // Resolve colors (calling $() at top level, not inside useMemo)
+  const accentColor = $("accent", theme);
+  const surfaceColor = $("surface");
+  const textPrimaryColor = $("textPrimary");
+  const successColor = $("success", theme);
+  const warningColor = $("warning", theme);
+  const dangerColor = $("danger", theme);
+  const primaryColor = $("primary", theme);
 
-  const surfaceColor = useMemo(() => $("surface"), [])
-  const textPrimaryColor = useMemo(() => $("textPrimary"), [])
-  const borderColorValue = useMemo(() => 
-    borderTone === "success"
-      ? $("success", theme)
-      : borderTone === "warning"
-      ? $("warning", theme)
-      : borderTone === "danger"
-      ? $("danger", theme)
-      : borderTone === "accent"
-      ? $("accent", theme)
-      : $("primary", theme), // Default to primary color
-  [borderTone, theme])
+  // Memoized color computations
+  const overlayColorValue = useMemo(() => {
+    if (dimColor) return dimColor;
+    if (accentOverlay) return tone(accentColor, "changeOpacity", undefined, 0.35, theme);
+    return "rgba(0, 0, 0, 0.45)";
+  }, [dimColor, accentOverlay, accentColor, theme]);
+
+  const borderColorValue = useMemo(() => {
+    if (borderTone === "success") return successColor;
+    if (borderTone === "warning") return warningColor;
+    if (borderTone === "danger") return dangerColor;
+    if (borderTone === "accent") return accentColor;
+    return primaryColor;
+  }, [borderTone, successColor, warningColor, dangerColor, accentColor, primaryColor])
 
   // 🔹 Fade + slide (+scale on web) entry/exit animation
   useEffect(() => {
@@ -136,9 +138,7 @@ export function AppModal({
 
       // Start fade + slide in
       fadeProgress.value = withTiming(1, { duration: 250 });
-      slideProgress.value = isWeb
-        ? withTiming(0, { duration: 280, easing: Easing.out(Easing.cubic) })
-        : withSpring(0, { damping: 6 });
+      slideProgress.value = withTiming(0, { duration: 280, easing: Easing.out(Easing.cubic) });
       scaleProgress.value = isWeb
         ? withTiming(1, { duration: 280, easing: Easing.out(Easing.cubic) })
         : withTiming(1, { duration: 1 });
@@ -228,29 +228,34 @@ export function AppModal({
     ],
   }));
 
-  // 🔹 Hardware back + Escape key
+  // 🔹 Hardware back (native) + Escape key (web)
   useEffect(() => {
     if (!visible) return;
 
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
+    const isWebPlatform = Platform.OS === 'web';
 
-    const handleBackPress = () => {
-      onClose();
-      return true;
-    };
-
-    document?.addEventListener?.("keydown", handleKeyPress);
-    const backSub = BackHandler.addEventListener(
-      "hardwareBackPress",
-      handleBackPress
-    );
-
-    return () => {
-      document?.removeEventListener?.("keydown", handleKeyPress);
-      backSub?.remove();
-    };
+    if (isWebPlatform) {
+      const handleKeyPress = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') onClose();
+      };
+      if (typeof document !== 'undefined' && document.addEventListener) {
+        document.addEventListener('keydown', handleKeyPress);
+      }
+      return () => {
+        if (typeof document !== 'undefined' && document.removeEventListener) {
+          document.removeEventListener('keydown', handleKeyPress);
+        }
+      };
+    } else {
+      const handleBackPress = () => {
+        onClose();
+        return true;
+      };
+      const backSub = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+      return () => {
+        backSub?.remove();
+      };
+    }
   }, [visible, onClose]);
 
   if (!rendered) return null;

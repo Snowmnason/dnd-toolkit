@@ -1,11 +1,12 @@
 import { $, useScale, UseTheme } from "@/theme";
 import * as Haptics from "expo-haptics";
 import React, { useState } from "react";
-import { Pressable, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
+  withTiming,
 } from "react-native-reanimated";
 import { Body, ObjHeading } from "./AppText";
 
@@ -29,20 +30,25 @@ export function Accordion({
   const S = useScale();
   const { theme } = UseTheme();
   const [open, setOpen] = useState(defaultOpen);
-  const [contentHeight, setContentHeight] = useState(0);
-  
-  // Reanimated shared values
+  // Content height (measured) and progress as shared values for smooth UI-thread animation
+  const measuredHeight = useSharedValue(0);
   const progress = useSharedValue(defaultOpen ? 1 : 0);
 
   const toggle = () => {
-    setOpen((prev) => !prev);
-    Haptics.selectionAsync();
-    progress.value = withSpring(open ? 0 : 1, { damping: 80 });
+    const nextOpen = !open;
+    setOpen(nextOpen);
+    if (Platform.OS !== 'web') {
+      Haptics.selectionAsync();
+    }
+    progress.value = withTiming(nextOpen ? 1 : 0, {
+      duration: nextOpen ? 250 : 200,
+      easing: Easing.out(Easing.cubic),
+    });
   };
 
   // Animated style for expandable content
   const animatedContentStyle = useAnimatedStyle(() => ({
-    height: progress.value * (contentHeight + 50), // content height + 50px padding
+    height: progress.value * measuredHeight.value,
     opacity: progress.value,
   }));
 
@@ -71,25 +77,39 @@ export function Accordion({
         <Body style={{ color: $("accent", theme) }}>{open ? "−" : "+"}</Body>
       </Pressable>
 
-      {/* Combined Animated.View + inner View */}
-      <Animated.View
-        style={[
-          {
-            overflow: "hidden",
-            paddingHorizontal: S.space.md,
-            paddingBottom: open ? S.space.md : 0,
-          },
-          animatedContentStyle,
-        ]}
+      {/* Hidden measuring container to get stable height on mobile */}
+      <View
+        style={{
+          position: 'absolute',
+          opacity: 0,
+          pointerEvents: 'none',
+          left: 0,
+          right: 0,
+          zIndex: -1,
+        }}
       >
-        <View
+        <View 
+          style={{ paddingHorizontal: S.space.md, paddingBottom: S.space.md }}
           onLayout={(event) => {
-            const measuredHeight = event.nativeEvent.layout.height;
-            if (measuredHeight > 0 && measuredHeight !== contentHeight) {
-              setContentHeight(measuredHeight);
+            const h = event.nativeEvent.layout.height;
+            if (h > 0 && h !== measuredHeight.value) {
+              measuredHeight.value = h;
             }
           }}
         >
+          {children}
+        </View>
+      </View>
+
+      {/* Animated visible content */}
+      <Animated.View
+        style={[
+          { overflow: 'hidden' },
+          animatedContentStyle,
+        ]}
+        pointerEvents={open ? 'auto' : 'none'}
+      >
+        <View style={{ paddingHorizontal: S.space.md, paddingBottom: S.space.md }}>
           {children}
         </View>
       </Animated.View>

@@ -2,9 +2,10 @@ import { useScale } from "@/theme";
 import { useEffect } from "react";
 import { StyleSheet } from "react-native";
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from "react-native-reanimated";
 import { Body } from "./AppText";
 import { ComponentView } from "./Resuables/ComponentViews";
@@ -55,7 +56,7 @@ export function AppToast({
         // Animate out: fade + slide up (reverse)
         opacity.value = withTiming(0, { duration: 200 });
         translateY.value = withTiming(-30, { duration: 200 }, () => {
-          if (onHide) onHide();
+          if (onHide) runOnJS(onHide)();
         });
       }, duration);
       return () => clearTimeout(timeout);

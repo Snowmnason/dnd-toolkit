@@ -35,25 +35,32 @@ export function TextInput({
   const { theme } = UseTheme()
   const S = useScale()
 
+  // Resolve colors at top level
+  const accentThemed = $('accent', theme)
+  const borderSubtle = $('borderSubtle' as any, theme)
+  const bgInverseColor = theme.bgInverse as string
+  const textInverseColor = theme.textInverse as string
+
+  // Compute derived colors with useMemo
   const borderColor = useMemo(() =>
     error
-      ? tone($('accent', theme), 'border', undefined, undefined, theme)
+      ? tone(accentThemed, 'border', undefined, undefined, theme)
       : focused
-      ? tone($('accent', theme), 'accent', undefined, undefined, theme)
-      : tone($('borderSubtle' as any, theme), 'base', undefined, undefined, theme),
-  [error, focused, theme])
+      ? tone(accentThemed, 'accent', undefined, undefined, theme)
+      : tone(borderSubtle, 'base', undefined, undefined, theme),
+  [error, focused, accentThemed, borderSubtle, theme])
 
   const backgroundColor = useMemo(() =>
     filled 
-      ? tone(theme.bgInverse as string, 'alt', undefined, undefined, theme)
-      : theme.bgInverse as string,
-  [filled, theme])
+      ? tone(bgInverseColor, 'alt', undefined, undefined, theme)
+      : bgInverseColor,
+  [filled, bgInverseColor, theme])
 
   const disabledTextColor = useMemo(() =>
-    tone(theme.textInverse as string, 'disabled', undefined, undefined, theme),
-  [theme])
+    tone(textInverseColor, 'disabled', undefined, undefined, theme),
+  [textInverseColor, theme])
 
-  const textColor = useMemo(() => theme.textInverse as string, [theme])
+  const textColor = textInverseColor
 
   const handleKeyPress = (e: any) => {
     // Handle Tab key
@@ -146,23 +153,30 @@ export function DescInput({
   const { theme } = UseTheme()
   const S = useScale()
 
+  // Resolve colors at top level
+  const accentThemed = $('accent', theme)
+  const borderSubtle = $('borderSubtle' as any, theme)
+  const bgInverseColor = theme.bgInverse as string
+  const textInverseColor = theme.textInverse as string
+
+  // Compute derived colors with useMemo
   const borderColor = useMemo(() =>
     error
-      ? tone($('accent', theme), 'border', undefined, undefined, theme)
+      ? tone(accentThemed, 'border', undefined, undefined, theme)
       : focused
-      ? tone($('accent', theme), 'accent', undefined, undefined, theme)
-      : tone($('borderSubtle' as any, theme), 'base', undefined, undefined, theme),
-  [error, focused, theme])
+      ? tone(accentThemed, 'accent', undefined, undefined, theme)
+      : tone(borderSubtle, 'base', undefined, undefined, theme),
+  [error, focused, accentThemed, borderSubtle, theme])
 
   const backgroundColor = useMemo(() =>
-    filled ? tone(theme.bgInverse as string, 'alt', undefined, undefined, theme) : theme.bgInverse as string,
-  [filled, theme])
+    filled ? tone(bgInverseColor, 'alt', undefined, undefined, theme) : bgInverseColor,
+  [filled, bgInverseColor, theme])
 
   const disabledTextColor = useMemo(() =>
-    tone(theme.textInverse as string, 'disabled', undefined, undefined, theme),
-  [theme])
+    tone(textInverseColor, 'disabled', undefined, undefined, theme),
+  [textInverseColor, theme])
 
-  const textColor = useMemo(() => theme.textInverse as string, [theme])
+  const textColor = textInverseColor
 
   const handleKeyPress = (e: any) => {
     // Handle Tab key

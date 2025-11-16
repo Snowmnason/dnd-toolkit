@@ -46,7 +46,9 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 ## Where to look
 - Layout/routing: `app/_layout.tsx`
 - Bootstrap: `hooks/use-app-bootstrap.tsx`
+- Splash screen: `hooks/use-splash-screen.tsx`
+- Feature flags: `config/feature-flags.json`, `lib/feature-flags.ts`
 - Auth state: `lib/auth-state.ts`
 - UI barrel: `components/ui/index.ts`
 - Theme root: `theme/index.ts` (families, tokens, provider)
-- Docs: `docs/COMPONENTS.md`, `docs/SCREENS.md`, `docs/NOTIFICATIONS_USAGE.md`
+- Docs: `docs/COMPONENTS.md`, `docs/SCREENS.md`, `docs/FEATURE_FLAGS.md`, `docs/NOTIFICATIONS_USAGE.md`

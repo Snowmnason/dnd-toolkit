@@ -3,22 +3,22 @@ import { Body, ObjHeading, TextType } from '@/components/ui/AppText'
 import { $, tone, useScale, UseTheme } from '@/theme'
 import { useMemo, useRef, useState } from 'react'
 import {
-  FlatList,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View,
+    FlatList,
+    Modal,
+    Platform,
+    Pressable,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native'
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+    withTiming,
 } from 'react-native-reanimated'
-import { scheduleOnRN } from 'react-native-worklets'
 
 interface DropdownItem {
   label: string
@@ -40,33 +40,20 @@ function DropdownItemComponent({
   borderColor,
   S,
 }: DropdownItemProps) {
+    // All hooks at the top before any other logic
   const hoverScale = useSharedValue(1)
   const hoverOpacity = useSharedValue(0)
-
-  const handlePressIn = () => {
-    hoverScale.value = withTiming(1.02, { duration: 80 })
-    hoverOpacity.value = withTiming(1, { duration: 80 })
-  }
-
-  const handlePressOut = () => {
-    hoverScale.value = withTiming(1, { duration: 80 })
-    hoverOpacity.value = withTiming(0, { duration: 80 })
-  }
-
-  const hoverStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: hoverScale.value }],
-  }))
-
-  // Simple colors - no tone magic
-  // Selected: use background color (blue-ish)
-  // Hovered: use accent color (gold-ish)
-  // Default: transparent or subtle
-  const selectedBg = useMemo(() => $('background'), [])
-  const hoverBg = useMemo(() => $('accent'), [])
   
-  // When selected: use default text color. When not selected: use inverse (light) text
-  const selectedTextColor = useMemo(() => $('textPrimary'), [])
-  const defaultTextColor = useMemo(() => $('textInverse'), [])
+    // Get colors first (these use hooks internally)
+  const selectedBg = $('background')
+  const hoverBg = $('accent')
+  const selectedTextColor = $('textPrimary')
+  const defaultTextColor = $('textInverse')
+
+    // Then animated styles (these also use hooks)
+    const hoverStyle = useAnimatedStyle(() => ({
+      transform: [{ scale: hoverScale.value }],
+    }))
 
   // Background color animation based on hover state
   const hoverColorStyle = useAnimatedStyle(() => {
@@ -81,6 +68,17 @@ function DropdownItemComponent({
     }
     return { backgroundColor: 'transparent' }
   })
+
+    // Event handlers (not hooks, can be anywhere)
+    const handlePressIn = () => {
+      hoverScale.value = withTiming(1.02, { duration: 80 })
+      hoverOpacity.value = withTiming(1, { duration: 80 })
+    }
+
+    const handlePressOut = () => {
+      hoverScale.value = withTiming(1, { duration: 80 })
+      hoverOpacity.value = withTiming(0, { duration: 80 })
+    }
 
   return (
     <Animated.View 
@@ -155,9 +153,10 @@ export default function Dropdown({
   const borderColor = $('accent')  // Direct style usage - use CSS vars
   const background = $('bgInverse')  // Direct style usage - use CSS vars
   const shadowColor = $('shadow')  // Direct style usage - use CSS vars
-  const textInverseColor = useMemo(() => $('textInverse'), [])
+  const textInverseColor = $('textInverse')
   // For tone(), we need resolved hex values because tone() processes colors with a library
-  const separatorColor = tone($('accent', theme), 'hover', undefined, undefined, theme)
+  const accentThemed = $('accent', theme)
+  const separatorColor = useMemo(() => tone(accentThemed, 'hover', undefined, undefined, theme), [accentThemed, theme])
 
   const chevronStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotate.value}deg` }],
@@ -188,6 +187,11 @@ export default function Dropdown({
     shadow.value = withTiming(1, { duration: 200 })
   }
 
+  const handleUnmount = () => {
+    setIsMounted(false)
+    setSearch('')
+  }
+
   const closeDropdown = () => {
     setIsOpen(false)
     // Use spring for a nicer reverse on the chevron as well
@@ -195,10 +199,8 @@ export default function Dropdown({
     // Reverse animations and unmount after fade completes
     opacity.value = withTiming(0, { duration: 150 }, (finished) => {
       if (finished) {
-        scheduleOnRN(() => {
-          setIsMounted(false)
-          setSearch('')
-        })
+        // Use runOnJS to safely update React state from the animation thread
+        runOnJS(handleUnmount)()
       }
     })
     scale.value = withSpring(0.9, { damping: 15, stiffness: 120, mass: 0.6 })
