@@ -10,7 +10,13 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "bundleIdentifier": "com.thesnowpost.dndtoolkit",
+      "buildNumber": "1",
+      "deploymentTarget": "14.0",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -20,11 +26,18 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.thesnowpost.dndtoolkit",
+      "versionCode": 1,
+      "minSdkVersion": 24,
+      "targetSdkVersion": 35
     },
     "extra": {
       "supabaseUrl": "https://xxoibawslmysvfllozyb.supabase.co",
-      "supabaseAnonKey": "sb_publishable_2ULezzANT_rq6dY97Tgh3g_FpkJJgGF"
+      "supabaseAnonKey": "sb_publishable_2ULezzANT_rq6dY97Tgh3g_FpkJJgGF",
+      "eas": {
+        "projectId": "PLACEHOLDER_EAS_PROJECT_ID"
+      }
     },
     "web": {
       "output": "static",
