@@ -299,6 +299,87 @@ env:
 
 ---
 
+## 3. Desktop App (Electron) Setup
+
+The desktop app uses Electron to wrap the web export, providing native Windows, macOS, and Linux apps.
+
+### Prerequisites
+- Node.js 18+
+- The web export must be built first (`npm run predeploy`)
+
+### Quick Start
+
+```bash
+# 1. Build the web export
+npm run predeploy
+
+# 2. Install desktop dependencies (one-time)
+npm run desktop:install
+
+# 3. Run in development mode
+npm run desktop:dev
+
+# 4. Build for distribution
+npm run desktop:dist:win     # Windows
+npm run desktop:dist:mac     # macOS
+npm run desktop:dist:linux   # Linux
+npm run desktop:dist:all     # All platforms
+```
+
+### Build Outputs
+
+Built apps are placed in `dist-desktop/` at the project root:
+
+| Platform | Files | Notes |
+|----------|-------|-------|
+| Windows | `.exe` installer, `.portable.exe` | NSIS installer |
+| macOS | `.dmg`, `.zip` | Universal (Intel + Apple Silicon) |
+| Linux | `.AppImage`, `.deb` | x64 architecture |
+
+### Code Signing (Production)
+
+For production releases that don't show security warnings:
+
+#### Windows Code Signing
+1. Purchase a code signing certificate from DigiCert, Sectigo, etc.
+2. Set environment variables:
+   ```bash
+   CSC_LINK="path/to/your/certificate.pfx"
+   CSC_KEY_PASSWORD="your-certificate-password"
+   ```
+
+#### macOS Code Signing
+1. Enroll in Apple Developer Program ($99/year)
+2. Create a "Developer ID Application" certificate
+3. Set environment variables:
+   ```bash
+   CSC_LINK="path/to/your/certificate.p12"
+   CSC_KEY_PASSWORD="your-certificate-password"
+   APPLE_ID="your-apple-id@example.com"
+   APPLE_ID_PASSWORD="app-specific-password"
+   APPLE_TEAM_ID="ABC123XYZ"
+   ```
+
+### Distribution Options
+
+#### GitHub Releases (Recommended)
+The desktop app is configured to publish to GitHub releases. To use:
+
+1. Create a GitHub personal access token with `repo` scope
+2. Set environment variable: `GH_TOKEN=your-token`
+3. Run: `npm run desktop:dist`
+4. Electron-builder will create a GitHub release with assets
+
+#### Manual Distribution
+1. Build the app: `npm run desktop:dist:all`
+2. Upload files from `dist-desktop/` to your website
+3. Link to downloads from the `/web/download` page
+
+### Auto-Updates
+The app checks GitHub releases for updates automatically. When you create a new release, users will be prompted to update.
+
+---
+
 ## References
 
 - [Expo EAS Build Docs](https://docs.expo.dev/build/introduction/)

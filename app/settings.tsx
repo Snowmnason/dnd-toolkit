@@ -23,6 +23,7 @@ import {
   Surface,
 } from "@/components/ui";
 import UserProfile from "../Screens/settings/user-profile";
+import VersionDisplay from "../components/VersionDisplay";
 
 // 🎨 Theme + Loading
 import { ThemeSelector } from "@/Screens/settings/ThemeSelector";
@@ -243,6 +244,11 @@ export default function SettingsPage() {
           />
         </View>
       </Surface>
+
+      {/* Version Info */}
+      <View style={{ alignItems: "center", marginTop: S.space.md }}>
+        <VersionDisplay />
+      </View>
 
       {/* Delete Confirmation Modal */}
       <CredentialConfirmModal

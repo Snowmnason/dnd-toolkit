@@ -20,7 +20,15 @@
     "build:mobile": "eas build --platform all",
     "submit:ios": "eas submit --platform ios",
     "submit:android": "eas submit --platform android",
-    "submit:mobile": "eas submit --platform all"
+    "submit:mobile": "eas submit --platform all",
+    "desktop:install": "cd desktop && npm install",
+    "desktop:build": "cd desktop && npm run build",
+    "desktop:dev": "npm run predeploy && cd desktop && npm run dev",
+    "desktop:dist": "npm run predeploy && cd desktop && npm run dist",
+    "desktop:dist:win": "npm run predeploy && cd desktop && npm run dist:win",
+    "desktop:dist:mac": "npm run predeploy && cd desktop && npm run dist:mac",
+    "desktop:dist:linux": "npm run predeploy && cd desktop && npm run dist:linux",
+    "desktop:dist:all": "npm run predeploy && cd desktop && npm run dist:all"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
