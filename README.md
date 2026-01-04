@@ -11,7 +11,7 @@
 [![Expo](https://img.shields.io/badge/Expo-000020?style=flat-square&logo=expo&logoColor=white)](https://expo.dev/)
 [![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com/)
 
-[**Live Demo**](https://snowmnason.github.io/dnd-toolkit/) • [**Features**](#-features) • [**Tech Stack**](#-tech-stack) • [**Architecture**](#-architecture)
+[**Live Demo**](https://snowmnason.github.io/dnd-toolkit/) • [**Download**](https://dnd-tool.thesnowpost.com/web/download) • [**Features**](#-features) • [**Tech Stack**](#-tech-stack) • [**Architecture**](#-architecture)
 
 </div>
 
