@@ -32,6 +32,7 @@
     "artifactName": "${productName}-${version}-${os}-${arch}-Setup.${ext}",
     "certificateFile": null,
     "certificatePassword": null,
+    "publisherName": "thesnowpost",
     "signingHashAlgorithms": []
   },
   "nsis": {
