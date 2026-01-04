@@ -14,8 +14,9 @@ on:
 # 3. Create tag: git tag vX.Y.Z
 # 4. Push tag: git push origin vX.Y.Z
 # 5. This workflow triggers automatically:
+#    - Builds web export (required by Electron)
 #    - Builds desktop installers for Windows, macOS, Linux (matrix strategy)
-#    - Uploads all installers as Release Assets to the GitHub Release
+#    - Filters and uploads only installer files as Release Assets
 #    - Single release created (avoided per-matrix duplication via needs: and if condition)
 
 jobs:
@@ -41,6 +42,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Build web export (required for desktop)
+        run: npm run predeploy
 
       - name: Build desktop for Windows
         if: matrix.os == 'windows-latest'
@@ -103,10 +107,22 @@ jobs:
       - name: List downloaded artifacts
         run: find artifacts -type f -exec ls -lh {} \;
 
+      - name: Organize release assets (filter to installers only)
+        run: |
+          mkdir -p release-assets
+          # Copy Windows installer (NSIS Setup .exe)
+          find artifacts -name '*Setup.exe' -type f -exec cp {} release-assets/ \;
+          # Copy macOS DMG
+          find artifacts -name '*.dmg' -type f -exec cp {} release-assets/ \;
+          # Copy Linux AppImage
+          find artifacts -name '*.AppImage' -type f -exec cp {} release-assets/ \;
+          echo "Release assets prepared:"
+          ls -lh release-assets/
+
       - name: Create GitHub Release with Assets
         uses: softprops/action-gh-release@v1
         with:
-          files: artifacts/**/*
+          files: release-assets/*
           draft: false
           generate_release_notes: true
         env:

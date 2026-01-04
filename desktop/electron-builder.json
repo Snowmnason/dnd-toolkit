@@ -2,6 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
   "productName": "DnD-Toolkit",
   "appId": "com.thesnowpost.dndtoolkit",
+  "executableName": "DnD-Toolkit",
   "copyright": "Copyright © 2024 thesnowpost",
   "directories": {
     "buildResources": "assets",
@@ -25,14 +26,11 @@
       {
         "target": "nsis",
         "arch": ["x64"]
-      },
-      {
-        "target": "portable",
-        "arch": ["x64"]
       }
     ],
-    "icon": "assets/images/icon.png",
-    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "icon": "assets/images/icon.ico",
+    "artifactName": "${productName}-${version}-Setup.${ext}",
+    "executableName": "DnD-Toolkit",
     "certificateFile": null,
     "certificatePassword": null,
     "signingHashAlgorithms": []
