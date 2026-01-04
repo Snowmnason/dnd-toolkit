@@ -50,14 +50,50 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: npm run desktop:dist:win
         
+      - name: List desktop build outputs (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          echo "== root =="
+          dir
+          echo "== dist-desktop =="
+          if exist dist-desktop dir dist-desktop
+          echo "== desktop/dist =="
+          if exist desktop\dist dir desktop\dist
+          echo "== search for exe =="
+          powershell -Command "Get-ChildItem -Recurse -Filter *.exe | Select-Object FullName"
+        
       - name: Build desktop for macOS
         if: matrix.os == 'macos-latest'
         run: npm run desktop:dist:mac
+        
+      - name: List desktop build outputs (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "== root =="
+          ls -la
+          echo "== dist-desktop =="
+          ls -la dist-desktop/ 2>/dev/null || echo "dist-desktop not found"
+          echo "== desktop/dist =="
+          ls -la desktop/dist/ 2>/dev/null || echo "desktop/dist not found"
+          echo "== search for dmg =="
+          find . -name "*.dmg" -type f 2>/dev/null || echo "no dmg found"
         
       - name: Build desktop for Linux
         if: matrix.os == 'ubuntu-latest'
         run: npm run desktop:dist:linux
 
+      - name: List desktop build outputs (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          echo "== root =="
+          ls -la
+          echo "== dist-desktop =="
+          ls -la dist-desktop/ 2>/dev/null || echo "dist-desktop not found"
+          echo "== desktop/dist =="
+          ls -la desktop/dist/ 2>/dev/null || echo "desktop/dist not found"
+          echo "== search for AppImage =="
+          find . -name "*.AppImage" -type f 2>/dev/null || echo "no AppImage found"
+        
       - name: Upload artifacts (Windows)
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
