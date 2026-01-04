@@ -107,7 +107,8 @@ async function getLatestReleaseAssetUrl(platform: PlatformType): Promise<string>
     const release: GitHubRelease = await response.json()
     
     // Find the first asset matching the platform pattern
-    const asset = release.assets?.find((a: GitHubReleaseAsset) => a.name.includes(pattern))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const asset = release.assets?.find((a: any) => a.name.endsWith(pattern))
     
     if (asset?.browser_download_url) {
       // Cache the successful result
