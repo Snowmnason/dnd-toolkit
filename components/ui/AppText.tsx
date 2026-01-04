@@ -117,25 +117,28 @@ export function AppText({
   // Scale lineHeight proportionally with scale factor for consistent typography
   const scaledLineHeight = typeof lineHeight === 'number' ? lineHeight * S.scale : lineHeight
 
+  const baseStyle: any = {
+    fontSize: resolvedFontSize,
+    color: resolvedColor,
+    // Respect explicit fontFamily prop; fallback to theme default
+    fontFamily: fontFamily ?? $('fontFamily'),
+    fontWeight: weight,
+    fontStyle: shouldItalic ? 'italic' : 'normal',
+    textAlign: align,
+    textDecorationLine: deco,
+    opacity: opacity,
+    lineHeight: scaledLineHeight,
+  };
+
+  // Add cursor only on web
+  if (Platform.OS === 'web') {
+    (baseStyle as any).cursor = cursor;
+  }
+
   return (
     <Text
       {...rest}
-      style={[
-        {
-          fontSize: resolvedFontSize,
-          color: resolvedColor,
-          // Respect explicit fontFamily prop; fallback to theme default
-          fontFamily: fontFamily ?? $('fontFamily'),
-          fontWeight: weight,
-          fontStyle: shouldItalic ? 'italic' : 'normal',
-          textAlign: align,
-          textDecorationLine: deco,
-          ...(Platform.OS === 'web' ? { cursor: cursor } : {}),
-          opacity: opacity,
-          lineHeight: scaledLineHeight,
-        },
-        style, // User style can override everything
-      ]}
+      style={[baseStyle, style]}
     >
       {children}
     </Text>

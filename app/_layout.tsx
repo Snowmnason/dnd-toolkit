@@ -158,7 +158,7 @@ function RootLayoutContent() {
         config.title = 'D&D Toolkit';
         
         // Handle feature-specific titles based on second segment
-        const secondSegment = segments.length > 1 ? segments[1] : undefined;
+        const secondSegment = (segments as string[])[1];
         
         // Handle main-landing route - always go back to world-selection
         if (secondSegment === 'main-landing') {
@@ -208,9 +208,6 @@ function RootLayoutContent() {
             case 'story-notes':
               config.title = 'Story & Notes';
               config.onBackPress = createFeatureBackHandler('story');
-              break;
-            default:
-              // Keep 'D&D Toolkit' for main menu
               break;
           }
         }
