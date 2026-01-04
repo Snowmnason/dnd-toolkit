@@ -28,7 +28,12 @@
     "desktop:dist:win": "npm run predeploy && cd desktop && npm run dist:win",
     "desktop:dist:mac": "npm run predeploy && cd desktop && npm run dist:mac",
     "desktop:dist:linux": "npm run predeploy && cd desktop && npm run dist:linux",
-    "desktop:dist:all": "npm run predeploy && cd desktop && npm run dist:all"
+    "desktop:dist:all": "npm run predeploy && cd desktop && npm run dist:all",
+    "clean": "node ./scripts/clean.js",
+    "clean:desktop": "node ./scripts/clean.js desktop",
+    "clean:web": "node ./scripts/clean.js web",
+    "clean:deps": "node ./scripts/clean.js deps",
+    "clean:cache": "node ./scripts/clean.js cache"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

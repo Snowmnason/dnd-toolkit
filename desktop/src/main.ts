@@ -4,6 +4,7 @@
  */
 
 const { app, BrowserWindow, shell, Menu, nativeTheme } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const url = require('url');
 
@@ -22,6 +23,29 @@ try {
 let mainWindow: typeof BrowserWindow | null = null;
 
 const isDev = process.env.NODE_ENV === 'development' || process.argv.includes('--dev');
+
+// Configure auto-updates (only in production)
+function setupAutoUpdater(): void {
+  if (isDev) {
+    console.log('[Auto-updater] Disabled in development mode');
+    return;
+  }
+
+  // Configure electron-updater
+  autoUpdater.checkForUpdatesAndNotify();
+
+  autoUpdater.on('update-available', () => {
+    console.log('[Auto-updater] Update available');
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    console.log('[Auto-updater] Update downloaded, will install on app quit');
+  });
+
+  autoUpdater.on('error', (error: Error) => {
+    console.error('[Auto-updater] Error:', error);
+  });
+}
 
 function createWindow(): void {
   // Create the browser window
@@ -195,6 +219,7 @@ function createMenu(): void {
 app.whenReady().then(() => {
   createMenu();
   createWindow();
+  setupAutoUpdater();
 
   // macOS: Re-create window when dock icon is clicked
   app.on('activate', () => {
