@@ -1,7 +1,7 @@
 {
   "name": "dnd-toolkit",
   "main": "index.tsx",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "homepage": "https://dnd-tool.thesnowpost.com/",
   "scripts": {
     "start": "expo start",
@@ -39,7 +39,8 @@
     "clean:desktop": "node ./scripts/clean.js desktop",
     "clean:web": "node ./scripts/clean.js web",
     "clean:deps": "node ./scripts/clean.js deps",
-    "clean:cache": "node ./scripts/clean.js cache"
+    "clean:cache": "node ./scripts/clean.js cache",
+    "version:bump": "node ./scripts/bump-version.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
