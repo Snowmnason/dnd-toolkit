@@ -2,12 +2,11 @@
  * Theme Provider - Manages theme state and persistence
  */
 
-import { ThemeName } from '@/constants/theme.types';
-import { getTheme } from '@/constants/themes';
-import { ThemeContext } from '@/contexts/ThemeContext';
+import { ThemeContext, ThemeContextType } from '@/contexts/ThemeContext';
 import { logger } from '@/lib/utils/logger';
+import { ThemeFamilyName, allThemes, getThemeFamily } from '@/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 
 const THEME_STORAGE_KEY = '@dnd_toolkit_theme';
 
@@ -24,7 +23,7 @@ interface ThemeProviderProps {
  * - Provides theme switching functionality
  */
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [themeName, setThemeName] = useState<ThemeName>('classic');
+  const [themeName, setThemeName] = useState<ThemeFamilyName>('classic');
   const [isLoading, setIsLoading] = useState(true);
 
   // Load saved theme on mount
@@ -37,7 +36,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       const savedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
       
       if (savedTheme && isValidThemeName(savedTheme)) {
-        setThemeName(savedTheme as ThemeName);
+        setThemeName(savedTheme as ThemeFamilyName);
         logger.info('ThemeProvider', `Loaded saved theme: ${savedTheme}`);
       } else {
         logger.info('ThemeProvider', 'No saved theme, using default: classic');
@@ -49,7 +48,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     }
   };
 
-  const saveTheme = async (newTheme: ThemeName) => {
+  const saveTheme = async (newTheme: ThemeFamilyName) => {
     try {
       await AsyncStorage.setItem(THEME_STORAGE_KEY, newTheme);
       logger.success('ThemeProvider', `Saved theme: ${newTheme}`);
@@ -58,19 +57,19 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     }
   };
 
-  const handleSetTheme = (newTheme: ThemeName) => {
+  const handleSetTheme = (newTheme: ThemeFamilyName) => {
     setThemeName(newTheme);
     saveTheme(newTheme);
     logger.info('ThemeProvider', `Theme changed to: ${newTheme}`);
   };
 
-  const theme = getTheme(themeName);
+  const theme = getThemeFamily(themeName);
 
-  const contextValue = {
+  const contextValue: ThemeContextType = {
     theme,
     themeName,
     setTheme: handleSetTheme,
-    isDark: theme.isDark,
+    isDark: (theme as any).isDark ?? true,
   };
 
   // Show nothing while loading theme (prevents flash of wrong theme)
@@ -86,8 +85,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 }
 
 // Helper to validate theme name
-function isValidThemeName(name: string): boolean {
-  return ['classic', 'dark', 'light', 'forest', 'ocean'].includes(name);
+function isValidThemeName(name: string): name is ThemeFamilyName {
+  return name in allThemes;
 }
 
 export default ThemeProvider;

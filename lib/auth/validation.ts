@@ -71,8 +71,8 @@ export const validateEmail = (email: string) => {
   // Sanitize input first
   const sanitizedEmail = sanitizeInput(email);
   
-  // Enhanced email regex that prevents common injection patterns
-  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+  // Simple, safe email regex to prevent ReDoS attacks
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   
   const isValidFormat = emailRegex.test(sanitizedEmail);
   const hasAtSymbol = sanitizedEmail.includes('@');

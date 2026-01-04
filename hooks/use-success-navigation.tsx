@@ -8,7 +8,7 @@ interface UseSuccessNavigationProps {
 
 export function useSuccessNavigation({ showSuccessModal, successWorldId }: UseSuccessNavigationProps) {
   const [isNavigating, setIsNavigating] = useState(false);
-  const successTimeoutRef = useRef<number | null>(null);
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
 
   // Auto-navigate after 30 seconds if success modal is shown

@@ -146,12 +146,26 @@ CREATE POLICY "Users can read worlds they own or have access to"
    # Add your Supabase URL and API key
    ```
 
-4. **Start development server**
+4. **Optional: Configure build credentials** (for production builds)
+   ```bash
+   cp .env.build .env.build.local
+   # Fill in your Apple/Google credentials when ready to build for stores
+   # ⚠️  Never commit real credentials - .env.build is gitignored
+   ```
+
+4. **Optional: Configure build credentials** (for production builds)
+   ```bash
+   cp .env.build .env.build.local
+   # Fill in your Apple/Google credentials when ready to build for stores
+   # ⚠️  Never commit real credentials - .env.build is gitignored
+   ```
+
+5. **Start development server**
    ```bash
    npx expo start
    ```
 
-5. **Choose your platform**
+6. **Choose your platform**
    - Press `w` for web development
    - Scan QR code with Expo Go for mobile
    - Press `i` for iOS simulator
@@ -159,7 +173,121 @@ CREATE POLICY "Users can read worlds they own or have access to"
 
 ---
 
-## 📊 Performance Optimizations
+## � Building & Deployment
+
+### **Web Deployment**
+The web version is deployed to GitHub Pages manually or as part of the release process:
+
+```bash
+# Build and deploy manually
+npm run predeploy    # Creates dist/ export
+npm run deploy       # Deploys to GitHub Pages
+```
+
+**Live at:** https://dnd-tool.thesnowpost.com/
+
+> **Note:** `main` is the testing/staging branch. Deployments to production are manual to prevent accidental releases.
+
+### **Desktop App (Windows/macOS/Linux)**
+
+Desktop builds use Electron and are automatically built via GitHub Actions.
+
+**Local Development:**
+```bash
+npm run desktop:dev   # Run desktop app in dev mode
+```
+
+**Building Installers:**
+```bash
+npm run desktop:dist:win    # Windows installer
+npm run desktop:dist:mac    # macOS app
+npm run desktop:dist:linux  # Linux AppImage
+npm run desktop:dist:all    # All platforms
+```
+
+**Desktop Features:**
+- Auto-updates from GitHub Releases
+- Native window chrome and menu
+- Development tools (dev mode only)
+- Custom icon and branding
+
+### **Mobile Apps (iOS/Android)**
+
+iOS and Android builds use Expo Application Services (EAS).
+
+**Build Commands:**
+```bash
+npm run build:ios      # Build iOS app
+npm run build:android  # Build Android app
+npm run build:mobile   # Build both platforms
+
+npm run submit:ios     # Submit to App Store
+npm run submit:android # Submit to Play Store
+```
+
+See [Release Management Guide](docs/RELEASES.md) for detailed mobile deployment instructions.
+
+### **Utility Scripts**
+
+Clean build artifacts to save disk space:
+
+```bash
+npm run clean          # Clean all builds and cache
+npm run clean:desktop  # Clean desktop builds only
+npm run clean:web      # Clean web builds only
+npm run clean:deps     # Clean node_modules
+npm run clean:cache    # Clean cache files
+```
+
+---
+
+## 📋 Release Process
+
+For comprehensive release instructions across all platforms, see [Release Management Guide](docs/RELEASES.md).
+
+**Quick Reference:**
+1. Bump version in `package.json`
+2. Commit: `git commit -m "chore: bump version to X.Y.Z"`
+3. Tag: `git tag -a vX.Y.Z -m "Release X.Y.Z"`
+4. Push: `git push origin main && git push origin vX.Y.Z`
+5. GitHub Actions automatically builds and creates a release
+
+---
+
+## 🧑‍💻 Development Workflow
+
+### **Scripts**
+| Command | Purpose |
+|---------|---------|
+| `npm start` | Start web development server |
+| `npm run web` | Shortcut for web development |
+| `npm run lint` | Check code quality |
+| `npm run predeploy` | Build web export |
+| `npm run reset-project` | Clean slate (careful!) |
+| `npm run desktop:dev` | Run desktop app locally |
+| `npm run clean` | Remove build artifacts |
+
+### **Environment Setup**
+Create `.env.local` with your Supabase credentials:
+```env
+EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+```
+
+For desktop development, the web build must be available at `dist/`:
+```bash
+npm run predeploy && npm run desktop:dev
+```
+
+### **Testing Platforms**
+```bash
+npm run web              # Web browser
+npm run ios              # iOS simulator
+npm run android          # Android emulator
+npm run desktop:dev      # Desktop (Electron)
+```
+
+---
 
 ### **Database Query Efficiency**
 - **Parallel queries** for world access and ownership data

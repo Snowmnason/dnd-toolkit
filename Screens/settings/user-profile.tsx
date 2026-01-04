@@ -4,7 +4,7 @@ import { logger, updateUsername } from '@/lib'
 import { $, useScale } from '@/theme'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { View } from 'react-native'
 
 interface UserProfileProps {
@@ -110,9 +110,10 @@ export default function UserProfile({ profile }: UserProfileProps) {
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: S.space.xs }}>
               <Body variant="semi">Username</Body>
               <IconButton
-                icon={<Ionicons name="settings-outline" size={18} color={$(
+                content={<Ionicons name="settings-outline" size={18} color={$(
                   'textPrimary'
                 )} />}
+                variant="icon"
                 onPress={() => setShowUsernameModal(true)}
                 size="sm"
               />

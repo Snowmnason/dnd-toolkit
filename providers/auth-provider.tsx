@@ -1,5 +1,5 @@
 import { AuthContext } from '@/hooks/use-auth-context'
-import { supabase } from '@/lib/supabase'
+import { getSupabaseClient } from '@/lib/database/supabase'
 import { logger } from '@/lib/utils/logger'
 import type { Session } from '@supabase/supabase-js'
 import { PropsWithChildren, useEffect, useState } from 'react'
@@ -13,6 +13,12 @@ export default function AuthProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     const fetchSession = async () => {
       setIsLoading(true)
+      const supabase = getSupabaseClient()
+      if (!supabase) {
+        logger.warn('auth-provider', 'Supabase not configured')
+        setIsLoading(false)
+        return
+      }
 
       const {
         data: { session },
@@ -28,6 +34,11 @@ export default function AuthProvider({ children }: PropsWithChildren) {
     }
 
     fetchSession()
+
+    const supabase = getSupabaseClient()
+    if (!supabase) {
+      return
+    }
 
     const {
       data: { subscription },
@@ -53,13 +64,24 @@ export default function AuthProvider({ children }: PropsWithChildren) {
       setIsLoading(true)
 
       if (session) {
-        const { data } = await supabase
-          .from('users')  // Changed from 'profiles' to 'users'
-          .select('*')
-          .eq('auth_id', session.user.id)  // Changed from 'id' to 'auth_id'
-          .single()
+        try {
+          const supabase = getSupabaseClient()
+          if (!supabase) {
+            logger.warn('auth-provider', 'Supabase not configured for profile fetch')
+            setIsLoading(false)
+            return
+          }
 
-        setProfile(data)
+          const { data } = await supabase
+            .from('users')  // Changed from 'profiles' to 'users'
+            .select('*')
+            .eq('auth_id', session.user.id)  // Changed from 'id' to 'auth_id'
+            .single()
+
+          setProfile(data)
+        } catch (error) {
+          logger.error('auth-provider', 'Error fetching profile:', error)
+        }
       } else {
         setProfile(null)
       }

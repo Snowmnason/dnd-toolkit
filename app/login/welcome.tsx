@@ -2,9 +2,9 @@ import { AuthActionGroup, AuthBody, AuthBodyFooter, AuthButton, AuthButtonSecond
 import { useWelcomeScreen } from '@/lib';
 import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
-import React from 'react';
 import { Platform, useWindowDimensions, View } from 'react-native';
 import CustomLoad from '../../components/ui/CustomLoad';
+import VersionDisplay from '../../components/VersionDisplay';
 
 
 // TODO: Uncomment when ready to enable social authentication
@@ -99,10 +99,10 @@ export default function WelcomeScreen() {
           color={isLoading ? '#BDB76B' : '#D4AF37'}
           onPress={() => {
             if(isMobile) {
-              router.replace('../StyleMobile');
+              router.push('../StyleMobile');
               return;
             }else {
-              router.replace('../StyleDesktop');
+              router.push('../StyleDesktop');
               return;
             }
             // TODO: Implement anonymous auth
@@ -121,6 +121,8 @@ export default function WelcomeScreen() {
         <AuthCaption>
           © 2025 The Snow Post · Forged for storytellers & adventurers
         </AuthCaption>
+
+        <VersionDisplay />
       </View>
     </AuthRoot>
   )
