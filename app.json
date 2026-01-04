@@ -4,7 +4,7 @@
     "slug": "dnd-toolkit",
     "version": "1.0.0",
     "orientation": "portrait",
-  "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "dnd-toolkit",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -41,7 +41,7 @@
     },
     "web": {
       "output": "static",
-  "favicon": "./assets/images/favicon.png",
+      "favicon": "./assets/images/favicon.png",
       "bundler": "metro",
       "name": "D&D Toolkit",
       "basePath": ".",
