@@ -146,12 +146,26 @@ CREATE POLICY "Users can read worlds they own or have access to"
    # Add your Supabase URL and API key
    ```
 
-4. **Start development server**
+4. **Optional: Configure build credentials** (for production builds)
+   ```bash
+   cp .env.build .env.build.local
+   # Fill in your Apple/Google credentials when ready to build for stores
+   # ⚠️  Never commit real credentials - .env.build is gitignored
+   ```
+
+4. **Optional: Configure build credentials** (for production builds)
+   ```bash
+   cp .env.build .env.build.local
+   # Fill in your Apple/Google credentials when ready to build for stores
+   # ⚠️  Never commit real credentials - .env.build is gitignored
+   ```
+
+5. **Start development server**
    ```bash
    npx expo start
    ```
 
-5. **Choose your platform**
+6. **Choose your platform**
    - Press `w` for web development
    - Scan QR code with Expo Go for mobile
    - Press `i` for iOS simulator

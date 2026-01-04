@@ -48,6 +48,7 @@ app-example
 .env.local
 .env.production
 .env.development
+.env.build
 
 # MD files
 zRoadmap.md

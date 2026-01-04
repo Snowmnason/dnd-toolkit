@@ -1,9 +1,12 @@
 # Security Headers for GitHub Pages
 # These headers help protect against common web vulnerabilities
+# CSP is configured without 'unsafe-inline' and 'unsafe-eval' for maximum security
 
 /*
   # Content Security Policy - restrict resource loading
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://dnd-tool.thesnowpost.com https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none';
+  # Note: 'unsafe-inline' and 'unsafe-eval' removed for security - if app breaks,
+  # consider using nonces or hashes for specific required inline scripts
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://dnd-tool.thesnowpost.com https://*.supabase.co; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none';
 
   # Prevent clickjacking
   X-Frame-Options: DENY

@@ -19,7 +19,6 @@
     "predeploy": "expo export -p web",
     "deploy": "gh-pages -d dist --dotfiles",
     "deploy-dev": "gh-pages -d dist -b gh-pages-dev",
-    "": "expo start",
     "w": "expo start --web",
     "build:ios": "eas build --platform ios",
     "build:android": "eas build --platform android",
