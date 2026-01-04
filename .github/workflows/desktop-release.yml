@@ -1,40 +1,25 @@
-# Desktop Release Workflow
-# Builds Electron apps for Windows, macOS, and Linux
-# 
-# TRIGGERS:
-# - Manual dispatch (workflow_dispatch) for testing
-# - Push tags matching v*.*.* (e.g., v1.0.0) for releases
-#
-# TO ENABLE AUTO-PUBLISH:
-# 1. Add GH_TOKEN secret to repository settings
-# 2. Uncomment the `--publish always` flag in the build steps
-# 3. Optionally add code signing secrets (CSC_LINK, CSC_KEY_PASSWORD, etc.)
-
-name: Desktop Release
+name: Desktop Release Build
 
 on:
+  push:
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
-    inputs:
-      publish:
-        description: 'Publish to GitHub Releases'
-        required: false
-        default: 'false'
-        type: choice
-        options:
-          - 'false'
-          - 'true'
-  # Uncomment to auto-build on version tags:
-  # push:
-  #   tags:
-  #     - 'v*.*.*'
 
 jobs:
-  # Build web export (shared by all platforms)
-  build-web:
-    runs-on: ubuntu-latest
+  build-matrix:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -45,186 +30,65 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build web export
-        run: npm run predeploy
+      - name: Build desktop for Windows
+        if: matrix.os == 'windows-latest'
+        run: npm run desktop:dist:win
+        
+      - name: Build desktop for macOS
+        if: matrix.os == 'macos-latest'
+        run: npm run desktop:dist:mac
+        
+      - name: Build desktop for Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run desktop:dist:linux
 
-      - name: Upload web build artifact
+      - name: Upload artifacts (Windows)
+        if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: web-build
-          path: dist/
-          retention-days: 1
+          name: desktop-windows
+          path: dist-desktop/
+          retention-days: 30
 
-  # Build Windows installer
-  build-windows:
-    needs: build-web
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Download web build
-        uses: actions/download-artifact@v4
-        with:
-          name: web-build
-          path: dist/
-
-      - name: Install desktop dependencies
-        run: |
-          cd desktop
-          npm ci
-
-      - name: Build TypeScript
-        run: |
-          cd desktop
-          npm run build
-
-      - name: Build Windows installer
-        run: |
-          cd desktop
-          npx electron-builder --win --publish never
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Uncomment for code signing:
-          # CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          # CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
-
-      - name: Upload Windows artifacts
+      - name: Upload artifacts (macOS)
+        if: matrix.os == 'macos-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: windows-build
-          path: |
-            dist-desktop/*.exe
-            dist-desktop/*.blockmap
-          retention-days: 7
+          name: desktop-macos
+          path: dist-desktop/
+          retention-days: 30
 
-  # Build macOS app
-  build-macos:
-    needs: build-web
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Download web build
-        uses: actions/download-artifact@v4
-        with:
-          name: web-build
-          path: dist/
-
-      - name: Install desktop dependencies
-        run: |
-          cd desktop
-          npm ci
-
-      - name: Build TypeScript
-        run: |
-          cd desktop
-          npm run build
-
-      - name: Build macOS app
-        run: |
-          cd desktop
-          npx electron-builder --mac --publish never
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Uncomment for code signing and notarization:
-          # CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-          # CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-          # APPLE_ID: ${{ secrets.APPLE_ID }}
-          # APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-
-      - name: Upload macOS artifacts
+      - name: Upload artifacts (Linux)
+        if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: macos-build
-          path: |
-            dist-desktop/*.dmg
-            dist-desktop/*.zip
-            dist-desktop/*.blockmap
-          retention-days: 7
+          name: desktop-linux
+          path: dist-desktop/
+          retention-days: 30
 
-  # Build Linux app
-  build-linux:
-    needs: build-web
+  create-release:
+    needs: build-matrix
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          fetch-depth: 0
 
-      - name: Download web build
-        uses: actions/download-artifact@v4
-        with:
-          name: web-build
-          path: dist/
-
-      - name: Install desktop dependencies
-        run: |
-          cd desktop
-          npm ci
-
-      - name: Build TypeScript
-        run: |
-          cd desktop
-          npm run build
-
-      - name: Build Linux app
-        run: |
-          cd desktop
-          npx electron-builder --linux --publish never
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-build
-          path: |
-            dist-desktop/*.AppImage
-            dist-desktop/*.deb
-          retention-days: 7
-
-  # Optional: Create GitHub Release (only when publish=true or on tag)
-  publish-release:
-    needs: [build-windows, build-macos, build-linux]
-    runs-on: ubuntu-latest
-    if: github.event.inputs.publish == 'true' || startsWith(github.ref, 'refs/tags/v')
-    steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts/
+          path: ./artifacts
 
-      - name: List artifacts
-        run: find artifacts/ -type f
-
-      - name: Create GitHub Release
+      - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          draft: true
+          files: artifacts/**/*
+          draft: false
           generate_release_notes: true
-          files: |
-            artifacts/windows-build/*
-            artifacts/macos-build/*
-            artifacts/linux-build/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -10,6 +10,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
+    "typecheck": "tsc --noEmit",
     "lint:security": "eslint --ext .js,.jsx,.ts,.tsx app/ components/ lib/ hooks/ theme/ --quiet",
     "audit": "npm audit --audit-level=moderate",
     "audit:fix": "npm audit fix",
