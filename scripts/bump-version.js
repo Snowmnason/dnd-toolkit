@@ -20,6 +20,9 @@ const path = require('path');
 const { execSync } = require('child_process');
 const readline = require('readline');
 
+// Define __dirname for CommonJS compatibility
+const __dirname = path.dirname(require.main.filename);
+
 const packageJsonPath = path.join(__dirname, '..', 'package.json');
 
 // Read package.json
