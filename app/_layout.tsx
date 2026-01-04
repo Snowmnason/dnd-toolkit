@@ -121,10 +121,10 @@ function RootLayoutContent() {
   }
 
   // Determine if we should show the TopBar - hide on login routes and index route
-  // Hide TopBar when: on login flow, on welcome screen, or on root/index (loading screen)
+  // Hide TopBar when: on login flow, on welcome screen, on root/index (loading screen), or web routes (downloads)
   const firstSegment = typeof segments[0] === 'string' ? segments[0] : '';
   const isRootRoute = segments[0] === undefined;
-  const hideTopBar = isRootRoute || firstSegment === 'login';
+  const hideTopBar = isRootRoute || firstSegment === 'login' || firstSegment === 'web';
 
   // Determine TopBar configuration based on current route
   const getTopBarConfig = () => {
