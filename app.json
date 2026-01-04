@@ -39,6 +39,10 @@
         "projectId": "PLACEHOLDER_EAS_PROJECT_ID"
       }
     },
+    "extra": {
+      "supabaseUrl": "https://xxoibawslmysvfllozyb.supabase.co",
+      "supabaseAnonKey": "sb_publishable_2ULezzANT_rq6dY97Tgh3g_FpkJJgGF"
+    },
     "web": {
       "output": "static",
   "favicon": "./assets/images/favicon.png",
