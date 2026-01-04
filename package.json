@@ -32,6 +32,7 @@
     "desktop:dev": "npm run predeploy && cd desktop && npm run dev",
     "desktop:dist": "npm run predeploy && cd desktop && npm run dist",
     "desktop:dist:win": "npm run predeploy && cd desktop && npm run dist:win",
+    "desktop:dist:win:unsigned": "npm run predeploy && node scripts/build-desktop-unsigned.js win",
     "desktop:dist:mac": "npm run predeploy && cd desktop && npm run dist:mac",
     "desktop:dist:linux": "npm run predeploy && cd desktop && npm run dist:linux",
     "desktop:dist:all": "npm run predeploy && cd desktop && npm run dist:all",
