@@ -29,8 +29,7 @@
       }
     ],
     "icon": "assets/images/icon.ico",
-    "artifactName": "${productName}-${version}-Setup.${ext}",
-    "executableName": "DnD-Toolkit",
+    "artifactName": "${productName}-${version}-${os}-${arch}-Setup.${ext}",
     "certificateFile": null,
     "certificatePassword": null,
     "signingHashAlgorithms": []

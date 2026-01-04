@@ -109,13 +109,52 @@ jobs:
 
       - name: Organize release assets (filter to installers only)
         run: |
+          set -e  # Exit on any error
+          
           mkdir -p release-assets
+          
+          # Track which assets were found
+          windows_found=0
+          macos_found=0
+          linux_found=0
+          
           # Copy Windows installer (NSIS Setup .exe)
-          find artifacts -name '*Setup.exe' -type f -exec cp {} release-assets/ \;
+          if find artifacts -name '*Setup.exe' -type f -exec cp {} release-assets/ \;; then
+            windows_found=$(find release-assets -name '*Setup.exe' | wc -l)
+            if [ $windows_found -gt 0 ]; then
+              echo "✓ Found $windows_found Windows installer(s)"
+            else
+              echo "⚠ Warning: No Windows installer found (build may have failed)"
+            fi
+          fi
+          
           # Copy macOS DMG
-          find artifacts -name '*.dmg' -type f -exec cp {} release-assets/ \;
+          if find artifacts -name '*.dmg' -type f -exec cp {} release-assets/ \;; then
+            macos_found=$(find release-assets -name '*.dmg' | wc -l)
+            if [ $macos_found -gt 0 ]; then
+              echo "✓ Found $macos_found macOS installer(s)"
+            else
+              echo "⚠ Warning: No macOS installer found (build may have failed)"
+            fi
+          fi
+          
           # Copy Linux AppImage
-          find artifacts -name '*.AppImage' -type f -exec cp {} release-assets/ \;
+          if find artifacts -name '*.AppImage' -type f -exec cp {} release-assets/ \;; then
+            linux_found=$(find release-assets -name '*.AppImage' | wc -l)
+            if [ $linux_found -gt 0 ]; then
+              echo "✓ Found $linux_found Linux installer(s)"
+            else
+              echo "⚠ Warning: No Linux installer found (build may have failed)"
+            fi
+          fi
+          
+          # Verify that at least some assets were found
+          if [ -z "$(ls -A release-assets/)" ]; then
+            echo "❌ Error: No release assets found! All platform builds may have failed."
+            exit 1
+          fi
+          
+          echo ""
           echo "Release assets prepared:"
           ls -lh release-assets/
 
