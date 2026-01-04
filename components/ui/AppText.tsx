@@ -130,7 +130,7 @@ export function AppText({
           fontStyle: shouldItalic ? 'italic' : 'normal',
           textAlign: align,
           textDecorationLine: deco,
-          cursor: cursor,
+          ...(Platform.OS === 'web' ? { cursor: cursor } : {}),
           opacity: opacity,
           lineHeight: scaledLineHeight,
         },

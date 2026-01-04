@@ -158,7 +158,7 @@ function RootLayoutContent() {
         config.title = 'D&D Toolkit';
         
         // Handle feature-specific titles based on second segment
-        const secondSegment = segments[1];
+        const secondSegment = segments.length > 1 ? segments[1] : undefined;
         
         // Handle main-landing route - always go back to world-selection
         if (secondSegment === 'main-landing') {
@@ -187,30 +187,32 @@ function RootLayoutContent() {
           return true; // Prevent default
         };
 
-        switch (secondSegment) {
-          case 'characters-npcs':
-            config.title = 'Characters & NPCs';
-            config.onBackPress = createFeatureBackHandler('characters');
-            break;
-          case 'items-treasure':
-            config.title = 'Items & Treasure';
-            config.onBackPress = createFeatureBackHandler('items');
-            break;
-          case 'world-exploration':
-            config.title = 'World & Exploration';
-            config.onBackPress = createFeatureBackHandler('world');
-            break;
-          case 'combat-events':
-            config.title = 'Combat & Events';
-            config.onBackPress = createFeatureBackHandler('combat');
-            break;
-          case 'story-notes':
-            config.title = 'Story & Notes';
-            config.onBackPress = createFeatureBackHandler('story');
-            break;
-          default:
-            // Keep 'D&D Toolkit' for main menu
-            break;
+        if (secondSegment) {
+          switch (secondSegment) {
+            case 'characters-npcs':
+              config.title = 'Characters & NPCs';
+              config.onBackPress = createFeatureBackHandler('characters');
+              break;
+            case 'items-treasure':
+              config.title = 'Items & Treasure';
+              config.onBackPress = createFeatureBackHandler('items');
+              break;
+            case 'world-exploration':
+              config.title = 'World & Exploration';
+              config.onBackPress = createFeatureBackHandler('world');
+              break;
+            case 'combat-events':
+              config.title = 'Combat & Events';
+              config.onBackPress = createFeatureBackHandler('combat');
+              break;
+            case 'story-notes':
+              config.title = 'Story & Notes';
+              config.onBackPress = createFeatureBackHandler('story');
+              break;
+            default:
+              // Keep 'D&D Toolkit' for main menu
+              break;
+          }
         }
         break;
       

@@ -1,11 +1,11 @@
 import { ReactNode } from "react";
 import {
-  Platform,
-  ScrollView,
-  StyleProp,
-  View,
-  ViewProps,
-  ViewStyle,
+    Platform,
+    ScrollView,
+    StyleProp,
+    View,
+    ViewProps,
+    ViewStyle,
 } from "react-native";
 import { GradientView } from "../Resuables/gradients";
 
@@ -151,7 +151,7 @@ export function ViewCust({
         style={[
           style,
           // On web, allow horizontal overflow so shadows aren't clipped
-          Platform.OS === 'web' ? { overflowX: 'visible' as any } : undefined
+          Platform.OS === 'web' ? { overflow: 'visible' as any } : undefined
         ]}
         contentContainerStyle={contentContainerStyle}
         showsVerticalScrollIndicator={showScrollIndicator}
