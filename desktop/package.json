@@ -5,6 +5,10 @@
   "main": "dist/main.js",
   "author": "Snowmnason",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Snowmnason/dnd-toolkit.git"
+  },
   "scripts": {
     "start": "electron .",
     "build": "tsc",
