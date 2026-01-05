@@ -43,6 +43,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install desktop dependencies
+        run: cd desktop && npm ci
+
       - name: Build web export (required for desktop)
         run: npm run predeploy
 
