@@ -12,8 +12,8 @@
  *    - bugfix -> patch (x.x.X)
  * 4. Updates package-lock.json and desktop/package-lock.json to keep them in sync
  * 5. Commits with message: "chore(release): bump version to X.Y.Z (breaking/feature/bugfix)"
- * 6. User then manually runs: git tag vX.Y.Z && git push origin vX.Y.Z
- *    Any vX.Y.Z tag triggers desktop-release.yml to build and upload installers.
+ * 6. Create or update a milestone with the version (e.g., "vX.Y.Z") and close it when ready to release
+ *    Closing the milestone triggers desktop-release.yml to build and upload installers.
  */
 
 const fs = require('fs');
@@ -178,8 +178,8 @@ const main = async () => {
       console.log(`\n✨ Version bumped and committed!\n`);
       console.log(`📝 Next steps:\n`);
       console.log(`   1. Review the commit: git show HEAD\n`);
-      console.log(`   2. Create the tag: git tag v${newVersion}\n`);
-      console.log(`   3. Push tag: git push origin v${newVersion}\n`);
+      console.log(`   2. Create or update a milestone with title "v${newVersion}"\n`);
+      console.log(`   3. Close the milestone when ready to release\n`);
       console.log(`   4. This will trigger the desktop-release.yml workflow to build and upload installers.\n`);
     } catch (_error) {
       console.error('\n❌ Git commit failed. Make sure git is configured.\n');
