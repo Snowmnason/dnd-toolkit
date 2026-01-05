@@ -1,9 +1,9 @@
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
   "productName": "DnD-Toolkit",
-  "appId": "com.thesnowpost.dndtoolkit",
+  "appId": "com.snowmnason.dndtoolkit",
   "executableName": "DnD-Toolkit",
-  "copyright": "Copyright © 2024 thesnowpost",
+  "copyright": "Copyright © 2024 Snowmnason",
   "directories": {
     "buildResources": "assets",
     "output": "../dist-desktop"
@@ -113,7 +113,7 @@
   },
   "publish": {
     "provider": "github",
-    "owner": "thesnowpost",
+    "owner": "Snowmnason",
     "repo": "dnd-toolkit",
     "releaseType": "release"
   }
