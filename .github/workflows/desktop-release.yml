@@ -7,16 +7,16 @@ on:
   workflow_dispatch:
 
 # Workflow to build desktop installers and attach them to GitHub Release
+# Only creates releases for major version bumps (breaking changes)
 # 
 # Version bump process:
 # 1. Manually bump version: npm run version:bump (prompts: breaking/feature/bugfix)
-# 2. Creates commit: "chore(release): bump version to X.Y.Z"
+# 2. Creates commit: "chore(release): bump version to X.Y.Z (breaking/feature/bugfix)"
 # 3. Create tag: git tag vX.Y.Z
 # 4. Push tag: git push origin vX.Y.Z
 # 5. This workflow triggers automatically:
-#    - Builds web export (required by Electron)
 #    - Builds desktop installers for Windows, macOS, Linux (matrix strategy)
-#    - Filters and uploads only installer files as Release Assets
+#    - If major version (breaking), creates release with assets
 #    - Single release created (avoided per-matrix duplication via needs: and if condition)
 
 jobs:
@@ -147,7 +147,23 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check if major version bump
+        id: check-major
+        run: |
+          # Get the commit message for the tag
+          COMMIT_MSG=$(git log -1 --pretty=%B ${{ github.sha }})
+          echo "Commit message: $COMMIT_MSG"
+          
+          if echo "$COMMIT_MSG" | grep -q "(breaking)"; then
+            echo "is_major=true" >> $GITHUB_OUTPUT
+            echo "✓ Major version bump detected"
+          else
+            echo "is_major=false" >> $GITHUB_OUTPUT
+            echo "ℹ Not a major version bump, skipping release creation"
+          fi
+
       - name: Download all artifacts
+        if: steps.check-major.outputs.is_major == 'true'
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts
@@ -156,6 +172,7 @@ jobs:
         run: find artifacts -type f -exec ls -lh {} \;
 
       - name: Organize release assets (filter to installers only)
+        if: steps.check-major.outputs.is_major == 'true'
         run: |
           set -e  # Exit on any error
           
@@ -207,6 +224,7 @@ jobs:
           ls -lh release-assets/
 
       - name: Create GitHub Release with Assets
+        if: steps.check-major.outputs.is_major == 'true'
         uses: softprops/action-gh-release@v1
         with:
           files: release-assets/*
