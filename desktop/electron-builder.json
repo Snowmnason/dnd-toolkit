@@ -110,11 +110,5 @@
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "synopsis": "D&D Campaign Management Toolkit",
     "description": "A comprehensive toolkit for managing D&D campaigns, characters, and worlds."
-  },
-  "publish": {
-    "provider": "github",
-    "owner": "Snowmnason",
-    "repo": "dnd-toolkit",
-    "releaseType": "release"
   }
 }
