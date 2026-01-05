@@ -1,11 +1,11 @@
-import { AuthStateManager } from "@/lib";
+import { AuthStateManager, AppErrorBoundary } from "@/lib";
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { ThemeProvider, UseTheme } from "@/theme";
 import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import LoadingOverlay from '../components/LoadingOverlay';
-import { SplashScreen } from '../components/SplashScreen';
+import { SplashScreen, CrashFallBack } from '../components/SplashScreen';
 import TopBar from '../components/TopBar';
 import { AppParamsProvider, useAppParams } from '../contexts/AppParamsContext';
 import { PlatformProvider, usePlatform } from '../contexts/PlatformContext';
@@ -278,17 +278,25 @@ function RootLayoutContent() {
   );
 }
 
-// Main export with provider wrapper
-export default Sentry.wrap(function RootLayout() {
+// Main export with provider wrapper and error boundary
+export default function RootLayout() {
   return (
     <ThemeProvider>
       <ScaleProvider>
         <PlatformProvider>
           <AppParamsProvider>
-            <RootLayoutContent />
+            <AppErrorBoundary 
+              fallback={<CrashFallBack error={null} onRetry={() => {
+                if (typeof window !== 'undefined') {
+                  window.location.reload();
+                }
+              }} />}
+            >
+              <RootLayoutContent />
+            </AppErrorBoundary>
           </AppParamsProvider>
         </PlatformProvider>
       </ScaleProvider>
     </ThemeProvider>
   );
-});
+}
