@@ -3,7 +3,7 @@ name: Desktop Release Build
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v1.*.*'
   workflow_dispatch:
 
 # Workflow to build desktop installers and attach them to GitHub Release
