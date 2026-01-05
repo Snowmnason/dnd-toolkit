@@ -22,7 +22,7 @@
   "devDependencies": {
     "@types/node": "^20.10.0",
     "electron": "^33.0.0",
-    "electron-builder": "^25.0.0",
+    "electron-builder": "^25.1.8",
     "electron-squirrel-startup": "^1.0.1",
     "typescript": "^5.3.3"
   },
