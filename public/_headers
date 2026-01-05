@@ -1,0 +1,39 @@
+# Security Headers for GitHub Pages
+# These headers help protect against common web vulnerabilities
+# CSP is configured without 'unsafe-inline' and 'unsafe-eval' for maximum security
+
+/*
+  # Content Security Policy - restrict resource loading
+  # Note: 'unsafe-inline' and 'unsafe-eval' removed for security - if app breaks,
+  # consider using nonces or hashes for specific required inline scripts
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://dnd-tool.thesnowpost.com https://*.supabase.co; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none';
+
+  # Prevent clickjacking
+  X-Frame-Options: DENY
+
+  # Prevent MIME type sniffing
+  X-Content-Type-Options: nosniff
+
+  # Enable XSS protection
+  X-XSS-Protection: 1; mode=block
+
+  # Referrer policy
+  Referrer-Policy: strict-origin-when-cross-origin
+
+  # Permissions policy - restrict browser features
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+
+# Specific headers for HTML files
+/*.html
+  Cache-Control: public, max-age=31536000, immutable
+
+# Specific headers for JS/CSS files
+/*.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/*.css
+  Cache-Control: public, max-age=31536000, immutable
+
+# Specific headers for assets
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

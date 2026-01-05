@@ -1,0 +1,217 @@
+name: Desktop Release Build
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+# Workflow to build desktop installers and attach them to GitHub Release
+# 
+# Version bump process:
+# 1. Manually bump version: npm run version:bump (prompts: breaking/feature/bugfix)
+# 2. Creates commit: "chore(release): bump version to X.Y.Z"
+# 3. Create tag: git tag vX.Y.Z
+# 4. Push tag: git push origin vX.Y.Z
+# 5. This workflow triggers automatically:
+#    - Builds web export (required by Electron)
+#    - Builds desktop installers for Windows, macOS, Linux (matrix strategy)
+#    - Filters and uploads only installer files as Release Assets
+#    - Single release created (avoided per-matrix duplication via needs: and if condition)
+
+jobs:
+  build-desktop:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install desktop dependencies
+        run: cd desktop && npm ci
+
+      - name: Build desktop TypeScript
+        run: cd desktop && npm run build
+
+      - name: Build web export (required for desktop)
+        run: npm run predeploy
+
+      - name: Build desktop for Windows
+        if: matrix.os == 'windows-latest'
+        run: npm run desktop:dist:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+      - name: List desktop build outputs (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          echo "== root =="
+          dir
+          echo "== dist-desktop =="
+          if (Test-Path dist-desktop) { dir dist-desktop }
+          echo "== desktop/dist =="
+          if (Test-Path desktop\dist) { dir desktop\dist }
+          echo "== search for exe =="
+          powershell -Command "Get-ChildItem -Recurse -Filter *.exe | Select-Object FullName"
+        
+      - name: Build desktop for macOS
+        if: matrix.os == 'macos-latest'
+        run: npm run desktop:dist:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+      - name: List desktop build outputs (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "== root =="
+          ls -la
+          echo "== dist-desktop =="
+          ls -la dist-desktop/ 2>/dev/null || echo "dist-desktop not found"
+          echo "== desktop/dist =="
+          ls -la desktop/dist/ 2>/dev/null || echo "desktop/dist not found"
+          echo "== search for dmg =="
+          find . -name "*.dmg" -type f 2>/dev/null || echo "no dmg found"
+        
+      - name: Build desktop for Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run desktop:dist:linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: List desktop build outputs (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          echo "== root =="
+          ls -la
+          echo "== dist-desktop =="
+          ls -la dist-desktop/ 2>/dev/null || echo "dist-desktop not found"
+          echo "== desktop/dist =="
+          ls -la desktop/dist/ 2>/dev/null || echo "desktop/dist not found"
+          echo "== search for AppImage =="
+          find . -name "*.AppImage" -type f 2>/dev/null || echo "no AppImage found"
+        
+      - name: Upload artifacts (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows
+          path: dist-desktop/
+          retention-days: 5
+          if-no-files-found: warn
+
+      - name: Upload artifacts (macOS)
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos
+          path: dist-desktop/
+          retention-days: 5
+          if-no-files-found: warn
+
+      - name: Upload artifacts (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-linux
+          path: dist-desktop/
+          retention-days: 5
+          if-no-files-found: warn
+
+  create-release:
+    # Only run once all matrix builds are done
+    needs: build-desktop
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: List downloaded artifacts
+        run: find artifacts -type f -exec ls -lh {} \;
+
+      - name: Organize release assets (filter to installers only)
+        run: |
+          set -e  # Exit on any error
+          
+          mkdir -p release-assets
+          
+          # Track which assets were found
+          windows_found=0
+          macos_found=0
+          linux_found=0
+          
+          # Copy Windows installer (NSIS Setup .exe)
+          if find artifacts -name '*Setup.exe' -type f -exec cp {} release-assets/ \;; then
+            windows_found=$(find release-assets -name '*Setup.exe' | wc -l)
+            if [ $windows_found -gt 0 ]; then
+              echo "✓ Found $windows_found Windows installer(s)"
+            else
+              echo "⚠ Warning: No Windows installer found (build may have failed)"
+            fi
+          fi
+          
+          # Copy macOS DMG
+          if find artifacts -name '*.dmg' -type f -exec cp {} release-assets/ \;; then
+            macos_found=$(find release-assets -name '*.dmg' | wc -l)
+            if [ $macos_found -gt 0 ]; then
+              echo "✓ Found $macos_found macOS installer(s)"
+            else
+              echo "⚠ Warning: No macOS installer found (build may have failed)"
+            fi
+          fi
+          
+          # Copy Linux AppImage
+          if find artifacts -name '*.AppImage' -type f -exec cp {} release-assets/ \;; then
+            linux_found=$(find release-assets -name '*.AppImage' | wc -l)
+            if [ $linux_found -gt 0 ]; then
+              echo "✓ Found $linux_found Linux installer(s)"
+            else
+              echo "⚠ Warning: No Linux installer found (build may have failed)"
+            fi
+          fi
+          
+          # Verify that at least some assets were found
+          if [ -z "$(ls -A release-assets/)" ]; then
+            echo "❌ Error: No release assets found! All platform builds may have failed."
+            exit 1
+          fi
+          
+          echo ""
+          echo "Release assets prepared:"
+          ls -lh release-assets/
+
+      - name: Create GitHub Release with Assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release-assets/*
+          draft: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Set release name from tag

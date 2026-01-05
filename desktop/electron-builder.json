@@ -1,0 +1,114 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "productName": "DnD-Toolkit",
+  "appId": "com.snowmnason.dndtoolkit",
+  "executableName": "DnD-Toolkit",
+  "copyright": "Copyright © 2024 Snowmnason",
+  "directories": {
+    "buildResources": "assets",
+    "output": "../dist-desktop"
+  },
+  "files": [
+    "dist/**/*",
+    "assets/**/*",
+    "!**/*.ts",
+    "!**/*.map"
+  ],
+  "extraResources": [
+    {
+      "from": "../dist",
+      "to": "web-build",
+      "filter": [
+        "**/*"
+      ]
+    }
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "icon": "assets/images/icon.ico",
+    "artifactName": "${productName}-${version}-${os}-${arch}-Setup.${ext}",
+    "certificateFile": null,
+    "certificatePassword": null,
+    "publisherName": null,
+    "signingHashAlgorithms": [],
+    "sign": null
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "DnD Toolkit"
+  },
+  "mac": {
+    "target": [
+      {
+        "target": "dmg",
+        "arch": [
+          "x64",
+          "arm64"
+        ]
+      },
+      {
+        "target": "zip",
+        "arch": [
+          "x64",
+          "arm64"
+        ]
+      }
+    ],
+    "icon": "assets/images/icon.png",
+    "category": "public.app-category.games",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "hardenedRuntime": true,
+    "gatekeeperAssess": false,
+    "entitlements": "entitlements.mac.plist",
+    "entitlementsInherit": "entitlements.mac.plist"
+  },
+  "dmg": {
+    "contents": [
+      {
+        "x": 130,
+        "y": 220
+      },
+      {
+        "x": 410,
+        "y": 220,
+        "type": "link",
+        "path": "/Applications"
+      }
+    ],
+    "window": {
+      "width": 540,
+      "height": 380
+    }
+  },
+  "linux": {
+    "target": [
+      {
+        "target": "AppImage",
+        "arch": [
+          "x64"
+        ]
+      },
+      {
+        "target": "deb",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "icon": "assets/images/icon.png",
+    "category": "Game",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "synopsis": "D&D Campaign Management Toolkit",
+    "description": "A comprehensive toolkit for managing D&D campaigns, characters, and worlds."
+  }
+}

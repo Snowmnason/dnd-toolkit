@@ -1,0 +1,39 @@
+{
+  "name": "dnd-toolkit",
+  "version": "0.1.0",
+  "description": "D&D Toolkit Desktop App - Electron wrapper for the web build",
+  "main": "dist/main.js",
+  "author": {
+    "name": "Snowmnason",
+    "email": "snowmailson@gmail.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Snowmnason/dnd-toolkit.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "build": "tsc",
+    "dev": "tsc && electron . --dev",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux",
+    "dist:all": "electron-builder --win --mac --linux"
+  },
+  "dependencies": {
+    "electron-updater": "^6.1.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "electron-squirrel-startup": "^1.0.1",
+    "typescript": "^5.3.3"
+  },
+  "build": {
+    "extends": "./electron-builder.json"
+  }
+}

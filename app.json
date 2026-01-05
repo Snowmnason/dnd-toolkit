@@ -5,11 +5,18 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "dndtoolkit",
+    "scheme": "dnd-toolkit",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "usesAppleSignIn": true,
+      "bundleIdentifier": "com.thesnowpost.dndtoolkit",
+      "buildNumber": "1",
+      "deploymentTarget": "14.0",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,13 +26,36 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.thesnowpost.dndtoolkit",
+      "versionCode": 1,
+      "minSdkVersion": 24,
+      "targetSdkVersion": 35
+    },
+    "extra": {
+      "supabaseUrl": "https://xxoibawslmysvfllozyb.supabase.co",
+      "supabaseAnonKey": "sb_publishable_2ULezzANT_rq6dY97Tgh3g_FpkJJgGF",
+      "eas": {
+        "projectId": "PLACEHOLDER_EAS_PROJECT_ID"
+      }
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "bundler": "metro",
+      "name": "D&D Toolkit",
+      "basePath": ".",
+      "backgroundColor": "#2f353d",
+      "themeColor": "#2f353d"
     },
     "plugins": [
+      [
+        "expo-web-browser",
+        {
+          "experimentalLauncherActivity": false
+        }
+      ],
+      "expo-apple-authentication",
       "expo-router",
       [
         "expo-splash-screen",
@@ -33,12 +63,13 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#2f353d",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#2f353d"
           }
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

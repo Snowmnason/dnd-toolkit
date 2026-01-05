@@ -6,6 +6,7 @@ node_modules/
 # Expo
 .expo/
 dist/
+dist-desktop/
 web-build/
 expo-env.d.ts
 
@@ -41,3 +42,14 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.development
+.env.build
+
+# MD files
+zRoadmap.md
+results.md
