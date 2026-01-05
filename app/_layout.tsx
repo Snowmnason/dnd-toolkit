@@ -11,6 +11,21 @@ import { AppParamsProvider, useAppParams } from '../contexts/AppParamsContext';
 import { PlatformProvider, usePlatform } from '../contexts/PlatformContext';
 import { useAppBootstrap } from '../hooks/use-app-bootstrap';
 import { useSplashScreen } from '../hooks/use-splash-screen';
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+  dsn: 'https://06f65cfda2f4d7ef6b4ce4e1e568b084@o4510658512879616.ingest.us.sentry.io/4510658513993728',
+
+  // Adds more context data to events (IP address, cookies, user, etc.)
+  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
+  sendDefaultPii: true,
+
+  // Enable Logs
+  enableLogs: false,
+
+  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
+  // spotlight: __DEV__,
+});
 
 function RootLayoutContent() {
   const { theme } = UseTheme();
@@ -264,7 +279,7 @@ function RootLayoutContent() {
 }
 
 // Main export with provider wrapper
-export default function RootLayout() {
+export default Sentry.wrap(function RootLayout() {
   return (
     <ThemeProvider>
       <ScaleProvider>
@@ -276,4 +291,4 @@ export default function RootLayout() {
       </ScaleProvider>
     </ThemeProvider>
   );
-}
+});
