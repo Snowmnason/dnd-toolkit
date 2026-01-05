@@ -55,6 +55,8 @@ jobs:
       - name: Build desktop for Windows
         if: matrix.os == 'windows-latest'
         run: npm run desktop:dist:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
       - name: List desktop build outputs (Windows)
         if: matrix.os == 'windows-latest'
@@ -71,6 +73,8 @@ jobs:
       - name: Build desktop for macOS
         if: matrix.os == 'macos-latest'
         run: npm run desktop:dist:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
       - name: List desktop build outputs (macOS)
         if: matrix.os == 'macos-latest'
@@ -87,6 +91,8 @@ jobs:
       - name: Build desktop for Linux
         if: matrix.os == 'ubuntu-latest'
         run: npm run desktop:dist:linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: List desktop build outputs (Linux)
         if: matrix.os == 'ubuntu-latest'
