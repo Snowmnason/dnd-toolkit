@@ -64,9 +64,9 @@ jobs:
           echo "== root =="
           dir
           echo "== dist-desktop =="
-          if exist dist-desktop dir dist-desktop
+          if (Test-Path dist-desktop) { dir dist-desktop }
           echo "== desktop/dist =="
-          if exist desktop\dist dir desktop\dist
+          if (Test-Path desktop\dist) { dir desktop\dist }
           echo "== search for exe =="
           powershell -Command "Get-ChildItem -Recurse -Filter *.exe | Select-Object FullName"
         
