@@ -1,22 +1,18 @@
 name: Desktop Release Build
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
-  workflow_dispatch:
+  milestone:
+    types: [closed]
 
 # Workflow to build desktop installers and attach them to GitHub Release
+# Triggers when a milestone is closed
 # 
-# Version bump process:
-# 1. Manually bump version: npm run version:bump (prompts: breaking/feature/bugfix)
-# 2. Creates commit: "chore(release): bump version to X.Y.Z"
-# 3. Create tag: git tag vX.Y.Z
-# 4. Push tag: git push origin vX.Y.Z
-# 5. This workflow triggers automatically:
-#    - Builds web export (required by Electron)
+# Release process:
+# 1. Create a milestone with title "vX.Y.Z" (e.g., "v1.2.3")
+# 2. Close the milestone when ready to release
+# 3. This workflow triggers automatically:
 #    - Builds desktop installers for Windows, macOS, Linux (matrix strategy)
-#    - Filters and uploads only installer files as Release Assets
+#    - Creates release with milestone title as tag
 #    - Single release created (avoided per-matrix duplication via needs: and if condition)
 
 jobs:
@@ -136,7 +132,6 @@ jobs:
   create-release:
     # Only run once all matrix builds are done
     needs: build-desktop
-    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -209,9 +204,9 @@ jobs:
       - name: Create GitHub Release with Assets
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ github.event.milestone.title }}
           files: release-assets/*
           draft: false
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Set release name from tag
