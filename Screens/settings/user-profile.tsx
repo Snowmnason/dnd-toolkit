@@ -27,10 +27,11 @@ export default function UserProfile({ profile }: UserProfileProps) {
     const fetchSessionUser = async () => {
       try {
         const { supabase } = await import('../../lib/database/supabase')
+        // Use cached session instead of making network call
         const {
-          data: { user },
-        } = await supabase.auth.getUser()
-        setSessionUser(user)
+          data: { session },
+        } = await supabase.auth.getSession()
+        setSessionUser(session?.user)
       } catch (error) {
         logger.error('user-profile', 'Error fetching session user:', error)
       } finally {

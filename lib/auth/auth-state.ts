@@ -126,17 +126,18 @@ export const AuthStateManager = {
         return authState.hasAccount;
       }
       
-      const { data: { user } } = await supabase.auth.getUser();
+      // Use cached session instead of getUser() to avoid network call
+      const { data: { session } } = await supabase.auth.getSession();
       
-      // User must exist and be confirmed
-      return !!(user && user.email_confirmed_at);
+      // User must have active session and be confirmed
+      return !!(session?.user && session.user.email_confirmed_at);
     } catch {
       logger.error('auth-state', '', );
       // On error, fall back to local auth state
       try {
         const authState = await this.getAuthState();
         return authState.hasAccount;
-  } catch {
+      } catch {
         return false;
       }
     }

@@ -1,5 +1,6 @@
 import { logger } from '../utils/logger';
 import { supabase } from './supabase';
+import { validateUserForWrite } from './common';
 
 /**
  * Database operations for invite links
@@ -29,31 +30,13 @@ export async function createInviteLink(
   try {
     const { worldId, hoursValid = 24 } = params;
 
-    // Get current user for created_by field
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
-      logger.error('invites', 'User not authenticated', userError);
-      return { success: false, error: 'User not authenticated' };
-    }
-
-    // IMPORTANT: created_by references public.users(id) (profile id),
-    // not the auth user's id. Look up the profile by auth_id first.
-    const { data: profile, error: profileError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('auth_id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      logger.error('invites', 'User profile not found for auth user', profileError);
-      return { success: false, error: 'User profile not found' };
-    }
+    // Validate before write operation
+    const currentUser = await validateUserForWrite();
 
     // Calculate custom expiration if not using default 24 hours
     const insertData: any = {
       world_id: worldId,
-      created_by: profile.id, // Use profile ID to satisfy FK to users(id)
+      created_by: currentUser.id, // Use profile ID to satisfy FK to users(id)
     };
 
     // Only set custom expiration if different from default

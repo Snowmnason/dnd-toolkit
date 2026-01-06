@@ -1,5 +1,6 @@
 import { validateUsername } from '../auth/validation';
 import { logger } from '../utils/logger';
+import { validateCurrentUser, validateUserForWrite } from './common';
 import { supabase } from './supabase';
 
 export interface User {
@@ -111,35 +112,26 @@ export const usersDB = {
     }
     
     // If not in storage, fetch from database
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+    // Use cached session instead of making network call (getUser)
+    const { data: { session }, error: authError } = await supabase.auth.getSession();
     
-    logger.debug('usersDB', 'Auth user fetch result:', {
-      hasAuthUser: !!authUser,
-      authUserId: authUser?.id,
+    logger.debug('usersDB', 'Auth session check result:', {
+      hasSession: !!session,
+      userId: session?.user?.id,
       authError: authError?.message
     });
     
     if (authError) {
-      // In a fresh app session with no existing auth, Supabase returns AuthSessionMissingError.
-      // Treat this as "not authenticated yet" instead of an error so callers can handle nulls.
-      const name = (authError as any)?.name ?? ''
-      const msg = (authError.message || '').toLowerCase()
-      const isSessionMissing = name === 'AuthSessionMissingError' || msg.includes('session missing')
-
-      if (isSessionMissing) {
-        logger.debug('usersDB', 'No auth session present yet (fresh session)');
-        return null
-      }
-
-      // Other auth errors are unexpected and should bubble up
       logger.error('usersDB', 'Auth error in getCurrentUser:', authError);
       throw new Error(authError.message || 'Authentication error');
     }
     
-    if (!authUser) {
-      logger.debug('usersDB', 'No authenticated user found');
+    if (!session?.user) {
+      logger.debug('usersDB', 'No authenticated user found (no session)');
       return null;
     }
+    
+    const authUser = session.user;
 
   logger.debug('usersDB', 'Fetching user profile from database for auth_id:', authUser.id);
 
@@ -190,11 +182,8 @@ export const usersDB = {
 
   // Update current user's profile with input validation
   async updateCurrentUser(updates: UpdateUserData): Promise<User> {
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    
-    if (!authUser) {
-      throw new Error('Not authenticated');
-    }
+    // Validate before write operation
+    const authUser = await validateUserForWrite();
 
     // Validate and sanitize username if being updated
     if (updates.username) {
@@ -232,9 +221,9 @@ export const usersDB = {
 
 
   async deleteCurrentUser(): Promise<boolean> {
-    // make sure we’re logged in so invoke sends a valid Authorization header
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error) throw new Error(error.message || 'Auth check failed');
+    // SECURITY-CRITICAL: Account deletion requires server validation
+    // Must use validateCurrentUser() to ensure user is truly authenticated with server
+    const user = await validateCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     // call your Edge Function by name (no URL needed, no body needed)
