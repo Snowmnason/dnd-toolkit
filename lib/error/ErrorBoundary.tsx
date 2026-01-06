@@ -4,7 +4,7 @@ import * as Sentry from '@sentry/react-native';
 
 interface Props {
   children: ReactNode;
-  fallback?: ReactNode;
+  renderFallback?: (error: Error | null, retry: () => void) => ReactNode;
 }
 
 interface State {
@@ -14,10 +14,10 @@ interface State {
 
 /**
  * Global Error Boundary Component
- * 
+ *
  * Catches unhandled errors in the React component tree
  * Logs errors to console and Sentry
- * Displays a user-friendly crash fallback screen
+ * Displays a user-friendly crash fallback screen via renderFallback prop
  */
 export class AppErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, error: null };
@@ -53,9 +53,11 @@ export class AppErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      // If a custom fallback is provided, use it
-      // Otherwise, the parent component should provide the fallback UI
-      return this.props.fallback || null;
+      // Use renderFallback if provided, otherwise return null
+      if (this.props.renderFallback) {
+        return this.props.renderFallback(this.state.error, this.handleRetry);
+      }
+      return null;
     }
 
     return this.props.children;

@@ -80,7 +80,7 @@ export function CrashFallBack({ error, onRetry }: CrashFallBackProps) {
             marginBottom: S.space.lg,
           }}
         >
-          Dont worry - your adventure is safe! Try rolling for initiative
+          Don&apos;t worry - your adventure is safe! Try rolling for initiative
           (restarting) or contact your DM (support) if this keeps happening.
         </Body>
 

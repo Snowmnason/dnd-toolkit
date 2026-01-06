@@ -35,6 +35,7 @@
     "extra": {
       "supabaseUrl": "https://xxoibawslmysvfllozyb.supabase.co",
       "supabaseAnonKey": "sb_publishable_2ULezzANT_rq6dY97Tgh3g_FpkJJgGF",
+      "sentryDsn": "https://06f65cfda2f4d7ef6b4ce4e1e568b084@o4510658512879616.ingest.us.sentry.io/4510658513993728",
       "eas": {
         "projectId": "PLACEHOLDER_EAS_PROJECT_ID"
       }
