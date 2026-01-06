@@ -36,7 +36,7 @@ import { AppSplit } from '@/components/ui/AppView'
 
 
 import { $, UseTheme, useScale } from '@/theme'
-import React, { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ScrollView, Text, View } from 'react-native'
 
 export default function StyleDesktop() {
@@ -67,14 +67,14 @@ export default function StyleDesktop() {
   const [colorTabValue, setColorTabValue] = useState('textPrimary')
   
   // Refs to access group components
-  const buttonGroupRef = React.useRef<any>(null)
-  const textInputGroupRef = React.useRef<any>(null)
-  const dropdownGroupRef = React.useRef<any>(null)
-  const switchGroupRef = React.useRef<any>(null)
-  const switchGroupExclusiveRef = React.useRef<any>(null)
-  const switchGroupMaxRef = React.useRef<any>(null)
-  const radioGroupRef = React.useRef<any>(null)
-  const toggleGroupRef = React.useRef<any>(null)
+  const buttonGroupRef = useRef<any>(null)
+  const textInputGroupRef = useRef<any>(null)
+  const dropdownGroupRef = useRef<any>(null)
+  const switchGroupRef = useRef<any>(null)
+  const switchGroupExclusiveRef = useRef<any>(null)
+  const switchGroupMaxRef = useRef<any>(null)
+  const radioGroupRef = useRef<any>(null)
+  const toggleGroupRef = useRef<any>(null)
   
   // Modal/Toast/Snackbar states
   const [modalVisible, setModalVisible] = useState(false)

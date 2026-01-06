@@ -104,10 +104,12 @@ export function Accordion({
       {/* Animated visible content */}
       <Animated.View
         style={[
-          { overflow: 'hidden' },
+          { 
+            overflow: 'hidden',
+            pointerEvents: open ? 'auto' : 'none',
+          },
           animatedContentStyle,
         ]}
-        pointerEvents={open ? 'auto' : 'none'}
       >
         <View style={{ paddingHorizontal: S.space.md, paddingBottom: S.space.md }}>
           {children}

@@ -1,9 +1,9 @@
 import { AppPage, Button, Heading } from '@/components/ui'
+import { getShadowStyle } from '@/components/ui/Resuables/shadows'
 import { useAppParams } from '@/contexts/AppParamsContext'
 import { usePlatform } from '@/contexts/PlatformContext'
 import { $, useScale } from '@/theme'
 import { useRouter } from 'expo-router'
-import React from 'react'
 import { View } from 'react-native'
 import { PanelConfig } from './PanelData'
 
@@ -93,7 +93,7 @@ export function PanelView({
             style={{
               width: '85%',
               marginVertical: S.space.xs,
-              shadowColor: $('shadow' as any),
+              ...getShadowStyle('softer'),
             }}
           />
         ))}
