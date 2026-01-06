@@ -127,19 +127,31 @@ class RequestManagerClass {
    */
   private cleanupStaleEntries(): void {
     const now = Date.now();
-    let removedCount = 0;
+    let removedBuckets = 0;
+    let removedRequests = 0;
 
-    // Convert Map entries to array to avoid downlevelIteration issues
-    const entries = Array.from(this.rateLimitBuckets.entries());
-    for (const [key, bucket] of entries) {
+    // Clean up stale rate limit buckets
+    const bucketEntries = Array.from(this.rateLimitBuckets.entries());
+    for (const [key, bucket] of bucketEntries) {
       if (now - bucket.lastAccess > this.STALE_THRESHOLD) {
         this.rateLimitBuckets.delete(key);
-        removedCount++;
+        removedBuckets++;
       }
     }
 
-    if (removedCount > 0) {
-      logger.debug('request-manager', `Cleaned up ${removedCount} stale rate limit buckets`);
+    // Clean up stale pending requests (requests that have been pending > 1 hour)
+    // This handles cases where requests hang or take an extremely long time
+    const requestEntries = Array.from(this.pendingRequests.entries());
+    for (const [key, request] of requestEntries) {
+      if (now - request.timestamp > this.STALE_THRESHOLD) {
+        this.pendingRequests.delete(key);
+        removedRequests++;
+        logger.warn('request-manager', `Cleaned up stale pending request: ${key}`);
+      }
+    }
+
+    if (removedBuckets > 0 || removedRequests > 0) {
+      logger.debug('request-manager', `Cleaned up ${removedBuckets} stale rate limit buckets and ${removedRequests} stale pending requests`);
     }
   }
 
@@ -171,7 +183,20 @@ class RequestManagerClass {
       // ========== DEDUPE CHECK ==========
       if (options_.dedupe && this.pendingRequests.has(key)) {
         logger.debug('request-manager', 'Returning deduplicated request:', key);
-        return this.pendingRequests.get(key)!.promise;
+        // Wrap the deduplicated promise to ensure error handling, Sentry reporting,
+        // and fail-open behavior apply even to deduplicated requests
+        const deduplicatedPromise = this.pendingRequests.get(key)!.promise;
+        return deduplicatedPromise.catch((error) => {
+          logger.error('request-manager', 'Deduplicated request failed:', { key, error });
+          this.reportErrorToSentry(error, { key, options: options_ });
+          
+          if (options_.failOpen) {
+            logger.warn('request-manager', 'Fail-open enabled for deduplicated request, returning null:', key);
+            return null;
+          }
+          
+          throw error;
+        });
       }
 
       // ========== RATE LIMIT CHECK ==========

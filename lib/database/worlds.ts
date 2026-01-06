@@ -362,12 +362,12 @@ export const worldsDB = {
    * Get a specific world by ID
    * Uses RequestManager for deduplication and retry
    * 
-   * Returns null in two scenarios:
-   * 1. World not found (error code PGRST116) - intentional, world doesn't exist
-   * 2. RequestManager request fails with failOpen=false - graceful degradation
+   * Returns null only when world is not found (error code PGRST116).
+   * Throws error on database failures or request failures.
    * 
-   * Callers should treat null as either case and handle accordingly.
-   * Check logs for 'RequestManager' errors to distinguish request failures.
+   * @param worldId - The unique identifier of the world
+   * @returns The world data or null if not found
+   * @throws Error if database query fails or RequestManager encounters an error
    */
   async getById(worldId: string): Promise<World | null> {
     return RequestManager.fetch(
