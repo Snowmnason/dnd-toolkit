@@ -5,16 +5,22 @@
  * This bypasses code signing which requires admin privileges on Windows
  */
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+import fs from 'fs';
+import path, { dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+import { execSync } from 'child_process';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const configPath = path.join(__dirname, '../desktop/electron-builder.json');
 
 console.log('📦 Building unsigned desktop installers for local testing...\n');
 
 // Read the original config
-const originalConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+const originalConfigContent = fs.readFileSync(configPath, 'utf8');
+const originalConfig = JSON.parse(originalConfigContent);
 
 // Create unsigned config by removing signing-related fields
 const unsignedConfig = {
@@ -61,6 +67,7 @@ try {
   process.exit(1);
 } finally {
   // Restore original config
-  fs.writeFileSync(configPath, JSON.stringify(originalConfig, null, 2));
+  const originalConfigJson = JSON.stringify(originalConfig, null, 2);
+  fs.writeFileSync(configPath, originalConfigJson);
   console.log('✓ Original config restored');
 }

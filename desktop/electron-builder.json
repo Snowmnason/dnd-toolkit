@@ -38,7 +38,8 @@
     "certificatePassword": null,
     "publisherName": null,
     "signingHashAlgorithms": [],
-    "sign": null
+    "sign": null,
+    "signAndEditExecutable": false
   },
   "nsis": {
     "oneClick": false,
