@@ -22,7 +22,7 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Bump major version and reset minor/patch
+      - name: Bump major version (keep minor/patch)
         run: |
           # Get milestone title (e.g., "v1.2.3")
           MILESTONE_TITLE="${{ github.event.milestone.title }}"
@@ -38,8 +38,10 @@ jobs:
           # Parse milestone version to get new X
           IFS='.' read -r NEW_X Y Z <<< "$MILESTONE_VERSION"
           
-          # Reset Y, Z to 0
-          NEW_VERSION="$NEW_X.0.0"
+          # Keep Y and Z from current version, only bump X
+          IFS='.' read -r CURRENT_X CURRENT_Y CURRENT_Z <<< "$CURRENT_VERSION"
+          
+          NEW_VERSION="$NEW_X.$CURRENT_Y.$CURRENT_Z"
           echo "New version: $NEW_VERSION"
           
           # Update package.json
