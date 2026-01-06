@@ -5,7 +5,12 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 
-const webStorageMode = (process.env.EXPO_PUBLIC_AUTH_STORAGE_MODE || 'session').toLowerCase();
+// Web auth session persistence:
+// - Default to 'local' for persistent sessions across tabs/browser restarts
+// - Allow override via EXPO_PUBLIC_AUTH_STORAGE_MODE ('local' | 'session')
+//   Set to 'session' if you want users to be signed out when the tab closes
+const rawStorageMode = (process.env.EXPO_PUBLIC_AUTH_STORAGE_MODE || 'local').toLowerCase();
+const webStorageMode = rawStorageMode === 'session' ? 'session' : 'local';
 
 const resolveWebStorage = (): Storage | null => {
   if (typeof window === 'undefined') return null;

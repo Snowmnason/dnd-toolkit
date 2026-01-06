@@ -5,13 +5,14 @@
  * - Emits a strict _headers file with security and caching directives
  */
 
-const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
+import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Handle __dirname for different Node.js contexts
-const __filename = typeof __filename !== 'undefined' ? __filename : require('url').fileURLToPath(import.meta.url);
-const __dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(__filename);
+// Handle __dirname in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const DIST_DIR = path.join(__dirname, '..', 'dist');
 const INDEX_HTML = path.join(DIST_DIR, 'index.html');
@@ -29,8 +30,10 @@ function ensureDist() {
   return true;
 }
 
-function generateNonce() {
-  return crypto.randomBytes(24).toString('base64');
+// Compute CSP-safe hashes for inline content
+function computeCspHash(content) {
+  const hash = crypto.createHash('sha256').update(content, 'utf8').digest('base64');
+  return `sha256-${hash}`;
 }
 
 function computeIntegrity(filePath) {
@@ -39,16 +42,18 @@ function computeIntegrity(filePath) {
   return `sha384-${hash}`;
 }
 
-function addNonceToTags(html, nonce) {
-  const scriptPatched = html.replace(/<script(?![^>]*\bnonce=)([^>]*)>/gi, (_match, attrs) => {
-    return `<script nonce="${nonce}"${attrs}>`;
-  });
+// Extract inline <script> and <style> contents to build hash-based CSP
+function extractInlineContents(html) {
+  const scriptMatches = Array.from(html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi));
+  const styleMatches = Array.from(html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi));
 
-  const stylePatched = scriptPatched.replace(/<style(?![^>]*\bnonce=)([^>]*)>/gi, (_match, attrs) => {
-    return `<style nonce="${nonce}"${attrs}>`;
-  });
+  const scriptContents = scriptMatches.map(m => (m[1] || '').trim()).filter(Boolean);
+  const styleContents = styleMatches.map(m => (m[1] || '').trim()).filter(Boolean);
 
-  return stylePatched;
+  const scriptHashes = scriptContents.map(computeCspHash);
+  const styleHashes = styleContents.map(computeCspHash);
+
+  return { scriptHashes, styleHashes };
 }
 
 function addSriAttributes(html) {
@@ -80,11 +85,24 @@ function addSriAttributes(html) {
   });
 }
 
-function buildCsp(nonce) {
+function buildCsp(scriptHashes, styleHashes) {
+  const scriptSrc = [
+    "'self'",
+    'https://dnd-tool.thesnowpost.com',
+    'https://*.supabase.co',
+    ...scriptHashes,
+  ].join(' ');
+
+  const styleSrc = [
+    "'self'",
+    'https://fonts.googleapis.com',
+    ...styleHashes,
+  ].join(' ');
+
   const directives = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' https://*.supabase.co`,
-    `style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
+    `script-src ${scriptSrc}`,
+    `style-src ${styleSrc}`,
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: https: blob:",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
@@ -119,14 +137,11 @@ function writeHeadersFile(csp) {
     '  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()',
     '  Cross-Origin-Opener-Policy: same-origin',
     '  Cross-Origin-Resource-Policy: same-origin',
-    '  Cross-Origin-Embedder-Policy: require-corp',
-    '  Access-Control-Allow-Origin: https://dnd-tool.thesnowpost.com',
-    '  Access-Control-Allow-Methods: GET, OPTIONS',
-    '  Access-Control-Allow-Headers: Content-Type, Authorization',
+    '  Cross-Origin-Embedder-Policy: credentialless',
     '*/',
     '',
     '/*.html',
-    '  Cache-Control: public, max-age=300',
+    '  Cache-Control: public, max-age=86400',
     '',
     '/*.js',
     '  Cache-Control: public, max-age=31536000, immutable',
@@ -149,15 +164,14 @@ function harden() {
   }
 
   let html = fs.readFileSync(INDEX_HTML, 'utf8');
-  const nonce = generateNonce();
-  const csp = buildCsp(nonce);
+  const { scriptHashes, styleHashes } = extractInlineContents(html);
+  const csp = buildCsp(scriptHashes, styleHashes);
 
-  html = addNonceToTags(html, nonce);
   html = addSriAttributes(html);
   html = injectCspMeta(html, csp);
 
   fs.writeFileSync(INDEX_HTML, html, 'utf8');
-  console.log('[harden-web] injected nonce and SRI into index.html');
+  console.log('[harden-web] injected SRI and hash-based CSP into index.html');
 
   writeHeadersFile(csp);
 }

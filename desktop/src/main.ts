@@ -44,6 +44,8 @@ type DialogFilter = {
 };
 
 const isDev = process.env.NODE_ENV === 'development' || process.argv.includes('--dev');
+// Allow enabling DevTools in production via CLI for authorized troubleshooting
+const devToolsEnabled = isDev || process.argv.includes('--enable-devtools');
 
 const TRUSTED_ORIGINS = ['app://', 'file://', 'http://localhost:8081'];
 
@@ -57,10 +59,12 @@ const isTrustedSender = (event: { senderFrame?: { url?: string }; sender?: { get
   return TRUSTED_ORIGINS.some((origin) => url.startsWith(origin));
 };
 
-const guardIpc = (event: any, channel: string) => {
+const guardIpc = (event: IpcMainEvent | IpcMainInvokeEvent, channel: string): boolean => {
   if (!isTrustedSender(event)) {
-    throw new Error(`[IPC] Blocked untrusted call to ${channel}`);
+    console.warn(`[IPC] Blocked untrusted call to ${channel}`);
+    return false;
   }
+  return true;
 };
 
 // Configure auto-updates (only in production)
@@ -106,7 +110,7 @@ function createWindow(): void {
       nodeIntegrationInSubFrames: false,
       allowRunningInsecureContent: false,
       webviewTag: false,
-      devTools: isDev,
+      devTools: devToolsEnabled,
       safeDialogs: true,
       navigateOnDragDrop: false,
     },
@@ -119,7 +123,7 @@ function createWindow(): void {
   // Gracefully show window when ready
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
-    if (isDev) {
+    if (devToolsEnabled) {
       mainWindow?.webContents.openDevTools();
     }
   });
@@ -148,11 +152,13 @@ function createWindow(): void {
 
   // Handle external links - open in default browser
   mainWindow.webContents.setWindowOpenHandler(({ url: linkUrl }: { url: string }) => {
+    // Allow HTTPS (and localhost in dev); block others but log for visibility
     if (linkUrl.startsWith('https://') || (isDev && linkUrl.startsWith('http://localhost'))) {
       shell.openExternal(linkUrl);
       return { action: 'deny' };
     }
 
+    console.warn('[Electron] Blocked non-HTTPS external link:', linkUrl);
     return { action: 'deny' };
   });
 
@@ -186,44 +192,44 @@ function registerIpcHandlers(): void {
   const getWindowForEvent = (event: { sender: any }) => BrowserWindow.fromWebContents(event.sender) || mainWindow;
 
   ipcMain.handle('get-app-version', (event: IpcMainInvokeEvent) => {
-    guardIpc(event, 'get-app-version');
+    if (!guardIpc(event, 'get-app-version')) return { error: 'unauthorized' };
     return app.getVersion();
   });
 
   ipcMain.handle('get-system-theme', (event: IpcMainInvokeEvent) => {
-    guardIpc(event, 'get-system-theme');
+    if (!guardIpc(event, 'get-system-theme')) return { error: 'unauthorized' };
     return nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
   });
 
   ipcMain.on('window-minimize', (event: IpcMainEvent) => {
-    guardIpc(event, 'window-minimize');
+    if (!guardIpc(event, 'window-minimize')) return;
     getWindowForEvent(event)?.minimize();
   });
 
   ipcMain.on('window-maximize', (event: IpcMainEvent) => {
-    guardIpc(event, 'window-maximize');
+    if (!guardIpc(event, 'window-maximize')) return;
     const target = getWindowForEvent(event);
     if (!target) return;
     target.isMaximized() ? target.unmaximize() : target.maximize();
   });
 
   ipcMain.on('window-close', (event: IpcMainEvent) => {
-    guardIpc(event, 'window-close');
+    if (!guardIpc(event, 'window-close')) return;
     getWindowForEvent(event)?.close();
   });
 
   ipcMain.handle('show-open-dialog', (event: IpcMainInvokeEvent, options: any) => {
-    guardIpc(event, 'show-open-dialog');
+    if (!guardIpc(event, 'show-open-dialog')) return { canceled: true, filePaths: [] };
     return dialog.showOpenDialog(getWindowForEvent(event) ?? undefined, sanitizeDialogOptions(options));
   });
 
   ipcMain.handle('show-save-dialog', (event: IpcMainInvokeEvent, options: any) => {
-    guardIpc(event, 'show-save-dialog');
+    if (!guardIpc(event, 'show-save-dialog')) return { canceled: true, filePath: undefined };
     return dialog.showSaveDialog(getWindowForEvent(event) ?? undefined, sanitizeDialogOptions(options));
   });
 
   ipcMain.on('show-notification', (event: IpcMainEvent, payload: any) => {
-    guardIpc(event, 'show-notification');
+    if (!guardIpc(event, 'show-notification')) return;
     const title = sanitizeText(payload?.title, 80) || 'DnD Toolkit';
     const body = sanitizeText(payload?.body, 240);
 
@@ -239,8 +245,10 @@ function registerIpcHandlers(): void {
 function setupSessionSecurity(): void {
   const defaultSession = session.defaultSession;
 
-  defaultSession.setPermissionRequestHandler((_wc: any, _permission: string, callback: (granted: boolean) => void) => {
-    callback(false);
+  // Narrow permission handling: allow safe clipboard-read, deny others
+  defaultSession.setPermissionRequestHandler((_wc: any, permission: string, callback: (granted: boolean) => void) => {
+    const allowed = permission === 'clipboard-read';
+    callback(allowed);
   });
 
   defaultSession.webRequest.onHeadersReceived((details: any, callback: (response: any) => void) => {
@@ -250,7 +258,7 @@ function setupSessionSecurity(): void {
       return;
     }
 
-    const csp = "default-src 'self' app:; script-src 'self' app: https://*.supabase.co; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; object-src 'none'; media-src 'self'; worker-src 'self' blob:";
+    const csp = "default-src 'self' app://; script-src 'self' app:// https://*.supabase.co; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; object-src 'none'; media-src 'self'; worker-src 'self' blob:";
 
     callback({
       responseHeaders: {
@@ -258,7 +266,7 @@ function setupSessionSecurity(): void {
         'Content-Security-Policy': [csp],
         'Cross-Origin-Opener-Policy': ['same-origin'],
         'Cross-Origin-Resource-Policy': ['same-origin'],
-        'Cross-Origin-Embedder-Policy': ['require-corp'],
+        'Cross-Origin-Embedder-Policy': ['credentialless'],
         'Referrer-Policy': ['strict-origin-when-cross-origin'],
         'X-Content-Type-Options': ['nosniff'],
         'X-Frame-Options': ['DENY'],
@@ -280,6 +288,20 @@ function setupNavigationGuards(): void {
     }
 
     contents.on('will-navigate', (event: { preventDefault: () => void }, navigationUrl: string) => {
+      const parsedUrl = new URL(navigationUrl);
+      if (parsedUrl.protocol === 'file:' || parsedUrl.protocol === 'app:') {
+        return;
+      }
+
+      if (isDev && parsedUrl.hostname === 'localhost') {
+        return;
+      }
+
+      event.preventDefault();
+    });
+
+    // Prevent unexpected redirects to external origins as well
+    contents.on('will-redirect', (event: { preventDefault: () => void }, navigationUrl: string) => {
       const parsedUrl = new URL(navigationUrl);
       if (parsedUrl.protocol === 'file:' || parsedUrl.protocol === 'app:') {
         return;

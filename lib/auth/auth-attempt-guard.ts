@@ -23,11 +23,13 @@ const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
 
+// Use sessionStorage on web (clears on tab close, more appropriate for temporary security state)
+// Use encrypted storage on native platforms
 const storage = {
   async getItem(key: string): Promise<string | null> {
     if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        return window.localStorage.getItem(key);
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        return window.sessionStorage.getItem(key);
       }
       return null;
     }
@@ -35,8 +37,8 @@ const storage = {
   },
   async setItem(key: string, value: string): Promise<void> {
     if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(key, value);
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.setItem(key, value);
       }
       return;
     }
@@ -44,8 +46,8 @@ const storage = {
   },
   async removeItem(key: string): Promise<void> {
     if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.removeItem(key);
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.removeItem(key);
       }
       return;
     }
@@ -126,18 +128,25 @@ export const recordAuthFailure = async (email: string, scope: AuthGuardScope = '
 
   if (record.attempts >= MAX_ATTEMPTS) {
     record.lockedUntil = now + LOCKOUT_MS;
-    Sentry.captureMessage('auth.lockout', {
-      level: 'warning',
-      tags: {
-        scope,
-        emailDomain: email.split('@')[1] || 'unknown',
-      },
-      extra: {
-        attempts: record.attempts,
-        windowMs: WINDOW_MS,
-        lockoutMs: LOCKOUT_MS,
-      },
-    });
+    try {
+      const capture = (Sentry as any)?.captureMessage;
+      if (typeof capture === 'function') {
+        capture('auth.lockout', {
+          level: 'warning',
+          tags: {
+            scope,
+            emailDomain: email.split('@')[1] || 'unknown',
+          },
+          extra: {
+            attempts: record.attempts,
+            windowMs: WINDOW_MS,
+            lockoutMs: LOCKOUT_MS,
+          },
+        });
+      }
+    } catch (err) {
+      logger.debug('auth-guard', 'Sentry disabled or failed to report lockout');
+    }
   }
 
   store[key] = record;
