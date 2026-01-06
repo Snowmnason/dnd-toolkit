@@ -26,5 +26,10 @@
     "expo-env.d.ts",
     "types/**/*.d.ts"
   ],
+  "exclude": [
+    "desktop/**",
+    "dist-desktop/**",
+    "node_modules"
+  ],
   "extends": "expo/tsconfig.base"
 }

@@ -3,6 +3,7 @@
 This document lists all npm scripts defined in the repository (root and desktop), with short descriptions and the exact commands.
 
 ---
+`npm run ___`
 
 ## Root package.json (`package.json`)
 
@@ -28,6 +29,7 @@ This document lists all npm scripts defined in the repository (root and desktop)
 - **submit:ios**: `eas submit --platform ios`
 - **submit:android**: `eas submit --platform android`
 - **submit:mobile**: `eas submit --platform all`
+- **lint**: 
 
 ### Desktop-related helper scripts (root)
 - **desktop:install**: `cd desktop && npm install`  

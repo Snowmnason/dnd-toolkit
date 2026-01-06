@@ -3,7 +3,9 @@
  * Loads the web build of DnD Toolkit in a native window
  */
 
-const { app, BrowserWindow, shell, Menu, nativeTheme, protocol } = require('electron');
+import type { BrowserWindow as BrowserWindowType, IpcMainEvent, IpcMainInvokeEvent } from 'electron';
+
+const { app, BrowserWindow, shell, Menu, nativeTheme, protocol, ipcMain, Notification, dialog, session } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const url = require('url');
@@ -34,9 +36,41 @@ try {
   // electron-squirrel-startup not installed, ignore
 }
 
-let mainWindow: typeof BrowserWindow | null = null;
+let mainWindow: BrowserWindowType | null = null;
+
+type DialogFilter = {
+  name: string;
+  extensions: string[];
+};
 
 const isDev = process.env.NODE_ENV === 'development' || process.argv.includes('--dev');
+// Allow enabling DevTools in production via CLI for authorized troubleshooting
+const devToolsEnabled = isDev || process.argv.includes('--enable-devtools');
+
+const TRUSTED_ORIGINS = ['app://', 'file://', 'http://localhost:8081'];
+
+const sanitizeText = (value: unknown, limit = 256): string => {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.replace(/[\r\n]+/g, ' ').trim();
+  const result = trimmed.slice(0, limit);
+  if (result.length < trimmed.length) {
+    console.warn(`[sanitizeText] Data truncated from ${trimmed.length} to ${limit} chars`);
+  }
+  return result;
+};
+
+const isTrustedSender = (event: IpcMainEvent | IpcMainInvokeEvent | undefined): boolean => {
+  const url = (event as any)?.senderFrame?.url || (event as any)?.sender?.getURL?.() || '';
+  return TRUSTED_ORIGINS.some((origin) => url.startsWith(origin));
+};
+
+const guardIpc = (event: IpcMainEvent | IpcMainInvokeEvent, channel: string): boolean => {
+  if (!isTrustedSender(event)) {
+    console.warn(`[IPC] Blocked untrusted call to ${channel}`);
+    return false;
+  }
+  return true;
+};
 
 // Configure auto-updates (only in production)
 function setupAutoUpdater(): void {
@@ -76,6 +110,14 @@ function createWindow(): void {
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: true,
+      // enableRemoteModule removed in Electron 14+; included for backwards compatibility docs
+      nodeIntegrationInWorker: false,
+      nodeIntegrationInSubFrames: false,
+      allowRunningInsecureContent: false,
+      webviewTag: false,
+      devTools: devToolsEnabled,
+      safeDialogs: true,
+      navigateOnDragDrop: false,
     },
     // Modern frameless look with native controls
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
@@ -84,9 +126,10 @@ function createWindow(): void {
   });
 
   // Gracefully show window when ready
+  if (!mainWindow) return;
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
-    if (isDev) {
+    if (devToolsEnabled) {
       mainWindow?.webContents.openDevTools();
     }
   });
@@ -115,16 +158,172 @@ function createWindow(): void {
 
   // Handle external links - open in default browser
   mainWindow.webContents.setWindowOpenHandler(({ url: linkUrl }: { url: string }) => {
-    if (linkUrl.startsWith('http://') || linkUrl.startsWith('https://')) {
+    // Allow HTTPS (and localhost in dev); block others but log for visibility
+    if (linkUrl.startsWith('https://') || (isDev && linkUrl.startsWith('http://localhost'))) {
       shell.openExternal(linkUrl);
       return { action: 'deny' };
     }
-    return { action: 'allow' };
+
+    console.warn('[Electron] Blocked non-HTTPS external link:', linkUrl);
+    return { action: 'deny' };
   });
 
   // Emitted when the window is closed
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+}
+
+const sanitizeDialogFilters = (filters?: DialogFilter[]) => {
+  if (!Array.isArray(filters)) return undefined;
+  return filters
+    .filter((filter) => filter && typeof filter.name === 'string' && Array.isArray(filter.extensions))
+    .map((filter) => ({
+      name: sanitizeText(filter.name, 60),
+      extensions: filter.extensions.filter((ext) => typeof ext === 'string').slice(0, 10),
+    }));
+};
+
+const sanitizeDialogOptions = (options: { defaultPath?: string; filters?: DialogFilter[]; properties?: string[] } = {}) => {
+  return {
+    defaultPath: typeof options.defaultPath === 'string' ? options.defaultPath : undefined,
+    filters: sanitizeDialogFilters(options.filters),
+    properties: Array.isArray(options.properties)
+      ? (options.properties.filter((prop) => typeof prop === 'string').slice(0, 10) as any)
+      : undefined,
+  };
+};
+
+function registerIpcHandlers(): void {
+  const getWindowForEvent = (event: { sender: any }) => BrowserWindow.fromWebContents(event.sender) || mainWindow;
+
+  ipcMain.handle('get-app-version', (event: IpcMainInvokeEvent) => {
+    if (!guardIpc(event, 'get-app-version')) return { error: 'unauthorized' };
+    return app.getVersion();
+  });
+
+  ipcMain.handle('get-system-theme', (event: IpcMainInvokeEvent) => {
+    if (!guardIpc(event, 'get-system-theme')) return { error: 'unauthorized' };
+    return nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
+  });
+
+  ipcMain.on('window-minimize', (event: IpcMainEvent) => {
+    if (!guardIpc(event, 'window-minimize')) return;
+    getWindowForEvent(event)?.minimize();
+  });
+
+  ipcMain.on('window-maximize', (event: IpcMainEvent) => {
+    if (!guardIpc(event, 'window-maximize')) return;
+    const target = getWindowForEvent(event);
+    if (!target) return;
+    target.isMaximized() ? target.unmaximize() : target.maximize();
+  });
+
+  ipcMain.on('window-close', (event: IpcMainEvent) => {
+    if (!guardIpc(event, 'window-close')) return;
+    getWindowForEvent(event)?.close();
+  });
+
+  ipcMain.handle('show-open-dialog', (event: IpcMainInvokeEvent, options: any) => {
+    if (!guardIpc(event, 'show-open-dialog')) return { canceled: true, filePaths: [] };
+    const win = getWindowForEvent(event);
+    if (!win) return { canceled: true, filePaths: [] };
+    return dialog.showOpenDialog(win, sanitizeDialogOptions(options));
+  });
+
+  ipcMain.handle('show-save-dialog', (event: IpcMainInvokeEvent, options: any) => {
+    if (!guardIpc(event, 'show-save-dialog')) return { canceled: true, filePath: undefined };
+    const win = getWindowForEvent(event);
+    if (!win) return { canceled: true, filePath: undefined };
+    return dialog.showSaveDialog(win, sanitizeDialogOptions(options));
+  });
+
+  ipcMain.on('show-notification', (event: IpcMainEvent, payload: any) => {
+    if (!guardIpc(event, 'show-notification')) return;
+    const title = sanitizeText(payload?.title, 80) || 'DnD Toolkit';
+    const body = sanitizeText(payload?.body, 240);
+
+    if (!Notification.isSupported()) {
+      return;
+    }
+
+    const notification = new Notification({ title, body });
+    notification.show();
+  });
+}
+
+function setupSessionSecurity(): void {
+  const defaultSession = session.defaultSession;
+
+  // Narrow permission handling: allow safe clipboard-read, deny others
+  defaultSession.setPermissionRequestHandler((_wc: any, permission: string, callback: (granted: boolean) => void) => {
+    const allowed = permission === 'clipboard-read';
+    callback(allowed);
+  });
+
+  defaultSession.webRequest.onHeadersReceived((details: any, callback: (response: any) => void) => {
+    const url = details.url || '';
+    if (!url.startsWith('app://') && !url.startsWith('file://')) {
+      callback({ responseHeaders: details.responseHeaders });
+      return;
+    }
+
+    const csp = "default-src 'self' app://; script-src 'self' app:// https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; object-src 'none'; media-src 'self'; worker-src 'self' blob:";
+
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [csp],
+        'Cross-Origin-Opener-Policy': ['same-origin'],
+        'Cross-Origin-Resource-Policy': ['same-origin'],
+        'Cross-Origin-Embedder-Policy': ['credentialless'],
+        'Referrer-Policy': ['strict-origin-when-cross-origin'],
+        'X-Content-Type-Options': ['nosniff'],
+        'X-Frame-Options': ['DENY'],
+      },
+    });
+  });
+}
+
+function setupNavigationGuards(): void {
+  app.on('web-contents-created', (_event: unknown, contents: any) => {
+    contents.on('will-attach-webview', (event: { preventDefault: () => void }) => {
+      event.preventDefault();
+    });
+
+    const owningWindow = BrowserWindow.fromWebContents(contents);
+
+    // Only allow window open handler for main window; deny for all others
+    if (!owningWindow || !mainWindow || owningWindow !== mainWindow) {
+      contents.setWindowOpenHandler(() => ({ action: 'deny' as const }));
+    }
+
+    contents.on('will-navigate', (event: { preventDefault: () => void }, navigationUrl: string) => {
+      const parsedUrl = new URL(navigationUrl);
+      if (parsedUrl.protocol === 'file:' || parsedUrl.protocol === 'app:') {
+        return;
+      }
+
+      if (isDev && parsedUrl.hostname === 'localhost') {
+        return;
+      }
+
+      event.preventDefault();
+    });
+
+    // Prevent unexpected redirects to external origins as well
+    contents.on('will-redirect', (event: { preventDefault: () => void }, navigationUrl: string) => {
+      const parsedUrl = new URL(navigationUrl);
+      if (parsedUrl.protocol === 'file:' || parsedUrl.protocol === 'app:') {
+        return;
+      }
+
+      if (isDev && parsedUrl.hostname === 'localhost') {
+        return;
+      }
+
+      event.preventDefault();
+    });
   });
 }
 
@@ -222,7 +421,7 @@ function createMenu(): void {
     },
   ];
 
-  const menu = Menu.buildFromTemplate(template);
+  const menu = Menu.buildFromTemplate(template as any);
   Menu.setApplicationMenu(menu);
 }
 
@@ -294,6 +493,10 @@ app.whenReady().then(() => {
     });
   }
   
+  setupSessionSecurity();
+  setupNavigationGuards();
+  registerIpcHandlers();
+
   createMenu();
   createWindow();
   setupAutoUpdater();
@@ -311,18 +514,6 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
-});
-
-// Security: Prevent navigation to unknown URLs
-app.on('web-contents-created', (_event: unknown, contents: { on: (event: string, handler: (e: { preventDefault: () => void }, url: string) => void) => void }) => {
-  contents.on('will-navigate', (event: { preventDefault: () => void }, navigationUrl: string) => {
-    const parsedUrl = new URL(navigationUrl);
-    
-    // Allow localhost for dev, app protocol for production, and file protocol
-    if (parsedUrl.protocol !== 'file:' && parsedUrl.protocol !== 'app:' && parsedUrl.hostname !== 'localhost') {
-      event.preventDefault();
-    }
-  });
 });
 
 // Helper function to determine content type from file extension

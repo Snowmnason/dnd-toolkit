@@ -1,6 +1,10 @@
+import type { AuthResponse, AuthTokenResponse } from '@supabase/supabase-js';
+
+import { RequestManager } from '../api/request-manager';
 import { supabase } from '../database/supabase';
 import { usersDB } from '../database/users';
 import { logger } from '../utils/logger';
+import { checkAuthGuard, recordAuthFailure, recordAuthSuccess } from './auth-attempt-guard';
 import { isExistingUser, validateEmail, validatePassword } from './validation';
 
 export interface SignUpResult {
@@ -59,33 +63,57 @@ export const signUpUser = async (
       };
     }
 
+    const guard = await checkAuthGuard(sanitizedEmail, 'signup');
+    if (!guard.allowed) {
+      const retrySeconds = guard.retryAfterMs ? Math.ceil(guard.retryAfterMs / 1000) : undefined;
+      return {
+        success: false,
+        error: retrySeconds
+          ? `Too many sign up attempts. Try again in ${retrySeconds} seconds.`
+          : 'Too many sign up attempts. Please wait before trying again.'
+      };
+    }
+
     const baseUrl = typeof window !== 'undefined' 
       ? window.location.origin 
       : 'https://dnd-tool.thesnowpost.com';
 
-    const { data, error } = await supabase.auth.signUp({ 
-      email: sanitizedEmail, 
-      password,
-      options: {
-        emailRedirectTo: `${baseUrl}/login/auth-redirect?action=signup-confirm`,
+    const signupResponse = await RequestManager.fetch<AuthResponse>(
+      `auth:signup:${sanitizedEmail}`,
+      () =>
+        supabase.auth.signUp({ 
+          email: sanitizedEmail, 
+          password,
+          options: {
+            emailRedirectTo: `${baseUrl}/login/auth-redirect?action=signup-confirm`,
+          }
+        }),
+      {
+        rateLimitKey: `auth:signup:${sanitizedEmail}`,
+        retries: 1,
+        timeout: 10000,
       }
-    });
+    );
+
+    const signupError = signupResponse?.error ?? null;
+    const signupData = signupResponse?.data;
 
     // Give Supabase a moment to process
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    if (error) {
+    if (signupError) {
+      await recordAuthFailure(sanitizedEmail, 'signup');
       // Check for email already exists error
-      if (error.message.includes('User already registered') || 
-          error.message.includes('already registered') || 
-          error.message.includes('already been registered') ||
-          error.message.includes('email address not available') ||
-          error.message.includes('duplicate key value') ||
-          error.code === '23505') {
+      if (signupError.message.includes('User already registered') || 
+          signupError.message.includes('already registered') || 
+          signupError.message.includes('already been registered') ||
+          signupError.message.includes('email address not available') ||
+          signupError.message.includes('duplicate key value') ||
+          signupError.code === '23505') {
         return { success: false, showEmailExistsModal: true };
       }
       
-      if (error.message.includes('Password')) {
+      if (signupError.message.includes('Password')) {
         return { 
           success: false, 
           error: 'Password does not meet requirements. Please check and try again.' 
@@ -93,12 +121,13 @@ export const signUpUser = async (
       } else {
         return { 
           success: false, 
-          error: error.message || 'Account creation failed. Please try again.' 
+          error: signupError.message || 'Account creation failed. Please try again.' 
         };
       }
-    } else if (data.user) {
+    } else if (signupData?.user) {
+      await recordAuthSuccess(sanitizedEmail, 'signup');
       // Check if this is an existing user trying to sign up again
-      if (isExistingUser(data)) {
+      if (isExistingUser(signupData)) {
         return { success: false, showEmailExistsModal: true };
       }
       
@@ -114,7 +143,10 @@ export const signUpUser = async (
     return { success: false, error: 'An unexpected error occurred. Please try again.' };
   } catch (error) {
     logger.error('auth', 'Sign up error:', error);
-    return { success: false, error: 'An unexpected error occurred. Please try again.' };
+    const message = (error as Error)?.message?.includes('Request timeout')
+      ? 'The server took too long to respond. Please try again.'
+      : 'An unexpected error occurred. Please try again.';
+    return { success: false, error: message };
   }
 };
 
@@ -146,15 +178,38 @@ export const signInUser = async (
       };
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: sanitizedEmail,
-      password
-    });
+    const guard = await checkAuthGuard(sanitizedEmail, 'signin');
+    if (!guard.allowed) {
+      const retrySeconds = guard.retryAfterMs ? Math.ceil(guard.retryAfterMs / 1000) : undefined;
+      return {
+        success: false,
+        error: retrySeconds
+          ? `Too many login attempts. Try again in ${retrySeconds} seconds.`
+          : 'Too many login attempts. Please wait before trying again.'
+      };
+    }
 
-    if (error) {
-      if (error.message.includes('Invalid login credentials') || 
-          error.message.includes('invalid credentials') ||
-          error.message.includes('Email not confirmed')) {
+    const signInResponse = await RequestManager.fetch<AuthTokenResponse>(
+      `auth:signin:${sanitizedEmail}`,
+      () => supabase.auth.signInWithPassword({
+        email: sanitizedEmail,
+        password
+      }),
+      {
+        rateLimitKey: `auth:signin:${sanitizedEmail}`,
+        retries: 1,
+        timeout: 10000,
+      }
+    );
+
+    const signInError = signInResponse?.error ?? null;
+    const signInData = signInResponse?.data;
+
+    if (signInError) {
+      await recordAuthFailure(sanitizedEmail, 'signin');
+      if (signInError.message.includes('Invalid login credentials') || 
+          signInError.message.includes('invalid credentials') ||
+          signInError.message.includes('Email not confirmed')) {
         return { 
           success: false, 
           error: 'Invalid email or password. Please check your credentials and try again.' 
@@ -163,13 +218,14 @@ export const signInUser = async (
       
       return { 
         success: false, 
-        error: error.message || 'Sign in failed. Please try again.' 
+        error: signInError.message || 'Sign in failed. Please try again.' 
       };
     }
 
-    if (data.user) {
+    if (signInData?.user) {
+      await recordAuthSuccess(sanitizedEmail, 'signin');
       // Set local auth state so route guards work immediately
-      const { AuthStateManager } = await import('./auth-state');
+      const { AuthStateManager } = await import('../auth-state');
       await AuthStateManager.setHasAccount(true);
 
       // Check if user has a complete profile
@@ -223,7 +279,10 @@ export const signInUser = async (
     return { success: false, error: 'An unexpected error occurred. Please try again.' };
   } catch (error) {
     logger.error('auth', 'Sign in error:', error);
-    return { success: false, error: 'An unexpected error occurred. Please try again.' };
+    const message = (error as Error)?.message?.includes('Request timeout')
+      ? 'The server took too long to respond. Please try again.'
+      : 'An unexpected error occurred. Please try again.';
+    return { success: false, error: message };
   }
 };
 
@@ -262,63 +321,63 @@ export const sendPasswordReset = async (email: string): Promise<ResetPasswordRes
       };
     }
 
-    // First, check if email exists by attempting to get user info
-    // We'll use a sign-in attempt with a dummy password to check if email exists
-    // This is a common pattern for checking email existence without exposing user data
-    const { error: checkError } = await supabase.auth.signInWithPassword({
-      email: sanitizedEmail,
-      password: 'dummy_password_for_check_only'
-    });
-    
-    // If we get "Invalid login credentials", it means the email exists but password is wrong
-    // If we get "User not found" or similar, the email doesn't exist
-    if (checkError) {
-      if (checkError.message.includes('User not found') || 
-          checkError.message.includes('not found') ||
-          checkError.message.includes('Invalid email')) {
-        return { 
-          success: false, 
-          showEmailNotFoundModal: true 
-        };
-      }
-      // If we get "Invalid login credentials", the email exists, proceed with reset
-    }
-
-    // Email exists, proceed with password reset
-    const baseUrl = typeof window !== 'undefined' 
-      ? window.location.origin 
-      : 'https://dnd-tool.thesnowpost.com';
-    const { error } = await supabase.auth.resetPasswordForEmail(sanitizedEmail, {
-      redirectTo: `${baseUrl}/login/auth-redirect?action=reset-password`
-    });
-
-    if (error) {
-      // Handle specific error cases
-      if (error.message.includes('Invalid email') || 
-          error.message.includes('not valid') ||
-          error.message.includes('invalid email format')) {
-        return { 
-          success: false, 
-          error: 'Please enter a valid email address.' 
-        };
-      }
-      
-      return { 
-        success: false, 
-        error: error.message || 'Failed to send reset email. Please try again.' 
+    const guard = await checkAuthGuard(sanitizedEmail, 'reset');
+    if (!guard.allowed) {
+      const retrySeconds = guard.retryAfterMs ? Math.ceil(guard.retryAfterMs / 1000) : undefined;
+      return {
+        success: false,
+        error: retrySeconds
+          ? `Too many reset attempts. Try again in ${retrySeconds} seconds.`
+          : 'Too many reset attempts. Please wait before trying again.'
       };
     }
 
+    // Proceed with password reset; backend will send email only if account exists.
+    const baseUrl = typeof window !== 'undefined' 
+      ? window.location.origin 
+      : 'https://dnd-tool.thesnowpost.com';
+    const resetResponse = await RequestManager.fetch<AuthResponse>(
+      `auth:reset:${sanitizedEmail}`,
+      () =>
+        supabase.auth.resetPasswordForEmail(sanitizedEmail, {
+          redirectTo: `${baseUrl}/login/auth-redirect?action=reset-password`
+        }),
+      {
+        rateLimitKey: `auth:reset:${sanitizedEmail}`,
+        retries: 1,
+        timeout: 10000,
+      }
+    );
+
+    const resetError = resetResponse?.error ?? null;
+
+    if (resetError) {
+      // Log full error details for debugging (helps identify network failures, config issues, rate limiting, etc.)
+      // But return generic message to user to prevent email enumeration
+      logger.error('auth', 'Password reset API error (full details for debugging):', {
+        message: resetError.message,
+        code: resetError.code,
+        status: (resetError as any)?.status,
+        details: resetError,
+      });
+      return { 
+        success: true, 
+        message: 'If that email exists, a reset link has been sent. Please check your inbox.' 
+      };
+    }
+
+    await recordAuthSuccess(sanitizedEmail, 'reset');
+
     return { 
       success: true, 
-      message: 'Password reset email sent! Please check your inbox and follow the instructions.' 
+      message: 'If that email exists, a reset link has been sent. Please check your inbox.' 
     };
   } catch (error) {
     logger.error('auth', 'Password reset error:', error);
-    return { 
-      success: false, 
-      error: 'An unexpected error occurred. Please try again.' 
-    };
+    const message = (error as Error)?.message?.includes('Request timeout')
+      ? 'The server took too long to respond. Please try again.'
+      : 'An unexpected error occurred. Please try again.';
+    return { success: false, error: message };
   }
 };
 

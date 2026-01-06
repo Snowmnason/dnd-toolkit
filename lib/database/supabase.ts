@@ -5,23 +5,46 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 
-// Web storage adapter that uses localStorage (browser) instead of AsyncStorage
+// Web auth session persistence:
+// - Default to 'local' for persistent sessions across tabs/browser restarts
+// - Allow override via EXPO_PUBLIC_AUTH_STORAGE_MODE ('local' | 'session')
+//   Set to 'session' if you want users to be signed out when the tab closes
+const rawStorageMode = (process.env.EXPO_PUBLIC_AUTH_STORAGE_MODE || 'local').toLowerCase();
+const webStorageMode = rawStorageMode === 'session' ? 'session' : 'local';
+
+const resolveWebStorage = (): Storage | null => {
+  if (typeof window === 'undefined') return null;
+
+  if (webStorageMode === 'session' && window.sessionStorage) {
+    return window.sessionStorage;
+  }
+
+  if (window.localStorage) {
+    return window.localStorage;
+  }
+
+  return null;
+};
+
 const WebStorageAdapter = {
   getItem: (key: string) => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      return Promise.resolve(window.localStorage.getItem(key));
+    const storage = resolveWebStorage();
+    if (storage) {
+      return Promise.resolve(storage.getItem(key));
     }
     return Promise.resolve(null);
   },
   setItem: (key: string, value: string) => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem(key, value);
+    const storage = resolveWebStorage();
+    if (storage) {
+      storage.setItem(key, value);
     }
     return Promise.resolve();
   },
   removeItem: (key: string) => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.removeItem(key);
+    const storage = resolveWebStorage();
+    if (storage) {
+      storage.removeItem(key);
     }
     return Promise.resolve();
   },
@@ -41,8 +64,8 @@ if (Platform.OS === 'web') {
   logger.debug('supabase', 'Supabase Configuration:', {
     hasUrl: !!supabaseUrl,
     hasKey: !!supabaseAnonKey,
-    urlLength: supabaseUrl.length,
-    keyLength: supabaseAnonKey.length
+    urlLength: supabaseUrl?.length || 0,
+    keyLength: supabaseAnonKey?.length || 0
   });
 }
 
@@ -93,6 +116,7 @@ export const getSupabaseClient = () => {
           autoRefreshToken: true,
           persistSession: true,
           detectSessionInUrl: false,
+          flowType: 'pkce',
         },
       },
     );
