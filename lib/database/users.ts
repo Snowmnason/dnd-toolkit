@@ -2,6 +2,7 @@ import { validateUsername } from '../auth/validation';
 import { logger } from '../utils/logger';
 import { validateCurrentUser, validateUserForWrite } from './common';
 import { supabase } from './supabase';
+import { RequestManager } from '../index';
 
 export interface User {
   id: string;
@@ -132,49 +133,66 @@ export const usersDB = {
     }
     
     const authUser = session.user;
+    const authId = authUser.id;
 
-  logger.debug('usersDB', 'Fetching user profile from database for auth_id:', authUser.id);
+    logger.debug('usersDB', 'Fetching user profile from database for auth_id:', authId);
 
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('auth_id', authUser.id)
-      .single();
-    
-    if (error) {
-      if (error.code === 'PGRST116') {
-        // This is expected for new users who haven't created a profile yet
-        logger.debug('usersDB', 'No profile exists yet for user - this is expected for new users');
-        return null;
+    // Use RequestManager to wrap database fetch
+    // (storage-to-DB fallback is not deduplicated, only the DB call)
+    const data = await RequestManager.fetch(
+      `user:profile:${authId}`,
+      async () => {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('auth_id', authId)
+          .single();
+        
+        if (error) {
+          if (error.code === 'PGRST116') {
+            // This is expected for new users who haven't created a profile yet
+            logger.debug('usersDB', 'No profile exists yet for user - this is expected for new users');
+            return null;
+          }
+          
+          // Only log as error for unexpected database issues
+          logger.error('usersDB', 'Unexpected database error in getCurrentUser:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+            auth_id: authId
+          });
+          
+          throw new Error(error.message || 'Failed to fetch user profile');
+        }
+        
+        return data;
+      },
+      {
+        dedupe: true,
+        retries: 2,
+        timeout: 15000
       }
-      
-      // Only log as error for unexpected database issues
-      logger.error('usersDB', 'Unexpected database error in getCurrentUser:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint,
-        auth_id: authUser.id
-      });
-      
-      throw new Error(error.message || 'Failed to fetch user profile');
+    );
+    
+    if (!data) {
+      return null;
     }
     
     logger.info('usersDB', 'User profile fetched successfully:', {
-      id: data?.id,
-      auth_id: data?.auth_id,
-      username: data?.username,
-      created_at: data?.created_at
+      id: data.id,
+      auth_id: data.auth_id,
+      username: data.username,
+      created_at: data.created_at
     });
     
     // Save user data to local storage to avoid future database calls
-    if (data) {
-      try {
-        const { AuthStateManager } = await import('../auth-state');
-        await AuthStateManager.saveUserData(data);
-      } catch (storageError) {
-        logger.warn('usersDB', 'Failed to save user data to storage (non-critical):', storageError);
-      }
+    try {
+      const { AuthStateManager } = await import('../auth-state');
+      await AuthStateManager.saveUserData(data);
+    } catch (storageError) {
+      logger.warn('usersDB', 'Failed to save user data to storage (non-critical):', storageError);
     }
     
     return data;

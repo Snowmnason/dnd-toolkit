@@ -1,6 +1,7 @@
 import { logger } from '../utils/logger';
 import { supabase } from './supabase';
 import { validateUserForWrite } from './common';
+import { RequestManager } from '../index';
 
 /**
  * Database operations for invite links
@@ -82,6 +83,7 @@ export async function createInviteLink(
 
 /**
  * Validate an invite token and get the associated world
+ * Uses RequestManager for deduplication and retry
  */
 export async function validateInviteToken(
   token: string
@@ -89,34 +91,49 @@ export async function validateInviteToken(
   try {
     logger.info('invites', `Validating invite token: ${token}`);
 
-    const { data, error } = await supabase
-      .from('invite_links')
-      .select('world_id, expires_at')
-      .eq('token', token)
-      .single();
+    const result = await RequestManager.fetch(
+      `invite:validate:${token}`,
+      async () => {
+        const { data, error } = await supabase
+          .from('invite_links')
+          .select('world_id, expires_at')
+          .eq('token', token)
+          .single();
 
-    if (error) {
-      logger.error('invites', 'Invalid invite token', error);
+        if (error) {
+          logger.error('invites', 'Invalid invite token', error);
+          throw new Error('Invalid or expired invite link');
+        }
+
+        if (!data) {
+          logger.error('invites', 'No invite found for token');
+          throw new Error('Invalid invite link');
+        }
+
+        // Check if expired
+        const expiresAt = new Date(data.expires_at);
+        if (expiresAt < new Date()) {
+          logger.warn('invites', 'Invite token expired', { expiresAt });
+          throw new Error('This invite link has expired');
+        }
+
+        logger.success(`Valid invite token for world: ${data.world_id}`);
+        return data;
+      },
+      {
+        dedupe: true,
+        retries: 2,
+        timeout: 10000
+      }
+    );
+
+    if (!result) {
       return { success: false, error: 'Invalid or expired invite link' };
     }
 
-    if (!data) {
-      logger.error('invites', 'No invite found for token');
-      return { success: false, error: 'Invalid invite link' };
-    }
-
-    // Check if expired
-    const expiresAt = new Date(data.expires_at);
-    if (expiresAt < new Date()) {
-      logger.warn('invites', 'Invite token expired', { expiresAt });
-      return { success: false, error: 'This invite link has expired' };
-    }
-
-    logger.success(`Valid invite token for world: ${data.world_id}`);
-    
     return { 
       success: true, 
-      worldId: data.world_id 
+      worldId: result.world_id 
     };
 
   } catch (error) {
@@ -167,6 +184,7 @@ export async function deleteInviteLink(
 
 /**
  * Get all active invite links for a world (for management UI)
+ * Uses RequestManager for deduplication and retry
  */
 export async function getWorldInviteLinks(
   worldId: string
@@ -174,17 +192,29 @@ export async function getWorldInviteLinks(
   try {
     logger.info('invites', `Fetching invite links for world: ${worldId}`);
 
-    const { data, error } = await supabase
-      .from('invite_links')
-      .select('*')
-      .eq('world_id', worldId)
-      .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false });
+    const data = await RequestManager.fetch(
+      `invites:world:${worldId}`,
+      async () => {
+        const { data, error } = await supabase
+          .from('invite_links')
+          .select('*')
+          .eq('world_id', worldId)
+          .gt('expires_at', new Date().toISOString())
+          .order('created_at', { ascending: false });
 
-    if (error) {
-      logger.error('invites', 'Failed to fetch invite links', error);
-      return { success: false, error: error.message };
-    }
+        if (error) {
+          logger.error('invites', 'Failed to fetch invite links', error);
+          throw new Error(error.message);
+        }
+
+        return data;
+      },
+      {
+        dedupe: true,
+        retries: 2,
+        timeout: 15000
+      }
+    );
 
     logger.info('invites', `Found ${data?.length || 0} active invite links`);
     

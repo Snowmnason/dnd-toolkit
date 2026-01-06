@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { worldsDB, WorldWithAccess } from '../database/worlds';
 import { logger } from '../utils/logger';
+import { RequestManager } from '../index';
 
 /**
  * Custom hook for managing world data and state
@@ -17,9 +18,22 @@ export function useWorlds(userId?: string) {
     try {
       setIsLoading(true);
       setError(null);
-      // Pass userId to getMyWorlds for potential optimization
-      const userWorlds = await worldsDB.getMyWorlds(userId);
-      setWorlds(userWorlds);
+      // Use RequestManager as a centralized layer for:
+      // - Deduplicating concurrent world list requests
+      // - Retrying on transient failures with exponential backoff
+      // - Rate limiting per user to prevent flooding
+      const userWorlds = await RequestManager.fetch(
+        `worlds:user:${userId || 'current'}`,
+        () => worldsDB.getMyWorlds(userId),
+        {
+          dedupe: true,                        // Deduplicate concurrent requests
+          retries: 3,                          // Retry 3 times on failure
+          retryDelay: 1000,                    // Start with 1 second delay
+          rateLimitKey: `user:${userId}:worlds`, // Rate limit per user
+          timeout: 30000                       // 30 second timeout
+        }
+      );
+      setWorlds(userWorlds ?? []);
     } catch (err) {
       logger.error('useWorlds', 'Error loading worlds:', err);
       setError('Failed to load worlds. Please try again.');
