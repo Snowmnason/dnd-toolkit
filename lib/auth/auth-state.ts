@@ -87,12 +87,12 @@ export const AuthStateManager = {
         try {
           const key = 'dnd_session_user_email';
           window.localStorage.setItem(key, session.user.email);
-  } catch {
-          // ignore
+  } catch (error) {
+          logger.error('auth-state', 'Error caching session email:', error);
         }
       }
-    } catch {
-      logger.error('auth-state', '', );
+    } catch (error) {
+      logger.error('auth-state', 'Error saving auth state:', error);
     }
   },
 

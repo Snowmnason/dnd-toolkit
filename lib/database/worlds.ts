@@ -1,7 +1,7 @@
-import { logger } from '../utils/logger';
-import { supabase } from './supabase';
-import { getCurrentUserProfile, executeParallelQueries, validateUserForWrite } from './common';
 import { RequestManager } from '../api/request-manager';
+import { logger } from '../utils/logger';
+import { executeParallelQueries, getCurrentUserProfile, validateUserForWrite } from './common';
+import { supabase } from './supabase';
 
 // User role types for better type safety and maintainability
 export type UserRole = 'owner' | 'dm' | 'player';
@@ -235,7 +235,7 @@ export const worldsDB = {
   },
 
   // Delete a world
-  async delete(worldId: string, userId: string): Promise<void> {
+  async delete(worldId: string): Promise<void> {
     // Validate before write
     const user = await validateUserForWrite();
     
@@ -329,7 +329,8 @@ export const worldsDB = {
 
   // Get all members of a world
   // Uses RequestManager for deduplication and retry
-  async getWorldMembers(worldId: string): Promise<(WorldAccess & { user: any })[]> {
+  // Note: Returns null if RequestManager fails with failOpen enabled
+  async getWorldMembers(worldId: string): Promise<(WorldAccess & { user: any })[] | null> {
     return RequestManager.fetch(
       `world:members:${worldId}`,
       async () => {
@@ -360,6 +361,13 @@ export const worldsDB = {
   /**
    * Get a specific world by ID
    * Uses RequestManager for deduplication and retry
+   * 
+   * Returns null in two scenarios:
+   * 1. World not found (error code PGRST116) - intentional, world doesn't exist
+   * 2. RequestManager request fails with failOpen=false - graceful degradation
+   * 
+   * Callers should treat null as either case and handle accordingly.
+   * Check logs for 'RequestManager' errors to distinguish request failures.
    */
   async getById(worldId: string): Promise<World | null> {
     return RequestManager.fetch(

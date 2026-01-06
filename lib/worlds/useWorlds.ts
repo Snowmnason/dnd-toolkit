@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
+import { RequestManager } from '../api/request-manager';
 import { worldsDB, WorldWithAccess } from '../database/worlds';
 import { logger } from '../utils/logger';
-import { RequestManager } from '../api/request-manager';
 
 /**
  * Custom hook for managing world data and state
@@ -21,7 +21,7 @@ export function useWorlds(userId?: string) {
       // Use RequestManager as a centralized layer for:
       // - Deduplicating concurrent world list requests
       // - Retrying on transient failures with exponential backoff
-      // - Rate limiting per user to prevent flooding
+      // - Rate limiting per user to prevent flooding (only when userId is available)
       const userWorlds = await RequestManager.fetch(
         `worlds:user:${userId || 'current'}`,
         () => worldsDB.getMyWorlds(userId),
@@ -29,7 +29,9 @@ export function useWorlds(userId?: string) {
           dedupe: true,                        // Deduplicate concurrent requests
           retries: 3,                          // Retry 3 times on failure
           retryDelay: 1000,                    // Start with 1 second delay
-          rateLimitKey: `user:${userId}:worlds`, // Rate limit per user
+          // Only apply rate limiting when userId is explicitly provided to avoid
+          // lumping all unauthenticated/current-user requests into one bucket
+          rateLimitKey: userId ? `user:${userId}:worlds` : undefined,
           timeout: 30000                       // 30 second timeout
         }
       );

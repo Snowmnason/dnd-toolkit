@@ -78,7 +78,6 @@ export async function getCurrentUserProfile(forceRefresh = false): Promise<User 
 
   // Step 4: Update cache for next time
   try {
-    const { AuthStateManager } = await import('../auth-state');
     await AuthStateManager.saveUserData(userProfile);
   } catch (error) {
     logger.warn('db-common', 'Failed to update cache (non-critical):', error);

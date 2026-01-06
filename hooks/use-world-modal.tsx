@@ -92,18 +92,9 @@ export const useWorldModal = (options?: UseWorldModalOptions) => {
       return;
     }
     
-    let currentUserId = userId;
-    if (!currentUserId) {
-      const currentUser = await usersDB.getCurrentUser();
-      if (!currentUser?.id) {
-        logger.error('world-modal', 'No user ID available for delete operation');
-        return;
-      }
-      currentUserId = currentUser.id;
-    }
-    
     try {
-      await worldsDB.delete(worldId, currentUserId);
+      // validateUserForWrite() in worldsDB.delete() handles user validation
+      await worldsDB.delete(worldId);
       logger.info('world-modal', 'World deleted:', worldId);
       setEditModalVisible(false);
       // Refresh worlds list to remove deleted world

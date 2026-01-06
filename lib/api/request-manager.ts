@@ -201,13 +201,16 @@ class RequestManagerClass {
           timestamp: Date.now(),
         });
 
-        // Clean up after request completes (fire-and-forget cleanup chain).
-        // .finally() removes the key when settled. .catch(() => {}) suppresses
-        // unhandled rejection warnings from this cleanup chain specifically.
-        // The actual promise rejection is still propagated to the caller.
-        promise
-          .finally(() => this.pendingRequests.delete(key))
-          .catch(() => {}); // Suppress unhandled rejection from cleanup chain only
+        // Clean up pending request after it settles (success or failure).
+        // Uses a single .then() call with both onFulfilled and onRejected handlers
+        // to avoid creating intermediate promise chains that could accumulate if
+        // the same key is reused frequently with deduplication enabled.
+        // Both handlers do the same cleanup; the second .catch() only suppresses
+        // errors that might occur in the cleanup operation itself.
+        promise.then(
+          () => this.pendingRequests.delete(key),
+          () => this.pendingRequests.delete(key)
+        ).catch(() => {}); // Suppress any errors from cleanup function
       }
 
       return promise;
