@@ -87,12 +87,12 @@ export const AuthStateManager = {
         try {
           const key = 'dnd_session_user_email';
           window.localStorage.setItem(key, session.user.email);
-  } catch {
-          // ignore
+  } catch (error) {
+          logger.error('auth-state', 'Error caching session email:', error);
         }
       }
-    } catch {
-      logger.error('auth-state', '', );
+    } catch (error) {
+      logger.error('auth-state', 'Error saving auth state:', error);
     }
   },
 
@@ -100,8 +100,8 @@ export const AuthStateManager = {
   async clearAuthState(): Promise<void> {
     try {
       await storage.removeItem(STORAGE_KEYS.HAS_ACCOUNT);
-    } catch {
-      logger.error('auth-state', '', );
+    } catch (error) {
+      logger.error('auth-state', 'Error clearing auth state:', error);
     }
   },
 
@@ -126,17 +126,18 @@ export const AuthStateManager = {
         return authState.hasAccount;
       }
       
-      const { data: { user } } = await supabase.auth.getUser();
+      // Use cached session instead of getUser() to avoid network call
+      const { data: { session } } = await supabase.auth.getSession();
       
-      // User must exist and be confirmed
-      return !!(user && user.email_confirmed_at);
-    } catch {
-      logger.error('auth-state', '', );
+      // User must have active session and be confirmed
+      return !!(session?.user && session.user.email_confirmed_at);
+    } catch (error) {
+      logger.error('auth-state', 'Error checking authentication:', error);
       // On error, fall back to local auth state
       try {
         const authState = await this.getAuthState();
         return authState.hasAccount;
-  } catch {
+      } catch {
         return false;
       }
     }
@@ -205,7 +206,7 @@ export const AuthStateManager = {
       // No account and no session -> welcome
       return { routingDecision: 'welcome', profileId: null };
     } catch (error) {
-      logger.error('auth-state', '', error);
+      logger.error('auth-state', 'Error determining routing decision:', error);
       return { routingDecision: 'welcome', profileId: null };
     }
   }

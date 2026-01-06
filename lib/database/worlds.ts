@@ -1,4 +1,6 @@
+import { RequestManager } from '../api/request-manager';
 import { logger } from '../utils/logger';
+import { executeParallelQueries, getCurrentUserProfile, validateUserForWrite } from './common';
 import { supabase } from './supabase';
 
 // User role types for better type safety and maintainability
@@ -42,34 +44,23 @@ export interface CreateWorldData {
 export const worldsDB = {
   // Create a new world
   async create(worldData: CreateWorldData): Promise<World> {
-    // Get current user's auth ID for lookup
-    const { data: { user } } = await supabase.auth.getUser();
-    logger.debug('worlds', 'Auth user:', user); // DEBUG
-    if (!user) throw new Error('Not authenticated');
-
-    // Get the user's profile ID (this is what owner_id should reference)
-    const { data: currentUser } = await supabase
-      .from('users')
-      .select('id')
-      .eq('auth_id', user.id)
-      .single();
-
-    if (!currentUser) throw new Error('User profile not found');
+    // IMPORTANT: Always validate user before write operations
+    // Prevents orphaned data if account is suspended/deleted between check and write
+    const currentUser = await validateUserForWrite();
+    
+    logger.debug('worlds', 'Creating world for user:', currentUser.id);
 
     // Store profile ID as owner_id (proper FK relationship)
     const insertData = {
       ...worldData,
-      owner_id: currentUser.id // This is the profile ID: 797cefa7-6640-40a7-ba7a-91eee369faa3
+      owner_id: currentUser.id
     };
-    logger.debug('worlds', 'Insert data:', insertData); // DEBUG
 
     const { data, error } = await supabase
       .from('worlds')
       .insert(insertData)
       .select()
       .single();
-    
-    logger.debug('worlds', 'Insert result:', { data, error }); // DEBUG
     
     if (error) {
       logger.error('worlds', 'Error creating world:', error);
@@ -81,29 +72,25 @@ export const worldsDB = {
 
   // Get all worlds for current user (both owned and member of)
   async getMyWorlds(userId?: string): Promise<WorldWithAccess[]> {
-    let currentUserId: string;
-    
-    if (userId) {
-      // Use provided userId for optimization
-      currentUserId = userId;
-    } else {
-      // Fall back to getting current user from auth
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { data: currentUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('auth_id', user.id)
-        .single();
-
-      if (!currentUser) throw new Error('User profile not found');
+    // Handle case where user is not authenticated (e.g., during logout)
+    let currentUserId = userId;
+    if (!currentUserId) {
+      // Use getCurrentUserProfile to handle logout gracefully
+      const currentUser = await getCurrentUserProfile();
+      if (!currentUser) {
+        return []; // Return empty array if not authenticated (graceful during logout)
+      }
       currentUserId = currentUser.id;
     }
 
     // STEP 1: Get world IDs from both world_access and owned worlds in parallel
     // Uses indexes: idx_world_access_user_id, idx_worlds_owner_id
-    const [accessRecordsResult, ownedWorldIdsResult] = await Promise.all([
+    const [accessRecordsResult, ownedWorldIdsResult] = await executeParallelQueries<
+      [
+        { data: any[] | null; error: any },
+        { data: any[] | null; error: any }
+      ]
+    >(
       // Get world_access records where user_id matches (includes world_id and role)
       supabase
         .from('world_access')
@@ -115,7 +102,7 @@ export const worldsDB = {
         .from('worlds')
         .select('world_id')
         .eq('owner_id', currentUserId)
-    ]);
+    );
 
     if (accessRecordsResult.error) {
       logger.error('worlds', 'Error fetching access records:', accessRecordsResult.error);
@@ -204,12 +191,15 @@ export const worldsDB = {
   },
 
     // Update a world name (only owner)
-  async updateName(worldId: string, userId: string, newName: string): Promise<World> {
+  async updateName(worldId: string, newName: string): Promise<World> {
+    // Validate before write
+    const user = await validateUserForWrite();
+    
     const { data, error } = await supabase
       .from('worlds')
       .update({name: newName, updated_at: 'now()'})
       .eq('world_id', worldId)
-      .eq('owner_id', userId)
+      .eq('owner_id', user.id)
       .select()
       .single();
     
@@ -223,6 +213,9 @@ export const worldsDB = {
 
   // Update a world
   async update(worldId: string, updates: Partial<CreateWorldData>): Promise<World> {
+    // Validate before write
+    await validateUserForWrite();
+    
     const { data, error } = await supabase
       .from('worlds')
       .update({
@@ -242,12 +235,15 @@ export const worldsDB = {
   },
 
   // Delete a world
-  async delete(worldId: string, userId: string): Promise<void> {
+  async delete(worldId: string): Promise<void> {
+    // Validate before write
+    const user = await validateUserForWrite();
+    
     const { error } = await supabase
       .from('worlds')
       .delete()
       .eq('world_id', worldId)
-      .eq('owner_id', userId); // Ensure only owner can delete
+      .eq('owner_id', user.id); // Ensure only owner can delete
     
     if (error) {
       logger.error('worlds', 'Error deleting world:', error);
@@ -269,28 +265,45 @@ export const worldsDB = {
     }
   },
 
-    // Check if user is already in a world (either as owner or member)
+  // Check if user is already in a world (either as owner or member)
+  // Uses RequestManager for deduplication and retry
   async isUserInWorld(worldId: string, userId: string): Promise<boolean> {
-    // Check if user is the owner
-    const { data: world } = await supabase
-      .from('worlds')
-      .select('owner_id')
-      .eq('world_id', worldId)
-      .single();
+    const result = await RequestManager.fetch(
+      `world:access:${worldId}:${userId}`,
+      async () => {
+        // Combine both checks into parallel queries for efficiency
+        const [worldResult, accessResult] = await executeParallelQueries<
+          [
+            { data: any | null; error: any },
+            { data: any | null; error: any }
+          ]
+        >(
+          supabase
+            .from('worlds')
+            .select('owner_id')
+            .eq('world_id', worldId)
+            .eq('owner_id', userId)
+            .maybeSingle(),
+          
+          supabase
+            .from('world_access')
+            .select('id')
+            .eq('world_id', worldId)
+            .eq('user_id', userId)
+            .maybeSingle()
+        );
 
-    if (world && world.owner_id === userId) {
-      return true;
-    }
-
-    // Check if user has access via world_access table
-    const { data: access } = await supabase
-      .from('world_access')
-      .select('id')
-      .eq('world_id', worldId)
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    return !!access;
+        return !!worldResult.data || !!accessResult.data;
+      },
+      {
+        dedupe: true,
+        retries: 2,
+        timeout: 10000
+      }
+    );
+    
+    // If RequestManager returns null (failOpen flag), default to false for safety
+    return result ?? false;
   },
 
     // Add user to world (invite/join)
@@ -315,157 +328,73 @@ export const worldsDB = {
   },
 
   // Get all members of a world
-  async getWorldMembers(worldId: string): Promise<(WorldAccess & { user: any })[]> {
-    const { data, error } = await supabase
-      .from('world_access')
-      .select(`
-        *,
-        users(id, username)
-      `)
-      .eq('world_id', worldId)
-      .order('created_at', { ascending: false });
+  // Uses RequestManager for deduplication and retry
+  // Note: Returns null if RequestManager fails with failOpen enabled
+  async getWorldMembers(worldId: string): Promise<(WorldAccess & { user: any })[] | null> {
+    return RequestManager.fetch(
+      `world:members:${worldId}`,
+      async () => {
+        const { data, error } = await supabase
+          .from('world_access')
+          .select(`
+            *,
+            users(id, username)
+          `)
+          .eq('world_id', worldId)
+          .order('created_at', { ascending: false });
 
-    if (error) {
-      logger.error('worlds', 'Error fetching world members:', error);
-      throw new Error(error.message || 'Failed to fetch world members');
-    }
+        if (error) {
+          logger.error('worlds', 'Error fetching world members:', error);
+          throw new Error(error.message || 'Failed to fetch world members');
+        }
 
-    return data || [];
-  },
-
-  /**
-   * NOT NEEDED FUNCTIONS
-   * Get only worlds I own
-   * 
-   * INDEXES LEVERAGED:
-   * - idx_users_auth_id: Fast user profile lookup by auth ID
-   * - idx_worlds_owner_id: Fast owned worlds lookup
-   */
-    // Get a specific world by ID
-  async getById(worldId: string): Promise<World | null> {
-    const { data, error } = await supabase
-      .from('worlds')
-      .select('*')
-      .eq('world_id', worldId)
-      .single();
-    
-    if (error) {
-      if (error.code === 'PGRST116') {
-        // No rows returned
-        return null;
+        return data || [];
+      },
+      {
+        dedupe: true,
+        retries: 2,
+        timeout: 15000
       }
-      logger.error('worlds', 'Error fetching world:', error);
-      throw new Error(error.message || 'Failed to fetch world');
-    }
-    
-    return data;
-  },
-
-  async getOwnedWorlds(): Promise<World[]> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
-
-    // Get user profile ID (uses idx_users_auth_id)
-    const { data: currentUser } = await supabase
-      .from('users')
-      .select('id')
-      .eq('auth_id', user.id)
-      .single();
-
-    if (!currentUser) throw new Error('User profile not found');
-
-    // Fetch owned worlds (uses idx_worlds_owner_id)
-    const { data, error } = await supabase
-      .from('worlds')
-      .select('*')
-      .eq('owner_id', currentUser.id)
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-      logger.error('worlds', 'Error fetching owned worlds:', error);
-      throw new Error(error.message || 'Failed to fetch owned worlds');
-    }
-    
-    return data || [];
+    );
   },
 
   /**
-   * Get only worlds I'm a member of (not owner)
+   * Get a specific world by ID
+   * Uses RequestManager for deduplication and retry
    * 
-   * INDEXES LEVERAGED:
-   * - idx_users_auth_id: Fast user profile lookup by auth ID
-   * - idx_world_access_user_id: Fast access records lookup
-   * - idx_worlds_owner_id: Filter out owned worlds
+   * Returns null only when world is not found (error code PGRST116).
+   * Throws error on database failures or request failures.
+   * 
+   * @param worldId - The unique identifier of the world
+   * @returns The world data or null if not found
+   * @throws Error if database query fails or RequestManager encounters an error
    */
-  async getMemberWorlds(): Promise<WorldWithAccess[]> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
-
-    // Get user profile ID (uses idx_users_auth_id)
-    const { data: currentUser } = await supabase
-      .from('users')
-      .select('id')
-      .eq('auth_id', user.id)
-      .single();
-
-    if (!currentUser) throw new Error('User profile not found');
-
-    // STEP 1: Get world_access records (uses idx_world_access_user_id)
-    const { data: accessRecords, error: accessError } = await supabase
-      .from('world_access')
-      .select('world_id, user_role, permissions, created_at')
-      .eq('user_id', currentUser.id);
-
-    if (accessError) {
-      logger.error('worlds', 'Error fetching access records:', accessError);
-      throw new Error(accessError.message || 'Failed to fetch access records');
-    }
-
-    if (!accessRecords || accessRecords.length === 0) {
-      return [];
-    }
-
-    // STEP 2: Build role map and collect world IDs
-    const roleMap = new Map<string, { role: AccessRole; permissions: any; created_at: string }>();
-    const worldIds: string[] = [];
-
-    accessRecords.forEach((access: any) => {
-      worldIds.push(access.world_id);
-      roleMap.set(access.world_id, {
-        role: access.user_role,
-        permissions: access.permissions || {},
-        created_at: access.created_at
-      });
-    });
-
-    // STEP 3: Fetch all worlds in one query
-    const { data: worldsData, error: worldsError } = await supabase
-      .from('worlds')
-      .select('*')
-      .in('world_id', worldIds)
-      .neq('owner_id', currentUser.id) // Filter out worlds user owns
-      .order('created_at', { ascending: false });
-
-    if (worldsError) {
-      logger.error('worlds', 'Error fetching member worlds:', worldsError);
-      throw new Error(worldsError.message || 'Failed to fetch member worlds');
-    }
-
-    // STEP 4: Combine world data with access info
-    return (worldsData || []).map((world: World) => {
-      const accessInfo = roleMap.get(world.world_id);
-      return {
-        ...world,
-        world_access: {
-          id: '',
-          world_id: world.world_id,
-          user_id: currentUser.id,
-          user_role: accessInfo?.role || 'player',
-          permissions: accessInfo?.permissions || {},
-          created_at: accessInfo?.created_at || world.created_at
-        },
-        user_role: accessInfo?.role || 'player'
-      };
-    });
+  async getById(worldId: string): Promise<World | null> {
+    return RequestManager.fetch(
+      `world:detail:${worldId}`,
+      async () => {
+        const { data, error } = await supabase
+          .from('worlds')
+          .select('*')
+          .eq('world_id', worldId)
+          .single();
+        
+        if (error) {
+          if (error.code === 'PGRST116') {
+            // No rows returned
+            return null;
+          }
+          logger.error('worlds', 'Error fetching world:', error);
+          throw new Error(error.message || 'Failed to fetch world');
+        }
+        
+        return data;
+      },
+      {
+        dedupe: true,
+        retries: 3,
+        timeout: 15000
+      }
+    );
   },
 };

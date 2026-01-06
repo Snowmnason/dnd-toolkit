@@ -3,6 +3,9 @@
  * Centralizes all exports from lib/* so consumers can import from '@/lib'
  */
 
+// ===== API =====
+export * from './api/request-manager';
+
 // ===== Auth =====
 export * from './auth/authService';
 export * from './auth/emailUtils';
@@ -15,6 +18,7 @@ export * from './auth/useWelcomeScreen';
 export * from './auth/validation';
 
 // ===== Database =====
+export * from './database/common';
 export * from './database/invites';
 export * from './database/supabase';
 export * from './database/users';

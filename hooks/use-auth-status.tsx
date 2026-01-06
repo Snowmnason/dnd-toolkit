@@ -7,8 +7,9 @@ export function useAuthStatus() {
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        setIsUserLoggedIn(user !== null);
+        // Use cached session instead of making network call
+        const { data: { session } } = await supabase.auth.getSession();
+        setIsUserLoggedIn(session?.user !== null);
       } catch (error) {
         logger.error('auth', 'Error checking auth status:', error);
         setIsUserLoggedIn(false);

@@ -1,5 +1,7 @@
+import { RequestManager } from '../api/request-manager';
 import { validateUsername } from '../auth/validation';
 import { logger } from '../utils/logger';
+import { validateCurrentUser, validateUserForWrite } from './common';
 import { supabase } from './supabase';
 
 export interface User {
@@ -111,78 +113,91 @@ export const usersDB = {
     }
     
     // If not in storage, fetch from database
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+    // Use cached session instead of making network call (getUser)
+    const { data: { session }, error: authError } = await supabase.auth.getSession();
     
-    logger.debug('usersDB', 'Auth user fetch result:', {
-      hasAuthUser: !!authUser,
-      authUserId: authUser?.id,
+    logger.debug('usersDB', 'Auth session check result:', {
+      hasSession: !!session,
+      userId: session?.user?.id,
       authError: authError?.message
     });
     
     if (authError) {
-      // In a fresh app session with no existing auth, Supabase returns AuthSessionMissingError.
-      // Treat this as "not authenticated yet" instead of an error so callers can handle nulls.
-      const name = (authError as any)?.name ?? ''
-      const msg = (authError.message || '').toLowerCase()
-      const isSessionMissing = name === 'AuthSessionMissingError' || msg.includes('session missing')
-
-      if (isSessionMissing) {
-        logger.debug('usersDB', 'No auth session present yet (fresh session)');
-        return null
-      }
-
-      // Other auth errors are unexpected and should bubble up
       logger.error('usersDB', 'Auth error in getCurrentUser:', authError);
       throw new Error(authError.message || 'Authentication error');
     }
     
-    if (!authUser) {
-      logger.debug('usersDB', 'No authenticated user found');
+    if (!session?.user) {
+      logger.debug('usersDB', 'No authenticated user found (no session)');
       return null;
     }
-
-  logger.debug('usersDB', 'Fetching user profile from database for auth_id:', authUser.id);
-
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('auth_id', authUser.id)
-      .single();
     
-    if (error) {
-      if (error.code === 'PGRST116') {
-        // This is expected for new users who haven't created a profile yet
-        logger.debug('usersDB', 'No profile exists yet for user - this is expected for new users');
-        return null;
+    const authUser = session.user;
+    const authId = authUser.id;
+
+    logger.debug('usersDB', 'Fetching user profile from database for auth_id:', authId);
+
+    // Use RequestManager to wrap database fetch
+    // (storage-to-DB fallback is not deduplicated, only the DB call)
+    const data = await RequestManager.fetch(
+      `user:profile:${authId}`,
+      async () => {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('auth_id', authId)
+          .single();
+        
+        if (error) {
+          if (error.code === 'PGRST116') {
+            // This is expected for new users who haven't created a profile yet
+            logger.debug('usersDB', 'No profile exists yet for user - this is expected for new users');
+            return null;
+          }
+          
+          // Only log as error for unexpected database issues
+          logger.error('usersDB', 'Unexpected database error in getCurrentUser:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+            auth_id: authId
+          });
+          
+          throw new Error(error.message || 'Failed to fetch user profile');
+        }
+        
+        return data;
+      },
+      {
+        dedupe: true,
+        retries: 2,
+        timeout: 15000
       }
-      
-      // Only log as error for unexpected database issues
-      logger.error('usersDB', 'Unexpected database error in getCurrentUser:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint,
-        auth_id: authUser.id
+    );
+    
+    if (!data) {
+      // Note: null only means profile doesn't exist for new user (PGRST116 error).
+      // RequestManager errors are thrown (failOpen defaults to false), not returned as null.
+      logger.debug('usersDB', 'User profile is null - new user without profile yet', {
+        userId: authId
       });
-      
-      throw new Error(error.message || 'Failed to fetch user profile');
+      return null;
     }
     
     logger.info('usersDB', 'User profile fetched successfully:', {
-      id: data?.id,
-      auth_id: data?.auth_id,
-      username: data?.username,
-      created_at: data?.created_at
+      id: data.id,
+      auth_id: data.auth_id,
+      username: data.username,
+      created_at: data.created_at
     });
     
     // Save user data to local storage to avoid future database calls
-    if (data) {
-      try {
-        const { AuthStateManager } = await import('../auth-state');
-        await AuthStateManager.saveUserData(data);
-      } catch (storageError) {
-        logger.warn('usersDB', 'Failed to save user data to storage (non-critical):', storageError);
-      }
+    try {
+      const { AuthStateManager } = await import('../auth-state');
+      await AuthStateManager.saveUserData(data);
+    } catch (storageError) {
+      logger.warn('usersDB', 'Failed to save user data to storage (non-critical):', storageError);
     }
     
     return data;
@@ -190,11 +205,8 @@ export const usersDB = {
 
   // Update current user's profile with input validation
   async updateCurrentUser(updates: UpdateUserData): Promise<User> {
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    
-    if (!authUser) {
-      throw new Error('Not authenticated');
-    }
+    // Validate before write operation
+    const authUser = await validateUserForWrite();
 
     // Validate and sanitize username if being updated
     if (updates.username) {
@@ -232,9 +244,9 @@ export const usersDB = {
 
 
   async deleteCurrentUser(): Promise<boolean> {
-    // make sure we’re logged in so invoke sends a valid Authorization header
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error) throw new Error(error.message || 'Auth check failed');
+    // SECURITY-CRITICAL: Account deletion requires server validation
+    // Must use validateCurrentUser() to ensure user is truly authenticated with server
+    const user = await validateCurrentUser();
     if (!user) throw new Error('Not authenticated');
 
     // call your Edge Function by name (no URL needed, no body needed)

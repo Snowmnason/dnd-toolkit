@@ -32,11 +32,11 @@ export default function CompleteProfileScreen() {
     const checkAuthAndProfile = async () => {
       logger.info('complete-profile', 'Starting auth and profile check');
       try {
-        // First check Supabase auth session
-        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-        logger.debug('complete-profile', 'Auth user check result:', { 
-          hasAuthUser: !!authUser, 
-          authUserId: authUser?.id,
+        // Use cached session instead of making network call
+        const { data: { session }, error: authError } = await supabase.auth.getSession();
+        logger.debug('complete-profile', 'Auth session check result:', { 
+          hasSession: !!session, 
+          userId: session?.user?.id,
           authError: authError?.message 
         });
 
@@ -46,11 +46,13 @@ export default function CompleteProfileScreen() {
           return;
         }
 
-        if (!authUser) {
+        if (!session?.user) {
           logger.warn('complete-profile', 'No authenticated user found, redirecting to sign-in');
           router.replace('/login/sign-in');
           return;
         }
+        
+        const authUser = session.user;
 
         // Try to get existing profile (might not exist for new users)
         logger.debug('complete-profile', 'Fetching user profile from database');

@@ -44,7 +44,8 @@ const storage = {
 // Storage keys
 const STORAGE_KEYS = {
   HAS_ACCOUNT: 'dnd_has_account',
-  USER_DATA: 'dnd_user_data'
+  USER_DATA: 'dnd_user_data',
+  USER_DATA_TIMESTAMP: 'dnd_user_data_timestamp'  // Track when cache was last updated
 };
 
 export interface AuthState {
@@ -57,6 +58,9 @@ export interface StoredUserData {
   username: string;
   created_at: string;
 }
+
+// Cache expiration: 4 hours in milliseconds
+const CACHE_EXPIRATION_MS = 4 * 60 * 60 * 1000; // 14,400,000 ms
 
 export const AuthStateManager = {
   // Get current auth state
@@ -75,11 +79,13 @@ export const AuthStateManager = {
     }
   },
 
-  // Save user data to local storage
+  // Save user data to local storage with timestamp
   async saveUserData(userData: StoredUserData): Promise<void> {
     try {
       await storage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(userData));
-      logger.debug('auth-state', 'User data saved to storage:', { id: userData.id, username: userData.username });
+      // Store the timestamp when this cache was updated
+      await storage.setItem(STORAGE_KEYS.USER_DATA_TIMESTAMP, Date.now().toString());
+      logger.debug('auth-state', 'User data saved to storage with timestamp:', { id: userData.id, username: userData.username });
     } catch (error) {
       logger.error('auth-state', 'Error saving user data:', error);
     }
@@ -144,9 +150,35 @@ export const AuthStateManager = {
     try {
       await storage.removeItem(STORAGE_KEYS.HAS_ACCOUNT);
       await storage.removeItem(STORAGE_KEYS.USER_DATA);
+      await storage.removeItem(STORAGE_KEYS.USER_DATA_TIMESTAMP);
       logger.debug('auth-state', 'Auth state cleared');
     } catch (error) {
       logger.error('auth-state', 'Error clearing auth state:', error);
+    }
+  },
+
+  // Check if cached user data is still fresh (< 4 hours old)
+  async isCacheFresh(): Promise<boolean> {
+    try {
+      const timestampStr = await storage.getItem(STORAGE_KEYS.USER_DATA_TIMESTAMP);
+      if (!timestampStr) {
+        return false; // No timestamp = no cache
+      }
+      
+      const timestamp = parseInt(timestampStr, 10);
+      const age = Date.now() - timestamp;
+      const isFresh = age < CACHE_EXPIRATION_MS;
+      
+      logger.debug('auth-state', 'Cache freshness check:', {
+        age: `${Math.round(age / 1000 / 60)} minutes`,
+        maxAge: '240 minutes (4 hours)',
+        isFresh
+      });
+      
+      return isFresh;
+    } catch (error) {
+      logger.error('auth-state', 'Error checking cache freshness:', error);
+      return false;
     }
   },
 
@@ -171,10 +203,11 @@ export const AuthStateManager = {
         return authState.hasAccount;
       }
       
-      const { data: { user } } = await supabase.auth.getUser();
+      // Use cached session instead of getUser() to avoid network call
+      const { data: { session } } = await supabase.auth.getSession();
       
-      // User must exist and be confirmed
-      return !!(user && user.email_confirmed_at);
+      // User must have active session and be confirmed
+      return !!(session?.user && session.user.email_confirmed_at);
     } catch {
       logger.error('auth-state', '', );
       // On error, fall back to local auth state

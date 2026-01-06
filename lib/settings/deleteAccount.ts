@@ -1,6 +1,7 @@
 import { AuthStateManager } from '../auth/auth-state';
 import { validatePassword } from '../auth/validation';
 import { supabase } from '../database/supabase';
+import { validateCurrentUser } from '../database/common';
 import { usersDB } from '../database/users';
 import { logger } from '../utils/logger';
 
@@ -26,8 +27,10 @@ export async function deleteUserAccount(password: string): Promise<DeleteAccount
       throw new Error('Password contains invalid characters');
     }
 
-    // Get current authenticated user
-    const { data: { user: authUser } } = await supabase.auth.getUser();
+    // Get current authenticated user - MUST validate with server for security-critical operation
+    // Account deletion is a security-critical operation that requires fresh server validation
+    // Do NOT use cache-first approach here
+    const authUser = await validateCurrentUser();
     if (!authUser?.email) {
       throw new Error('Unable to verify current user');
     }
