@@ -267,12 +267,24 @@ For comprehensive release instructions across all platforms, see [Release Manage
 | `npm run desktop:dev` | Run desktop app locally |
 | `npm run clean` | Remove build artifacts |
 
+### **Metro Configuration**
+The project uses Sentry's Expo Metro configuration as a base. To add custom Metro settings (e.g., for additional asset types or resolver configurations), modify `metro.config.js` and merge your changes with the Sentry config.
+
 ### **Environment Setup**
-Create `.env.local` with your Supabase credentials:
+Create `.env.local` with your credentials:
 ```env
 EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+EXPO_PUBLIC_SENTRY_DSN=your_sentry_dsn
+SENTRY_AUTH_TOKEN=your_sentry_auth_token
+# Optional: Override default environment (development/production/staging)
+# EXPO_PUBLIC_ENVIRONMENT=staging
 ```
+
+**Sentry Configuration:**
+- **Development**: Debug mode enabled, full error sampling, filtered common dev errors
+- **Production**: Reduced error sampling (10%), optimized for performance
+- **Environment**: Automatically detected or set via `EXPO_PUBLIC_ENVIRONMENT`
 
 For desktop development, the web build must be available at `dist/`:
 ```bash

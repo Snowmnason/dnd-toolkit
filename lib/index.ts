@@ -28,6 +28,9 @@ export * from './settings/updateUsername';
 // ===== Utils =====
 export { default as Logger, logger } from './utils/logger';
 
+// ===== Error Handling =====
+export * from './error';
+
 // ===== Other top-level lib utilities =====
 export * from './auth-state';
 export * from './auth/encrypted-storage';

@@ -30,6 +30,7 @@ import {
     Title,
     ToggleGroup
 } from '@/components/ui'
+import { CrashTester } from '@/components/SplashScreen'
 
 import { $, useScale } from '@/theme'
 import React, { useState } from 'react'
@@ -37,6 +38,9 @@ import { ScrollView, Text, View } from 'react-native'
 
 export default function StyleMobile() {
   const S = useScale()
+  
+  // Crash tester state
+  const [triggerCrash, setTriggerCrash] = useState(false)
   
   // Simple display states
   const [primaryClicks, setPrimaryClicks] = useState(0)
@@ -76,6 +80,26 @@ export default function StyleMobile() {
         }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Crash Tester - Hidden component for testing error boundary */}
+        {triggerCrash && <CrashTester />}
+
+        {/* 🧪 Error Testing Section */}
+        <Card>
+          <Heading>🧪 Error Testing</Heading>
+          <Body style={{ marginTop: S.space.md, marginBottom: S.space.md }}>
+            Test the error boundary and Sentry crash reporting:
+          </Body>
+          <Button
+            text="💥 Trigger Crash"
+            variant="destructive"
+            onPress={() => setTriggerCrash(true)}
+            style={{ marginBottom: S.space.sm }}
+          />
+          <Caption style={{ opacity: 0.7 }}>
+            This will throw an error and show the crash fallback screen
+          </Caption>
+        </Card>
+
         <ThemeSelector />
 
         <Card>

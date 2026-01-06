@@ -53,3 +53,4 @@ app-example
 # MD files
 zRoadmap.md
 results.md
+.env.local

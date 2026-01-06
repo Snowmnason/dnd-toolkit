@@ -1,16 +1,68 @@
-import { AuthStateManager } from "@/lib";
+import { AuthStateManager, AppErrorBoundary } from "@/lib";
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { ThemeProvider, UseTheme } from "@/theme";
 import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
+import Constants from 'expo-constants';
 import LoadingOverlay from '../components/LoadingOverlay';
-import { SplashScreen } from '../components/SplashScreen';
+import { SplashScreen, CrashFallBack } from '../components/SplashScreen';
 import TopBar from '../components/TopBar';
 import { AppParamsProvider, useAppParams } from '../contexts/AppParamsContext';
 import { PlatformProvider, usePlatform } from '../contexts/PlatformContext';
 import { useAppBootstrap } from '../hooks/use-app-bootstrap';
 import { useSplashScreen } from '../hooks/use-splash-screen';
+import { APP_VERSION } from '../lib/version';
+import * as Sentry from '@sentry/react-native';
+
+// Get Sentry DSN from environment variables
+const sentryDsn =
+  process.env.EXPO_PUBLIC_SENTRY_DSN ||
+  Constants.expoConfig?.extra?.sentryDsn;
+
+// Get environment from Expo config or default to development/production
+const environment = process.env.EXPO_PUBLIC_ENVIRONMENT ||
+  Constants.expoConfig?.extra?.environment ||
+  (__DEV__ ? 'development' : 'production');
+
+Sentry.init({
+  dsn: sentryDsn,
+
+  // Environment-specific configuration
+  environment,
+  release: `dnd-toolkit@${APP_VERSION}`,
+
+  // Enable debug mode in development
+  debug: __DEV__,
+
+  // Sample rate for production (reduce noise)
+  sampleRate: __DEV__ ? 1.0 : 0.1,
+
+  // Adds more context data to events (IP address, cookies, user, etc.)
+  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
+  sendDefaultPii: true,
+
+  // Enable Logs in development only
+  enableLogs: __DEV__,
+
+  // Filter out development errors in production
+  beforeSend: (event) => {
+    // In development, only send errors that are not common development issues
+    if (__DEV__) {
+      // Filter out common development errors
+      if (event.exception?.values?.[0]?.value?.includes('Network request failed')) {
+        return null;
+      }
+      if (event.exception?.values?.[0]?.value?.includes('Loading chunk')) {
+        return null;
+      }
+    }
+    return event;
+  },
+
+  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
+  // spotlight: __DEV__,
+});
 
 function RootLayoutContent() {
   const { theme } = UseTheme();
@@ -263,14 +315,20 @@ function RootLayoutContent() {
   );
 }
 
-// Main export with provider wrapper
+// Main export with provider wrapper and error boundary
 export default function RootLayout() {
   return (
     <ThemeProvider>
       <ScaleProvider>
         <PlatformProvider>
           <AppParamsProvider>
-            <RootLayoutContent />
+            <AppErrorBoundary 
+              renderFallback={(error, onRetry) => (
+                <CrashFallBack error={error} onRetry={onRetry} />
+              )}
+            >
+              <RootLayoutContent />
+            </AppErrorBoundary>
           </AppParamsProvider>
         </PlatformProvider>
       </ScaleProvider>
