@@ -1,6 +1,6 @@
 {
   "name": "dnd-toolkit",
-  "version": "0.4.1",
+  "version": "0.5.1",
   "description": "D&D Toolkit Desktop App - Electron wrapper for the web build",
   "main": "dist/main.js",
   "author": {
@@ -21,7 +21,8 @@
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
     "dist:linux": "electron-builder --linux",
-    "dist:all": "electron-builder --win --mac --linux"
+    "dist:all": "electron-builder --win --mac --linux",
+    "lint": "expo lint"
   },
   "dependencies": {
     "electron-updater": "^6.1.7"

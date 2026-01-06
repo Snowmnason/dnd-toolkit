@@ -1,19 +1,19 @@
-import { AuthStateManager, AppErrorBoundary } from "@/lib";
+import { AppErrorBoundary, AuthStateManager } from "@/lib";
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { ThemeProvider, UseTheme } from "@/theme";
+import * as Sentry from '@sentry/react-native';
+import Constants from 'expo-constants';
 import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import Constants from 'expo-constants';
 import LoadingOverlay from '../components/LoadingOverlay';
-import { SplashScreen, CrashFallBack } from '../components/SplashScreen';
+import { CrashFallBack, SplashScreen } from '../components/SplashScreen';
 import TopBar from '../components/TopBar';
 import { AppParamsProvider, useAppParams } from '../contexts/AppParamsContext';
 import { PlatformProvider, usePlatform } from '../contexts/PlatformContext';
 import { useAppBootstrap } from '../hooks/use-app-bootstrap';
 import { useSplashScreen } from '../hooks/use-splash-screen';
 import { APP_VERSION } from '../lib/version';
-import * as Sentry from '@sentry/react-native';
 
 // Get Sentry DSN from environment variables
 const sentryDsn =
@@ -25,8 +25,10 @@ const environment = process.env.EXPO_PUBLIC_ENVIRONMENT ||
   Constants.expoConfig?.extra?.environment ||
   (__DEV__ ? 'development' : 'production');
 
-Sentry.init({
-  dsn: sentryDsn,
+// Only initialize Sentry if DSN is provided
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
 
   // Environment-specific configuration
   environment,
@@ -62,7 +64,10 @@ Sentry.init({
 
   // uncomment the line below to enable Spotlight (https://spotlightjs.com)
   // spotlight: __DEV__,
-});
+  });
+} else {
+  console.log('[Sentry] Disabled - no DSN provided');
+}
 
 function RootLayoutContent() {
   const { theme } = UseTheme();

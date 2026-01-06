@@ -7,6 +7,7 @@
 export * from './api/request-manager';
 
 // ===== Auth =====
+export * from './auth/auth-attempt-guard';
 export * from './auth/authService';
 export * from './auth/emailUtils';
 export * from './auth/redirectSafety';
