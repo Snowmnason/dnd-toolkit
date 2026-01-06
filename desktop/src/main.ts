@@ -69,7 +69,7 @@ function createWindow(): void {
     minWidth: 800,
     minHeight: 600,
     title: 'DnD-Toolkit',
-    icon: path.join(__dirname, '../assets/images/icon.png'),
+    icon: path.join(__dirname, '../assets/images/icon.ico'),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1a1a2e' : '#f5f5f5',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -231,18 +231,8 @@ app.whenReady().then(() => {
   // Register custom protocol handler for production builds
   if (!isDev) {
     // In packaged app: app.getAppPath() = app.asar/
-    // We need: resources/web-build/
-    // So we go up from asar and into resources
-    let webBuildDir: string;
-    
-    if (process.platform === 'win32') {
-      // On Windows: C:\Users\...\AppData\Local\Programs\DnD-Toolkit\resources\app.asar
-      // We want: C:\Users\...\AppData\Local\Programs\DnD-Toolkit\resources\web-build
-      webBuildDir = path.join(app.getAppPath(), '..', 'web-build');
-    } else {
-      // On macOS/Linux, the structure is similar
-      webBuildDir = path.join(app.getAppPath(), '..', 'web-build');
-    }
+    // We need: resources/web-build/ (same resolution across platforms)
+    const webBuildDir = path.join(app.getAppPath(), '..', 'web-build');
     
     console.log('[Electron] isDev:', isDev);
     console.log('[Electron] App path:', app.getAppPath());
@@ -275,21 +265,31 @@ app.whenReady().then(() => {
       if (!requestUrl || requestUrl === '') {
         requestUrl = 'index.html';
       }
+
+      // Normalize and guard against traversal
+      const normalizedPath = path.normalize(requestUrl);
+      const candidatePath = path.join(webBuildDir, normalizedPath);
+      const resolvedRoot = path.resolve(webBuildDir);
+      const resolvedCandidate = path.resolve(candidatePath);
+
+      if (!resolvedCandidate.startsWith(resolvedRoot)) {
+        console.error('[Electron] Blocked path traversal:', request.url, '→', resolvedCandidate);
+        return new Response('Forbidden', { status: 403 });
+      }
       
-      const filePath = path.join(webBuildDir, requestUrl);
-      console.log('[Electron] Protocol request:', request.url, '→', filePath, 'exists:', fs.existsSync(filePath));
+      console.log('[Electron] Protocol request:', request.url, '→', resolvedCandidate, 'exists:', fs.existsSync(resolvedCandidate));
       
       try {
-        const fileContent = fs.readFileSync(filePath);
-        console.log('[Electron] Loaded:', filePath);
+        const fileContent = fs.readFileSync(resolvedCandidate);
+        console.log('[Electron] Loaded:', resolvedCandidate);
         return new Response(fileContent, {
           headers: {
-            'content-type': getContentType(filePath),
+            'content-type': getContentType(resolvedCandidate),
           },
         });
       } catch (error) {
-        console.error('[Electron] Failed to load file:', filePath, error);
-        return new Response('File not found: ' + filePath, { status: 404 });
+        console.error('[Electron] Failed to load file:', resolvedCandidate, error);
+        return new Response('File not found: ' + resolvedCandidate, { status: 404 });
       }
     });
   }

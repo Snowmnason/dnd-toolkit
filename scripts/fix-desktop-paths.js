@@ -15,53 +15,36 @@ const __dirname = dirname(__filename);
 
 const distDir = path.join(__dirname, '..', 'dist');
 
-// Recursively find all HTML files
-function findHtmlFiles(dir) {
-  const htmlFiles = [];
-  
+// Recursively find files by extension
+function findFilesByExtension(dir, extension) {
+  const matches = [];
+
   try {
     const files = readdirSync(dir);
-    
+
     files.forEach((file) => {
       const filePath = path.join(dir, file);
       const stat = statSync(filePath);
-      
+
       if (stat.isDirectory()) {
-        htmlFiles.push(...findHtmlFiles(filePath));
-      } else if (file.endsWith('.html')) {
-        htmlFiles.push(filePath);
+        matches.push(...findFilesByExtension(filePath, extension));
+      } else if (file.endsWith(extension)) {
+        matches.push(filePath);
       }
     });
   } catch (error) {
     console.error(`Error reading directory ${dir}:`, error.message);
   }
-  
-  return htmlFiles;
+
+  return matches;
 }
 
-const htmlFiles = findHtmlFiles(distDir);
+const htmlFiles = findFilesByExtension(distDir, '.html');
 
 console.log(`[Fix Desktop Paths] Found ${htmlFiles.length} HTML files`);
 
 // Also find and fix JS bundles
-const jsFiles = [];
-function findJsFiles(dir) {
-  try {
-    const files = readdirSync(dir);
-    files.forEach((file) => {
-      const filePath = path.join(dir, file);
-      const stat = statSync(filePath);
-      if (stat.isDirectory()) {
-        findJsFiles(filePath);
-      } else if (file.endsWith('.js')) {
-        jsFiles.push(filePath);
-      }
-    });
-  } catch (error) {
-    console.error(`Error reading directory ${dir}:`, error.message);
-  }
-}
-findJsFiles(distDir);
+const jsFiles = findFilesByExtension(distDir, '.js');
 
 console.log(`[Fix Desktop Paths] Found ${jsFiles.length} JS files`);
 
@@ -72,7 +55,6 @@ htmlFiles.forEach((filePath) => {
     const originalContent = content;
 
     // Replace absolute paths with app:// protocol paths for Electron
-    // This allows proper asset resolution with custom protocol handler
     // /_expo/static -> app://_expo/static
     content = content.replace(/href="\/_expo\//g, 'href="app://_expo/');
     content = content.replace(/src="\/_expo\//g, 'src="app://_expo/');
@@ -102,9 +84,9 @@ jsFiles.forEach((filePath) => {
 
     // Replace absolute paths in JS strings with app:// protocol
     // Match patterns like "/_expo/static" in string literals
-    content = content.replace(/"\/\_expo\//g, '"app://_expo/');
-    content = content.replace(/'\/\_expo\//g, "'app://_expo/");
-    content = content.replace(/`\/\_expo\//g, '`app://_expo/');
+    content = content.replace(/"\/_expo\//g, '"app://_expo/');
+    content = content.replace(/'\/_expo\//g, "'app://_expo/");
+    content = content.replace(/`\/_expo\//g, '`app://_expo/');
     
     // Match /assets/ paths
     content = content.replace(/"\/assets\//g, '"app://assets/');

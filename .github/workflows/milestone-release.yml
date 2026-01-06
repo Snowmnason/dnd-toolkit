@@ -125,8 +125,8 @@ jobs:
       - name: Build desktop TypeScript
         run: cd desktop && npm run build
 
-      - name: Build web export
-        run: npm run predeploy
+      - name: Build web export (desktop)
+        run: npm run predeploy:desktop
 
       - name: Build desktop for Windows
         if: matrix.os == 'windows-latest'
