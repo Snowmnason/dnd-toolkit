@@ -1,42 +1,42 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { ThemeSelector } from '@/Screens/settings/ThemeSelector'
+import { CrashTester } from '@/components/SplashScreen'
 import {
-    Accordion,
-    AppModal,
-    AppToast,
-    AppTooltip,
-    Body,
-    Button,
-    ButtonGroup,
-    Caption,
-    Card,
-    CustomLoad,
-    DescInput,
-    Dropdown,
-    DropdownGroup,
-    Heading,
-    IconButton,
-    Link,
-    ObjHeading,
-    Paragraph,
-    RadioButtonGroup,
-    SnackBar,
-    SubTitle,
-    Surface,
-    Switch,
-    SwitchGroup,
-    Tabs,
-    TextInput,
-    TextInputGroup,
-    Title,
-    ToggleGroup
+  Accordion,
+  AppModal,
+  AppToast,
+  AppTooltip,
+  Body,
+  Button,
+  ButtonGroup,
+  Caption,
+  Card,
+  CustomLoad,
+  DescInput,
+  Dropdown,
+  DropdownGroup,
+  Heading,
+  IconButton,
+  Link,
+  ObjHeading,
+  Paragraph,
+  RadioButtonGroup,
+  SnackBar,
+  SubTitle,
+  Surface,
+  Switch,
+  SwitchGroup,
+  Tabs,
+  TextInput,
+  TextInputGroup,
+  Title,
+  ToggleGroup
 } from '@/components/ui'
 import { AppSplit } from '@/components/ui/AppView'
-import { CrashTester } from '@/components/SplashScreen'
 
 
 import { $, UseTheme, useScale } from '@/theme'
-import React, { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ScrollView, Text, View } from 'react-native'
 
 export default function StyleDesktop() {
@@ -67,14 +67,14 @@ export default function StyleDesktop() {
   const [colorTabValue, setColorTabValue] = useState('textPrimary')
   
   // Refs to access group components
-  const buttonGroupRef = React.useRef<any>(null)
-  const textInputGroupRef = React.useRef<any>(null)
-  const dropdownGroupRef = React.useRef<any>(null)
-  const switchGroupRef = React.useRef<any>(null)
-  const switchGroupExclusiveRef = React.useRef<any>(null)
-  const switchGroupMaxRef = React.useRef<any>(null)
-  const radioGroupRef = React.useRef<any>(null)
-  const toggleGroupRef = React.useRef<any>(null)
+  const buttonGroupRef = useRef<any>(null)
+  const textInputGroupRef = useRef<any>(null)
+  const dropdownGroupRef = useRef<any>(null)
+  const switchGroupRef = useRef<any>(null)
+  const switchGroupExclusiveRef = useRef<any>(null)
+  const switchGroupMaxRef = useRef<any>(null)
+  const radioGroupRef = useRef<any>(null)
+  const toggleGroupRef = useRef<any>(null)
   
   // Modal/Toast/Snackbar states
   const [modalVisible, setModalVisible] = useState(false)
@@ -86,7 +86,9 @@ export default function StyleDesktop() {
   const [snackVisible, setSnackVisible] = useState(false)
 
   return (
-    <AppSplit 
+    <AppSplit
+      verticalPadding="none"
+      horizontalPadding='xs'
       left={
         <ScrollView style={{  }}>
           {/* Crash Tester - Hidden component for testing error boundary */}

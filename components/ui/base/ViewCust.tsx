@@ -1,11 +1,10 @@
 import { ReactNode } from "react";
 import {
-    Platform,
-    ScrollView,
-    StyleProp,
-    View,
-    ViewProps,
-    ViewStyle,
+  ScrollView,
+  StyleProp,
+  View,
+  ViewProps,
+  ViewStyle
 } from "react-native";
 import { GradientView } from "../Resuables/gradients";
 
@@ -76,8 +75,8 @@ export function ViewCust({
     // Split style into wrapper styles (border, radius, shadow, dimensions) and inner styles (padding, margin, flex layout)
     const flatStyle = Array.isArray(style) ? Object.assign({}, ...style.filter(Boolean)) : (style || {});
     
-    const wrapperStyle: any = {};
-    const innerStyle: any = {};
+    const wrapperStyle: ViewStyle = {};
+    const innerStyle: ViewStyle = {};
     
     // Distribute styles appropriately
     Object.entries(flatStyle).forEach(([key, value]) => {
@@ -93,7 +92,8 @@ export function ViewCust({
         key === 'elevation' ||
         key.startsWith('margin')  // Margin controls spacing BETWEEN components
       ) {
-        wrapperStyle[key] = value;
+        // eslint-disable-next-line security/detect-object-injection
+        (wrapperStyle as any)[key] = value;
       }
       // Inner gets: padding (internal spacing), flex layout, positioning
       else if (
@@ -103,7 +103,8 @@ export function ViewCust({
         key.startsWith('justify') ||
         key === 'gap'
       ) {
-        innerStyle[key] = value;
+        // eslint-disable-next-line security/detect-object-injection
+        (innerStyle as any)[key] = value;
       }
       // Background goes nowhere (gradient provides it)
       else if (key === 'backgroundColor') {
@@ -111,7 +112,8 @@ export function ViewCust({
       }
       // Everything else to inner
       else {
-        innerStyle[key] = value;
+        // eslint-disable-next-line security/detect-object-injection
+        (innerStyle as any)[key] = value;
       }
     });
     
@@ -136,7 +138,7 @@ export function ViewCust({
             {children}
           </ScrollView>
         ) : (
-          <View style={{ backgroundColor: 'transparent', border: 'none', ...innerStyle }} {...rest}>
+          <View style={{ backgroundColor: 'transparent', ...innerStyle }} {...rest}>
             {children}
           </View>
         )}
@@ -148,11 +150,7 @@ export function ViewCust({
   if (scroll) {
     return (
       <ScrollView
-        style={[
-          style,
-          // On web, allow horizontal overflow so shadows aren't clipped
-          Platform.OS === 'web' ? { overflow: 'visible' as any } : undefined
-        ]}
+        style={style}
         contentContainerStyle={contentContainerStyle}
         showsVerticalScrollIndicator={showScrollIndicator}
         {...rest}

@@ -2,7 +2,10 @@ import { AppPage, Body, Title } from '@/components/ui';
 
 export default function PartyOverviewPage() {
   return (
-    <AppPage style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+    <AppPage 
+      style={{ flex: 1, padding: 20 }}
+      contentContainerStyle={{ justifyContent: 'center', alignItems: 'center' }}
+    >
       <Title style={{ marginBottom: 20 }}>
         Party Overview
       </Title>

@@ -49,7 +49,8 @@ export function AppText({
   const resolvedFontSize = (() => {
     if (typeof fontSize === 'string' && fontSize.startsWith('$')) {
       const token = fontSize.slice(1) as keyof typeof S.font
-      const tokenValue = S.font[token]
+      // Safe access: token is constrained to keyof typeof S.font
+      const tokenValue = S.font[token as keyof typeof S.font]
       if (typeof tokenValue === 'number') {
         return tokenValue
       }
@@ -68,7 +69,8 @@ export function AppText({
     if (color) {
       if (typeof color === 'string' && color.startsWith('$')) {
         const token = color.slice(1) as keyof typeof theme
-        const tokenValue = theme[token]
+        // Safe access: token is constrained to keyof typeof theme
+        const tokenValue = theme[token as keyof typeof theme]
         if (typeof tokenValue === 'string') {
           return tokenValue
         }

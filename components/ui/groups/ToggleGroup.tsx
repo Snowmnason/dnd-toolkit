@@ -1,10 +1,10 @@
 import { Body, ObjHeading } from '@/components/ui/AppText'
 import { $, useScale, UseTheme, type Sizing } from '@/theme'
 import React, {
-  forwardRef,
-  useEffect,
-  useImperativeHandle,
-  useState,
+    forwardRef,
+    useEffect,
+    useImperativeHandle,
+    useState,
 } from 'react'
 import { TouchableOpacity, View } from 'react-native'
 import { GroupView } from '../Resuables/SpecializedViews'
@@ -140,7 +140,7 @@ export const ToggleGroup = forwardRef<ToggleGroupRef, ToggleGroupProps>(
             flexDirection: direction === 'horizontal' ? 'row' : 'column',
             alignItems: direction === 'horizontal' ? 'center' : 'flex-start',
             justifyContent: direction === 'horizontal' ? 'space-evenly' : 'flex-start',
-            gap: S.space[spacing],
+            gap: S.space[spacing as keyof typeof S.space],
           }}
         >
           {items.map((item) => {

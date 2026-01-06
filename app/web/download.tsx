@@ -30,7 +30,8 @@ function getPlatformName(platform: PlatformType): string {
     linux: 'Linux',
     unknown: 'Your Device'
   }
-  return names[platform]
+  // Safe access: platform is constrained to PlatformType which has all keys in names
+  return names[platform as PlatformType]
 }
 
 export default function DownloadScreen() {

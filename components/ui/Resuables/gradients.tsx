@@ -103,7 +103,7 @@ export function gradient(config: GradientConfig): any {
     
     if (locations && locations.length === colors.length) {
       // Custom locations provided
-      colorStops = colors.map((color, i) => `${color} ${locations[i]}%`)
+      colorStops = colors.map((color, i) => `${color} ${locations[i as keyof typeof locations]}%`)
     } else {
       // Auto-distribute evenly
       const step = 100 / (colors.length - 1)
@@ -353,7 +353,7 @@ export function GradientView({
     let colorStops: string[]
     if (locations && locations.length === gradientColors.length) {
       // Custom locations provided
-      colorStops = gradientColors.map((c, i) => `${c} ${locations[i]}%`)
+      colorStops = gradientColors.map((c, i) => `${c} ${locations[i as keyof typeof locations]}%`)
     } else if (gradientColors.length === 2 && !locations) {
       // Simple 2-color with transition midpoint
       // transitionPoint is where the colors meet 50/50

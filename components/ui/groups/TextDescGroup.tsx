@@ -113,7 +113,7 @@ export const TextDescGroup = forwardRef<TextDescGroupRef, TextDescGroupProps>(
         <View
           style={{
             flexDirection: direction === 'horizontal' ? 'row' : 'column',
-            gap: S.space[spacing],
+            gap: S.space[spacing as keyof typeof S.space],
           }}
         >
           {items.map((item, index) => (

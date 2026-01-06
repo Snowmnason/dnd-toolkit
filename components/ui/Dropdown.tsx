@@ -3,21 +3,21 @@ import { Body, ObjHeading, TextType } from '@/components/ui/AppText'
 import { $, tone, useScale, UseTheme } from '@/theme'
 import { useMemo, useRef, useState } from 'react'
 import {
-    FlatList,
-    Modal,
-    Platform,
-    Pressable,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native'
 import Animated, {
-    runOnJS,
-    useAnimatedStyle,
-    useSharedValue,
-    withSpring,
-    withTiming,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
 } from 'react-native-reanimated'
 
 interface DropdownItem {
@@ -25,12 +25,13 @@ interface DropdownItem {
   value: string
 }
 
-interface DropdownItemProps {
+interface DropdownItemComponentProps {
   item: DropdownItem
   isSelected: boolean
   onPress: () => void
   borderColor: string
   S: ReturnType<typeof useScale>
+  theme: ReturnType<typeof UseTheme>['theme']
 }
 
 function DropdownItemComponent({
@@ -39,16 +40,17 @@ function DropdownItemComponent({
   onPress,
   borderColor,
   S,
-}: DropdownItemProps) {
+  theme,
+}: DropdownItemComponentProps) {
     // All hooks at the top before any other logic
   const hoverScale = useSharedValue(1)
   const hoverOpacity = useSharedValue(0)
   
-    // Get colors first (these use hooks internally)
-  const selectedBg = $('background')
-  const hoverBg = $('accent')
-  const selectedTextColor = $('textPrimary')
-  const defaultTextColor = $('textInverse')
+    // Get colors using explicit theme to avoid hook calls in conditionally rendered component
+  const selectedBg = $('background', theme)
+  const hoverBg = $('accent', theme)
+  const selectedTextColor = $('textPrimary', theme)
+  const defaultTextColor = $('textInverse', theme)
 
     // Then animated styles (these also use hooks)
     const hoverStyle = useAnimatedStyle(() => ({
@@ -288,13 +290,13 @@ export default function Dropdown({
 
             {/* Positioned container with safety padding so clicks near dropdown won't close */}
             <View
-              pointerEvents="box-none"
               style={{
                 position: 'absolute',
                 top: Math.max(anchor.y - SAFE_AREA, 0),
                 left: Math.max(anchor.x - SAFE_AREA, 0),
                 width: anchor.width + SAFE_AREA * 2,
                 padding: SAFE_AREA,
+                pointerEvents: 'box-none',
               }}
             >
               <Animated.View
@@ -307,10 +309,10 @@ export default function Dropdown({
                     borderRadius: S.radius.md,
                     maxHeight: computedMaxHeight,
                     transformOrigin: 'top center',
+                    pointerEvents: 'auto',
                   },
                   dropdownAnimStyle,
                 ]}
-                pointerEvents="auto"
               >
           {enableSearch && (
             <View
@@ -371,6 +373,7 @@ export default function Dropdown({
                 }}
                 borderColor={borderColor}
                 S={S}
+                theme={theme}
               />
             )}
           />

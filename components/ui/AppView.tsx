@@ -45,6 +45,10 @@ export interface AppSplitViewProps extends AppViewProps {
   animateRightSlide?: boolean;
   /** Controls visibility of right panel when animation is enabled */
   rightVisible?: boolean;
+  /** Padding on top/bottom. Defaults to gap value. Use 'none' to remove. */
+  verticalPadding?: SpaceKey | "none";
+  /** Padding on left/right. Defaults to gap value. Use 'none' to remove. */
+  horizontalPadding?: SpaceKey | "none";
 }
 
 export interface AppLoadingViewProps extends ViewProps {
@@ -104,7 +108,8 @@ export function AppPage({
         style={[
           {
             flex: 1,
-            padding: S.space[gap],
+            // Safe access: gap is constrained to SpaceKey
+            padding: S.space[gap as SpaceKey],
             backgroundColor,
           },
           style,
@@ -139,11 +144,22 @@ export function AppSplit({
   showScrollIndicator = false,
   animateRightSlide = false,
   rightVisible = true,
+  verticalPadding = 'none',
+  horizontalPadding = 'xs',
   ...rest
 }: AppSplitViewProps) {
   const S = useScale();
   // no-op; $() handles CSS vars on web
   const { isDesktop, width } = usePlatform();
+
+  // Resolve padding values
+  const vPadding = verticalPadding === undefined ? gap : verticalPadding;
+  const hPadding = horizontalPadding === undefined ? gap : horizontalPadding;
+  
+  const paddingTop = vPadding === "none" ? 0 : S.space[vPadding as SpaceKey];
+  const paddingBottom = vPadding === "none" ? 0 : S.space[vPadding as SpaceKey];
+  const paddingLeft = hPadding === "none" ? 0 : S.space[hPadding as SpaceKey];
+  const paddingRight = hPadding === "none" ? 0 : S.space[hPadding as SpaceKey];
 
   // Shared value to animate right panel in/out on mobile
   const slideProgress = useSharedValue(rightVisible ? 1 : 0);
@@ -176,7 +192,10 @@ export function AppSplit({
           flex: 1,
           flexDirection: isDesktop ? "row" : "column",
           backgroundColor: $("background"),
-          padding: S.space[gap],
+          paddingTop,
+          paddingBottom,
+          paddingLeft,
+          paddingRight,
         },
       ]}
       {...rest}
@@ -216,10 +235,11 @@ export function AppSplit({
             style={[
               {
                 position: "absolute",
-                left: S.space[gap],
-                right: S.space[gap],
-                top: S.space[gap],
-                bottom: S.space[gap],
+                // Safe access: gap is constrained to SpaceKey
+                left: S.space[gap as SpaceKey],
+                right: S.space[gap as SpaceKey],
+                top: S.space[gap as SpaceKey],
+                bottom: S.space[gap as SpaceKey],
                 backgroundColor: $("background"),
                 // Ensure it overlays the left content during slide
                 zIndex: 10,
