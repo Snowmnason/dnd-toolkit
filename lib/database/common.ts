@@ -16,7 +16,7 @@ import type { User } from './users';
  * @throws Error if auth succeeds but profile not found (data inconsistency)
  * 
  * Usage:
- * - Regular reads: `getCurrentUserProfile()` - uses cache if < 4 hours
+ * - Regular reads: `getCurrentUserProfile()` - uses cache if up to 4 hours old
  * - Live data: `getCurrentUserProfile(true)` - always fetches fresh
  */
 export async function getCurrentUserProfile(forceRefresh = false): Promise<User | null> {
@@ -28,7 +28,7 @@ export async function getCurrentUserProfile(forceRefresh = false): Promise<User 
       const cachedUser = await AuthStateManager.getUserData();
       
       if (cachedUser) {
-        // Check if cache is still fresh (< 4 hours old)
+        // Check if cache is still fresh (up to 4 hours old)
         const isFresh = await AuthStateManager.isCacheFresh();
         if (isFresh) {
           logger.debug('db-common', 'User profile loaded from fresh cache');

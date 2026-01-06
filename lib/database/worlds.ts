@@ -1,7 +1,7 @@
 import { logger } from '../utils/logger';
 import { supabase } from './supabase';
 import { getCurrentUserProfile, executeParallelQueries, validateUserForWrite } from './common';
-import { RequestManager } from '../index';
+import { RequestManager } from '../api/request-manager';
 
 // User role types for better type safety and maintainability
 export type UserRole = 'owner' | 'dm' | 'player';
@@ -191,7 +191,7 @@ export const worldsDB = {
   },
 
     // Update a world name (only owner)
-  async updateName(worldId: string, userId: string, newName: string): Promise<World> {
+  async updateName(worldId: string, newName: string): Promise<World> {
     // Validate before write
     const user = await validateUserForWrite();
     

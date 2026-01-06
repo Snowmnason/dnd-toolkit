@@ -2,7 +2,7 @@ import { validateUsername } from '../auth/validation';
 import { logger } from '../utils/logger';
 import { validateCurrentUser, validateUserForWrite } from './common';
 import { supabase } from './supabase';
-import { RequestManager } from '../index';
+import { RequestManager } from '../api/request-manager';
 
 export interface User {
   id: string;
@@ -177,6 +177,13 @@ export const usersDB = {
     );
     
     if (!data) {
+      // Note: null could mean either:
+      // 1. No profile exists for new user (expected - DB returned null for PGRST116)
+      // 2. RequestManager request failed with failOpen=true (check logs for "RequestManager failed" warning)
+      // Check logs with 'RequestManager failed' to distinguish between these cases
+      logger.debug('usersDB', 'User profile is null (either new user or request failed with failOpen)', {
+        userId: authId
+      });
       return null;
     }
     

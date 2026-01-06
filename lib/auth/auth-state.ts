@@ -100,8 +100,8 @@ export const AuthStateManager = {
   async clearAuthState(): Promise<void> {
     try {
       await storage.removeItem(STORAGE_KEYS.HAS_ACCOUNT);
-    } catch {
-      logger.error('auth-state', '', );
+    } catch (error) {
+      logger.error('auth-state', 'Error clearing auth state:', error);
     }
   },
 
@@ -131,8 +131,8 @@ export const AuthStateManager = {
       
       // User must have active session and be confirmed
       return !!(session?.user && session.user.email_confirmed_at);
-    } catch {
-      logger.error('auth-state', '', );
+    } catch (error) {
+      logger.error('auth-state', 'Error checking authentication:', error);
       // On error, fall back to local auth state
       try {
         const authState = await this.getAuthState();
@@ -206,7 +206,7 @@ export const AuthStateManager = {
       // No account and no session -> welcome
       return { routingDecision: 'welcome', profileId: null };
     } catch (error) {
-      logger.error('auth-state', '', error);
+      logger.error('auth-state', 'Error determining routing decision:', error);
       return { routingDecision: 'welcome', profileId: null };
     }
   }

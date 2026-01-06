@@ -43,6 +43,7 @@ interface PendingRequest {
 interface RateLimitBucket {
   tokens: number;
   lastRefill: number;
+  lastAccess: number; // Track last access time for cleanup
 }
 
 // ==========================================
@@ -75,22 +76,72 @@ class RequestManagerClass {
   
   /** Rate limit buckets by key */
   private rateLimitBuckets: Map<string, RateLimitBucket> = new Map();
-
-  /**
-   * Hook for offline request buffering (future implementation)
-   * Currently stubbed - can be implemented to queue failed requests
-   */
-  onOfflineBuffer?: (
-    key: string,
-    fetcher: () => Promise<any>,
-    error: Error
-  ) => Promise<void>;
-
-  /**
-   * Hook for offline detection
-   * When set, RequestManager can short-circuit to fail-open
-   */
+  
+  /** Periodic cleanup timer to prevent memory leaks */
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null;
+  
+  /** Cleanup interval: 1 hour */
+  private readonly CLEANUP_INTERVAL = 60 * 60 * 1000;
+  
+  /** Stale entry threshold: 1 hour of inactivity */
+  private readonly STALE_THRESHOLD = 60 * 60 * 1000;
+  
+  /** Hook for offline detection - can short-circuit to fail-open */
   onOfflineDetect?: () => boolean | Promise<boolean>;
+
+  constructor() {
+    // Start periodic cleanup of stale rate limit buckets
+    this.startCleanupTimer();
+  }
+
+  /**
+   * Start periodic cleanup of stale rate limit buckets
+   */
+  private startCleanupTimer(): void {
+    // Only start if not already running
+    if (this.cleanupTimer) return;
+    
+    this.cleanupTimer = setInterval(() => {
+      this.cleanupStaleEntries();
+    }, this.CLEANUP_INTERVAL);
+    
+    // Make timer non-blocking (won't prevent process exit) on Node.js
+    if (typeof this.cleanupTimer === 'object' && 'unref' in this.cleanupTimer) {
+      (this.cleanupTimer as any).unref();
+    }
+  }
+
+  /**
+   * Stop the cleanup timer (useful for testing or cleanup)
+   */
+  private stopCleanupTimer(): void {
+    if (this.cleanupTimer !== null) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
+  }
+
+  /**
+   * Remove stale rate limit bucket entries that haven't been accessed
+   * This prevents unbounded memory growth in long-running applications
+   */
+  private cleanupStaleEntries(): void {
+    const now = Date.now();
+    let removedCount = 0;
+
+    // Convert Map entries to array to avoid downlevelIteration issues
+    const entries = Array.from(this.rateLimitBuckets.entries());
+    for (const [key, bucket] of entries) {
+      if (now - bucket.lastAccess > this.STALE_THRESHOLD) {
+        this.rateLimitBuckets.delete(key);
+        removedCount++;
+      }
+    }
+
+    if (removedCount > 0) {
+      logger.debug('request-manager', `Cleaned up ${removedCount} stale rate limit buckets`);
+    }
+  }
 
   /**
    * Execute a request with optional dedupe, retry, and rate limiting
@@ -114,46 +165,49 @@ class RequestManagerClass {
     fetcher: () => Promise<T>,
     options: RequestOptions = {}
   ): Promise<T | null> {
-    const opts = { ...DEFAULT_OPTIONS, ...options };
+    const options_ = { ...DEFAULT_OPTIONS, ...options };
 
     try {
       // ========== DEDUPE CHECK ==========
-      if (opts.dedupe && this.pendingRequests.has(key)) {
+      if (options_.dedupe && this.pendingRequests.has(key)) {
         logger.debug('request-manager', 'Returning deduplicated request:', key);
         return this.pendingRequests.get(key)!.promise;
       }
 
       // ========== RATE LIMIT CHECK ==========
-      if (opts.rateLimitKey) {
-        const canProceed = this.checkRateLimit(opts.rateLimitKey);
+      if (options_.rateLimitKey) {
+        const canProceed = this.checkRateLimit(options_.rateLimitKey);
         if (!canProceed) {
-          logger.warn('request-manager', 'Rate limited:', opts.rateLimitKey);
-          if (opts.failOpen) {
+          logger.warn('request-manager', 'Rate limited:', options_.rateLimitKey);
+          if (options_.failOpen) {
             return null;
           }
-          throw new Error(`Rate limit exceeded: ${opts.rateLimitKey}`);
+          throw new Error(`Rate limit exceeded: ${options_.rateLimitKey}`);
         }
       }
 
       // ========== EXECUTE WITH RETRY ==========
       const promise = this.executeWithRetry(
         fetcher,
-        opts.retries,
-        opts.retryDelay,
-        opts.timeout
+        options_.retries,
+        options_.retryDelay,
+        options_.timeout
       );
 
       // ========== TRACK PENDING REQUEST ==========
-      if (opts.dedupe) {
+      if (options_.dedupe) {
         this.pendingRequests.set(key, {
           promise,
           timestamp: Date.now(),
         });
 
-        // Clean up after request completes
+        // Clean up after request completes (fire-and-forget cleanup chain).
+        // .finally() removes the key when settled. .catch(() => {}) suppresses
+        // unhandled rejection warnings from this cleanup chain specifically.
+        // The actual promise rejection is still propagated to the caller.
         promise
           .finally(() => this.pendingRequests.delete(key))
-          .catch(() => {}); // Suppress unhandled rejection warning
+          .catch(() => {}); // Suppress unhandled rejection from cleanup chain only
       }
 
       return promise;
@@ -161,10 +215,10 @@ class RequestManagerClass {
       logger.error('request-manager', 'Request failed:', { key, error });
 
       // ========== SENTRY REPORTING ==========
-      this.reportErrorToSentry(error, { key, options: opts });
+      this.reportErrorToSentry(error, { key, options: options_ });
 
       // ========== FAIL OPEN BEHAVIOR ==========
-      if (opts.failOpen) {
+      if (options_.failOpen) {
         logger.warn('request-manager', 'Fail-open enabled, returning null:', key);
         return null;
       }
@@ -220,15 +274,26 @@ class RequestManagerClass {
     fn: () => Promise<T>,
     timeout: number
   ): Promise<T> {
-    return Promise.race([
-      fn(),
-      new Promise<T>((_, reject) =>
-        setTimeout(
-          () => reject(new Error(`Request timeout after ${timeout}ms`)),
-          timeout
-        )
-      ),
-    ]);
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const timeoutPromise = new Promise<T>((_, reject) => {
+      timeoutId = setTimeout(
+        () => reject(new Error(`Request timeout after ${timeout}ms`)),
+        timeout
+      );
+    });
+
+    return Promise.race([fn(), timeoutPromise])
+      .then((result) => {
+        // Clear timeout on success
+        if (timeoutId !== null) clearTimeout(timeoutId);
+        return result;
+      })
+      .catch((error) => {
+        // Clear timeout on error
+        if (timeoutId !== null) clearTimeout(timeoutId);
+        throw error;
+      });
   }
 
   /**
@@ -246,13 +311,19 @@ class RequestManagerClass {
       bucket = {
         tokens: RATE_LIMIT_CONFIG.maxTokens,
         lastRefill: now,
+        lastAccess: now, // Initialize lastAccess
       };
       this.rateLimitBuckets.set(key, bucket);
     }
 
-    // Refill tokens based on time elapsed
+    // Update last access time for cleanup purposes
+    bucket.lastAccess = now;
+
+    // Refill tokens based on time elapsed (use integer math to avoid floating point drift).
+    // Instead of: (timePassed / 1000) * tokensPerSecond, compute as multiplication first
+    // then division to maintain integer precision and avoid accumulated rounding errors.
     const timePassed = now - bucket.lastRefill;
-    const tokensToAdd = (timePassed / 1000) * RATE_LIMIT_CONFIG.tokensPerSecond;
+    const tokensToAdd = Math.round((timePassed * RATE_LIMIT_CONFIG.tokensPerSecond) / 1000);
     bucket.tokens = Math.min(
       RATE_LIMIT_CONFIG.maxTokens,
       bucket.tokens + tokensToAdd

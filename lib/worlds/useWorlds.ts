@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { worldsDB, WorldWithAccess } from '../database/worlds';
 import { logger } from '../utils/logger';
-import { RequestManager } from '../index';
+import { RequestManager } from '../api/request-manager';
 
 /**
  * Custom hook for managing world data and state

@@ -1,7 +1,7 @@
 import { logger } from '../utils/logger';
 import { supabase } from './supabase';
 import { validateUserForWrite } from './common';
-import { RequestManager } from '../index';
+import { RequestManager } from '../api/request-manager';
 
 /**
  * Database operations for invite links
@@ -131,6 +131,11 @@ export async function validateInviteToken(
       return { success: false, error: 'Invalid or expired invite link' };
     }
 
+    // Type guard: ensure result has the expected properties
+    if (!result.world_id) {
+      return { success: false, error: 'Invalid invite link structure' };
+    }
+
     return { 
       success: true, 
       worldId: result.world_id 
@@ -216,11 +221,14 @@ export async function getWorldInviteLinks(
       }
     );
 
-    logger.info('invites', `Found ${data?.length || 0} active invite links`);
+    // Ensure data is always an array, even if null from failOpen
+    const invites = Array.isArray(data) ? data : [];
+    
+    logger.info('invites', `Found ${invites.length} active invite links`);
     
     return { 
       success: true, 
-      invites: (data as InviteLink[]) || [] 
+      invites 
     };
 
   } catch (error) {

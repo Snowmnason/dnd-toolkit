@@ -41,7 +41,7 @@ export const useWorldModal = (options?: UseWorldModalOptions) => {
     }
 
     try {
-      await worldsDB.updateName(worldId, currentUserId, sanitizedName);
+      await worldsDB.updateName(worldId, sanitizedName);
       // Close modal and reset state on success
       setEditModalVisible(false);
       setModalWorldName('');
