@@ -1,0 +1,211 @@
+name: Milestone Release (Bump Major Version & Deploy)
+
+on:
+  milestone:
+    types: [closed]
+
+jobs:
+  bump-major-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Bump major version and reset minor/patch
+        run: |
+          # Get milestone title (e.g., "v1.2.3")
+          MILESTONE_TITLE="${{ github.event.milestone.title }}"
+          echo "Milestone: $MILESTONE_TITLE"
+          
+          # Parse current version from package.json
+          CURRENT_VERSION=$(jq -r '.version' package.json)
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Extract major version from milestone title (remove 'v' prefix)
+          MILESTONE_VERSION="${MILESTONE_TITLE#v}"
+          
+          # Parse milestone version to get new X
+          IFS='.' read -r NEW_X Y Z <<< "$MILESTONE_VERSION"
+          
+          # Reset Y, Z to 0
+          NEW_VERSION="$NEW_X.0.0"
+          echo "New version: $NEW_VERSION"
+          
+          # Update package.json
+          jq ".version = \"$NEW_VERSION\"" package.json > package.json.tmp
+          mv package.json.tmp package.json
+          
+          # Update app.json
+          jq ".expo.version = \"$NEW_VERSION\"" app.json > app.json.tmp
+          mv app.json.tmp app.json
+          
+          # Update desktop/package.json
+          jq ".version = \"$NEW_VERSION\"" desktop/package.json > desktop/package.json.tmp
+          mv desktop/package.json.tmp desktop/package.json
+          
+          echo "new_version=$NEW_VERSION" >> $GITHUB_ENV
+          echo "milestone_title=$MILESTONE_TITLE" >> $GITHUB_ENV
+
+      - name: Update package locks
+        run: |
+          npm install --package-lock-only
+          cd desktop && npm install --package-lock-only
+
+      - name: Commit version bump
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add package.json package-lock.json app.json desktop/package.json desktop/package-lock.json
+          git commit -m "chore(release): bump major version to ${{ env.new_version }} - milestone closed"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Git tag and release
+        run: |
+          git tag -a "${{ env.milestone_title }}" -m "Release ${{ env.milestone_title }}" || echo "Tag already exists"
+          git push origin "${{ env.milestone_title }}" || echo "Tag push skipped"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.milestone_title }}
+          body: |
+            ## Version ${{ env.new_version }}
+            
+            Milestone closed: ${{ github.event.milestone.title }}
+            
+            This release resets the feature (Y), enhancement (Z), and bugfix (W) counters.
+          draft: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-desktop:
+    needs: bump-major-version
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install desktop dependencies
+        run: cd desktop && npm ci
+
+      - name: Build desktop TypeScript
+        run: cd desktop && npm run build
+
+      - name: Build web export
+        run: npm run predeploy
+
+      - name: Build desktop for Windows
+        if: matrix.os == 'windows-latest'
+        run: npm run desktop:dist:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build desktop for macOS
+        if: matrix.os == 'macos-latest'
+        run: npm run desktop:dist:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build desktop for Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run desktop:dist:linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows
+          path: dist-desktop/
+          retention-days: 5
+
+      - name: Upload artifacts (macOS)
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos
+          path: dist-desktop/
+          retention-days: 5
+
+      - name: Upload artifacts (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-linux
+          path: dist-desktop/
+          retention-days: 5
+
+  attach-installers:
+    needs: build-desktop
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Organize release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -name '*Setup.exe' -exec cp {} release-assets/ \;
+          find artifacts -name '*.dmg' -exec cp {} release-assets/ \;
+          find artifacts -name '*.AppImage' -exec cp {} release-assets/ \;
+          
+          if [ -z "$(ls -A release-assets/)" ]; then
+            echo "⚠ Warning: No installers found"
+          else
+            echo "Release assets prepared:"
+            ls -lh release-assets/
+          fi
+
+      - name: Attach installers to release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.milestone.title }}
+          files: release-assets/*
+          append_body: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
