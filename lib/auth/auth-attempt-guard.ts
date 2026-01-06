@@ -1,8 +1,24 @@
-import * as Sentry from '@sentry/react-native';
 import { Platform } from 'react-native';
 import { logger } from '../utils/logger';
 
 import { EncryptedStorage } from './encrypted-storage';
+
+// Lazy import Sentry only when needed to reduce bundle size when disabled
+const getSentry = async () => {
+  try {
+    return await import('@sentry/react-native');
+  } catch {
+    return null;
+  }
+};
+
+let sentryInstance: any = null;
+const initSentryInstance = async () => {
+  if (!sentryInstance) {
+    sentryInstance = await getSentry();
+  }
+  return sentryInstance;
+};
 
 export type AuthGuardScope = 'signin' | 'signup' | 'reset';
 
@@ -23,13 +39,14 @@ const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
 
-// Use sessionStorage on web (clears on tab close, more appropriate for temporary security state)
+// Use localStorage on web for rate limit lockout persistence across tabs/windows
+// (Session storage can be bypassed by opening a new tab; rate limits must persist)
 // Use encrypted storage on native platforms
 const storage = {
   async getItem(key: string): Promise<string | null> {
     if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.sessionStorage) {
-        return window.sessionStorage.getItem(key);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return window.localStorage.getItem(key);
       }
       return null;
     }
@@ -37,8 +54,8 @@ const storage = {
   },
   async setItem(key: string, value: string): Promise<void> {
     if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.sessionStorage) {
-        window.sessionStorage.setItem(key, value);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(key, value);
       }
       return;
     }
@@ -46,8 +63,8 @@ const storage = {
   },
   async removeItem(key: string): Promise<void> {
     if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.sessionStorage) {
-        window.sessionStorage.removeItem(key);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem(key);
       }
       return;
     }
@@ -128,25 +145,29 @@ export const recordAuthFailure = async (email: string, scope: AuthGuardScope = '
 
   if (record.attempts >= MAX_ATTEMPTS) {
     record.lockedUntil = now + LOCKOUT_MS;
-    try {
-      const capture = (Sentry as any)?.captureMessage;
-      if (typeof capture === 'function') {
-        capture('auth.lockout', {
-          level: 'warning',
-          tags: {
-            scope,
-            emailDomain: email.split('@')[1] || 'unknown',
-          },
-          extra: {
-            attempts: record.attempts,
-            windowMs: WINDOW_MS,
-            lockoutMs: LOCKOUT_MS,
-          },
-        });
+    // Report lockout to Sentry asynchronously if available (don't block rate limit logic)
+    initSentryInstance().then((Sentry) => {
+      try {
+        if (Sentry?.captureMessage) {
+          Sentry.captureMessage('auth.lockout', {
+            level: 'warning',
+            tags: {
+              scope,
+              emailDomain: email.split('@')[1] || 'unknown',
+            },
+            extra: {
+              attempts: record.attempts,
+              windowMs: WINDOW_MS,
+              lockoutMs: LOCKOUT_MS,
+            },
+          });
+        }
+      } catch (err) {
+        logger.debug('auth-guard', 'Sentry disabled or failed to report lockout');
       }
-    } catch (err) {
-      logger.debug('auth-guard', 'Sentry disabled or failed to report lockout');
-    }
+    }).catch(() => {
+      // Sentry init failed, continue without reporting
+    });
   }
 
   store[key] = record;

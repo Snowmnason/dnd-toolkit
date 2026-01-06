@@ -50,8 +50,8 @@ function extractInlineContents(html) {
   const scriptContents = scriptMatches.map(m => (m[1] || '').trim()).filter(Boolean);
   const styleContents = styleMatches.map(m => (m[1] || '').trim()).filter(Boolean);
 
-  const scriptHashes = scriptContents.map(computeCspHash);
-  const styleHashes = styleContents.map(computeCspHash);
+  const scriptHashes = scriptContents.map(computeCspHash).map(hash => `'${hash}'`);
+  const styleHashes = styleContents.map(computeCspHash).map(hash => `'${hash}'`);
 
   return { scriptHashes, styleHashes };
 }
@@ -95,6 +95,7 @@ function buildCsp(scriptHashes, styleHashes) {
 
   const styleSrc = [
     "'self'",
+    "'unsafe-inline'",
     'https://fonts.googleapis.com',
     ...styleHashes,
   ].join(' ');

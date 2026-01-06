@@ -3,9 +3,9 @@
  * Loads the web build of DnD Toolkit in a native window
  */
 
+import type { BrowserWindow as BrowserWindowType, IpcMainEvent, IpcMainInvokeEvent } from 'electron';
+
 const { app, BrowserWindow, shell, Menu, nativeTheme, protocol, ipcMain, Notification, dialog, session } = require('electron');
-type IpcMainEvent = typeof ipcMain extends { on: (channel: string, listener: (event: infer E, ...args: any[]) => void) => any } ? E : any;
-type IpcMainInvokeEvent = typeof ipcMain extends { handle: (channel: string, listener: (event: infer E, ...args: any[]) => any) => any } ? E : any;
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const url = require('url');
@@ -36,7 +36,7 @@ try {
   // electron-squirrel-startup not installed, ignore
 }
 
-let mainWindow: typeof BrowserWindow | null = null;
+let mainWindow: BrowserWindowType | null = null;
 
 type DialogFilter = {
   name: string;
@@ -51,11 +51,16 @@ const TRUSTED_ORIGINS = ['app://', 'file://', 'http://localhost:8081'];
 
 const sanitizeText = (value: unknown, limit = 256): string => {
   if (typeof value !== 'string') return '';
-  return value.replace(/[\r\n]+/g, ' ').trim().slice(0, limit);
+  const trimmed = value.replace(/[\r\n]+/g, ' ').trim();
+  const result = trimmed.slice(0, limit);
+  if (result.length < trimmed.length) {
+    console.warn(`[sanitizeText] Data truncated from ${trimmed.length} to ${limit} chars`);
+  }
+  return result;
 };
 
-const isTrustedSender = (event: { senderFrame?: { url?: string }; sender?: { getURL?: () => string } } | undefined): boolean => {
-  const url = event?.senderFrame?.url || event?.sender?.getURL?.() || '';
+const isTrustedSender = (event: IpcMainEvent | IpcMainInvokeEvent | undefined): boolean => {
+  const url = (event as any)?.senderFrame?.url || (event as any)?.sender?.getURL?.() || '';
   return TRUSTED_ORIGINS.some((origin) => url.startsWith(origin));
 };
 
@@ -105,7 +110,7 @@ function createWindow(): void {
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: true,
-      enableRemoteModule: false,
+      // enableRemoteModule removed in Electron 14+; included for backwards compatibility docs
       nodeIntegrationInWorker: false,
       nodeIntegrationInSubFrames: false,
       allowRunningInsecureContent: false,
@@ -121,6 +126,7 @@ function createWindow(): void {
   });
 
   // Gracefully show window when ready
+  if (!mainWindow) return;
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
     if (devToolsEnabled) {
@@ -183,7 +189,7 @@ const sanitizeDialogOptions = (options: { defaultPath?: string; filters?: Dialog
     defaultPath: typeof options.defaultPath === 'string' ? options.defaultPath : undefined,
     filters: sanitizeDialogFilters(options.filters),
     properties: Array.isArray(options.properties)
-      ? options.properties.filter((prop) => typeof prop === 'string').slice(0, 10)
+      ? (options.properties.filter((prop) => typeof prop === 'string').slice(0, 10) as any)
       : undefined,
   };
 };
@@ -220,12 +226,16 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('show-open-dialog', (event: IpcMainInvokeEvent, options: any) => {
     if (!guardIpc(event, 'show-open-dialog')) return { canceled: true, filePaths: [] };
-    return dialog.showOpenDialog(getWindowForEvent(event) ?? undefined, sanitizeDialogOptions(options));
+    const win = getWindowForEvent(event);
+    if (!win) return { canceled: true, filePaths: [] };
+    return dialog.showOpenDialog(win, sanitizeDialogOptions(options));
   });
 
   ipcMain.handle('show-save-dialog', (event: IpcMainInvokeEvent, options: any) => {
     if (!guardIpc(event, 'show-save-dialog')) return { canceled: true, filePath: undefined };
-    return dialog.showSaveDialog(getWindowForEvent(event) ?? undefined, sanitizeDialogOptions(options));
+    const win = getWindowForEvent(event);
+    if (!win) return { canceled: true, filePath: undefined };
+    return dialog.showSaveDialog(win, sanitizeDialogOptions(options));
   });
 
   ipcMain.on('show-notification', (event: IpcMainEvent, payload: any) => {
@@ -258,7 +268,7 @@ function setupSessionSecurity(): void {
       return;
     }
 
-    const csp = "default-src 'self' app://; script-src 'self' app:// https://*.supabase.co; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; object-src 'none'; media-src 'self'; worker-src 'self' blob:";
+    const csp = "default-src 'self' app://; script-src 'self' app:// https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; object-src 'none'; media-src 'self'; worker-src 'self' blob:";
 
     callback({
       responseHeaders: {
@@ -283,7 +293,8 @@ function setupNavigationGuards(): void {
 
     const owningWindow = BrowserWindow.fromWebContents(contents);
 
-    if (!owningWindow || owningWindow !== mainWindow) {
+    // Only allow window open handler for main window; deny for all others
+    if (!owningWindow || !mainWindow || owningWindow !== mainWindow) {
       contents.setWindowOpenHandler(() => ({ action: 'deny' as const }));
     }
 
@@ -410,7 +421,7 @@ function createMenu(): void {
     },
   ];
 
-  const menu = Menu.buildFromTemplate(template);
+  const menu = Menu.buildFromTemplate(template as any);
   Menu.setApplicationMenu(menu);
 }
 

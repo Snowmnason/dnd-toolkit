@@ -352,8 +352,14 @@ export const sendPasswordReset = async (email: string): Promise<ResetPasswordRes
     const resetError = resetResponse?.error ?? null;
 
     if (resetError) {
-      // Do not leak whether the email exists; log and return generic success message
-      logger.warn('auth', 'Password reset request encountered an error (suppressed to avoid enumeration):', resetError);
+      // Log full error details for debugging (helps identify network failures, config issues, rate limiting, etc.)
+      // But return generic message to user to prevent email enumeration
+      logger.error('auth', 'Password reset API error (full details for debugging):', {
+        message: resetError.message,
+        code: resetError.code,
+        status: (resetError as any)?.status,
+        details: resetError,
+      });
       return { 
         success: true, 
         message: 'If that email exists, a reset link has been sent. Please check your inbox.' 
