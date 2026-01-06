@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { View } from 'react-native'
 
 import { CreateWorldModals } from '@/components/modals'
@@ -68,7 +68,8 @@ export default function CreateWorldScreen() {
       name: worldName,
       description,
       system,
-      mapImageUrl: defaultMapImages[mapIndex],
+      // Safely access array with bounds checking
+      mapImageUrl: defaultMapImages[Math.max(0, Math.min(mapIndex, defaultMapImages.length - 1))],
     })
 
     if (result.success) setShowSuccessModal(true)
@@ -108,7 +109,8 @@ export default function CreateWorldScreen() {
           setMapIndex(Math.floor(Math.random() * defaultMapImages.length))
         }}
         imageImported={imageImported}
-        imageUrl={defaultMapImages[mapIndex]}
+        // Safely access array with bounds checking
+        imageUrl={defaultMapImages[Math.max(0, Math.min(mapIndex, defaultMapImages.length - 1))]}
       />
       <Button
         text="Import Image"

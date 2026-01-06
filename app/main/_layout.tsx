@@ -44,7 +44,8 @@ export default function MainLayout() {
     const routeParams: any = { tab: tabKey, worldId }
 
     // Preload the screen if not already cached
-    if (!tabCache[tabKey]) {
+    // Check if key exists in tabCache before accessing it
+    if (!(tabKey in tabCache)) {
       const route = `/main/main-landing/${getTabRoute(tabKey)}`
       setTabCache((prev) => ({
         ...prev,

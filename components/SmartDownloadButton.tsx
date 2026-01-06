@@ -54,7 +54,8 @@ const ASSET_PATTERNS: Record<PlatformType, string | null> = {
 }
 
 async function getLatestReleaseAssetUrl(platform: PlatformType): Promise<string> {
-  const pattern = ASSET_PATTERNS[platform]
+  // Safe access: platform is constrained to PlatformType which has all keys
+  const pattern = ASSET_PATTERNS[platform as keyof typeof ASSET_PATTERNS]
   
   // For mobile apps, return store links (handled elsewhere)
   if (!pattern) {
@@ -103,11 +104,9 @@ async function getLatestReleaseAssetUrl(platform: PlatformType): Promise<string>
       return fallbackUrl
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const release: GitHubRelease = await response.json()
     
     // Find the first asset matching the platform pattern
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const asset = release.assets?.find((a: any) => a.name.endsWith(pattern))
     
     if (asset?.browser_download_url) {
@@ -139,7 +138,8 @@ function getMobileStoreUrl(platform: PlatformType): string {
     linux: '', // Not applicable
     unknown: 'https://dnd-tool.thesnowpost.com'
   }
-  return urls[platform]
+  // Safe access: platform is constrained to PlatformType which has all keys
+  return urls[platform as PlatformType]
 }
 
 /**

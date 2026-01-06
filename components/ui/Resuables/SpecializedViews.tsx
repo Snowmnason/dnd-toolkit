@@ -64,11 +64,14 @@ export function GroupView({
         {
           flexDirection: direction,
           flexWrap: wrap ? 'wrap' : 'nowrap',
-          gap: S.space[gap],
-          padding: padding ? S.space[padding] : undefined,
+          // Safe access: gap is constrained to keyof space
+          gap: S.space[gap as keyof typeof S.space],
+          // Safe access: padding is constrained to keyof space or undefined
+          padding: padding ? S.space[padding as keyof typeof S.space] : undefined,
           borderWidth,
           borderColor,
-          borderRadius: S.radius[borderRadius],
+          // Safe access: borderRadius is constrained to keyof radius
+          borderRadius: S.radius[borderRadius as keyof typeof S.radius],
           backgroundColor,
           justifyContent,
           alignItems,
@@ -139,9 +142,9 @@ export function NotificationView({
           backgroundColor,
           borderWidth,
           borderColor,
-          borderRadius: S.radius[borderRadius],
-          paddingHorizontal: S.space[paddingHorizontal],
-          paddingVertical: S.space[paddingVertical],
+          borderRadius: S.radius[borderRadius as keyof typeof S.radius],
+          paddingHorizontal: S.space[paddingHorizontal as keyof typeof S.space],
+          paddingVertical: S.space[paddingVertical as keyof typeof S.space],
           opacity,
           ...getShadowStyle(shadow),
         },
@@ -189,7 +192,7 @@ export function SwitchContainerView({
         {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: S.space[gap],
+          gap: S.space[gap as keyof typeof S.space],
           backgroundColor,
         },
         style,

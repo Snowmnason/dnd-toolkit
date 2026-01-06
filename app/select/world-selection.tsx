@@ -6,7 +6,7 @@ import { useWorldModal } from '@/hooks/use-world-modal'
 import { useWorlds } from '@/lib'
 import { WorldListPanel } from '@/Screens/select/world-selection/WorldListPanel'
 import { WorldRightPanel } from '@/Screens/select/world-selection/WorldRightPanel'
-import React, { useState } from 'react'
+import { useState } from 'react'
 
 // Fallback image
 const noImageSelected = require('../../assets/images/Miku.png')

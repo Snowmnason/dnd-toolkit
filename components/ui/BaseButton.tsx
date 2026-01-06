@@ -2,18 +2,18 @@ import { $, tone, useScale, UseTheme } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import React, { useMemo } from 'react'
 import {
-  ActivityIndicator,
-  Platform,
-  StyleProp,
-  TouchableOpacity,
-  View,
-  ViewStyle,
+    ActivityIndicator,
+    Platform,
+    StyleProp,
+    TouchableOpacity,
+    View,
+    ViewStyle,
 } from 'react-native'
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+    withTiming,
 } from 'react-native-reanimated'
 import { ButtonText } from './AppText'
 import { ButtonView } from './Resuables/ComponentViews'
@@ -188,7 +188,8 @@ export function Button(props: ButtonProps) {
   const spinnerOpacity = useSharedValue(0)
   const hoverOpacity = useSharedValue(1)
 
-  const sizing = S.button[size]
+  // Safe access: size is constrained to ButtonSize
+  const sizing = S.button[size as ButtonSize]
   const paddingH = sizing.paddingHorizontal
   const height = sizing.height
 

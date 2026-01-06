@@ -76,8 +76,10 @@ export function Card({
       style={[
         {
           backgroundColor: !gradient ? bgColor : undefined,
-          padding: paddingValue ? S.space[paddingValue] : undefined,
-          borderRadius: S.radius[radius],
+          // Safe access: paddingValue is constrained to keyof space or undefined
+          padding: paddingValue ? S.space[paddingValue as keyof typeof S.space] : undefined,
+          // Safe access: radius is constrained to RadiusKey
+          borderRadius: S.radius[radius as keyof typeof S.radius],
           borderWidth: bordered ? 3 : 0,
           borderColor: borderColorValue,
           ...getShadowStyle(shadow ? 'combined' : 'none'),
@@ -159,8 +161,10 @@ export function Surface({
       style={[
         {
           backgroundColor: !gradient ? bgColor : undefined,
-          padding: paddingValue ? S.space[paddingValue] : undefined,
-          borderRadius: S.radius[radius],
+          // Safe access: paddingValue is constrained to keyof space or undefined
+          padding: paddingValue ? S.space[paddingValue as keyof typeof S.space] : undefined,
+          // Safe access: radius is constrained to RadiusKey
+          borderRadius: S.radius[radius as keyof typeof S.radius],
           borderWidth: bordered ? 2 : 0,
           borderColor: bordered ? $('borderSubtle', theme) : 'transparent',
           width: fillWidth ? '100%' : undefined,

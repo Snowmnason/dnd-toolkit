@@ -1,11 +1,10 @@
 import { ReactNode } from "react";
 import {
-    Platform,
-    ScrollView,
-    StyleProp,
-    View,
-    ViewProps,
-    ViewStyle,
+  ScrollView,
+  StyleProp,
+  View,
+  ViewProps,
+  ViewStyle
 } from "react-native";
 import { GradientView } from "../Resuables/gradients";
 
@@ -93,7 +92,7 @@ export function ViewCust({
         key === 'elevation' ||
         key.startsWith('margin')  // Margin controls spacing BETWEEN components
       ) {
-        wrapperStyle[key] = value;
+        wrapperStyle[key as keyof typeof wrapperStyle] = value;
       }
       // Inner gets: padding (internal spacing), flex layout, positioning
       else if (
@@ -103,7 +102,7 @@ export function ViewCust({
         key.startsWith('justify') ||
         key === 'gap'
       ) {
-        innerStyle[key] = value;
+        innerStyle[key as keyof typeof innerStyle] = value;
       }
       // Background goes nowhere (gradient provides it)
       else if (key === 'backgroundColor') {
@@ -111,7 +110,7 @@ export function ViewCust({
       }
       // Everything else to inner
       else {
-        innerStyle[key] = value;
+        innerStyle[key as keyof typeof innerStyle] = value;
       }
     });
     
@@ -148,11 +147,7 @@ export function ViewCust({
   if (scroll) {
     return (
       <ScrollView
-        style={[
-          style,
-          // On web, allow horizontal overflow so shadows aren't clipped
-          Platform.OS === 'web' ? { overflow: 'visible' as any } : undefined
-        ]}
+        style={style}
         contentContainerStyle={contentContainerStyle}
         showsVerticalScrollIndicator={showScrollIndicator}
         {...rest}

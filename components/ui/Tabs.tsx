@@ -67,7 +67,7 @@ export function Tabs({
 
   // Animate underline when active tab changes
   useEffect(() => {
-    const activeLayout = tabLayouts[active];
+    const activeLayout = tabLayouts[active as keyof typeof tabLayouts];
     if (activeLayout) {
       underlineX.value = withTiming(activeLayout.x, {
         duration: 300,

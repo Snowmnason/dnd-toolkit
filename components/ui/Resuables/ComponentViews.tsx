@@ -224,7 +224,8 @@ export function ButtonView({
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          borderRadius: S.radius[borderRadius],
+          // Safe access: borderRadius is constrained to RadiusKey
+          borderRadius: S.radius[borderRadius as RadiusKey],
           borderColor: borderColor,
           borderWidth: borderWidth,
           overflow: 'hidden',

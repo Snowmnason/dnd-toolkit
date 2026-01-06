@@ -1,38 +1,38 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { ThemeSelector } from '@/Screens/settings/ThemeSelector'
+import { CrashTester } from '@/components/SplashScreen'
 import {
-    Accordion,
-    AppModal,
-    AppToast,
-    AppTooltip,
-    Body,
-    Button,
-    ButtonGroup,
-    Caption,
-    Card,
-    CustomLoad,
-    DescInput,
-    Dropdown,
-    DropdownGroup,
-    Heading,
-    IconButton,
-    Link,
-    ObjHeading,
-    Paragraph,
-    RadioButtonGroup,
-    SnackBar,
-    SubTitle,
-    Surface,
-    Switch,
-    SwitchGroup,
-    Tabs,
-    TextInput,
-    TextInputGroup,
-    Title,
-    ToggleGroup
+  Accordion,
+  AppModal,
+  AppToast,
+  AppTooltip,
+  Body,
+  Button,
+  ButtonGroup,
+  Caption,
+  Card,
+  CustomLoad,
+  DescInput,
+  Dropdown,
+  DropdownGroup,
+  Heading,
+  IconButton,
+  Link,
+  ObjHeading,
+  Paragraph,
+  RadioButtonGroup,
+  SnackBar,
+  SubTitle,
+  Surface,
+  Switch,
+  SwitchGroup,
+  Tabs,
+  TextInput,
+  TextInputGroup,
+  Title,
+  ToggleGroup
 } from '@/components/ui'
 import { AppSplit } from '@/components/ui/AppView'
-import { CrashTester } from '@/components/SplashScreen'
 
 
 import { $, UseTheme, useScale } from '@/theme'
@@ -86,7 +86,9 @@ export default function StyleDesktop() {
   const [snackVisible, setSnackVisible] = useState(false)
 
   return (
-    <AppSplit 
+    <AppSplit
+      verticalPadding="none"
+      horizontalPadding='xs'
       left={
         <ScrollView style={{  }}>
           {/* Crash Tester - Hidden component for testing error boundary */}
