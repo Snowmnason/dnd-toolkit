@@ -1,25 +1,32 @@
 /**
  * Feature flags system for development and testing
- * Allows toggling features without code changes via config/feature-flags.json
+ * Allows toggling features without code changes via appsettings.*.json
  */
+import appSettingsProd from '../config/appsettings.json';
+import { getAppConfig, isProduction } from './config/loader';
 
-import featureFlagsConfig from '../config/feature-flags.json';
-
-export type FeatureFlagName = keyof typeof featureFlagsConfig.flags;
+export type FeatureFlagName = keyof typeof appSettingsProd.featureFlags;
 
 export type FeatureFlagKind = 'free' | 'premium' | 'beta';
 
-export interface FeatureFlag {
-  enabled: boolean;
-  description?: string;
-  kind?: FeatureFlagKind; // optional classification; future-friendly
-}
+export type FeatureFlag = (typeof appSettingsProd.featureFlags)[FeatureFlagName] & {
+  kind?: FeatureFlagKind;
+};
 
 class FeatureFlagsManager {
   private flags: Map<FeatureFlagName, FeatureFlag>;
 
   constructor() {
-    this.flags = new Map(Object.entries(featureFlagsConfig.flags) as [FeatureFlagName, FeatureFlag][]);
+    const featureFlags = getAppConfig().featureFlags || {};
+    this.flags = new Map(Object.entries(featureFlags) as [FeatureFlagName, FeatureFlag][]);
+
+    // Warn if production build ships beta-enabled flags
+    if (isProduction()) {
+      const betaEnabled = [...this.flags.entries()].filter(([, flag]) => flag.kind === 'beta' && flag.enabled);
+      if (betaEnabled.length > 0) {
+        console.warn('[FeatureFlags] Beta flags enabled in production:', betaEnabled.map(([name]) => name).join(', '));
+      }
+    }
   }
 
   /**
@@ -49,6 +56,25 @@ class FeatureFlagsManager {
    */
   getKind(flagName: FeatureFlagName): FeatureFlagKind | undefined {
     return this.flags.get(flagName)?.kind;
+  }
+
+  /**
+   * Get all flags by kind
+   */
+  getByKind(kind: FeatureFlagKind): Record<string, FeatureFlag> {
+    return Object.fromEntries([...this.flags.entries()].filter(([, flag]) => flag.kind === kind));
+  }
+
+  /**
+   * Toggle all flags of a given kind
+   */
+  toggleKind(kind: FeatureFlagKind, enabled: boolean): void {
+    [...this.flags.entries()].forEach(([name, flag]) => {
+      if (flag.kind === kind) {
+        flag.enabled = enabled;
+      }
+    });
+    console.log(`[FeatureFlags] Set all '${kind}' flags to ${enabled}`);
   }
 
   /**
