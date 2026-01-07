@@ -7,23 +7,26 @@ import featureFlagsConfig from '../config/feature-flags.json';
 
 export type FeatureFlagName = keyof typeof featureFlagsConfig.flags;
 
+export type FeatureFlagKind = 'free' | 'premium' | 'beta';
+
 export interface FeatureFlag {
   enabled: boolean;
   description?: string;
+  kind?: FeatureFlagKind; // optional classification; future-friendly
 }
 
 class FeatureFlagsManager {
-  private flags: Record<string, FeatureFlag>;
+  private flags: Map<FeatureFlagName, FeatureFlag>;
 
   constructor() {
-    this.flags = featureFlagsConfig.flags;
+    this.flags = new Map(Object.entries(featureFlagsConfig.flags) as [FeatureFlagName, FeatureFlag][]);
   }
 
   /**
    * Check if a feature flag is enabled
    */
   isEnabled(flagName: FeatureFlagName): boolean {
-    const flag = this.flags[flagName];
+    const flag = this.flags.get(flagName);
     return flag?.enabled ?? false;
   }
 
@@ -31,22 +34,30 @@ class FeatureFlagsManager {
    * Get all feature flags
    */
   getAllFlags(): Record<string, FeatureFlag> {
-    return { ...this.flags };
+    return Object.fromEntries(this.flags);
   }
 
   /**
    * Get flag description
    */
   getDescription(flagName: FeatureFlagName): string | undefined {
-    return this.flags[flagName]?.description;
+    return this.flags.get(flagName)?.description;
+  }
+
+  /**
+   * Get flag kind/classification (free/premium/beta) if provided.
+   */
+  getKind(flagName: FeatureFlagName): FeatureFlagKind | undefined {
+    return this.flags.get(flagName)?.kind;
   }
 
   /**
    * Runtime toggle (for dev console use - doesn't persist)
    */
   toggle(flagName: FeatureFlagName, enabled: boolean): void {
-    if (this.flags[flagName]) {
-      this.flags[flagName].enabled = enabled;
+    const flag = this.flags.get(flagName);
+    if (flag) {
+      flag.enabled = enabled;
       console.log(`[FeatureFlags] ${flagName} = ${enabled}`);
     }
   }
