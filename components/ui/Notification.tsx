@@ -1,4 +1,5 @@
 import { usePlatform } from '@/contexts/PlatformContext'
+import { logger } from '@/lib/utils/logger'
 import { $, S, UseTheme } from '@/theme'
 import { Ionicons } from '@expo/vector-icons'
 import { useMemo } from 'react'
@@ -46,8 +47,7 @@ export function Notification({
   const { theme } = UseTheme()
   const { isMobile } = usePlatform()
   const insets = useSafeAreaInsets()
-
-  console.log(`[Notification] visible: ${visible}, id=${id}`)
+  logger.debug(`[Notification] visible: ${visible}, id=${id}`)
 
   // Icon based on type
   const iconName = 
@@ -81,7 +81,7 @@ export function Notification({
   const stackOffset = index * (isMobile ? 90 : 100)
   const baseTop = isMobile ? insets.top + 12 : 80
 
-  console.log(`[Notification] Rendering id=${id}, type=${type}`)
+  logger.debug('Notification', 'Rendering id:', id, 'type:', type)
 
   return (
     <View

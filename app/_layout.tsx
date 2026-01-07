@@ -24,7 +24,9 @@ const sentryDsn =
 // Get environment from Expo config or default to development/production
 const environment = process.env.EXPO_PUBLIC_ENVIRONMENT ||
   Constants.expoConfig?.extra?.environment ||
-  (__DEV__ ? 'development' : 'production');
+  'production';
+
+const isDev = environment === 'development';
 
 // Only initialize Sentry if DSN is provided
 if (sentryDsn) {
@@ -36,22 +38,22 @@ if (sentryDsn) {
   release: `dnd-toolkit@${APP_VERSION}`,
 
   // Enable debug mode in development
-  debug: __DEV__,
+  debug: isDev,
 
   // Sample rate for production (reduce noise)
-  sampleRate: __DEV__ ? 1.0 : 0.1,
+  sampleRate: isDev ? 1.0 : 0.1,
 
   // Adds more context data to events (IP address, cookies, user, etc.)
   // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
   sendDefaultPii: true,
 
   // Enable Logs in development only
-  enableLogs: __DEV__,
+  enableLogs: isDev,
 
   // Filter out development errors in production
   beforeSend: (event) => {
     // In development, only send errors that are not common development issues
-    if (__DEV__) {
+    if (isDev) {
       // Filter out common development errors
       if (event.exception?.values?.[0]?.value?.includes('Network request failed')) {
         return null;
@@ -64,7 +66,7 @@ if (sentryDsn) {
   },
 
   // uncomment the line below to enable Spotlight (https://spotlightjs.com)
-  // spotlight: __DEV__,
+  // spotlight: isDev,
   });
 } else {
   console.log('[Sentry] Disabled - no DSN provided');

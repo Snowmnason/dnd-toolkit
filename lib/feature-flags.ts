@@ -13,8 +13,14 @@ export type FeatureFlag = (typeof appSettingsProd.featureFlags)[FeatureFlagName]
   kind?: FeatureFlagKind;
 };
 
+/**
+ * Event type for flag change notifications
+ */
+type FlagChangeCallback = (flagName: FeatureFlagName | null, kind?: FeatureFlagKind) => void;
+
 class FeatureFlagsManager {
   private flags: Map<FeatureFlagName, FeatureFlag>;
+  private changeListeners: Set<FlagChangeCallback> = new Set();
 
   constructor() {
     const featureFlags = getAppConfig().featureFlags || {};
@@ -27,6 +33,22 @@ class FeatureFlagsManager {
         console.warn('[FeatureFlags] Beta flags enabled in production:', betaEnabled.map(([name]) => name).join(', '));
       }
     }
+  }
+
+  /**
+   * Subscribe to flag changes. Used internally by useFeatureFlagListener to trigger re-renders.
+   * @param callback Called when any flag or kind is toggled; flagName null + no kind = all flags changed
+   */
+  subscribe(callback: FlagChangeCallback): () => void {
+    this.changeListeners.add(callback);
+    return () => this.changeListeners.delete(callback);
+  }
+
+  /**
+   * Notify all listeners of a flag change
+   */
+  private notifyListeners(flagName: FeatureFlagName | null = null, kind?: FeatureFlagKind): void {
+    this.changeListeners.forEach((callback) => callback(flagName, kind));
   }
 
   /**
@@ -66,7 +88,9 @@ class FeatureFlagsManager {
   }
 
   /**
-   * Toggle all flags of a given kind
+   * Toggle all flags of a given kind.
+   * Mutates flags in-place and notifies listeners so React components can re-render.
+   * For dev console use: `FeatureFlags.toggleKind('beta', true)` to enable all beta features.
    */
   toggleKind(kind: FeatureFlagKind, enabled: boolean): void {
     [...this.flags.entries()].forEach(([name, flag]) => {
@@ -75,16 +99,20 @@ class FeatureFlagsManager {
       }
     });
     console.log(`[FeatureFlags] Set all '${kind}' flags to ${enabled}`);
+    this.notifyListeners(null, kind);
   }
 
   /**
-   * Runtime toggle (for dev console use - doesn't persist)
+   * Runtime toggle (for dev console use - doesn't persist).
+   * Mutates the flag in-place and notifies listeners so React components can re-render.
+   * Example: `FeatureFlags.toggle('debugLogs', true)` in browser console.
    */
   toggle(flagName: FeatureFlagName, enabled: boolean): void {
     const flag = this.flags.get(flagName);
     if (flag) {
       flag.enabled = enabled;
       console.log(`[FeatureFlags] ${flagName} = ${enabled}`);
+      this.notifyListeners(flagName);
     }
   }
 }

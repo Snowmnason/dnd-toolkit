@@ -1,17 +1,21 @@
 /**
- * Dev-only features guarded by compile-time checks.
- * These functions are completely removed from production builds.
+ * Dev-only features with runtime guards.
+ * 
+ * These functions use runtime checks (isDevelopment()) to execute dev-only logic.
+ * In production, they perform no-op operations with minimal overhead.
+ * The functions remain in the bundle but are safe to call—they simply return early.
  *
  * Usage:
  *   import { useDevConsole } from '@/lib/config/dev-only';
- *   // Will type-error or return no-op in production
+ *   const logger = useDevConsole('MyModule');
+ *   logger.log('This only logs in dev'); // No-op in production
  */
 
 import { getAppConfig, isDevelopment } from './loader';
 
 /**
  * Dev-only console logger.
- * In production, this is a no-op and will be tree-shaken.
+ * In production, returns an object with no-op methods (minimal overhead).
  */
 export function useDevConsole(scope: string) {
   if (!isDevelopment()) {
@@ -44,11 +48,10 @@ export function useDevConsole(scope: string) {
 }
 
 /**
- * Dev-only feature bypass.
- * Allows skipping auth or other checks during local testing.
- * Completely disabled in production.
+ * Check if dev bypass mode is enabled (skips auth, feature gates, etc. during testing).
+ * Only available in development; always returns false in production.
  */
-export function canBypassFeature(featureName: string): boolean {
+export function isDevBypassEnabled(): boolean {
   if (!isDevelopment()) return false;
 
   const config = getAppConfig();
@@ -57,7 +60,7 @@ export function canBypassFeature(featureName: string): boolean {
 
 /**
  * Dev-only debug assertion.
- * Throws in dev if condition is false; no-op in production.
+ * Throws in dev if condition is false; returns immediately in production (no-op).
  */
 export function devAssert(condition: boolean, message: string): void {
   if (!isDevelopment()) return;
@@ -72,7 +75,7 @@ export function devAssert(condition: boolean, message: string): void {
 
 /**
  * Dev-only performance monitoring.
- * Returns a no-op timer in production.
+ * In production, returns a timer with a no-op `end()` method (minimal overhead).
  */
 export function createDevTimer(label: string) {
   if (!isDevelopment()) {
