@@ -15,6 +15,11 @@
           },
           "description": {
             "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["free", "premium", "beta"],
+            "description": "Optional classification of the feature"
           }
         },
         "required": ["enabled"]

@@ -34,3 +34,6 @@ export * from './groups/SwitchGroup';
 export * from './groups/TextInputGroup';
 export * from './groups/ToggleGroup';
 
+// Gates
+export * from './FeatureGate';
+
