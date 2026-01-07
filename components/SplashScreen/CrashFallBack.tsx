@@ -1,9 +1,9 @@
 import { UseTheme, useScale } from "@/theme";
 
-import { View, ScrollView } from "react-native";
+import { useMemo } from "react";
+import { ScrollView, View } from "react-native";
 import { Body, Button, Card, Title } from "../ui";
 import VersionDisplay from "../VersionDisplay";
-import { useMemo } from "react";
 
 export interface CrashFallBackProps {
   error: Error | null;
@@ -35,7 +35,7 @@ const ERROR_MESSAGES = [
 export function CrashFallBack({ error, onRetry }: CrashFallBackProps) {
   const { theme } = UseTheme();
   const S = useScale();
-  const isDev = __DEV__;
+  const isDev = (process.env.EXPO_PUBLIC_ENVIRONMENT || 'production') === 'development';
 
   // Pick a random fun message
   const funMessage = useMemo(

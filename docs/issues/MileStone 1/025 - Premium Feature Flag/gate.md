@@ -6,7 +6,7 @@ A unified system to gate features behind feature flags, beta access, or premium 
 ## Core Concepts
 
 ### Feature Flags
-JSON-driven toggles in `config/feature-flags.json` with optional `kind` classification:
+JSON-driven toggles in `config/appsettings.*.json` under `featureFlags` with optional `kind` classification:
 - `free` – Available to all users
 - `premium` – Requires paid tier
 - `beta` – Unfinished/testing features
@@ -23,7 +23,7 @@ Currently stubbed; returns `free` until backend is wired to Supabase/Stripe.
 
 | Mode | Use Case | How It Works |
 |------|----------|--------------|
-| **Feature Flag** | Toggle any feature on/off | Checks `config/feature-flags.json` |
+| **Feature Flag** | Toggle any feature on/off | Checks `config/appsettings.*.json` |
 | **Premium** | Require paid tier | Checks `SubscriptionManager.isPremium()` |
 | **Premium + Feature Key** | Specific premium feature | Checks tier + explicit entitlement list |
 | **Combined** | Beta + premium | Both flag and premium must pass |
@@ -31,7 +31,7 @@ Currently stubbed; returns `free` until backend is wired to Supabase/Stripe.
 ## How It Works
 
 ### 1. Feature Flags
-Stored in `config/feature-flags.json`:
+Stored in `config/appsettings.*.json`:
 ```json
 {
   "flags": {
@@ -96,7 +96,7 @@ Location: `lib/feature-flags.ts`
 ## Configuration
 
 ### Adding a Feature Flag
-1. Edit `config/feature-flags.json`:
+1. Edit `config/appsettings.dev.json` (and mirror in `config/appsettings.json`):
 ```json
 {
   "flags": {

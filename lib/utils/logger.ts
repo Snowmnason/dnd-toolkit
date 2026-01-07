@@ -21,8 +21,8 @@ class Logger {
   private config: LoggerConfig;
 
   constructor() {
-    // Determine environment
-    const isDevelopment = process.env.NODE_ENV === 'development' || __DEV__;
+    // Determine environment using new EXPO_PUBLIC_ENVIRONMENT system
+    const isDevelopment = (process.env.EXPO_PUBLIC_ENVIRONMENT || 'production') === 'development';
     
     // Configure based on environment
     this.config = {

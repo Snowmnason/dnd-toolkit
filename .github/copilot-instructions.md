@@ -20,6 +20,7 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 - Linting: `npm run lint` (eslint-config-expo). Keep TypeScript strict.
 - Web export: `npm run predeploy` (Expo export → `dist`), then `npm run deploy` (gh-pages). A `deploy-dev` branch exists for previews.
 - Reset: `npm run reset-project` runs `scripts/reset-project.js` (use sparingly).
+- Commits: Never commit unless the user explicitly requests it.
 
 ## Screen/routing conventions
 - Add screens under `app/` using Expo Router. Layouts live in directory-level `_layout.tsx` files.
@@ -37,6 +38,8 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
   ```
 - Apply themed backgrounds: `contentStyle: { backgroundColor: '$background' }` (as used in `app/_layout.tsx`).
 - Prefer design tokens (colors, radius, spacing) over hard-coded values; escalate via theme tokens or `ElevatedView` variants.
+- Typography/components: Use `Body`, `Title`, `Subtitle` heading components; do not use `AppText`. 
+- For layout, use the provided view components (not `ViewCust`), and only use raw `View` as a simple container when necessary.
 
 ## Gotchas
 - RN Web pointerEvents: avoid full-screen wrappers that block clicks; if needed, set pointer events via style and keep overlays minimal.
@@ -47,7 +50,7 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 - Layout/routing: `app/_layout.tsx`
 - Bootstrap: `hooks/use-app-bootstrap.tsx`
 - Splash screen: `hooks/use-splash-screen.tsx`
-- Feature flags: `config/feature-flags.json`, `lib/feature-flags.ts`
+- Feature flags: `config/appsettings.*.json` (`featureFlags`), `lib/feature-flags.ts` (kind helper + beta warning in prod)
 - Auth state: `lib/auth-state.ts`
 - UI barrel: `components/ui/index.ts`
 - Theme root: `theme/index.ts` (families, tokens, provider)

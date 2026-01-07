@@ -26,7 +26,8 @@ export function FeatureGate({
   fallback = null,
 }: FeatureGateProps) {
   // Dev validation: featureKey should only be used with requirePremium
-  if (process.env.NODE_ENV !== 'production' && featureKey && !requirePremium) {
+  const isDev = (process.env.EXPO_PUBLIC_ENVIRONMENT || 'production') === 'development';
+  if (isDev && featureKey && !requirePremium) {
     console.warn('[FeatureGate] featureKey provided without requirePremium=true; key will be ignored.');
   }
 

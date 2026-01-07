@@ -1,5 +1,6 @@
 import { Notification } from '@/components/ui/Notification'
 import { useNotifications } from '@/hooks/use-notifications'
+import { logger } from '@/lib/utils/logger'
 import { memo, useEffect } from 'react'
 
 /**
@@ -14,15 +15,15 @@ function NotificationContainerInner() {
   const { notifications } = useNotifications()
 
   useEffect(() => {
-    console.log(`[NotificationContainer] Mount`)
-    return () => console.log(`[NotificationContainer] Unmount`)
+    logger.debug('NotificationContainer', 'Mount')
+    return () => logger.debug('NotificationContainer', 'Unmount')
   }, [])
 
   useEffect(() => {
-    console.log(`[NotificationContainer] Notifications updated:`, notifications.length, notifications.map(n => n.id))
+    logger.debug('NotificationContainer', 'Notifications updated:', notifications.length, notifications.map(n => n.id))
   }, [notifications])
 
-  console.log(`[NotificationContainer] Rendering with ${notifications.length} notifications`)
+  logger.debug('NotificationContainer', 'Rendering with', notifications.length, 'notifications')
 
   // Only return notifications - no full-screen wrapper
   // Each notification handles its own positioning and pointer events

@@ -1,6 +1,6 @@
 # Feature Flags System
 
-A simple JSON-based feature flag system for toggling features during development and testing without code changes.
+A simple JSON-based feature flag system for toggling features during development and testing without code changes. Flags now live inside `config/appsettings.*.json` under the `featureFlags` key.
 
 ## Usage
 
@@ -22,11 +22,11 @@ const description = FeatureFlags.getDescription('splashScreen');
 
 #### Via config file (persistent)
 
-Edit `config/feature-flags.json`:
+Edit `config/appsettings.dev.json` (for local) or `config/appsettings.json` (for prod defaults):
 
 ```json
 {
-  "flags": {
+  "featureFlags": {
     "splashScreen": {
       "enabled": true,
       "description": "Show splash screen on app load"
@@ -71,10 +71,10 @@ Runtime toggles are lost on page refresh.
 
 ## Adding New Flags
 
-1. Add the flag to `config/feature-flags.json`:
+1. Add the flag to `config/appsettings.dev.json` (and mirror the key in `config/appsettings.json`):
    ```json
    {
-     "flags": {
+     "featureFlags": {
        "myNewFeature": {
          "enabled": false,
          "description": "Description of my new feature"
@@ -96,3 +96,4 @@ Runtime toggles are lost on page refresh.
 - Config file changes require app restart (web: refresh, native: reload)
 - Console toggles work immediately but don't persist across refreshes
 - The system is exposed to `window.FeatureFlags` for easy console access on web
+- Config Files: `config/appsettings.{dev,json}` (`featureFlags`); beta flags enabled in production log a warning; helpers can toggle by kind
