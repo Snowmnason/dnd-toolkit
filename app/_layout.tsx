@@ -1,5 +1,6 @@
 import { AppErrorBoundary, AuthStateManager } from "@/lib";
 import { ScaleProvider } from "@/providers/ScaleProvider";
+import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ThemeProvider, UseTheme } from "@/theme";
 import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
@@ -326,15 +327,17 @@ export default function RootLayout() {
     <ThemeProvider>
       <ScaleProvider>
         <PlatformProvider>
-          <AppParamsProvider>
-            <AppErrorBoundary 
-              renderFallback={(error, onRetry) => (
-                <CrashFallBack error={error} onRetry={onRetry} />
-              )}
-            >
-              <RootLayoutContent />
-            </AppErrorBoundary>
-          </AppParamsProvider>
+          <SubscriptionProvider>
+            <AppParamsProvider>
+              <AppErrorBoundary 
+                renderFallback={(error, onRetry) => (
+                  <CrashFallBack error={error} onRetry={onRetry} />
+                )}
+              >
+                <RootLayoutContent />
+              </AppErrorBoundary>
+            </AppParamsProvider>
+          </SubscriptionProvider>
         </PlatformProvider>
       </ScaleProvider>
     </ThemeProvider>

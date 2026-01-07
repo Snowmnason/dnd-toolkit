@@ -59,10 +59,40 @@ class SubscriptionManagerImpl {
     this.cache = { ...DEFAULT_SUBSCRIPTION, fetchedAt: Date.now() };
     return this.cache;
   }
+
+  /**
+   * Synchronous check using cached state (no async fetch).
+   * Returns false if cache is empty. Use for quick non-UI checks.
+   */
+  isPremiumCached(): boolean {
+    return this.cache?.tier !== 'free' && this.cache !== null;
+  }
+
+  /**
+   * Synchronous feature check using cached state.
+   * Returns false if cache is empty or feature not found.
+   */
+  hasFeatureCached(featureKey: string): boolean {
+    if (!this.cache) return false;
+    if (this.cache.tier !== 'free') return true;
+    return this.cache.features.includes(featureKey);
+  }
+
+  /**
+   * Get cached subscription without triggering refresh.
+   * Returns null if cache is empty.
+   */
+  getCachedSubscription(): Subscription | null {
+    return this.cache;
+  }
 }
 
 export const SubscriptionManager = new SubscriptionManagerImpl();
 
+/**
+ * Return type for premium feature access checks.
+ * Reserved for future utility functions that need to return both premium status and feature availability.
+ */
 export type PremiumFeatureCheck = {
   isPremium: boolean;
   isAvailable: boolean;

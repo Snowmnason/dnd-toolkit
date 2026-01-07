@@ -1,7 +1,9 @@
 import { FeatureFlagName, FeatureFlags } from '@/lib/feature-flags';
-import { useMemo } from 'react';
 
-/** Minimal hook to read a feature flag once. */
+/**
+ * Hook to read a feature flag.
+ * Note: Recomputes on every render to support runtime toggles via FeatureFlags.toggle().
+ */
 export function useFeatureFlag(flagName: FeatureFlagName): boolean {
-  return useMemo(() => FeatureFlags.isEnabled(flagName), [flagName]);
+  return FeatureFlags.isEnabled(flagName);
 }

@@ -25,13 +25,20 @@ export function FeatureGate({
   featureKey,
   fallback = null,
 }: FeatureGateProps) {
+  // Dev validation: featureKey should only be used with requirePremium
+  if (process.env.NODE_ENV !== 'production' && featureKey && !requirePremium) {
+    console.warn('[FeatureGate] featureKey provided without requirePremium=true; key will be ignored.');
+  }
+
   const flagAllowed = flag ? FeatureFlags.isEnabled(flag) : true;
-  const { isAvailable, loading } = usePremiumFeature(requirePremium ? featureKey : undefined);
+  
+  // Only check premium if explicitly required
+  const premiumCheck = usePremiumFeature(requirePremium ? featureKey : undefined);
+  
+  // While loading premium state, avoid flicker
+  if (requirePremium && premiumCheck.loading) return fallback;
 
-  // While loading, avoid flicker by not rendering gated content
-  if (loading) return fallback;
-
-  const premiumAllowed = requirePremium ? isAvailable : true;
+  const premiumAllowed = requirePremium ? premiumCheck.isAvailable : true;
   const allowed = flagAllowed && premiumAllowed;
 
   if (!allowed) return fallback;
