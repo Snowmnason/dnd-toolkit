@@ -1,14 +1,18 @@
 
-name: Auto-Bump Version on Main Push
+name: Auto-Bump Version on PR Merge or Main Push
 
 on:
+  pull_request:
+    types: [closed]
+    branches: [main]
   push:
     branches: [main]
 
 jobs:
-
-jobs:
   bump-version:
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
+      (github.event_name == 'push' && !contains(github.event.head_commit.message, 'chore(release): bump version'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -24,12 +28,18 @@ jobs:
         with:
           node-version: '20'
 
-
-      - name: Bump version based on commit message
+      - name: Determine bump type and update version
         run: |
-          # Get latest commit message
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-          echo "Latest commit message: $COMMIT_MSG"
+          # Get commit message (different for PR vs push)
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # For PR merges, use PR title as commit message
+            COMMIT_MSG="${{ github.event.pull_request.title }}"
+            echo "PR merge detected. Using PR title: $COMMIT_MSG"
+          else
+            # For direct pushes (rare hotfixes), always bump patch
+            echo "Direct push to main detected - treating as hotfix, always bumping patch"
+            COMMIT_MSG="hotfix"
+          fi
 
           # Read current package.json version
           CURRENT_VERSION=$(jq -r '.version' package.json)
@@ -38,14 +48,16 @@ jobs:
           # Parse version parts (X.Y.Z)
           IFS='.' read -r X Y Z <<< "$CURRENT_VERSION"
 
-          # Decide bump type
-          if [[ "$COMMIT_MSG" == feat:* ]]; then
+          # Decide bump type based on commit/PR title
+          if [[ "$COMMIT_MSG" == feat:* ]] || [[ "$COMMIT_MSG" == enhancement:* ]]; then
             Y=$((Y + 1))
             Z=0
             BUMP_TYPE="minor"
+            echo "Detected feature/enhancement -> bumping Y (minor)"
           else
             Z=$((Z + 1))
             BUMP_TYPE="patch"
+            echo "Detected fix/patch/hotfix -> bumping Z (patch)"
           fi
 
           NEW_VERSION="$X.$Y.$Z"
@@ -72,7 +84,19 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add package.json app.json desktop/package.json
-          git commit -m "chore(release): bump version ${{ env.current_version }} → ${{ env.new_version }} (patch)"
+          git commit -m "chore(release): bump version ${{ env.current_version }} → ${{ env.new_version }} (${{ env.bump_type }})"
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on PR (if PR merge)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `✅ Version bumped: **${{ env.current_version }}** → **${{ env.new_version }}** (${{ env.bump_type }})`
+            })
