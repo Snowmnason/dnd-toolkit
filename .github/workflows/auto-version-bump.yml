@@ -1,13 +1,14 @@
-name: Auto-Bump Version on PR Merge
+
+name: Auto-Bump Version on Main Push
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [main]
 
 jobs:
+
+jobs:
   bump-version:
-    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -23,76 +24,55 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Determine version bump type and update
+
+      - name: Bump version based on commit message
         run: |
-          # Get PR labels as JSON
-          LABELS=$(echo '${{ toJson(github.event.pull_request.labels) }}' | jq -r '.[].name')
-          
-          echo "PR Labels: $LABELS"
-          
-          # Determine version part to bump based on label
-          BUMP_TYPE="bug"
-          if echo "$LABELS" | grep -iq "feature\|enhancement"; then
-            BUMP_TYPE="feature"
-            echo "Label: feature/enhancement -> bump Y"
-          else
-            BUMP_TYPE="bug"
-            echo "Label: bug (or default) -> bump Z"
-          fi
-          
+          # Get latest commit message
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Latest commit message: $COMMIT_MSG"
+
           # Read current package.json version
           CURRENT_VERSION=$(jq -r '.version' package.json)
           echo "Current version: $CURRENT_VERSION"
-          
+
           # Parse version parts (X.Y.Z)
           IFS='.' read -r X Y Z <<< "$CURRENT_VERSION"
-          
-          # Bump the appropriate part
-          case "$BUMP_TYPE" in
-            feature)
-              Y=$((Y + 1))
-              ;;
-            bug)
-              Z=$((Z + 1))
-              ;;
-          esac
-          
+
+          # Decide bump type
+          if [[ "$COMMIT_MSG" == feat:* ]]; then
+            Y=$((Y + 1))
+            Z=0
+            BUMP_TYPE="minor"
+          else
+            Z=$((Z + 1))
+            BUMP_TYPE="patch"
+          fi
+
           NEW_VERSION="$X.$Y.$Z"
           echo "New version: $NEW_VERSION"
-          
+
           # Update package.json
           jq ".version = \"$NEW_VERSION\"" package.json > package.json.tmp
           mv package.json.tmp package.json
-          
+
           # Update app.json (Expo config)
           jq ".expo.version = \"$NEW_VERSION\"" app.json > app.json.tmp
           mv app.json.tmp app.json
-          
+
           # Update desktop/package.json
           jq ".version = \"$NEW_VERSION\"" desktop/package.json > desktop/package.json.tmp
           mv desktop/package.json.tmp desktop/package.json
-          
-          echo "bump_type=$BUMP_TYPE" >> $GITHUB_ENV
+
           echo "new_version=$NEW_VERSION" >> $GITHUB_ENV
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_ENV
+          echo "bump_type=$BUMP_TYPE" >> $GITHUB_ENV
 
       - name: Commit and push changes
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add package.json app.json desktop/package.json
-          git commit -m "chore(release): bump version ${{ env.current_version }} → ${{ env.new_version }} (${{ env.bump_type }})"
+          git commit -m "chore(release): bump version ${{ env.current_version }} → ${{ env.new_version }} (patch)"
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Comment on PR
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `✅ Version bumped: **${{ env.current_version }}** → **${{ env.new_version }}** (${{ env.bump_type }})`
-            })
