@@ -1,6 +1,7 @@
 import { useAnalyticsNavigation } from '@/hooks/use-analytics-navigation';
 import { AppErrorBoundary, useAuthGuard, AUTH_CONFIG } from "@/lib";
 import { Analytics, sessionManager } from '@/lib/analytics';
+import { getAppConfig } from '@/lib/config/loader';
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ThemeProvider, UseTheme } from "@/theme";
@@ -18,6 +19,10 @@ import { useAppBootstrap } from '../hooks/use-app-bootstrap';
 import { useSplashScreen } from '../hooks/use-splash-screen';
 import { APP_VERSION } from '../lib/version';
 
+// Check if Sentry is enabled via feature flag
+const config = getAppConfig();
+const isSentryEnabled = config.features?.sentryEnabled ?? false;
+
 // Get Sentry DSN from environment variables
 const sentryDsn =
   process.env.EXPO_PUBLIC_SENTRY_DSN ||
@@ -30,8 +35,8 @@ const environment = process.env.EXPO_PUBLIC_ENVIRONMENT ||
 
 const isDev = environment === 'development';
 
-// Only initialize Sentry if DSN is provided
-if (sentryDsn) {
+// Only initialize Sentry if enabled via feature flag AND DSN is provided
+if (isSentryEnabled && sentryDsn) {
   Sentry.init({
     dsn: sentryDsn,
 
@@ -70,8 +75,13 @@ if (sentryDsn) {
   // uncomment the line below to enable Spotlight (https://spotlightjs.com)
   // spotlight: isDev,
   });
+  console.log('[Sentry] Initialized (feature flag enabled)');
 } else {
-  console.log('[Sentry] Disabled - no DSN provided');
+  if (!isSentryEnabled) {
+    console.log('[Sentry] Disabled via feature flag (sentryEnabled=false)');
+  } else if (!sentryDsn) {
+    console.log('[Sentry] Disabled - no DSN provided');
+  }
 }
 
 function RootLayoutContent() {

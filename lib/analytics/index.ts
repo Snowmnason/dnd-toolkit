@@ -49,8 +49,12 @@ const sanitizeProps = (props?: AnalyticsEventProps | Error): AnalyticsEventProps
 
 function isSentryEnabled(): boolean {
   try {
+    const config = getAppConfig();
+    // Check sentryEnabled feature flag first
+    if (!config.features?.sentryEnabled) return false;
+    
     const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN || Constants.expoConfig?.extra?.sentryDsn;
-    const perfFlag = getAppConfig().features?.performanceMonitoring;
+    const perfFlag = config.features?.performanceMonitoring;
     return !!dsn && !!perfFlag;
   } catch {
     return false;
