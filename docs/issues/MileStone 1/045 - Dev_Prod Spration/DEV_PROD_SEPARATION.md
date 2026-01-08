@@ -57,8 +57,8 @@ In production, `useDevConsole()` returns a no-op logger that's completely optimi
 ```typescript
 import { canBypassFeature } from '@/lib/config/dev-only';
 
-if (canBypassFeature('skipAuth')) {
-  // Skip auth in dev for faster testing
+if (canBypassFeature('devBypass')) {
+   // Dev-only bypass example (use a guarded feature key)
 }
 // In production, this always returns false
 ```

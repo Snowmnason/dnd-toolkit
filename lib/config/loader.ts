@@ -25,7 +25,6 @@ export interface AppSettings {
     performanceMonitoring: boolean;
   };
   overrides: {
-    skipAuth: boolean;
     mockSupabase: boolean;
     verboseErrorMessages: boolean;
   };
