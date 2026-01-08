@@ -1,6 +1,6 @@
 import { useAnalyticsNavigation } from '@/hooks/use-analytics-navigation';
 import { AppErrorBoundary, AuthStateManager } from "@/lib";
-import { Analytics } from '@/lib/analytics';
+import { Analytics, SessionManager_ } from '@/lib/analytics';
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ThemeProvider, UseTheme } from "@/theme";
@@ -98,6 +98,11 @@ function RootLayoutContent() {
   // Identify user to analytics when available
   useEffect(() => {
     Analytics.identify(userId ? { id: userId } : null);
+    
+    // Start session when user is identified
+    if (userId) {
+      SessionManager_.startSession(userId);
+    }
   }, [userId]);
 
   // Protected routes that require authentication

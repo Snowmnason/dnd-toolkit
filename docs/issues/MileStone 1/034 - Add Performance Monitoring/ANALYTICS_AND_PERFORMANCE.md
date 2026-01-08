@@ -1,6 +1,6 @@
 # Analytics & Performance Monitoring
 
-Purpose: add lightweight, low-cost instrumentation for navigation, API timing, and feature gating, while remaining a no-op unless explicitly enabled.
+Purpose: add lightweight, low-cost instrumentation for navigation, API timing, and feature gating, while remaining a no-op unless explicitly enabled. **See [ANALYTICS_EXTENSIONS_AND_SENTRY_INTEGRATION.md](ANALYTICS_EXTENSIONS_AND_SENTRY_INTEGRATION.md) for detailed integration guide and future extensibility.**
 
 ## What We Implemented
 - Central analytics wrapper powered by Sentry (breadcrumbs only) that no-ops when disabled.

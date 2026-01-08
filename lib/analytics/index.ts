@@ -3,8 +3,19 @@ import Constants from 'expo-constants';
 import { useEffect } from 'react';
 import { getAppConfig } from '../config/loader';
 import { logger } from '../utils/logger';
+import { AnalyticsConsent } from './consent';
+import { categorizeError } from './error-categorization';
 
 type AnalyticsEventProps = Record<string, any>;
+
+const getThreshold = (key: 'slowScreenMs' | 'slowRequestMs'): number => {
+  try {
+    // eslint-disable-next-line security/detect-object-injection
+    return getAppConfig().thresholds?.[key] ?? (key === 'slowScreenMs' ? 3000 : 3000);
+  } catch {
+    return 3000;
+  }
+};
 
 const sanitizeError = (err: any) => {
   if (!err) return undefined;
@@ -50,14 +61,22 @@ function isSentryEnabled(): boolean {
   }
 }
 
-function withTiming<T>(label: string, fn: () => Promise<T> | T, warnMs: number = 3000): Promise<T> | T {
+function withTiming<T>(label: string, fn: () => Promise<T> | T, warnMs?: number): Promise<T> | T {
   const start = Date.now();
+  const slowScreenThreshold = warnMs ?? getThreshold('slowScreenMs');
+  
   const finish = (ok: boolean, extra?: any) => {
     const duration_ms = Date.now() - start;
-    if (duration_ms > warnMs) logger.warn('performance', `Slow operation: ${label} took ${duration_ms}ms`);
-    if (isSentryEnabled()) {
+    if (duration_ms > slowScreenThreshold) logger.warn('performance', `Slow operation: ${label} took ${duration_ms}ms`);
+    if (isSentryEnabled() && AnalyticsConsent.isAllowed('performance')) {
       try {
-        Sentry.addBreadcrumb({ category: 'performance', message: label, data: { duration_ms, ok, ...extra }, level: 'info' });
+        const errorCategory = extra?.error ? categorizeError(extra.error) : undefined;
+        Sentry.addBreadcrumb({ 
+          category: 'performance', 
+          message: label, 
+          data: { duration_ms, ok, error_category: errorCategory, ...extra }, 
+          level: 'info' 
+        });
       } catch {}
     }
   };
@@ -99,6 +118,14 @@ export const Analytics = {
 
   track(event: string, props?: AnalyticsEventProps): void {
     if (!this.enabled()) return;
+    // Check consent before tracking
+    if (event === 'screen_view' || event === 'component_usage') {
+      if (!AnalyticsConsent.isAllowed('usage')) return;
+    }
+    if (event.startsWith('performance') || event === 'api_request') {
+      if (!AnalyticsConsent.isAllowed('performance')) return;
+    }
+    
     const safeProps = sanitizeProps(props);
     try {
       Sentry.addBreadcrumb({
@@ -125,13 +152,14 @@ export const Performance = {
     this.marks.set(label, Date.now());
   },
 
-  endMeasure(label: string, warnMs: number = 3000) {
+  endMeasure(label: string, warnMs?: number) {
     const start = this.marks.get(label);
     if (!start) return;
     const duration = Date.now() - start;
+    const slowScreenThreshold = warnMs ?? getThreshold('slowScreenMs');
     this.marks.delete(label);
     Analytics.track('performance_measure', { label, duration_ms: duration });
-    if (duration > warnMs) logger.warn('performance', `Slow operation: ${label} took ${duration}ms`);
+    if (duration > slowScreenThreshold) logger.warn('performance', `Slow operation: ${label} took ${duration}ms`);
   },
 
   useScreenDuration(screenName: string) {
@@ -149,5 +177,10 @@ export function trackFeatureBlocked(params: { feature: string; reason: FeatureBl
   const { feature, reason } = params;
   Analytics.track('feature_blocked', { feature, reason });
 }
+
+// Export analytics utilities
+export { AnalyticsConsent } from './consent';
+export { categorizeError, type ErrorCategory } from './error-categorization';
+export { SessionManager_ } from './session';
 
 export default Analytics;

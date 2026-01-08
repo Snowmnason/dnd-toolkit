@@ -1,6 +1,7 @@
-import { Component, ErrorInfo, ReactNode } from 'react';
-import { logger } from '../utils/logger';
 import * as Sentry from '@sentry/react-native';
+import { Component, ErrorInfo, ReactNode } from 'react';
+import { SessionManager_ } from '../analytics/session';
+import { logger } from '../utils/logger';
 
 interface Props {
   children: ReactNode;
@@ -30,6 +31,13 @@ export class AppErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log error details for debugging
     logger.error('ErrorBoundary', 'Uncaught error:', error, errorInfo);
+
+    // Track error in session
+    try {
+      SessionManager_.trackError();
+    } catch (sessionError) {
+      logger.warn('ErrorBoundary', 'Could not track error in session:', sessionError);
+    }
 
     // Send to Sentry crash reporting service
     try {

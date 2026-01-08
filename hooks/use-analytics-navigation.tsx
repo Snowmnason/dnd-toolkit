@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { Analytics, Performance, SessionManager_ } from '@/lib/analytics';
 import { useSegments } from 'expo-router';
-import { Analytics, Performance } from '@/lib/analytics';
+import { useEffect, useMemo, useRef } from 'react';
 
 /**
  * Tracks basic navigation analytics and coarse screen duration.
@@ -21,6 +21,7 @@ export function useAnalyticsNavigation() {
     // Debounce rapid transitions: only track if different from last tracked
     if (screenName && lastTrackedRef.current !== screenName) {
       Analytics.track('screen_view', { screen: screenName });
+      SessionManager_.trackScreenView(screenName);
       lastTrackedRef.current = screenName;
     }
   }, [screenName]);
