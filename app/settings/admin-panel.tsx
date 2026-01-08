@@ -14,6 +14,16 @@ type FlagEntry = {
   kind?: string;
 };
 
+type SettingsSection = 'features' | 'overrides' | 'devTools' | 'featureFlags';
+
+type SettingsEntry = {
+  section: SettingsSection;
+  key: string;
+  title?: string;
+  description?: string;
+  value: boolean;
+};
+
 export default function AdminPanelScreen() {
   const router = useRouter();
   const routeParams = useLocalSearchParams();
@@ -21,9 +31,11 @@ export default function AdminPanelScreen() {
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [flags, setFlags] = useState<FlagEntry[]>([]);
+  const [allSettings, setAllSettings] = useState<SettingsEntry[]>([]);
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const [kindFilter, setKindFilter] = useState<string | 'all'>('all');
   const [kindToggles, setKindToggles] = useState<Record<string, boolean>>({});
+  const [activeSection, setActiveSection] = useState<SettingsSection>('featureFlags');
 
   useEffect(() => {
     let mounted = true;
@@ -44,9 +56,57 @@ export default function AdminPanelScreen() {
 
         setAuthorized(!!user.isAdmin);
 
-        // Load feature flags from bundled config
+        // Load all settings from config (features, overrides, devTools, featureFlags)
         try {
+          const { getAppConfig } = await import('@/lib/config/loader');
           const { FeatureFlags } = await import('@/lib/feature-flags');
+          const config = getAppConfig();
+
+          // Build all settings entries from all sections
+          const allEntries: SettingsEntry[] = [];
+
+          // Add features section
+          if (config.features) {
+            Object.entries(config.features).forEach(([key, value]) => {
+              allEntries.push({
+                section: 'features',
+                key,
+                title: key,
+                description: `Feature flag: ${key}`,
+                value: !!value,
+              });
+            });
+          }
+
+          // Add overrides section
+          if (config.overrides) {
+            Object.entries(config.overrides).forEach(([key, value]) => {
+              allEntries.push({
+                section: 'overrides',
+                key,
+                title: key,
+                description: `Override: ${key}`,
+                value: !!value,
+              });
+            });
+          }
+
+          // Add devTools section
+          if (config.devTools) {
+            Object.entries(config.devTools).forEach(([key, value]) => {
+              allEntries.push({
+                section: 'devTools',
+                key,
+                title: key,
+                description: `Dev tool: ${key}`,
+                value: !!value,
+              });
+            });
+          }
+
+          setAllSettings(allEntries);
+
+          // Load feature flags from bundled config
           const ff = FeatureFlags.getAllFlags();
           const entries = Object.entries(ff || {}).map(([key, val]: any) => ({
             key,
@@ -63,8 +123,9 @@ export default function AdminPanelScreen() {
           });
           setOverrides(initialOverrides);
         } catch (err) {
-          logger.warn('admin-panel', 'Failed to load feature flags config', err);
+          logger.warn('admin-panel', 'Failed to load config', err);
           setFlags([]);
+          setAllSettings([]);
         }
       } catch (err) {
         logger.error('admin-panel', 'Admin check failed', err);
@@ -85,6 +146,12 @@ export default function AdminPanelScreen() {
     // Local override stub — no server persistence implemented
     setOverrides((prev) => ({ ...prev, [key]: value }));
     logger.info('admin-panel', `Toggled feature flag locally: ${key} => ${value}`);
+  }
+
+  function toggleSetting(section: SettingsSection, key: string, value: boolean) {
+    // Local override stub — no server persistence implemented
+    setOverrides((prev) => ({ ...prev, [key]: value }));
+    logger.info('admin-panel', `Toggled ${section} setting locally: ${key} => ${value}`);
   }
 
   async function toggleKind(kind: string, enabled: boolean) {
@@ -173,86 +240,164 @@ export default function AdminPanelScreen() {
         Toggles are local-only stubs; server changes not implemented.
       </Body>
 
-      {flags.length === 0 && (
-        <Body textType="secondary" style={{ marginBottom: S.space.md }}>
-          No feature flags found.
-        </Body>
+      {/* Section Navigation */}
+      <View style={{ marginBottom: S.space.md }}>
+        <Body style={{ fontWeight: '600', marginBottom: S.space.xs }}>Settings Sections</Body>
+        <View style={{ flexDirection: 'row', gap: S.space.xs, flexWrap: 'wrap' }}>
+          <Button
+            variant={activeSection === 'featureFlags' ? 'primary' : 'ghost'}
+            text="Feature Flags"
+            onPress={() => setActiveSection('featureFlags')}
+          />
+          <Button
+            variant={activeSection === 'features' ? 'primary' : 'ghost'}
+            text="Features"
+            onPress={() => setActiveSection('features')}
+          />
+          <Button
+            variant={activeSection === 'overrides' ? 'primary' : 'ghost'}
+            text="Overrides"
+            onPress={() => setActiveSection('overrides')}
+          />
+          <Button
+            variant={activeSection === 'devTools' ? 'primary' : 'ghost'}
+            text="Dev Tools"
+            onPress={() => setActiveSection('devTools')}
+          />
+        </View>
+      </View>
+
+      {/* Feature Flags Section */}
+      {activeSection === 'featureFlags' && (
+        <>
+          {flags.length === 0 && (
+            <Body textType="secondary" style={{ marginBottom: S.space.md }}>
+              No feature flags found.
+            </Body>
+          )}
+
+          {/* Kind filters and toggles */}
+          {flags.length > 0 && (
+            <>
+              <View style={{ marginBottom: S.space.md }}>
+                <Body style={{ fontWeight: '600', marginBottom: S.space.xs }}>Filter by kind</Body>
+                <View style={{ flexDirection: 'row', gap: S.space.xs }}>
+                  <Button
+                    variant={kindFilter === 'all' ? 'primary' : 'ghost'}
+                    text="All"
+                    onPress={() => setKindFilter('all')}
+                  />
+                  <Button
+                    variant={kindFilter === 'free' ? 'primary' : 'ghost'}
+                    text="Free"
+                    onPress={() => setKindFilter('free')}
+                  />
+                  <Button
+                    variant={kindFilter === 'premium' ? 'primary' : 'ghost'}
+                    text="Premium"
+                    onPress={() => setKindFilter('premium')}
+                  />
+                  <Button
+                    variant={kindFilter === 'beta' ? 'primary' : 'ghost'}
+                    text="Beta"
+                    onPress={() => setKindFilter('beta')}
+                  />
+                </View>
+              </View>
+
+              <View style={{ marginBottom: S.space.md }}>
+                <Body style={{ fontWeight: '600', marginBottom: S.space.xs }}>Enable all by kind (local)</Body>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.space.sm }}>
+                  <Body>Free</Body>
+                  <View style={{ maxWidth: 140 }}>
+                    <Switch checked={!!kindToggles['free']} onChange={(v) => toggleKind('free', v)} />
+                  </View>
+                  <Body style={{ marginLeft: S.space.xs }}>Premium</Body>
+                  <View style={{ maxWidth: 140 }}>
+                    <Switch checked={!!kindToggles['premium']} onChange={(v) => toggleKind('premium', v)} />
+                  </View>
+                  <Body style={{ marginLeft: S.space.xs }}>Beta</Body>
+                  <View style={{ maxWidth: 140 }}>
+                    <Switch checked={!!kindToggles['beta']} onChange={(v) => toggleKind('beta', v)} />
+                  </View>
+                </View>
+              </View>
+
+              {flags
+                .filter((f) => (kindFilter === 'all' ? true : f.kind === kindFilter))
+                .map((flag) => (
+                  <View
+                    key={flag.key}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: S.space.md,
+                      borderBottomWidth: 1,
+                      borderBottomColor: '#eee',
+                      gap: S.space.sm,
+                    }}
+                  >
+                    <View style={{ flex: 1, paddingRight: S.space.sm }}>
+                      <Body>{flag.title}</Body>
+                      <SubTitle>{flag.kind ?? 'free'}</SubTitle>
+                      {flag.description ? (
+                        <Body style={{ color: '#666', marginTop: S.space.xs }} fontSize={S.font.body1}>
+                          {flag.description}
+                        </Body>
+                      ) : null}
+                    </View>
+                    <View style={{ maxWidth: 140 }}>
+                      <Switch checked={!!overrides[flag.key]} onChange={(v) => toggleFlag(flag.key, v)} />
+                    </View>
+                  </View>
+                ))}
+            </>
+          )}
+        </>
       )}
 
-      {/* Kind filters and toggles */}
-      <View style={{ marginBottom: S.space.md }}>
-        <Body style={{ fontWeight: '600', marginBottom: S.space.xs }}>Filter by kind</Body>
-        <View style={{ flexDirection: 'row', gap: S.space.xs }}>
-          <Button
-            variant={kindFilter === 'all' ? 'primary' : 'ghost'}
-            text="All"
-            onPress={() => setKindFilter('all')}
-          />
-          <Button
-            variant={kindFilter === 'free' ? 'primary' : 'ghost'}
-            text="Free"
-            onPress={() => setKindFilter('free')}
-          />
-          <Button
-            variant={kindFilter === 'premium' ? 'primary' : 'ghost'}
-            text="Premium"
-            onPress={() => setKindFilter('premium')}
-          />
-          <Button
-            variant={kindFilter === 'beta' ? 'primary' : 'ghost'}
-            text="Beta"
-            onPress={() => setKindFilter('beta')}
-          />
-        </View>
-      </View>
-
-      <View style={{ marginBottom: S.space.md }}>
-        <Body style={{ fontWeight: '600', marginBottom: S.space.xs }}>Enable all by kind (local)</Body>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.space.sm }}>
-          <Body style={{  }}>Free</Body>
-          <View style={{ maxWidth: 140 }}>
-            <Switch checked={!!kindToggles['free']} onChange={(v) => toggleKind('free', v)} />
-          </View>
-          <Body style={{  marginLeft: S.space.xs }}>Premium</Body>
-          <View style={{ maxWidth: 140 }}>
-            <Switch checked={!!kindToggles['premium']} onChange={(v) => toggleKind('premium', v)} />
-          </View>
-          <Body style={{ marginLeft: S.space.xs }}>Beta</Body>
-          <View style={{ maxWidth: 140 }}>
-            <Switch checked={!!kindToggles['beta']} onChange={(v) => toggleKind('beta', v)} />
-          </View>
-        </View>
-      </View>
-
-      {flags
-        .filter((f) => (kindFilter === 'all' ? true : f.kind === kindFilter))
-        .map((flag) => (
-          <View
-            key={flag.key}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingVertical: S.space.md,
-              borderBottomWidth: 1,
-              borderBottomColor: '#eee',
-              gap: S.space.sm,
-            }}
-          >
-            <View style={{ flex: 1, paddingRight: S.space.sm }}>
-              <Body>{flag.title}</Body>
-              <SubTitle>{flag.kind ?? 'free'}</SubTitle>
-              {flag.description ? (
-                <Body style={{ color: '#666', marginTop: S.space.xs }} fontSize={S.font.body1}>
-                  {flag.description}
-                </Body>
-              ) : null}
-            </View>
-            <View style={{ maxWidth: 140 }}>
-              <Switch checked={!!overrides[flag.key]} onChange={(v) => toggleFlag(flag.key, v)} />
-            </View>
-          </View>
-        ))}
+      {/* Other Settings Sections */}
+      {['features', 'overrides', 'devTools'].includes(activeSection) && (
+        <>
+          {allSettings.filter((s) => s.section === activeSection).length === 0 && (
+            <Body textType="secondary" style={{ marginBottom: S.space.md }}>
+              No settings found in this section.
+            </Body>
+          )}
+          {allSettings
+            .filter((s) => s.section === activeSection)
+            .map((setting) => (
+              <View
+                key={`${setting.section}-${setting.key}`}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: S.space.md,
+                  borderBottomWidth: 1,
+                  borderBottomColor: '#eee',
+                  gap: S.space.sm,
+                }}
+              >
+                <View style={{ flex: 1, paddingRight: S.space.sm }}>
+                  <Body>{setting.title}</Body>
+                  {setting.description ? (
+                    <Body style={{ color: '#666', marginTop: S.space.xs }} fontSize={S.font.body1}>
+                      {setting.description}
+                    </Body>
+                  ) : null}
+                </View>
+                <View style={{ maxWidth: 140 }}>
+                  <Switch
+                    checked={!!overrides[setting.key]}
+                    onChange={(v) => toggleSetting(setting.section, setting.key, v)}
+                  />
+                </View>
+              </View>
+            ))}
+        </>
+      )}
     </AppPage>
   );
 }
