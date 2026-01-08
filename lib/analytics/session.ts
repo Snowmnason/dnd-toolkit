@@ -3,8 +3,10 @@
  * Tracks user sessions, duration, and engagement metrics
  */
 
+import * as Sentry from '@sentry/react-native';
+import Constants from 'expo-constants';
+import { getAppConfig } from '../config/loader';
 import { logger } from '../utils/logger';
-import { Analytics } from './index';
 
 interface SessionData {
   startedAt: number;
@@ -16,12 +18,18 @@ interface SessionData {
 
 class SessionManager {
   private currentSession: SessionData | null = null;
-  private sessionStorageKey = 'dnd_analytics_session';
 
   /**
    * Start a new session
+   * If a session is already active, ends it before starting the new one
    */
   startSession(userId?: string): void {
+    // End existing session if active
+    if (this.currentSession) {
+      logger.debug('analytics', 'Ending existing session before starting new one');
+      this.endSession();
+    }
+
     const now = Date.now();
     this.currentSession = {
       startedAt: now,
@@ -31,7 +39,7 @@ class SessionManager {
       lastActivityAt: now,
     };
 
-    Analytics.track('session_started', {
+    this.trackEvent('session_started', {
       userId: userId || undefined,
       timestamp: now,
     });
@@ -49,7 +57,7 @@ class SessionManager {
     const duration = now - this.currentSession.startedAt;
     const durationMinutes = Math.round(duration / 60000);
 
-    Analytics.track('session_ended', {
+    this.trackEvent('session_ended', {
       duration_ms: duration,
       duration_minutes: durationMinutes,
       screen_views: this.currentSession.screenViews,
@@ -103,6 +111,27 @@ class SessionManager {
     const thirtyMinutesMs = 30 * 60 * 1000;
     return inactiveMs < thirtyMinutesMs;
   }
+
+  /**
+   * Internal method to track session events to Sentry
+   * Avoids circular dependency with Analytics module
+   */
+  private trackEvent(event: string, data?: Record<string, any>): void {
+    try {
+      const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN || Constants.expoConfig?.extra?.sentryDsn;
+      const perfFlag = getAppConfig().features?.performanceMonitoring;
+      if (!dsn || !perfFlag) return;
+
+      Sentry.addBreadcrumb({
+        category: 'analytics',
+        message: event,
+        data,
+        level: 'info',
+      });
+    } catch (err) {
+      logger.warn('analytics', 'Failed to track session event:', err);
+    }
+  }
 }
 
-export const SessionManager_ = new SessionManager();
+export const sessionManager = new SessionManager();

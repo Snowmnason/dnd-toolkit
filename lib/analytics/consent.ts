@@ -4,12 +4,16 @@
  * Provides a foundation for consent-based analytics tracking.
  * Allows users to opt-in/out of analytics collection at runtime.
  * Future-proofs for GDPR, privacy regulations, and user preferences.
+ * 
+ * Default: 'basic' consent level (essential tracking only)
+ * This ensures GDPR compliance out-of-the-box. Users must explicitly
+ * opt-in to 'full' tracking for usage analytics and performance monitoring.
  */
 
 export type ConsentLevel = 'none' | 'basic' | 'full';
 
 class AnalyticsConsentManager {
-  private consentLevel: ConsentLevel = 'full'; // Default to full for now
+  private consentLevel: ConsentLevel = 'basic'; // Default to basic for GDPR compliance
 
   /**
    * Set the consent level

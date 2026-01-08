@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/react-native';
 import { Component, ErrorInfo, ReactNode } from 'react';
-import { SessionManager_ } from '../analytics/session';
+import { sessionManager } from '../analytics/session';
 import { logger } from '../utils/logger';
 
 interface Props {
@@ -34,7 +34,7 @@ export class AppErrorBoundary extends Component<Props, State> {
 
     // Track error in session
     try {
-      SessionManager_.trackError();
+      sessionManager.trackError();
     } catch (sessionError) {
       logger.warn('ErrorBoundary', 'Could not track error in session:', sessionError);
     }

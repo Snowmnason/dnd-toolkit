@@ -1,6 +1,7 @@
-import { SubscriptionManager } from '@/lib/premium/subscription-manager';
-import { useEffect, useRef, useState } from 'react';
 import { trackFeatureBlocked } from '@/lib/analytics';
+import { SubscriptionManager } from '@/lib/premium/subscription-manager';
+import { logger } from '@/lib/utils/logger';
+import { useEffect, useRef, useState } from 'react';
 
 export interface UsePremiumFeatureState {
   isPremium: boolean;
@@ -60,7 +61,10 @@ export function usePremiumFeature(featureKey?: string): UsePremiumFeatureState {
 
     try {
       trackFeatureBlocked({ feature: featureKey!, reason: 'requires_premium' });
-    } catch {}
+    } catch (error) {
+      // Log tracking failures for debugging without blocking feature checks
+      logger.debug('premium-feature', 'Failed to track feature blocked event:', error);
+    }
     trackedRef.current = true;
   }, [shouldCheckPremium, state.loading, state.isAvailable, featureKey]);
 

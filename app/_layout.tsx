@@ -1,6 +1,6 @@
 import { useAnalyticsNavigation } from '@/hooks/use-analytics-navigation';
 import { AppErrorBoundary, AuthStateManager } from "@/lib";
-import { Analytics, SessionManager_ } from '@/lib/analytics';
+import { Analytics, sessionManager } from '@/lib/analytics';
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ThemeProvider, UseTheme } from "@/theme";
@@ -101,7 +101,7 @@ function RootLayoutContent() {
     
     // Start session when user is identified
     if (userId) {
-      SessionManager_.startSession(userId);
+      sessionManager.startSession(userId);
     }
   }, [userId]);
 

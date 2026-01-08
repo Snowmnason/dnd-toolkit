@@ -5,25 +5,21 @@ import { getAppConfig } from '../config/loader';
 import { logger } from '../utils/logger';
 import { AnalyticsConsent } from './consent';
 import { categorizeError } from './error-categorization';
+import { getThreshold, sanitizeError } from './utils';
 
 type AnalyticsEventProps = Record<string, any>;
 
-const getThreshold = (key: 'slowScreenMs' | 'slowRequestMs'): number => {
-  try {
-    // eslint-disable-next-line security/detect-object-injection
-    return getAppConfig().thresholds?.[key] ?? (key === 'slowScreenMs' ? 3000 : 3000);
-  } catch {
-    return 3000;
-  }
-};
-
-const sanitizeError = (err: any) => {
-  if (!err) return undefined;
-  const error_name = typeof err.name === 'string' ? err.name : undefined;
-  const error_code = typeof err.code === 'string' || typeof err.code === 'number' ? err.code : undefined;
-  return error_name || error_code ? { error_name, error_code } : undefined;
-};
-
+/**
+ * Sanitize analytics properties before sending to Sentry
+ * 
+ * Security: Removes potentially sensitive fields that may contain:
+ * - User input or system paths (message, stack)
+ * - Raw error objects with detailed context
+ * - Any string representations of errors
+ * 
+ * Only structured, predictable fields (error_name, error_code) are preserved
+ * to prevent accidental leakage of sensitive information to analytics services.
+ */
 const sanitizeProps = (props?: AnalyticsEventProps | Error): AnalyticsEventProps | undefined => {
   if (!props) return undefined;
   if (props instanceof Error) {
@@ -33,7 +29,7 @@ const sanitizeProps = (props?: AnalyticsEventProps | Error): AnalyticsEventProps
 
   const cloned: any = { ...(props as any) };
 
-  // Remove common sensitive fields
+  // Remove common sensitive fields that may contain user data or system paths
   if (typeof cloned.message === 'string') delete cloned.message;
   if (typeof cloned.stack === 'string') delete cloned.stack;
 
@@ -108,6 +104,8 @@ export const Analytics = {
     return isSentryEnabled();
   },
 
+  getThreshold,
+
   identify(user: { id?: string; username?: string } | null): void {
     if (!this.enabled()) return;
     try {
@@ -147,9 +145,21 @@ export const Analytics = {
 
 export const Performance = {
   marks: new Map<string, number>(),
+  // Maximum age for marks (5 minutes) to prevent memory leaks from abandoned measurements
+  MAX_MARK_AGE_MS: 5 * 60 * 1000,
 
+  /**
+   * Start a performance measurement
+   * If a mark with this label already exists, logs a warning and overwrites it
+   * to prevent incorrect measurements from reused labels
+   */
   startMeasure(label: string) {
+    const existing = this.marks.get(label);
+    if (existing) {
+      logger.warn('performance', `Mark '${label}' already exists, overwriting (potential duplicate measurement)`);
+    }
     this.marks.set(label, Date.now());
+    this.cleanupOldMarks();
   },
 
   endMeasure(label: string, warnMs?: number) {
@@ -160,6 +170,26 @@ export const Performance = {
     this.marks.delete(label);
     Analytics.track('performance_measure', { label, duration_ms: duration });
     if (duration > slowScreenThreshold) logger.warn('performance', `Slow operation: ${label} took ${duration}ms`);
+  },
+
+  /**
+   * Clean up marks older than MAX_MARK_AGE_MS to prevent memory leaks
+   * from abandoned measurements (e.g., unmounted components, errors)
+   */
+  cleanupOldMarks() {
+    const now = Date.now();
+    const staleLabels: string[] = [];
+    
+    this.marks.forEach((timestamp, label) => {
+      if (now - timestamp > this.MAX_MARK_AGE_MS) {
+        staleLabels.push(label);
+      }
+    });
+
+    staleLabels.forEach(label => {
+      logger.debug('performance', `Removing stale mark: ${label}`);
+      this.marks.delete(label);
+    });
   },
 
   useScreenDuration(screenName: string) {
@@ -181,6 +211,7 @@ export function trackFeatureBlocked(params: { feature: string; reason: FeatureBl
 // Export analytics utilities
 export { AnalyticsConsent } from './consent';
 export { categorizeError, type ErrorCategory } from './error-categorization';
-export { SessionManager_ } from './session';
+export { sessionManager } from './session';
+export { getThreshold, sanitizeError } from './utils';
 
 export default Analytics;
