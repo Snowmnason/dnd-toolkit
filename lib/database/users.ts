@@ -9,15 +9,18 @@ export interface User {
   auth_id: string;
   username: string;
   created_at: string;
+  isAdmin: boolean;
 }
 
 export interface CreateUserData {
   auth_id: string;
   username: string;
+  isAdmin?: boolean;
 }
 
 export interface UpdateUserData {
   username?: string;
+  isAdmin?: boolean;
 }
 
 export const usersDB = {
@@ -87,6 +90,7 @@ export const usersDB = {
     const defaultUserData: CreateUserData = {
       auth_id: authId,
       username: `user_${authId.slice(-8)}`, // Default username using last 8 chars of auth_id
+      isAdmin: false,
     };
 
     return this.create(defaultUserData);
@@ -104,7 +108,8 @@ export const usersDB = {
       if (cachedUser) {
         logger.debug('usersDB', 'User profile loaded from storage (avoiding DB call):', {
           id: cachedUser.id,
-          username: cachedUser.username
+          username: cachedUser.username,
+          isAdmin: cachedUser.isAdmin
         });
         return cachedUser;
       }

@@ -22,8 +22,8 @@ import {
   Heading,
   Surface,
 } from "@/components/ui";
-import UserProfile from "../Screens/settings/user-profile";
-import VersionDisplay from "../components/VersionDisplay";
+import UserProfile from "../../Screens/settings/user-profile";
+import VersionDisplay from "../../components/VersionDisplay";
 
 // 🎨 Theme + Loading
 import { ThemeSelector } from "@/Screens/settings/ThemeSelector";
@@ -205,9 +205,9 @@ export default function SettingsPage() {
           text="Playground"
           onPress={() => {
             if (isMobile) {
-              router.push("/StyleMobile");
+              router.push("../settings/StyleMobile");
             } else {
-              router.push("/StyleDesktop");
+              router.push("../settings/StyleDesktop");
             }
           }}
           style={{ alignSelf: "center" }}

@@ -57,6 +57,7 @@ export interface StoredUserData {
   auth_id: string;
   username: string;
   created_at: string;
+  isAdmin: boolean;
 }
 
 // Cache expiration: 4 hours in milliseconds
@@ -85,7 +86,7 @@ export const AuthStateManager = {
       await storage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(userData));
       // Store the timestamp when this cache was updated
       await storage.setItem(STORAGE_KEYS.USER_DATA_TIMESTAMP, Date.now().toString());
-      logger.debug('auth-state', 'User data saved to storage with timestamp:', { id: userData.id, username: userData.username });
+      logger.debug('auth-state', 'User data saved to storage with timestamp:', { id: userData.id, username: userData.username, isAdmin: userData.isAdmin });
     } catch (error) {
       logger.error('auth-state', 'Error saving user data:', error);
     }

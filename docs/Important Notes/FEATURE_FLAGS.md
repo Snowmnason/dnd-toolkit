@@ -64,11 +64,6 @@ Runtime toggles are lost on page refresh.
 - **Description**: Enable verbose debug logging throughout the app
 - **Impact**: Reserved for future use; currently not implemented.
 
-### `skipAuth`
-- **Default**: `false`
-- **Description**: Skip authentication checks (for local testing only)
-- **Impact**: Reserved for future use; currently not implemented.
-
 ## Adding New Flags
 
 1. Add the flag to `config/appsettings.dev.json` (and mirror the key in `config/appsettings.json`):

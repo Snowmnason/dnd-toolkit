@@ -98,10 +98,10 @@ export default function WelcomeScreen() {
         <AuthLink
           color={isLoading ? '#BDB76B' : '#D4AF37'}
           onPress={() => {
-            if(isMobile) {
-              router.push('../StyleMobile');
+            if (isMobile) {
+              //do nothing for now
               return;
-            }else {
+            } else {
               router.push('../StyleDesktop');
               return;
             }

@@ -1,3 +1,4 @@
+import { logger } from '@/lib'
 import { S, UseTheme } from '@/theme'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
@@ -10,6 +11,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import SettingsMenu from './modals/SettingsModal'
+import { AppToast } from './ui'
 import { IconButton } from './ui/IconButton'
 
 // 🎨 Fixed palette (matches BottomTabBar)
@@ -40,6 +42,7 @@ export default function TopBar({
   const { width } = useWindowDimensions()
   const isMobile = Platform.OS !== 'web' || width < 900
   const [showSettingsMenu, setShowSettingsMenu] = useState(false)
+  const [showErrorToast, setShowErrorToast] = useState(false)
   const { theme } = UseTheme()
   const insets = useSafeAreaInsets()
 
@@ -105,21 +108,38 @@ export default function TopBar({
       <SettingsMenu
         visible={showSettingsMenu}
         onClose={() => setShowSettingsMenu(false)}
-        onAccountSettings={() => {
-          setShowSettingsMenu(false)
-          const routeParams: any = {}
-          if (worldId) routeParams.worldId = worldId
-          if (userRole) routeParams.userRole = userRole
+          onAccountSettings={async () => {
+            setShowSettingsMenu(false)
+            const routeParams: any = {}
+            if (worldId) routeParams.worldId = worldId
+            if (userRole) routeParams.userRole = userRole
 
-          router.push({
-            pathname: '/settings',
-            params: routeParams,
-          })
-        }}
+            try {
+              const { AuthStateManager } = await import('@/lib/auth-state');
+              const user = await AuthStateManager.getUserData();
+              const raw = user?.username || 'user';
+              const username = encodeURIComponent(raw);
+              const qs = Object.keys(routeParams).length
+                ? `?${new URLSearchParams(routeParams).toString()}`
+                : '';
+              router.push(`/settings/${username}${qs}`);
+            } catch (err) {
+              logger.warn('TopBar: failed to resolve username route, falling back', err);
+              setShowErrorToast(true);
+            }
+          }}
         onReturnToWorldSelection={() => {
           setShowSettingsMenu(false)
           router.replace('/select/world-selection')
         }}
+      />
+
+      {/* Error feedback */}
+      <AppToast
+        visible={showErrorToast}
+        message="Failed to navigate to settings. Please try again."
+        type="error"
+        onHide={() => setShowErrorToast(false)}
       />
     </>
   )
