@@ -1,11 +1,11 @@
 import { usePlatform } from "@/contexts/PlatformContext";
 import {
-  AuthStateManager,
   deleteUserAccount,
   logger,
   signOutUser,
   supabase,
   usersDB,
+  isSupabaseConfigured,
 } from "@/lib";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { useRouter } from "expo-router";
@@ -35,6 +35,7 @@ export default function SettingsPage() {
   const { isMobile } = usePlatform();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [secureReady, setSecureReady] = useState(false);
 
   // Sign-out + delete state
   const [signingOut, setSigningOut] = useState(false);
@@ -46,30 +47,28 @@ export default function SettingsPage() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const isAuth = await AuthStateManager.isAuthenticated();
-        if (!isAuth) {
-          logger.debug("settings", "User not authenticated, redirecting");
+    // Double-check: require confirmed Supabase session before proceeding
+    if (!isSupabaseConfigured()) {
+      logger.debug("settings", "Supabase not configured; redirecting to welcome");
+      router.replace("/login/welcome");
+      return;
+    }
+
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }: { data: { session: Session | null } }) => {
+        const user: User | null = session?.user ?? null;
+        if (!user || !user.email_confirmed_at) {
+          logger.debug("settings", "No confirmed user session, redirecting");
           router.replace("/login/welcome");
           return;
         }
-      } catch (error) {
-        logger.error("settings", "Settings auth check error:", error);
-        router.replace("/login/welcome");
-        return;
-      }
-    };
-
-    checkAuth();
-
-    supabase.auth
-      .getUser()
-      .then((res: { data?: { user?: User | null }; error?: any }) => {
+        setSecureReady(true);
         setLoading(false);
       })
       .catch((err: unknown) => {
-        logger.error("settings", "Error fetching user on settings mount:", err);
+        logger.error("settings", "Error checking session:", err);
+        router.replace("/login/welcome");
         setLoading(false);
       });
 
@@ -89,14 +88,16 @@ export default function SettingsPage() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      (event: AuthChangeEvent, _session: Session | null) => {
-        if (event === "SIGNED_OUT") {
+      (_event: AuthChangeEvent, session: Session | null) => {
+        const user: User | null = session?.user ?? null;
+        if (!user) {
+          logger.debug("settings", "Auth state changed: user signed out");
           router.replace("/login/welcome");
         }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => subscription?.unsubscribe?.();
   }, [router]);
 
   const handleSignOutConfirm = async () => {
@@ -166,6 +167,10 @@ export default function SettingsPage() {
 
   if (loading) {
     return <AppLoading loadMessage="Loading Settings..." />;
+  }
+
+  if (!secureReady) {
+    return <AppLoading loadMessage="Securing Settings..." />;
   }
 
   return (

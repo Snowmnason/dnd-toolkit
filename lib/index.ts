@@ -17,6 +17,9 @@ export * from './auth/useSignInForm';
 export * from './auth/useSignUpForm';
 export * from './auth/useWelcomeScreen';
 export * from './auth/validation';
+export * from './auth/useAuthGuard';
+// ===== Routing config =====
+export * from './routing/route-config';
 
 // ===== Database =====
 export * from './database/common';
