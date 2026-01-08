@@ -57,6 +57,7 @@ create table public.users (
   auth_id uuid not null,
   username text not null default 'changeling',
   created_at timestamp with time zone not null default now(),
+  isAdmin boolean not null default false,
   constraint users_pkey primary key (id),
   constraint users_auth_id_fkey foreign key (auth_id) references auth.users (id) on update cascade on delete cascade
 ) tablespace pg_default;

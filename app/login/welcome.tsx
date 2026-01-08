@@ -102,7 +102,7 @@ export default function WelcomeScreen() {
               //do nothing for now
               return;
             } else {
-              router.push('/StyleDesktop');
+              router.push('../StyleDesktop');
               return;
             }
             // TODO: Implement anonymous auth

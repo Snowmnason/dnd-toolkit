@@ -11,6 +11,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import SettingsMenu from './modals/SettingsModal'
+import { AppToast } from './ui'
 import { IconButton } from './ui/IconButton'
 
 // 🎨 Fixed palette (matches BottomTabBar)
@@ -41,6 +42,7 @@ export default function TopBar({
   const { width } = useWindowDimensions()
   const isMobile = Platform.OS !== 'web' || width < 900
   const [showSettingsMenu, setShowSettingsMenu] = useState(false)
+  const [showErrorToast, setShowErrorToast] = useState(false)
   const { theme } = UseTheme()
   const insets = useSafeAreaInsets()
 
@@ -123,12 +125,21 @@ export default function TopBar({
               router.push(`/settings/${username}${qs}`);
             } catch (err) {
               logger.warn('TopBar: failed to resolve username route, falling back', err);
+              setShowErrorToast(true);
             }
           }}
         onReturnToWorldSelection={() => {
           setShowSettingsMenu(false)
           router.replace('/select/world-selection')
         }}
+      />
+
+      {/* Error feedback */}
+      <AppToast
+        visible={showErrorToast}
+        message="Failed to navigate to settings. Please try again."
+        type="error"
+        onHide={() => setShowErrorToast(false)}
       />
     </>
   )

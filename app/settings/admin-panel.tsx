@@ -1,16 +1,23 @@
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Button, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { getCurrentUserProfile } from '../../lib/database/common';
-import { logger } from '../../lib/utils/logger';
+import { View } from 'react-native';
+
+import { AppPage, Body, Button, CustomLoad, SubTitle, Switch, Title } from '@/components/ui';
+import { getCurrentUserProfile } from '@/lib/database/common';
+import { logger } from '@/lib/utils/logger';
+import { useScale } from '@/theme';
 
 type FlagEntry = {
   key: string;
-  title: string;
-  description?: string;
+  title?: string;
+  description: string;
   kind?: string;
 };
 
-export default function AdminPanelScreen({ navigation }: any) {
+export default function AdminPanelScreen() {
+  const router = useRouter();
+  const routeParams = useLocalSearchParams();
+  const S = useScale();
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [flags, setFlags] = useState<FlagEntry[]>([]);
@@ -35,24 +42,21 @@ export default function AdminPanelScreen({ navigation }: any) {
           return;
         }
 
-        setAuthorized(!!(user as any).admin);
+        setAuthorized(!!user.isAdmin);
 
         // Load feature flags from bundled config
         try {
-          // Dynamic import so bundlers handle JSON correctly
-          // config path relative to project root
-           
-            const { FeatureFlags } = await import('../../lib/feature-flags');
-            const ff = FeatureFlags.getAllFlags();
+          const { FeatureFlags } = await import('@/lib/feature-flags');
+          const ff = FeatureFlags.getAllFlags();
           const entries = Object.entries(ff || {}).map(([key, val]: any) => ({
             key,
             title: val.title || key,
             description: val.description,
-            kind: val.kind || 'free'
+            kind: val.kind || 'free',
           }));
           setFlags(entries);
           // Initialize switches to reflect current FeatureFlags enabled state
-          const initialOverrides: Record<string, boolean> = {};
+          const initialOverrides: Record<string, boolean> = Object.create(null);
           Object.entries(ff || {}).forEach(([k, v]: any) => {
             initialOverrides[k] = !!v.enabled;
           });
@@ -78,27 +82,27 @@ export default function AdminPanelScreen({ navigation }: any) {
 
   function toggleFlag(key: string, value: boolean) {
     // Local override stub — no server persistence implemented
-    setOverrides(prev => ({ ...prev, [key]: value }));
+    setOverrides((prev) => ({ ...prev, [key]: value }));
     logger.info('admin-panel', `Toggled feature flag locally: ${key} => ${value}`);
   }
 
   async function toggleKind(kind: string, enabled: boolean) {
     try {
-      const { FeatureFlags } = await import('../../lib/feature-flags');
+      const { FeatureFlags } = await import('@/lib/feature-flags');
       FeatureFlags.toggleKind(kind as any, enabled);
-      setKindToggles(prev => ({ ...prev, [kind]: enabled }));
+      setKindToggles((prev) => ({ ...prev, [kind]: enabled }));
       // Refresh the flag list from manager
       const ff = FeatureFlags.getAllFlags();
       const entries = Object.entries(ff || {}).map(([key, val]: any) => ({
         key,
         title: val.title || key,
         description: val.description,
-        kind: val.kind || 'free'
+        kind: val.kind || 'free',
       }));
       setFlags(entries);
       // Update overrides for this kind so switches reflect the change
       const newOverrides = { ...overrides };
-      entries.forEach(e => {
+      entries.forEach((e) => {
         if (e.kind === kind) newOverrides[e.key] = enabled;
       });
       setOverrides(newOverrides);
@@ -107,108 +111,146 @@ export default function AdminPanelScreen({ navigation }: any) {
     }
   }
 
+  const handleBack = async () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    let username = 'user';
+    try {
+      const { AuthStateManager } = await import('@/lib/auth-state');
+      const user = await AuthStateManager.getUserData();
+      if (user?.username) {
+        username = encodeURIComponent(user.username);
+      }
+    } catch (err) {
+      logger.warn('admin-panel', 'Failed to resolve username; using default', err);
+    }
+
+    const { username: _ignored, ...rest } = routeParams || {};
+    const qs = Object.keys(rest).length
+      ? `?${new URLSearchParams(
+          Object.entries(rest).reduce<Record<string, string>>((acc, [k, v]) => {
+            acc[k] = Array.isArray(v) ? v[0] ?? '' : (v ?? '').toString();
+            return acc;
+          }, {})
+        ).toString()}`
+      : '';
+
+    router.replace(`/settings/${username}${qs}`);
+  };
+
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" />
-        <Text style={styles.hint}>Verifying admin access…</Text>
-      </View>
+      <AppPage center>
+        <CustomLoad size="medium" />
+        <Body textType="secondary" style={{ marginTop: S.space.sm }}>
+          Verifying admin access…
+        </Body>
+      </AppPage>
     );
   }
 
   if (!authorized) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.title}>Not authorized</Text>
-        <Text style={styles.hint}>You must be an admin to access this panel.</Text>
-        <Button title="Back" onPress={() => navigation?.goBack?.()} />
-      </View>
+      <AppPage center>
+        <Title style={{ marginBottom: S.space.xs }}>Not authorized</Title>
+        <Body textType="secondary" style={{ marginBottom: S.space.md }}>
+          You must be an admin to access this panel.
+        </Body>
+        <Button text="Back" variant="ghost" onPress={handleBack} />
+      </AppPage>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Admin Panel</Text>
-      <Text style={styles.hint}>Toggles are local-only stubs; server changes not implemented.</Text>
+    <AppPage>
+      <Title style={{ marginBottom: S.space.xs }}>Admin Panel</Title>
+      <Body textType="secondary" style={{ marginBottom: S.space.md }}>
+        Toggles are local-only stubs; server changes not implemented.
+      </Body>
 
-      {flags.length === 0 && <Text style={styles.hint}>No feature flags found.</Text>}
+      {flags.length === 0 && (
+        <Body textType="secondary" style={{ marginBottom: S.space.md }}>
+          No feature flags found.
+        </Body>
+      )}
 
       {/* Kind filters and toggles */}
-      <View style={{ marginBottom: 12 }}>
-        <Text style={{ fontWeight: '600', marginBottom: 8 }}>Filter by kind</Text>
-        <View style={{ flexDirection: 'row', gap: 12 }}>
-          <Button title="All" onPress={() => setKindFilter('all')} />
-          <Button title="Free" onPress={() => setKindFilter('free')} />
-          <Button title="Premium" onPress={() => setKindFilter('premium')} />
-          <Button title="Beta" onPress={() => setKindFilter('beta')} />
-        </View>
-      </View>
-
-      <View style={{ marginBottom: 12 }}>
-        <Text style={{ fontWeight: '600', marginBottom: 8 }}>Enable all by kind (local)</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Text style={{ width: 80 }}>Free</Text>
-          <Switch value={!!kindToggles['free']} onValueChange={(v) => toggleKind('free', v)} />
-          <Text style={{ width: 80, marginLeft: 8 }}>Premium</Text>
-          <Switch value={!!kindToggles['premium']} onValueChange={(v) => toggleKind('premium', v)} />
-          <Text style={{ width: 80, marginLeft: 8 }}>Beta</Text>
-          <Switch value={!!kindToggles['beta']} onValueChange={(v) => toggleKind('beta', v)} />
-        </View>
-      </View>
-
-      {flags.filter(f => kindFilter === 'all' ? true : f.kind === kindFilter).map(flag => (
-        <View key={flag.key} style={styles.row}>
-          <View style={styles.rowText}>
-            <Text style={styles.flagTitle}>{flag.title} <Text style={{ fontSize: 12, color: '#888' }}>({flag.kind})</Text></Text>
-            {flag.description ? <Text style={styles.flagDesc}>{flag.description}</Text> : null}
-          </View>
-          <Switch
-            value={!!overrides[flag.key]}
-            onValueChange={v => toggleFlag(flag.key, v)}
+      <View style={{ marginBottom: S.space.md }}>
+        <Body style={{ fontWeight: '600', marginBottom: S.space.xs }}>Filter by kind</Body>
+        <View style={{ flexDirection: 'row', gap: S.space.xs }}>
+          <Button
+            variant={kindFilter === 'all' ? 'primary' : 'ghost'}
+            text="All"
+            onPress={() => setKindFilter('all')}
+          />
+          <Button
+            variant={kindFilter === 'free' ? 'primary' : 'ghost'}
+            text="Free"
+            onPress={() => setKindFilter('free')}
+          />
+          <Button
+            variant={kindFilter === 'premium' ? 'primary' : 'ghost'}
+            text="Premium"
+            onPress={() => setKindFilter('premium')}
+          />
+          <Button
+            variant={kindFilter === 'beta' ? 'primary' : 'ghost'}
+            text="Beta"
+            onPress={() => setKindFilter('beta')}
           />
         </View>
-      ))}
+      </View>
 
-    </ScrollView>
+      <View style={{ marginBottom: S.space.md }}>
+        <Body style={{ fontWeight: '600', marginBottom: S.space.xs }}>Enable all by kind (local)</Body>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.space.sm }}>
+          <Body style={{  }}>Free</Body>
+          <View style={{ maxWidth: 140 }}>
+            <Switch checked={!!kindToggles['free']} onChange={(v) => toggleKind('free', v)} />
+          </View>
+          <Body style={{  marginLeft: S.space.xs }}>Premium</Body>
+          <View style={{ maxWidth: 140 }}>
+            <Switch checked={!!kindToggles['premium']} onChange={(v) => toggleKind('premium', v)} />
+          </View>
+          <Body style={{ marginLeft: S.space.xs }}>Beta</Body>
+          <View style={{ maxWidth: 140 }}>
+            <Switch checked={!!kindToggles['beta']} onChange={(v) => toggleKind('beta', v)} />
+          </View>
+        </View>
+      </View>
+
+      {flags
+        .filter((f) => (kindFilter === 'all' ? true : f.kind === kindFilter))
+        .map((flag) => (
+          <View
+            key={flag.key}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingVertical: S.space.md,
+              borderBottomWidth: 1,
+              borderBottomColor: '#eee',
+              gap: S.space.sm,
+            }}
+          >
+            <View style={{ flex: 1, paddingRight: S.space.sm }}>
+              <Body>{flag.title}</Body>
+              <SubTitle>{flag.kind ?? 'free'}</SubTitle>
+              {flag.description ? (
+                <Body style={{ color: '#666', marginTop: S.space.xs }} fontSize={S.font.body1}>
+                  {flag.description}
+                </Body>
+              ) : null}
+            </View>
+            <View style={{ maxWidth: 140 }}>
+              <Switch checked={!!overrides[flag.key]} onChange={(v) => toggleFlag(flag.key, v)} />
+            </View>
+          </View>
+        ))}
+    </AppPage>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 8
-  },
-  hint: {
-    color: '#666',
-    marginBottom: 12
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee'
-  },
-  rowText: {
-    flex: 1,
-    paddingRight: 12
-  },
-  flagTitle: {
-    fontSize: 16,
-    fontWeight: '500'
-  },
-  flagDesc: {
-    color: '#666'
-  }
-});
