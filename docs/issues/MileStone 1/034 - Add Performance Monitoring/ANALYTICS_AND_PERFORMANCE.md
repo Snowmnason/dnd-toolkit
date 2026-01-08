@@ -10,12 +10,12 @@ Purpose: add lightweight, low-cost instrumentation for navigation, API timing, a
 
 ## How It Works
 - Wrapper and helpers live in [lib/analytics/index.ts](lib/analytics/index.ts):
-  - `Analytics.track(event, props)`: Sends a Sentry info-level message with optional context. No-ops if disabled.
+  - `Analytics.track(event, props)`: Adds a Sentry breadcrumb with optional sanitized context. No-ops if disabled.
   - `Analytics.identify(user)`: Associates `id/username` with Sentry user context.
   - `Analytics.withTiming(label, fn, warnMs?)`: Measures async/sync operations, warns if slow.
   - `Performance.startMeasure()/endMeasure()`: Manual timing markers.
-  - `Performance.useScreenLoadTime(screenName)`: React hook to time a screen’s mount → unmount.
-  - `trackFeatureBlocked({ feature, reason, userId? })`: Standardized event when a feature is blocked.
+  - `Performance.useScreenDuration(screenName)`: React hook to measure time a screen stays mounted (coarse duration).
+  - `trackFeatureBlocked({ feature, reason })`: Standardized event when a feature is blocked (user identity comes from `Analytics.identify`).
   - `Analytics.trackComponentUsage({ component, action, detail? })`: Log component-level usage (e.g., inputs, sliders, feature-specific UI) for future UX analysis.
 - Enablement is gated by BOTH of the following:
   - `config/appsettings.*.json` → `features.performanceMonitoring === true`.
@@ -51,12 +51,12 @@ Purpose: add lightweight, low-cost instrumentation for navigation, API timing, a
 - Measure a screen load:
   ```ts
   import { Performance } from '@/lib';
-  Performance.useScreenLoadTime('CharactersScreen');
+  Performance.useScreenDuration('CharactersScreen');
   ```
 - Feature block (flag/premium/beta):
   ```ts
   import { trackFeatureBlocked } from '@/lib';
-  trackFeatureBlocked({ feature: 'campaigns', reason: 'flag_disabled', userId });
+  trackFeatureBlocked({ feature: 'campaigns', reason: 'flag_disabled' });
   ```
 - Component usage:
   ```ts

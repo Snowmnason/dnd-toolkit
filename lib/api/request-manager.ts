@@ -47,6 +47,14 @@ interface RateLimitBucket {
   lastAccess: number; // Track last access time for cleanup
 }
 
+// Minimal error sanitization for analytics payloads to avoid leaking sensitive data
+const sanitizeErrorForAnalytics = (error: unknown) => {
+  const err = error as any;
+  const error_name = typeof err?.name === 'string' ? err.name : undefined;
+  const error_code = typeof err?.code === 'string' || typeof err?.code === 'number' ? err.code : undefined;
+  return { error_name, error_code };
+};
+
 // ==========================================
 // Configuration
 // ==========================================
@@ -180,14 +188,36 @@ class RequestManagerClass {
   ): Promise<T | null> {
     const options_ = { ...DEFAULT_OPTIONS, ...options };
     const startedAt = Date.now();
+    const trackingEnabled = Analytics.enabled();
+
+    const attachTracking = (p: Promise<T>, started: number): Promise<T> => {
+      if (!trackingEnabled) return p;
+      return p.then(
+        (value) => {
+          const duration_ms = Date.now() - started;
+          Analytics.track('api_request', { key, ok: true, duration_ms });
+          if (duration_ms > 3000) {
+            logger.warn('request-manager', `Slow request: ${key} took ${duration_ms}ms`);
+          }
+          return value;
+        },
+        (err) => {
+          const duration_ms = Date.now() - started;
+          Analytics.track('api_request', { key, ok: false, duration_ms, ...sanitizeErrorForAnalytics(err) });
+          if (duration_ms > 3000) {
+            logger.warn('request-manager', `Slow failed request: ${key} took ${duration_ms}ms`);
+          }
+          throw err;
+        }
+      );
+    };
 
     try {
       // ========== DEDUPE CHECK ==========
       if (options_.dedupe && this.pendingRequests.has(key)) {
         logger.debug('request-manager', 'Returning deduplicated request:', key);
-        // Wrap the deduplicated promise to ensure error handling, Sentry reporting,
-        // and fail-open behavior apply even to deduplicated requests
-        const deduplicatedPromise = this.pendingRequests.get(key)!.promise;
+        const pending = this.pendingRequests.get(key)!;
+        const deduplicatedPromise = pending.promise as Promise<T>;
         return deduplicatedPromise.catch((error) => {
           logger.error('request-manager', 'Deduplicated request failed:', { key, error });
           this.reportErrorToSentry(error, { key, options: options_ });
@@ -221,29 +251,13 @@ class RequestManagerClass {
         options_.timeout
       );
 
-      // Attach lightweight duration tracking without altering the original promise
-      promise.then(
-        () => {
-          const duration_ms = Date.now() - startedAt;
-          Analytics.track('api_request', { key, ok: true, duration_ms });
-          if (duration_ms > 3000) {
-            logger.warn('request-manager', `Slow request: ${key} took ${duration_ms}ms`);
-          }
-        },
-        (err) => {
-          const duration_ms = Date.now() - startedAt;
-          Analytics.track('api_request', { key, ok: false, duration_ms, error: (err as Error)?.message });
-          if (duration_ms > 3000) {
-            logger.warn('request-manager', `Slow failed request: ${key} took ${duration_ms}ms`);
-          }
-        }
-      ).catch(() => {});
+      const trackedPromise = attachTracking(promise, startedAt);
 
       // ========== TRACK PENDING REQUEST ==========
       if (options_.dedupe) {
         this.pendingRequests.set(key, {
-          promise,
-          timestamp: Date.now(),
+          promise: trackedPromise,
+          timestamp: startedAt,
         });
 
         // Clean up pending request after it settles (success or failure).
@@ -252,13 +266,15 @@ class RequestManagerClass {
         // the same key is reused frequently with deduplication enabled.
         // Both handlers do the same cleanup; the second .catch() only suppresses
         // errors that might occur in the cleanup operation itself.
-        promise.then(
+        trackedPromise.then(
           () => this.pendingRequests.delete(key),
           () => this.pendingRequests.delete(key)
-        ).catch(() => {}); // Suppress any errors from cleanup function
+        ).catch((cleanupError) => {
+          logger.warn('request-manager', 'Cleanup handler error:', cleanupError);
+        });
       }
 
-      return promise;
+      return trackedPromise;
     } catch (error) {
       logger.error('request-manager', 'Request failed:', { key, error });
 
@@ -267,7 +283,7 @@ class RequestManagerClass {
 
       // Tracking for thrown path (in case promise creation failed early)
       const duration_ms = Date.now() - startedAt;
-      Analytics.track('api_request', { key, ok: false, duration_ms, error: (error as Error)?.message });
+      Analytics.track('api_request', { key, ok: false, duration_ms, ...sanitizeErrorForAnalytics(error) });
 
       // ========== FAIL OPEN BEHAVIOR ==========
       if (options_.failOpen) {

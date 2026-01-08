@@ -50,13 +50,18 @@ export function usePremiumFeature(featureKey?: string): UsePremiumFeatureState {
   useEffect(() => {
     if (!shouldCheckPremium) return;
     if (state.loading) return;
-    if (trackedRef.current) return;
-    if (!state.isAvailable) {
-      try {
-        trackFeatureBlocked({ feature: featureKey!, reason: 'requires_premium' });
-      } catch {}
-      trackedRef.current = true;
+    // Reset tracking when available again so future blocks are recorded
+    if (state.isAvailable) {
+      trackedRef.current = false;
+      return;
     }
+
+    if (trackedRef.current) return;
+
+    try {
+      trackFeatureBlocked({ feature: featureKey!, reason: 'requires_premium' });
+    } catch {}
+    trackedRef.current = true;
   }, [shouldCheckPremium, state.loading, state.isAvailable, featureKey]);
 
   return state;
