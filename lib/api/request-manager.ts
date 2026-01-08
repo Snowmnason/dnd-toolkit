@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/react-native';
+import { Analytics, sanitizeError as sanitizeErrorForAnalytics } from '../analytics';
 import { logger } from '../utils/logger';
 
 /**
@@ -178,14 +179,41 @@ class RequestManagerClass {
     options: RequestOptions = {}
   ): Promise<T | null> {
     const options_ = { ...DEFAULT_OPTIONS, ...options };
+    const startedAt = Date.now();
+    const trackingEnabled = Analytics.enabled();
+
+    const attachTracking = (p: Promise<T>, started: number): Promise<T> => {
+      if (!trackingEnabled) return p;
+      return p.then(
+        (value) => {
+          const duration_ms = Date.now() - started;
+          Analytics.track('api_request', { key, ok: true, duration_ms });
+          const slowRequestThreshold = Analytics.getThreshold?.('slowRequestMs') ?? 3000;
+          if (duration_ms > slowRequestThreshold) {
+            logger.warn('request-manager', `Slow request: ${key} took ${duration_ms}ms`);
+          }
+          return value;
+        },
+        (err) => {
+          const duration_ms = Date.now() - started;
+          Analytics.track('api_request', { key, ok: false, duration_ms, ...sanitizeErrorForAnalytics(err) });
+          const slowRequestThreshold = Analytics.getThreshold?.('slowRequestMs') ?? 3000;
+          if (duration_ms > slowRequestThreshold) {
+            logger.warn('request-manager', `Slow failed request: ${key} took ${duration_ms}ms`);
+          }
+          throw err;
+        }
+      );
+    };
 
     try {
       // ========== DEDUPE CHECK ==========
       if (options_.dedupe && this.pendingRequests.has(key)) {
         logger.debug('request-manager', 'Returning deduplicated request:', key);
-        // Wrap the deduplicated promise to ensure error handling, Sentry reporting,
-        // and fail-open behavior apply even to deduplicated requests
-        const deduplicatedPromise = this.pendingRequests.get(key)!.promise;
+        const pending = this.pendingRequests.get(key)!;
+        const deduplicatedPromise = pending.promise as Promise<T>;
+        // Note: Duration tracking uses the original request's timestamp (pending.timestamp)
+        // not the current request's startedAt, ensuring accurate duration for deduplicated requests
         return deduplicatedPromise.catch((error) => {
           logger.error('request-manager', 'Deduplicated request failed:', { key, error });
           this.reportErrorToSentry(error, { key, options: options_ });
@@ -219,31 +247,42 @@ class RequestManagerClass {
         options_.timeout
       );
 
+      const trackedPromise = attachTracking(promise, startedAt);
+
       // ========== TRACK PENDING REQUEST ==========
       if (options_.dedupe) {
         this.pendingRequests.set(key, {
-          promise,
-          timestamp: Date.now(),
+          promise: trackedPromise,
+          timestamp: startedAt,
         });
 
         // Clean up pending request after it settles (success or failure).
         // Uses a single .then() call with both onFulfilled and onRejected handlers
         // to avoid creating intermediate promise chains that could accumulate if
         // the same key is reused frequently with deduplication enabled.
-        // Both handlers do the same cleanup; the second .catch() only suppresses
-        // errors that might occur in the cleanup operation itself.
-        promise.then(
+        // The second .catch() handles rare cases where the cleanup operation itself
+        // might fail (e.g., if the Map is corrupted). These errors are logged for
+        // debugging but don't affect the main request result.
+        trackedPromise.then(
           () => this.pendingRequests.delete(key),
           () => this.pendingRequests.delete(key)
-        ).catch(() => {}); // Suppress any errors from cleanup function
+        ).catch((cleanupError) => {
+          // Log cleanup failures for debugging without blocking the main operation.
+          // Cleanup errors are unexpected and indicate potential memory leaks.
+          logger.warn('request-manager', 'Cleanup handler error (unexpected):', cleanupError);
+        });
       }
 
-      return promise;
+      return trackedPromise;
     } catch (error) {
       logger.error('request-manager', 'Request failed:', { key, error });
 
       // ========== SENTRY REPORTING ==========
       this.reportErrorToSentry(error, { key, options: options_ });
+
+      // Tracking for thrown path (in case promise creation failed early)
+      const duration_ms = Date.now() - startedAt;
+      Analytics.track('api_request', { key, ok: false, duration_ms, ...sanitizeErrorForAnalytics(error) });
 
       // ========== FAIL OPEN BEHAVIOR ==========
       if (options_.failOpen) {

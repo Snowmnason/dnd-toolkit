@@ -40,5 +40,6 @@ export * from './error';
 export * from './auth-state';
 export * from './auth/encrypted-storage';
 export * from './worlds/useWorlds';
+export * from './analytics';
 
 

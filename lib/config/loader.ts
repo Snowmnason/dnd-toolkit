@@ -35,6 +35,10 @@ export interface AppSettings {
     enableReduxDevTools: boolean;
     enableReactDevTools: boolean;
   };
+  thresholds?: {
+    slowScreenMs?: number;
+    slowRequestMs?: number;
+  };
   featureFlags: Record<
     string,
     {
