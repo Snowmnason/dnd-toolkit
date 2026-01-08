@@ -49,9 +49,13 @@ const sanitizeProps = (props?: AnalyticsEventProps | Error): AnalyticsEventProps
 
 function isSentryEnabled(): boolean {
   try {
+    const config = getAppConfig();
+    // Check sentryEnabled feature flag first - this is the primary control
+    if (!config.features?.sentryEnabled) return false;
+    
+    // Only require DSN; performanceMonitoring is for performance features only
     const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN || Constants.expoConfig?.extra?.sentryDsn;
-    const perfFlag = getAppConfig().features?.performanceMonitoring;
-    return !!dsn && !!perfFlag;
+    return !!dsn;
   } catch {
     return false;
   }

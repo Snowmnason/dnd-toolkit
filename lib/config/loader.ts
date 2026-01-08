@@ -23,6 +23,7 @@ export interface AppSettings {
     devBypass: boolean;
     mockData: boolean;
     performanceMonitoring: boolean;
+    sentryEnabled: boolean;
   };
   overrides: {
     mockSupabase: boolean;
