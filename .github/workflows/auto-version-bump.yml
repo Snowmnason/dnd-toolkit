@@ -36,9 +36,9 @@ jobs:
             COMMIT_MSG="${{ github.event.pull_request.title }}"
             echo "PR merge detected. Using PR title: $COMMIT_MSG"
           else
-            # For direct pushes (rare hotfixes), always bump patch
-            echo "Direct push to main detected - treating as hotfix, always bumping patch"
-            COMMIT_MSG="hotfix"
+            # For direct pushes, use latest commit message
+            COMMIT_MSG=$(git log -1 --pretty=%B)
+            echo "Direct push detected. Using commit message: $COMMIT_MSG"
           fi
 
           # Read current package.json version
@@ -75,6 +75,17 @@ jobs:
           jq ".version = \"$NEW_VERSION\"" desktop/package.json > desktop/package.json.tmp
           mv desktop/package.json.tmp desktop/package.json
 
+          # Update lockfiles (root and desktop) if present
+          if [ -f package-lock.json ]; then
+            jq ".version = \"$NEW_VERSION\" | .packages[\"\"].version = \"$NEW_VERSION\"" package-lock.json > package-lock.json.tmp
+            mv package-lock.json.tmp package-lock.json
+          fi
+
+          if [ -f desktop/package-lock.json ]; then
+            jq ".version = \"$NEW_VERSION\" | .packages[\"\"].version = \"$NEW_VERSION\"" desktop/package-lock.json > desktop/package-lock.json.tmp
+            mv desktop/package-lock.json.tmp desktop/package-lock.json
+          fi
+
           echo "new_version=$NEW_VERSION" >> $GITHUB_ENV
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_ENV
           echo "bump_type=$BUMP_TYPE" >> $GITHUB_ENV
@@ -83,7 +94,7 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add package.json app.json desktop/package.json
+          git add package.json app.json desktop/package.json package-lock.json desktop/package-lock.json
           git commit -m "chore(release): bump version ${{ env.current_version }} → ${{ env.new_version }} (${{ env.bump_type }})"
           git push
         env:
