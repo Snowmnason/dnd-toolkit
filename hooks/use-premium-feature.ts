@@ -1,5 +1,6 @@
 import { SubscriptionManager } from '@/lib/premium/subscription-manager';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { trackFeatureBlocked } from '@/lib/analytics';
 
 export interface UsePremiumFeatureState {
   isPremium: boolean;
@@ -29,6 +30,7 @@ export function usePremiumFeature(featureKey?: string): UsePremiumFeatureState {
     isAvailable: !shouldCheckPremium, // available if no check needed
     loading: shouldCheckPremium,
   }));
+  const trackedRef = useRef(false);
 
   useEffect(() => {
     if (!shouldCheckPremium) return; // no-op when premium not required
@@ -43,6 +45,19 @@ export function usePremiumFeature(featureKey?: string): UsePremiumFeatureState {
       cancelled = true;
     };
   }, [featureKey, shouldCheckPremium]);
+
+  // Track when a premium gate blocks access
+  useEffect(() => {
+    if (!shouldCheckPremium) return;
+    if (state.loading) return;
+    if (trackedRef.current) return;
+    if (!state.isAvailable) {
+      try {
+        trackFeatureBlocked({ feature: featureKey!, reason: 'requires_premium' });
+      } catch {}
+      trackedRef.current = true;
+    }
+  }, [shouldCheckPremium, state.loading, state.isAvailable, featureKey]);
 
   return state;
 }

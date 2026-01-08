@@ -15,6 +15,7 @@ import { PlatformProvider, usePlatform } from '../contexts/PlatformContext';
 import { useAppBootstrap } from '../hooks/use-app-bootstrap';
 import { useSplashScreen } from '../hooks/use-splash-screen';
 import { APP_VERSION } from '../lib/version';
+import { useAnalyticsNavigation } from '@/hooks/use-analytics-navigation';
 
 // Get Sentry DSN from environment variables
 const sentryDsn =
@@ -90,6 +91,15 @@ function RootLayoutContent() {
   
   // Splash screen management (feature flag controlled)
   const splash = useSplashScreen();
+  // Analytics: track route changes and coarse screen timings
+  useAnalyticsNavigation();
+
+  // Identify user to analytics when available
+  useEffect(() => {
+    import('@/lib/analytics').then(({ Analytics }) => {
+      Analytics.identify(userId ? { id: userId } : null);
+    });
+  }, [userId]);
 
   // Protected routes that require authentication
   const protectedRoutes = ['select', 'main', 'settings'] as const;

@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/react-native';
+import { Analytics } from '../analytics';
 import { logger } from '../utils/logger';
 
 /**
@@ -178,6 +179,7 @@ class RequestManagerClass {
     options: RequestOptions = {}
   ): Promise<T | null> {
     const options_ = { ...DEFAULT_OPTIONS, ...options };
+    const startedAt = Date.now();
 
     try {
       // ========== DEDUPE CHECK ==========
@@ -219,6 +221,24 @@ class RequestManagerClass {
         options_.timeout
       );
 
+      // Attach lightweight duration tracking without altering the original promise
+      promise.then(
+        () => {
+          const duration_ms = Date.now() - startedAt;
+          Analytics.track('api_request', { key, ok: true, duration_ms });
+          if (duration_ms > 3000) {
+            logger.warn('request-manager', `Slow request: ${key} took ${duration_ms}ms`);
+          }
+        },
+        (err) => {
+          const duration_ms = Date.now() - startedAt;
+          Analytics.track('api_request', { key, ok: false, duration_ms, error: (err as Error)?.message });
+          if (duration_ms > 3000) {
+            logger.warn('request-manager', `Slow failed request: ${key} took ${duration_ms}ms`);
+          }
+        }
+      ).catch(() => {});
+
       // ========== TRACK PENDING REQUEST ==========
       if (options_.dedupe) {
         this.pendingRequests.set(key, {
@@ -244,6 +264,10 @@ class RequestManagerClass {
 
       // ========== SENTRY REPORTING ==========
       this.reportErrorToSentry(error, { key, options: options_ });
+
+      // Tracking for thrown path (in case promise creation failed early)
+      const duration_ms = Date.now() - startedAt;
+      Analytics.track('api_request', { key, ok: false, duration_ms, error: (error as Error)?.message });
 
       // ========== FAIL OPEN BEHAVIOR ==========
       if (options_.failOpen) {
