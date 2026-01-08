@@ -51,7 +51,6 @@ jobs:
           # Decide bump type based on commit/PR title
           if [[ "$COMMIT_MSG" == feat:* ]] || [[ "$COMMIT_MSG" == enhancement:* ]]; then
             Y=$((Y + 1))
-            Z=0
             BUMP_TYPE="minor"
             echo "Detected feature/enhancement -> bumping Y (minor)"
           else
