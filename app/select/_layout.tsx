@@ -1,10 +1,12 @@
 import { AppLoading, AppPage } from '@/components/ui';
 import { logger, useAuthGuard } from '@/lib';
+import { useAppBootstrap } from '@/hooks/use-app-bootstrap';
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 
 export default function SelectLayout() {
-  const authState = useAuthGuard();
+  const bootstrap = useAppBootstrap();
+  const authState = useAuthGuard(bootstrap.isReady);
 
   // Show minimal loading while guard resolves
   useEffect(() => {

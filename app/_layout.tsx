@@ -142,8 +142,10 @@ function RootLayoutContent() {
     }
   }, [urlParams, segments, updateParams, clearAllParams, clearWorldParams, params.userId, params.worldId, params.userRole]);
 
-  // Centralized auth guard
-  const authState = useAuthGuard();
+  // Centralized auth guard (pass bootstrap state to avoid circular dependency)
+  const authState = useAuthGuard(bootstrap.isReady);
+  
+  // Manage loading state based on guard and bootstrap
   useEffect(() => {
     if (!bootstrap.isReady) return;
     // Don't block login routes

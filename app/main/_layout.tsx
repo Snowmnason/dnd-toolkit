@@ -1,5 +1,6 @@
 import { AppLoading, AppPage } from '@/components/ui'
 import { useAuthGuard } from '@/lib'
+import { useAppBootstrap } from '@/hooks/use-app-bootstrap'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Platform, useWindowDimensions, View } from 'react-native'
@@ -17,7 +18,8 @@ export default function MainLayout() {
   const [tabCache, setTabCache] = useState<Record<string, React.ReactNode>>({})
 
   // 🔐 Centralized auth guard
-  const authState = useAuthGuard()
+  const bootstrap = useAppBootstrap()
+  const authState = useAuthGuard(bootstrap.isReady)
   useEffect(() => {
     if (authState !== 'loading') {
       setIsCheckingAuth(false)
@@ -50,9 +52,6 @@ export default function MainLayout() {
 
   // Tab → Route helper
   const getTabRoute = (tab: string) => {
-      if (isCheckingAuth) {
-        return <AppLoading />
-      }
     switch (tab) {
       case 'characters':
         return 'characters-npcs'

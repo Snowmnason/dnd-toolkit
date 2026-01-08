@@ -1,24 +1,27 @@
 import { useRouter, useSegments } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AUTH_CONFIG } from '../routing/route-config';
 import { AuthStateManager } from '../auth-state';
-import { useAppBootstrap } from '@/hooks/use-app-bootstrap';
 
 type AuthState = 'loading' | 'authenticated' | 'unauthenticated';
 
-export function useAuthGuard(): AuthState {
+export function useAuthGuard(bootstrapReady: boolean): AuthState {
   const router = useRouter();
   const segments = useSegments();
-  const bootstrap = useAppBootstrap();
   const [authState, setAuthState] = useState<AuthState>('loading');
+  const hasRedirectedRef = useRef(false);
 
   const firstSegment = typeof segments[0] === 'string' ? (segments[0] as string) : '';
   const isProtectedRoute = AUTH_CONFIG.protectedRoutes.includes(firstSegment as any);
-  const isPublicRoute = AUTH_CONFIG.publicRoutes.includes(firstSegment as any);
 
-  // Core auth check gated by bootstrap readiness
+  // Reset redirect flag when route changes
   useEffect(() => {
-    if (!bootstrap.isReady) return;
+    hasRedirectedRef.current = false;
+  }, [firstSegment]);
+
+  // Core auth check gated by bootstrap readiness (passed from parent)
+  useEffect(() => {
+    if (!bootstrapReady) return;
 
     let mounted = true;
     const check = async () => {
@@ -26,7 +29,8 @@ export function useAuthGuard(): AuthState {
         const authenticated = await AuthStateManager.isAuthenticated();
 
         if (mounted) {
-          if (isProtectedRoute && !authenticated) {
+          if (isProtectedRoute && !authenticated && !hasRedirectedRef.current) {
+            hasRedirectedRef.current = true;
             router.replace(AUTH_CONFIG.redirectOnUnauthenticated);
             setAuthState('unauthenticated');
             return;
@@ -35,7 +39,8 @@ export function useAuthGuard(): AuthState {
         }
       } catch {
         if (mounted) {
-          if (isProtectedRoute) {
+          if (isProtectedRoute && !hasRedirectedRef.current) {
+            hasRedirectedRef.current = true;
             router.replace(AUTH_CONFIG.redirectOnUnauthenticated);
           }
           setAuthState('unauthenticated');
@@ -47,7 +52,7 @@ export function useAuthGuard(): AuthState {
     return () => {
       mounted = false;
     };
-  }, [bootstrap.isReady, firstSegment, isProtectedRoute, router]);
+  }, [bootstrapReady, isProtectedRoute, router, segments]);
 
   // Subscribe to auth state changes to catch invalidation events
   useEffect(() => {
@@ -63,14 +68,22 @@ export function useAuthGuard(): AuthState {
         } = supabase.auth.onAuthStateChange(async () => {
           try {
             const authenticated = await AuthStateManager.isAuthenticated();
-            if (isProtectedRoute && !authenticated) {
+            const currentSegment = typeof segments[0] === 'string' ? segments[0] : '';
+            const isCurrentlyProtected = AUTH_CONFIG.protectedRoutes.includes(currentSegment as any);
+            
+            if (isCurrentlyProtected && !authenticated && !hasRedirectedRef.current) {
+              hasRedirectedRef.current = true;
               router.replace(AUTH_CONFIG.redirectOnUnauthenticated);
               setAuthState('unauthenticated');
               return;
             }
             setAuthState(authenticated ? 'authenticated' : 'unauthenticated');
           } catch {
-            if (isProtectedRoute) {
+            const currentSegment = typeof segments[0] === 'string' ? segments[0] : '';
+            const isCurrentlyProtected = AUTH_CONFIG.protectedRoutes.includes(currentSegment as any);
+            
+            if (isCurrentlyProtected && !hasRedirectedRef.current) {
+              hasRedirectedRef.current = true;
               router.replace(AUTH_CONFIG.redirectOnUnauthenticated);
             }
             setAuthState('unauthenticated');
@@ -86,13 +99,7 @@ export function useAuthGuard(): AuthState {
     return () => {
       subscription?.unsubscribe?.();
     };
-    // Depend only on route segment to avoid re-subscribing excessively
-  }, [firstSegment, isProtectedRoute, router]);
-
-  // Never block public routes; return unauthenticated state for awareness
-  if (isPublicRoute && authState === 'loading' && bootstrap.isReady) {
-    return 'unauthenticated';
-  }
+  }, [router, segments]);
 
   return authState;
 }
