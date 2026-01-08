@@ -1,5 +1,5 @@
 import { AppLoading, AppPage } from '@/components/ui'
-import { AuthStateManager, logger } from '@/lib'
+import { useAuthGuard } from '@/lib'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Platform, useWindowDimensions, View } from 'react-native'
@@ -16,25 +16,13 @@ export default function MainLayout() {
   // Cache opened tab screens
   const [tabCache, setTabCache] = useState<Record<string, React.ReactNode>>({})
 
-  // 🔐 Auth check
+  // 🔐 Centralized auth guard
+  const authState = useAuthGuard()
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const authenticated = await AuthStateManager.isAuthenticated()
-        if (!authenticated) {
-          logger.debug('main-layout', 'User not authenticated')
-          router.replace('/login/welcome')
-          return
-        }
-      } catch (error) {
-        logger.error('main-layout', 'Main layout auth check error:', error)
-        router.replace('/login/welcome')
-      } finally {
-        setIsCheckingAuth(false)
-      }
+    if (authState !== 'loading') {
+      setIsCheckingAuth(false)
     }
-    checkAuth()
-  }, [router])
+  }, [authState])
 
   // 🧭 Handle tab switching (cached)
   const handleTabChange = (tabKey: string) => {
@@ -62,6 +50,9 @@ export default function MainLayout() {
 
   // Tab → Route helper
   const getTabRoute = (tab: string) => {
+      if (isCheckingAuth) {
+        return <AppLoading />
+      }
     switch (tab) {
       case 'characters':
         return 'characters-npcs'

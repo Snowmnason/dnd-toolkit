@@ -1,5 +1,5 @@
 import { useAnalyticsNavigation } from '@/hooks/use-analytics-navigation';
-import { AppErrorBoundary, AuthStateManager } from "@/lib";
+import { AppErrorBoundary, useAuthGuard, AUTH_CONFIG } from "@/lib";
 import { Analytics, sessionManager } from '@/lib/analytics';
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
@@ -106,9 +106,8 @@ function RootLayoutContent() {
   }, [userId]);
 
   // Protected routes that require authentication
-  const protectedRoutes = ['select', 'main', 'settings'] as const;
   const firstSegmentForProtection = typeof segments[0] === 'string' ? segments[0] : '';
-  const isProtectedRoute = protectedRoutes.includes(firstSegmentForProtection as any);
+  const isProtectedRoute = AUTH_CONFIG.protectedRoutes.includes(firstSegmentForProtection as any);
 
   // (logging removed)
 
@@ -143,39 +142,28 @@ function RootLayoutContent() {
     }
   }, [urlParams, segments, updateParams, clearAllParams, clearWorldParams, params.userId, params.worldId, params.userRole]);
 
-  // Check authentication status ONLY after bootstrap is complete
+  // Centralized auth guard
+  const authState = useAuthGuard();
   useEffect(() => {
-    // Don't proceed until bootstrap is complete
-    if (!bootstrap.isReady) {
+    if (!bootstrap.isReady) return;
+    // Don't block login routes
+    if (segments[0] === 'login') {
+      setIsCheckingAuth(false);
       return;
     }
+    if (authState !== 'loading') {
+      setIsCheckingAuth(false);
+    }
+  }, [authState, bootstrap.isReady, segments]);
 
-    const checkAuth = async () => {
-      try {
-        // Don't interfere with login routes at all
-        if (segments[0] === 'login') {
-          setIsCheckingAuth(false);
-          return;
-        }
-
-        const authenticated = await AuthStateManager.isAuthenticated();
-
-        // Only redirect if trying to access protected route without authentication
-        if (isProtectedRoute && !authenticated) {
-          router.replace('/login/welcome');
-        }
-      } catch {
-        // On error, only redirect protected routes, let login routes work normally
-        if (isProtectedRoute) {
-          router.replace('/login/welcome');
-        }
-      } finally {
-        setIsCheckingAuth(false);
-      }
-    };
-
-    checkAuth();
-  }, [segments, router, isProtectedRoute, bootstrap.isReady]);
+  // Ensure unauthenticated users on root index are redirected to login/welcome
+  useEffect(() => {
+    if (!bootstrap.isReady) return;
+    const onRoot = segments[0] === undefined;
+    if (onRoot && authState === 'unauthenticated') {
+      router.replace('/login/welcome');
+    }
+  }, [bootstrap.isReady, authState, segments, router]);
 
   // Show splash screen (if enabled via feature flag)
   // Splash screen displays BEFORE any other content
