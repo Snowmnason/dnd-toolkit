@@ -1,7 +1,10 @@
+import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { useAnalyticsNavigation } from '@/hooks/use-analytics-navigation';
-import { AppErrorBoundary, AUTH_CONFIG, getRouteConfig, useAuthGuard } from "@/lib";
+import { AppErrorBoundary, AUTH_CONFIG, getRouteConfig, resolveBackTarget, resolveTitle, useAuthGuard } from "@/lib";
 import { Analytics, sessionManager } from '@/lib/analytics';
 import { getAppConfig } from '@/lib/config/loader';
+import { buildNavigationTarget } from '@/lib/navigation/uri-helpers';
+import { logger } from '@/lib/utils/logger';
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ThemeProvider, UseTheme } from "@/theme";
@@ -75,36 +78,45 @@ if (isSentryEnabled && sentryDsn) {
   // uncomment the line below to enable Spotlight (https://spotlightjs.com)
   // spotlight: isDev,
   });
-  console.log('[Sentry] Initialized (feature flag enabled)');
+  logger.info('[Sentry] Initialized (feature flag enabled)');
 } else {
   if (!isSentryEnabled) {
-    console.log('[Sentry] Disabled via feature flag (sentryEnabled=false)');
+    logger.info('[Sentry] Disabled via feature flag (sentryEnabled=false)');
   } else if (!sentryDsn) {
-    console.log('[Sentry] Disabled - no DSN provided');
+    logger.info('[Sentry] Disabled - no DSN provided');
   }
 }
 
 function RootLayoutContent() {
+  // ==================== HOOKS SECTION ====================
+  // ALL hooks must be called unconditionally before any early returns
+  // (React Rules of Hooks requirement)
+  
+  // Theme and routing hooks
   const { theme } = UseTheme();
-  // Get local search params using the hook at the top level
   const urlParams = useLocalSearchParams();
   const router = useRouter();
   const segments = useSegments();
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const { isMobile } = usePlatform();
   
-  // Use centralized params context
+  // State management hooks
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  
+  // Context hooks
   const { params, updateParams, clearWorldParams, clearAllParams } = useAppParams();
   const { userId, worldId, userRole } = params;
   
-  // Use the bootstrap hook to ensure assets and session are loaded
+  // Data loading hooks
   const bootstrap = useAppBootstrap();
-  
-  // Splash screen management (feature flag controlled)
   const splash = useSplashScreen();
-  // Analytics: track route changes and coarse screen timings
+  const authState = useAuthGuard(bootstrap.isReady);
+  
+  // Analytics hook (must be called unconditionally)
   useAnalyticsNavigation();
-
+  
+  // ==================== EFFECT HOOKS SECTION ====================
+  // All effects that depend on above hooks
+  
   // Identify user to analytics when available
   useEffect(() => {
     Analytics.identify(userId ? { id: userId } : null);
@@ -115,46 +127,92 @@ function RootLayoutContent() {
     }
   }, [userId]);
 
-  // Protected routes that require authentication
-  const firstSegmentForProtection = typeof segments[0] === 'string' ? segments[0] : '';
-  const isProtectedRoute = AUTH_CONFIG.protectedRoutes.includes(firstSegmentForProtection as any);
-
-  // (logging removed)
-
   // Update context params when URL params change
   useEffect(() => {
-    const currentWorldId = typeof urlParams.worldId === 'string' ? urlParams.worldId : undefined;
-    const currentUserRole = typeof urlParams.userRole === 'string' ? urlParams.userRole : undefined;
+    const firstSegment = typeof segments[0] === 'string' ? segments[0] : ''
+
+    // Main routes: allow initial set from URL only if context is empty; otherwise ignore overrides
+    if (firstSegment === 'main') {
+      const urlWorldId = typeof urlParams.worldId === 'string' ? urlParams.worldId : undefined
+      const urlUserRole = typeof urlParams.userRole === 'string' ? urlParams.userRole : undefined
+
+      // If no world in context yet, seed from URL once (owner navigating directly to their world)
+      if (!params.worldId && urlWorldId) {
+        logger.info('[NavGuard] Seeding world from URL on main route', { urlWorldId, urlUserRole })
+        updateParams({ worldId: urlWorldId, userRole: urlUserRole })
+      }
+      // Skip further processing for main routes to avoid clearing params
+      return
+    }
+
+    const currentWorldId = typeof urlParams.worldId === 'string' ? urlParams.worldId : undefined
+    const currentUserRole = typeof urlParams.userRole === 'string' ? urlParams.userRole : undefined
 
     // Only update if values are different from context (userId is loaded from storage, not URL)
-    let shouldUpdate = false;
-    const updates: { worldId?: string; userRole?: string } = {};
+    let shouldUpdate = false
+    const updates: { worldId?: string; userRole?: string } = {}
     if (currentWorldId && currentWorldId !== params.worldId) {
-      updates.worldId = currentWorldId;
-      shouldUpdate = true;
+      updates.worldId = currentWorldId
+      shouldUpdate = true
     }
     if (currentUserRole && currentUserRole !== params.userRole) {
-      updates.userRole = currentUserRole;
-      shouldUpdate = true;
+      updates.userRole = currentUserRole
+      shouldUpdate = true
     }
 
     if (shouldUpdate) {
-      updateParams(updates);
+      updateParams(updates)
     }
 
     // Only clear params when entering login routes and params exist
     if (segments[0] === 'login' && (params.userId || params.worldId || params.userRole)) {
-      clearAllParams();
-    } 
+      clearAllParams()
+    }
     // Only clear world params when entering select routes and world params exist
     else if (segments[0] === 'select' && (params.worldId || params.userRole)) {
-      clearWorldParams();
+      clearWorldParams()
     }
-  }, [urlParams, segments, updateParams, clearAllParams, clearWorldParams, params.userId, params.worldId, params.userRole]);
+  }, [urlParams, segments, updateParams, clearAllParams, clearWorldParams, params.userId, params.worldId, params.userRole])
 
-  // Centralized auth guard (pass bootstrap state to avoid circular dependency)
-  const authState = useAuthGuard(bootstrap.isReady);
-  
+  // Guard against mismatched or missing world params on main routes
+  useEffect(() => {
+    if (!bootstrap.isReady) return
+
+    const firstSegment = typeof segments[0] === 'string' ? segments[0] : ''
+    if (firstSegment !== 'main') return
+
+    const currentWorldId = params.worldId
+    const currentUserRole = params.userRole
+    const urlWorldId = typeof urlParams.worldId === 'string' ? urlParams.worldId : undefined
+
+    logger.info('[NavGuard] main route check', {
+      segments,
+      urlWorldId,
+      currentWorldId,
+      currentUserRole,
+      urlParams,
+    })
+
+    // If URL provides a worldId and it differs from context, trust the URL and sync context
+    if (urlWorldId && urlWorldId !== currentWorldId) {
+      logger.info('[NavGuard] Syncing context from URL worldId on main route', { urlWorldId, currentWorldId })
+      updateParams({ worldId: urlWorldId })
+      return
+    }
+
+    // If no worldId in context and none in URL, force user to select
+    if (!currentWorldId && !urlWorldId) {
+      logger.info('[NavGuard] Missing worldId in context and URL on main route; redirecting to selection')
+      const target = buildNavigationTarget(
+        '/select/world-selection',
+        { worldId: currentWorldId, userRole: currentUserRole },
+        ['worldId', 'userRole']
+      )
+      router.replace(target as any)
+      return
+    }
+  }, [bootstrap.isReady, params.worldId, params.userRole, router, segments, urlParams, updateParams])
+
   // Manage loading state based on guard and bootstrap
   useEffect(() => {
     if (!bootstrap.isReady) return;
@@ -176,6 +234,11 @@ function RootLayoutContent() {
       router.replace('/login/welcome');
     }
   }, [bootstrap.isReady, authState, segments, router]);
+
+  // ==================== RENDER LOGIC SECTION ====================
+  // Protected routes that require authentication
+  const firstSegmentForProtection = typeof segments[0] === 'string' ? segments[0] : '';
+  const isProtectedRoute = AUTH_CONFIG.protectedRoutes.includes(firstSegmentForProtection as any);
 
   // Show splash screen (if enabled via feature flag)
   // Splash screen displays BEFORE any other content
@@ -200,113 +263,8 @@ function RootLayoutContent() {
   const isRootRoute = segments[0] === undefined;
   const hideTopBar = isRootRoute || firstSegment === 'login' || firstSegment === 'web';
 
-  // Determine TopBar configuration based on current route
-  const getTopBarConfig = () => {
-    const firstSegment = segments[0];
-
-    if (hideTopBar) return null;
-
-    // Default config
-    let config = {
-      title: 'D&D Toolkit',
-      showBackButton: true,
-      showHamburger: true,
-      onBackPress: undefined as (() => boolean) | undefined
-    };
-
-    // Configure based on route
-    switch (firstSegment) {
-      case 'select':
-        config.title = 'Select World';
-        
-        // Handle create-world back navigation
-        if (segments.some(segment => segment === 'create-world')) {
-          config.onBackPress = () => {
-            router.replace('/select/world-selection');
-            return true; // Prevent default
-          };
-        }
-        break;
-      
-      case 'main':
-        config.title = 'D&D Toolkit';
-        
-        // Handle feature-specific titles based on second segment
-        const secondSegment = (segments as string[])[1];
-        
-        // Handle main-landing route - always go back to world-selection
-        if (secondSegment === 'main-landing') {
-          config.onBackPress = () => {
-            router.replace('/select/world-selection');
-            return true; // Prevent default
-          };
-        }
-
-        // Helper function to create feature screen back handler
-        const createFeatureBackHandler = (tabKey: string) => () => {
-          const routeParams: any = {};
-          routeParams.worldId = worldId;
-          routeParams.userRole = userRole;
-          
-          const pathname = '/main/main-landing';
-          
-          if (isMobile) {
-            routeParams.tab = tabKey;
-          }
-          
-          router.replace({
-            pathname,
-            params: routeParams,
-          });
-          return true; // Prevent default
-        };
-
-        if (secondSegment) {
-          switch (secondSegment) {
-            case 'characters-npcs':
-              config.title = 'Characters & NPCs';
-              config.onBackPress = createFeatureBackHandler('characters');
-              break;
-            case 'items-treasure':
-              config.title = 'Items & Treasure';
-              config.onBackPress = createFeatureBackHandler('items');
-              break;
-            case 'world-exploration':
-              config.title = 'World & Exploration';
-              config.onBackPress = createFeatureBackHandler('world');
-              break;
-            case 'combat-events':
-              config.title = 'Combat & Events';
-              config.onBackPress = createFeatureBackHandler('combat');
-              break;
-            case 'story-notes':
-              config.title = 'Story & Notes';
-              config.onBackPress = createFeatureBackHandler('story');
-              break;
-          }
-        }
-        break;
-      
-      case 'settings':
-        config.title = 'Settings';
-        config.showHamburger = false;
-        config.onBackPress = () => {
-          router.replace('/select/world-selection');
-          return true; // Prevent default
-        };
-        break;
-      
-      default:
-        // Keep defaults
-        break;
-    }
-    return config;
-  };
-
-  const topBarConfig = getTopBarConfig();
-
-  // Get route config for a11y focus target
-  const routeConfig = getRouteConfig({
+  // Build navigation context for route config
+  const navContext = {
     segments,
     params: {
       worldId: worldId as string | undefined,
@@ -317,38 +275,73 @@ function RootLayoutContent() {
     userRole: userRole as string | undefined,
     isMobile,
     isAuthenticated: authState === 'authenticated',
-  });
+  };
+
+  // Get route config for centralized TopBar, back behavior, and a11y
+  const routeConfig = getRouteConfig(navContext);
+  const topBarTitle = !hideTopBar ? resolveTitle(routeConfig, navContext) : undefined;
+  const topBarBackTarget = !hideTopBar ? resolveBackTarget(routeConfig, navContext) : undefined;
+
+  // Build back press handler using config
+  const handleTopBarBack = () => {
+    if (topBarBackTarget) {
+      // Check if back target has params to preserve
+      if (routeConfig.preserveParamsOnBack && (worldId || userRole)) {
+        const target = buildNavigationTarget(
+          topBarBackTarget,
+          { worldId, userRole },
+          routeConfig.preserveParamsOnBack || []
+        );
+        router.replace(target as any);
+      } else {
+        router.replace(topBarBackTarget as any);
+      }
+    } else {
+        const fallbackTarget = buildNavigationTarget(
+          '/select/world-selection',
+          { worldId, userRole },
+          ['worldId', 'userRole']
+        );
+        router.replace(fallbackTarget as any);
+      }
+  };
 
   return (
 
-    <View style={{
-      height: '100%',
-      width: '100%',
-      backgroundColor: theme.background || '#2f353d'
-    }}>
-      {/* Global TopBar - shown on most screens */}
-      {topBarConfig && (
-        <TopBar 
-          title={topBarConfig.title}
-          showBackButton={topBarConfig.showBackButton}
-          showHamburger={topBarConfig.showHamburger}
-          onBackPress={topBarConfig.onBackPress}
-          userId={userId}
-          worldId={worldId}
-          userRole={userRole}
-          a11yFocusTarget={routeConfig.a11yFocusTarget}
+    <RouteErrorBoundary 
+      routeConfig={routeConfig}
+      navigationContext={navContext}
+      fallbackRoute="/select/world-selection"
+    >
+      <View style={{
+        height: '100%',
+        width: '100%',
+        backgroundColor: theme.background || '#2f353d'
+      }}>
+        {/* Global TopBar - driven by centralized navigation config */}
+        {!hideTopBar && topBarTitle && (
+          <TopBar 
+            title={topBarTitle}
+            showBackButton={routeConfig.back !== undefined}
+            showHamburger={routeConfig.showHamburger}
+            onBackPress={handleTopBarBack}
+            userId={userId}
+            worldId={worldId}
+            userRole={userRole}
+            a11yFocusTarget={routeConfig.a11yFocusTarget}
+          />
+        )}
+        
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: {
+              backgroundColor: '$background',
+            },
+          }}
         />
-      )}
-      
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: {
-            backgroundColor: '$background',
-          },
-        }}
-      />
-    </View>
+      </View>
+    </RouteErrorBoundary>
   );
 }
 

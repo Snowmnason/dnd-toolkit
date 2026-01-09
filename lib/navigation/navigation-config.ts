@@ -3,10 +3,24 @@
  * 
  * Centralized route configuration for D&D Toolkit.
  * Each route defines TopBar appearance, back behavior, modals, aliases, and more.
+ * 
+ * ## Modals
+ * Modal components (SettingsModal, CreateWorldModals, etc.) are **presentational only**.
+ * They do not have route URLs and are controlled via React state (visible prop).
+ * The `modal` config field is reserved for future modal-as-route patterns.
+ * 
+ * ## Animations
+ * Animation types are defined in route config but not yet implemented in Expo Router.
+ * Use `getTransitionAnimation()` helper for future integration.
  */
 
 import { Router } from 'expo-router';
 import { normalizePath, pathEquals, pathStartsWith, RouteParams } from './uri-helpers';
+import { LOGIN_ROUTES } from './routes/login-routes';
+import { MAIN_ROUTES } from './routes/main-routes';
+import { SELECT_ROUTES } from './routes/select-routes';
+import { SETTINGS_ROUTES } from './routes/settings-routes';
+import { WEB_ROUTES } from './routes/web-routes';
 
 /**
  * A11y focus target on route navigation
@@ -107,372 +121,15 @@ export interface RouteConfig {
 }
 
 /**
- * Safely extract username param as a string
- */
-function getUsernameParam(context: NavigationContext): string | undefined {
-  if (!Object.prototype.hasOwnProperty.call(context.params, 'username')) {
-    return undefined;
-  }
-
-  const value = context.params['username'];
-  return typeof value === 'string' ? value : undefined;
-}
-
-/**
  * Route configuration registry
  * Add new routes here with their configuration
  */
 const ROUTE_CONFIGS: RouteConfig[] = [
-  // Root/Index
-  {
-    path: '/',
-    title: 'D&D Toolkit',
-    showTopBar: false,
-    analyticsName: 'root_index',
-  },
-  
-  // Login routes
-  {
-    path: '/login',
-    aliases: ['/login/welcome'],
-    title: 'Welcome',
-    showTopBar: false,
-    analyticsName: 'login_welcome',
-  },
-  {
-    path: '/login/sign-in',
-    title: 'Sign In',
-    showTopBar: false,
-    back: '/login/welcome',
-    analyticsName: 'login_signin',
-  },
-  {
-    path: '/login/create-account',
-    title: 'Create Account',
-    showTopBar: false,
-    back: '/login/welcome',
-    analyticsName: 'login_create',
-  },
-  {
-    path: '/login/sign-up',
-    title: 'Create Account',
-    showTopBar: false,
-    back: '/login/welcome',
-    analyticsName: 'login_signup',
-  },
-  {
-    path: '/login/forgot-password',
-    title: 'Forgot Password',
-    showTopBar: false,
-    back: '/login/sign-in',
-    analyticsName: 'login_forgot',
-  },
-  {
-    path: '/login/reset-password',
-    title: 'Reset Password',
-    showTopBar: false,
-    back: '/login/sign-in',
-    analyticsName: 'login_reset',
-  },
-  {
-    path: '/login/confirm-signin',
-    title: 'Confirm Sign In',
-    showTopBar: false,
-    back: '/login/sign-in',
-    analyticsName: 'login_confirm',
-  },
-  {
-    path: '/login/email-confirmation',
-    title: 'Confirm Your Email',
-    showTopBar: false,
-    back: '/login/sign-in',
-    analyticsName: 'login_email_confirm',
-  },
-  {
-    path: '/login/complete-profile',
-    title: 'Complete Profile',
-    showTopBar: false,
-    back: '/login/welcome',
-    analyticsName: 'login_complete_profile',
-  },
-  {
-    path: '/login/auth-redirect',
-    title: 'Authenticating…',
-    showTopBar: false,
-    back: '/login/welcome',
-    analyticsName: 'login_auth_redirect',
-  },
-  
-  // Select routes
-  {
-    path: '/select/world-selection',
-    title: 'Select World',
-    showTopBar: true,
-    showHamburger: true,
-    analyticsName: 'select_world',
-  },
-  {
-    path: '/select/create-world',
-    title: 'Create World',
-    showTopBar: true,
-    back: '/select/world-selection',
-    analyticsName: 'select_create',
-  },
-  
-  // Main routes
-  {
-    path: '/main/main-landing',
-    title: 'D&D Toolkit',
-    showTopBar: true,
-    showHamburger: true,
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_landing',
-    redirectIf: (context) => {
-      // Example: redirect if no worldId (will be wired in follow-up)
-      if (!context.worldId) {
-        return '/select/world-selection';
-      }
-      return undefined;
-    },
-  },
-  {
-    path: '/main/characters-npcs',
-    title: 'Characters & NPCs',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_characters',
-  },
-  {
-    path: '/main/characters-npcs/character-sheets',
-    title: 'Character Sheets',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_character_sheets',
-  },
-  {
-    path: '/main/items-treasure',
-    title: 'Items & Treasure',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_items',
-  },
-  {
-    path: '/main/items-treasure/inventory',
-    title: 'Inventory',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_items_inventory',
-  },
-  {
-    path: '/main/items-treasure/party-loot',
-    title: 'Party Loot',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_items_party_loot',
-  },
-  {
-    path: '/main/items-treasure/shop-generator',
-    title: 'Shop Generator',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_items_shop_generator',
-  },
-  {
-    path: '/main/items-treasure/treasure-generator',
-    title: 'Treasure Generator',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_items_treasure_generator',
-  },
-  {
-    path: '/main/world-exploration',
-    title: 'World & Exploration',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_world',
-  },
-  {
-    path: '/main/world-exploration/world-map',
-    title: 'World Map',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_world_map',
-  },
-  {
-    path: '/main/world-exploration/weather-generator',
-    title: 'Weather Generator',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_world_weather',
-  },
-  {
-    path: '/main/world-exploration/dungeon-town-creator',
-    title: 'Dungeon & Town Creator',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_world_dungeon_town',
-  },
-  {
-    path: '/main/world-exploration/battle-map-maker',
-    title: 'Battle Map Maker',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_world_battle_map',
-  },
-  {
-    path: '/main/combat-events',
-    title: 'Combat & Events',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_combat',
-  },
-  {
-    path: '/main/combat-events/calendar',
-    title: 'Calendar',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_combat_calendar',
-  },
-  {
-    path: '/main/combat-events/encounter-builder',
-    title: 'Encounter Builder',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_combat_encounter',
-  },
-  {
-    path: '/main/combat-events/event-builder',
-    title: 'Event Builder',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_combat_event',
-  },
-  {
-    path: '/main/combat-events/initiative-tracker',
-    title: 'Initiative Tracker',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_combat_initiative',
-  },
-  {
-    path: '/main/story-notes',
-    title: 'Story & Notes',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_story',
-  },
-  {
-    path: '/main/story-notes/notes',
-    title: 'Notes',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_story_notes',
-  },
-  {
-    path: '/main/story-notes/journal',
-    title: 'Journal',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_story_journal',
-  },
-  {
-    path: '/main/story-notes/handouts',
-    title: 'Handouts',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_story_handouts',
-  },
-  {
-    path: '/main/story-notes/quest-log',
-    title: 'Quest Log',
-    showTopBar: true,
-    back: '/main/main-landing',
-    requiredParams: ['worldId', 'userRole'],
-    preserveParamsOnBack: ['worldId', 'userRole'],
-    analyticsName: 'main_story_quest_log',
-  },
-  
-  // Settings routes
-  {
-    path: '/settings',
-    title: (context) => {
-      const username = getUsernameParam(context);
-      return username ? `Settings - ${username}` : 'Settings';
-    },
-    showTopBar: true,
-    showHamburger: true,
-    analyticsName: 'settings',
-  },
-  {
-    path: '/settings/admin-panel',
-    title: 'Admin Panel',
-    showTopBar: true,
-    showHamburger: false,
-    back: '/select/world-selection',
-    analyticsName: 'settings_admin',
-  },
-  {
-    path: '/settings/[username]',
-    title: (context) => {
-      const username = getUsernameParam(context);
-      return username ? `Settings - ${username}` : 'Settings';
-    },
-    showTopBar: true,
-    showHamburger: false,
-    back: '/select/world-selection',
-    analyticsName: 'settings_user',
-  },
-
-  // Web routes
-  {
-    path: '/web/download',
-    title: 'Download',
-    showTopBar: false,
-    analyticsName: 'web_download',
-  },
+  ...LOGIN_ROUTES,
+  ...SELECT_ROUTES,
+  ...MAIN_ROUTES,
+  ...SETTINGS_ROUTES,
+  ...WEB_ROUTES,
 ];
 
 /**
@@ -532,7 +189,7 @@ function applyDefaults(config: RouteConfig): RouteConfig {
     showTopBar: true,
     showHamburger: false,
     a11yFocusTarget: 'title',
-    animation: 'slide',
+    animation: 'none',
     ...config,
   };
 }
@@ -584,6 +241,19 @@ export function shouldRedirect(
  */
 export function getAllRouteConfigs(): RouteConfig[] {
   return ROUTE_CONFIGS;
+}
+
+/**
+ * Get animation type for route transition (placeholder for future implementation)
+ * Returns the animation type from route config, defaults to 'none'
+ * 
+ * Future: This will integrate with Expo Router stack options or custom transition handlers
+ */
+export function getTransitionAnimation(
+  config: RouteConfig,
+  context: NavigationContext
+): AnimationType {
+  return config.animation || 'none';
 }
 
 /**

@@ -116,9 +116,15 @@ export default function EmailConfirmationScreen() {
     // Note: setLoading(false) is handled above in success case
   };
 
-  const handleChangeEmail = () => {
-    router.back();
-  };
+  // TODO: Clarify email-change intent and implementation
+  // Currently just navigates back to welcome; unclear if this should:
+  // 1. Allow changing the email on the current signup flow
+  // 2. Simply allow retrying with a different email
+  // Disabled pending clarification and proper implementation
+  // const handleChangeEmail = () => {
+  //   const target = buildNavigationTarget('/login/welcome', {}, []);
+  //   router.replace(target as any);
+  // };
 
   return (
     <AuthRoot>
@@ -168,17 +174,17 @@ export default function EmailConfirmationScreen() {
           loading={loading}
         />
 
-        {/* Bottom Row: Change Email + Already Confirmed */}
+        {/* Bottom Row: Already Confirmed */}
         <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
-          {/* Change Email Button */}
-          <AuthButton
+          {/* TODO: Re-enable "Use Different Email" after clarifying intent */}
+          {/* <AuthButton
             text='Use Different Email'
             bg="rgba(139, 69, 19, 0.15)"
             borderColor="#8B4513"
             textColor="#F5E6D3"
             style={{ flex: 1, width: 'auto' }}
             onPress={handleChangeEmail}
-          />
+          /> */}
 
           {/* Already Confirmed Button */}
           <AuthButton

@@ -7,6 +7,7 @@ import {
   usersDB,
   isSupabaseConfigured,
 } from "@/lib";
+import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -50,7 +51,8 @@ export default function SettingsPage() {
     // Double-check: require confirmed Supabase session before proceeding
     if (!isSupabaseConfigured()) {
       logger.debug("settings", "Supabase not configured; redirecting to welcome");
-      router.replace("/login/welcome");
+      const target = buildNavigationTarget('/login/welcome', {}, []);
+      router.replace(target as any);
       return;
     }
 
@@ -60,7 +62,8 @@ export default function SettingsPage() {
         const user: User | null = session?.user ?? null;
         if (!user || !user.email_confirmed_at) {
           logger.debug("settings", "No confirmed user session, redirecting");
-          router.replace("/login/welcome");
+          const target = buildNavigationTarget('/login/welcome', {}, []);
+          router.replace(target as any);
           return;
         }
         setSecureReady(true);
@@ -68,7 +71,8 @@ export default function SettingsPage() {
       })
       .catch((err: unknown) => {
         logger.error("settings", "Error checking session:", err);
-        router.replace("/login/welcome");
+        const target = buildNavigationTarget('/login/welcome', {}, []);
+        router.replace(target as any);
         setLoading(false);
       });
 
@@ -92,7 +96,8 @@ export default function SettingsPage() {
         const user: User | null = session?.user ?? null;
         if (!user) {
           logger.debug("settings", "Auth state changed: user signed out");
-          router.replace("/login/welcome");
+          const target = buildNavigationTarget('/login/welcome', {}, []);
+          router.replace(target as any);
         }
       }
     );
@@ -111,7 +116,8 @@ export default function SettingsPage() {
       setButtonDisabled(true);
       try {
         await signOutUser();
-        router.replace("/login/welcome");
+        const target = buildNavigationTarget('/login/welcome', {}, []);
+        router.replace(target as any);
       } catch (error) {
         logger.error("settings", "Sign out error:", error);
         Alert.alert("Error", "Failed to sign out. Please try again.");
@@ -145,7 +151,8 @@ export default function SettingsPage() {
         throw new Error(result.error || "Failed to delete account");
 
       setShowDeleteModal(false);
-      router.replace("/login/welcome");
+      const target = buildNavigationTarget('/login/welcome', {}, []);
+      router.replace(target as any);
     } catch (error: any) {
       logger.error("settings", "Delete account error:", error);
       setDeleteError(
@@ -209,11 +216,11 @@ export default function SettingsPage() {
           variant="secondary"
           text="Playground"
           onPress={() => {
-            if (isMobile) {
-              router.push("../settings/StyleMobile");
-            } else {
-              router.push("../settings/StyleDesktop");
-            }
+            const targetPath = isMobile
+              ? '/settings/StyleMobile'
+              : '/settings/StyleDesktop';
+            const target = buildNavigationTarget(targetPath, {}, []);
+            router.push(target as any);
           }}
           style={{ alignSelf: "center" }}
         />
