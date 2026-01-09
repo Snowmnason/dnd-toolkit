@@ -102,7 +102,6 @@ export default function TopBar({
 
         {/* Center: Title */}
         <Text
-          accessibilityRole="header"
           accessibilityLiveRegion="polite"
           style={[
             styles.title,

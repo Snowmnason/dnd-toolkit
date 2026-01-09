@@ -2,6 +2,8 @@ import { Button, Card, Heading } from '@/components/ui'
 import { useAppParams } from '@/contexts/AppParamsContext'
 import { usePlatform } from '@/contexts/PlatformContext'
 import { WorldWithAccess } from '@/lib/database/worlds'
+import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
+import { logger } from '@/lib/utils/logger'
 import { $, useScale, UseTheme } from '@/theme'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
@@ -91,17 +93,28 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
               variant="primary"
               onPress={() => {
                 if (!selectedWorld) return
+                
+                logger.info('[WorldRightPanel] Open button pressed', {
+                  worldId: selectedWorld.world_id,
+                  userRole: selectedWorld.user_role,
+                })
+                
+                // Update context first
                 updateParams({
                   worldId: selectedWorld.world_id,
                   userRole: selectedWorld.user_role,
                 })
-                router.push({
-                  pathname: '/main/main-landing',
-                  params: {
+                
+                // Navigate using centralized navigation helper
+                const target = buildNavigationTarget(
+                  '/main/main-landing',
+                  {
                     worldId: selectedWorld.world_id,
                     userRole: selectedWorld.user_role,
                   },
-                })
+                  ['worldId', 'userRole']
+                )
+                router.push(target)
               }}
               style={{ width: 160 }}
             />

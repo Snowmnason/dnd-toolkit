@@ -2,6 +2,7 @@ import { Body, Button } from '@/components/ui'
 import { useAppParams } from '@/contexts/AppParamsContext'
 import { usePlatform } from '@/contexts/PlatformContext'
 import { WorldWithAccess } from '@/lib/database/worlds'
+import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
 import { useScale } from '@/theme'
 import { useRouter } from 'expo-router'
 import React from 'react'
@@ -90,7 +91,8 @@ export function WorldListPanel({ worlds, selectedWorld, setSelectedWorld, setMap
           text="Create New World"
           variant="primary"
           onPress={() => {
-            router.push('/select/create-world')
+            const target = buildNavigationTarget('/select/create-world', {}, [])
+            router.push(target)
           }}
           style={{ borderRadius: S.radius.lg,
             position: 'absolute',

@@ -1,7 +1,5 @@
-import { AppLoading } from '@/components/ui'
-import { useAppBootstrap } from '@/hooks/use-app-bootstrap'
-import { useAuthGuard } from '@/lib'
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
+import { logger } from '@/lib/utils/logger'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Platform, useWindowDimensions, View } from 'react-native'
@@ -10,19 +8,14 @@ import { BottomTabBar } from '../../Screens/main-panels/BottomTabBar'
 export default function MainLayout() {
   const router = useRouter()
   const params = useLocalSearchParams()
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [activeTab, setActiveTab] = useState('characters')
   const { width } = useWindowDimensions()
   const isMobile = Platform.OS !== 'web' || width < 900
 
-  // 🔐 Centralized auth guard
-  const bootstrap = useAppBootstrap()
-  const authState = useAuthGuard(bootstrap.isReady)
-  useEffect(() => {
-    if (authState !== 'loading') {
-      setIsCheckingAuth(false)
-    }
-  }, [authState])
+  logger.info('[MainLayout] Rendering with params', { 
+    worldId: params.worldId, 
+    userRole: params.userRole 
+  })
 
   // Update active tab from URL params
   useEffect(() => {
@@ -46,10 +39,6 @@ export default function MainLayout() {
 
     // Navigate for consistency (keeps URL updated)
     router.replace(target as any)
-  }
-
-  if (isCheckingAuth) {
-    return <AppLoading />
   }
 
   return (

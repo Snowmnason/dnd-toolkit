@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useAppParams } from '@/contexts/AppParamsContext';
 import { RequestManager } from '../api/request-manager';
 import { worldsDB, WorldWithAccess } from '../database/worlds';
 import { logger } from '../utils/logger';
@@ -13,6 +14,7 @@ export function useWorlds(userId?: string) {
   const [worlds, setWorlds] = useState<WorldWithAccess[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { setConnectedWorldIds } = useAppParams();
 
   const loadWorlds = useCallback(async () => {
     try {
@@ -36,13 +38,21 @@ export function useWorlds(userId?: string) {
         }
       );
       setWorlds(userWorlds ?? []);
+      
+      // Update connected worlds cache for navigation guard
+      if (userWorlds && userWorlds.length > 0) {
+        const worldIds = userWorlds.map(w => w.world_id);
+        setConnectedWorldIds(worldIds);
+      } else {
+        setConnectedWorldIds([]);
+      }
     } catch (err) {
       logger.error('useWorlds', 'Error loading worlds:', err);
       setError('Failed to load worlds. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  }, [userId]); // Include userId since it's used in the callback
+  }, [userId, setConnectedWorldIds]); // Include userId and setConnectedWorldIds since they're used in the callback
 
   // Load worlds on mount
   useEffect(() => {

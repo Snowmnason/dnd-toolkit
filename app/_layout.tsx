@@ -103,7 +103,7 @@ function RootLayoutContent() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
   // Context hooks
-  const { params, updateParams, clearWorldParams, clearAllParams } = useAppParams();
+  const { params, updateParams, clearWorldParams, clearAllParams, hasAccessToWorld } = useAppParams();
   const { userId, worldId, userRole } = params;
   
   // Data loading hooks
@@ -174,44 +174,56 @@ function RootLayoutContent() {
     }
   }, [urlParams, segments, updateParams, clearAllParams, clearWorldParams, params.userId, params.worldId, params.userRole])
 
-  // Guard against mismatched or missing world params on main routes
+  // Guard against invalid world access on main routes
+  // Validates on: programmatic navigation, cache load, and browser back/forward/refresh
   useEffect(() => {
     if (!bootstrap.isReady) return
 
-    const firstSegment = typeof segments[0] === 'string' ? segments[0] : ''
-    if (firstSegment !== 'main') return
+    const validateWorldAccess = () => {
+      const firstSegment = typeof segments[0] === 'string' ? segments[0] : ''
+      if (firstSegment !== 'main') return
 
-    const currentWorldId = params.worldId
-    const currentUserRole = params.userRole
-    const urlWorldId = typeof urlParams.worldId === 'string' ? urlParams.worldId : undefined
+      // Wait for window.location to sync with segments after navigation
+      setTimeout(() => {
+        const searchParams = new URLSearchParams(window.location.search)
+        const urlWorldId = searchParams.get('worldId') || undefined
+        const cacheIsPopulated = params.connectedWorldIds.length > 0
+        
+        // If cache not loaded yet, skip validation
+        if (!cacheIsPopulated) {
+          return
+        }
 
-    logger.info('[NavGuard] main route check', {
-      segments,
-      urlWorldId,
-      currentWorldId,
-      currentUserRole,
-      urlParams,
-    })
+        const hasAccess = urlWorldId ? hasAccessToWorld(urlWorldId) : false
 
-    // If URL provides a worldId and it differs from context, trust the URL and sync context
-    if (urlWorldId && urlWorldId !== currentWorldId) {
-      logger.info('[NavGuard] Syncing context from URL worldId on main route', { urlWorldId, currentWorldId })
-      updateParams({ worldId: urlWorldId })
-      return
+        // If no worldId in URL, redirect
+        if (!urlWorldId) {
+          logger.warn('[NavGuard] No worldId in URL, redirecting to world selection')
+          const target = buildNavigationTarget('/select/world-selection', {}, [])
+          router.replace(target)
+          return
+        }
+
+        // If worldId not in cache, redirect
+        if (!hasAccess) {
+          logger.warn('[NavGuard] Invalid world access, redirecting to world selection', { urlWorldId })
+          const target = buildNavigationTarget('/select/world-selection', {}, [])
+          router.replace(target)
+          return
+        }
+      }, 0)
     }
 
-    // If no worldId in context and none in URL, force user to select
-    if (!currentWorldId && !urlWorldId) {
-      logger.info('[NavGuard] Missing worldId in context and URL on main route; redirecting to selection')
-      const target = buildNavigationTarget(
-        '/select/world-selection',
-        { worldId: currentWorldId, userRole: currentUserRole },
-        ['worldId', 'userRole']
-      )
-      router.replace(target as any)
-      return
+    // Validate on effect trigger (programmatic nav, cache load)
+    validateWorldAccess()
+
+    // Also validate on browser back/forward/refresh
+    window.addEventListener('popstate', validateWorldAccess)
+    
+    return () => {
+      window.removeEventListener('popstate', validateWorldAccess)
     }
-  }, [bootstrap.isReady, params.worldId, params.userRole, router, segments, urlParams, updateParams])
+  }, [bootstrap.isReady, params.connectedWorldIds, router, segments, hasAccessToWorld])
 
   // Manage loading state based on guard and bootstrap
   useEffect(() => {
@@ -231,7 +243,8 @@ function RootLayoutContent() {
     if (!bootstrap.isReady) return;
     const onRoot = segments[0] === undefined;
     if (onRoot && authState === 'unauthenticated') {
-      router.replace('/login/welcome');
+      const target = buildNavigationTarget('/login/welcome', {}, []);
+      router.replace(target);
     }
   }, [bootstrap.isReady, authState, segments, router]);
 
