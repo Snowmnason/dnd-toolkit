@@ -3,6 +3,15 @@
  * 
  * Centralized route configuration for D&D Toolkit.
  * Each route defines TopBar appearance, back behavior, modals, aliases, and more.
+ * 
+ * ## Modals
+ * Modal components (SettingsModal, CreateWorldModals, etc.) are **presentational only**.
+ * They do not have route URLs and are controlled via React state (visible prop).
+ * The `modal` config field is reserved for future modal-as-route patterns.
+ * 
+ * ## Animations
+ * Animation types are defined in route config but not yet implemented in Expo Router.
+ * Use `getTransitionAnimation()` helper for future integration.
  */
 
 import { Router } from 'expo-router';
@@ -128,6 +137,7 @@ const ROUTE_CONFIGS: RouteConfig[] = [
     path: '/',
     title: 'D&D Toolkit',
     showTopBar: false,
+    animation: 'fade',
     analyticsName: 'root_index',
   },
   
@@ -137,6 +147,7 @@ const ROUTE_CONFIGS: RouteConfig[] = [
     aliases: ['/login/welcome'],
     title: 'Welcome',
     showTopBar: false,
+    animation: 'fade',
     analyticsName: 'login_welcome',
   },
   {
@@ -209,6 +220,7 @@ const ROUTE_CONFIGS: RouteConfig[] = [
     showTopBar: true,
     showHamburger: false,
     back: '/login/welcome',
+    animation: 'slide',
     analyticsName: 'style_desktop_anonymous',
   },
   
@@ -236,6 +248,7 @@ const ROUTE_CONFIGS: RouteConfig[] = [
     showHamburger: true,
     requiredParams: ['worldId', 'userRole'],
     preserveParamsOnBack: ['worldId', 'userRole'],
+    animation: 'slide',
     analyticsName: 'main_landing',
     redirectIf: (context) => {
       // Example: redirect if no worldId (will be wired in follow-up)
@@ -243,6 +256,12 @@ const ROUTE_CONFIGS: RouteConfig[] = [
         return '/select/world-selection';
       }
       return undefined;
+    },
+    onError: (error, context) => {
+      // Log critical main landing errors
+      console.error('[Route Error] main-landing:', error.message);
+      // Fallback: redirect to world selection
+      context.router.replace('/select/world-selection');
     },
   },
   {
@@ -567,7 +586,7 @@ function applyDefaults(config: RouteConfig): RouteConfig {
     showTopBar: true,
     showHamburger: false,
     a11yFocusTarget: 'title',
-    animation: 'slide',
+    animation: 'none',
     ...config,
   };
 }
@@ -619,6 +638,19 @@ export function shouldRedirect(
  */
 export function getAllRouteConfigs(): RouteConfig[] {
   return ROUTE_CONFIGS;
+}
+
+/**
+ * Get animation type for route transition (placeholder for future implementation)
+ * Returns the animation type from route config, defaults to 'none'
+ * 
+ * Future: This will integrate with Expo Router stack options or custom transition handlers
+ */
+export function getTransitionAnimation(
+  config: RouteConfig,
+  context: NavigationContext
+): AnimationType {
+  return config.animation || 'none';
 }
 
 /**
