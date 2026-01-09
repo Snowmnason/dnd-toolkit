@@ -7,7 +7,7 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 - Root providers: `ThemeProvider` → `ScaleProvider` → `PlatformProvider` → `AppParamsProvider` (see `app/_layout.tsx`). Don’t move or reorder these casually.
 - Bootstrap flow: `hooks/use-app-bootstrap.tsx` preloads fonts/images/themes and restores Supabase session. UI waits on `bootstrap.isReady`.
 - Auth: `lib/auth-state.ts` (`AuthStateManager`) provides quick checks and routing decisions. Supabase is dynamically imported and guarded by `isSupabaseConfigured()` to support GH Pages/no-env scenarios.
-- Navigation: Centralized in `lib/navigation/navigation-config.ts`. Each route's TopBar, back button, params, modals, and redirects are defined declaratively. Use `getRouteConfig(context)` instead of inline switch/case. See `docs/NAVIGATION_CONFIG.md`.
+- Navigation: Centralized in `lib/navigation/navigation-config.ts`. Each route's TopBar, back button, params, modals, and redirects are defined declaratively. Use `getRouteConfig(context)` instead of inline switch/case. See `docs\issues\MileStone 1\024 - Navigation\NAVIGATION_CONFIG.md`.
 - Route params: Expo Router segments (`useSegments()`) + URL params merged into `AppParamsContext` (worldId/userRole).
 
 ## UI system
