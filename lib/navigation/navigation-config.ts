@@ -202,6 +202,15 @@ const ROUTE_CONFIGS: RouteConfig[] = [
     back: '/login/welcome',
     analyticsName: 'login_auth_redirect',
   },
+  {
+    path: '/StyleDesktop',
+    aliases: ['/styledesktop'],
+    title: 'Component Playground (Anonymous)',
+    showTopBar: true,
+    showHamburger: false,
+    back: '/login/welcome',
+    analyticsName: 'style_desktop_anonymous',
+  },
   
   // Select routes
   {
@@ -464,6 +473,32 @@ const ROUTE_CONFIGS: RouteConfig[] = [
     showHamburger: false,
     back: '/select/world-selection',
     analyticsName: 'settings_user',
+    redirectIf: (context) => {
+      // Redirect to login if not authenticated
+      return !context.isAuthenticated ? '/login/welcome' : undefined;
+    },
+  },
+  {
+    path: '/settings/style-mobile',
+    title: 'Component Playground (Mobile)',
+    showTopBar: true,
+    showHamburger: false,
+    back: (context) => {
+      const username = getUsernameParam(context);
+      return username ? `/settings/${username}` : '/select/world-selection';
+    },
+    analyticsName: 'settings_style_mobile',
+  },
+  {
+    path: '/settings/style-desktop',
+    title: 'Component Playground (Desktop)',
+    showTopBar: true,
+    showHamburger: false,
+    back: (context) => {
+      const username = getUsernameParam(context);
+      return username ? `/settings/${username}` : '/select/world-selection';
+    },
+    analyticsName: 'settings_style_desktop',
   },
 
   // Web routes

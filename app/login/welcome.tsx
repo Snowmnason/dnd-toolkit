@@ -1,5 +1,6 @@
 import { AuthActionGroup, AuthBody, AuthBodyFooter, AuthButton, AuthButtonSecondary, AuthCaption, AuthLink, AuthRoot, AuthSubTitle, AuthTitle } from '@/components/auth_components';
 import { useWelcomeScreen } from '@/lib';
+import { buildNavigationTarget } from '@/lib/navigation/uri-helpers';
 import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
 import { Platform, useWindowDimensions, View } from 'react-native';
@@ -102,7 +103,8 @@ export default function WelcomeScreen() {
               //do nothing for now
               return;
             } else {
-              router.push('../StyleDesktop');
+              const target = buildNavigationTarget('/StyleDesktop', {}, []);
+              router.push(target as any);
               return;
             }
             // TODO: Implement anonymous auth
