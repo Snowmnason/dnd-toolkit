@@ -48,25 +48,6 @@ export default function MainLayout() {
     router.replace(target as any)
   }
 
-  // Tab → Route helper (kept for reference; navigation now config-driven)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const getTabRoute = (tab: string): string => {
-    switch (tab) {
-      case 'characters':
-        return 'characters-npcs'
-      case 'items':
-        return 'items-treasure'
-      case 'world':
-        return 'world-exploration'
-      case 'combat':
-        return 'combat-events'
-      case 'story':
-        return 'story-notes'
-      default:
-        return 'characters-npcs'
-    }
-  }
-
   if (isCheckingAuth) {
     return <AppLoading />
   }

@@ -1,4 +1,5 @@
 import { logger } from '@/lib'
+import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
 import { S, UseTheme } from '@/theme'
 import { useRouter, useSegments } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
@@ -128,19 +129,20 @@ export default function TopBar({
         onClose={() => setShowSettingsMenu(false)}
           onAccountSettings={async () => {
             setShowSettingsMenu(false)
-            const routeParams: any = {}
-            if (worldId) routeParams.worldId = worldId
-            if (userRole) routeParams.userRole = userRole
 
             try {
               const { AuthStateManager } = await import('@/lib/auth-state');
               const user = await AuthStateManager.getUserData();
-              const raw = user?.username || 'user';
-              const username = encodeURIComponent(raw);
-              const qs = Object.keys(routeParams).length
-                ? `?${new URLSearchParams(routeParams).toString()}`
-                : '';
-              router.push(`/settings/${username}${qs}`);
+              const username = user?.username || 'user';
+              
+              // Use centralized navigation helper for settings route
+              const target = buildNavigationTarget(
+                `/settings/${encodeURIComponent(username)}`,
+                { worldId, userRole },
+                ['worldId', 'userRole']
+              );
+              
+              router.push(target as any);
             } catch (err) {
               logger.warn('TopBar: failed to resolve username route, falling back', err);
               setShowErrorToast(true);
@@ -148,7 +150,13 @@ export default function TopBar({
           }}
         onReturnToWorldSelection={() => {
           setShowSettingsMenu(false)
-          router.replace('/select/world-selection')
+          // Use centralized navigation helper
+          const target = buildNavigationTarget(
+            '/select/world-selection',
+            {},
+            []
+          );
+          router.replace(target as any)
         }}
       />
 

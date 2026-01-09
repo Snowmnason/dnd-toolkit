@@ -256,7 +256,11 @@ function RootLayoutContent() {
         {!hideTopBar && topBarTitle && (
           <TopBar 
             title={topBarTitle}
-          showBackButton={routeConfig.back !== undefined}
+            showBackButton={routeConfig.back !== undefined}
+            showHamburger={routeConfig.showHamburger}
+            onBackPress={handleTopBarBack}
+            userId={userId}
+            worldId={worldId}
             userRole={userRole}
             a11yFocusTarget={routeConfig.a11yFocusTarget}
           />
