@@ -236,8 +236,13 @@ function RootLayoutContent() {
         router.replace(topBarBackTarget as any);
       }
     } else {
-      router.back();
-    }
+        const fallbackTarget = buildNavigationTarget(
+          '/select/world-selection',
+          { worldId, userRole },
+          ['worldId', 'userRole']
+        );
+        router.replace(fallbackTarget as any);
+      }
   };
 
   return (

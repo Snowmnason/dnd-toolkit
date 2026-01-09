@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { AppPage, Body, Button, CustomLoad, SubTitle, Switch, Title } from '@/components/ui';
 import { getCurrentUserProfile } from '@/lib/database/common';
+import { buildNavigationTarget } from '@/lib/navigation/uri-helpers';
 import { logger } from '@/lib/utils/logger';
 import { useScale } from '@/theme';
 
@@ -180,11 +181,6 @@ export default function AdminPanelScreen() {
   }
 
   const handleBack = async () => {
-    if (router.canGoBack()) {
-      router.back();
-      return;
-    }
-
     let username = 'user';
     try {
       const { AuthStateManager } = await import('@/lib/auth-state');
@@ -197,17 +193,19 @@ export default function AdminPanelScreen() {
     }
 
     const { username: _ignored, ...rest } = routeParams || {};
-    const qs = Object.keys(rest).length
-      ? `?${new URLSearchParams(
-          Object.entries(rest).reduce<Record<string, string>>((acc, [k, v]) => {
-            // eslint-disable-next-line security/detect-object-injection
-            acc[k] = Array.isArray(v) ? v[0] ?? '' : (v ?? '').toString();
-            return acc;
-          }, {})
-        ).toString()}`
-      : '';
+    const sanitizedParams: Record<string, string | number | boolean | undefined> = {};
+    for (const [key, value] of Object.entries(rest)) {
+      // Safe because we only assign normalized primitives for navigation params
+      // eslint-disable-next-line security/detect-object-injection
+      sanitizedParams[key] = Array.isArray(value) ? value[0] : value;
+    }
 
-    router.replace(`/settings/${username}${qs}`);
+    const target = buildNavigationTarget(
+      `/settings/${username}`,
+      sanitizedParams,
+      ['worldId', 'userRole']
+    );
+    router.replace(target as any);
   };
 
   if (loading) {

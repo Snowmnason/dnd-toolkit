@@ -64,8 +64,12 @@ export default function TopBar({
   }, [segments, a11yFocusTarget, title])
 
   const handleBackPress = () => {
-    if (onBackPress) onBackPress()
-    else router.back()
+    if (onBackPress) {
+      onBackPress()
+      return
+    }
+    logger.warn('TopBar back press with no handler; ignoring')
+    setShowErrorToast(true)
   }
 
   const handleHamburgerPress = () => {

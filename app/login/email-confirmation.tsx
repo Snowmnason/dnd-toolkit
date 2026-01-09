@@ -15,6 +15,7 @@ import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
+import { buildNavigationTarget } from '@/lib/navigation/uri-helpers';
 
 
 
@@ -117,7 +118,8 @@ export default function EmailConfirmationScreen() {
   };
 
   const handleChangeEmail = () => {
-    router.back();
+    const target = buildNavigationTarget('/login/welcome', {}, []);
+    router.replace(target as any);
   };
 
   return (

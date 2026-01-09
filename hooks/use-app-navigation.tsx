@@ -86,11 +86,24 @@ export function useAppNavigation() {
   );
 
   /**
-   * Navigate back using router.back()
+   * Navigate back; if history is unavailable, fall back to world selection
    */
-  const goBack = useCallback(() => {
-    router.back();
-  }, [router]);
+  const goBack = useCallback(
+    (fallbackPath: string = '/select/world-selection') => {
+      if (router.canGoBack?.()) {
+        router.back();
+        return;
+      }
+
+      const target = buildNavigationTarget(
+        fallbackPath,
+        { worldId: params.worldId, userRole: params.userRole },
+        ['worldId', 'userRole']
+      );
+      router.replace(target as any);
+    },
+    [router, params]
+  );
 
   return {
     navigateWithParams,
