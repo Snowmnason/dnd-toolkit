@@ -1,4 +1,4 @@
-import type { NavigationContext, RouteConfig } from '../navigation-config';
+import type { NavigationContext, RouteConfig } from '../navigation-config'
 
 // Main app routes (world-dependent)
 export const MAIN_ROUTES: RouteConfig[] = [
@@ -22,7 +22,8 @@ export const MAIN_ROUTES: RouteConfig[] = [
       context.router.replace('/select/world-selection')
     },
   },
-// Characters & NPCs
+
+  // Characters & NPCs
   {
     path: '/main/characters-npcs',
     title: 'Characters & NPCs',
@@ -41,7 +42,7 @@ export const MAIN_ROUTES: RouteConfig[] = [
     preserveParamsOnBack: ['worldId', 'userRole'],
     analyticsName: 'main_character_sheets',
   },
-    {
+  {
     path: '/main/characters-npcs/faction-tracker',
     title: 'Faction Tracker',
     showTopBar: true,
@@ -50,7 +51,7 @@ export const MAIN_ROUTES: RouteConfig[] = [
     preserveParamsOnBack: ['worldId', 'userRole'],
     analyticsName: 'main_faction_tracker',
   },
-    {
+  {
     path: '/main/characters-npcs/npc-forge',
     title: 'NPC Forge',
     showTopBar: true,
@@ -59,7 +60,7 @@ export const MAIN_ROUTES: RouteConfig[] = [
     preserveParamsOnBack: ['worldId', 'userRole'],
     analyticsName: 'main_npc_forge',
   },
-    {
+  {
     path: '/main/characters-npcs/party-overview',
     title: 'Party Overview',
     showTopBar: true,

@@ -193,11 +193,15 @@ export default function AdminPanelScreen() {
     }
 
     const { username: _ignored, ...rest } = routeParams || {};
-    const sanitizedParams: Record<string, string | number | boolean | undefined> = {};
+    const sanitizedParams: Record<string, string | number | boolean> = {};
     for (const [key, value] of Object.entries(rest)) {
-      // Safe because we only assign normalized primitives for navigation params
-      // eslint-disable-next-line security/detect-object-injection
-      sanitizedParams[key] = Array.isArray(value) ? value[0] : value;
+      const normalized = Array.isArray(value) ? value[0] : value;
+      if (normalized === undefined) continue;
+      if (typeof normalized === 'string' || typeof normalized === 'number' || typeof normalized === 'boolean') {
+        // Only persist defined primitives to avoid undefined params downstream
+        // eslint-disable-next-line security/detect-object-injection
+        sanitizedParams[key] = normalized;
+      }
     }
 
     const target = buildNavigationTarget(
