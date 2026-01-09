@@ -1,5 +1,5 @@
 import { useAnalyticsNavigation } from '@/hooks/use-analytics-navigation';
-import { AppErrorBoundary, useAuthGuard, AUTH_CONFIG } from "@/lib";
+import { AppErrorBoundary, AUTH_CONFIG, getRouteConfig, useAuthGuard } from "@/lib";
 import { Analytics, sessionManager } from '@/lib/analytics';
 import { getAppConfig } from '@/lib/config/loader';
 import { ScaleProvider } from "@/providers/ScaleProvider";
@@ -305,6 +305,20 @@ function RootLayoutContent() {
 
   const topBarConfig = getTopBarConfig();
 
+  // Get route config for a11y focus target
+  const routeConfig = getRouteConfig({
+    segments,
+    params: {
+      worldId: worldId as string | undefined,
+      userRole: userRole as string | undefined,
+    },
+    router,
+    worldId: worldId as string | undefined,
+    userRole: userRole as string | undefined,
+    isMobile,
+    isAuthenticated: authState === 'authenticated',
+  });
+
   return (
 
     <View style={{
@@ -322,6 +336,7 @@ function RootLayoutContent() {
           userId={userId}
           worldId={worldId}
           userRole={userRole}
+          a11yFocusTarget={routeConfig.a11yFocusTarget}
         />
       )}
       

@@ -1,7 +1,7 @@
 import { logger } from '@/lib'
 import { S, UseTheme } from '@/theme'
-import { useRouter } from 'expo-router'
-import { useState } from 'react'
+import { useRouter, useSegments } from 'expo-router'
+import { useEffect, useRef, useState } from 'react'
 import {
   Platform,
   StyleSheet,
@@ -27,6 +27,7 @@ interface TopBarProps {
   userId?: string
   worldId?: string
   userRole?: string
+  a11yFocusTarget?: 'title' | 'firstInteractive' | 'none'
 }
 
 export default function TopBar({
@@ -37,14 +38,29 @@ export default function TopBar({
   userId,
   worldId,
   userRole,
+  a11yFocusTarget = 'title',
 }: TopBarProps) {
   const router = useRouter()
+  const segments = useSegments()
   const { width } = useWindowDimensions()
   const isMobile = Platform.OS !== 'web' || width < 900
   const [showSettingsMenu, setShowSettingsMenu] = useState(false)
   const [showErrorToast, setShowErrorToast] = useState(false)
   const { theme } = UseTheme()
   const insets = useSafeAreaInsets()
+  const titleRef = useRef<Text>(null)
+
+  // A11y: Focus title on route change for screen readers
+  useEffect(() => {
+    if (a11yFocusTarget === 'title' && Platform.OS === 'web' && titleRef.current) {
+      // On web, focus the text element to announce route change to screen readers
+      try {
+        (titleRef.current as any).focus?.()
+      } catch {
+        // Focus may not be available on all RN Web elements; silently fail
+      }
+    }
+  }, [segments, a11yFocusTarget])
 
   const handleBackPress = () => {
     if (onBackPress) onBackPress()
@@ -81,6 +97,8 @@ export default function TopBar({
 
         {/* Center: Title */}
         <Text
+          ref={titleRef}
+          accessibilityRole="header"
           style={[
             styles.title,
             { fontFamily: theme.fontFamilyTitle, fontSize: S.font.heading3 },
