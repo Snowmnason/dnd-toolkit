@@ -7,7 +7,8 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 - Root providers: `ThemeProvider` → `ScaleProvider` → `PlatformProvider` → `AppParamsProvider` (see `app/_layout.tsx`). Don’t move or reorder these casually.
 - Bootstrap flow: `hooks/use-app-bootstrap.tsx` preloads fonts/images/themes and restores Supabase session. UI waits on `bootstrap.isReady`.
 - Auth: `lib/auth-state.ts` (`AuthStateManager`) provides quick checks and routing decisions. Supabase is dynamically imported and guarded by `isSupabaseConfigured()` to support GH Pages/no-env scenarios.
-- Navigation: Expo Router segments (`useSegments()`) + URL params merged into `AppParamsContext` (worldId/userRole). Top bar UX derives from route segments.
+- Navigation: Centralized in `lib/navigation/navigation-config.ts`. Each route's TopBar, back button, params, modals, and redirects are defined declaratively. Use `getRouteConfig(context)` instead of inline switch/case. See `docs\issues\MileStone 1\024 - Navigation\NAVIGATION_CONFIG.md`.
+- Route params: Expo Router segments (`useSegments()`) + URL params merged into `AppParamsContext` (worldId/userRole).
 
 ## UI system
 - Components live in `components/ui` and are exported via `components/ui/index.ts` (barrel). Import only from this barrel.
@@ -24,7 +25,8 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 
 ## Screen/routing conventions
 - Add screens under `app/` using Expo Router. Layouts live in directory-level `_layout.tsx` files.
-- Top bar behavior is centralized in `app/_layout.tsx` based on `segments[0]`/`[1]`. When adding routes (especially under `app/main/*`), extend `getTopBarConfig()` instead of duplicating headers.
+- Navigation config: Routes are defined in `lib/navigation/navigation-config.ts` with TopBar title, back behavior, params, modals, redirects. When adding a route, add one config entry—no need to modify layouts.
+- Legacy TopBar logic: `app/_layout.tsx` still has inline switch/case; migration to use config pending (see follow-up issue).
 - URL params (e.g., `worldId`, `userRole`) are read via `useLocalSearchParams()` and merged into `AppParamsContext`. Don’t pass these deep as props; use the context.
 
 ## Data and services
@@ -54,4 +56,5 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 - Auth state: `lib/auth-state.ts`
 - UI barrel: `components/ui/index.ts`
 - Theme root: `theme/index.ts` (families, tokens, provider)
-- Docs: `docs/COMPONENTS.md`, `docs/SCREENS.md`, `docs/FEATURE_FLAGS.md`, `docs/NOTIFICATIONS_USAGE.md`
+- Navigation config: `lib/navigation/navigation-config.ts`, URI helpers: `lib/navigation/uri-helpers.ts`
+- Docs: `docs/COMPONENTS.md`, `docs/SCREENS.md`, `docs/FEATURE_FLAGS.md`, `docs/NOTIFICATIONS_USAGE.md`, `docs/NAVIGATION_CONFIG.md`

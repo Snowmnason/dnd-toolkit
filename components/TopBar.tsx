@@ -1,8 +1,9 @@
 import { logger } from '@/lib'
 import { S, UseTheme } from '@/theme'
-import { useRouter } from 'expo-router'
-import { useState } from 'react'
+import { useRouter, useSegments } from 'expo-router'
+import { useEffect, useRef, useState } from 'react'
 import {
+  AccessibilityInfo,
   Platform,
   StyleSheet,
   Text,
@@ -27,6 +28,7 @@ interface TopBarProps {
   userId?: string
   worldId?: string
   userRole?: string
+  a11yFocusTarget?: 'title' | 'firstInteractive' | 'none'
 }
 
 export default function TopBar({
@@ -37,14 +39,28 @@ export default function TopBar({
   userId,
   worldId,
   userRole,
+  a11yFocusTarget = 'title',
 }: TopBarProps) {
   const router = useRouter()
+  const segments = useSegments()
   const { width } = useWindowDimensions()
   const isMobile = Platform.OS !== 'web' || width < 900
   const [showSettingsMenu, setShowSettingsMenu] = useState(false)
   const [showErrorToast, setShowErrorToast] = useState(false)
   const { theme } = UseTheme()
   const insets = useSafeAreaInsets()
+  const lastAnnouncedTitle = useRef<string | undefined>(undefined)
+
+  // A11y: announce title changes for screen readers without relying on DOM focus
+  useEffect(() => {
+    if (a11yFocusTarget !== 'title') return
+
+    if (lastAnnouncedTitle.current === title) return
+    lastAnnouncedTitle.current = title
+
+    // AccessibilityInfo.announceForAccessibility is void; no promise to catch
+    AccessibilityInfo.announceForAccessibility(title)
+  }, [segments, a11yFocusTarget, title])
 
   const handleBackPress = () => {
     if (onBackPress) onBackPress()
@@ -81,6 +97,8 @@ export default function TopBar({
 
         {/* Center: Title */}
         <Text
+          accessibilityRole="header"
+          accessibilityLiveRegion="polite"
           style={[
             styles.title,
             { fontFamily: theme.fontFamilyTitle, fontSize: S.font.heading3 },

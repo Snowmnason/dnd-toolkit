@@ -21,6 +21,10 @@ export * from './auth/useAuthGuard';
 // ===== Routing config =====
 export * from './routing/route-config';
 
+// ===== Navigation =====
+export * from './navigation/uri-helpers';
+export * from './navigation/navigation-config';
+
 // ===== Database =====
 export * from './database/common';
 export * from './database/invites';
