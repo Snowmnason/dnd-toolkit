@@ -4,6 +4,7 @@ import { AppErrorBoundary, AUTH_CONFIG, getRouteConfig, resolveBackTarget, resol
 import { Analytics, sessionManager } from '@/lib/analytics';
 import { getAppConfig } from '@/lib/config/loader';
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers';
+import { logger } from '@/lib/utils/logger';
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ThemeProvider, UseTheme } from "@/theme";
@@ -77,12 +78,12 @@ if (isSentryEnabled && sentryDsn) {
   // uncomment the line below to enable Spotlight (https://spotlightjs.com)
   // spotlight: isDev,
   });
-  console.log('[Sentry] Initialized (feature flag enabled)');
+  logger.info('[Sentry] Initialized (feature flag enabled)');
 } else {
   if (!isSentryEnabled) {
-    console.log('[Sentry] Disabled via feature flag (sentryEnabled=false)');
+    logger.info('[Sentry] Disabled via feature flag (sentryEnabled=false)');
   } else if (!sentryDsn) {
-    console.log('[Sentry] Disabled - no DSN provided');
+    logger.info('[Sentry] Disabled - no DSN provided');
   }
 }
 
@@ -137,7 +138,7 @@ function RootLayoutContent() {
 
       // If no world in context yet, seed from URL once (owner navigating directly to their world)
       if (!params.worldId && urlWorldId) {
-        console.log('[NavGuard] Seeding world from URL on main route', { urlWorldId, urlUserRole })
+        logger.info('[NavGuard] Seeding world from URL on main route', { urlWorldId, urlUserRole })
         updateParams({ worldId: urlWorldId, userRole: urlUserRole })
       }
       // Skip further processing for main routes to avoid clearing params
@@ -184,7 +185,7 @@ function RootLayoutContent() {
     const currentUserRole = params.userRole
     const urlWorldId = typeof urlParams.worldId === 'string' ? urlParams.worldId : undefined
 
-    console.log('[NavGuard] main route check', {
+    logger.info('[NavGuard] main route check', {
       segments,
       urlWorldId,
       currentWorldId,
@@ -194,14 +195,14 @@ function RootLayoutContent() {
 
     // If URL provides a worldId and it differs from context, trust the URL and sync context
     if (urlWorldId && urlWorldId !== currentWorldId) {
-      console.log('[NavGuard] Syncing context from URL worldId on main route', { urlWorldId, currentWorldId })
+      logger.info('[NavGuard] Syncing context from URL worldId on main route', { urlWorldId, currentWorldId })
       updateParams({ worldId: urlWorldId })
       return
     }
 
     // If no worldId in context and none in URL, force user to select
     if (!currentWorldId && !urlWorldId) {
-      console.log('[NavGuard] Missing worldId in context and URL on main route; redirecting to selection')
+      logger.info('[NavGuard] Missing worldId in context and URL on main route; redirecting to selection')
       const target = buildNavigationTarget(
         '/select/world-selection',
         { worldId: currentWorldId, userRole: currentUserRole },
