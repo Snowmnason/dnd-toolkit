@@ -1,7 +1,9 @@
+import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { useAnalyticsNavigation } from '@/hooks/use-analytics-navigation';
-import { AppErrorBoundary, AUTH_CONFIG, getRouteConfig, useAuthGuard } from "@/lib";
+import { AppErrorBoundary, AUTH_CONFIG, getRouteConfig, resolveBackTarget, resolveTitle, useAuthGuard } from "@/lib";
 import { Analytics, sessionManager } from '@/lib/analytics';
 import { getAppConfig } from '@/lib/config/loader';
+import { buildNavigationTarget } from '@/lib/navigation/uri-helpers';
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ThemeProvider, UseTheme } from "@/theme";
@@ -200,113 +202,8 @@ function RootLayoutContent() {
   const isRootRoute = segments[0] === undefined;
   const hideTopBar = isRootRoute || firstSegment === 'login' || firstSegment === 'web';
 
-  // Determine TopBar configuration based on current route
-  const getTopBarConfig = () => {
-    const firstSegment = segments[0];
-
-    if (hideTopBar) return null;
-
-    // Default config
-    let config = {
-      title: 'D&D Toolkit',
-      showBackButton: true,
-      showHamburger: true,
-      onBackPress: undefined as (() => boolean) | undefined
-    };
-
-    // Configure based on route
-    switch (firstSegment) {
-      case 'select':
-        config.title = 'Select World';
-        
-        // Handle create-world back navigation
-        if (segments.some(segment => segment === 'create-world')) {
-          config.onBackPress = () => {
-            router.replace('/select/world-selection');
-            return true; // Prevent default
-          };
-        }
-        break;
-      
-      case 'main':
-        config.title = 'D&D Toolkit';
-        
-        // Handle feature-specific titles based on second segment
-        const secondSegment = (segments as string[])[1];
-        
-        // Handle main-landing route - always go back to world-selection
-        if (secondSegment === 'main-landing') {
-          config.onBackPress = () => {
-            router.replace('/select/world-selection');
-            return true; // Prevent default
-          };
-        }
-
-        // Helper function to create feature screen back handler
-        const createFeatureBackHandler = (tabKey: string) => () => {
-          const routeParams: any = {};
-          routeParams.worldId = worldId;
-          routeParams.userRole = userRole;
-          
-          const pathname = '/main/main-landing';
-          
-          if (isMobile) {
-            routeParams.tab = tabKey;
-          }
-          
-          router.replace({
-            pathname,
-            params: routeParams,
-          });
-          return true; // Prevent default
-        };
-
-        if (secondSegment) {
-          switch (secondSegment) {
-            case 'characters-npcs':
-              config.title = 'Characters & NPCs';
-              config.onBackPress = createFeatureBackHandler('characters');
-              break;
-            case 'items-treasure':
-              config.title = 'Items & Treasure';
-              config.onBackPress = createFeatureBackHandler('items');
-              break;
-            case 'world-exploration':
-              config.title = 'World & Exploration';
-              config.onBackPress = createFeatureBackHandler('world');
-              break;
-            case 'combat-events':
-              config.title = 'Combat & Events';
-              config.onBackPress = createFeatureBackHandler('combat');
-              break;
-            case 'story-notes':
-              config.title = 'Story & Notes';
-              config.onBackPress = createFeatureBackHandler('story');
-              break;
-          }
-        }
-        break;
-      
-      case 'settings':
-        config.title = 'Settings';
-        config.showHamburger = false;
-        config.onBackPress = () => {
-          router.replace('/select/world-selection');
-          return true; // Prevent default
-        };
-        break;
-      
-      default:
-        // Keep defaults
-        break;
-    }
-    return config;
-  };
-
-  const topBarConfig = getTopBarConfig();
-
-  // Get route config for a11y focus target
-  const routeConfig = getRouteConfig({
+  // Build navigation context for route config
+  const navContext = {
     segments,
     params: {
       worldId: worldId as string | undefined,
@@ -317,38 +214,64 @@ function RootLayoutContent() {
     userRole: userRole as string | undefined,
     isMobile,
     isAuthenticated: authState === 'authenticated',
-  });
+  };
+
+  // Get route config for centralized TopBar, back behavior, and a11y
+  const routeConfig = getRouteConfig(navContext);
+  const topBarTitle = !hideTopBar ? resolveTitle(routeConfig, navContext) : undefined;
+  const topBarBackTarget = !hideTopBar ? resolveBackTarget(routeConfig, navContext) : undefined;
+
+  // Build back press handler using config
+  const handleTopBarBack = () => {
+    if (topBarBackTarget) {
+      // Check if back target has params to preserve
+      if (routeConfig.preserveParamsOnBack && (worldId || userRole)) {
+        const target = buildNavigationTarget(
+          topBarBackTarget,
+          { worldId, userRole },
+          routeConfig.preserveParamsOnBack || []
+        );
+        router.replace(target as any);
+      } else {
+        router.replace(topBarBackTarget as any);
+      }
+    } else {
+      router.back();
+    }
+  };
 
   return (
 
-    <View style={{
-      height: '100%',
-      width: '100%',
-      backgroundColor: theme.background || '#2f353d'
-    }}>
-      {/* Global TopBar - shown on most screens */}
-      {topBarConfig && (
-        <TopBar 
-          title={topBarConfig.title}
-          showBackButton={topBarConfig.showBackButton}
-          showHamburger={topBarConfig.showHamburger}
-          onBackPress={topBarConfig.onBackPress}
-          userId={userId}
-          worldId={worldId}
-          userRole={userRole}
-          a11yFocusTarget={routeConfig.a11yFocusTarget}
+    <RouteErrorBoundary 
+      routeConfig={routeConfig}
+      navigationContext={navContext}
+      fallbackRoute="/select/world-selection"
+    >
+      <View style={{
+        height: '100%',
+        width: '100%',
+        backgroundColor: theme.background || '#2f353d'
+      }}>
+        {/* Global TopBar - driven by centralized navigation config */}
+        {!hideTopBar && topBarTitle && (
+          <TopBar 
+            title={topBarTitle}
+          showBackButton={routeConfig.back !== undefined}
+            userRole={userRole}
+            a11yFocusTarget={routeConfig.a11yFocusTarget}
+          />
+        )}
+        
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: {
+              backgroundColor: '$background',
+            },
+          }}
         />
-      )}
-      
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: {
-            backgroundColor: '$background',
-          },
-        }}
-      />
-    </View>
+      </View>
+    </RouteErrorBoundary>
   );
 }
 

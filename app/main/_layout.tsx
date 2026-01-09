@@ -1,6 +1,7 @@
-import { AppLoading, AppPage } from '@/components/ui'
-import { useAuthGuard } from '@/lib'
+import { AppLoading } from '@/components/ui'
 import { useAppBootstrap } from '@/hooks/use-app-bootstrap'
+import { useAuthGuard } from '@/lib'
+import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Platform, useWindowDimensions, View } from 'react-native'
@@ -14,9 +15,6 @@ export default function MainLayout() {
   const { width } = useWindowDimensions()
   const isMobile = Platform.OS !== 'web' || width < 900
 
-  // Cache opened tab screens
-  const [tabCache, setTabCache] = useState<Record<string, React.ReactNode>>({})
-
   // 🔐 Centralized auth guard
   const bootstrap = useAppBootstrap()
   const authState = useAuthGuard(bootstrap.isReady)
@@ -26,32 +24,33 @@ export default function MainLayout() {
     }
   }, [authState])
 
-  // 🧭 Handle tab switching (cached)
-  const handleTabChange = (tabKey: string) => {
-    setActiveTab(tabKey)
-
-    const worldId = typeof params.worldId === 'string' ? params.worldId : undefined
-    const routeParams: any = { tab: tabKey, worldId }
-
-    // Preload the screen if not already cached
-    // Check if key is already cached as an own property
-    if (!Object.hasOwn(tabCache, tabKey)) {
-      const route = `/main/main-landing/${getTabRoute(tabKey)}`
-      setTabCache((prev) => ({
-        ...prev,
-        [tabKey]: <Stack.Screen key={tabKey} name={route} />,
-      }))
+  // Update active tab from URL params
+  useEffect(() => {
+    const tabParam = typeof params.tab === 'string' ? params.tab : undefined
+    if (tabParam && tabParam !== activeTab) {
+      setActiveTab(tabParam)
     }
+  }, [params.tab, activeTab])
+
+  // 🧭 Handle tab switching with centralized navigation helpers
+  const handleTabChange = (tabKey: string) => {
+    const worldId = typeof params.worldId === 'string' ? params.worldId : undefined
+
+    // Build target using centralized helper - preserves worldId and userRole
+    const target = buildNavigationTarget(
+      '/main/main-landing',
+      { tab: tabKey, worldId },
+      ['worldId', 'userRole'],
+      { tab: tabKey }
+    )
 
     // Navigate for consistency (keeps URL updated)
-    router.replace({
-      pathname: `/main/main-landing`,
-      params: routeParams,
-    })
+    router.replace(target as any)
   }
 
-  // Tab → Route helper
-  const getTabRoute = (tab: string) => {
+  // Tab → Route helper (kept for reference; navigation now config-driven)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const getTabRoute = (tab: string): string => {
     switch (tab) {
       case 'characters':
         return 'characters-npcs'
@@ -74,20 +73,7 @@ export default function MainLayout() {
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Cached tab screens */}
-      {Object.entries(tabCache).map(([key, element]) => (
-        <AppPage
-          key={key}
-          style={{
-            display: key === activeTab ? 'flex' : 'none',
-            flex: 1,
-          }}
-        >
-          {element}
-        </AppPage>
-      ))}
-
-      {/* Default stack for non-tab routes */}
+      {/* Stack for main routes and nested navigation */}
       <Stack screenOptions={{ headerShown: false }} />
 
       {/* Bottom bar only for mobile */}
