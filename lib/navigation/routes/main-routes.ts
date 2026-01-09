@@ -1,4 +1,4 @@
-import type { RouteConfig } from '../navigation-config'
+import type { NavigationContext, RouteConfig } from '../navigation-config';
 
 // Main app routes (world-dependent)
 export const MAIN_ROUTES: RouteConfig[] = [
@@ -11,17 +11,18 @@ export const MAIN_ROUTES: RouteConfig[] = [
     preserveParamsOnBack: ['worldId', 'userRole'],
     animation: 'slide',
     analyticsName: 'main_landing',
-    redirectIf: (context) => {
+    redirectIf: (context: NavigationContext) => {
       if (!context.worldId) {
         return '/select/world-selection'
       }
       return undefined
     },
-    onError: (error, context) => {
+    onError: (error: Error, context: NavigationContext) => {
       console.error('[Route Error] main-landing:', error.message)
       context.router.replace('/select/world-selection')
     },
   },
+// Characters & NPCs
   {
     path: '/main/characters-npcs',
     title: 'Characters & NPCs',
@@ -40,6 +41,34 @@ export const MAIN_ROUTES: RouteConfig[] = [
     preserveParamsOnBack: ['worldId', 'userRole'],
     analyticsName: 'main_character_sheets',
   },
+    {
+    path: '/main/characters-npcs/faction-tracker',
+    title: 'Character Sheets',
+    showTopBar: true,
+    back: '/main/main-landing',
+    requiredParams: ['worldId', 'userRole'],
+    preserveParamsOnBack: ['worldId', 'userRole'],
+    analyticsName: 'main_character_sheets',
+  },
+    {
+    path: '/main/characters-npcs/npc-forge',
+    title: 'Character Sheets',
+    showTopBar: true,
+    back: '/main/main-landing',
+    requiredParams: ['worldId', 'userRole'],
+    preserveParamsOnBack: ['worldId', 'userRole'],
+    analyticsName: 'main_character_sheets',
+  },
+    {
+    path: '/main/characters-npcs/party-overview',
+    title: 'Character Sheets',
+    showTopBar: true,
+    back: '/main/main-landing',
+    requiredParams: ['worldId', 'userRole'],
+    preserveParamsOnBack: ['worldId', 'userRole'],
+    analyticsName: 'main_character_sheets',
+  },
+  // Items & Treasure
   {
     path: '/main/items-treasure',
     title: 'Items & Treasure',
@@ -85,6 +114,8 @@ export const MAIN_ROUTES: RouteConfig[] = [
     preserveParamsOnBack: ['worldId', 'userRole'],
     analyticsName: 'main_items_treasure_generator',
   },
+
+  // World & Exploration
   {
     path: '/main/world-exploration',
     title: 'World & Exploration',
@@ -130,6 +161,8 @@ export const MAIN_ROUTES: RouteConfig[] = [
     preserveParamsOnBack: ['worldId', 'userRole'],
     analyticsName: 'main_world_battle_map',
   },
+
+  // Combat & Events
   {
     path: '/main/combat-events',
     title: 'Combat & Events',
@@ -175,6 +208,8 @@ export const MAIN_ROUTES: RouteConfig[] = [
     preserveParamsOnBack: ['worldId', 'userRole'],
     analyticsName: 'main_combat_initiative',
   },
+
+  // Story & Notes
   {
     path: '/main/story-notes',
     title: 'Story & Notes',

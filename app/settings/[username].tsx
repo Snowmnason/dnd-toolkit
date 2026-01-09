@@ -217,8 +217,8 @@ export default function SettingsPage() {
           text="Playground"
           onPress={() => {
             const targetPath = isMobile
-              ? '/settings/style-mobile'
-              : '/settings/style-desktop';
+              ? '/settings/StyleMobile'
+              : '/settings/StyleDesktop';
             const target = buildNavigationTarget(targetPath, {}, []);
             router.push(target as any);
           }}

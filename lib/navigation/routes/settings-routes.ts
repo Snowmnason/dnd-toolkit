@@ -44,7 +44,7 @@ export const SETTINGS_ROUTES: RouteConfig[] = [
     },
   },
   {
-    path: '/settings/style-mobile',
+    path: '/settings/StyleMobile',
     title: 'Component Playground (Mobile)',
     showTopBar: true,
     showHamburger: false,
@@ -55,7 +55,7 @@ export const SETTINGS_ROUTES: RouteConfig[] = [
     analyticsName: 'settings_style_mobile',
   },
   {
-    path: '/settings/style-desktop',
+    path: '/settings/StyleDesktop',
     title: 'Component Playground (Desktop)',
     showTopBar: true,
     showHamburger: false,

@@ -87,26 +87,35 @@ if (isSentryEnabled && sentryDsn) {
 }
 
 function RootLayoutContent() {
+  // ==================== HOOKS SECTION ====================
+  // ALL hooks must be called unconditionally before any early returns
+  // (React Rules of Hooks requirement)
+  
+  // Theme and routing hooks
   const { theme } = UseTheme();
-  // Get local search params using the hook at the top level
   const urlParams = useLocalSearchParams();
   const router = useRouter();
   const segments = useSegments();
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const { isMobile } = usePlatform();
   
-  // Use centralized params context
+  // State management hooks
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  
+  // Context hooks
   const { params, updateParams, clearWorldParams, clearAllParams } = useAppParams();
   const { userId, worldId, userRole } = params;
   
-  // Use the bootstrap hook to ensure assets and session are loaded
+  // Data loading hooks
   const bootstrap = useAppBootstrap();
-  
-  // Splash screen management (feature flag controlled)
   const splash = useSplashScreen();
-  // Analytics: track route changes and coarse screen timings
+  const authState = useAuthGuard(bootstrap.isReady);
+  
+  // Analytics hook (must be called unconditionally)
   useAnalyticsNavigation();
-
+  
+  // ==================== EFFECT HOOKS SECTION ====================
+  // All effects that depend on above hooks
+  
   // Identify user to analytics when available
   useEffect(() => {
     Analytics.identify(userId ? { id: userId } : null);
@@ -117,46 +126,92 @@ function RootLayoutContent() {
     }
   }, [userId]);
 
-  // Protected routes that require authentication
-  const firstSegmentForProtection = typeof segments[0] === 'string' ? segments[0] : '';
-  const isProtectedRoute = AUTH_CONFIG.protectedRoutes.includes(firstSegmentForProtection as any);
-
-  // (logging removed)
-
   // Update context params when URL params change
   useEffect(() => {
-    const currentWorldId = typeof urlParams.worldId === 'string' ? urlParams.worldId : undefined;
-    const currentUserRole = typeof urlParams.userRole === 'string' ? urlParams.userRole : undefined;
+    const firstSegment = typeof segments[0] === 'string' ? segments[0] : ''
+
+    // Main routes: allow initial set from URL only if context is empty; otherwise ignore overrides
+    if (firstSegment === 'main') {
+      const urlWorldId = typeof urlParams.worldId === 'string' ? urlParams.worldId : undefined
+      const urlUserRole = typeof urlParams.userRole === 'string' ? urlParams.userRole : undefined
+
+      // If no world in context yet, seed from URL once (owner navigating directly to their world)
+      if (!params.worldId && urlWorldId) {
+        console.log('[NavGuard] Seeding world from URL on main route', { urlWorldId, urlUserRole })
+        updateParams({ worldId: urlWorldId, userRole: urlUserRole })
+      }
+      // Skip further processing for main routes to avoid clearing params
+      return
+    }
+
+    const currentWorldId = typeof urlParams.worldId === 'string' ? urlParams.worldId : undefined
+    const currentUserRole = typeof urlParams.userRole === 'string' ? urlParams.userRole : undefined
 
     // Only update if values are different from context (userId is loaded from storage, not URL)
-    let shouldUpdate = false;
-    const updates: { worldId?: string; userRole?: string } = {};
+    let shouldUpdate = false
+    const updates: { worldId?: string; userRole?: string } = {}
     if (currentWorldId && currentWorldId !== params.worldId) {
-      updates.worldId = currentWorldId;
-      shouldUpdate = true;
+      updates.worldId = currentWorldId
+      shouldUpdate = true
     }
     if (currentUserRole && currentUserRole !== params.userRole) {
-      updates.userRole = currentUserRole;
-      shouldUpdate = true;
+      updates.userRole = currentUserRole
+      shouldUpdate = true
     }
 
     if (shouldUpdate) {
-      updateParams(updates);
+      updateParams(updates)
     }
 
     // Only clear params when entering login routes and params exist
     if (segments[0] === 'login' && (params.userId || params.worldId || params.userRole)) {
-      clearAllParams();
-    } 
+      clearAllParams()
+    }
     // Only clear world params when entering select routes and world params exist
     else if (segments[0] === 'select' && (params.worldId || params.userRole)) {
-      clearWorldParams();
+      clearWorldParams()
     }
-  }, [urlParams, segments, updateParams, clearAllParams, clearWorldParams, params.userId, params.worldId, params.userRole]);
+  }, [urlParams, segments, updateParams, clearAllParams, clearWorldParams, params.userId, params.worldId, params.userRole])
 
-  // Centralized auth guard (pass bootstrap state to avoid circular dependency)
-  const authState = useAuthGuard(bootstrap.isReady);
-  
+  // Guard against mismatched or missing world params on main routes
+  useEffect(() => {
+    if (!bootstrap.isReady) return
+
+    const firstSegment = typeof segments[0] === 'string' ? segments[0] : ''
+    if (firstSegment !== 'main') return
+
+    const currentWorldId = params.worldId
+    const currentUserRole = params.userRole
+    const urlWorldId = typeof urlParams.worldId === 'string' ? urlParams.worldId : undefined
+
+    console.log('[NavGuard] main route check', {
+      segments,
+      urlWorldId,
+      currentWorldId,
+      currentUserRole,
+      urlParams,
+    })
+
+    // If URL provides a worldId and it differs from context, trust the URL and sync context
+    if (urlWorldId && urlWorldId !== currentWorldId) {
+      console.log('[NavGuard] Syncing context from URL worldId on main route', { urlWorldId, currentWorldId })
+      updateParams({ worldId: urlWorldId })
+      return
+    }
+
+    // If no worldId in context and none in URL, force user to select
+    if (!currentWorldId && !urlWorldId) {
+      console.log('[NavGuard] Missing worldId in context and URL on main route; redirecting to selection')
+      const target = buildNavigationTarget(
+        '/select/world-selection',
+        { worldId: currentWorldId, userRole: currentUserRole },
+        ['worldId', 'userRole']
+      )
+      router.replace(target as any)
+      return
+    }
+  }, [bootstrap.isReady, params.worldId, params.userRole, router, segments, urlParams, updateParams])
+
   // Manage loading state based on guard and bootstrap
   useEffect(() => {
     if (!bootstrap.isReady) return;
@@ -178,6 +233,11 @@ function RootLayoutContent() {
       router.replace('/login/welcome');
     }
   }, [bootstrap.isReady, authState, segments, router]);
+
+  // ==================== RENDER LOGIC SECTION ====================
+  // Protected routes that require authentication
+  const firstSegmentForProtection = typeof segments[0] === 'string' ? segments[0] : '';
+  const isProtectedRoute = AUTH_CONFIG.protectedRoutes.includes(firstSegmentForProtection as any);
 
   // Show splash screen (if enabled via feature flag)
   // Splash screen displays BEFORE any other content
