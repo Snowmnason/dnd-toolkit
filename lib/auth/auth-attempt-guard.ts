@@ -1,7 +1,5 @@
-import { Platform } from 'react-native';
 import { logger } from '../utils/logger';
-
-import { EncryptedStorage } from './encrypted-storage';
+import { SecureStorage } from '../storage';
 
 // Lazy import Sentry only when needed to reduce bundle size when disabled
 const getSentry = async () => {
@@ -34,49 +32,17 @@ interface GuardResult {
   retryAfterMs?: number;
 }
 
-const STORAGE_KEY = 'dnd_auth_attempts';
+// Auth attempt rate limiting key (uses SecureStorage for cross-platform persistence)
+const AUTH_ATTEMPTS_KEY = 'dnd:auth:attempts';
 const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
-
-// Use localStorage on web for rate limit lockout persistence across tabs/windows
-// (Session storage can be bypassed by opening a new tab; rate limits must persist)
-// Use encrypted storage on native platforms
-const storage = {
-  async getItem(key: string): Promise<string | null> {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        return window.localStorage.getItem(key);
-      }
-      return null;
-    }
-    return EncryptedStorage.getItem(key);
-  },
-  async setItem(key: string, value: string): Promise<void> {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(key, value);
-      }
-      return;
-    }
-    await EncryptedStorage.setItem(key, value);
-  },
-  async removeItem(key: string): Promise<void> {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.removeItem(key);
-      }
-      return;
-    }
-    await EncryptedStorage.removeItem(key);
-  },
-};
 
 const normalizeKey = (email: string, scope: AuthGuardScope) => `${scope}:${email.trim().toLowerCase()}`;
 
 const loadStore = async (): Promise<Record<string, AttemptRecord>> => {
   try {
-    const raw = await storage.getItem(STORAGE_KEY);
+    const raw = await SecureStorage.getItem(AUTH_ATTEMPTS_KEY);
     if (!raw) return {};
     return JSON.parse(raw);
   } catch (error) {
@@ -87,7 +53,7 @@ const loadStore = async (): Promise<Record<string, AttemptRecord>> => {
 
 const persistStore = async (store: Record<string, AttemptRecord>) => {
   try {
-    await storage.setItem(STORAGE_KEY, JSON.stringify(store));
+    await SecureStorage.setJSON(AUTH_ATTEMPTS_KEY, store);
   } catch (error) {
     logger.error('auth-guard', 'Failed to persist auth attempt store', error);
   }
@@ -97,6 +63,7 @@ export const checkAuthGuard = async (email: string, scope: AuthGuardScope = 'sig
   const key = normalizeKey(email, scope);
   const store = await loadStore();
   const now = Date.now();
+  // eslint-disable-next-line security/detect-object-injection
   const record = store[key];
 
   if (record?.lockedUntil && record.lockedUntil > now) {
@@ -123,7 +90,9 @@ export const checkAuthGuard = async (email: string, scope: AuthGuardScope = 'sig
 export const recordAuthSuccess = async (email: string, scope: AuthGuardScope = 'signin'): Promise<void> => {
   const key = normalizeKey(email, scope);
   const store = await loadStore();
+  // eslint-disable-next-line security/detect-object-injection
   if (store[key]) {
+    // eslint-disable-next-line security/detect-object-injection
     delete store[key];
     await persistStore(store);
   }
@@ -133,7 +102,7 @@ export const recordAuthFailure = async (email: string, scope: AuthGuardScope = '
   const key = normalizeKey(email, scope);
   const store = await loadStore();
   const now = Date.now();
-
+  // eslint-disable-next-line security/detect-object-injection
   const record = store[key] || { attempts: 0, firstAttempt: now };
 
   if (now - record.firstAttempt > WINDOW_MS) {
@@ -162,7 +131,7 @@ export const recordAuthFailure = async (email: string, scope: AuthGuardScope = '
             },
           });
         }
-      } catch (err) {
+      } catch {
         logger.debug('auth-guard', 'Sentry disabled or failed to report lockout');
       }
     }).catch(() => {
@@ -170,6 +139,7 @@ export const recordAuthFailure = async (email: string, scope: AuthGuardScope = '
     });
   }
 
+  // eslint-disable-next-line security/detect-object-injection
   store[key] = record;
   await persistStore(store);
 

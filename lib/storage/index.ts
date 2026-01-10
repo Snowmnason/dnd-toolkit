@@ -39,6 +39,9 @@ export const STORAGE_KEYS = {
   USER_DATA: 'dnd:auth:user_data',
   USER_DATA_TIMESTAMP: 'dnd:auth:user_data_timestamp',
   
+  // Auth attempt rate limiting
+  AUTH_ATTEMPTS: 'dnd:auth:attempts',
+  
   // User preferences
   THEME_PREFERENCE: 'dnd:user:theme',
   SCALE_PREFERENCE: 'dnd:user:scale',

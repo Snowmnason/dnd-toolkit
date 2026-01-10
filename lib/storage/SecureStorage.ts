@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { logger } from '../utils/logger';
 
 /**
  * SecureStorage
@@ -27,8 +27,8 @@ class SecureStorageService {
     }
 
     try {
-      const { default: EncryptedStorage } = await import('../auth/encrypted-storage');
-      this.encryptedStorage = EncryptedStorage;
+      const module = await import('../auth/encrypted-storage');
+      this.encryptedStorage = module.EncryptedStorage;
       this.initialized = true;
       return this.encryptedStorage;
     } catch (error) {

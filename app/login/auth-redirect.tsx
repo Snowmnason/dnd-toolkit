@@ -1,54 +1,42 @@
 import { AuthModal } from '@/components/auth_components';
 import { Caption } from '@/components/ui';
 import { AuthStateManager, logger, supabase, usersDB, worldsDB } from '@/lib';
+import { SecureStorage } from '@/lib/storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import CustomLoad from '../../components/ui/CustomLoad';
 import { useAppParams } from '../../contexts/AppParamsContext';
 
-// Storage for pending invites when user isn't logged in
-const PENDING_INVITE_KEY = 'pending_world_invite';
+// Storage key for pending invites (use SecureStorage for encryption)
+const PENDING_INVITE_KEY = 'dnd:invite:pending';
 
-interface PendingInvite {
-  token: string;
-  worldName: string;
-  timestamp: number;
-}
-
-// Helper functions for invite storage
-const savePendingInvite = (token: string, worldName: string) => {
-  if (typeof window !== 'undefined') {
-    const inviteData: PendingInvite = {
-      token,
-      worldName,
-      timestamp: Date.now()
-    };
-    localStorage.setItem(PENDING_INVITE_KEY, JSON.stringify(inviteData));
-  }
+// Helper functions for invite storage (encrypted via SecureStorage)
+const savePendingInvite = async (token: string, worldName: string) => {
+  const inviteData: PendingInvite = {
+    token,
+    worldName,
+    timestamp: Date.now()
+  };
+  await SecureStorage.setJSON(PENDING_INVITE_KEY, inviteData);
 };
 
-const getPendingInvite = (): PendingInvite | null => {
-  if (typeof window !== 'undefined') {
-    const stored = localStorage.getItem(PENDING_INVITE_KEY);
-    if (stored) {
-      const inviteData: PendingInvite = JSON.parse(stored);
-      // Check if invite is less than 24 hours old
-      if (Date.now() - inviteData.timestamp < 24 * 60 * 60 * 1000) {
-        return inviteData;
-      } else {
-        // Clean up expired invite
-        localStorage.removeItem(PENDING_INVITE_KEY);
-      }
+const getPendingInvite = async (): Promise<PendingInvite | null> => {
+  const inviteData = await SecureStorage.getJSON<PendingInvite>(PENDING_INVITE_KEY);
+  if (inviteData) {
+    // Check if invite is less than 24 hours old
+    if (Date.now() - inviteData.timestamp < 24 * 60 * 60 * 1000) {
+      return inviteData;
+    } else {
+      // Clean up expired invite
+      await SecureStorage.removeItem(PENDING_INVITE_KEY);
     }
   }
   return null;
 };
 
-const clearPendingInvite = () => {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(PENDING_INVITE_KEY);
-  }
+const clearPendingInvite = async () => {
+  await SecureStorage.removeItem(PENDING_INVITE_KEY);
 };
 
 export default function AuthRedirect() {
@@ -242,7 +230,7 @@ export default function AuthRedirect() {
       if (!hasValidSession) {
         // User not logged in - save invite token and redirect to sign in
         logger.debug('auth-redirect', 'Saving pending invite for after login...');
-        savePendingInvite(inviteToken, decodedWorldName);
+        await savePendingInvite(inviteToken, decodedWorldName);
         
         setWorldName(decodedWorldName);
         setShowInviteModal(true);
@@ -297,7 +285,7 @@ export default function AuthRedirect() {
     };
 
     const checkForPendingInvites = async () => {
-      const pendingInvite = getPendingInvite();
+      const pendingInvite = await getPendingInvite();
       if (pendingInvite) {
         logger.debug('auth-redirect', 'Found pending invite:', pendingInvite);
         
@@ -305,7 +293,7 @@ export default function AuthRedirect() {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           logger.info('auth-redirect', 'User logged in, processing pending invite...');
-          clearPendingInvite();
+          await clearPendingInvite();
           
           try {
             // Import invitesDB dynamically
