@@ -1,0 +1,127 @@
+import { z } from 'zod';
+
+/**
+ * SQL injection protection: strips dangerous characters and keywords
+ */
+const sanitizeDangerousChars = (val: string) => {
+  // Remove SQL injection patterns: quotes, semicolons, comment markers
+  return val.replace(/['"`;<>]|--|\/\*|\*\//g, '');
+};
+
+/**
+ * Check for SQL keywords (case-insensitive)
+ */
+const hasNoSqlKeywords = (val: string) => {
+  const sqlKeywords = /\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE|UNION|SCRIPT|JAVASCRIPT|ONERROR|ONLOAD)\b/i;
+  return !sqlKeywords.test(val);
+};
+
+/**
+ * Email validation schema with SQL injection protection
+ */
+export const emailSchema = z
+  .string()
+  .trim()
+  .min(1, 'Email is required')
+  .transform(sanitizeDangerousChars)
+  .refine(hasNoSqlKeywords, 'Email contains invalid characters')
+  .pipe(z.string().email('Please enter a valid email address'))
+  .transform(val => val.toLowerCase());
+
+/**
+ * Password validation schema with SQL injection protection
+ * Matches existing validation: min 6 chars, uppercase, lowercase, number, special char
+ */
+export const passwordSchema = z
+  .string()
+  .min(6, 'Password must be at least 6 characters')
+  .refine(hasNoSqlKeywords, 'Password contains invalid characters')
+  .refine(val => !/[\x00-\x1F\x7F]/.test(val), 'Password contains invalid characters')
+  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+  .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+  .regex(/[0-9]/, 'Password must contain at least one number')
+  .regex(/[!@#$%^&*(),.?":{}|<>]/, 'Password must contain at least one special character');
+
+/**
+ * Username validation schema with SQL injection protection
+ * Matches existing validation: 3-20 chars, starts with letter, alphanumeric + underscores
+ */
+export const usernameSchema = z
+  .string()
+  .trim()
+  .min(3, 'Username must be at least 3 characters')
+  .max(20, 'Username must be 20 characters or less')
+  .transform(sanitizeDangerousChars)
+  .refine(hasNoSqlKeywords, 'Username contains reserved words')
+  .refine(val => /^[a-zA-Z]/.test(val), 'Username must start with a letter')
+  .refine(val => /^[a-zA-Z0-9_]*$/.test(val), 'Username can only contain letters, numbers, and underscores');
+
+/**
+ * Sign-in schema
+ */
+export const signInSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(1, 'Password is required'), // Don't validate complexity on sign-in
+});
+
+/**
+ * Sign-up schema with password confirmation
+ */
+export const signUpSchema = z
+  .object({
+    email: emailSchema,
+    password: passwordSchema,
+    confirmPassword: z.string().min(1, 'Please confirm your password'),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
+
+/**
+ * Forgot password schema
+ */
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+});
+
+/**
+ * Reset password schema
+ */
+export const resetPasswordSchema = z
+  .object({
+    password: passwordSchema,
+    confirmPassword: z.string().min(1, 'Please confirm your password'),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
+
+/**
+ * Complete profile schema (username only)
+ */
+export const completeProfileSchema = z.object({
+  username: usernameSchema,
+});
+
+/**
+ * Update username schema (requires different from original)
+ */
+export const updateUsernameSchema = z
+  .object({
+    username: usernameSchema,
+    originalUsername: z.string(),
+  })
+  .refine((data) => data.username !== data.originalUsername, {
+    message: 'New username must be different',
+    path: ['username'],
+  });
+
+// Infer TypeScript types from schemas
+export type SignInFormData = z.infer<typeof signInSchema>;
+export type SignUpFormData = z.infer<typeof signUpSchema>;
+export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
+export type CompleteProfileFormData = z.infer<typeof completeProfileSchema>;
+export type UpdateUsernameFormData = z.infer<typeof updateUsernameSchema>;
