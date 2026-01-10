@@ -1,0 +1,155 @@
+import { Platform } from 'react-native';
+
+/**
+ * SecureStorage
+ * 
+ * Cross-platform encrypted storage for ALL app data.
+ * Uses existing EncryptedStorage implementation under the hood.
+ * 
+ * Platform support:
+ * - Web: localStorage with AES-CTR encryption
+ * - Native (iOS/Android): expo-secure-store + AsyncStorage with encryption
+ * - Desktop: TBD (likely Electron secure storage)
+ * 
+ * All methods are async for consistency across platforms.
+ */
+class SecureStorageService {
+  private encryptedStorage: any = null;
+  private initialized = false;
+
+  /**
+   * Lazy-load EncryptedStorage to avoid circular dependencies
+   * and ensure platform-specific imports work correctly
+   */
+  private async getStorage() {
+    if (this.encryptedStorage) {
+      return this.encryptedStorage;
+    }
+
+    try {
+      const { default: EncryptedStorage } = await import('../auth/encrypted-storage');
+      this.encryptedStorage = EncryptedStorage;
+      this.initialized = true;
+      return this.encryptedStorage;
+    } catch (error) {
+      logger.error('Failed to load EncryptedStorage', error);
+      throw new Error('SecureStorage initialization failed');
+    }
+  }
+
+  /**
+   * Store a value securely (encrypted on all platforms)
+   */
+  async setItem(key: string, value: string): Promise<void> {
+    try {
+      const storage = await this.getStorage();
+      await storage.setItem(key, value);
+      logger.debug(`SecureStorage.setItem: ${key}`);
+    } catch (error) {
+      logger.error(`SecureStorage.setItem failed for key: ${key}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieve a value from secure storage
+   * Returns null if key doesn't exist or on error
+   */
+  async getItem(key: string): Promise<string | null> {
+    try {
+      const storage = await this.getStorage();
+      const value = await storage.getItem(key);
+      logger.debug(`SecureStorage.getItem: ${key} -> ${value ? 'found' : 'not found'}`);
+      return value;
+    } catch (error) {
+      logger.warn(`SecureStorage.getItem failed for key: ${key}`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Remove a value from secure storage
+   */
+  async removeItem(key: string): Promise<void> {
+    try {
+      const storage = await this.getStorage();
+      await storage.removeItem(key);
+      logger.debug(`SecureStorage.removeItem: ${key}`);
+    } catch (error) {
+      logger.error(`SecureStorage.removeItem failed for key: ${key}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Clear all storage (use with caution!)
+   */
+  async clear(): Promise<void> {
+    try {
+      const storage = await this.getStorage();
+      await storage.clear();
+      logger.warn('SecureStorage.clear: All storage cleared');
+    } catch (error) {
+      logger.error('SecureStorage.clear failed', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Store a JSON object (convenience helper)
+   */
+  async setJSON<T = any>(key: string, value: T): Promise<void> {
+    try {
+      const jsonString = JSON.stringify(value);
+      await this.setItem(key, jsonString);
+    } catch (error) {
+      logger.error(`SecureStorage.setJSON failed for key: ${key}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieve and parse a JSON object (convenience helper)
+   * Returns null if key doesn't exist, can't be parsed, or on error
+   */
+  async getJSON<T = any>(key: string): Promise<T | null> {
+    try {
+      const value = await this.getItem(key);
+      if (!value) {
+        return null;
+      }
+      return JSON.parse(value) as T;
+    } catch (error) {
+      logger.warn(`SecureStorage.getJSON failed for key: ${key} (invalid JSON?)`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if a key exists in storage
+   */
+  async hasItem(key: string): Promise<boolean> {
+    const value = await this.getItem(key);
+    return value !== null;
+  }
+
+  /**
+   * Get all keys in storage (for debugging/migration)
+   * Delegates to EncryptedStorage for consistent platform handling
+   */
+  async getAllKeys(): Promise<string[]> {
+    try {
+      const storage = await this.getStorage();
+      const keys = await storage.getAllKeys();
+      logger.debug(`SecureStorage.getAllKeys: Found ${keys.length} keys`);
+      return keys;
+    } catch (error) {
+      logger.warn('SecureStorage.getAllKeys failed', error);
+      return [];
+    }
+  }
+}
+
+// Export singleton instance
+export const SecureStorage = new SecureStorageService();
+export default SecureStorage;

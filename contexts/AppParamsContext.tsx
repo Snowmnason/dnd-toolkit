@@ -1,5 +1,6 @@
 import { logger } from '@/lib/utils/logger';
 import { AuthStateManager } from '@/lib/auth-state';
+import { SecureStorage, STORAGE_KEYS } from '@/lib/storage';
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 
 interface AppParams {
@@ -25,8 +26,6 @@ interface AppParamsContextType {
 
 const AppParamsContext = createContext<AppParamsContextType | undefined>(undefined);
 
-const CONNECTED_WORLDS_STORAGE_KEY = 'dnd_connected_worlds';
-
 export function AppParamsProvider({ children }: { children: ReactNode }) {
   const [params, setParams] = useState<AppParams>({
     userId: undefined,
@@ -46,12 +45,11 @@ export function AppParamsProvider({ children }: { children: ReactNode }) {
           logger.debug('AppParamsContext', 'Loaded userId from storage:', userId);
         }
 
-        // Load connected worlds cache
-        const cachedWorlds = localStorage.getItem(CONNECTED_WORLDS_STORAGE_KEY);
-        if (cachedWorlds) {
-          const worldIds = JSON.parse(cachedWorlds);
+        // Load connected worlds cache from SecureStorage
+        const worldIds = await SecureStorage.getJSON<string[]>(STORAGE_KEYS.CONNECTED_WORLDS);
+        if (worldIds && Array.isArray(worldIds)) {
           setParams(prev => ({ ...prev, connectedWorldIds: worldIds }));
-          logger.debug('AppParamsContext', 'Loaded connected worlds from localStorage:', worldIds);
+          logger.debug('AppParamsContext', 'Loaded connected worlds from SecureStorage:', worldIds);
         }
       } catch (error) {
         logger.error('AppParamsContext', 'Error loading from storage:', error);
@@ -80,31 +78,31 @@ export function AppParamsProvider({ children }: { children: ReactNode }) {
     setParams(prev => ({ ...prev, worldId: undefined, userRole: undefined }));
   }, []);
 
-  const clearAllParams = useCallback(() => {
+  const clearAllParams = useCallback(async () => {
     setParams({ userId: undefined, worldId: undefined, userRole: undefined, connectedWorldIds: [] });
-    localStorage.removeItem(CONNECTED_WORLDS_STORAGE_KEY);
+    await SecureStorage.removeItem(STORAGE_KEYS.CONNECTED_WORLDS);
   }, []);
 
-  const setConnectedWorldIds = useCallback((worldIds: string[]) => {
+  const setConnectedWorldIds = useCallback(async (worldIds: string[]) => {
     setParams(prev => ({ ...prev, connectedWorldIds: worldIds }));
-    localStorage.setItem(CONNECTED_WORLDS_STORAGE_KEY, JSON.stringify(worldIds));
+    await SecureStorage.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, worldIds);
     logger.debug('AppParamsContext', 'Updated connected worlds cache:', worldIds);
   }, []);
 
-  const addConnectedWorld = useCallback((worldId: string) => {
+  const addConnectedWorld = useCallback(async (worldId: string) => {
     setParams(prev => {
       if (prev.connectedWorldIds.includes(worldId)) return prev;
       const updated = [...prev.connectedWorldIds, worldId];
-      localStorage.setItem(CONNECTED_WORLDS_STORAGE_KEY, JSON.stringify(updated));
+      SecureStorage.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, updated);
       logger.debug('AppParamsContext', 'Added world to cache:', worldId);
       return { ...prev, connectedWorldIds: updated };
     });
   }, []);
 
-  const removeConnectedWorld = useCallback((worldId: string) => {
+  const removeConnectedWorld = useCallback(async (worldId: string) => {
     setParams(prev => {
       const updated = prev.connectedWorldIds.filter(id => id !== worldId);
-      localStorage.setItem(CONNECTED_WORLDS_STORAGE_KEY, JSON.stringify(updated));
+      SecureStorage.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, updated);
       logger.debug('AppParamsContext', 'Removed world from cache:', worldId);
       return { ...prev, connectedWorldIds: updated };
     });
