@@ -2,6 +2,7 @@ import { AppPage, Button, Heading } from '@/components/ui'
 import { getShadowStyle } from '@/components/ui/Resuables/shadows'
 import { useAppParams } from '@/contexts/AppParamsContext'
 import { usePlatform } from '@/contexts/PlatformContext'
+import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
 import { $, useScale } from '@/theme'
 import { useRouter } from 'expo-router'
 import { View } from 'react-native'
@@ -34,14 +35,12 @@ export function PanelView({
   const navigateToFeature = (featurePath: string) => {
     updateParams({ worldId, userRole })
 
-    const routeParams: Record<string, string> = {}
-    if (worldId) routeParams.worldId = worldId
-    if (userRole) routeParams.userRole = userRole
-
-    router.push({
-      pathname: `/main/${featurePath}` as any,
-      params: routeParams,
-    })
+    const target = buildNavigationTarget(
+      `/main/${featurePath}`,
+      { worldId, userRole },
+      ['worldId', 'userRole']
+    )
+    router.push(target as any)
   }
 
   const backgroundImage = image ? { uri: image } : undefined

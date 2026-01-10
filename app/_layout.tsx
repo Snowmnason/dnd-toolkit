@@ -166,52 +166,13 @@ function RootLayoutContent() {
 
     // Only clear params when entering login routes and params exist
     if (segments[0] === 'login' && (params.userId || params.worldId || params.userRole)) {
-      clearAllParams()
+      clearAllParams();
     }
     // Only clear world params when entering select routes and world params exist
     else if (segments[0] === 'select' && (params.worldId || params.userRole)) {
-      clearWorldParams()
+      clearWorldParams();
     }
-  }, [urlParams, segments, updateParams, clearAllParams, clearWorldParams, params.userId, params.worldId, params.userRole])
-
-  // Guard against mismatched or missing world params on main routes
-  useEffect(() => {
-    if (!bootstrap.isReady) return
-
-    const firstSegment = typeof segments[0] === 'string' ? segments[0] : ''
-    if (firstSegment !== 'main') return
-
-    const currentWorldId = params.worldId
-    const currentUserRole = params.userRole
-    const urlWorldId = typeof urlParams.worldId === 'string' ? urlParams.worldId : undefined
-
-    logger.info('[NavGuard] main route check', {
-      segments,
-      urlWorldId,
-      currentWorldId,
-      currentUserRole,
-      urlParams,
-    })
-
-    // If URL provides a worldId and it differs from context, trust the URL and sync context
-    if (urlWorldId && urlWorldId !== currentWorldId) {
-      logger.info('[NavGuard] Syncing context from URL worldId on main route', { urlWorldId, currentWorldId })
-      updateParams({ worldId: urlWorldId })
-      return
-    }
-
-    // If no worldId in context and none in URL, force user to select
-    if (!currentWorldId && !urlWorldId) {
-      logger.info('[NavGuard] Missing worldId in context and URL on main route; redirecting to selection')
-      const target = buildNavigationTarget(
-        '/select/world-selection',
-        { worldId: currentWorldId, userRole: currentUserRole },
-        ['worldId', 'userRole']
-      )
-      router.replace(target as any)
-      return
-    }
-  }, [bootstrap.isReady, params.worldId, params.userRole, router, segments, urlParams, updateParams])
+  }, [urlParams, segments, updateParams, clearAllParams, clearWorldParams, params.userId, params.worldId, params.userRole]);
 
   // Manage loading state based on guard and bootstrap
   useEffect(() => {
@@ -231,7 +192,8 @@ function RootLayoutContent() {
     if (!bootstrap.isReady) return;
     const onRoot = segments[0] === undefined;
     if (onRoot && authState === 'unauthenticated') {
-      router.replace('/login/welcome');
+      const target = buildNavigationTarget('/login/welcome', {}, []);
+      router.replace(target as any);
     }
   }, [bootstrap.isReady, authState, segments, router]);
 

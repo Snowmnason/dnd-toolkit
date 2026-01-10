@@ -1,4 +1,4 @@
-import { logger } from '@/lib';
+import { logger } from '@/lib/utils/logger';
 import { AuthStateManager } from '@/lib/auth-state';
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 
@@ -6,6 +6,7 @@ interface AppParams {
   userId?: string;
   worldId?: string;
   userRole?: string;
+  connectedWorldIds: string[]; // Cache of world IDs user has access to
 }
 
 interface AppParamsContextType {
@@ -16,31 +17,47 @@ interface AppParamsContextType {
   updateParams: (newParams: Partial<AppParams>) => void;
   clearWorldParams: () => void;
   clearAllParams: () => void;
+  setConnectedWorldIds: (worldIds: string[]) => void;
+  addConnectedWorld: (worldId: string) => void;
+  removeConnectedWorld: (worldId: string) => void;
+  hasAccessToWorld: (worldId: string) => boolean;
 }
 
 const AppParamsContext = createContext<AppParamsContextType | undefined>(undefined);
+
+const CONNECTED_WORLDS_STORAGE_KEY = 'dnd_connected_worlds';
 
 export function AppParamsProvider({ children }: { children: ReactNode }) {
   const [params, setParams] = useState<AppParams>({
     userId: undefined,
     worldId: undefined,
     userRole: undefined,
+    connectedWorldIds: [],
   });
 
-  // Load userId from storage on mount
+  // Load userId and connected worlds from storage on mount
   useEffect(() => {
-    async function loadUserId() {
+    async function loadFromStorage() {
       try {
+        // Load userId
         const userId = await AuthStateManager.getUserId();
         if (userId) {
           setParams(prev => ({ ...prev, userId }));
           logger.debug('AppParamsContext', 'Loaded userId from storage:', userId);
         }
+
+        // Load connected worlds cache
+        const cachedWorlds = localStorage.getItem(CONNECTED_WORLDS_STORAGE_KEY);
+        if (cachedWorlds) {
+          const worldIds = JSON.parse(cachedWorlds);
+          setParams(prev => ({ ...prev, connectedWorldIds: worldIds }));
+          logger.debug('AppParamsContext', 'Loaded connected worlds from localStorage:', worldIds);
+        }
       } catch (error) {
-        logger.error('AppParamsContext', 'Error loading userId from storage:', error);
+        logger.error('AppParamsContext', 'Error loading from storage:', error);
       }
     }
-    loadUserId();
+    loadFromStorage();
   }, []);
 
   const setUserId = useCallback((userId: string | undefined) => {
@@ -64,8 +81,38 @@ export function AppParamsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearAllParams = useCallback(() => {
-    setParams({ userId: undefined, worldId: undefined, userRole: undefined });
+    setParams({ userId: undefined, worldId: undefined, userRole: undefined, connectedWorldIds: [] });
+    localStorage.removeItem(CONNECTED_WORLDS_STORAGE_KEY);
   }, []);
+
+  const setConnectedWorldIds = useCallback((worldIds: string[]) => {
+    setParams(prev => ({ ...prev, connectedWorldIds: worldIds }));
+    localStorage.setItem(CONNECTED_WORLDS_STORAGE_KEY, JSON.stringify(worldIds));
+    logger.debug('AppParamsContext', 'Updated connected worlds cache:', worldIds);
+  }, []);
+
+  const addConnectedWorld = useCallback((worldId: string) => {
+    setParams(prev => {
+      if (prev.connectedWorldIds.includes(worldId)) return prev;
+      const updated = [...prev.connectedWorldIds, worldId];
+      localStorage.setItem(CONNECTED_WORLDS_STORAGE_KEY, JSON.stringify(updated));
+      logger.debug('AppParamsContext', 'Added world to cache:', worldId);
+      return { ...prev, connectedWorldIds: updated };
+    });
+  }, []);
+
+  const removeConnectedWorld = useCallback((worldId: string) => {
+    setParams(prev => {
+      const updated = prev.connectedWorldIds.filter(id => id !== worldId);
+      localStorage.setItem(CONNECTED_WORLDS_STORAGE_KEY, JSON.stringify(updated));
+      logger.debug('AppParamsContext', 'Removed world from cache:', worldId);
+      return { ...prev, connectedWorldIds: updated };
+    });
+  }, []);
+
+  const hasAccessToWorld = useCallback((worldId: string) => {
+    return params.connectedWorldIds.includes(worldId);
+  }, [params.connectedWorldIds]);
 
   return (
     <AppParamsContext.Provider
@@ -77,6 +124,10 @@ export function AppParamsProvider({ children }: { children: ReactNode }) {
         updateParams,
         clearWorldParams,
         clearAllParams,
+        setConnectedWorldIds,
+        addConnectedWorld,
+        removeConnectedWorld,
+        hasAccessToWorld,
       }}
     >
       {children}
