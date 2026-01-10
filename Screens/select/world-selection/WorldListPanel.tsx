@@ -92,7 +92,7 @@ export function WorldListPanel({ worlds, selectedWorld, setSelectedWorld, setMap
           variant="primary"
           onPress={() => {
             const target = buildNavigationTarget('/select/create-world', {}, [])
-            router.push(target)
+            router.push(target as any)
           }}
           style={{ borderRadius: S.radius.lg,
             position: 'absolute',

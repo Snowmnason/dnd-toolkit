@@ -1,6 +1,7 @@
 import { UpdateUsernameModal } from '@/components/modals'
 import { Body, Button, Heading, IconButton, SubTitle, Surface } from '@/components/ui'
 import { logger, updateUsername } from '@/lib'
+import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
 import { $, useScale } from '@/theme'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
@@ -82,7 +83,10 @@ export default function UserProfile({ profile }: UserProfileProps) {
         <Button
           text="Return to Login"
           variant="primary"
-          onPress={() => router.replace('/login/welcome')}
+          onPress={() => {
+            const target = buildNavigationTarget('/login/welcome', {}, []);
+            router.replace(target as any);
+          }}
           style={{ alignSelf: 'center', minWidth: 140 }}
         />
       </Surface>

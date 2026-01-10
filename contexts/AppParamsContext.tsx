@@ -95,6 +95,7 @@ export function AppParamsProvider({ children }: { children: ReactNode }) {
     setParams(prev => {
       if (prev.connectedWorldIds.includes(worldId)) return prev;
       const updated = [...prev.connectedWorldIds, worldId];
+      localStorage.setItem(CONNECTED_WORLDS_STORAGE_KEY, JSON.stringify(updated));
       logger.debug('AppParamsContext', 'Added world to cache:', worldId);
       return { ...prev, connectedWorldIds: updated };
     });
@@ -103,6 +104,7 @@ export function AppParamsProvider({ children }: { children: ReactNode }) {
   const removeConnectedWorld = useCallback((worldId: string) => {
     setParams(prev => {
       const updated = prev.connectedWorldIds.filter(id => id !== worldId);
+      localStorage.setItem(CONNECTED_WORLDS_STORAGE_KEY, JSON.stringify(updated));
       logger.debug('AppParamsContext', 'Removed world from cache:', worldId);
       return { ...prev, connectedWorldIds: updated };
     });

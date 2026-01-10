@@ -103,7 +103,7 @@ function RootLayoutContent() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
   // Context hooks
-  const { params, updateParams, clearWorldParams, clearAllParams, hasAccessToWorld } = useAppParams();
+  const { params, updateParams, clearWorldParams, clearAllParams } = useAppParams();
   const { userId, worldId, userRole } = params;
   
   // Data loading hooks
@@ -166,64 +166,13 @@ function RootLayoutContent() {
 
     // Only clear params when entering login routes and params exist
     if (segments[0] === 'login' && (params.userId || params.worldId || params.userRole)) {
-      clearAllParams()
+      clearAllParams();
     }
     // Only clear world params when entering select routes and world params exist
     else if (segments[0] === 'select' && (params.worldId || params.userRole)) {
-      clearWorldParams()
+      clearWorldParams();
     }
-  }, [urlParams, segments, updateParams, clearAllParams, clearWorldParams, params.userId, params.worldId, params.userRole])
-
-  // Guard against invalid world access on main routes
-  // Validates on: programmatic navigation, cache load, and browser back/forward/refresh
-  useEffect(() => {
-    if (!bootstrap.isReady) return
-
-    const validateWorldAccess = () => {
-      const firstSegment = typeof segments[0] === 'string' ? segments[0] : ''
-      if (firstSegment !== 'main') return
-
-      // Wait for window.location to sync with segments after navigation
-      setTimeout(() => {
-        const searchParams = new URLSearchParams(window.location.search)
-        const urlWorldId = searchParams.get('worldId') || undefined
-        const cacheIsPopulated = params.connectedWorldIds.length > 0
-        
-        // If cache not loaded yet, skip validation
-        if (!cacheIsPopulated) {
-          return
-        }
-
-        const hasAccess = urlWorldId ? hasAccessToWorld(urlWorldId) : false
-
-        // If no worldId in URL, redirect
-        if (!urlWorldId) {
-          logger.warn('[NavGuard] No worldId in URL, redirecting to world selection')
-          const target = buildNavigationTarget('/select/world-selection', {}, [])
-          router.replace(target)
-          return
-        }
-
-        // If worldId not in cache, redirect
-        if (!hasAccess) {
-          logger.warn('[NavGuard] Invalid world access, redirecting to world selection', { urlWorldId })
-          const target = buildNavigationTarget('/select/world-selection', {}, [])
-          router.replace(target)
-          return
-        }
-      }, 0)
-    }
-
-    // Validate on effect trigger (programmatic nav, cache load)
-    validateWorldAccess()
-
-    // Also validate on browser back/forward/refresh
-    window.addEventListener('popstate', validateWorldAccess)
-    
-    return () => {
-      window.removeEventListener('popstate', validateWorldAccess)
-    }
-  }, [bootstrap.isReady, params.connectedWorldIds, router, segments, hasAccessToWorld])
+  }, [urlParams, segments, updateParams, clearAllParams, clearWorldParams, params.userId, params.worldId, params.userRole]);
 
   // Manage loading state based on guard and bootstrap
   useEffect(() => {
@@ -244,7 +193,7 @@ function RootLayoutContent() {
     const onRoot = segments[0] === undefined;
     if (onRoot && authState === 'unauthenticated') {
       const target = buildNavigationTarget('/login/welcome', {}, []);
-      router.replace(target);
+      router.replace(target as any);
     }
   }, [bootstrap.isReady, authState, segments, router]);
 

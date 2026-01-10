@@ -1,3 +1,4 @@
+import { useAppParams } from '@/contexts/AppParamsContext'
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
 import { logger } from '@/lib/utils/logger'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
@@ -8,6 +9,7 @@ import { BottomTabBar } from '../../Screens/main-panels/BottomTabBar'
 export default function MainLayout() {
   const router = useRouter()
   const params = useLocalSearchParams()
+  const { hasAccessToWorld, params: appParams } = useAppParams()
   const [activeTab, setActiveTab] = useState('characters')
   const { width } = useWindowDimensions()
   const isMobile = Platform.OS !== 'web' || width < 900
@@ -16,6 +18,31 @@ export default function MainLayout() {
     worldId: params.worldId, 
     userRole: params.userRole 
   })
+
+  // Validate world access on mount and when worldId changes
+  useEffect(() => {
+    const urlWorldId = typeof params.worldId === 'string' ? params.worldId : undefined
+    const cacheIsPopulated = appParams.connectedWorldIds.length > 0
+
+    // Skip validation if cache not loaded yet
+    if (!cacheIsPopulated) return
+
+    // If no worldId in URL, redirect
+    if (!urlWorldId) {
+      logger.warn('[MainLayout] No worldId in URL, redirecting to world selection')
+      const target = buildNavigationTarget('/select/world-selection', {}, [])
+      router.replace(target as any)
+      return
+    }
+
+    // If worldId not in cache, redirect
+    if (!hasAccessToWorld(urlWorldId)) {
+      logger.warn('[MainLayout] Invalid world access, redirecting to world selection', { urlWorldId })
+      const target = buildNavigationTarget('/select/world-selection', {}, [])
+      router.replace(target as any)
+      return
+    }
+  }, [params.worldId, appParams.connectedWorldIds, hasAccessToWorld, router])
 
   // Update active tab from URL params
   useEffect(() => {

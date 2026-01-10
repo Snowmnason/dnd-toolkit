@@ -40,7 +40,7 @@ export function PanelView({
       { worldId, userRole },
       ['worldId', 'userRole']
     )
-    router.push(target)
+    router.push(target as any)
   }
 
   const backgroundImage = image ? { uri: image } : undefined

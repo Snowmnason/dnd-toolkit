@@ -114,7 +114,7 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
                   },
                   ['worldId', 'userRole']
                 )
-                router.push(target)
+                router.push(target as any)
               }}
               style={{ width: 160 }}
             />

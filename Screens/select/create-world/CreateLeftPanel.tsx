@@ -1,6 +1,7 @@
 import { Button, DescInput, Dropdown, Heading, SubTitle, TextInput } from '@/components/ui'
 import { usePlatform } from '@/contexts/PlatformContext'
 import { createWorldNameChangeHandler, isValidWorldNameForSubmission, type WorldNameValidationResult } from '@/lib'
+import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
 import { useScale } from '@/theme'
 import { useRouter } from 'expo-router'
 import React from 'react'
@@ -121,7 +122,10 @@ export function CreateLeftPanel({
         <Button
           text="Cancel"
           variant="outlined"
-          onPress={() => router.replace('/select/world-selection')}
+          onPress={() => {
+            const target = buildNavigationTarget('/select/world-selection', {}, []);
+            router.replace(target as any);
+          }}
           style={{ flex: 1, marginRight: S.space.sm }}
         />
         <Button

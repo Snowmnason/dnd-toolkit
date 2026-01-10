@@ -1,3 +1,4 @@
+import { buildNavigationTarget } from '@/lib/navigation/uri-helpers';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 
@@ -18,9 +19,8 @@ export function useSuccessNavigation({ showSuccessModal, successWorldId }: UseSu
         if (!isNavigating) { // Double-check before navigating
           setIsNavigating(true);
           // Navigate to world-selection for safety (prevents 404 if world ID issues)
-          router.replace({
-            pathname: '/select/world-selection'
-          });
+          const target = buildNavigationTarget('/select/world-selection', {}, []);
+          router.replace(target as any);
         }
       }, 30000); // 30 second timeout
     }
@@ -41,15 +41,16 @@ export function useSuccessNavigation({ showSuccessModal, successWorldId }: UseSu
       
       // Navigate directly to the created world for immediate use
       if (successWorldId) {
-        router.replace({
-          pathname: '/main/main-landing',
-          params: { worldId: successWorldId }
-        });
+        const target = buildNavigationTarget(
+          '/main/main-landing',
+          { worldId: successWorldId },
+          ['worldId']
+        );
+        router.replace(target as any);
       } else {
         // Fallback if no world ID
-        router.replace({
-          pathname: '/select/world-selection'
-        });
+        const target = buildNavigationTarget('/select/world-selection', {}, []);
+        router.replace(target as any);
       }
     }
   };
