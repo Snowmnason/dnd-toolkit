@@ -25,14 +25,13 @@ const supabaseAnonKey =
   Constants.expoConfig?.extra?.supabaseAnonKey;
 
 // Log configuration status for debugging
-if (Platform.OS === 'web') {
-  logger.debug('supabase', 'Supabase Configuration:', {
-    hasUrl: !!supabaseUrl,
-    hasKey: !!supabaseAnonKey,
-    urlLength: supabaseUrl?.length || 0,
-    keyLength: supabaseAnonKey?.length || 0
-  });
-}
+logger.debug('supabase', 'Loading Supabase Configuration:', {
+  hasUrl: !!supabaseUrl,
+  hasKey: !!supabaseAnonKey,
+  urlLength: supabaseUrl?.length || 0,
+  keyLength: supabaseAnonKey?.length || 0,
+  platform: Platform.OS,
+});
 
 // Check if Supabase is properly configured
 // Check if Supabase is properly configured
@@ -48,7 +47,7 @@ export const isSupabaseConfigured = () => {
   );
 
   if (!hasLoggedSupabaseConfig) {
-    logger.debug('supabase', 'Supabase Config:', {
+    logger.info('supabase', `Supabase Configuration Status: ${configured ? '✅ CONFIGURED' : '❌ NOT CONFIGURED'}`, {
       hasUrl: !!supabaseUrl,
       hasKey: !!supabaseAnonKey,
       urlLength: supabaseUrl?.length || 0,

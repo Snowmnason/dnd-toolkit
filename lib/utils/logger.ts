@@ -2,12 +2,14 @@
  * Logger Utility - Environment-aware logging system
  * 
  * Features:
- * - Environment-based log levels (development shows all, production shows errors only)
+ * - Feature-flag controlled logging (debugLogs flag enables production logging)
  * - Categorized logging (info, warn, error, debug)
  * - Automatic production log stripping preparation
  * - Consistent formatting with emojis for easy scanning
  * - Module/context tagging for better debugging
  */
+
+import { getAppConfig } from '@/lib/config/loader';
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -21,16 +23,17 @@ class Logger {
   private config: LoggerConfig;
 
   constructor() {
-    // Determine environment using new EXPO_PUBLIC_ENVIRONMENT system
-    const isDevelopment = (process.env.EXPO_PUBLIC_ENVIRONMENT || 'production') === 'development';
+    // Get app config to check debugLogs feature flag
+    const appConfig = getAppConfig();
+    const debugLogsEnabled = appConfig.featureFlags.debugLogs?.enabled ?? false;
     
-    // Configure based on environment
+    // Configure based on feature flag - allows production logging when enabled
     this.config = {
-      enabledLevels: isDevelopment 
-        ? ['debug', 'info', 'warn', 'error'] 
+      enabledLevels: debugLogsEnabled
+        ? ['debug', 'info', 'warn', 'error'] // All levels when debug logging enabled
         : ['error'], // Production: only errors
-      showTimestamp: isDevelopment,
-      showContext: isDevelopment,
+      showTimestamp: debugLogsEnabled,
+      showContext: debugLogsEnabled,
     };
   }
 

@@ -6,7 +6,7 @@ import { Platform } from "react-native";
 import { logger } from "../lib/utils/logger";
 
 // Bootstrap configuration
-const BOOTSTRAP_LOGS = false; // Gate logs to keep console clean by default
+const BOOTSTRAP_LOGS = true; // Enable logs for production debugging - helps diagnose bootstrap issues
 const SESSION_RESTORE_TIMEOUT = 5000; // 5 seconds - timeout for Supabase session restoration
 
 const blog = {
@@ -58,7 +58,8 @@ export function useAppBootstrap() {
 
     async function bootstrap() {
       try {
-        blog.debug("bootstrap", "Starting app bootstrap...");
+        blog.debug("bootstrap", "🚀 Starting app bootstrap...");
+        const bootstrapStartTime = Date.now();
 
         // Step 1: Load assets in parallel
         const assetPromises = [
@@ -72,8 +73,10 @@ export function useAppBootstrap() {
         const sessionPromise = restoreSession();
 
         // Wait for both assets and session
+        blog.debug("bootstrap", "⏳ Waiting for assets and session restoration...");
         await Promise.all([Promise.all(assetPromises), sessionPromise]);
 
+        const bootstrapTime = Date.now() - bootstrapStartTime;
         if (isMounted) {
           setState((prev) => ({
             ...prev,
@@ -81,10 +84,10 @@ export function useAppBootstrap() {
             sessionRestored: true,
             isReady: true,
           }));
-          blog.info("bootstrap", "App bootstrap completed successfully");
+          blog.info("bootstrap", `✅ App bootstrap completed successfully in ${bootstrapTime}ms`);
         }
       } catch (error) {
-        blog.error("bootstrap", "Bootstrap error:", error);
+        blog.error("bootstrap", "❌ Bootstrap error:", error);
         if (isMounted) {
           setState((prev) => ({
             ...prev,
@@ -110,8 +113,10 @@ export function useAppBootstrap() {
 
 async function loadFonts() {
   try {
+    const startTime = Date.now();
     await Font.loadAsync(customFonts);
-    blog.debug("bootstrap", "Fonts loaded successfully");
+    const elapsed = Date.now() - startTime;
+    blog.debug("bootstrap", `✅ Fonts loaded in ${elapsed}ms`);
   } catch (error) {
     blog.warn("bootstrap", "Font loading error (non-critical):", error);
     // Continue anyway - fonts are not critical
@@ -120,8 +125,10 @@ async function loadFonts() {
 
 async function loadImages() {
   try {
+    const startTime = Date.now();
     await Asset.loadAsync(preloadImages);
-    blog.debug("bootstrap", "Images loaded successfully");
+    const elapsed = Date.now() - startTime;
+    blog.debug("bootstrap", `✅ Images loaded in ${elapsed}ms`);
   } catch (error) {
     blog.warn("bootstrap", "Image loading error (non-critical):", error);
     // Continue anyway - these images are not critical
@@ -133,15 +140,16 @@ async function loadPlatformAssets() {
     // Skia is now loaded in index.tsx before React renders
     // Just add a small delay for web stability
     await new Promise((resolve) => setTimeout(resolve, 200));
-    blog.debug("bootstrap", "Web platform assets ready");
+    blog.debug("bootstrap", "🌐 Web platform assets ready (200ms)");
   } else {
-    blog.debug("bootstrap", "Mobile platform ready");
+    blog.debug("bootstrap", `📱 ${Platform.OS} platform ready`);
   }
 }
 
 async function restoreSession() {
   try {
     blog.debug("bootstrap", "Restoring Supabase session...");
+    const sessionStartTime = Date.now();
 
     // Import supabase dynamically to avoid circular dependencies
     const { supabase, isSupabaseConfigured } = await import(
@@ -164,7 +172,8 @@ async function restoreSession() {
     const timeoutPromise = new Promise<{ data: { session: null }; error: any }>((resolve) =>
       setTimeout(() => {
         timedOut = true;
-        blog.warn("bootstrap", "Session restore timed out after 5s");
+        const elapsed = Date.now() - sessionStartTime;
+        blog.warn("bootstrap", `⏱️ Session restore timed out after ${SESSION_RESTORE_TIMEOUT}ms (total: ${elapsed}ms)`);
         resolve({ data: { session: null }, error: new Error("Session restore timeout") });
       }, SESSION_RESTORE_TIMEOUT)
     );
@@ -175,9 +184,11 @@ async function restoreSession() {
       error,
     } = await Promise.race([sessionPromise, timeoutPromise]);
 
+    const totalTime = Date.now() - sessionStartTime;
+
     // If we timed out, ignore late session restoration results
     if (timedOut) {
-      blog.warn("bootstrap", "Skipping session restoration - timed out");
+      blog.warn("bootstrap", `Skipping session restoration - timed out after ${totalTime}ms`);
       // Set up listener anyway for future auth changes
       supabase.auth.onAuthStateChange(async (event: string, session: any) => {
         blog.debug("bootstrap", "Auth state changed:", event);
@@ -192,18 +203,18 @@ async function restoreSession() {
     }
 
     if (error) {
-      blog.warn("bootstrap", "Session restore error:", error);
+      blog.warn("bootstrap", `Session restore error (${totalTime}ms):`, error);
       return;
     }
 
     if (session) {
-      blog.info("bootstrap", "Session restored successfully");
+      blog.info("bootstrap", `✅ Session restored successfully in ${totalTime}ms`);
 
       // Update local auth state to match
       const { AuthStateManager } = await import("../lib/auth/auth-state");
       await AuthStateManager.setSession(session);
     } else {
-      blog.info("bootstrap", "No stored session found");
+      blog.info("bootstrap", `⚠️ No stored session found (checked in ${totalTime}ms)`);
     }
 
     // Set up auth state change listener for future changes
