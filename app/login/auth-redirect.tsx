@@ -11,6 +11,12 @@ import { useAppParams } from '../../contexts/AppParamsContext';
 // Storage key for pending invites (use SecureStorage for encryption)
 const PENDING_INVITE_KEY = 'dnd:invite:pending';
 
+interface PendingInvite {
+  token: string;
+  worldName: string;
+  timestamp: number;
+}
+
 // Helper functions for invite storage (encrypted via SecureStorage)
 const savePendingInvite = async (token: string, worldName: string) => {
   const inviteData: PendingInvite = {
