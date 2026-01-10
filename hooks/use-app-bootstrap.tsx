@@ -5,8 +5,10 @@ import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { logger } from "../lib/utils/logger";
 
-// Gate bootstrap logs to keep console clean by default
-const BOOTSTRAP_LOGS = false;
+// Bootstrap configuration
+const BOOTSTRAP_LOGS = false; // Gate logs to keep console clean by default
+const SESSION_RESTORE_TIMEOUT = 5000; // 5 seconds - timeout for Supabase session restoration
+
 const blog = {
   debug: (...args: any[]) => {
     if (BOOTSTRAP_LOGS) logger.debug(...args);
@@ -154,11 +156,40 @@ async function restoreSession() {
       return;
     }
 
-    // Get the current session (this will restore from storage if available)
+    // Wrap session restoration in a timeout to prevent indefinite hanging
+    // If token refresh fails or hangs, we still let the app boot
+    let timedOut = false;
+    
+    const sessionPromise = supabase.auth.getSession();
+    const timeoutPromise = new Promise<{ data: { session: null }; error: any }>((resolve) =>
+      setTimeout(() => {
+        timedOut = true;
+        blog.warn("bootstrap", "Session restore timed out after 5s");
+        resolve({ data: { session: null }, error: new Error("Session restore timeout") });
+      }, SESSION_RESTORE_TIMEOUT)
+    );
+
+    // Race between session restore and timeout
     const {
       data: { session },
       error,
-    } = await supabase.auth.getSession();
+    } = await Promise.race([sessionPromise, timeoutPromise]);
+
+    // If we timed out, ignore late session restoration results
+    if (timedOut) {
+      blog.warn("bootstrap", "Skipping session restoration - timed out");
+      // Set up listener anyway for future auth changes
+      supabase.auth.onAuthStateChange(async (event: string, session: any) => {
+        blog.debug("bootstrap", "Auth state changed:", event);
+        const { AuthStateManager } = await import("../lib/auth/auth-state");
+        if (session) {
+          await AuthStateManager.setSession(session);
+        } else {
+          await AuthStateManager.clearAuthState();
+        }
+      });
+      return;
+    }
 
     if (error) {
       blog.warn("bootstrap", "Session restore error:", error);

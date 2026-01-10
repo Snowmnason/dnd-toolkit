@@ -95,7 +95,17 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git add package.json app.json desktop/package.json package-lock.json desktop/package-lock.json
           git commit -m "chore(release): bump version ${{ env.current_version }} → ${{ env.new_version }} (${{ env.bump_type }})"
-          git push
+          
+          # Retry push with rebase up to 3 times to handle race conditions
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push --force-with-lease && break
+            if [ $i -eq 3 ]; then
+              echo "Failed to push after 3 attempts"
+              exit 1
+            fi
+            echo "Push failed, retrying in 5 seconds... (attempt $i/3)"
+            sleep 5
+          done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
