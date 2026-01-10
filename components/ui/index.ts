@@ -16,6 +16,8 @@ export { default as CustomLoad } from './CustomLoad';
 export { default as Dropdown } from './Dropdown';
 export * from './ElevatedView'; // Now exports ElevatedView, Card, Surface, and InteractiveCard
 export * from './IconButton';
+export * from './ImageSkeleton';
+export * from './LazyImage';
 export * from './Notification';
 export * from './NotificationContainer';
 export * from './RadioButton';
@@ -26,8 +28,8 @@ export * from './Switch';
 export * from './Tabs';
 export * from './TextInputs';
 // Form wrappers
-export * from './forms/FormTextInput';
 export * from './forms/FormDescInput';
+export * from './forms/FormTextInput';
 
 // Groups
 export * from './groups//ButtonGroup';
