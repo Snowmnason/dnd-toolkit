@@ -133,93 +133,8 @@ export const isExistingUser = (data: any) => {
 };
 
 // ============================================================================
-// FORM VALIDATION HELPERS
+// PASSWORD UI HELPERS (for strength display)
 // ============================================================================
-
-// Form validation errors helper with enhanced security
-export const getFormValidationErrors = (
-  email: string,
-  username: string,
-  password: string,
-  confirmPassword: string
-) => {
-  const emailValidation = validateEmail(email);
-  const passwordValidation = validatePassword(password);
-  const usernameValidation = validateUsername(username);
-
-  // Email validation error
-  if (!emailValidation.isValid) {
-    if (!email.trim()) {
-      return 'Email is required';
-    } else if (!emailValidation.hasAtSymbol) {
-      return 'Email must contain @ symbol';
-    } else if (!emailValidation.hasDomain) {
-      return 'Email must have a valid domain';
-    } else if (!emailValidation.hasNoSqlKeywords) {
-      return 'Email contains invalid characters';
-    } else {
-      return 'Please enter a valid email address';
-    }
-  }
-
-  // Password validation error
-  if (!passwordValidation.isValid) {
-    if (!password.trim()) {
-      return 'Password is required';
-    } else if (!passwordValidation.hasNoSqlKeywords) {
-      return 'Password contains invalid characters';
-    } else if (!passwordValidation.hasNoControlChars) {
-      return 'Password contains invalid characters';
-    } else {
-      return 'Password must meet all requirements above';
-    }
-  }
-
-  // Password match validation
-  if (password !== confirmPassword) {
-    return 'Passwords do not match';
-  }
-
-  // Username validation error
-  if (!usernameValidation.isValid) {
-    if (!username.trim()) {
-      return 'Username is required';
-    } else if (!usernameValidation.startsWithLetter) {
-      return 'Username must start with a letter';
-    } else if (!usernameValidation.hasNoSqlKeywords) {
-      return 'Username contains reserved words';
-    } else {
-      return 'Username must be 3-20 characters, letters, numbers, and underscores only';
-    }
-  }
-
-  return null; // No errors
-};
-
-// Check if sign-up form is valid
-export const isSignUpFormValid = (
-  email: string,
-  username: string,
-  password: string,
-  confirmPassword: string
-): boolean => {
-  const emailValidation = validateEmail(email);
-  const passwordValidation = validatePassword(password);
-  const usernameValidation = validateUsername(username);
-  const passwordsMatch = password === confirmPassword;
-  
-  return emailValidation.isValid && 
-         passwordValidation.isValid && 
-         usernameValidation.isValid && 
-         passwordsMatch && 
-         confirmPassword.length > 0;
-};
-
-// Check if sign-in form is valid
-export const isSignInFormValid = (email: string, password: string): boolean => {
-  const emailValidation = validateEmail(email);
-  return emailValidation.isValid && password.trim().length > 0;
-};
 
 // Get password hint color based on validation strength
 export const getPasswordHintColor = (password: string): string => {
@@ -312,41 +227,4 @@ export function validateWorldName(name: string, originalName?: string): WorldNam
     sanitizedName: working,
     errors,
   };
-}
-
-/**
- * Creates a sanitized onChange handler for world name inputs
- * @param setValue - The state setter function
- * @param onValidationChange - Optional callback for validation state changes
- * @returns A function that can be used as onChangeText for TextInput
- */
-export function createWorldNameChangeHandler(
-  setValue: (value: string) => void,
-  onValidationChange?: (result: WorldNameValidationResult) => void
-) {
-  return (text: string) => {
-    // Live input sanitization: allow spaces while typing, strip only dangerous delimiters, cap length to 20.
-    const dangerousChars = /['"`;<>]|--|\/\*|\*\//g;
-    let live = (text ?? '').replace(dangerousChars, '');
-    if (live.length > 20) {
-      live = live.substring(0, 20);
-    }
-
-    setValue(live);
-
-    // Compute validation state (uses trimming internally for submit-time correctness)
-    const result = validateWorldName(live);
-    if (onValidationChange) onValidationChange(result);
-  };
-}
-
-/**
- * Checks if a world name is valid for submission
- * @param name - The world name to validate
- * @param originalName - Optional original name for edit scenarios
- * @returns True if the name is valid for submission
- */
-export function isValidWorldNameForSubmission(name: string, originalName?: string): boolean {
-  const result = validateWorldName(name, originalName);
-  return result.isValid && result.sanitizedName.length >= 2;
 }
