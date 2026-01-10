@@ -251,7 +251,7 @@ export const getPasswordRequirementsText = (password: string): string => {
   if (!passwordValidation.hasSpecialChar) missingCriteria.push('special character (!@#$%^&*...)');
   
   if (passwordValidation.isValid) {
-    return `✅ Password is ${passwordValidation.strength}! All requirements met.`;
+    return `✅ Looks great! All requirements met.`;
   } else {
     return `Need: ${missingCriteria.join(', ')}`;
   }

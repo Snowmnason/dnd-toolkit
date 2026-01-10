@@ -1,51 +1,51 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { usersDB } from '../database/users';
 import { logger } from '../utils/logger';
 import { checkPendingInvites, signUpUser } from './authService';
-import { getPasswordHintColor, getPasswordRequirementsText, validateEmail, validatePassword, validateUsername } from './validation';
+import {
+  signUpSchema,
+  completeProfileSchema,
+  type SignUpFormData,
+  type CompleteProfileFormData,
+} from '../schemas/auth.schema';
+import { getPasswordHintColor, getPasswordRequirementsText } from './validation';
 
 type SignUpMode = 'signup' | 'complete-profile';
+type SignUpFormValues = SignUpFormData & CompleteProfileFormData;
 
 export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
   const router = useRouter();
   
-  // Form state
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [username, setUsername] = useState('');
+  // RHF + Zod form
+  const schema = mode === 'complete-profile' ? completeProfileSchema : signUpSchema;
+  const { control, handleSubmit, formState: { isValid }, getValues, watch } = useForm<SignUpFormValues>({
+    resolver: zodResolver(schema as any),
+    mode: 'onChange',
+    defaultValues: mode === 'complete-profile'
+      ? { username: '' }
+      : { email: '', password: '', confirmPassword: '' },
+  });
+
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showEmailExistsModal, setShowEmailExistsModal] = useState(false);
-
-  // Validation state
-  const passwordValidation = validatePassword(password);
-  const emailValidation = validateEmail(email);
-  const usernameValidation = validateUsername(username);
+  const password = watch('password') as string | undefined;
+  const confirmPassword = watch('confirmPassword') as string | undefined;
+  const email = watch('email') as string | undefined;
+  const username = watch('username') as string | undefined;
   const passwordsMatch = password === confirmPassword;
-  
-  // Form validity depends on mode
-  const isFormValid = mode === 'complete-profile' 
-    ? usernameValidation.isValid
-    : emailValidation.isValid && passwordValidation.isValid && passwordsMatch;
 
   // Handle sign up or profile completion
-  const handleSignUp = async () => {
+  const onSubmit = async () => {
     setAuthError('');
     
     if (mode === 'complete-profile') {
-      // Complete profile mode - just validate username and create profile
-      if (!usernameValidation.isValid) {
-        if (!username.trim()) {
-          setAuthError('Username is required');
-        } else {
-          setAuthError('Username must be 3-20 characters, letters and numbers only');
-        }
-        return;
-      }
-      
+      const { username } = getValues();
+
       if (!user) {
         setAuthError('Authentication error. Please try again.');
         return;
@@ -114,21 +114,7 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
         logger.debug('signup', 'Profile creation process completed');
       }
     } else {
-      // Sign up mode - validate email and password only (no username)
-      if (!emailValidation.isValid) {
-        setAuthError(!email.trim() ? 'Email is required' : 'Please enter a valid email address');
-        return;
-      }
-      
-      if (!passwordValidation.isValid) {
-        setAuthError('Password must be at least 8 characters with uppercase, lowercase, number, and special character');
-        return;
-      }
-      
-      if (!passwordsMatch) {
-        setAuthError('Passwords do not match');
-        return;
-      }
+      const { email, password } = getValues();
       
       setLoading(true);
       
@@ -149,73 +135,43 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
     }
   };
 
-  // Handle input changes (with error clearing)
-  const handleEmailChange = (text: string) => {
-    setEmail(text);
-    if (authError) setAuthError('');
-  };
-
-  const handleUsernameChange = (text: string) => {
-    setUsername(text);
-    if (authError) setAuthError('');
-  };
-
-  const handlePasswordChange = (text: string) => {
-    setPassword(text);
-    if (authError) setAuthError('');
-  };
-
-  const handleConfirmPasswordChange = (text: string) => {
-    setConfirmPassword(text);
-    if (authError) setAuthError('');
-  };
-
   // UI helpers
   const getUsernameDisplayText = () => {
-    if (username.length === 0) return '';
-    return usernameValidation.isValid ? 
+    if (!username || username.length === 0) return '';
+    // Schema handles validity; keep message concise
+    return username.length >= 3 && username.length <= 20 ? 
       `Welcome "${username}"!` : 
       'Username: 3-20 characters, letters and numbers only';
   };
 
   const getPasswordMatchText = () => {
-    if (confirmPassword.length === 0) return '';
+    if (!confirmPassword || confirmPassword.length === 0) return '';
     return passwordsMatch ? '✅ Passwords match!' : '❌ Passwords do not match';
   };
 
   return {
     // Mode info
     mode,
-    
-    // Form data
-    email,
-    password,
-    confirmPassword,
-    username,
+    control,
+    isValid,
+    email: email || '',
+    password: password || '',
+    confirmPassword: confirmPassword || '',
+    username: username || '',
     loading,
     authError,
     showPassword,
     showEmailExistsModal,
-    
-    // Validation state
-    passwordValidation,
-    emailValidation,
-    usernameValidation,
     passwordsMatch,
-    isFormValid,
     
     // Handlers
-    handleSignUp,
-    handleEmailChange,
-    handleUsernameChange,
-    handlePasswordChange,
-    handleConfirmPasswordChange,
+    handleSignUp: handleSubmit(onSubmit),
     setShowPassword,
     setShowEmailExistsModal,
     
     // UI helpers
-    getPasswordHintColor: () => getPasswordHintColor(password),
-    getPasswordRequirementsText: () => getPasswordRequirementsText(password),
+    getPasswordHintColor: () => getPasswordHintColor(password || ''),
+    getPasswordRequirementsText: () => getPasswordRequirementsText(password || ''),
     getUsernameDisplayText,
     getPasswordMatchText,
   };

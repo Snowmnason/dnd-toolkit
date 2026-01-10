@@ -2,8 +2,8 @@ import {
   AuthActionGroup, AuthBackButtonContainer,
   AuthBodyFooter,
   AuthButton, AuthButtonBack,
-  AuthButtonSecondary, AuthCaption, AuthError, AuthForm, AuthInput,
-  AuthModal,
+  AuthButtonSecondary, AuthCaption, AuthError, AuthForm,
+  AuthModal, FormAuthInput,
   AuthRoot, AuthSubTitle, AuthTitle
 } from '@/components/auth_components';
 import { useSignUpForm } from '@/lib';
@@ -20,30 +20,18 @@ export default function SignUpScreen() {
   const passwordInputRef = useRef<TextInput>(null);
   const confirmPasswordInputRef = useRef<TextInput>(null);
   const {
-    // Form data
+    control,
+    isValid,
     email,
-    password,
     confirmPassword,
     loading,
     authError,
     showPassword,
     showEmailExistsModal,
-    
-    // Validation state
-    passwordValidation,
-    emailValidation,
     passwordsMatch,
-    isFormValid,
-    
-    // Handlers
     handleSignUp,
-    handleEmailChange,
-    handlePasswordChange,
-    handleConfirmPasswordChange,
     setShowPassword,
     setShowEmailExistsModal,
-    
-    // UI helpers
     getPasswordHintColor,
     getPasswordRequirementsText,
     getPasswordMatchText,
@@ -69,30 +57,22 @@ export default function SignUpScreen() {
 
       {/* Form Inputs */}
       <AuthForm>
-        <AuthInput
+        <FormAuthInput
+          control={control}
+          name="email"
           placeholder="Email"
-          value={email}
-          onChangeText={handleEmailChange}
           keyboardType="email-address"
           autoCapitalize="none"
           editable={!loading}
           returnKeyType="next"
           onSubmitEditing={() => passwordInputRef.current?.focus()}
-          style={{
-            borderColor:
-              !emailValidation.isValid && email.length > 0
-                ? '#dc3545'
-                : undefined,
-            borderWidth:
-              !emailValidation.isValid && email.length > 0 ? 3 : undefined,
-          }}
         />
 
-        <AuthInput
+        <FormAuthInput
+          control={control}
+          name="password"
           ref={passwordInputRef}
           placeholder="Password"
-          value={password}
-          onChangeText={handlePasswordChange}
           secureTextEntry={true}
           editable={!loading}
           showPasswordToggle={true}
@@ -100,14 +80,6 @@ export default function SignUpScreen() {
           showPassword={showPassword}
           returnKeyType="next"
           onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
-          style={{
-            borderColor:
-              !passwordValidation.isValid && password.length > 0
-                ? '#dc3545'
-                : undefined,
-            borderWidth:
-              !passwordValidation.isValid && password.length > 0 ? 2 : undefined,
-          }}
         />
 
         {/* Password Requirements */}
@@ -126,26 +98,16 @@ export default function SignUpScreen() {
           {getPasswordRequirementsText()}
         </AuthSubTitle>
 
-        <AuthInput
+        <FormAuthInput
+          control={control}
+          name="confirmPassword"
           ref={confirmPasswordInputRef}
           placeholder="Confirm Password"
-          value={confirmPassword}
-          onChangeText={handleConfirmPasswordChange}
           secureTextEntry={true}
           showPassword={showPassword}
           editable={!loading}
           returnKeyType="go"
           onSubmitEditing={handleSignUp}
-          style={{
-            borderColor:
-              confirmPassword.length > 0 && password !== confirmPassword
-                ? '#dc3545'
-                : undefined,
-            borderWidth:
-              confirmPassword.length > 0 && password !== confirmPassword
-                ? 2
-                : undefined,
-          }}
         />
 
         {/* Password Match Indicator */}
@@ -169,7 +131,7 @@ export default function SignUpScreen() {
         <AuthButton
           text="Create Account"
           onPress={handleSignUp}
-          disabled={!isFormValid}
+          disabled={!isValid}
           loading={loading}
         />
 

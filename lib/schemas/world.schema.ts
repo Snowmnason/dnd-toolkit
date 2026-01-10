@@ -20,7 +20,7 @@ export const worldSchema = z.object({
     .optional()
     .or(z.literal('')), // Allow empty string
   system: z.enum(['D&D 5e', 'Pathfinder', 'Call of Cthulhu', 'Custom'], {
-    errorMap: () => ({ message: 'Please select a tabletop system' }),
+    message: 'Please select a tabletop system',
   }),
 });
 

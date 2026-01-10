@@ -4,6 +4,7 @@ import React, {
     forwardRef,
     useEffect,
     useImperativeHandle,
+    useRef,
     useState,
 } from 'react'
 import { TouchableOpacity, View } from 'react-native'
@@ -73,6 +74,7 @@ export const ToggleGroup = forwardRef<ToggleGroupRef, ToggleGroupProps>(
     const { theme } = UseTheme()
     const [internalActive, setInternalActive] = useState(defaultActive)
     const activeItems = active ?? internalActive
+    const initializedRef = useRef(false)
 
     /** core selection logic */
     const handleToggle = (key: string) => {
@@ -105,9 +107,14 @@ export const ToggleGroup = forwardRef<ToggleGroupRef, ToggleGroupProps>(
       getValues: () => activeItems,
     }))
 
+    // Only initialize on mount to avoid infinite loops from array prop recreation
     useEffect(() => {
-      setInternalActive(defaultActive)
-    }, [defaultActive])
+      if (!initializedRef.current) {
+        setInternalActive(defaultActive)
+        initializedRef.current = true
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     return (
       <GroupView

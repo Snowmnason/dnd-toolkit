@@ -1,27 +1,39 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { supabase } from '../database/supabase';
 import { logger } from '../utils/logger';
 import { updatePassword } from './authService';
+import { resetPasswordSchema, type ResetPasswordFormData } from '../schemas/auth.schema';
 
 export const useResetPasswordConfirm = () => {
   const router = useRouter();
-  
-  // Form state
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const { control, handleSubmit, formState: { isValid, errors }, watch, reset } = useForm<ResetPasswordFormData>({
+    resolver: zodResolver(resetPasswordSchema),
+    mode: 'onChange',
+    defaultValues: {
+      password: '',
+      confirmPassword: '',
+    },
+  });
+
+  const password = watch('password') || '';
+  const confirmPassword = watch('confirmPassword') || '';
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(''); // runtime/auth errors
   const [success, setSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [userEmail, setUserEmail] = useState('');
-
-  // Password validation
-  const isPasswordValid = password.length >= 6;
   const doPasswordsMatch = password === confirmPassword && confirmPassword.length > 0;
-  const isFormValid = isPasswordValid && doPasswordsMatch;
+
+  // Clear runtime messages when user edits fields again
+  useEffect(() => {
+    if (error) setError('');
+    if (success) setSuccess(false);
+  }, [password, confirmPassword, error, success]);
 
   // Get user email from the session/token when component mounts
   useEffect(() => {
@@ -65,32 +77,20 @@ export const useResetPasswordConfirm = () => {
   }, [userEmail]);
 
   // Handle password update
-  const handleResetPassword = async () => {
+  const onSubmit = async (values: ResetPasswordFormData) => {
     setError('');
     setSuccess(false);
-    
-    // Client-side validation
-    if (!isPasswordValid) {
-      setError('Password must be at least 6 characters long');
-      return;
-    }
-    
-    if (!doPasswordsMatch) {
-      setError('Passwords do not match');
-      return;
-    }
-    
+
     setLoading(true);
     
     try {
-      const result = await updatePassword(password);
+      const result = await updatePassword(values.password);
       
       if (result.success && result.message) {
         setSuccess(true);
         setSuccessMessage(result.message);
         // Clear form on success
-        setPassword('');
-        setConfirmPassword('');
+        reset({ password: '', confirmPassword: '' });
         
         // Auto-redirect to sign-in after success
         setTimeout(() => {
@@ -104,26 +104,14 @@ export const useResetPasswordConfirm = () => {
     }
   };
 
-  // Handle input changes
-  const handlePasswordChange = (text: string) => {
-    setPassword(text);
-    if (error) setError('');
-    if (success) setSuccess(false);
-  };
-
-  const handleConfirmPasswordChange = (text: string) => {
-    setConfirmPassword(text);
-    if (error) setError('');
-    if (success) setSuccess(false);
-  };
-
   // Navigate to sign in
   const goToSignIn = () => {
     router.replace('/login/sign-in');
   };
 
   return {
-    // Form data
+    control,
+    isValid,
     password,
     confirmPassword,
     loading,
@@ -132,16 +120,9 @@ export const useResetPasswordConfirm = () => {
     successMessage,
     showPassword,
     userEmail,
-    
-    // Validation state
-    isPasswordValid,
     doPasswordsMatch,
-    isFormValid,
-    
-    // Handlers
-    handleResetPassword,
-    handlePasswordChange,
-    handleConfirmPasswordChange,
+    fieldErrors: errors,
+    handleResetPassword: handleSubmit(onSubmit),
     setShowPassword,
     goToSignIn,
   };

@@ -7,10 +7,10 @@ import {
     AuthCaption,
     AuthError,
     AuthForm,
-    AuthInput,
     AuthRoot,
     AuthSubTitle,
-    AuthTitle
+    AuthTitle,
+    FormAuthInput
 } from '@/components/auth_components';
 import { Body } from '@/components/ui';
 import { logger, supabase, usersDB, useSignUpForm } from '@/lib';
@@ -108,14 +108,13 @@ export default function CompleteProfileScreen() {
   const {
     // Only need username-related data in this mode
     username,
+    control,
     loading,
     authError,
-    usernameValidation,
-    isFormValid,
+    isValid,
     
     // Handlers
     handleSignUp: handleCompleteProfile,
-    handleUsernameChange,
     
     // UI helpers
     getUsernameDisplayText,
@@ -166,22 +165,14 @@ export default function CompleteProfileScreen() {
 
       {/* 🧾 Form */}
   <AuthForm style={{ marginBottom: authError ? S.space.md : S.space.xxl }}>
-        <AuthInput
+        <FormAuthInput
+          control={control}
+          name="username"
           placeholder="Username"
-          value={username}
-          onChangeText={handleUsernameChange}
           autoCapitalize="none"
           editable={!loading}
           returnKeyType="go"
           onSubmitEditing={handleCompleteProfile}
-          style={{
-            borderColor:
-              !usernameValidation.isValid && username.length > 0
-                ? '#dc3545'
-                : undefined,
-            borderWidth:
-              !usernameValidation.isValid && username.length > 0 ? 3 : undefined,
-          }}
         />
 
         <AuthError error={authError} />
@@ -191,7 +182,7 @@ export default function CompleteProfileScreen() {
           fontSize='$para'
             style={{
               textAlign: 'left',
-              color: usernameValidation.isValid ? '#82cc7eff' : '#f78888ff',
+              color: isValid ? '#82cc7eff' : '#f78888ff',
               lineHeight: S.font.body2 + 2,
               opacity: 0.9,
               marginBottom: S.space.xs,
@@ -208,7 +199,7 @@ export default function CompleteProfileScreen() {
         <AuthButton
           text="Complete Profile"
           onPress={handleCompleteProfile}
-          disabled={!isFormValid}
+          disabled={!isValid}
           loading={loading}
         />
 

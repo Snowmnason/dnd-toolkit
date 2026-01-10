@@ -16,3 +16,6 @@ export { default as GoogleSignInButton } from './social-auth-buttons/google/goog
 export { default as SignOutButton } from './social-auth-buttons/sign-out-button';
 export { default as SignOutButtons } from './social-auth-buttons/sign-out-buttons';
 
+// Form wrappers
+export * from './forms/FormAuthInput';
+

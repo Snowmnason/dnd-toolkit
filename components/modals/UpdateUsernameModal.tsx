@@ -1,7 +1,9 @@
-import { AppModal, Body, Button, TextInput } from '@/components/ui'
-import { validateUsername } from '@/lib/auth/validation'
+import { AppModal, Body, Button, FormTextInput } from '@/components/ui'
 import { $, useScale, UseTheme } from '@/theme'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { updateUsernameSchema, type UpdateUsernameFormData } from '@/lib/schemas/auth.schema'
 import { View } from 'react-native'
 
 interface UpdateUsernameModalProps {
@@ -27,44 +29,37 @@ export function UpdateUsernameModal({
 }: UpdateUsernameModalProps) {
   const S = useScale()
   const { theme } = UseTheme()
-  const [newUsername, setNewUsername] = useState('')
+  const { control, handleSubmit, formState: { isValid, errors }, reset, watch } = useForm<UpdateUsernameFormData>({
+    resolver: zodResolver(updateUsernameSchema),
+    mode: 'onChange',
+    defaultValues: {
+      username: '',
+      originalUsername: currentUsername,
+    },
+  })
 
-  // ✅ Reset field when modal closes
+  const username = watch('username') || ''
+
+  // Reset when modal opens/closes or username changes
   useEffect(() => {
-    if (!visible) {
-      setNewUsername('')
-    }
-  }, [visible])
+    reset({ username: '', originalUsername: currentUsername })
+  }, [visible, currentUsername, reset])
 
-  const usernameValidation = validateUsername(newUsername)
-  const isValid =
-    usernameValidation.isValid && newUsername.trim() !== currentUsername.trim()
-
-  const handleConfirm = async () => {
-    if (isValid && !loading) {
-      await onConfirm(newUsername.trim())
-      setNewUsername('')
-    }
+  const handleConfirm = async (values: UpdateUsernameFormData) => {
+    if (loading) return
+    await onConfirm(values.username.trim())
+    reset({ username: '', originalUsername: currentUsername })
   }
 
   const handleCancel = () => {
-    setNewUsername('')
+    reset({ username: '', originalUsername: currentUsername })
     onCancel()
   }
 
   const getUsernameHint = () => {
-    if (newUsername.length === 0) return ''
-    if (newUsername === currentUsername)
-      return 'New username must be different'
-    if (!usernameValidation.minLength || !usernameValidation.maxLength)
-      return 'Username must be 3–20 characters'
-    if (!usernameValidation.startsWithLetter)
-      return 'Username must start with a letter'
-    if (!usernameValidation.validChars)
-      return 'Only letters, numbers, and underscores allowed'
-    if (usernameValidation.isValid)
-      return `✅ "${newUsername}" looks great!`
-    return 'Invalid username'
+    if (username.length === 0) return ''
+    if (errors.username?.message) return errors.username.message
+    return `✅ "${username}" looks great!`
   }
 
   return (
@@ -83,23 +78,17 @@ export function UpdateUsernameModal({
         }}
       >
         {/* Username Input */}
-        <TextInput
-          value={newUsername}
-          onChangeText={setNewUsername}
+        <FormTextInput
+          control={control}
+          name="username"
           placeholder="New username"
           autoCapitalize="none"
           editable={!loading}
-          style={{
-            borderColor:
-              newUsername.length > 0 && !isValid
-                ? $('danger', theme)
-                : $('border', theme),
-            borderWidth: S.s(1.5),
-          }}
+          onSubmitEditing={handleSubmit(handleConfirm)}
         />
 
         {/* Validation Hint */}
-        {newUsername.length > 0 && (
+        {username.length > 0 && (
           <Body
             style={{
               marginTop: S.space.xs,
@@ -141,7 +130,7 @@ export function UpdateUsernameModal({
             text={loading ? 'Updating...' : 'Update'}
             variant="primary"
             disabled={!isValid || loading}
-            onPress={handleConfirm}
+            onPress={handleSubmit(handleConfirm)}
           />
         </View>
       </View>
