@@ -33,7 +33,7 @@ export const useResetPasswordConfirm = () => {
   useEffect(() => {
     if (error) setError('');
     if (success) setSuccess(false);
-  }, [password, confirmPassword, error, success]);
+  }, [password, confirmPassword]);
 
   // Get user email from the session/token when component mounts
   useEffect(() => {

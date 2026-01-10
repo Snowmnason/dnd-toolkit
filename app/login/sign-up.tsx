@@ -6,15 +6,17 @@ import {
   AuthModal, FormAuthInput,
   AuthRoot, AuthSubTitle, AuthTitle
 } from '@/components/auth_components';
+import { AppToast } from '@/components/ui';
 import { useSignUpForm } from '@/lib';
 import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TextInput } from 'react-native';
 
 export default function SignUpScreen() {
   const S = useScale();
   const router = useRouter();
+  const [showValidationToast, setShowValidationToast] = useState(false);
   
   // Refs for keyboard navigation
   const passwordInputRef = useRef<TextInput>(null);
@@ -26,6 +28,7 @@ export default function SignUpScreen() {
     confirmPassword,
     loading,
     authError,
+    validationWarning,
     showPassword,
     showEmailExistsModal,
     passwordsMatch,
@@ -36,6 +39,13 @@ export default function SignUpScreen() {
     getPasswordRequirementsText,
     getPasswordMatchText,
   } = useSignUpForm();
+
+  // Show toast when validation warning occurs
+  useEffect(() => {
+    if (validationWarning) {
+      setShowValidationToast(true);
+    }
+  }, [validationWarning]);
 
   return (
     <AuthRoot>
@@ -172,6 +182,14 @@ export default function SignUpScreen() {
             variant: 'primary',
           },
         ]}
+      />
+
+      <AppToast
+        message={validationWarning}
+        type="warning"
+        visible={showValidationToast}
+        duration={4000}
+        onHide={() => setShowValidationToast(false)}
       />
     </AuthRoot>
   )

@@ -27,8 +27,8 @@ export function FormTextInput<T extends FieldValues>({ control, name, ...props }
             {...props}
             value={(field.value as string) ?? ''}
             onChangeText={(val) => {
-              if (props.onChangeText) props.onChangeText(val)
-              field.onChange(val)
+              field.onChange(val) // Update RHF state first
+              if (props.onChangeText) props.onChangeText(val) // Then call external handler
             }}
             error={!!fieldState.error}
           />

@@ -1,7 +1,7 @@
 import { AppModal, Body, Button, FormTextInput } from '@/components/ui'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { editWorldSchema, type EditWorldFormData } from '@/lib/schemas'
+import { editWorldNameSchema, type EditWorldNameFormData } from '@/lib/schemas'
 import { logger } from '@/lib/utils/logger'
 import { $, useScale, UseTheme } from '@/theme'
 import React, { useEffect, useState } from 'react'
@@ -40,14 +40,12 @@ export function EditWorldModal({
   const [deleteDisabled, setDeleteDisabled] = useState(false)
 
   // RHF for name editing
-  const { control, handleSubmit, formState: { isValid }, reset } = useForm<EditWorldFormData>({
-    resolver: zodResolver(editWorldSchema),
+  const { control, handleSubmit, formState: { isValid }, reset } = useForm<EditWorldNameFormData>({
+    resolver: zodResolver(editWorldNameSchema),
     mode: 'onChange',
     defaultValues: {
       name: worldName || '',
       originalName: originalWorldName || '',
-      description: '',
-      system: 'D&D 5e',
     }
   })
 
@@ -94,8 +92,6 @@ export function EditWorldModal({
       reset({
         name: worldName || '',
         originalName: originalWorldName || '',
-        description: '',
-        system: 'D&D 5e',
       })
     }
   }, [visible, reset, worldName, originalWorldName])

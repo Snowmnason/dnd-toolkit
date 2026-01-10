@@ -9,7 +9,7 @@ export const useSignInForm = () => {
   const router = useRouter();
   
   // RHF + Zod form setup
-  const { control, handleSubmit, formState: { isValid }, getValues, watch } = useForm<SignInFormData>({
+  const { control, handleSubmit, formState: { isValid }, watch } = useForm<SignInFormData>({
     resolver: zodResolver(signInSchema),
     mode: 'onChange',
     defaultValues: {
@@ -20,21 +20,24 @@ export const useSignInForm = () => {
   const [loading, setLoading] = useState(false);
   const email = watch('email') || '';
   const [authError, setAuthError] = useState('');
+  const [validationWarning, setValidationWarning] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Handle sign in
-  const handleSignIn = async () => {
+  // Handle sign in - receives validated data from RHF
+  const handleSignIn = async (data: SignInFormData) => {
     setAuthError('');
-    
-    const { email, password } = getValues();
+    setValidationWarning('');
     
     setLoading(true);
     
     try {
-      const result = await signInUser(email, password);
+      const result = await signInUser(data.email, data.password);
       
       if (result.success && result.redirectTo) {
         router.replace(result.redirectTo as any);
+      } else if (result.validationWarning) {
+        setValidationWarning(result.validationWarning);
+        setAuthError(result.error || '');
       } else if (result.error) {
         setAuthError(result.error);
       }
@@ -50,6 +53,7 @@ export const useSignInForm = () => {
     email,
     loading,
     authError,
+    validationWarning,
     showPassword,
     
     // Handlers

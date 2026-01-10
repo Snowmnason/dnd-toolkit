@@ -1,15 +1,16 @@
 import { z } from 'zod';
 
 /**
- * SQL injection protection: strips dangerous characters and keywords
+ * Check for dangerous SQL injection characters (run BEFORE any transforms)
+ * Rejects input instead of silently transforming for better security
  */
-const sanitizeDangerousChars = (val: string) => {
-  // Remove SQL injection patterns: quotes, semicolons, comment markers
-  return val.replace(/['"`;<>]|--|\/\*|\*\//g, '');
+const hasNoDangerousChars = (val: string) => {
+  // Check for SQL injection patterns: quotes, semicolons, comment markers
+  return !/['"`;<>]|--|\/\*|\*\//.test(val);
 };
 
 /**
- * Check for SQL keywords (case-insensitive)
+ * Check for SQL keywords (case-insensitive, run BEFORE any transforms)
  */
 const hasNoSqlKeywords = (val: string) => {
   const sqlKeywords = /\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE|UNION|SCRIPT|JAVASCRIPT|ONERROR|ONLOAD)\b/i;
@@ -18,13 +19,14 @@ const hasNoSqlKeywords = (val: string) => {
 
 /**
  * Email validation schema with SQL injection protection
+ * Validates BEFORE transforms to prevent sneaky SQL injection attempts
  */
 export const emailSchema = z
   .string()
   .trim()
   .min(1, 'Email is required')
-  .transform(sanitizeDangerousChars)
   .refine(hasNoSqlKeywords, 'Email contains invalid characters')
+  .refine(hasNoDangerousChars, 'Email contains invalid characters')
   .pipe(z.string().email('Please enter a valid email address'))
   .transform(val => val.toLowerCase());
 
@@ -45,14 +47,15 @@ export const passwordSchema = z
 /**
  * Username validation schema with SQL injection protection
  * Matches existing validation: 3-20 chars, starts with letter, alphanumeric + underscores
+ * Validates BEFORE any transforms for security
  */
 export const usernameSchema = z
   .string()
   .trim()
   .min(3, 'Username must be at least 3 characters')
   .max(20, 'Username must be 20 characters or less')
-  .transform(sanitizeDangerousChars)
   .refine(hasNoSqlKeywords, 'Username contains reserved words')
+  .refine(hasNoDangerousChars, 'Username contains invalid characters')
   .refine(val => /^[a-zA-Z]/.test(val), 'Username must start with a letter')
   .refine(val => /^[a-zA-Z0-9_]*$/.test(val), 'Username can only contain letters, numbers, and underscores');
 

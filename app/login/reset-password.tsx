@@ -71,17 +71,6 @@ export default function ResetPasswordScreen() {
           onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
         />
 
-        {fieldErrors.password?.message && (
-          <AuthSubTitle
-            color="#dc3545"
-            align="left"
-            fontSize='$caption'
-            style={{ marginTop: -6, marginBottom: 2 }}
-          >
-            {fieldErrors.password.message}
-          </AuthSubTitle>
-        )}
-
         {/* Password Requirements */}
         <AuthSubTitle
           color={getPasswordHintColor(password)}
@@ -109,17 +98,6 @@ export default function ResetPasswordScreen() {
           returnKeyType="go"
           onSubmitEditing={handleResetPassword}
         />
-
-        {fieldErrors.confirmPassword?.message && (
-          <AuthSubTitle
-            color="#dc3545"
-            align="left"
-            fontSize='$caption'
-            style={{ marginTop: -6, marginBottom: 2 }}
-          >
-            {fieldErrors.confirmPassword.message}
-          </AuthSubTitle>
-        )}
 
         {/* Password Match Indicator */}
         {confirmPassword.length > 0 && (

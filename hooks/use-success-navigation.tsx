@@ -30,7 +30,7 @@ export function useSuccessNavigation({ showSuccessModal, successWorldId }: UseSu
         clearTimeout(successTimeoutRef.current);
       }
     };
-  }, [showSuccessModal, isNavigating]);
+  }, [showSuccessModal, isNavigating, router]);
 
   const navigateToWorld = () => {
     if (!isNavigating) {

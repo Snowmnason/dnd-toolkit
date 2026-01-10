@@ -89,17 +89,6 @@ export default function ForgotPasswordScreen() {
           onSubmitEditing={handleSubmit(onSubmit)}
         />
 
-        {errors.email?.message && (
-          <AuthSubTitle
-            color="#dc3545"
-            align="left"
-            fontSize='$caption'
-            style={{ marginTop: -6, marginBottom: 2 }}
-          >
-            {errors.email.message}
-          </AuthSubTitle>
-        )}
-
         {/* Error Display */}
         <AuthError error={error} />
 

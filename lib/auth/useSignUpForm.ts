@@ -14,15 +14,16 @@ import {
 import { getPasswordHintColor, getPasswordRequirementsText } from './validation';
 
 type SignUpMode = 'signup' | 'complete-profile';
-type SignUpFormValues = SignUpFormData & CompleteProfileFormData;
+// Use conditional type to properly type form values based on mode
+type SignUpFormValues = SignUpFormData | CompleteProfileFormData;
 
 export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
   const router = useRouter();
   
-  // RHF + Zod form
+  // RHF + Zod form - type is properly inferred from schema
   const schema = mode === 'complete-profile' ? completeProfileSchema : signUpSchema;
-  const { control, handleSubmit, formState: { isValid }, getValues, watch } = useForm<SignUpFormValues>({
-    resolver: zodResolver(schema as any),
+  const { control, handleSubmit, formState: { isValid }, watch } = useForm({
+    resolver: zodResolver(schema),
     mode: 'onChange',
     defaultValues: mode === 'complete-profile'
       ? { username: '' }
@@ -31,6 +32,7 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
 
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [validationWarning, setValidationWarning] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showEmailExistsModal, setShowEmailExistsModal] = useState(false);
   const password = watch('password') as string | undefined;
@@ -39,13 +41,12 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
   const username = watch('username') as string | undefined;
   const passwordsMatch = password === confirmPassword;
 
-  // Handle sign up or profile completion
-  const onSubmit = async () => {
+  // Handle sign up or profile completion - receives validated data from RHF
+  const onSubmit = async (data: SignUpFormValues) => {
     setAuthError('');
+    setValidationWarning('');
     
     if (mode === 'complete-profile') {
-      const { username } = getValues();
-
       if (!user) {
         setAuthError('Authentication error. Please try again.');
         return;
@@ -57,14 +58,14 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
       try {
         logger.debug('signup', 'Creating user profile with data:', {
           auth_id: user.id,
-          username: username.trim(),
-          usernameLength: username.trim().length
+          username: data.username.trim(),
+          usernameLength: data.username.trim().length
         });
         
         // Create user profile
         const newProfile = await usersDB.create({
           auth_id: user.id,
-          username: username.trim()
+          username: data.username.trim()
         });
         
         logger.info('signup', 'Profile created successfully:', {
@@ -114,13 +115,11 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
         logger.debug('signup', 'Profile creation process completed');
       }
     } else {
-      const { email, password } = getValues();
-      
       setLoading(true);
       
       try {
         // Sign up without creating user profile (username will be collected later)
-        const result = await signUpUser(email, password);
+        const result = await signUpUser(data.email, data.password);
         
         if (result.success && result.redirectTo) {
           router.replace(result.redirectTo as any);
@@ -160,6 +159,7 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
     username: username || '',
     loading,
     authError,
+    validationWarning,
     showPassword,
     showEmailExistsModal,
     passwordsMatch,

@@ -1,5 +1,5 @@
 import { UpdateUsernameModal } from '@/components/modals'
-import { Body, Button, Heading, IconButton, SubTitle, Surface } from '@/components/ui'
+import { AppToast, Body, Button, Heading, IconButton, SubTitle, Surface } from '@/components/ui'
 import { logger, updateUsername } from '@/lib'
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
 import { $, useScale } from '@/theme'
@@ -23,6 +23,8 @@ export default function UserProfile({ profile }: UserProfileProps) {
   const [showUsernameModal, setShowUsernameModal] = useState(false)
   const [updatingUsername, setUpdatingUsername] = useState(false)
   const [usernameError, setUsernameError] = useState('')
+  const [usernameValidationWarning, setUsernameValidationWarning] = useState('')
+  const [showValidationToast, setShowValidationToast] = useState(false)
 
   useEffect(() => {
     const fetchSessionUser = async () => {
@@ -42,13 +44,24 @@ export default function UserProfile({ profile }: UserProfileProps) {
     fetchSessionUser()
   }, [])
 
+  // Show toast when validation warning occurs
+  useEffect(() => {
+    if (usernameValidationWarning) {
+      setShowValidationToast(true)
+    }
+  }, [usernameValidationWarning])
+
   const handleUpdateUsername = async (newUsername: string) => {
     setUsernameError('')
+    setUsernameValidationWarning('')
     setUpdatingUsername(true)
 
     try {
       const result = await updateUsername(newUsername)
       if (!result.success) {
+        if (result.validationWarning) {
+          setUsernameValidationWarning(result.validationWarning)
+        }
         setUsernameError(result.error || 'Failed to update username')
         return
       }
@@ -148,6 +161,14 @@ export default function UserProfile({ profile }: UserProfileProps) {
           errorText={usernameError}
         />
       )}
+
+      <AppToast
+        message={usernameValidationWarning}
+        type="warning"
+        visible={showValidationToast}
+        duration={4000}
+        onHide={() => setShowValidationToast(false)}
+      />
     </View>
   )
 }

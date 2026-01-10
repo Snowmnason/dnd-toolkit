@@ -8,6 +8,7 @@ import { logger } from '../utils/logger';
 export interface DeleteAccountResult {
   success: boolean;
   error?: string;
+  validationWarning?: string; // When client validation passed but server validation failed
 }
 
 /**
@@ -17,9 +18,10 @@ export interface DeleteAccountResult {
  * @throws Error with user-friendly message if deletion fails
  */
 export async function deleteUserAccount(password: string): Promise<DeleteAccountResult> {
+  // Validate password outside try block so it's available in catch
+  const passwordValidation = validatePassword(password);
+  
   try {
-    // Validate password using utility function
-    const passwordValidation = validatePassword(password);
     if (!password || password.trim().length === 0) {
       throw new Error('Password is required to confirm account deletion');
     }
@@ -44,7 +46,11 @@ export async function deleteUserAccount(password: string): Promise<DeleteAccount
 
     if (reAuthError) {
       logger.error('deleteAccount', 'Re-authentication failed:', reAuthError);
-      throw new Error('Password verification failed. Please check your password and try again.');
+      // If password passed client validation but failed auth, mark as validation warning
+      const isBackendValidationFailure = passwordValidation.isValid;
+      throw Object.assign(new Error('Password verification failed. Please check your password and try again.'), {
+        isBackendValidationFailure
+      });
     }
 
     // Call the edge function to delete everything
@@ -69,8 +75,16 @@ export async function deleteUserAccount(password: string): Promise<DeleteAccount
     
   } catch (error: any) {
     logger.error('deleteAccount', 'Delete account error:', error);
+    
+    // Check if this is a backend validation failure (client passed, server rejected)
+    const isBackendValidationFailure = (error as any)?.isBackendValidationFailure || 
+      (passwordValidation.isValid && error.message?.includes('Password verification failed'));
+    
     return {
       success: false,
+      validationWarning: isBackendValidationFailure ?
+        'An authentication issue occurred. Please try again.' :
+        undefined,
       error: error?.message || 'Failed to delete account. Please try again.'
     };
   }

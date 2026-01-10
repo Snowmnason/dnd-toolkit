@@ -5,16 +5,18 @@ import {
   AuthButtonSecondary, AuthCaption, AuthError, AuthForm, AuthRoot, AuthSubTitle, AuthTitle,
   FormAuthInput
 } from '@/components/auth_components';
+import { AppToast } from '@/components/ui';
 import { logger, supabase, useSignInForm } from '@/lib';
 import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TextInput } from 'react-native';
 
 export default function SignInScreen() {
   const S = useScale();
   const router = useRouter();
   const [isResendingEmail, setIsResendingEmail] = useState(false);
+  const [showValidationToast, setShowValidationToast] = useState(false);
   
   // Refs for keyboard navigation
   const passwordInputRef = useRef<TextInput>(null);
@@ -28,6 +30,7 @@ export default function SignInScreen() {
     // State
     loading,
     authError,
+    validationWarning,
     showPassword,
     
     // Handlers
@@ -55,6 +58,13 @@ export default function SignInScreen() {
       setIsResendingEmail(false);
     }
   };
+
+  // Show toast when validation warning occurs
+  useEffect(() => {
+    if (validationWarning) {
+      setShowValidationToast(true);
+    }
+  }, [validationWarning]);
 
   return (
     <AuthRoot>
@@ -144,6 +154,14 @@ export default function SignInScreen() {
       <AuthCaption>
         © 2025 The Snow Post · Forged for storytellers & adventurers
       </AuthCaption>
+
+      <AppToast
+        message={validationWarning}
+        type="warning"
+        visible={showValidationToast}
+        duration={4000}
+        onHide={() => setShowValidationToast(false)}
+      />
     </AuthRoot>
   )
 }
