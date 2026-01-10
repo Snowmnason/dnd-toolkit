@@ -90,6 +90,7 @@ function buildCsp(scriptHashes, styleHashes) {
     "'self'",
     'https://dnd-tool.thesnowpost.com',
     'https://*.supabase.co',
+    "'wasm-unsafe-eval'", // Required for WebAssembly (React DevTools, etc.)
     ...scriptHashes,
   ].join(' ');
 

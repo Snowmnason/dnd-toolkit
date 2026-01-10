@@ -70,6 +70,9 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git add package.json package-lock.json app.json desktop/package.json desktop/package-lock.json
           git commit -m "chore(release): bump major version to ${{ env.new_version }} - milestone closed"
+          
+          # Pull latest changes and rebase to avoid conflicts
+          git pull --rebase origin main
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

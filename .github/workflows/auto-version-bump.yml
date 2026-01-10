@@ -95,6 +95,9 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git add package.json app.json desktop/package.json package-lock.json desktop/package-lock.json
           git commit -m "chore(release): bump version ${{ env.current_version }} → ${{ env.new_version }} (${{ env.bump_type }})"
+          
+          # Pull latest changes and rebase to avoid conflicts
+          git pull --rebase origin main
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

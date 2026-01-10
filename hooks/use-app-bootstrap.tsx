@@ -154,11 +154,23 @@ async function restoreSession() {
       return;
     }
 
-    // Get the current session (this will restore from storage if available)
+    // Wrap session restoration in a timeout to prevent indefinite hanging
+    // If token refresh fails or hangs, we still let the app boot
+    const SESSION_RESTORE_TIMEOUT = 5000; // 5 seconds
+    
+    const sessionPromise = supabase.auth.getSession();
+    const timeoutPromise = new Promise<{ data: { session: null }; error: any }>((resolve) =>
+      setTimeout(() => {
+        blog.warn("bootstrap", "Session restore timed out after 5s");
+        resolve({ data: { session: null }, error: new Error("Session restore timeout") });
+      }, SESSION_RESTORE_TIMEOUT)
+    );
+
+    // Race between session restore and timeout
     const {
       data: { session },
       error,
-    } = await supabase.auth.getSession();
+    } = await Promise.race([sessionPromise, timeoutPromise]);
 
     if (error) {
       blog.warn("bootstrap", "Session restore error:", error);
