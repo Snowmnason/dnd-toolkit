@@ -166,6 +166,29 @@ export class EncryptedStorage {
       throw error;
     }
   }
+
+  // Get all keys from storage (for debugging/migration)
+  static async getAllKeys(): Promise<string[]> {
+    try {
+      if (Platform.OS === 'web') {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const keys: string[] = [];
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const key = window.localStorage.key(i);
+            if (key) keys.push(key);
+          }
+          return keys;
+        }
+        return [];
+      } else if (AsyncStorage) {
+        return await AsyncStorage.getAllKeys();
+      }
+      return [];
+    } catch (error) {
+      logger.error('encrypted-storage', 'Error getting all keys:', error);
+      return [];
+    }
+  }
 }
 
 // Supabase storage adapter using our encrypted storage

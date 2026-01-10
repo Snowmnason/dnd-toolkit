@@ -32,6 +32,7 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 ## Data and services
 - Supabase client/config under `lib/database/`. Always guard usage with `isSupabaseConfigured()` and prefer dynamic imports to avoid circular deps and to keep web fallback working.
 - Auth/session: Use `AuthStateManager.isAuthenticated()` for guards and `getRoutingDecision()` for flow decisions. Clearing/saving state uses platform-appropriate storage (web localStorage vs. encrypted storage on native).
+- **Storage**: Use `SecureStorage` from `@/lib/storage` for all persistent app data. All data is encrypted via AES-CTR on all platforms (web, iOS, Android, desktop). Never use direct `localStorage`, `sessionStorage`, or `EncryptedStorage`—always go through `SecureStorage`. Use `STORAGE_KEYS` constants, never hardcode keys. See `docs/issues/MileStone 1/082 - Central Storage/` for API docs and patterns.
 
 ## Patterns and examples
 - Import UI components:
@@ -54,7 +55,8 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 - Splash screen: `hooks/use-splash-screen.tsx`
 - Feature flags: `config/appsettings.*.json` (`featureFlags`), `lib/feature-flags.ts` (kind helper + beta warning in prod)
 - Auth state: `lib/auth-state.ts`
+- **Storage**: `lib/storage/SecureStorage.ts` (implementation), `lib/storage/index.ts` (exports + keys)
 - UI barrel: `components/ui/index.ts`
 - Theme root: `theme/index.ts` (families, tokens, provider)
 - Navigation config: `lib/navigation/navigation-config.ts`, URI helpers: `lib/navigation/uri-helpers.ts`
-- Docs: `docs/COMPONENTS.md`, `docs/SCREENS.md`, `docs/FEATURE_FLAGS.md`, `docs/NOTIFICATIONS_USAGE.md`, `docs/NAVIGATION_CONFIG.md`
+- Docs: `docs/COMPONENTS.md`, `docs/SCREENS.md`, `docs/FEATURE_FLAGS.md`, `docs/NOTIFICATIONS_USAGE.md`, `docs/NAVIGATION_CONFIG.md`, **`docs/issues/MileStone 1/082 - Central Storage/SECURE_STORAGE.md`**

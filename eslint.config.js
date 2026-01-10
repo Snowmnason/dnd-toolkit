@@ -12,6 +12,18 @@ module.exports = defineConfig([
     },
     rules: {
       '@typescript-eslint/no-require-imports': 'off',
+      // Storage: All data must use SecureStorage for cross-platform encryption
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'localStorage',
+          message: 'Use SecureStorage from @/lib/storage instead. It encrypts data on all platforms (web, iOS, Android).',
+        },
+        {
+          name: 'sessionStorage',
+          message: 'Use SecureStorage from @/lib/storage instead. It encrypts data on all platforms (web, iOS, Android).',
+        },
+      ],
       // Security rules
       'security/detect-buffer-noassert': 'error',
       'security/detect-child-process': 'error',

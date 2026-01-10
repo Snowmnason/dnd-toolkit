@@ -1,52 +1,15 @@
-import { Platform } from 'react-native';
 import { logger } from './utils/logger';
+import { SecureStorage, STORAGE_KEYS as SECURE_STORAGE_KEYS } from './storage';
 
-// Simple storage interface for cross-platform compatibility
-const storage = {
-  async getItem(key: string): Promise<string | null> {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        return window.localStorage.getItem(key);
-      }
-      return null;
-    } else {
-      // For mobile, we'll use our encrypted storage
-      const { EncryptedStorage } = await import('./auth/encrypted-storage');
-      return await EncryptedStorage.getItem(key);
-    }
-  },
-
-  async setItem(key: string, value: string): Promise<void> {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(key, value);
-      }
-    } else {
-      // For mobile, we'll use our encrypted storage
-      const { EncryptedStorage } = await import('./auth/encrypted-storage');
-      await EncryptedStorage.setItem(key, value);
-    }
-  },
-
-  async removeItem(key: string): Promise<void> {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.removeItem(key);
-      }
-    } else {
-      // For mobile, we'll use our encrypted storage
-      const { EncryptedStorage } = await import('./auth/encrypted-storage');
-      await EncryptedStorage.removeItem(key);
-    }
-  }
+// Local storage keys for auth state (use SecureStorage barrel export)
+const AUTH_STORAGE_KEYS = {
+  HAS_ACCOUNT: SECURE_STORAGE_KEYS.HAS_ACCOUNT,
+  USER_DATA: SECURE_STORAGE_KEYS.USER_DATA,
+  USER_DATA_TIMESTAMP: SECURE_STORAGE_KEYS.USER_DATA_TIMESTAMP,
 };
 
-// Storage keys
-const STORAGE_KEYS = {
-  HAS_ACCOUNT: 'dnd_has_account',
-  USER_DATA: 'dnd_user_data',
-  USER_DATA_TIMESTAMP: 'dnd_user_data_timestamp'  // Track when cache was last updated
-};
+// Cache expiration: 4 hours in milliseconds
+const CACHE_EXPIRATION_MS = 4 * 60 * 60 * 1000; // 14,400,000 ms
 
 export interface AuthState {
   hasAccount: boolean;
@@ -60,14 +23,11 @@ export interface StoredUserData {
   isAdmin: boolean;
 }
 
-// Cache expiration: 4 hours in milliseconds
-const CACHE_EXPIRATION_MS = 4 * 60 * 60 * 1000; // 14,400,000 ms
-
 export const AuthStateManager = {
   // Get current auth state
   async getAuthState(): Promise<AuthState> {
     try {
-      const hasAccount = await storage.getItem(STORAGE_KEYS.HAS_ACCOUNT);
+      const hasAccount = await SecureStorage.getItem(AUTH_STORAGE_KEYS.HAS_ACCOUNT);
 
       return {
         hasAccount: hasAccount === 'true'
@@ -80,26 +40,22 @@ export const AuthStateManager = {
     }
   },
 
-  // Save user data to local storage with timestamp
+  // Save user data to storage with timestamp
   async saveUserData(userData: StoredUserData): Promise<void> {
     try {
-      await storage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(userData));
+      await SecureStorage.setJSON(AUTH_STORAGE_KEYS.USER_DATA, userData);
       // Store the timestamp when this cache was updated
-      await storage.setItem(STORAGE_KEYS.USER_DATA_TIMESTAMP, Date.now().toString());
+      await SecureStorage.setItem(AUTH_STORAGE_KEYS.USER_DATA_TIMESTAMP, Date.now().toString());
       logger.debug('auth-state', 'User data saved to storage with timestamp:', { id: userData.id, username: userData.username, isAdmin: userData.isAdmin });
     } catch (error) {
       logger.error('auth-state', 'Error saving user data:', error);
     }
   },
 
-  // Get user data from local storage
+  // Get user data from storage
   async getUserData(): Promise<StoredUserData | null> {
     try {
-      const userData = await storage.getItem(STORAGE_KEYS.USER_DATA);
-      if (userData) {
-        return JSON.parse(userData);
-      }
-      return null;
+      return await SecureStorage.getJSON<StoredUserData>(AUTH_STORAGE_KEYS.USER_DATA);
     } catch (error) {
       logger.error('auth-state', 'Error getting user data:', error);
       return null;
@@ -120,7 +76,7 @@ export const AuthStateManager = {
   // Set user has created/logged into account
   async setHasAccount(hasAccount: boolean): Promise<void> {
     try {
-      await storage.setItem(STORAGE_KEYS.HAS_ACCOUNT, hasAccount.toString());
+      await SecureStorage.setItem(AUTH_STORAGE_KEYS.HAS_ACCOUNT, hasAccount.toString());
     } catch (error) {
       logger.error('auth-state', 'Error setting hasAccount:', error);
     }
@@ -130,28 +86,18 @@ export const AuthStateManager = {
   async setSession(session: any): Promise<void> {
     try {
       // Keep the simple has-account flag in sync
-      await storage.setItem(STORAGE_KEYS.HAS_ACCOUNT, 'true');
-
-      // Optionally cache minimal session info on web (not storing full token for security)
-      if (Platform.OS === 'web' && session?.user?.email) {
-        try {
-          const key = 'dnd_session_user_email';
-          window.localStorage.setItem(key, session.user.email);
-  } catch {
-          // ignore
-        }
-      }
-    } catch {
-      logger.error('auth-state', '', );
+      await SecureStorage.setItem(AUTH_STORAGE_KEYS.HAS_ACCOUNT, 'true');
+    } catch (error) {
+      logger.error('auth-state', 'Error setting session:', error);
     }
   },
 
   // Clear all auth state (logout)
   async clearAuthState(): Promise<void> {
     try {
-      await storage.removeItem(STORAGE_KEYS.HAS_ACCOUNT);
-      await storage.removeItem(STORAGE_KEYS.USER_DATA);
-      await storage.removeItem(STORAGE_KEYS.USER_DATA_TIMESTAMP);
+      await SecureStorage.removeItem(AUTH_STORAGE_KEYS.HAS_ACCOUNT);
+      await SecureStorage.removeItem(AUTH_STORAGE_KEYS.USER_DATA);
+      await SecureStorage.removeItem(AUTH_STORAGE_KEYS.USER_DATA_TIMESTAMP);
       logger.debug('auth-state', 'Auth state cleared');
     } catch (error) {
       logger.error('auth-state', 'Error clearing auth state:', error);
@@ -161,7 +107,7 @@ export const AuthStateManager = {
   // Check if cached user data is still fresh (< 4 hours old)
   async isCacheFresh(): Promise<boolean> {
     try {
-      const timestampStr = await storage.getItem(STORAGE_KEYS.USER_DATA_TIMESTAMP);
+      const timestampStr = await SecureStorage.getItem(AUTH_STORAGE_KEYS.USER_DATA_TIMESTAMP);
       if (!timestampStr) {
         return false; // No timestamp = no cache
       }
