@@ -1,15 +1,15 @@
 import { useImageCache } from '@/hooks/use-image-cache'
 import { useViewportTracking } from '@/hooks/use-viewport-tracking'
 import {
-    generateResponsiveSrcset,
     isSupabaseUrl,
     optimizeSupabaseImage,
     supportsWebP,
 } from '@/lib/utils/image-optimization'
+import { $ } from '@/theme'
 import { Image, ImageProps } from 'expo-image'
 import type { RefObject } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Platform, Pressable, Text, View, ViewStyle } from 'react-native'
+import { Pressable, Text, View, ViewStyle } from 'react-native'
 import { ImageSkeleton } from './ImageSkeleton'
 
 interface LazyImageProps extends Omit<ImageProps, 'source'> {
@@ -135,6 +135,7 @@ export function LazyImage({
   const { set: setCache } = useImageCache()
   const imageRef = useRef<any>(null)
   const [containerPixelWidth, setContainerPixelWidth] = useState<number | null>(null)
+  const [containerPixelHeight, setContainerPixelHeight] = useState<number | null>(null)
   const [reloadKey, setReloadKey] = useState<number>(0)
 
   // Check WebP support on mount
@@ -155,11 +156,47 @@ export function LazyImage({
   const handleLayout = useCallback((e: any) => {
     try {
       const w = e?.nativeEvent?.layout?.width
+      const h = e?.nativeEvent?.layout?.height
       const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1
       if (typeof w === 'number' && w > 0) {
         setContainerPixelWidth(Math.round(w * dpr))
       }
+      if (typeof h === 'number' && h > 0) {
+        setContainerPixelHeight(Math.round(h * dpr))
+      }
     } catch {}
+  }, [])
+
+  // Try to get Content-Length via HEAD; fallback to estimate
+  const getRemoteContentLength = useCallback(async (url: string): Promise<number | null> => {
+    try {
+      if (typeof fetch === 'function') {
+        const res = await fetch(url, { method: 'HEAD' })
+        const len = res.headers.get('content-length')
+        if (len) return parseInt(len, 10)
+      }
+    } catch {}
+    return null
+  }, [])
+
+  const estimateImageSize = useCallback((w?: number | null, h?: number | null, format?: 'webp' | 'jpeg' | 'png', quality?: number): number => {
+    if (!w || !h) return 0
+    const pixels = w * h
+    let bpp = 0.5 // default ~JPEG
+    switch (format) {
+      case 'webp':
+        bpp = 0.35
+        break
+      case 'png':
+        bpp = 0.8
+        break
+      case 'jpeg':
+      default:
+        bpp = 0.5
+        break
+    }
+    const qScale = quality ? Math.max(0.3, Math.min(1, quality / 85)) : 1
+    return Math.round(pixels * bpp * qScale)
   }, [])
 
   // Prefetch image if requested
@@ -168,12 +205,14 @@ export function LazyImage({
       if (typeof window !== 'undefined') {
         const img = new (window as any).Image()
         img.src = src
-        img.onload = () => {
-          setCache(src, img, 5000)
+        img.onload = async () => {
+          const headSize = await getRemoteContentLength(src)
+          const est = estimateImageSize(img.naturalWidth, img.naturalHeight, (useWebP && webpSupported) ? 'webp' : 'jpeg', optimizeQuality)
+          setCache(src, img, headSize ?? est ?? 0)
         }
       }
     }
-  }, [prefetch, src, setCache])
+  }, [prefetch, src, setCache, getRemoteContentLength, estimateImageSize, useWebP, webpSupported, optimizeQuality])
 
   // Optimize Supabase URLs with responsive support and WebP detection
   const optimizedSrc = useMemo(() => {
@@ -183,11 +222,6 @@ export function LazyImage({
     if (typeof src !== 'string') return src
 
     if (optimizeSupabase && isSupabaseUrl(src)) {
-      // For web, use responsive srcsets if available
-      if (responsive && Platform.OS === 'web') {
-        return generateResponsiveSrcset(src, responsiveWidths)
-      }
-
       // Single image optimization
       return optimizeSupabaseImage(src, {
         width: autoOptimizeWidth && containerPixelWidth ? containerPixelWidth : optimizeWidth,
@@ -208,17 +242,29 @@ export function LazyImage({
     responsiveWidths,
     useWebP,
     webpSupported,
+    supabaseFit,
+    autoOptimizeWidth,
+    containerPixelWidth,
   ])
 
   const handleLoad = useCallback(() => {
     setIsLoaded(true)
     setHasError(false)
 
-    // Cache the loaded image
+    // Cache the loaded image with realistic size
     if (cacheStrategy !== 'none' && imageRef.current) {
-      setCache(src, imageRef.current, 10000)
+      const urlStr = typeof optimizedSrc === 'string' ? optimizedSrc : (typeof src === 'string' ? src : undefined)
+      if (urlStr) {
+        getRemoteContentLength(urlStr).then((headSize) => {
+          const est = estimateImageSize(containerPixelWidth ?? undefined, containerPixelHeight ?? undefined, (useWebP && webpSupported) ? 'webp' : 'jpeg', optimizeQuality)
+          setCache(src, imageRef.current, headSize ?? est ?? 0)
+        })
+      } else {
+        const est = estimateImageSize(containerPixelWidth ?? undefined, containerPixelHeight ?? undefined, undefined, optimizeQuality)
+        setCache(src, imageRef.current, est)
+      }
     }
-  }, [src, cacheStrategy, setCache])
+  }, [src, cacheStrategy, setCache, optimizedSrc, getRemoteContentLength, estimateImageSize, containerPixelWidth, containerPixelHeight, useWebP, webpSupported, optimizeQuality])
 
   const handleError = useCallback(() => {
     setHasError(true)
@@ -293,7 +339,7 @@ export function LazyImage({
             position: 'absolute',
             bottom: 12,
             right: 12,
-            backgroundColor: 'rgba(0,0,0,0.5)',
+            backgroundColor: $('surface' as any),
             paddingHorizontal: 10,
             paddingVertical: 6,
             borderRadius: 8,
@@ -308,7 +354,7 @@ export function LazyImage({
               alignItems: 'center',
             }}
           >
-            <Text style={{ color: '#fff' }}>Retry</Text>
+            <Text style={{ color: $('textPrimary' as any) }}>Retry</Text>
           </Pressable>
         </View>
       )}

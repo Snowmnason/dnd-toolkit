@@ -65,7 +65,7 @@ export function useViewportTracking({
       setIsInView(true)
       setHasLoaded(true)
     }
-  }, [threshold, rootMargin])
+  }, [threshold, rootMargin, rootRef])
 
   return {
     ref,

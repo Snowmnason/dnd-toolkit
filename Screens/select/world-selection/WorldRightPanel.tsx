@@ -39,8 +39,7 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
           optimizeWidth={1200}
           optimizeQuality={85}
           showSkeleton={!!mapImage}
-          priority="low"
-          cachePolicy="memory-disk"
+          cacheStrategy="memory-disk"
           transition={300}
           containerStyle={{
             position: 'absolute',
