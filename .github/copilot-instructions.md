@@ -56,7 +56,16 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 - Feature flags: `config/appsettings.*.json` (`featureFlags`), `lib/feature-flags.ts` (kind helper + beta warning in prod)
 - Auth state: `lib/auth-state.ts`
 - **Storage**: `lib/storage/SecureStorage.ts` (implementation), `lib/storage/index.ts` (exports + keys)
+- **Image optimization**: `components/ui/LazyImage.tsx`, `hooks/use-viewport-tracking.tsx`, `hooks/use-image-cache.tsx`, `lib/utils/image-optimization.ts`. See `docs/issues/MileStone 1/030 - Optimize Image Loading/` for full guide.
 - UI barrel: `components/ui/index.ts`
 - Theme root: `theme/index.ts` (families, tokens, provider)
 - Navigation config: `lib/navigation/navigation-config.ts`, URI helpers: `lib/navigation/uri-helpers.ts`
-- Docs: `docs/COMPONENTS.md`, `docs/SCREENS.md`, `docs/FEATURE_FLAGS.md`, `docs/NOTIFICATIONS_USAGE.md`, `docs/NAVIGATION_CONFIG.md`, **`docs/issues/MileStone 1/082 - Central Storage/SECURE_STORAGE.md`**
+- Docs: `docs/COMPONENTS.md`, `docs/SCREENS.md`, `docs/FEATURE_FLAGS.md`, `docs/NOTIFICATIONS_USAGE.md`, `docs/NAVIGATION_CONFIG.md`, **`docs/issues/MileStone 1/082 - Central Storage/SECURE_STORAGE.md`**, **`docs/issues/MileStone 1/030 - Optimize Image Loading/IMAGE_OPTIMIZATION_GUIDE.md`**
+
+## Documentation Rule
+When creating feature documentation:
+- Create docs in `docs/issues/MileStone X/NNN - Feature Name/` folder
+- Include 1-2 docs max: one for "How to use" (with examples), one for architecture/implementation if complex
+- Focus on feature functionality and usage, not implementation history or design decisions
+- Omit benefits/why statements (assume reader knows why the feature exists)
+- Include code examples, API reference, troubleshooting, and best practices

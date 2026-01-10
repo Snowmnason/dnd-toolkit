@@ -56,12 +56,15 @@ export function WorldListPanel({ worlds, selectedWorld, setSelectedWorld, setMap
                 text={world.name}
                 variant={variant as any}
                 onPress={() => {
-                  setMapImage(world.map_image_url || null)
                   if (isDesktop) {
                     setSelectedWorld((prev) => {
-                      const newSelection = prev?.world_id === world.world_id ? null : world
-                      setMapImage(newSelection ? world.map_image_url || null : null)
-                      return newSelection
+                      if (prev?.world_id === world.world_id) {
+                        setMapImage(null)
+                        return null
+                      } else {
+                        setMapImage(world.map_image_url || null)
+                        return world
+                      }
                     })
                   } else {
                     // Update centralized params context

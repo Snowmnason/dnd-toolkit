@@ -1,11 +1,10 @@
-import { Button, Card, Heading } from '@/components/ui'
+import { Button, Card, Heading, LazyImage } from '@/components/ui'
 import { useAppParams } from '@/contexts/AppParamsContext'
 import { usePlatform } from '@/contexts/PlatformContext'
 import { WorldWithAccess } from '@/lib/database/worlds'
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
 import { logger } from '@/lib/utils/logger'
 import { $, useScale, UseTheme } from '@/theme'
-import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { View } from 'react-native'
 
@@ -28,23 +27,26 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
 
   return (
     <View style={{ flex: 1, position: 'relative' }}>
-      {/* Map Preview - fills entire container */}
+      {/* Map Preview - fills entire container with lazy loading */}
       {!DISABLE_BACKDROP && (
-        <Image
-          source={mapImage ? { uri: mapImage } : noImageSelected}
+        <LazyImage
+          src={mapImage || noImageSelected}
+          fallbackSrc={noImageSelected}
+          width="100%"
+          height="100%"
           contentFit={isDesktop ? 'cover' : 'contain'}
-          priority="low"
-          cachePolicy="memory-disk"
-          transition={120}
-          recyclingKey="world-right-panel-bg"
-          style={{
+          optimizeSupabase={!!mapImage}
+          optimizeWidth={1200}
+          optimizeQuality={85}
+          showSkeleton={!!mapImage}
+          cacheStrategy="memory-disk"
+          transition={300}
+          containerStyle={{
             position: 'absolute',
             top: 0,
             left: 0,
             right: 0,
             bottom: 0,
-            width: '100%',
-            height: '100%',
           }}
         />
       )}
