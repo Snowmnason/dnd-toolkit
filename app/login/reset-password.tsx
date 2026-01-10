@@ -3,21 +3,24 @@ import {
   AuthBody,
   AuthBodyFooter,
   AuthButton,
-  AuthCaption, AuthError, AuthForm, AuthInput, AuthRoot, AuthSubTitle,
+  AuthCaption, AuthError, AuthForm, AuthRoot, AuthSubTitle,
   AuthSuccess,
-  AuthTitle
+  AuthTitle,
+  FormAuthInput,
 } from '@/components/auth_components';
 import { useResetPasswordConfirm } from '@/lib';
 import { useScale } from '@/theme';
 import { useRef } from 'react';
 import { TextInput } from 'react-native';
+import { getPasswordHintColor, getPasswordRequirementsText } from '@/lib/auth/validation';
 
 export default function ResetPasswordScreen() {
   const S = useScale();
   // Refs for keyboard navigation
   const confirmPasswordInputRef = useRef<TextInput>(null);
   const {
-    // Form data
+    control,
+    isValid,
     password,
     confirmPassword,
     loading,
@@ -26,32 +29,15 @@ export default function ResetPasswordScreen() {
     successMessage,
     showPassword,
     userEmail,
-    
-    // Validation state
-    isPasswordValid,
     doPasswordsMatch,
-    isFormValid,
-    
-    // Handlers
+    fieldErrors,
     handleResetPassword,
-    handlePasswordChange,
-    handleConfirmPasswordChange,
     setShowPassword,
     goToSignIn,
   } = useResetPasswordConfirm();
 
-  // Helper functions for UI state
-  const getPasswordHintColor = () => {
-    if (password.length === 0) return '#A3D4A0';
-    return isPasswordValid ? '#A3D4A0' : '#F5A5A5';
-  };
-
-  const getPasswordRequirementsText = () => {
-    if (password.length === 0) return 'Password must be at least 6 characters';
-    return isPasswordValid ? '✓ Password meets requirements' : '✗ Password must be at least 6 characters';
-  };
-
   const getPasswordMatchText = () => {
+    if (confirmPassword.length === 0) return '';
     return doPasswordsMatch ? '✓ Passwords match' : '✗ Passwords do not match';
   };
 
@@ -72,10 +58,10 @@ export default function ResetPasswordScreen() {
         {success && <AuthSuccess message={successMessage} />}
 
         {/* Password Input */}
-        <AuthInput
+        <FormAuthInput
+          control={control}
+          name="password"
           placeholder="Password"
-          value={password}
-          onChangeText={handlePasswordChange}
           secureTextEntry={!showPassword}
           editable={!loading && !success}
           showPasswordToggle={true}
@@ -83,17 +69,11 @@ export default function ResetPasswordScreen() {
           showPassword={showPassword}
           returnKeyType="next"
           onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
-          style={{
-            borderColor:
-              !isPasswordValid && password.length > 0 ? '#dc3545' : undefined,
-            borderWidth:
-              !isPasswordValid && password.length > 0 ? 3 : undefined,
-          }}
         />
 
         {/* Password Requirements */}
         <AuthSubTitle
-          color={getPasswordHintColor()}
+          color={getPasswordHintColor(password)}
           align="left"
           fontSize='$caption'
             style={{
@@ -104,29 +84,19 @@ export default function ResetPasswordScreen() {
               opacity: 0.9,
             }}
         >
-          {getPasswordRequirementsText()}
+          {getPasswordRequirementsText(password)}
         </AuthSubTitle>
 
         {/* Confirm Password Input */}
-        <AuthInput
+        <FormAuthInput
+          control={control}
+          name="confirmPassword"
           ref={confirmPasswordInputRef}
           placeholder="Confirm Password"
-          value={confirmPassword}
-          onChangeText={handleConfirmPasswordChange}
           secureTextEntry={!showPassword}
           editable={!loading && !success}
           returnKeyType="go"
           onSubmitEditing={handleResetPassword}
-          style={{
-            borderColor:
-              confirmPassword.length > 0 && password !== confirmPassword
-                ? '#dc3545'
-                : undefined,
-            borderWidth:
-              confirmPassword.length > 0 && password !== confirmPassword
-                ? 2
-                : undefined,
-          }}
         />
 
         {/* Password Match Indicator */}
@@ -156,7 +126,7 @@ export default function ResetPasswordScreen() {
           <AuthButton
             text="Reset Password"
             onPress={handleResetPassword}
-            disabled={!isFormValid}
+            disabled={!isValid}
             loading={loading}
           />
         )}

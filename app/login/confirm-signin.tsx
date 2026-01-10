@@ -7,10 +7,10 @@ import {
   AuthCaption,
   AuthError,
   AuthForm,
-  AuthInput,
   AuthRoot,
   AuthSubTitle,
-  AuthTitle
+  AuthTitle,
+  FormAuthInput
 } from '@/components/auth_components';
 import { useSignInForm } from '@/lib';
 import { useScale } from '@/theme';
@@ -21,21 +21,12 @@ export default function SignInScreen() {
   const router = useRouter();
   
   const {
-    // Form data
-    email,
-    password,
+    control,
+    isValid,
     loading,
     authError,
     showPassword,
-    
-    // Validation state
-    emailValidation,
-    isFormValid,
-    
-    // Handlers
     handleSignIn,
-    handleEmailChange,
-    handlePasswordChange,
     setShowPassword,
   } = useSignInForm();
 
@@ -59,36 +50,27 @@ export default function SignInScreen() {
 
       {/* 🧾 Form Inputs */}
       <AuthForm style={{ marginBottom: authError ? S.space.md : S.space.xxl }}>
-        <AuthInput
+        <FormAuthInput
+          control={control}
+          name="email"
           placeholder="Email"
-          value={email}
-          onChangeText={handleEmailChange}
           keyboardType="email-address"
           autoCapitalize="none"
           editable={!loading}
-          style={{
-            borderColor:
-              !emailValidation.isValid && email.length > 0 ? '#dc3545' : undefined,
-            borderWidth:
-              !emailValidation.isValid && email.length > 0 ? 2 : undefined,
-          }}
+          returnKeyType="next"
         />
 
-        <AuthInput
+        <FormAuthInput
+          control={control}
+          name="password"
           placeholder="Password"
-          value={password}
-          onChangeText={handlePasswordChange}
           secureTextEntry={true}
           editable={!loading}
           showPasswordToggle={true}
           onTogglePassword={() => setShowPassword(!showPassword)}
           showPassword={showPassword}
-          style={{
-            borderColor:
-              !password.trim() && password.length > 0 ? '#dc3545' : undefined,
-            borderWidth:
-              !password.trim() && password.length > 0 ? 2 : undefined,
-          }}
+          returnKeyType="go"
+          onSubmitEditing={handleSignIn}
         />
 
         {/* Forgot Password Link */}
@@ -114,7 +96,7 @@ export default function SignInScreen() {
         <AuthButton
           text="Sign In"
           onPress={handleSignIn}
-          disabled={!isFormValid}
+          disabled={!isValid}
           loading={loading}
         />
 

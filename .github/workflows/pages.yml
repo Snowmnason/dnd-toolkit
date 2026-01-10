@@ -3,7 +3,9 @@ name: Deploy to GitHub Pages
 on:
   workflow_dispatch:
   workflow_run:
-    workflows: ["Auto-Bump Version on PR Merge or Main Push"]
+    workflows:
+      - "Auto-Bump Version on PR Merge or Main Push"
+      - "Milestone Release (Bump Major Version & Deploy)"
     types: [completed]
 
 permissions:
@@ -21,6 +23,50 @@ jobs:
     # Only run after successful auto-bump workflow completion
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     steps:
+      - name: Wait for pending bump/milestone workflows
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const workflows = ['auto-version-bump.yml', 'milestone-release.yml'];
+            const intervalMs = 10000; // 10s
+            const timeoutMs = 15 * 60 * 1000; // 15 minutes
+            const start = Date.now();
+
+            async function hasActiveRuns(workflowId) {
+              const inProgress = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowId, branch: 'main', status: 'in_progress' });
+              const queued = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: workflowId, branch: 'main', status: 'queued' });
+              return (inProgress.data.workflow_runs?.length || 0) > 0 || (queued.data.workflow_runs?.length || 0) > 0;
+            }
+
+            async function waitForIdle() {
+              while (true) {
+                let busy = false;
+                for (const wf of workflows) {
+                  if (await hasActiveRuns(wf)) {
+                    busy = true;
+                    break;
+                  }
+                }
+
+                if (!busy) {
+                  core.info('No active auto-bump or milestone workflows on main. Proceeding to deploy.');
+                  return;
+                }
+
+                if (Date.now() - start > timeoutMs) {
+                  core.setFailed('Timeout waiting for auto-bump/milestone workflows to finish.');
+                  return;
+                }
+
+                core.info('Waiting for auto-bump/milestone workflows to finish...');
+                await new Promise(r => setTimeout(r, intervalMs));
+              }
+            }
+
+            await waitForIdle();
+
       - name: Checkout
         uses: actions/checkout@v4
         with:

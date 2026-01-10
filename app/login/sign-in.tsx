@@ -2,38 +2,39 @@ import {
   AuthActionGroup, AuthBackButtonContainer,
   AuthBodyFooter,
   AuthButton, AuthButtonBack,
-  AuthButtonSecondary, AuthCaption, AuthError, AuthForm, AuthInput, AuthRoot, AuthSubTitle, AuthTitle
+  AuthButtonSecondary, AuthCaption, AuthError, AuthForm, AuthRoot, AuthSubTitle, AuthTitle,
+  FormAuthInput
 } from '@/components/auth_components';
+import { AppToast } from '@/components/ui';
 import { logger, supabase, useSignInForm } from '@/lib';
 import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TextInput } from 'react-native';
 
 export default function SignInScreen() {
   const S = useScale();
   const router = useRouter();
   const [isResendingEmail, setIsResendingEmail] = useState(false);
+  const [showValidationToast, setShowValidationToast] = useState(false);
   
   // Refs for keyboard navigation
   const passwordInputRef = useRef<TextInput>(null);
   
   const {
-    // Form data
+    // Form
+    control,
+    isValid,
     email,
-    password,
+    
+    // State
     loading,
     authError,
+    validationWarning,
     showPassword,
-    
-    // Validation state
-    emailValidation,
-    isFormValid,
     
     // Handlers
     handleSignIn,
-    handleEmailChange,
-    handlePasswordChange,
     setShowPassword,
   } = useSignInForm();
 
@@ -58,6 +59,13 @@ export default function SignInScreen() {
     }
   };
 
+  // Show toast when validation warning occurs
+  useEffect(() => {
+    if (validationWarning) {
+      setShowValidationToast(true);
+    }
+  }, [validationWarning]);
+
   return (
     <AuthRoot>
       {/* 🧭 Back Button*/}
@@ -76,30 +84,21 @@ export default function SignInScreen() {
 
       {/* 🧾 Form*/}
       <AuthForm>
-        <AuthInput
+        <FormAuthInput
+          control={control}
+          name="email"
           placeholder="Email"
-          value={email}
-          onChangeText={handleEmailChange}
           keyboardType="email-address"
           autoCapitalize="none"
           editable={!loading}
           returnKeyType="next"
           onSubmitEditing={() => passwordInputRef.current?.focus()}
-          style={{
-            borderColor:
-              !emailValidation.isValid && email.length > 0
-                ? '#dc3545'
-                : undefined,
-            borderWidth:
-              !emailValidation.isValid && email.length > 0 ? 3 : undefined,
-          }}
         />
 
-        <AuthInput
-          ref={passwordInputRef}
+        <FormAuthInput
+          control={control}
+          name="password"
           placeholder="Password"
-          value={password}
-          onChangeText={handlePasswordChange}
           secureTextEntry={true}
           editable={!loading}
           showPasswordToggle={true}
@@ -107,12 +106,6 @@ export default function SignInScreen() {
           showPassword={showPassword}
           returnKeyType="go"
           onSubmitEditing={handleSignIn}
-          style={{
-            borderColor:
-              !password.trim() && password.length > 0 ? '#dc3545' : undefined,
-            borderWidth:
-              !password.trim() && password.length > 0 ? 2 : undefined,
-          }}
         />
 
         {/* Error Display (with resend option) */}
@@ -142,7 +135,7 @@ export default function SignInScreen() {
         <AuthButton
           text="Sign In"
           onPress={handleSignIn}
-          disabled={!isFormValid}
+          disabled={!isValid}
           loading={loading}
         />
 
@@ -161,6 +154,14 @@ export default function SignInScreen() {
       <AuthCaption>
         © 2025 The Snow Post · Forged for storytellers & adventurers
       </AuthCaption>
+
+      <AppToast
+        message={validationWarning}
+        type="warning"
+        visible={showValidationToast}
+        duration={4000}
+        onHide={() => setShowValidationToast(false)}
+      />
     </AuthRoot>
   )
 }

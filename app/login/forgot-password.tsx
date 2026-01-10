@@ -3,52 +3,48 @@ import {
   AuthBody,
   AuthBodyFooter,
   AuthButton, AuthButtonBack,
-  AuthCaption, AuthError, AuthForm, AuthInput,
+  AuthCaption, AuthError, AuthForm,
   AuthModal,
   AuthRoot,
   AuthSubTitle,
   AuthSuccess,
-  AuthTitle
+  AuthTitle,
+  FormAuthInput,
 } from '@/components/auth_components';
-import { sendPasswordReset, validateEmail } from '@/lib';
+import { sendPasswordReset } from '@/lib';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { forgotPasswordSchema, type ForgotPasswordFormData } from '@/lib/schemas/auth.schema';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   
-  // Form state
-  const [email, setEmail] = useState('');
+  const { control, handleSubmit, formState: { isValid, errors }, watch } = useForm<ForgotPasswordFormData>({
+    resolver: zodResolver(forgotPasswordSchema),
+    mode: 'onChange',
+    defaultValues: {
+      email: '',
+    },
+  });
+  const email = watch('email') || '';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showEmailNotFoundModal, setShowEmailNotFoundModal] = useState(false);
 
-  // Validation
-  const emailValidation = validateEmail(email);
-  const isFormValid = emailValidation.isValid && email.trim().length > 0;
-
   // Handle password reset
-  const handleForgotPassword = async () => {
+  const onSubmit = async (values: ForgotPasswordFormData) => {
     setError('');
     setSuccess(false);
-    
-    // Client-side validation
-    if (!emailValidation.isValid) {
-      if (!email.trim()) {
-        setError('Email is required');
-      } else {
-        setError('Please enter a valid email address');
-      }
-      return;
-    }
     
     setLoading(true);
     
     try {
-      const result = await sendPasswordReset(email);
+      const result = await sendPasswordReset(values.email);
       
       if (result.success && result.message) {
         setSuccess(true);
@@ -61,13 +57,6 @@ export default function ForgotPasswordScreen() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Handle email change
-  const handleEmailChange = (text: string) => {
-    setEmail(text);
-    if (error) setError('');
-    if (success) setSuccess(false);
   };
 
 
@@ -89,21 +78,15 @@ export default function ForgotPasswordScreen() {
 
       {/* 🧾 Form*/}
       <AuthForm>
-        <AuthInput
+        <FormAuthInput
+          control={control}
+          name="email"
           placeholder="Email"
-          value={email}
-          onChangeText={handleEmailChange}
           keyboardType="email-address"
           autoCapitalize="none"
           editable={!loading}
           returnKeyType="go"
-          onSubmitEditing={handleForgotPassword}
-          style={{
-            borderColor:
-              !emailValidation.isValid && email.length > 0 ? '#dc3545' : undefined,
-            borderWidth:
-              !emailValidation.isValid && email.length > 0 ? 3 : undefined,
-          }}
+          onSubmitEditing={handleSubmit(onSubmit)}
         />
 
         {/* Error Display */}
@@ -117,8 +100,8 @@ export default function ForgotPasswordScreen() {
       <AuthActionGroup>
         <AuthButton
           text="Send New Password Email"
-          onPress={handleForgotPassword}
-          disabled={!isFormValid}
+          onPress={handleSubmit(onSubmit)}
+          disabled={!isValid}
           loading={loading}
         />
 

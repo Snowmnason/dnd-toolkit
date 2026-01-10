@@ -1,38 +1,27 @@
-import { Button, DescInput, Dropdown, Heading, SubTitle, TextInput } from '@/components/ui'
+import { Button, Dropdown, Heading, FormTextInput, FormDescInput } from '@/components/ui'
 import { usePlatform } from '@/contexts/PlatformContext'
-import { createWorldNameChangeHandler, isValidWorldNameForSubmission, type WorldNameValidationResult } from '@/lib'
+import type { WorldFormData } from '@/lib/schemas'
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
 import { useScale } from '@/theme'
 import { useRouter } from 'expo-router'
 import React from 'react'
 import { ScrollView, View } from 'react-native'
+import { Controller, type Control } from 'react-hook-form'
 
 interface CreateLeftPanelProps {
-  worldName: string
-  setWorldName: (name: string) => void
-  worldNameValidation: WorldNameValidationResult | null
-  setWorldNameValidation: (validation: WorldNameValidationResult | null) => void
-  system: string
-  setSystem: (system: string) => void
+  control: Control<WorldFormData, any>
   systemItems: { label: string; value: string }[]
-  description: string
-  setDescription: (description: string) => void
   isCreating: boolean
   handleCreateWorld: () => void
+  isFormValid: boolean
 }
 
 export function CreateLeftPanel({
-  worldName,
-  setWorldName,
-  worldNameValidation,
-  setWorldNameValidation,
-  system,
-  setSystem,
+  control,
   systemItems,
-  description,
-  setDescription,
   isCreating,
   handleCreateWorld,
+  isFormValid,
 }: CreateLeftPanelProps) {
   const S = useScale()
   const router = useRouter()
@@ -54,46 +43,38 @@ export function CreateLeftPanel({
 
       {/* World Name */}
       <View style={{ marginBottom: S.space.md }}>
-        <TextInput
+        <FormTextInput
+          control={control}
+          name="name"
           heading="Name of World"
           placeholder="World Name"
-          value={worldName}
-          onChangeText={createWorldNameChangeHandler(
-            setWorldName,
-            setWorldNameValidation
-          )}
         />
-
-        {/* Validation errors */}
-        {worldNameValidation && !worldNameValidation.isValid && (
-          <View style={{}}>
-            {worldNameValidation.errors.map((error, index) => (
-              <SubTitle color="$danger" key={index}>
-                ⚠️ {error}
-              </SubTitle>
-            ))}
-          </View>
-        )}
       </View>
 
       {/* Tabletop System */}
-      <Dropdown
-        heading="Tabletop System"
-        value={system}
-        items={systemItems}
-        onChange={(value) => {
-          if (value !== null) setSystem(value)
-        }}
-        placeholder="Select a tabletop system"
-        style={{ marginBottom: S.space.md }}
+      <Controller
+        control={control}
+        name="system"
+        render={({ field }) => (
+          <Dropdown
+            heading="Tabletop System"
+            value={field.value}
+            items={systemItems}
+            onChange={(value) => {
+              if (value !== null) field.onChange(value)
+            }}
+            placeholder="Select a tabletop system"
+            style={{ marginBottom: S.space.md }}
+          />
+        )}
       />
 
       {/* Description */}
-      <DescInput
+      <FormDescInput
+        control={control}
+        name="description"
         heading="Description"
         placeholder="Description"
-        value={description}
-        onChangeText={setDescription}
         multiline
         style={{
           height: 300,
@@ -132,7 +113,7 @@ export function CreateLeftPanel({
           text={isCreating ? 'Creating...' : 'Create'}
           variant="primary"
           onPress={handleCreateWorld}
-          disabled={!isValidWorldNameForSubmission(worldName) || isCreating}
+          disabled={!isFormValid || isCreating}
           style={{ flex: 1, marginLeft: S.space.sm }}
         />
       </View>

@@ -5,6 +5,7 @@ import { logger } from '../utils/logger';
 export interface UpdateUsernameResult {
   success: boolean;
   error?: string;
+  validationWarning?: string; // When client validation passed but server validation failed
 }
 
 /**
@@ -13,11 +14,12 @@ export interface UpdateUsernameResult {
  * @returns Promise with success status
  */
 export async function updateUsername(newUsername: string): Promise<UpdateUsernameResult> {
+  // Validate username outside try block so it's available in catch
+  const usernameValidation = validateUsername(newUsername);
+  
   try {
     logger.info('updateUsername', 'Starting username update');
 
-    // Validate username
-    const usernameValidation = validateUsername(newUsername);
     logger.debug('updateUsername', 'Username validation:', {
       isValid: usernameValidation.isValid,
       sanitized: usernameValidation.sanitized
@@ -56,8 +58,18 @@ export async function updateUsername(newUsername: string): Promise<UpdateUsernam
       return { success: false, error: 'Username already taken. Please choose another.' };
     }
     
+    // Check if this is a backend validation failure (client passed Zod, server rejected)
+    const isBackendValidationFailure = 
+      error.message?.includes('invalid username') ||
+      error.message?.includes('username') ||
+      error.code === 'INVALID_USERNAME' ||
+      (error.message && usernameValidation.isValid);
+    
     return {
       success: false,
+      validationWarning: isBackendValidationFailure ? 
+        'Your username was rejected by the server. Please try a different one.' : 
+        undefined,
       error: error?.message || 'Failed to update username. Please try again.'
     };
   }

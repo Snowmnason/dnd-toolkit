@@ -1,13 +1,11 @@
-import { AppModal, Body, Button } from '@/components/ui'
-import {
-    createWorldNameChangeHandler,
-    isValidWorldNameForSubmission,
-    type WorldNameValidationResult,
-} from '@/lib/auth/validation'
+import { AppModal, Body, Button, FormTextInput } from '@/components/ui'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { editWorldNameSchema, type EditWorldNameFormData } from '@/lib/schemas'
 import { logger } from '@/lib/utils/logger'
 import { $, useScale, UseTheme } from '@/theme'
 import React, { useEffect, useState } from 'react'
-import { Platform, TextInput, View } from 'react-native'
+import { Platform, View } from 'react-native'
 
 interface EditWorldModalProps {
   visible: boolean
@@ -38,10 +36,18 @@ export function EditWorldModal({
 }: EditWorldModalProps) {
   const S = useScale()
   const { theme } = UseTheme()
-  const [worldNameValidation, setWorldNameValidation] =
-    useState<WorldNameValidationResult | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteDisabled, setDeleteDisabled] = useState(false)
+
+  // RHF for name editing
+  const { control, handleSubmit, formState: { isValid }, reset } = useForm<EditWorldNameFormData>({
+    resolver: zodResolver(editWorldNameSchema),
+    mode: 'onChange',
+    defaultValues: {
+      name: worldName || '',
+      originalName: originalWorldName || '',
+    }
+  })
 
   const isDesktop =
     Platform.OS === 'web' ||
@@ -78,16 +84,17 @@ export function EditWorldModal({
     }
   }
 
-  const validName = isValidWorldNameForSubmission(worldName, originalWorldName)
-
   // Reset transient state whenever modal closes to avoid stale flags affecting next open
   useEffect(() => {
     if (!visible) {
       setDeleting(false)
       setDeleteDisabled(false)
-      setWorldNameValidation(null)
+      reset({
+        name: worldName || '',
+        originalName: originalWorldName || '',
+      })
     }
-  }, [visible])
+  }, [visible, reset, worldName, originalWorldName])
 
   return (
     <AppModal
@@ -111,7 +118,12 @@ export function EditWorldModal({
           gap: S.space.sm,
         }}
       >
-        <TextInput
+        <FormTextInput
+          control={control}
+          name="name"
+          heading="World Name"
+          placeholder="Enter world name..."
+          onChangeText={onWorldNameChange}
           style={{
             flex: 1,
             borderWidth: 1,
@@ -122,39 +134,15 @@ export function EditWorldModal({
             backgroundColor: $('surface', theme),
             fontSize: isDesktop ? S.s(18) : S.s(16),
           }}
-          placeholder="Enter world name..."
-          placeholderTextColor={$('textSecondary', theme)}
-          value={worldName}
-          onChangeText={createWorldNameChangeHandler(
-            onWorldNameChange,
-            setWorldNameValidation
-          )}
         />
         <Button
           text="Confirm"
           variant="primary"
-          onPress={onConfirmWorldName}
-          disabled={!validName}
+          onPress={handleSubmit(() => onConfirmWorldName())}
+          disabled={!isValid}
         />
       </View>
-
-      {/* ⚠️ Validation Errors */}
-      {worldNameValidation && !worldNameValidation.isValid && (
-        <View style={{ marginBottom: S.space.md }}>
-          {worldNameValidation.errors.map((err, i) => (
-            <Body
-              key={i}
-              style={{
-                color: $('danger', theme),
-                    fontSize: S.s(14),
-                marginBottom: S.space.xs,
-              }}
-            >
-              ⚠️ {err}
-            </Body>
-          ))}
-        </View>
-      )}
+      {/* Field-level errors are displayed inline via TextInput error prop */}
 
       {/* 🔗 Invite Section */}
       <Body style={{ marginBottom: S.space.xs, fontWeight: '600' }}>

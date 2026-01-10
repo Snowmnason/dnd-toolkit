@@ -1,48 +1,43 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { signInUser } from './authService';
-import { isSignInFormValid, validateEmail } from './validation';
+import { signInSchema, type SignInFormData } from '../schemas/auth.schema';
 
 export const useSignInForm = () => {
   const router = useRouter();
   
-  // Form state
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  // RHF + Zod form setup
+  const { control, handleSubmit, formState: { isValid }, watch } = useForm<SignInFormData>({
+    resolver: zodResolver(signInSchema),
+    mode: 'onChange',
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
   const [loading, setLoading] = useState(false);
+  const email = watch('email') || '';
   const [authError, setAuthError] = useState('');
+  const [validationWarning, setValidationWarning] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Validation state
-  const emailValidation = validateEmail(email);
-  const isFormValid = isSignInFormValid(email, password);
-
-  // Handle sign in
-  const handleSignIn = async () => {
+  // Handle sign in - receives validated data from RHF
+  const handleSignIn = async (data: SignInFormData) => {
     setAuthError('');
-    
-    // Client-side validation
-    if (!emailValidation.isValid) {
-      if (!email.trim()) {
-        setAuthError('Email is required');
-      } else {
-        setAuthError('Please enter a valid email address');
-      }
-      return;
-    }
-
-    if (!password.trim()) {
-      setAuthError('Password is required');
-      return;
-    }
+    setValidationWarning('');
     
     setLoading(true);
     
     try {
-      const result = await signInUser(email, password);
+      const result = await signInUser(data.email, data.password);
       
       if (result.success && result.redirectTo) {
         router.replace(result.redirectTo as any);
+      } else if (result.validationWarning) {
+        setValidationWarning(result.validationWarning);
+        setAuthError(result.error || '');
       } else if (result.error) {
         setAuthError(result.error);
       }
@@ -51,33 +46,18 @@ export const useSignInForm = () => {
     }
   };
 
-  // Handle input changes (with error clearing)
-  const handleEmailChange = (text: string) => {
-    setEmail(text);
-    if (authError) setAuthError('');
-  };
-
-  const handlePasswordChange = (text: string) => {
-    setPassword(text);
-    if (authError) setAuthError('');
-  };
-
   return {
     // Form data
+    control,
+    isValid,
     email,
-    password,
     loading,
     authError,
+    validationWarning,
     showPassword,
     
-    // Validation state
-    emailValidation,
-    isFormValid,
-    
     // Handlers
-    handleSignIn,
-    handleEmailChange,
-    handlePasswordChange,
+    handleSignIn: handleSubmit(handleSignIn),
     setShowPassword,
   };
 };

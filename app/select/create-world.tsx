@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { View } from 'react-native'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 
 import { CreateWorldModals } from '@/components/modals'
 import { AppSplit, Button } from '@/components/ui'
@@ -7,7 +9,7 @@ import { usePlatform } from '@/contexts/PlatformContext'
 import { useAuthStatus } from '@/hooks/use-auth-status'
 import { useSuccessNavigation } from '@/hooks/use-success-navigation'
 import { useWorldCreation } from '@/hooks/use-world-creation'
-import { isValidWorldNameForSubmission, type WorldNameValidationResult } from '@/lib'
+import { worldSchema, type WorldFormData } from '@/lib/schemas'
 import { CreateLeftPanel } from '@/Screens/select/create-world/CreateLeftPanel'
 import MapCanvas from '@/Screens/select/create-world/MapCanvas'
 import { useScale } from '@/theme'
@@ -28,12 +30,17 @@ export default function CreateWorldScreen() {
   // Centralized platform detection
   const { isDesktop } = usePlatform()
 
-  // State
-  const [worldName, setWorldName] = useState('')
-  const [worldNameValidation, setWorldNameValidation] =
-    useState<WorldNameValidationResult | null>(null)
-  const [system, setSystem] = useState(tabletopSystems[0])
-  const [description, setDescription] = useState('')
+  // RHF form
+  const { control, handleSubmit, formState: { isValid } } = useForm<WorldFormData>({
+    resolver: zodResolver(worldSchema),
+    mode: 'onChange',
+    defaultValues: {
+      name: '',
+      description: '',
+      system: tabletopSystems[0] as WorldFormData['system'],
+    },
+  })
+  // Local state
   const [imageImported, setImageImported] = useState(false)
   const [mapIndex, setMapIndex] = useState(
     Math.floor(Math.random() * defaultMapImages.length)
@@ -53,21 +60,16 @@ export default function CreateWorldScreen() {
   })
 
   // Logic
-  const handleCreateWorld = async () => {
-    if (!isValidWorldNameForSubmission(worldName)) {
-      setShowValidationModal(true)
-      return
-    }
-
+  const onSubmit = async (data: WorldFormData) => {
     if (!isUserLoggedIn) {
       setShowSignInModal(true)
       return
     }
 
     const result = await createWorld({
-      name: worldName,
-      description,
-      system,
+      name: data.name,
+      description: data.description || '',
+      system: data.system,
       // Safely access array with bounds checking
       mapImageUrl: defaultMapImages[Math.max(0, Math.min(mapIndex, defaultMapImages.length - 1))],
     })
@@ -82,17 +84,11 @@ export default function CreateWorldScreen() {
   // Left Panel Component
   const LeftPanel = (
     <CreateLeftPanel
-      worldName={worldName}
-      setWorldName={setWorldName}
-      worldNameValidation={worldNameValidation}
-      setWorldNameValidation={setWorldNameValidation}
-      system={system}
-      setSystem={setSystem}
+      control={control}
       systemItems={systemItems}
-      description={description}
-      setDescription={setDescription}
       isCreating={isCreating}
-      handleCreateWorld={handleCreateWorld}
+      isFormValid={isValid}
+      handleCreateWorld={handleSubmit(onSubmit, () => setShowValidationModal(true))}
     />
   )
 

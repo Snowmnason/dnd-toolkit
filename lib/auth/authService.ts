@@ -10,6 +10,7 @@ import { isExistingUser, validateEmail, validatePassword } from './validation';
 export interface SignUpResult {
   success: boolean;
   error?: string;
+  validationWarning?: string; // When client validation passed but server validation failed
   showEmailExistsModal?: boolean;
   redirectTo?: string;
 }
@@ -17,6 +18,7 @@ export interface SignUpResult {
 export interface SignInResult {
   success: boolean;
   error?: string;
+  validationWarning?: string; // When client validation passed but server validation failed
   redirectTo?: string;
 }
 

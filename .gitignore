@@ -52,6 +52,7 @@ app-example
 
 # MD files
 zRoadmap.md
+implem guide.md
 results.md
 issues.md
 .env.local

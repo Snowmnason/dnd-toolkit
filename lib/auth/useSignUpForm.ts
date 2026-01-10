@@ -1,50 +1,54 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { usersDB } from '../database/users';
 import { logger } from '../utils/logger';
 import { checkPendingInvites, signUpUser } from './authService';
-import { getPasswordHintColor, getPasswordRequirementsText, validateEmail, validatePassword, validateUsername } from './validation';
+import {
+  signUpSchema,
+  completeProfileSchema,
+  type SignUpFormData,
+  type CompleteProfileFormData,
+} from '../schemas/auth.schema';
+import { getPasswordHintColor, getPasswordRequirementsText } from './validation';
 
 type SignUpMode = 'signup' | 'complete-profile';
+// Use conditional type to properly type form values based on mode
+type SignUpFormValues = SignUpFormData | CompleteProfileFormData;
 
 export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
   const router = useRouter();
   
-  // Form state
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [username, setUsername] = useState('');
+  // RHF + Zod form - type is properly inferred from schema
+  const schema = mode === 'complete-profile' ? completeProfileSchema : signUpSchema;
+  const { control, handleSubmit, formState: { isValid }, watch } = useForm({
+    resolver: zodResolver(schema),
+    mode: 'onChange',
+    defaultValues: mode === 'complete-profile'
+      ? { username: '' }
+      : { email: '', password: '', confirmPassword: '' },
+  });
+
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [validationWarning, setValidationWarning] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showEmailExistsModal, setShowEmailExistsModal] = useState(false);
-
-  // Validation state
-  const passwordValidation = validatePassword(password);
-  const emailValidation = validateEmail(email);
-  const usernameValidation = validateUsername(username);
+  const password = watch('password') as string | undefined;
+  const confirmPassword = watch('confirmPassword') as string | undefined;
+  const email = watch('email') as string | undefined;
+  const username = watch('username') as string | undefined;
   const passwordsMatch = password === confirmPassword;
-  
-  // Form validity depends on mode
-  const isFormValid = mode === 'complete-profile' 
-    ? usernameValidation.isValid
-    : emailValidation.isValid && passwordValidation.isValid && passwordsMatch;
 
-  // Handle sign up or profile completion
-  const handleSignUp = async () => {
+  // Handle sign up or profile completion - receives validated data from RHF
+  const onSubmit = async (data: SignUpFormValues) => {
     setAuthError('');
+    setValidationWarning('');
     
     if (mode === 'complete-profile') {
-      // Complete profile mode - just validate username and create profile
-      if (!usernameValidation.isValid) {
-        if (!username.trim()) {
-          setAuthError('Username is required');
-        } else {
-          setAuthError('Username must be 3-20 characters, letters and numbers only');
-        }
-        return;
-      }
+      // Type assertion: we know data is CompleteProfileFormData in this branch
+      const profileData = data as CompleteProfileFormData;
       
       if (!user) {
         setAuthError('Authentication error. Please try again.');
@@ -57,14 +61,14 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
       try {
         logger.debug('signup', 'Creating user profile with data:', {
           auth_id: user.id,
-          username: username.trim(),
-          usernameLength: username.trim().length
+          username: profileData.username.trim(),
+          usernameLength: profileData.username.trim().length
         });
         
         // Create user profile
         const newProfile = await usersDB.create({
           auth_id: user.id,
-          username: username.trim()
+          username: profileData.username.trim()
         });
         
         logger.info('signup', 'Profile created successfully:', {
@@ -114,27 +118,14 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
         logger.debug('signup', 'Profile creation process completed');
       }
     } else {
-      // Sign up mode - validate email and password only (no username)
-      if (!emailValidation.isValid) {
-        setAuthError(!email.trim() ? 'Email is required' : 'Please enter a valid email address');
-        return;
-      }
-      
-      if (!passwordValidation.isValid) {
-        setAuthError('Password must be at least 8 characters with uppercase, lowercase, number, and special character');
-        return;
-      }
-      
-      if (!passwordsMatch) {
-        setAuthError('Passwords do not match');
-        return;
-      }
+      // Type assertion: we know data is SignUpFormData in this branch
+      const signUpData = data as SignUpFormData;
       
       setLoading(true);
       
       try {
         // Sign up without creating user profile (username will be collected later)
-        const result = await signUpUser(email, password);
+        const result = await signUpUser(signUpData.email, signUpData.password);
         
         if (result.success && result.redirectTo) {
           router.replace(result.redirectTo as any);
@@ -149,73 +140,44 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
     }
   };
 
-  // Handle input changes (with error clearing)
-  const handleEmailChange = (text: string) => {
-    setEmail(text);
-    if (authError) setAuthError('');
-  };
-
-  const handleUsernameChange = (text: string) => {
-    setUsername(text);
-    if (authError) setAuthError('');
-  };
-
-  const handlePasswordChange = (text: string) => {
-    setPassword(text);
-    if (authError) setAuthError('');
-  };
-
-  const handleConfirmPasswordChange = (text: string) => {
-    setConfirmPassword(text);
-    if (authError) setAuthError('');
-  };
-
   // UI helpers
   const getUsernameDisplayText = () => {
-    if (username.length === 0) return '';
-    return usernameValidation.isValid ? 
+    if (!username || username.length === 0) return '';
+    // Schema handles validity; keep message concise
+    return username.length >= 3 && username.length <= 20 ? 
       `Welcome "${username}"!` : 
       'Username: 3-20 characters, letters and numbers only';
   };
 
   const getPasswordMatchText = () => {
-    if (confirmPassword.length === 0) return '';
+    if (!confirmPassword || confirmPassword.length === 0) return '';
     return passwordsMatch ? '✅ Passwords match!' : '❌ Passwords do not match';
   };
 
   return {
     // Mode info
     mode,
-    
-    // Form data
-    email,
-    password,
-    confirmPassword,
-    username,
+    control,
+    isValid,
+    email: email || '',
+    password: password || '',
+    confirmPassword: confirmPassword || '',
+    username: username || '',
     loading,
     authError,
+    validationWarning,
     showPassword,
     showEmailExistsModal,
-    
-    // Validation state
-    passwordValidation,
-    emailValidation,
-    usernameValidation,
     passwordsMatch,
-    isFormValid,
     
     // Handlers
-    handleSignUp,
-    handleEmailChange,
-    handleUsernameChange,
-    handlePasswordChange,
-    handleConfirmPasswordChange,
+    handleSignUp: handleSubmit(onSubmit),
     setShowPassword,
     setShowEmailExistsModal,
     
     // UI helpers
-    getPasswordHintColor: () => getPasswordHintColor(password),
-    getPasswordRequirementsText: () => getPasswordRequirementsText(password),
+    getPasswordHintColor: () => getPasswordHintColor(password || ''),
+    getPasswordRequirementsText: () => getPasswordRequirementsText(password || ''),
     getUsernameDisplayText,
     getPasswordMatchText,
   };

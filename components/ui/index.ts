@@ -25,6 +25,9 @@ export * from './Snackbar';
 export * from './Switch';
 export * from './Tabs';
 export * from './TextInputs';
+// Form wrappers
+export * from './forms/FormTextInput';
+export * from './forms/FormDescInput';
 
 // Groups
 export * from './groups//ButtonGroup';
