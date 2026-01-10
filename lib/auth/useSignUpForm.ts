@@ -47,6 +47,9 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
     setValidationWarning('');
     
     if (mode === 'complete-profile') {
+      // Type assertion: we know data is CompleteProfileFormData in this branch
+      const profileData = data as CompleteProfileFormData;
+      
       if (!user) {
         setAuthError('Authentication error. Please try again.');
         return;
@@ -58,14 +61,14 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
       try {
         logger.debug('signup', 'Creating user profile with data:', {
           auth_id: user.id,
-          username: data.username.trim(),
-          usernameLength: data.username.trim().length
+          username: profileData.username.trim(),
+          usernameLength: profileData.username.trim().length
         });
         
         // Create user profile
         const newProfile = await usersDB.create({
           auth_id: user.id,
-          username: data.username.trim()
+          username: profileData.username.trim()
         });
         
         logger.info('signup', 'Profile created successfully:', {
@@ -115,11 +118,14 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
         logger.debug('signup', 'Profile creation process completed');
       }
     } else {
+      // Type assertion: we know data is SignUpFormData in this branch
+      const signUpData = data as SignUpFormData;
+      
       setLoading(true);
       
       try {
         // Sign up without creating user profile (username will be collected later)
-        const result = await signUpUser(data.email, data.password);
+        const result = await signUpUser(signUpData.email, signUpData.password);
         
         if (result.success && result.redirectTo) {
           router.replace(result.redirectTo as any);
