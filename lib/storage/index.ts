@@ -2,7 +2,7 @@
  * Storage Module
  * 
  * Centralized storage access for all app data.
- * All data is stored encrypted via SecureStorage.
+ * All data is stored encrypted via EncryptedStorage; SecureStorage is the facade/wrapper you should use.
  * 
  * Usage:
  * ```ts
@@ -41,6 +41,9 @@ export const STORAGE_KEYS = {
   
   // Auth attempt rate limiting
   AUTH_ATTEMPTS: 'dnd:auth:attempts',
+
+  // Invites
+  PENDING_INVITE: 'dnd:invite:pending',
   
   // User preferences
   THEME_PREFERENCE: 'dnd:user:theme',

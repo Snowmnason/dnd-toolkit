@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger';
-import { SecureStorage } from '../storage';
+import { SecureStorage, STORAGE_KEYS } from '../storage';
 
 // Lazy import Sentry only when needed to reduce bundle size when disabled
 const getSentry = async () => {
@@ -32,8 +32,6 @@ interface GuardResult {
   retryAfterMs?: number;
 }
 
-// Auth attempt rate limiting key (uses SecureStorage for cross-platform persistence)
-const AUTH_ATTEMPTS_KEY = 'dnd:auth:attempts';
 const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
@@ -42,7 +40,7 @@ const normalizeKey = (email: string, scope: AuthGuardScope) => `${scope}:${email
 
 const loadStore = async (): Promise<Record<string, AttemptRecord>> => {
   try {
-    const raw = await SecureStorage.getItem(AUTH_ATTEMPTS_KEY);
+    const raw = await SecureStorage.getItem(STORAGE_KEYS.AUTH_ATTEMPTS);
     if (!raw) return {};
     return JSON.parse(raw);
   } catch (error) {
@@ -53,7 +51,7 @@ const loadStore = async (): Promise<Record<string, AttemptRecord>> => {
 
 const persistStore = async (store: Record<string, AttemptRecord>) => {
   try {
-    await SecureStorage.setJSON(AUTH_ATTEMPTS_KEY, store);
+    await SecureStorage.setJSON(STORAGE_KEYS.AUTH_ATTEMPTS, store);
   } catch (error) {
     logger.error('auth-guard', 'Failed to persist auth attempt store', error);
   }

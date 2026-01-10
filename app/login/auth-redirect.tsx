@@ -1,15 +1,12 @@
 import { AuthModal } from '@/components/auth_components';
 import { Caption } from '@/components/ui';
 import { AuthStateManager, logger, supabase, usersDB, worldsDB } from '@/lib';
-import { SecureStorage } from '@/lib/storage';
+import { SecureStorage, STORAGE_KEYS } from '@/lib/storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import CustomLoad from '../../components/ui/CustomLoad';
 import { useAppParams } from '../../contexts/AppParamsContext';
-
-// Storage key for pending invites (use SecureStorage for encryption)
-const PENDING_INVITE_KEY = 'dnd:invite:pending';
 
 interface PendingInvite {
   token: string;
@@ -24,25 +21,25 @@ const savePendingInvite = async (token: string, worldName: string) => {
     worldName,
     timestamp: Date.now()
   };
-  await SecureStorage.setJSON(PENDING_INVITE_KEY, inviteData);
+  await SecureStorage.setJSON(STORAGE_KEYS.PENDING_INVITE, inviteData);
 };
 
 const getPendingInvite = async (): Promise<PendingInvite | null> => {
-  const inviteData = await SecureStorage.getJSON<PendingInvite>(PENDING_INVITE_KEY);
+  const inviteData = await SecureStorage.getJSON<PendingInvite>(STORAGE_KEYS.PENDING_INVITE);
   if (inviteData) {
     // Check if invite is less than 24 hours old
     if (Date.now() - inviteData.timestamp < 24 * 60 * 60 * 1000) {
       return inviteData;
     } else {
       // Clean up expired invite
-      await SecureStorage.removeItem(PENDING_INVITE_KEY);
+      await SecureStorage.removeItem(STORAGE_KEYS.PENDING_INVITE);
     }
   }
   return null;
 };
 
 const clearPendingInvite = async () => {
-  await SecureStorage.removeItem(PENDING_INVITE_KEY);
+  await SecureStorage.removeItem(STORAGE_KEYS.PENDING_INVITE);
 };
 
 export default function AuthRedirect() {
