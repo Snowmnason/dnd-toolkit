@@ -27,21 +27,22 @@ export default function WelcomeScreen() {
 
   // Auth guard: redirect authenticated users away from welcome screen
   useEffect(() => {
+    let mounted = true;
+    
     const checkAuthAndRedirect = async () => {
       try {
         logger.debug('welcome', '🔍 Checking authentication status...');
         const { routingDecision } = await AuthStateManager.getRoutingDecision();
         
-        // If user should be on main or complete-profile, redirect them
-        if (routingDecision === 'main') {
-          logger.info('welcome', '🔀 User authenticated, redirecting to world selection');
-          router.replace('/select/world-selection');
-          return;
-        }
+        if (!mounted) return; // Don't proceed if unmounted
         
-        if (routingDecision === 'complete-profile') {
-          logger.info('welcome', '🔀 User needs to complete profile, redirecting');
-          router.replace('/login/complete-profile');
+        // Early return pattern - combine redirect checks
+        if (routingDecision === 'main' || routingDecision === 'complete-profile') {
+          const target = routingDecision === 'main' 
+            ? '/select/world-selection' 
+            : '/login/complete-profile';
+          logger.info('welcome', `🔀 Redirecting to ${target}`);
+          router.replace(target);
           return;
         }
         
@@ -50,11 +51,15 @@ export default function WelcomeScreen() {
       } catch (error) {
         logger.error('welcome', 'Error checking auth:', error);
       } finally {
-        setIsCheckingAuth(false);
+        if (mounted) {
+          setIsCheckingAuth(false);
+        }
       }
     };
 
     checkAuthAndRedirect();
+    
+    return () => { mounted = false; };
   }, [router]);
 
   if (isCheckingAuth || isLoading) {
