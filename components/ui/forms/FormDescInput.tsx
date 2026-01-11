@@ -1,8 +1,9 @@
+import { $, UseTheme, useScale } from '@/theme'
 import React from 'react'
+import { Control, Controller, FieldPath, FieldValues } from 'react-hook-form'
 import { View } from 'react-native'
-import { Controller, Control, FieldPath, FieldValues } from 'react-hook-form'
-import { DescInput, SubTitle } from '@/components/ui'
-import { UseTheme, useScale, $ } from '@/theme'
+import { Caption } from '../AppText'
+import { DescInput } from '../TextInputs'
 
 /**
  * RHF wrapper for DescInput
@@ -29,7 +30,7 @@ export function FormDescInput<T extends FieldValues>({ control, name, ...props }
           />
           {/* Show error with negative margin to pull content up */}
           {fieldState.error && (
-            <SubTitle
+            <Caption
               fontSize="$caption"
               italic={false}
               textType="primary"
@@ -41,7 +42,7 @@ export function FormDescInput<T extends FieldValues>({ control, name, ...props }
               }}
             >
               {fieldState.error?.message}
-            </SubTitle>
+            </Caption>
           )}
         </View>
       )}

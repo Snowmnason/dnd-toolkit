@@ -24,7 +24,7 @@ const hasNoSqlKeywords = (val: string) => {
 export const emailSchema = z
   .string()
   .trim()
-  .min(1, 'Email is required')
+  .min(1, ' ')
   .refine(hasNoSqlKeywords, 'Email contains invalid characters')
   .refine(hasNoDangerousChars, 'Email contains invalid characters')
   .pipe(z.string().email('Please enter a valid email address'))
@@ -128,3 +128,72 @@ export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 export type CompleteProfileFormData = z.infer<typeof completeProfileSchema>;
 export type UpdateUsernameFormData = z.infer<typeof updateUsernameSchema>;
+
+// ============================================================================
+// PASSWORD UI HELPERS (for real-time feedback)
+// ============================================================================
+
+/**
+ * Validate password and return detailed criteria status
+ */
+const validatePasswordCriteria = (password: string) => {
+  if (typeof password !== 'string') {
+    return {
+      minLength: false,
+      hasUppercase: false,
+      hasLowercase: false,
+      hasNumber: false,
+      hasSpecialChar: false,
+      criteriaCount: 0,
+      isValid: false,
+      strength: 'weak' as const,
+    };
+  }
+  
+  const minLength = password.length >= 6;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasLowercase = /[a-z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>?]/.test(password);
+  
+  const criteriaCount = [minLength, hasUppercase, hasLowercase, hasNumber, hasSpecialChar].filter(Boolean).length;
+  
+  return {
+    minLength,
+    hasUppercase,
+    hasLowercase,
+    hasNumber,
+    hasSpecialChar,
+    criteriaCount,
+    isValid: criteriaCount >= 5,
+    strength: criteriaCount === 0 ? 'weak' as const
+      : criteriaCount <= 2 ? 'weak' as const
+      : criteriaCount <= 3 ? 'medium' as const
+      : criteriaCount === 4 ? 'strong' as const
+      : 'very strong' as const,
+  };
+};
+
+/**
+ * Get password requirements text for real-time feedback
+ */
+export const getPasswordRequirementsText = (password: string): string => {
+  if (!password) {
+    return ' ';
+  }
+
+  const validation = validatePasswordCriteria(password);
+  const missingCriteria = [];
+  
+  if (!validation.minLength) missingCriteria.push('6+ characters');
+  if (!validation.hasUppercase) missingCriteria.push('uppercase letter');
+  if (!validation.hasLowercase) missingCriteria.push('lowercase letter');
+  if (!validation.hasNumber) missingCriteria.push('number');
+  if (!validation.hasSpecialChar) missingCriteria.push('special character (!@#$%^&*...)');
+  
+  if (validation.isValid) {
+    return `✅ Looks great! All requirements met.`;
+  } else {
+    return `Need: ${missingCriteria.join(', ')}`;
+  }
+};

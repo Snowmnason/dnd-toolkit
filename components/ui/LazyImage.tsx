@@ -238,8 +238,6 @@ export function LazyImage({
     optimizeSupabase,
     optimizeWidth,
     optimizeQuality,
-    responsive,
-    responsiveWidths,
     useWebP,
     webpSupported,
     supabaseFit,

@@ -157,11 +157,14 @@ export const signInUser = async (
   email: string,
   password: string
 ): Promise<SignInResult> => {
+  logger.debug('auth', `🔐 Sign-in attempt for email: ${email}`);
+  
   try {
     // Validate and sanitize inputs
     const emailValidation = validateEmail(email);
     
     if (!emailValidation.isValid) {
+      logger.warn('auth', '❌ Invalid email format');
       return {
         success: false,
         error: 'Please enter a valid email address.'
@@ -170,19 +173,24 @@ export const signInUser = async (
     
     // Use sanitized email
     const sanitizedEmail = emailValidation.sanitized;
+    logger.debug('auth', `✅ Email validated: ${sanitizedEmail}`);
 
     // Check if Supabase is configured before attempting signin
     const { isSupabaseConfigured } = await import('../database/supabase');
     if (!isSupabaseConfigured()) {
+      logger.error('auth', '❌ Supabase not configured');
       return {
         success: false,
         error: 'Unable to connect to servers. Please check your internet connection and try again.'
       };
     }
+    
+    logger.debug('auth', '✅ Supabase configured, proceeding with sign-in');
 
     const guard = await checkAuthGuard(sanitizedEmail, 'signin');
     if (!guard.allowed) {
       const retrySeconds = guard.retryAfterMs ? Math.ceil(guard.retryAfterMs / 1000) : undefined;
+      logger.warn('auth', `🚫 Auth guard blocked sign-in for ${sanitizedEmail}`);
       return {
         success: false,
         error: retrySeconds
@@ -191,6 +199,9 @@ export const signInUser = async (
       };
     }
 
+    logger.debug('auth', `🔐 Calling Supabase signInWithPassword for ${sanitizedEmail}...`);
+    const signInStartTime = Date.now();
+    
     const signInResponse = await RequestManager.fetch<AuthTokenResponse>(
       `auth:signin:${sanitizedEmail}`,
       () => supabase.auth.signInWithPassword({
@@ -204,11 +215,15 @@ export const signInUser = async (
       }
     );
 
+    const signInElapsed = Date.now() - signInStartTime;
+    logger.debug('auth', `⏱️ Sign-in API call completed in ${signInElapsed}ms`);
+
     const signInError = signInResponse?.error ?? null;
     const signInData = signInResponse?.data;
 
     if (signInError) {
       await recordAuthFailure(sanitizedEmail, 'signin');
+      logger.error('auth', `❌ Sign-in error:`, signInError.message);
       if (signInError.message.includes('Invalid login credentials') || 
           signInError.message.includes('invalid credentials') ||
           signInError.message.includes('Email not confirmed')) {
@@ -226,25 +241,36 @@ export const signInUser = async (
 
     if (signInData?.user) {
       await recordAuthSuccess(sanitizedEmail, 'signin');
+      logger.info('auth', `✅ Sign-in successful for ${sanitizedEmail}, setting auth state...`);
+      
       // Set local auth state so route guards work immediately
       const { AuthStateManager } = await import('../auth-state');
       await AuthStateManager.setHasAccount(true);
+      logger.debug('auth', '✅ Auth state set, checking user profile...');
 
       // Check if user has a complete profile
       try {
+        const profileStartTime = Date.now();
         const userProfile = await usersDB.getCurrentUser();
+        const profileElapsed = Date.now() - profileStartTime;
+        logger.debug('auth', `⏱️ User profile fetch completed in ${profileElapsed}ms`);
+        
         // Robust profile validation
         const hasValidProfile = userProfile && 
                                userProfile.username && 
                                userProfile.username.trim().length > 0;
         
+        logger.debug('auth', `Profile validation: hasValidProfile=${hasValidProfile}`);
+        
         // Check for pending invites
         const pendingInvite = checkPendingInvites();
+        logger.debug('auth', `Pending invite check: ${pendingInvite ? 'found' : 'none'}`);
         
         if (hasValidProfile) {
           // Profile is complete
           if (pendingInvite) {
             // Has pending invite - redirect to auth-redirect to process it
+            logger.info('auth', `🎫 Redirecting to auth-redirect for pending invite`);
             if (typeof window !== 'undefined') {
               localStorage.removeItem('pending_world_invite'); // Clean up
             }
@@ -254,6 +280,7 @@ export const signInUser = async (
             };
           } else {
             // No pending invite - go to world selection
+            logger.info('auth', `🌍 Redirecting to world selection`);
             return { 
               success: true, 
               redirectTo: '/select/world-selection' 

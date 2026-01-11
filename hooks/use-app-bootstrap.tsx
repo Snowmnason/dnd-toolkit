@@ -7,7 +7,8 @@ import { logger } from "../lib/utils/logger";
 
 // Bootstrap configuration
 const BOOTSTRAP_LOGS = true; // Enable logs for production debugging - helps diagnose bootstrap issues
-const SESSION_RESTORE_TIMEOUT = 5000; // 5 seconds - timeout for Supabase session restoration
+const SESSION_RESTORE_TIMEOUT = 20000; // 20 seconds - increased timeout for Supabase session restoration on slow networks
+const FONT_LOADING_TIMEOUT = 15000; // 15 seconds - timeout for font loading
 
 const blog = {
   debug: (...args: any[]) => {
@@ -114,9 +115,32 @@ export function useAppBootstrap() {
 async function loadFonts() {
   try {
     const startTime = Date.now();
-    await Font.loadAsync(customFonts);
-    const elapsed = Date.now() - startTime;
-    blog.debug("bootstrap", `✅ Fonts loaded in ${elapsed}ms`);
+    
+    // Wrap font loading in a timeout to prevent indefinite hanging
+    let timedOut = false;
+    const fontPromise = Font.loadAsync(customFonts);
+    const timeoutPromise = new Promise<void>((_, reject) =>
+      setTimeout(() => {
+        timedOut = true;
+        reject(new Error(`Font loading timeout after ${FONT_LOADING_TIMEOUT}ms`));
+      }, FONT_LOADING_TIMEOUT)
+    );
+
+    try {
+      await Promise.race([fontPromise, timeoutPromise]);
+    } catch (e) {
+      if (timedOut) {
+        const elapsed = Date.now() - startTime;
+        blog.warn("bootstrap", `⏱️ Font loading timed out after ${FONT_LOADING_TIMEOUT}ms (total: ${elapsed}ms)`);
+      } else {
+        throw e;
+      }
+    }
+
+    if (!timedOut) {
+      const elapsed = Date.now() - startTime;
+      blog.debug("bootstrap", `✅ Fonts loaded in ${elapsed}ms`);
+    }
   } catch (error) {
     blog.warn("bootstrap", "Font loading error (non-critical):", error);
     // Continue anyway - fonts are not critical

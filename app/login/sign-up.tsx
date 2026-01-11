@@ -3,18 +3,17 @@ import {
   AuthBodyFooter,
   AuthButton, AuthButtonBack,
   AuthButtonSecondary, AuthCaption, AuthError, AuthForm,
-  AuthModal, FormAuthInput,
-  AuthRoot, AuthSubTitle, AuthTitle
+  AuthModal,
+  AuthRoot, AuthSubTitle, AuthTitle,
+  FormAuthInput
 } from '@/components/auth_components';
 import { AppToast } from '@/components/ui';
 import { useSignUpForm } from '@/lib';
-import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { TextInput } from 'react-native';
 
 export default function SignUpScreen() {
-  const S = useScale();
   const router = useRouter();
   const [showValidationToast, setShowValidationToast] = useState(false);
   
@@ -35,8 +34,6 @@ export default function SignUpScreen() {
     handleSignUp,
     setShowPassword,
     setShowEmailExistsModal,
-    getPasswordHintColor,
-    getPasswordRequirementsText,
     getPasswordMatchText,
   } = useSignUpForm();
 
@@ -91,22 +88,6 @@ export default function SignUpScreen() {
           returnKeyType="next"
           onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
         />
-
-        {/* Password Requirements */}
-        <AuthSubTitle
-          color={getPasswordHintColor()}
-          align="left"
-          fontSize='$caption'
-          style={{
-            lineHeight: 16,
-            marginBottom: S.space.xs,
-            marginTop: (S.space.sm*-1),
-            marginLeft: S.space.xs,
-            opacity: 0.9,
-          }}
-        >
-          {getPasswordRequirementsText()}
-        </AuthSubTitle>
 
         <FormAuthInput
           control={control}

@@ -24,7 +24,7 @@ export function useWorldCreation() {
         description: formData.description.trim() || '',
         system: formData.system,
         is_dm: true, // World creators are always DMs
-        map_image_url: formData.mapImageUrl || 'https://media.wizards.com/2015/images/dnd/resources/Sword-Coast-Map_MedRes.jpg'
+        map_image_url: formData.mapImageUrl || '' // Use empty string as default - maps can be added later
       });
 
       // Capture the world details for success modal and navigation

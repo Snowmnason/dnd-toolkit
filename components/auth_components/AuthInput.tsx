@@ -37,7 +37,7 @@ const AuthInput = React.forwardRef<RNTextInput, AuthInputProps>(({
 }, ref) => {
   const S = useScale()
   return (
-    <View style={{ position: 'relative', marginBottom: S.space.xxs }}>
+    <View style={{ position: 'relative' }}>
       <RNTextInput
         ref={ref}
         placeholder={placeholder}
@@ -61,9 +61,8 @@ const AuthInput = React.forwardRef<RNTextInput, AuthInputProps>(({
             paddingHorizontal: S.space.sm,
             backgroundColor: '#F5E6D3',
             color: '#2f353d',
-            marginBottom: S.space.sm,
             fontSize: S.font.para,
-            
+            marginBottom: -8,
           },
           showPasswordToggle ? { paddingRight: S.s(40) } : null,
           style,

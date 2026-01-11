@@ -1,17 +1,19 @@
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { usersDB } from '../database/users';
+import { buildRoute } from '../navigation/uri-helpers';
+import {
+  type CompleteProfileFormData,
+  completeProfileSchema,
+  getPasswordRequirementsText,
+  type SignUpFormData,
+  signUpSchema,
+} from '../schemas/auth.schema';
+import { SecureStorage, STORAGE_KEYS } from '../storage';
 import { logger } from '../utils/logger';
 import { checkPendingInvites, signUpUser } from './authService';
-import {
-  signUpSchema,
-  completeProfileSchema,
-  type SignUpFormData,
-  type CompleteProfileFormData,
-} from '../schemas/auth.schema';
-import { getPasswordHintColor, getPasswordRequirementsText } from './validation';
 
 type SignUpMode = 'signup' | 'complete-profile';
 // Use conditional type to properly type form values based on mode
@@ -83,15 +85,20 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
         
         if (pendingInvite) {
           logger.info('signup', 'Found pending invite, redirecting to process it:', pendingInvite);
-          // Clear the pending invite from localStorage since we're processing it
-          localStorage.removeItem('pending_world_invite');
+          // Clear the pending invite from storage since we're processing it
+          await SecureStorage.removeItem(STORAGE_KEYS.PENDING_INVITE);
           
-          // Redirect to auth-redirect to process the invite
-          router.replace(`/login/auth-redirect?action=world-invite&token=${pendingInvite.token}&worldName=${encodeURIComponent(pendingInvite.worldName)}`);
+          // Redirect to auth-redirect to process the invite using centralized route building
+          const authRedirectRoute = buildRoute('/login/auth-redirect', {
+            action: 'world-invite',
+            token: pendingInvite.token,
+            worldName: pendingInvite.worldName,
+          });
+          router.replace(authRedirectRoute as any);
         } else {
           logger.info('signup', 'No pending invite found, redirecting to world selection');
           // No pending invite - redirect to world selection
-          router.replace('/select/world-selection');
+          router.replace(buildRoute('/select/world-selection') as any);
         }
         
       } catch (error: any) {
@@ -176,7 +183,6 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
     setShowEmailExistsModal,
     
     // UI helpers
-    getPasswordHintColor: () => getPasswordHintColor(password || ''),
     getPasswordRequirementsText: () => getPasswordRequirementsText(password || ''),
     getUsernameDisplayText,
     getPasswordMatchText,

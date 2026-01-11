@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { View } from 'react-native'
-import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { View } from 'react-native'
 
 import { CreateWorldModals } from '@/components/modals'
 import { AppSplit, Button } from '@/components/ui'
@@ -17,12 +17,17 @@ import { useScale } from '@/theme'
 // Constants
 const tabletopSystems = ['D&D 5e', 'Pathfinder', 'Call of Cthulhu', 'Custom']
 const systemItems = tabletopSystems.map((t) => ({ label: t, value: t }))
-const defaultMapImages = [
-  'https://media.wizards.com/2015/images/dnd/resources/Sword-Coast-Map_MedRes.jpg',
-  'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgJm47wbufqY9yqRw_OLFJBtLEYYNGlCMMHWRozByIB4-SvH-6lwXPEI7L4LXhA1la-Ek0w7L_TU1wBkX4P7Z4fKmVQ2XAHuAmiF-4HYOGKWAZofbqc0e3pNca2dvU4HAWDuh8bg4y869M/s1600/Vlaroa1.jpg',
-  'https://talaraska.com/wp-content/uploads/2024/01/text-1-hw-terrain-4275x2600-1.jpg',
-  'https://images.squarespace-cdn.com/content/v1/5dadaf88e03a4e6bb69307dd/904f0cc0-7846-4576-ac91-176528727e4b/Vhaledhon+No+Text+Map+Blog.jpg',
-]
+
+/**
+ * Default map images
+ * NOTE: External URLs require CORS headers. For production:
+ * 1. Download images and store in assets/images/
+ * 2. Use local paths instead of external URLs
+ * 3. Or use your backend as an image proxy
+ * 
+ * Currently empty - maps can be uploaded via the import feature
+ */
+const defaultMapImages: string[] = []
 
 export default function CreateWorldScreen() {
   const S = useScale()
@@ -42,9 +47,7 @@ export default function CreateWorldScreen() {
   })
   // Local state
   const [imageImported, setImageImported] = useState(false)
-  const [mapIndex, setMapIndex] = useState(
-    Math.floor(Math.random() * defaultMapImages.length)
-  )
+  const [mapIndex, setMapIndex] = useState(0)
 
   // Modal state
   const [showSignInModal, setShowSignInModal] = useState(false)
@@ -70,8 +73,9 @@ export default function CreateWorldScreen() {
       name: data.name,
       description: data.description || '',
       system: data.system,
-      // Safely access array with bounds checking
-      mapImageUrl: defaultMapImages[Math.max(0, Math.min(mapIndex, defaultMapImages.length - 1))],
+      // Use map image if available, otherwise empty string
+      // eslint-disable-next-line security/detect-object-injection
+      mapImageUrl: defaultMapImages.length > 0 ? defaultMapImages[mapIndex] : undefined,
     })
 
     if (result.success) setShowSuccessModal(true)
@@ -102,11 +106,14 @@ export default function CreateWorldScreen() {
       <MapCanvas
         onPress={() => {
           setImageImported(false)
-          setMapIndex(Math.floor(Math.random() * defaultMapImages.length))
+          if (defaultMapImages.length > 0) {
+            setMapIndex(Math.floor(Math.random() * defaultMapImages.length))
+          }
         }}
         imageImported={imageImported}
-        // Safely access array with bounds checking
-        imageUrl={defaultMapImages[Math.max(0, Math.min(mapIndex, defaultMapImages.length - 1))]}
+        // Use map image if available
+        // eslint-disable-next-line security/detect-object-injection
+        imageUrl={defaultMapImages.length > 0 ? defaultMapImages[mapIndex] : undefined}
       />
       <Button
         text="Import Image"
