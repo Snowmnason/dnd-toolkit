@@ -20,7 +20,7 @@
  * ```
  */
 
-export { SecureStorage, default } from './SecureStorage';
+export { SecureStorage } from './SecureStorage';
 
 /**
  * Storage Keys

@@ -1,4 +1,5 @@
 import { logger } from '../utils/logger';
+import { CacheSchema, handleCacheMigration, validateCacheEntry, VersionedCacheEntry } from './cache-versioning';
 
 /**
  * SecureStorage
@@ -148,8 +149,82 @@ class SecureStorageService {
       return [];
     }
   }
+
+  /**
+   * Get and validate a versioned JSON entry with schema
+   * Handles cache validation and migration automatically
+   */
+  async getValidatedJSON<T = any>(
+    key: string,
+    schema: CacheSchema<T>
+  ): Promise<T | null> {
+    try {
+      const rawEntry = await this.getJSON<VersionedCacheEntry>(key);
+      
+      if (!rawEntry) {
+        logger.debug(`SecureStorage.getValidatedJSON: ${key} not found`);
+        return null;
+      }
+
+      // Validate against schema
+      const validation = validateCacheEntry(rawEntry, schema);
+      
+      if (validation.valid) {
+        logger.debug(`SecureStorage.getValidatedJSON: ${key} validated successfully`);
+        return rawEntry.data as T;
+      }
+
+      // Handle validation failure
+      logger.warn(`SecureStorage.getValidatedJSON: ${key} failed validation`, {
+        reason: validation.reason,
+        oldVersion: validation.oldVersion,
+        currentVersion: validation.currentVersion,
+      });
+
+      // Attempt migration
+      const migrated = await handleCacheMigration(rawEntry, validation, schema);
+      
+      if (migrated !== null) {
+        // Update storage with migrated data
+        await this.setVersionedJSON(key, migrated, schema.version);
+        logger.info(`SecureStorage.getValidatedJSON: ${key} migrated and updated`);
+        return migrated;
+      }
+
+      // Migration failed or not available - clear the entry
+      await this.removeItem(key);
+      logger.info(`SecureStorage.getValidatedJSON: ${key} cleared due to migration failure`);
+      return null;
+    } catch (error) {
+      logger.error(`SecureStorage.getValidatedJSON failed for key: ${key}`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Store a versioned JSON entry with schema version
+   */
+  async setVersionedJSON<T = any>(
+    key: string,
+    value: T,
+    version: number
+  ): Promise<void> {
+    try {
+      const versionedEntry: VersionedCacheEntry<T> = {
+        version,
+        data: value,
+        timestamp: Date.now(),
+      };
+      const jsonString = JSON.stringify(versionedEntry);
+      await this.setItem(key, jsonString);
+      logger.debug(`SecureStorage.setVersionedJSON: ${key} (v${version})`);
+    } catch (error) {
+      logger.error(`SecureStorage.setVersionedJSON failed for key: ${key}`, error);
+      throw error;
+    }
+  }
 }
+
 
 // Export singleton instance
 export const SecureStorage = new SecureStorageService();
-export default SecureStorage;

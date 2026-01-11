@@ -1,24 +1,23 @@
-import { SecureStorage } from '../storage';
+import { SecureStorage, STORAGE_KEYS } from '../storage';
+import { CacheSchema, CURRENT_CACHE_VERSION } from '../storage/cache-versioning';
 import { logger } from '../utils/logger';
 
-// Simple storage interface for cross-platform compatibility
-const storage = {
-  async getItem(key: string): Promise<string | null> {
-    return await SecureStorage.getItem(key);
+// Auth state schema with versioning
+const AUTH_STATE_SCHEMA: CacheSchema<AuthState> = {
+  version: CURRENT_CACHE_VERSION,
+  validate: (data: any) => {
+    return (
+      typeof data === 'object' &&
+      data !== null &&
+      typeof data.hasAccount === 'boolean'
+    );
   },
-
-  async setItem(key: string, value: string): Promise<void> {
-    await SecureStorage.setItem(key, value);
+  migrate: (oldData: any) => {
+    // Ensure all required fields exist
+    return {
+      hasAccount: oldData?.hasAccount === true || false,
+    };
   },
-
-  async removeItem(key: string): Promise<void> {
-    await SecureStorage.removeItem(key);
-  }
-};
-
-// Storage keys
-const STORAGE_KEYS = {
-  HAS_ACCOUNT: 'dnd_has_account'
 };
 
 export interface AuthState {
@@ -26,26 +25,29 @@ export interface AuthState {
 }
 
 export const AuthStateManager = {
-  // Get current auth state
+  // Get current auth state with validation
   async getAuthState(): Promise<AuthState> {
     try {
-      const hasAccount = await storage.getItem(STORAGE_KEYS.HAS_ACCOUNT);
-
-      return {
-        hasAccount: hasAccount === 'true'
-      };
+      const authState = await SecureStorage.getValidatedJSON<AuthState>(
+        STORAGE_KEYS.HAS_ACCOUNT,
+        AUTH_STATE_SCHEMA
+      );
+      return authState || { hasAccount: false };
     } catch (error) {
       logger.error('auth-state', 'Error getting auth state:', error);
-      return {
-        hasAccount: false
-      };
+      return { hasAccount: false };
     }
   },
 
   // Set user has created/logged into account
   async setHasAccount(hasAccount: boolean): Promise<void> {
     try {
-      await storage.setItem(STORAGE_KEYS.HAS_ACCOUNT, hasAccount.toString());
+      const newState: AuthState = { hasAccount };
+      await SecureStorage.setVersionedJSON(
+        STORAGE_KEYS.HAS_ACCOUNT,
+        newState,
+        CURRENT_CACHE_VERSION
+      );
     } catch (error) {
       logger.error('auth-state', 'Error setting hasAccount:', error);
     }
@@ -54,8 +56,8 @@ export const AuthStateManager = {
   // Store session information or mark that user has an account when a session exists
   async setSession(session: any): Promise<void> {
     try {
-      // Keep the simple has-account flag in sync
-      await storage.setItem(STORAGE_KEYS.HAS_ACCOUNT, 'true');
+      // Update auth state
+      await this.setHasAccount(true);
 
       // Optionally cache minimal session info (encrypted via SecureStorage)
       if (session?.user?.email) {
@@ -74,7 +76,7 @@ export const AuthStateManager = {
   // Clear all auth state (logout)
   async clearAuthState(): Promise<void> {
     try {
-      await storage.removeItem(STORAGE_KEYS.HAS_ACCOUNT);
+      await SecureStorage.removeItem(STORAGE_KEYS.HAS_ACCOUNT);
     } catch (error) {
       logger.error('auth-state', 'Error clearing auth state:', error);
     }
