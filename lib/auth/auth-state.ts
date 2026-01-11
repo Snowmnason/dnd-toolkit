@@ -105,12 +105,15 @@ export const AuthStateManager = {
       // Step 2: Try to get cached session with a short timeout
       // This prevents the auth guard from hanging on slow network
       try {
+        let timeoutId: ReturnType<typeof setTimeout>;
+        
         const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise<{ data: { session: null } }>((resolve) =>
-          setTimeout(() => resolve({ data: { session: null } }), 2000) // 2 second timeout
-        );
+        const timeoutPromise = new Promise<{ data: { session: null } }>((resolve) => {
+          timeoutId = setTimeout(() => resolve({ data: { session: null } }), 2000); // 2 second timeout
+        });
         
         const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
+        clearTimeout(timeoutId!); // ✅ Clean up the timer
         
         // If we got a session, verify it's confirmed
         if (session?.user && session.user.email_confirmed_at) {
@@ -120,7 +123,7 @@ export const AuthStateManager = {
         // If session check timed out or returned null, trust local storage
         // The background session restore will update this later
         return authState.hasAccount;
-      } catch {
+      } catch (error) {
         // On any error, trust local storage
         return authState.hasAccount;
       }

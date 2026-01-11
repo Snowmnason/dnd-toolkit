@@ -7,6 +7,7 @@ import {
 } from '@/components/auth_components';
 import { AppToast } from '@/components/ui';
 import { buildRoute, logger, supabase, useSignInForm } from '@/lib';
+import type { Href } from 'expo-router';
 import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -72,7 +73,7 @@ export default function SignInScreen() {
       <AuthBackButtonContainer>
         <AuthButtonBack
           text="← Back"
-          onPress={() => router.replace(buildRoute('/login/welcome') as any)}
+          onPress={() => router.replace(buildRoute('/login/welcome') as Href)}
           disabled={loading}
         />
       </AuthBackButtonContainer>
@@ -124,7 +125,7 @@ export default function SignInScreen() {
           color="#D4AF37"
           align="right"
           style={{ marginBottom: 4, marginTop: (S.space.sm*-1) }}
-          onPress={() => router.push(buildRoute('/login/forgot-password') as any)}
+          onPress={() => router.push(buildRoute('/login/forgot-password') as Href)}
         >
           Forgot Password?
         </AuthSubTitle>
@@ -141,7 +142,7 @@ export default function SignInScreen() {
 
         <AuthButtonSecondary
           text="Need an account? Sign Up"
-          onPress={() => router.push(buildRoute('/login/sign-up') as any)}
+          onPress={() => router.push(buildRoute('/login/sign-up') as Href)}
           disabled={loading}
         />
       </AuthActionGroup>

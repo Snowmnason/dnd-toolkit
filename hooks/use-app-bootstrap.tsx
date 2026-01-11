@@ -152,7 +152,7 @@ async function loadFonts() {
     
     // Wrap font loading in a timeout to prevent indefinite hanging
     let timedOut = false;
-    let timeoutId: ReturnType<typeof setTimeout>;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     
     const fontPromise = Font.loadAsync(criticalFonts); // Only critical fonts
     const timeoutPromise = new Promise<void>((_, reject) => {
@@ -164,9 +164,9 @@ async function loadFonts() {
 
     try {
       await Promise.race([fontPromise, timeoutPromise]);
-      clearTimeout(timeoutId!); // ✅ Clean up the timer
+      if (timeoutId) clearTimeout(timeoutId); // ✅ Clean up the timer
     } catch (e) {
-      clearTimeout(timeoutId!); // ✅ Clean up here too
+      if (timeoutId) clearTimeout(timeoutId); // ✅ Clean up here too
       if (timedOut) {
         const elapsed = Date.now() - startTime;
         blog.warn("bootstrap", `⏱️ Font loading timed out after ${FONT_LOADING_TIMEOUT}ms (total: ${elapsed}ms)`);
@@ -241,7 +241,7 @@ async function restoreSession() {
 
     // Cache miss - fetch from Supabase with timeout
     let timedOut = false;
-    let timeoutId: ReturnType<typeof setTimeout>;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     
     const sessionPromise = supabase.auth.getSession();
     const timeoutPromise = new Promise<{ data: { session: null }; error: any }>((resolve) => {
@@ -259,7 +259,7 @@ async function restoreSession() {
       error,
     } = await Promise.race([sessionPromise, timeoutPromise]);
 
-    clearTimeout(timeoutId!); // ✅ Clean up timer
+    if (timeoutId) clearTimeout(timeoutId); // ✅ Clean up timer
     const totalTime = Date.now() - sessionStartTime;
 
     // If we timed out, ignore late session restoration results
