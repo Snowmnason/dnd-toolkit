@@ -90,9 +90,9 @@ function buildCsp(scriptHashes, styleHashes) {
     "'self'",
     'https://dnd-tool.thesnowpost.com',
     'https://*.supabase.co',
-    "'strict-dynamic'", // ✅ Modern dynamic script loading (Expo code splitting)
+    // "'strict-dynamic'", // ❌ Removed - conflicts with Expo's dynamic script loading on same domain
     ...scriptHashes,
-    "'unsafe-inline'" // ✅ Fallback for old browsers (ignored with strict-dynamic)
+    "'unsafe-inline'" // ✅ Fallback for inline scripts
   ].join(' ');
 
   const styleSrc = [
