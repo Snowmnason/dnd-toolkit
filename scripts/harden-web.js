@@ -96,6 +96,7 @@ function buildCsp(scriptHashes, styleHashes) {
   const styleSrc = [
     "'self'",
     'https://fonts.googleapis.com',
+    "'unsafe-inline'",  // Allow inline styles that can't be hashed (React Native Web runtime styles)
     ...styleHashes,
   ].join(' ');
 

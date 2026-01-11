@@ -7,8 +7,8 @@ import { logger } from "../lib/utils/logger";
 
 // Bootstrap configuration
 const BOOTSTRAP_LOGS = true; // Enable logs for production debugging - helps diagnose bootstrap issues
-const SESSION_RESTORE_TIMEOUT = 20000; // 20 seconds - increased timeout for Supabase session restoration on slow networks
-const FONT_LOADING_TIMEOUT = 15000; // 15 seconds - timeout for font loading
+const SESSION_RESTORE_TIMEOUT = 5000; // 5 seconds - faster timeout, let app boot even if session is slow
+const FONT_LOADING_TIMEOUT = 3000; // 3 seconds - timeout for font loading (non-critical)
 
 const blog = {
   debug: (...args: any[]) => {
@@ -62,7 +62,7 @@ export function useAppBootstrap() {
         blog.debug("bootstrap", "🚀 Starting app bootstrap...");
         const bootstrapStartTime = Date.now();
 
-        // Step 1: Load assets in parallel
+        // Step 1: Load assets in parallel (fast operations only)
         const assetPromises = [
           loadFonts(),
           loadImages(),
@@ -70,23 +70,26 @@ export function useAppBootstrap() {
           preloadThemes(),
         ];
 
-        // Step 2: Restore Supabase session in parallel with assets
-        const sessionPromise = restoreSession();
-
-        // Wait for both assets and session
-        blog.debug("bootstrap", "⏳ Waiting for assets and session restoration...");
-        await Promise.all([Promise.all(assetPromises), sessionPromise]);
+        // Wait for assets only - session restore runs in background
+        blog.debug("bootstrap", "⏳ Loading assets...");
+        await Promise.all(assetPromises);
 
         const bootstrapTime = Date.now() - bootstrapStartTime;
         if (isMounted) {
           setState((prev) => ({
             ...prev,
             assetsLoaded: true,
-            sessionRestored: true,
+            sessionRestored: true, // Mark as ready even before session completes
             isReady: true,
           }));
-          blog.info("bootstrap", `✅ App bootstrap completed successfully in ${bootstrapTime}ms`);
+          blog.info("bootstrap", `✅ App bootstrap completed in ${bootstrapTime}ms`);
         }
+
+        // Step 2: Restore session in background (non-blocking)
+        // This runs AFTER the app is ready so users see the UI immediately
+        restoreSession().catch((err) => {
+          blog.warn("bootstrap", "Background session restore failed:", err);
+        });
       } catch (error) {
         blog.error("bootstrap", "❌ Bootstrap error:", error);
         if (isMounted) {
@@ -113,6 +116,13 @@ export function useAppBootstrap() {
 }
 
 async function loadFonts() {
+  // On web, skip custom font loading during bootstrap - they'll be loaded when needed
+  // This prevents CORS/network issues from blocking the app
+  if (Platform.OS === "web") {
+    blog.debug("bootstrap", "🌐 Skipping font preload on web (loaded on-demand)");
+    return;
+  }
+  
   try {
     const startTime = Date.now();
     
@@ -142,7 +152,7 @@ async function loadFonts() {
       blog.debug("bootstrap", `✅ Fonts loaded in ${elapsed}ms`);
     }
   } catch (error) {
-    blog.warn("bootstrap", "Font loading error (non-critical):", error);
+    blog.warn("bootstrap", "⚠️ Font loading error (non-critical):", error);
     // Continue anyway - fonts are not critical
   }
 }
@@ -162,9 +172,8 @@ async function loadImages() {
 async function loadPlatformAssets() {
   if (Platform.OS === "web") {
     // Skia is now loaded in index.tsx before React renders
-    // Just add a small delay for web stability
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    blog.debug("bootstrap", "🌐 Web platform assets ready (200ms)");
+    // No delay needed - let the app boot fast
+    blog.debug("bootstrap", "🌐 Web platform ready");
   } else {
     blog.debug("bootstrap", `📱 ${Platform.OS} platform ready`);
   }

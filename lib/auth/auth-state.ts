@@ -110,6 +110,7 @@ export const AuthStateManager = {
   // ==========================================
   async isAuthenticated(): Promise<boolean> {
     try {
+      // Step 1: Quick local storage check (fast path)
       const authState = await this.getAuthState();
       
       if (!authState.hasAccount) {
@@ -126,11 +127,28 @@ export const AuthStateManager = {
         return authState.hasAccount;
       }
       
-      // Use cached session instead of getUser() to avoid network call
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      // User must have active session and be confirmed
-      return !!(session?.user && session.user.email_confirmed_at);
+      // Step 2: Try to get cached session with a short timeout
+      // This prevents the auth guard from hanging on slow network
+      try {
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise<{ data: { session: null } }>((resolve) =>
+          setTimeout(() => resolve({ data: { session: null } }), 2000) // 2 second timeout
+        );
+        
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
+        
+        // If we got a session, verify it's confirmed
+        if (session?.user && session.user.email_confirmed_at) {
+          return true;
+        }
+        
+        // If session check timed out or returned null, trust local storage
+        // The background session restore will update this later
+        return authState.hasAccount;
+      } catch {
+        // On any error, trust local storage
+        return authState.hasAccount;
+      }
     } catch (error) {
       logger.error('auth-state', 'Error checking authentication:', error);
       // On error, fall back to local auth state
