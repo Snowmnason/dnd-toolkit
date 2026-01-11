@@ -90,7 +90,9 @@ function buildCsp(scriptHashes, styleHashes) {
     "'self'",
     'https://dnd-tool.thesnowpost.com',
     'https://*.supabase.co',
+    "'strict-dynamic'", // ✅ Modern dynamic script loading (Expo code splitting)
     ...scriptHashes,
+    "'unsafe-inline'" // ✅ Fallback for old browsers (ignored with strict-dynamic)
   ].join(' ');
 
   const styleSrc = [
@@ -100,6 +102,22 @@ function buildCsp(scriptHashes, styleHashes) {
     ...styleHashes,
   ].join(' ');
 
+  const imgSrc = [
+    "'self'",
+    'data:',
+    'blob:',
+    'https://fonts.gstatic.com', // ✅ Tightened from https:
+    'https://*.supabase.co',
+    'https://dnd-tool.thesnowpost.com'
+  ].join(' ');
+
+  const connectSrc = [
+    "'self'",
+    'https://dnd-tool.thesnowpost.com', // ✅ Added for API calls
+    'https://*.supabase.co',
+    'wss://*.supabase.co'
+  ].join(' ');
+
   // Note: frame-ancestors MUST be in HTTP headers only, not meta tags
   // It will be ignored if placed in a meta CSP tag
   const metaDirectives = [
@@ -107,8 +125,8 @@ function buildCsp(scriptHashes, styleHashes) {
     `script-src ${scriptSrc}`,
     `style-src ${styleSrc}`,
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: https: blob:",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+    `img-src ${imgSrc}`, // ✅ Tightened to specific domains
+    `connect-src ${connectSrc}`, // ✅ Added domain
     "form-action 'self'",
     "base-uri 'self'",
     "object-src 'none'",
@@ -123,8 +141,8 @@ function buildCsp(scriptHashes, styleHashes) {
     `script-src ${scriptSrc}`,
     `style-src ${styleSrc}`,
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: https: blob:",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+    `img-src ${imgSrc}`,
+    `connect-src ${connectSrc}`,
     "frame-ancestors 'none'",
     "form-action 'self'",
     "base-uri 'self'",

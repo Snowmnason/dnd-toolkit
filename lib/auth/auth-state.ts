@@ -1,43 +1,18 @@
-import { Platform } from 'react-native';
+import { SecureStorage } from '../storage';
 import { logger } from '../utils/logger';
 
 // Simple storage interface for cross-platform compatibility
 const storage = {
   async getItem(key: string): Promise<string | null> {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        return window.localStorage.getItem(key);
-      }
-      return null;
-    } else {
-      // For mobile, we'll use our encrypted storage
-      const { EncryptedStorage } = await import('./encrypted-storage');
-      return await EncryptedStorage.getItem(key);
-    }
+    return await SecureStorage.getItem(key);
   },
 
   async setItem(key: string, value: string): Promise<void> {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(key, value);
-      }
-    } else {
-      // For mobile, we'll use our encrypted storage
-      const { EncryptedStorage } = await import('./encrypted-storage');
-      await EncryptedStorage.setItem(key, value);
-    }
+    await SecureStorage.setItem(key, value);
   },
 
   async removeItem(key: string): Promise<void> {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.removeItem(key);
-      }
-    } else {
-      // For mobile, we'll use our encrypted storage
-      const { EncryptedStorage } = await import('./encrypted-storage');
-      await EncryptedStorage.removeItem(key);
-    }
+    await SecureStorage.removeItem(key);
   }
 };
 
@@ -82,12 +57,12 @@ export const AuthStateManager = {
       // Keep the simple has-account flag in sync
       await storage.setItem(STORAGE_KEYS.HAS_ACCOUNT, 'true');
 
-      // Optionally cache minimal session info on web (not storing full token for security)
-      if (Platform.OS === 'web' && session?.user?.email) {
+      // Optionally cache minimal session info (encrypted via SecureStorage)
+      if (session?.user?.email) {
         try {
           const key = 'dnd_session_user_email';
-          window.localStorage.setItem(key, session.user.email);
-  } catch (error) {
+          await SecureStorage.setItem(key, session.user.email);
+        } catch (error) {
           logger.error('auth-state', 'Error caching session email:', error);
         }
       }

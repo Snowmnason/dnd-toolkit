@@ -2,7 +2,7 @@
  * Safety mechanisms to prevent infinite redirects in authentication flow
  */
 
-import { Platform } from 'react-native';
+import { SecureStorage } from '../storage';
 import { logger } from '../utils/logger';
 
 const REDIRECT_SAFETY_KEY = 'dnd_redirect_attempts';
@@ -15,22 +15,13 @@ interface RedirectAttempt {
   targetRoute: string;
 }
 
-// Storage interface
-const getStorage = async () => {
-  if (Platform.OS === 'web') {
-    return {
-      getItem: (key: string) => localStorage.getItem(key),
-      setItem: (key: string, value: string) => localStorage.setItem(key, value),
-      removeItem: (key: string) => localStorage.removeItem(key)
-    };
-  } else {
-    const { EncryptedStorage } = await import('./encrypted-storage');
-    return {
-      getItem: (key: string) => EncryptedStorage.getItem(key),
-      setItem: (key: string, value: string) => EncryptedStorage.setItem(key, value),
-      removeItem: (key: string) => EncryptedStorage.removeItem(key)
-    };
-  }
+// Storage interface using SecureStorage for consistency
+const getStorage = () => {
+  return {
+    getItem: (key: string) => SecureStorage.getItem(key),
+    setItem: (key: string, value: string) => SecureStorage.setItem(key, value),
+    removeItem: (key: string) => SecureStorage.removeItem(key)
+  };
 };
 
 /**
@@ -38,7 +29,7 @@ const getStorage = async () => {
  */
 export const isSafeToRedirect = async (targetRoute: string): Promise<boolean> => {
   try {
-    const storage = await getStorage();
+    const storage = getStorage();
     const stored = await storage.getItem(REDIRECT_SAFETY_KEY);
     
     if (!stored) {
@@ -84,7 +75,7 @@ export const isSafeToRedirect = async (targetRoute: string): Promise<boolean> =>
  */
 const recordRedirectAttempt = async (targetRoute: string, count = 1): Promise<void> => {
   try {
-    const storage = await getStorage();
+    const storage = getStorage();
     const attempt: RedirectAttempt = {
       count,
       lastAttempt: Date.now(),
@@ -102,7 +93,7 @@ const recordRedirectAttempt = async (targetRoute: string, count = 1): Promise<vo
  */
 export const clearRedirectSafety = async (): Promise<void> => {
   try {
-    const storage = await getStorage();
+    const storage = getStorage();
     await storage.removeItem(REDIRECT_SAFETY_KEY);
   } catch (error) {
     logger.error('redirect-safety', 'Error clearing redirect safety:', error);

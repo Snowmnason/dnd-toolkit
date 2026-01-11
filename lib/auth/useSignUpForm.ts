@@ -81,7 +81,7 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
         
         // Check for pending invites after profile creation
         logger.debug('signup', 'Checking for pending invites');
-        const pendingInvite = checkPendingInvites();
+        const pendingInvite = await checkPendingInvites();
         
         if (pendingInvite) {
           logger.info('signup', 'Found pending invite, redirecting to process it:', pendingInvite);

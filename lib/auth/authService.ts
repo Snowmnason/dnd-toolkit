@@ -3,6 +3,7 @@ import type { AuthResponse, AuthTokenResponse } from '@supabase/supabase-js';
 import { RequestManager } from '../api/request-manager';
 import { supabase } from '../database/supabase';
 import { usersDB } from '../database/users';
+import { SecureStorage, STORAGE_KEYS } from '../storage';
 import { logger } from '../utils/logger';
 import { checkAuthGuard, recordAuthFailure, recordAuthSuccess } from './auth-attempt-guard';
 import { isExistingUser, validateEmail, validatePassword } from './validation';
@@ -263,7 +264,7 @@ export const signInUser = async (
         logger.debug('auth', `Profile validation: hasValidProfile=${hasValidProfile}`);
         
         // Check for pending invites
-        const pendingInvite = checkPendingInvites();
+        const pendingInvite = await checkPendingInvites();
         logger.debug('auth', `Pending invite check: ${pendingInvite ? 'found' : 'none'}`);
         
         if (hasValidProfile) {
@@ -272,7 +273,7 @@ export const signInUser = async (
             // Has pending invite - redirect to auth-redirect to process it
             logger.info('auth', `🎫 Redirecting to auth-redirect for pending invite`);
             if (typeof window !== 'undefined') {
-              localStorage.removeItem('pending_world_invite'); // Clean up
+              await SecureStorage.removeItem(STORAGE_KEYS.PENDING_INVITE); // Clean up
             }
             return { 
               success: true, 
@@ -522,9 +523,9 @@ export const generateWorldInviteLink = async (
 };
 
 // Helper function to check for pending invites
-export const checkPendingInvites = (): { token: string; worldName: string } | null => {
+export const checkPendingInvites = async (): Promise<{ token: string; worldName: string } | null> => {
   if (typeof window !== 'undefined') {
-    const stored = localStorage.getItem('pending_world_invite');
+    const stored = await SecureStorage.getItem(STORAGE_KEYS.PENDING_INVITE);
     if (stored) {
       try {
         const inviteData = JSON.parse(stored);
@@ -533,11 +534,11 @@ export const checkPendingInvites = (): { token: string; worldName: string } | nu
           return { token: inviteData.token, worldName: inviteData.worldName };
         } else {
           // Clean up expired invite
-          localStorage.removeItem('pending_world_invite');
+          await SecureStorage.removeItem(STORAGE_KEYS.PENDING_INVITE);
         }
       } catch (error) {
         logger.error('auth', 'Error parsing pending invite:', error);
-        localStorage.removeItem('pending_world_invite');
+        await SecureStorage.removeItem(STORAGE_KEYS.PENDING_INVITE);
       }
     }
   }
