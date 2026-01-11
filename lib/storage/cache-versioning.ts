@@ -29,7 +29,7 @@ export interface VersionedCacheEntry<T = any> {
  */
 export interface CacheValidationResult {
   valid: boolean;
-  reason?: string; // 'version_mismatch' | 'parse_error' | 'schema_invalid' | 'missing_fields'
+  reason?: 'version_mismatch' | 'parse_error' | 'schema_invalid' | 'missing_fields';
   oldVersion?: number;
   currentVersion?: number;
   shouldReset?: boolean; // If true, caller should clear this cache entry
@@ -58,7 +58,8 @@ export function validateCacheEntry<T = any>(
       valid: false,
       reason: 'parse_error',
       currentVersion: schema.version,
-      shouldReset: true,
+      shouldMigrate: !!schema.migrate, // Try migration if available
+      shouldReset: !schema.migrate,    // Reset only if no migration path
     };
   }
 
@@ -93,7 +94,8 @@ export function validateCacheEntry<T = any>(
       valid: false,
       reason: 'schema_invalid',
       currentVersion: schema.version,
-      shouldReset: true,
+      shouldMigrate: !!schema.migrate,
+      shouldReset: !schema.migrate,
     };
   }
 
@@ -111,7 +113,8 @@ export async function handleCacheMigration<T = any>(
 ): Promise<T | null> {
   // Validation passed, no migration needed
   if (result.valid) {
-    return oldEntry.data as T;
+    // Handle both versioned and unversioned entries
+    return (oldEntry as VersionedCacheEntry<T>).data || (oldEntry as T);
   }
 
   // No migration path available
@@ -130,7 +133,12 @@ export async function handleCacheMigration<T = any>(
       reason: result.reason,
     });
 
-    const migratedData = schema.migrate(oldEntry.data, result.oldVersion || 0);
+    // For versioned entries, pass oldEntry.data; for unversioned/legacy, pass oldEntry directly
+    const dataToMigrate = (oldEntry as VersionedCacheEntry).version !== undefined 
+      ? (oldEntry as VersionedCacheEntry).data 
+      : oldEntry;
+
+    const migratedData = schema.migrate(dataToMigrate, result.oldVersion || 0);
 
     if (migratedData === null) {
       logger.info('cache-versioning', 'Migration returned null, cache will be reset');

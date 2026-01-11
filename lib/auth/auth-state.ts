@@ -13,10 +13,18 @@ const AUTH_STATE_SCHEMA: CacheSchema<AuthState> = {
     );
   },
   migrate: (oldData: any) => {
-    // Ensure all required fields exist
-    return {
-      hasAccount: oldData?.hasAccount === true || false,
-    };
+    // Handle both object data and legacy primitive data
+    if (typeof oldData === 'object' && oldData !== null) {
+      // New format: { hasAccount: boolean }
+      return {
+        hasAccount: oldData?.hasAccount === true || false,
+      };
+    } else {
+      // Legacy format: "true" or "false" string
+      return {
+        hasAccount: oldData === 'true' || oldData === true,
+      };
+    }
   },
 };
 

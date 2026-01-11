@@ -228,16 +228,6 @@ async function restoreSession() {
       return;
     }
 
-    // ✅ Validate auth cache on startup
-    blog.debug("bootstrap", "Validating cached auth state...");
-    try {
-      const authState = await AuthStateManager.getAuthState();
-      blog.debug("bootstrap", "✅ Auth state validation passed", { hasAccount: authState.hasAccount });
-    } catch (validationError) {
-      blog.warn("bootstrap", "Auth state validation encountered an issue:", validationError);
-      // Continue anyway - validation errors are logged but non-fatal
-    }
-
     // ✅ Try cached session first (stale-while-revalidate pattern)
     const authState = await AuthStateManager.getAuthState();
     if (authState.hasAccount) {
