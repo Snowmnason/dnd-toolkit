@@ -1,28 +1,28 @@
 import {
-  AuthActionGroup,
-  AuthBody,
-  AuthBodyFooter,
-  AuthButton, AuthButtonBack,
-  AuthCaption, AuthError, AuthForm,
-  AuthModal,
-  AuthRoot,
-  AuthSubTitle,
-  AuthSuccess,
-  AuthTitle,
-  FormAuthInput,
+    AuthActionGroup,
+    AuthBody,
+    AuthBodyFooter,
+    AuthButton, AuthButtonBack,
+    AuthCaption, AuthError, AuthForm,
+    AuthModal,
+    AuthRoot,
+    AuthSubTitle,
+    AuthSuccess,
+    AuthTitle,
+    FormAuthInput,
 } from '@/components/auth_components';
 import { sendPasswordReset } from '@/lib';
+import { forgotPasswordSchema, type ForgotPasswordFormData } from '@/lib/schemas/auth.schema';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { View } from 'react-native';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { forgotPasswordSchema, type ForgotPasswordFormData } from '@/lib/schemas/auth.schema';
+import { View } from 'react-native';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   
-  const { control, handleSubmit, formState: { isValid, errors }, watch } = useForm<ForgotPasswordFormData>({
+  const { control, handleSubmit, formState: { isValid }, watch } = useForm<ForgotPasswordFormData>({
     resolver: zodResolver(forgotPasswordSchema),
     mode: 'onChange',
     defaultValues: {

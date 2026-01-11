@@ -1,8 +1,9 @@
 import { AuthActionGroup, AuthBody, AuthBodyFooter, AuthButton, AuthButtonSecondary, AuthCaption, AuthLink, AuthRoot, AuthSubTitle, AuthTitle } from '@/components/auth_components';
-import { useWelcomeScreen } from '@/lib';
+import { AuthStateManager, logger, useWelcomeScreen } from '@/lib';
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers';
 import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Platform, useWindowDimensions, View } from 'react-native';
 import CustomLoad from '../../components/ui/CustomLoad';
 import VersionDisplay from '../../components/VersionDisplay';
@@ -17,17 +18,52 @@ export default function WelcomeScreen() {
   const isMobile = (Platform.OS === 'ios' || Platform.OS === 'android') || (Platform.OS === 'web' && width < 900);
    
   const router = useRouter();
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const {
     isLoading,
     handleSignIn,
     handleSignUp,
   } = useWelcomeScreen();
 
-  if (isLoading) {
+  // Auth guard: redirect authenticated users away from welcome screen
+  useEffect(() => {
+    const checkAuthAndRedirect = async () => {
+      try {
+        logger.debug('welcome', '🔍 Checking authentication status...');
+        const { routingDecision } = await AuthStateManager.getRoutingDecision();
+        
+        // If user should be on main or complete-profile, redirect them
+        if (routingDecision === 'main') {
+          logger.info('welcome', '🔀 User authenticated, redirecting to world selection');
+          router.replace('/select/world-selection');
+          return;
+        }
+        
+        if (routingDecision === 'complete-profile') {
+          logger.info('welcome', '🔀 User needs to complete profile, redirecting');
+          router.replace('/login/complete-profile');
+          return;
+        }
+        
+        // User should be on welcome or login screen - stay here
+        logger.debug('welcome', `✅ User belongs on welcome screen (decision: ${routingDecision})`);
+      } catch (error) {
+        logger.error('welcome', 'Error checking auth:', error);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkAuthAndRedirect();
+  }, [router]);
+
+  if (isCheckingAuth || isLoading) {
     return (
       <AuthRoot>
         <CustomLoad size="large" />
-        <AuthBody style={{ marginTop: 16 }}>Loading...</AuthBody>
+        <AuthBody style={{ marginTop: 16 }}>
+          {isCheckingAuth ? 'Checking authentication...' : 'Loading...'}
+        </AuthBody>
       </AuthRoot>
     )
   }

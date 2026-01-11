@@ -153,7 +153,7 @@ export const getPasswordHintColor = (password: string): string => {
 // Get password requirements text
 export const getPasswordRequirementsText = (password: string): string => {
   if (!password) {
-    return 'Password must be at least 6 characters with uppercase, lowercase, number, and special character.';
+    return ' ';
   }
 
   const passwordValidation = validatePassword(password);

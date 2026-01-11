@@ -95,12 +95,29 @@ function buildCsp(scriptHashes, styleHashes) {
 
   const styleSrc = [
     "'self'",
-    "'unsafe-inline'",
     'https://fonts.googleapis.com',
     ...styleHashes,
   ].join(' ');
 
-  const directives = [
+  // Note: frame-ancestors MUST be in HTTP headers only, not meta tags
+  // It will be ignored if placed in a meta CSP tag
+  const metaDirectives = [
+    "default-src 'self'",
+    `script-src ${scriptSrc}`,
+    `style-src ${styleSrc}`,
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: https: blob:",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+    "form-action 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "media-src 'self'",
+    "worker-src 'self' blob:",
+    'upgrade-insecure-requests'
+  ];
+
+  // Full directives for HTTP headers (includes frame-ancestors)
+  const headerDirectives = [
     "default-src 'self'",
     `script-src ${scriptSrc}`,
     `style-src ${styleSrc}`,
@@ -116,7 +133,10 @@ function buildCsp(scriptHashes, styleHashes) {
     'upgrade-insecure-requests'
   ];
 
-  return directives.join('; ');
+  return {
+    meta: metaDirectives.join('; '),
+    header: headerDirectives.join('; ')
+  };
 }
 
 function injectCspMeta(html, csp) {
@@ -166,15 +186,15 @@ function harden() {
 
   let html = fs.readFileSync(INDEX_HTML, 'utf8');
   const { scriptHashes, styleHashes } = extractInlineContents(html);
-  const csp = buildCsp(scriptHashes, styleHashes);
+  const cspPolicies = buildCsp(scriptHashes, styleHashes);
 
   html = addSriAttributes(html);
-  html = injectCspMeta(html, csp);
+  html = injectCspMeta(html, cspPolicies.meta);
 
   fs.writeFileSync(INDEX_HTML, html, 'utf8');
   console.log('[harden-web] injected SRI and hash-based CSP into index.html');
 
-  writeHeadersFile(csp);
+  writeHeadersFile(cspPolicies.header);
 }
 
 harden();

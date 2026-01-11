@@ -9,10 +9,10 @@ import {
   FormAuthInput,
 } from '@/components/auth_components';
 import { useResetPasswordConfirm } from '@/lib';
+import { getPasswordRequirementsText } from '@/lib/schemas/auth.schema';
 import { useScale } from '@/theme';
 import { useRef } from 'react';
 import { TextInput } from 'react-native';
-import { getPasswordHintColor, getPasswordRequirementsText } from '@/lib/auth/validation';
 
 export default function ResetPasswordScreen() {
   const S = useScale();
@@ -30,7 +30,6 @@ export default function ResetPasswordScreen() {
     showPassword,
     userEmail,
     doPasswordsMatch,
-    fieldErrors,
     handleResetPassword,
     setShowPassword,
     goToSignIn,
@@ -73,7 +72,6 @@ export default function ResetPasswordScreen() {
 
         {/* Password Requirements */}
         <AuthSubTitle
-          color={getPasswordHintColor(password)}
           align="left"
           fontSize='$caption'
             style={{

@@ -177,21 +177,22 @@ export default function CompleteProfileScreen() {
 
         <AuthError error={authError} />
 
-        {username.length > 0 && (
-          <AuthSubTitle
-          fontSize='$para'
-            style={{
-              textAlign: 'left',
-              color: isValid ? '#82cc7eff' : '#f78888ff',
-              lineHeight: S.font.body2 + 2,
-              opacity: 0.9,
-              marginBottom: S.space.xs,
-              marginTop: (S.space.sm * -1),
-            }}
-          >
-            {getUsernameDisplayText()}
-          </AuthSubTitle>
-        )}
+        {/* Reserve space for validation message to prevent layout shift */}
+        <View style={{ minHeight: S.font.body2 + 2 + S.space.xs, marginTop: (S.space.sm * -1), marginBottom: S.space.xs }}>
+          {username.length > 0 && (
+            <AuthSubTitle
+              fontSize='$para'
+              style={{
+                textAlign: 'left',
+                color: isValid ? '#82cc7eff' : '#f78888ff',
+                lineHeight: S.font.body2 + 2,
+                opacity: 0.9,
+              }}
+            >
+              {getUsernameDisplayText()}
+            </AuthSubTitle>
+          )}
+        </View>
       </AuthForm>
 
       {/* 🔘 Actions */}
