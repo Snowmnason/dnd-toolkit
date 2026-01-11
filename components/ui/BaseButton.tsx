@@ -221,7 +221,7 @@ export function Button(props: ButtonProps) {
       borderColorValue: computedBorderColor,
       textColorValue: computedTextColor,
     }
-  }, [variantColors.background, variantColors.border, variantColors.text, bg, borderColor, textColor, disabled, loading, theme])
+  }, [variantColors, bg, borderColor, textColor, disabled, loading, theme])
 
   // Reanimated style hooks
   const scaleStyle = useAnimatedStyle(() => ({

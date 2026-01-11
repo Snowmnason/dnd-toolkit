@@ -2,7 +2,7 @@ import { Button, SubTitle } from '@/components/ui'
 import { logger } from '@/lib'
 import { getCurrentUserProfile } from '@/lib/database/common'
 import { useScale } from '@/theme'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { View } from 'react-native'
 
 interface AppSettingsProps {
@@ -27,8 +27,17 @@ export function AppSettings({
   const S = useScale()
   const [refreshDisabled, setRefreshDisabled] = useState(false)
   
+  // Track component mount status to prevent state updates on unmounted component
+  const isMountedRef = useRef(true)
+  
   // TODO: Replace with actual offline check when offline functionality is implemented
   const isOffline = false
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   const handleForceRefresh = async () => {
     if (refreshDisabled || isOffline) return
@@ -48,17 +57,23 @@ export function AppSettings({
       const remainingTime = Math.max(0, minDisplayTime - elapsedTime)
       
       setTimeout(() => {
-        setSyncingToast(false)
-        setSuccessToast(true)
+        if (isMountedRef.current) {
+          setSyncingToast(false)
+          setSuccessToast(true)
+        }
       }, remainingTime)
     } catch (error: any) {
       logger.error('AppSettings', 'Force refresh failed:', error)
-      setErrorMessage(error?.message || 'Failed to sync data. Please try again.')
+      setErrorMessage('Failed to sync data. Please try again.')
       setSyncingToast(false)
       setErrorToast(true)
     } finally {
       // Prevent accidental excessive refreshes
-      setTimeout(() => setRefreshDisabled(false), 1500)
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          setRefreshDisabled(false)
+        }
+      }, 1500)
     }
   }
 
