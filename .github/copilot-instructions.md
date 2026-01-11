@@ -34,6 +34,13 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 - Auth/session: Use `AuthStateManager.isAuthenticated()` for guards and `getRoutingDecision()` for flow decisions. Clearing/saving state uses platform-appropriate storage (web localStorage vs. encrypted storage on native).
 - **Storage**: Use `SecureStorage` from `@/lib/storage` for all persistent app data. All data is encrypted via AES-CTR on all platforms (web, iOS, Android, desktop). Never use direct `localStorage`, `sessionStorage`, or `EncryptedStorage`—always go through `SecureStorage`. Use `STORAGE_KEYS` constants, never hardcode keys. See `docs/issues/MileStone 1/082 - Central Storage/` for API docs and patterns.
 
+## Cache Versioning
+- **Version Updates**: Increment `CURRENT_CACHE_VERSION` in `lib/storage/cache-versioning.ts` when making breaking changes to stored data structures
+- **Breaking Changes Include**: Schema changes (add/remove/rename fields), stricter validation rules, type changes, new required fields without defaults
+- **Non-Breaking**: Optional fields with defaults, performance improvements, bug fixes, cosmetic changes
+- **Process**: Update schema validation → update migration function → increment version → test migration
+- **Location**: `lib/storage/cache-versioning.ts` (core logic), `docs/issues/MileStone 1/098 - Cache Versioning/CACHE_VERSIONING.md` (docs)
+
 ## Patterns and examples
 - Import UI components:
   ```ts
