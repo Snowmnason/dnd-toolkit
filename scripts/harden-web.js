@@ -99,7 +99,7 @@ function buildCsp(scriptHashes, styleHashes) {
     "'self'",
     'https://fonts.googleapis.com',
     "'unsafe-inline'",  // Allow inline styles that can't be hashed (React Native Web runtime styles)
-    ...styleHashes,
+    // ...styleHashes, // ❌ Removed - blocks runtime inline styles when present
   ].join(' ');
 
   const imgSrc = [

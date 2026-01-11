@@ -179,8 +179,11 @@ export function Button(props: ButtonProps) {
   const { theme } = UseTheme()
   const S = useScale()
 
-  // Get variant colors (calls $() internally, must be at top level)
-  const variantColors = getVariantColors(variant, theme)
+  // Memoize variant colors to prevent stale color calculations on re-enable
+  const variantColors = useMemo(
+    () => getVariantColors(variant, theme),
+    [variant, theme]
+  )
 
   // Reanimated shared values
   const scale = useSharedValue(1)
@@ -193,7 +196,7 @@ export function Button(props: ButtonProps) {
   const paddingH = sizing.paddingHorizontal
   const height = sizing.height
 
-  // Pre-compute all color values
+  // Pre-compute all color values with proper memoization
   const isGhost = variant === 'ghost'
   
   const { backgroundColor, borderColorValue, textColorValue } = useMemo(() => {
@@ -218,7 +221,7 @@ export function Button(props: ButtonProps) {
       borderColorValue: computedBorderColor,
       textColorValue: computedTextColor,
     }
-  }, [bg, variantColors, disabled, loading, borderColor, textColor, theme])
+  }, [variantColors.background, variantColors.border, variantColors.text, bg, borderColor, textColor, disabled, loading, theme])
 
   // Reanimated style hooks
   const scaleStyle = useAnimatedStyle(() => ({
@@ -279,6 +282,13 @@ export function Button(props: ButtonProps) {
     textOpacity.value = withTiming(loading ? 0 : 1, { duration: 250 })
     spinnerOpacity.value = withTiming(loading ? 1 : 0, { duration: 250 })
   }, [loading, textOpacity, spinnerOpacity])
+
+  // Reset hover opacity when button becomes disabled/enabled
+  React.useEffect(() => {
+    if (disabled || loading) {
+      hoverOpacity.value = 1
+    }
+  }, [disabled, loading, hoverOpacity])
 
   const contentView = (
     <>
