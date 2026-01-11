@@ -1,11 +1,10 @@
-import { usePlatform } from "@/contexts/PlatformContext";
 import {
-  deleteUserAccount,
-  logger,
-  signOutUser,
-  supabase,
-  usersDB,
-  isSupabaseConfigured,
+    deleteUserAccount,
+    isSupabaseConfigured,
+    logger,
+    signOutUser,
+    supabase,
+    usersDB,
 } from "@/lib";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
@@ -16,24 +15,25 @@ import { Alert, View } from "react-native";
 // 🧱 New UI Components
 import { CredentialConfirmModal } from "@/components/modals";
 import {
-  AppLoading,
-  AppPage,
-  Body,
-  Button,
-  Heading,
-  Surface,
+    AppLoading,
+    AppPage,
+    AppToast,
+    Button,
+    Heading,
+    Surface
 } from "@/components/ui";
 import UserProfile from "../../Screens/settings/user-profile";
 import VersionDisplay from "../../components/VersionDisplay";
 
 // 🎨 Theme + Loading
+import { AppSettings } from "@/Screens/settings/AppSettings";
 import { ThemeSelector } from "@/Screens/settings/ThemeSelector";
 import { useScale } from "@/theme";
 
 export default function SettingsPage() {
   const router = useRouter();
   const S = useScale();
-  const { isMobile } = usePlatform();
+  
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [secureReady, setSecureReady] = useState(false);
@@ -46,6 +46,12 @@ export default function SettingsPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
+
+  // App Settings toasts (force refresh)
+  const [syncingToast, setSyncingToast] = useState(false);
+  const [successToast, setSuccessToast] = useState(false);
+  const [errorToast, setErrorToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     // Double-check: require confirmed Supabase session before proceeding
@@ -204,25 +210,11 @@ export default function SettingsPage() {
         App Settings
       </Heading>
       <Surface bordered padded radius="md">
-        <Body
-          italic
-          align="center"
-          color="$textSecondary"
-          style={{ opacity: 0.7, marginBottom: S.space.md }}
-        >
-          🎲 Coming Soon: Theme settings, backup options, and more!
-        </Body>
-        <Button
-          variant="secondary"
-          text="Playground"
-          onPress={() => {
-            const targetPath = isMobile
-              ? '/settings/StyleMobile'
-              : '/settings/StyleDesktop';
-            const target = buildNavigationTarget(targetPath, {}, []);
-            router.push(target as any);
-          }}
-          style={{ alignSelf: "center" }}
+        <AppSettings
+          setSyncingToast={setSyncingToast}
+          setSuccessToast={setSuccessToast}
+          setErrorToast={setErrorToast}
+          setErrorMessage={setErrorMessage}
         />
       </Surface>
 
@@ -273,6 +265,31 @@ export default function SettingsPage() {
         errorText={deleteError}
         onCancel={handleCloseDeleteModal}
         onConfirm={handleDeleteAccount}
+      />
+
+      {/* App Settings Toasts */}
+      <AppToast
+        message="Syncing latest data..."
+        type="warning"
+        visible={syncingToast}
+        duration={5000}
+        onHide={() => setSyncingToast(false)}
+      />
+
+      <AppToast
+        message="App Data Synced"
+        type="success"
+        visible={successToast}
+        duration={4000}
+        onHide={() => setSuccessToast(false)}
+      />
+
+      <AppToast
+        message={errorMessage}
+        type="error"
+        visible={errorToast}
+        duration={4000}
+        onHide={() => setErrorToast(false)}
       />
     </AppPage>
   );
