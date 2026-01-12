@@ -16,22 +16,40 @@ export default function WelcomeScreen() {
   const S = useScale();
   const { width } = useWindowDimensions();
   const isMobile = (Platform.OS === 'ios' || Platform.OS === 'android') || (Platform.OS === 'web' && width < 900);
+  
+  // Create unique ID for this component instance to track mounts
+  const [componentId] = useState(() => Math.random().toString(36).slice(2, 9));
    
   const router = useRouter();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
   const {
     isLoading,
     handleSignIn,
     handleSignUp,
   } = useWelcomeScreen();
 
-  // Auth guard: redirect authenticated users away from welcome screen
+  // Log mount and unmount
   useEffect(() => {
+    logger.info('welcome', `[CMP:${componentId}] 🟢 Component mounted`);
+    return () => {
+      logger.info('welcome', `[CMP:${componentId}] 🔴 Component unmounted`);
+    };
+  }, [componentId]);
+
+  // Auth guard: redirect authenticated users away from welcome screen
+  // Only run ONCE on mount to prevent redirect loops
+  useEffect(() => {
+    if (hasCheckedAuth) {
+      logger.debug('welcome', `[CMP:${componentId}] ⏭️ Auth check already performed, skipping`);
+      return;
+    }
+
     let mounted = true;
     
     const checkAuthAndRedirect = async () => {
       try {
-        logger.debug('welcome', '🔍 Checking authentication status...');
+        logger.debug('welcome', `[CMP:${componentId}] 🔍 Checking authentication status...`);
         const { routingDecision } = await AuthStateManager.getRoutingDecision();
         
         if (!mounted) return; // Don't proceed if unmounted
@@ -41,18 +59,19 @@ export default function WelcomeScreen() {
           const target = routingDecision === 'main' 
             ? '/select/world-selection' 
             : '/login/complete-profile';
-          logger.info('welcome', `🔀 Redirecting to ${target}`);
+          logger.info('welcome', `[CMP:${componentId}] 🔀 Redirecting to ${target}`);
           router.replace(target);
           return;
         }
         
         // User should be on welcome or login screen - stay here
-        logger.debug('welcome', `✅ User belongs on welcome screen (decision: ${routingDecision})`);
+        logger.debug('welcome', `[CMP:${componentId}] ✅ User belongs on welcome screen (decision: ${routingDecision})`);
       } catch (error) {
-        logger.error('welcome', 'Error checking auth:', error);
+        logger.error('welcome', `[CMP:${componentId}] Error checking auth:`, error);
       } finally {
         if (mounted) {
           setIsCheckingAuth(false);
+          setHasCheckedAuth(true);
         }
       }
     };
@@ -60,7 +79,7 @@ export default function WelcomeScreen() {
     checkAuthAndRedirect();
     
     return () => { mounted = false; };
-  }, [router]);
+  }, [hasCheckedAuth, router, componentId]);
 
   if (isCheckingAuth || isLoading) {
     return (

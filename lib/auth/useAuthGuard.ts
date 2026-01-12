@@ -1,15 +1,25 @@
 import { useRouter, useSegments } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { AUTH_CONFIG } from '../routing/route-config';
 import { AuthStateManager } from '../auth-state';
+import { AUTH_CONFIG } from '../routing/route-config';
+import { logger } from '../utils/logger';
 
 type AuthState = 'loading' | 'authenticated' | 'unauthenticated';
+
+// Cache dynamic imports to prevent re-importing modules on every auth check
+let supabaseCache: any = null;
+let isSupabaseConfiguredCache: any = null;
 
 export function useAuthGuard(bootstrapReady: boolean): AuthState {
   const router = useRouter();
   const segments = useSegments();
   const [authState, setAuthState] = useState<AuthState>('loading');
+  const [subscriptionReady, setSubscriptionReady] = useState(false);
   const hasRedirectedRef = useRef(false);
+  const subscriptionReadyRef = useRef(false); // Track if we've already set subscriptionReady
+  
+  // Create unique ID for this hook instance
+  const [instanceId] = useState(() => Math.random().toString(36).slice(2, 9));
 
   const firstSegment = typeof segments[0] === 'string' ? (segments[0] as string) : '';
   const isProtectedRoute = AUTH_CONFIG.protectedRoutes.includes(firstSegment as any);
@@ -19,25 +29,111 @@ export function useAuthGuard(bootstrapReady: boolean): AuthState {
     hasRedirectedRef.current = false;
   }, [firstSegment]);
 
-  // Core auth check gated by bootstrap readiness (passed from parent)
+  // Subscribe to auth state changes ONLY ONCE on mount
+  // Only instanceId is in dependencies (stable due to useState)
+  useEffect(() => {
+    let subscription: { unsubscribe: () => void } | null = null;
+    let mounted = true;
+
+    logger.info('auth-guard', `[GUARD:${instanceId}] 🟢 Setting up auth state subscription`);
+
+    const setup = async () => {
+      try {
+        // Use cached imports to avoid re-loading modules
+        if (!supabaseCache) {
+          const imported = await import('@/lib/database/supabase');
+          supabaseCache = imported.supabase;
+          isSupabaseConfiguredCache = imported.isSupabaseConfigured;
+        }
+        
+        if (!isSupabaseConfiguredCache()) {
+          logger.warn('auth-guard', `[GUARD:${instanceId}] ⚠️ Supabase not configured, skipping subscription`);
+          setSubscriptionReady(true);
+          return;
+        }
+
+        const {
+          data: { subscription: sub },
+        } = supabaseCache.auth.onAuthStateChange(async (event: string, session: any) => {
+          if (!mounted) {
+            logger.debug('auth-guard', `[GUARD:${instanceId}] 🔇 Subscription event received after unmount, ignoring`);
+            return;
+          }
+          
+          logger.debug('auth-guard', `[GUARD:${instanceId}] 🔔 onAuthStateChange: event=${event}, hasSession=${!!session}`);
+          
+          // CRITICAL: Mark subscription as ready once we get first event
+          if (!subscriptionReadyRef.current) {
+            subscriptionReadyRef.current = true;
+            logger.info('auth-guard', `[GUARD:${instanceId}] ✅ Subscription ready with first event: ${event}`);
+            setSubscriptionReady(true);
+          }
+          
+          // CRITICAL: If we get a session event, sync it to local auth state immediately
+          // This ensures isAuthenticated() will return true on next check
+          if (session && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')) {
+            logger.info('auth-guard', `[GUARD:${instanceId}] 🔄 Syncing Supabase session to local auth state`);
+            await AuthStateManager.setHasAccount(true);
+          }
+          
+          try {
+            const authenticated = await AuthStateManager.isAuthenticated();
+            logger.debug('auth-guard', `[GUARD:${instanceId}] ✓ Updated auth state to: ${authenticated ? 'authenticated' : 'unauthenticated'}`);
+            setAuthState(authenticated ? 'authenticated' : 'unauthenticated');
+          } catch (error) {
+            logger.error('auth-guard', `[GUARD:${instanceId}] Error in auth state change handler:`, error);
+            setAuthState('unauthenticated');
+          }
+        });
+        subscription = sub ?? null;
+        logger.info('auth-guard', `[GUARD:${instanceId}] 🔗 Subscription listener registered`);
+      } catch (error) {
+        logger.error('auth-guard', `[GUARD:${instanceId}] Error setting up auth subscription:`, error);
+        setSubscriptionReady(true); // Allow fallback
+      }
+    };
+
+    setup();
+    return () => {
+      mounted = false;
+      if (subscription) {
+        logger.info('auth-guard', `[GUARD:${instanceId}] 🔴 Cleaning up subscription`);
+        subscription.unsubscribe();
+      }
+    };
+  }, [instanceId]); // Only run once on mount
+
+  // Core auth check ONLY runs on protected routes AFTER subscription is ready
   useEffect(() => {
     if (!bootstrapReady) return;
+    
+    // For protected routes, wait for subscription to establish before checking auth
+    // This ensures session is synced to local storage
+    if (isProtectedRoute && !subscriptionReady) {
+      logger.debug('auth-guard', `[GUARD:${instanceId}] ⏳ Waiting for subscription to be ready before auth check on protected route`);
+      return;
+    }
+
+    logger.debug('auth-guard', `[GUARD:${instanceId}] 🚀 Starting core auth check, isProtectedRoute=${isProtectedRoute}`);
 
     let mounted = true;
     const check = async () => {
       try {
         const authenticated = await AuthStateManager.isAuthenticated();
+        logger.debug('auth-guard', `[GUARD:${instanceId}] ✓ isAuthenticated returned: ${authenticated}`);
 
         if (mounted) {
           if (isProtectedRoute && !authenticated && !hasRedirectedRef.current) {
             hasRedirectedRef.current = true;
+            logger.warn('auth-guard', `[GUARD:${instanceId}] ❌ Protected route but not authenticated, redirecting to login`);
             router.replace(AUTH_CONFIG.redirectOnUnauthenticated);
             setAuthState('unauthenticated');
             return;
           }
           setAuthState(authenticated ? 'authenticated' : 'unauthenticated');
         }
-      } catch {
+      } catch (error) {
+        logger.error('auth-guard', `[GUARD:${instanceId}] Error in auth check:`, error);
         if (mounted) {
           if (isProtectedRoute && !hasRedirectedRef.current) {
             hasRedirectedRef.current = true;
@@ -52,54 +148,7 @@ export function useAuthGuard(bootstrapReady: boolean): AuthState {
     return () => {
       mounted = false;
     };
-  }, [bootstrapReady, isProtectedRoute, router, segments]);
-
-  // Subscribe to auth state changes to catch invalidation events
-  useEffect(() => {
-    let subscription: { unsubscribe: () => void } | null = null;
-
-    const setup = async () => {
-      try {
-        const { supabase, isSupabaseConfigured } = await import('@/lib/database/supabase');
-        if (!isSupabaseConfigured()) return;
-
-        const {
-          data: { subscription: sub },
-        } = supabase.auth.onAuthStateChange(async () => {
-          try {
-            const authenticated = await AuthStateManager.isAuthenticated();
-            const currentSegment = typeof segments[0] === 'string' ? segments[0] : '';
-            const isCurrentlyProtected = AUTH_CONFIG.protectedRoutes.includes(currentSegment as any);
-            
-            if (isCurrentlyProtected && !authenticated && !hasRedirectedRef.current) {
-              hasRedirectedRef.current = true;
-              router.replace(AUTH_CONFIG.redirectOnUnauthenticated);
-              setAuthState('unauthenticated');
-              return;
-            }
-            setAuthState(authenticated ? 'authenticated' : 'unauthenticated');
-          } catch {
-            const currentSegment = typeof segments[0] === 'string' ? segments[0] : '';
-            const isCurrentlyProtected = AUTH_CONFIG.protectedRoutes.includes(currentSegment as any);
-            
-            if (isCurrentlyProtected && !hasRedirectedRef.current) {
-              hasRedirectedRef.current = true;
-              router.replace(AUTH_CONFIG.redirectOnUnauthenticated);
-            }
-            setAuthState('unauthenticated');
-          }
-        });
-        subscription = sub ?? null;
-      } catch {
-        // No-op if supabase cannot be loaded
-      }
-    };
-
-    setup();
-    return () => {
-      subscription?.unsubscribe?.();
-    };
-  }, [router, segments]);
+  }, [bootstrapReady, isProtectedRoute, subscriptionReady, router, instanceId]);
 
   return authState;
 }

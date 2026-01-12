@@ -92,6 +92,9 @@ function RootLayoutContent() {
   // ALL hooks must be called unconditionally before any early returns
   // (React Rules of Hooks requirement)
   
+  // Create a unique session ID for this mount to track re-renders
+  const [sessionId] = useState(() => Math.random().toString(36).slice(2, 9));
+  
   // Theme and routing hooks
   const { theme } = UseTheme();
   const urlParams = useLocalSearchParams();
@@ -111,6 +114,10 @@ function RootLayoutContent() {
   const splash = useSplashScreen();
   const authState = useAuthGuard(bootstrap.isReady);
   
+  // Log every render with session ID
+  useEffect(() => {
+    logger.debug('_layout', `[SESSION:${sessionId}] 📍 Root layout rendered - route: ${segments[0] || 'index'}, authState: ${authState}`);
+  });
   // Analytics hook (must be called unconditionally)
   useAnalyticsNavigation();
   
