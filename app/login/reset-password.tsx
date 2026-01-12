@@ -62,6 +62,7 @@ export default function ResetPasswordScreen() {
           name="password"
           placeholder="Password"
           secureTextEntry={!showPassword}
+          autoCapitalize="none"
           editable={!loading && !success}
           showPasswordToggle={true}
           onTogglePassword={() => setShowPassword(!showPassword)}
@@ -93,6 +94,7 @@ export default function ResetPasswordScreen() {
           placeholder="Confirm Password"
           secureTextEntry={!showPassword}
           editable={!loading && !success}
+          autoCapitalize="none"
           returnKeyType="go"
           onSubmitEditing={handleResetPassword}
         />

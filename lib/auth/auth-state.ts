@@ -1,45 +1,21 @@
 import { SecureStorage, STORAGE_KEYS } from '../storage';
-import { CacheSchema, CURRENT_CACHE_VERSION } from '../storage/cache-versioning';
 import { logger } from '../utils/logger';
 
-// Auth state schema with versioning
-const AUTH_STATE_SCHEMA: CacheSchema<AuthState> = {
-  version: CURRENT_CACHE_VERSION,
-  validate: (data: any) => {
-    return (
-      typeof data === 'object' &&
-      data !== null &&
-      typeof data.hasAccount === 'boolean'
-    );
-  },
-  migrate: (oldData: any) => {
-    // Handle both object data and legacy primitive data
-    if (typeof oldData === 'object' && oldData !== null) {
-      // New format: { hasAccount: boolean }
-      return {
-        hasAccount: oldData?.hasAccount === true || false,
-      };
-    } else {
-      // Legacy format: "true" or "false" string
-      return {
-        hasAccount: oldData === 'true' || oldData === true,
-      };
-    }
-  },
-};
+// Cache dynamic imports to prevent re-importing modules on every auth check
+let supabaseCache: any = null;
+let isSupabaseConfiguredCache: any = null;
+let usersDBCache: any = null;
 
 export interface AuthState {
   hasAccount: boolean;
 }
 
 export const AuthStateManager = {
-  // Get current auth state with validation
+  // Get current auth state
   async getAuthState(): Promise<AuthState> {
     try {
-      const authState = await SecureStorage.getValidatedJSON<AuthState>(
-        STORAGE_KEYS.HAS_ACCOUNT,
-        AUTH_STATE_SCHEMA
-      );
+      const storageKey = STORAGE_KEYS.HAS_ACCOUNT;
+      const authState = await SecureStorage.getJSON<AuthState>(storageKey);
       return authState || { hasAccount: false };
     } catch (error) {
       logger.error('auth-state', 'Error getting auth state:', error);
@@ -51,11 +27,8 @@ export const AuthStateManager = {
   async setHasAccount(hasAccount: boolean): Promise<void> {
     try {
       const newState: AuthState = { hasAccount };
-      await SecureStorage.setVersionedJSON(
-        STORAGE_KEYS.HAS_ACCOUNT,
-        newState,
-        CURRENT_CACHE_VERSION
-      );
+      const storageKey = STORAGE_KEYS.HAS_ACCOUNT;
+      await SecureStorage.setJSON(storageKey, newState);
     } catch (error) {
       logger.error('auth-state', 'Error setting hasAccount:', error);
     }
@@ -102,12 +75,16 @@ export const AuthStateManager = {
         return false;
       }
 
-      // Import supabase dynamically to avoid circular dependency
-      const { supabase, isSupabaseConfigured } = await import('../database/supabase');
+      // Use cached supabase import to avoid re-loading modules
+      if (!supabaseCache) {
+        const imported = await import('../database/supabase');
+        supabaseCache = imported.supabase;
+        isSupabaseConfiguredCache = imported.isSupabaseConfigured;
+      }
       
       // If Supabase isn't configured (like on GitHub Pages without env vars), 
       // fall back to local auth state
-      if (!isSupabaseConfigured()) {
+      if (!isSupabaseConfiguredCache()) {
         logger.warn('auth-state', 'Supabase not configured, using local auth state');
         return authState.hasAccount;
       }
@@ -117,7 +94,7 @@ export const AuthStateManager = {
       try {
         let timeoutId: ReturnType<typeof setTimeout>;
         
-        const sessionPromise = supabase.auth.getSession();
+        const sessionPromise = supabaseCache.auth.getSession();
         const timeoutPromise = new Promise<{ data: { session: null } }>((resolve) => {
           timeoutId = setTimeout(() => resolve({ data: { session: null } }), 2000); // 2 second timeout
         });
@@ -157,23 +134,37 @@ export const AuthStateManager = {
       // First, get local auth flag
       const authState = await this.getAuthState();
 
-      // Import supabase (lazy) and check if configured
-      const { supabase, isSupabaseConfigured } = await import('../database/supabase');
+      // Use cached supabase import to avoid re-loading modules
+      if (!supabaseCache) {
+        const imported = await import('../database/supabase');
+        supabaseCache = imported.supabase;
+        isSupabaseConfiguredCache = imported.isSupabaseConfigured;
+      }
 
       // If Supabase isn't configured, fall back to local state
-      if (!isSupabaseConfigured()) {
+      if (!isSupabaseConfiguredCache()) {
         logger.warn('auth-state', 'Supabase not configured - defaulting to welcome');
         return { routingDecision: 'welcome', profileId: null };
       }
 
       // Ask Supabase for an active session
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await supabaseCache.auth.getSession();
+
+      // If there's a Supabase session, ensure local auth state is synced
+      if (session && !authState.hasAccount) {
+        logger.info('auth-state', '🔄 [getRoutingDecision] Found Supabase session but local hasAccount=false, syncing...');
+        await this.setHasAccount(true);
+      }
 
       // Try to fetch the user profile once (may fail)
       let userProfile: any = null;
       try {
-        const { usersDB } = await import('../database/users');
-        userProfile = await usersDB.getCurrentUser();
+        // Use cached usersDB import
+        if (!usersDBCache) {
+          const imported = await import('../database/users');
+          usersDBCache = imported.usersDB;
+        }
+        userProfile = await usersDBCache.getCurrentUser();
       } catch (dbError) {
         logger.debug('auth-state', 'Database error checking profile:', dbError);
         // If DB fails, allow user to continue to main (graceful degradation)
