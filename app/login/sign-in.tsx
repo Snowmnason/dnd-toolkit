@@ -101,6 +101,7 @@ export default function SignInScreen() {
           name="password"
           placeholder="Password"
           secureTextEntry={true}
+          autoCapitalize="none"
           editable={!loading}
           showPasswordToggle={true}
           onTogglePassword={() => setShowPassword(!showPassword)}

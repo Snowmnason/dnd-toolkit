@@ -81,6 +81,7 @@ export default function SignUpScreen() {
           ref={passwordInputRef}
           placeholder="Password"
           secureTextEntry={true}
+          autoCapitalize="none"
           editable={!loading}
           showPasswordToggle={true}
           onTogglePassword={() => setShowPassword(!showPassword)}
@@ -95,6 +96,7 @@ export default function SignUpScreen() {
           ref={confirmPasswordInputRef}
           placeholder="Confirm Password"
           secureTextEntry={true}
+          autoCapitalize="none"
           showPassword={showPassword}
           editable={!loading}
           returnKeyType="go"

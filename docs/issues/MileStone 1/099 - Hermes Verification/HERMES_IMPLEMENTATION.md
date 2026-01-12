@@ -23,7 +23,7 @@ This document outlines how Hermes is configured, validated, and maintained acros
 
 When enabled:
 - iOS: Hermes bytecode compiler runs during the build; artifacts are included in the app binary
-- Android: Hermes is linked via ExoPlayer and compiled at build time for the target architecture (arm64-v8a, armeabi-v7a, etc.)
+- Android: Hermes is linked through the Android build system (Gradle) and React Native's native modules, compiled at build time for the target architecture (arm64-v8a, armeabi-v7a, etc.)
 - Web: Not applicable (uses browser JS engine)
 - Desktop: Not applicable (uses Chromium/V8)
 

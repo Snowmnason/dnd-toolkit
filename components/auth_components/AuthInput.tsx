@@ -62,7 +62,7 @@ const AuthInput = React.forwardRef<RNTextInput, AuthInputProps>(({
             backgroundColor: '#F5E6D3',
             color: '#2f353d',
             fontSize: S.font.para,
-            marginBottom: -8,
+            marginBottom: -S.space.xs * .5,
           },
           showPasswordToggle ? { paddingRight: S.s(40) } : null,
           style,
