@@ -7,6 +7,8 @@ module.exports = defineConfig([
   expoConfig,
   {
     ignores: ['dist/*'],
+  },
+  {
     plugins: {
       security: securityPlugin,
     },
@@ -43,26 +45,33 @@ module.exports = defineConfig([
       'security/detect-pseudoRandomBytes': 'error',
       'security/detect-unsafe-regex': 'error',
     },
-    overrides: [
-      {
-        // Cache layer is allowed to use these patterns safely
-        files: ['lib/cache/**/*.ts', 'lib/storage/**/*.ts'],
-        rules: {
-          // Pattern-based invalidation requires dynamic regexes from controlled cache keys
-          'security/detect-non-literal-regexp': 'off',
-          // Storage layer uses dynamic keys from STORAGE_KEYS constants
-          'security/detect-object-injection': 'off',
-        },
-      },
-      {
-        // Database layer uses controlled patterns
-        files: ['lib/database/**/*.ts'],
-        rules: {
-          // Database keys are from constants or user IDs (safe)
-          'security/detect-object-injection': 'off',
-        },
-      },
-    ],
+  },
+  // Cache layer is allowed to use these patterns safely
+  {
+    files: ['lib/cache/**/*.ts', 'lib/cache/**/*.tsx'],
+    rules: {
+      // Pattern-based invalidation requires dynamic regexes from controlled cache keys
+      'security/detect-non-literal-regexp': 'off',
+      // Storage layer uses dynamic keys from STORAGE_KEYS constants
+      'security/detect-object-injection': 'off',
+    },
+  },
+  // Storage layer uses controlled patterns
+  {
+    files: ['lib/storage/**/*.ts', 'lib/storage/**/*.tsx'],
+    rules: {
+      // Storage layer uses dynamic keys from STORAGE_KEYS constants
+      'security/detect-object-injection': 'off',
+    },
+  },
+  // Database layer uses controlled patterns
+  {
+    files: ['lib/database/**/*.ts', 'lib/database/**/*.tsx'],
+    rules: {
+      // Database keys are from constants or user IDs (safe)
+      'security/detect-object-injection': 'off',
+    },
   },
 ]);
+
 

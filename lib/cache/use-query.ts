@@ -1,0 +1,211 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { logger } from '../utils/logger';
+import { QueryCache } from './query-cache';
+
+/**
+ * Options for useQuery hook
+ */
+export interface UseQueryOptions {
+  /** Cache stale time in seconds (default: 7200s = 2 hours) */
+  staleTime?: number;
+  /** Cache time in seconds (default: 14400s = 4 hours) */
+  cacheTime?: number;
+  /** Whether to revalidate in background when stale (default: true) */
+  revalidateOnFocus?: boolean;
+  /** Manually disable this query (default: false) */
+  disabled?: boolean;
+  /** Tags for smart cache invalidation */
+  tags?: string[];
+  /** Called when data is fetched successfully */
+  onSuccess?: (data: unknown) => void;
+  /** Called when error occurs */
+  onError?: (error: Error) => void;
+}
+
+/**
+ * State returned by useQuery hook
+ */
+export interface UseQueryState<T> {
+  /** Current cached data (or undefined if not yet loaded) */
+  data: T | undefined;
+  /** Whether first load is in progress */
+  isLoading: boolean;
+  /** Whether background revalidation is in progress */
+  isValidating: boolean;
+  /** Current error, if any */
+  error: Error | undefined;
+  /** Manually refetch data */
+  refetch: () => Promise<void>;
+  /** Manually invalidate this query */
+  invalidate: () => Promise<void>;
+}
+
+/**
+ * Fetch function type - takes a key and returns data
+ */
+type FetchFn<T> = (key: string) => Promise<T>;
+
+/**
+ * SWR (Stale-While-Revalidate) hook for data fetching with cache
+ *
+ * @example
+ * ```ts
+ * const { data, isLoading, error, refetch } = useQuery(
+ *   'worlds:user:123',
+ *   async (key) => {
+ *     const worlds = await worldsDB.getWorldsForUser('123');
+ *     return worlds;
+ *   },
+ *   { tags: ['worlds', 'user:123'] }
+ * );
+ * ```
+ */
+export function useQuery<T>(
+  key: string,
+  fetcher: FetchFn<T>,
+  options: UseQueryOptions = {},
+): UseQueryState<T> {
+  const {
+    staleTime = 7200,
+    cacheTime = 14400,
+    revalidateOnFocus = true,
+    disabled = false,
+    tags = [],
+    onSuccess,
+    onError,
+  } = options;
+
+  const [data, setData] = useState<T | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isValidating, setIsValidating] = useState(false);
+  const [error, setError] = useState<Error | undefined>(undefined);
+
+  // Track if mounted to prevent memory leaks
+  const isMountedRef = useRef(true);
+  // Track if we're doing initial fetch
+  const isInitialFetchRef = useRef(true);
+  // Track unsubscribe function
+  const unsubscribeRef = useRef<(() => void) | null>(null);
+
+  const revalidate = async () => {
+    if (disabled) return;
+
+    try {
+      setIsValidating(true);
+      const freshData = await fetcher(key);
+
+      if (!isMountedRef.current) return;
+
+      // Store in cache
+      await QueryCache.set(key, freshData, {
+        staleTime,
+        cacheTime,
+        tags,
+      });
+
+      setData(freshData);
+      setError(undefined);
+      onSuccess?.(freshData);
+    } catch (err) {
+      if (!isMountedRef.current) return;
+
+      const error = err instanceof Error ? err : new Error(String(err));
+      setError(error);
+      onError?.(error);
+      logger.error(`[useQuery] Fetch failed for key "${key}":`, error);
+    } finally {
+      if (isMountedRef.current) {
+        setIsValidating(false);
+      }
+    }
+  };
+
+  const invalidate = async () => {
+    await QueryCache.remove(key);
+    setData(undefined);
+    setError(undefined);
+    await revalidate();
+  };
+
+  const refetch = revalidate;
+
+  // Main effect: load data and setup cache subscription
+  useEffect(() => {
+    isMountedRef.current = true;
+    isInitialFetchRef.current = true;
+
+    const loadData = async () => {
+      if (disabled) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Try to get from cache first
+        const cachedData = await QueryCache.get<T>(key);
+
+        if (!isMountedRef.current) return;
+
+        if (cachedData !== null) {
+          // Have cached data
+          setData(cachedData);
+          setError(undefined);
+
+          // Check if stale
+          const isStale = await QueryCache.isStale(key);
+          if (isStale && revalidateOnFocus) {
+            // Stale - revalidate in background
+            setIsValidating(true);
+            await revalidate();
+          } else {
+            setIsValidating(false);
+            setIsLoading(false);
+          }
+        } else {
+          // No cached data - fetch immediately
+          setIsValidating(true);
+          await revalidate();
+        }
+      } catch (err) {
+        if (!isMountedRef.current) return;
+
+        const error = err instanceof Error ? err : new Error(String(err));
+        setError(error);
+        onError?.(error);
+        logger.error(`[useQuery] Initial load failed for key "${key}":`, error);
+      } finally {
+        if (isMountedRef.current) {
+          setIsLoading(false);
+          isInitialFetchRef.current = false;
+        }
+      }
+    };
+
+    // Subscribe to cache updates
+    unsubscribeRef.current = QueryCache.subscribe(key, (newData) => {
+      if (isMountedRef.current) {
+        setData(newData as T);
+        setError(undefined);
+      }
+    });
+
+    loadData();
+
+    return () => {
+      isMountedRef.current = false;
+      unsubscribeRef.current?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, disabled, revalidateOnFocus]);
+
+  return {
+    data,
+    isLoading,
+    isValidating,
+    error,
+    refetch,
+    invalidate,
+  };
+}
