@@ -61,6 +61,12 @@ type FetchFn<T> = (key: string) => Promise<T>;
  *   { tags: ['worlds', 'user:123'] }
  * );
  * ```
+ *
+ * @note staleTime, cacheTime, tags, onSuccess, and onError changes do NOT trigger refetch.
+ * Changes to these options apply to the next revalidation. If you need immediate effect:
+ * - Call refetch() manually
+ * - Memoize callbacks with useCallback() to maintain stable reference
+ * - Change the key to force re-initialization
  */
 export function useQuery<T>(
   key: string,
@@ -76,6 +82,10 @@ export function useQuery<T>(
     onSuccess,
     onError,
   } = options;
+
+  // Convert staleTime and cacheTime from seconds to milliseconds for QueryCache
+  const staleTimeMs = staleTime * 1000;
+  const cacheTimeMs = cacheTime * 1000;
 
   const [data, setData] = useState<T | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
@@ -109,8 +119,8 @@ export function useQuery<T>(
         key,
         freshData,
         {
-          staleTime,
-          cacheTime,
+          staleTime: staleTimeMs,
+          cacheTime: cacheTimeMs,
           tags,
         },
         versionAtStart // Pass version for race condition prevention
@@ -210,6 +220,11 @@ export function useQuery<T>(
       isMountedRef.current = false;
       unsubscribeRef.current?.();
     };
+    // NOTE: Dependencies intentionally minimal to prevent excessive refetches.
+    // Excluded: staleTime, cacheTime, tags, onSuccess, onError
+    // - staleTime/cacheTime/tags: Changes don't require refetch; apply to next revalidation
+    // - onSuccess/onError: Often redefined on render; memoize with useCallback if stable reference needed
+    // If you need immediate effect on these changes, call refetch() manually or change the key.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, disabled, revalidateOnFocus]);
 

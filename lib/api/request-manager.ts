@@ -75,7 +75,7 @@ const DEFAULT_OPTIONS: Required<RequestOptions> = {
   timeout: 30000,
   rateLimitKey: '',
   useQueryCache: false,
-  staleTime: 0,
+  staleTime: 2 * 60 * 1000, // 2 minutes - align with typical server-side cache TTL
   cacheTime: 5 * 60 * 1000, // 5 minutes
   tags: [],
 };

@@ -195,19 +195,19 @@ class FastCacheService {
    */
   async removeByPrefix(prefix: string): Promise<number> {
     try {
-      let keys: string[] = [];
+      let matchingKeys: string[] = [];
 
       if (Platform.OS === 'web') {
-        keys = Object.keys(localStorage).filter(key => key.startsWith(prefix));
-        keys.forEach(key => localStorage.removeItem(key));
+        matchingKeys = Object.keys(localStorage).filter(key => key.startsWith(prefix));
+        matchingKeys.forEach(key => localStorage.removeItem(key));
       } else {
-        keys = await AsyncStorage.getAllKeys();
-        const matchingKeys = keys.filter(key => key.startsWith(prefix));
+        const allKeys = await AsyncStorage.getAllKeys();
+        matchingKeys = allKeys.filter((key: string) => key.startsWith(prefix));
         await AsyncStorage.multiRemove(matchingKeys);
       }
 
-      logger.debug('cache', `FastCache.removeByPrefix: ${prefix} (removed ${keys.length} items)`);
-      return keys.length;
+      logger.debug('cache', `FastCache.removeByPrefix: ${prefix} (removed ${matchingKeys.length} items)`);
+      return matchingKeys.length;
     } catch (error) {
       logger.error('cache', `FastCache.removeByPrefix failed for ${prefix}:`, error);
       return 0;
@@ -234,6 +234,11 @@ class FastCacheService {
           return [key, JSON.stringify(entry)];
         });
         await AsyncStorage.multiSet(entries);
+
+        // Notify subscribers for each key (matching web platform behavior)
+        for (const [key, value] of items) {
+          this.notifySubscribers(key, value);
+        }
       }
 
       logger.debug('cache', `FastCache.multiSet: ${items.length} items`);

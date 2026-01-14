@@ -13,6 +13,17 @@ import { logger } from '../utils/logger';
  */
 
 // ==========================================
+// Helper Functions
+// ==========================================
+
+/**
+ * Escape special regex characters in a string to prevent ReDoS attacks
+ */
+function escapeRegexChars(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// ==========================================
 // Types
 // ==========================================
 
@@ -269,7 +280,9 @@ class QueryCacheClass {
 
       let regex: RegExp;
       if (typeof pattern === 'string') {
-        regex = new RegExp(`^${pattern}`);
+        // Escape special regex characters to prevent ReDoS attacks
+        const escapedPattern = escapeRegexChars(pattern);
+        regex = new RegExp(`^${escapedPattern}`);
       } else {
         regex = pattern;
       }

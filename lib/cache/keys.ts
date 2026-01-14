@@ -132,13 +132,13 @@ export const INVALIDATION_PATTERNS = {
   userData: (userId: string) => new RegExp(`^user:${userId}:`),
 
   // All notes in a world
-   
   worldNotes: (worldId: string) =>
+     // eslint-disable-next-line security/detect-non-literal-regexp
     new RegExp(`^world:${worldId}:note(s)?:`),
 
   // All characters in a world
-   
   worldCharacters: (worldId: string) =>
+    // eslint-disable-next-line security/detect-non-literal-regexp
     new RegExp(`^world:${worldId}:character(s)?:`),
 
   // All session data

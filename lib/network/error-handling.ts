@@ -158,7 +158,8 @@ export async function handleErrorGracefully(error: any, context: {
   options?: GracefulErrorOptions;
 }): Promise<{ success: boolean; data?: any; error?: any }> {
   const { key, operation, getCachedData, options = {} } = context;
-  const { gracefulDegradation = true, showOfflineIndicator = false } = options;
+  const { gracefulDegradation = true } = options;
+  // Note: showOfflineIndicator is reserved for future use (Milestone 3+)
 
   const isNetError = isNetworkError(error);
   const isOnline = NetworkDetection.isOnline();
