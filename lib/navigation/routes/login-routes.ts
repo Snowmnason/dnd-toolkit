@@ -8,11 +8,6 @@ export const LOGIN_ROUTES: RouteConfig[] = [
     showTopBar: false,
     animation: 'fade',
     analyticsName: 'root_index',
-    redirectIf: (context) => {
-      // Safety net: if user somehow stays on index, redirect to welcome
-      // Actual redirect happens in app/index.tsx via AuthStateManager
-      return '/login/welcome'
-    },
   },
   {
     path: '/login',
@@ -26,21 +21,21 @@ export const LOGIN_ROUTES: RouteConfig[] = [
     path: '/login/sign-in',
     title: 'Sign In',
     showTopBar: false,
-    back: '/login/welcome',
+    back: '/',
     analyticsName: 'login_signin',
   },
   {
     path: '/login/create-account',
     title: 'Create Account',
     showTopBar: false,
-    back: '/login/welcome',
+    back: '/',
     analyticsName: 'login_create',
   },
   {
     path: '/login/sign-up',
     title: 'Create Account',
     showTopBar: false,
-    back: '/login/welcome',
+    back: '/',
     analyticsName: 'login_signup',
   },
   {
@@ -75,14 +70,14 @@ export const LOGIN_ROUTES: RouteConfig[] = [
     path: '/login/complete-profile',
     title: 'Complete Profile',
     showTopBar: false,
-    back: '/login/welcome',
+    back: '/',
     analyticsName: 'login_complete_profile',
   },
   {
     path: '/login/auth-redirect',
     title: 'Authenticating…',
     showTopBar: false,
-    back: '/login/welcome',
+    back: '/',
     analyticsName: 'login_auth_redirect',
   },
   {
@@ -91,8 +86,9 @@ export const LOGIN_ROUTES: RouteConfig[] = [
     title: 'Component Playground (Anonymous)',
     showTopBar: true,
     showHamburger: false,
-    back: '/login/welcome',
+    back: '/',
     animation: 'slide',
     analyticsName: 'style_desktop_anonymous',
   },
 ]
+

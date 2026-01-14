@@ -36,7 +36,7 @@ export default function SignInScreen() {
       <AuthBackButtonContainer>
         <AuthButtonBack
           text="← Back"
-          onPress={() => router.replace('/login/welcome')}
+          onPress={() => router.replace('/')}
           disabled={loading}
         />
       </AuthBackButtonContainer>
@@ -105,7 +105,7 @@ export default function SignInScreen() {
           color="#D4AF37"
           deco="underline"
           style={{ marginTop: 8 }}
-          onPress={() => router.replace('/login/welcome')}
+          onPress={() => router.replace('/')}
         >
           ← Back to Welcome
         </AuthBody>

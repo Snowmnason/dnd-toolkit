@@ -1,7 +1,9 @@
-import { AuthStateManager, logger } from "@/lib";
+import { logger } from "@/lib";
+import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
 import { useRouter } from "expo-router";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import Welcome from "../Screens/Welcome";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { useAppBootstrap } from "../hooks/use-app-bootstrap";
 
@@ -21,6 +23,8 @@ const TAVERN_LOCATIONS = [
 export default function HomePage() {
   const router = useRouter();
   const [showFailsafe, setShowFailsafe] = React.useState(false);
+  const [isAuthChecked, setIsAuthChecked] = React.useState(false);
+  const [hasAccount, setHasAccount] = React.useState(false);
   
   // Pick a random location on mount
   const randomLocation = React.useMemo(() => {
@@ -38,111 +42,125 @@ export default function HomePage() {
   // Wait for bootstrap to complete before routing
   const bootstrap = useAppBootstrap();
 
-  // Show failsafe button after timeout
+  // Show failsafe button after timeout, but only if we haven't completed auth check
   React.useEffect(() => {
     const timer = setTimeout(() => {
-      logger.warn('bootstrap', '⏱️ Failsafe timeout reached, showing manual navigation button');
-      setShowFailsafe(true);
+      // Only show failsafe if we're still waiting for auth check
+      if (!isAuthChecked) {
+        logger.warn('bootstrap', '⏱️ Failsafe timeout reached, showing manual navigation button');
+        setShowFailsafe(true);
+      }
     }, FAILSAFE_TIMEOUT);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [isAuthChecked]);
 
-  // Determine routing decision ASAP once bootstrap is ready
+  // Simple time-based check: if user logged in within 7 days, redirect (skip welcome)
   React.useEffect(() => {
     // Don't proceed until bootstrap is complete
     if (!bootstrap.isReady) {
-      logger.debug('bootstrap', '⏸️ Waiting for bootstrap to complete', {
-        assetsLoaded: bootstrap.assetsLoaded,
-        sessionRestored: bootstrap.sessionRestored,
-        isReady: bootstrap.isReady,
-        error: bootstrap.error?.message
-      });
+      logger.debug('bootstrap', '⏸️ Waiting for bootstrap to complete');
       return;
     }
 
-    logger.info('bootstrap', '🚀 Bootstrap ready! Starting routing decision...');
+    logger.info('bootstrap', '🚀 Bootstrap ready! Checking login recency...');
 
-    const determineRoute = async () => {
+    const checkLoginRecency = async () => {
       try {
-        logger.info('bootstrap', '🔍 Calling AuthStateManager.getRoutingDecision()...');
-        const startTime = Date.now();
-        const { routingDecision: decision } = await AuthStateManager.getRoutingDecision();
-        const elapsed = Date.now() - startTime;
-        logger.info('bootstrap', `✅ Routing decision received in ${elapsed}ms:`, decision);
+        const lastLoggedInStr = await SecureStorage.getItem(STORAGE_KEYS.LAST_LOGGED_IN);
         
-        // Navigate immediately without state update to avoid render
-        switch (decision) {
-          case 'welcome':
-            logger.info('bootstrap', '🏠 Navigating to: /login/welcome');
-            router.replace('/login/welcome');
-            break;
-          case 'login':
-            logger.info('bootstrap', '🔑 Navigating to: /login/sign-in');
-            router.replace('/login/sign-in');
-            break;
-          case 'complete-profile':
-            logger.info('bootstrap', '👤 Navigating to: /login/complete-profile');
-            router.replace('/login/complete-profile');
-            break;
-          case 'main':
-            logger.info('bootstrap', '🌍 Navigating to: /select/world-selection');
+        if (!lastLoggedInStr) {
+          logger.debug('bootstrap', '⏭️ No recent login found, showing welcome');
+          setIsAuthChecked(true);
+          setHasAccount(false);
+          return;
+        }
+        
+        const lastLoggedInMs = parseInt(lastLoggedInStr, 10);
+        const now = Date.now();
+        const sevenDaysMs = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+        const isWithinSevenDays = (now - lastLoggedInMs) < sevenDaysMs;
+        
+        if (isWithinSevenDays) {
+          logger.info('bootstrap', `✅ Recent login detected (${Math.floor((now - lastLoggedInMs) / (1000 * 60 * 60))} hours ago), redirecting to world selection`);
+          setIsAuthChecked(true);
+          setHasAccount(true);
+          // Redirect to world selection after a brief moment to ensure state is set
+          setTimeout(() => {
             router.replace('/select/world-selection');
-            break;
-          default:
-            logger.warn('bootstrap', `⚠️ Unknown decision "${decision}", using fallback: /login/welcome`);
-            router.replace('/login/welcome');
+          }, 100);
+          return;
         }
         
-        logger.info('bootstrap', '✅ router.replace() called successfully');
+        logger.debug('bootstrap', '⏭️ Login is stale (>7 days), showing welcome');
+        setIsAuthChecked(true);
+        setHasAccount(false);
       } catch (error) {
-        logger.error('bootstrap', '❌ Routing error:', error);
-        logger.error('bootstrap', '📍 Attempting fallback to /login/welcome');
-        try {
-          router.replace('/login/welcome');
-          logger.info('bootstrap', '✅ Fallback navigation successful');
-        } catch (fallbackError) {
-          logger.error('bootstrap', '❌ Fallback navigation also failed:', fallbackError);
-        }
+        // If check fails, just show welcome - no harm done
+        logger.debug('bootstrap', '⚠️ Login recency check failed, showing welcome:', error);
+        setIsAuthChecked(true);
+        setHasAccount(false);
       }
     };
 
-    determineRoute();
-  }, [bootstrap.isReady, bootstrap.assetsLoaded, bootstrap.sessionRestored, bootstrap.error?.message, router]);
+    checkLoginRecency();
+  }, [bootstrap.isReady, router]);
 
-  // Show loading spinner while bootstrap is happening or determining route
-  const loadingMessage = !bootstrap.isReady 
-    ? (bootstrap.assetsLoaded ? 'Restoring session...' : 'Loading assets...')
-    : 'Determining route...';
+  // Show loading spinner while bootstrap is happening
+  if (!bootstrap.isReady) {
+    const loadingMessage = bootstrap.assetsLoaded ? 'Restoring session...' : 'Loading assets...';
+    logger.debug('bootstrap', '⏳ Rendering index loading overlay:', loadingMessage);
+    
+    return (
+      <View style={styles.container}>
+        <LoadingOverlay 
+          message={loadingMessage}
+          error={bootstrap.error}
+          assetsLoaded={bootstrap.assetsLoaded}
+        />
+      </View>
+    );
+  }
 
-  logger.debug('bootstrap', '⏳ Rendering index loading overlay:', loadingMessage);
+  // Show welcome screen once auth check is complete
+  // For authenticated users: they'll see the welcome screen momentarily, 
+  // but the select route guard will pull them to /select/world-selection
+  if (isAuthChecked) {
+    logger.debug('bootstrap', `📋 Rendering welcome screen (hasAccount: ${hasAccount})`);
+    
+    return (
+      <View style={styles.container}>
+        <Welcome />
+        
+        {showFailsafe && (
+          <View style={styles.failsafeContainer}>
+            <TouchableOpacity 
+              style={styles.failsafeButton}
+              onPress={() => {
+                logger.info('bootstrap', '🚪 User clicked failsafe button, navigating to welcome');
+                // Welcome screen is already showing, so this is a manual refresh
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.failsafeIcon}>{randomLocation.icon}</Text>
+              <Text style={styles.failsafeText}>{randomLocation.text}</Text>
+              <Text style={styles.failsafeSubtext}>Manual Navigation</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  }
 
-  const handleManualNavigation = () => {
-    logger.info('bootstrap', '🚪 User clicked failsafe button, navigating to welcome');
-    router.replace('/login/welcome');
-  };
-
+  // Show loading while determining auth status
+  logger.debug('bootstrap', '⏳ Checking auth status...');
   return (
     <View style={styles.container}>
       <LoadingOverlay 
-        message={loadingMessage}
+        message="Checking authentication..."
         error={bootstrap.error}
         assetsLoaded={bootstrap.assetsLoaded}
       />
-      
-      {showFailsafe && (
-        <View style={styles.failsafeContainer}>
-          <TouchableOpacity 
-            style={styles.failsafeButton}
-            onPress={handleManualNavigation}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.failsafeIcon}>{randomLocation.icon}</Text>
-            <Text style={styles.failsafeText}>{randomLocation.text}</Text>
-            <Text style={styles.failsafeSubtext}>Manual Navigation</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </View>
   );
 }

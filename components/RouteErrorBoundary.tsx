@@ -1,8 +1,11 @@
-import { AppPage, Body, Button, Card, Title } from '@/components/ui';
+import { Body, Button, Card, Title } from '@/components/ui';
 import { logger } from '@/lib';
+import { View } from "react-native";
+import { getAppConfig } from '@/lib/config/loader';
 import { NavigationContext, RouteConfig } from '@/lib/navigation/navigation-config';
+import { UseTheme, useScale } from '@/theme';
 import { useRouter } from 'expo-router';
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useMemo } from 'react';
 
 interface RouteErrorBoundaryProps {
   children: ReactNode;
@@ -15,6 +18,22 @@ interface State {
   hasError: boolean;
   error?: Error;
 }
+// Fun D&D-themed error messages
+const ERROR_MESSAGES = [
+  "Oops! Someone spilled a drink on the character sheet!",
+  "Oops! Your pencil broke mid-session!",
+  "Oops! We encountered a TPK!",
+  "Oops! The DM's notes got eaten by the dog!",
+  "Oops! Natural 1!",
+  "Oops! The dice rolled off the table!",
+  "Oops! Someone forgot to bring snacks!",
+  "Oops! The dragon decided to show up early!",
+  "Oops! Critical fumble on the app loading!",
+  "Oops! The tavern ran out of ale!",
+  "Oops! Your spell fizzled!",
+  "Oops! The mimic was actually the treasure chest!",
+];
+
 
 /**
  * Error boundary for individual routes
@@ -79,52 +98,92 @@ interface ErrorFallbackProps {
 
 /**
  * Fallback UI for route errors
+ * Styled similar to CrashFallBack for consistency
  */
 function ErrorFallback({ error, fallbackRoute }: ErrorFallbackProps) {
+  const { theme } = UseTheme();
+  const S = useScale();
   const router = useRouter();
+  const config = getAppConfig();
+  // Check override setting first, fall back to NODE_ENV if not explicitly set
+  // This allows showing detailed errors in production builds via appsettings.dev.json
+  const showDetailedErrors = config.overrides?.verboseErrorMessages ?? process.env.NODE_ENV === 'development';
 
   const handleRecover = () => {
+    // Redirect to fallbackRoute (provided by parent or defaults to safe route)
     router.replace(fallbackRoute as any);
   };
+    // Pick a random fun message
+  const funMessage = useMemo(
+    () => ERROR_MESSAGES[Math.floor(Math.random() * ERROR_MESSAGES.length)],
+    []
+  );
 
   return (
-    <AppPage 
-      style={{ 
-        flex: 1, 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        paddingHorizontal: 24 
+<View
+      style={{
+        alignItems: "center",
+        justifyContent: "center",
+        flex: 1,
+        backgroundColor: theme.background,
+        padding: S.space.lg,
       }}
     >
-      <Card 
-        style={{ 
-          alignItems: 'center', 
-          maxWidth: 400, 
-          padding: 24 
+      <Card
+        padded
+        bordered
+        style={{
+          width: "100%",
+          padding: S.space.xl,
         }}
       >
-        <Title style={{ marginBottom: 12 }}>Oops!</Title>
-        <Body style={{ textAlign: 'center', marginBottom: 16 }}>
-          Something went wrong on this screen. Please try again or return to the previous screen.
+        {/* Error Icon/Title */}
+        <Title
+          align="center"
+          style={{
+            color: theme.accent,
+            marginBottom: S.space.md,
+          }}
+        >
+          🎲 {funMessage}
+        </Title>
+        <Body 
+          align="center" 
+          style={{ 
+            marginBottom: 24, 
+            lineHeight: 1.6,
+            opacity: 0.9
+          }}
+        >
+          Don&apos;t worry - your adventure is safe! Try returning to the tavern (home screen) to continue your quest.
         </Body>
-        {error && (
-          <Body 
+        {error && showDetailedErrors && (
+          <Card 
+            bordered
+            padded
             style={{ 
-              marginBottom: 20, 
-              fontFamily: 'monospace', 
-              opacity: 0.8 
-            }} 
-            numberOfLines={3}
+              marginBottom: 24,
+              width: '100%',
+              maxHeight: 200,
+              overflow: 'hidden'
+            }}
           >
-            Error: {error.message}
-          </Body>
+            <Body 
+              style={{ 
+                fontFamily: 'monospace', 
+                fontSize: 12,
+                opacity: 0.8
+              }}
+            >
+              {error.message}
+            </Body>
+          </Card>
         )}
         <Button
-          text="Return to Safety"
+          text="Return to Welcome Screen"
           onPress={handleRecover}
-          style={{ marginTop: 16 }}
         />
       </Card>
-    </AppPage>
+    </View>
   );
 }

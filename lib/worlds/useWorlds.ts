@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useAppParams } from '@/contexts/AppParamsContext';
 import { RequestManager } from '../api/request-manager';
+import { SecureStorage } from '../storage';
 import { worldsDB, WorldWithAccess } from '../database/worlds';
 import { logger } from '../utils/logger';
 
@@ -8,13 +8,13 @@ import { logger } from '../utils/logger';
  * Custom hook for managing world data and state
  * Provides loading, error handling, and retry functionality
  * @param userId - Optional user ID for optimization. If not provided, uses current auth user
+ * @param onWorldsLoaded - Optional callback to update parent context with loaded world IDs
  */
-export function useWorlds(userId?: string) {
+export function useWorlds(userId?: string, onWorldsLoaded?: (worldIds: string[]) => void) {
   const [selectedWorld, setSelectedWorld] = useState<WorldWithAccess | null>(null);
   const [worlds, setWorlds] = useState<WorldWithAccess[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { setConnectedWorldIds } = useAppParams();
 
   const loadWorlds = useCallback(async () => {
     try {
@@ -39,12 +39,24 @@ export function useWorlds(userId?: string) {
       );
       setWorlds(userWorlds ?? []);
       
-      // Update connected worlds cache for navigation guard
+      // Update world access cache for all loaded worlds
+      // These worlds are confirmed accessible since they came from the server's getMyWorlds()
       if (userWorlds && userWorlds.length > 0) {
-        const worldIds = userWorlds.map(w => w.world_id);
-        setConnectedWorldIds(worldIds);
-      } else {
-        setConnectedWorldIds([]);
+        for (const world of userWorlds) {
+          const cacheKey = `world_access_${world.world_id}`;
+          const metaKey = `world_access_meta_${world.world_id}`;
+          await SecureStorage.setJSON(cacheKey, true); // User has access
+          await SecureStorage.setJSON(metaKey, {
+            timestamp: Date.now(),
+            source: 'server_verified'
+          });
+        }
+      }
+      
+      // Notify parent if callback provided (parent will update context)
+      if (onWorldsLoaded) {
+        const worldIds = userWorlds?.map(w => w.world_id) ?? [];
+        onWorldsLoaded(worldIds);
       }
     } catch (err) {
       logger.error('storage', 'Error loading worlds:', err);
@@ -52,7 +64,7 @@ export function useWorlds(userId?: string) {
     } finally {
       setIsLoading(false);
     }
-  }, [userId, setConnectedWorldIds]); // Include userId and setConnectedWorldIds since they're used in the callback
+  }, [userId, onWorldsLoaded]); // Include userId and onWorldsLoaded since they're used in the callback
 
   // Load worlds on mount
   useEffect(() => {

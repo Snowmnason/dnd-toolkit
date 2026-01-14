@@ -132,7 +132,7 @@ export default function EmailConfirmationScreen() {
       <AuthBackButtonContainer>
         <AuthButtonBack
           text="← Back"
-          onPress={() => router.replace('/login/welcome')}
+          onPress={() => router.replace('/')}
           disabled={loading}
         />
       </AuthBackButtonContainer>

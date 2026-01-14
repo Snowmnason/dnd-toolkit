@@ -38,6 +38,7 @@ export const STORAGE_KEYS = {
   HAS_ACCOUNT: 'dnd:auth:has_account',
   USER_DATA: 'dnd:auth:user_data',
   USER_DATA_TIMESTAMP: 'dnd:auth:user_data_timestamp',
+  LAST_LOGGED_IN: 'dnd:auth:last_logged_in', // Timestamp of last successful sign-in (used for welcome screen skip)
   
   // Auth attempt rate limiting
   AUTH_ATTEMPTS: 'dnd:auth:attempts',

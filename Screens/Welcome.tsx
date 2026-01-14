@@ -1,92 +1,41 @@
 import { AuthActionGroup, AuthBody, AuthBodyFooter, AuthButton, AuthButtonSecondary, AuthCaption, AuthLink, AuthRoot, AuthSubTitle, AuthTitle } from '@/components/auth_components';
-import { AuthStateManager, logger, useWelcomeScreen } from '@/lib';
+import { useWelcomeScreen } from '@/lib';
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers';
 import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
 import { Platform, useWindowDimensions, View } from 'react-native';
-import CustomLoad from '../../components/ui/CustomLoad';
-import VersionDisplay from '../../components/VersionDisplay';
+import CustomLoad from '../components/ui/CustomLoad';
+import VersionDisplay from '../components/VersionDisplay';
 
 
 // TODO: Uncomment when ready to enable social authentication
-// import AppleSignInButton from '../../components/social-auth-buttons/apple/apple-sign-in-button';
-// import GoogleSignInButton from '../../components/social-auth-buttons/google/google-sign-in-button';
-export default function WelcomeScreen() {
+// import AppleSignInButton from '../components/social-auth-buttons/apple/apple-sign-in-button';
+// import GoogleSignInButton from '../components/social-auth-buttons/google/google-sign-in-button';
+
+interface WelcomeScreenProps {
+  isLoading?: boolean;
+}
+
+export default function Welcome({ isLoading = false }: WelcomeScreenProps) {
   const S = useScale();
   const { width } = useWindowDimensions();
   const isMobile = (Platform.OS === 'ios' || Platform.OS === 'android') || (Platform.OS === 'web' && width < 900);
   
-  // Create unique ID for this component instance to track mounts
-  const [componentId] = useState(() => Math.random().toString(36).slice(2, 9));
-   
   const router = useRouter();
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
   const {
-    isLoading,
+    isLoading: authIsLoading,
     handleSignIn,
     handleSignUp,
   } = useWelcomeScreen();
 
-  // Log mount and unmount
-  useEffect(() => {
-    logger.info('auth', `[CMP:${componentId}] 🟢 Component mounted`);
-    return () => {
-      logger.info('auth', `[CMP:${componentId}] 🔴 Component unmounted`);
-    };
-  }, [componentId]);
+  const loading = isLoading || authIsLoading;
 
-  // Auth guard: redirect authenticated users away from welcome screen
-  // Only run ONCE on mount to prevent redirect loops
-  useEffect(() => {
-    if (hasCheckedAuth) {
-      logger.debug('auth', `[CMP:${componentId}] ⏭️ Auth check already performed, skipping`);
-      return;
-    }
-
-    let mounted = true;
-    
-    const checkAuthAndRedirect = async () => {
-      try {
-        logger.debug('auth', `[CMP:${componentId}] 🔍 Checking authentication status...`);
-        const { routingDecision } = await AuthStateManager.getRoutingDecision();
-        
-        if (!mounted) return; // Don't proceed if unmounted
-        
-        // Early return pattern - combine redirect checks
-        if (routingDecision === 'main' || routingDecision === 'complete-profile') {
-          const target = routingDecision === 'main' 
-            ? '/select/world-selection' 
-            : '/login/complete-profile';
-          logger.info('auth', `[CMP:${componentId}] 🔀 Redirecting to ${target}`);
-          router.replace(target);
-          return;
-        }
-        
-        // User should be on welcome or login screen - stay here
-        logger.debug('auth', `[CMP:${componentId}] ✅ User belongs on welcome screen (decision: ${routingDecision})`);
-      } catch (error) {
-        logger.error('auth', `[CMP:${componentId}] Error checking auth:`, error);
-      } finally {
-        if (mounted) {
-          setIsCheckingAuth(false);
-          setHasCheckedAuth(true);
-        }
-      }
-    };
-
-    checkAuthAndRedirect();
-    
-    return () => { mounted = false; };
-  }, [hasCheckedAuth, router, componentId]);
-
-  if (isCheckingAuth || isLoading) {
+  if (loading) {
     return (
       <AuthRoot>
         <CustomLoad size="large" />
         <AuthBody style={{ marginTop: 16 }}>
-          {isCheckingAuth ? 'Checking authentication...' : 'Loading...'}
+          Loading...
         </AuthBody>
       </AuthRoot>
     )
@@ -128,8 +77,8 @@ export default function WelcomeScreen() {
           
           Social Auth Row - Both buttons side by side:
           <View style={{ flexDirection: 'row', gap: 12, width: '100%', marginBottom: 16 }}>
-            <AppleSignInButton style={{ flex: 1 }} disabled={isLoading} />
-            <GoogleSignInButton style={{ flex: 1 }} disabled={isLoading} />
+            <AppleSignInButton style={{ flex: 1 }} disabled={loading} />
+            <GoogleSignInButton style={{ flex: 1 }} disabled={loading} />
           </View>
 
           Add divider between social and email auth when enabled:
@@ -144,20 +93,20 @@ export default function WelcomeScreen() {
         <AuthButton
           text="Sign In"
           onPress={handleSignIn}
-          disabled={isLoading}
-          loading={isLoading}
+          disabled={loading}
+          loading={loading}
         />
 
         {/* Sign Up Button */}
         <AuthButtonSecondary
           text="Create Account"
           onPress={handleSignUp}
-          disabled={isLoading}
+          disabled={loading}
         />
 
         {/* Continue Without Account */}
         <AuthLink
-          color={isLoading ? '#BDB76B' : '#D4AF37'}
+          color={loading ? '#BDB76B' : '#D4AF37'}
           onPress={() => {
             if (isMobile) {
               //do nothing for now

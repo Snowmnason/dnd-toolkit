@@ -6,7 +6,7 @@ import {
   FormAuthInput
 } from '@/components/auth_components';
 import { AppToast } from '@/components/ui';
-import { buildRoute, logger, supabase, useSignInForm } from '@/lib';
+import { AuthStateManager, buildRoute, logger, supabase, useSignInForm } from '@/lib';
 import type { Href } from 'expo-router';
 import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
@@ -38,6 +38,45 @@ export default function SignInScreen() {
     handleSignIn,
     setShowPassword,
   } = useSignInForm();
+
+  // Heavy-duty auth check: verify with Supabase and ensure all data exists
+  useEffect(() => {
+    const verifyAuthStatus = async () => {
+      try {
+        logger.debug('auth', 'Sign-in screen: Performing heavy-duty auth verification');
+        
+        // Check 1: Local storage has account flag
+        const authState = await AuthStateManager.getAuthState();
+        if (!authState.hasAccount) {
+          logger.debug('auth', 'Sign-in screen: No account flag in storage, showing login form');
+          return;
+        }
+        
+        // Check 2: Verify with Supabase that session is still valid
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session) {
+          logger.warn('auth', 'Sign-in screen: Session invalid or expired', sessionError?.message);
+          return;
+        }
+        
+        // Check 3: Verify user data exists in storage
+        const userData = await AuthStateManager.getUserData();
+        if (!userData || !userData.id) {
+          logger.warn('auth', 'Sign-in screen: User data missing from storage');
+          return;
+        }
+        
+        // All checks passed - user is authenticated
+        logger.info('auth', 'Sign-in screen: All checks passed, redirecting to world selection');
+        router.replace('/select/world-selection');
+      } catch (error) {
+        logger.error('auth', 'Sign-in screen: Error during verification:', error);
+        // If verification fails, just show login form (no harm)
+      }
+    };
+
+    verifyAuthStatus();
+  }, [router]);
 
   const handleResendConfirmationFromError = async (email: string) => {
     setIsResendingEmail(true);
@@ -73,7 +112,7 @@ export default function SignInScreen() {
       <AuthBackButtonContainer>
         <AuthButtonBack
           text="← Back"
-          onPress={() => router.replace(buildRoute('/login/welcome') as Href)}
+          onPress={() => router.replace(buildRoute('/') as Href)}
           disabled={loading}
         />
       </AuthBackButtonContainer>

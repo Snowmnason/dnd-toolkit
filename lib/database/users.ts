@@ -76,7 +76,7 @@ export const usersDB = {
     
     // Save user data to local storage
     try {
-      const { AuthStateManager } = await import('../auth-state');
+      const { AuthStateManager } = await import('../auth/auth-state');
       await AuthStateManager.saveUserData(data);
     } catch (storageError) {
       logger.warn('storage', 'Failed to save user data to storage (non-critical):', storageError);
@@ -102,7 +102,7 @@ export const usersDB = {
     
     // First, try to get from local storage to avoid DB call
     try {
-      const { AuthStateManager } = await import('../auth-state');
+      const { AuthStateManager } = await import('../auth/auth-state');
       const cachedUser = await AuthStateManager.getUserData();
       
       if (cachedUser) {
@@ -199,7 +199,7 @@ export const usersDB = {
     
     // Save user data to local storage to avoid future database calls
     try {
-      const { AuthStateManager } = await import('../auth-state');
+      const { AuthStateManager } = await import('../auth/auth-state');
       await AuthStateManager.saveUserData(data);
     } catch (storageError) {
       logger.warn('storage', 'Failed to save user data to storage (non-critical):', storageError);
@@ -238,7 +238,7 @@ export const usersDB = {
     
     // Save updated user data to local storage
     try {
-      const { AuthStateManager } = await import('../auth-state');
+      const { AuthStateManager } = await import('../auth/auth-state');
       await AuthStateManager.saveUserData(data);
     } catch (storageError) {
       logger.warn('storage', 'Failed to save updated user data to storage (non-critical):', storageError);

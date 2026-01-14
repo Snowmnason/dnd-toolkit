@@ -245,9 +245,13 @@ export const signInUser = async (
       logger.info('auth', `✅ Sign-in successful for ${sanitizedEmail}, setting auth state...`);
       
       // Set local auth state so route guards work immediately
-      const { AuthStateManager } = await import('../auth-state');
+      const { AuthStateManager } = await import('./auth-state');
       await AuthStateManager.setHasAccount(true);
-      logger.debug('auth', '✅ Auth state set, checking user profile...');
+      
+      // Record successful login timestamp (for welcome screen skip - valid for 7 days)
+      const { SecureStorage, STORAGE_KEYS } = await import('@/lib/storage');
+      await SecureStorage.setItem(STORAGE_KEYS.LAST_LOGGED_IN, Date.now().toString());
+      logger.debug('auth', '✅ Auth state set, login timestamp recorded');
 
       // Check if user has a complete profile
       try {
@@ -255,6 +259,12 @@ export const signInUser = async (
         const userProfile = await usersDB.getCurrentUser();
         const profileElapsed = Date.now() - profileStartTime;
         logger.debug('auth', `⏱️ User profile fetch completed in ${profileElapsed}ms`);
+        
+        // CRITICAL: Ensure user data is saved to storage before continuing
+        // This ensures the userId context can load it immediately when the route renders
+        logger.debug('auth', '💾 Ensuring user data is saved to storage...');
+        await AuthStateManager.saveUserData(userProfile);
+        logger.debug('auth', '✅ User data saved, userId available in storage');
         
         // Robust profile validation
         const hasValidProfile = userProfile && 

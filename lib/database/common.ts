@@ -20,7 +20,7 @@ import type { User } from './users';
  * - Live data: `getCurrentUserProfile(true)` - always fetches fresh
  */
 export async function getCurrentUserProfile(forceRefresh = false): Promise<User | null> {
-  const { AuthStateManager } = await import('../auth-state');
+  const { AuthStateManager } = await import('../auth/auth-state');
   
   // Step 1: Try cache first (unless force refresh)
   if (!forceRefresh) {
@@ -28,14 +28,8 @@ export async function getCurrentUserProfile(forceRefresh = false): Promise<User 
       const cachedUser = await AuthStateManager.getUserData();
       
       if (cachedUser) {
-        // Check if cache is still fresh (up to 4 hours old)
-        const isFresh = await AuthStateManager.isCacheFresh();
-        if (isFresh) {
-          logger.debug('storage', 'User profile loaded from fresh cache');
-          return cachedUser;
-        }
-        // Cache is stale, but don't throw - just fetch fresh
-        logger.debug('storage', 'Cache expired, fetching fresh data');
+        logger.debug('storage', 'User profile loaded from cache');
+        return cachedUser;
       }
     } catch {
       logger.debug('storage', 'Cache access failed, fetching from session');
@@ -164,7 +158,7 @@ export async function validateCurrentUser(): Promise<{ auth_id: string; email: s
  * ```
  */
 export async function validateUserForWrite(): Promise<User> {
-  const { AuthStateManager } = await import('../auth-state');
+  const { AuthStateManager } = await import('../auth/auth-state');
   
   // Always validate with server for writes
   // This ensures user still has permission and account is active

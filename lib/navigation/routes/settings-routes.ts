@@ -39,9 +39,6 @@ export const SETTINGS_ROUTES: RouteConfig[] = [
     showHamburger: false,
     back: '/select/world-selection',
     analyticsName: 'settings_user',
-    redirectIf: (context) => {
-      return !context.isAuthenticated ? '/login/welcome' : undefined
-    },
   },
   {
     path: '/settings/StyleMobile',

@@ -1,4 +1,5 @@
 import { Button, Card, Heading, LazyImage } from '@/components/ui'
+import { useAppParamsStable } from '@/contexts/AppParamsStableContext'
 import { useAppParamsVolatile } from '@/contexts/AppParamsVolatileContext'
 import { usePlatform } from '@/contexts/PlatformContext'
 import { WorldWithAccess } from '@/lib/database/worlds'
@@ -21,6 +22,7 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
   const { theme } = UseTheme()
   const router = useRouter()
   const { updateVolatileParams } = useAppParamsVolatile()
+  const { addConnectedWorld } = useAppParamsStable()
   const { isDesktop } = usePlatform()
   // Optional flag to disable the large backdrop image if it's causing perf issues
   const DISABLE_BACKDROP = process.env.EXPO_PUBLIC_DISABLE_WORLD_MAP_IMAGE === '1'
@@ -100,6 +102,9 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
                   worldId: selectedWorld.world_id,
                   userRole: selectedWorld.user_role,
                 })
+                
+                // Immediately add to connected worlds so auth guard can verify access
+                addConnectedWorld(selectedWorld.world_id)
                 
                 // Update context first
                 updateVolatileParams({

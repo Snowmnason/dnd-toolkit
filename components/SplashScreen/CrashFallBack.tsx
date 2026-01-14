@@ -92,7 +92,7 @@ export function CrashFallBack({ error, onRetry }: CrashFallBackProps) {
             style={{
               backgroundColor: theme.surface,
               marginBottom: S.space.lg,
-              maxHeight: 200,
+              maxHeight: 400,
             }}
           >
             <Body
