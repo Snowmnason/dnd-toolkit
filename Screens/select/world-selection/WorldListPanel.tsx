@@ -1,5 +1,5 @@
 import { Body, Button } from '@/components/ui'
-import { useAppParams } from '@/contexts/AppParamsContext'
+import { useAppParamsVolatile } from '@/contexts/AppParamsVolatileContext'
 import { usePlatform } from '@/contexts/PlatformContext'
 import { WorldWithAccess } from '@/lib/database/worlds'
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
@@ -19,7 +19,7 @@ interface WorldListPanelProps {
 export function WorldListPanel({ worlds, selectedWorld, setSelectedWorld, setMapImage, onMobileWorldSelect }: WorldListPanelProps) {
   const S = useScale()
   const router = useRouter()
-  const { updateParams } = useAppParams()
+  const { updateVolatileParams } = useAppParamsVolatile()
 
   // Centralized platform detection
   const { isDesktop } = usePlatform()
@@ -68,7 +68,7 @@ export function WorldListPanel({ worlds, selectedWorld, setSelectedWorld, setMap
                     })
                   } else {
                     // Update centralized params context
-                    updateParams({
+                    updateVolatileParams({
                       worldId: world.world_id,
                       userRole: world.user_role,
                     })

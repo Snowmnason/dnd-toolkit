@@ -6,7 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import CustomLoad from '../../components/ui/CustomLoad';
-import { useAppParams } from '../../contexts/AppParamsContext';
+import { useAppParamsStable } from '../../contexts/AppParamsStableContext';
 
 interface PendingInvite {
   token: string;
@@ -45,7 +45,7 @@ const clearPendingInvite = async () => {
 export default function AuthRedirect() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { updateParams } = useAppParams();
+  const { setUserId } = useAppParamsStable();
   const [processing, setProcessing] = useState(true);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -145,7 +145,7 @@ export default function AuthRedirect() {
           
           if (userProfile) {
             // Update centralized params context
-            updateParams({ userId: userProfile.id });
+            setUserId(userProfile.id);
             // Check if user has completed profile
             if (userProfile.username) {
               // Profile complete, go to world selection
@@ -355,7 +355,7 @@ export default function AuthRedirect() {
     };
 
     handleAuthRedirect();
-  }, [params, router, updateParams]);
+  }, [params, router, setUserId]);
 
   const handleWelcomeModalClose = async () => {
     setShowWelcomeModal(false);
@@ -365,7 +365,7 @@ export default function AuthRedirect() {
     
     if (userId) {
       // Update centralized params context
-      updateParams({ userId });
+      setUserId(userId);
     }
     
     router.replace('/select/world-selection');
@@ -449,7 +449,7 @@ export default function AuthRedirect() {
 
           if (userId) {
             // Update centralized params context
-            updateParams({ userId })
+            setUserId(userId)
           }
 
           router.replace('/select/world-selection')

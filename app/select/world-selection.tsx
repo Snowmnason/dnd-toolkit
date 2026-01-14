@@ -1,6 +1,6 @@
 import { ConfirmLeaveModal, EditWorldModal } from '@/components/modals'
 import { AppLoading, AppPage, AppSplit, Body, Button } from '@/components/ui'
-import { useAppParams } from '@/contexts/AppParamsContext'
+import { useUserId } from '@/contexts/AppParamsStableContext'
 import { usePanelNavigation } from '@/hooks/use-panel-navigation'
 import { useWorldModal } from '@/hooks/use-world-modal'
 import { useWorlds } from '@/lib'
@@ -13,8 +13,7 @@ const noImageSelected = require('../../assets/images/Miku.png')
 
 export default function LandingPage() {
   // Centralized params
-  const { params } = useAppParams()
-  const userId = params.userId
+  const userId = useUserId()
 
   // Panel navigation hook - manages left/right panel switching
   const { showRightPanel, goToRightPanel, goToLeftPanel, isDesktop } = usePanelNavigation()

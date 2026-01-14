@@ -61,6 +61,47 @@ export interface AppLoadingViewProps extends ViewProps {
    📄 Layout Variants
 ──────────────────────────────── */
 
+/**
+ * Separates layout styles that should be on contentContainerStyle from ScrollView styles
+ */
+function separateScrollViewStyles(style: StyleProp<ViewStyle>) {
+  if (!style) return { scrollViewStyle: undefined, contentStyle: undefined };
+
+  const layoutKeys: (keyof ViewStyle)[] = [
+    'alignItems',
+    'justifyContent',
+    'flexDirection',
+    'flexWrap',
+    'alignContent',
+  ];
+
+  const scrollViewStyles: ViewStyle = {};
+  const contentStyles: ViewStyle = {};
+
+  // Flatten the style array if it's an array
+  const styleArray = Array.isArray(style) ? style : [style];
+
+  styleArray.forEach((styleObj) => {
+    if (!styleObj || typeof styleObj !== 'object') return;
+
+    Object.keys(styleObj).forEach((key) => {
+      const styleKey = key as keyof ViewStyle;
+      if (layoutKeys.includes(styleKey)) {
+        // eslint-disable-next-line security/detect-object-injection
+        (contentStyles as any)[styleKey] = (styleObj as any)[styleKey];
+      } else {
+        // eslint-disable-next-line security/detect-object-injection
+        (scrollViewStyles as any)[styleKey] = (styleObj as any)[styleKey];
+      }
+    });
+  });
+
+  return {
+    scrollViewStyle: Object.keys(scrollViewStyles).length > 0 ? scrollViewStyles : undefined,
+    contentStyle: Object.keys(contentStyles).length > 0 ? contentStyles : undefined,
+  };
+}
+
 /* ───── AppPage ───── 
    Full-featured page container with ScrollView
    Opinionated defaults: scrolling, padding, background image support
@@ -102,6 +143,9 @@ export function AppPage({
     ? { source: backgroundImage, resizeMode: "cover" as const }
     : {};
 
+  // Separate layout styles from ScrollView styles
+  const { scrollViewStyle, contentStyle } = separateScrollViewStyles(style);
+
   return (
     <Wrapper {...wrapperProps} style={{ flex: 1 }}>
       <ScrollView
@@ -112,7 +156,7 @@ export function AppPage({
             padding: S.space[gap as SpaceKey],
             backgroundColor,
           },
-          style,
+          scrollViewStyle,
         ]}
         contentContainerStyle={[
           {
@@ -120,6 +164,7 @@ export function AppPage({
             justifyContent: center ? "center" : undefined,
             alignItems: center ? "center" : undefined,
           },
+          contentStyle,
           contentContainerStyle,
         ]}
         showsVerticalScrollIndicator={showScrollIndicator}

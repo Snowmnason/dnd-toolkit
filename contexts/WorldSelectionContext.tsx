@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useState } from 'react';
 
 interface WorldSelectionContextType {
   selectedWorld: string | null;
@@ -11,21 +11,23 @@ const WorldSelectionContext = createContext<WorldSelectionContextType | undefine
 export function WorldSelectionProvider({ children }: { children: React.ReactNode }) {
   const [selectedWorld, setSelectedWorld] = useState<string | null>(null);
 
-  const handleBackPress = () => {
+  const handleBackPress = useCallback(() => {
     if (selectedWorld) {
       // If a world is selected, go back to world list
       setSelectedWorld(null);
       return true; // Indicate we handled the back press
     }
     return false; // Let default back behavior happen
-  };
+  }, [selectedWorld]);
+
+  const value = React.useMemo(() => ({
+    selectedWorld,
+    setSelectedWorld,
+    handleBackPress,
+  }), [selectedWorld, handleBackPress]);
 
   return (
-    <WorldSelectionContext.Provider value={{
-      selectedWorld,
-      setSelectedWorld,
-      handleBackPress,
-    }}>
+    <WorldSelectionContext.Provider value={value}>
       {children}
     </WorldSelectionContext.Provider>
   );

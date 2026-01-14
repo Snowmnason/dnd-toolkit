@@ -1,5 +1,5 @@
 import { Button, Card, Heading, LazyImage } from '@/components/ui'
-import { useAppParams } from '@/contexts/AppParamsContext'
+import { useAppParamsVolatile } from '@/contexts/AppParamsVolatileContext'
 import { usePlatform } from '@/contexts/PlatformContext'
 import { WorldWithAccess } from '@/lib/database/worlds'
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
@@ -20,7 +20,7 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
   const S = useScale()
   const { theme } = UseTheme()
   const router = useRouter()
-  const { updateParams } = useAppParams()
+  const { updateVolatileParams } = useAppParamsVolatile()
   const { isDesktop } = usePlatform()
   // Optional flag to disable the large backdrop image if it's causing perf issues
   const DISABLE_BACKDROP = process.env.EXPO_PUBLIC_DISABLE_WORLD_MAP_IMAGE === '1'
@@ -102,7 +102,7 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
                 })
                 
                 // Update context first
-                updateParams({
+                updateVolatileParams({
                   worldId: selectedWorld.world_id,
                   userRole: selectedWorld.user_role,
                 })

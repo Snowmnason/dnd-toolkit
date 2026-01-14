@@ -15,8 +15,9 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { CrashFallBack, SplashScreen } from '../components/SplashScreen';
-import TopBar from '../components/TopBar';
-import { AppParamsProvider, useAppParams } from '../contexts/AppParamsContext';
+import { TopBar } from '@/components/ui';
+import { AppParamsStableProvider, useUserId, useAppParamsStable } from '../contexts/AppParamsStableContext';
+import { AppParamsVolatileProvider, useWorldId, useUserRole, useAppParamsVolatile } from '../contexts/AppParamsVolatileContext';
 import { PlatformProvider, usePlatform } from '../contexts/PlatformContext';
 import { useAppBootstrap } from '../hooks/use-app-bootstrap';
 import { useSplashScreen } from '../hooks/use-splash-screen';
@@ -106,8 +107,11 @@ function RootLayoutContent() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
   // Context hooks
-  const { params, updateParams, clearWorldParams, clearAllParams } = useAppParams();
-  const { userId, worldId, userRole } = params;
+  const userId = useUserId();
+  const worldId = useWorldId();
+  const userRole = useUserRole();
+  const { updateVolatileParams, clearWorldParams } = useAppParamsVolatile();
+  const { clearAllParams } = useAppParamsStable();
   
   // Data loading hooks
   const bootstrap = useAppBootstrap();
@@ -144,9 +148,9 @@ function RootLayoutContent() {
       const urlUserRole = typeof urlParams.userRole === 'string' ? urlParams.userRole : undefined
 
       // If no world in context yet, seed from URL once (owner navigating directly to their world)
-      if (!params.worldId && urlWorldId) {
+      if (!worldId && urlWorldId) {
         logger.info('[NavGuard] Seeding world from URL on main route', { urlWorldId, urlUserRole })
-        updateParams({ worldId: urlWorldId, userRole: urlUserRole })
+        updateVolatileParams({ worldId: urlWorldId, userRole: urlUserRole })
       }
       // Skip further processing for main routes to avoid clearing params
       return
@@ -158,28 +162,28 @@ function RootLayoutContent() {
     // Only update if values are different from context (userId is loaded from storage, not URL)
     let shouldUpdate = false
     const updates: { worldId?: string; userRole?: string } = {}
-    if (currentWorldId && currentWorldId !== params.worldId) {
+    if (currentWorldId && currentWorldId !== worldId) {
       updates.worldId = currentWorldId
       shouldUpdate = true
     }
-    if (currentUserRole && currentUserRole !== params.userRole) {
+    if (currentUserRole && currentUserRole !== userRole) {
       updates.userRole = currentUserRole
       shouldUpdate = true
     }
 
     if (shouldUpdate) {
-      updateParams(updates)
+      updateVolatileParams(updates)
     }
 
     // Only clear params when entering login routes and params exist
-    if (segments[0] === 'login' && (params.userId || params.worldId || params.userRole)) {
+    if (segments[0] === 'login' && (userId || worldId || userRole)) {
       clearAllParams();
     }
     // Only clear world params when entering select routes and world params exist
-    else if (segments[0] === 'select' && (params.worldId || params.userRole)) {
+    else if (segments[0] === 'select' && (worldId || userRole)) {
       clearWorldParams();
     }
-  }, [urlParams, segments, updateParams, clearAllParams, clearWorldParams, params.userId, params.worldId, params.userRole]);
+  }, [urlParams, segments, updateVolatileParams, clearAllParams, clearWorldParams, userId, worldId, userRole]);
 
   // Manage loading state based on guard and bootstrap
   useEffect(() => {
@@ -321,15 +325,17 @@ export default function RootLayout() {
       <ScaleProvider>
         <PlatformProvider>
           <SubscriptionProvider>
-            <AppParamsProvider>
-              <AppErrorBoundary 
-                renderFallback={(error, onRetry) => (
-                  <CrashFallBack error={error} onRetry={onRetry} />
-                )}
-              >
-                <RootLayoutContent />
-              </AppErrorBoundary>
-            </AppParamsProvider>
+            <AppParamsStableProvider>
+              <AppParamsVolatileProvider>
+                <AppErrorBoundary 
+                  renderFallback={(error, onRetry) => (
+                    <CrashFallBack error={error} onRetry={onRetry} />
+                  )}
+                >
+                  <RootLayoutContent />
+                </AppErrorBoundary>
+              </AppParamsVolatileProvider>
+            </AppParamsStableProvider>
           </SubscriptionProvider>
         </PlatformProvider>
       </ScaleProvider>

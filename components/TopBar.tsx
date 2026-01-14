@@ -2,7 +2,7 @@ import { logger } from '@/lib'
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
 import { S, UseTheme } from '@/theme'
 import { useRouter, useSegments } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, memo } from 'react'
 import {
   AccessibilityInfo,
   Platform,
@@ -32,7 +32,7 @@ interface TopBarProps {
   a11yFocusTarget?: 'title' | 'firstInteractive' | 'none'
 }
 
-export default function TopBar({
+function TopBar({
   title = 'D&D Toolkit',
   showBackButton = true,
   showHamburger = true,
@@ -203,3 +203,5 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 })
+
+export default memo(TopBar);

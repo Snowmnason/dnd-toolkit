@@ -49,6 +49,10 @@ export const STORAGE_KEYS = {
   THEME_PREFERENCE: 'dnd:user:theme',
   SCALE_PREFERENCE: 'dnd:user:scale',
   
+  // Session state (volatile persistence)
+  LAST_SELECTED_WORLD: 'dnd:session:last_selected_world',
+  LAST_USER_ROLE: 'dnd:session:last_user_role',
+  
   // Feature flags / dev settings
   DEV_MODE: 'dnd:dev:mode',
   
