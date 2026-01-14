@@ -5,7 +5,8 @@ import { Stack } from 'expo-router';
 
 export default function SettingsLayout() {
   const bootstrap = useAppBootstrap();
-  const authState = useAuthGuard(bootstrap.isReady, 'account-only');
+  // Force Supabase verification on every mount for security-critical pages
+  const authState = useAuthGuard(bootstrap.isReady, 'account-only', { forceVerification: true });
 
   // Show loading while guard resolves
   if (authState === 'loading') {

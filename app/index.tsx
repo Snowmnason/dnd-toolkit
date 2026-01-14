@@ -1,4 +1,6 @@
-import { AuthStateManager, logger } from "@/lib";
+import { logger } from "@/lib";
+import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
+import { useRouter } from "expo-router";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Welcome from "../Screens/Welcome";
@@ -19,6 +21,7 @@ const TAVERN_LOCATIONS = [
 ];
 
 export default function HomePage() {
+  const router = useRouter();
   const [showFailsafe, setShowFailsafe] = React.useState(false);
   const [isAuthChecked, setIsAuthChecked] = React.useState(false);
   const [hasAccount, setHasAccount] = React.useState(false);
@@ -52,8 +55,7 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, [isAuthChecked]);
 
-  // Ultra-simple auth check: just look at HAS_ACCOUNT flag
-  // If true, redirect. If false or error, just show welcome screen (no harm done)
+  // Simple time-based check: if user logged in within 7 days, redirect (skip welcome)
   React.useEffect(() => {
     // Don't proceed until bootstrap is complete
     if (!bootstrap.isReady) {
@@ -61,35 +63,48 @@ export default function HomePage() {
       return;
     }
 
-    logger.info('bootstrap', '🚀 Bootstrap ready! Checking for quick redirect...');
+    logger.info('bootstrap', '🚀 Bootstrap ready! Checking login recency...');
 
-    const quickAuthCheck = async () => {
+    const checkLoginRecency = async () => {
       try {
-        const authState = await AuthStateManager.getAuthState();
+        const lastLoggedInStr = await SecureStorage.getItem(STORAGE_KEYS.LAST_LOGGED_IN);
         
-        // Simple check: if HAS_ACCOUNT is true, redirect (saves a click)
-        if (authState.hasAccount) {
-          logger.debug('bootstrap', '✅ Quick check passed: user has account, redirecting');
+        if (!lastLoggedInStr) {
+          logger.debug('bootstrap', '⏭️ No recent login found, showing welcome');
           setIsAuthChecked(true);
-          setHasAccount(true);
-          // Don't redirect here - let the effect below run, or just proceed
-          // Actually, we'll return early so the render below shows loading briefly, then select guard takes over
+          setHasAccount(false);
           return;
         }
         
-        logger.debug('bootstrap', '⏭️ Quick check: no account flag, showing welcome');
+        const lastLoggedInMs = parseInt(lastLoggedInStr, 10);
+        const now = Date.now();
+        const sevenDaysMs = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+        const isWithinSevenDays = (now - lastLoggedInMs) < sevenDaysMs;
+        
+        if (isWithinSevenDays) {
+          logger.info('bootstrap', `✅ Recent login detected (${Math.floor((now - lastLoggedInMs) / (1000 * 60 * 60))} hours ago), redirecting to world selection`);
+          setIsAuthChecked(true);
+          setHasAccount(true);
+          // Redirect to world selection after a brief moment to ensure state is set
+          setTimeout(() => {
+            router.replace('/select/world-selection');
+          }, 100);
+          return;
+        }
+        
+        logger.debug('bootstrap', '⏭️ Login is stale (>7 days), showing welcome');
         setIsAuthChecked(true);
         setHasAccount(false);
       } catch (error) {
         // If check fails, just show welcome - no harm done
-        logger.debug('bootstrap', '⚠️ Quick check failed, showing welcome:', error);
+        logger.debug('bootstrap', '⚠️ Login recency check failed, showing welcome:', error);
         setIsAuthChecked(true);
         setHasAccount(false);
       }
     };
 
-    quickAuthCheck();
-  }, [bootstrap.isReady]);
+    checkLoginRecency();
+  }, [bootstrap.isReady, router]);
 
   // Show loading spinner while bootstrap is happening
   if (!bootstrap.isReady) {

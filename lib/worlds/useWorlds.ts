@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { RequestManager } from '../api/request-manager';
+import { SecureStorage, STORAGE_KEYS } from '../storage';
 import { worldsDB, WorldWithAccess } from '../database/worlds';
 import { logger } from '../utils/logger';
 
@@ -37,6 +38,20 @@ export function useWorlds(userId?: string, onWorldsLoaded?: (worldIds: string[])
         }
       );
       setWorlds(userWorlds ?? []);
+      
+      // Update world access cache for all loaded worlds
+      // These worlds are confirmed accessible since they came from the server's getMyWorlds()
+      if (userWorlds && userWorlds.length > 0) {
+        for (const world of userWorlds) {
+          const cacheKey = `world_access_${world.world_id}`;
+          const metaKey = `world_access_meta_${world.world_id}`;
+          await SecureStorage.setJSON(cacheKey, true); // User has access
+          await SecureStorage.setJSON(metaKey, {
+            timestamp: Date.now(),
+            source: 'server_verified'
+          });
+        }
+      }
       
       // Notify parent if callback provided (parent will update context)
       if (onWorldsLoaded) {

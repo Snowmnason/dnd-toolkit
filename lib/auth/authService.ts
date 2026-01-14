@@ -247,7 +247,11 @@ export const signInUser = async (
       // Set local auth state so route guards work immediately
       const { AuthStateManager } = await import('./auth-state');
       await AuthStateManager.setHasAccount(true);
-      logger.debug('auth', '✅ Auth state set, checking user profile...');
+      
+      // Record successful login timestamp (for welcome screen skip - valid for 7 days)
+      const { SecureStorage, STORAGE_KEYS } = await import('@/lib/storage');
+      await SecureStorage.setItem(STORAGE_KEYS.LAST_LOGGED_IN, Date.now().toString());
+      logger.debug('auth', '✅ Auth state set, login timestamp recorded');
 
       // Check if user has a complete profile
       try {

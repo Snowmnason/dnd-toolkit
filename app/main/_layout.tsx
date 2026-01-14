@@ -1,5 +1,4 @@
 import { AppLoading } from '@/components/ui';
-import { useAppParamsStable } from '@/contexts/AppParamsStableContext'
 import { useAppBootstrap } from '@/hooks/use-app-bootstrap';
 import { useAuthGuard } from '@/lib';
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
@@ -14,7 +13,6 @@ export default function MainLayout() {
   const bootstrap = useAppBootstrap();
   const authState = useAuthGuard(bootstrap.isReady, 'world-required');
   const params = useLocalSearchParams()
-  const { hasAccessToWorld, stableParams } = useAppParamsStable()
   const [activeTab, setActiveTab] = useState('characters')
   const { width } = useWindowDimensions()
   const isMobile = Platform.OS !== 'web' || width < 900
@@ -29,12 +27,12 @@ export default function MainLayout() {
 
   // Validate world access on mount and when worldId changes
   useEffect(() => {
-    // Skip validation while guard is loading or until cache is loaded
-    if (authState === 'loading' || stableParams.connectedWorldIds.length === 0) return;
+    // Skip validation while auth guard is still checking
+    if (authState === 'loading') return;
 
     const urlWorldId = typeof params.worldId === 'string' ? params.worldId : undefined
 
-    // If no worldId in URL, redirect
+    // If no worldId in URL, redirect (shouldn't happen as guard checks this)
     if (!urlWorldId) {
       logger.warn('[MainLayout] No worldId in URL, redirecting to world selection')
       const target = buildNavigationTarget('/select/world-selection', {}, [])
@@ -42,14 +40,10 @@ export default function MainLayout() {
       return
     }
 
-    // If worldId not in cache, redirect
-    if (!hasAccessToWorld(urlWorldId)) {
-      logger.warn('[MainLayout] Invalid world access, redirecting to world selection', { urlWorldId })
-      const target = buildNavigationTarget('/select/world-selection', {}, [])
-      router.replace(target as any)
-      return
-    }
-  }, [authState, params.worldId, stableParams.connectedWorldIds, hasAccessToWorld, router])
+    // The auth guard already verified access via Supabase, so we're good
+    // (see useAuthGuard with 'world-required' level in this component)
+    logger.debug('[MainLayout] Auth guard passed, rendering world screen', { urlWorldId })
+  }, [authState, params.worldId, router])
 
   // Update active tab from URL params
   useEffect(() => {

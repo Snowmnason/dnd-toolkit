@@ -50,6 +50,46 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         const worldIds = await SecureStorage.getJSON<string[]>(STORAGE_KEYS.CONNECTED_WORLDS);
         if (worldIds && Array.isArray(worldIds)) {
           setStableParams(prev => ({ ...prev, connectedWorldIds: worldIds }));
+          
+          // Background verification against Supabase
+          // Verify each world access with Supabase (lazy verification)
+          setTimeout(async () => {
+            try {
+              logger.debug('context', 'AppParamsStableProvider: Starting background world access verification');
+              const verifiedWorldIds: string[] = [];
+              
+              for (const worldId of worldIds) {
+                const verification = await AuthStateManager.verifyWorldAccessWithDatabase(
+                  worldId,
+                  (reason: string) => {
+                    // Access revoked for this world
+                    logger.warn('context', `World ${worldId} access revoked:`, reason);
+                    // Could show a toast here if needed
+                  }
+                );
+                
+                if (verification.hasAccess) {
+                  verifiedWorldIds.push(worldId);
+                }
+              }
+              
+              // Update context with verified list if changed
+              if (JSON.stringify(verifiedWorldIds) !== JSON.stringify(worldIds)) {
+                logger.info('context', 'AppParamsStableProvider: World access list updated from Supabase', {
+                  cached: worldIds.length,
+                  verified: verifiedWorldIds.length
+                });
+                
+                setStableParams(prev => ({
+                  ...prev,
+                  connectedWorldIds: verifiedWorldIds
+                }));
+              }
+            } catch (error) {
+              logger.error('context', 'AppParamsStableProvider: Background verification failed:', error);
+              // Keep cached values on error
+            }
+          }, 500); // Delay to not block initial render
         }
       } catch (error) {
         logger.error('context', 'AppParamsStableProvider: Error loading from storage:', error);
