@@ -6,16 +6,16 @@ let supabaseCache: any = null;
 let isSupabaseConfiguredCache: any = null;
 let usersDBCache: any = null;
 
-export interface AuthState {
+export interface SupabaseAuthState {
   hasAccount: boolean;
 }
 
 export const AuthStateManager = {
   // Get current auth state
-  async getAuthState(): Promise<AuthState> {
+  async getAuthState(): Promise<SupabaseAuthState> {
     try {
       const storageKey = STORAGE_KEYS.HAS_ACCOUNT;
-      const authState = await SecureStorage.getJSON<AuthState>(storageKey);
+      const authState = await SecureStorage.getJSON<SupabaseAuthState>(storageKey);
       return authState || { hasAccount: false };
     } catch (error) {
       logger.error('auth', 'Error getting auth state:', error);
@@ -26,7 +26,7 @@ export const AuthStateManager = {
   // Set user has created/logged into account
   async setHasAccount(hasAccount: boolean): Promise<void> {
     try {
-      const newState: AuthState = { hasAccount };
+      const newState: SupabaseAuthState = { hasAccount };
       const storageKey = STORAGE_KEYS.HAS_ACCOUNT;
       await SecureStorage.setJSON(storageKey, newState);
     } catch (error) {
@@ -57,7 +57,13 @@ export const AuthStateManager = {
   // Clear all auth state (logout)
   async clearAuthState(): Promise<void> {
     try {
-      await SecureStorage.removeItem(STORAGE_KEYS.HAS_ACCOUNT);
+      // Clear all auth-related storage keys
+      await Promise.all([
+        SecureStorage.removeItem(STORAGE_KEYS.HAS_ACCOUNT),
+        SecureStorage.removeItem(STORAGE_KEYS.USER_DATA),
+        SecureStorage.removeItem(STORAGE_KEYS.CONNECTED_WORLDS),
+      ]);
+      logger.debug('auth', 'Cleared all auth storage keys');
     } catch (error) {
       logger.error('auth', 'Error clearing auth state:', error);
     }
@@ -153,6 +159,44 @@ export const AuthStateManager = {
         return authState.hasAccount;
       } catch {
         return false;
+      }
+    }
+  },
+
+  // ==========================================
+  // 🔓 LOGOUT - Clear all auth state
+  // ==========================================
+  async logout(): Promise<void> {
+    try {
+      logger.info('auth', '🔓 Logging out...');
+
+      // Use cached supabase import
+      if (!supabaseCache) {
+        const imported = await import('../database/supabase');
+        supabaseCache = imported.supabase;
+        isSupabaseConfiguredCache = imported.isSupabaseConfigured;
+      }
+
+      // Sign out from Supabase if configured
+      if (isSupabaseConfiguredCache()) {
+        try {
+          await supabaseCache.auth.signOut();
+          logger.info('auth', '✅ Signed out from Supabase');
+        } catch (error) {
+          logger.error('auth', 'Error signing out from Supabase:', error);
+        }
+      }
+
+      // Clear local auth state
+      await this.clearAuthState();
+      logger.info('auth', '✅ Logout complete');
+    } catch (error) {
+      logger.error('auth', 'Error during logout:', error);
+      // Don't throw - fail gracefully and ensure auth state is cleared
+      try {
+        await this.clearAuthState();
+      } catch (clearError) {
+        logger.error('auth', 'Failed to clear auth state during error recovery:', clearError);
       }
     }
   },

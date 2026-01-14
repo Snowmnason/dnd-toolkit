@@ -13,7 +13,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import SettingsMenu from './modals/SettingsModal'
-import { AppToast } from './ui'
+import { AppToast } from './ui/AppToast'
 import { IconButton } from './ui/IconButton'
 
 // 🎨 Fixed palette (matches BottomTabBar)

@@ -1,4 +1,5 @@
-import { AppModal, Button } from "@/components/ui";
+import { AppModal } from "@/components/ui/AppModal";
+import { Button } from "@/components/ui/BaseButton";
 import { useScale } from "@/theme";
 import React from "react";
 import { View } from "react-native";

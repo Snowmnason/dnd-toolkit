@@ -1,20 +1,13 @@
 import { AppLoading, AppPage } from '@/components/ui';
-import { logger, useAuthGuard } from '@/lib';
 import { useAppBootstrap } from '@/hooks/use-app-bootstrap';
+import { useAuthGuard } from '@/lib';
 import { Stack } from 'expo-router';
-import { useEffect } from 'react';
 
-export default function SelectLayout() {
+export default function SettingsLayout() {
   const bootstrap = useAppBootstrap();
   const authState = useAuthGuard(bootstrap.isReady, 'account-only');
 
-  // Show minimal loading while guard resolves
-  useEffect(() => {
-    if (authState === 'unauthenticated') {
-      logger.debug('navigation', 'Unauthenticated state detected in select layout');
-    }
-  }, [authState]);
-
+  // Show loading while guard resolves
   if (authState === 'loading') {
     return <AppLoading />;
   }

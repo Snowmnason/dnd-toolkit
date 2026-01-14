@@ -1,5 +1,4 @@
 import { AuthStateManager, logger } from "@/lib";
-import { useRouter } from "expo-router";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Welcome from "../Screens/Welcome";
@@ -20,7 +19,6 @@ const TAVERN_LOCATIONS = [
 ];
 
 export default function HomePage() {
-  const router = useRouter();
   const [showFailsafe, setShowFailsafe] = React.useState(false);
   const [isAuthChecked, setIsAuthChecked] = React.useState(false);
   const [hasAccount, setHasAccount] = React.useState(false);
@@ -54,46 +52,44 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, [isAuthChecked]);
 
-  // Fast auth check: Check if user has account (don't verify with Supabase yet)
+  // Ultra-simple auth check: just look at HAS_ACCOUNT flag
+  // If true, redirect. If false or error, just show welcome screen (no harm done)
   React.useEffect(() => {
     // Don't proceed until bootstrap is complete
     if (!bootstrap.isReady) {
-      logger.debug('bootstrap', '⏸️ Waiting for bootstrap to complete', {
-        assetsLoaded: bootstrap.assetsLoaded,
-        sessionRestored: bootstrap.sessionRestored,
-        isReady: bootstrap.isReady,
-        error: bootstrap.error?.message
-      });
+      logger.debug('bootstrap', '⏸️ Waiting for bootstrap to complete');
       return;
     }
 
-    logger.info('bootstrap', '🚀 Bootstrap ready! Performing fast auth check...');
+    logger.info('bootstrap', '🚀 Bootstrap ready! Checking for quick redirect...');
 
-    const performFastAuthCheck = async () => {
+    const quickAuthCheck = async () => {
       try {
-        logger.debug('bootstrap', '🔍 Checking if user has account...');
         const authState = await AuthStateManager.getAuthState();
-        const userHasAccount = authState.hasAccount;
         
-        logger.info('bootstrap', `✅ Auth check complete. Has account: ${userHasAccount}`);
-        setHasAccount(userHasAccount);
-        setIsAuthChecked(true);
-        
-        // Only redirect if user is NOT authenticated
-        // If authenticated, show welcome screen and let select route pull them in
-        if (userHasAccount) {
-          logger.debug('bootstrap', '📋 User authenticated, showing welcome screen for redirect');
+        // Simple check: if HAS_ACCOUNT is true, redirect (saves a click)
+        if (authState.hasAccount) {
+          logger.debug('bootstrap', '✅ Quick check passed: user has account, redirecting');
+          setIsAuthChecked(true);
+          setHasAccount(true);
+          // Don't redirect here - let the effect below run, or just proceed
+          // Actually, we'll return early so the render below shows loading briefly, then select guard takes over
+          return;
         }
-        // Otherwise, show welcome screen (handled in conditional render below)
-      } catch (error) {
-        logger.error('bootstrap', '❌ Auth check error:', error);
+        
+        logger.debug('bootstrap', '⏭️ Quick check: no account flag, showing welcome');
         setIsAuthChecked(true);
-        // Default to showing welcome screen on error
+        setHasAccount(false);
+      } catch (error) {
+        // If check fails, just show welcome - no harm done
+        logger.debug('bootstrap', '⚠️ Quick check failed, showing welcome:', error);
+        setIsAuthChecked(true);
+        setHasAccount(false);
       }
     };
 
-    performFastAuthCheck();
-  }, [bootstrap.isReady, bootstrap.assetsLoaded, bootstrap.sessionRestored, bootstrap.error?.message, router]);
+    quickAuthCheck();
+  }, [bootstrap.isReady]);
 
   // Show loading spinner while bootstrap is happening
   if (!bootstrap.isReady) {

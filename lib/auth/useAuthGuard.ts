@@ -4,13 +4,14 @@ import { AUTH_CONFIG } from '../routing/route-config';
 import { logger } from '../utils/logger';
 import { AuthStateManager } from './auth-state';
 
-type AuthState = 'loading' | 'authenticated' | 'unauthenticated';
+export type AuthLevel = 'account-only' | 'world-required';
+export type AuthState = 'loading' | 'authenticated' | 'unauthenticated';
 
 // Cache dynamic imports to prevent re-importing modules on every auth check
 let supabaseCache: any = null;
 let isSupabaseConfiguredCache: any = null;
 
-export function useAuthGuard(bootstrapReady: boolean): AuthState {
+export function useAuthGuard(bootstrapReady: boolean, level: AuthLevel = 'account-only'): AuthState {
   const router = useRouter();
   const segments = useSegments();
   const [authState, setAuthState] = useState<AuthState>('loading');

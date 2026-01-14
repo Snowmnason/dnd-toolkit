@@ -1,6 +1,6 @@
 import { Body, Button, Card, Title } from '@/components/ui';
 import { logger } from '@/lib';
-import { ScrollView, View } from "react-native";
+import { View } from "react-native";
 import { getAppConfig } from '@/lib/config/loader';
 import { NavigationContext, RouteConfig } from '@/lib/navigation/navigation-config';
 import { UseTheme, useScale } from '@/theme';

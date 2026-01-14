@@ -1,4 +1,7 @@
+import { AppLoading } from '@/components/ui';
 import { useAppParamsStable } from '@/contexts/AppParamsStableContext'
+import { useAppBootstrap } from '@/hooks/use-app-bootstrap';
+import { useAuthGuard } from '@/lib';
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
 import { logger } from '@/lib/utils/logger'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
@@ -8,24 +11,28 @@ import { BottomTabBar } from '../../Screens/main-panels/BottomTabBar'
 
 export default function MainLayout() {
   const router = useRouter()
+  const bootstrap = useAppBootstrap();
+  const authState = useAuthGuard(bootstrap.isReady, 'world-required');
   const params = useLocalSearchParams()
   const { hasAccessToWorld, stableParams } = useAppParamsStable()
   const [activeTab, setActiveTab] = useState('characters')
   const { width } = useWindowDimensions()
   const isMobile = Platform.OS !== 'web' || width < 900
 
-  logger.info('[MainLayout] Rendering with params', { 
-    worldId: params.worldId, 
-    userRole: params.userRole 
-  })
+  // All hooks must be called unconditionally (before any conditional returns)
+  useEffect(() => {
+    logger.info('[MainLayout] Rendering with params', { 
+      worldId: params.worldId, 
+      userRole: params.userRole 
+    })
+  }, [params.worldId, params.userRole])
 
   // Validate world access on mount and when worldId changes
   useEffect(() => {
-    const urlWorldId = typeof params.worldId === 'string' ? params.worldId : undefined
-    const cacheIsPopulated = stableParams.connectedWorldIds.length > 0
+    // Skip validation while guard is loading or until cache is loaded
+    if (authState === 'loading' || stableParams.connectedWorldIds.length === 0) return;
 
-    // Skip validation if cache not loaded yet
-    if (!cacheIsPopulated) return
+    const urlWorldId = typeof params.worldId === 'string' ? params.worldId : undefined
 
     // If no worldId in URL, redirect
     if (!urlWorldId) {
@@ -42,7 +49,7 @@ export default function MainLayout() {
       router.replace(target as any)
       return
     }
-  }, [params.worldId, stableParams.connectedWorldIds, hasAccessToWorld, router])
+  }, [authState, params.worldId, stableParams.connectedWorldIds, hasAccessToWorld, router])
 
   // Update active tab from URL params
   useEffect(() => {
@@ -66,6 +73,11 @@ export default function MainLayout() {
 
     // Navigate for consistency (keeps URL updated)
     router.replace(target as any)
+  }
+
+  // Show loading while auth guard is resolving
+  if (authState === 'loading') {
+    return <AppLoading />;
   }
 
   return (
