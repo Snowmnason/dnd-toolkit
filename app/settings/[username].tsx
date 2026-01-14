@@ -57,7 +57,7 @@ export default function SettingsPage() {
     // Double-check: require confirmed Supabase session before proceeding
     if (!isSupabaseConfigured()) {
       logger.debug("settings", "Supabase not configured; redirecting to welcome");
-      const target = buildNavigationTarget('/login/welcome', {}, []);
+      const target = buildNavigationTarget('/', {}, []);
       router.replace(target as any);
       return;
     }
@@ -68,7 +68,7 @@ export default function SettingsPage() {
         const user: User | null = session?.user ?? null;
         if (!user || !user.email_confirmed_at) {
           logger.debug("settings", "No confirmed user session, redirecting");
-          const target = buildNavigationTarget('/login/welcome', {}, []);
+          const target = buildNavigationTarget('/', {}, []);
           router.replace(target as any);
           return;
         }
@@ -77,7 +77,7 @@ export default function SettingsPage() {
       })
       .catch((err: unknown) => {
         logger.error("settings", "Error checking session:", err);
-        const target = buildNavigationTarget('/login/welcome', {}, []);
+        const target = buildNavigationTarget('/', {}, []);
         router.replace(target as any);
         setLoading(false);
       });
@@ -102,7 +102,7 @@ export default function SettingsPage() {
         const user: User | null = session?.user ?? null;
         if (!user) {
           logger.debug("settings", "Auth state changed: user signed out");
-          const target = buildNavigationTarget('/login/welcome', {}, []);
+          const target = buildNavigationTarget('/', {}, []);
           router.replace(target as any);
         }
       }
@@ -122,7 +122,7 @@ export default function SettingsPage() {
       setButtonDisabled(true);
       try {
         await signOutUser();
-        const target = buildNavigationTarget('/login/welcome', {}, []);
+        const target = buildNavigationTarget('/', {}, []);
         router.replace(target as any);
       } catch (error) {
         logger.error("settings", "Sign out error:", error);
@@ -157,7 +157,7 @@ export default function SettingsPage() {
         throw new Error(result.error || "Failed to delete account");
 
       setShowDeleteModal(false);
-      const target = buildNavigationTarget('/login/welcome', {}, []);
+      const target = buildNavigationTarget('/', {}, []);
       router.replace(target as any);
     } catch (error: any) {
       logger.error("settings", "Delete account error:", error);

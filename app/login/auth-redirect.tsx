@@ -140,7 +140,7 @@ export default function AuthRedirect() {
           } else {
             // Not in storage, fetch from database
             userProfile = await usersDB.getCurrentUser();
-            userId = userProfile?.id || null;
+            userId = userProfile?.id || undefined;
           }
           
           if (userProfile) {
@@ -189,7 +189,7 @@ export default function AuthRedirect() {
             } else if (action === 'signup') {
               router.replace('/login/sign-up');
             } else {
-              router.replace('/login/welcome');
+              router.replace('/');
             }
         }
       } catch (error) {
@@ -431,7 +431,7 @@ export default function AuthRedirect() {
             onPress: () => {
               clearPendingInvite()
               setShowInviteModal(false)
-              router.replace('/login/welcome')
+              router.replace('/')
             },
             variant: 'cancel',
           },
@@ -473,7 +473,7 @@ export default function AuthRedirect() {
         visible={showErrorModal}
         onClose={() => {
           setShowErrorModal(false)
-          router.replace('/login/welcome')
+          router.replace('/')
         }}
         title="Oops! ⚠️"
         message={errorMessage}
@@ -482,7 +482,7 @@ export default function AuthRedirect() {
             text: 'OK',
             onPress: () => {
               setShowErrorModal(false)
-              router.replace('/login/welcome')
+              router.replace('/')
             },
             variant: 'primary',
           },

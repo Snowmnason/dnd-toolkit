@@ -73,7 +73,7 @@ export default function SignInScreen() {
       <AuthBackButtonContainer>
         <AuthButtonBack
           text="← Back"
-          onPress={() => router.replace(buildRoute('/login/welcome') as Href)}
+          onPress={() => router.replace(buildRoute('/') as Href)}
           disabled={loading}
         />
       </AuthBackButtonContainer>

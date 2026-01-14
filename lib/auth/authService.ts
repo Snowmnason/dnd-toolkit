@@ -256,6 +256,12 @@ export const signInUser = async (
         const profileElapsed = Date.now() - profileStartTime;
         logger.debug('auth', `⏱️ User profile fetch completed in ${profileElapsed}ms`);
         
+        // CRITICAL: Ensure user data is saved to storage before continuing
+        // This ensures the userId context can load it immediately when the route renders
+        logger.debug('auth', '💾 Ensuring user data is saved to storage...');
+        await AuthStateManager.saveUserData(userProfile);
+        logger.debug('auth', '✅ User data saved, userId available in storage');
+        
         // Robust profile validation
         const hasValidProfile = userProfile && 
                                userProfile.username && 

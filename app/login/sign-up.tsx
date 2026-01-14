@@ -50,7 +50,7 @@ export default function SignUpScreen() {
       <AuthBackButtonContainer>
         <AuthButtonBack
           text="← Back"
-          onPress={() => router.replace('/login/welcome')}
+          onPress={() => router.replace('/')}
           disabled={loading}
         />
       </AuthBackButtonContainer>
