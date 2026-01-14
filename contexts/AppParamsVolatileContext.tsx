@@ -8,7 +8,6 @@ interface AppParamsVolatile {
 }
 
 interface AppParamsVolatileContextType {
-  volatileParams: AppParamsVolatile;
   setWorldId: (worldId: string | undefined) => void;
   setUserRole: (userRole: string | undefined) => void;
   updateVolatileParams: (newParams: Partial<AppParamsVolatile>) => void;
@@ -91,7 +90,6 @@ export function AppParamsVolatileProvider({ children }: { children: ReactNode })
 
   // ✅ Only stable functions in memoization
   const contextValue = React.useMemo(() => ({
-    volatileParams,
     setWorldId,
     setUserRole,
     updateVolatileParams,
