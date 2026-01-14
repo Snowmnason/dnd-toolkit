@@ -49,12 +49,12 @@ export default function SignInScreen() {
       
       if (error) {
         // Note: This would need to be handled differently since authError is managed by the hook
-        logger.error('sign-in', 'Failed to resend email:', error.message);
+        logger.error('auth', 'Failed to resend email:', error.message);
       } else {
-        logger.info('sign-in', 'Confirmation email sent!');
+        logger.info('auth', 'Confirmation email sent!');
       }
     } catch {
-      logger.error('sign-in', 'Failed to resend confirmation email.');
+      logger.error('auth', 'Failed to resend confirmation email.');
     } finally {
       setIsResendingEmail(false);
     }

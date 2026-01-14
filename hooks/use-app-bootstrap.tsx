@@ -11,16 +11,16 @@ const FONT_LOADING_TIMEOUT = 3000; // 3 seconds - timeout for font loading (non-
 
 const blog = {
   debug: (...args: any[]) => {
-    if (BOOTSTRAP_LOGS) logger.debug(...args);
+    if (BOOTSTRAP_LOGS) logger.category('bootstrap').debug(...args);
   },
   info: (...args: any[]) => {
-    if (BOOTSTRAP_LOGS) logger.info(...args);
+    if (BOOTSTRAP_LOGS) logger.category('bootstrap').info(...args);
   },
   warn: (...args: any[]) => {
-    if (BOOTSTRAP_LOGS) logger.warn(...args);
+    if (BOOTSTRAP_LOGS) logger.category('bootstrap').warn(...args);
   },
   error: (...args: any[]) => {
-    if (BOOTSTRAP_LOGS) logger.error(...args);
+    if (BOOTSTRAP_LOGS) logger.category('bootstrap').error(...args);
   },
 };
 
@@ -80,6 +80,21 @@ export function useAppBootstrap() {
         metrics.platform = Date.now() - platformStart;
 
         const bootstrapTime = Date.now() - bootstrapStartTime;
+        
+        // Log performance metrics
+        logger.category('performance').info('Bootstrap completed', {
+          totalTime: bootstrapTime,
+          breakdown: metrics,
+          platform: Platform.OS
+        });
+
+        // Warn on slow bootstrap
+        if (bootstrapTime > 2000) {
+          logger.category('performance').warn('Slow bootstrap detected', {
+            totalTime: bootstrapTime,
+            breakdown: metrics
+          });
+        }
         
         // ✅ Mark as ready IMMEDIATELY - don't block on session or images
         if (isMounted) {
@@ -233,6 +248,7 @@ async function restoreSession() {
     if (authState.hasAccount) {
       const cacheTime = Date.now() - sessionStartTime;
       blog.info("bootstrap", `✅ Using cached auth state (${cacheTime}ms)`);
+      logger.category('security').debug('Session cache hit', { cacheTime });
       
       // Revalidate in background (don't await)
       validateSessionInBackground(supabase, AuthStateManager, sessionStartTime);
@@ -278,8 +294,13 @@ async function restoreSession() {
     if (session) {
       blog.info("bootstrap", `✅ Session restored successfully in ${totalTime}ms`);
       await AuthStateManager.setSession(session);
+      logger.category('security').info('Session restored from Supabase', { 
+        duration: totalTime,
+        hasUser: !!session.user 
+      });
     } else {
       blog.info("bootstrap", `⚠️ No stored session found (checked in ${totalTime}ms)`);
+      logger.category('security').debug('No stored session found');
     }
 
     setupAuthListener(supabase);

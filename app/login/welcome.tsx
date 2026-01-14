@@ -31,9 +31,9 @@ export default function WelcomeScreen() {
 
   // Log mount and unmount
   useEffect(() => {
-    logger.info('welcome', `[CMP:${componentId}] 🟢 Component mounted`);
+    logger.info('auth', `[CMP:${componentId}] 🟢 Component mounted`);
     return () => {
-      logger.info('welcome', `[CMP:${componentId}] 🔴 Component unmounted`);
+      logger.info('auth', `[CMP:${componentId}] 🔴 Component unmounted`);
     };
   }, [componentId]);
 
@@ -41,7 +41,7 @@ export default function WelcomeScreen() {
   // Only run ONCE on mount to prevent redirect loops
   useEffect(() => {
     if (hasCheckedAuth) {
-      logger.debug('welcome', `[CMP:${componentId}] ⏭️ Auth check already performed, skipping`);
+      logger.debug('auth', `[CMP:${componentId}] ⏭️ Auth check already performed, skipping`);
       return;
     }
 
@@ -49,7 +49,7 @@ export default function WelcomeScreen() {
     
     const checkAuthAndRedirect = async () => {
       try {
-        logger.debug('welcome', `[CMP:${componentId}] 🔍 Checking authentication status...`);
+        logger.debug('auth', `[CMP:${componentId}] 🔍 Checking authentication status...`);
         const { routingDecision } = await AuthStateManager.getRoutingDecision();
         
         if (!mounted) return; // Don't proceed if unmounted
@@ -59,15 +59,15 @@ export default function WelcomeScreen() {
           const target = routingDecision === 'main' 
             ? '/select/world-selection' 
             : '/login/complete-profile';
-          logger.info('welcome', `[CMP:${componentId}] 🔀 Redirecting to ${target}`);
+          logger.info('auth', `[CMP:${componentId}] 🔀 Redirecting to ${target}`);
           router.replace(target);
           return;
         }
         
         // User should be on welcome or login screen - stay here
-        logger.debug('welcome', `[CMP:${componentId}] ✅ User belongs on welcome screen (decision: ${routingDecision})`);
+        logger.debug('auth', `[CMP:${componentId}] ✅ User belongs on welcome screen (decision: ${routingDecision})`);
       } catch (error) {
-        logger.error('welcome', `[CMP:${componentId}] Error checking auth:`, error);
+        logger.error('auth', `[CMP:${componentId}] Error checking auth:`, error);
       } finally {
         if (mounted) {
           setIsCheckingAuth(false);

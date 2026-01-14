@@ -8,14 +8,14 @@ import { logger } from '../utils/logger';
  */
 export async function signOutUser(): Promise<void> {
   try {
-    logger.debug('signOut', 'Starting sign out process');
+    logger.debug('auth', 'Starting sign out process');
     
     await supabase.auth.signOut();
     await AuthStateManager.clearAuthState();
     
-    logger.info('signOut', 'Sign out completed successfully');
+    logger.info('auth', 'Sign out completed successfully');
   } catch (error) {
-    logger.error('signOut', 'Sign out error:', error);
+    logger.error('auth', 'Sign out error:', error);
     throw new Error('Failed to sign out. Please try again.');
   }
 }

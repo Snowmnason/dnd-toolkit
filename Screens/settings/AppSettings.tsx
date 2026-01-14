@@ -49,7 +49,7 @@ export function AppSettings({
     try {
       // Force refresh bypasses 4-hour cache, fetches latest from server
       await getCurrentUserProfile(true)
-      logger.info('AppSettings', 'Force refresh completed successfully')
+      logger.info('other', 'Force refresh completed successfully')
       
       // Keep syncing toast visible for at least 2 seconds before showing success
       const elapsedTime = Date.now() - startTime
@@ -63,7 +63,7 @@ export function AppSettings({
         }
       }, remainingTime)
     } catch (error: any) {
-      logger.error('AppSettings', 'Force refresh failed:', error)
+      logger.error('other', 'Force refresh failed:', error)
       setErrorMessage('Failed to sync data. Please try again.')
       setSyncingToast(false)
       setErrorToast(true)

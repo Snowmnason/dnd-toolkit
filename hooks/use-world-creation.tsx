@@ -33,7 +33,7 @@ export function useWorldCreation() {
       
       return { success: true, world: newWorld };
     } catch (error) {
-      logger.error('world-creation', 'Create world error:', error);
+      logger.error('storage', 'Create world error:', error);
       Alert.alert(
         'Error', 
         'Failed to create world. Please check your connection and try again.'

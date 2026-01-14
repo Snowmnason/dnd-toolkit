@@ -55,7 +55,7 @@ export const isSafeToRedirect = async (targetRoute: string): Promise<boolean> =>
     
     // Same route too many times
     if (attempt.count >= MAX_REDIRECT_ATTEMPTS) {
-      logger.warn('redirect-safety', `Too many attempts to redirect to ${targetRoute}`);
+      logger.warn('security', `Too many attempts to redirect to ${targetRoute}`);
       return false;
     }
     
@@ -64,7 +64,7 @@ export const isSafeToRedirect = async (targetRoute: string): Promise<boolean> =>
     return true;
     
   } catch (error) {
-    logger.error('redirect-safety', 'Error checking redirect safety:', error);
+    logger.error('security', 'Error checking redirect safety:', error);
     // If we can't check, allow the redirect
     return true;
   }
@@ -84,7 +84,7 @@ const recordRedirectAttempt = async (targetRoute: string, count = 1): Promise<vo
     
     await storage.setItem(REDIRECT_SAFETY_KEY, JSON.stringify(attempt));
   } catch (error) {
-    logger.error('redirect-safety', 'Error recording redirect attempt:', error);
+    logger.error('security', 'Error recording redirect attempt:', error);
   }
 };
 
@@ -96,7 +96,7 @@ export const clearRedirectSafety = async (): Promise<void> => {
     const storage = getStorage();
     await storage.removeItem(REDIRECT_SAFETY_KEY);
   } catch (error) {
-    logger.error('redirect-safety', 'Error clearing redirect safety:', error);
+    logger.error('security', 'Error clearing redirect safety:', error);
   }
 };
 

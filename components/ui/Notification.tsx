@@ -81,7 +81,7 @@ export function Notification({
   const stackOffset = index * (isMobile ? 90 : 100)
   const baseTop = isMobile ? insets.top + 12 : 80
 
-  logger.debug('Notification', 'Rendering id:', id, 'type:', type)
+  logger.debug('ui', 'Rendering id:', id, 'type:', type)
 
   return (
     <View

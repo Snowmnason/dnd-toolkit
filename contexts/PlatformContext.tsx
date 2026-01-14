@@ -1,3 +1,4 @@
+import { logger } from '@/lib/utils/logger'
 import React, { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react'
 import { Platform, useWindowDimensions } from 'react-native'
 
@@ -44,11 +45,23 @@ export function PlatformProvider({ children }: PlatformProviderProps) {
       // Initial set
       setIsMobileState(rawIsMobile)
       lastWidthRef.current = width
+      logger.category('ui').debug('PlatformContext: initial platform detected', { 
+        isMobile: rawIsMobile, 
+        platform: Platform.OS,
+        width,
+        height
+      })
     } else if (lastWidthRef.current !== null) {
       const widthDiff = Math.abs(width - lastWidthRef.current)
       // Only update if width change is significant (> HYSTERESIS px), avoiding scrollbar flips
       if (widthDiff > HYSTERESIS) {
         if (rawIsMobile !== isMobileState) {
+          logger.category('ui').debug('PlatformContext: platform changed', { 
+            from: isMobileState ? 'mobile' : 'desktop',
+            to: rawIsMobile ? 'mobile' : 'desktop',
+            widthDiff,
+            newWidth: width
+          })
           setIsMobileState(rawIsMobile)
         }
         lastWidthRef.current = width

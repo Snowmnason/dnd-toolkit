@@ -47,7 +47,7 @@ export function useWorlds(userId?: string) {
         setConnectedWorldIds([]);
       }
     } catch (err) {
-      logger.error('useWorlds', 'Error loading worlds:', err);
+      logger.error('storage', 'Error loading worlds:', err);
       setError('Failed to load worlds. Please try again.');
     } finally {
       setIsLoading(false);

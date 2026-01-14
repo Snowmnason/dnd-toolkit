@@ -54,9 +54,9 @@ export const useResetPasswordConfirm = () => {
             
             if (!error && data.user) {
               setUserEmail(data.user.email || '');
-              logger.info('reset-password', 'Reset session established for:', data.user.email);
+              logger.info('auth', 'Reset session established for:', data.user.email);
             } else {
-              logger.error('reset-password', 'Failed to establish reset session:', error);
+              logger.error('auth', 'Failed to establish reset session:', error);
               setError('Invalid or expired reset link. Please request a new password reset.');
             }
           }
@@ -68,7 +68,7 @@ export const useResetPasswordConfirm = () => {
           setUserEmail(user.email);
         }
       } catch (err) {
-        logger.error('reset-password', 'Error getting user info:', err);
+        logger.error('auth', 'Error getting user info:', err);
         setError('Failed to verify reset token. Please try again.');
       }
     };

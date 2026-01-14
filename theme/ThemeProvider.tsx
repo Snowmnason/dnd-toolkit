@@ -1,12 +1,13 @@
+import { logger } from '@/lib/utils/logger'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import React, {
-  createContext,
-  ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
+import {
+    createContext,
+    ReactNode,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useState,
 } from 'react'
 import { allThemes, ThemeFamilyName } from './themeRegistry'
 import { ThemeTokens, TokenName } from './tokens'
@@ -47,12 +48,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
         if (savedFamily && allThemes[savedFamily as ThemeFamily]) {
           setFamilyState(savedFamily as ThemeFamily)
+          logger.category('ui').debug('ThemeProvider: loaded saved family', { family: savedFamily })
         }
         if (savedMode && (savedMode === 'light' || savedMode === 'dark')) {
           setModeState(savedMode as ThemeMode)
+          logger.category('ui').debug('ThemeProvider: loaded saved mode', { mode: savedMode })
         }
       } catch (error) {
-        console.warn('[ThemeProvider] Failed to load theme preferences:', error)
+        logger.category('ui').error('ThemeProvider: failed to load preferences', { error: String(error) })
       } finally {
         setIsLoading(false)
       }
@@ -70,11 +73,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   /** Update family and persist */
   const setFamily = useCallback((f: ThemeFamily) => {
     if (!allThemes[f]) {
-      console.warn(`[ThemeProvider] Unknown theme: "${f}", falling back to classic.`)
+      logger.category('ui').warn('ThemeProvider: unknown theme', { requested: f, fallback: 'classic' })
       setFamilyState('classic')
       AsyncStorage.setItem('activeTheme', 'classic')
     } else {
       setFamilyState(f)
+      logger.category('ui').debug('ThemeProvider: family changed', { family: f })
       AsyncStorage.setItem('activeTheme', f)
     }
   }, [])
@@ -82,13 +86,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   /** Update mode and persist */
   const setMode = useCallback((m: ThemeMode) => {
     setModeState(m)
+    logger.category('ui').debug('ThemeProvider: mode changed', { mode: m })
     AsyncStorage.setItem('themeMode', m)
   }, [])
 
   /** Update both family + mode and persist */
   const setTheme = useCallback((f: ThemeFamily, m: ThemeMode) => {
     if (!allThemes[f]) {
-      console.warn(`[ThemeProvider] Unknown theme: "${f}", falling back to classic.`)
+      logger.category('ui').warn('ThemeProvider: unknown theme in setTheme', { requested: f, fallback: 'classic', mode: m })
       setFamilyState('classic')
       AsyncStorage.setItem('activeTheme', 'classic')
     } else {
@@ -96,6 +101,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       AsyncStorage.setItem('activeTheme', f)
     }
     setModeState(m)
+    logger.category('ui').debug('ThemeProvider: theme changed', { family: f || 'classic', mode: m })
     AsyncStorage.setItem('themeMode', m)
   }, [])
 

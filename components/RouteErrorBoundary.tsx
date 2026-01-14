@@ -33,16 +33,27 @@ export class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps,
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     const { routeConfig, navigationContext } = this.props;
 
-    // Log the error
-    logger.error('[RouteErrorBoundary] Caught error', error);
-    logger.debug('[RouteErrorBoundary] Error info', errorInfo.componentStack);
+    // Log the error with category and detailed context
+    logger.category('error').error('Route error caught', {
+      route: routeConfig?.path || 'unknown',
+      errorType: error.name,
+      errorMessage: error.message,
+      componentStack: errorInfo.componentStack?.substring(0, 200),
+      hasCustomErrorHandler: !!routeConfig?.onError
+    });
 
     // Call route's custom error handler if available
     if (routeConfig?.onError && navigationContext) {
       try {
+        logger.category('error').debug('Calling custom error handler', {
+          route: routeConfig.path
+        });
         routeConfig.onError(error, navigationContext);
       } catch (e) {
-        logger.error('[RouteErrorBoundary] Error in custom error handler', e);
+        logger.category('error').error('Error handler failed', {
+          route: routeConfig?.path,
+          handlerError: (e as Error).message
+        });
       }
     }
   }

@@ -30,13 +30,13 @@ export class AppErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log error details for debugging
-    logger.error('ErrorBoundary', 'Uncaught error:', error, errorInfo);
+    logger.error('ui', 'Uncaught error:', error, errorInfo);
 
     // Track error in session
     try {
       sessionManager.trackError();
     } catch (sessionError) {
-      logger.warn('ErrorBoundary', 'Could not track error in session:', sessionError);
+      logger.warn('ui', 'Could not track error in session:', sessionError);
     }
 
     // Send to Sentry crash reporting service
@@ -50,7 +50,7 @@ export class AppErrorBoundary extends Component<Props, State> {
       });
     } catch (sentryError) {
       // Sentry might not be available (e.g., on web in some cases)
-      logger.warn('ErrorBoundary', 'Could not send error to Sentry:', sentryError);
+      logger.warn('ui', 'Could not send error to Sentry:', sentryError);
     }
   }
 

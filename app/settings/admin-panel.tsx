@@ -124,12 +124,12 @@ export default function AdminPanelScreen() {
           });
           setOverrides(initialOverrides);
         } catch (err) {
-          logger.warn('admin-panel', 'Failed to load config', err);
+          logger.warn('ui', 'Failed to load config', err);
           setFlags([]);
           setAllSettings([]);
         }
       } catch (err) {
-        logger.error('admin-panel', 'Admin check failed', err);
+        logger.error('ui', 'Admin check failed', err);
         setAuthorized(false);
       } finally {
         if (mounted) setLoading(false);
@@ -146,13 +146,13 @@ export default function AdminPanelScreen() {
   function toggleFlag(key: string, value: boolean) {
     // Local override stub — no server persistence implemented
     setOverrides((prev) => ({ ...prev, [key]: value }));
-    logger.info('admin-panel', `Toggled feature flag locally: ${key} => ${value}`);
+    logger.info('ui', `Toggled feature flag locally: ${key} => ${value}`);
   }
 
   function toggleSetting(section: SettingsSection, key: string, value: boolean) {
     // Local override stub — no server persistence implemented
     setOverrides((prev) => ({ ...prev, [key]: value }));
-    logger.info('admin-panel', `Toggled ${section} setting locally: ${key} => ${value}`);
+    logger.info('ui', `Toggled ${section} setting locally: ${key} => ${value}`);
   }
 
   async function toggleKind(kind: string, enabled: boolean) {
@@ -176,7 +176,7 @@ export default function AdminPanelScreen() {
       });
       setOverrides(newOverrides);
     } catch (err) {
-      logger.warn('admin-panel', 'Failed to toggle kind', kind, err);
+      logger.warn('ui', 'Failed to toggle kind', kind, err);
     }
   }
 
@@ -189,7 +189,7 @@ export default function AdminPanelScreen() {
         username = encodeURIComponent(user.username);
       }
     } catch (err) {
-      logger.warn('admin-panel', 'Failed to resolve username; using default', err);
+      logger.warn('ui', 'Failed to resolve username; using default', err);
     }
 
     const { username: _ignored, ...rest } = routeParams || {};

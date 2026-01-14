@@ -41,7 +41,7 @@ export const openEmailApp = async (email: string) => {
       // If no mail app available, do nothing - user will handle it themselves
     }
   } catch (error) {
-    logger.error('email-utils', 'Error opening email:', error);
+    logger.error('other', 'Error opening email:', error);
     // Only show error alert if something actually went wrong during the attempt
     if (Platform.OS === 'web') {
       Alert.alert('Error', 'Could not open email app');

@@ -43,7 +43,7 @@ export default function EmailConfirmationScreen() {
   // Listen for auth state changes (for auto-signin after email confirmation)
   useEffect(() => {
   const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
-  logger.debug('email-confirmation', 'Auth state change:', event, session?.user?.email);
+  logger.debug('auth', 'Auth state change:', event, session?.user?.email);
       
       if (event === 'SIGNED_IN' && session?.user?.email === userEmail) {
         // User successfully confirmed email and is now signed in
@@ -94,12 +94,12 @@ export default function EmailConfirmationScreen() {
         
         timerRef.current = setInterval(() => {
           countdown--;
-          logger.debug('email-confirmation', 'Countdown:', countdown);
+          logger.debug('auth', 'Countdown:', countdown);
           if (countdown > 0) {
             setWaitingResend(`(${countdown}s)`);
           } else {
             // Re-enable button and reset text
-            logger.debug('email-confirmation', 'Timer finished, re-enabling button');
+            logger.debug('auth', 'Timer finished, re-enabling button');
             setWaitingResend('Resend Email');
             setIsCountingDown(false);
             if (timerRef.current) {

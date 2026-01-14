@@ -15,7 +15,7 @@ export default function AuthProvider({ children }: PropsWithChildren) {
       setIsLoading(true)
       const supabase = getSupabaseClient()
       if (!supabase) {
-        logger.warn('auth-provider', 'Supabase not configured')
+        logger.category('auth').warn('Supabase not configured for session fetch')
         setIsLoading(false)
         return
       }
@@ -26,7 +26,9 @@ export default function AuthProvider({ children }: PropsWithChildren) {
       } = await supabase.auth.getSession()
 
       if (error) {
-        logger.error('auth-provider', 'Error fetching session:', error)
+        logger.category('auth').error('Failed to fetch session', { error: error.message })
+      } else {
+        logger.category('auth').debug('Session fetched', { hasSession: !!session, userId: session?.user.id })
       }
 
       setSession(session)
@@ -47,7 +49,7 @@ export default function AuthProvider({ children }: PropsWithChildren) {
         _event: import('@supabase/supabase-js').AuthChangeEvent,
         session: Session | null
       ) => {
-        logger.debug('auth-provider', 'Auth state changed:', { event: _event, session })
+        logger.category('auth').debug('Auth state changed', { event: _event, hasSession: !!session })
         setSession(session)
       }
     )
@@ -67,22 +69,29 @@ export default function AuthProvider({ children }: PropsWithChildren) {
         try {
           const supabase = getSupabaseClient()
           if (!supabase) {
-            logger.warn('auth-provider', 'Supabase not configured for profile fetch')
+            logger.category('auth').warn('Supabase not configured for profile fetch')
             setIsLoading(false)
             return
           }
 
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('users')  // Changed from 'profiles' to 'users'
             .select('*')
             .eq('auth_id', session.user.id)  // Changed from 'id' to 'auth_id'
             .single()
 
+          if (error) {
+            logger.category('auth').error('Failed to fetch profile', { error: error.message, userId: session.user.id })
+          } else {
+            logger.category('auth').debug('Profile fetched', { userId: session.user.id, hasProfile: !!data })
+          }
+
           setProfile(data)
         } catch (error) {
-          logger.error('auth-provider', 'Error fetching profile:', error)
+          logger.category('auth').error('Unexpected error fetching profile', { error: String(error) })
         }
       } else {
+        logger.category('auth').debug('No session, clearing profile')
         setProfile(null)
       }
 

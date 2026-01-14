@@ -58,10 +58,10 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
       }
       
       setLoading(true);
-      logger.info('signup', 'Starting profile creation in complete-profile mode');
+      logger.info('auth', 'Starting profile creation in complete-profile mode');
       
       try {
-        logger.debug('signup', 'Creating user profile with data:', {
+        logger.debug('auth', 'Creating user profile with data:', {
           auth_id: user.id,
           username: profileData.username.trim(),
           usernameLength: profileData.username.trim().length
@@ -73,18 +73,18 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
           username: profileData.username.trim()
         });
         
-        logger.info('signup', 'Profile created successfully:', {
+        logger.info('auth', 'Profile created successfully:', {
           profileId: newProfile.id,
           profileUsername: newProfile.username,
           profileAuthId: newProfile.auth_id
         });
         
         // Check for pending invites after profile creation
-        logger.debug('signup', 'Checking for pending invites');
+        logger.debug('auth', 'Checking for pending invites');
         const pendingInvite = await checkPendingInvites();
         
         if (pendingInvite) {
-          logger.info('signup', 'Found pending invite, redirecting to process it:', pendingInvite);
+          logger.info('auth', 'Found pending invite, redirecting to process it:', pendingInvite);
           // Clear the pending invite from storage since we're processing it
           await SecureStorage.removeItem(STORAGE_KEYS.PENDING_INVITE);
           
@@ -96,14 +96,14 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
           });
           router.replace(authRedirectRoute as any);
         } else {
-          logger.info('signup', 'No pending invite found, redirecting to world selection');
+          logger.info('auth', 'No pending invite found, redirecting to world selection');
           // No pending invite - redirect to world selection
           router.replace(buildRoute('/select/world-selection') as any);
         }
         
       } catch (error: any) {
-        logger.error('signup', 'Profile creation error:', error);
-        logger.error('signup', 'Error details:', {
+        logger.error('auth', 'Profile creation error:', error);
+        logger.error('auth', 'Error details:', {
           message: error.message,
           code: error.code,
           details: error.details,
@@ -115,14 +115,14 @@ export const useSignUpForm = (mode: SignUpMode = 'signup', user?: any) => {
         if (error.message?.includes('duplicate') || error.code === '23505') {
           setAuthError('Username already taken. Please choose another.');
         } else if (error.message?.includes('display_name')) {
-          logger.error('signup', 'Display name column error detected - database schema issue');
+          logger.error('auth', 'Display name column error detected - database schema issue');
           setAuthError('Database configuration error. Please contact support.');
         } else {
           setAuthError('Failed to create profile. Please try again.');
         }
       } finally {
         setLoading(false);
-        logger.debug('signup', 'Profile creation process completed');
+        logger.debug('auth', 'Profile creation process completed');
       }
     } else {
       // Type assertion: we know data is SignUpFormData in this branch

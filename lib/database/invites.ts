@@ -46,7 +46,7 @@ export async function createInviteLink(
       insertData.expires_at = expiresAt.toISOString();
     }
 
-    logger.info('invites', `Creating invite link for world ${worldId}`, { hoursValid });
+    logger.info('storage', `Creating invite link for world ${worldId}`, { hoursValid });
 
     // Insert and let Supabase generate token and default expiration
     const { data, error } = await supabase
@@ -56,12 +56,12 @@ export async function createInviteLink(
       .single();
 
     if (error) {
-      logger.error('invites', 'Failed to create invite link', error);
+      logger.error('storage', 'Failed to create invite link', error);
       return { success: false, error: error.message };
     }
 
     if (!data) {
-      logger.error('invites', 'No data returned from insert');
+      logger.error('storage', 'No data returned from insert');
       return { success: false, error: 'Failed to create invite link' };
     }
 
@@ -73,7 +73,7 @@ export async function createInviteLink(
     };
 
   } catch (error) {
-    logger.error('invites', 'Unexpected error creating invite link', error);
+    logger.error('storage', 'Unexpected error creating invite link', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
@@ -89,7 +89,7 @@ export async function validateInviteToken(
   token: string
 ): Promise<{ success: boolean; worldId?: string; error?: string }> {
   try {
-    logger.info('invites', `Validating invite token: ${token}`);
+    logger.info('storage', `Validating invite token: ${token}`);
 
     const result = await RequestManager.fetch(
       `invite:validate:${token}`,
@@ -101,19 +101,19 @@ export async function validateInviteToken(
           .single();
 
         if (error) {
-          logger.error('invites', 'Invalid invite token', error);
+          logger.error('storage', 'Invalid invite token', error);
           throw new Error('Invalid or expired invite link');
         }
 
         if (!data) {
-          logger.error('invites', 'No invite found for token');
+          logger.error('storage', 'No invite found for token');
           throw new Error('Invalid invite link');
         }
 
         // Check if expired
         const expiresAt = new Date(data.expires_at);
         if (expiresAt < new Date()) {
-          logger.warn('invites', 'Invite token expired', { expiresAt });
+          logger.warn('storage', 'Invite token expired', { expiresAt });
           throw new Error('This invite link has expired');
         }
 
@@ -142,7 +142,7 @@ export async function validateInviteToken(
     };
 
   } catch (error) {
-    logger.error('invites', 'Unexpected error validating token', error);
+    logger.error('storage', 'Unexpected error validating token', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
@@ -162,7 +162,7 @@ export async function deleteInviteLink(
   token: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    logger.info('invites', `Deleting invite link: ${token}`);
+    logger.info('storage', `Deleting invite link: ${token}`);
 
     const { error } = await supabase
       .from('invite_links')
@@ -170,7 +170,7 @@ export async function deleteInviteLink(
       .eq('token', token);
 
     if (error) {
-      logger.error('invites', 'Failed to delete invite link', error);
+      logger.error('storage', 'Failed to delete invite link', error);
       return { success: false, error: error.message };
     }
 
@@ -179,7 +179,7 @@ export async function deleteInviteLink(
     return { success: true };
 
   } catch (error) {
-    logger.error('invites', 'Unexpected error deleting invite link', error);
+    logger.error('storage', 'Unexpected error deleting invite link', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
@@ -195,7 +195,7 @@ export async function getWorldInviteLinks(
   worldId: string
 ): Promise<{ success: boolean; invites?: InviteLink[]; error?: string }> {
   try {
-    logger.info('invites', `Fetching invite links for world: ${worldId}`);
+    logger.info('storage', `Fetching invite links for world: ${worldId}`);
 
     const data = await RequestManager.fetch(
       `invites:world:${worldId}`,
@@ -208,7 +208,7 @@ export async function getWorldInviteLinks(
           .order('created_at', { ascending: false });
 
         if (error) {
-          logger.error('invites', 'Failed to fetch invite links', error);
+          logger.error('storage', 'Failed to fetch invite links', error);
           throw new Error(error.message);
         }
 
@@ -224,7 +224,7 @@ export async function getWorldInviteLinks(
     // Ensure data is always an array, even if null from failOpen
     const invites = Array.isArray(data) ? data : [];
     
-    logger.info('invites', `Found ${invites.length} active invite links`);
+    logger.info('storage', `Found ${invites.length} active invite links`);
     
     return { 
       success: true, 
@@ -232,7 +232,7 @@ export async function getWorldInviteLinks(
     };
 
   } catch (error) {
-    logger.error('invites', 'Unexpected error fetching invite links', error);
+    logger.error('storage', 'Unexpected error fetching invite links', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 

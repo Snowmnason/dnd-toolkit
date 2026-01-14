@@ -51,7 +51,7 @@ export class EncryptedStorage {
         return newKey;
       }
     } catch (error) {
-      logger.error('encrypted-storage', 'Error managing encryption key:', error);
+      logger.error('storage', 'Error managing encryption key:', error);
       // Fallback to a simple key if SecureStore fails
       const fallbackKey = new Uint8Array(32);
       fallbackKey.fill(123);
@@ -125,7 +125,7 @@ export class EncryptedStorage {
       const encryptedValue = this.encryptData(value, encryptionKey);
       await this.platformSetItem(key, encryptedValue);
     } catch (error) {
-      logger.error('encrypted-storage', 'Error storing encrypted data:', error);
+      logger.error('storage', 'Error storing encrypted data:', error);
       throw error;
     }
   }
@@ -142,7 +142,7 @@ export class EncryptedStorage {
       const encryptionKey = await this.getOrCreateEncryptionKey();
       return this.decryptData(encryptedValue, encryptionKey);
     } catch (error) {
-      logger.error('encrypted-storage', 'Error retrieving encrypted data:', error);
+      logger.error('storage', 'Error retrieving encrypted data:', error);
       return null;
     }
   }
@@ -152,7 +152,7 @@ export class EncryptedStorage {
     try {
       await this.platformRemoveItem(key);
     } catch (error) {
-      logger.error('encrypted-storage', 'Error removing encrypted data:', error);
+      logger.error('storage', 'Error removing encrypted data:', error);
       throw error;
     }
   }
@@ -162,7 +162,7 @@ export class EncryptedStorage {
     try {
       await this.platformClear();
     } catch (error) {
-      logger.error('encrypted-storage', 'Error clearing encrypted data:', error);
+      logger.error('storage', 'Error clearing encrypted data:', error);
       throw error;
     }
   }
@@ -185,7 +185,7 @@ export class EncryptedStorage {
       }
       return [];
     } catch (error) {
-      logger.error('encrypted-storage', 'Error getting all keys:', error);
+      logger.error('storage', 'Error getting all keys:', error);
       return [];
     }
   }

@@ -44,7 +44,7 @@ const loadStore = async (): Promise<Record<string, AttemptRecord>> => {
     if (!raw) return {};
     return JSON.parse(raw);
   } catch (error) {
-    logger.error('auth-guard', 'Failed to load auth attempt store', error);
+    logger.error('security', 'Failed to load auth attempt store', error);
     return {};
   }
 };
@@ -53,7 +53,7 @@ const persistStore = async (store: Record<string, AttemptRecord>) => {
   try {
     await SecureStorage.setJSON(STORAGE_KEYS.AUTH_ATTEMPTS, store);
   } catch (error) {
-    logger.error('auth-guard', 'Failed to persist auth attempt store', error);
+    logger.error('security', 'Failed to persist auth attempt store', error);
   }
 };
 
@@ -130,7 +130,7 @@ export const recordAuthFailure = async (email: string, scope: AuthGuardScope = '
           });
         }
       } catch {
-        logger.debug('auth-guard', 'Sentry disabled or failed to report lockout');
+        logger.debug('security', 'Sentry disabled or failed to report lockout');
       }
     }).catch(() => {
       // Sentry init failed, continue without reporting
