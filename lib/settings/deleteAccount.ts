@@ -38,14 +38,14 @@ export async function deleteUserAccount(password: string): Promise<DeleteAccount
     }
 
     // Re-authenticate with password before deletion for security
-    logger.debug('deleteAccount', 'Re-authenticating user before account deletion');
+    logger.debug('auth', 'Re-authenticating user before account deletion');
     const { error: reAuthError } = await supabase.auth.signInWithPassword({
       email: authUser.email,
       password: password
     });
 
     if (reAuthError) {
-      logger.error('deleteAccount', 'Re-authentication failed:', reAuthError);
+      logger.error('auth', 'Re-authentication failed:', reAuthError);
       // If password passed client validation but failed auth, mark as validation warning
       const isBackendValidationFailure = passwordValidation.isValid;
       throw Object.assign(new Error('Password verification failed. Please check your password and try again.'), {
@@ -54,7 +54,7 @@ export async function deleteUserAccount(password: string): Promise<DeleteAccount
     }
 
     // Call the edge function to delete everything
-    logger.info('deleteAccount', 'Starting account deletion process');
+    logger.info('auth', 'Starting account deletion process');
     const result = await usersDB.deleteCurrentUser();
     
     if (!result) {
@@ -62,19 +62,19 @@ export async function deleteUserAccount(password: string): Promise<DeleteAccount
     }
 
     // Success - log and proceed with cleanup
-    logger.info('deleteAccount', 'Account deletion completed successfully, result:', result);
+    logger.info('auth', 'Account deletion completed successfully, result:', result);
     
     // Clean up local state and sign out
-    logger.debug('deleteAccount', 'Clearing local auth state');
+    logger.debug('auth', 'Clearing local auth state');
     await AuthStateManager.clearAuthState();
     await supabase.auth.signOut();
     
-    logger.info('deleteAccount', 'Account deletion and cleanup completed');
+    logger.info('auth', 'Account deletion and cleanup completed');
     
     return { success: true };
     
   } catch (error: any) {
-    logger.error('deleteAccount', 'Delete account error:', error);
+    logger.error('auth', 'Delete account error:', error);
     
     // Check if this is a backend validation failure (client passed, server rejected)
     const isBackendValidationFailure = (error as any)?.isBackendValidationFailure || 

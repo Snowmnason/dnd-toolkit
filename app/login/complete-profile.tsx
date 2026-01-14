@@ -30,24 +30,24 @@ export default function CompleteProfileScreen() {
   // Check if user is authenticated and needs to complete profile
   useEffect(() => {
     const checkAuthAndProfile = async () => {
-      logger.info('complete-profile', 'Starting auth and profile check');
+      logger.info('auth', 'Starting auth and profile check');
       try {
         // Use cached session instead of making network call
         const { data: { session }, error: authError } = await supabase.auth.getSession();
-        logger.debug('complete-profile', 'Auth session check result:', { 
+        logger.debug('auth', 'Auth session check result:', { 
           hasSession: !!session, 
           userId: session?.user?.id,
           authError: authError?.message 
         });
 
         if (authError) {
-          logger.error('complete-profile', 'Auth session error:', authError);
+          logger.error('auth', 'Auth session error:', authError);
           router.replace('/login/sign-in');
           return;
         }
 
         if (!session?.user) {
-          logger.warn('complete-profile', 'No authenticated user found, redirecting to sign-in');
+          logger.warn('auth', 'No authenticated user found, redirecting to sign-in');
           router.replace('/login/sign-in');
           return;
         }
@@ -55,9 +55,9 @@ export default function CompleteProfileScreen() {
         const authUser = session.user;
 
         // Try to get existing profile (might not exist for new users)
-        logger.debug('complete-profile', 'Fetching user profile from database');
+        logger.debug('auth', 'Fetching user profile from database');
         const existingProfile = await usersDB.getCurrentUser();
-        logger.info('complete-profile', 'Profile fetch result:', { 
+        logger.info('auth', 'Profile fetch result:', { 
           hasProfile: !!existingProfile,
           profileId: existingProfile?.id,
           profileUsername: existingProfile?.username,
@@ -70,7 +70,7 @@ export default function CompleteProfileScreen() {
         } else {
           // No profile exists - this is expected for new users
           // Use the auth user data to create the profile
-          logger.info('complete-profile', 'No database profile found - this is expected for new users');
+          logger.info('auth', 'No database profile found - this is expected for new users');
           setUser(authUser);
         }
         
@@ -79,7 +79,7 @@ export default function CompleteProfileScreen() {
                                existingProfile.username && 
                                existingProfile.username.trim().length > 0;
         
-        logger.debug('complete-profile', 'Profile validation:', { 
+        logger.debug('auth', 'Profile validation:', { 
           hasValidProfile,
           hasExistingProfile: !!existingProfile,
           username: existingProfile?.username,
@@ -87,17 +87,17 @@ export default function CompleteProfileScreen() {
         });
 
         if (hasValidProfile) {
-          logger.info('complete-profile', 'User already has complete profile, redirecting to world selection');
+          logger.info('auth', 'User already has complete profile, redirecting to world selection');
           router.replace('/select/world-selection');
           return;
         }
-        logger.info('complete-profile', 'User needs to complete profile, staying on this screen');
+        logger.info('auth', 'User needs to complete profile, staying on this screen');
       } catch (error) {
-        logger.error('complete-profile', 'Auth check error:', error);
+        logger.error('auth', 'Auth check error:', error);
         router.replace('/login/sign-in');
       } finally {
         setInitializing(false);
-        logger.debug('complete-profile', 'Auth check completed, initializing set to false');
+        logger.debug('auth', 'Auth check completed, initializing set to false');
       }
     };
     

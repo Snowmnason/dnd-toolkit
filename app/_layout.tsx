@@ -120,7 +120,7 @@ function RootLayoutContent() {
   
   // Log every render with session ID
   useEffect(() => {
-    logger.debug('_layout', `[SESSION:${sessionId}] 📍 Root layout rendered - route: ${segments[0] || 'index'}, authState: ${authState}`);
+    logger.debug('navigation', `[SESSION:${sessionId}] 📍 Root layout rendered - route: ${segments[0] || 'index'}, authState: ${authState}`);
   });
   // Analytics hook (must be called unconditionally)
   useAnalyticsNavigation();

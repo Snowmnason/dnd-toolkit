@@ -67,7 +67,9 @@ function withTiming<T>(label: string, fn: () => Promise<T> | T, warnMs?: number)
   
   const finish = (ok: boolean, extra?: any) => {
     const duration_ms = Date.now() - start;
-    if (duration_ms > slowScreenThreshold) logger.warn('performance', `Slow operation: ${label} took ${duration_ms}ms`);
+    if (duration_ms > slowScreenThreshold) {
+      logger.category('performance').warn('Slow operation detected', { operation: label, duration_ms, threshold: slowScreenThreshold });
+    }
     if (isSentryEnabled() && AnalyticsConsent.isAllowed('performance')) {
       try {
         const errorCategory = extra?.error ? categorizeError(extra.error) : undefined;
@@ -77,7 +79,10 @@ function withTiming<T>(label: string, fn: () => Promise<T> | T, warnMs?: number)
           data: { duration_ms, ok, error_category: errorCategory, ...extra }, 
           level: 'info' 
         });
-      } catch {}
+        logger.category('analytics').debug('Performance breadcrumb sent to Sentry', { operation: label, duration_ms, ok });
+      } catch (e) {
+        logger.category('analytics').error('Failed to send performance breadcrumb', { operation: label, error: String(e) });
+      }
     }
   };
 
@@ -111,11 +116,21 @@ export const Analytics = {
   getThreshold,
 
   identify(user: { id?: string; username?: string } | null): void {
-    if (!this.enabled()) return;
+    if (!this.enabled()) {
+      logger.category('analytics').debug('Analytics disabled, skipping user identification');
+      return;
+    }
     try {
-      if (user?.id) Sentry.setUser({ id: user.id, username: user.username });
-      else Sentry.setUser(null);
-    } catch {}
+      if (user?.id) {
+        Sentry.setUser({ id: user.id, username: user.username });
+        logger.category('analytics').debug('User identified in analytics', { userId: user.id, username: user.username });
+      } else {
+        Sentry.setUser(null);
+        logger.category('analytics').debug('User cleared from analytics');
+      }
+    } catch (e) {
+      logger.category('analytics').error('Failed to identify user in analytics', { error: String(e) });
+    }
   },
 
   track(event: string, props?: AnalyticsEventProps): void {

@@ -18,7 +18,7 @@ export const AuthStateManager = {
       const authState = await SecureStorage.getJSON<AuthState>(storageKey);
       return authState || { hasAccount: false };
     } catch (error) {
-      logger.error('auth-state', 'Error getting auth state:', error);
+      logger.error('auth', 'Error getting auth state:', error);
       return { hasAccount: false };
     }
   },
@@ -30,7 +30,7 @@ export const AuthStateManager = {
       const storageKey = STORAGE_KEYS.HAS_ACCOUNT;
       await SecureStorage.setJSON(storageKey, newState);
     } catch (error) {
-      logger.error('auth-state', 'Error setting hasAccount:', error);
+      logger.error('auth', 'Error setting hasAccount:', error);
     }
   },
 
@@ -46,11 +46,11 @@ export const AuthStateManager = {
           const key = 'dnd_session_user_email';
           await SecureStorage.setItem(key, session.user.email);
         } catch (error) {
-          logger.error('auth-state', 'Error caching session email:', error);
+          logger.error('auth', 'Error caching session email:', error);
         }
       }
     } catch (error) {
-      logger.error('auth-state', 'Error saving auth state:', error);
+      logger.error('auth', 'Error saving auth state:', error);
     }
   },
 
@@ -59,7 +59,7 @@ export const AuthStateManager = {
     try {
       await SecureStorage.removeItem(STORAGE_KEYS.HAS_ACCOUNT);
     } catch (error) {
-      logger.error('auth-state', 'Error clearing auth state:', error);
+      logger.error('auth', 'Error clearing auth state:', error);
     }
   },
 
@@ -85,7 +85,7 @@ export const AuthStateManager = {
       // If Supabase isn't configured (like on GitHub Pages without env vars), 
       // fall back to local auth state
       if (!isSupabaseConfiguredCache()) {
-        logger.warn('auth-state', 'Supabase not configured, using local auth state');
+        logger.warn('auth', 'Supabase not configured, using local auth state');
         return authState.hasAccount;
       }
       
@@ -115,7 +115,7 @@ export const AuthStateManager = {
         return authState.hasAccount;
       }
     } catch (error) {
-      logger.error('auth-state', 'Error checking authentication:', error);
+      logger.error('auth', 'Error checking authentication:', error);
       // On error, fall back to local auth state
       try {
         const authState = await this.getAuthState();
@@ -131,8 +131,11 @@ export const AuthStateManager = {
   // ==========================================
   async getRoutingDecision(): Promise<{ routingDecision: 'welcome' | 'login' | 'main' | 'complete-profile'; profileId: string | null }> {
     try {
+      logger.category('security').debug('Evaluating routing decision');
+      
       // First, get local auth flag
       const authState = await this.getAuthState();
+      logger.category('security').debug('Local auth state', { hasAccount: authState.hasAccount });
 
       // Use cached supabase import to avoid re-loading modules
       if (!supabaseCache) {
@@ -143,7 +146,7 @@ export const AuthStateManager = {
 
       // If Supabase isn't configured, fall back to local state
       if (!isSupabaseConfiguredCache()) {
-        logger.warn('auth-state', 'Supabase not configured - defaulting to welcome');
+        logger.warn('auth', 'Supabase not configured - defaulting to welcome');
         return { routingDecision: 'welcome', profileId: null };
       }
 
@@ -152,7 +155,7 @@ export const AuthStateManager = {
 
       // If there's a Supabase session, ensure local auth state is synced
       if (session && !authState.hasAccount) {
-        logger.info('auth-state', '🔄 [getRoutingDecision] Found Supabase session but local hasAccount=false, syncing...');
+        logger.info('auth', '🔄 [getRoutingDecision] Found Supabase session but local hasAccount=false, syncing...');
         await this.setHasAccount(true);
       }
 
@@ -166,7 +169,7 @@ export const AuthStateManager = {
         }
         userProfile = await usersDBCache.getCurrentUser();
       } catch (dbError) {
-        logger.debug('auth-state', 'Database error checking profile:', dbError);
+        logger.debug('auth', 'Database error checking profile:', dbError);
         // If DB fails, allow user to continue to main (graceful degradation)
         if (session) return { routingDecision: 'main', profileId: userProfile?.id || null };
         // If no session but we can't query profile, prefer 'login' if user has account, else 'welcome'
@@ -182,28 +185,41 @@ export const AuthStateManager = {
 
         // If profile missing or mismatch -> force complete-profile path
         if (!matchesAuth) {
+          logger.category('security').info('Routing to complete-profile: profile mismatch', {
+            hasProfile: !!userProfile,
+            profileId: userProfile?.id,
+            sessionUserId: session.user.id
+          });
           return { routingDecision: 'complete-profile', profileId: userProfile.id };
         }
 
         // If username is missing or blank -> complete-profile
         if (!userProfile.username || userProfile.username.trim().length === 0) {
+          logger.category('security').info('Routing to complete-profile: missing username', {
+            profileId: userProfile.id
+          });
           return { routingDecision: 'complete-profile', profileId: userProfile.id };
         }
 
         // Session and profile valid -> main
+        logger.category('security').debug('Routing to main: valid session and profile', {
+          profileId: userProfile.id
+        });
         return { routingDecision: 'main', profileId: userProfile.id };
       }
 
       // No active session
       if (authState.hasAccount) {
         // User has an account but no active session -> prompt login
+        logger.category('security').debug('Routing to login: has account but no session');
         return { routingDecision: 'login', profileId: null };
       }
 
       // No account and no session -> welcome
+      logger.category('security').debug('Routing to welcome: no account or session');
       return { routingDecision: 'welcome', profileId: null };
     } catch (error) {
-      logger.error('auth-state', 'Error determining routing decision:', error);
+      logger.error('auth', 'Error determining routing decision:', error);
       return { routingDecision: 'welcome', profileId: null };
     }
   }

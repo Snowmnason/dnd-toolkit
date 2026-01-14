@@ -25,7 +25,7 @@ export function useSplashScreen() {
     const splashEnabled = FeatureFlags.isEnabled('splashScreen');
     
     if (!splashEnabled) {
-      logger.debug('splash', '🎬 Splash screen disabled via feature flag');
+      logger.debug('ui', '🎬 Splash screen disabled via feature flag');
       setShowSplash(false);
       setBufferComplete(true);
       return;
@@ -33,17 +33,17 @@ export function useSplashScreen() {
 
     // Wait for bootstrap to complete
     if (!bootstrap.isReady) {
-      logger.debug('splash', '⏳ Waiting for bootstrap to complete...');
+      logger.debug('ui', '⏳ Waiting for bootstrap to complete...');
       return;
     }
 
-    logger.debug('splash', `✅ Bootstrap ready, starting ${SPLASH_BUFFER_MS}ms buffer on ${Platform.OS}`);
+    logger.debug('ui', `✅ Bootstrap ready, starting ${SPLASH_BUFFER_MS}ms buffer on ${Platform.OS}`);
 
     // Add platform-specific buffer after bootstrap completes
     const timer = setTimeout(() => {
       setBufferComplete(true);
       setShowSplash(false);
-      logger.debug('splash', '🎬 Splash screen hidden, app ready');
+      logger.debug('ui', '🎬 Splash screen hidden, app ready');
     }, SPLASH_BUFFER_MS);
 
     return () => clearTimeout(timer);

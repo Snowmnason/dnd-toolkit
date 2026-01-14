@@ -41,7 +41,7 @@ export default function HomePage() {
   // Show failsafe button after timeout
   React.useEffect(() => {
     const timer = setTimeout(() => {
-      logger.warn('index', '⏱️ Failsafe timeout reached, showing manual navigation button');
+      logger.warn('bootstrap', '⏱️ Failsafe timeout reached, showing manual navigation button');
       setShowFailsafe(true);
     }, FAILSAFE_TIMEOUT);
 
@@ -52,7 +52,7 @@ export default function HomePage() {
   React.useEffect(() => {
     // Don't proceed until bootstrap is complete
     if (!bootstrap.isReady) {
-      logger.debug('index', '⏸️ Waiting for bootstrap to complete', {
+      logger.debug('bootstrap', '⏸️ Waiting for bootstrap to complete', {
         assetsLoaded: bootstrap.assetsLoaded,
         sessionRestored: bootstrap.sessionRestored,
         isReady: bootstrap.isReady,
@@ -61,48 +61,48 @@ export default function HomePage() {
       return;
     }
 
-    logger.info('index', '🚀 Bootstrap ready! Starting routing decision...');
+    logger.info('bootstrap', '🚀 Bootstrap ready! Starting routing decision...');
 
     const determineRoute = async () => {
       try {
-        logger.info('index', '🔍 Calling AuthStateManager.getRoutingDecision()...');
+        logger.info('bootstrap', '🔍 Calling AuthStateManager.getRoutingDecision()...');
         const startTime = Date.now();
         const { routingDecision: decision } = await AuthStateManager.getRoutingDecision();
         const elapsed = Date.now() - startTime;
-        logger.info('index', `✅ Routing decision received in ${elapsed}ms:`, decision);
+        logger.info('bootstrap', `✅ Routing decision received in ${elapsed}ms:`, decision);
         
         // Navigate immediately without state update to avoid render
         switch (decision) {
           case 'welcome':
-            logger.info('index', '🏠 Navigating to: /login/welcome');
+            logger.info('bootstrap', '🏠 Navigating to: /login/welcome');
             router.replace('/login/welcome');
             break;
           case 'login':
-            logger.info('index', '🔑 Navigating to: /login/sign-in');
+            logger.info('bootstrap', '🔑 Navigating to: /login/sign-in');
             router.replace('/login/sign-in');
             break;
           case 'complete-profile':
-            logger.info('index', '👤 Navigating to: /login/complete-profile');
+            logger.info('bootstrap', '👤 Navigating to: /login/complete-profile');
             router.replace('/login/complete-profile');
             break;
           case 'main':
-            logger.info('index', '🌍 Navigating to: /select/world-selection');
+            logger.info('bootstrap', '🌍 Navigating to: /select/world-selection');
             router.replace('/select/world-selection');
             break;
           default:
-            logger.warn('index', `⚠️ Unknown decision "${decision}", using fallback: /login/welcome`);
+            logger.warn('bootstrap', `⚠️ Unknown decision "${decision}", using fallback: /login/welcome`);
             router.replace('/login/welcome');
         }
         
-        logger.info('index', '✅ router.replace() called successfully');
+        logger.info('bootstrap', '✅ router.replace() called successfully');
       } catch (error) {
-        logger.error('index', '❌ Routing error:', error);
-        logger.error('index', '📍 Attempting fallback to /login/welcome');
+        logger.error('bootstrap', '❌ Routing error:', error);
+        logger.error('bootstrap', '📍 Attempting fallback to /login/welcome');
         try {
           router.replace('/login/welcome');
-          logger.info('index', '✅ Fallback navigation successful');
+          logger.info('bootstrap', '✅ Fallback navigation successful');
         } catch (fallbackError) {
-          logger.error('index', '❌ Fallback navigation also failed:', fallbackError);
+          logger.error('bootstrap', '❌ Fallback navigation also failed:', fallbackError);
         }
       }
     };
@@ -115,10 +115,10 @@ export default function HomePage() {
     ? (bootstrap.assetsLoaded ? 'Restoring session...' : 'Loading assets...')
     : 'Determining route...';
 
-  logger.debug('index', '⏳ Rendering index loading overlay:', loadingMessage);
+  logger.debug('bootstrap', '⏳ Rendering index loading overlay:', loadingMessage);
 
   const handleManualNavigation = () => {
-    logger.info('index', '🚪 User clicked failsafe button, navigating to welcome');
+    logger.info('bootstrap', '🚪 User clicked failsafe button, navigating to welcome');
     router.replace('/login/welcome');
   };
 

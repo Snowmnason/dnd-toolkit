@@ -25,7 +25,7 @@ const supabaseAnonKey =
   Constants.expoConfig?.extra?.supabaseAnonKey;
 
 // Log configuration status for debugging
-logger.debug('supabase', 'Loading Supabase Configuration:', {
+logger.debug('storage', 'Loading Supabase Configuration:', {
   hasUrl: !!supabaseUrl,
   hasKey: !!supabaseAnonKey,
   urlLength: supabaseUrl?.length || 0,
@@ -47,7 +47,7 @@ export const isSupabaseConfigured = () => {
   );
 
   if (!hasLoggedSupabaseConfig) {
-    logger.info('supabase', `Supabase Configuration Status: ${configured ? '✅ CONFIGURED' : '❌ NOT CONFIGURED'}`, {
+    logger.info('storage', `Supabase Configuration Status: ${configured ? '✅ CONFIGURED' : '❌ NOT CONFIGURED'}`, {
       hasUrl: !!supabaseUrl,
       hasKey: !!supabaseAnonKey,
       urlLength: supabaseUrl?.length || 0,
@@ -93,7 +93,7 @@ export const getSupabaseClient = () => {
 export const supabase = new Proxy({} as any, {
   get(target, prop) {
     if (!isSupabaseConfigured()) {
-      logger.warn('supabase', 'Server connection unavailable - operations will be skipped');
+      logger.warn('storage', 'Server connection unavailable - operations will be skipped');
       // Return a mock object that doesn't throw but logs warnings
       return new Proxy({} as any, {
         get() {

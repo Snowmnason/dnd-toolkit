@@ -48,7 +48,12 @@ export const worldsDB = {
     // Prevents orphaned data if account is suspended/deleted between check and write
     const currentUser = await validateUserForWrite();
     
-    logger.debug('worlds', 'Creating world for user:', currentUser.id);
+    logger.category('storage').debug('Creating world', {
+      ownerId: currentUser.id,
+      worldName: worldData.name,
+      system: worldData.system,
+      isDm: worldData.is_dm
+    });
 
     // Store profile ID as owner_id (proper FK relationship)
     const insertData = {
@@ -63,9 +68,20 @@ export const worldsDB = {
       .single();
     
     if (error) {
-      logger.error('worlds', 'Error creating world:', error);
+      logger.category('storage').error('Failed to create world', {
+        ownerId: currentUser.id,
+        worldName: worldData.name,
+        error: error.message,
+        code: error.code
+      });
       throw new Error(error.message || 'Failed to create world');
     }
+    
+    logger.category('storage').info('World created successfully', {
+      worldId: data.world_id,
+      ownerId: currentUser.id,
+      name: data.name
+    });
     
     return data;
   },
@@ -105,12 +121,12 @@ export const worldsDB = {
     );
 
     if (accessRecordsResult.error) {
-      logger.error('worlds', 'Error fetching access records:', accessRecordsResult.error);
+      logger.error('storage', 'Error fetching access records:', accessRecordsResult.error);
       throw new Error(accessRecordsResult.error.message || 'Failed to fetch access records');
     }
 
     if (ownedWorldIdsResult.error) {
-      logger.error('worlds', 'Error fetching owned world IDs:', ownedWorldIdsResult.error);
+      logger.error('storage', 'Error fetching owned world IDs:', ownedWorldIdsResult.error);
       throw new Error(ownedWorldIdsResult.error.message || 'Failed to fetch owned world IDs');
     }
 
@@ -137,13 +153,13 @@ export const worldsDB = {
     });
 
     // DEBUGGING: Uncomment to see collected IDs
-    logger.debug('worlds', 'Unique world IDs:', worldIdSet.size);
-    logger.debug('worlds', 'World IDs:', Array.from(worldIdSet));
+    logger.debug('storage', 'Unique world IDs:', worldIdSet.size);
+    logger.debug('storage', 'World IDs:', Array.from(worldIdSet));
 
     // STEP 3: Early return if no worlds found
     if (worldIdSet.size === 0) {
       // DEBUGGING: Uncomment to trace empty results
-      logger.info('worlds', 'No worlds found for user');
+      logger.info('storage', 'No worlds found for user');
       return [];
     }
 
@@ -156,19 +172,19 @@ export const worldsDB = {
       .order('created_at', { ascending: false });
 
     if (worldsError) {
-      logger.error('worlds', 'Error fetching worlds:', worldsError);
+      logger.error('storage', 'Error fetching worlds:', worldsError);
       throw new Error(worldsError.message || 'Failed to fetch worlds');
     }
 
     // DEBUGGING: Uncomment to see fetched worlds count
-    logger.debug('worlds', 'Worlds fetched:', worldsData?.length || 0);
+    logger.debug('storage', 'Worlds fetched:', worldsData?.length || 0);
 
     // STEP 5: Map worlds with their roles
     const allWorlds: WorldWithAccess[] = (worldsData || []).map((world: World) => {
       const roleInfo = roleMap.get(world.world_id);
       
       // DEBUGGING: Uncomment to trace each world
-      logger.debug('worlds', `Adding world: ${world.name} (role: ${roleInfo?.role})`);
+      logger.debug('storage', `Adding world: ${world.name} (role: ${roleInfo?.role})`);
       
       return {
         ...world,
@@ -185,7 +201,7 @@ export const worldsDB = {
     });
 
     // DEBUGGING: Uncomment to see final count
-    logger.debug('worlds', `Total worlds returned: ${allWorlds.length}`);
+    logger.debug('storage', `Total worlds returned: ${allWorlds.length}`);
     
     return allWorlds;
   },
@@ -204,7 +220,7 @@ export const worldsDB = {
       .single();
     
     if (error) {
-      logger.error('worlds', 'Error updating world:', error);
+      logger.error('storage', 'Error updating world:', error);
       throw new Error(error.message || 'Failed to update world');
     }
     
@@ -227,7 +243,7 @@ export const worldsDB = {
       .single();
     
     if (error) {
-      logger.error('worlds', 'Error updating world:', error);
+      logger.error('storage', 'Error updating world:', error);
       throw new Error(error.message || 'Failed to update world');
     }
     
@@ -246,7 +262,7 @@ export const worldsDB = {
       .eq('owner_id', user.id); // Ensure only owner can delete
     
     if (error) {
-      logger.error('worlds', 'Error deleting world:', error);
+      logger.error('storage', 'Error deleting world:', error);
       throw new Error(error.message || 'Failed to delete world');
     }
   },
@@ -260,7 +276,7 @@ export const worldsDB = {
       .eq('user_id', userId);
 
     if (error) {
-      logger.error('worlds', 'Error removing user from world:', error);
+      logger.error('storage', 'Error removing user from world:', error);
       throw new Error(error.message || 'Failed to remove user from world');
     }
   },
@@ -320,7 +336,7 @@ export const worldsDB = {
       .single();
 
     if (error) {
-      logger.error('worlds', 'Error adding user to world:', error);
+      logger.error('storage', 'Error adding user to world:', error);
       throw new Error(error.message || 'Failed to add user to world');
     }
 
@@ -344,7 +360,7 @@ export const worldsDB = {
           .order('created_at', { ascending: false });
 
         if (error) {
-          logger.error('worlds', 'Error fetching world members:', error);
+          logger.error('storage', 'Error fetching world members:', error);
           throw new Error(error.message || 'Failed to fetch world members');
         }
 
@@ -384,7 +400,7 @@ export const worldsDB = {
             // No rows returned
             return null;
           }
-          logger.error('worlds', 'Error fetching world:', error);
+          logger.error('storage', 'Error fetching world:', error);
           throw new Error(error.message || 'Failed to fetch world');
         }
         

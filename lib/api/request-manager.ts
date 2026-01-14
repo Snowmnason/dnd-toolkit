@@ -147,12 +147,20 @@ class RequestManagerClass {
       if (now - request.timestamp > this.STALE_THRESHOLD) {
         this.pendingRequests.delete(key);
         removedRequests++;
-        logger.warn('request-manager', `Cleaned up stale pending request: ${key}`);
+        logger.category('api').warn('Stale request cleaned up', { 
+          key, 
+          staleSinceMinutes: Math.round((now - request.timestamp) / 1000 / 60)
+        });
       }
     }
 
     if (removedBuckets > 0 || removedRequests > 0) {
-      logger.debug('request-manager', `Cleaned up ${removedBuckets} stale rate limit buckets and ${removedRequests} stale pending requests`);
+      logger.category('api').debug('Cleanup cycle completed', {
+        buckets: removedBuckets,
+        requests: removedRequests,
+        totalPendingNow: this.pendingRequests.size,
+        totalBucketsNow: this.rateLimitBuckets.size
+      });
     }
   }
 
@@ -190,7 +198,7 @@ class RequestManagerClass {
           Analytics.track('api_request', { key, ok: true, duration_ms });
           const slowRequestThreshold = Analytics.getThreshold?.('slowRequestMs') ?? 3000;
           if (duration_ms > slowRequestThreshold) {
-            logger.warn('request-manager', `Slow request: ${key} took ${duration_ms}ms`);
+            logger.warn('api', `Slow request: ${key} took ${duration_ms}ms`);
           }
           return value;
         },
@@ -199,7 +207,7 @@ class RequestManagerClass {
           Analytics.track('api_request', { key, ok: false, duration_ms, ...sanitizeErrorForAnalytics(err) });
           const slowRequestThreshold = Analytics.getThreshold?.('slowRequestMs') ?? 3000;
           if (duration_ms > slowRequestThreshold) {
-            logger.warn('request-manager', `Slow failed request: ${key} took ${duration_ms}ms`);
+            logger.warn('api', `Slow failed request: ${key} took ${duration_ms}ms`);
           }
           throw err;
         }
@@ -209,17 +217,17 @@ class RequestManagerClass {
     try {
       // ========== DEDUPE CHECK ==========
       if (options_.dedupe && this.pendingRequests.has(key)) {
-        logger.debug('request-manager', 'Returning deduplicated request:', key);
+        logger.debug('api', 'Returning deduplicated request:', key);
         const pending = this.pendingRequests.get(key)!;
         const deduplicatedPromise = pending.promise as Promise<T>;
         // Note: Duration tracking uses the original request's timestamp (pending.timestamp)
         // not the current request's startedAt, ensuring accurate duration for deduplicated requests
         return deduplicatedPromise.catch((error) => {
-          logger.error('request-manager', 'Deduplicated request failed:', { key, error });
+          logger.error('api', 'Deduplicated request failed:', { key, error });
           this.reportErrorToSentry(error, { key, options: options_ });
           
           if (options_.failOpen) {
-            logger.warn('request-manager', 'Fail-open enabled for deduplicated request, returning null:', key);
+            logger.warn('api', 'Fail-open enabled for deduplicated request, returning null:', key);
             return null;
           }
           
@@ -231,7 +239,7 @@ class RequestManagerClass {
       if (options_.rateLimitKey) {
         const canProceed = this.checkRateLimit(options_.rateLimitKey);
         if (!canProceed) {
-          logger.warn('request-manager', 'Rate limited:', options_.rateLimitKey);
+          logger.warn('api', 'Rate limited:', options_.rateLimitKey);
           if (options_.failOpen) {
             return null;
           }
@@ -321,6 +329,19 @@ class RequestManagerClass {
         retriesLeft,
         delayMs: delay,
       });
+
+      if (retriesLeft === 1) {
+        logger.category('api').warn('Final retry attempt', {
+          error: (error as Error).message,
+          nextDelay: delay * 2
+        });
+      } else {
+        logger.category('api').debug('Retrying request', {
+          error: (error as Error).message,
+          retriesLeft,
+          delayMs: delay
+        });
+      }
 
       // Wait before retry
       await new Promise((resolve) => setTimeout(resolve, delay));

@@ -15,12 +15,13 @@
  */
 
 import { Router } from 'expo-router';
-import { normalizePath, pathEquals, pathStartsWith, RouteParams } from './uri-helpers';
+import { logger } from '../utils/logger';
 import { LOGIN_ROUTES } from './routes/login-routes';
 import { MAIN_ROUTES } from './routes/main-routes';
 import { SELECT_ROUTES } from './routes/select-routes';
 import { SETTINGS_ROUTES } from './routes/settings-routes';
 import { WEB_ROUTES } from './routes/web-routes';
+import { normalizePath, pathEquals, pathStartsWith, RouteParams } from './uri-helpers';
 
 /**
  * A11y focus target on route navigation
@@ -139,6 +140,12 @@ const ROUTE_CONFIGS: RouteConfig[] = [
 export function getRouteConfig(context: NavigationContext): RouteConfig {
   const currentPath = '/' + context.segments.join('/');
   
+  logger.category('navigation').debug('Resolving route config', { 
+    path: currentPath, 
+    segments: context.segments,
+    params: context.params 
+  });
+  
   // Strategy 1: Exact match
   let match = ROUTE_CONFIGS.find((config) => 
     pathEquals(config.path, currentPath) ||
@@ -146,6 +153,11 @@ export function getRouteConfig(context: NavigationContext): RouteConfig {
   );
   
   if (match) {
+    logger.category('navigation').debug('Route matched (exact)', { 
+      path: currentPath, 
+      matched: match.path,
+      strategy: 'exact' 
+    });
     return applyDefaults(match);
   }
   
@@ -155,6 +167,11 @@ export function getRouteConfig(context: NavigationContext): RouteConfig {
   );
   
   if (match) {
+    logger.category('navigation').debug('Route matched (starts with)', { 
+      path: currentPath, 
+      matched: match.path,
+      strategy: 'starts_with' 
+    });
     return applyDefaults(match);
   }
   
@@ -167,11 +184,21 @@ export function getRouteConfig(context: NavigationContext): RouteConfig {
     });
     
     if (match) {
+      logger.category('navigation').debug('Route matched (first segment)', { 
+        path: currentPath, 
+        matched: match.path,
+        strategy: 'first_segment',
+        firstSegment 
+      });
       return applyDefaults(match);
     }
   }
   
   // Strategy 4: Default fallback
+  logger.category('navigation').warn('Route not found, using default', { 
+    path: currentPath,
+    availableRoutes: ROUTE_CONFIGS.map(c => c.path)
+  });
   return applyDefaults({
     path: currentPath,
     title: 'D&D Toolkit',

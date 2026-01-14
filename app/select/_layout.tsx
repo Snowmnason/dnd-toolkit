@@ -11,7 +11,7 @@ export default function SelectLayout() {
   // Show minimal loading while guard resolves
   useEffect(() => {
     if (authState === 'unauthenticated') {
-      logger.debug('select-layout', 'Unauthenticated state');
+      logger.debug('navigation', 'Unauthenticated state');
     }
   }, [authState]);
 

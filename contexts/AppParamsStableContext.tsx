@@ -46,7 +46,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
           setStableParams(prev => ({ ...prev, connectedWorldIds: worldIds }));
         }
       } catch (error) {
-        logger.error('AppParamsStableContext', 'Error loading from storage:', error);
+        logger.error('other', 'Error loading from storage:', error);
       }
     }
     loadFromStorage();
@@ -59,7 +59,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
   const setConnectedWorldIds = useCallback((worldIds: string[]) => {
     setStableParams(prev => ({ ...prev, connectedWorldIds: worldIds }));
     void SecureStorage.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, worldIds).catch(error => {
-      logger.error('AppParamsStableContext', 'Failed to persist connected worlds cache', error);
+      logger.error('other', 'Failed to persist connected worlds cache', error);
     });
   }, []);
 
@@ -84,7 +84,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
   const clearAllParams = useCallback(() => {
     setStableParams({ userId: undefined, connectedWorldIds: [] });
     void SecureStorage.removeItem(STORAGE_KEYS.CONNECTED_WORLDS).catch(error => {
-      logger.error('AppParamsStableContext', 'Failed to clear connected worlds cache', error);
+      logger.error('other', 'Failed to clear connected worlds cache', error);
     });
   }, []);
 

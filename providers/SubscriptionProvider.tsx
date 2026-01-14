@@ -13,6 +13,7 @@
  */
 
 import { Subscription, SubscriptionManager } from '@/lib/premium';
+import { logger } from '@/lib/utils/logger';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 interface SubscriptionContextValue {
@@ -44,9 +45,14 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       try {
         // TODO: Replace with real backend fetch when implemented
         const sub = await SubscriptionManager.getSubscription();
+        if (sub) {
+          logger.category('analytics').debug('SubscriptionProvider: subscription loaded', { tier: sub.tier });
+        } else {
+          logger.category('analytics').debug('SubscriptionProvider: no subscription found (free tier)');
+        }
         setSubscription(sub);
       } catch (error) {
-        console.error('[SubscriptionProvider] Failed to load subscription:', error);
+        logger.category('analytics').error('SubscriptionProvider: failed to load subscription', { error: String(error) });
         // TODO: Set default/error state
       } finally {
         setIsLoading(false);
@@ -62,9 +68,10 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     try {
       // TODO: Replace with real backend refresh when implemented
       const sub = await SubscriptionManager.refresh();
+      logger.category('analytics').debug('SubscriptionProvider: subscription refreshed', { tier: sub?.tier });
       setSubscription(sub);
     } catch (error) {
-      console.error('[SubscriptionProvider] Failed to refresh subscription:', error);
+      logger.category('analytics').error('SubscriptionProvider: failed to refresh subscription', { error: String(error) });
       // TODO: Handle error state
     } finally {
       setIsLoading(false);

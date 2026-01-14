@@ -26,7 +26,7 @@ export interface UpdateUserData {
 export const usersDB = {
   // Create a new user profile (called after auth signup) with input validation
   async create(userData: CreateUserData): Promise<User> {
-    logger.info('usersDB', 'Starting user profile creation', {
+    logger.info('storage', 'Starting user profile creation', {
       auth_id: userData.auth_id,
       username: userData.username,
       usernameLength: userData.username?.length
@@ -35,21 +35,21 @@ export const usersDB = {
     // Validate and sanitize username if provided
     if (userData.username) {
       const usernameValidation = validateUsername(userData.username);
-      logger.debug('usersDB', 'Username validation result:', {
+      logger.debug('storage', 'Username validation result:', {
         isValid: usernameValidation.isValid,
         sanitized: usernameValidation.sanitized,
         original: userData.username
       });
       
       if (!usernameValidation.isValid) {
-        logger.error('usersDB', 'Username validation failed');
+        logger.error('storage', 'Username validation failed');
         throw new Error('Username contains invalid characters or format');
       }
       userData.username = usernameValidation.sanitized;
     }
     
     // Note: display_name removed from schema
-    logger.debug('usersDB', 'Inserting user data into database:', userData);
+    logger.debug('storage', 'Inserting user data into database:', userData);
 
     const { data, error } = await supabase
       .from('users')
@@ -58,7 +58,7 @@ export const usersDB = {
       .single();
     
     if (error) {
-      logger.error('usersDB', 'Database error during user creation:', {
+      logger.error('storage', 'Database error during user creation:', {
         message: error.message,
         code: error.code,
         details: error.details,
@@ -67,7 +67,7 @@ export const usersDB = {
       throw new Error(error.message || 'Failed to create user profile');
     }
     
-    logger.info('usersDB', 'User profile created successfully:', {
+    logger.info('storage', 'User profile created successfully:', {
       id: data.id,
       auth_id: data.auth_id,
       username: data.username,
@@ -79,7 +79,7 @@ export const usersDB = {
       const { AuthStateManager } = await import('../auth-state');
       await AuthStateManager.saveUserData(data);
     } catch (storageError) {
-      logger.warn('usersDB', 'Failed to save user data to storage (non-critical):', storageError);
+      logger.warn('storage', 'Failed to save user data to storage (non-critical):', storageError);
     }
     
     return data;
@@ -98,7 +98,7 @@ export const usersDB = {
 
   // Get current user's profile
   async getCurrentUser(): Promise<User | null> {
-    logger.debug('usersDB', 'Starting getCurrentUser');
+    logger.debug('storage', 'Starting getCurrentUser');
     
     // First, try to get from local storage to avoid DB call
     try {
@@ -106,7 +106,7 @@ export const usersDB = {
       const cachedUser = await AuthStateManager.getUserData();
       
       if (cachedUser) {
-        logger.debug('usersDB', 'User profile loaded from storage (avoiding DB call):', {
+        logger.debug('storage', 'User profile loaded from storage (avoiding DB call):', {
           id: cachedUser.id,
           username: cachedUser.username,
           isAdmin: cachedUser.isAdmin
@@ -114,33 +114,33 @@ export const usersDB = {
         return cachedUser;
       }
     } catch (storageError) {
-      logger.warn('usersDB', 'Could not load from storage, fetching from DB:', storageError);
+      logger.warn('storage', 'Could not load from storage, fetching from DB:', storageError);
     }
     
     // If not in storage, fetch from database
     // Use cached session instead of making network call (getUser)
     const { data: { session }, error: authError } = await supabase.auth.getSession();
     
-    logger.debug('usersDB', 'Auth session check result:', {
+    logger.debug('storage', 'Auth session check result:', {
       hasSession: !!session,
       userId: session?.user?.id,
       authError: authError?.message
     });
     
     if (authError) {
-      logger.error('usersDB', 'Auth error in getCurrentUser:', authError);
+      logger.error('storage', 'Auth error in getCurrentUser:', authError);
       throw new Error(authError.message || 'Authentication error');
     }
     
     if (!session?.user) {
-      logger.debug('usersDB', 'No authenticated user found (no session)');
+      logger.debug('storage', 'No authenticated user found (no session)');
       return null;
     }
     
     const authUser = session.user;
     const authId = authUser.id;
 
-    logger.debug('usersDB', 'Fetching user profile from database for auth_id:', authId);
+    logger.debug('storage', 'Fetching user profile from database for auth_id:', authId);
 
     // Use RequestManager to wrap database fetch
     // (storage-to-DB fallback is not deduplicated, only the DB call)
@@ -156,12 +156,12 @@ export const usersDB = {
         if (error) {
           if (error.code === 'PGRST116') {
             // This is expected for new users who haven't created a profile yet
-            logger.debug('usersDB', 'No profile exists yet for user - this is expected for new users');
+            logger.debug('storage', 'No profile exists yet for user - this is expected for new users');
             return null;
           }
           
           // Only log as error for unexpected database issues
-          logger.error('usersDB', 'Unexpected database error in getCurrentUser:', {
+          logger.error('storage', 'Unexpected database error in getCurrentUser:', {
             message: error.message,
             code: error.code,
             details: error.details,
@@ -184,13 +184,13 @@ export const usersDB = {
     if (!data) {
       // Note: null only means profile doesn't exist for new user (PGRST116 error).
       // RequestManager errors are thrown (failOpen defaults to false), not returned as null.
-      logger.debug('usersDB', 'User profile is null - new user without profile yet', {
+      logger.debug('storage', 'User profile is null - new user without profile yet', {
         userId: authId
       });
       return null;
     }
     
-    logger.info('usersDB', 'User profile fetched successfully:', {
+    logger.info('storage', 'User profile fetched successfully:', {
       id: data.id,
       auth_id: data.auth_id,
       username: data.username,
@@ -202,7 +202,7 @@ export const usersDB = {
       const { AuthStateManager } = await import('../auth-state');
       await AuthStateManager.saveUserData(data);
     } catch (storageError) {
-      logger.warn('usersDB', 'Failed to save user data to storage (non-critical):', storageError);
+      logger.warn('storage', 'Failed to save user data to storage (non-critical):', storageError);
     }
     
     return data;
@@ -232,7 +232,7 @@ export const usersDB = {
       .single();
     
     if (error) {
-      logger.error('users', 'Error updating user profile:', error);
+      logger.error('storage', 'Error updating user profile:', error);
       throw new Error(error.message || 'Failed to update user profile');
     }
     
@@ -241,7 +241,7 @@ export const usersDB = {
       const { AuthStateManager } = await import('../auth-state');
       await AuthStateManager.saveUserData(data);
     } catch (storageError) {
-      logger.warn('usersDB', 'Failed to save updated user data to storage (non-critical):', storageError);
+      logger.warn('storage', 'Failed to save updated user data to storage (non-critical):', storageError);
     }
     
     return data;
@@ -257,7 +257,7 @@ export const usersDB = {
     // call your Edge Function by name (no URL needed, no body needed)
     const { data, error: fnError } = await supabase.functions.invoke('delete-account');
     if (fnError) throw new Error(fnError.message || 'Failed to delete account');
-    logger.debug('users', 'Account deletion function response:', data);
+    logger.debug('storage', 'Account deletion function response:', data);
     return true;
   }
 

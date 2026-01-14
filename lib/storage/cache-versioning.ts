@@ -119,15 +119,16 @@ export async function handleCacheMigration<T = any>(
 
   // No migration path available
   if (!result.shouldMigrate || !schema.migrate) {
-    logger.warn('cache-versioning', 'Cache reset required:', {
+    logger.category('storage').warn('Cache reset required', {
       reason: result.reason,
       oldVersion: result.oldVersion,
+      currentVersion: result.currentVersion,
     });
     return null;
   }
 
   try {
-    logger.info('cache-versioning', 'Attempting cache migration:', {
+    logger.category('storage').info('Attempting cache migration', {
       from: result.oldVersion,
       to: result.currentVersion,
       reason: result.reason,
@@ -141,14 +142,21 @@ export async function handleCacheMigration<T = any>(
     const migratedData = schema.migrate(dataToMigrate, result.oldVersion || 0);
 
     if (migratedData === null) {
-      logger.info('cache-versioning', 'Migration returned null, cache will be reset');
+      logger.category('storage').warn('Cache migration returned null, resetting');
       return null;
     }
 
-    logger.info('cache-versioning', 'Cache migration successful');
+    logger.category('storage').info('Cache migration successful', {
+      from: result.oldVersion,
+      to: result.currentVersion,
+    });
     return migratedData;
   } catch (error) {
-    logger.error('cache-versioning', 'Cache migration failed, resetting:', error);
+    logger.category('storage').error('Cache migration failed, resetting', { 
+      error: String(error),
+      from: result.oldVersion,
+      to: result.currentVersion,
+    });
     return null;
   }
 }

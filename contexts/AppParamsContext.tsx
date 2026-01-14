@@ -42,36 +42,62 @@ export function AppParamsProvider({ children }: { children: ReactNode }) {
         const userId = await AuthStateManager.getUserId();
         if (userId) {
           setParams(prev => ({ ...prev, userId }));
-          logger.debug('AppParamsContext', 'Loaded userId from storage:', userId);
+          logger.debug('other', 'Loaded userId from storage:', userId);
         }
 
         // Load connected worlds cache from SecureStorage
         const worldIds = await SecureStorage.getJSON<string[]>(STORAGE_KEYS.CONNECTED_WORLDS);
         if (worldIds && Array.isArray(worldIds)) {
           setParams(prev => ({ ...prev, connectedWorldIds: worldIds }));
-          logger.debug('AppParamsContext', 'Loaded connected worlds from SecureStorage:', worldIds);
+          logger.debug('other', 'Loaded connected worlds from SecureStorage:', worldIds);
         }
       } catch (error) {
-        logger.error('AppParamsContext', 'Error loading from storage:', error);
+        logger.error('other', 'Error loading from storage:', error);
       }
     }
     loadFromStorage();
   }, []);
 
   const setUserId = useCallback((userId: string | undefined) => {
-    setParams(prev => ({ ...prev, userId }));
+    setParams(prev => {
+      if (prev.userId !== userId) {
+        logger.category('ui').debug('AppParams: userId changed', { from: prev.userId, to: userId });
+      }
+      return { ...prev, userId };
+    });
   }, []);
 
   const setWorldId = useCallback((worldId: string | undefined) => {
-    setParams(prev => ({ ...prev, worldId }));
+    setParams(prev => {
+      if (prev.worldId !== worldId) {
+        logger.category('ui').debug('AppParams: worldId changed', { from: prev.worldId, to: worldId });
+      }
+      return { ...prev, worldId };
+    });
   }, []);
 
   const setUserRole = useCallback((userRole: string | undefined) => {
-    setParams(prev => ({ ...prev, userRole }));
+    setParams(prev => {
+      if (prev.userRole !== userRole) {
+        logger.category('ui').debug('AppParams: userRole changed', { from: prev.userRole, to: userRole });
+      }
+      return { ...prev, userRole };
+    });
   }, []);
 
   const updateParams = useCallback((newParams: Partial<AppParams>) => {
-    setParams(prev => ({ ...prev, ...newParams }));
+    setParams(prev => {
+      const changed: string[] = [];
+      Object.keys(newParams).forEach(key => {
+        if (prev[key as keyof AppParams] !== newParams[key as keyof AppParams]) {
+          changed.push(key);
+        }
+      });
+      if (changed.length > 0) {
+        logger.category('ui').debug('AppParams: batch update', { changedKeys: changed, newValues: newParams });
+      }
+      return { ...prev, ...newParams };
+    });
   }, []);
 
   const clearWorldParams = useCallback(() => {
@@ -81,16 +107,16 @@ export function AppParamsProvider({ children }: { children: ReactNode }) {
   const clearAllParams = useCallback(() => {
     setParams({ userId: undefined, worldId: undefined, userRole: undefined, connectedWorldIds: [] });
     void SecureStorage.removeItem(STORAGE_KEYS.CONNECTED_WORLDS).catch(error => {
-      logger.error('AppParamsContext', 'Failed to clear connected worlds cache', error);
+      logger.error('other', 'Failed to clear connected worlds cache', error);
     });
   }, []);
 
   const setConnectedWorldIds = useCallback((worldIds: string[]) => {
     setParams(prev => ({ ...prev, connectedWorldIds: worldIds }));
     void SecureStorage.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, worldIds).catch(error => {
-      logger.error('AppParamsContext', 'Failed to persist connected worlds cache', error);
+      logger.error('other', 'Failed to persist connected worlds cache', error);
     });
-    logger.debug('AppParamsContext', 'Updated connected worlds cache:', worldIds);
+    logger.debug('other', 'Updated connected worlds cache:', worldIds);
   }, []);
 
   const addConnectedWorld = useCallback((worldId: string) => {
@@ -111,9 +137,9 @@ export function AppParamsProvider({ children }: { children: ReactNode }) {
     if (!added || !updatedWorldIds) return;
 
     void SecureStorage.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, updatedWorldIds).catch(error => {
-      logger.error('AppParamsContext', 'Failed to persist added world cache', error);
+      logger.error('other', 'Failed to persist added world cache', error);
     });
-    logger.debug('AppParamsContext', 'Added world to cache:', worldId);
+    logger.debug('other', 'Added world to cache:', worldId);
   }, []);
 
   const removeConnectedWorld = useCallback((worldId: string) => {
@@ -134,9 +160,9 @@ export function AppParamsProvider({ children }: { children: ReactNode }) {
     if (!removed || !updatedWorldIds) return;
 
     void SecureStorage.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, updatedWorldIds).catch(error => {
-      logger.error('AppParamsContext', 'Failed to persist removed world cache', error);
+      logger.error('other', 'Failed to persist removed world cache', error);
     });
-    logger.debug('AppParamsContext', 'Removed world from cache:', worldId);
+    logger.debug('other', 'Removed world from cache:', worldId);
   }, []);
 
   const hasAccessToWorld = useCallback((worldId: string) => {

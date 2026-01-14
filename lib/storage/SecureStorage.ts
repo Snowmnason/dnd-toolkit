@@ -33,7 +33,7 @@ class SecureStorageService {
       this.initialized = true;
       return this.encryptedStorage;
     } catch (error) {
-      logger.error('Failed to load EncryptedStorage', error);
+      logger.error('storage', 'Failed to load EncryptedStorage', error);
       throw new Error('SecureStorage initialization failed');
     }
   }
@@ -45,9 +45,9 @@ class SecureStorageService {
     try {
       const storage = await this.getStorage();
       await storage.setItem(key, value);
-      logger.debug(`SecureStorage.setItem: ${key}`);
+      logger.category('storage').debug('Item stored', { key, length: value.length });
     } catch (error) {
-      logger.error(`SecureStorage.setItem failed for key: ${key}`, error);
+      logger.category('storage').error('setItem failed', { key, error });
       throw error;
     }
   }
@@ -60,10 +60,14 @@ class SecureStorageService {
     try {
       const storage = await this.getStorage();
       const value = await storage.getItem(key);
-      logger.debug(`SecureStorage.getItem: ${key} -> ${value ? 'found' : 'not found'}`);
+      logger.category('storage').debug('Item retrieved', { 
+        key, 
+        found: !!value,
+        length: value?.length || 0 
+      });
       return value;
     } catch (error) {
-      logger.warn(`SecureStorage.getItem failed for key: ${key}`, error);
+      logger.category('storage').warn('getItem failed', { key, error });
       return null;
     }
   }
@@ -75,7 +79,7 @@ class SecureStorageService {
     try {
       const storage = await this.getStorage();
       await storage.removeItem(key);
-      logger.debug(`SecureStorage.removeItem: ${key}`);
+      logger.category('storage').debug('Item removed', { key });
     } catch (error) {
       logger.error(`SecureStorage.removeItem failed for key: ${key}`, error);
       throw error;
@@ -89,7 +93,7 @@ class SecureStorageService {
     try {
       const storage = await this.getStorage();
       await storage.clear();
-      logger.warn('SecureStorage.clear: All storage cleared');
+      logger.category('storage').warn('All storage cleared');
     } catch (error) {
       logger.error('SecureStorage.clear failed', error);
       throw error;

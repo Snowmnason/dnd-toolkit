@@ -37,12 +37,12 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       
       if (savedTheme && isValidThemeName(savedTheme)) {
         setThemeName(savedTheme as ThemeFamilyName);
-        logger.info('ThemeProvider', `Loaded saved theme: ${savedTheme}`);
+        logger.info('ui', `Loaded saved theme: ${savedTheme}`);
       } else {
-        logger.info('ThemeProvider', 'No saved theme, using default: classic');
+        logger.info('ui', 'No saved theme, using default: classic');
       }
     } catch (error) {
-      logger.error('ThemeProvider', 'Failed to load saved theme:', error);
+      logger.error('ui', 'Failed to load saved theme:', error);
     } finally {
       setIsLoading(false);
     }
@@ -51,16 +51,16 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const saveTheme = async (newTheme: ThemeFamilyName) => {
     try {
       await AsyncStorage.setItem(THEME_STORAGE_KEY, newTheme);
-      logger.success('ThemeProvider', `Saved theme: ${newTheme}`);
+      logger.success('ui', `Saved theme: ${newTheme}`);
     } catch (error) {
-      logger.error('ThemeProvider', 'Failed to save theme:', error);
+      logger.error('ui', 'Failed to save theme:', error);
     }
   };
 
   const handleSetTheme = useCallback((newTheme: ThemeFamilyName) => {
     setThemeName(newTheme);
     saveTheme(newTheme);
-    logger.info('ThemeProvider', `Theme changed to: ${newTheme}`);
+    logger.info('ui', `Theme changed to: ${newTheme}`);
   }, []);
 
   const theme = getThemeFamily(themeName);

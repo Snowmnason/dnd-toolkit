@@ -1,9 +1,7 @@
 import "@expo/metro-runtime";
 import { App } from "expo-router/build/qualified-entry";
 import { renderRootComponent } from "expo-router/build/renderRootComponent";
-import React from "react";
 import { Platform } from "react-native";
-import { logger } from "./lib/utils/logger";
 
 // Ensure the initial page background is dark immediately on web to avoid white flash
 if (Platform.OS === "web") {

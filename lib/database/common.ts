@@ -31,29 +31,29 @@ export async function getCurrentUserProfile(forceRefresh = false): Promise<User 
         // Check if cache is still fresh (up to 4 hours old)
         const isFresh = await AuthStateManager.isCacheFresh();
         if (isFresh) {
-          logger.debug('db-common', 'User profile loaded from fresh cache');
+          logger.debug('storage', 'User profile loaded from fresh cache');
           return cachedUser;
         }
         // Cache is stale, but don't throw - just fetch fresh
-        logger.debug('db-common', 'Cache expired, fetching fresh data');
+        logger.debug('storage', 'Cache expired, fetching fresh data');
       }
     } catch {
-      logger.debug('db-common', 'Cache access failed, fetching from session');
+      logger.debug('storage', 'Cache access failed, fetching from session');
     }
   } else {
-    logger.debug('db-common', 'Force refresh requested, skipping cache');
+    logger.debug('storage', 'Force refresh requested, skipping cache');
   }
 
   // Step 2: Check cached session (no network call, but may be stale)
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
   
   if (sessionError) {
-    logger.error('db-common', 'Session error:', sessionError);
+    logger.error('storage', 'Session error:', sessionError);
     return null;
   }
   
   if (!session || !session.user) {
-    logger.debug('db-common', 'No active session');
+    logger.debug('storage', 'No active session');
     return null;
   }
 
@@ -67,12 +67,12 @@ export async function getCurrentUserProfile(forceRefresh = false): Promise<User 
     .single();
 
   if (dbError) {
-    logger.error('db-common', 'Error fetching user profile:', dbError);
+    logger.error('storage', 'Error fetching user profile:', dbError);
     throw new Error(dbError.message || 'Failed to fetch user profile');
   }
 
   if (!userProfile) {
-    logger.error('db-common', 'User profile not found for auth_id:', authUserId);
+    logger.error('storage', 'User profile not found for auth_id:', authUserId);
     throw new Error('User profile not found');
   }
 
@@ -80,7 +80,7 @@ export async function getCurrentUserProfile(forceRefresh = false): Promise<User 
   try {
     await AuthStateManager.saveUserData(userProfile);
   } catch (error) {
-    logger.warn('db-common', 'Failed to update cache (non-critical):', error);
+    logger.warn('storage', 'Failed to update cache (non-critical):', error);
   }
 
   return userProfile;
@@ -132,7 +132,7 @@ export async function validateCurrentUser(): Promise<{ auth_id: string; email: s
   const { data: { user }, error } = await supabase.auth.getUser();
   
   if (error || !user) {
-    logger.debug('db-common', 'User validation failed:', error?.message);
+    logger.debug('storage', 'User validation failed:', error?.message);
     return null;
   }
   
@@ -182,7 +182,7 @@ export async function validateUserForWrite(): Promise<User> {
     .single();
   
   if (error || !userProfile) {
-    logger.error('db-common', 'User profile not found during write validation:', error);
+    logger.error('storage', 'User profile not found during write validation:', error);
     throw new Error('User profile not found - cannot perform write operation');
   }
   
@@ -190,7 +190,7 @@ export async function validateUserForWrite(): Promise<User> {
   try {
     await AuthStateManager.saveUserData(userProfile);
   } catch (cacheError) {
-    logger.warn('db-common', 'Failed to update cache after write validation (non-critical):', cacheError);
+    logger.warn('storage', 'Failed to update cache after write validation (non-critical):', cacheError);
   }
   
   return userProfile;
@@ -223,12 +223,12 @@ export function querySucceeded<T>(result: { data: T | null; error: any }): resul
  */
 export function extractData<T>(result: { data: T | null; error: any }, context: string): T {
   if (result.error) {
-    logger.error('db-common', `${context}:`, result.error);
+    logger.error('storage', `${context}:`, result.error);
     throw new Error(result.error.message || `${context} failed`);
   }
   
   if (result.data === null) {
-    logger.error('db-common', `${context}: No data returned`);
+    logger.error('storage', `${context}: No data returned`);
     throw new Error(`${context}: No data returned`);
   }
   
