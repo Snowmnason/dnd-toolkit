@@ -73,12 +73,12 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
   const isPremium = subscription?.tier === 'premium';
 
-  const value: SubscriptionContextValue = {
+  const value: SubscriptionContextValue = React.useMemo(() => ({
     subscription,
     isLoading,
     isPremium,
     refresh,
-  };
+  }), [subscription, isLoading, isPremium, refresh]);
 
   return (
     <SubscriptionContext.Provider value={value}>

@@ -6,7 +6,7 @@ import { ThemeContext, ThemeContextType } from '@/contexts/ThemeContext';
 import { logger } from '@/lib/utils/logger';
 import { ThemeFamilyName, allThemes, getThemeFamily } from '@/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ReactNode, useEffect, useState } from 'react';
+import React, { ReactNode, useEffect, useState } from 'react';
 
 const THEME_STORAGE_KEY = '@dnd_toolkit_theme';
 
@@ -65,12 +65,12 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
   const theme = getThemeFamily(themeName);
 
-  const contextValue: ThemeContextType = {
+  const contextValue: ThemeContextType = React.useMemo(() => ({
     theme,
     themeName,
     setTheme: handleSetTheme,
     isDark: (theme as any).isDark ?? true,
-  };
+  }), [theme, themeName, handleSetTheme]);
 
   // Show nothing while loading theme (prevents flash of wrong theme)
   if (isLoading) {

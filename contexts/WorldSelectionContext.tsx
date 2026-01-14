@@ -20,12 +20,14 @@ export function WorldSelectionProvider({ children }: { children: React.ReactNode
     return false; // Let default back behavior happen
   };
 
+  const value = React.useMemo(() => ({
+    selectedWorld,
+    setSelectedWorld,
+    handleBackPress,
+  }), [selectedWorld, setSelectedWorld]);
+
   return (
-    <WorldSelectionContext.Provider value={{
-      selectedWorld,
-      setSelectedWorld,
-      handleBackPress,
-    }}>
+    <WorldSelectionContext.Provider value={value}>
       {children}
     </WorldSelectionContext.Provider>
   );

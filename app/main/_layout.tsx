@@ -1,4 +1,4 @@
-import { useAppParams } from '@/contexts/AppParamsContext'
+import { useAppParamsStable } from '@/contexts/AppParamsStableContext'
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
 import { logger } from '@/lib/utils/logger'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
@@ -9,7 +9,7 @@ import { BottomTabBar } from '../../Screens/main-panels/BottomTabBar'
 export default function MainLayout() {
   const router = useRouter()
   const params = useLocalSearchParams()
-  const { hasAccessToWorld, params: appParams } = useAppParams()
+  const { hasAccessToWorld, stableParams } = useAppParamsStable()
   const [activeTab, setActiveTab] = useState('characters')
   const { width } = useWindowDimensions()
   const isMobile = Platform.OS !== 'web' || width < 900
@@ -22,7 +22,7 @@ export default function MainLayout() {
   // Validate world access on mount and when worldId changes
   useEffect(() => {
     const urlWorldId = typeof params.worldId === 'string' ? params.worldId : undefined
-    const cacheIsPopulated = appParams.connectedWorldIds.length > 0
+    const cacheIsPopulated = stableParams.connectedWorldIds.length > 0
 
     // Skip validation if cache not loaded yet
     if (!cacheIsPopulated) return
@@ -42,7 +42,7 @@ export default function MainLayout() {
       router.replace(target as any)
       return
     }
-  }, [params.worldId, appParams.connectedWorldIds, hasAccessToWorld, router])
+  }, [params.worldId, stableParams.connectedWorldIds, hasAccessToWorld, router])
 
   // Update active tab from URL params
   useEffect(() => {

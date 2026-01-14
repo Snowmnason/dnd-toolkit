@@ -2,7 +2,8 @@ import { logger } from '@/lib';
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers';
 import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { useAppParams } from '../contexts/AppParamsContext';
+import { useUserId } from '../contexts/AppParamsStableContext';
+import { useWorldId, useUserRole, useAppParamsVolatile } from '../contexts/AppParamsVolatileContext';
 
 /**
  * Custom hook for navigation that automatically manages the centralized params context
@@ -10,7 +11,10 @@ import { useAppParams } from '../contexts/AppParamsContext';
  */
 export function useAppNavigation() {
   const router = useRouter();
-  const { params, updateParams } = useAppParams();
+  const userId = useUserId();
+  const worldId = useWorldId();
+  const userRole = useUserRole();
+  const { updateVolatileParams } = useAppParamsVolatile();
 
   /**
    * Navigate with automatic params management and route validation
@@ -28,16 +32,16 @@ export function useAppNavigation() {
         // Build navigation target with proper param preservation
         const target = buildNavigationTarget(
           pathname,
-          { worldId: params.worldId, userRole: params.userRole, ...additionalParams },
+          { worldId, userRole, ...additionalParams },
           ['worldId', 'userRole'],
           additionalParams || {}
         );
 
         // Update context if requested
         if (updateContext) {
-          updateParams({
-            worldId: params.worldId,
-            userRole: params.userRole,
+          updateVolatileParams({
+            worldId,
+            userRole,
             ...additionalParams,
           });
         }
@@ -47,7 +51,7 @@ export function useAppNavigation() {
         logger.warn(`useAppNavigation: Failed to navigate to ${pathname}`, error);
       }
     },
-    [router, params.worldId, params.userRole, updateParams]
+    [router, worldId, userRole, updateVolatileParams]
   );
 
   /**
@@ -63,16 +67,16 @@ export function useAppNavigation() {
         // Build navigation target with proper param preservation
         const target = buildNavigationTarget(
           pathname,
-          { worldId: params.worldId, userRole: params.userRole, ...additionalParams },
+          { worldId, userRole, ...additionalParams },
           ['worldId', 'userRole'],
           additionalParams || {}
         );
 
         // Update context if requested
         if (updateContext) {
-          updateParams({
-            worldId: params.worldId,
-            userRole: params.userRole,
+          updateVolatileParams({
+            worldId,
+            userRole,
             ...additionalParams,
           });
         }
@@ -82,7 +86,7 @@ export function useAppNavigation() {
         logger.warn(`useAppNavigation: Failed to replace route ${pathname}`, error);
       }
     },
-    [router, params.worldId, params.userRole, updateParams]
+    [router, worldId, userRole, updateVolatileParams]
   );
 
   /**
@@ -97,19 +101,19 @@ export function useAppNavigation() {
 
       const target = buildNavigationTarget(
         fallbackPath,
-        { worldId: params.worldId, userRole: params.userRole },
+        { worldId, userRole },
         ['worldId', 'userRole']
       );
       router.replace(target as any);
     },
-    [router, params]
+    [router, worldId, userRole]
   );
 
   return {
     navigateWithParams,
     replaceWithParams,
     goBack,
-    params,
+    params: { userId, worldId, userRole },
     router,
   };
 }

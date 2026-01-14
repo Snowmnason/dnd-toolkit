@@ -59,12 +59,12 @@ export function PlatformProvider({ children }: PlatformProviderProps) {
   const isMobile = isMobileState !== null ? isMobileState : rawIsMobile
   const isDesktop = !isMobile && width >= DESKTOP_BREAKPOINT
 
-  const value: PlatformContextType = {
+  const value: PlatformContextType = React.useMemo(() => ({
     isMobile,
     isDesktop,
     width,
     height,
-  }
+  }), [isMobile, isDesktop, width, height])
 
   return <PlatformContext.Provider value={value}>{children}</PlatformContext.Provider>
 }

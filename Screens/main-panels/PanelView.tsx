@@ -1,6 +1,6 @@
 import { AppPage, Button, Heading } from '@/components/ui'
 import { getShadowStyle } from '@/components/ui/Resuables/shadows'
-import { useAppParams } from '@/contexts/AppParamsContext'
+import { useAppParamsVolatile } from '@/contexts/AppParamsVolatileContext'
 import { usePlatform } from '@/contexts/PlatformContext'
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
 import { $, useScale } from '@/theme'
@@ -28,12 +28,12 @@ export function PanelView({
 }: PanelViewProps) {
   const router = useRouter()
   const S = useScale()
-  const { updateParams } = useAppParams()
+  const { updateVolatileParams } = useAppParamsVolatile()
   // Centralized platform detection
   const { isDesktop } = usePlatform()
 
   const navigateToFeature = (featurePath: string) => {
-    updateParams({ worldId, userRole })
+    updateVolatileParams({ worldId, userRole })
 
     const target = buildNavigationTarget(
       `/main/${featurePath}`,
