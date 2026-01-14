@@ -92,6 +92,21 @@ const bumpVersion = (version, type) => {
 
 const main = async () => {
   try {
+    // Check if the current commit is a doc-only change
+    let lastCommitMessage = '';
+    try {
+      lastCommitMessage = execSync('git log -1 --pretty=%B', { encoding: 'utf-8' }).trim();
+    } catch {
+      // If we can't get commit message, continue with version bump prompt
+    }
+
+    // If commit starts with "doc:", skip version bump
+    if (lastCommitMessage.startsWith('doc:')) {
+      console.log(`\n📚 Doc-only commit detected: "${lastCommitMessage}"\n`);
+      console.log(`⏭️  Skipping version bump for documentation changes.\n`);
+      process.exit(0);
+    }
+
     // Prompt user for change type
     const answer = await question(
       '🔍 What type of change?\n' +
