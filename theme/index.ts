@@ -19,7 +19,7 @@ export { useScale } from '@/providers/ScaleProvider'
 
 /**
  * ⚡ Preload all theme assets (fonts, async color maps, etc.)
- * Optional: call once during bootstrap.
+ * Runs in background after bootstrap - non-blocking
  */
 export async function preloadThemes() {
   try {

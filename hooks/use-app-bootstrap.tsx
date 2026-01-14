@@ -3,6 +3,7 @@ import * as Font from "expo-font";
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { logger } from "../lib/utils/logger";
+import { injectWebFonts } from "../lib/utils/web-font-loader";
 
 // Bootstrap configuration
 const BOOTSTRAP_LOGS = true; // Enable logs for production debugging - helps diagnose bootstrap issues
@@ -71,9 +72,14 @@ export function useAppBootstrap() {
         await loadFonts();
         metrics.fonts = Date.now() - fontsStart;
 
+        // Load themes in background (non-blocking)
         const themesStart = Date.now();
-        await preloadThemes();
-        metrics.themes = Date.now() - themesStart;
+        preloadThemes().then(() => {
+          metrics.themes = Date.now() - themesStart;
+          blog.debug("bootstrap", `✅ Themes preloaded in background (${metrics.themes}ms)`);
+        }).catch((err) => {
+          blog.warn("bootstrap", "Background theme preload failed:", err);
+        });
 
         const platformStart = Date.now();
         await loadPlatformAssets();
@@ -85,7 +91,8 @@ export function useAppBootstrap() {
         logger.category('performance').info('Bootstrap completed', {
           totalTime: bootstrapTime,
           breakdown: metrics,
-          platform: Platform.OS
+          platform: Platform.OS,
+          note: 'themes loaded in background'
         });
 
         // Warn on slow bootstrap
@@ -155,10 +162,15 @@ export function useAppBootstrap() {
 }
 
 async function loadFonts() {
-  // On web, skip custom font loading during bootstrap - they'll be loaded when needed
-  // This prevents CORS/network issues from blocking the app
+  // On web, inject fonts.css which defines @font-face rules for all custom fonts
   if (Platform.OS === "web") {
-    blog.debug("bootstrap", "🌐 Skipping font preload on web (loaded on-demand)");
+    try {
+      await injectWebFonts();
+      blog.debug("bootstrap", "🌐 Web fonts stylesheet injected");
+    } catch (error) {
+      blog.warn("bootstrap", "⚠️ Failed to inject web fonts:", error);
+      // Non-critical, app can continue
+    }
     return;
   }
   
