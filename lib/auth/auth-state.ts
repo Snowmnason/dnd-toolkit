@@ -170,7 +170,7 @@ export const AuthStateManager = {
   },
 
   // ==========================================
-  // 🔓 LOGOUT - Clear all auth state
+  // 🌍 WORLD ACCESS VERIFICATION - Lazy verification with cache-first approach
   // ==========================================
   async logout(): Promise<void> {
     try {
@@ -208,7 +208,7 @@ export const AuthStateManager = {
   },
 
   // ==========================================
-  // 🔐 WORLD ACCESS VERIFICATION - Lazy verification with cache-first approach
+  // � VERIFY WORLD ACCESS - Cache-first verification with Supabase fallback
   // ==========================================
   /**
    * Verify world access against cache first, then Supabase for stale cache
@@ -370,7 +370,7 @@ export const AuthStateManager = {
   },
 
   // ==========================================
-  // 🔓 LOGOUT - Clear all auth state
+  // 🧭 ROUTING DECISION - Determine where to send user
   // ==========================================
   async getRoutingDecision(): Promise<{ routingDecision: 'welcome' | 'login' | 'main' | 'complete-profile'; profileId: string | null }> {
     try {

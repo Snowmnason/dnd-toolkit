@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { RequestManager } from '../api/request-manager';
-import { SecureStorage, STORAGE_KEYS } from '../storage';
+import { SecureStorage } from '../storage';
 import { worldsDB, WorldWithAccess } from '../database/worlds';
 import { logger } from '../utils/logger';
 

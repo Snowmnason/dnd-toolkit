@@ -53,11 +53,11 @@ export default function AuthRedirect() {
   const [showAlreadyMemberModal, setShowAlreadyMemberModal] = useState(false);
   const [worldName, setWorldName] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const lastProcessedRef = useRef<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
+  const lastProcessedRef = useRef<string | undefined>(undefined);
 
   // Helper function to get current user ID (checks storage first)
-  const getCurrentUserId = async (): Promise<string | null> => {
+  const getCurrentUserId = async (): Promise<string | undefined> => {
     try {
       // Try storage first
       const userId = await AuthStateManager.getUserId();
@@ -68,10 +68,10 @@ export default function AuthRedirect() {
       
       // Fallback to database
       const userProfile = await usersDB.getCurrentUser();
-      return userProfile?.id || null;
+      return userProfile?.id || undefined;
     } catch (error) {
       logger.error('auth-redirect', 'Error fetching user ID:', error);
-      return null;
+      return undefined;
     }
   };
 
@@ -140,7 +140,6 @@ export default function AuthRedirect() {
           } else {
             // Not in storage, fetch from database
             userProfile = await usersDB.getCurrentUser();
-            userId = userProfile?.id || undefined;
           }
           
           if (userProfile) {

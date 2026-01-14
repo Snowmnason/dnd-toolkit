@@ -80,6 +80,9 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
                   verified: verifiedWorldIds.length
                 });
                 
+                // Persist verified list to storage
+                await SecureStorage.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, verifiedWorldIds);
+                
                 setStableParams(prev => ({
                   ...prev,
                   connectedWorldIds: verifiedWorldIds

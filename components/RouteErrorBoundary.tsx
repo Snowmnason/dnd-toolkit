@@ -110,8 +110,8 @@ function ErrorFallback({ error, fallbackRoute }: ErrorFallbackProps) {
   const showDetailedErrors = config.overrides?.verboseErrorMessages ?? process.env.NODE_ENV === 'development';
 
   const handleRecover = () => {
-    // Always redirect to welcome screen (/) to avoid redirect loops
-    router.replace('/' as any);
+    // Redirect to fallbackRoute (provided by parent or defaults to safe route)
+    router.replace(fallbackRoute as any);
   };
     // Pick a random fun message
   const funMessage = useMemo(
