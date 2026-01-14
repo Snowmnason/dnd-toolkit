@@ -87,15 +87,13 @@ class NetworkDetectionClass {
       try {
         
         //TODO install these packages if using native network detection
-        // eslint-disable-next-line import/no-unresolved
-        module = await import('@react-native-community/net-info');
+        //module = await import('@react-native-community/net-info');
       } catch {
         // Try expo-network instead
         try {
           
           //TODO install these packages if using native network detection
-          // eslint-disable-next-line import/no-unresolved
-          module = await import('expo-network');
+          //module = await import('expo-network');
         } catch {
           // Neither package available - return null
           return null;

@@ -74,6 +74,10 @@ const DEFAULT_OPTIONS: Required<RequestOptions> = {
   failOpen: false,
   timeout: 30000,
   rateLimitKey: '',
+  useQueryCache: false,
+  staleTime: 0,
+  cacheTime: 5 * 60 * 1000, // 5 minutes
+  tags: [],
 };
 
 // Rate limiting: token bucket algorithm

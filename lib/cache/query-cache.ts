@@ -89,7 +89,7 @@ class QueryCacheClass {
       }
 
       if (!entry) {
-        return undefined;
+        return null;
       }
 
       // Check if cache is expired (beyond cacheTime)
