@@ -5,8 +5,8 @@ import { AppErrorBoundary, getRouteConfig, resolveBackTarget, resolveTitle } fro
 import { Analytics, sessionManager } from '@/lib/analytics';
 import { getAppConfig } from '@/lib/config/loader';
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers';
-import { logger } from '@/lib/utils/logger';
 import { lazyLoadInBackground } from '@/lib/utils/lazy-imports';
+import { logger } from '@/lib/utils/logger';
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ThemeProvider, UseTheme } from "@/theme";
