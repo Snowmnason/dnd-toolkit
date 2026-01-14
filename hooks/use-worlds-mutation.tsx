@@ -25,7 +25,7 @@ import { worldsDB, World, CreateWorldData } from '@/lib/database/worlds';
  */
 export function useCreateWorldMutation() {
   const { mutate, data, error, isLoading } = useMutation<World, CreateWorldData>(
-    (variables) => worldsDB.create(variables),
+    (variables: any) => worldsDB.create(variables as CreateWorldData),
     {
       invalidateTags: ['worlds'],
     },
@@ -35,7 +35,7 @@ export function useCreateWorldMutation() {
     mutate,
     world: data ?? null,
     isLoading,
-    error: error?.message ?? null,
+    error: (error as any)?.message ?? null,
   };
 }
 
@@ -57,7 +57,7 @@ export function useUpdateWorldMutation() {
     World,
     { worldId: string; updates: Partial<CreateWorldData> }
   >(
-    (variables) => worldsDB.update(variables.worldId, variables.updates),
+    (variables: any) => worldsDB.update((variables as any).worldId, (variables as any).updates),
     {
       invalidateTags: ['worlds'],
     },
@@ -67,7 +67,7 @@ export function useUpdateWorldMutation() {
     mutate,
     world: data ?? null,
     isLoading,
-    error: error?.message ?? null,
+    error: (error as any)?.message ?? null,
   };
 }
 
@@ -83,7 +83,7 @@ export function useUpdateWorldMutation() {
  */
 export function useDeleteWorldMutation() {
   const { mutate, error, isLoading } = useMutation<void, { worldId: string }>(
-    (variables) => worldsDB.delete(variables.worldId),
+    (variables: any) => worldsDB.delete((variables as any).worldId),
     {
       invalidateTags: ['worlds'],
     },
@@ -92,6 +92,6 @@ export function useDeleteWorldMutation() {
   return {
     mutate,
     isLoading,
-    error: error?.message ?? null,
+    error: (error as any)?.message ?? null,
   };
 }

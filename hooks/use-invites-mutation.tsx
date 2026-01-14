@@ -37,9 +37,9 @@ export function useCreateInviteLinkMutation() {
     { success: boolean; inviteLink?: InviteLink; error?: string },
     { worldId: string; hoursValid?: number }
   >(
-    (variables) => createInviteLink(variables),
+    (variables: any) => createInviteLink(variables as Parameters<typeof createInviteLink>[0]),
     {
-      invalidatePatterns: [(worldId) => new RegExp(`^world:.*:invites`)],
+      invalidateTags: ['invites'],
     },
   );
 
@@ -47,7 +47,7 @@ export function useCreateInviteLinkMutation() {
     mutate,
     result: data ?? null,
     isLoading,
-    error: error?.message ?? null,
+    error: (error as any)?.message ?? null,
   };
 }
 
@@ -71,13 +71,13 @@ export function useValidateInviteTokenMutation() {
     { success: boolean; worldId?: string; error?: string },
     { token: string }
   >(
-    (variables) => validateInviteToken(variables.token),
+    (variables: any) => validateInviteToken((variables as any).token),
   );
 
   return {
     mutate,
     result: data ?? null,
     isLoading,
-    error: error?.message ?? null,
+    error: (error as any)?.message ?? null,
   };
 }

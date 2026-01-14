@@ -78,7 +78,7 @@ class QueryCacheClass {
       // If not in memory, try FastCache
       if (!entry) {
         const storageKey = this.toCacheKey(key);
-        entry = await FastCache.getJSON<CacheEntry<T>>(storageKey);
+        const retrieved = await FastCache.getJSON<CacheEntry<T>>(storageKey);
         if (retrieved) {
           entry = retrieved;
           // Restore to in-memory cache
@@ -87,7 +87,7 @@ class QueryCacheClass {
       }
 
       if (!entry) {
-        return null;
+        return undefined;
       }
 
       // Check if cache is expired (beyond cacheTime)
