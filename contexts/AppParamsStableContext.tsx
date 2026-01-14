@@ -1,7 +1,8 @@
-import { logger } from '@/lib/utils/logger';
 import { AuthStateManager } from '@/lib/auth-state';
 import { SecureStorage, STORAGE_KEYS } from '@/lib/storage';
+import { logger } from '@/lib/utils/logger';
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { useContextSelector } from 'use-context-selector';
 
 interface AppParamsStable {
   userId?: string;
@@ -19,6 +20,11 @@ interface AppParamsStableContextType {
 }
 
 const AppParamsStableContext = createContext<AppParamsStableContextType | undefined>(undefined);
+// Separate context for data to enable true selectors
+const AppParamsStableDataContext = createContext<AppParamsStable>({
+  userId: undefined,
+  connectedWorldIds: [],
+});
 
 export function AppParamsStableProvider({ children }: { children: ReactNode }) {
   const [stableParams, setStableParams] = useState<AppParamsStable>({
@@ -84,7 +90,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
 
   const hasAccessToWorld = useCallback((worldId: string) => {
     return stableParams.connectedWorldIds.includes(worldId);
-  }, [stableParams.connectedWorldIds]);
+  }, []);
 
   const contextValue = React.useMemo(() => ({
     stableParams,
@@ -94,12 +100,14 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     removeConnectedWorld,
     hasAccessToWorld,
     clearAllParams,
-  }), [stableParams, setUserId, setConnectedWorldIds, addConnectedWorld, removeConnectedWorld, hasAccessToWorld, clearAllParams]);
+  }), [setUserId, setConnectedWorldIds, addConnectedWorld, removeConnectedWorld, hasAccessToWorld, clearAllParams]);
 
   return (
-    <AppParamsStableContext.Provider value={contextValue}>
-      {children}
-    </AppParamsStableContext.Provider>
+    <AppParamsStableDataContext.Provider value={stableParams}>
+      <AppParamsStableContext.Provider value={contextValue}>
+        {children}
+      </AppParamsStableContext.Provider>
+    </AppParamsStableDataContext.Provider>
   );
 }
 
@@ -111,11 +119,12 @@ export function useAppParamsStable() {
   return context;
 }
 
-// Selector hooks
+// Selector hooks - using useContextSelector for true selectors
+// ✅ These now only re-render when their specific selected value changes
 export function useUserId() {
-  return useAppParamsStable().stableParams.userId;
+  return useContextSelector(AppParamsStableDataContext, (value) => value.userId);
 }
 
 export function useConnectedWorlds() {
-  return useAppParamsStable().stableParams.connectedWorldIds;
+  return useContextSelector(AppParamsStableDataContext, (value) => value.connectedWorldIds);
 }

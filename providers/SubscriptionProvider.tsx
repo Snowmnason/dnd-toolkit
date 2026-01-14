@@ -13,7 +13,7 @@
  */
 
 import { Subscription, SubscriptionManager } from '@/lib/premium';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 interface SubscriptionContextValue {
   subscription: Subscription | null;
@@ -57,7 +57,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   }, []);
 
   // STUB: Placeholder refresh (currently does nothing)
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setIsLoading(true);
     try {
       // TODO: Replace with real backend refresh when implemented
@@ -69,7 +69,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   const isPremium = subscription?.tier === 'premium';
 
