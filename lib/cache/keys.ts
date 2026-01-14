@@ -14,6 +14,7 @@
 export const CACHE_KEYS = {
   // World queries
   worlds: {
+    list: (userId?: string) => userId ? `worlds:user:${userId}` : 'worlds:list',
     all: 'worlds:list',
     owned: 'worlds:list:owned',
     forUser: (userId: string) => `worlds:user:${userId}`,

@@ -1,43 +1,35 @@
-import { useCallback, useEffect, useState } from 'react';
-import { RequestManager } from '../api/request-manager';
-import { SecureStorage } from '../storage';
+import { useCallback, useState } from 'react';
+import { useQuery } from '../cache/use-query';
 import { worldsDB, WorldWithAccess } from '../database/worlds';
+import { SecureStorage } from '../storage';
 import { logger } from '../utils/logger';
+import { CACHE_KEYS, CACHE_TAGS, CACHE_CONFIG } from '../cache/keys';
 
 /**
- * Custom hook for managing world data and state
- * Provides loading, error handling, and retry functionality
- * @param userId - Optional user ID for optimization. If not provided, uses current auth user
- * @param onWorldsLoaded - Optional callback to update parent context with loaded world IDs
+ * Hook for managing world data with SWR (Stale-While-Revalidate) pattern
+ * 
+ * Features:
+ * - Returns cached worlds immediately
+ * - Background revalidation while stale
+ * - Automatic invalidation on mutations
+ * - Loading/error handling
+ * 
+ * @param userId - Optional user ID. If not provided, uses current auth user
+ * @param onWorldsLoaded - Optional callback when worlds are loaded
  */
 export function useWorlds(userId?: string, onWorldsLoaded?: (worldIds: string[]) => void) {
   const [selectedWorld, setSelectedWorld] = useState<WorldWithAccess | null>(null);
-  const [worlds, setWorlds] = useState<WorldWithAccess[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const loadWorlds = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      // Use RequestManager as a centralized layer for:
-      // - Deduplicating concurrent world list requests
-      // - Retrying on transient failures with exponential backoff
-      // - Rate limiting per user to prevent flooding (only when userId is available)
-      const userWorlds = await RequestManager.fetch(
-        `worlds:user:${userId || 'current'}`,
-        () => worldsDB.getMyWorlds(userId),
-        {
-          dedupe: true,                        // Deduplicate concurrent requests
-          retries: 3,                          // Retry 3 times on failure
-          retryDelay: 1000,                    // Start with 1 second delay
-          // Only apply rate limiting when userId is explicitly provided to avoid
-          // lumping all unauthenticated/current-user requests into one bucket
-          rateLimitKey: userId ? `user:${userId}:worlds` : undefined,
-          timeout: 30000                       // 30 second timeout
-        }
-      );
-      setWorlds(userWorlds ?? []);
+  // Use QueryCache with SWR pattern for worlds fetching
+  const { 
+    data: worlds = [], 
+    isLoading, 
+    error, 
+    refetch 
+  } = useQuery<WorldWithAccess[]>(
+    CACHE_KEYS.worlds.list(userId || 'current'),
+    async () => {
+      const userWorlds = await worldsDB.getMyWorlds(userId);
       
       // Update world access cache for all loaded worlds
       // These worlds are confirmed accessible since they came from the server's getMyWorlds()
@@ -52,35 +44,31 @@ export function useWorlds(userId?: string, onWorldsLoaded?: (worldIds: string[])
           });
         }
       }
-      
-      // Notify parent if callback provided (parent will update context)
+
+      // Notify parent if callback provided
       if (onWorldsLoaded) {
         const worldIds = userWorlds?.map(w => w.world_id) ?? [];
         onWorldsLoaded(worldIds);
       }
-    } catch (err) {
-      logger.error('storage', 'Error loading worlds:', err);
-      setError('Failed to load worlds. Please try again.');
-    } finally {
-      setIsLoading(false);
+
+      return userWorlds;
+    },
+    {
+      ...CACHE_CONFIG.metadata,  // Default: staleTime 2h, cacheTime 4h
+      tags: [CACHE_TAGS.worlds, CACHE_TAGS.user(userId || 'current')],
+      onError: (err) => {
+        logger.error('cache', 'Error loading worlds:', err);
+      }
     }
-  }, [userId, onWorldsLoaded]); // Include userId and onWorldsLoaded since they're used in the callback
+  );
 
-  // Load worlds on mount
-  useEffect(() => {
-    loadWorlds();
-  }, [loadWorlds]);
+  // Format error message
+  const errorMessage = error ? 'Failed to load worlds. Please try again.' : null;
 
-  // Retry function for error recovery
+  // Retry function for error recovery (calls refetch)
   const retry = useCallback(() => {
-    setError(null);
-    loadWorlds();
-  }, [loadWorlds]);
-
-  // Refetch function for manual refresh
-  const refetch = useCallback(() => {
-    loadWorlds();
-  }, [loadWorlds]);
+    refetch();
+  }, [refetch]);
 
   return {
     // State
@@ -88,11 +76,10 @@ export function useWorlds(userId?: string, onWorldsLoaded?: (worldIds: string[])
     setSelectedWorld,
     worlds,
     isLoading,
-    error,
+    error: errorMessage,
     
     // Actions
     retry,
-    refetch,
-    loadWorlds
+    refetch
   };
 }
