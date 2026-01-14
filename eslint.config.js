@@ -40,4 +40,13 @@ module.exports = defineConfig([
       'security/detect-unsafe-regex': 'error',
     },
   },
+  // FastCache layer: allowed to use localStorage directly for performance (unencrypted query cache)
+  {
+    files: ['lib/storage/FastCache.ts'],
+    rules: {
+      'no-restricted-globals': 'off',
+    },
+  },
 ]);
+
+

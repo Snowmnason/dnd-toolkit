@@ -1,6 +1,7 @@
 import { RequestManager } from '../api/request-manager';
 import { validateUsername } from '../auth/validation';
 import { logger } from '../utils/logger';
+import { QueryCache } from '../cache';
 import { validateCurrentUser, validateUserForWrite } from './common';
 import { supabase } from './supabase';
 
@@ -235,6 +236,9 @@ export const usersDB = {
       logger.error('storage', 'Error updating user profile:', error);
       throw new Error(error.message || 'Failed to update user profile');
     }
+
+    // Invalidate user profile cache
+    await QueryCache.invalidateByTags(['users', `user:${data.id}`]);
     
     // Save updated user data to local storage
     try {

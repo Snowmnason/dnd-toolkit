@@ -1,5 +1,7 @@
 import { RequestManager } from '../api/request-manager';
 import { logger } from '../utils/logger';
+import { QueryCache } from '../cache';
+import { CACHE_KEYS, CACHE_TAGS } from '../cache/keys';
 import { executeParallelQueries, getCurrentUserProfile, validateUserForWrite } from './common';
 import { supabase } from './supabase';
 
@@ -82,6 +84,12 @@ export const worldsDB = {
       ownerId: currentUser.id,
       name: data.name
     });
+
+    // Invalidate world lists cache (notify all subscribers)
+    await QueryCache.invalidateByTags([
+      CACHE_TAGS.worlds,
+      CACHE_TAGS.user(currentUser.id)
+    ]);
     
     return data;
   },
@@ -223,6 +231,12 @@ export const worldsDB = {
       logger.error('storage', 'Error updating world:', error);
       throw new Error(error.message || 'Failed to update world');
     }
+
+    // Invalidate specific world and lists cache
+    await QueryCache.invalidateByTags([
+      CACHE_TAGS.worlds,
+      CACHE_TAGS.world(worldId)
+    ]);
     
     return data;
   },
@@ -246,6 +260,12 @@ export const worldsDB = {
       logger.error('storage', 'Error updating world:', error);
       throw new Error(error.message || 'Failed to update world');
     }
+
+    // Invalidate specific world and lists cache
+    await QueryCache.invalidateByTags([
+      CACHE_TAGS.worlds,
+      CACHE_TAGS.world(worldId)
+    ]);
     
     return data;
   },
@@ -265,9 +285,15 @@ export const worldsDB = {
       logger.error('storage', 'Error deleting world:', error);
       throw new Error(error.message || 'Failed to delete world');
     }
+
+    // Invalidate specific world and lists cache
+    await QueryCache.invalidateByTags([
+      CACHE_TAGS.worlds,
+      CACHE_TAGS.world(worldId)
+    ]);
   },
 
-    // Remove user from world
+  // Remove user from world
   async removeUserFromWorld(worldId: string, userId: string): Promise<void> {
     const { error } = await supabase
       .from('world_access')
@@ -279,6 +305,12 @@ export const worldsDB = {
       logger.error('storage', 'Error removing user from world:', error);
       throw new Error(error.message || 'Failed to remove user from world');
     }
+
+    // Invalidate world members and user's worlds cache
+    await QueryCache.invalidateByTags([
+      CACHE_TAGS.worldMembers(worldId),
+      CACHE_TAGS.user(userId)
+    ]);
   },
 
   // Check if user is already in a world (either as owner or member)
@@ -339,6 +371,13 @@ export const worldsDB = {
       logger.error('storage', 'Error adding user to world:', error);
       throw new Error(error.message || 'Failed to add user to world');
     }
+
+    // Invalidate world members and user's worlds cache
+    await QueryCache.invalidateByTags([
+      CACHE_TAGS.worldMembers(worldId),
+      CACHE_TAGS.user(userId),
+      CACHE_TAGS.worlds
+    ]);
 
     return data;
   },

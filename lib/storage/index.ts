@@ -21,6 +21,26 @@
  */
 
 export { SecureStorage } from './SecureStorage';
+export { FastCache } from './FastCache';
+export {
+  classifyStorageError,
+  isStorageError,
+  logStorageError,
+  shouldServeFallbackOnStorageError,
+  handleStorageErrorGracefully,
+  safeStorageGet,
+  safeStorageSet,
+  safeStorageRemove,
+  safeStorageGetJSON,
+  safeStorageSetJSON,
+  batchStorageOperation,
+  checkStorageHealth,
+  type StorageOperation,
+  type StorageErrorInfo,
+  type StorageGracefulResult,
+  type StorageOperationOptions,
+  type BatchStorageResult,
+} from './storage-error-handling';
 
 /**
  * Storage Keys

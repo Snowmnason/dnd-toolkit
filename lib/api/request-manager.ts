@@ -1,12 +1,14 @@
 import * as Sentry from '@sentry/react-native';
 import { Analytics, sanitizeError as sanitizeErrorForAnalytics } from '../analytics';
 import { logger } from '../utils/logger';
+import { QueryCache } from '../cache';
 
 /**
  * Request Manager: Centralized API request layer with:
  * - Request deduplication (avoid duplicate in-flight requests)
  * - Retry logic with exponential backoff
  * - Optional rate limiting (token bucket)
+ * - Optional QueryCache integration for data persistence
  * - Fail-open flag (graceful degradation when offline/disabled)
  * - Sentry error reporting
  * - Extension point for future offline buffering
@@ -34,6 +36,20 @@ export interface RequestOptions {
   
   /** Timeout in ms for the request (default: 30000) */
   timeout?: number;
+
+  // ===== QueryCache Integration Options =====
+  
+  /** Use QueryCache for data persistence (default: false) */
+  useQueryCache?: boolean;
+  
+  /** Stale time for QueryCache (only used if useQueryCache is true) */
+  staleTime?: number;
+  
+  /** Cache time for QueryCache (only used if useQueryCache is true) */
+  cacheTime?: number;
+  
+  /** Tags for QueryCache invalidation (only used if useQueryCache is true) */
+  tags?: string[];
 }
 
 interface PendingRequest {
@@ -58,6 +74,10 @@ const DEFAULT_OPTIONS: Required<RequestOptions> = {
   failOpen: false,
   timeout: 30000,
   rateLimitKey: '',
+  useQueryCache: false,
+  staleTime: 2 * 60 * 1000, // 2 minutes - align with typical server-side cache TTL
+  cacheTime: 5 * 60 * 1000, // 5 minutes
+  tags: [],
 };
 
 // Rate limiting: token bucket algorithm
@@ -165,11 +185,11 @@ class RequestManagerClass {
   }
 
   /**
-   * Execute a request with optional dedupe, retry, and rate limiting
+   * Execute a request with optional dedupe, retry, rate limiting, and QueryCache
    * 
    * @param key - Unique key for deduplication (should be deterministic)
    * @param fetcher - Async function that performs the actual request
-   * @param options - Request options (dedupe, retries, failOpen, etc.)
+   * @param options - Request options (dedupe, retries, failOpen, useQueryCache, etc.)
    * @returns The result of the fetcher function
    * 
    * @example
@@ -177,7 +197,13 @@ class RequestManagerClass {
    * const worlds = await RequestManager.fetch(
    *   `worlds:user:${userId}`,
    *   () => worldsDB.getMyWorlds(userId),
-   *   { dedupe: true, rateLimitKey: `user:${userId}` }
+   *   { 
+   *     dedupe: true, 
+   *     rateLimitKey: `user:${userId}`,
+   *     useQueryCache: true,
+   *     staleTime: 2 * 60 * 60 * 1000, // 2 hours
+   *     tags: ['worlds', `user:${userId}`]
+   *   }
    * );
    * ```
    */
@@ -189,6 +215,28 @@ class RequestManagerClass {
     const options_ = { ...DEFAULT_OPTIONS, ...options };
     const startedAt = Date.now();
     const trackingEnabled = Analytics.enabled();
+
+    // ========== QueryCache CHECK (Optional) ==========
+    // If useQueryCache is enabled, check cache first before dedupe/retry logic
+    if (options_.useQueryCache) {
+      try {
+        const cached = await QueryCache.get<T>(key);
+        if (cached !== undefined && cached !== null) {
+          const isStale = await QueryCache.isStale(key);
+          if (!isStale) {
+            // Cache hit and not stale - return immediately
+            logger.debug('api', 'QueryCache hit (not stale):', { key });
+            Analytics.track('api_request', { key, ok: true, source: 'cache_hit', duration_ms: 0 });
+            return cached;
+          }
+          // Cache stale - fall through to fetch, but return cached data while fetching
+          logger.debug('api', 'QueryCache stale (will revalidate in background):', { key });
+        }
+      } catch (error) {
+        logger.warn('api', 'QueryCache read error:', { key, error });
+        // Continue with normal fetch if cache read fails
+      }
+    }
 
     const attachTracking = (p: Promise<T>, started: number): Promise<T> => {
       if (!trackingEnabled) return p;
@@ -257,10 +305,44 @@ class RequestManagerClass {
 
       const trackedPromise = attachTracking(promise, startedAt);
 
+      // ========== QueryCache PERSISTENCE (Optional) ==========
+      // If useQueryCache is enabled, persist successful results to cache
+      let cachePersistedPromise = trackedPromise;
+      if (options_.useQueryCache) {
+        cachePersistedPromise = trackedPromise.then(
+          async (result: T) => {
+            try {
+              // Capture version at request start for race condition prevention
+              const versionAtStart = QueryCache.getCurrentVersion();
+              
+              await QueryCache.set(
+                key,
+                result,
+                {
+                  staleTime: options_.staleTime,
+                  cacheTime: options_.cacheTime,
+                  tags: options_.tags,
+                },
+                versionAtStart
+              );
+              logger.debug('api', 'Persisted to QueryCache:', { key });
+            } catch (error) {
+              logger.warn('api', 'QueryCache persistence failed:', { key, error });
+              // Don't throw - cache persistence failure shouldn't break the request
+            }
+            return result;
+          },
+          // On error, just rethrow - don't try to cache errors
+          (error) => {
+            throw error;
+          }
+        );
+      }
+
       // ========== TRACK PENDING REQUEST ==========
       if (options_.dedupe) {
         this.pendingRequests.set(key, {
-          promise: trackedPromise,
+          promise: cachePersistedPromise,
           timestamp: startedAt,
         });
 
@@ -271,7 +353,7 @@ class RequestManagerClass {
         // The second .catch() handles rare cases where the cleanup operation itself
         // might fail (e.g., if the Map is corrupted). These errors are logged for
         // debugging but don't affect the main request result.
-        trackedPromise.then(
+        cachePersistedPromise.then(
           () => this.pendingRequests.delete(key),
           () => this.pendingRequests.delete(key)
         ).catch((cleanupError) => {
@@ -281,7 +363,7 @@ class RequestManagerClass {
         });
       }
 
-      return trackedPromise;
+      return cachePersistedPromise;
     } catch (error) {
       logger.error('request-manager', 'Request failed:', { key, error });
 
