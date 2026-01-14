@@ -88,22 +88,33 @@ export function useQuery<T>(
   const isInitialFetchRef = useRef(true);
   // Track unsubscribe function
   const unsubscribeRef = useRef<(() => void) | null>(null);
+  // Track version when request started (for race condition prevention)
+  const requestVersionRef = useRef<number>(QueryCache.getCurrentVersion());
 
   const revalidate = async () => {
     if (disabled) return;
 
     try {
       setIsValidating(true);
+      // Capture version at start of request
+      const versionAtStart = QueryCache.getCurrentVersion();
+      
       const freshData = await fetcher(key);
 
       if (!isMountedRef.current) return;
 
-      // Store in cache
-      await QueryCache.set(key, freshData, {
-        staleTime,
-        cacheTime,
-        tags,
-      });
+      // Store in cache with version - if invalidation occurred during fetch,
+      // the set will be rejected and data won't be cached
+      await QueryCache.set(
+        key,
+        freshData,
+        {
+          staleTime,
+          cacheTime,
+          tags,
+        },
+        versionAtStart // Pass version for race condition prevention
+      );
 
       setData(freshData);
       setError(undefined);
@@ -135,6 +146,8 @@ export function useQuery<T>(
   useEffect(() => {
     isMountedRef.current = true;
     isInitialFetchRef.current = true;
+    // Capture version at effect start for race condition prevention
+    requestVersionRef.current = QueryCache.getCurrentVersion();
 
     const loadData = async () => {
       if (disabled) {

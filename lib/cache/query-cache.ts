@@ -22,6 +22,7 @@ export interface CacheEntry<T = any> {
   staleTime: number; // How long until stale (ms)
   cacheTime: number; // How long to keep in cache (ms)
   tags?: string[]; // Tags for invalidation
+  version?: number; // Version number for race condition prevention
 }
 
 export interface CacheOptions {
@@ -57,6 +58,7 @@ class QueryCacheClass {
   private inMemoryCache: Map<string, CacheEntry> = new Map();
   private subscribers: Map<string, Set<CacheSubscriber>> = new Map();
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
+  private globalVersion: number = 0;
 
   constructor() {
     this.startCleanupTimer();
@@ -107,15 +109,37 @@ class QueryCacheClass {
 
   /**
    * Set cached data for a query key
+   * 
+   * @param key - Cache key
+   * @param data - Data to cache
+   * @param options - Cache options (staleTime, cacheTime, tags, version)
+   * @param requestVersion - Optional version from when request started.
+   *                         If provided and is less than current globalVersion,
+   *                         the set is rejected (invalidation occurred during request)
    */
-  async set<T>(key: string, data: T, options: CacheOptions = {}): Promise<void> {
+  async set<T>(
+    key: string,
+    data: T,
+    options: CacheOptions = {},
+    requestVersion?: number
+  ): Promise<void> {
     try {
+      // Race condition prevention: Check if invalidation happened during request
+      if (requestVersion !== undefined && requestVersion < this.globalVersion) {
+        logger.debug('cache', `Stale version for ${key}, discarding result`, {
+          requestVersion,
+          currentVersion: this.globalVersion,
+        });
+        return; // Don't cache stale data
+      }
+
       const entry: CacheEntry<T> = {
         data,
         timestamp: Date.now(),
         staleTime: options.staleTime ?? this.config.defaultStaleTime,
         cacheTime: options.cacheTime ?? this.config.defaultCacheTime,
         tags: options.tags,
+        version: this.globalVersion,
       };
 
       // Store in memory
@@ -136,6 +160,7 @@ class QueryCacheClass {
       logger.debug('cache', `Cached data for key: ${key}`, {
         tags: entry.tags,
         staleTime: entry.staleTime,
+        version: entry.version,
       });
     } catch (error) {
       logger.error('cache', `Error setting cache for ${key}:`, error);
@@ -192,11 +217,25 @@ class QueryCacheClass {
   // ==========================================
 
   /**
+   * Get the current global version number
+   * Used by queries to detect if invalidation occurred during their request
+   */
+  getCurrentVersion(): number {
+    return this.globalVersion;
+  }
+
+  /**
    * Invalidate cache entries by tags
    * Example: invalidateByTags(['worlds', 'user:123'])
+   * 
+   * Side effect: Increments global version to prevent stale writes
+   * from in-flight requests
    */
   async invalidateByTags(tags: string[]): Promise<void> {
     try {
+      // Bump version to invalidate in-flight requests
+      this.globalVersion++;
+
       const keysToInvalidate: string[] = [];
 
       for (const [key, entry] of this.inMemoryCache.entries()) {
@@ -207,7 +246,10 @@ class QueryCacheClass {
 
       await Promise.all(keysToInvalidate.map(key => this.remove(key)));
 
-      logger.info('cache', `Invalidated ${keysToInvalidate.length} entries by tags`, { tags });
+      logger.info('cache', `Invalidated ${keysToInvalidate.length} entries by tags`, {
+        tags,
+        newVersion: this.globalVersion,
+      });
     } catch (error) {
       logger.error('cache', 'Error invalidating by tags:', error);
     }
@@ -216,9 +258,15 @@ class QueryCacheClass {
   /**
    * Invalidate cache entries by pattern (regex or string)
    * Example: invalidate(/^worlds:/) or invalidate('worlds:user:123')
+   * 
+   * Side effect: Increments global version to prevent stale writes
+   * from in-flight requests
    */
   async invalidate(pattern: string | RegExp): Promise<void> {
     try {
+      // Bump version to invalidate in-flight requests
+      this.globalVersion++;
+
       let regex: RegExp;
       if (typeof pattern === 'string') {
         regex = new RegExp(`^${pattern}`);
@@ -237,6 +285,7 @@ class QueryCacheClass {
 
       logger.info('cache', `Invalidated ${keysToInvalidate.length} entries by pattern`, {
         pattern: pattern.toString(),
+        newVersion: this.globalVersion,
       });
     } catch (error) {
       logger.error('cache', 'Error invalidating by pattern:', error);
