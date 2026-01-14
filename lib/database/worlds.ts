@@ -1,5 +1,6 @@
 import { RequestManager } from '../api/request-manager';
 import { logger } from '../utils/logger';
+import { QueryCache } from '../cache';
 import { executeParallelQueries, getCurrentUserProfile, validateUserForWrite } from './common';
 import { supabase } from './supabase';
 
@@ -82,6 +83,9 @@ export const worldsDB = {
       ownerId: currentUser.id,
       name: data.name
     });
+
+    // Invalidate world lists cache
+    await QueryCache.invalidateByTags(['worlds', `user:${currentUser.id}`]);
     
     return data;
   },
@@ -223,6 +227,10 @@ export const worldsDB = {
       logger.error('storage', 'Error updating world:', error);
       throw new Error(error.message || 'Failed to update world');
     }
+
+    // Invalidate specific world and lists cache
+    await QueryCache.invalidate(`world:${worldId}:*`);
+    await QueryCache.invalidateByTags(['worlds']);
     
     return data;
   },
@@ -246,6 +254,10 @@ export const worldsDB = {
       logger.error('storage', 'Error updating world:', error);
       throw new Error(error.message || 'Failed to update world');
     }
+
+    // Invalidate specific world and lists cache
+    await QueryCache.invalidate(`world:${worldId}:*`);
+    await QueryCache.invalidateByTags(['worlds']);
     
     return data;
   },
@@ -265,6 +277,10 @@ export const worldsDB = {
       logger.error('storage', 'Error deleting world:', error);
       throw new Error(error.message || 'Failed to delete world');
     }
+
+    // Invalidate specific world and lists cache
+    await QueryCache.invalidate(`world:${worldId}:*`);
+    await QueryCache.invalidateByTags(['worlds']);
   },
 
     // Remove user from world
@@ -279,6 +295,11 @@ export const worldsDB = {
       logger.error('storage', 'Error removing user from world:', error);
       throw new Error(error.message || 'Failed to remove user from world');
     }
+
+    // Invalidate world members and user's worlds cache
+    await QueryCache.invalidate(`world:${worldId}:members`);
+    await QueryCache.invalidate(`user:${userId}:worlds`);
+    await QueryCache.invalidateByTags(['worlds']);
   },
 
   // Check if user is already in a world (either as owner or member)

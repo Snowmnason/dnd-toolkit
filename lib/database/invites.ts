@@ -1,4 +1,5 @@
 import { logger } from '../utils/logger';
+import { QueryCache } from '../cache';
 import { supabase } from './supabase';
 import { validateUserForWrite } from './common';
 import { RequestManager } from '../api/request-manager';
@@ -66,6 +67,9 @@ export async function createInviteLink(
     }
 
     logger.success(`Invite link created with token: ${data.token}`);
+
+    // Invalidate invite links cache for this world
+    await QueryCache.invalidate(`world:${worldId}:invites`);
     
     return { 
       success: true, 

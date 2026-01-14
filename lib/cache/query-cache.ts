@@ -1,4 +1,4 @@
-import { SecureStorage } from '../storage';
+import { FastCache } from '../storage';
 import { logger } from '../utils/logger';
 
 /**
@@ -75,10 +75,10 @@ class QueryCacheClass {
       // Check in-memory cache first (fast)
       let entry = this.inMemoryCache.get(key) as CacheEntry<T> | undefined;
 
-      // If not in memory, try SecureStorage
+      // If not in memory, try FastCache
       if (!entry) {
         const storageKey = this.toCacheKey(key);
-        const retrieved = await SecureStorage.getJSON<CacheEntry<T>>(storageKey);
+        entry = await FastCache.getJSON<CacheEntry<T>>(storageKey);
         if (retrieved) {
           entry = retrieved;
           // Restore to in-memory cache
@@ -121,9 +121,9 @@ class QueryCacheClass {
       // Store in memory
       this.inMemoryCache.set(key, entry);
 
-      // Persist to SecureStorage (encrypted)
+      // Persist to FastCache (unencrypted, fast)
       const storageKey = this.toCacheKey(key);
-      await SecureStorage.setJSON(storageKey, entry);
+      await FastCache.setJSON(storageKey, entry);
 
       // Enforce max entries limit
       if (this.inMemoryCache.size > this.config.maxEntries) {
@@ -161,7 +161,7 @@ class QueryCacheClass {
     try {
       this.inMemoryCache.delete(key);
       const storageKey = this.toCacheKey(key);
-      await SecureStorage.removeItem(storageKey);
+      await FastCache.removeItem(storageKey);
       logger.debug('cache', `Removed cache for key: ${key}`);
     } catch (error) {
       logger.error('cache', `Error removing cache for ${key}:`, error);
@@ -176,9 +176,9 @@ class QueryCacheClass {
       const keys = Array.from(this.inMemoryCache.keys());
       this.inMemoryCache.clear();
       
-      // Remove from SecureStorage
+      // Remove from FastCache
       await Promise.all(
-        keys.map(key => SecureStorage.removeItem(this.toCacheKey(key)))
+        keys.map(key => FastCache.removeItem(this.toCacheKey(key)))
       );
       
       logger.info('cache', 'Cleared all query cache');

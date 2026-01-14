@@ -21,6 +21,7 @@
  */
 
 export { SecureStorage } from './SecureStorage';
+export { FastCache } from './FastCache';
 
 /**
  * Storage Keys
