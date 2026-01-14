@@ -4,11 +4,11 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 
 ## Big picture
 - App type: React Native + Expo Router (web, iOS, Android). Entry at `index.tsx`; routing/layout in `app/_layout.tsx`.
-- Root providers: `ThemeProvider` → `ScaleProvider` → `PlatformProvider` → `AppParamsProvider` (see `app/_layout.tsx`). Don’t move or reorder these casually.
+- Root providers: `ThemeProvider` → `ScaleProvider` → `PlatformProvider` → `AppParamsStableProvider` + `AppParamsVolatileProvider` (see `app/_layout.tsx`). Don't move or reorder these casually.
 - Bootstrap flow: `hooks/use-app-bootstrap.tsx` preloads fonts/images/themes and restores Supabase session. UI waits on `bootstrap.isReady`.
 - Auth: `lib/auth/auth-state.ts` (`AuthStateManager`) provides authentication checks and world access verification. `lib/auth/useAuthGuard.ts` is the primary hook for protecting routes with tiered levels ('account-only', 'world-required'). Supabase is dynamically imported and guarded by `isSupabaseConfigured()` to support GH Pages/no-env scenarios. See `docs/implem guide.md` **Phase 6** for complete auth architecture.
-- Navigation: Centralized in `lib/navigation/navigation-config.ts`. Each route's TopBar, back button, params, modals, and redirects are defined declaratively. Use `getRouteConfig(context)` instead of inline switch/case. See `docs\issues\MileStone 1\024 - Navigation\NAVIGATION_CONFIG.md`.
-- Route params: Expo Router segments (`useSegments()`) + URL params merged into `AppParamsContext` (worldId/userRole).
+- Navigation: Centralized in `lib/navigation/navigation-config.ts`. Each route's TopBar, back button, params, modals, and redirects are defined declaratively. Use `getRouteConfig(context)` instead of inline switch/case. See `docs/issues/MileStone 1/107 - Updated Nav/NAVIGATION_CONFIG.md`.
+- Route params: Expo Router segments (`useSegments()`) + URL params merged into split contexts (`AppParamsStableContext` for userId/connectedWorlds, `AppParamsVolatileContext` for worldId/userRole). Use selector hooks (`useWorldId()`, `useUserId()`, `useConnectedWorlds()`, `useUserRole()`) instead of full context consumers to minimize re-renders.
 
 ## UI system
 - Components live in `components/ui` and are exported via `components/ui/index.ts` (barrel). Import only from this barrel.
@@ -34,6 +34,8 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 - **Auth/Guards**: Use `useAuthGuard(bootstrapReady, level)` in protected `_layout.tsx` files with level='account-only' (needs auth) or 'world-required' (needs auth + world access). Use `AuthStateManager.isAuthenticated()` for runtime checks. See `docs/implem guide.md` Phase 3 for guard patterns.
 - **World Access Verification**: `verifyWorldAccessWithDatabase(worldId)` implements cache-first verification (fresh <2h = instant, stale 2-4h = Supabase check). Use `forceVerification: true` option for sensitive pages (settings). See `docs/implem guide.md` Phase 4 for verification flow.
 - **Storage**: Use `SecureStorage` from `@/lib/storage` for all persistent app data. All data is encrypted via AES-CTR on all platforms (web, iOS, Android, desktop). Never use direct `localStorage`, `sessionStorage`, or `EncryptedStorage`—always go through `SecureStorage`. Use `STORAGE_KEYS` constants, never hardcode keys. See `docs/issues/MileStone 1/082 - Central Storage/` for API docs and patterns.
+- **Query Cache**: Use `QueryCache` from `@/lib/cache` for in-memory caching of API responses. Follow hierarchical key naming (`domain:entity:action:identifier`). Use tags for invalidation. See `docs/issues/MileStone 1/101 - Query Cache/CACHE_STRATEGY.md`.
+- **Context Optimization**: Use granular selector hooks (`useWorldId()`, `useUserId()`, etc.) instead of consuming full contexts. This prevents unnecessary re-renders. See `docs/issues/MileStone 1/100 - Context Optimization/USAGE_GUIDE.md`.
 
 ## Cache Versioning
 - **Version Updates**: Increment `CURRENT_CACHE_VERSION` in `lib/storage/cache-versioning.ts` when making breaking changes to stored data structures
@@ -41,6 +43,12 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 - **Non-Breaking**: Optional fields with defaults, performance improvements, bug fixes, cosmetic changes
 - **Process**: Update schema validation → update migration function → increment version → test migration
 - **Location**: `lib/storage/cache-versioning.ts` (core logic), `docs/issues/MileStone 1/098 - Cache Versioning/CACHE_VERSIONING.md` (docs)
+
+## Logger System
+- Use category-based logging: `logger.category('auth').info('message')` or `logger.info('auth', 'message')`
+- Categories: `auth`, `navigation`, `api`, `performance`, `storage`, `ui`, `analytics`, `security`, `bootstrap`, `error`, `other`
+- Configure categories in `config/appsettings.*.json` under `featureFlags.loggerCategories`
+- See `docs/issues/MileStone 1/108 - Improve Logger System with Categories and Filtering/LOGGER_SYSTEM.md`
 
 ## Patterns and examples
 - Import UI components:
@@ -77,3 +85,6 @@ When creating feature documentation:
 - Focus on feature functionality and usage, not implementation history or design decisions
 - Omit benefits/why statements (assume reader knows why the feature exists)
 - Include code examples, API reference, troubleshooting, and best practices
+
+## Milestone Overview
+For a comprehensive overview of all Milestone 1 implementations, see `docs/issues/MileStone 1/MILESTONE_1_OVERVIEW.md`. This document summarizes all features, architectural changes, and provides quick links to detailed documentation.

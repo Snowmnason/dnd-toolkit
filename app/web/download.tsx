@@ -1,5 +1,5 @@
 import { SmartDownloadButton } from '@/components/SmartDownloadButton'
-import { AppPage, AppText, Body, Caption, Heading, Surface, Title } from '@/components/ui'
+import { AppPage, Body, Caption, Heading, Surface, Title } from '@/components/ui'
 import { usePlatform } from '@/contexts/PlatformContext'
 import { useScale } from '@/theme'
 import { useEffect, useState } from 'react'
@@ -94,23 +94,23 @@ export default function DownloadScreen() {
             <Heading style={{ marginBottom: S.space.md }}>Why Download?</Heading>
             <View style={{ gap: S.space.sm }}>
               <View style={{ flexDirection: 'row', gap: S.space.md }}>
-                <AppText style={{ fontSize: 20 }}>⚡</AppText>
+                <Body style={{ fontSize: 20 }}>⚡</Body>
                 <Body textType="secondary" style={{ flex: 1 }}>
-                  <AppText style={{ fontWeight: '600' }}>Faster Performance</AppText>
+                  <Body style={{ fontWeight: '600' }}>Faster Performance</Body>
                   {' '}– Native desktop app runs smoother than web
                 </Body>
               </View>
               <View style={{ flexDirection: 'row', gap: S.space.md }}>
-                <AppText style={{ fontSize: 20 }}>🔌</AppText>
+                <Body style={{ fontSize: 20 }}>🔌</Body>
                 <Body textType="secondary" style={{ flex: 1 }}>
-                  <AppText style={{ fontWeight: '600' }}>Offline Support</AppText>
+                  <Body style={{ fontWeight: '600' }}>Offline Support</Body>
                   {' '}– Access campaigns even without internet
                 </Body>
               </View>
               <View style={{ flexDirection: 'row', gap: S.space.md }}>
-                <AppText style={{ fontSize: 20 }}>📲</AppText>
+                <Body style={{ fontSize: 20 }}>📲</Body>
                 <Body textType="secondary" style={{ flex: 1 }}>
-                  <AppText style={{ fontWeight: '600' }}>Always Updated</AppText>
+                  <Body style={{ fontWeight: '600' }}>Always Updated</Body>
                   {' '}– Auto-updates keep you on the latest version
                 </Body>
               </View>
