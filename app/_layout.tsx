@@ -6,10 +6,10 @@ import { Analytics, sessionManager } from '@/lib/analytics';
 import { getAppConfig } from '@/lib/config/loader';
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers';
 import { logger } from '@/lib/utils/logger';
+import { lazyLoadInBackground } from '@/lib/utils/lazy-imports';
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ThemeProvider, UseTheme } from "@/theme";
-import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
 import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -39,50 +39,41 @@ const environment = process.env.EXPO_PUBLIC_ENVIRONMENT ||
 
 const isDev = environment === 'development';
 
-// Only initialize Sentry if enabled via feature flag AND DSN is provided
+// Lazy initialize Sentry only if enabled via feature flag AND DSN is provided
 if (isSentryEnabled && sentryDsn) {
-  Sentry.init({
-    dsn: sentryDsn,
-
-  // Environment-specific configuration
-  environment,
-  release: `dnd-toolkit@${APP_VERSION}`,
-
-  // Enable debug mode in development
-  debug: isDev,
-
-  // Sample rate for production (reduce noise)
-  sampleRate: isDev ? 1.0 : 0.1,
-
-  // Adds more context data to events (IP address, cookies, user, etc.)
-  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
-  sendDefaultPii: true,
-
-  // Enable Logs in development only
-  enableLogs: isDev,
-
-  // Filter out development errors in production
-  beforeSend: (event) => {
-    // In development, only send errors that are not common development issues
-    if (isDev) {
-      // Filter out common development errors
-      if (event.exception?.values?.[0]?.value?.includes('Network request failed')) {
-        return null;
-      }
-      if (event.exception?.values?.[0]?.value?.includes('Loading chunk')) {
-        return null;
-      }
-    }
-    return event;
-  },
-
-  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
-  // spotlight: isDev,
+  lazyLoadInBackground(
+    async () => {
+      const Sentry = await import('@sentry/react-native');
+      Sentry.init({
+        dsn: sentryDsn,
+        environment,
+        release: `dnd-toolkit@${APP_VERSION}`,
+        debug: isDev,
+        sampleRate: isDev ? 1.0 : 0.1,
+        sendDefaultPii: true,
+        enableLogs: isDev,
+        beforeSend: (event) => {
+          if (isDev) {
+            if (event.exception?.values?.[0]?.value?.includes('Network request failed')) {
+              return null;
+            }
+            if (event.exception?.values?.[0]?.value?.includes('Loading chunk')) {
+              return null;
+            }
+          }
+          return event;
+        },
+      });
+      logger.info('[Sentry] Initialized in background');
+      return Sentry;
+    },
+    'Sentry'
+  ).catch((error) => {
+    logger.warn('[Sentry] Failed to initialize:', error);
   });
-  logger.info('[Sentry] Initialized (feature flag enabled)');
 } else {
   if (!isSentryEnabled) {
-    logger.info('[Sentry] Disabled via feature flag (sentryEnabled=false)');
+    logger.info('[Sentry] Disabled via feature flag (sentryEnabled=false) - not loading');
   } else if (!sentryDsn) {
     logger.info('[Sentry] Disabled - no DSN provided');
   }

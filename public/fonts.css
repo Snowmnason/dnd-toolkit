@@ -1,0 +1,31 @@
+/* 🔤 Web Font Definitions
+   These fonts are stored in /public/ and served statically on web.
+   On native platforms, fonts are loaded via expo-font from /assets/fonts/
+*/
+
+/* GrenzeGotisch - Serif Gothic Font (Classic & Fantasy themes) */
+@font-face {
+  font-family: 'GrenzeGotisch';
+  src: url('/GrenzeGotisch.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Eurostile - Geometric Sans (Cyberpunk theme) */
+@font-face {
+  font-family: 'Eurostile';
+  src: url('/Eurostile.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Cyberpunk - Display Font (Cyberpunk theme title) */
+@font-face {
+  font-family: 'Cyberpunk';
+  src: url('/Cyberpunk.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
