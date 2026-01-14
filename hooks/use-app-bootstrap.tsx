@@ -281,13 +281,11 @@ async function restoreSession() {
     // If we timed out, ignore late session restoration results
     if (timedOut) {
       blog.warn("bootstrap", `Skipping session restoration - timed out after ${totalTime}ms`);
-      setupAuthListener(supabase);
       return;
     }
 
     if (error) {
       blog.warn("bootstrap", `Session restore error (${totalTime}ms):`, error);
-      setupAuthListener(supabase);
       return;
     }
 
@@ -302,8 +300,6 @@ async function restoreSession() {
       blog.info("bootstrap", `⚠️ No stored session found (checked in ${totalTime}ms)`);
       logger.category('security').debug('No stored session found');
     }
-
-    setupAuthListener(supabase);
   } catch (error) {
     blog.error("bootstrap", "Session restore error:", error);
     // Don't throw - app can still function without session
@@ -334,24 +330,7 @@ async function validateSessionInBackground(
       await AuthStateManager.clearAuthState();
       blog.info("bootstrap", "Session expired, cleared cache");
     }
-
-    setupAuthListener(supabase);
   } catch (error) {
     blog.warn("bootstrap", "Background session validation error:", error);
   }
-}
-
-// Set up auth state change listener
-function setupAuthListener(supabase: any) {
-  supabase.auth.onAuthStateChange(async (event: string, session: any) => {
-    blog.debug("bootstrap", "Auth state changed:", event);
-
-    const { AuthStateManager } = await import("../lib/auth/auth-state");
-
-    if (session) {
-      await AuthStateManager.setSession(session);
-    } else {
-      await AuthStateManager.clearAuthState();
-    }
-  });
 }

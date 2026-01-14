@@ -245,7 +245,7 @@ export const signInUser = async (
       logger.info('auth', `✅ Sign-in successful for ${sanitizedEmail}, setting auth state...`);
       
       // Set local auth state so route guards work immediately
-      const { AuthStateManager } = await import('../auth-state');
+      const { AuthStateManager } = await import('./auth-state');
       await AuthStateManager.setHasAccount(true);
       logger.debug('auth', '✅ Auth state set, checking user profile...');
 

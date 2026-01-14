@@ -1,8 +1,8 @@
-import { AuthStateManager } from '@/lib/auth-state';
+import { AuthStateManager } from '@/lib/auth/auth-state';
 import { SecureStorage, STORAGE_KEYS } from '@/lib/storage';
 import { logger } from '@/lib/utils/logger';
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
-import { useContextSelector } from 'use-context-selector';
+import React, { createContext as createReactContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useContextSelector } from 'use-context-selector';
 
 interface AppParamsStable {
   userId?: string;
@@ -19,8 +19,8 @@ interface AppParamsStableContextType {
   clearAllParams: () => void;
 }
 
-const AppParamsStableContext = createContext<AppParamsStableContextType | undefined>(undefined);
-// Separate context for data to enable true selectors
+const AppParamsStableContext = createReactContext<AppParamsStableContextType | undefined>(undefined);
+// Separate context for data to enable true selectors - using use-context-selector's createContext
 const AppParamsStableDataContext = createContext<AppParamsStable>({
   userId: undefined,
   connectedWorldIds: [],
@@ -90,7 +90,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
 
   const hasAccessToWorld = useCallback((worldId: string) => {
     return stableParams.connectedWorldIds.includes(worldId);
-  }, []);
+  }, [stableParams.connectedWorldIds]);
 
   const contextValue = React.useMemo(() => ({
     stableParams,
@@ -100,7 +100,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     removeConnectedWorld,
     hasAccessToWorld,
     clearAllParams,
-  }), [setUserId, setConnectedWorldIds, addConnectedWorld, removeConnectedWorld, hasAccessToWorld, clearAllParams]);
+  }), [stableParams, setUserId, setConnectedWorldIds, addConnectedWorld, removeConnectedWorld, hasAccessToWorld, clearAllParams]);
 
   return (
     <AppParamsStableDataContext.Provider value={stableParams}>

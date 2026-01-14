@@ -2,7 +2,7 @@ import { logger } from '@/lib'
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
 import { S, UseTheme } from '@/theme'
 import { useRouter, useSegments } from 'expo-router'
-import { useEffect, useRef, useState, memo } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import {
   AccessibilityInfo,
   Platform,
@@ -134,7 +134,7 @@ function TopBar({
             setShowSettingsMenu(false)
 
             try {
-              const { AuthStateManager } = await import('@/lib/auth-state');
+              const { AuthStateManager } = await import('@/lib/auth/auth-state');
               const user = await AuthStateManager.getUserData();
               const username = user?.username || 'user';
               

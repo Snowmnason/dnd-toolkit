@@ -63,6 +63,37 @@ export const AuthStateManager = {
     }
   },
 
+  // Get stored user ID (convenience method)
+  async getUserId(): Promise<string | undefined> {
+    try {
+      const userData = await SecureStorage.getJSON<{ id: string }>(STORAGE_KEYS.USER_DATA);
+      return userData?.id;
+    } catch (error) {
+      logger.error('auth', 'Error getting user ID:', error);
+      return undefined;
+    }
+  },
+
+  // Get stored user data (full profile)
+  async getUserData(): Promise<any> {
+    try {
+      const userData = await SecureStorage.getJSON(STORAGE_KEYS.USER_DATA);
+      return userData;
+    } catch (error) {
+      logger.error('auth', 'Error getting user data:', error);
+      return undefined;
+    }
+  },
+
+  // Save user data to storage
+  async saveUserData(userData: any): Promise<void> {
+    try {
+      await SecureStorage.setJSON(STORAGE_KEYS.USER_DATA, userData);
+    } catch (error) {
+      logger.error('auth', 'Error saving user data:', error);
+    }
+  },
+
   // ==========================================
   // 🔒 AUTHENTICATION CHECK - Quick check for route guards
   // ==========================================
@@ -110,7 +141,7 @@ export const AuthStateManager = {
         // If session check timed out or returned null, trust local storage
         // The background session restore will update this later
         return authState.hasAccount;
-      } catch (error) {
+      } catch {
         // On any error, trust local storage
         return authState.hasAccount;
       }

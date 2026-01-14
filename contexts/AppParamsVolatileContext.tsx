@@ -1,6 +1,6 @@
 import { SecureStorage, STORAGE_KEYS } from '@/lib/storage';
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
-import { useContextSelector } from 'use-context-selector';
+import React, { createContext as createReactContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useContextSelector } from 'use-context-selector';
 
 interface AppParamsVolatile {
   worldId?: string;
@@ -14,8 +14,8 @@ interface AppParamsVolatileContextType {
   clearWorldParams: () => void;
 }
 
-const AppParamsVolatileContext = createContext<AppParamsVolatileContextType | undefined>(undefined);
-// Separate context for data to enable true selectors
+const AppParamsVolatileContext = createReactContext<AppParamsVolatileContextType | undefined>(undefined);
+// Separate context for data to enable true selectors - using use-context-selector's createContext
 const AppParamsVolatileDataContext = createContext<AppParamsVolatile>({
   worldId: undefined,
   userRole: undefined,

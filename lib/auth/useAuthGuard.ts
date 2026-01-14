@@ -1,8 +1,8 @@
 import { useRouter, useSegments } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { AuthStateManager } from '../auth-state';
 import { AUTH_CONFIG } from '../routing/route-config';
 import { logger } from '../utils/logger';
+import { AuthStateManager } from './auth-state';
 
 type AuthState = 'loading' | 'authenticated' | 'unauthenticated';
 

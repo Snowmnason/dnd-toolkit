@@ -1,6 +1,7 @@
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
+import { TopBar } from '@/components/ui';
 import { useAnalyticsNavigation } from '@/hooks/use-analytics-navigation';
-import { AppErrorBoundary, AUTH_CONFIG, getRouteConfig, resolveBackTarget, resolveTitle, useAuthGuard } from "@/lib";
+import { AppErrorBoundary, getRouteConfig, resolveBackTarget, resolveTitle } from "@/lib";
 import { Analytics, sessionManager } from '@/lib/analytics';
 import { getAppConfig } from '@/lib/config/loader';
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers';
@@ -15,9 +16,8 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { CrashFallBack, SplashScreen } from '../components/SplashScreen';
-import { TopBar } from '@/components/ui';
-import { AppParamsStableProvider, useUserId, useAppParamsStable } from '../contexts/AppParamsStableContext';
-import { AppParamsVolatileProvider, useWorldId, useUserRole, useAppParamsVolatile } from '../contexts/AppParamsVolatileContext';
+import { AppParamsStableProvider, useAppParamsStable, useUserId } from '../contexts/AppParamsStableContext';
+import { AppParamsVolatileProvider, useAppParamsVolatile, useUserRole, useWorldId } from '../contexts/AppParamsVolatileContext';
 import { PlatformProvider, usePlatform } from '../contexts/PlatformContext';
 import { useAppBootstrap } from '../hooks/use-app-bootstrap';
 import { useSplashScreen } from '../hooks/use-splash-screen';
@@ -103,9 +103,6 @@ function RootLayoutContent() {
   const segments = useSegments();
   const { isMobile } = usePlatform();
   
-  // State management hooks
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  
   // Context hooks
   const userId = useUserId();
   const worldId = useWorldId();
@@ -116,11 +113,10 @@ function RootLayoutContent() {
   // Data loading hooks
   const bootstrap = useAppBootstrap();
   const splash = useSplashScreen();
-  const authState = useAuthGuard(bootstrap.isReady);
   
   // Log every render with session ID
   useEffect(() => {
-    logger.debug('navigation', `[SESSION:${sessionId}] 📍 Root layout rendered - route: ${segments[0] || 'index'}, authState: ${authState}`);
+    logger.debug('navigation', `[SESSION:${sessionId}] 📍 Root layout rendered - route: ${segments[0] || 'index'}`);
   });
   // Analytics hook (must be called unconditionally)
   useAnalyticsNavigation();
@@ -185,42 +181,17 @@ function RootLayoutContent() {
     }
   }, [urlParams, segments, updateVolatileParams, clearAllParams, clearWorldParams, userId, worldId, userRole]);
 
-  // Manage loading state based on guard and bootstrap
-  useEffect(() => {
-    if (!bootstrap.isReady) return;
-    // Don't block login routes
-    if (segments[0] === 'login') {
-      setIsCheckingAuth(false);
-      return;
-    }
-    if (authState !== 'loading') {
-      setIsCheckingAuth(false);
-    }
-  }, [authState, bootstrap.isReady, segments]);
 
-  // Ensure unauthenticated users on root index are redirected to login/welcome
-  useEffect(() => {
-    if (!bootstrap.isReady) return;
-    const onRoot = segments[0] === undefined;
-    if (onRoot && authState === 'unauthenticated') {
-      const target = buildNavigationTarget('/login/welcome', {}, []);
-      router.replace(target as any);
-    }
-  }, [bootstrap.isReady, authState, segments, router]);
 
   // ==================== RENDER LOGIC SECTION ====================
-  // Protected routes that require authentication
-  const firstSegmentForProtection = typeof segments[0] === 'string' ? segments[0] : '';
-  const isProtectedRoute = AUTH_CONFIG.protectedRoutes.includes(firstSegmentForProtection as any);
-
   // Show splash screen (if enabled via feature flag)
   // Splash screen displays BEFORE any other content
   if (splash.showSplash) {
     return <SplashScreen />;
   }
 
-  // Show loading while bootstrap is happening OR while checking auth for protected routes
-  if (!bootstrap.isReady || (isCheckingAuth && isProtectedRoute)) {
+  // Show loading while bootstrap is happening
+  if (!bootstrap.isReady) {
     return (
       <LoadingOverlay 
         message="Loading D&D Toolkit..."
@@ -247,7 +218,6 @@ function RootLayoutContent() {
     worldId: worldId as string | undefined,
     userRole: userRole as string | undefined,
     isMobile,
-    isAuthenticated: authState === 'authenticated',
   };
 
   // Get route config for centralized TopBar, back behavior, and a11y

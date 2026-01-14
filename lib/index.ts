@@ -12,18 +12,18 @@ export * from './auth/authService';
 export * from './auth/emailUtils';
 export * from './auth/redirectSafety';
 export * from './auth/sessionService';
+export * from './auth/useAuthGuard';
 export * from './auth/useResetPasswordConfirm';
 export * from './auth/useSignInForm';
 export * from './auth/useSignUpForm';
 export * from './auth/useWelcomeScreen';
 export * from './auth/validation';
-export * from './auth/useAuthGuard';
 // ===== Routing config =====
 export * from './routing/route-config';
 
 // ===== Navigation =====
-export * from './navigation/uri-helpers';
 export * from './navigation/navigation-config';
+export * from './navigation/uri-helpers';
 
 // ===== Database =====
 export * from './database/common';
@@ -44,9 +44,9 @@ export { default as Logger, logger } from './utils/logger';
 export * from './error';
 
 // ===== Other top-level lib utilities =====
-export * from './auth-state';
+export * from './analytics';
+export * from './auth/auth-state';
 export * from './auth/encrypted-storage';
 export * from './worlds/useWorlds';
-export * from './analytics';
 
 

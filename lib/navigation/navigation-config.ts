@@ -70,8 +70,6 @@ export interface NavigationContext {
   userRole?: string;
   /** Is mobile platform */
   isMobile: boolean;
-  /** Is authenticated */
-  isAuthenticated: boolean;
 }
 
 /**

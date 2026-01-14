@@ -183,7 +183,7 @@ export default function AdminPanelScreen() {
   const handleBack = async () => {
     let username = 'user';
     try {
-      const { AuthStateManager } = await import('@/lib/auth-state');
+      const { AuthStateManager } = await import('@/lib/auth/auth-state');
       const user = await AuthStateManager.getUserData();
       if (user?.username) {
         username = encodeURIComponent(user.username);

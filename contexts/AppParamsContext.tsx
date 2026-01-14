@@ -1,7 +1,7 @@
-import { logger } from '@/lib/utils/logger';
-import { AuthStateManager } from '@/lib/auth-state';
+import { AuthStateManager } from '@/lib/auth/auth-state';
 import { SecureStorage, STORAGE_KEYS } from '@/lib/storage';
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { logger } from '@/lib/utils/logger';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 
 interface AppParams {
   userId?: string;
