@@ -46,6 +46,12 @@ export { default as Logger, logger } from './utils/logger';
 // ===== Error Handling =====
 export * from './error';
 
+// ===== Network Detection & Error Handling =====
+export * from './network';
+
+// ===== Storage (Encryption & Error Handling) =====
+export * from './storage';
+
 // ===== Other top-level lib utilities =====
 export * from './analytics';
 export * from './auth/auth-state';
