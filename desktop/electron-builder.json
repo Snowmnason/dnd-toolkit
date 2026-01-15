@@ -4,6 +4,11 @@
   "appId": "com.snowmnason.dndtoolkit",
   "executableName": "DnD-Toolkit",
   "copyright": "Copyright © 2024 Snowmnason",
+  "publish": {
+    "provider": "github",
+    "owner": "Snowmnason",
+    "repo": "dnd-toolkit"
+  },
   "directories": {
     "buildResources": "assets",
     "output": "../dist-desktop"
