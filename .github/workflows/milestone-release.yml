@@ -24,7 +24,7 @@ jobs:
 
       - name: Bump major version (keep minor/patch)
         run: |
-          # Get milestone title (e.g., "v1.2.3")
+          # Get milestone title (for release notes only)
           MILESTONE_TITLE="${{ github.event.milestone.title }}"
           echo "Milestone: $MILESTONE_TITLE"
           
@@ -32,15 +32,11 @@ jobs:
           CURRENT_VERSION=$(jq -r '.version' package.json)
           echo "Current version: $CURRENT_VERSION"
           
-          # Extract major version from milestone title (remove 'v' prefix)
-          MILESTONE_VERSION="${MILESTONE_TITLE#v}"
-          
-          # Parse milestone version to get new X
-          IFS='.' read -r NEW_X Y Z <<< "$MILESTONE_VERSION"
-          
-          # Keep Y and Z from current version, only bump X
+          # Parse current version to get X.Y.Z
           IFS='.' read -r CURRENT_X CURRENT_Y CURRENT_Z <<< "$CURRENT_VERSION"
           
+          # Increment major version (X) only, keep Y and Z
+          NEW_X=$((CURRENT_X + 1))
           NEW_VERSION="$NEW_X.$CURRENT_Y.$CURRENT_Z"
           echo "New version: $NEW_VERSION"
           
