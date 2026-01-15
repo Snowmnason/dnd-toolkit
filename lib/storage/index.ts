@@ -20,26 +20,26 @@
  * ```
  */
 
-export { SecureStorage } from './SecureStorage';
 export { FastCache } from './FastCache';
+export { SecureStorage } from './SecureStorage';
 export {
-  classifyStorageError,
-  isStorageError,
-  logStorageError,
-  shouldServeFallbackOnStorageError,
-  handleStorageErrorGracefully,
-  safeStorageGet,
-  safeStorageSet,
-  safeStorageRemove,
-  safeStorageGetJSON,
-  safeStorageSetJSON,
   batchStorageOperation,
   checkStorageHealth,
-  type StorageOperation,
+  classifyStorageError,
+  handleStorageErrorGracefully,
+  isStorageError,
+  logStorageError,
+  safeStorageGet,
+  safeStorageGetJSON,
+  safeStorageRemove,
+  safeStorageSet,
+  safeStorageSetJSON,
+  shouldServeFallbackOnStorageError,
+  type BatchStorageResult,
   type StorageErrorInfo,
   type StorageGracefulResult,
-  type StorageOperationOptions,
-  type BatchStorageResult,
+  type StorageOperation,
+  type StorageOperationOptions
 } from './storage-error-handling';
 
 /**
@@ -68,6 +68,7 @@ export const STORAGE_KEYS = {
   
   // User preferences
   THEME_PREFERENCE: 'dnd:user:theme',
+  THEME_MODE: 'dnd:user:theme_mode',
   SCALE_PREFERENCE: 'dnd:user:scale',
   
   // Session state (volatile persistence)
