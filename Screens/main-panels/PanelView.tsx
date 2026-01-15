@@ -63,15 +63,25 @@ export function PanelView({
       }}
     >
       {/* ─────────────── Panel Header ─────────────── */}
+      <View
+        style={{
+          alignItems: 'center', 
+          justifyContent: 'center',
+          width: '100%',
+          height: S.space.md * 5,
+        }}
+      >
       <Heading
         align="center"
         style={{
           marginBottom: S.space.md,
-          color: $('textPrimary'),
+          marginTop: S.space.md,
+          marginHorizontal: S.space.sm,
         }}
       >
         {config.title}
       </Heading>
+      </View>
 
       {/* ─────────────── Feature Buttons ─────────────── */}
       <View
