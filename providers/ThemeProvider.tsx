@@ -3,12 +3,10 @@
  */
 
 import { ThemeContext, ThemeContextType } from '@/contexts/ThemeContext';
+import { SecureStorage, STORAGE_KEYS } from '@/lib/storage';
 import { logger } from '@/lib/utils/logger';
-import { ThemeFamilyName, allThemes, getThemeFamily } from '@/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { allThemes, getThemeFamily, ThemeFamilyName } from '@/theme';
 import React, { ReactNode, useCallback, useEffect, useState } from 'react';
-
-const THEME_STORAGE_KEY = '@dnd_toolkit_theme';
 
 interface ThemeProviderProps {
   children: ReactNode;
@@ -18,7 +16,7 @@ interface ThemeProviderProps {
  * ThemeProvider - Provides theme context to the app
  * 
  * Features:
- * - Persists user's theme preference to AsyncStorage
+ * - Persists user's theme preference to SecureStorage
  * - Automatically loads saved theme on mount
  * - Provides theme switching functionality
  */
@@ -33,7 +31,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
   const loadSavedTheme = async () => {
     try {
-      const savedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
+      const savedTheme = await SecureStorage.getItem(STORAGE_KEYS.THEME_PREFERENCE);
       
       if (savedTheme && isValidThemeName(savedTheme)) {
         setThemeName(savedTheme as ThemeFamilyName);
@@ -50,7 +48,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
   const saveTheme = async (newTheme: ThemeFamilyName) => {
     try {
-      await AsyncStorage.setItem(THEME_STORAGE_KEY, newTheme);
+      await SecureStorage.setItem(STORAGE_KEYS.THEME_PREFERENCE, newTheme);
       logger.success('ui', `Saved theme: ${newTheme}`);
     } catch (error) {
       logger.error('ui', 'Failed to save theme:', error);

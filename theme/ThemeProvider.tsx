@@ -1,13 +1,13 @@
+import { SecureStorage, STORAGE_KEYS } from '@/lib/storage'
 import { logger } from '@/lib/utils/logger'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
-    createContext,
-    ReactNode,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useState,
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
 } from 'react'
 import { allThemes, ThemeFamilyName } from './themeRegistry'
 import { ThemeTokens, TokenName } from './tokens'
@@ -30,7 +30,7 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
 /**
  * 🌈 ThemeProvider
  * Wraps the entire app and manages the active theme family + mode.
- * Automatically loads and persists theme preferences from AsyncStorage.
+ * Automatically loads and persists theme preferences from SecureStorage.
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [family, setFamilyState] = useState<ThemeFamily>('classic')
@@ -42,8 +42,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const loadThemePreferences = async () => {
       try {
         const [savedFamily, savedMode] = await Promise.all([
-          AsyncStorage.getItem('activeTheme'),
-          AsyncStorage.getItem('themeMode'),
+          SecureStorage.getItem(STORAGE_KEYS.THEME_PREFERENCE),
+          SecureStorage.getItem(STORAGE_KEYS.THEME_MODE),
         ])
 
         if (savedFamily && allThemes[savedFamily as ThemeFamily]) {
@@ -75,11 +75,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (!allThemes[f]) {
       logger.category('ui').warn('ThemeProvider: unknown theme', { requested: f, fallback: 'classic' })
       setFamilyState('classic')
-      AsyncStorage.setItem('activeTheme', 'classic')
+      SecureStorage.setItem(STORAGE_KEYS.THEME_PREFERENCE, 'classic').catch((e) => 
+        logger.category('ui').error('Failed to save theme preference', { error: String(e) })
+      )
     } else {
       setFamilyState(f)
       logger.category('ui').debug('ThemeProvider: family changed', { family: f })
-      AsyncStorage.setItem('activeTheme', f)
+      SecureStorage.setItem(STORAGE_KEYS.THEME_PREFERENCE, f).catch((e) => 
+        logger.category('ui').error('Failed to save theme preference', { error: String(e) })
+      )
     }
   }, [])
 
@@ -87,22 +91,28 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const setMode = useCallback((m: ThemeMode) => {
     setModeState(m)
     logger.category('ui').debug('ThemeProvider: mode changed', { mode: m })
-    AsyncStorage.setItem('themeMode', m)
+    SecureStorage.setItem(STORAGE_KEYS.THEME_MODE, m).catch((e) => 
+      logger.category('ui').error('Failed to save theme mode', { error: String(e) })
+    )
   }, [])
 
   /** Update both family + mode and persist */
   const setTheme = useCallback((f: ThemeFamily, m: ThemeMode) => {
     if (!allThemes[f]) {
-      logger.category('ui').warn('ThemeProvider: unknown theme in setTheme', { requested: f, fallback: 'classic', mode: m })
-      setFamilyState('classic')
-      AsyncStorage.setItem('activeTheme', 'classic')
+      SecureStorage.setItem(STORAGE_KEYS.THEME_PREFERENCE, 'classic').catch((e) => 
+        logger.category('ui').error('Failed to save theme preference', { error: String(e) })
+      )
     } else {
       setFamilyState(f)
-      AsyncStorage.setItem('activeTheme', f)
+      SecureStorage.setItem(STORAGE_KEYS.THEME_PREFERENCE, f).catch((e) => 
+        logger.category('ui').error('Failed to save theme preference', { error: String(e) })
+      )
     }
     setModeState(m)
     logger.category('ui').debug('ThemeProvider: theme changed', { family: f || 'classic', mode: m })
-    AsyncStorage.setItem('themeMode', m)
+    SecureStorage.setItem(STORAGE_KEYS.THEME_MODE, m).catch((e) => 
+      logger.category('ui').error('Failed to save theme mode', { error: String(e) })
+    )
   }, [])
 
   // Memoize context value to prevent unnecessary re-renders of all consumers
