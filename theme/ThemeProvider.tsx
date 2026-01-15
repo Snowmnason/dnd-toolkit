@@ -49,10 +49,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         if (savedFamily && allThemes[savedFamily as ThemeFamily]) {
           setFamilyState(savedFamily as ThemeFamily)
           logger.category('ui').debug('ThemeProvider: loaded saved family', { family: savedFamily })
+        } else {
+          setFamilyState('classic')
+          SecureStorage.setItem(STORAGE_KEYS.THEME_PREFERENCE, 'classic').catch((e) =>
+            logger.category('ui').error('Failed to save corrected theme preference', { error: String(e) })
+          )
+          logger.category('ui').debug('ThemeProvider: invalid saved family, defaulted to classic')
         }
         if (savedMode && (savedMode === 'light' || savedMode === 'dark')) {
           setModeState(savedMode as ThemeMode)
           logger.category('ui').debug('ThemeProvider: loaded saved mode', { mode: savedMode })
+        } else {
+          setModeState('dark')
+          SecureStorage.setItem(STORAGE_KEYS.THEME_MODE, 'dark').catch((e) =>
+            logger.category('ui').error('Failed to save corrected theme mode', { error: String(e) })
+          )
+          logger.category('ui').debug('ThemeProvider: invalid saved mode, defaulted to dark')
         }
       } catch (error) {
         logger.category('ui').error('ThemeProvider: failed to load preferences', { error: String(error) })
@@ -99,6 +111,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   /** Update both family + mode and persist */
   const setTheme = useCallback((f: ThemeFamily, m: ThemeMode) => {
     if (!allThemes[f]) {
+      logger.category('ui').warn('ThemeProvider: unknown theme', { requested: f, fallback: 'classic' })
       SecureStorage.setItem(STORAGE_KEYS.THEME_PREFERENCE, 'classic').catch((e) => 
         logger.category('ui').error('Failed to save theme preference', { error: String(e) })
       )

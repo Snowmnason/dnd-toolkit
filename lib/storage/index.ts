@@ -24,9 +24,22 @@ export { FastCache } from './FastCache';
 export { SecureStorage } from './SecureStorage';
 export {
   batchStorageOperation,
-  checkStorageHealth, classifyStorageError, handleStorageErrorGracefully, isStorageError,
-  logStorageError, safeStorageGet, safeStorageGetJSON, safeStorageRemove, safeStorageSet, safeStorageSetJSON, shouldServeFallbackOnStorageError, type BatchStorageResult, type StorageErrorInfo,
-  type StorageGracefulResult, type StorageOperation, type StorageOperationOptions
+  checkStorageHealth,
+  classifyStorageError,
+  handleStorageErrorGracefully,
+  isStorageError,
+  logStorageError,
+  safeStorageGet,
+  safeStorageGetJSON,
+  safeStorageRemove,
+  safeStorageSet,
+  safeStorageSetJSON,
+  shouldServeFallbackOnStorageError,
+  type BatchStorageResult,
+  type StorageErrorInfo,
+  type StorageGracefulResult,
+  type StorageOperation,
+  type StorageOperationOptions
 } from './storage-error-handling';
 
 /**
