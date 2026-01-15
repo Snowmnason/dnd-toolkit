@@ -67,6 +67,11 @@ htmlFiles.forEach((filePath) => {
     content = content.replace(/href="\/favicon/g, 'href="app://favicon');
     content = content.replace(/src="\/favicon/g, 'src="app://favicon');
 
+    // Remove integrity attributes since we're modifying paths
+    // SRI hashes are incompatible with Electron's custom protocol
+    content = content.replace(/\s+integrity="[^"]*"/g, '');
+    content = content.replace(/\s+crossorigin="anonymous"/g, '');
+
     if (content !== originalContent) {
       writeFileSync(filePath, content, 'utf8');
       console.log(`✓ Fixed: ${path.relative(distDir, filePath)}`);

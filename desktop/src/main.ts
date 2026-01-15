@@ -97,13 +97,18 @@ function setupAutoUpdater(): void {
 
 function createWindow(): void {
   // Create the browser window
+  // Determine icon path - different for dev vs packaged app
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'assets', 'images', 'icon.ico')
+    : path.join(__dirname, '../assets/images/icon.ico');
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 800,
     minHeight: 600,
     title: 'DnD-Toolkit',
-    icon: path.join(__dirname, '../assets/images/icon.ico'),
+    icon: iconPath,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1a1a2e' : '#f5f5f5',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -268,7 +273,7 @@ function setupSessionSecurity(): void {
       return;
     }
 
-    const csp = "default-src 'self' app:; script-src 'self' app: https://*.supabase.co 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob: app:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; object-src 'none'; media-src 'self'; worker-src 'self' blob:";
+    const csp = "default-src 'self' app:; script-src 'self' app: https://*.supabase.co 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' app: https://fonts.gstatic.com; img-src 'self' data: https: blob: app:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; object-src 'none'; media-src 'self'; worker-src 'self' blob:";
 
     callback({
       responseHeaders: {

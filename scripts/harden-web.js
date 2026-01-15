@@ -88,6 +88,7 @@ function addSriAttributes(html) {
 function buildCsp(scriptHashes, styleHashes) {
   const scriptSrc = [
     "'self'",
+    'app:',  // ✅ Added for Electron app:// protocol
     'https://dnd-tool.thesnowpost.com',
     'https://*.supabase.co',
     // "'strict-dynamic'", // ❌ Removed - conflicts with Expo's dynamic script loading on same domain
@@ -104,6 +105,7 @@ function buildCsp(scriptHashes, styleHashes) {
 
   const imgSrc = [
     "'self'",
+    'app:',  // ✅ Added for Electron app:// protocol
     'data:',
     'blob:',
     'https://fonts.gstatic.com', // ✅ Tightened from https:
@@ -121,10 +123,10 @@ function buildCsp(scriptHashes, styleHashes) {
   // Note: frame-ancestors MUST be in HTTP headers only, not meta tags
   // It will be ignored if placed in a meta CSP tag
   const metaDirectives = [
-    "default-src 'self'",
+    "default-src 'self' app:",  // ✅ Added app: for Electron
     `script-src ${scriptSrc}`,
     `style-src ${styleSrc}`,
-    "font-src 'self' https://fonts.gstatic.com",
+    "font-src 'self' app: https://fonts.gstatic.com",  // ✅ Added app: for Electron
     `img-src ${imgSrc}`, // ✅ Tightened to specific domains
     `connect-src ${connectSrc}`, // ✅ Added domain
     "form-action 'self'",
@@ -137,10 +139,10 @@ function buildCsp(scriptHashes, styleHashes) {
 
   // Full directives for HTTP headers (includes frame-ancestors)
   const headerDirectives = [
-    "default-src 'self'",
+    "default-src 'self' app:",  // ✅ Added app: for Electron
     `script-src ${scriptSrc}`,
     `style-src ${styleSrc}`,
-    "font-src 'self' https://fonts.gstatic.com",
+    "font-src 'self' app: https://fonts.gstatic.com",  // ✅ Added app: for Electron
     `img-src ${imgSrc}`,
     `connect-src ${connectSrc}`,
     "frame-ancestors 'none'",

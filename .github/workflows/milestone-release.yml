@@ -205,8 +205,10 @@ jobs:
         run: |
           mkdir -p release-assets
           find artifacts -name '*Setup.exe' -exec cp {} release-assets/ \;
+          find artifacts -name '*.exe.blockmap' -exec cp {} release-assets/ \;
           find artifacts -name '*.dmg' -exec cp {} release-assets/ \;
           find artifacts -name '*.AppImage' -exec cp {} release-assets/ \;
+          find artifacts -name 'latest.yml' -exec cp {} release-assets/ \;
           
           if [ -z "$(ls -A release-assets/)" ]; then
             echo "⚠ Warning: No installers found"

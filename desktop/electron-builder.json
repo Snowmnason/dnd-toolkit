@@ -3,6 +3,7 @@
   "productName": "DnD-Toolkit",
   "appId": "com.snowmnason.dndtoolkit",
   "executableName": "DnD-Toolkit",
+  "afterPack": "./scripts/embed-icon.js",
   "copyright": "Copyright © 2024 Snowmnason",
   "publish": {
     "provider": "github",
@@ -51,7 +52,11 @@
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "DnD Toolkit"
+    "shortcutName": "DnD Toolkit",
+    "installerIcon": "assets/images/icon.ico",
+    "uninstallerIcon": "assets/images/icon.ico",
+    "packElevateHelper": false,
+    "artifactName": "${productName}-${version}-installer.${ext}"
   },
   "mac": {
     "target": [
