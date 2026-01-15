@@ -86,15 +86,15 @@ jobs:
 
       - name: Create Git tag and release
         run: |
-          git tag -a "${{ env.milestone_title }}" -m "Release ${{ env.milestone_title }}" || echo "Tag already exists"
-          git push origin "${{ env.milestone_title }}" || echo "Tag push skipped"
+          git tag -a "v${{ env.new_version }}" -m "Release v${{ env.new_version }}" || echo "Tag already exists"
+          git push origin "v${{ env.new_version }}" || echo "Tag push skipped"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ env.milestone_title }}
+          tag_name: v${{ env.new_version }}
           body: |
             ## Version ${{ env.new_version }}
             
