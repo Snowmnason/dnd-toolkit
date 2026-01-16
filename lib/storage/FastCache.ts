@@ -7,6 +7,33 @@ if (Platform.OS !== 'web') {
   AsyncStorage = require('@react-native-async-storage/async-storage').default;
 }
 
+// Storage API interface for type safety
+interface StorageAPI {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+  clear(): void;
+  length: number;
+  key(index: number): string | null;
+}
+
+// Polyfill localStorage for Node.js environments (build processes, server-side)
+const getLocalStorage = (): StorageAPI => {
+  if (typeof localStorage !== 'undefined') {
+    return localStorage;
+  }
+
+  // Return no-op implementation for Node.js environments
+  return {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+    clear: () => {},
+    length: 0,
+    key: () => null,
+  };
+};
+
 /**
  * FastCache
  *
@@ -78,7 +105,7 @@ class FastCacheService {
       const entryJson = JSON.stringify(entry);
 
       if (Platform.OS === 'web') {
-        localStorage.setItem(key, entryJson);
+        getLocalStorage().setItem(key, entryJson);
       } else {
         await AsyncStorage.setItem(key, entryJson);
       }
@@ -100,7 +127,7 @@ class FastCacheService {
       let rawValue: string | null;
 
       if (Platform.OS === 'web') {
-        rawValue = localStorage.getItem(key);
+        rawValue = getLocalStorage().getItem(key);
       } else {
         rawValue = await AsyncStorage.getItem(key);
       }
@@ -162,7 +189,7 @@ class FastCacheService {
   async removeItem(key: string): Promise<void> {
     try {
       if (Platform.OS === 'web') {
-        localStorage.removeItem(key);
+        getLocalStorage().removeItem(key);
       } else {
         await AsyncStorage.removeItem(key);
       }
@@ -198,8 +225,14 @@ class FastCacheService {
       let matchingKeys: string[] = [];
 
       if (Platform.OS === 'web') {
-        matchingKeys = Object.keys(localStorage).filter(key => key.startsWith(prefix));
-        matchingKeys.forEach(key => localStorage.removeItem(key));
+        const storage = getLocalStorage();
+        for (let i = 0; i < storage.length; i++) {
+          const key = storage.key(i);
+          if (key && key.startsWith(prefix)) {
+            matchingKeys.push(key);
+          }
+        }
+        matchingKeys.forEach(key => storage.removeItem(key));
       } else {
         const allKeys = await AsyncStorage.getAllKeys();
         matchingKeys = allKeys.filter((key: string) => key.startsWith(prefix));
@@ -344,11 +377,12 @@ class FastCacheService {
       let estimatedSize = 0;
 
       if (Platform.OS === 'web') {
-        itemCount = localStorage.length;
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
+        const storage = getLocalStorage();
+        itemCount = storage.length;
+        for (let i = 0; i < storage.length; i++) {
+          const key = storage.key(i);
           if (key) {
-            const value = localStorage.getItem(key);
+            const value = storage.getItem(key);
             if (value) {
               estimatedSize += key.length + value.length;
             }
@@ -386,7 +420,7 @@ class FastCacheService {
   async clear(): Promise<void> {
     try {
       if (Platform.OS === 'web') {
-        localStorage.clear();
+        getLocalStorage().clear();
       } else {
         await AsyncStorage.clear();
       }
@@ -405,11 +439,12 @@ class FastCacheService {
       let keysToRemove: string[] = [];
 
       if (Platform.OS === 'web') {
+        const storage = getLocalStorage();
         const now = Date.now();
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
+        for (let i = 0; i < storage.length; i++) {
+          const key = storage.key(i);
           if (key) {
-            const value = localStorage.getItem(key);
+            const value = storage.getItem(key);
             if (value) {
               try {
                 const entry: CacheEntry<any> = JSON.parse(value);
@@ -425,7 +460,7 @@ class FastCacheService {
             }
           }
         }
-        keysToRemove.forEach(key => localStorage.removeItem(key));
+        keysToRemove.forEach(key => storage.removeItem(key));
       } else {
         const keys = await AsyncStorage.getAllKeys();
         const now = Date.now();

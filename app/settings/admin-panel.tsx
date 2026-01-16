@@ -45,7 +45,11 @@ export default function AdminPanelScreen() {
       setLoading(true);
 
       try {
-        // Force a fresh fetch from DB to verify admin and recache
+        // ⚠️ CRITICAL: Always use forceRefresh=true for admin panel
+        // Admin verification MUST NOT use SecureStorage cache - ALWAYS verify with Supabase
+        // Reason: Admin panel protects sensitive operations. If network fails or cache is stale,
+        //         deny access rather than allowing based on stale cached admin status.
+        // If network error or slow connection: throw error, don't fallback to cache
         const user = await getCurrentUserProfile(true);
         if (!mounted) return;
 

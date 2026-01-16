@@ -1,3 +1,4 @@
+import { UseTheme } from '@/theme'
 import { View } from 'react-native'
 import CustomLoad from './ui/CustomLoad'
 
@@ -12,13 +13,15 @@ export default function LoadingOverlay({
   error,
   assetsLoaded = false,
 }: LoadingOverlayProps) {
+  const { theme } = UseTheme()
+
   return (
     <View
       style={{
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#2f353d',
+        backgroundColor: theme.background,
         zIndex: 9999,
       }}
       accessible

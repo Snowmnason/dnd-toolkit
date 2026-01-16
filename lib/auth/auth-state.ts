@@ -208,19 +208,17 @@ export const AuthStateManager = {
   },
 
   // ==========================================
-  // � VERIFY WORLD ACCESS - Cache-first verification with Supabase fallback
+  // 🌍 WORLD ACCESS VERIFICATION - Cache-first verification with updateStorageCache service
   // ==========================================
   /**
-   * Verify world access against cache first, then Supabase for stale cache
-   * 
+   * Verify world access against cache first, then updateStorageCache service for stale cache
+   *
    * Flow:
    * 1. Check SecureStorage cache - instant
    * 2. Check cache age:
-   *    - Fresh (<2 hours): Trust cache, let user in immediately (no Supabase call)
-   *    - Stale (2-4 hours): Verify with Supabase before allowing access
-   * 3. If Supabase DENIES but cache ALLOWED:
-   *    - Update cache to deny
-   *    - Trigger revocation callback
+   *    - Fresh (<4 hours): Trust cache, let user in immediately (no database call)
+   *    - Stale (4+ hours): Refresh via updateStorageCache.refreshAllWorldsCache() then check again
+   * 3. updateStorageCache service handles the Supabase verification and cache updates
    * 4. Handle network errors gracefully (don't boot user on network fail)
    */
   async verifyWorldAccessWithDatabase(
@@ -234,80 +232,83 @@ export const AuthStateManager = {
   }> {
     logger.info('auth', `[VERIFY:START] Verifying world ${worldId}, forceFresh=${options?.forceFresh}`);
     
-    const CACHE_STALE_THRESHOLD = 2 * 60 * 60 * 1000; // 2 hours (half of 4-hour update cycle)
+    // Cache freshness window: only trust cache younger than 4 hours
+    // After 4 hours, always refresh via updateStorageCache service to catch permission changes
+    const CACHE_FRESH_THRESHOLD = 4 * 60 * 60 * 1000; // 4 hours
     const cacheKey = `world_access_${worldId}`;
     const metaKey = `world_access_meta_${worldId}`;
     
     try {
-      // NEW: If forceFresh is true, skip cache and go straight to Supabase
+      // If forceFresh is true, skip cache and refresh from database
       if (options?.forceFresh) {
         logger.info('auth', `[VERIFY:FORCE] Force fresh check for world ${worldId}`);
-        const dbResult = await this.checkWorldAccessInSupabase(worldId);
-        logger.info('auth', `[VERIFY:FORCE-RESULT] hasAccess=${dbResult.hasAccess}, reason=${dbResult.reason}`);
         
-        // Update cache with fresh data
-        await SecureStorage.setJSON(cacheKey, dbResult.hasAccess);
-        await SecureStorage.setJSON(metaKey, {
-          timestamp: Date.now(),
-          source: 'supabase'
-        } as CacheMetadata);
+        // Refresh all worlds cache (if one is stale, all are stale)
+        const { updateStorageCache } = await import('../storage/update-storage-cache');
+        await updateStorageCache.refreshAllWorldsCache();
+        
+        // Now check cache - it's been refreshed
+        const freshCached = await SecureStorage.getJSON<boolean>(cacheKey);
+        logger.info('auth', `[VERIFY:FORCE-RESULT] hasAccess=${freshCached}`);
         
         return {
-          hasAccess: dbResult.hasAccess,
+          hasAccess: freshCached === true,
           fromCache: false,
           isVerifying: false
         };
       }
       
-      // Step 1: Check SecureStorage cache (instant)
+      // Step 1: Check SecureStorage cache
       const cached = await SecureStorage.getJSON<boolean>(cacheKey);
       const cacheMeta = await SecureStorage.getJSON<CacheMetadata>(metaKey);
       
       const cacheAge = cacheMeta ? Date.now() - cacheMeta.timestamp : Infinity;
-      const isCacheStale = cacheAge > CACHE_STALE_THRESHOLD;
+      const isCacheFresh = cacheAge < CACHE_FRESH_THRESHOLD;
       
-      logger.info('auth', `[VERIFY:CACHE] world=${worldId}, hasCache=${!!cached}, ageMs=${cacheAge}, isCacheStale=${isCacheStale}`);
+      logger.info('auth', `[VERIFY:CACHE] world=${worldId}, hasCache=${cached !== null}, ageMs=${cacheAge}, isCacheFresh=${isCacheFresh}`);
       
-      // Step 2: If cache is stale (2+ hours), wait for Supabase before allowing
-      if (isCacheStale) {
-        logger.info('auth', `[VERIFY:STALE] Cache stale, checking Supabase for world ${worldId}`);
-        const dbResult = await this.checkWorldAccessInSupabase(worldId);
-        logger.info('auth', `[VERIFY:STALE-RESULT] hasAccess=${dbResult.hasAccess}`);
-        
-        // Update cache with fresh data
-        await SecureStorage.setJSON(cacheKey, dbResult.hasAccess);
-        await SecureStorage.setJSON(metaKey, {
-          timestamp: Date.now(),
-          source: 'supabase'
-        } as CacheMetadata);
-        
+      // Step 2: If cache is fresh AND exists, trust it
+      if (isCacheFresh && cached !== null) {
+        logger.info('auth', `[VERIFY:FRESH] Cache fresh for world ${worldId}, trusting cache, hasAccess=${cached}`);
         return {
-          hasAccess: dbResult.hasAccess,
-          fromCache: false,
+          hasAccess: cached === true,
+          fromCache: true,
           isVerifying: false
         };
       }
       
-      // Step 3: Cache is fresh (<2 hours), trust it without Supabase check
-      logger.info('auth', `[VERIFY:FRESH] Cache fresh for world ${worldId}, trusting cache, hasAccess=${cached}`);
+      // Step 3: Cache is stale or missing - refresh all worlds then check again
+      // If one world is stale, all worlds are stale - refresh everything at once
+      logger.info('auth', `[VERIFY:STALE] Cache ${cached === null ? 'missing' : 'stale'}, refreshing all worlds from database`);
+      
+      // Refresh all worlds cache (userId from SecureStorage never stale)
+      const { updateStorageCache } = await import('../storage/update-storage-cache');
+      await updateStorageCache.refreshAllWorldsCache();
+      
+      // Now check cache again - it's been refreshed
+      const freshCached = await SecureStorage.getJSON<boolean>(cacheKey);
+      logger.info('auth', `[VERIFY:FRESH-RESULT] hasAccess=${freshCached}`);
       
       return {
-        hasAccess: cached === true,
-        fromCache: true,
-        isVerifying: false // No Supabase check needed for fresh cache
+        hasAccess: freshCached === true,
+        fromCache: false,
+        isVerifying: false
       };
     } catch (error) {
       logger.error('auth', `[VERIFY:ERROR] Cache check failed:`, error);
-      // Fallback: check Supabase directly
+      // Fallback: refresh all worlds cache and try again
       try {
-        const dbResult = await this.checkWorldAccessInSupabase(worldId);
+        const { updateStorageCache } = await import('../storage/update-storage-cache');
+        await updateStorageCache.refreshAllWorldsCache();
+        
+        const freshCached = await SecureStorage.getJSON<boolean>(cacheKey);
         return {
-          hasAccess: dbResult.hasAccess,
+          hasAccess: freshCached === true,
           fromCache: false,
           isVerifying: false
         };
       } catch (dbError) {
-        logger.error('auth', `[VERIFY:FAIL] Supabase check also failed:`, dbError);
+        logger.error('auth', `[VERIFY:FAIL] Database refresh also failed:`, dbError);
         // On complete failure, deny access for security
         return {
           hasAccess: false,
