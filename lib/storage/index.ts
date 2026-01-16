@@ -41,6 +41,7 @@ export {
   type StorageOperation,
   type StorageOperationOptions
 } from './storage-error-handling';
+export { updateStorageCache } from './update-storage-cache';
 
 /**
  * Storage Keys

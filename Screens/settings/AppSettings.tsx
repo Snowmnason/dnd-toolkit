@@ -1,6 +1,6 @@
 import { Button, SubTitle } from '@/components/ui'
 import { logger } from '@/lib'
-import { getCurrentUserProfile } from '@/lib/database/common'
+import { updateStorageCache } from '@/lib/storage'
 import { useScale } from '@/theme'
 import { useEffect, useRef, useState } from 'react'
 import { View } from 'react-native'
@@ -47,8 +47,9 @@ export function AppSettings({
     const startTime = Date.now()
 
     try {
-      // Force refresh bypasses 4-hour cache, fetches latest from server
-      await getCurrentUserProfile(true)
+      // Refresh everything: user profile + all world access cache
+      await updateStorageCache.refreshEverything()
+      
       logger.info('other', 'Force refresh completed successfully')
       
       // Keep syncing toast visible for at least 2 seconds before showing success

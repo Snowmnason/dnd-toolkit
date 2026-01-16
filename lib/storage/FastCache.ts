@@ -7,6 +7,18 @@ if (Platform.OS !== 'web') {
   AsyncStorage = require('@react-native-async-storage/async-storage').default;
 }
 
+// Polyfill localStorage for Node.js environments (build processes, server-side)
+if (typeof localStorage === 'undefined') {
+  (global as any).localStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+    clear: () => {},
+    length: 0,
+    key: () => null,
+  };
+}
+
 /**
  * FastCache
  *
