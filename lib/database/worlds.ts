@@ -46,52 +46,62 @@ export interface CreateWorldData {
 export const worldsDB = {
   // Create a new world
   async create(worldData: CreateWorldData): Promise<World> {
-    // IMPORTANT: Always validate user before write operations
-    // Prevents orphaned data if account is suspended/deleted between check and write
-    const currentUser = await validateUserForWrite();
-    
-    logger.category('storage').debug('Creating world', {
-      ownerId: currentUser.id,
-      worldName: worldData.name,
-      system: worldData.system,
-      isDm: worldData.is_dm
-    });
+    return RequestManager.fetch(
+      `worlds:create:${Date.now()}`,
+      async () => {
+        // IMPORTANT: Always validate user before write operations
+        // Prevents orphaned data if account is suspended/deleted between check and write
+        const currentUser = await validateUserForWrite();
+        
+        logger.category('storage').debug('Creating world', {
+          ownerId: currentUser.id,
+          worldName: worldData.name,
+          system: worldData.system,
+          isDm: worldData.is_dm
+        });
 
-    // Store profile ID as owner_id (proper FK relationship)
-    const insertData = {
-      ...worldData,
-      owner_id: currentUser.id
-    };
+        // Store profile ID as owner_id (proper FK relationship)
+        const insertData = {
+          ...worldData,
+          owner_id: currentUser.id
+        };
 
-    const { data, error } = await supabase
-      .from('worlds')
-      .insert(insertData)
-      .select()
-      .single();
-    
-    if (error) {
-      logger.category('storage').error('Failed to create world', {
-        ownerId: currentUser.id,
-        worldName: worldData.name,
-        error: error.message,
-        code: error.code
-      });
-      throw new Error(error.message || 'Failed to create world');
-    }
-    
-    logger.category('storage').info('World created successfully', {
-      worldId: data.world_id,
-      ownerId: currentUser.id,
-      name: data.name
-    });
+        const { data, error } = await supabase
+          .from('worlds')
+          .insert(insertData)
+          .select()
+          .single();
+        
+        if (error) {
+          logger.category('storage').error('Failed to create world', {
+            ownerId: currentUser.id,
+            worldName: worldData.name,
+            error: error.message,
+            code: error.code
+          });
+          throw new Error(error.message || 'Failed to create world');
+        }
+        
+        logger.category('storage').info('World created successfully', {
+          worldId: data.world_id,
+          ownerId: currentUser.id,
+          name: data.name
+        });
 
-    // Invalidate world lists cache (notify all subscribers)
-    await QueryCache.invalidateByTags([
-      CACHE_TAGS.worlds,
-      CACHE_TAGS.user(currentUser.id)
-    ]);
-    
-    return data;
+        // Invalidate world lists cache (notify all subscribers)
+        await QueryCache.invalidateByTags([
+          CACHE_TAGS.worlds,
+          CACHE_TAGS.user(currentUser.id)
+        ]);
+        
+        return data;
+      },
+      {
+        dedupe: false,
+        retries: 3,
+        timeout: 15000,
+      }
+    );
   },
 
   // Get all worlds for current user (both owned and member of)
@@ -266,101 +276,141 @@ export const worldsDB = {
 
     // Update a world name (only owner)
   async updateName(worldId: string, newName: string): Promise<World> {
-    // Validate before write
-    const user = await validateUserForWrite();
-    
-    const { data, error } = await supabase
-      .from('worlds')
-      .update({name: newName, updated_at: 'now()'})
-      .eq('world_id', worldId)
-      .eq('owner_id', user.id)
-      .select()
-      .single();
-    
-    if (error) {
-      logger.error('storage', 'Error updating world:', error);
-      throw new Error(error.message || 'Failed to update world');
-    }
+    return RequestManager.fetch(
+      `worlds:updateName:${worldId}`,
+      async () => {
+        // Validate before write
+        const user = await validateUserForWrite();
+        
+        const { data, error } = await supabase
+          .from('worlds')
+          .update({name: newName, updated_at: 'now()'})
+          .eq('world_id', worldId)
+          .eq('owner_id', user.id)
+          .select()
+          .single();
+        
+        if (error) {
+          logger.error('storage', 'Error updating world:', error);
+          throw new Error(error.message || 'Failed to update world');
+        }
 
-    // Invalidate specific world and lists cache
-    await QueryCache.invalidateByTags([
-      CACHE_TAGS.worlds,
-      CACHE_TAGS.world(worldId)
-    ]);
-    
-    return data;
+        // Invalidate specific world and lists cache
+        await QueryCache.invalidateByTags([
+          CACHE_TAGS.worlds,
+          CACHE_TAGS.world(worldId)
+        ]);
+        
+        return data;
+      },
+      {
+        dedupe: false,
+        retries: 3,
+        timeout: 15000,
+      }
+    );
   },
 
   // Update a world
   async update(worldId: string, updates: Partial<CreateWorldData>): Promise<World> {
-    // Validate before write
-    await validateUserForWrite();
-    
-    const { data, error } = await supabase
-      .from('worlds')
-      .update({
-        ...updates,
-        updated_at: 'now()'
-      })
-      .eq('world_id', worldId)
-      .select()
-      .single();
-    
-    if (error) {
-      logger.error('storage', 'Error updating world:', error);
-      throw new Error(error.message || 'Failed to update world');
-    }
+    return RequestManager.fetch(
+      `worlds:update:${worldId}`,
+      async () => {
+        // Validate before write
+        await validateUserForWrite();
+        
+        const { data, error } = await supabase
+          .from('worlds')
+          .update({
+            ...updates,
+            updated_at: 'now()'
+          })
+          .eq('world_id', worldId)
+          .select()
+          .single();
+        
+        if (error) {
+          logger.error('storage', 'Error updating world:', error);
+          throw new Error(error.message || 'Failed to update world');
+        }
 
-    // Invalidate specific world and lists cache
-    await QueryCache.invalidateByTags([
-      CACHE_TAGS.worlds,
-      CACHE_TAGS.world(worldId)
-    ]);
-    
-    return data;
+        // Invalidate specific world and lists cache
+        await QueryCache.invalidateByTags([
+          CACHE_TAGS.worlds,
+          CACHE_TAGS.world(worldId)
+        ]);
+        
+        return data;
+      },
+      {
+        dedupe: false,
+        retries: 3,
+        timeout: 15000,
+      }
+    );
   },
 
   // Delete a world
   async delete(worldId: string): Promise<void> {
-    // Validate before write
-    const user = await validateUserForWrite();
-    
-    const { error } = await supabase
-      .from('worlds')
-      .delete()
-      .eq('world_id', worldId)
-      .eq('owner_id', user.id); // Ensure only owner can delete
-    
-    if (error) {
-      logger.error('storage', 'Error deleting world:', error);
-      throw new Error(error.message || 'Failed to delete world');
-    }
+    return RequestManager.fetch(
+      `worlds:delete:${worldId}`,
+      async () => {
+        // Validate before write
+        const user = await validateUserForWrite();
+        
+        const { error } = await supabase
+          .from('worlds')
+          .delete()
+          .eq('world_id', worldId)
+          .eq('owner_id', user.id); // Ensure only owner can delete
+        
+        if (error) {
+          logger.error('storage', 'Error deleting world:', error);
+          throw new Error(error.message || 'Failed to delete world');
+        }
 
-    // Invalidate specific world and lists cache
-    await QueryCache.invalidateByTags([
-      CACHE_TAGS.worlds,
-      CACHE_TAGS.world(worldId)
-    ]);
+        // Invalidate specific world and lists cache
+        await QueryCache.invalidateByTags([
+          CACHE_TAGS.worlds,
+          CACHE_TAGS.world(worldId)
+        ]);
+      },
+      {
+        dedupe: false,
+        retries: 3,
+        timeout: 15000,
+      }
+    );
   },
 
   // Remove user from world
   async removeUserFromWorld(worldId: string, userId: string): Promise<void> {
-    const { error } = await supabase
-      .from('world_access')
-      .delete()
-      .eq('world_id', worldId)
-      .eq('user_id', userId);
+    return RequestManager.fetch(
+      `worlds:removeUserFromWorld:${worldId}:${userId}`,
+      async () => {
+        const { error } = await supabase
+          .from('world_access')
+          .delete()
+          .eq('world_id', worldId)
+          .eq('user_id', userId);
 
-    if (error) {
-      logger.error('storage', 'Error removing user from world:', error);
-      throw new Error(error.message || 'Failed to remove user from world');
-    }
+        if (error) {
+          logger.error('storage', 'Error removing user from world:', error);
+          throw new Error(error.message || 'Failed to remove user from world');
+        }
 
-    // Invalidate world members and user's worlds cache
-    await QueryCache.invalidateByTags([
-      CACHE_TAGS.worldMembers(worldId),
-      CACHE_TAGS.user(userId)
-    ]);
+        // Invalidate world members and user's worlds cache
+        await QueryCache.invalidateByTags([
+          CACHE_TAGS.worldMembers(worldId),
+          CACHE_TAGS.user(userId)
+        ]);
+      },
+      {
+        dedupe: false,
+        retries: 3,
+        timeout: 15000,
+      }
+    );
   },
 
   // Check if user is already in a world (either as owner or member)
@@ -406,30 +456,40 @@ export const worldsDB = {
 
     // Add user to world (invite/join)
   async addUserToWorld(worldId: string, userId: string, userRole: AccessRole = 'player', permissions: any = {}): Promise<WorldAccess> {
-    const { data, error } = await supabase
-      .from('world_access')
-      .insert({
-        world_id: worldId,
-        user_id: userId,
-        user_role: userRole,
-        permissions
-      })
-      .select()
-      .single();
+    return RequestManager.fetch(
+      `worlds:addUserToWorld:${worldId}:${userId}`,
+      async () => {
+        const { data, error } = await supabase
+          .from('world_access')
+          .insert({
+            world_id: worldId,
+            user_id: userId,
+            user_role: userRole,
+            permissions
+          })
+          .select()
+          .single();
 
-    if (error) {
-      logger.error('storage', 'Error adding user to world:', error);
-      throw new Error(error.message || 'Failed to add user to world');
-    }
+        if (error) {
+          logger.error('storage', 'Error adding user to world:', error);
+          throw new Error(error.message || 'Failed to add user to world');
+        }
 
-    // Invalidate world members and user's worlds cache
-    await QueryCache.invalidateByTags([
-      CACHE_TAGS.worldMembers(worldId),
-      CACHE_TAGS.user(userId),
-      CACHE_TAGS.worlds
-    ]);
+        // Invalidate world members and user's worlds cache
+        await QueryCache.invalidateByTags([
+          CACHE_TAGS.worldMembers(worldId),
+          CACHE_TAGS.user(userId),
+          CACHE_TAGS.worlds
+        ]);
 
-    return data;
+        return data;
+      },
+      {
+        dedupe: false,
+        retries: 3,
+        timeout: 15000,
+      }
+    );
   },
 
   // Get all members of a world
