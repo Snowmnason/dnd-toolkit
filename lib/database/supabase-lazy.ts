@@ -7,21 +7,27 @@
  * use static imports of supabase.ts since they are the authoritative data layer.
  *
  * Usage:
- *   const { getSupabaseClient, isSupabaseConfigured } = await getSupabaseModule();
- *   if (!isSupabaseConfigured()) { /* handle gracefully }
- *   const client = getSupabaseClient();
- **/
+ *   if (!await isSupabaseConfiguredLazy()) { return handleOfflineMode(); }
+ *   const supabase = await getSupabaseClientLazy();
+ *   const { data } = await supabase.from('table').select('*');
+ */
 
 export async function getSupabaseModule() {
   return await import('./supabase');
 }
 
-export async function getSupabaseClientLazy() {
-  const mod = await getSupabaseModule();
-  return mod.getSupabaseClient();
-}
-
 export async function isSupabaseConfiguredLazy() {
   const mod = await getSupabaseModule();
   return mod.isSupabaseConfigured();
+}
+
+export async function getSupabaseClientLazy() {
+  const configured = await isSupabaseConfiguredLazy();
+  if (!configured) {
+    throw new Error(
+      'Supabase is not configured. Cannot initialize client without EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY environment variables.'
+    );
+  }
+  const mod = await getSupabaseModule();
+  return mod.getSupabaseClient();
 }

@@ -33,7 +33,8 @@ export const useResetPasswordConfirm = () => {
   useEffect(() => {
     if (error) setError('');
     if (success) setSuccess(false);
-  }, [password, confirmPassword, error, success]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [password, confirmPassword]);
 
   // Get user email from the session/token when component mounts
   useEffect(() => {

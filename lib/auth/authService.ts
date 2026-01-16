@@ -83,12 +83,11 @@ export const signUpUser = async (
     const signupResponse = await RequestManager.fetch<AuthResponse>(
       `auth:signup:${sanitizedEmail}`,
       async () => {
-        if (!await isSupabaseConfiguredLazy()) {
-          throw new Error('Supabase not configured');
-        }
+        const configured = await isSupabaseConfiguredLazy();
+        if (!configured) throw new Error('Supabase not configured');
         const supabase = await getSupabaseClientLazy();
-        return supabase.auth.signUp({ 
-          email: sanitizedEmail, 
+        return supabase.auth.signUp({
+          email: sanitizedEmail,
           password,
           options: {
             emailRedirectTo: `${baseUrl}/login/auth-redirect?action=signup-confirm`,
@@ -209,9 +208,8 @@ export const signInUser = async (
     const signInResponse = await RequestManager.fetch<AuthTokenResponse>(
       `auth:signin:${sanitizedEmail}`,
       async () => {
-        if (!await isSupabaseConfiguredLazy()) {
-          throw new Error('Supabase not configured');
-        }
+        const configured = await isSupabaseConfiguredLazy();
+        if (!configured) throw new Error('Supabase not configured');
         const supabase = await getSupabaseClientLazy();
         return supabase.auth.signInWithPassword({
           email: sanitizedEmail,
@@ -387,9 +385,8 @@ export const sendPasswordReset = async (email: string): Promise<ResetPasswordRes
     const resetResponse = await RequestManager.fetch<AuthResponse>(
       `auth:reset:${sanitizedEmail}`,
       async () => {
-        if (!await isSupabaseConfiguredLazy()) {
-          throw new Error('Supabase not configured');
-        }
+        const configured = await isSupabaseConfiguredLazy();
+        if (!configured) throw new Error('Supabase not configured');
         const supabase = await getSupabaseClientLazy();
         return supabase.auth.resetPasswordForEmail(sanitizedEmail, {
           redirectTo: `${baseUrl}/login/auth-redirect?action=reset-password`

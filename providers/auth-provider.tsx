@@ -2,12 +2,13 @@ import { AuthContext } from '@/hooks/use-auth-context'
 import { getSupabaseClientLazy, isSupabaseConfiguredLazy } from '@/lib/database/supabase-lazy'
 import { logger } from '@/lib/utils/logger'
 import type { Session } from '@supabase/supabase-js'
-import { PropsWithChildren, useEffect, useState } from 'react'
+import { PropsWithChildren, useEffect, useRef, useState } from 'react'
 
 export default function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | undefined | null>()
   const [profile, setProfile] = useState<any>()
   const [isLoading, setIsLoading] = useState<boolean>(true)
+  const subscriptionRef = useRef<any>(null)
 
   // Fetch the session once, and subscribe to auth state changes
   useEffect(() => {
@@ -43,13 +44,12 @@ export default function AuthProvider({ children }: PropsWithChildren) {
     fetchSession()
 
     // Subscribe to auth changes only if configured
-    let subscription: any
     const setupSubscription = async () => {
       if (!await isSupabaseConfiguredLazy()) return
       const supabase = await getSupabaseClientLazy()
 
       const {
-        data: { subscription: sub },
+        data: { subscription },
       } = supabase.auth.onAuthStateChange(
         (
           _event: import('@supabase/supabase-js').AuthChangeEvent,
@@ -59,14 +59,14 @@ export default function AuthProvider({ children }: PropsWithChildren) {
           setSession(session)
         }
       )
-      subscription = sub
+      subscriptionRef.current = subscription
     }
 
     setupSubscription()
 
     // Cleanup subscription on unmount
     return () => {
-      subscription?.unsubscribe()
+      subscriptionRef.current?.unsubscribe()
     }
   }, [])
 
