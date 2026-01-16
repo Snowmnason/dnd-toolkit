@@ -1,7 +1,8 @@
 import { RequestManager } from '../api/request-manager';
-import { logger } from '../utils/logger';
 import { QueryCache } from '../cache';
-import { CACHE_KEYS, CACHE_TAGS } from '../cache/keys';
+import { CACHE_TAGS } from '../cache/keys';
+import { logger } from '../utils/logger';
+import { worldAccessCache } from '../storage/world-access-cache';
 import { executeParallelQueries, getCurrentUserProfile, validateUserForWrite } from './common';
 import { supabase } from './supabase';
 
@@ -46,154 +47,217 @@ export interface CreateWorldData {
 export const worldsDB = {
   // Create a new world
   async create(worldData: CreateWorldData): Promise<World> {
-    // IMPORTANT: Always validate user before write operations
-    // Prevents orphaned data if account is suspended/deleted between check and write
-    const currentUser = await validateUserForWrite();
-    
-    logger.category('storage').debug('Creating world', {
-      ownerId: currentUser.id,
-      worldName: worldData.name,
-      system: worldData.system,
-      isDm: worldData.is_dm
-    });
+    return RequestManager.fetch(
+      `worlds:create:${Date.now()}`,
+      async () => {
+        // IMPORTANT: Always validate user before write operations
+        // Prevents orphaned data if account is suspended/deleted between check and write
+        const currentUser = await validateUserForWrite();
+        
+        logger.category('storage').debug('Creating world', {
+          ownerId: currentUser.id,
+          worldName: worldData.name,
+          system: worldData.system,
+          isDm: worldData.is_dm
+        });
 
-    // Store profile ID as owner_id (proper FK relationship)
-    const insertData = {
-      ...worldData,
-      owner_id: currentUser.id
-    };
+        // Store profile ID as owner_id (proper FK relationship)
+        const insertData = {
+          ...worldData,
+          owner_id: currentUser.id
+        };
 
-    const { data, error } = await supabase
-      .from('worlds')
-      .insert(insertData)
-      .select()
-      .single();
-    
-    if (error) {
-      logger.category('storage').error('Failed to create world', {
-        ownerId: currentUser.id,
-        worldName: worldData.name,
-        error: error.message,
-        code: error.code
-      });
-      throw new Error(error.message || 'Failed to create world');
-    }
-    
-    logger.category('storage').info('World created successfully', {
-      worldId: data.world_id,
-      ownerId: currentUser.id,
-      name: data.name
-    });
+        const { data, error } = await supabase
+          .from('worlds')
+          .insert(insertData)
+          .select()
+          .single();
+        
+        if (error) {
+          logger.category('storage').error('Failed to create world', {
+            ownerId: currentUser.id,
+            worldName: worldData.name,
+            error: error.message,
+            code: error.code
+          });
+          throw new Error(error.message || 'Failed to create world');
+        }
+        
+        logger.category('storage').info('World created successfully', {
+          worldId: data.world_id,
+          ownerId: currentUser.id,
+          name: data.name
+        });
 
-    // Invalidate world lists cache (notify all subscribers)
-    await QueryCache.invalidateByTags([
-      CACHE_TAGS.worlds,
-      CACHE_TAGS.user(currentUser.id)
-    ]);
-    
-    return data;
+        // Invalidate world lists cache (notify all subscribers)
+        await QueryCache.invalidateByTags([
+          CACHE_TAGS.worlds,
+          CACHE_TAGS.user(currentUser.id)
+        ]);
+
+        // Update SecureStorage access flag for new world (owner has access)
+        await worldAccessCache.updateAccessFlag(data.world_id, true, 'create');
+        
+        return data;
+      },
+      {
+        dedupe: false,
+        retries: 3,
+        timeout: 15000,
+      }
+    );
   },
 
   // Get all worlds for current user (both owned and member of)
+  // NOTE: This is a convenience wrapper around getMyWorldsPaginated() that returns all worlds
+  // without pagination. Uses the same caching and optimization logic internally.
   async getMyWorlds(userId?: string): Promise<WorldWithAccess[]> {
+    // Call the paginated version without pagination params to get all worlds
+    // This ensures we get the caching benefits without code duplication
+    const result = await this.getMyWorldsPaginated(userId);
+    return result.items;
+  },
+
+  // Get paginated worlds for current user (both owned and member of)
+  async getMyWorldsPaginated(
+    userId?: string,
+    options: { page?: number; limit?: number } = {}
+  ): Promise<{ items: WorldWithAccess[]; total: number }> {
+    const { page = 1, limit = 20 } = options;
+    const offset = (page - 1) * limit;
+
     // Handle case where user is not authenticated (e.g., during logout)
     let currentUserId = userId;
     if (!currentUserId) {
       // Use getCurrentUserProfile to handle logout gracefully
       const currentUser = await getCurrentUserProfile();
       if (!currentUser) {
-        return []; // Return empty array if not authenticated (graceful during logout)
+        return { items: [], total: 0 }; // Return empty result if not authenticated
       }
       currentUserId = currentUser.id;
     }
 
-    // STEP 1: Get world IDs from both world_access and owned worlds in parallel
-    // Uses indexes: idx_world_access_user_id, idx_worlds_owner_id
-    const [accessRecordsResult, ownedWorldIdsResult] = await executeParallelQueries<
-      [
+    // OPTIMIZATION: Try to get world IDs from cache first
+    // This avoids re-fetching the same world access data for every page
+    const cacheKey = `worlds:ids:${currentUserId}`;
+    let worldIdSet: Set<string>;
+    let roleMap: Map<string, { role: UserRole; permissions: any }>;
+    
+    const cachedData = await QueryCache.get<{
+      worldIds: string[];
+      roles: [string, { role: UserRole; permissions: any }][];
+    }>(cacheKey);
+
+    if (cachedData) {
+      // Use cached world IDs and roles
+      worldIdSet = new Set(cachedData.worldIds);
+      roleMap = new Map(cachedData.roles);
+      logger.debug('storage', `Using cached world IDs for user ${currentUserId}`, {
+        count: worldIdSet.size
+      });
+    } else {
+      // STEP 1: Get world IDs from both world_access and owned worlds in parallel
+      const [accessRecordsResult, ownedWorldIdsResult] = await executeParallelQueries<[
         { data: any[] | null; error: any },
         { data: any[] | null; error: any }
-      ]
-    >(
-      // Get world_access records where user_id matches (includes world_id and role)
-      supabase
-        .from('world_access')
-        .select('world_id, user_role, permissions')
-        .eq('user_id', currentUserId),
-      
-      // Get world IDs where owner_id matches
-      supabase
-        .from('worlds')
-        .select('world_id')
-        .eq('owner_id', currentUserId)
-    );
+      ]>(
+        // Get world_access records where user_id matches (includes world_id and role)
+        supabase
+          .from('world_access')
+          .select('world_id, user_role, permissions')
+          .eq('user_id', currentUserId),
 
-    if (accessRecordsResult.error) {
-      logger.error('storage', 'Error fetching access records:', accessRecordsResult.error);
-      throw new Error(accessRecordsResult.error.message || 'Failed to fetch access records');
+        // Get world IDs where owner_id matches
+        supabase
+          .from('worlds')
+          .select('world_id')
+          .eq('owner_id', currentUserId)
+      );
+
+      if (accessRecordsResult.error) {
+        logger.error('storage', 'Error fetching access records:', accessRecordsResult.error);
+        throw new Error(accessRecordsResult.error.message || 'Failed to fetch access records');
+      }
+
+      if (ownedWorldIdsResult.error) {
+        logger.error('storage', 'Error fetching owned world IDs:', ownedWorldIdsResult.error);
+        throw new Error(ownedWorldIdsResult.error.message || 'Failed to fetch owned world IDs');
+      }
+
+      // STEP 2: Collect all unique world IDs and build role mapping
+      worldIdSet = new Set<string>();
+      roleMap = new Map<string, { role: UserRole; permissions: any }>();
+
+      // Add world IDs from world_access (user is a member/dm)
+      (accessRecordsResult.data || []).forEach((access: any) => {
+        worldIdSet.add(access.world_id);
+        roleMap.set(access.world_id, {
+          role: access.user_role,
+          permissions: access.permissions || {}
+        });
+      });
+
+      // Add world IDs from owned worlds (user is owner) - owner takes precedence
+      (ownedWorldIdsResult.data || []).forEach((world: any) => {
+        worldIdSet.add(world.world_id);
+        roleMap.set(world.world_id, {
+          role: 'owner',
+          permissions: {}
+        });
+      });
+
+      // Cache the world IDs and roles (short TTL since membership can change)
+      await QueryCache.set(
+        cacheKey,
+        {
+          worldIds: Array.from(worldIdSet),
+          roles: Array.from(roleMap.entries()),
+        },
+        {
+          staleTime: 5 * 60 * 1000, // 5 minutes
+          cacheTime: 15 * 60 * 1000, // 15 minutes
+          tags: ['worlds', `user:${currentUserId}`],
+        }
+      );
+
+      logger.debug('storage', `Cached world IDs for user ${currentUserId}`, {
+        count: worldIdSet.size
+      });
     }
 
-    if (ownedWorldIdsResult.error) {
-      logger.error('storage', 'Error fetching owned world IDs:', ownedWorldIdsResult.error);
-      throw new Error(ownedWorldIdsResult.error.message || 'Failed to fetch owned world IDs');
-    }
-
-    // STEP 2: Collect all unique world IDs and build role mapping
-    const worldIdSet = new Set<string>();
-    const roleMap = new Map<string, { role: UserRole; permissions: any }>();
-
-    // Add world IDs from world_access (user is a member/dm)
-    (accessRecordsResult.data || []).forEach((access: any) => {
-      worldIdSet.add(access.world_id);
-      roleMap.set(access.world_id, {
-        role: access.user_role,
-        permissions: access.permissions || {}
-      });
-    });
-
-    // Add world IDs from owned worlds (user is owner) - owner takes precedence
-    (ownedWorldIdsResult.data || []).forEach((world: any) => {
-      worldIdSet.add(world.world_id);
-      roleMap.set(world.world_id, {
-        role: 'owner',
-        permissions: {}
-      });
-    });
-
-    // DEBUGGING: Uncomment to see collected IDs
-    logger.debug('storage', 'Unique world IDs:', worldIdSet.size);
-    logger.debug('storage', 'World IDs:', Array.from(worldIdSet));
+    const totalWorlds = worldIdSet.size;
 
     // STEP 3: Early return if no worlds found
-    if (worldIdSet.size === 0) {
-      // DEBUGGING: Uncomment to trace empty results
-      logger.info('storage', 'No worlds found for user');
-      return [];
+    if (totalWorlds === 0) {
+      return { items: [], total: 0 };
     }
 
-    // STEP 4: Fetch all worlds in ONE query using the collected IDs
+    // STEP 4: Fetch paginated worlds using the collected IDs
+    // NOTE: We apply pagination here after collecting IDs because:
+    // 1. We need to merge owner + member roles (owner takes precedence)
+    // 2. SQL can't easily handle this precedence logic
+    // 3. Most users have <100 worlds, so fetching all IDs is acceptable
+    // 4. World IDs are now cached (5min TTL), so subsequent pages are faster
+    // If your users typically have 1000+ worlds, consider a different approach:
+    // - Use a database view that merges roles
+    // - Or implement server-side cursor pagination
     const worldIds = Array.from(worldIdSet);
     const { data: worldsData, error: worldsError } = await supabase
       .from('worlds')
       .select('*')
       .in('world_id', worldIds)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (worldsError) {
-      logger.error('storage', 'Error fetching worlds:', worldsError);
+      logger.error('storage', 'Error fetching paginated worlds:', worldsError);
       throw new Error(worldsError.message || 'Failed to fetch worlds');
     }
 
-    // DEBUGGING: Uncomment to see fetched worlds count
-    logger.debug('storage', 'Worlds fetched:', worldsData?.length || 0);
-
     // STEP 5: Map worlds with their roles
-    const allWorlds: WorldWithAccess[] = (worldsData || []).map((world: World) => {
+    const paginatedWorlds: WorldWithAccess[] = (worldsData || []).map((world: World) => {
       const roleInfo = roleMap.get(world.world_id);
-      
-      // DEBUGGING: Uncomment to trace each world
-      logger.debug('storage', `Adding world: ${world.name} (role: ${roleInfo?.role})`);
-      
+
       return {
         ...world,
         user_role: roleInfo?.role || 'player',
@@ -208,109 +272,162 @@ export const worldsDB = {
       };
     });
 
-    // DEBUGGING: Uncomment to see final count
-    logger.debug('storage', `Total worlds returned: ${allWorlds.length}`);
-    
-    return allWorlds;
+    return {
+      items: paginatedWorlds,
+      total: totalWorlds
+    };
   },
 
     // Update a world name (only owner)
   async updateName(worldId: string, newName: string): Promise<World> {
-    // Validate before write
-    const user = await validateUserForWrite();
-    
-    const { data, error } = await supabase
-      .from('worlds')
-      .update({name: newName, updated_at: 'now()'})
-      .eq('world_id', worldId)
-      .eq('owner_id', user.id)
-      .select()
-      .single();
-    
-    if (error) {
-      logger.error('storage', 'Error updating world:', error);
-      throw new Error(error.message || 'Failed to update world');
-    }
+    return RequestManager.fetch(
+      `worlds:updateName:${worldId}`,
+      async () => {
+        // Validate before write
+        const user = await validateUserForWrite();
+        
+        const { data, error } = await supabase
+          .from('worlds')
+          .update({name: newName, updated_at: 'now()'})
+          .eq('world_id', worldId)
+          .eq('owner_id', user.id)
+          .select()
+          .single();
+        
+        if (error) {
+          logger.error('storage', 'Error updating world:', error);
+          throw new Error(error.message || 'Failed to update world');
+        }
 
-    // Invalidate specific world and lists cache
-    await QueryCache.invalidateByTags([
-      CACHE_TAGS.worlds,
-      CACHE_TAGS.world(worldId)
-    ]);
-    
-    return data;
+        // Invalidate specific world and lists cache
+        await QueryCache.invalidateByTags([
+          CACHE_TAGS.worlds,
+          CACHE_TAGS.world(worldId)
+        ]);
+        
+        return data;
+      },
+      {
+        dedupe: false,
+        retries: 3,
+        timeout: 15000,
+      }
+    );
   },
 
   // Update a world
   async update(worldId: string, updates: Partial<CreateWorldData>): Promise<World> {
-    // Validate before write
-    await validateUserForWrite();
-    
-    const { data, error } = await supabase
-      .from('worlds')
-      .update({
-        ...updates,
-        updated_at: 'now()'
-      })
-      .eq('world_id', worldId)
-      .select()
-      .single();
-    
-    if (error) {
-      logger.error('storage', 'Error updating world:', error);
-      throw new Error(error.message || 'Failed to update world');
-    }
+    return RequestManager.fetch(
+      `worlds:update:${worldId}`,
+      async () => {
+        // Validate before write
+        await validateUserForWrite();
+        
+        const { data, error } = await supabase
+          .from('worlds')
+          .update({
+            ...updates,
+            updated_at: 'now()'
+          })
+          .eq('world_id', worldId)
+          .select()
+          .single();
+        
+        if (error) {
+          logger.error('storage', 'Error updating world:', error);
+          throw new Error(error.message || 'Failed to update world');
+        }
 
-    // Invalidate specific world and lists cache
-    await QueryCache.invalidateByTags([
-      CACHE_TAGS.worlds,
-      CACHE_TAGS.world(worldId)
-    ]);
-    
-    return data;
+        // Invalidate specific world and lists cache
+        await QueryCache.invalidateByTags([
+          CACHE_TAGS.worlds,
+          CACHE_TAGS.world(worldId)
+        ]);
+        
+        return data;
+      },
+      {
+        dedupe: false,
+        retries: 3,
+        timeout: 15000,
+      }
+    );
   },
 
   // Delete a world
   async delete(worldId: string): Promise<void> {
-    // Validate before write
-    const user = await validateUserForWrite();
-    
-    const { error } = await supabase
-      .from('worlds')
-      .delete()
-      .eq('world_id', worldId)
-      .eq('owner_id', user.id); // Ensure only owner can delete
-    
-    if (error) {
-      logger.error('storage', 'Error deleting world:', error);
-      throw new Error(error.message || 'Failed to delete world');
-    }
+    await RequestManager.fetch(
+      `worlds:delete:${worldId}`,
+      async () => {
+        // Validate before write
+        const user = await validateUserForWrite();
+        
+        const { error } = await supabase
+          .from('worlds')
+          .delete()
+          .eq('world_id', worldId)
+          .eq('owner_id', user.id); // Ensure only owner can delete
+        
+        if (error) {
+          logger.error('storage', 'Error deleting world:', error);
+          throw new Error(error.message || 'Failed to delete world');
+        }
 
-    // Invalidate specific world and lists cache
-    await QueryCache.invalidateByTags([
-      CACHE_TAGS.worlds,
-      CACHE_TAGS.world(worldId)
-    ]);
+        // Invalidate specific world and lists cache
+        await QueryCache.invalidateByTags([
+          CACHE_TAGS.worlds,
+          CACHE_TAGS.world(worldId)
+        ]);
+
+        // Clear SecureStorage access flags for deleted world
+        await worldAccessCache.clearWorldAccess(worldId);
+      },
+      {
+        dedupe: false,
+        retries: 3,
+        timeout: 15000,
+      }
+    );
+
+    return;
   },
 
   // Remove user from world
   async removeUserFromWorld(worldId: string, userId: string): Promise<void> {
-    const { error } = await supabase
-      .from('world_access')
-      .delete()
-      .eq('world_id', worldId)
-      .eq('user_id', userId);
+    await RequestManager.fetch(
+      `worlds:removeUserFromWorld:${worldId}:${userId}`,
+      async () => {
+        const { error } = await supabase
+          .from('world_access')
+          .delete()
+          .eq('world_id', worldId)
+          .eq('user_id', userId);
 
-    if (error) {
-      logger.error('storage', 'Error removing user from world:', error);
-      throw new Error(error.message || 'Failed to remove user from world');
-    }
+        if (error) {
+          logger.error('storage', 'Error removing user from world:', error);
+          throw new Error(error.message || 'Failed to remove user from world');
+        }
 
-    // Invalidate world members and user's worlds cache
-    await QueryCache.invalidateByTags([
-      CACHE_TAGS.worldMembers(worldId),
-      CACHE_TAGS.user(userId)
-    ]);
+        // Invalidate world members and user's worlds cache
+        await QueryCache.invalidateByTags([
+          CACHE_TAGS.worldMembers(worldId),
+          CACHE_TAGS.user(userId)
+        ]);
+
+        // NOTE: Do not update SecureStorage here. This function removes userId (potentially another user)
+        // from the world, but SecureStorage is per-user and can only be updated for the current user.
+        // If userId === currentUserId (user removing themselves), the background QueryCache.getMyWorlds()
+        // will refresh and update SecureStorage via useWorlds hook. For other users, their own clients
+        // will sync when they next fetch their world list.
+      },
+      {
+        dedupe: false,
+        retries: 3,
+        timeout: 15000,
+      }
+    );
+
+    return;
   },
 
   // Check if user is already in a world (either as owner or member)
@@ -356,30 +473,46 @@ export const worldsDB = {
 
     // Add user to world (invite/join)
   async addUserToWorld(worldId: string, userId: string, userRole: AccessRole = 'player', permissions: any = {}): Promise<WorldAccess> {
-    const { data, error } = await supabase
-      .from('world_access')
-      .insert({
-        world_id: worldId,
-        user_id: userId,
-        user_role: userRole,
-        permissions
-      })
-      .select()
-      .single();
+    return RequestManager.fetch(
+      `worlds:addUserToWorld:${worldId}:${userId}`,
+      async () => {
+        const { data, error } = await supabase
+          .from('world_access')
+          .insert({
+            world_id: worldId,
+            user_id: userId,
+            user_role: userRole,
+            permissions
+          })
+          .select()
+          .single();
 
-    if (error) {
-      logger.error('storage', 'Error adding user to world:', error);
-      throw new Error(error.message || 'Failed to add user to world');
-    }
+        if (error) {
+          logger.error('storage', 'Error adding user to world:', error);
+          throw new Error(error.message || 'Failed to add user to world');
+        }
 
-    // Invalidate world members and user's worlds cache
-    await QueryCache.invalidateByTags([
-      CACHE_TAGS.worldMembers(worldId),
-      CACHE_TAGS.user(userId),
-      CACHE_TAGS.worlds
-    ]);
+        // Invalidate world members and user's worlds cache
+        await QueryCache.invalidateByTags([
+          CACHE_TAGS.worldMembers(worldId),
+          CACHE_TAGS.user(userId),
+          CACHE_TAGS.worlds
+        ]);
 
-    return data;
+        // NOTE: Do not update SecureStorage here. This function adds userId to the world,
+        // but SecureStorage is per-user and can only be updated for the current user.
+        // If userId === currentUserId (user being added/invited), the background QueryCache.getMyWorlds()
+        // will refresh and update SecureStorage via useWorlds hook. For other invitations to different users,
+        // their own clients will sync when they next fetch their world list.
+
+        return data;
+      },
+      {
+        dedupe: false,
+        retries: 3,
+        timeout: 15000,
+      }
+    );
   },
 
   // Get all members of a world

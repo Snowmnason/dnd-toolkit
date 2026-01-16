@@ -27,63 +27,73 @@ export interface UpdateUserData {
 export const usersDB = {
   // Create a new user profile (called after auth signup) with input validation
   async create(userData: CreateUserData): Promise<User> {
-    logger.info('storage', 'Starting user profile creation', {
-      auth_id: userData.auth_id,
-      username: userData.username,
-      usernameLength: userData.username?.length
-    });
+    return RequestManager.fetch(
+      `user:create:${userData.auth_id}`,
+      async () => {
+        logger.info('storage', 'Starting user profile creation', {
+          auth_id: userData.auth_id,
+          username: userData.username,
+          usernameLength: userData.username?.length
+        });
 
-    // Validate and sanitize username if provided
-    if (userData.username) {
-      const usernameValidation = validateUsername(userData.username);
-      logger.debug('storage', 'Username validation result:', {
-        isValid: usernameValidation.isValid,
-        sanitized: usernameValidation.sanitized,
-        original: userData.username
-      });
-      
-      if (!usernameValidation.isValid) {
-        logger.error('storage', 'Username validation failed');
-        throw new Error('Username contains invalid characters or format');
+        // Validate and sanitize username if provided
+        if (userData.username) {
+          const usernameValidation = validateUsername(userData.username);
+          logger.debug('storage', 'Username validation result:', {
+            isValid: usernameValidation.isValid,
+            sanitized: usernameValidation.sanitized,
+            original: userData.username
+          });
+          
+          if (!usernameValidation.isValid) {
+            logger.error('storage', 'Username validation failed');
+            throw new Error('Username contains invalid characters or format');
+          }
+          userData.username = usernameValidation.sanitized;
+        }
+        
+        // Note: display_name removed from schema
+        logger.debug('storage', 'Inserting user data into database:', userData);
+
+        const { data, error } = await supabase
+          .from('users')
+          .insert(userData)
+          .select()
+          .single();
+        
+        if (error) {
+          logger.error('storage', 'Database error during user creation:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint
+          });
+          throw new Error(error.message || 'Failed to create user profile');
+        }
+        
+        logger.info('storage', 'User profile created successfully:', {
+          id: data.id,
+          auth_id: data.auth_id,
+          username: data.username,
+          created_at: data.created_at
+        });
+        
+        // Save user data to local storage
+        try {
+          const { AuthStateManager } = await import('../auth/auth-state');
+          await AuthStateManager.saveUserData(data);
+        } catch (storageError) {
+          logger.warn('storage', 'Failed to save user data to storage (non-critical):', storageError);
+        }
+        
+        return data;
+      },
+      {
+        dedupe: false,
+        retries: 3,
+        timeout: 15000,
       }
-      userData.username = usernameValidation.sanitized;
-    }
-    
-    // Note: display_name removed from schema
-    logger.debug('storage', 'Inserting user data into database:', userData);
-
-    const { data, error } = await supabase
-      .from('users')
-      .insert(userData)
-      .select()
-      .single();
-    
-    if (error) {
-      logger.error('storage', 'Database error during user creation:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      });
-      throw new Error(error.message || 'Failed to create user profile');
-    }
-    
-    logger.info('storage', 'User profile created successfully:', {
-      id: data.id,
-      auth_id: data.auth_id,
-      username: data.username,
-      created_at: data.created_at
-    });
-    
-    // Save user data to local storage
-    try {
-      const { AuthStateManager } = await import('../auth/auth-state');
-      await AuthStateManager.saveUserData(data);
-    } catch (storageError) {
-      logger.warn('storage', 'Failed to save user data to storage (non-critical):', storageError);
-    }
-    
-    return data;
+    );
   },
 
   // Create user with default values after signup (called from auth triggers or signup)
@@ -211,58 +221,80 @@ export const usersDB = {
 
   // Update current user's profile with input validation
   async updateCurrentUser(updates: UpdateUserData): Promise<User> {
-    // Validate before write operation
-    const authUser = await validateUserForWrite();
+    return RequestManager.fetch(
+      `user:update:${Date.now()}`,
+      async () => {
+        // Validate before write operation
+        const authUser = await validateUserForWrite();
 
-    // Validate and sanitize username if being updated
-    if (updates.username) {
-      const usernameValidation = validateUsername(updates.username);
-      if (!usernameValidation.isValid) {
-        throw new Error('Username contains invalid characters or format');
+        // Validate and sanitize username if being updated
+        if (updates.username) {
+          const usernameValidation = validateUsername(updates.username);
+          if (!usernameValidation.isValid) {
+            throw new Error('Username contains invalid characters or format');
+          }
+          updates.username = usernameValidation.sanitized;
+        }
+        
+        // Note: display_name removed from schema
+
+        const { data, error } = await supabase
+          .from('users')
+          .update(updates)
+          .eq('auth_id', authUser.id)
+          .select()
+          .single();
+        
+        if (error) {
+          logger.error('storage', 'Error updating user profile:', error);
+          throw new Error(error.message || 'Failed to update user profile');
+        }
+
+        // Invalidate user profile cache
+        await QueryCache.invalidateByTags(['users', `user:${data.id}`]);
+        
+        // Save updated user data to local storage
+        try {
+          const { AuthStateManager } = await import('../auth/auth-state');
+          await AuthStateManager.saveUserData(data);
+        } catch (storageError) {
+          logger.warn('storage', 'Failed to save updated user data to storage (non-critical):', storageError);
+        }
+        
+        return data;
+      },
+      {
+        dedupe: false,
+        retries: 3,
+        timeout: 15000,
       }
-      updates.username = usernameValidation.sanitized;
-    }
-    
-    // Note: display_name removed from schema
-
-    const { data, error } = await supabase
-      .from('users')
-      .update(updates)
-      .eq('auth_id', authUser.id)
-      .select()
-      .single();
-    
-    if (error) {
-      logger.error('storage', 'Error updating user profile:', error);
-      throw new Error(error.message || 'Failed to update user profile');
-    }
-
-    // Invalidate user profile cache
-    await QueryCache.invalidateByTags(['users', `user:${data.id}`]);
-    
-    // Save updated user data to local storage
-    try {
-      const { AuthStateManager } = await import('../auth/auth-state');
-      await AuthStateManager.saveUserData(data);
-    } catch (storageError) {
-      logger.warn('storage', 'Failed to save updated user data to storage (non-critical):', storageError);
-    }
-    
-    return data;
+    );
   },
 
-
   async deleteCurrentUser(): Promise<boolean> {
-    // SECURITY-CRITICAL: Account deletion requires server validation
-    // Must use validateCurrentUser() to ensure user is truly authenticated with server
-    const user = await validateCurrentUser();
-    if (!user) throw new Error('Not authenticated');
+    const result = await RequestManager.fetch(
+      `user:delete:${Date.now()}`,
+      async () => {
+        // SECURITY-CRITICAL: Account deletion requires server validation
+        // Must use validateCurrentUser() to ensure user is truly authenticated with server
+        const user = await validateCurrentUser();
+        if (!user) throw new Error('Not authenticated');
 
-    // call your Edge Function by name (no URL needed, no body needed)
-    const { data, error: fnError } = await supabase.functions.invoke('delete-account');
-    if (fnError) throw new Error(fnError.message || 'Failed to delete account');
-    logger.debug('storage', 'Account deletion function response:', data);
-    return true;
+        // call your Edge Function by name (no URL needed, no body needed)
+        const { data, error: fnError } = await supabase.functions.invoke('delete-account');
+        if (fnError) throw new Error(fnError.message || 'Failed to delete account');
+        logger.debug('storage', 'Account deletion function response:', data);
+        return true;
+      },
+      {
+        dedupe: false,
+        retries: 3,
+        timeout: 15000,
+      }
+    );
+
+    // RequestManager may return null if failOpen is enabled; normalize to boolean
+    return result ?? false;
   }
 
 };

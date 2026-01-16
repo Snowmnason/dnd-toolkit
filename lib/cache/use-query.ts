@@ -109,7 +109,7 @@ export function useQuery<T>(
       // Capture version at start of request
       const versionAtStart = QueryCache.getCurrentVersion();
       
-      const freshData = await fetcher(key);
+      const freshData = await QueryCache.fetchWithDedupe(key, () => fetcher(key));
 
       if (!isMountedRef.current) return;
 
