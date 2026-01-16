@@ -414,8 +414,11 @@ export const worldsDB = {
           CACHE_TAGS.user(userId)
         ]);
 
-        // Clear SecureStorage access flag for removed user
-        await worldAccessCache.updateAccessFlag(worldId, false, 'remove');
+        // NOTE: Do not update SecureStorage here. This function removes userId (potentially another user)
+        // from the world, but SecureStorage is per-user and can only be updated for the current user.
+        // If userId === currentUserId (user removing themselves), the background QueryCache.getMyWorlds()
+        // will refresh and update SecureStorage via useWorlds hook. For other users, their own clients
+        // will sync when they next fetch their world list.
       },
       {
         dedupe: false,
@@ -496,8 +499,11 @@ export const worldsDB = {
           CACHE_TAGS.worlds
         ]);
 
-        // Update SecureStorage access flag for newly added user
-        await worldAccessCache.updateAccessFlag(worldId, true, 'add');
+        // NOTE: Do not update SecureStorage here. This function adds userId to the world,
+        // but SecureStorage is per-user and can only be updated for the current user.
+        // If userId === currentUserId (user being added/invited), the background QueryCache.getMyWorlds()
+        // will refresh and update SecureStorage via useWorlds hook. For other invitations to different users,
+        // their own clients will sync when they next fetch their world list.
 
         return data;
       },
