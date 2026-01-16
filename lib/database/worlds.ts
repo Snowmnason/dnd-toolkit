@@ -2,6 +2,7 @@ import { RequestManager } from '../api/request-manager';
 import { QueryCache } from '../cache';
 import { CACHE_TAGS } from '../cache/keys';
 import { logger } from '../utils/logger';
+import { worldAccessCache } from '../storage/world-access-cache';
 import { executeParallelQueries, getCurrentUserProfile, validateUserForWrite } from './common';
 import { supabase } from './supabase';
 
@@ -93,6 +94,9 @@ export const worldsDB = {
           CACHE_TAGS.worlds,
           CACHE_TAGS.user(currentUser.id)
         ]);
+
+        // Update SecureStorage access flag for new world (owner has access)
+        await worldAccessCache.updateAccessFlag(data.world_id, true, 'create');
         
         return data;
       },
@@ -374,6 +378,9 @@ export const worldsDB = {
           CACHE_TAGS.worlds,
           CACHE_TAGS.world(worldId)
         ]);
+
+        // Clear SecureStorage access flags for deleted world
+        await worldAccessCache.clearWorldAccess(worldId);
       },
       {
         dedupe: false,
@@ -404,6 +411,9 @@ export const worldsDB = {
           CACHE_TAGS.worldMembers(worldId),
           CACHE_TAGS.user(userId)
         ]);
+
+        // Clear SecureStorage access flag for removed user
+        await worldAccessCache.updateAccessFlag(worldId, false, 'remove');
       },
       {
         dedupe: false,
@@ -481,6 +491,9 @@ export const worldsDB = {
           CACHE_TAGS.user(userId),
           CACHE_TAGS.worlds
         ]);
+
+        // Update SecureStorage access flag for newly added user
+        await worldAccessCache.updateAccessFlag(worldId, true, 'add');
 
         return data;
       },
