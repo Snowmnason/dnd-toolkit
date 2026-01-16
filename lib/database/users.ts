@@ -272,7 +272,7 @@ export const usersDB = {
   },
 
   async deleteCurrentUser(): Promise<boolean> {
-    return RequestManager.fetch(
+    const result = await RequestManager.fetch(
       `user:delete:${Date.now()}`,
       async () => {
         // SECURITY-CRITICAL: Account deletion requires server validation
@@ -292,6 +292,9 @@ export const usersDB = {
         timeout: 15000,
       }
     );
+
+    // RequestManager may return null if failOpen is enabled; normalize to boolean
+    return result ?? false;
   }
 
 };

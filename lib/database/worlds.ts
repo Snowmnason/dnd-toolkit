@@ -356,7 +356,7 @@ export const worldsDB = {
 
   // Delete a world
   async delete(worldId: string): Promise<void> {
-    return RequestManager.fetch(
+    await RequestManager.fetch(
       `worlds:delete:${worldId}`,
       async () => {
         // Validate before write
@@ -388,11 +388,13 @@ export const worldsDB = {
         timeout: 15000,
       }
     );
+
+    return;
   },
 
   // Remove user from world
   async removeUserFromWorld(worldId: string, userId: string): Promise<void> {
-    return RequestManager.fetch(
+    await RequestManager.fetch(
       `worlds:removeUserFromWorld:${worldId}:${userId}`,
       async () => {
         const { error } = await supabase
@@ -421,6 +423,8 @@ export const worldsDB = {
         timeout: 15000,
       }
     );
+
+    return;
   },
 
   // Check if user is already in a world (either as owner or member)
