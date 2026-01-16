@@ -73,7 +73,6 @@ const contextValue = React.useMemo(() => ({
 - `Screens/main-panels/PanelView.tsx` - Migrated to selector hooks
 - `components/TopBar.tsx` - Memoized with React.memo
 - `contexts/PlatformContext.tsx` - Added context memoization
-- `providers/ThemeProvider.tsx` - Added context memoization
 - `contexts/WorldSelectionContext.tsx` - Added context memoization
 - `providers/SubscriptionProvider.tsx` - Added context memoization
 
