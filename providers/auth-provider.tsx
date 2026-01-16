@@ -1,62 +1,72 @@
 import { AuthContext } from '@/hooks/use-auth-context'
-import { getSupabaseClient } from '@/lib/database/supabase'
+import { getSupabaseClientLazy, isSupabaseConfiguredLazy } from '@/lib/database/supabase-lazy'
 import { logger } from '@/lib/utils/logger'
 import type { Session } from '@supabase/supabase-js'
-import { PropsWithChildren, useEffect, useState } from 'react'
+import { PropsWithChildren, useEffect, useRef, useState } from 'react'
 
 export default function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | undefined | null>()
   const [profile, setProfile] = useState<any>()
   const [isLoading, setIsLoading] = useState<boolean>(true)
+  const subscriptionRef = useRef<any>(null)
 
   // Fetch the session once, and subscribe to auth state changes
   useEffect(() => {
     const fetchSession = async () => {
       setIsLoading(true)
-      const supabase = getSupabaseClient()
-      if (!supabase) {
-        logger.category('auth').warn('Supabase not configured for session fetch')
+      try {
+        if (!await isSupabaseConfiguredLazy()) {
+          logger.category('auth').warn('Supabase not configured for session fetch')
+          setIsLoading(false)
+          return
+        }
+        const supabase = await getSupabaseClientLazy()
+
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession()
+
+        if (error) {
+          logger.category('auth').error('Failed to fetch session', { error: error.message })
+        } else {
+          logger.category('auth').debug('Session fetched', { hasSession: !!session, userId: session?.user.id })
+        }
+
+        setSession(session)
+      } catch (error) {
+        logger.category('auth').error('Error fetching session', { error })
+      } finally {
         setIsLoading(false)
-        return
       }
-
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession()
-
-      if (error) {
-        logger.category('auth').error('Failed to fetch session', { error: error.message })
-      } else {
-        logger.category('auth').debug('Session fetched', { hasSession: !!session, userId: session?.user.id })
-      }
-
-      setSession(session)
-      setIsLoading(false)
     }
 
     fetchSession()
 
-    const supabase = getSupabaseClient()
-    if (!supabase) {
-      return
+    // Subscribe to auth changes only if configured
+    const setupSubscription = async () => {
+      if (!await isSupabaseConfiguredLazy()) return
+      const supabase = await getSupabaseClientLazy()
+
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange(
+        (
+          _event: import('@supabase/supabase-js').AuthChangeEvent,
+          session: Session | null
+        ) => {
+          logger.category('auth').debug('Auth state changed', { event: _event, hasSession: !!session })
+          setSession(session)
+        }
+      )
+      subscriptionRef.current = subscription
     }
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      (
-        _event: import('@supabase/supabase-js').AuthChangeEvent,
-        session: Session | null
-      ) => {
-        logger.category('auth').debug('Auth state changed', { event: _event, hasSession: !!session })
-        setSession(session)
-      }
-    )
+    setupSubscription()
 
     // Cleanup subscription on unmount
     return () => {
-      subscription.unsubscribe()
+      subscriptionRef.current?.unsubscribe()
     }
   }, [])
 
@@ -67,12 +77,12 @@ export default function AuthProvider({ children }: PropsWithChildren) {
 
       if (session) {
         try {
-          const supabase = getSupabaseClient()
-          if (!supabase) {
+          if (!await isSupabaseConfiguredLazy()) {
             logger.category('auth').warn('Supabase not configured for profile fetch')
             setIsLoading(false)
             return
           }
+          const supabase = await getSupabaseClientLazy()
 
           const { data, error } = await supabase
             .from('users')  // Changed from 'profiles' to 'users'

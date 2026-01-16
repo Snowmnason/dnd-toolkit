@@ -1,5 +1,5 @@
 import { AuthStateManager } from '../auth/auth-state';
-import { getSupabaseClient, isSupabaseConfigured } from '../database/supabase';
+import { getSupabaseClientLazy, isSupabaseConfiguredLazy } from '../database/supabase-lazy';
 import { logger } from '../utils/logger';
 
 /**
@@ -10,8 +10,8 @@ export async function signOutUser(): Promise<void> {
   try {
     logger.debug('auth', 'Starting sign out process');
     
-    if (!isSupabaseConfigured()) throw new Error('Supabase not configured');
-    const supabase = getSupabaseClient();
+    if (!await isSupabaseConfiguredLazy()) throw new Error('Supabase not configured');
+    const supabase = await getSupabaseClientLazy();
     await supabase.auth.signOut();
     await AuthStateManager.clearAuthState();
     

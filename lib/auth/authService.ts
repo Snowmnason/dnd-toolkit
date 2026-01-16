@@ -1,7 +1,7 @@
 import type { AuthResponse, AuthTokenResponse } from '@supabase/supabase-js';
 
 import { RequestManager } from '../api/request-manager';
-import { getSupabaseClient, isSupabaseConfigured } from '../database/supabase';
+import { getSupabaseClientLazy, isSupabaseConfiguredLazy } from '../database/supabase-lazy';
 import { usersDB } from '../database/users';
 import { SecureStorage, STORAGE_KEYS } from '../storage';
 import { logger } from '../utils/logger';
@@ -58,8 +58,7 @@ export const signUpUser = async (
     const sanitizedEmail = emailValidation.sanitized;
 
     // Check if Supabase is configured before attempting signup
-    const { isSupabaseConfigured } = await import('../database/supabase');
-    if (!isSupabaseConfigured()) {
+    if (!await isSupabaseConfiguredLazy()) {
       return {
         success: false,
         error: 'Unable to connect to servers. Please check your internet connection and try again.'
@@ -83,13 +82,12 @@ export const signUpUser = async (
 
     const signupResponse = await RequestManager.fetch<AuthResponse>(
       `auth:signup:${sanitizedEmail}`,
-      () => {
-        if (!isSupabaseConfigured()) {
-          throw new Error('Supabase not configured');
-        }
-        const supabase = getSupabaseClient();
-        return supabase.auth.signUp({ 
-          email: sanitizedEmail, 
+      async () => {
+        const configured = await isSupabaseConfiguredLazy();
+        if (!configured) throw new Error('Supabase not configured');
+        const supabase = await getSupabaseClientLazy();
+        return supabase.auth.signUp({
+          email: sanitizedEmail,
           password,
           options: {
             emailRedirectTo: `${baseUrl}/login/auth-redirect?action=signup-confirm`,
@@ -182,8 +180,7 @@ export const signInUser = async (
     logger.debug('auth', `✅ Email validated: ${sanitizedEmail}`);
 
     // Check if Supabase is configured before attempting signin
-    const { isSupabaseConfigured } = await import('../database/supabase');
-    if (!isSupabaseConfigured()) {
+    if (!await isSupabaseConfiguredLazy()) {
       logger.error('auth', '❌ Supabase not configured');
       return {
         success: false,
@@ -210,11 +207,10 @@ export const signInUser = async (
     
     const signInResponse = await RequestManager.fetch<AuthTokenResponse>(
       `auth:signin:${sanitizedEmail}`,
-      () => {
-        if (!isSupabaseConfigured()) {
-          throw new Error('Supabase not configured');
-        }
-        const supabase = getSupabaseClient();
+      async () => {
+        const configured = await isSupabaseConfiguredLazy();
+        if (!configured) throw new Error('Supabase not configured');
+        const supabase = await getSupabaseClientLazy();
         return supabase.auth.signInWithPassword({
           email: sanitizedEmail,
           password
@@ -364,8 +360,7 @@ export const sendPasswordReset = async (email: string): Promise<ResetPasswordRes
     const sanitizedEmail = emailValidation.sanitized;
 
     // Check if Supabase is configured before attempting password reset
-    const { isSupabaseConfigured } = await import('../database/supabase');
-    if (!isSupabaseConfigured()) {
+    if (!await isSupabaseConfiguredLazy()) {
       return {
         success: false,
         error: 'Unable to connect to servers. Please check your internet connection and try again.'
@@ -389,11 +384,10 @@ export const sendPasswordReset = async (email: string): Promise<ResetPasswordRes
       : 'https://dnd-tool.thesnowpost.com';
     const resetResponse = await RequestManager.fetch<AuthResponse>(
       `auth:reset:${sanitizedEmail}`,
-      () => {
-        if (!isSupabaseConfigured()) {
-          throw new Error('Supabase not configured');
-        }
-        const supabase = getSupabaseClient();
+      async () => {
+        const configured = await isSupabaseConfiguredLazy();
+        if (!configured) throw new Error('Supabase not configured');
+        const supabase = await getSupabaseClientLazy();
         return supabase.auth.resetPasswordForEmail(sanitizedEmail, {
           redirectTo: `${baseUrl}/login/auth-redirect?action=reset-password`
         });
@@ -441,14 +435,13 @@ export const sendPasswordReset = async (email: string): Promise<ResetPasswordRes
 export const updatePassword = async (newPassword: string): Promise<ResetPasswordResult> => {
   try {
     // Check if Supabase is configured before attempting password update
-    const { isSupabaseConfigured, getSupabaseClient } = await import('../database/supabase');
-    if (!isSupabaseConfigured()) {
+    if (!await isSupabaseConfiguredLazy()) {
       return {
         success: false,
         error: 'Unable to connect to servers. Please check your internet connection and try again.'
       };
     }
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientLazy();
 
     const { error } = await supabase.auth.updateUser({
       password: newPassword
