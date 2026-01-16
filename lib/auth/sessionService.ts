@@ -1,4 +1,4 @@
-import { getSupabaseClient, isSupabaseConfigured } from '../database/supabase';
+import { getSupabaseClientLazy, isSupabaseConfiguredLazy } from '../database/supabase-lazy';
 import { usersDB } from '../database/users';
 import { logger } from '../utils/logger';
 import { AuthStateManager } from './auth-state';
@@ -15,14 +15,14 @@ export interface SessionCheckResult {
  */
 export const checkUserSession = async (): Promise<SessionCheckResult> => {
   try {
-    if (!isSupabaseConfigured()) {
+    if (!await isSupabaseConfiguredLazy()) {
       return {
         hasValidSession: false,
         hasCompleteProfile: false,
         shouldRedirectTo: '/login/sign-in'
       };
     }
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientLazy();
     
     // First, check if user already has valid session
     const { data: { session }, error } = await supabase.auth.getSession();

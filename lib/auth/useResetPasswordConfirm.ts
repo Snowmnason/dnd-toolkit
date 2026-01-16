@@ -1,12 +1,12 @@
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { getSupabaseClient, isSupabaseConfigured } from '../database/supabase';
+import { Platform } from 'react-native';
+import { getSupabaseClientLazy, isSupabaseConfiguredLazy } from '../database/supabase-lazy';
+import { resetPasswordSchema, type ResetPasswordFormData } from '../schemas/auth.schema';
 import { logger } from '../utils/logger';
 import { updatePassword } from './authService';
-import { resetPasswordSchema, type ResetPasswordFormData } from '../schemas/auth.schema';
 
 export const useResetPasswordConfirm = () => {
   const router = useRouter();
@@ -33,18 +33,18 @@ export const useResetPasswordConfirm = () => {
   useEffect(() => {
     if (error) setError('');
     if (success) setSuccess(false);
-  }, [password, confirmPassword]);
+  }, [password, confirmPassword, error, success]);
 
   // Get user email from the session/token when component mounts
   useEffect(() => {
     const getUserInfo = async () => {
       try {
-        if (!isSupabaseConfigured()) {
+        if (!await isSupabaseConfiguredLazy()) {
           logger.warn('auth', 'Supabase not configured, cannot reset password');
           setError('Unable to connect to servers. Please check your internet connection.');
           return;
         }
-        const supabase = getSupabaseClient();
+        const supabase = await getSupabaseClientLazy();
         
         // Check if we have URL parameters for the reset token
         if (Platform.OS === 'web') {
