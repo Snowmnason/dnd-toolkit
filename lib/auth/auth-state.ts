@@ -208,19 +208,17 @@ export const AuthStateManager = {
   },
 
   // ==========================================
-  // � VERIFY WORLD ACCESS - Cache-first verification with Supabase fallback
+  // 🌍 WORLD ACCESS VERIFICATION - Cache-first verification with updateStorageCache service
   // ==========================================
   /**
-   * Verify world access against cache first, then Supabase for stale cache
-   * 
+   * Verify world access against cache first, then updateStorageCache service for stale cache
+   *
    * Flow:
    * 1. Check SecureStorage cache - instant
    * 2. Check cache age:
-   *    - Fresh (<2 hours): Trust cache, let user in immediately (no Supabase call)
-   *    - Stale (2-4 hours): Verify with Supabase before allowing access
-   * 3. If Supabase DENIES but cache ALLOWED:
-   *    - Update cache to deny
-   *    - Trigger revocation callback
+   *    - Fresh (<4 hours): Trust cache, let user in immediately (no database call)
+   *    - Stale (4+ hours): Refresh via updateStorageCache.refreshAllWorldsCache() then check again
+   * 3. updateStorageCache service handles the Supabase verification and cache updates
    * 4. Handle network errors gracefully (don't boot user on network fail)
    */
   async verifyWorldAccessWithDatabase(
@@ -235,7 +233,7 @@ export const AuthStateManager = {
     logger.info('auth', `[VERIFY:START] Verifying world ${worldId}, forceFresh=${options?.forceFresh}`);
     
     // Cache freshness window: only trust cache younger than 4 hours
-    // After 4 hours, always verify with Supabase to catch permission changes
+    // After 4 hours, always refresh via updateStorageCache service to catch permission changes
     const CACHE_FRESH_THRESHOLD = 4 * 60 * 60 * 1000; // 4 hours
     const cacheKey = `world_access_${worldId}`;
     const metaKey = `world_access_meta_${worldId}`;

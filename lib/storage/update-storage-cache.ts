@@ -32,17 +32,17 @@ export const updateStorageCache = {
       const userId = userData?.id;
 
       if (!userId) {
-        logger.warn('cache-update', 'No userId in SecureStorage, skipping cache refresh');
+        logger.warn('storage', 'No userId in SecureStorage, skipping cache refresh');
         return;
       }
 
-      logger.info('cache-update', `Refreshing all worlds cache for user ${userId}`);
+      logger.info('storage', `Refreshing all worlds cache for user ${userId}`);
 
       // Call existing database function (no new Supabase query)
       const { worldsDB } = await import('../database/worlds');
       const userWorlds = await worldsDB.getMyWorlds(userId);
 
-      logger.info('cache-update', `Fetched ${userWorlds.length} worlds from database`);
+      logger.info('storage', `Fetched ${userWorlds.length} worlds from database`);
 
       // Update SecureStorage for each world in parallel
       const timestamp = Date.now();
@@ -59,9 +59,9 @@ export const updateStorageCache = {
         })
       );
 
-      logger.info('cache-update', `Updated cache for ${userWorlds.length} worlds`);
+      logger.info('storage', `Updated cache for ${userWorlds.length} worlds`);
     } catch (error) {
-      logger.error('cache-update', 'Error refreshing all worlds cache:', error);
+      logger.error('storage', 'Error refreshing all worlds cache:', error);
       throw error;
     }
   },
@@ -80,13 +80,13 @@ export const updateStorageCache = {
    */
   async refreshUserProfile(): Promise<void> {
     try {
-      logger.info('cache-update', 'Refreshing user profile cache');
+      logger.info('storage', 'Refreshing user profile cache');
 
       // Import Supabase directly for this critical operation
       const { supabase, isSupabaseConfigured } = await import('../database/supabase');
 
       if (!isSupabaseConfigured()) {
-        logger.warn('cache-update', 'Supabase not configured, skipping user profile refresh');
+        logger.warn('storage', 'Supabase not configured, skipping user profile refresh');
         return;
       }
 
@@ -94,12 +94,12 @@ export const updateStorageCache = {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
       if (sessionError) {
-        logger.error('cache-update', 'Error getting session:', sessionError);
+        logger.error('storage', 'Error getting session:', sessionError);
         throw sessionError;
       }
 
       if (!session?.user?.id) {
-        logger.warn('cache-update', 'No active session, skipping user profile refresh');
+        logger.warn('storage', 'No active session, skipping user profile refresh');
         return;
       }
 
@@ -111,12 +111,12 @@ export const updateStorageCache = {
         .single();
 
       if (profileError) {
-        logger.error('cache-update', 'Error fetching user profile:', profileError);
+        logger.error('storage', 'Error fetching user profile:', profileError);
         throw profileError;
       }
 
       if (!userProfile) {
-        logger.warn('cache-update', 'User profile not found for auth_id');
+        logger.warn('storage', 'User profile not found for auth_id');
         return;
       }
 
@@ -129,9 +129,9 @@ export const updateStorageCache = {
         source: 'supabase'
       });
 
-      logger.info('cache-update', `User profile cache updated for user ${userProfile.id}`);
+      logger.info('storage', `User profile cache updated for user ${userProfile.id}`);
     } catch (error) {
-      logger.error('cache-update', 'Error refreshing user profile cache:', error);
+      logger.error('storage', 'Error refreshing user profile cache:', error);
       throw error;
     }
   },
@@ -144,16 +144,16 @@ export const updateStorageCache = {
    */
   async refreshEverything(): Promise<void> {
     try {
-      logger.info('cache-update', 'Refreshing all caches');
+      logger.info('storage', 'Refreshing all caches');
       
       await Promise.all([
         updateStorageCache.refreshAllWorldsCache(),
         updateStorageCache.refreshUserProfile()
       ]);
 
-      logger.info('cache-update', 'All caches refreshed successfully');
+      logger.info('storage', 'All caches refreshed successfully');
     } catch (error) {
-      logger.error('cache-update', 'Error refreshing all caches:', error);
+      logger.error('storage', 'Error refreshing all caches:', error);
       throw error;
     }
   }

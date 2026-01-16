@@ -1,7 +1,7 @@
 import { AuthModal } from '@/components/auth_components';
 import { Caption } from '@/components/ui';
 import { AuthStateManager, logger, supabase, usersDB, worldsDB } from '@/lib';
-import { SecureStorage, STORAGE_KEYS, updateStorageCache } from '@/lib/storage';
+import { SecureStorage, STORAGE_KEYS } from '@/lib/storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
@@ -129,18 +129,6 @@ export default function AuthRedirect() {
 
         // If we established a session but no explicit action provided, default based on context
         if (!action && hasValidSession) {
-          // ✅ Force refresh auth cache on auto-login (reassurance check)
-          // This ensures cached user profile and world access are fresh, especially after
-          // cache versioning updates or if app was in background for a long time
-          logger.info('auth-redirect', 'Auto-login detected: refreshing auth cache...');
-          try {
-            await updateStorageCache.refreshEverything();
-            logger.debug('auth-redirect', 'Auth cache refreshed successfully');
-          } catch (refreshError) {
-            logger.warn('auth-redirect', 'Cache refresh failed during auto-login:', refreshError);
-            // Non-blocking: continue even if refresh fails, cache will be validated on-demand
-          }
-
           // Check storage first, then database
           let userId = await AuthStateManager.getUserId();
           let userProfile = null;
