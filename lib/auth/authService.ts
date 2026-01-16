@@ -1,7 +1,7 @@
 import type { AuthResponse, AuthTokenResponse } from '@supabase/supabase-js';
 
 import { RequestManager } from '../api/request-manager';
-import { supabase } from '../database/supabase';
+import { getSupabaseClient, isSupabaseConfigured } from '../database/supabase';
 import { usersDB } from '../database/users';
 import { SecureStorage, STORAGE_KEYS } from '../storage';
 import { logger } from '../utils/logger';
@@ -83,14 +83,19 @@ export const signUpUser = async (
 
     const signupResponse = await RequestManager.fetch<AuthResponse>(
       `auth:signup:${sanitizedEmail}`,
-      () =>
-        supabase.auth.signUp({ 
+      () => {
+        if (!isSupabaseConfigured()) {
+          throw new Error('Supabase not configured');
+        }
+        const supabase = getSupabaseClient();
+        return supabase.auth.signUp({ 
           email: sanitizedEmail, 
           password,
           options: {
             emailRedirectTo: `${baseUrl}/login/auth-redirect?action=signup-confirm`,
           }
-        }),
+        });
+      },
       {
         rateLimitKey: `auth:signup:${sanitizedEmail}`,
         retries: 1,
@@ -205,10 +210,16 @@ export const signInUser = async (
     
     const signInResponse = await RequestManager.fetch<AuthTokenResponse>(
       `auth:signin:${sanitizedEmail}`,
-      () => supabase.auth.signInWithPassword({
-        email: sanitizedEmail,
-        password
-      }),
+      () => {
+        if (!isSupabaseConfigured()) {
+          throw new Error('Supabase not configured');
+        }
+        const supabase = getSupabaseClient();
+        return supabase.auth.signInWithPassword({
+          email: sanitizedEmail,
+          password
+        });
+      },
       {
         rateLimitKey: `auth:signin:${sanitizedEmail}`,
         retries: 1,
@@ -378,10 +389,15 @@ export const sendPasswordReset = async (email: string): Promise<ResetPasswordRes
       : 'https://dnd-tool.thesnowpost.com';
     const resetResponse = await RequestManager.fetch<AuthResponse>(
       `auth:reset:${sanitizedEmail}`,
-      () =>
-        supabase.auth.resetPasswordForEmail(sanitizedEmail, {
+      () => {
+        if (!isSupabaseConfigured()) {
+          throw new Error('Supabase not configured');
+        }
+        const supabase = getSupabaseClient();
+        return supabase.auth.resetPasswordForEmail(sanitizedEmail, {
           redirectTo: `${baseUrl}/login/auth-redirect?action=reset-password`
-        }),
+        });
+      },
       {
         rateLimitKey: `auth:reset:${sanitizedEmail}`,
         retries: 1,
@@ -425,13 +441,14 @@ export const sendPasswordReset = async (email: string): Promise<ResetPasswordRes
 export const updatePassword = async (newPassword: string): Promise<ResetPasswordResult> => {
   try {
     // Check if Supabase is configured before attempting password update
-    const { isSupabaseConfigured } = await import('../database/supabase');
+    const { isSupabaseConfigured, getSupabaseClient } = await import('../database/supabase');
     if (!isSupabaseConfigured()) {
       return {
         success: false,
         error: 'Unable to connect to servers. Please check your internet connection and try again.'
       };
     }
+    const supabase = getSupabaseClient();
 
     const { error } = await supabase.auth.updateUser({
       password: newPassword

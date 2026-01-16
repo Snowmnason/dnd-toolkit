@@ -1,6 +1,6 @@
 import { AuthStateManager } from '../auth/auth-state';
 import { validatePassword } from '../auth/validation';
-import { supabase } from '../database/supabase';
+import { getSupabaseClient, isSupabaseConfigured } from '../database/supabase';
 import { validateCurrentUser } from '../database/common';
 import { usersDB } from '../database/users';
 import { logger } from '../utils/logger';
@@ -39,6 +39,8 @@ export async function deleteUserAccount(password: string): Promise<DeleteAccount
 
     // Re-authenticate with password before deletion for security
     logger.debug('auth', 'Re-authenticating user before account deletion');
+    if (!isSupabaseConfigured()) throw new Error('Supabase not configured');
+    const supabase = getSupabaseClient();
     const { error: reAuthError } = await supabase.auth.signInWithPassword({
       email: authUser.email,
       password: password
@@ -67,7 +69,10 @@ export async function deleteUserAccount(password: string): Promise<DeleteAccount
     // Clean up local state and sign out
     logger.debug('auth', 'Clearing local auth state');
     await AuthStateManager.clearAuthState();
-    await supabase.auth.signOut();
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabaseClient();
+      await supabase.auth.signOut();
+    }
     
     logger.info('auth', 'Account deletion and cleanup completed');
     
