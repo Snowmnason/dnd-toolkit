@@ -70,6 +70,7 @@ class QueryCacheClass {
   private subscribers: Map<string, Set<CacheSubscriber>> = new Map();
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
   private globalVersion: number = 0;
+  private pendingRequests: Map<string, Promise<any>> = new Map();
 
   constructor() {
     this.startCleanupTimer();
@@ -188,6 +189,91 @@ class QueryCacheClass {
 
     const age = Date.now() - entry.timestamp;
     return age > entry.staleTime;
+  }
+
+  /**
+   * Fetch with deduplication - prevents duplicate API calls for the same key
+   * If a request for this key is already in progress, returns the existing promise
+   */
+  async fetchWithDedupe<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+    if (this.pendingRequests.has(key)) {
+      logger.debug('cache', `Deduplicating request for key: ${key}`);
+      return this.pendingRequests.get(key)!;
+    }
+
+    const promise = fetcher().finally(() => {
+      this.pendingRequests.delete(key);
+    });
+
+    this.pendingRequests.set(key, promise);
+    return promise;
+  }
+
+  /**
+   * Apply optimistic update to cache and return revert function
+   * Used for instant UI feedback before mutations complete
+   * 
+   * @param updater - Function that transforms cached data
+   * @param options - Optional filters to target specific cache entries
+   * @param options.tags - Only update entries with these tags
+   * @param options.keyPattern - Only update entries matching this pattern
+   */
+  applyOptimisticUpdate(
+    updater: (prev: any) => any,
+    options?: { tags?: string[]; keyPattern?: RegExp }
+  ): () => void {
+    const affectedKeys: string[] = [];
+    const previousValues: Map<string, any> = new Map();
+
+    for (const [key, entry] of this.inMemoryCache.entries()) {
+      // Filter by tags if specified
+      if (options?.tags && entry.tags) {
+        const hasMatchingTag = entry.tags.some(tag => options.tags!.includes(tag));
+        if (!hasMatchingTag) continue;
+      }
+
+      // Filter by key pattern if specified
+      if (options?.keyPattern && !options.keyPattern.test(key)) {
+        continue;
+      }
+
+      const newValue = updater(entry.data);
+      if (newValue !== entry.data) {
+        affectedKeys.push(key);
+        previousValues.set(key, entry.data);
+
+        // Apply optimistic update
+        const optimisticEntry: CacheEntry = {
+          ...entry,
+          data: newValue,
+          timestamp: Date.now(), // Update timestamp to prevent immediate staleness
+        };
+
+        this.inMemoryCache.set(key, optimisticEntry);
+        this.notifySubscribers(key, newValue);
+
+        logger.debug('cache', `Applied optimistic update for key: ${key}`);
+      }
+    }
+
+    // Return revert function
+    return () => {
+      for (const key of affectedKeys) {
+        const previousValue = previousValues.get(key);
+        if (previousValue !== undefined) {
+          const entry = this.inMemoryCache.get(key);
+          if (entry) {
+            const revertedEntry: CacheEntry = {
+              ...entry,
+              data: previousValue,
+            };
+            this.inMemoryCache.set(key, revertedEntry);
+            this.notifySubscribers(key, previousValue);
+            logger.debug('cache', `Reverted optimistic update for key: ${key}`);
+          }
+        }
+      }
+    };
   }
 
   /**
