@@ -1,5 +1,5 @@
 import { AuthStateManager } from '../auth/auth-state';
-import { supabase } from '../database/supabase';
+import { getSupabaseClient, isSupabaseConfigured } from '../database/supabase';
 import { logger } from '../utils/logger';
 
 /**
@@ -10,6 +10,8 @@ export async function signOutUser(): Promise<void> {
   try {
     logger.debug('auth', 'Starting sign out process');
     
+    if (!isSupabaseConfigured()) throw new Error('Supabase not configured');
+    const supabase = getSupabaseClient();
     await supabase.auth.signOut();
     await AuthStateManager.clearAuthState();
     

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { supabase } from '../database/supabase';
+import { getSupabaseClient, isSupabaseConfigured } from '../database/supabase';
 import { logger } from '../utils/logger';
 import { updatePassword } from './authService';
 import { resetPasswordSchema, type ResetPasswordFormData } from '../schemas/auth.schema';
@@ -39,6 +39,13 @@ export const useResetPasswordConfirm = () => {
   useEffect(() => {
     const getUserInfo = async () => {
       try {
+        if (!isSupabaseConfigured()) {
+          logger.warn('auth', 'Supabase not configured, cannot reset password');
+          setError('Unable to connect to servers. Please check your internet connection.');
+          return;
+        }
+        const supabase = getSupabaseClient();
+        
         // Check if we have URL parameters for the reset token
         if (Platform.OS === 'web') {
           const urlParams = new URLSearchParams(window.location.search);
