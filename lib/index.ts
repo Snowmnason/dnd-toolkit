@@ -9,8 +9,9 @@ export * from './api/request-manager';
 // ===== Cache =====
 export * from './cache';
 
-// ===== Kernel =====
-export * from './kernel';
+// ===== Kernel (Bootstrap & Lifecycle) =====
+export { AppKernel, AppKernelProvider, KernelErrorCode, KernelPhase, useAppKernel, useAppReady, usePhaseReady } from './kernel';
+export type { AppKernelState, KernelCapabilities, KernelError } from './kernel';
 
 // ===== Auth =====
 export * from './auth/auth-attempt-guard';

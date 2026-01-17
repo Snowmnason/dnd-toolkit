@@ -14,7 +14,7 @@
  * - ERROR: A critical phase failed
  */
 
-import { NetworkDetection } from '@/lib/network/network-detection';
+import { NetworkDetection, NetworkStatus } from '@/lib/network/network-detection';
 import { logger } from '@/lib/utils/logger';
 
 // FUTURE ENHANCEMENT: Phase Progress Callbacks
@@ -34,6 +34,46 @@ export enum KernelPhase {
   ERROR = 'error',
 }
 
+/**
+ * Error codes for kernel failures
+ * Allows consumers to handle specific error types
+ */
+export enum KernelErrorCode {
+  PRELOAD_FAILED = 'PRELOAD_FAILED',
+  STORAGE_MIGRATION_FAILED = 'STORAGE_MIGRATION_FAILED',
+  STORAGE_VALIDATION_FAILED = 'STORAGE_VALIDATION_FAILED',
+  NETWORK_INIT_FAILED = 'NETWORK_INIT_FAILED',
+  AUTH_RESTORE_FAILED = 'AUTH_RESTORE_FAILED',
+  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
+}
+
+/**
+ * Detailed error information for kernel failures
+ * Extends Error to be compatible with standard error handling
+ */
+export interface KernelError extends Error {
+  code: KernelErrorCode;
+  name: string; // Error interface requirement
+  message: string;
+  phase: KernelPhase;
+  originalError?: Error;
+  recoverable: boolean; // Can retry() recover from this?
+  timestamp: number;
+}
+
+/**
+ * Platform capabilities tracked by kernel
+ * Determines what features are available at runtime
+ */
+export interface KernelCapabilities {
+  storage: boolean;        // SecureStorage available
+  network: boolean;        // Network detection working
+  auth: boolean;           // Auth system available
+  analytics: boolean;      // Analytics tracking enabled
+  backend: boolean;        // Supabase configured
+  platform: 'web' | 'ios' | 'android' | 'desktop' | 'unknown';
+}
+
 export interface AppKernelState {
   currentPhase: KernelPhase;
   phases: {
@@ -43,8 +83,10 @@ export interface AppKernelState {
     authReady: boolean;
     appReady: boolean;
   };
-  error: Error | null;
+  error: KernelError | null;
   timing: Record<string, number>; // Phase timing in milliseconds
+  capabilities: KernelCapabilities;
+  networkStatus: NetworkStatus | null;
 }
 
 type KernelListener = (state: AppKernelState) => void;
@@ -61,10 +103,20 @@ class AppKernelClass {
     },
     error: null,
     timing: {},
+    capabilities: {
+      storage: false,
+      network: false,
+      auth: false,
+      analytics: false,
+      backend: false,
+      platform: 'unknown', // Will be detected on initialize()
+    },
+    networkStatus: null,
   };
 
   private listeners: Set<KernelListener> = new Set();
   private initPromise: Promise<void> | null = null;
+  private networkUnsubscribe: (() => void) | null = null;
 
   /**
    * Initialize the kernel once
@@ -83,6 +135,9 @@ class AppKernelClass {
   private async _initializeInternal(): Promise<void> {
     try {
       logger.category('bootstrap').info('AppKernel initializing...');
+
+      // Detect platform and initial capabilities
+      await this.detectCapabilities();
 
       // Phase 1: Preload (fonts, platform assets)
       await this.runPhase('preload', async () => {
@@ -136,9 +191,32 @@ class AppKernelClass {
       await this.runPhase('network', async () => {
         try {
           await NetworkDetection.initialize();
-          logger.category('bootstrap').debug('Network detection initialized');
+          
+          // Subscribe to network changes
+          this.networkUnsubscribe = NetworkDetection.subscribe((status) => {
+            this.updateState({ networkStatus: status });
+            logger.category('bootstrap').debug('Network status changed', { 
+              isOnline: status.isOnline,
+              type: status.type 
+            });
+          });
+          
+          // Get initial status
+          const initialStatus = NetworkDetection.getStatus();
+          this.updateState({ 
+            networkStatus: initialStatus,
+            capabilities: { ...this.state.capabilities, network: true }
+          });
+          
+          logger.category('bootstrap').debug('Network detection initialized', {
+            isOnline: initialStatus.isOnline,
+            type: initialStatus.type
+          });
         } catch (error) {
-          logger.category('bootstrap').warn('Network detection failed (non-critical)', { error: (error as Error).message });
+          logger.category('bootstrap').warn('Network detection failed (non-critical)', { 
+            error: (error as Error).message 
+          });
+          // Network failure is non-critical - app works offline
         }
       });
 
@@ -198,12 +276,103 @@ class AppKernelClass {
         error: err.message,
         stack: err.stack?.substring(0, 200),
       });
+      
+      const kernelError = this.createKernelError(
+        KernelErrorCode.UNKNOWN_ERROR,
+        err.message,
+        this.state.currentPhase,
+        err,
+        true
+      );
+      
       this.updateState({
         currentPhase: KernelPhase.ERROR,
-        error: err,
+        error: kernelError,
       });
       throw err;
     }
+  }
+
+  /**
+   * Detect platform and available capabilities
+   */
+  private async detectCapabilities(): Promise<void> {
+    const capabilities: KernelCapabilities = {
+      storage: false,
+      network: false,
+      auth: false,
+      analytics: false,
+      backend: false,
+      platform: 'unknown',
+    };
+
+    try {
+      // Detect platform
+      const { Platform } = await import('react-native');
+      
+      // Electron detection: check if running in Electron environment
+      const isElectron = typeof window !== 'undefined' && 
+                        (window as any).electron !== undefined;
+      
+      capabilities.platform = isElectron ? 'desktop' :
+                             Platform.OS === 'web' ? 'web' : 
+                             Platform.OS === 'ios' ? 'ios' : 
+                             Platform.OS === 'android' ? 'android' : 
+                             'unknown';
+
+      // Check if storage is available
+      try {
+        await import('@/lib/storage');
+        capabilities.storage = true;
+      } catch {
+        logger.category('bootstrap').warn('Storage not available');
+      }
+
+      // Check if analytics is configured
+      try {
+        const { Analytics } = await import('@/lib/analytics');
+        capabilities.analytics = Analytics.enabled();
+      } catch {
+        logger.category('bootstrap').debug('Analytics not available');
+      }
+
+      // Check if backend (Supabase) is configured
+      try {
+        const { isSupabaseConfigured } = await import('@/lib/database/supabase');
+        capabilities.backend = isSupabaseConfigured();
+        capabilities.auth = isSupabaseConfigured(); // Auth depends on backend
+      } catch {
+        logger.category('bootstrap').debug('Backend not configured');
+      }
+
+      this.updateState({ capabilities });
+      logger.category('bootstrap').info('Capabilities detected', capabilities);
+    } catch (error) {
+      logger.category('bootstrap').error('Capability detection failed', { 
+        error: (error as Error).message 
+      });
+    }
+  }
+
+  /**
+   * Create a structured kernel error
+   */
+  private createKernelError(
+    code: KernelErrorCode,
+    message: string,
+    phase: KernelPhase,
+    originalError?: Error,
+    recoverable: boolean = false
+  ): KernelError {
+    return {
+      code,
+      name: `KernelError[${code}]`,
+      message,
+      phase,
+      originalError,
+      recoverable,
+      timestamp: Date.now(),
+    };
   }
 
   /**
@@ -288,8 +457,24 @@ class AppKernelClass {
       },
       error: null,
       timing: {},
+      capabilities: {
+        storage: false,
+        network: false,
+        auth: false,
+        analytics: false,
+        backend: false,
+        platform: 'unknown', // Will be detected on next initialize()
+      },
+      networkStatus: null,
     };
     this.initPromise = null;
+    
+    // Cleanup network subscription
+    if (this.networkUnsubscribe) {
+      this.networkUnsubscribe();
+      this.networkUnsubscribe = null;
+    }
+    
     this.notifyListeners();
   }
 
@@ -349,6 +534,66 @@ class AppKernelClass {
       default:
         throw new Error(`Cannot rerun phase: ${phase}. Only auth, network, and storage can be rerun.`);
     }
+  }
+
+  /**
+   * Get redacted diagnostics snapshot for debugging
+   * Safe to expose to users or send to logs
+   */
+  getDiagnostics(): {
+    phase: KernelPhase;
+    phases: AppKernelState['phases'];
+    timing: Record<string, number>;
+    totalBootstrapTime: number;
+    capabilities: KernelCapabilities;
+    networkStatus: NetworkStatus | null;
+    error: {
+      code: string;
+      message: string;
+      phase: string;
+      recoverable: boolean;
+      timestamp: number;
+    } | null;
+    platform: string;
+    appVersion: string;
+    timestamp: number;
+  } {
+    const totalBootstrapTime = Object.values(this.state.timing).reduce((a, b) => a + b, 0);
+    
+    return {
+      phase: this.state.currentPhase,
+      phases: { ...this.state.phases },
+      timing: { ...this.state.timing },
+      totalBootstrapTime,
+      capabilities: { ...this.state.capabilities },
+      networkStatus: this.state.networkStatus ? { ...this.state.networkStatus } : null,
+      error: this.state.error ? {
+        code: this.state.error.code,
+        message: this.state.error.message,
+        phase: this.state.error.phase,
+        recoverable: this.state.error.recoverable,
+        timestamp: this.state.error.timestamp,
+      } : null,
+      platform: this.state.capabilities.platform,
+      appVersion: process.env.EXPO_PUBLIC_VERSION || 'unknown',
+      timestamp: Date.now(),
+    };
+  }
+
+  /**
+   * Cleanup resources on app shutdown
+   */
+  destroy(): void {
+    logger.category('bootstrap').info('AppKernel shutting down');
+    
+    // Unsubscribe from network changes
+    if (this.networkUnsubscribe) {
+      this.networkUnsubscribe();
+      this.networkUnsubscribe = null;
+    }
+    
+    // Clear all listeners
+    this.listeners.clear();
   }
 }
 

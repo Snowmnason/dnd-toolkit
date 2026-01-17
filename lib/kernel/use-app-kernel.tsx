@@ -6,7 +6,7 @@
  */
 
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { AppKernel, AppKernelState } from './app-kernel.js';
+import { AppKernel, AppKernelState } from './app-kernel';
 
 /**
  * React context for kernel state

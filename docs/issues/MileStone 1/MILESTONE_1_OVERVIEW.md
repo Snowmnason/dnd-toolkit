@@ -49,7 +49,7 @@ Milestone 1 focused on establishing a **solid architectural foundation** for the
 
 **Usage:**
 ```tsx
-const authState = useAuthGuard(bootstrap.isReady, 'world-required');
+const authState = useAuthGuard(kernel.phases.appReady, 'world-required');
 if (authState === 'loading') return <LoadingOverlay />;
 ```
 
@@ -238,10 +238,10 @@ await QueryCache.invalidateByTags(['worlds']);
 **What it does:**
 - Lazy loading for non-critical fonts (Eurostile, Cyberpunk)
 - Theme switching without re-render flicker
-- Font preloading in bootstrap for critical fonts
+- Font preloading moved to the kernel preload phase for critical fonts
 
 **Key files:**
-- `hooks/use-app-bootstrap.tsx` - Font loading
+- `lib/kernel/use-app-kernel.tsx` - Kernel provider + hook (replaces legacy `use-app-bootstrap`)
 - `theme/ThemeProvider.tsx` - Theme management
 
 **Docs:** [THEMES_AND_FONTS.md](102%20-%20Bundle%20&%20Theme/THEMES_AND_FONTS.md), [LAZY_LOADING_GUIDE.md](102%20-%20Bundle%20&%20Theme/LAZY_LOADING_GUIDE.md)

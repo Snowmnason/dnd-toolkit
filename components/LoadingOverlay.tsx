@@ -1,10 +1,11 @@
+import { KernelError } from '@/lib/kernel'
 import { UseTheme } from '@/theme'
 import { View } from 'react-native'
 import CustomLoad from './ui/CustomLoad'
 
 interface LoadingOverlayProps {
   message?: string
-  error?: Error | null
+  error?: Error | KernelError | null
   assetsLoaded?: boolean
 }
 
