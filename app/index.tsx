@@ -1,11 +1,10 @@
-import { logger } from "@/lib";
+import { logger, useAppKernel } from "@/lib";
 import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
 import { useRouter } from "expo-router";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Welcome from "../Screens/Welcome";
 import LoadingOverlay from "../components/LoadingOverlay";
-import { useAppBootstrap } from "../hooks/use-app-bootstrap";
 
 const FAILSAFE_TIMEOUT = 8000; // Show failsafe button after 8 seconds
 
@@ -39,8 +38,8 @@ export default function HomePage() {
     return location;
   }, []);
   
-  // Wait for bootstrap to complete before routing
-  const bootstrap = useAppBootstrap();
+  // Wait for kernel to complete before routing
+  const kernel = useAppKernel();
 
   // Show failsafe button after timeout, but only if we haven't completed auth check
   React.useEffect(() => {
@@ -57,13 +56,13 @@ export default function HomePage() {
 
   // Simple time-based check: if user logged in within 7 days, redirect (skip welcome)
   React.useEffect(() => {
-    // Don't proceed until bootstrap is complete
-    if (!bootstrap.isReady) {
-      logger.debug('bootstrap', '⏸️ Waiting for bootstrap to complete');
+    // Don't proceed until kernel is complete
+    if (!kernel.phases.appReady) {
+      logger.debug('bootstrap', '⏸️ Waiting for kernel to complete');
       return;
     }
 
-    logger.info('bootstrap', '🚀 Bootstrap ready! Checking login recency...');
+    logger.info('bootstrap', '🚀 Kernel ready! Checking login recency...');
 
     const checkLoginRecency = async () => {
       try {
@@ -104,19 +103,19 @@ export default function HomePage() {
     };
 
     checkLoginRecency();
-  }, [bootstrap.isReady, router]);
+  }, [kernel.phases.appReady, router]);
 
-  // Show loading spinner while bootstrap is happening
-  if (!bootstrap.isReady) {
-    const loadingMessage = bootstrap.assetsLoaded ? 'Restoring session...' : 'Loading assets...';
+  // Show loading spinner while kernel is initializing
+  if (!kernel.phases.appReady) {
+    const loadingMessage = kernel.phases.preloadReady ? 'Restoring session...' : 'Loading assets...';
     logger.debug('bootstrap', '⏳ Rendering index loading overlay:', loadingMessage);
     
     return (
       <View style={styles.container}>
         <LoadingOverlay 
           message={loadingMessage}
-          error={bootstrap.error}
-          assetsLoaded={bootstrap.assetsLoaded}
+          error={kernel.error}
+          assetsLoaded={kernel.phases.preloadReady}
         />
       </View>
     );
@@ -158,8 +157,8 @@ export default function HomePage() {
     <View style={styles.container}>
       <LoadingOverlay 
         message="Checking authentication..."
-        error={bootstrap.error}
-        assetsLoaded={bootstrap.assetsLoaded}
+        error={kernel.error}
+        assetsLoaded={kernel.phases.preloadReady}
       />
     </View>
   );

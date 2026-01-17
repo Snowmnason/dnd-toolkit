@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { FeatureFlags } from '../lib/feature-flags';
+import { useAppKernel } from '../lib/kernel';
 import { logger } from '../lib/utils/logger';
-import { useAppBootstrap } from './use-app-bootstrap';
 
 /**
  * Manages splash screen visibility
- * - Waits for bootstrap to complete
- * - Adds platform-specific buffer after bootstrap (shorter on web, longer on mobile)
+ * - Waits for kernel to become ready
+ * - Adds platform-specific buffer after kernel ready (shorter on web, longer on mobile)
  * - Respects feature flag toggle
  */
 export function useSplashScreen() {
-  const bootstrap = useAppBootstrap();
+  const kernel = useAppKernel();
   const [showSplash, setShowSplash] = useState(true);
   const [bufferComplete, setBufferComplete] = useState(false);
 
@@ -31,15 +31,15 @@ export function useSplashScreen() {
       return;
     }
 
-    // Wait for bootstrap to complete
-    if (!bootstrap.isReady) {
-      logger.debug('ui', '⏳ Waiting for bootstrap to complete...');
+    // Wait for kernel to become ready
+    if (!kernel.phases.appReady) {
+      logger.debug('ui', '⏳ Waiting for app kernel to complete...');
       return;
     }
 
-    logger.debug('ui', `✅ Bootstrap ready, starting ${SPLASH_BUFFER_MS}ms buffer on ${Platform.OS}`);
+    logger.debug('ui', `✅ Kernel ready, starting ${SPLASH_BUFFER_MS}ms buffer on ${Platform.OS}`);
 
-    // Add platform-specific buffer after bootstrap completes
+    // Add platform-specific buffer after kernel completes
     const timer = setTimeout(() => {
       setBufferComplete(true);
       setShowSplash(false);
@@ -47,12 +47,12 @@ export function useSplashScreen() {
     }, SPLASH_BUFFER_MS);
 
     return () => clearTimeout(timer);
-  }, [SPLASH_BUFFER_MS, bootstrap.isReady]);
+  }, [SPLASH_BUFFER_MS, kernel.phases.appReady]);
 
   return {
     showSplash,
     bufferComplete,
-    bootstrapReady: bootstrap.isReady,
-    bootstrapError: bootstrap.error,
+    kernelReady: kernel.phases.appReady,
+    kernelError: kernel.error,
   };
 }

@@ -1,5 +1,6 @@
-import { useRouter, useSegments, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { useAppKernel } from '../kernel';
 import { AUTH_CONFIG } from '../routing/route-config';
 import { logger } from '../utils/logger';
 import { AuthStateManager } from './auth-state';
@@ -22,7 +23,7 @@ let supabaseCache: any = null;
 let isSupabaseConfiguredCache: any = null;
 
 export function useAuthGuard(
-  bootstrapReady: boolean,
+  bootstrapReadyOrUndefined?: boolean,
   level: AuthLevel = 'account-only',
   options?: AuthGuardOptions
 ): AuthState {
@@ -33,6 +34,10 @@ export function useAuthGuard(
   const [subscriptionReady, setSubscriptionReady] = useState(false);
   const hasRedirectedRef = useRef(false);
   const subscriptionReadyRef = useRef(false); // Track if we've already set subscriptionReady
+  
+  // If bootstrapReadyOrUndefined is undefined, use kernel; otherwise use the provided value
+  const kernel = useAppKernel();
+  const appReady = bootstrapReadyOrUndefined !== undefined ? bootstrapReadyOrUndefined : kernel.phases.appReady;
   
   // Create unique ID for this hook instance
   const [instanceId] = useState(() => Math.random().toString(36).slice(2, 9));
@@ -121,7 +126,7 @@ export function useAuthGuard(
 
   // Core auth check ONLY runs on protected routes AFTER subscription is ready
   useEffect(() => {
-    if (!bootstrapReady) return;
+    if (!appReady) return;
     
     // For protected routes, wait for subscription to establish before checking auth
     // This ensures session is synced to local storage
@@ -260,7 +265,7 @@ logger.debug('security', `[GUARD:${instanceId}] 🚀 Starting core auth check, i
     return () => {
       mounted = false;
     };
-  }, [bootstrapReady, isProtectedRoute, subscriptionReady, router, instanceId, level, params.worldId, options?.forceVerification]);
+  }, [appReady, isProtectedRoute, subscriptionReady, router, instanceId, level, params.worldId, options?.forceVerification]);
 
   return authState;
 }

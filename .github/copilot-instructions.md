@@ -4,8 +4,8 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 
 ## Big picture
 - App type: React Native + Expo Router (web, iOS, Android). Entry at `index.tsx`; routing/layout in `app/_layout.tsx`.
-- Root providers: `ThemeProvider` → `ScaleProvider` → `PlatformProvider` → `AppParamsStableProvider` + `AppParamsVolatileProvider` (see `app/_layout.tsx`). Don't move or reorder these casually.
-- Bootstrap flow: `hooks/use-app-bootstrap.tsx` preloads fonts/images/themes and restores Supabase session. UI waits on `bootstrap.isReady`.
+- Root providers: `AppKernelProvider` → `ThemeProvider` → `ScaleProvider` → `PlatformProvider` → `SubscriptionProvider` → `AppParamsStableProvider` + `AppParamsVolatileProvider` (see `app/_layout.tsx`). Don't move or reorder these casually.
+- Kernel flow: `lib/kernel/use-app-kernel.tsx` preloads fonts/images/themes, initializes network, and restores Supabase session where appropriate. UI waits on `kernel.phases.appReady` or specific phase flags.
 - Auth: `lib/auth/auth-state.ts` (`AuthStateManager`) provides authentication checks and world access verification. `lib/auth/useAuthGuard.ts` is the primary hook for protecting routes with tiered levels ('account-only', 'world-required'). Supabase is dynamically imported and guarded by `isSupabaseConfigured()` to support GH Pages/no-env scenarios. See `docs/implem guide.md` **Phase 6** for complete auth architecture.
 - Navigation: Centralized in `lib/navigation/navigation-config.ts`. Each route's TopBar, back button, params, modals, and redirects are defined declaratively. Use `getRouteConfig(context)` instead of inline switch/case. See `docs/issues/MileStone 1/107 - Updated Nav/NAVIGATION_CONFIG.md`.
 - Route params: Expo Router segments (`useSegments()`) + URL params merged into split contexts (`AppParamsStableContext` for userId/connectedWorlds, `AppParamsVolatileContext` for worldId/userRole). Use selector hooks (`useWorldId()`, `useUserId()`, `useConnectedWorlds()`, `useUserRole()`) instead of full context consumers to minimize re-renders.
@@ -31,7 +31,7 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 
 ## Data and services
 - Supabase client/config under `lib/database/`. Always guard usage with `isSupabaseConfigured()` and prefer dynamic imports to avoid circular deps and to keep web fallback working.
-- **Auth/Guards**: Use `useAuthGuard(bootstrapReady, level)` in protected `_layout.tsx` files with level='account-only' (needs auth) or 'world-required' (needs auth + world access). Use `AuthStateManager.isAuthenticated()` for runtime checks. See `docs/implem guide.md` Phase 3 for guard patterns.
+- **Auth/Guards**: Use `useAuthGuard(kernel.phases.appReady, level)` in protected `_layout.tsx` files with level='account-only' (needs auth) or 'world-required' (needs auth + world access). Use `AuthStateManager.isAuthenticated()` for runtime checks. See `docs/implem guide.md` Phase 3 for guard patterns.
 - **World Access Verification**: `verifyWorldAccessWithDatabase(worldId)` implements cache-first verification (fresh <2h = instant, stale 2-4h = Supabase check). Use `forceVerification: true` option for sensitive pages (settings). See `docs/implem guide.md` Phase 4 for verification flow.
 - **Storage**: Use `SecureStorage` from `@/lib/storage` for all persistent app data. All data is encrypted via AES-CTR on all platforms (web, iOS, Android, desktop). Never use direct `localStorage`, `sessionStorage`, or `EncryptedStorage`—always go through `SecureStorage`. Use `STORAGE_KEYS` constants, never hardcode keys. See `docs/issues/MileStone 1/082 - Central Storage/` for API docs and patterns.
 - **Query Cache**: Use `QueryCache` from `@/lib/cache` for in-memory caching of API responses. Follow hierarchical key naming (`domain:entity:action:identifier`). Use tags for invalidation. See `docs/issues/MileStone 1/101 - Query Cache/CACHE_STRATEGY.md`.
