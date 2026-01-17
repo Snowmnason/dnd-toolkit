@@ -1,12 +1,11 @@
 import { AppLoading, AppPage } from '@/components/ui';
-import { useAppBootstrap } from '@/hooks/use-app-bootstrap';
-import { useAuthGuard } from '@/lib';
+import { useAppKernel, useAuthGuard } from '@/lib';
 import { Stack } from 'expo-router';
 
 export default function SettingsLayout() {
-  const bootstrap = useAppBootstrap();
+  const kernel = useAppKernel();
   // Force Supabase verification on every mount for security-critical pages
-  const authState = useAuthGuard(bootstrap.isReady, 'account-only', { forceVerification: true });
+  const authState = useAuthGuard(kernel.phases.appReady, 'account-only', { forceVerification: true });
 
   // Show loading while guard resolves
   if (authState === 'loading') {

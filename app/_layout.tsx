@@ -4,6 +4,7 @@ import { useAnalyticsNavigation } from '@/hooks/use-analytics-navigation';
 import { AppErrorBoundary, getRouteConfig, resolveBackTarget, resolveTitle } from "@/lib";
 import { Analytics, sessionManager } from '@/lib/analytics';
 import { getAppConfig } from '@/lib/config/loader';
+import { AppKernelProvider, useAppKernel } from '@/lib/kernel';
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers';
 import { lazyLoadInBackground } from '@/lib/utils/lazy-imports';
 import { logger } from '@/lib/utils/logger';
@@ -19,7 +20,6 @@ import { CrashFallBack, RouteErrorBoundary, SplashScreen } from '../components/S
 import { AppParamsStableProvider, useAppParamsStable, useUserId } from '../contexts/AppParamsStableContext';
 import { AppParamsVolatileProvider, useAppParamsVolatile, useUserRole, useWorldId } from '../contexts/AppParamsVolatileContext';
 import { PlatformProvider, usePlatform } from '../contexts/PlatformContext';
-import { useAppBootstrap } from '../hooks/use-app-bootstrap';
 import { useSplashScreen } from '../hooks/use-splash-screen';
 import { APP_VERSION } from '../lib/version';
 
@@ -102,7 +102,7 @@ function RootLayoutContent() {
   const { clearAllParams } = useAppParamsStable();
   
   // Data loading hooks
-  const bootstrap = useAppBootstrap();
+  const kernel = useAppKernel();
   const splash = useSplashScreen();
   
   // Log every render with session ID
@@ -181,13 +181,13 @@ function RootLayoutContent() {
     return <SplashScreen />;
   }
 
-  // Show loading while bootstrap is happening
-  if (!bootstrap.isReady) {
+  // Show loading while app kernel is initializing
+  if (!kernel.phases.appReady) {
     return (
       <LoadingOverlay 
         message="Loading D&D Toolkit..."
-        error={bootstrap.error}
-        assetsLoaded={bootstrap.assetsLoaded}
+        error={kernel.error}
+        assetsLoaded={kernel.phases.preloadReady}
       />
     );
   }
@@ -282,24 +282,26 @@ function RootLayoutContent() {
 // Main export with provider wrapper and error boundary
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <ScaleProvider>
-        <PlatformProvider>
-          <SubscriptionProvider>
-            <AppParamsStableProvider>
-              <AppParamsVolatileProvider>
-                <AppErrorBoundary 
-                  renderFallback={(error, onRetry) => (
-                    <CrashFallBack error={error} onRetry={onRetry} />
-                  )}
-                >
-                  <RootLayoutContent />
-                </AppErrorBoundary>
-              </AppParamsVolatileProvider>
-            </AppParamsStableProvider>
-          </SubscriptionProvider>
-        </PlatformProvider>
-      </ScaleProvider>
-    </ThemeProvider>
+    <AppKernelProvider>
+      <ThemeProvider>
+        <ScaleProvider>
+          <PlatformProvider>
+            <SubscriptionProvider>
+              <AppParamsStableProvider>
+                <AppParamsVolatileProvider>
+                  <AppErrorBoundary 
+                    renderFallback={(error, onRetry) => (
+                      <CrashFallBack error={error} onRetry={onRetry} />
+                    )}
+                  >
+                    <RootLayoutContent />
+                  </AppErrorBoundary>
+                </AppParamsVolatileProvider>
+              </AppParamsStableProvider>
+            </SubscriptionProvider>
+          </PlatformProvider>
+        </ScaleProvider>
+      </ThemeProvider>
+    </AppKernelProvider>
   );
 }

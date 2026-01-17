@@ -9,6 +9,9 @@ export * from './api/request-manager';
 // ===== Cache =====
 export * from './cache';
 
+// ===== Kernel =====
+export * from './kernel';
+
 // ===== Auth =====
 export * from './auth/auth-attempt-guard';
 export * from './auth/authService';
