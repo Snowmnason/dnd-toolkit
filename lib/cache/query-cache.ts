@@ -1,9 +1,9 @@
-import { FastCache } from '../storage';
-import { logger } from '../utils/logger';
+import { FastCache } from "../storage";
+import { logger } from "../utils/logger";
 
 /**
  * Query Cache: Centralized cache with invalidation patterns
- * 
+ *
  * Features:
  * - Stale-While-Revalidate (SWR) pattern
  * - Tag-based invalidation (invalidate related queries)
@@ -20,7 +20,7 @@ import { logger } from '../utils/logger';
  * Escape special regex characters in a string to prevent ReDoS attacks
  */
 function escapeRegexChars(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 // ==========================================
@@ -39,13 +39,13 @@ export interface CacheEntry<T = any> {
 export interface CacheOptions {
   staleTime?: number; // Default: 2 hours
   cacheTime?: number; // Default: 4 hours
-  tags?: string[];    // Tags for invalidation
+  tags?: string[]; // Tags for invalidation
 }
 
 export interface QueryCacheConfig {
   defaultStaleTime: number; // 2 hours
   defaultCacheTime: number; // 4 hours
-  maxEntries: number;       // Prevent unbounded growth
+  maxEntries: number; // Prevent unbounded growth
 }
 
 type CacheSubscriber = (key: string, data: any) => void;
@@ -55,9 +55,9 @@ type CacheSubscriber = (key: string, data: any) => void;
 // ==========================================
 
 const DEFAULT_CONFIG: QueryCacheConfig = {
-  defaultStaleTime: 2 * 60 * 60 * 1000,  // 2 hours
-  defaultCacheTime: 4 * 60 * 60 * 1000,  // 4 hours
-  maxEntries: 500,                        // Max 500 cached queries
+  defaultStaleTime: 2 * 60 * 60 * 1000, // 2 hours
+  defaultCacheTime: 4 * 60 * 60 * 1000, // 4 hours
+  maxEntries: 500, // Max 500 cached queries
 };
 
 // ==========================================
@@ -107,21 +107,21 @@ class QueryCacheClass {
       // Check if cache is expired (beyond cacheTime)
       const age = Date.now() - entry.timestamp;
       if (age > entry.cacheTime) {
-        logger.debug('cache', `Cache expired for key: ${key}`);
+        logger.debug("cache", `Cache expired for key: ${key}`);
         await this.remove(key);
         return null;
       }
 
       return entry.data;
     } catch (error) {
-      logger.error('cache', `Error reading cache for ${key}:`, error);
+      logger.error("cache", `Error reading cache for ${key}:`, error);
       return null;
     }
   }
 
   /**
    * Set cached data for a query key
-   * 
+   *
    * @param key - Cache key
    * @param data - Data to cache
    * @param options - Cache options (staleTime, cacheTime, tags, version)
@@ -138,7 +138,7 @@ class QueryCacheClass {
     try {
       // Race condition prevention: Check if invalidation happened during request
       if (requestVersion !== undefined && requestVersion < this.globalVersion) {
-        logger.debug('cache', `Stale version for ${key}, discarding result`, {
+        logger.debug("cache", `Stale version for ${key}, discarding result`, {
           requestVersion,
           currentVersion: this.globalVersion,
         });
@@ -169,13 +169,13 @@ class QueryCacheClass {
       // Notify subscribers
       this.notifySubscribers(key, data);
 
-      logger.debug('cache', `Cached data for key: ${key}`, {
+      logger.debug("cache", `Cached data for key: ${key}`, {
         tags: entry.tags,
         staleTime: entry.staleTime,
         version: entry.version,
       });
     } catch (error) {
-      logger.error('cache', `Error setting cache for ${key}:`, error);
+      logger.error("cache", `Error setting cache for ${key}:`, error);
     }
   }
 
@@ -197,7 +197,7 @@ class QueryCacheClass {
    */
   async fetchWithDedupe<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
     if (this.pendingRequests.has(key)) {
-      logger.debug('cache', `Deduplicating request for key: ${key}`);
+      logger.debug("cache", `Deduplicating request for key: ${key}`);
       return this.pendingRequests.get(key)!;
     }
 
@@ -212,7 +212,7 @@ class QueryCacheClass {
   /**
    * Apply optimistic update to cache and return revert function
    * Used for instant UI feedback before mutations complete
-   * 
+   *
    * @param updater - Function that transforms cached data
    * @param options - Optional filters to target specific cache entries
    * @param options.tags - Only update entries with these tags
@@ -228,7 +228,9 @@ class QueryCacheClass {
     for (const [key, entry] of this.inMemoryCache.entries()) {
       // Filter by tags if specified
       if (options?.tags && entry.tags) {
-        const hasMatchingTag = entry.tags.some(tag => options.tags!.includes(tag));
+        const hasMatchingTag = entry.tags.some((tag) =>
+          options.tags!.includes(tag)
+        );
         if (!hasMatchingTag) continue;
       }
 
@@ -252,7 +254,7 @@ class QueryCacheClass {
         this.inMemoryCache.set(key, optimisticEntry);
         this.notifySubscribers(key, newValue);
 
-        logger.debug('cache', `Applied optimistic update for key: ${key}`);
+        logger.debug("cache", `Applied optimistic update for key: ${key}`);
       }
     }
 
@@ -269,7 +271,7 @@ class QueryCacheClass {
             };
             this.inMemoryCache.set(key, revertedEntry);
             this.notifySubscribers(key, previousValue);
-            logger.debug('cache', `Reverted optimistic update for key: ${key}`);
+            logger.debug("cache", `Reverted optimistic update for key: ${key}`);
           }
         }
       }
@@ -284,9 +286,9 @@ class QueryCacheClass {
       this.inMemoryCache.delete(key);
       const storageKey = this.toCacheKey(key);
       await FastCache.removeItem(storageKey);
-      logger.debug('cache', `Removed cache for key: ${key}`);
+      logger.debug("cache", `Removed cache for key: ${key}`);
     } catch (error) {
-      logger.error('cache', `Error removing cache for ${key}:`, error);
+      logger.error("cache", `Error removing cache for ${key}:`, error);
     }
   }
 
@@ -297,15 +299,15 @@ class QueryCacheClass {
     try {
       const keys = Array.from(this.inMemoryCache.keys());
       this.inMemoryCache.clear();
-      
+
       // Remove from FastCache
       await Promise.all(
-        keys.map(key => FastCache.removeItem(this.toCacheKey(key)))
+        keys.map((key) => FastCache.removeItem(this.toCacheKey(key)))
       );
-      
-      logger.info('cache', 'Cleared all query cache');
+
+      logger.info("cache", "Cleared all query cache");
     } catch (error) {
-      logger.error('cache', 'Error clearing cache:', error);
+      logger.error("cache", "Error clearing cache:", error);
     }
   }
 
@@ -324,7 +326,7 @@ class QueryCacheClass {
   /**
    * Invalidate cache entries by tags
    * Example: invalidateByTags(['worlds', 'user:123'])
-   * 
+   *
    * Side effect: Increments global version to prevent stale writes
    * from in-flight requests
    */
@@ -336,26 +338,30 @@ class QueryCacheClass {
       const keysToInvalidate: string[] = [];
 
       for (const [key, entry] of this.inMemoryCache.entries()) {
-        if (entry.tags && entry.tags.some(tag => tags.includes(tag))) {
+        if (entry.tags && entry.tags.some((tag) => tags.includes(tag))) {
           keysToInvalidate.push(key);
         }
       }
 
-      await Promise.all(keysToInvalidate.map(key => this.remove(key)));
+      await Promise.all(keysToInvalidate.map((key) => this.remove(key)));
 
-      logger.info('cache', `Invalidated ${keysToInvalidate.length} entries by tags`, {
-        tags,
-        newVersion: this.globalVersion,
-      });
+      logger.info(
+        "cache",
+        `Invalidated ${keysToInvalidate.length} entries by tags`,
+        {
+          tags,
+          newVersion: this.globalVersion,
+        }
+      );
     } catch (error) {
-      logger.error('cache', 'Error invalidating by tags:', error);
+      logger.error("cache", "Error invalidating by tags:", error);
     }
   }
 
   /**
    * Invalidate cache entries by pattern (regex or string)
    * Example: invalidate(/^worlds:/) or invalidate('worlds:user:123')
-   * 
+   *
    * Side effect: Increments global version to prevent stale writes
    * from in-flight requests
    */
@@ -365,7 +371,7 @@ class QueryCacheClass {
       this.globalVersion++;
 
       let regex: RegExp;
-      if (typeof pattern === 'string') {
+      if (typeof pattern === "string") {
         // Escape special regex characters to prevent ReDoS attacks
         const escapedPattern = escapeRegexChars(pattern);
         regex = new RegExp(`^${escapedPattern}`);
@@ -380,14 +386,18 @@ class QueryCacheClass {
         }
       }
 
-      await Promise.all(keysToInvalidate.map(key => this.remove(key)));
+      await Promise.all(keysToInvalidate.map((key) => this.remove(key)));
 
-      logger.info('cache', `Invalidated ${keysToInvalidate.length} entries by pattern`, {
-        pattern: pattern.toString(),
-        newVersion: this.globalVersion,
-      });
+      logger.info(
+        "cache",
+        `Invalidated ${keysToInvalidate.length} entries by pattern`,
+        {
+          pattern: pattern.toString(),
+          newVersion: this.globalVersion,
+        }
+      );
     } catch (error) {
-      logger.error('cache', 'Error invalidating by pattern:', error);
+      logger.error("cache", "Error invalidating by pattern:", error);
     }
   }
 
@@ -423,13 +433,29 @@ class QueryCacheClass {
   private notifySubscribers(key: string, data: any): void {
     const subs = this.subscribers.get(key);
     if (subs) {
-      subs.forEach(callback => callback(key, data));
+      subs.forEach((callback) => callback(key, data));
     }
   }
 
   // ==========================================
   // Utility Methods
   // ==========================================
+
+  /**
+   * Clear all cache entries (for logout scenarios)
+   * Removes all entries from both in-memory cache and persistent storage
+   */
+  async clearAll(): Promise<void> {
+    try {
+      const keys = Array.from(this.inMemoryCache.keys());
+      await Promise.all(keys.map((key) => this.remove(key)));
+      this.inMemoryCache.clear();
+      this.subscribers.clear();
+      logger.info("cache", "Cleared all cache entries");
+    } catch (error) {
+      logger.error("cache", "Error clearing all cache:", error);
+    }
+  }
 
   /**
    * Convert query key to storage key
@@ -451,7 +477,7 @@ class QueryCacheClass {
       await this.remove(keyToRemove);
     }
 
-    logger.debug('cache', `Evicted ${toRemove} oldest cache entries`);
+    logger.debug("cache", `Evicted ${toRemove} oldest cache entries`);
   }
 
   /**
@@ -460,11 +486,14 @@ class QueryCacheClass {
   private startCleanupTimer(): void {
     if (this.cleanupTimer) return;
 
-    this.cleanupTimer = setInterval(() => {
-      this.cleanupExpired();
-    }, 60 * 60 * 1000); // Every hour
+    this.cleanupTimer = setInterval(
+      () => {
+        this.cleanupExpired();
+      },
+      60 * 60 * 1000
+    ); // Every hour
 
-    if (typeof this.cleanupTimer === 'object' && 'unref' in this.cleanupTimer) {
+    if (typeof this.cleanupTimer === "object" && "unref" in this.cleanupTimer) {
       (this.cleanupTimer as any).unref();
     }
   }
@@ -480,10 +509,13 @@ class QueryCacheClass {
       }
     }
 
-    await Promise.all(keysToRemove.map(key => this.remove(key)));
+    await Promise.all(keysToRemove.map((key) => this.remove(key)));
 
     if (keysToRemove.length > 0) {
-      logger.info('cache', `Cleaned up ${keysToRemove.length} expired cache entries`);
+      logger.info(
+        "cache",
+        `Cleaned up ${keysToRemove.length} expired cache entries`
+      );
     }
   }
 
