@@ -5,9 +5,15 @@
  * Must wrap the app at the root level for all consumers to work.
  */
 
-import { logger } from '@/lib';
-import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { AppKernel, AppKernelState } from './app-kernel';
+import {
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import { logger } from "../utils/logger";
+import { AppKernel, AppKernelState } from "./app-kernel";
 
 /**
  * React context for kernel state
@@ -29,7 +35,9 @@ export function AppKernelProvider({ children }: AppKernelProviderProps) {
     // Initialize kernel once on mount
     AppKernel.initialize().catch((error: unknown) => {
       // Error is already logged in kernel, but we can handle it here if needed
-      logger.category('bootstrap').error('[AppKernelProvider] Kernel initialization failed:', error);
+      logger
+        .category("bootstrap")
+        .error("[AppKernelProvider] Kernel initialization failed:", error);
     });
 
     // Subscribe to kernel state changes
@@ -56,7 +64,7 @@ export function AppKernelProvider({ children }: AppKernelProviderProps) {
 export function useAppKernel(): AppKernelState {
   const state = useContext(AppKernelContext);
   if (state === null) {
-    throw new Error('useAppKernel must be called within an AppKernelProvider');
+    throw new Error("useAppKernel must be called within an AppKernelProvider");
   }
   return state;
 }
@@ -73,7 +81,7 @@ export function useAppReady(): boolean {
  * Hook to check if a specific phase is ready
  * Type-safe: TypeScript enforces phase must be a valid key of AppKernelState['phases']
  */
-export function usePhaseReady(phase: keyof AppKernelState['phases']): boolean {
+export function usePhaseReady(phase: keyof AppKernelState["phases"]): boolean {
   const kernel = useAppKernel();
-  return kernel.phases[phase as keyof AppKernelState['phases']];
+  return kernel.phases[phase as keyof AppKernelState["phases"]];
 }

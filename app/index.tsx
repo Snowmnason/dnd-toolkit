@@ -9,14 +9,14 @@ import LoadingOverlay from "../components/LoadingOverlay";
 const FAILSAFE_TIMEOUT = 8000; // Show failsafe button after 8 seconds
 
 const TAVERN_LOCATIONS = [
-  { text: 'Enter the Tavern', icon: '🍺' },
-  { text: 'Enter the Dungeon', icon: '🗝️' },
-  { text: 'Enter the Castle', icon: '🏰' },
-  { text: 'Enter the Camp', icon: '⛺' },
-  { text: 'Enter the Plane', icon: '✨' },
-  { text: 'Enter the Guild Hall', icon: '🛡️' },
-  { text: 'Enter the Temple', icon: '⛪' },
-  { text: 'Enter the Dragon\'s Lair', icon: '🐉' },
+  { text: "Enter the Tavern", icon: "🍺" },
+  { text: "Enter the Dungeon", icon: "🗝️" },
+  { text: "Enter the Castle", icon: "🏰" },
+  { text: "Enter the Camp", icon: "⛺" },
+  { text: "Enter the Plane", icon: "✨" },
+  { text: "Enter the Guild Hall", icon: "🛡️" },
+  { text: "Enter the Temple", icon: "⛪" },
+  { text: "Enter the Dragon's Lair", icon: "🐉" },
 ];
 
 export default function HomePage() {
@@ -24,7 +24,7 @@ export default function HomePage() {
   const [showFailsafe, setShowFailsafe] = React.useState(false);
   const [isAuthChecked, setIsAuthChecked] = React.useState(false);
   const [hasAccount, setHasAccount] = React.useState(false);
-  
+
   // Pick a random location on mount
   const randomLocation = React.useMemo(() => {
     const randomIndex = Math.floor(Math.random() * TAVERN_LOCATIONS.length);
@@ -33,11 +33,11 @@ export default function HomePage() {
     if (!location) {
       // Fallback to first location if random index fails
       const fallback = TAVERN_LOCATIONS.at(0);
-      return fallback || { text: 'Enter the Tavern', icon: '🍺' };
+      return fallback || { text: "Enter the Tavern", icon: "🍺" };
     }
     return location;
   }, []);
-  
+
   // Wait for kernel to complete before routing
   const kernel = useAppKernel();
 
@@ -46,7 +46,10 @@ export default function HomePage() {
     const timer = setTimeout(() => {
       // Only show failsafe if we're still waiting for auth check
       if (!isAuthChecked) {
-        logger.warn('bootstrap', '⏱️ Failsafe timeout reached, showing manual navigation button');
+        logger.warn(
+          "bootstrap",
+          "⏱️ Failsafe timeout reached, showing manual navigation button"
+        );
         setShowFailsafe(true);
       }
     }, FAILSAFE_TIMEOUT);
@@ -58,45 +61,77 @@ export default function HomePage() {
   React.useEffect(() => {
     // Don't proceed until kernel is complete
     if (!kernel.phases.appReady) {
-      logger.debug('bootstrap', '⏸️ Waiting for kernel to complete');
+      logger.debug("bootstrap", "⏸️ Waiting for kernel to complete");
       return;
     }
 
-    logger.info('bootstrap', '🚀 Kernel ready! Checking login recency...');
+    logger.info("bootstrap", "🚀 Kernel ready! Checking login recency...");
 
     const checkLoginRecency = async () => {
       try {
-        const lastLoggedInStr = await SecureStorage.getItem(STORAGE_KEYS.LAST_LOGGED_IN);
-        
-        if (!lastLoggedInStr) {
-          logger.debug('bootstrap', '⏭️ No recent login found, showing welcome');
+        // CRITICAL: Check hasAccount first - if user logged out, don't use cached login time
+        // This prevents the redirect loop after logout
+        const authState = await SecureStorage.getJSON(STORAGE_KEYS.HAS_ACCOUNT);
+        const hasAccount = authState?.hasAccount === true;
+
+        // If user explicitly logged out (hasAccount is false/null/undefined), show welcome
+        if (!hasAccount) {
+          logger.debug(
+            "bootstrap",
+            "⏭️ User not logged in (hasAccount=false), showing welcome"
+          );
           setIsAuthChecked(true);
           setHasAccount(false);
           return;
         }
-        
+
+        // User is logged in, check if their last login is recent
+        const lastLoggedInStr = await SecureStorage.getItem(
+          STORAGE_KEYS.LAST_LOGGED_IN
+        );
+
+        if (!lastLoggedInStr) {
+          logger.debug(
+            "bootstrap",
+            "⏭️ No recent login found, showing welcome"
+          );
+          setIsAuthChecked(true);
+          setHasAccount(false);
+          return;
+        }
+
         const lastLoggedInMs = parseInt(lastLoggedInStr, 10);
         const now = Date.now();
         const sevenDaysMs = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
-        const isWithinSevenDays = (now - lastLoggedInMs) < sevenDaysMs;
-        
+        const isWithinSevenDays = now - lastLoggedInMs < sevenDaysMs;
+
         if (isWithinSevenDays) {
-          logger.info('bootstrap', `✅ Recent login detected (${Math.floor((now - lastLoggedInMs) / (1000 * 60 * 60))} hours ago), redirecting to world selection`);
+          logger.info(
+            "bootstrap",
+            `✅ Recent login detected (${Math.floor((now - lastLoggedInMs) / (1000 * 60 * 60))} hours ago), redirecting to world selection`
+          );
           setIsAuthChecked(true);
           setHasAccount(true);
           // Redirect to world selection after a brief moment to ensure state is set
           setTimeout(() => {
-            router.replace('/select/world-selection');
+            router.replace("/select/world-selection");
           }, 100);
           return;
         }
-        
-        logger.debug('bootstrap', '⏭️ Login is stale (>7 days), showing welcome');
+
+        logger.debug(
+          "bootstrap",
+          "⏭️ Login is stale (>7 days), showing welcome"
+        );
         setIsAuthChecked(true);
         setHasAccount(false);
       } catch (error) {
         // If check fails, just show welcome - no harm done
-        logger.debug('bootstrap', '⚠️ Login recency check failed, showing welcome:', error);
+        logger.debug(
+          "bootstrap",
+          "⚠️ Login recency check failed, showing welcome:",
+          error
+        );
         setIsAuthChecked(true);
         setHasAccount(false);
       }
@@ -107,12 +142,18 @@ export default function HomePage() {
 
   // Show loading spinner while kernel is initializing
   if (!kernel.phases.appReady) {
-    const loadingMessage = kernel.phases.preloadReady ? 'Restoring session...' : 'Loading assets...';
-    logger.debug('bootstrap', '⏳ Rendering index loading overlay:', loadingMessage);
-    
+    const loadingMessage = kernel.phases.preloadReady
+      ? "Restoring session..."
+      : "Loading assets...";
+    logger.debug(
+      "bootstrap",
+      "⏳ Rendering index loading overlay:",
+      loadingMessage
+    );
+
     return (
       <View style={styles.container}>
-        <LoadingOverlay 
+        <LoadingOverlay
           message={loadingMessage}
           error={kernel.error}
           assetsLoaded={kernel.phases.preloadReady}
@@ -122,21 +163,27 @@ export default function HomePage() {
   }
 
   // Show welcome screen once auth check is complete
-  // For authenticated users: they'll see the welcome screen momentarily, 
+  // For authenticated users: they'll see the welcome screen momentarily,
   // but the select route guard will pull them to /select/world-selection
   if (isAuthChecked) {
-    logger.debug('bootstrap', `📋 Rendering welcome screen (hasAccount: ${hasAccount})`);
-    
+    logger.debug(
+      "bootstrap",
+      `📋 Rendering welcome screen (hasAccount: ${hasAccount})`
+    );
+
     return (
       <View style={styles.container}>
         <Welcome />
-        
+
         {showFailsafe && (
           <View style={styles.failsafeContainer}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.failsafeButton}
               onPress={() => {
-                logger.info('bootstrap', '🚪 User clicked failsafe button, navigating to welcome');
+                logger.info(
+                  "bootstrap",
+                  "🚪 User clicked failsafe button, navigating to welcome"
+                );
                 // Welcome screen is already showing, so this is a manual refresh
               }}
               activeOpacity={0.8}
@@ -152,10 +199,10 @@ export default function HomePage() {
   }
 
   // Show loading while determining auth status
-  logger.debug('bootstrap', '⏳ Checking auth status...');
+  logger.debug("bootstrap", "⏳ Checking auth status...");
   return (
     <View style={styles.container}>
-      <LoadingOverlay 
+      <LoadingOverlay
         message="Checking authentication..."
         error={kernel.error}
         assetsLoaded={kernel.phases.preloadReady}
@@ -167,26 +214,26 @@ export default function HomePage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2f353d',
+    backgroundColor: "#2f353d",
   },
   failsafeContainer: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 60,
     left: 0,
     right: 0,
-    alignItems: 'center',
+    alignItems: "center",
     zIndex: 10000,
   },
   failsafeButton: {
-    backgroundColor: 'rgba(212, 175, 55, 0.95)', // Gold
+    backgroundColor: "rgba(212, 175, 55, 0.95)", // Gold
     paddingVertical: 16,
     paddingHorizontal: 32,
     borderRadius: 12,
     borderWidth: 3,
-    borderColor: '#8B4513', // Saddle brown
-    boxShadow: '#000, 0 4px 8px',
+    borderColor: "#8B4513", // Saddle brown
+    boxShadow: "#000, 0 4px 8px",
     elevation: 8,
-    alignItems: 'center',
+    alignItems: "center",
     minWidth: 200,
   },
   failsafeIcon: {
@@ -194,16 +241,16 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   failsafeText: {
-    color: '#2f353d',
+    color: "#2f353d",
     fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontWeight: "bold",
+    textAlign: "center",
     marginBottom: 2,
   },
   failsafeSubtext: {
-    color: 'rgba(47, 53, 61, 0.7)',
+    color: "rgba(47, 53, 61, 0.7)",
     fontSize: 12,
-    textAlign: 'center',
-    fontStyle: 'italic',
+    textAlign: "center",
+    fontStyle: "italic",
   },
 });
