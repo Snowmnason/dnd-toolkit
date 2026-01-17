@@ -1,63 +1,76 @@
-import { Button } from '@/components/ui'
-import { usePlatform } from '@/contexts/PlatformContext'
-import { useThemeSwitcher } from '@/hooks/useThemeSwitcher'
-import { buildNavigationTarget } from "@/lib/navigation/uri-helpers"
-import { $, allThemes, ThemeFamily, ThemeMode, useScale, UseTheme } from '@/theme'
-import { useRouter } from "expo-router"
-import { Text, TouchableOpacity, View } from 'react-native'
+import { Button } from "@/components/ui";
+import { usePlatform } from "@/contexts/PlatformContext";
+import { useThemeSwitcher } from "@/hooks/useThemeSwitcher";
+import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
+import {
+  $,
+  allThemes,
+  ThemeFamily,
+  ThemeMode,
+  useScale,
+  UseTheme,
+} from "@/theme";
+import { useRouter, useSegments } from "expo-router";
+import { Text, TouchableOpacity, View } from "react-native";
 
 /**
  * 🎨 ThemeSelector
  * Displays a grid of theme families with light/dark swatches.
  */
 export function ThemeSelector() {
-  const { activeTheme, mode, changeTheme, toggleMode } = useThemeSwitcher()
+  const { activeTheme, mode, changeTheme, toggleMode } = useThemeSwitcher();
   const { isMobile } = usePlatform();
-  const { theme: currentTheme } = UseTheme()
-  const S = useScale()
+  const { theme: currentTheme } = UseTheme();
+  const S = useScale();
   const router = useRouter();
+  const segments = useSegments();
+
+  // Check if we're already on the StyleMobile or StyleDesktop routes
+  const isOnStylePage =
+    (segments as string[]).includes("StyleMobile") ||
+    (segments as string[]).includes("StyleDesktop");
 
   const handleSelect = (themeName: ThemeFamily, themeMode: ThemeMode) => {
     // Change theme family first
-    changeTheme(themeName)
+    changeTheme(themeName);
 
     // Then, ensure the mode matches
-    if (mode !== themeMode) toggleMode()
-  }
+    if (mode !== themeMode) toggleMode();
+  };
 
   return (
     <View
       style={{
-        flexDirection: 'column',
-        alignItems: 'center',
+        flexDirection: "column",
+        alignItems: "center",
         gap: S.space.lg,
       }}
     >
       <View
         style={{
-          flexDirection: 'row',
-          justifyContent: 'space-around',
-          flexWrap: 'wrap',
+          flexDirection: "row",
+          justifyContent: "space-around",
+          flexWrap: "wrap",
           gap: S.space.lg,
         }}
       >
         {Object.entries(allThemes).map(([key, theme]) => {
-          const themeKey = key as ThemeFamily
-          const isActiveFamily = themeKey === activeTheme
+          const themeKey = key as ThemeFamily;
+          const isActiveFamily = themeKey === activeTheme;
 
           return (
             <View
               key={themeKey}
               style={{
-                alignItems: 'center',
+                alignItems: "center",
                 padding: S.space.sm,
               }}
             >
               {/* ─────────── Theme Name ─────────── */}
               <Text
                 style={{
-                  color: $('textPrimary', currentTheme),
-                  fontWeight: isActiveFamily ? 'bold' : '600',
+                  color: $("textPrimary", currentTheme),
+                  fontWeight: isActiveFamily ? "bold" : "600",
                   marginBottom: S.space.sm,
                 }}
               >
@@ -65,16 +78,16 @@ export function ThemeSelector() {
               </Text>
 
               {/* ─────────── Light & Dark Swatches ─────────── */}
-              <View style={{ flexDirection: 'row', gap: S.space.sm }}>
+              <View style={{ flexDirection: "row", gap: S.space.sm }}>
                 {(Object.keys(theme) as ThemeMode[]).map((m) => {
-                  let bg = '#222'
+                  let bg = "#222";
                   switch (m) {
-                    case 'light':
-                      bg = theme.light?.background ?? '#222'
-                      break
-                    case 'dark':
-                      bg = theme.dark?.background ?? '#222'
-                      break
+                    case "light":
+                      bg = theme.light?.background ?? "#222";
+                      break;
+                    case "dark":
+                      bg = theme.dark?.background ?? "#222";
+                      break;
                   }
                   return (
                     <TouchableOpacity
@@ -86,33 +99,34 @@ export function ThemeSelector() {
                         height: 70,
                         borderRadius: S.radius.md,
                         backgroundColor: bg,
-                        borderWidth:
-                          isActiveFamily && mode === m ? 3 : 1,
+                        borderWidth: isActiveFamily && mode === m ? 3 : 1,
                         borderColor:
                           isActiveFamily && mode === m
-                            ? $('accent', currentTheme)
-                            : $('border', currentTheme),
+                            ? $("accent", currentTheme)
+                            : $("border", currentTheme),
                       }}
                     />
-                  )
+                  );
                 })}
               </View>
             </View>
-          )
+          );
         })}
       </View>
-      <Button
-        variant="secondary"
-        text="Playground"
-        onPress={() => {
-          const targetPath = isMobile
-            ? '/settings/StyleMobile'
-            : '/settings/StyleDesktop';
-          const target = buildNavigationTarget(targetPath, {}, []);
-          router.push(target as any);
-        }}
-        style={{ alignSelf: "center" }}
-      />
+      {!isOnStylePage && (
+        <Button
+          variant="secondary"
+          text="Playground"
+          onPress={() => {
+            const targetPath = isMobile
+              ? "/settings/StyleMobile"
+              : "/settings/StyleDesktop";
+            const target = buildNavigationTarget(targetPath, {}, []);
+            router.push(target as any);
+          }}
+          style={{ alignSelf: "center" }}
+        />
+      )}
     </View>
-  )
+  );
 }

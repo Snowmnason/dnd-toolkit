@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useMemo } from 'react'
 import { Pressable, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import Animated, { FadeInDown, SlideOutUp } from 'react-native-reanimated'
 import { Body, Caption } from './AppText'
 import { getShadowStyle } from './Resuables/shadows'
 
@@ -28,7 +29,7 @@ interface NotificationProps extends NotificationData {
 
 /**
  * 🔔 Notification
- * SIMPLIFIED - No animations, just appears/disappears
+ * Bouncy drop-in animation with smooth slide-up on dismiss
  * Platform-aware notification banner for messages, updates, and alerts.
  * - Desktop: Top-right corner, stacks vertically
  * - Mobile: Top-center (keyboard-safe), stacks vertically
@@ -84,7 +85,9 @@ export function Notification({
   logger.debug('ui', 'Rendering id:', id, 'type:', type)
 
   return (
-    <View
+    <Animated.View
+      entering={FadeInDown.duration(500).springify().damping(0.7).delay(index * 80)}
+      exiting={SlideOutUp.duration(300)}
       style={{
         position: 'absolute',
         top: baseTop + stackOffset,
@@ -168,7 +171,7 @@ export function Notification({
           </View>
         </View>
       </Pressable>
-    </View>
+    </Animated.View>
   )
 }
 
