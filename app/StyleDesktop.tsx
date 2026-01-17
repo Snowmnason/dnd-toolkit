@@ -32,7 +32,7 @@ import {
   ToggleGroup
 } from '@/components/ui'
 import { AppSplit } from '@/components/ui/AppView'
-
+import { useNotifications } from '@/hooks/use-notifications'
 
 import { $, UseTheme, useScale } from '@/theme'
 import { useRef, useState } from 'react'
@@ -41,6 +41,7 @@ import { ScrollView, Text, View } from 'react-native'
 export default function StyleDesktop() {
   const S = useScale()
   const { theme } = UseTheme()
+  const { showNotification } = useNotifications()
   
   
   // Simple display states (not controlling components, just for right panel display)
@@ -104,10 +105,48 @@ export default function StyleDesktop() {
               <Link>Link text</Link>
             </View>
           </Surface>
-          {/* Notifications system temporarily removed */}
+          {/* Notifications system - re-enabled for testing */}
           <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.lg }}>
             <Heading>Notifications (In-App)</Heading>
-            <Caption>Notification system temporarily disabled</Caption>
+            <Body style={{ marginBottom: S.space.md }}>Test the notification queue system</Body>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <Button 
+                variant="primary"
+                text="Show Info" 
+                onPress={() => showNotification({
+                  type: 'info',
+                  title: 'Info',
+                  message: 'This is an info notification',
+                })}
+              />
+              <Button 
+                variant="secondary"
+                text="Show Update" 
+                onPress={() => showNotification({
+                  type: 'update',
+                  title: 'Update Available',
+                  message: 'A new version is available',
+                })}
+              />
+              <Button 
+                variant="solid"
+                text="Show Alert" 
+                onPress={() => showNotification({
+                  type: 'alert',
+                  title: 'Alert',
+                  message: 'Important alert message',
+                })}
+              />
+              <Button 
+                variant="outlined"
+                text="Show Message" 
+                onPress={() => showNotification({
+                  type: 'message',
+                  title: 'Message',
+                  message: 'You have a new message',
+                })}
+              />
+            </View>
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg }}>
@@ -660,6 +699,74 @@ export default function StyleDesktop() {
                       <Body>Dramatic depth</Body>
                     </Card>
                   </View>
+          </Surface>
+
+          <Surface style={{ marginTop: S.space.lg }}>
+            <Heading>🔔 Notification Testing</Heading>
+            <Body style={{ marginBottom: S.space.md }}>Test in-app notification queue system</Body>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <Button 
+                text="Show Info Notification" 
+                onPress={() => showNotification({
+                  type: 'info',
+                  title: 'Info Message',
+                  message: 'This is an info notification to test the system.',
+                })}
+              />
+              <Button 
+                variant="outlined"
+                text="Show Update Notification" 
+                onPress={() => showNotification({
+                  type: 'update',
+                  title: 'System Update',
+                  message: 'A new version of the app is available.',
+                })}
+              />
+              <Button 
+                text="Show Alert Notification" 
+                onPress={() => showNotification({
+                  type: 'alert',
+                  title: 'Alert',
+                  message: 'This is an important alert notification.',
+                })}
+              />
+              <Button 
+                variant="outlined"
+                text="Show Message Notification" 
+                onPress={() => showNotification({
+                  type: 'message',
+                  title: 'New Message',
+                  message: 'You have a new message from someone.',
+                })}
+              />
+              <Button 
+                text="Queue Multiple Notifications" 
+                onPress={() => {
+                  showNotification({
+                    type: 'message',
+                    title: 'First',
+                    message: 'This is the first notification',
+                  })
+                  setTimeout(() => {
+                    showNotification({
+                      type: 'info',
+                      title: 'Second',
+                      message: 'This is the second notification',
+                    })
+                  }, 100)
+                  setTimeout(() => {
+                    showNotification({
+                      type: 'update',
+                      title: 'Third',
+                      message: 'This is the third notification',
+                    })
+                  }, 200)
+                }}
+              />
+            </View>
+            <Body style={{ marginTop: S.space.md, color: $('textSecondary', theme) }}>
+              Notifications appear in the top-right corner (desktop) or top-center (mobile) and auto-dismiss after 5 seconds.
+            </Body>
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg }}>

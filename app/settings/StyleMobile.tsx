@@ -33,11 +33,13 @@ import {
 // CrashTester removed
 
 import { $, useScale } from '@/theme'
+import { useNotifications } from '@/hooks/use-notifications'
 import React, { useState } from 'react'
 import { ScrollView, Text, View } from 'react-native'
 
 export default function StyleMobile() {
   const S = useScale()
+  const { showNotification } = useNotifications()
   
   
   // Simple display states
@@ -464,9 +466,45 @@ export default function StyleMobile() {
 
         <Card>
           <Heading>Notifications (In-App)</Heading>
-          <Body style={{ marginBottom: S.space.md }}>
-            Notification system temporarily disabled
-          </Body>
+          <Body style={{ marginBottom: S.space.md }}>Test the notification queue system</Body>
+          <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+            <Button 
+              variant="primary"
+              text="Show Info" 
+              onPress={() => showNotification({
+                type: 'info',
+                title: 'Info',
+                message: 'This is an info notification',
+              })}
+            />
+            <Button 
+              variant="secondary"
+              text="Show Update" 
+              onPress={() => showNotification({
+                type: 'update',
+                title: 'Update Available',
+                message: 'A new version is available',
+              })}
+            />
+            <Button 
+              variant="solid"
+              text="Show Alert" 
+              onPress={() => showNotification({
+                type: 'alert',
+                title: 'Alert',
+                message: 'Important alert message',
+              })}
+            />
+            <Button 
+              variant="outlined"
+              text="Show Message" 
+              onPress={() => showNotification({
+                type: 'message',
+                title: 'Message',
+                message: 'You have a new message',
+              })}
+            />
+          </View>
         </Card>
 
         <Card>

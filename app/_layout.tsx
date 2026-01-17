@@ -1,5 +1,6 @@
 
-import { TopBar } from '@/components/ui';
+import { NotificationContainer, TopBar } from '@/components/ui';
+import { NotificationProvider } from '@/hooks/use-notifications';
 import { useAnalyticsNavigation } from '@/hooks/use-analytics-navigation';
 import { AppErrorBoundary, getRouteConfig, resolveBackTarget, resolveTitle } from "@/lib";
 import { Analytics, sessionManager } from '@/lib/analytics';
@@ -274,6 +275,9 @@ function RootLayoutContent() {
             },
           }}
         />
+        
+        {/* Notification Container - renders all queued notifications */}
+        <NotificationContainer />
       </View>
     </RouteErrorBoundary>
   );
@@ -289,13 +293,15 @@ export default function RootLayout() {
             <SubscriptionProvider>
               <AppParamsStableProvider>
                 <AppParamsVolatileProvider>
-                  <AppErrorBoundary 
-                    renderFallback={(error, onRetry) => (
-                      <CrashFallBack error={error} onRetry={onRetry} />
-                    )}
-                  >
-                    <RootLayoutContent />
-                  </AppErrorBoundary>
+                  <NotificationProvider>
+                    <AppErrorBoundary 
+                      renderFallback={(error, onRetry) => (
+                        <CrashFallBack error={error} onRetry={onRetry} />
+                      )}
+                    >
+                      <RootLayoutContent />
+                    </AppErrorBoundary>
+                  </NotificationProvider>
                 </AppParamsVolatileProvider>
               </AppParamsStableProvider>
             </SubscriptionProvider>

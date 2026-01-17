@@ -32,7 +32,7 @@ import {
   ToggleGroup
 } from '@/components/ui'
 import { AppSplit } from '@/components/ui/AppView'
-
+import { useNotifications } from '@/hooks/use-notifications'
 
 import { $, UseTheme, useScale } from '@/theme'
 import { useRef, useState } from 'react'
@@ -41,6 +41,7 @@ import { ScrollView, Text, View } from 'react-native'
 export default function StyleDesktop() {
   const S = useScale()
   const { theme } = UseTheme()
+  const { showNotification } = useNotifications()
   
   
   // Simple display states (not controlling components, just for right panel display)
@@ -104,10 +105,48 @@ export default function StyleDesktop() {
               <Link>Link text</Link>
             </View>
           </Surface>
-          {/* Notifications system temporarily removed */}
+          {/* Notifications system - re-enabled for testing */}
           <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.lg }}>
             <Heading>Notifications (In-App)</Heading>
-            <Caption>Notification system temporarily disabled</Caption>
+            <Body style={{ marginBottom: S.space.md }}>Test the notification queue system</Body>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <Button 
+                variant="primary"
+                text="Show Info" 
+                onPress={() => showNotification({
+                  type: 'info',
+                  title: 'Info',
+                  message: 'This is an info notification',
+                })}
+              />
+              <Button 
+                variant="secondary"
+                text="Show Update" 
+                onPress={() => showNotification({
+                  type: 'update',
+                  title: 'Update Available',
+                  message: 'A new version is available',
+                })}
+              />
+              <Button 
+                variant="solid"
+                text="Show Alert" 
+                onPress={() => showNotification({
+                  type: 'alert',
+                  title: 'Alert',
+                  message: 'Important alert message',
+                })}
+              />
+              <Button 
+                variant="outlined"
+                text="Show Message" 
+                onPress={() => showNotification({
+                  type: 'message',
+                  title: 'Message',
+                  message: 'You have a new message',
+                })}
+              />
+            </View>
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg }}>
