@@ -1,11 +1,9 @@
-import { Body, Button, Card, Title } from '@/components/ui';
 import { logger } from '@/lib';
-import { View } from "react-native";
 import { getAppConfig } from '@/lib/config/loader';
 import { NavigationContext, RouteConfig } from '@/lib/navigation/navigation-config';
-import { UseTheme, useScale } from '@/theme';
 import { useRouter } from 'expo-router';
-import React, { ReactNode, useMemo } from 'react';
+import React, { ReactNode } from 'react';
+import { ErrorFallbackShell } from './ErrorFallbackShell';
 
 interface RouteErrorBoundaryProps {
   children: ReactNode;
@@ -18,21 +16,6 @@ interface State {
   hasError: boolean;
   error?: Error;
 }
-// Fun D&D-themed error messages
-const ERROR_MESSAGES = [
-  "Oops! Someone spilled a drink on the character sheet!",
-  "Oops! Your pencil broke mid-session!",
-  "Oops! We encountered a TPK!",
-  "Oops! The DM's notes got eaten by the dog!",
-  "Oops! Natural 1!",
-  "Oops! The dice rolled off the table!",
-  "Oops! Someone forgot to bring snacks!",
-  "Oops! The dragon decided to show up early!",
-  "Oops! Critical fumble on the app loading!",
-  "Oops! The tavern ran out of ale!",
-  "Oops! Your spell fizzled!",
-  "Oops! The mimic was actually the treasure chest!",
-];
 
 
 /**
@@ -98,11 +81,9 @@ interface ErrorFallbackProps {
 
 /**
  * Fallback UI for route errors
- * Styled similar to CrashFallBack for consistency
+ * Uses ErrorFallbackShell for consistent error display
  */
 function ErrorFallback({ error, fallbackRoute }: ErrorFallbackProps) {
-  const { theme } = UseTheme();
-  const S = useScale();
   const router = useRouter();
   const config = getAppConfig();
   // Check override setting first, fall back to NODE_ENV if not explicitly set
@@ -113,77 +94,14 @@ function ErrorFallback({ error, fallbackRoute }: ErrorFallbackProps) {
     // Redirect to fallbackRoute (provided by parent or defaults to safe route)
     router.replace(fallbackRoute as any);
   };
-    // Pick a random fun message
-  const funMessage = useMemo(
-    () => ERROR_MESSAGES[Math.floor(Math.random() * ERROR_MESSAGES.length)],
-    []
-  );
 
   return (
-<View
-      style={{
-        alignItems: "center",
-        justifyContent: "center",
-        flex: 1,
-        backgroundColor: theme.background,
-        padding: S.space.lg,
-      }}
-    >
-      <Card
-        padded
-        bordered
-        style={{
-          width: "100%",
-          padding: S.space.xl,
-        }}
-      >
-        {/* Error Icon/Title */}
-        <Title
-          align="center"
-          style={{
-            color: theme.accent,
-            marginBottom: S.space.md,
-          }}
-        >
-          🎲 {funMessage}
-        </Title>
-        <Body 
-          align="center" 
-          style={{ 
-            marginBottom: 24, 
-            lineHeight: 1.6,
-            opacity: 0.9
-          }}
-        >
-          Don&apos;t worry - your adventure is safe! Try returning to the tavern (home screen) to continue your quest.
-        </Body>
-        {error && showDetailedErrors && (
-          <Card 
-            bordered
-            padded
-            style={{ 
-              marginBottom: 24,
-              width: '100%',
-              maxHeight: 200,
-              overflow: 'hidden'
-            }}
-          >
-            <Body 
-              style={{ 
-                fontFamily: 'monospace', 
-                fontSize: 12,
-                opacity: 0.8
-              }}
-            >
-              {error.message}
-            </Body>
-          </Card>
-        )}
-        <Button
-          text="Return to Welcome Screen"
-          onPress={handleRecover}
-        />
-      </Card>
-    </View>
+    <ErrorFallbackShell
+      error={error}
+      showDetails={showDetailedErrors && !!error}
+      recoveryMessage="Don't worry - your adventure is safe! Try returning to continue your quest."
+      primaryButtonText="Return to The Safe Path"
+      onPrimaryAction={handleRecover}
+    />
   );
 }

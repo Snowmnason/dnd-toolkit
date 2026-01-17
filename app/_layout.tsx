@@ -1,4 +1,4 @@
-import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
+
 import { TopBar } from '@/components/ui';
 import { useAnalyticsNavigation } from '@/hooks/use-analytics-navigation';
 import { AppErrorBoundary, getRouteConfig, resolveBackTarget, resolveTitle } from "@/lib";
@@ -15,7 +15,7 @@ import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import LoadingOverlay from '../components/LoadingOverlay';
-import { CrashFallBack, SplashScreen } from '../components/SplashScreen';
+import { CrashFallBack, RouteErrorBoundary, SplashScreen } from '../components/SplashScreen';
 import { AppParamsStableProvider, useAppParamsStable, useUserId } from '../contexts/AppParamsStableContext';
 import { AppParamsVolatileProvider, useAppParamsVolatile, useUserRole, useWorldId } from '../contexts/AppParamsVolatileContext';
 import { PlatformProvider, usePlatform } from '../contexts/PlatformContext';

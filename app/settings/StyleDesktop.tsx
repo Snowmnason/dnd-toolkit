@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { ThemeSelector } from '@/Screens/settings/ThemeSelector'
-import { CrashTester } from '@/components/SplashScreen'
 import {
   Accordion,
   AppModal,
@@ -43,8 +42,6 @@ export default function StyleDesktop() {
   const S = useScale()
   const { theme } = UseTheme()
   
-  // Crash tester state
-  const [triggerCrash, setTriggerCrash] = useState(false)
   
   // Simple display states (not controlling components, just for right panel display)
   const [primaryClicks, setPrimaryClicks] = useState(0)
@@ -91,25 +88,7 @@ export default function StyleDesktop() {
       horizontalPadding='xs'
       left={
         <ScrollView style={{  }}>
-          {/* Crash Tester - Hidden component for testing error boundary */}
-          {triggerCrash && <CrashTester />}
-
-          {/* 🧪 Error Testing Section */}
-          <Surface style={{ marginTop: S.space.lg }}>
-            <Heading>🧪 Error Testing</Heading>
-            <Body style={{ marginTop: S.space.md, marginBottom: S.space.md, color: theme.textSecondary }}>
-              Test the error boundary and Sentry crash reporting:
-            </Body>
-            <Button
-              text="💥 Trigger Crash"
-              variant="destructive"
-              onPress={() => setTriggerCrash(true)}
-              style={{ marginBottom: S.space.sm }}
-            />
-            <Caption style={{ color: theme.textSecondary, opacity: 0.7 }}>
-              This will throw an error and show the crash fallback screen
-            </Caption>
-          </Surface>
+          {/* Crash tester removed (was a hidden test helper) */}
 
           <ThemeSelector />
 
