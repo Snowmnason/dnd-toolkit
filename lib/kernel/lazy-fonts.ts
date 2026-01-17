@@ -36,29 +36,49 @@ export type LazyFontName = keyof typeof lazyFonts;
 // Track which fonts have been loaded to avoid duplicate loads
 const loadedFonts = new Set<LazyFontName>();
 
+// Track in-progress font loads to prevent concurrent loads of the same font
+const inProgressLoads = new Map<LazyFontName, Promise<void>>();
+
 /**
  * Load a specific lazy font on-demand
  * Safe to call multiple times - will only load once per font
+ * Handles concurrent calls for the same font by returning the same promise
  */
 export async function loadLazyFont(fontName: LazyFontName): Promise<void> {
+  // If already loaded, return immediately
   if (loadedFonts.has(fontName)) {
     logger.category('bootstrap').debug(`Lazy font ${fontName} already loaded, skipping`);
     return;
   }
 
-  try {
-    logger.category('bootstrap').debug(`Loading lazy font: ${fontName}`);
-    // eslint-disable-next-line security/detect-object-injection
-    const fontSource = lazyFonts[fontName];
-    await Font.loadAsync({ [fontName]: fontSource });
-    loadedFonts.add(fontName);
-    logger.category('bootstrap').info(`Lazy font loaded successfully: ${fontName}`);
-  } catch (error) {
-    logger.category('bootstrap').error(`Failed to load lazy font: ${fontName}`, {
-      error: (error as Error).message,
-    });
-    throw error;
+  // If already loading, return the same promise to prevent concurrent loads
+  if (inProgressLoads.has(fontName)) {
+    logger.category('bootstrap').debug(`Lazy font ${fontName} is already loading, returning existing promise`);
+    return inProgressLoads.get(fontName)!;
   }
+
+  // Create the load promise and track it
+  const loadPromise = (async () => {
+    try {
+      logger.category('bootstrap').debug(`Loading lazy font: ${fontName}`);
+      // eslint-disable-next-line security/detect-object-injection
+      const fontSource = lazyFonts[fontName];
+      await Font.loadAsync({ [fontName]: fontSource });
+      loadedFonts.add(fontName);
+      logger.category('bootstrap').info(`Lazy font loaded successfully: ${fontName}`);
+    } catch (error) {
+      logger.category('bootstrap').error(`Failed to load lazy font: ${fontName}`, {
+        error: (error as Error).message,
+      });
+      throw error;
+    } finally {
+      // Clean up the in-progress tracking
+      inProgressLoads.delete(fontName);
+    }
+  })();
+
+  inProgressLoads.set(fontName, loadPromise);
+  return loadPromise;
 }
 
 /**

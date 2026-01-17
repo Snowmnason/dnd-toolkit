@@ -117,6 +117,7 @@ class AppKernelClass {
   private listeners: Set<KernelListener> = new Set();
   private initPromise: Promise<void> | null = null;
   private networkUnsubscribe: (() => void) | null = null;
+  private authCompletionTime: number | null = null;
 
   /**
    * Initialize the kernel once
@@ -192,6 +193,12 @@ class AppKernelClass {
         try {
           await NetworkDetection.initialize();
           
+          // Clean up existing subscription before creating a new one
+          if (this.networkUnsubscribe) {
+            this.networkUnsubscribe();
+            this.networkUnsubscribe = null;
+          }
+          
           // Subscribe to network changes
           this.networkUnsubscribe = NetworkDetection.subscribe((status) => {
             this.updateState({ networkStatus: status });
@@ -223,16 +230,26 @@ class AppKernelClass {
       // Phase 4: Auth (restore session - non-blocking)
       // Start in background without awaiting
       this.runPhase('auth', async () => {
+        const authPhaseStart = performance.now();
         try {
           const { AuthStateManager } = await import('@/lib/auth/auth-state');
           await AuthStateManager.getAuthState();
           logger.category('bootstrap').debug('Auth state loaded');
           
+          // Track auth completion time (completes after appReady)
+          this.authCompletionTime = performance.now() - authPhaseStart;
+          
           // Mark auth as ready after successful load
           this.updateState({ 
             phases: { ...this.state.phases, authReady: true }
           });
+          
+          logger.category('bootstrap').info('Auth phase completed asynchronously', {
+            delayMs: this.authCompletionTime,
+            completedAfterAppReady: true,
+          });
         } catch (e) {
+          this.authCompletionTime = performance.now() - authPhaseStart;
           logger.category('auth').error('Auth state load failed', { error: (e as Error).message });
           // Mark auth as ready even on failure - app should still work
           this.updateState({ 
@@ -254,6 +271,7 @@ class AppKernelClass {
       logger.category('bootstrap').info('AppKernel ready', {
         timing: this.state.timing,
         totalMs: totalBootstrapTime,
+        note: 'Auth phase runs asynchronously and not included in total',
       });
 
       // Track performance metrics in Analytics
@@ -262,6 +280,8 @@ class AppKernelClass {
         Analytics.track('app_bootstrap_complete', {
           total: totalBootstrapTime,
           ...this.state.timing,
+          authCompletedAsynchronously: true,
+          postAppReadyAuthMs: this.authCompletionTime || 0,
         });
         logger.category('bootstrap').debug('Bootstrap metrics tracked');
       } catch (analyticsError) {
@@ -468,6 +488,7 @@ class AppKernelClass {
       networkStatus: null,
     };
     this.initPromise = null;
+    this.authCompletionTime = null;
     
     // Cleanup network subscription
     if (this.networkUnsubscribe) {
