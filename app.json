@@ -2,7 +2,7 @@
   "expo": {
     "name": "dnd-toolkit",
     "slug": "dnd-toolkit",
-    "version": "1.23.22",
+    "version": "1.24.22",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "dnd-toolkit",
