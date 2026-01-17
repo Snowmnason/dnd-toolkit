@@ -3,19 +3,19 @@ import { usePlatform } from "@/contexts/PlatformContext";
 import { $, Sizing, useScale } from "@/theme";
 import { ComponentType, ReactNode, useEffect, useMemo } from "react";
 import {
-  ImageBackground,
-  Platform,
-  ScrollView,
-  StyleProp,
-  View,
-  ViewProps,
-  ViewStyle,
+    ImageBackground,
+    Platform,
+    ScrollView,
+    StyleProp,
+    View,
+    ViewProps,
+    ViewStyle,
 } from "react-native";
 import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    Easing,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from "react-native-reanimated";
 import { ViewCust } from "./base/ViewCust";
 
@@ -68,11 +68,11 @@ function separateScrollViewStyles(style: StyleProp<ViewStyle>) {
   if (!style) return { scrollViewStyle: undefined, contentStyle: undefined };
 
   const layoutKeys: (keyof ViewStyle)[] = [
-    'alignItems',
-    'justifyContent',
-    'flexDirection',
-    'flexWrap',
-    'alignContent',
+    "alignItems",
+    "justifyContent",
+    "flexDirection",
+    "flexWrap",
+    "alignContent",
   ];
 
   const scrollViewStyles: ViewStyle = {};
@@ -82,7 +82,7 @@ function separateScrollViewStyles(style: StyleProp<ViewStyle>) {
   const styleArray = Array.isArray(style) ? style : [style];
 
   styleArray.forEach((styleObj) => {
-    if (!styleObj || typeof styleObj !== 'object') return;
+    if (!styleObj || typeof styleObj !== "object") return;
 
     Object.keys(styleObj).forEach((key) => {
       const styleKey = key as keyof ViewStyle;
@@ -97,8 +97,10 @@ function separateScrollViewStyles(style: StyleProp<ViewStyle>) {
   });
 
   return {
-    scrollViewStyle: Object.keys(scrollViewStyles).length > 0 ? scrollViewStyles : undefined,
-    contentStyle: Object.keys(contentStyles).length > 0 ? contentStyles : undefined,
+    scrollViewStyle:
+      Object.keys(scrollViewStyles).length > 0 ? scrollViewStyles : undefined,
+    contentStyle:
+      Object.keys(contentStyles).length > 0 ? contentStyles : undefined,
   };
 }
 
@@ -120,18 +122,24 @@ export function AppPage({
 }: AppViewProps) {
   const S = useScale();
 
+  // Call $() at top level (not inside useMemo) since it uses UseTheme hook
+  const bgSurfaceAlt = $("surfaceAlt" as any);
+  const bgAccentAlt = $("accentAlt" as any);
+  const bgSurface = $("surface");
+  const bgBackground = $("background");
+
   // Determine background color: custom color takes precedence over tone
   const backgroundColor = useMemo(
     () =>
       customBgColor ||
       (tone === "alt"
-        ? $("surfaceAlt" as any)
+        ? bgSurfaceAlt
         : tone === "accent"
-        ? $("accentAlt" as any)
-        : tone === "surface"
-        ? $("surface")
-        : $("background")),
-    [customBgColor, tone]
+          ? bgAccentAlt
+          : tone === "surface"
+            ? bgSurface
+            : bgBackground),
+    [customBgColor, tone, bgSurfaceAlt, bgAccentAlt, bgSurface, bgBackground]
   );
 
   /* Handle background image layering */
@@ -189,8 +197,8 @@ export function AppSplit({
   showScrollIndicator = false,
   animateRightSlide = false,
   rightVisible = true,
-  verticalPadding = 'none',
-  horizontalPadding = 'xs',
+  verticalPadding = "none",
+  horizontalPadding = "xs",
   ...rest
 }: AppSplitViewProps) {
   const S = useScale();
@@ -200,7 +208,7 @@ export function AppSplit({
   // Resolve padding values
   const vPadding = verticalPadding === undefined ? gap : verticalPadding;
   const hPadding = horizontalPadding === undefined ? gap : horizontalPadding;
-  
+
   const paddingTop = vPadding === "none" ? 0 : S.space[vPadding as SpaceKey];
   const paddingBottom = vPadding === "none" ? 0 : S.space[vPadding as SpaceKey];
   const paddingLeft = hPadding === "none" ? 0 : S.space[hPadding as SpaceKey];
