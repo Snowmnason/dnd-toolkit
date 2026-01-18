@@ -1,17 +1,22 @@
-import { logger } from '../utils/logger';
-import { CacheSchema, handleCacheMigration, validateCacheEntry, VersionedCacheEntry } from './cache-versioning';
+import { logger } from "../utils/logger";
+import {
+  CacheSchema,
+  handleCacheMigration,
+  validateCacheEntry,
+  VersionedCacheEntry,
+} from "./cache-versioning";
 
 /**
  * SecureStorage
- * 
+ *
  * Cross-platform encrypted storage for ALL app data.
  * Uses existing EncryptedStorage implementation under the hood.
- * 
+ *
  * Platform support:
  * - Web: localStorage with AES-CTR encryption
  * - Native (iOS/Android): expo-secure-store + AsyncStorage with encryption
  * - Desktop: TBD (likely Electron secure storage)
- * 
+ *
  * All methods are async for consistency across platforms.
  */
 class SecureStorageService {
@@ -28,13 +33,13 @@ class SecureStorageService {
     }
 
     try {
-      const module = await import('../auth/encrypted-storage');
+      const module = await import("../auth/encrypted-storage");
       this.encryptedStorage = module.EncryptedStorage;
       this.initialized = true;
       return this.encryptedStorage;
     } catch (error) {
-      logger.error('storage', 'Failed to load EncryptedStorage', error);
-      throw new Error('SecureStorage initialization failed');
+      logger.error("storage", "Failed to load EncryptedStorage", error);
+      throw new Error("SecureStorage initialization failed");
     }
   }
 
@@ -45,9 +50,11 @@ class SecureStorageService {
     try {
       const storage = await this.getStorage();
       await storage.setItem(key, value);
-      logger.category('storage').debug('Item stored', { key, length: value.length });
+      logger
+        .category("storage")
+        .debug(`Item stored: ${key} (${value.length} chars)`);
     } catch (error) {
-      logger.category('storage').error('setItem failed', { key, error });
+      logger.category("storage").error("setItem failed", { key, error });
       throw error;
     }
   }
@@ -60,14 +67,9 @@ class SecureStorageService {
     try {
       const storage = await this.getStorage();
       const value = await storage.getItem(key);
-      logger.category('storage').debug('Item retrieved', { 
-        key, 
-        found: !!value,
-        length: value?.length || 0 
-      });
       return value;
     } catch (error) {
-      logger.category('storage').warn('getItem failed', { key, error });
+      logger.category("storage").warn("getItem failed", { key, error });
       return null;
     }
   }
@@ -79,7 +81,7 @@ class SecureStorageService {
     try {
       const storage = await this.getStorage();
       await storage.removeItem(key);
-      logger.category('storage').debug('Item removed', { key });
+      logger.category("storage").debug(`Item removed: ${key}`);
     } catch (error) {
       logger.error(`SecureStorage.removeItem failed for key: ${key}`, error);
       throw error;
@@ -93,9 +95,9 @@ class SecureStorageService {
     try {
       const storage = await this.getStorage();
       await storage.clear();
-      logger.category('storage').warn('All storage cleared');
+      logger.category("storage").warn("All storage cleared");
     } catch (error) {
-      logger.error('SecureStorage.clear failed', error);
+      logger.error("SecureStorage.clear failed", error);
       throw error;
     }
   }
@@ -125,7 +127,10 @@ class SecureStorageService {
       }
       return JSON.parse(value) as T;
     } catch (error) {
-      logger.warn(`SecureStorage.getJSON failed for key: ${key} (invalid JSON?)`, error);
+      logger.warn(
+        `SecureStorage.getJSON failed for key: ${key} (invalid JSON?)`,
+        error
+      );
       return null;
     }
   }
@@ -149,7 +154,7 @@ class SecureStorageService {
       logger.debug(`SecureStorage.getAllKeys: Found ${keys.length} keys`);
       return keys;
     } catch (error) {
-      logger.warn('SecureStorage.getAllKeys failed', error);
+      logger.warn("SecureStorage.getAllKeys failed", error);
       return [];
     }
   }
@@ -164,7 +169,7 @@ class SecureStorageService {
   ): Promise<T | null> {
     try {
       const rawEntry = await this.getJSON<VersionedCacheEntry>(key);
-      
+
       if (!rawEntry) {
         logger.debug(`SecureStorage.getValidatedJSON: ${key} not found`);
         return null;
@@ -172,9 +177,11 @@ class SecureStorageService {
 
       // Validate against schema
       const validation = validateCacheEntry(rawEntry, schema);
-      
+
       if (validation.valid) {
-        logger.debug(`SecureStorage.getValidatedJSON: ${key} validated successfully`);
+        logger.debug(
+          `SecureStorage.getValidatedJSON: ${key} validated successfully`
+        );
         return rawEntry.data as T;
       }
 
@@ -187,20 +194,27 @@ class SecureStorageService {
 
       // Attempt migration
       const migrated = await handleCacheMigration(rawEntry, validation, schema);
-      
+
       if (migrated !== null) {
         // Update storage with migrated data
         await this.setVersionedJSON(key, migrated, schema.version);
-        logger.info(`SecureStorage.getValidatedJSON: ${key} migrated and updated`);
+        logger.info(
+          `SecureStorage.getValidatedJSON: ${key} migrated and updated`
+        );
         return migrated;
       }
 
       // Migration failed or not available - clear the entry
       await this.removeItem(key);
-      logger.info(`SecureStorage.getValidatedJSON: ${key} cleared due to migration failure`);
+      logger.info(
+        `SecureStorage.getValidatedJSON: ${key} cleared due to migration failure`
+      );
       return null;
     } catch (error) {
-      logger.error(`SecureStorage.getValidatedJSON failed for key: ${key}`, error);
+      logger.error(
+        `SecureStorage.getValidatedJSON failed for key: ${key}`,
+        error
+      );
       return null;
     }
   }
@@ -223,12 +237,14 @@ class SecureStorageService {
       await this.setItem(key, jsonString);
       logger.debug(`SecureStorage.setVersionedJSON: ${key} (v${version})`);
     } catch (error) {
-      logger.error(`SecureStorage.setVersionedJSON failed for key: ${key}`, error);
+      logger.error(
+        `SecureStorage.setVersionedJSON failed for key: ${key}`,
+        error
+      );
       throw error;
     }
   }
 }
-
 
 // Export singleton instance
 export const SecureStorage = new SecureStorageService();
