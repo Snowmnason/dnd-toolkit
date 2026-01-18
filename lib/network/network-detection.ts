@@ -91,6 +91,14 @@ class NetworkDetectionClass {
   private isInitialized = false;
   private webPingTimer: ReturnType<typeof setInterval> | null = null;
   private batteryUnsubscribe: (() => void) | null = null;
+  private networkUnsubscribe: (() => void) | null = null;
+  private onlineListener: (() => void) | null = null;
+  private offlineListener: (() => void) | null = null;
+  private visibilityListener: (() => void) | null = null;
+  private batteryLevelListener: (() => void) | null = null;
+  private batteryChargingListener: (() => void) | null = null;
+  private batteryObject: any = null;
+  private nativeBatteryPollTimer: ReturnType<typeof setInterval> | null = null;
   private pingLatencies: number[] = [];
   private maxLatencyWindowSize = 10; // Track last 10 ping latencies
 
@@ -100,6 +108,9 @@ class NetworkDetectionClass {
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
+
+    // Clean up any existing listeners before initializing
+    this.cleanup();
 
     try {
       logger
@@ -115,7 +126,7 @@ class NetworkDetectionClass {
       // Battery tracking (web + native)
       await this.setupBatteryTracking();
 
-      // Native: Use network detection if available (react-native-netinfo package)
+      // Native: Use network detection if available (@react-native-community/netinfo package)
       // This is optional - web works fine without it
       // Skip native detection on web platform
       if (typeof window === "undefined" && Platform?.OS !== "web") {
@@ -139,10 +150,11 @@ class NetworkDetectionClass {
       }
 
       this.isInitialized = true;
-      logger.category("network").info("Network detection initialized", {
-        isOnline: this.currentStatus.isOnline,
-        connectionQuality: this.currentStatus.connectionQuality,
-      });
+      logger
+        .category("network")
+        .info(
+          `Network detection initialized (online: ${this.currentStatus.isOnline}, quality: ${this.currentStatus.connectionQuality})`
+        );
     } catch (error) {
       logger
         .category("network")
@@ -152,26 +164,101 @@ class NetworkDetectionClass {
   }
 
   /**
-   * Safely load NetInfo from react-native-netinfo
+   * Clean up listeners and timers
+   */
+  private cleanup(): void {
+    // Clean up network listener
+    if (this.networkUnsubscribe) {
+      this.networkUnsubscribe();
+      this.networkUnsubscribe = null;
+    }
+
+    // Clean up battery listener
+    if (this.batteryUnsubscribe) {
+      this.batteryUnsubscribe();
+      this.batteryUnsubscribe = null;
+    }
+
+    // Clean up web ping timer
+    if (this.webPingTimer) {
+      clearInterval(this.webPingTimer);
+      this.webPingTimer = null;
+    }
+
+    // Clean up web event listeners
+    if (typeof window !== "undefined") {
+      if (this.onlineListener) {
+        window.removeEventListener("online", this.onlineListener);
+        this.onlineListener = null;
+      }
+      if (this.offlineListener) {
+        window.removeEventListener("offline", this.offlineListener);
+        this.offlineListener = null;
+      }
+    }
+
+    if (typeof document !== "undefined") {
+      if (this.visibilityListener) {
+        document.removeEventListener(
+          "visibilitychange",
+          this.visibilityListener
+        );
+        this.visibilityListener = null;
+      }
+    }
+
+    // Clean up battery listeners
+    if (this.batteryObject) {
+      if (this.batteryLevelListener) {
+        this.batteryObject.removeEventListener(
+          "levelchange",
+          this.batteryLevelListener
+        );
+        this.batteryLevelListener = null;
+      }
+      if (this.batteryChargingListener) {
+        this.batteryObject.removeEventListener(
+          "chargingchange",
+          this.batteryChargingListener
+        );
+        this.batteryChargingListener = null;
+      }
+      this.batteryObject = null;
+    }
+
+    // Clean up native battery polling timer
+    if (this.nativeBatteryPollTimer) {
+      clearInterval(this.nativeBatteryPollTimer);
+      this.nativeBatteryPollTimer = null;
+    }
+  }
+
+  /**
+   * Safely load NetInfo from @react-native-community/netinfo
    * Returns null if package not available
    */
   private async loadNetInfo(): Promise<any> {
     try {
-      // Load react-native-netinfo (cross-platform, reliable)
-      const module = await import("react-native-netinfo");
+      // Load @react-native-community/netinfo (cross-platform, reliable)
+      const module = await import("@react-native-community/netinfo");
 
       // Extract NetInfo - it's a named export
       const NetInfo = module.NetInfo || null;
       if (!NetInfo) {
         logger
           .category("network")
-          .debug("NetInfo export not found in react-native-netinfo package");
+          .debug(
+            "NetInfo export not found in @react-native-community/netinfo package"
+          );
       }
       return NetInfo;
     } catch (error) {
       logger
         .category("network")
-        .debug("Failed to load react-native-netinfo package:", error);
+        .debug(
+          "Failed to load @react-native-community/netinfo package:",
+          error
+        );
       return null;
     }
   }
@@ -187,6 +274,9 @@ class NetworkDetectionClass {
         try {
           const battery = await (navigator as any).getBattery?.();
           if (battery) {
+            // Store battery object reference for cleanup
+            this.batteryObject = battery;
+
             // Initial battery state
             this.currentBattery = {
               level: battery.level,
@@ -195,21 +285,26 @@ class NetworkDetectionClass {
             this.updateExpensiveFlag();
 
             // Listen to battery changes
-            battery.addEventListener("levelchange", () => {
+            this.batteryLevelListener = () => {
               this.currentBattery.level = battery.level;
               this.updateExpensiveFlag();
               logger.category("network").debug("Battery level changed", {
                 level: battery.level,
               });
-            });
+            };
+            battery.addEventListener("levelchange", this.batteryLevelListener);
 
-            battery.addEventListener("chargingchange", () => {
+            this.batteryChargingListener = () => {
               this.currentBattery.charging = battery.charging;
               this.updateExpensiveFlag();
               logger.category("network").debug("Charging state changed", {
                 charging: battery.charging,
               });
-            });
+            };
+            battery.addEventListener(
+              "chargingchange",
+              this.batteryChargingListener
+            );
 
             logger
               .category("network")
@@ -232,7 +327,7 @@ class NetworkDetectionClass {
           const deviceInfo = await import("react-native-device-info");
           if (deviceInfo) {
             // Poll battery every 30 seconds
-            setInterval(async () => {
+            this.nativeBatteryPollTimer = setInterval(async () => {
               try {
                 const level = await deviceInfo.getBatteryLevel?.();
                 const charging = await deviceInfo.isCharging?.();
@@ -299,15 +394,13 @@ class NetworkDetectionClass {
       const timeout = setTimeout(() => controller.abort(), WEB_PING_TIMEOUT);
       const startTime = performance.now();
 
-      // Use a lightweight endpoint that returns 204 No Content
-      // Using a data URL to avoid CORS issues
-      const response = await fetch(
-        "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
-        {
-          method: "GET",
-          signal: controller.signal,
-        }
-      );
+      // Use Cloudflare's lightweight trace endpoint to test actual connectivity
+      // Returns minimal response (~100 bytes) to minimize bandwidth
+      // TODO: Replace with custom endpoint - see docs/Important Notes/DO SOON - Custom Ping Endpoint.md
+      const response = await fetch("https://www.cloudflare.com/cdn-cgi/trace", {
+        method: "GET",
+        signal: controller.signal,
+      });
 
       clearTimeout(timeout);
       const latency = performance.now() - startTime;
@@ -322,11 +415,11 @@ class NetworkDetectionClass {
       const isNowOnline = response.ok || response.status < 400;
 
       if (wasOnline !== isNowOnline) {
-        logger.category("network").info("Ping detected connectivity change", {
-          from: wasOnline,
-          to: isNowOnline,
-          latency,
-        });
+        logger
+          .category("network")
+          .info(
+            `Ping detected connectivity change: ${wasOnline} -> ${isNowOnline} (${latency}ms)`
+          );
         this.updateStatus({ isOnline: isNowOnline });
       }
 
@@ -419,12 +512,14 @@ class NetworkDetectionClass {
         : ConnectionQuality.OFFLINE,
     };
 
-    logger.category("network").info("Web network detection initialized", {
-      isOnline: this.currentStatus.isOnline,
-    });
+    logger
+      .category("network")
+      .info(
+        `Web network detection initialized (online: ${this.currentStatus.isOnline})`
+      );
 
     // Listen to online/offline events
-    window.addEventListener("online", () => {
+    this.onlineListener = () => {
       logger
         .category("network")
         .info("Network came online (navigator.online event)");
@@ -433,9 +528,10 @@ class NetworkDetectionClass {
         type: "wifi",
         connectionQuality: ConnectionQuality.GOOD,
       });
-    });
+    };
+    window.addEventListener("online", this.onlineListener);
 
-    window.addEventListener("offline", () => {
+    this.offlineListener = () => {
       logger
         .category("network")
         .info("Network went offline (navigator.offline event)");
@@ -444,10 +540,11 @@ class NetworkDetectionClass {
         type: "none",
         connectionQuality: ConnectionQuality.OFFLINE,
       });
-    });
+    };
+    window.addEventListener("offline", this.offlineListener);
 
     // Also listen to visibility changes (helps detect network loss while backgrounded)
-    document.addEventListener("visibilitychange", () => {
+    this.visibilityListener = () => {
       if (document.visibilityState === "visible") {
         // App came to foreground - recheck network status
         const wasOnline = this.currentStatus.isOnline;
@@ -470,16 +567,17 @@ class NetworkDetectionClass {
             : ConnectionQuality.OFFLINE,
         });
       }
-    });
+    };
+    document.addEventListener("visibilitychange", this.visibilityListener);
   }
 
   /**
-   * Setup native network detection via react-native-netinfo
+   * Setup native network detection via @react-native-community/netinfo
    */
   private setupNativeNetworkDetection(NetInfo: any): void {
     // Subscribe to network state updates
     if (NetInfo.addEventListener) {
-      NetInfo.addEventListener((state: any) => {
+      this.networkUnsubscribe = NetInfo.addEventListener((state: any) => {
         logger.category("network").debug("Native network state changed", {
           isInternetReachable: state.isInternetReachable,
           type: state.type,
@@ -513,10 +611,11 @@ class NetworkDetectionClass {
 
     // Log significant changes
     if (oldStatus.isOnline !== this.currentStatus.isOnline) {
-      logger.category("network").info("Online status changed", {
-        from: oldStatus.isOnline,
-        to: this.currentStatus.isOnline,
-      });
+      logger
+        .category("network")
+        .info(
+          `Online status changed: ${oldStatus.isOnline} -> ${this.currentStatus.isOnline}`
+        );
     }
 
     if (oldStatus.type !== this.currentStatus.type) {
@@ -527,10 +626,11 @@ class NetworkDetectionClass {
     }
 
     if (oldStatus.connectionQuality !== this.currentStatus.connectionQuality) {
-      logger.category("network").info("Connection quality changed", {
-        from: oldStatus.connectionQuality,
-        to: this.currentStatus.connectionQuality,
-      });
+      logger
+        .category("network")
+        .info(
+          `Connection quality changed: ${oldStatus.connectionQuality} -> ${this.currentStatus.connectionQuality}`
+        );
     }
 
     if (oldStatus.isExpensive !== this.currentStatus.isExpensive) {

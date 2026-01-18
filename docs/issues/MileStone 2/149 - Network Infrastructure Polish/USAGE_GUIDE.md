@@ -170,7 +170,7 @@ if (status.isExpensive) {
 
 ### iOS/Android
 
-- **Network Detection**: react-native-netinfo (installed)
+- **Network Detection**: @react-native-community/netinfo (installed)
 - **Type Detection**: Distinguishes WiFi vs cellular
 - **Battery Tracking**: react-native-device-info (optional)
 - **Graceful Degradation**: Works even if packages unavailable
@@ -295,9 +295,9 @@ function MyComponent() {
    const status = useNetworkStatus(); // Called outside component
    ```
 
-3. **Check Network Package**: On native platforms, react-native-netinfo must be installed
+3. **Check Network Package**: On native platforms, @react-native-community/netinfo must be installed
    ```bash
-   npm list react-native-netinfo
+   npm list @react-native-community/netinfo
    ```
 
 ### Latency Not Updating (Web)

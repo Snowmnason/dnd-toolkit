@@ -37,7 +37,7 @@ Prevent heavy operations on metered connections:
 
 **iOS/Android**:
 
-- react-native-netinfo for network type detection
+- @react-native-community/netinfo for network type detection
 - react-native-device-info for battery tracking
 - Graceful degradation if packages unavailable
 
@@ -58,7 +58,7 @@ Prevent heavy operations on metered connections:
   - Integration points
   - Algorithm explanations
 
-- `types/react-native-netinfo.d.ts`
+- `types/react-native-community-netinfo.d.ts`
 - `types/react-native-device-info.d.ts`
 
 ### Modified Files

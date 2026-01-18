@@ -1,9 +1,9 @@
 /**
- * Type declarations for react-native-netinfo
+ * Type declarations for @react-native-community/netinfo
  * Allows optional dynamic imports without TypeScript errors
  */
 
-declare module "react-native-netinfo" {
+declare module "@react-native-community/netinfo" {
   export interface NetInfoState {
     isInternetReachable: boolean | null;
     type: string;
@@ -13,7 +13,7 @@ declare module "react-native-netinfo" {
   }
 
   export interface NetInfoType {
-    addEventListener(callback: (state: NetInfoState) => void): void;
+    addEventListener(callback: (state: NetInfoState) => void): () => void;
     fetch?(): Promise<NetInfoState>;
   }
 

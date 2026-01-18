@@ -9,7 +9,7 @@ Architecture and implementation details for the network detection system. This d
 ```
 NetworkDetection (Singleton)
 ├── Web Detection (navigator.onLine)
-├── Native Detection (react-native-netinfo)
+├── Native Detection (@react-native-community/netinfo)
 ├── Battery Tracking (Battery Status API + device-info)
 ├── Periodic Ping (Web fallback)
 └── Listeners (Subscribe/notify pattern)
@@ -78,11 +78,11 @@ navigator
 
 ### Native Implementation
 
-**Network Detection** (react-native-netinfo):
+**Network Detection** (@react-native-community/netinfo):
 
 ```typescript
 // Dynamic import with error handling
-const { NetInfo } = await import("react-native-netinfo");
+const { NetInfo } = await import("@react-native-community/netinfo");
 
 // Subscribe to state changes
 NetInfo.addEventListener((state) => {
@@ -214,7 +214,7 @@ All errors are non-blocking and gracefully degrade:
 ```typescript
 // Package loading errors
 try {
-  const NetInfo = await import("react-native-netinfo");
+  const NetInfo = await import("@react-native-community/netinfo");
 } catch (error) {
   logger.debug("Failed to load NetInfo (non-critical)");
   // Continue without native detection
@@ -284,7 +284,7 @@ if (quality === ConnectionQuality.OFFLINE) {
 
 Files created for optional packages:
 
-- `types/react-native-netinfo.d.ts` - NetInfo interface
+- `types/react-native-community-netinfo.d.ts` - NetInfo interface
 - `types/react-native-device-info.d.ts` - Battery functions
 
 This allows TypeScript to work without these packages installed (graceful degradation).
@@ -412,7 +412,7 @@ window.dispatchEvent(new Event("online"));
 - **`lib/utils/logger.ts`** (Updated)
   - Added 'network' category
 
-- **`types/react-native-netinfo.d.ts`** (Created)
+- **`types/react-native-community-netinfo.d.ts`** (Created)
   - Type declarations for optional package
 
 - **`types/react-native-device-info.d.ts`** (Created)

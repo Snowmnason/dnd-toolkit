@@ -125,6 +125,7 @@ class Logger {
         "auth",
         "navigation",
         "api",
+        "network",
         "performance",
         "storage",
         "ui",
@@ -142,6 +143,7 @@ class Logger {
     if (categories.auth !== false) enabled.push("auth");
     if (categories.navigation !== false) enabled.push("navigation");
     if (categories.api !== false) enabled.push("api");
+    if (categories.network !== false) enabled.push("network");
     if (categories.performance !== false) enabled.push("performance");
     if (categories.storage !== false) enabled.push("storage");
     if (categories.ui !== false) enabled.push("ui");
@@ -172,6 +174,7 @@ class Logger {
       "auth",
       "navigation",
       "api",
+      "network",
       "performance",
       "storage",
       "ui",
