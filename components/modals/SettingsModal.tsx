@@ -1,7 +1,6 @@
 import { AppModal } from "@/components/ui/AppModal";
 import { Button } from "@/components/ui/BaseButton";
 import { useScale } from "@/theme";
-import React from "react";
 import { View } from "react-native";
 
 interface SettingsMenuProps {
@@ -27,16 +26,6 @@ export default function SettingsModal({
       borderTone="accent"
     >
       <View style={{ gap: S.space.md }}>
-        {/* Account Settings */}
-        <Button
-          text="Account Settings"
-          variant="secondary"
-          onPress={() => {
-            onClose();
-            onAccountSettings();
-          }}
-        />
-
         {/* Return to World Selection */}
         <Button
           text="Return to World Selection"
@@ -44,6 +33,15 @@ export default function SettingsModal({
           onPress={() => {
             onClose();
             onReturnToWorldSelection();
+          }}
+        />
+        {/* Account Settings */}
+        <Button
+          text="Account Settings"
+          variant="secondary"
+          onPress={() => {
+            onClose();
+            onAccountSettings();
           }}
         />
 

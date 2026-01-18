@@ -1,29 +1,38 @@
-import { ConfirmLeaveModal, EditWorldModal } from '@/components/modals'
-import { AppLoading, AppPage, AppSplit, Body, Button } from '@/components/ui'
-import { useAppParamsStable, useUserId } from '@/contexts/AppParamsStableContext'
-import { usePanelNavigation } from '@/hooks/use-panel-navigation'
-import { useWorldModal } from '@/hooks/use-world-modal'
-import { useWorlds } from '@/lib'
-import { WorldListPanel } from '@/Screens/select/world-selection/WorldListPanel'
-import { WorldRightPanel } from '@/Screens/select/world-selection/WorldRightPanel'
-import { useState } from 'react'
+import { ConfirmLeaveModal, EditWorldModal } from "@/components/modals";
+import { AppLoading, AppPage, AppSplit, Body, Button } from "@/components/ui";
+import {
+  useAppParamsStable,
+  useUserId,
+} from "@/contexts/AppParamsStableContext";
+import { usePanelNavigation } from "@/hooks/use-panel-navigation";
+import { useWorldModal } from "@/hooks/use-world-modal";
+import { useWorlds } from "@/lib";
+import { WorldListPanel } from "@/Screens/select/world-selection/WorldListPanel";
+import { WorldRightPanel } from "@/Screens/select/world-selection/WorldRightPanel";
+import { useState } from "react";
 
 // Fallback image
-const noImageSelected = require('../../assets/images/Miku.png')
+const noImageSelected = require("../../assets/images/Miku.png");
 
 export default function LandingPage() {
   // Centralized params
-  const userId = useUserId()
-  const { setConnectedWorldIds } = useAppParamsStable()
+  const userId = useUserId();
+  const { setConnectedWorldIds } = useAppParamsStable();
 
   // Panel navigation hook - manages left/right panel switching
-  const { showRightPanel, goToRightPanel, goToLeftPanel, isDesktop } = usePanelNavigation()
+  const { showRightPanel, goToRightPanel, goToLeftPanel, isDesktop } =
+    usePanelNavigation();
 
-  const { selectedWorld, setSelectedWorld, worlds, isLoading, error, retry, refetch } = useWorlds(
-    userId,
-    setConnectedWorldIds
-  )
-  const [mapImage, setMapImage] = useState<string | null>(null)
+  const {
+    selectedWorld,
+    setSelectedWorld,
+    worlds,
+    isLoading,
+    error,
+    retry,
+    refetch,
+  } = useWorlds(userId, setConnectedWorldIds);
+  const [mapImage, setMapImage] = useState<string | null>(null);
 
   // Modal controls via hook
   const {
@@ -42,15 +51,15 @@ export default function LandingPage() {
     createRemoveFromWorldHandler,
   } = useWorldModal({
     onWorldsChange: () => {
-      setSelectedWorld(null)
-      setMapImage(null)
-      refetch()
+      setSelectedWorld(null);
+      setMapImage(null);
+      refetch();
     },
-  })
+  });
 
   // Loading state (use your modern loader view)
   if (isLoading) {
-    return <AppLoading loadMessage="Loading your worlds..." />
+    return <AppLoading loadMessage="Loading your worlds..." />;
   }
 
   // Error state
@@ -60,24 +69,17 @@ export default function LandingPage() {
         <Body align="center" color="$destructive">
           {error}
         </Body>
-        <Button variant='outlined' text="Try Again" onPress={retry} />
+        <Button variant="outlined" text="Try Again" onPress={retry} />
       </AppPage>
-    )
+    );
   }
 
   // Handler for mobile world selection - shows right panel instead of navigating
-  const handleMobileWorldSelect = (world: typeof worlds[0]) => {
-    setSelectedWorld(world)
-    setMapImage(world.map_image_url || null)
-    goToRightPanel()
-  }
-
-  // Handler to go back to left panel on mobile
-  const handleMobileBackToList = () => {
-    goToLeftPanel()
-    setSelectedWorld(null)
-    setMapImage(null)
-  }
+  const handleMobileWorldSelect = (world: (typeof worlds)[0]) => {
+    setSelectedWorld(world);
+    setMapImage(world.map_image_url || null);
+    goToRightPanel();
+  };
 
   // Left Panel Component - Always rendered to avoid hook order issues
   const LeftPanel = (
@@ -88,7 +90,7 @@ export default function LandingPage() {
       setMapImage={setMapImage}
       onMobileWorldSelect={!isDesktop ? handleMobileWorldSelect : undefined}
     />
-  )
+  );
 
   // Right Panel Component - Always rendered to avoid hook order issues
   const RightPanel = (
@@ -97,21 +99,21 @@ export default function LandingPage() {
       mapImage={mapImage}
       noImageSelected={noImageSelected}
       onEditOrLeave={
-        selectedWorld?.user_role === 'owner'
+        selectedWorld?.user_role === "owner"
           ? () => openEditModal(selectedWorld.name)
-          : () => openLeaveModal(selectedWorld?.name || '')
+          : () => openLeaveModal(selectedWorld?.name || "")
       }
-      onMobileBack={!isDesktop ? handleMobileBackToList : undefined}
     />
-  )
+  );
 
   return (
     <>
-      <AppSplit 
+      <AppSplit
         left={LeftPanel}
         right={RightPanel}
         animateRightSlide={!isDesktop}
         rightVisible={showRightPanel}
+        onMobileRightPanelClose={!isDesktop ? goToLeftPanel : undefined}
       />
 
       {/* Modals rendered unconditionally to avoid hook order issues */}
@@ -121,17 +123,32 @@ export default function LandingPage() {
         worldName={modalWorldName}
         originalWorldName={selectedWorld?.name}
         onWorldNameChange={setModalWorldName}
-        onConfirmWorldName={() => handleConfirmWorldName(selectedWorld?.world_id, modalWorldName, userId)}
-        onGenerateInviteLink={createGenerateInviteLinkHandler(selectedWorld?.world_id, selectedWorld?.name)}
-        onDeleteWorld={createDeleteWorldHandler(selectedWorld?.world_id, userId)}
+        onConfirmWorldName={() =>
+          handleConfirmWorldName(
+            selectedWorld?.world_id,
+            modalWorldName,
+            userId
+          )
+        }
+        onGenerateInviteLink={createGenerateInviteLinkHandler(
+          selectedWorld?.world_id,
+          selectedWorld?.name
+        )}
+        onDeleteWorld={createDeleteWorldHandler(
+          selectedWorld?.world_id,
+          userId
+        )}
         generatingLink={generatingLink}
       />
       <ConfirmLeaveModal
         visible={!!leaveModalVisible}
         onClose={closeLeaveModal}
         worldName={modalWorldName}
-        onConfirmLeave={createRemoveFromWorldHandler(selectedWorld?.world_id, userId)}
+        onConfirmLeave={createRemoveFromWorldHandler(
+          selectedWorld?.world_id,
+          userId
+        )}
       />
     </>
-  )
+  );
 }

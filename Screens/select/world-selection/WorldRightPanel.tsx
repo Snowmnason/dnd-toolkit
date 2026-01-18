@@ -1,34 +1,40 @@
-import { Button, Card, Heading, LazyImage } from '@/components/ui'
-import { useAppParamsStable } from '@/contexts/AppParamsStableContext'
-import { useAppParamsVolatile } from '@/contexts/AppParamsVolatileContext'
-import { usePlatform } from '@/contexts/PlatformContext'
-import { WorldWithAccess } from '@/lib/database/worlds'
-import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
-import { logger } from '@/lib/utils/logger'
-import { $, useScale, UseTheme } from '@/theme'
-import { useRouter } from 'expo-router'
-import { View } from 'react-native'
+import { Button, Card, Heading, LazyImage } from "@/components/ui";
+import { useAppParamsStable } from "@/contexts/AppParamsStableContext";
+import { useAppParamsVolatile } from "@/contexts/AppParamsVolatileContext";
+import { usePlatform } from "@/contexts/PlatformContext";
+import { WorldWithAccess } from "@/lib/database/worlds";
+import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
+import { logger } from "@/lib/utils/logger";
+import { $, useScale, UseTheme } from "@/theme";
+import { useRouter } from "expo-router";
+import { View } from "react-native";
 
 interface WorldRightPanelProps {
-  selectedWorld: WorldWithAccess | null
-  mapImage: string | null
-  noImageSelected: any
-  onEditOrLeave: () => void
-  onMobileBack?: () => void
+  selectedWorld: WorldWithAccess | null;
+  mapImage: string | null;
+  noImageSelected: any;
+  onEditOrLeave: () => void;
 }
 
-export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEditOrLeave, onMobileBack }: WorldRightPanelProps) {
-  const S = useScale()
-  const { theme } = UseTheme()
-  const router = useRouter()
-  const { updateVolatileParams } = useAppParamsVolatile()
-  const { addConnectedWorld } = useAppParamsStable()
-  const { isDesktop } = usePlatform()
+export function WorldRightPanel({
+  selectedWorld,
+  mapImage,
+  noImageSelected,
+  onEditOrLeave,
+  onMobileBack,
+}: WorldRightPanelProps) {
+  const S = useScale();
+  const { theme } = UseTheme();
+  const router = useRouter();
+  const { updateVolatileParams } = useAppParamsVolatile();
+  const { addConnectedWorld } = useAppParamsStable();
+  const { isDesktop } = usePlatform();
   // Optional flag to disable the large backdrop image if it's causing perf issues
-  const DISABLE_BACKDROP = process.env.EXPO_PUBLIC_DISABLE_WORLD_MAP_IMAGE === '1'
+  const DISABLE_BACKDROP =
+    process.env.EXPO_PUBLIC_DISABLE_WORLD_MAP_IMAGE === "1";
 
   return (
-    <View style={{ flex: 1, position: 'relative' }}>
+    <View style={{ flex: 1, position: "relative" }}>
       {/* Map Preview - fills entire container with lazy loading */}
       {!DISABLE_BACKDROP && (
         <LazyImage
@@ -36,7 +42,7 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
           fallbackSrc={noImageSelected}
           width="100%"
           height="100%"
-          contentFit={isDesktop ? 'cover' : 'contain'}
+          contentFit={isDesktop ? "cover" : "contain"}
           optimizeSupabase={!!mapImage}
           optimizeWidth={1200}
           optimizeQuality={85}
@@ -44,7 +50,7 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
           cacheStrategy="memory-disk"
           transition={300}
           containerStyle={{
-            position: 'absolute',
+            position: "absolute",
             top: 0,
             left: 0,
             right: 0,
@@ -61,15 +67,18 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
             bordered
             toneVariant="base"
             style={{
-              position: 'absolute',
+              position: "absolute",
               top: S.space.lg,
               left: S.space.lg,
               right: S.space.lg,
               padding: S.space.sm,
-              borderColor: $('borderSubtle' as any),
+              borderColor: $("borderSubtle" as any),
             }}
           >
-            <Heading align="center" style={{ color: $('textPrimary', theme), marginBottom: 0 }}>
+            <Heading
+              align="center"
+              style={{ color: $("textPrimary", theme), marginBottom: 0 }}
+            >
               {selectedWorld.name}
             </Heading>
           </Card>
@@ -77,17 +86,17 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
           {/* Bottom action buttons */}
           <View
             style={{
-              position: 'absolute',
+              position: "absolute",
               left: "1%",
               right: "1%",
               bottom: S.space.xl,
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              backgroundColor: 'transparent',
+              flexDirection: "row",
+              justifyContent: "space-between",
+              backgroundColor: "transparent",
             }}
           >
             <Button
-              text={selectedWorld.user_role === 'owner' ? 'Edit' : 'Leave'}
+              text={selectedWorld.user_role === "owner" ? "Edit" : "Leave"}
               variant="secondary"
               onPress={onEditOrLeave}
               style={{ width: 160 }}
@@ -96,32 +105,32 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
               text="Open"
               variant="primary"
               onPress={() => {
-                if (!selectedWorld) return
-                
-                logger.info('[WorldRightPanel] Open button pressed', {
+                if (!selectedWorld) return;
+
+                logger.info("[WorldRightPanel] Open button pressed", {
                   worldId: selectedWorld.world_id,
                   userRole: selectedWorld.user_role,
-                })
-                
+                });
+
                 // Immediately add to connected worlds so auth guard can verify access
-                addConnectedWorld(selectedWorld.world_id)
-                
+                addConnectedWorld(selectedWorld.world_id);
+
                 // Update context first
                 updateVolatileParams({
                   worldId: selectedWorld.world_id,
                   userRole: selectedWorld.user_role,
-                })
-                
+                });
+
                 // Navigate using centralized navigation helper
                 const target = buildNavigationTarget(
-                  '/main/main-landing',
+                  "/main/main-landing",
                   {
                     worldId: selectedWorld.world_id,
                     userRole: selectedWorld.user_role,
                   },
-                  ['worldId', 'userRole']
-                )
-                router.push(target as any)
+                  ["worldId", "userRole"]
+                );
+                router.push(target as any);
               }}
               style={{ width: 160 }}
             />
@@ -129,5 +138,5 @@ export function WorldRightPanel({ selectedWorld, mapImage, noImageSelected, onEd
         </>
       )}
     </View>
-  )
+  );
 }
