@@ -1,19 +1,23 @@
-import * as aesjs from 'aes-js';
-import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
-import 'react-native-get-random-values';
-import { logger } from '../utils/logger';
+import * as aesjs from "aes-js";
+import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
+import "react-native-get-random-values";
+import { logger } from "../utils/logger";
 
 // Type-safe import for AsyncStorage
 let AsyncStorage: any;
-if (Platform.OS !== 'web') {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  AsyncStorage = require('@react-native-async-storage/async-storage').default;
+if (Platform.OS !== "web") {
+  AsyncStorage = require("@react-native-async-storage/async-storage").default;
 }
 
 // Storage adapter that uses SecureStore for encryption keys and AsyncStorage for encrypted data
 export class EncryptedStorage {
-  private static readonly ENCRYPTION_KEY_STORAGE_KEY = 'encryption_key';
+  private static readonly ENCRYPTION_KEY_STORAGE_KEY = "encryption_key";
+
+  // Platform detection helper
+  private static isMobilePlatform(): boolean {
+    return Platform.OS === "ios" || Platform.OS === "android";
+  }
 
   // Generate a new 256-bit encryption key
   private static generateEncryptionKey(): Uint8Array {
@@ -24,15 +28,17 @@ export class EncryptedStorage {
   private static async getOrCreateEncryptionKey(): Promise<Uint8Array> {
     try {
       // On web, SecureStore isn't available, so we'll use a fixed key (less secure but functional)
-      if (Platform.OS === 'web') {
+      if (Platform.OS === "web") {
         // Generate a deterministic key for web (not ideal for production)
         const webKey = new Uint8Array(32);
         webKey.fill(42); // Simple fixed key for development
         return webKey;
       }
 
-      const existingKey = await SecureStore.getItemAsync(this.ENCRYPTION_KEY_STORAGE_KEY);
-      
+      const existingKey = await SecureStore.getItemAsync(
+        this.ENCRYPTION_KEY_STORAGE_KEY
+      );
+
       if (existingKey) {
         // Convert stored string back to Uint8Array
         return new Uint8Array(JSON.parse(existingKey));
@@ -44,14 +50,14 @@ export class EncryptedStorage {
           JSON.stringify(Array.from(newKey)),
           {
             requireAuthentication: false,
-            keychainService: 'dnd-toolkit-keychain',
-            accessGroup: 'dnd-toolkit-access-group',
+            keychainService: "dnd-toolkit-keychain",
+            accessGroup: "dnd-toolkit-access-group",
           }
         );
         return newKey;
       }
     } catch (error) {
-      logger.error('storage', 'Error managing encryption key:', error);
+      logger.error("storage", "Error managing encryption key:", error);
       // Fallback to a simple key if SecureStore fails
       const fallbackKey = new Uint8Array(32);
       fallbackKey.fill(123);
@@ -61,6 +67,16 @@ export class EncryptedStorage {
 
   // Encrypt data using AES-CTR
   private static encryptData(data: string, key: Uint8Array): string {
+    // TEMPORARY FIX: Disable encryption on mobile platforms (iOS/Android)
+    // This is a workaround for mobile sign-in issues caused by AES-CTR encryption
+    // Web and Desktop encryption remain enabled and working
+    if (this.isMobilePlatform()) {
+      logger
+        .category("storage")
+        .warn("Mobile encryption temporarily disabled (v1.22.14 workaround)");
+      return data; // Return plaintext on mobile
+    }
+
     const textBytes = aesjs.utils.utf8.toBytes(data);
     const aesCtr = new aesjs.ModeOfOperation.ctr(key, new aesjs.Counter(5));
     const encryptedBytes = aesCtr.encrypt(textBytes);
@@ -69,6 +85,13 @@ export class EncryptedStorage {
 
   // Decrypt data using AES-CTR
   private static decryptData(encryptedData: string, key: Uint8Array): string {
+    // TEMPORARY FIX: Disable decryption on mobile platforms (iOS/Android)
+    // This is a workaround for mobile sign-in issues caused by AES-CTR encryption
+    // Web and Desktop encryption remain enabled and working
+    if (this.isMobilePlatform()) {
+      return encryptedData; // Return data as-is on mobile (no decryption)
+    }
+
     const encryptedBytes = aesjs.utils.hex.toBytes(encryptedData);
     const aesCtr = new aesjs.ModeOfOperation.ctr(key, new aesjs.Counter(5));
     const decryptedBytes = aesCtr.decrypt(encryptedBytes);
@@ -76,9 +99,12 @@ export class EncryptedStorage {
   }
 
   // Platform-aware storage helper
-  private static async platformSetItem(key: string, value: string): Promise<void> {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
+  private static async platformSetItem(
+    key: string,
+    value: string
+  ): Promise<void> {
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.localStorage) {
         window.localStorage.setItem(key, value);
       }
     } else if (AsyncStorage) {
@@ -87,8 +113,8 @@ export class EncryptedStorage {
   }
 
   private static async platformGetItem(key: string): Promise<string | null> {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.localStorage) {
         return window.localStorage.getItem(key);
       }
       return null;
@@ -99,8 +125,8 @@ export class EncryptedStorage {
   }
 
   private static async platformRemoveItem(key: string): Promise<void> {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.localStorage) {
         window.localStorage.removeItem(key);
       }
     } else if (AsyncStorage) {
@@ -109,8 +135,8 @@ export class EncryptedStorage {
   }
 
   private static async platformClear(): Promise<void> {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.localStorage) {
         window.localStorage.clear();
       }
     } else if (AsyncStorage) {
@@ -125,7 +151,7 @@ export class EncryptedStorage {
       const encryptedValue = this.encryptData(value, encryptionKey);
       await this.platformSetItem(key, encryptedValue);
     } catch (error) {
-      logger.error('storage', 'Error storing encrypted data:', error);
+      logger.error("storage", "Error storing encrypted data:", error);
       throw error;
     }
   }
@@ -134,15 +160,24 @@ export class EncryptedStorage {
   static async getItem(key: string): Promise<string | null> {
     try {
       const encryptedValue = await this.platformGetItem(key);
-      
+
       if (!encryptedValue) {
+        logger.category("storage").debug(`Item not found in storage: ${key}`);
         return null;
       }
 
       const encryptionKey = await this.getOrCreateEncryptionKey();
-      return this.decryptData(encryptedValue, encryptionKey);
+      const decrypted = this.decryptData(encryptedValue, encryptionKey);
+      logger
+        .category("storage")
+        .debug(`Item retrieved: ${key} (${decrypted.length} chars)`);
+      return decrypted;
     } catch (error) {
-      logger.error('storage', 'Error retrieving encrypted data:', error);
+      logger.error(
+        "storage",
+        `Error retrieving encrypted data for ${key}:`,
+        error
+      );
       return null;
     }
   }
@@ -152,7 +187,7 @@ export class EncryptedStorage {
     try {
       await this.platformRemoveItem(key);
     } catch (error) {
-      logger.error('storage', 'Error removing encrypted data:', error);
+      logger.error("storage", "Error removing encrypted data:", error);
       throw error;
     }
   }
@@ -162,7 +197,7 @@ export class EncryptedStorage {
     try {
       await this.platformClear();
     } catch (error) {
-      logger.error('storage', 'Error clearing encrypted data:', error);
+      logger.error("storage", "Error clearing encrypted data:", error);
       throw error;
     }
   }
@@ -170,8 +205,8 @@ export class EncryptedStorage {
   // Get all keys from storage (for debugging/migration)
   static async getAllKeys(): Promise<string[]> {
     try {
-      if (Platform.OS === 'web') {
-        if (typeof window !== 'undefined' && window.localStorage) {
+      if (Platform.OS === "web") {
+        if (typeof window !== "undefined" && window.localStorage) {
           const keys: string[] = [];
           for (let i = 0; i < window.localStorage.length; i++) {
             const key = window.localStorage.key(i);
@@ -185,7 +220,7 @@ export class EncryptedStorage {
       }
       return [];
     } catch (error) {
-      logger.error('storage', 'Error getting all keys:', error);
+      logger.error("storage", "Error getting all keys:", error);
       return [];
     }
   }

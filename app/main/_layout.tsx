@@ -70,7 +70,7 @@ export default function MainLayout() {
     query.append("tab", tabKey);
 
     const target = `/main/main-landing?${query.toString()}`;
-    router.replace(target);
+    router.replace(target as any);
   };
 
   // Show loading while auth guard is resolving

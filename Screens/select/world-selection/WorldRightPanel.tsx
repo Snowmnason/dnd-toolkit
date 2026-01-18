@@ -21,7 +21,6 @@ export function WorldRightPanel({
   mapImage,
   noImageSelected,
   onEditOrLeave,
-  onMobileBack,
 }: WorldRightPanelProps) {
   const S = useScale();
   const { theme } = UseTheme();

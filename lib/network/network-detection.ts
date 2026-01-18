@@ -500,7 +500,13 @@ class NetworkDetectionClass {
    * Setup web-based network detection
    */
   private setupWebNetworkDetection(): void {
-    if (typeof window === "undefined") return;
+    if (
+      typeof window === "undefined" ||
+      typeof navigator === "undefined" ||
+      typeof window.addEventListener !== "function"
+    ) {
+      return;
+    }
 
     // Initial status
     this.currentStatus = {
@@ -544,31 +550,33 @@ class NetworkDetectionClass {
     window.addEventListener("offline", this.offlineListener);
 
     // Also listen to visibility changes (helps detect network loss while backgrounded)
-    this.visibilityListener = () => {
-      if (document.visibilityState === "visible") {
-        // App came to foreground - recheck network status
-        const wasOnline = this.currentStatus.isOnline;
-        const isNowOnline = navigator.onLine;
+    if (typeof document !== "undefined") {
+      this.visibilityListener = () => {
+        if (document.visibilityState === "visible") {
+          // App came to foreground - recheck network status
+          const wasOnline = this.currentStatus.isOnline;
+          const isNowOnline = navigator.onLine;
 
-        if (wasOnline !== isNowOnline) {
-          logger
-            .category("network")
-            .info("Network status changed on foreground", {
-              from: wasOnline,
-              to: isNowOnline,
-            });
+          if (wasOnline !== isNowOnline) {
+            logger
+              .category("network")
+              .info("Network status changed on foreground", {
+                from: wasOnline,
+                to: isNowOnline,
+              });
+          }
+
+          this.updateStatus({
+            isOnline: isNowOnline,
+            type: isNowOnline ? "wifi" : "none",
+            connectionQuality: isNowOnline
+              ? ConnectionQuality.GOOD
+              : ConnectionQuality.OFFLINE,
+          });
         }
-
-        this.updateStatus({
-          isOnline: isNowOnline,
-          type: isNowOnline ? "wifi" : "none",
-          connectionQuality: isNowOnline
-            ? ConnectionQuality.GOOD
-            : ConnectionQuality.OFFLINE,
-        });
-      }
-    };
-    document.addEventListener("visibilitychange", this.visibilityListener);
+      };
+      document.addEventListener("visibilitychange", this.visibilityListener);
+    }
   }
 
   /**
