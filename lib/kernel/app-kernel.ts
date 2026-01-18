@@ -14,8 +14,11 @@
  * - ERROR: A critical phase failed
  */
 
-import { NetworkDetection, NetworkStatus } from '@/lib/network/network-detection';
-import { logger } from '@/lib/utils/logger';
+import {
+    NetworkDetection,
+    NetworkStatus,
+} from "@/lib/network/network-detection";
+import { logger } from "@/lib/utils/logger";
 
 // FUTURE ENHANCEMENT: Phase Progress Callbacks
 // To add progress tracking for phases (e.g., "Loading fonts... 50%"):
@@ -25,13 +28,13 @@ import { logger } from '@/lib/utils/logger';
 // Example: this.notifyProgress('preload', 0.5, 'Loading GrenzeGotisch font...');
 
 export enum KernelPhase {
-  IDLE = 'idle',
-  PRELOAD = 'preload',
-  STORAGE = 'storage',
-  NETWORK = 'network',
-  AUTH = 'auth',
-  READY = 'ready',
-  ERROR = 'error',
+  IDLE = "idle",
+  PRELOAD = "preload",
+  STORAGE = "storage",
+  NETWORK = "network",
+  AUTH = "auth",
+  READY = "ready",
+  ERROR = "error",
 }
 
 /**
@@ -39,12 +42,12 @@ export enum KernelPhase {
  * Allows consumers to handle specific error types
  */
 export enum KernelErrorCode {
-  PRELOAD_FAILED = 'PRELOAD_FAILED',
-  STORAGE_MIGRATION_FAILED = 'STORAGE_MIGRATION_FAILED',
-  STORAGE_VALIDATION_FAILED = 'STORAGE_VALIDATION_FAILED',
-  NETWORK_INIT_FAILED = 'NETWORK_INIT_FAILED',
-  AUTH_RESTORE_FAILED = 'AUTH_RESTORE_FAILED',
-  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
+  PRELOAD_FAILED = "PRELOAD_FAILED",
+  STORAGE_MIGRATION_FAILED = "STORAGE_MIGRATION_FAILED",
+  STORAGE_VALIDATION_FAILED = "STORAGE_VALIDATION_FAILED",
+  NETWORK_INIT_FAILED = "NETWORK_INIT_FAILED",
+  AUTH_RESTORE_FAILED = "AUTH_RESTORE_FAILED",
+  UNKNOWN_ERROR = "UNKNOWN_ERROR",
 }
 
 /**
@@ -66,12 +69,12 @@ export interface KernelError extends Error {
  * Determines what features are available at runtime
  */
 export interface KernelCapabilities {
-  storage: boolean;        // SecureStorage available
-  network: boolean;        // Network detection working
-  auth: boolean;           // Auth system available
-  analytics: boolean;      // Analytics tracking enabled
-  backend: boolean;        // Supabase configured
-  platform: 'web' | 'ios' | 'android' | 'desktop' | 'unknown';
+  storage: boolean; // SecureStorage available
+  network: boolean; // Network detection working
+  auth: boolean; // Auth system available
+  analytics: boolean; // Analytics tracking enabled
+  backend: boolean; // Supabase configured
+  platform: "web" | "ios" | "android" | "desktop" | "unknown";
 }
 
 export interface AppKernelState {
@@ -109,7 +112,7 @@ class AppKernelClass {
       auth: false,
       analytics: false,
       backend: false,
-      platform: 'unknown', // Will be detected on initialize()
+      platform: "unknown", // Will be detected on initialize()
     },
     networkStatus: null,
   };
@@ -135,18 +138,19 @@ class AppKernelClass {
 
   private async _initializeInternal(): Promise<void> {
     try {
-      logger.category('bootstrap').info('AppKernel initializing...');
+      logger.category("bootstrap").info("AppKernel initializing...");
 
       // Validate configuration before proceeding
-      const { getAppConfig } = await import('@/lib/config/loader');
-      const { validateConfig, logValidationResults } = await import('@/lib/config/config-validator');
+      const { getAppConfig } = await import("@/lib/config/loader");
+      const { validateConfig, logValidationResults } =
+        await import("@/lib/config/config-validator");
       const config = getAppConfig();
       const configValidation = validateConfig(config);
       logValidationResults(configValidation);
 
       if (!configValidation.valid) {
         throw new Error(
-          `Configuration validation failed: ${configValidation.errors.join('; ')}`
+          `Configuration validation failed: ${configValidation.errors.join("; ")}`
         );
       }
 
@@ -154,123 +158,149 @@ class AppKernelClass {
       await this.detectCapabilities();
 
       // Phase 1: Preload (fonts, platform assets)
-      await this.runPhase('preload', async () => {
+      await this.runPhase("preload", async () => {
         try {
-          const { Platform } = await import('react-native');
-          const { preloadThemes } = await import('@/theme');
-          const { injectWebFonts } = await import('@/lib/utils/web-font-loader');
+          const { Platform } = await import("react-native");
+          const { preloadThemes } = await import("@/theme");
+          const { injectWebFonts } =
+            await import("@/lib/utils/web-font-loader");
 
-          if (Platform.OS === 'web') {
+          if (Platform.OS === "web") {
             await injectWebFonts();
           } else {
             try {
-              const FontModule = await import('expo-font');
+              const FontModule = await import("expo-font");
               const Font = FontModule.default || FontModule;
               const criticalFonts = {
-                GrenzeGotisch: require('../../assets/fonts/GrenzeGotisch.ttf'),
+                GrenzeGotisch: require("../../assets/fonts/GrenzeGotisch.ttf"),
               };
               await Font.loadAsync(criticalFonts);
             } catch (fontError) {
-              logger.category('bootstrap').warn('Font loading failed (non-critical)', { error: (fontError as Error).message });
+              logger
+                .category("bootstrap")
+                .warn("Font loading failed (non-critical)", {
+                  error: (fontError as Error).message,
+                });
             }
           }
 
           // Preload themes in background
           preloadThemes().catch(() => {
-            logger.category('bootstrap').debug('Theme preload in background');
+            logger.category("bootstrap").debug("Theme preload in background");
           });
         } catch (error) {
-          logger.category('bootstrap').warn('Preload assets failed (non-critical)', { error: (error as Error).message });
+          logger
+            .category("bootstrap")
+            .warn("Preload assets failed (non-critical)", {
+              error: (error as Error).message,
+            });
         }
       });
 
       // Phase 2: Storage (cache validation/migrations)
-      await this.runPhase('storage', async () => {
+      await this.runPhase("storage", async () => {
         try {
           // Validate critical storage entries during bootstrap
           // Only validate what's needed for app to function - don't block on world data
-          logger.category('bootstrap').debug('Running storage validation for critical cache entries');
-          
+          logger
+            .category("bootstrap")
+            .debug("Running storage validation for critical cache entries");
+
           // Storage validation happens lazily on first access via SecureStorage.getValidatedJSON()
           // This phase ensures storage system is initialized and ready
-          logger.category('bootstrap').debug('Storage system initialized and ready');
+          logger
+            .category("bootstrap")
+            .debug("Storage system initialized and ready");
         } catch (error) {
-          logger.category('bootstrap').warn('Storage validation warning (non-critical)', { 
-            error: (error as Error).message 
-          });
+          logger
+            .category("bootstrap")
+            .warn("Storage validation warning (non-critical)", {
+              error: (error as Error).message,
+            });
         }
       });
 
       // Phase 3: Network (initialize detection)
-      await this.runPhase('network', async () => {
+      await this.runPhase("network", async () => {
         try {
           await NetworkDetection.initialize();
-          
+
           // Clean up existing subscription before creating a new one
           if (this.networkUnsubscribe) {
             this.networkUnsubscribe();
             this.networkUnsubscribe = null;
           }
-          
+
           // Subscribe to network changes
           this.networkUnsubscribe = NetworkDetection.subscribe((status) => {
             this.updateState({ networkStatus: status });
-            logger.category('bootstrap').debug('Network status changed', { 
-              isOnline: status.isOnline,
-              type: status.type 
-            });
+            logger
+              .category("bootstrap")
+              .debug(
+                `Network status changed: online=${status.isOnline}, type=${status.type}`
+              );
           });
-          
+
           // Get initial status
           const initialStatus = NetworkDetection.getStatus();
-          this.updateState({ 
+          this.updateState({
             networkStatus: initialStatus,
-            capabilities: { ...this.state.capabilities, network: true }
+            capabilities: { ...this.state.capabilities, network: true },
           });
-          
-          logger.category('bootstrap').debug('Network detection initialized', {
-            isOnline: initialStatus.isOnline,
-            type: initialStatus.type
-          });
+
+          logger
+            .category("bootstrap")
+            .debug(
+              `Network detection initialized: online=${initialStatus.isOnline}, type=${initialStatus.type}`
+            );
         } catch (error) {
-          logger.category('bootstrap').warn('Network detection failed (non-critical)', { 
-            error: (error as Error).message 
-          });
+          logger
+            .category("bootstrap")
+            .warn("Network detection failed (non-critical)", {
+              error: (error as Error).message,
+            });
           // Network failure is non-critical - app works offline
         }
       });
 
       // Phase 4: Auth (restore session - non-blocking)
       // Start in background without awaiting
-      this.runPhase('auth', async () => {
+      this.runPhase("auth", async () => {
         const authPhaseStart = performance.now();
         try {
-          const { AuthStateManager } = await import('@/lib/auth/auth-state');
+          const { AuthStateManager } = await import("@/lib/auth/auth-state");
           await AuthStateManager.getAuthState();
-          logger.category('bootstrap').debug('Auth state loaded');
-          
+          logger.category("bootstrap").debug("Auth state loaded");
+
           // Track auth completion time (completes after appReady)
           this.authCompletionTime = performance.now() - authPhaseStart;
-          
+
           // Mark auth as ready after successful load
-          this.updateState({ 
-            phases: { ...this.state.phases, authReady: true }
+          this.updateState({
+            phases: { ...this.state.phases, authReady: true },
           });
-          
-          logger.category('bootstrap').info('Auth phase completed asynchronously', {
-            delayMs: this.authCompletionTime,
-            completedAfterAppReady: true,
-          });
+
+          logger
+            .category("bootstrap")
+            .info(
+              `Auth phase completed asynchronously (${this.authCompletionTime}ms delay, after app ready)`
+            );
         } catch (e) {
           this.authCompletionTime = performance.now() - authPhaseStart;
-          logger.category('auth').error('Auth state load failed', { error: (e as Error).message });
+          logger
+            .category("auth")
+            .error("Auth state load failed", { error: (e as Error).message });
           // Mark auth as ready even on failure - app should still work
-          this.updateState({ 
-            phases: { ...this.state.phases, authReady: true }
+          this.updateState({
+            phases: { ...this.state.phases, authReady: true },
           });
         }
       }).catch((e) => {
-        logger.category('bootstrap').warn('Auth phase error (non-blocking)', { error: (e as Error).message });
+        logger
+          .category("bootstrap")
+          .warn("Auth phase error (non-blocking)", {
+            error: (e as Error).message,
+          });
       });
 
       // Mark app ready - don't wait for auth
@@ -279,37 +309,42 @@ class AppKernelClass {
         phases: { ...this.state.phases, appReady: true },
       });
 
-      const totalBootstrapTime = Object.values(this.state.timing).reduce((a, b) => a + b, 0);
-      
-      logger.category('bootstrap').info('AppKernel ready', {
+      const totalBootstrapTime = Object.values(this.state.timing).reduce(
+        (a, b) => a + b,
+        0
+      );
+
+      logger.category("bootstrap").info("AppKernel ready", {
         timing: this.state.timing,
         totalMs: totalBootstrapTime,
-        note: 'Auth phase runs asynchronously and not included in total',
+        note: "Auth phase runs asynchronously and not included in total",
       });
 
       // Track performance metrics in Analytics
       try {
-        const { Analytics } = await import('@/lib/analytics');
-        Analytics.track('app_bootstrap_complete', {
+        const { Analytics } = await import("@/lib/analytics");
+        Analytics.track("app_bootstrap_complete", {
           total: totalBootstrapTime,
           ...this.state.timing,
           authCompletedAsynchronously: true,
           postAppReadyAuthMs: this.authCompletionTime || 0,
         });
-        logger.category('bootstrap').debug('Bootstrap metrics tracked');
+        logger.category("bootstrap").debug("Bootstrap metrics tracked");
       } catch (analyticsError) {
         // Non-critical - don't block on analytics
-        logger.category('bootstrap').debug('Analytics tracking skipped', { 
-          error: (analyticsError as Error).message 
-        });
+        logger
+          .category("bootstrap")
+          .debug(
+            `Analytics tracking skipped: ${(analyticsError as Error).message}`
+          );
       }
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      logger.category('bootstrap').error('AppKernel initialization failed', {
+      logger.category("bootstrap").error("AppKernel initialization failed", {
         error: err.message,
         stack: err.stack?.substring(0, 200),
       });
-      
+
       const kernelError = this.createKernelError(
         KernelErrorCode.UNKNOWN_ERROR,
         err.message,
@@ -317,7 +352,7 @@ class AppKernelClass {
         err,
         true
       );
-      
+
       this.updateState({
         currentPhase: KernelPhase.ERROR,
         error: kernelError,
@@ -336,53 +371,58 @@ class AppKernelClass {
       auth: false,
       analytics: false,
       backend: false,
-      platform: 'unknown',
+      platform: "unknown",
     };
 
     try {
       // Detect platform
-      const { Platform } = await import('react-native');
-      
+      const { Platform } = await import("react-native");
+
       // Electron detection: check if running in Electron environment
-      const isElectron = typeof window !== 'undefined' && 
-                        (window as any).electron !== undefined;
-      
-      capabilities.platform = isElectron ? 'desktop' :
-                             Platform.OS === 'web' ? 'web' : 
-                             Platform.OS === 'ios' ? 'ios' : 
-                             Platform.OS === 'android' ? 'android' : 
-                             'unknown';
+      const isElectron =
+        typeof window !== "undefined" && (window as any).electron !== undefined;
+
+      capabilities.platform = isElectron
+        ? "desktop"
+        : Platform.OS === "web"
+          ? "web"
+          : Platform.OS === "ios"
+            ? "ios"
+            : Platform.OS === "android"
+              ? "android"
+              : "unknown";
 
       // Check if storage is available
       try {
-        await import('@/lib/storage');
+        await import("@/lib/storage");
         capabilities.storage = true;
       } catch {
-        logger.category('bootstrap').warn('Storage not available');
+        logger.category("bootstrap").warn("Storage not available");
       }
 
       // Check if analytics is configured
       try {
-        const { Analytics } = await import('@/lib/analytics');
+        const { Analytics } = await import("@/lib/analytics");
         capabilities.analytics = Analytics.enabled();
       } catch {
-        logger.category('bootstrap').debug('Analytics not available');
+        logger.category("bootstrap").debug("Analytics not available");
       }
 
       // Check if backend (Supabase) is configured
       try {
-        const { isSupabaseConfigured } = await import('@/lib/database/supabase');
+        const { isSupabaseConfigured } =
+          await import("@/lib/database/supabase");
         capabilities.backend = isSupabaseConfigured();
         capabilities.auth = isSupabaseConfigured(); // Auth depends on backend
       } catch {
-        logger.category('bootstrap').debug('Backend not configured');
+        logger.category("bootstrap").debug("Backend not configured");
       }
 
       this.updateState({ capabilities });
-      logger.category('bootstrap').info('Capabilities detected', capabilities);
+      logger.category("bootstrap").info("Capabilities detected", capabilities);
     } catch (error) {
-      logger.category('bootstrap').error('Capability detection failed', { 
-        error: (error as Error).message 
+      logger.category("bootstrap").error("Capability detection failed", {
+        error: (error as Error).message,
       });
     }
   }
@@ -411,23 +451,32 @@ class AppKernelClass {
   /**
    * Run a phase with timing and error handling
    */
-  private async runPhase(phaseName: string, fn: () => Promise<void>): Promise<void> {
-    const phaseKey = `${phaseName}Ready` as keyof AppKernelState['phases'];
+  private async runPhase(
+    phaseName: string,
+    fn: () => Promise<void>
+  ): Promise<void> {
+    const phaseKey = `${phaseName}Ready` as keyof AppKernelState["phases"];
     const startTime = Date.now();
 
     try {
-      this.updateState({ currentPhase: KernelPhase[phaseName.toUpperCase() as keyof typeof KernelPhase] || KernelPhase.IDLE });
+      this.updateState({
+        currentPhase:
+          KernelPhase[phaseName.toUpperCase() as keyof typeof KernelPhase] ||
+          KernelPhase.IDLE,
+      });
       await fn();
       const duration = Date.now() - startTime;
       this.updateState({
         phases: { ...this.state.phases, [phaseKey]: true },
         timing: { ...this.state.timing, [phaseName]: duration },
       });
-      logger.category('bootstrap').debug(`${phaseName} phase complete`, { durationMs: duration });
+      logger
+        .category("bootstrap")
+        .debug(`${phaseName} phase complete (${duration}ms)`);
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       const duration = Date.now() - startTime;
-      logger.category('bootstrap').error(`${phaseName} phase failed`, {
+      logger.category("bootstrap").error(`${phaseName} phase failed`, {
         error: err.message,
         durationMs: duration,
       });
@@ -451,7 +500,9 @@ class AppKernelClass {
       try {
         listener({ ...this.state });
       } catch (error) {
-        logger.category('error').error('Kernel listener error', { error: (error as Error).message });
+        logger
+          .category("error")
+          .error("Kernel listener error", { error: (error as Error).message });
       }
     });
   }
@@ -478,7 +529,7 @@ class AppKernelClass {
    * Reset kernel (for testing or app reset scenarios)
    */
   reset(): void {
-    logger.category('bootstrap').info('AppKernel reset requested');
+    logger.category("bootstrap").info("AppKernel reset requested");
     this.state = {
       currentPhase: KernelPhase.IDLE,
       phases: {
@@ -496,19 +547,19 @@ class AppKernelClass {
         auth: false,
         analytics: false,
         backend: false,
-        platform: 'unknown', // Will be detected on next initialize()
+        platform: "unknown", // Will be detected on next initialize()
       },
       networkStatus: null,
     };
     this.initPromise = null;
     this.authCompletionTime = null;
-    
+
     // Cleanup network subscription
     if (this.networkUnsubscribe) {
       this.networkUnsubscribe();
       this.networkUnsubscribe = null;
     }
-    
+
     this.notifyListeners();
   }
 
@@ -517,12 +568,14 @@ class AppKernelClass {
    * Useful for recovering from transient failures
    */
   async retry(): Promise<void> {
-    logger.category('bootstrap').info('AppKernel retry requested');
-    
+    logger.category("bootstrap").info("AppKernel retry requested");
+
     if (this.state.currentPhase !== KernelPhase.ERROR) {
-      logger.category('bootstrap').warn('Retry called but kernel is not in ERROR state', {
-        currentPhase: this.state.currentPhase,
-      });
+      logger
+        .category("bootstrap")
+        .warn("Retry called but kernel is not in ERROR state", {
+          currentPhase: this.state.currentPhase,
+        });
       return;
     }
 
@@ -535,38 +588,42 @@ class AppKernelClass {
    * Re-run a specific phase
    * Useful for refreshing auth, network status, etc. without full restart
    */
-  async rerunPhase(phase: 'auth' | 'network' | 'storage'): Promise<void> {
-    logger.category('bootstrap').info('Rerunning phase', { phase });
+  async rerunPhase(phase: "auth" | "network" | "storage"): Promise<void> {
+    logger.category("bootstrap").info("Rerunning phase", { phase });
 
     if (this.state.currentPhase === KernelPhase.ERROR) {
-      throw new Error('Cannot rerun phase while kernel is in ERROR state. Call retry() first.');
+      throw new Error(
+        "Cannot rerun phase while kernel is in ERROR state. Call retry() first."
+      );
     }
 
     switch (phase) {
-      case 'auth':
-        await this.runPhase('auth', async () => {
-          const { AuthStateManager } = await import('@/lib/auth/auth-state');
+      case "auth":
+        await this.runPhase("auth", async () => {
+          const { AuthStateManager } = await import("@/lib/auth/auth-state");
           await AuthStateManager.getAuthState();
-          this.updateState({ 
-            phases: { ...this.state.phases, authReady: true }
+          this.updateState({
+            phases: { ...this.state.phases, authReady: true },
           });
         });
         break;
 
-      case 'network':
-        await this.runPhase('network', async () => {
+      case "network":
+        await this.runPhase("network", async () => {
           await NetworkDetection.initialize();
         });
         break;
 
-      case 'storage':
-        await this.runPhase('storage', async () => {
-          logger.category('bootstrap').debug('Storage system revalidated');
+      case "storage":
+        await this.runPhase("storage", async () => {
+          logger.category("bootstrap").debug("Storage system revalidated");
         });
         break;
 
       default:
-        throw new Error(`Cannot rerun phase: ${phase}. Only auth, network, and storage can be rerun.`);
+        throw new Error(
+          `Cannot rerun phase: ${phase}. Only auth, network, and storage can be rerun.`
+        );
     }
   }
 
@@ -576,7 +633,7 @@ class AppKernelClass {
    */
   getDiagnostics(): {
     phase: KernelPhase;
-    phases: AppKernelState['phases'];
+    phases: AppKernelState["phases"];
     timing: Record<string, number>;
     totalBootstrapTime: number;
     capabilities: KernelCapabilities;
@@ -592,24 +649,31 @@ class AppKernelClass {
     appVersion: string;
     timestamp: number;
   } {
-    const totalBootstrapTime = Object.values(this.state.timing).reduce((a, b) => a + b, 0);
-    
+    const totalBootstrapTime = Object.values(this.state.timing).reduce(
+      (a, b) => a + b,
+      0
+    );
+
     return {
       phase: this.state.currentPhase,
       phases: { ...this.state.phases },
       timing: { ...this.state.timing },
       totalBootstrapTime,
       capabilities: { ...this.state.capabilities },
-      networkStatus: this.state.networkStatus ? { ...this.state.networkStatus } : null,
-      error: this.state.error ? {
-        code: this.state.error.code,
-        message: this.state.error.message,
-        phase: this.state.error.phase,
-        recoverable: this.state.error.recoverable,
-        timestamp: this.state.error.timestamp,
-      } : null,
+      networkStatus: this.state.networkStatus
+        ? { ...this.state.networkStatus }
+        : null,
+      error: this.state.error
+        ? {
+            code: this.state.error.code,
+            message: this.state.error.message,
+            phase: this.state.error.phase,
+            recoverable: this.state.error.recoverable,
+            timestamp: this.state.error.timestamp,
+          }
+        : null,
       platform: this.state.capabilities.platform,
-      appVersion: process.env.EXPO_PUBLIC_VERSION || 'unknown',
+      appVersion: process.env.EXPO_PUBLIC_VERSION || "unknown",
       timestamp: Date.now(),
     };
   }
@@ -618,14 +682,14 @@ class AppKernelClass {
    * Cleanup resources on app shutdown
    */
   destroy(): void {
-    logger.category('bootstrap').info('AppKernel shutting down');
-    
+    logger.category("bootstrap").info("AppKernel shutting down");
+
     // Unsubscribe from network changes
     if (this.networkUnsubscribe) {
       this.networkUnsubscribe();
       this.networkUnsubscribe = null;
     }
-    
+
     // Clear all listeners
     this.listeners.clear();
   }
