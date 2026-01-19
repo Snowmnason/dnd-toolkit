@@ -1,5 +1,6 @@
 import { AppLoading } from "@/components/ui";
 import { useAppKernel, useAuthGuard } from "@/lib";
+import { buildRoute } from "@/lib/navigation/uri-helpers";
 import { logger } from "@/lib/utils/logger";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -34,9 +35,9 @@ export default function MainLayout() {
     // If no worldId in URL, redirect (shouldn't happen as guard checks this)
     if (!urlWorldId) {
       logger.warn(
-        "[MainLayout] No worldId in URL, redirecting to world selection"
+        "[MainLayout] No worldId in URL, redirecting to world selection",
       );
-      router.replace("/select/world-selection");
+      router.replace(buildRoute("/select/world-selection") as any);
       return;
     }
 

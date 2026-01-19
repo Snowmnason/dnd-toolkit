@@ -1,8 +1,8 @@
 import { logger } from "@/lib";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
 import {
-  NetworkDetection,
   ConnectionQuality,
+  NetworkDetection,
 } from "@/lib/network/network-detection";
 import { S, UseTheme } from "@/theme";
 import { useRouter, useSegments } from "expo-router";
@@ -53,7 +53,7 @@ function TopBar({
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [networkStatus, setNetworkStatus] = useState(
-    NetworkDetection.getStatus()
+    NetworkDetection.getStatus(),
   );
   const { theme } = UseTheme();
   const insets = useSafeAreaInsets();
@@ -116,7 +116,7 @@ function TopBar({
             : styles.containerDesktop,
         ]}
       >
-        {/* Left: Back Button */}
+        {/* Left: Back Button (fixed width to reserve space for centering) */}
         <View style={styles.sideSlot}>
           {showBackButton && (
             <IconButton
@@ -129,14 +129,8 @@ function TopBar({
           )}
         </View>
 
-        {/* Right: WiFi Indicator + Title */}
-        <View
-          style={[
-            styles.sideSlot,
-            { flexDirection: "row", gap: 8, justifyContent: "flex-end" },
-          ]}
-        >
-          {/* Center: Title */}
+        {/* Center: Title + WiFi indicator */}
+        <View style={styles.centerSlot} pointerEvents="none">
           <Text
             accessibilityLiveRegion="polite"
             style={[
@@ -144,34 +138,35 @@ function TopBar({
               { fontFamily: theme.fontFamilyTitle, fontSize: S.font.heading3 },
             ]}
             numberOfLines={1}
+            accessible={true}
+            accessibilityRole="header"
           >
             {title}
           </Text>
-          {/* WiFi indicator (not web only) */}
           {Platform.OS !== "web" && (
             <View
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: getWifiColor(),
-                alignSelf: "center",
-              }}
+              style={[
+                styles.wifiIndicator,
+                { backgroundColor: getWifiColor() },
+              ]}
               accessible={true}
               accessibilityLabel={`Network: ${networkStatus.isOnline ? (networkStatus.connectionQuality === ConnectionQuality.GOOD ? "Online" : "Weak connection") : "Offline"}`}
             />
           )}
         </View>
 
-        {showHamburger && (
-          <IconButton
-            variant="text"
-            content="☰"
-            textColor={TOPBAR_TEXT}
-            onPress={handleHamburgerPress}
-            size="lg"
-          />
-        )}
+        {/* Right: Hamburger Menu (fixed width to mirror left) */}
+        <View style={styles.sideSlot}>
+          {showHamburger && (
+            <IconButton
+              variant="text"
+              content="☰"
+              textColor={TOPBAR_TEXT}
+              onPress={handleHamburgerPress}
+              size="lg"
+            />
+          )}
+        </View>
       </View>
 
       {/* Custom Settings Menu */}
@@ -190,14 +185,14 @@ function TopBar({
             const target = buildNavigationTarget(
               `/settings/${encodeURIComponent(username)}`,
               { worldId, userRole },
-              ["worldId", "userRole"]
+              ["worldId", "userRole"],
             );
 
             router.push(target as any);
           } catch (err) {
             logger.warn(
               "TopBar: failed to resolve username route, falling back",
-              err
+              err,
             );
             setShowErrorToast(true);
           }
@@ -208,7 +203,7 @@ function TopBar({
           const target = buildNavigationTarget(
             "/select/world-selection",
             {},
-            []
+            [],
           );
           router.replace(target as any);
         }}
@@ -243,7 +238,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   sideSlot: {
-    right: -20,
+    width: 56,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -251,6 +246,21 @@ const styles = StyleSheet.create({
     color: TOPBAR_TEXT,
     fontWeight: "700",
     textAlign: "center",
+    flexShrink: 1,
+  },
+  centerSlot: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  wifiIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginLeft: 8,
+    backgroundColor: "#10B981",
+    alignSelf: "center",
   },
 });
 

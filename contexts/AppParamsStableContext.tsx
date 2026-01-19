@@ -235,18 +235,10 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearAllParams = useCallback(() => {
-    // Only clear if there's actually data to clear (prevents infinite loops on mobile)
-    setStableParams((prev) => {
-      if (!prev.userId && prev.connectedWorldIds.length === 0) {
-        // Already cleared, skip to avoid redundant storage operations
-        logger.debug(
-          "context",
-          "AppParamsStableProvider: clearAllParams skipped (already empty)"
-        );
-        return prev;
-      }
-      return { userId: undefined, connectedWorldIds: [] };
-    });
+    // Always update state to clear in-memory data
+    setStableParams({ userId: undefined, connectedWorldIds: [] });
+
+    // Always clear storage, regardless of state (prevents stale data if storage/state mismatch occurs)
     void SecureStorage.removeItem(STORAGE_KEYS.CONNECTED_WORLDS).catch(
       (error) => {
         logger.error("other", "Failed to clear connected worlds cache", error);

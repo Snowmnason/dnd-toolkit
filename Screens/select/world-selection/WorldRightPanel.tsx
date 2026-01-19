@@ -127,7 +127,7 @@ export function WorldRightPanel({
                     worldId: selectedWorld.world_id,
                     userRole: selectedWorld.user_role,
                   },
-                  ["worldId", "userRole"]
+                  ["worldId", "userRole"],
                 );
                 router.push(target as any);
               }}

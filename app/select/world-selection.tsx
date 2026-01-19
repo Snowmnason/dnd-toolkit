@@ -81,6 +81,13 @@ export default function LandingPage() {
     goToRightPanel();
   };
 
+  // Handler for mobile back from right panel to list
+  const handleMobileBackToList = () => {
+    setSelectedWorld(null);
+    setMapImage(null);
+    goToLeftPanel();
+  };
+
   // Left Panel Component - Always rendered to avoid hook order issues
   const LeftPanel = (
     <WorldListPanel
@@ -113,7 +120,9 @@ export default function LandingPage() {
         right={RightPanel}
         animateRightSlide={!isDesktop}
         rightVisible={showRightPanel}
-        onMobileRightPanelClose={!isDesktop ? goToLeftPanel : undefined}
+        onMobileRightPanelClose={
+          !isDesktop ? handleMobileBackToList : undefined
+        }
       />
 
       {/* Modals rendered unconditionally to avoid hook order issues */}
