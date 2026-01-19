@@ -251,7 +251,6 @@ const styles = StyleSheet.create({
     color: TOPBAR_TEXT,
     fontWeight: "700",
     textAlign: "center",
-    flex: 1,
   },
 });
 
