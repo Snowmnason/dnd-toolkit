@@ -1,4 +1,4 @@
-declare module 'aes-js' {
+declare module "aes-js" {
   export const utils: {
     utf8: {
       toBytes: (text: string) => number[];
@@ -11,13 +11,15 @@ declare module 'aes-js' {
   };
 
   export class Counter {
-    constructor(initialValue: number);
+    constructor(initialValue: number | number[]);
+    setBytes(bytes: number[]): void;
   }
 
-  export class ModeOfOperation {
-    static ctr: new (key: Uint8Array, counter: Counter) => {
-      encrypt: (bytes: number[]) => number[];
-      decrypt: (bytes: number[]) => number[];
-    };
+  export namespace ModeOfOperation {
+    class ctr {
+      constructor(key: number[] | Uint8Array, counter: Counter);
+      encrypt(bytes: number[] | Uint8Array): Uint8Array;
+      decrypt(bytes: number[] | Uint8Array): Uint8Array;
+    }
   }
 }

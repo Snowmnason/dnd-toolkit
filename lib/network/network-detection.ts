@@ -153,7 +153,7 @@ class NetworkDetectionClass {
       logger
         .category("network")
         .info(
-          `Network detection initialized (online: ${this.currentStatus.isOnline}, quality: ${this.currentStatus.connectionQuality})`
+          `Network detection initialized (online: ${this.currentStatus.isOnline}, quality: ${this.currentStatus.connectionQuality})`,
         );
     } catch (error) {
       logger
@@ -186,7 +186,10 @@ class NetworkDetectionClass {
     }
 
     // Clean up web event listeners
-    if (typeof window !== "undefined") {
+    if (
+      typeof window !== "undefined" &&
+      typeof window.removeEventListener === "function"
+    ) {
       if (this.onlineListener) {
         window.removeEventListener("online", this.onlineListener);
         this.onlineListener = null;
@@ -197,29 +200,35 @@ class NetworkDetectionClass {
       }
     }
 
-    if (typeof document !== "undefined") {
+    if (
+      typeof document !== "undefined" &&
+      typeof document.removeEventListener === "function"
+    ) {
       if (this.visibilityListener) {
         document.removeEventListener(
           "visibilitychange",
-          this.visibilityListener
+          this.visibilityListener,
         );
         this.visibilityListener = null;
       }
     }
 
     // Clean up battery listeners
-    if (this.batteryObject) {
+    if (
+      this.batteryObject &&
+      typeof this.batteryObject.removeEventListener === "function"
+    ) {
       if (this.batteryLevelListener) {
         this.batteryObject.removeEventListener(
           "levelchange",
-          this.batteryLevelListener
+          this.batteryLevelListener,
         );
         this.batteryLevelListener = null;
       }
       if (this.batteryChargingListener) {
         this.batteryObject.removeEventListener(
           "chargingchange",
-          this.batteryChargingListener
+          this.batteryChargingListener,
         );
         this.batteryChargingListener = null;
       }
@@ -248,7 +257,7 @@ class NetworkDetectionClass {
         logger
           .category("network")
           .debug(
-            "NetInfo export not found in @react-native-community/netinfo package"
+            "NetInfo export not found in @react-native-community/netinfo package",
           );
       }
       return NetInfo;
@@ -257,7 +266,7 @@ class NetworkDetectionClass {
         .category("network")
         .debug(
           "Failed to load @react-native-community/netinfo package:",
-          error
+          error,
         );
       return null;
     }
@@ -303,7 +312,7 @@ class NetworkDetectionClass {
             };
             battery.addEventListener(
               "chargingchange",
-              this.batteryChargingListener
+              this.batteryChargingListener,
             );
 
             logger
@@ -418,7 +427,7 @@ class NetworkDetectionClass {
         logger
           .category("network")
           .info(
-            `Ping detected connectivity change: ${wasOnline} -> ${isNowOnline} (${latency}ms)`
+            `Ping detected connectivity change: ${wasOnline} -> ${isNowOnline} (${latency}ms)`,
           );
         this.updateStatus({ isOnline: isNowOnline });
       }
@@ -500,7 +509,14 @@ class NetworkDetectionClass {
    * Setup web-based network detection
    */
   private setupWebNetworkDetection(): void {
-    if (typeof window === "undefined") return;
+    if (
+      typeof window === "undefined" ||
+      typeof navigator === "undefined" ||
+      typeof window.addEventListener !== "function" ||
+      typeof window.removeEventListener !== "function"
+    ) {
+      return;
+    }
 
     // Initial status
     this.currentStatus = {
@@ -515,7 +531,7 @@ class NetworkDetectionClass {
     logger
       .category("network")
       .info(
-        `Web network detection initialized (online: ${this.currentStatus.isOnline})`
+        `Web network detection initialized (online: ${this.currentStatus.isOnline})`,
       );
 
     // Listen to online/offline events
@@ -544,31 +560,33 @@ class NetworkDetectionClass {
     window.addEventListener("offline", this.offlineListener);
 
     // Also listen to visibility changes (helps detect network loss while backgrounded)
-    this.visibilityListener = () => {
-      if (document.visibilityState === "visible") {
-        // App came to foreground - recheck network status
-        const wasOnline = this.currentStatus.isOnline;
-        const isNowOnline = navigator.onLine;
+    if (typeof document !== "undefined") {
+      this.visibilityListener = () => {
+        if (document.visibilityState === "visible") {
+          // App came to foreground - recheck network status
+          const wasOnline = this.currentStatus.isOnline;
+          const isNowOnline = navigator.onLine;
 
-        if (wasOnline !== isNowOnline) {
-          logger
-            .category("network")
-            .info("Network status changed on foreground", {
-              from: wasOnline,
-              to: isNowOnline,
-            });
+          if (wasOnline !== isNowOnline) {
+            logger
+              .category("network")
+              .info("Network status changed on foreground", {
+                from: wasOnline,
+                to: isNowOnline,
+              });
+          }
+
+          this.updateStatus({
+            isOnline: isNowOnline,
+            type: isNowOnline ? "wifi" : "none",
+            connectionQuality: isNowOnline
+              ? ConnectionQuality.GOOD
+              : ConnectionQuality.OFFLINE,
+          });
         }
-
-        this.updateStatus({
-          isOnline: isNowOnline,
-          type: isNowOnline ? "wifi" : "none",
-          connectionQuality: isNowOnline
-            ? ConnectionQuality.GOOD
-            : ConnectionQuality.OFFLINE,
-        });
-      }
-    };
-    document.addEventListener("visibilitychange", this.visibilityListener);
+      };
+      document.addEventListener("visibilitychange", this.visibilityListener);
+    }
   }
 
   /**
@@ -614,7 +632,7 @@ class NetworkDetectionClass {
       logger
         .category("network")
         .info(
-          `Online status changed: ${oldStatus.isOnline} -> ${this.currentStatus.isOnline}`
+          `Online status changed: ${oldStatus.isOnline} -> ${this.currentStatus.isOnline}`,
         );
     }
 
@@ -629,7 +647,7 @@ class NetworkDetectionClass {
       logger
         .category("network")
         .info(
-          `Connection quality changed: ${oldStatus.connectionQuality} -> ${this.currentStatus.connectionQuality}`
+          `Connection quality changed: ${oldStatus.connectionQuality} -> ${this.currentStatus.connectionQuality}`,
         );
     }
 
@@ -718,7 +736,7 @@ export const NetworkDetection = new NetworkDetectionClass();
  */
 export function useNetworkStatus(): NetworkStatus {
   const [status, setStatus] = React.useState<NetworkStatus>(
-    NetworkDetection.getStatus()
+    NetworkDetection.getStatus(),
   );
 
   React.useEffect(() => {

@@ -3,21 +3,22 @@ import { usePlatform } from "@/contexts/PlatformContext";
 import { $, Sizing, useScale } from "@/theme";
 import { ComponentType, ReactNode, useEffect, useMemo } from "react";
 import {
-    ImageBackground,
-    Platform,
-    ScrollView,
-    StyleProp,
-    View,
-    ViewProps,
-    ViewStyle,
+  ImageBackground,
+  Platform,
+  ScrollView,
+  StyleProp,
+  View,
+  ViewProps,
+  ViewStyle,
 } from "react-native";
 import Animated, {
-    Easing,
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import { ViewCust } from "./base/ViewCust";
+import { IconButton } from "./IconButton";
 
 /* ───────────────────────────────
    🪶 AppView Props
@@ -45,6 +46,8 @@ export interface AppSplitViewProps extends AppViewProps {
   animateRightSlide?: boolean;
   /** Controls visibility of right panel when animation is enabled */
   rightVisible?: boolean;
+  /** Callback when close button is pressed on mobile right panel */
+  onMobileRightPanelClose?: () => void;
   /** Padding on top/bottom. Defaults to gap value. Use 'none' to remove. */
   verticalPadding?: SpaceKey | "none";
   /** Padding on left/right. Defaults to gap value. Use 'none' to remove. */
@@ -197,6 +200,7 @@ export function AppSplit({
   showScrollIndicator = false,
   animateRightSlide = false,
   rightVisible = true,
+  onMobileRightPanelClose,
   verticalPadding = "none",
   horizontalPadding = "xs",
   ...rest
@@ -288,11 +292,11 @@ export function AppSplit({
             style={[
               {
                 position: "absolute",
-                // Safe access: gap is constrained to SpaceKey
-                left: S.space[gap as SpaceKey],
-                right: S.space[gap as SpaceKey],
-                top: S.space[gap as SpaceKey],
-                bottom: S.space[gap as SpaceKey],
+                // Fill full screen on mobile (no insets)
+                left: 0,
+                right: 0,
+                top: 0,
+                bottom: 0,
                 backgroundColor: $("background"),
                 // Ensure it overlays the left content during slide
                 zIndex: 10,
@@ -308,6 +312,25 @@ export function AppSplit({
               ? { pointerEvents: (rightVisible ? "auto" : "none") as any }
               : {})}
           >
+            {/* Mobile close button in top-right corner */}
+            {onMobileRightPanelClose && (
+              <View
+                style={{
+                  position: "absolute",
+                  top: S.space.lg,
+                  right: S.space.lg,
+                  zIndex: 20,
+                }}
+              >
+                <IconButton
+                  variant="text"
+                  content="✕"
+                  size="lg"
+                  onPress={onMobileRightPanelClose}
+                  textColor={$("textPrimary" as any)}
+                />
+              </View>
+            )}
             {right}
           </Animated.View>
         ))}
