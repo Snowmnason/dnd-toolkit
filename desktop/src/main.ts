@@ -39,6 +39,8 @@ const {
   dialog,
   session,
 } = require("electron");
+// Note: electron-updater imported but not used - auto-updates disabled (no publish server configured)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const fs = require("fs");
@@ -47,43 +49,34 @@ const fs = require("fs");
 // LOGGING SETUP
 // ============================================================================
 
-// Create log file in user data directory
-const logFilePath = path.join(app.getPath("userData"), "app.log");
-const logStream = fs.createWriteStream(logFilePath, { flags: "a" });
+// Import desktop logger with file rotation and log levels
+const {
+  createDesktopLogger,
+  isDebugLoggingEnabled,
+} = require("./utils/logger-simple");
 
-// Override console.log to write to both console and file
-const originalLog = console.log;
-const originalError = console.error;
-const originalWarn = console.warn;
+// Process CLI flags for logging before initializing logger
+// Support --enable-logging flag for CLI users
+if (process.argv.includes("--enable-logging")) {
+  process.env.LOG_LEVEL = "debug";
+}
 
-console.log = (...args: any[]) => {
-  const message = args
-    .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : String(arg)))
-    .join(" ");
-  const timestamp = new Date().toISOString();
-  logStream.write(`[${timestamp}] LOG: ${message}\n`);
-  originalLog(...args);
-};
+// Initialize logger - SIMPLE VERSION THAT WORKS
+// Uses synchronous fs.appendFileSync to write immediately to file
+// No async state machines, no buffering complications
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const logger = createDesktopLogger(app.getPath("userData"), {});
 
-console.error = (...args: any[]) => {
-  const message = args
-    .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : String(arg)))
-    .join(" ");
-  const timestamp = new Date().toISOString();
-  logStream.write(`[${timestamp}] ERROR: ${message}\n`);
-  originalError(...args);
-};
-
-console.warn = (...args: any[]) => {
-  const message = args
-    .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : String(arg)))
-    .join(" ");
-  const timestamp = new Date().toISOString();
-  logStream.write(`[${timestamp}] WARN: ${message}\n`);
-  originalWarn(...args);
-};
-
-console.log("[Logging] Log file:", logFilePath);
+// IMPORTANT: All console.log/error/warn calls AFTER this point use the logger system
+// Logger overrides console methods above
+console.log("========================================");
+console.log("[App] ✅ DnD-Toolkit Desktop App Started");
+console.log("[App] Log file:", app.getPath("userData") + "/app.log");
+console.log("[App] Process arguments:", process.argv);
+console.log("========================================");
+console.log(
+  "[Logging] Desktop logger initialized - all console output goes to file",
+);
 
 // ============================================================================
 // CONSTANTS & CONFIG
@@ -105,6 +98,143 @@ const WINDOW_STATE_FILE = path.join(
   app.getPath("userData"),
   "window-state.json",
 );
+
+// Global reference to protocol root for fallback usage
+let globalResolvedRoot: string = "";
+
+// ============================================================================
+// PATH VALIDATION UTILITIES
+// ============================================================================
+
+/**
+ * Validate that a resolved path is within an allowed root directory
+ * This prevents directory traversal attacks (e.g., ../../../etc/passwd)
+ * Cross-platform robust: handles Windows case-insensitivity via path.relative()
+ *
+ * @param resolvedPath - The resolved absolute path to validate
+ * @param allowedRoot - The root directory the path must be within
+ * @returns true if path is valid and within allowedRoot, false otherwise
+ */
+function isPathWithinRoot(resolvedPath: string, allowedRoot: string): boolean {
+  // Normalize both paths for consistent separator handling
+  const normalizedPath = path.normalize(resolvedPath);
+  const normalizedRoot = path.normalize(allowedRoot);
+
+  // path.relative() is the robust cross-platform approach:
+  // - On Windows: handles case-insensitivity automatically
+  // - On Unix: maintains case-sensitive validation
+  // - Returns ".." if target is outside root
+  // - Returns absolute path if it escapes the root
+  const relative = path.relative(normalizedRoot, normalizedPath);
+
+  // Valid if relative path doesn't start with ".." and isn't absolute
+  // (path.relative returns ".." when target is outside root)
+  return !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+/**
+ * Safely check if a file exists with runtime validation
+ * Replaces fs.existsSync calls that would trigger ESLint warnings
+ *
+ * @param filePath - Path to check (will be validated)
+ * @param allowedRoot - Optional root directory to validate path is within
+ * @returns true if file exists and is valid, false otherwise
+ */
+function safeFileExists(filePath: string, allowedRoot?: string): boolean {
+  try {
+    // Validate path is within allowed root if specified
+    if (allowedRoot) {
+      const resolved = path.resolve(filePath);
+      if (!isPathWithinRoot(resolved, path.resolve(allowedRoot))) {
+        console.warn("[Security] Attempted access outside allowed root:", {
+          filePath,
+          resolved,
+          allowedRoot,
+        });
+        return false;
+      }
+    }
+
+    // Safe to check - path has been validated
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    return fs.existsSync(filePath);
+  } catch (error) {
+    console.warn("[Security] Error checking file existence:", error);
+    return false;
+  }
+}
+
+/**
+ * Safely read a file with runtime validation
+ * Replaces fs.readFileSync calls that would trigger ESLint warnings
+ *
+ * @param filePath - Path to read (will be validated)
+ * @param encoding - File encoding (default: utf-8)
+ * @param allowedRoot - Optional root directory to validate path is within
+ * @returns File contents, or null if validation fails
+ */
+function safeReadFile(
+  filePath: string,
+  encoding: BufferEncoding = "utf-8",
+  allowedRoot?: string,
+): string | Buffer | null {
+  try {
+    // Validate path is within allowed root if specified
+    if (allowedRoot) {
+      const resolved = path.resolve(filePath);
+      if (!isPathWithinRoot(resolved, path.resolve(allowedRoot))) {
+        console.error("[Security] Attempted read outside allowed root:", {
+          filePath,
+          resolved,
+          allowedRoot,
+        });
+        return null;
+      }
+    }
+
+    // Safe to read - path has been validated
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    return fs.readFileSync(filePath, encoding);
+  } catch (error) {
+    console.error("[Security] Error reading file:", error);
+    return null;
+  }
+}
+
+/**
+ * Safely list directory contents with runtime validation
+ * Replaces fs.readdirSync calls that would trigger ESLint warnings
+ *
+ * @param dirPath - Directory to list (will be validated)
+ * @param allowedRoot - Optional root directory to validate path is within
+ * @returns Array of filenames, or empty array if validation fails
+ */
+function safeReadDir(dirPath: string, allowedRoot?: string): string[] {
+  try {
+    // Validate path is within allowed root if specified
+    if (allowedRoot) {
+      const resolved = path.resolve(dirPath);
+      if (!isPathWithinRoot(resolved, path.resolve(allowedRoot))) {
+        console.error(
+          "[Security] Attempted directory read outside allowed root:",
+          {
+            dirPath,
+            resolved,
+            allowedRoot,
+          },
+        );
+        return [];
+      }
+    }
+
+    // Safe to read - path has been validated
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    return fs.readdirSync(dirPath);
+  } catch (error) {
+    console.error("[Security] Error reading directory:", error);
+    return [];
+  }
+}
 
 // ============================================================================
 // CUSTOM PROTOCOL REGISTRATION (BEFORE app.ready)
@@ -171,12 +301,15 @@ let mainWindow: BrowserWindowType | null = null;
  */
 const loadWindowState = (): WindowState | null => {
   try {
-    // ESLint: Path is validated - WINDOW_STATE_FILE is constructed from app.getPath("userData") which is safe
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    if (fs.existsSync(WINDOW_STATE_FILE as string)) {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename
-      const data = fs.readFileSync(WINDOW_STATE_FILE as string, "utf-8");
-      const state = JSON.parse(data);
+    // WINDOW_STATE_FILE is constructed from app.getPath("userData") which is a trusted Electron API
+    if (safeFileExists(WINDOW_STATE_FILE, app.getPath("userData"))) {
+      const data = safeReadFile(
+        WINDOW_STATE_FILE,
+        "utf-8",
+        app.getPath("userData"),
+      );
+      if (!data) return null;
+      const state = JSON.parse(data as string);
       console.log("[Window State] Loaded:", state);
       return state;
     }
@@ -192,7 +325,17 @@ const loadWindowState = (): WindowState | null => {
  */
 const saveWindowState = (state: WindowState): void => {
   try {
-    // ESLint: Path is validated - WINDOW_STATE_FILE is constructed from app.getPath("userData") which is safe
+    // WINDOW_STATE_FILE is constructed from app.getPath("userData") which is a trusted Electron API
+    // Validate path before writing
+    const userDataDir = app.getPath("userData");
+    const resolvedPath = path.resolve(WINDOW_STATE_FILE);
+    if (!isPathWithinRoot(resolvedPath, path.resolve(userDataDir))) {
+      console.error(
+        "[Window State] Security: attempted write outside userData directory",
+      );
+      return;
+    }
+    // Path has been validated above - safe to write
     // eslint-disable-next-line security/detect-non-literal-fs-filename
     fs.writeFileSync(
       WINDOW_STATE_FILE as string,
@@ -314,23 +457,26 @@ function setupProtocolHandler(): void {
   const webBuildDir = path.join(process.resourcesPath, "web-build");
   const resolvedRoot = path.resolve(webBuildDir);
 
+  // Store globally for use in other functions
+  globalResolvedRoot = resolvedRoot;
+
   console.log("[Protocol] Setup:", {
     isDev,
     resourcesPath: process.resourcesPath,
     appPath: app.getAppPath(),
     webBuildDir,
     resolvedRoot,
-    // ESLint: Path is validated - constructed from app.getAppPath() + "../web-build" which is safe
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    exists: fs.existsSync(webBuildDir as string),
+    // Check if web-build directory exists with validation
+    exists: safeFileExists(webBuildDir, process.resourcesPath),
   });
 
   // List files in web-build for debugging
   try {
-    // ESLint: Path is validated - webBuildDir constructed from trusted app.getAppPath()
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    const files = fs.readdirSync(webBuildDir as string);
-    console.log("[Protocol] Web build contents:", files.slice(0, 15));
+    // webBuildDir is constructed from process.resourcesPath which is a trusted Electron value
+    const files = safeReadDir(webBuildDir, process.resourcesPath);
+    if (isDebugLoggingEnabled()) {
+      console.log("[Protocol] Web build contents:", files.slice(0, 15));
+    }
   } catch (e) {
     console.error("[Protocol] Failed to list web-build:", e);
   }
@@ -338,147 +484,84 @@ function setupProtocolHandler(): void {
   // Register protocol handler using MODERN protocol.handle() API on defaultSession
   // CRITICAL: Must use session.defaultSession.protocol.handle(), not global protocol
   try {
-    console.log(
-      "[Protocol] Attempting to register handler on session.defaultSession...",
-    );
-    console.log(
-      "[Protocol] Session:",
-      session.defaultSession ? "exists" : "null",
-    );
-    console.log(
-      "[Protocol] Protocol object:",
-      typeof session.defaultSession?.protocol,
-    );
+    if (isDebugLoggingEnabled()) {
+      console.log(
+        "[Protocol] Attempting to register handler on session.defaultSession...",
+      );
+      console.log(
+        "[Protocol] Session:",
+        session.defaultSession ? "exists" : "null",
+      );
+      console.log(
+        "[Protocol] Protocol object:",
+        typeof session.defaultSession?.protocol,
+      );
+    }
 
-    session.defaultSession.protocol.handle("app", (request: GlobalRequest) => {
-      console.log("[Protocol] ===== INCOMING REQUEST =====");
-      console.log("[Protocol] Full URL:", request.url);
+    // SIMPLIFIED: Just serve files directly from disk, default to index.html
+    console.log("[Protocol] Attempting to register protocol handler...");
 
-      try {
-        // Parse URL: app:// or app://path or app://path/file.ext
-        let requestUrl = request.url.replace("app://", "");
+    try {
+      session.defaultSession.protocol.registerFileProtocol(
+        "app",
+        (request: any, callback: any) => {
+          console.log("[Protocol] 🔷 REQUEST:", request.url);
 
-        console.log("[Protocol] Parsed path:", requestUrl);
+          // Parse URL
+          let filePath = request.url.replace("app://", "");
 
-        // Remove hash/fragment (e.g., #/ for React Router)
-        if (requestUrl.includes("#")) {
-          requestUrl = requestUrl.split("#")[0];
-        }
+          // Remove trailing slashes FIRST
+          filePath = filePath.replace(/\/+$/, "");
 
-        // Remove query string (e.g., ?v=123)
-        if (requestUrl.includes("?")) {
-          requestUrl = requestUrl.split("?")[0];
-        }
-
-        // Remove leading slash
-        if (requestUrl.startsWith("/")) {
-          requestUrl = requestUrl.substring(1);
-        }
-
-        // Fix: Remove index.html/ prefix if present
-        // This happens when base tag is app://index.html/ instead of app://
-        // Converts: app://index.html/fonts.css → app://fonts.css
-        if (requestUrl.startsWith("index.html/")) {
-          requestUrl = requestUrl.substring(11); // Remove 'index.html/'
-        }
-
-        // Default to index.html if no file specified
-        if (!requestUrl || requestUrl === "") {
-          requestUrl = "index.html";
-        }
-
-        // Resolve and validate path (prevent directory traversal)
-        const candidatePath = path.join(resolvedRoot, requestUrl);
-        const resolvedCandidate = path.resolve(candidatePath);
-
-        // Security: Ensure resolved path is inside web-build directory
-        if (!resolvedCandidate.startsWith(resolvedRoot)) {
-          console.error(
-            "[Protocol] BLOCKED path traversal:",
-            request.url,
-            "→",
-            resolvedCandidate,
-          );
-          return new Response("Forbidden: Path traversal attempt", {
-            status: 403,
-            headers: { "content-type": "text/plain" },
-          });
-        }
-
-        console.log(
-          "[Protocol] Resolved:",
-          requestUrl,
-          "→",
-          resolvedCandidate,
-          "exists:",
-          // ESLint: resolvedCandidate validated against resolvedRoot above to prevent path traversal
-          // eslint-disable-next-line security/detect-non-literal-fs-filename
-          fs.existsSync(resolvedCandidate as string),
-        );
-
-        // Read file
-        // ESLint: resolvedCandidate validated against resolvedRoot above to prevent path traversal
-        // eslint-disable-next-line security/detect-non-literal-fs-filename
-        if (!fs.existsSync(resolvedCandidate as string)) {
-          console.error("[Protocol] File not found:", resolvedCandidate);
-          return new Response(`Not found: ${requestUrl}`, {
-            status: 404,
-            headers: { "content-type": "text/plain" },
-          });
-        }
-
-        // ESLint: resolvedCandidate validated against resolvedRoot above to prevent path traversal
-        // eslint-disable-next-line security/detect-non-literal-fs-filename
-        let fileContent = fs.readFileSync(resolvedCandidate as string);
-        const contentType = getContentType(resolvedCandidate);
-
-        // CRITICAL FIX: Inject base tag into index.html for correct relative path resolution
-        // Without this, /fonts.css becomes app://index.html/fonts.css (broken)
-        // With this, /fonts.css becomes app://fonts.css (correct)
-        if (resolvedCandidate.endsWith("index.html")) {
-          let htmlString = fileContent.toString("utf-8");
-
-          // Only inject if not already present
-          if (!htmlString.includes('<base href="app://"')) {
-            // Inject right after <head> tag
-            htmlString = htmlString.replace(
-              /<head>/i,
-              '<head>\n    <base href="app://">',
-            );
-            console.log("[Protocol] ✅ Injected base tag into index.html");
+          // Remove hash/fragment
+          if (filePath.includes("#")) {
+            filePath = filePath.split("#")[0];
           }
 
-          fileContent = Buffer.from(htmlString, "utf-8");
-        }
+          // Remove query string
+          if (filePath.includes("?")) {
+            filePath = filePath.split("?")[0];
+          }
 
-        console.log(
-          "[Protocol] ✅ Loaded:",
-          resolvedCandidate,
-          `(${fileContent.length} bytes)`,
-        );
+          // Remove leading slash
+          if (filePath.startsWith("/")) {
+            filePath = filePath.substring(1);
+          }
 
-        // Return Response object (modern protocol.handle API)
-        return new Response(fileContent, {
-          status: 200,
-          headers: { "content-type": contentType },
-        });
-      } catch (error) {
-        console.error("[Protocol] Error:", error);
-        return new Response("Internal server error", {
-          status: 500,
-          headers: { "content-type": "text/plain" },
-        });
-      }
-    });
+          // Default to index.html
+          if (!filePath || filePath === "") {
+            filePath = "index.html";
+            console.log("[Protocol] ✅ Defaulting to index.html");
+          }
 
-    console.log(
-      "[Protocol] ✅ app:// protocol handler registered successfully",
-    );
-    console.log("[Protocol] Ready to serve from:", resolvedRoot);
+          const resolvedPath = path.join(resolvedRoot, filePath);
+          console.log("[Protocol] 📄 Resolved path:", resolvedPath);
 
-    // Verify protocol is handled
-    const isHandled = session.defaultSession.protocol.isProtocolHandled("app");
-    console.log("[Protocol] isProtocolHandled('app'):", isHandled);
+          // Security check
+          if (!isPathWithinRoot(resolvedPath, resolvedRoot)) {
+            console.error(
+              "[Protocol] ❌ BLOCKED - path escape attempt:",
+              resolvedPath,
+            );
+            callback({ statusCode: 404 });
+            return;
+          }
+
+          // Check if file exists
+          if (!safeFileExists(resolvedPath, resolvedRoot)) {
+            console.error("[Protocol] ❌ NOT FOUND:", resolvedPath);
+            callback({ statusCode: 404 });
+            return;
+          }
+
+          console.log("[Protocol] ✅ SUCCESS - serving file:", filePath);
+          callback({ path: resolvedPath });
+        },
+      );
+      console.log("[Protocol] ✅ Handler registered successfully");
+    } catch (err) {
+      console.error("[Protocol] ❌ Registration failed:", err);
+    }
   } catch (protocolError) {
     console.error(
       "[Protocol] ❌ FATAL: Failed to register protocol handler:",
@@ -644,31 +727,20 @@ function setupNavigationGuards(): void {
 // ============================================================================
 
 /**
- * Configure auto-updater (only in production)
- * Checks for updates on startup and notifies user
+ * Configure auto-updater (disabled - no publish server configured)
+ *
+ * DISABLED: electron-builder.json has "publish": null
+ * The app has no configured update server, so checkForUpdatesAndNotify()
+ * was timing out and blocking the main thread, causing blank screen.
+ *
+ * To enable updates in future:
+ * 1. Configure publish server in electron-builder.json (e.g., GitHub releases)
+ * 2. Ensure autoUpdater has valid configuration
+ * 3. Uncomment code below and run checkForUpdatesAndNotify() in background
  */
 function setupAutoUpdater(): void {
-  if (isDev) {
-    console.log("[Auto-updater] Disabled in development mode");
-    return;
-  }
-
-  // Check for updates on app start
-  autoUpdater.checkForUpdatesAndNotify();
-
-  autoUpdater.on("update-available", () => {
-    console.log("[Auto-updater] Update available");
-  });
-
-  autoUpdater.on("update-downloaded", () => {
-    console.log("[Auto-updater] Update downloaded, will install on quit");
-  });
-
-  autoUpdater.on("error", (error: Error) => {
-    console.error("[Auto-updater] Error:", error);
-  });
-
-  console.log("[Auto-updater] ✅ Configured");
+  console.log("[Auto-updater] Disabled - no publish server configured");
+  // Future: Move to separate thread or defer until app ready to prevent blocking
 }
 
 // ============================================================================
@@ -817,6 +889,7 @@ const sanitizeDialogOptions = (
  */
 function createWindow(): void {
   // Determine icon path (different for dev vs packaged)
+  // In packaged app, assets are included via files glob pattern in electron-builder.json
   const iconPath = app.isPackaged
     ? path.join(process.resourcesPath, "assets", "images", "icon.ico")
     : path.join(__dirname, "../assets/images/icon.ico");
@@ -855,106 +928,199 @@ function createWindow(): void {
     show: false, // Hide until ready-to-show event
   });
 
+  // Non-null assertion: mainWindow is guaranteed to be initialized here
+  const window = mainWindow!;
+
   // Restore maximized state
-  if (savedState?.isMaximized && mainWindow) {
-    mainWindow.maximize();
+  if (savedState?.isMaximized) {
+    window.maximize();
   }
 
   // Save window state on move, resize, maximize, unmaximize
   const saveState = () => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    const bounds = mainWindow.getBounds();
+    if (!window || window.isDestroyed()) return;
+    const bounds = window.getBounds();
     saveWindowState({
       width: bounds.width,
       height: bounds.height,
       x: bounds.x,
       y: bounds.y,
-      isMaximized: mainWindow.isMaximized(),
+      isMaximized: window.isMaximized(),
     });
   };
 
-  if (mainWindow) {
-    mainWindow.on("move", saveState);
-    mainWindow.on("resize", saveState);
-    mainWindow.on("maximize", saveState);
-    mainWindow.on("unmaximize", saveState);
+  window.on("move", saveState);
+  window.on("resize", saveState);
+  window.on("maximize", saveState);
+  window.on("unmaximize", saveState);
 
-    // Show window when ready (prevents white flash)
-    mainWindow.once("ready-to-show", () => {
-      console.log("[Window] ready-to-show event fired");
-      mainWindow?.show();
+  // Show window when ready (prevents white flash)
+  window.once("ready-to-show", () => {
+    console.log("[Window] ready-to-show event fired");
+    window.show();
+    if (devToolsEnabled) {
+      window.webContents.openDevTools();
+    }
+  });
+
+  // Fallback: show window after 5 seconds even if ready-to-show doesn't fire
+  setTimeout(() => {
+    if (window && !window.isVisible()) {
+      console.warn("[Window] ready-to-show didn't fire, force showing window");
+      window.show();
       if (devToolsEnabled) {
-        mainWindow?.webContents.openDevTools();
+        window.webContents.openDevTools();
       }
+    }
+  }, 5000);
+
+  // Load app
+  if (isDev) {
+    // Development: Load from Expo dev server
+    console.log("[Window] Loading from dev server: http://localhost:8081");
+    window.loadURL("http://localhost:8081");
+
+    // Auto-retry if dev server not ready
+    window.webContents.on("did-fail-load", () => {
+      console.log("[Dev] Failed to load, retrying in 2 seconds...");
+      setTimeout(() => {
+        window?.loadURL("http://localhost:8081");
+      }, 2000);
+    });
+  } else {
+    // Production: Load from app:// protocol
+    // CRITICAL: Use app:// (root) not app://index.html (breaks relative paths)
+    console.log("[Window] Loading from protocol: app://");
+
+    // Add comprehensive event logging
+    window.webContents.on("did-start-loading", () => {
+      console.log("[Window] ℹ️ Started loading");
     });
 
-    // Fallback: show window after 5 seconds even if ready-to-show doesn't fire
-    setTimeout(() => {
-      if (mainWindow && !mainWindow.isVisible()) {
-        console.warn(
-          "[Window] ready-to-show didn't fire, force showing window",
+    window.webContents.on("did-finish-load", () => {
+      console.log("[Window] ✅ Finished loading successfully!");
+    });
+
+    window.webContents.on(
+      "did-fail-load",
+      (_event: any, errorCode: number, errorDescription: string) => {
+        console.error(
+          "[Window] ❌ Load failed - code:",
+          errorCode,
+          "desc:",
+          errorDescription,
         );
-        mainWindow.show();
-        if (devToolsEnabled) {
-          mainWindow.webContents.openDevTools();
-        }
-      }
-    }, 5000);
-
-    // Load app
-    if (isDev) {
-      // Development: Load from Expo dev server
-      console.log("[Window] Loading from dev server: http://localhost:8081");
-      mainWindow.loadURL("http://localhost:8081");
-
-      // Auto-retry if dev server not ready
-      mainWindow.webContents.on("did-fail-load", () => {
-        console.log("[Dev] Failed to load, retrying in 2 seconds...");
-        setTimeout(() => {
-          mainWindow?.loadURL("http://localhost:8081");
-        }, 2000);
-      });
-    } else {
-      // Production: Load from app:// protocol
-      // CRITICAL: Use app:// (root) not app://index.html (breaks relative paths)
-      console.log("[Window] Loading from protocol: app://");
-      mainWindow.loadURL("app://");
-
-      // Log errors for debugging
-      mainWindow.webContents.on(
-        "did-fail-load",
-        (_event: any, errorCode: number, errorDescription: string) => {
-          console.error(
-            "[Electron] Failed to load:",
-            errorCode,
-            errorDescription,
-          );
-        },
-      );
-    }
-
-    // Handle external links - open in browser
-    mainWindow.webContents.setWindowOpenHandler(
-      ({ url: linkUrl }: { url: string }) => {
-        // Allow HTTPS (and localhost in dev)
-        if (
-          linkUrl.startsWith("https://") ||
-          (isDev && linkUrl.startsWith("http://localhost"))
-        ) {
-          shell.openExternal(linkUrl);
-          return { action: "deny" };
-        }
-
-        console.warn("[Security] Blocked non-HTTPS link:", linkUrl);
-        return { action: "deny" };
       },
     );
 
-    // Cleanup on close
-    mainWindow.on("closed", () => {
-      mainWindow = null;
+    (window.webContents as any).on("crashed", () => {
+      console.error("[Window] ❌ WebContents crashed!");
     });
+
+    (window.webContents as any).on("unresponsive", () => {
+      console.warn("[Window] ⚠️ WebContents unresponsive");
+    });
+
+    (window.webContents as any).on("responsive", () => {
+      console.log("[Window] ℹ️ WebContents responsive again");
+    });
+
+    // Add console message handler to capture renderer errors
+    (window.webContents as any).on(
+      "console-message",
+      (level: number, message: string, line: number, sourceId: string) => {
+        console.log(
+          `[Renderer Console] Level=${level} Line=${line} Source=${sourceId} Message=${message}`,
+        );
+      },
+    );
+
+    // Log any uncaught exceptions in renderer
+    (window.webContents as any).on(
+      "render-process-gone",
+      (event: any, details: any) => {
+        console.error("[Renderer] Process gone:", details);
+      },
+    );
+
+    // STRATEGY: Inject base tag + modify CSP in index.html, then load via app://
+    // file:// protocol in Electron ignores CSP meta tags (system policy)
+    // So we use app:// (which respects CSP meta tags) and inject permissive CSP
+    const indexPath = path.join(globalResolvedRoot, "index.html");
+
+    // Read index.html
+    let indexContent = fs.readFileSync(indexPath, "utf-8");
+    let needsWrite = false;
+
+    // 1. Inject base tag for app:// protocol
+    if (!indexContent.includes('<base href="app://')) {
+      console.log(
+        "[Window] Injecting base tag into index.html for app:// protocol resolution",
+      );
+      indexContent = indexContent.replace(
+        /<head[^>]*>/i,
+        '<head><base href="app://">',
+      );
+      needsWrite = true;
+    }
+
+    // 2. Inject a PERMISSIVE CSP meta tag at the very beginning of head
+    // This will be evaluated FIRST and take precedence
+    // Skip if already injected (marked by unique comment to avoid re-injecting every startup)
+    if (!indexContent.includes("<!-- DESKTOP_CSP_INJECTED -->")) {
+      console.log(
+        "[Window] Injecting permissive CSP meta tag to allow app: protocol",
+      );
+      indexContent = indexContent.replace(
+        /<head[^>]*>/i,
+        "<head><!-- DESKTOP_CSP_INJECTED --><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self' app:; script-src 'self' app: https://dnd-tool.thesnowpost.com https://*.supabase.co 'unsafe-inline'; style-src 'self' app: 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' app: https://fonts.gstatic.com; img-src 'self' app: data: blob: https://fonts.gstatic.com https://*.supabase.co https://dnd-tool.thesnowpost.com https:; connect-src 'self' app: https://dnd-tool.thesnowpost.com https://*.supabase.co wss://*.supabase.co; form-action 'self'; base-uri 'self' app:; object-src 'none'; media-src 'self'; worker-src 'self' blob:; upgrade-insecure-requests;\">",
+      );
+      needsWrite = true;
+    }
+
+    // 3. Write modified index.html back to disk only if changes were made
+    if (needsWrite) {
+      try {
+        fs.writeFileSync(indexPath, indexContent);
+        console.log(
+          "[Window] Updated index.html with base tag and permissive CSP",
+        );
+      } catch (writeError) {
+        console.error(
+          "[Window] ⚠️ Failed to write index.html modifications:",
+          writeError,
+        );
+        // Don't fail - app might still work with old HTML
+      }
+    } else {
+      console.log("[Window] index.html already has CSP and base tag, skipping");
+    }
+
+    // 4. Load via app:// (custom protocol that respects meta tag CSP)
+    window.loadURL("app://index.html");
   }
+
+  // Handle external links - open in browser
+  window.webContents.setWindowOpenHandler(
+    ({ url: linkUrl }: { url: string }) => {
+      // Allow HTTPS (and localhost in dev)
+      if (
+        linkUrl.startsWith("https://") ||
+        (isDev && linkUrl.startsWith("http://localhost"))
+      ) {
+        shell.openExternal(linkUrl);
+        return { action: "deny" };
+      }
+
+      console.warn("[Security] Blocked non-HTTPS link:", linkUrl);
+      return { action: "deny" };
+    },
+  );
+
+  // Cleanup on close
+  window.on("closed", () => {
+    mainWindow = null;
+  });
 
   console.log("[Window] ✅ Created");
 }
@@ -1028,12 +1194,9 @@ function createMenu(): void {
       label: "View",
       submenu: [
         { role: "reload" },
-        { role: "forceReload" },
         { role: "toggleDevTools" },
         { type: "separator" },
         { role: "resetZoom" },
-        { role: "zoomIn" },
-        { role: "zoomOut" },
         { type: "separator" },
         { role: "togglefullscreen" },
       ],

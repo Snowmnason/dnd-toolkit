@@ -117,8 +117,10 @@ cssFiles.forEach((filePath) => {
     let content = readFileSync(filePath, "utf8");
     const originalContent = content;
 
-    // Replace absolute paths in url() declarations with app:// protocol
-    // url('/fonts.ttf') -> url('app://fonts.ttf')
+    // CSS url() declarations need special handling for the app:// protocol
+    // The regex matches url() with optional quotes and replaces /fonts/* paths
+    // Example: url('/fonts.ttf') -> url('app://fonts.ttf')
+    // This ensures font files and other CSS assets load correctly from the bundled resources
     content = content.replace(
       /url\((['"])?\/([^)'"]*)(['"])?\)/g,
       "url($1app://$2$3)",

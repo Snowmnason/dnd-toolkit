@@ -35,6 +35,19 @@ contextBridge.exposeInMainWorld("electronAPI", {
     };
     ipcRenderer.on("theme-changed", listener);
     // Return cleanup function to prevent memory leaks
+    // IMPORTANT: Consumers MUST call this cleanup function in useEffect cleanup
+    // to avoid listener accumulation and memory leaks on component unmount.
+    //
+    // Example usage in React component:
+    // ```tsx
+    // useEffect(() => {
+    //   const cleanup = window.electronAPI.onThemeChange((theme) => {
+    //     console.log('System theme changed to:', theme);
+    //     // Update component state or trigger theme sync
+    //   });
+    //   return cleanup; // Call cleanup on unmount
+    // }, []);
+    // ```
     return () => {
       ipcRenderer.removeListener("theme-changed", listener);
     };
@@ -66,6 +79,27 @@ declare global {
       maximize: () => void;
       close: () => void;
       getSystemTheme: () => Promise<"light" | "dark">;
+      /**
+       * Listen for system theme changes (OS-level light/dark mode changes)
+       *
+       * Returns a cleanup function that MUST be called in useEffect cleanup
+       * to prevent memory leaks from event listener accumulation.
+       *
+       * Usage in React:
+       * ```tsx
+       * useEffect(() => {
+       *   const cleanup = window.electronAPI.onThemeChange((theme) => {
+       *     console.log('System theme changed:', theme);
+       *   });
+       *   return cleanup; // CRITICAL: Call cleanup on unmount
+       * }, []);
+       * ```
+       *
+       * Failing to call the cleanup function will cause:
+       * - Multiple listeners accumulating on component re-mounts
+       * - Memory leaks from unreferenced listener functions
+       * - Theme change callbacks being called multiple times
+       */
       onThemeChange: (
         callback: (theme: "light" | "dark") => void,
       ) => () => void; // Returns cleanup function

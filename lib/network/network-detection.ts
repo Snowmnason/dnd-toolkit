@@ -14,6 +14,13 @@
  * - Graceful degradation across all platforms
  */
 
+import {
+    LATENCY_THRESHOLD,
+    LOW_BATTERY_THRESHOLD,
+    SUPABASE_HEALTH_ENDPOINT,
+    WEB_PING_INTERVAL,
+    WEB_PING_TIMEOUT,
+} from "@/lib/network/network-config";
 import { logger } from "@/lib/utils/logger";
 import * as React from "react";
 import { Platform } from "react-native";
@@ -55,11 +62,6 @@ interface BatteryStatus {
   level: number | null; // 0..1 or null if unavailable
   charging: boolean;
 }
-
-const LOW_BATTERY_THRESHOLD = 0.2; // 20% threshold for expensive flag
-const WEB_PING_INTERVAL = 5 * 60 * 1000; // 5 minutes
-const WEB_PING_TIMEOUT = 5000; // 5 second timeout
-const LATENCY_THRESHOLD = 500; // 500ms = poor connection
 
 /**
  * Callback when network status changes
@@ -405,13 +407,11 @@ class NetworkDetectionClass {
 
       // Use Supabase health endpoint instead of Cloudflare for CSP compliance
       // Supabase is already whitelisted in CSP for API calls
-      const response = await fetch(
-        "https://xxoibawslmysvfllozyb.supabase.co/rest/v1/",
-        {
-          method: "HEAD",
-          signal: controller.signal,
-        },
-      );
+      // Endpoint is configured in network-config.ts
+      const response = await fetch(SUPABASE_HEALTH_ENDPOINT, {
+        method: "HEAD",
+        signal: controller.signal,
+      });
 
       clearTimeout(timeout);
       const latency = performance.now() - startTime;

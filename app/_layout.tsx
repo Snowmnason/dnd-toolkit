@@ -23,7 +23,7 @@ import {
     useRouter,
     useSegments,
 } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { View } from "react-native";
 import LoadingOverlay from "../components/LoadingOverlay";
 import {
@@ -110,9 +110,6 @@ function RootLayoutContent() {
   // ALL hooks must be called unconditionally before any early returns
   // (React Rules of Hooks requirement)
 
-  // Create a unique session ID for this mount to track re-renders
-  const [sessionId] = useState(() => Math.random().toString(36).slice(2, 9));
-
   // Theme and routing hooks
   const { theme } = UseTheme();
   const urlParams = useLocalSearchParams();
@@ -132,12 +129,13 @@ function RootLayoutContent() {
   const splash = useSplashScreen();
 
   // Log every render with session ID
-  useEffect(() => {
-    logger.debug(
-      "navigation",
-      `[SESSION:${sessionId}] 📍 Root layout rendered - route: ${segments[0] || "index"}`,
-    );
-  }, [sessionId, segments]);
+  // Debug: Uncomment to trace root layout renders
+  // useEffect(() => {
+  //   logger.debug(
+  //     "navigation",
+  //     `[SESSION:${sessionId}] 📍 Root layout rendered - route: ${segments[0] || "index"}`,
+  //   );
+  // }, [sessionId, segments]);
   // Analytics hook (must be called unconditionally)
   useAnalyticsNavigation();
 

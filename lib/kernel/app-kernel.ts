@@ -14,9 +14,10 @@
  * - ERROR: A critical phase failed
  */
 
+import { STORAGE_DEFAULTS } from "@/lib/kernel/storage-defaults";
 import {
-  NetworkDetection,
-  NetworkStatus,
+    NetworkDetection,
+    NetworkStatus,
 } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
 
@@ -686,28 +687,11 @@ class AppKernelClass {
    */
   private async initializeStorageDefaults(): Promise<void> {
     try {
-      const { SecureStorage, STORAGE_KEYS } = await import("@/lib/storage");
-
-      // Define defaults for each storage key
-      // Format: key -> default value
-      const defaults: Record<string, string | null> = {
-        [STORAGE_KEYS.CONNECTED_WORLDS]: JSON.stringify([]), // Empty array, not null
-        [STORAGE_KEYS.HAS_ACCOUNT]: JSON.stringify(false), // false by default, not null
-        [STORAGE_KEYS.USER_DATA]: null, // Can be null - user data may not exist
-        [STORAGE_KEYS.USER_DATA_TIMESTAMP]: JSON.stringify(0), // 0 by default
-        [STORAGE_KEYS.LAST_LOGGED_IN]: JSON.stringify(null), // null is fine for last login
-        [STORAGE_KEYS.AUTH_ATTEMPTS]: JSON.stringify(0), // 0 attempts by default
-        [STORAGE_KEYS.PENDING_INVITE]: null, // Can be null
-        [STORAGE_KEYS.THEME_PREFERENCE]: JSON.stringify("classic"), // Default theme
-        [STORAGE_KEYS.THEME_MODE]: JSON.stringify("dark"), // Default to dark mode
-        [STORAGE_KEYS.SCALE_PREFERENCE]: JSON.stringify(1), // Default scale 1x
-        [STORAGE_KEYS.LAST_SELECTED_WORLD]: null, // Can be null
-        [STORAGE_KEYS.LAST_USER_ROLE]: null, // Can be null
-        [STORAGE_KEYS.DEV_MODE]: JSON.stringify(false), // Dev mode off by default
-      };
+      const { SecureStorage } = await import("@/lib/storage");
 
       // Initialize each key if it doesn't exist
-      for (const [key, defaultValue] of Object.entries(defaults)) {
+      // STORAGE_DEFAULTS is imported from storage-defaults.ts for centralized management
+      for (const [key, defaultValue] of Object.entries(STORAGE_DEFAULTS)) {
         const existing = await SecureStorage.getItem(key);
         if (existing === null && defaultValue !== null) {
           // Key doesn't exist and we have a default - set it

@@ -136,18 +136,11 @@ export class EncryptedStorage {
     // Detect if running in Electron (desktop app)
     // Electron preload script exposes window.electronAPI
     try {
-      const result =
+      return (
         typeof window !== "undefined" &&
-        (window as any).electronAPI !== undefined;
-      console.log(
-        "[ATTEMPT FIX 2] isElectron() check:",
-        result,
-        "window.electronAPI:",
-        (window as any).electronAPI,
+        (window as any).electronAPI !== undefined
       );
-      return result;
-    } catch (e) {
-      console.log("[ATTEMPT FIX 2] isElectron() error:", e);
+    } catch {
       return false;
     }
   }
