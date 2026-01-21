@@ -13,6 +13,4 @@
   
   ; Try to remove the userData folder (only if empty)
   RMDir "$APPDATA\DnD-Toolkit"
-  
-  MessageBox MB_ICONINFORMATION "User data and cache have been removed."
 !macroend
