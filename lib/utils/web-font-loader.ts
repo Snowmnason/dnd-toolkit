@@ -4,29 +4,39 @@
  */
 
 export async function injectWebFonts(): Promise<void> {
-  if (typeof document === 'undefined') {
+  if (typeof document === "undefined") {
     return; // Not running on web
   }
 
   try {
+    // Detect if running in Electron
+    const isElectron = !!(window as any).electronAPI;
+    const fontsHref = isElectron ? "app://fonts.css" : "/fonts.css";
+
     // Check if fonts.css is already loaded
-    const existing = document.querySelector('link[href="/fonts.css"]');
+    const existing =
+      document.querySelector(`link[href="${fontsHref}"]`) ||
+      document.querySelector('link[href="/fonts.css"]') ||
+      document.querySelector('link[href="app://fonts.css"]');
     if (existing) {
       return; // Already loaded
     }
 
     // Create and inject the link tag
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = '/fonts.css';
-    link.type = 'text/css';
-    
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = fontsHref;
+    link.type = "text/css";
+
     // Add to head
-    const head = document.head || document.querySelector('head') || document.documentElement;
+    const head =
+      document.head ||
+      document.querySelector("head") ||
+      document.documentElement;
     head.appendChild(link);
-    
-    console.log('✅ Web fonts stylesheet injected');
+
+    console.log(`✅ Web fonts stylesheet injected (${fontsHref})`);
   } catch (error) {
-    console.error('❌ Failed to inject web fonts:', error);
+    console.error("❌ Failed to inject web fonts:", error);
   }
 }

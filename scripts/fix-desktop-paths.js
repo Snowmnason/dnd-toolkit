@@ -5,15 +5,14 @@
  * This allows the app to load resources when using file:// protocol
  */
 
-import { readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
-import path, { dirname } from 'path';
-import { fileURLToPath } from 'url';
-
+import { readdirSync, readFileSync, statSync, writeFileSync } from "fs";
+import path, { dirname } from "path";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const distDir = path.join(__dirname, '..', 'dist');
+const distDir = path.join(__dirname, "..", "dist");
 
 // Recursively find files by extension
 function findFilesByExtension(dir, extension) {
@@ -39,19 +38,24 @@ function findFilesByExtension(dir, extension) {
   return matches;
 }
 
-const htmlFiles = findFilesByExtension(distDir, '.html');
+const htmlFiles = findFilesByExtension(distDir, ".html");
 
 console.log(`[Fix Desktop Paths] Found ${htmlFiles.length} HTML files`);
 
 // Also find and fix JS bundles
-const jsFiles = findFilesByExtension(distDir, '.js');
+const jsFiles = findFilesByExtension(distDir, ".js");
 
 console.log(`[Fix Desktop Paths] Found ${jsFiles.length} JS files`);
+
+// Also find and fix CSS files (for font paths)
+const cssFiles = findFilesByExtension(distDir, ".css");
+
+console.log(`[Fix Desktop Paths] Found ${cssFiles.length} CSS files`);
 
 // Fix HTML files
 htmlFiles.forEach((filePath) => {
   try {
-    let content = readFileSync(filePath, 'utf8');
+    let content = readFileSync(filePath, "utf8");
     const originalContent = content;
 
     // Replace absolute paths with app:// protocol paths for Electron
@@ -69,11 +73,11 @@ htmlFiles.forEach((filePath) => {
 
     // Remove integrity attributes since we're modifying paths
     // SRI hashes are incompatible with Electron's custom protocol
-    content = content.replace(/\s+integrity="[^"]*"/g, '');
-    content = content.replace(/\s+crossorigin="anonymous"/g, '');
+    content = content.replace(/\s+integrity="[^"]*"/g, "");
+    content = content.replace(/\s+crossorigin="anonymous"/g, "");
 
     if (content !== originalContent) {
-      writeFileSync(filePath, content, 'utf8');
+      writeFileSync(filePath, content, "utf8");
       console.log(`✓ Fixed: ${path.relative(distDir, filePath)}`);
     }
   } catch (error) {
@@ -84,22 +88,22 @@ htmlFiles.forEach((filePath) => {
 // Fix JS bundles - replace absolute paths in JavaScript code
 jsFiles.forEach((filePath) => {
   try {
-    let content = readFileSync(filePath, 'utf8');
+    let content = readFileSync(filePath, "utf8");
     const originalContent = content;
 
     // Replace absolute paths in JS strings with app:// protocol
     // Match patterns like "/_expo/static" in string literals
     content = content.replace(/"\/_expo\//g, '"app://_expo/');
     content = content.replace(/'\/_expo\//g, "'app://_expo/");
-    content = content.replace(/`\/_expo\//g, '`app://_expo/');
-    
+    content = content.replace(/`\/_expo\//g, "`app://_expo/");
+
     // Match /assets/ paths
     content = content.replace(/"\/assets\//g, '"app://assets/');
     content = content.replace(/'\/assets\//g, "'app://assets/");
-    content = content.replace(/`\/assets\//g, '`app://assets/');
+    content = content.replace(/`\/assets\//g, "`app://assets/");
 
     if (content !== originalContent) {
-      writeFileSync(filePath, content, 'utf8');
+      writeFileSync(filePath, content, "utf8");
       console.log(`✓ Fixed JS: ${path.relative(distDir, filePath)}`);
     }
   } catch (error) {
@@ -107,5 +111,26 @@ jsFiles.forEach((filePath) => {
   }
 });
 
-console.log('[Fix Desktop Paths] Done!');
+// Fix CSS files - replace absolute paths in url() declarations (for fonts)
+cssFiles.forEach((filePath) => {
+  try {
+    let content = readFileSync(filePath, "utf8");
+    const originalContent = content;
 
+    // Replace absolute paths in url() declarations with app:// protocol
+    // url('/fonts.ttf') -> url('app://fonts.ttf')
+    content = content.replace(
+      /url\((['"])?\/([^)'"]*)(['"])?\)/g,
+      "url($1app://$2$3)",
+    );
+
+    if (content !== originalContent) {
+      writeFileSync(filePath, content, "utf8");
+      console.log(`✓ Fixed CSS: ${path.relative(distDir, filePath)}`);
+    }
+  } catch (error) {
+    console.error(`✗ Error processing CSS ${filePath}:`, error.message);
+  }
+});
+
+console.log("[Fix Desktop Paths] Done!");
