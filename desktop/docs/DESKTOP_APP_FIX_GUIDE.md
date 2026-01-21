@@ -53,7 +53,7 @@ filePath = filePath.replace(/\/+$/, "");
 
 This ensures `app://index.html/` → `index.html` (not `index.html\` on Windows).
 
-#### 2. Runtime CSP + Base Tag Injection (`src/main.ts`, lines 1045-1095)
+#### 2. Runtime CSP + Base Tag Injection (`src/main.ts`, lines 1045-1115)
 
 **Problem:**
 
@@ -76,13 +76,31 @@ This ensures `app://index.html/` → `index.html` (not `index.html\` on Windows)
 - Detection marker `<!-- DESKTOP_CSP_INJECTED -->` prevents redundant rewrites on every startup
 - Error handling catches write failures without crashing
 
-#### 3. Disabled Auto-updater (`src/main.ts`, lines 854-863)
+#### 3. Font Injection (`src/main.ts`, lines 1072-1113)
+
+**Problem:** The web build loads fonts via `fonts.css` stylesheet with relative paths (`/FontName.ttf`). These paths fail when loaded via the `app://` protocol because the stylesheet itself was blocked by CSP, and relative paths don't resolve correctly across protocol changes.
+
+**Solution:** Inject fonts as inline `@font-face` styles directly in the HTML:
+
+1. Read `public/fonts.css` from the built app
+2. Replace relative paths with `app://` protocol paths (`/FontName.ttf` → `app://FontName.ttf`)
+3. Inject as inline `<style>` tag in the document head
+4. Mark with detection comment to avoid re-injecting on every startup
+
+**Key Details:**
+
+- Font files (`*.ttf`) are served via the protocol handler just like other assets
+- Inline styles bypass all CSP stylesheet loading restrictions
+- Fallback `@font-face` definitions included if `fonts.css` is missing
+- Fonts now load successfully without any CSP violations
+
+#### 4. Disabled Auto-updater (`src/main.ts`, lines 854-863)
 
 **Problem:** `checkForUpdatesAndNotify()` was timing out because no publish server was configured.
 
 **Solution:** Disabled auto-updater. To enable in future, configure `publish` server in `electron-builder.json`.
 
-#### 4. Logger System (`src/main.ts`, lines 50-67)
+#### 5. Logger System (`src/main.ts`, lines 50-67)
 
 **Problem:** Async logger was opening write stream after initial logs, file appeared empty.
 

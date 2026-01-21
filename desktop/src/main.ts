@@ -460,52 +460,27 @@ function setupProtocolHandler(): void {
   // Store globally for use in other functions
   globalResolvedRoot = resolvedRoot;
 
-  console.log("[Protocol] Setup:", {
-    isDev,
-    resourcesPath: process.resourcesPath,
-    appPath: app.getAppPath(),
-    webBuildDir,
-    resolvedRoot,
-    // Check if web-build directory exists with validation
-    exists: safeFileExists(webBuildDir, process.resourcesPath),
-  });
-
-  // List files in web-build for debugging
-  try {
-    // webBuildDir is constructed from process.resourcesPath which is a trusted Electron value
-    const files = safeReadDir(webBuildDir, process.resourcesPath);
-    if (isDebugLoggingEnabled()) {
-      console.log("[Protocol] Web build contents:", files.slice(0, 15));
-    }
-  } catch (e) {
-    console.error("[Protocol] Failed to list web-build:", e);
+  if (isDebugLoggingEnabled()) {
+    console.log("[Protocol] Setup:", {
+      isDev,
+      resourcesPath: process.resourcesPath,
+      appPath: app.getAppPath(),
+      webBuildDir,
+      resolvedRoot,
+      exists: safeFileExists(webBuildDir, process.resourcesPath),
+    });
   }
 
   // Register protocol handler using MODERN protocol.handle() API on defaultSession
   // CRITICAL: Must use session.defaultSession.protocol.handle(), not global protocol
   try {
-    if (isDebugLoggingEnabled()) {
-      console.log(
-        "[Protocol] Attempting to register handler on session.defaultSession...",
-      );
-      console.log(
-        "[Protocol] Session:",
-        session.defaultSession ? "exists" : "null",
-      );
-      console.log(
-        "[Protocol] Protocol object:",
-        typeof session.defaultSession?.protocol,
-      );
-    }
-
-    // SIMPLIFIED: Just serve files directly from disk, default to index.html
-    console.log("[Protocol] Attempting to register protocol handler...");
-
     try {
       session.defaultSession.protocol.registerFileProtocol(
         "app",
         (request: any, callback: any) => {
-          console.log("[Protocol] 🔷 REQUEST:", request.url);
+          if (isDebugLoggingEnabled()) {
+            console.log("[Protocol] 🔷 REQUEST:", request.url);
+          }
 
           // Parse URL
           let filePath = request.url.replace("app://", "");
@@ -531,11 +506,12 @@ function setupProtocolHandler(): void {
           // Default to index.html
           if (!filePath || filePath === "") {
             filePath = "index.html";
-            console.log("[Protocol] ✅ Defaulting to index.html");
           }
 
           const resolvedPath = path.join(resolvedRoot, filePath);
-          console.log("[Protocol] 📄 Resolved path:", resolvedPath);
+          if (isDebugLoggingEnabled()) {
+            console.log("[Protocol] 📄 Resolved path:", resolvedPath);
+          }
 
           // Security check
           if (!isPathWithinRoot(resolvedPath, resolvedRoot)) {
@@ -554,11 +530,15 @@ function setupProtocolHandler(): void {
             return;
           }
 
-          console.log("[Protocol] ✅ SUCCESS - serving file:", filePath);
+          if (isDebugLoggingEnabled()) {
+            console.log("[Protocol] ✅ SUCCESS - serving file:", filePath);
+          }
           callback({ path: resolvedPath });
         },
       );
-      console.log("[Protocol] ✅ Handler registered successfully");
+      if (isDebugLoggingEnabled()) {
+        console.log("[Protocol] ✅ Handler registered successfully");
+      }
     } catch (err) {
       console.error("[Protocol] ❌ Registration failed:", err);
     }
@@ -1064,27 +1044,58 @@ function createWindow(): void {
       needsWrite = true;
     }
 
-    // 2. Inject a PERMISSIVE CSP meta tag at the very beginning of head
-    // This will be evaluated FIRST and take precedence
-    // Skip if already injected (marked by unique comment to avoid re-injecting every startup)
-    if (!indexContent.includes("<!-- DESKTOP_CSP_INJECTED -->")) {
-      console.log(
-        "[Window] Injecting permissive CSP meta tag to allow app: protocol",
-      );
-      indexContent = indexContent.replace(
-        /<head[^>]*>/i,
-        "<head><!-- DESKTOP_CSP_INJECTED --><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self' app:; script-src 'self' app: https://dnd-tool.thesnowpost.com https://*.supabase.co 'unsafe-inline'; style-src 'self' app: 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' app: https://fonts.gstatic.com; img-src 'self' app: data: blob: https://fonts.gstatic.com https://*.supabase.co https://dnd-tool.thesnowpost.com https:; connect-src 'self' app: https://dnd-tool.thesnowpost.com https://*.supabase.co wss://*.supabase.co; form-action 'self'; base-uri 'self' app:; object-src 'none'; media-src 'self'; worker-src 'self' blob:; upgrade-insecure-requests;\">",
-      );
-      needsWrite = true;
+    // 2. Inject fonts directly into HTML - read fonts.css and inject as inline style with app:// paths
+    // This bypasses all CSP stylesheet loading issues
+    // Skip if already injected (marked by unique comment)
+    if (!indexContent.includes("<!-- DESKTOP_FONTS_INJECTED -->")) {
+      try {
+        // Read fonts.css from public folder
+        const fontsCssPath = path.join(
+          path.dirname(globalResolvedRoot),
+          "public",
+          "fonts.css",
+        );
+        // Fallback: if fonts.css doesn't exist in public, create inline @font-face
+        let fontsCss = "";
+        if (fs.existsSync(fontsCssPath)) {
+          fontsCss = fs.readFileSync(fontsCssPath, "utf-8");
+          // Replace relative paths with app:// protocol paths
+          // /FontName.ttf becomes app://FontName.ttf
+          fontsCss = fontsCss.replace(/url\('\/([^']+)'\)/g, "url('app://$1')");
+        } else {
+          // Fallback font faces if fonts.css not found
+          fontsCss = `@font-face {
+  font-family: 'GrenzeGotisch';
+  src: url('app://GrenzeGotisch.ttf') format('truetype');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Eurostile';
+  src: url('app://Eurostile.ttf') format('truetype');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Cyberpunk';
+  src: url('app://Cyberpunk.ttf') format('truetype');
+  font-display: swap;
+}`;
+        }
+        const fontsStyleTag = `<!-- DESKTOP_FONTS_INJECTED --><style>${fontsCss}</style>`;
+        indexContent = indexContent.replace(
+          /<head[^>]*>/i,
+          `<head>${fontsStyleTag}`,
+        );
+        needsWrite = true;
+      } catch (error) {
+        console.error("[Window] ⚠️ Failed to inject fonts:", error);
+        // Continue anyway - app will work with fallback fonts
+      }
     }
 
     // 3. Write modified index.html back to disk only if changes were made
     if (needsWrite) {
       try {
         fs.writeFileSync(indexPath, indexContent);
-        console.log(
-          "[Window] Updated index.html with base tag and permissive CSP",
-        );
       } catch (writeError) {
         console.error(
           "[Window] ⚠️ Failed to write index.html modifications:",
@@ -1092,8 +1103,6 @@ function createWindow(): void {
         );
         // Don't fail - app might still work with old HTML
       }
-    } else {
-      console.log("[Window] index.html already has CSP and base tag, skipping");
     }
 
     // 4. Load via app:// (custom protocol that respects meta tag CSP)
