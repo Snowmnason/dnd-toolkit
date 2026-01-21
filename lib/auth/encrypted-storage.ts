@@ -52,13 +52,29 @@ class InvalidFormatError extends Error {
  * Provides encrypted storage across web, desktop, and mobile platforms with
  * platform-specific backend storage and key management:
  *
- * **Web/Desktop (Electron)**
- * - Key storage: sessionStorage (session-only, survives page reload but not browser restart)
+ * **Web (Browser)**
+ * - Key storage: sessionStorage (session-only, cleared on page reload/browser restart)
  * - Data storage: localStorage (persistent across sessions)
- * - Persistence: OS app data directory (Chromium leveldb)
+ * - Persistence: Browser storage persistence depends on browser settings
  * - ⚠️  SECURITY NOTE: sessionStorage is still accessible to JavaScript/XSS. For production web apps
  *   handling sensitive data, use a server-side session approach or Web Crypto API with hardware keys.
  *   Current implementation is suitable for development/demo only.
+ *
+ * **Desktop (Electron)**
+ * - Key storage: localStorage (persistent across app restarts, survives process restart)
+ * - Data storage: localStorage (persistent across app restarts)
+ * - Persistence: OS app data directory via Chromium's leveldb storage
+ * - ✅ IMPROVED: Encryption keys now persist across app restarts (fixed authentication mismatch issue)
+ * - ⚠️  SECURITY NOTE: Keys are stored in `localStorage` (Chromium) and therefore persist across sessions.
+ *   This makes them more accessible than `sessionStorage` (which is cleared on session end). While
+ *   persisting the key fixes authentication and usability issues, it increases exposure (for example
+ *   to malicious renderer code, browser extensions, other local processes with access to the profile,
+ *   or when running on a public/shared machine). For production desktop apps that handle highly
+ *   sensitive data, consider using Electron's `safeStorage` API or a native secure storage mechanism
+ *   to encrypt keys at rest, implement optional passphrase protection, or prompt users when running on
+ *   public/shared machines. This comment documents the trade-off taken here: improved persistence at
+ *   the cost of increased accessibility; plan a follow-up to migrate to a stronger platform-backed
+ *   key protection strategy if needed.
  *
  * **Mobile (React Native/Expo)**
  * - Key storage: expo-secure-store (iOS Keychain, Android Keystore - hardware-backed)
@@ -92,6 +108,7 @@ class InvalidFormatError extends Error {
  * - HMAC-SHA256 requires the key to compute/verify - prevents tampering
  * - Immune to length-extension attacks (unlike plain SHA256)
  * - For web: sessionStorage provides session-level isolation but is vulnerable to XSS
+ * - For desktop: localStorage persists keys across app restarts (fixed from sessionStorage)
  * - For mobile: expo-secure-store provides hardware-backed key storage (iOS Keychain, Android Keystore)
  *
  * **Version History**
@@ -101,6 +118,7 @@ class InvalidFormatError extends Error {
  *
  * **Limitations & Future Work**
  * - **Web production**: Implement server-side session encryption or use Web Crypto API with TPM/secure enclave
+ * - **Desktop encryption at rest**: Consider using Electron's safeStorage API for additional key protection
  * - **Key rotation**: Implement key rotation strategy for long-lived keys
  * - **Auditing**: Add optional logging of decryption failures for security monitoring
  */
@@ -122,28 +140,57 @@ export class EncryptedStorage {
     return key;
   }
 
+  private static isElectron(): boolean {
+    // Detect if running in Electron (desktop app)
+    // Electron preload script exposes window.electronAPI
+    try {
+      return (
+        typeof window !== "undefined" &&
+        (window as any).electronAPI !== undefined
+      );
+    } catch {
+      return false;
+    }
+  }
+
   private static async _initializeKey(): Promise<Uint8Array> {
     try {
       if (Platform.OS === "web") {
+        // Differentiate between browser web and Electron desktop
+        const isElectron = this.isElectron();
+        const storageBackend = isElectron
+          ? window.localStorage
+          : window.sessionStorage;
+        const storageType = isElectron
+          ? "localStorage (persistent)"
+          : "sessionStorage (session-only)";
+
         // Web: use sessionStorage for key storage (session-only, more secure than localStorage)
-        // ⚠️  SECURITY: sessionStorage is still accessible to JavaScript code. This is suitable
+        // Desktop (Electron): use localStorage (persistent across app restarts)
+        // ⚠️  SECURITY: Both are still accessible to JavaScript code. This is suitable
         // for development/SPA demos but NOT production. For production, use server-side session
         // encryption or Web Crypto API with hardware-backed keys (Web Authentication API).
-        if (typeof window !== "undefined" && window.sessionStorage) {
-          const storedKey = window.sessionStorage.getItem(
-            this.ENCRYPTION_KEY_STORAGE_KEY
+        if (typeof window !== "undefined" && storageBackend) {
+          const storedKey = storageBackend.getItem(
+            this.ENCRYPTION_KEY_STORAGE_KEY,
           );
           if (storedKey) {
             const key = new Uint8Array(JSON.parse(storedKey));
             this.cachedKey = key;
+            logger
+              .category("storage")
+              .debug(`Loaded encryption key from ${storageType}`);
             return key;
           }
           const newKey = this.generateEncryptionKey();
-          window.sessionStorage.setItem(
+          storageBackend.setItem(
             this.ENCRYPTION_KEY_STORAGE_KEY,
-            JSON.stringify(Array.from(newKey))
+            JSON.stringify(Array.from(newKey)),
           );
           this.cachedKey = newKey;
+          logger
+            .category("storage")
+            .debug(`Generated and stored new encryption key in ${storageType}`);
           return newKey;
         }
       } else {
@@ -155,7 +202,7 @@ export class EncryptedStorage {
         if (SecureStore) {
           try {
             const storedKey = await SecureStore.getItemAsync(
-              this.ENCRYPTION_KEY_STORAGE_KEY
+              this.ENCRYPTION_KEY_STORAGE_KEY,
             );
             if (storedKey) {
               const parsed = JSON.parse(storedKey);
@@ -166,7 +213,7 @@ export class EncryptedStorage {
             const newKey = this.generateEncryptionKey();
             await SecureStore.setItemAsync(
               this.ENCRYPTION_KEY_STORAGE_KEY,
-              JSON.stringify(Array.from(newKey))
+              JSON.stringify(Array.from(newKey)),
             );
             this.cachedKey = newKey;
             return newKey;
@@ -176,7 +223,7 @@ export class EncryptedStorage {
             logger.warn(
               "storage",
               "SecureStore unavailable, falling back to AsyncStorage for key storage (less secure):",
-              error
+              error,
             );
           }
         }
@@ -185,7 +232,7 @@ export class EncryptedStorage {
         // This can happen in Expo Go or on devices without secure storage support
         if (AsyncStorage) {
           const storedKey = await AsyncStorage.getItem(
-            this.ENCRYPTION_KEY_STORAGE_KEY
+            this.ENCRYPTION_KEY_STORAGE_KEY,
           );
           if (storedKey) {
             const parsed = JSON.parse(storedKey);
@@ -196,7 +243,7 @@ export class EncryptedStorage {
           const newKey = this.generateEncryptionKey();
           await AsyncStorage.setItem(
             this.ENCRYPTION_KEY_STORAGE_KEY,
-            JSON.stringify(Array.from(newKey))
+            JSON.stringify(Array.from(newKey)),
           );
           this.cachedKey = newKey;
           return newKey;
@@ -218,7 +265,7 @@ export class EncryptedStorage {
    */
   private static async encryptData(
     data: string,
-    key: Uint8Array
+    key: Uint8Array,
   ): Promise<string> {
     try {
       // Generate random 16-byte IV
@@ -268,7 +315,7 @@ export class EncryptedStorage {
    */
   private static async decryptData(
     encryptedData: string,
-    key: Uint8Array
+    key: Uint8Array,
   ): Promise<string> {
     let parsed: any;
 
@@ -282,11 +329,11 @@ export class EncryptedStorage {
         throw new InvalidFormatError(
           `Encrypted data appears to be double-wrapped (JSON.stringify of base64). ` +
             `This indicates a mismatch between platformSetItem (wrapping) and platformGetItem (not unwrapping). ` +
-            `Ensure both are symmetric.`
+            `Ensure both are symmetric.`,
         );
       }
       throw new InvalidFormatError(
-        `Failed to parse encrypted data structure: ${error instanceof Error ? error.message : String(error)}`
+        `Failed to parse encrypted data structure: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
 
@@ -300,7 +347,7 @@ export class EncryptedStorage {
     // Validate version field exists and is a number
     if (typeof version !== "number") {
       throw new InvalidFormatError(
-        `Invalid or missing encryption version: ${version}, expected number`
+        `Invalid or missing encryption version: ${version}, expected number`,
       );
     }
 
@@ -310,7 +357,7 @@ export class EncryptedStorage {
         logger
           .category("storage")
           .warn(
-            `Data encrypted with version 1 found. Migration not yet implemented.`
+            `Data encrypted with version 1 found. Migration not yet implemented.`,
           );
         // TODO: Implement migration from version 1 (AES-CBC) to version 3 (AES-CTR + HMAC-SHA256)
       } else if (version === 2) {
@@ -320,7 +367,7 @@ export class EncryptedStorage {
           .category("storage")
           .warn(
             `Data encrypted with version 2 (weak SHA256 authentication) found. ` +
-              `This will be re-encrypted with version 3 (proper HMAC-SHA256) on next write.`
+              `This will be re-encrypted with version 3 (proper HMAC-SHA256) on next write.`,
           );
         // Continue with decryption using v2 logic (plain SHA256 verification)
         // But this will be flagged as requiring re-encryption
@@ -328,11 +375,11 @@ export class EncryptedStorage {
         logger
           .category("storage")
           .warn(
-            `Data encrypted with unsupported version ${version}. Current version: ${EncryptedStorage.CURRENT_ENCRYPTION_VERSION}`
+            `Data encrypted with unsupported version ${version}. Current version: ${EncryptedStorage.CURRENT_ENCRYPTION_VERSION}`,
           );
         throw new UnsupportedVersionError(
           `Unsupported encryption version: ${version}`,
-          version
+          version,
         );
       }
     }
@@ -344,25 +391,25 @@ export class EncryptedStorage {
         // Version 2: Plain SHA256 (weak, but support for migration)
         computedAuthTag = await Crypto.digestStringAsync(
           Crypto.CryptoDigestAlgorithm.SHA256,
-          ivBase64 + ciphertextBase64
+          ivBase64 + ciphertextBase64,
         );
       } else {
         // Version 3+: Proper HMAC-SHA256 (requires key)
         computedAuthTag = await this.computeHmac(
           ivBase64 + ciphertextBase64,
-          key
+          key,
         );
       }
 
       if (computedAuthTag !== storedHmac) {
         throw new AuthenticationFailureError(
-          "Authentication tag mismatch: data may be corrupted or encrypted with different key"
+          "Authentication tag mismatch: data may be corrupted or encrypted with different key",
         );
       }
     } catch (error) {
       if (error instanceof AuthenticationFailureError) throw error;
       throw new DecryptionError(
-        `Authentication tag computation failed: ${error instanceof Error ? error.message : String(error)}`
+        `Authentication tag computation failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
 
@@ -380,7 +427,7 @@ export class EncryptedStorage {
       return plaintext;
     } catch (error) {
       throw new DecryptionError(
-        `AES-CTR decryption failed: ${error instanceof Error ? error.message : String(error)}`
+        `AES-CTR decryption failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -397,7 +444,7 @@ export class EncryptedStorage {
    **/
   private static async computeHmac(
     message: string,
-    key: Uint8Array
+    key: Uint8Array,
   ): Promise<string> {
     const blockSize = 64; // SHA256 block size in bytes
     const hashSize = 32; // SHA256 output size in bytes
@@ -408,7 +455,7 @@ export class EncryptedStorage {
       // If key is longer than block size, hash it first
       const keyHashed = await Crypto.digestStringAsync(
         Crypto.CryptoDigestAlgorithm.SHA256,
-        String.fromCharCode(...key)
+        String.fromCharCode(...key),
       );
       const keyHashedBytes = new Uint8Array(hashSize);
       for (let i = 0; i < hashSize; i++) {
@@ -434,7 +481,7 @@ export class EncryptedStorage {
     const innerMessage = String.fromCharCode(...ipad) + message;
     const innerHash = await Crypto.digestStringAsync(
       Crypto.CryptoDigestAlgorithm.SHA256,
-      innerMessage
+      innerMessage,
     );
 
     // Convert hex hash back to bytes for outer computation
@@ -448,7 +495,7 @@ export class EncryptedStorage {
       String.fromCharCode(...opad) + String.fromCharCode(...innerHashBytes);
     const outerHash = await Crypto.digestStringAsync(
       Crypto.CryptoDigestAlgorithm.SHA256,
-      outerMessage
+      outerMessage,
     );
 
     return outerHash;
@@ -489,7 +536,7 @@ export class EncryptedStorage {
   // Platform-aware storage helper
   private static async platformSetItem(
     key: string,
-    value: string
+    value: string,
   ): Promise<void> {
     if (Platform.OS === "web") {
       if (typeof window !== "undefined" && window.localStorage) {
@@ -587,7 +634,7 @@ export class EncryptedStorage {
           logger.error(
             "storage",
             `Failed to remove corrupted data for ${key}:`,
-            removeError
+            removeError,
           );
         }
         return null;
@@ -597,7 +644,7 @@ export class EncryptedStorage {
         // Transient decryption errors (not auth failures) - do NOT delete
         logger.warn(
           "storage",
-          `Decryption error for ${key} (not removing data - may be transient): ${error.message}`
+          `Decryption error for ${key} (not removing data - may be transient): ${error.message}`,
         );
         return null;
       }
@@ -638,7 +685,7 @@ export class EncryptedStorage {
             logger.warn(
               "storage",
               "Failed to clear encryption key from SecureStore:",
-              error
+              error,
             );
           }
         }

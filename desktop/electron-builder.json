@@ -5,37 +5,24 @@
   "executableName": "DnD-Toolkit",
   "afterPack": "./scripts/embed-icon.js",
   "copyright": "Copyright © 2024 Snowmnason",
-  "publish": {
-    "provider": "github",
-    "owner": "Snowmnason",
-    "repo": "dnd-toolkit"
-  },
+  "publish": null,
   "directories": {
     "buildResources": "assets",
     "output": "../dist-desktop"
   },
-  "files": [
-    "dist/**/*",
-    "assets/**/*",
-    "!**/*.ts",
-    "!**/*.map"
-  ],
+  "files": ["dist/**/*", "assets/**/*", "!**/*.ts", "!**/*.map"],
   "extraResources": [
     {
       "from": "../dist",
       "to": "web-build",
-      "filter": [
-        "**/*"
-      ]
+      "filter": ["**/*"]
     }
   ],
   "win": {
     "target": [
       {
         "target": "nsis",
-        "arch": [
-          "x64"
-        ]
+        "arch": ["x64"]
       }
     ],
     "icon": "assets/images/icon.ico",
@@ -56,23 +43,18 @@
     "installerIcon": "assets/images/icon.ico",
     "uninstallerIcon": "assets/images/icon.ico",
     "packElevateHelper": false,
-    "artifactName": "${productName}-${version}-installer.${ext}"
+    "artifactName": "${productName}-${version}-installer.${ext}",
+    "include": "scripts/nsis-uninstall.nsh"
   },
   "mac": {
     "target": [
       {
         "target": "dmg",
-        "arch": [
-          "x64",
-          "arm64"
-        ]
+        "arch": ["x64", "arm64"]
       },
       {
         "target": "zip",
-        "arch": [
-          "x64",
-          "arm64"
-        ]
+        "arch": ["x64", "arm64"]
       }
     ],
     "icon": "assets/images/icon.png",
@@ -105,15 +87,11 @@
     "target": [
       {
         "target": "AppImage",
-        "arch": [
-          "x64"
-        ]
+        "arch": ["x64"]
       },
       {
         "target": "deb",
-        "arch": [
-          "x64"
-        ]
+        "arch": ["x64"]
       }
     ],
     "icon": "assets/images/icon.png",

@@ -14,6 +14,13 @@
  * - Graceful degradation across all platforms
  */
 
+import {
+    LATENCY_THRESHOLD,
+    LOW_BATTERY_THRESHOLD,
+    SUPABASE_HEALTH_ENDPOINT,
+    WEB_PING_INTERVAL,
+    WEB_PING_TIMEOUT,
+} from "@/lib/network/network-config";
 import { logger } from "@/lib/utils/logger";
 import * as React from "react";
 import { Platform } from "react-native";
@@ -55,11 +62,6 @@ interface BatteryStatus {
   level: number | null; // 0..1 or null if unavailable
   charging: boolean;
 }
-
-const LOW_BATTERY_THRESHOLD = 0.2; // 20% threshold for expensive flag
-const WEB_PING_INTERVAL = 5 * 60 * 1000; // 5 minutes
-const WEB_PING_TIMEOUT = 5000; // 5 second timeout
-const LATENCY_THRESHOLD = 500; // 500ms = poor connection
 
 /**
  * Callback when network status changes
@@ -403,11 +405,11 @@ class NetworkDetectionClass {
       const timeout = setTimeout(() => controller.abort(), WEB_PING_TIMEOUT);
       const startTime = performance.now();
 
-      // Use Cloudflare's lightweight trace endpoint to test actual connectivity
-      // Returns minimal response (~100 bytes) to minimize bandwidth
-      // TODO: Replace with custom endpoint - see docs/Important Notes/DO SOON - Custom Ping Endpoint.md
-      const response = await fetch("https://www.cloudflare.com/cdn-cgi/trace", {
-        method: "GET",
+      // Use Supabase health endpoint instead of Cloudflare for CSP compliance
+      // Supabase is already whitelisted in CSP for API calls
+      // Endpoint is configured in network-config.ts
+      const response = await fetch(SUPABASE_HEALTH_ENDPOINT, {
+        method: "HEAD",
         signal: controller.signal,
       });
 
@@ -421,13 +423,16 @@ class NetworkDetectionClass {
       }
 
       const wasOnline = this.currentStatus.isOnline;
-      const isNowOnline = response.ok || response.status < 400;
+      // Consider online if we got ANY response (including auth errors like 401/403)
+      // Auth errors indicate network is working, just auth failed
+      // Only offline on network errors (>= 500 or connection refused, etc)
+      const isNowOnline = response.ok || response.status < 500;
 
       if (wasOnline !== isNowOnline) {
         logger
           .category("network")
           .info(
-            `Ping detected connectivity change: ${wasOnline} -> ${isNowOnline} (${latency}ms)`,
+            `Ping detected connectivity change: ${wasOnline} -> ${isNowOnline} (${latency}ms, status: ${response.status})`,
           );
         this.updateStatus({ isOnline: isNowOnline });
       }

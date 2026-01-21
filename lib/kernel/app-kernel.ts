@@ -14,6 +14,7 @@
  * - ERROR: A critical phase failed
  */
 
+import { STORAGE_DEFAULTS } from "@/lib/kernel/storage-defaults";
 import {
     NetworkDetection,
     NetworkStatus,
@@ -150,7 +151,7 @@ class AppKernelClass {
 
       if (!configValidation.valid) {
         throw new Error(
-          `Configuration validation failed: ${configValidation.errors.join("; ")}`
+          `Configuration validation failed: ${configValidation.errors.join("; ")}`,
         );
       }
 
@@ -197,9 +198,12 @@ class AppKernelClass {
         }
       });
 
-      // Phase 2: Storage (cache validation/migrations)
+      // Phase 2: Storage (cache validation/migrations and initialization)
       await this.runPhase("storage", async () => {
         try {
+          // Initialize all storage keys with safe defaults on startup
+          await this.initializeStorageDefaults();
+
           // Validate critical storage entries during bootstrap
           // Only validate what's needed for app to function - don't block on world data
           logger
@@ -237,7 +241,7 @@ class AppKernelClass {
             logger
               .category("bootstrap")
               .debug(
-                `Network status changed: online=${status.isOnline}, type=${status.type}`
+                `Network status changed: online=${status.isOnline}, type=${status.type}`,
               );
           });
 
@@ -251,7 +255,7 @@ class AppKernelClass {
           logger
             .category("bootstrap")
             .debug(
-              `Network detection initialized: online=${initialStatus.isOnline}, type=${initialStatus.type}`
+              `Network detection initialized: online=${initialStatus.isOnline}, type=${initialStatus.type}`,
             );
         } catch (error) {
           logger
@@ -283,7 +287,7 @@ class AppKernelClass {
           logger
             .category("bootstrap")
             .info(
-              `Auth phase completed asynchronously (${this.authCompletionTime}ms delay, after app ready)`
+              `Auth phase completed asynchronously (${this.authCompletionTime}ms delay, after app ready)`,
             );
         } catch (e) {
           this.authCompletionTime = performance.now() - authPhaseStart;
@@ -296,11 +300,9 @@ class AppKernelClass {
           });
         }
       }).catch((e) => {
-        logger
-          .category("bootstrap")
-          .warn("Auth phase error (non-blocking)", {
-            error: (e as Error).message,
-          });
+        logger.category("bootstrap").warn("Auth phase error (non-blocking)", {
+          error: (e as Error).message,
+        });
       });
 
       // Mark app ready - don't wait for auth
@@ -311,7 +313,7 @@ class AppKernelClass {
 
       const totalBootstrapTime = Object.values(this.state.timing).reduce(
         (a, b) => a + b,
-        0
+        0,
       );
 
       logger.category("bootstrap").info("AppKernel ready", {
@@ -335,7 +337,7 @@ class AppKernelClass {
         logger
           .category("bootstrap")
           .debug(
-            `Analytics tracking skipped: ${(analyticsError as Error).message}`
+            `Analytics tracking skipped: ${(analyticsError as Error).message}`,
           );
       }
     } catch (error) {
@@ -350,7 +352,7 @@ class AppKernelClass {
         err.message,
         this.state.currentPhase,
         err,
-        true
+        true,
       );
 
       this.updateState({
@@ -435,7 +437,7 @@ class AppKernelClass {
     message: string,
     phase: KernelPhase,
     originalError?: Error,
-    recoverable: boolean = false
+    recoverable: boolean = false,
   ): KernelError {
     return {
       code,
@@ -453,7 +455,7 @@ class AppKernelClass {
    */
   private async runPhase(
     phaseName: string,
-    fn: () => Promise<void>
+    fn: () => Promise<void>,
   ): Promise<void> {
     const phaseKey = `${phaseName}Ready` as keyof AppKernelState["phases"];
     const startTime = Date.now();
@@ -593,7 +595,7 @@ class AppKernelClass {
 
     if (this.state.currentPhase === KernelPhase.ERROR) {
       throw new Error(
-        "Cannot rerun phase while kernel is in ERROR state. Call retry() first."
+        "Cannot rerun phase while kernel is in ERROR state. Call retry() first.",
       );
     }
 
@@ -622,7 +624,7 @@ class AppKernelClass {
 
       default:
         throw new Error(
-          `Cannot rerun phase: ${phase}. Only auth, network, and storage can be rerun.`
+          `Cannot rerun phase: ${phase}. Only auth, network, and storage can be rerun.`,
         );
     }
   }
@@ -651,7 +653,7 @@ class AppKernelClass {
   } {
     const totalBootstrapTime = Object.values(this.state.timing).reduce(
       (a, b) => a + b,
-      0
+      0,
     );
 
     return {
@@ -676,6 +678,41 @@ class AppKernelClass {
       appVersion: process.env.EXPO_PUBLIC_VERSION || "unknown",
       timestamp: Date.now(),
     };
+  }
+
+  /**
+   * Initialize all storage keys with safe defaults on startup
+   * Ensures every key exists with a sensible default value
+   * Prevents "undefined" values and cascading failures
+   */
+  private async initializeStorageDefaults(): Promise<void> {
+    try {
+      const { SecureStorage } = await import("@/lib/storage");
+
+      // Initialize each key if it doesn't exist
+      // STORAGE_DEFAULTS is imported from storage-defaults.ts for centralized management
+      for (const [key, defaultValue] of Object.entries(STORAGE_DEFAULTS)) {
+        const existing = await SecureStorage.getItem(key);
+        if (existing === null && defaultValue !== null) {
+          // Key doesn't exist and we have a default - set it
+          await SecureStorage.setItem(key, defaultValue);
+          logger
+            .category("bootstrap")
+            .debug(`Storage key initialized: ${key} = ${defaultValue}`);
+        }
+      }
+
+      logger
+        .category("bootstrap")
+        .info("Storage defaults initialized successfully");
+    } catch (error) {
+      logger
+        .category("bootstrap")
+        .warn("Failed to initialize storage defaults (non-critical)", {
+          error: (error as Error).message,
+        });
+      // Non-critical - app can still boot
+    }
   }
 
   /**
