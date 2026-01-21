@@ -5,19 +5,46 @@
  * These constants define behavior for ping detection, timeouts, and external endpoints.
  */
 
+import Constants from "expo-constants";
+
 /**
- * Supabase API endpoint used for network health checks
+ * Get the Supabase health endpoint for network checks
  *
  * Why Supabase?
  * - Already whitelisted in Content Security Policy for API calls
  * - Reliable health endpoint at /rest/v1/
  * - Avoids CSP violations that would occur with Cloudflare or other endpoints
  *
- * This should match the configured Supabase URL in your environment.
- * Currently set to the DnD Toolkit Supabase project.
+ * Uses environment variables for environment-agnostic configuration:
+ * - EXPO_PUBLIC_SUPABASE_URL: Configured via .env or app.json
+ * - Falls back to Constants.expoConfig?.extra?.supabaseUrl for development
+ *
+ * @returns The Supabase health endpoint URL, or empty string if not configured
  */
-export const SUPABASE_HEALTH_ENDPOINT =
-  "https://xxoibawslmysvfllozyb.supabase.co/rest/v1/";
+export function getSupabaseHealthEndpoint(): string {
+  // Allow explicit override of the health endpoint for testing or to point
+  // to a public, unauthenticated health route (recommended to avoid 401 noise).
+  const explicit = process.env.EXPO_PUBLIC_SUPABASE_HEALTH_ENDPOINT;
+  if (explicit) return explicit;
+
+  const supabaseUrl =
+    process.env.EXPO_PUBLIC_SUPABASE_URL ||
+    Constants.expoConfig?.extra?.supabaseUrl;
+
+  if (!supabaseUrl) {
+    return "";
+  }
+
+  // Normalize: strip any trailing slashes then append the path
+  const normalized = supabaseUrl.replace(/\/+$|\s+/g, "");
+  return `${normalized}/rest/v1/`;
+}
+
+/**
+ * Supabase API endpoint used for network health checks
+ * @deprecated Use getSupabaseHealthEndpoint() instead for dynamic configuration
+ */
+export const SUPABASE_HEALTH_ENDPOINT = getSupabaseHealthEndpoint();
 
 /**
  * Web platform ping interval (5 minutes)

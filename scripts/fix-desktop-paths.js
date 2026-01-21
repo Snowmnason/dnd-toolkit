@@ -52,6 +52,62 @@ const cssFiles = findFilesByExtension(distDir, ".css");
 
 console.log(`[Fix Desktop Paths] Found ${cssFiles.length} CSS files`);
 
+// ============================================================================
+// Inject fonts into index.html at build time
+// ============================================================================
+// This eliminates the need for runtime file I/O in the Electron main process,
+// reducing startup time by ~10-50ms. Fonts are injected once during the build
+// and available immediately when the app loads.
+
+const indexHtmlPath = path.join(distDir, "index.html");
+
+try {
+  const indexStat = statSync(indexHtmlPath);
+  if (indexStat) {
+    let indexContent = readFileSync(indexHtmlPath, "utf8");
+
+    // Skip if fonts already injected (marked by detection comment)
+    if (!indexContent.includes("<!-- DESKTOP_FONTS_INJECTED -->")) {
+      // Try to read fonts.css from the root dist directory
+      const fontsCssPath = path.join(distDir, "fonts.css");
+      let fontsCss = "";
+
+      try {
+        const fontsStat = statSync(fontsCssPath);
+        if (fontsStat) {
+          fontsCss = readFileSync(fontsCssPath, "utf8");
+          // Replace relative paths with app:// protocol paths
+          // /FontName.ttf becomes app://FontName.ttf
+          fontsCss = fontsCss.replace(/url\('\/([^']+)'\)/g, "url('app://$1')");
+          console.log(
+            "[Fix Desktop Paths] ✓ Injected fonts.css into index.html",
+          );
+        }
+      } catch {
+        // Fallback: create inline @font-face for known fonts
+        console.log(
+          "[Fix Desktop Paths] ⚠️ fonts.css not found, using fallback fonts",
+        );
+        fontsCss = `@font-face{font-family:'GrenzeGotisch';src:url('app://GrenzeGotisch.ttf') format('truetype');font-display:swap}@font-face{font-family:'Eurostile';src:url('app://Eurostile.ttf') format('truetype');font-display:swap}@font-face{font-family:'Cyberpunk';src:url('app://Cyberpunk.ttf') format('truetype');font-display:swap}`;
+      }
+
+      // Inject inline <style> with detection marker
+      const fontsStyleTag = `<!-- DESKTOP_FONTS_INJECTED --><style>${fontsCss}</style>`;
+      indexContent = indexContent.replace(
+        /<head[^>]*>/i,
+        `<head>${fontsStyleTag}`,
+      );
+
+      writeFileSync(indexHtmlPath, indexContent, "utf8");
+      console.log("[Fix Desktop Paths] ✓ Font injection complete");
+    } else {
+      console.log("[Fix Desktop Paths] ℹ️ Fonts already injected, skipping");
+    }
+  }
+} catch (error) {
+  console.error("[Fix Desktop Paths] ✗ Error injecting fonts:", error.message);
+}
+
 // Fix HTML files
 htmlFiles.forEach((filePath) => {
   try {

@@ -65,8 +65,16 @@ class InvalidFormatError extends Error {
  * - Data storage: localStorage (persistent across app restarts)
  * - Persistence: OS app data directory via Chromium's leveldb storage
  * - ✅ IMPROVED: Encryption keys now persist across app restarts (fixed authentication mismatch issue)
- * - ⚠️  SECURITY NOTE: Still JavaScript-accessible. For production desktop apps with highly sensitive data,
- *   consider using Electron's safeStorage API for key encryption at rest.
+ * - ⚠️  SECURITY NOTE: Keys are stored in `localStorage` (Chromium) and therefore persist across sessions.
+ *   This makes them more accessible than `sessionStorage` (which is cleared on session end). While
+ *   persisting the key fixes authentication and usability issues, it increases exposure (for example
+ *   to malicious renderer code, browser extensions, other local processes with access to the profile,
+ *   or when running on a public/shared machine). For production desktop apps that handle highly
+ *   sensitive data, consider using Electron's `safeStorage` API or a native secure storage mechanism
+ *   to encrypt keys at rest, implement optional passphrase protection, or prompt users when running on
+ *   public/shared machines. This comment documents the trade-off taken here: improved persistence at
+ *   the cost of increased accessibility; plan a follow-up to migrate to a stronger platform-backed
+ *   key protection strategy if needed.
  *
  * **Mobile (React Native/Expo)**
  * - Key storage: expo-secure-store (iOS Keychain, Android Keystore - hardware-backed)

@@ -61,11 +61,9 @@ if (process.argv.includes("--enable-logging")) {
   process.env.LOG_LEVEL = "debug";
 }
 
-// Initialize logger - SIMPLE VERSION THAT WORKS
-// Uses synchronous fs.appendFileSync to write immediately to file
-// No async state machines, no buffering complications
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const logger = createDesktopLogger(app.getPath("userData"), {});
+// Initialize logger - production-friendly implementation
+// Uses async queued writes for errors and keeps console passthrough
+createDesktopLogger(app.getPath("userData"), {});
 
 // IMPORTANT: All console.log/error/warn calls AFTER this point use the logger system
 // Logger overrides console methods above
@@ -198,41 +196,6 @@ function safeReadFile(
   } catch (error) {
     console.error("[Security] Error reading file:", error);
     return null;
-  }
-}
-
-/**
- * Safely list directory contents with runtime validation
- * Replaces fs.readdirSync calls that would trigger ESLint warnings
- *
- * @param dirPath - Directory to list (will be validated)
- * @param allowedRoot - Optional root directory to validate path is within
- * @returns Array of filenames, or empty array if validation fails
- */
-function safeReadDir(dirPath: string, allowedRoot?: string): string[] {
-  try {
-    // Validate path is within allowed root if specified
-    if (allowedRoot) {
-      const resolved = path.resolve(dirPath);
-      if (!isPathWithinRoot(resolved, path.resolve(allowedRoot))) {
-        console.error(
-          "[Security] Attempted directory read outside allowed root:",
-          {
-            dirPath,
-            resolved,
-            allowedRoot,
-          },
-        );
-        return [];
-      }
-    }
-
-    // Safe to read - path has been validated
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    return fs.readdirSync(dirPath);
-  } catch (error) {
-    console.error("[Security] Error reading directory:", error);
-    return [];
   }
 }
 
@@ -399,47 +362,6 @@ const guardIpc = (
 // ============================================================================
 // PROTOCOL HANDLER (app:// → web-build/)
 // ============================================================================
-
-/**
- * Get MIME type for file extension
- * Critical for fonts, CSS, JS to load correctly
- */
-function getContentType(filePath: string): string {
-  const ext = path.extname(filePath).toLowerCase();
-  const fileName = path.basename(filePath).toLowerCase();
-
-  // Explicit handling for fonts.css (including hashed versions like fonts-abc123.css)
-  if (fileName.includes("fonts") && fileName.endsWith(".css")) {
-    return "text/css; charset=utf-8";
-  }
-
-  const contentTypes: Record<string, string> = {
-    ".html": "text/html; charset=utf-8",
-    ".js": "application/javascript; charset=utf-8",
-    ".css": "text/css; charset=utf-8",
-    ".json": "application/json",
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".gif": "image/gif",
-    ".svg": "image/svg+xml",
-    ".ico": "image/x-icon",
-    ".webp": "image/webp",
-    // Font formats
-    ".woff": "font/woff",
-    ".woff2": "font/woff2",
-    ".ttf": "font/ttf",
-    ".otf": "font/otf",
-    ".eot": "application/vnd.ms-fontobject",
-  };
-
-  // Use explicit has check to avoid ESLint security warning
-  // ext is validated via path.extname() which only returns safe file extensions
-  if (Object.prototype.hasOwnProperty.call(contentTypes, ext)) {
-    return contentTypes[ext as keyof typeof contentTypes];
-  }
-  return "application/octet-stream";
-}
 
 /**
  * Setup custom app:// protocol handler
@@ -1023,9 +945,10 @@ function createWindow(): void {
       },
     );
 
-    // STRATEGY: Inject base tag + modify CSP in index.html, then load via app://
+    // STRATEGY: Inject base tag in index.html, then load via app://
     // file:// protocol in Electron ignores CSP meta tags (system policy)
-    // So we use app:// (which respects CSP meta tags) and inject permissive CSP
+    // So we use app:// (which respects CSP meta tags) and inject base tag
+    // Note: Fonts are pre-injected at build time by fix-desktop-paths.js
     const indexPath = path.join(globalResolvedRoot, "index.html");
 
     // Read index.html
@@ -1044,55 +967,7 @@ function createWindow(): void {
       needsWrite = true;
     }
 
-    // 2. Inject fonts directly into HTML - read fonts.css and inject as inline style with app:// paths
-    // This bypasses all CSP stylesheet loading issues
-    // Skip if already injected (marked by unique comment)
-    if (!indexContent.includes("<!-- DESKTOP_FONTS_INJECTED -->")) {
-      try {
-        // Read fonts.css from public folder
-        const fontsCssPath = path.join(
-          path.dirname(globalResolvedRoot),
-          "public",
-          "fonts.css",
-        );
-        // Fallback: if fonts.css doesn't exist in public, create inline @font-face
-        let fontsCss = "";
-        if (fs.existsSync(fontsCssPath)) {
-          fontsCss = fs.readFileSync(fontsCssPath, "utf-8");
-          // Replace relative paths with app:// protocol paths
-          // /FontName.ttf becomes app://FontName.ttf
-          fontsCss = fontsCss.replace(/url\('\/([^']+)'\)/g, "url('app://$1')");
-        } else {
-          // Fallback font faces if fonts.css not found
-          fontsCss = `@font-face {
-  font-family: 'GrenzeGotisch';
-  src: url('app://GrenzeGotisch.ttf') format('truetype');
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Eurostile';
-  src: url('app://Eurostile.ttf') format('truetype');
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Cyberpunk';
-  src: url('app://Cyberpunk.ttf') format('truetype');
-  font-display: swap;
-}`;
-        }
-        const fontsStyleTag = `<!-- DESKTOP_FONTS_INJECTED --><style>${fontsCss}</style>`;
-        indexContent = indexContent.replace(
-          /<head[^>]*>/i,
-          `<head>${fontsStyleTag}`,
-        );
-        needsWrite = true;
-      } catch (error) {
-        console.error("[Window] ⚠️ Failed to inject fonts:", error);
-        // Continue anyway - app will work with fallback fonts
-      }
-    }
-
-    // 3. Write modified index.html back to disk only if changes were made
+    // 2. Write modified index.html back to disk only if changes were made
     if (needsWrite) {
       try {
         fs.writeFileSync(indexPath, indexContent);
@@ -1105,7 +980,7 @@ function createWindow(): void {
       }
     }
 
-    // 4. Load via app:// (custom protocol that respects meta tag CSP)
+    // 3. Load via app:// (custom protocol that respects meta tag CSP)
     window.loadURL("app://index.html");
   }
 
