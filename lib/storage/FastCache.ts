@@ -17,10 +17,10 @@ interface StorageAPI {
   key(index: number): string | null;
 }
 
-// Polyfill localStorage for Node.js environments (build processes, server-side)
-const getLocalStorage = (): StorageAPI => {
-  if (typeof localStorage !== 'undefined') {
-    return localStorage;
+// Get sessionStorage for web (ephemeral cache, cleared on session end)
+const getSessionStorage = (): StorageAPI => {
+  if (typeof sessionStorage !== 'undefined') {
+    return sessionStorage;
   }
 
   // Return no-op implementation for Node.js environments
@@ -41,20 +41,20 @@ const getLocalStorage = (): StorageAPI => {
  * Uses platform-native storage without encryption overhead.
  *
  * Platform support:
- * - Web: localStorage (synchronous, ~2-5ms access)
+ * - Web: sessionStorage (synchronous, ~2-5ms access, ephemeral)
  * - Native: AsyncStorage (asynchronous, ~5-10ms access)
  *
  * Performance: 5-10x faster than SecureStorage due to no encryption
  *
  * Use for:
- * - Query results and API cache
+ * - Query results and API cache (refetchable on demand)
  * - Non-sensitive user preferences
  * - Temporary session data
  *
  * Don't use for:
  * - Auth tokens, passwords, encryption keys
  * - Sensitive user data or permissions
- * - Any data that requires security
+ * - Any data that requires persistence or security
  *
  * Features:
  * - Per-item TTL (time-to-live) support
@@ -105,7 +105,7 @@ class FastCacheService {
       const entryJson = JSON.stringify(entry);
 
       if (Platform.OS === 'web') {
-        getLocalStorage().setItem(key, entryJson);
+        getSessionStorage().setItem(key, entryJson);
       } else {
         await AsyncStorage.setItem(key, entryJson);
       }
@@ -127,7 +127,7 @@ class FastCacheService {
       let rawValue: string | null;
 
       if (Platform.OS === 'web') {
-        rawValue = getLocalStorage().getItem(key);
+        rawValue = getSessionStorage().getItem(key);
       } else {
         rawValue = await AsyncStorage.getItem(key);
       }
@@ -189,7 +189,7 @@ class FastCacheService {
   async removeItem(key: string): Promise<void> {
     try {
       if (Platform.OS === 'web') {
-        getLocalStorage().removeItem(key);
+        getSessionStorage().removeItem(key);
       } else {
         await AsyncStorage.removeItem(key);
       }
@@ -225,7 +225,7 @@ class FastCacheService {
       let matchingKeys: string[] = [];
 
       if (Platform.OS === 'web') {
-        const storage = getLocalStorage();
+        const storage = getSessionStorage();
         for (let i = 0; i < storage.length; i++) {
           const key = storage.key(i);
           if (key && key.startsWith(prefix)) {
@@ -377,7 +377,7 @@ class FastCacheService {
       let estimatedSize = 0;
 
       if (Platform.OS === 'web') {
-        const storage = getLocalStorage();
+        const storage = getSessionStorage();
         itemCount = storage.length;
         for (let i = 0; i < storage.length; i++) {
           const key = storage.key(i);
@@ -414,13 +414,13 @@ class FastCacheService {
 
   /**
    * Clear all items from fast cache
-   * WARNING: This clears ALL localStorage/AsyncStorage
+   * WARNING: This clears ALL sessionStorage/AsyncStorage
    * Prefer removeByPrefix() for selective cleanup
    */
   async clear(): Promise<void> {
     try {
       if (Platform.OS === 'web') {
-        getLocalStorage().clear();
+        getSessionStorage().clear();
       } else {
         await AsyncStorage.clear();
       }
@@ -439,7 +439,7 @@ class FastCacheService {
       let keysToRemove: string[] = [];
 
       if (Platform.OS === 'web') {
-        const storage = getLocalStorage();
+        const storage = getSessionStorage();
         const now = Date.now();
         for (let i = 0; i < storage.length; i++) {
           const key = storage.key(i);

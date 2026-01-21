@@ -52,29 +52,11 @@ class InvalidFormatError extends Error {
  * Provides encrypted storage across web, desktop, and mobile platforms with
  * platform-specific backend storage and key management:
  *
- * **Web (Browser)**
- * - Key storage: sessionStorage (session-only, cleared on page reload/browser restart)
+ * **Web & Desktop (Electron)**
+ * - Key storage: localStorage (persistent across reloads/app restarts)
  * - Data storage: localStorage (persistent across sessions)
- * - Persistence: Browser storage persistence depends on browser settings
- * - ⚠️  SECURITY NOTE: sessionStorage is still accessible to JavaScript/XSS. For production web apps
- *   handling sensitive data, use a server-side session approach or Web Crypto API with hardware keys.
- *   Current implementation is suitable for development/demo only.
- *
- * **Desktop (Electron)**
- * - Key storage: localStorage (persistent across app restarts, survives process restart)
- * - Data storage: localStorage (persistent across app restarts)
- * - Persistence: OS app data directory via Chromium's leveldb storage
- * - ✅ IMPROVED: Encryption keys now persist across app restarts (fixed authentication mismatch issue)
- * - ⚠️  SECURITY NOTE: Keys are stored in `localStorage` (Chromium) and therefore persist across sessions.
- *   This makes them more accessible than `sessionStorage` (which is cleared on session end). While
- *   persisting the key fixes authentication and usability issues, it increases exposure (for example
- *   to malicious renderer code, browser extensions, other local processes with access to the profile,
- *   or when running on a public/shared machine). For production desktop apps that handle highly
- *   sensitive data, consider using Electron's `safeStorage` API or a native secure storage mechanism
- *   to encrypt keys at rest, implement optional passphrase protection, or prompt users when running on
- *   public/shared machines. This comment documents the trade-off taken here: improved persistence at
- *   the cost of increased accessibility; plan a follow-up to migrate to a stronger platform-backed
- *   key protection strategy if needed.
+ * - Persistence: Browser/Chromium leveldb storage in app data directory
+ * - ✅ UNIFIED: Web and desktop use the exact same localStorage backend
  *
  * **Mobile (React Native/Expo)**
  * - Key storage: expo-secure-store (iOS Keychain, Android Keystore - hardware-backed)
@@ -92,9 +74,7 @@ class InvalidFormatError extends Error {
  * - Version 3: Uses HMAC-SHA256 which requires the encryption key to compute/verify
  * - Prevents tampering: Attacker cannot modify encrypted data without the key
  * - Key-binding: Authentication tag binds data to the specific encryption key
- * - Version 2 (legacy): Used plain SHA256 (cryptographically weak for authentication)
- *   - Supported for migration but flagged as deprecated
- *   - Will be re-encrypted to v3 on next write
+ * - Versions 1-2 (legacy): Unsupported and will throw UnsupportedVersionError
  *
  * **Error Handling**
  * - Throws specific error types (DecryptionError, AuthenticationFailureError,
@@ -107,14 +87,13 @@ class InvalidFormatError extends Error {
  * - Key is cached in memory after first retrieval (cachedKey)
  * - HMAC-SHA256 requires the key to compute/verify - prevents tampering
  * - Immune to length-extension attacks (unlike plain SHA256)
- * - For web: sessionStorage provides session-level isolation but is vulnerable to XSS
- * - For desktop: localStorage persists keys across app restarts (fixed from sessionStorage)
+ * - For web/desktop: localStorage provides persistence; for production, consider Web Crypto API with hardware keys
  * - For mobile: expo-secure-store provides hardware-backed key storage (iOS Keychain, Android Keystore)
  *
  * **Version History**
  * - v1: AES-CBC (legacy, unsupported)
- * - v2: AES-CTR with plain SHA256 (weak authentication, deprecated)
- * - v3: AES-CTR with HMAC-SHA256 (current, recommended)
+ * - v2: AES-CTR with plain SHA256 (weak authentication, unsupported)
+ * - v3: AES-CTR with HMAC-SHA256 (current, only supported version)
  *
  * **Limitations & Future Work**
  * - **Web production**: Implement server-side session encryption or use Web Crypto API with TPM/secure enclave
@@ -140,38 +119,14 @@ export class EncryptedStorage {
     return key;
   }
 
-  private static isElectron(): boolean {
-    // Detect if running in Electron (desktop app)
-    // Electron preload script exposes window.electronAPI
-    try {
-      return (
-        typeof window !== "undefined" &&
-        (window as any).electronAPI !== undefined
-      );
-    } catch {
-      return false;
-    }
-  }
-
   private static async _initializeKey(): Promise<Uint8Array> {
     try {
       if (Platform.OS === "web") {
-        // Differentiate between browser web and Electron desktop
-        const isElectron = this.isElectron();
-        const storageBackend = isElectron
-          ? window.localStorage
-          : window.sessionStorage;
-        const storageType = isElectron
-          ? "localStorage (persistent)"
-          : "sessionStorage (session-only)";
-
-        // Web: use sessionStorage for key storage (session-only, more secure than localStorage)
-        // Desktop (Electron): use localStorage (persistent across app restarts)
-        // ⚠️  SECURITY: Both are still accessible to JavaScript code. This is suitable
-        // for development/SPA demos but NOT production. For production, use server-side session
-        // encryption or Web Crypto API with hardware-backed keys (Web Authentication API).
-        if (typeof window !== "undefined" && storageBackend) {
-          const storedKey = storageBackend.getItem(
+        // Web and Desktop (Electron) both use localStorage for persistent key storage
+        // localStorage survives page reloads (web) and app restarts (Electron)
+        // ✅ UNIFIED: Exact same backend for both web and desktop
+        if (typeof window !== "undefined" && window.localStorage) {
+          const storedKey = window.localStorage.getItem(
             this.ENCRYPTION_KEY_STORAGE_KEY,
           );
           if (storedKey) {
@@ -179,18 +134,18 @@ export class EncryptedStorage {
             this.cachedKey = key;
             logger
               .category("storage")
-              .debug(`Loaded encryption key from ${storageType}`);
+              .debug(`Loaded encryption key from localStorage`);
             return key;
           }
           const newKey = this.generateEncryptionKey();
-          storageBackend.setItem(
+          window.localStorage.setItem(
             this.ENCRYPTION_KEY_STORAGE_KEY,
             JSON.stringify(Array.from(newKey)),
           );
           this.cachedKey = newKey;
           logger
             .category("storage")
-            .debug(`Generated and stored new encryption key in ${storageType}`);
+            .debug(`Generated and stored new encryption key in localStorage`);
           return newKey;
         }
       } else {
@@ -198,7 +153,7 @@ export class EncryptedStorage {
         // iOS: Keychain (hardware-backed, survives app reinstall if device is kept)
         // Android: Android Keystore (hardware-backed, encrypted at rest)
         // ✅ SECURITY: Keys are stored in platform-specific secure enclaves,
-        // providing much stronger protection than AsyncStorage
+        // providing much stronger protection than localStorage
         if (SecureStore) {
           try {
             const storedKey = await SecureStore.getItemAsync(
@@ -351,55 +306,26 @@ export class EncryptedStorage {
       );
     }
 
-    // Reject unsupported versions (version 1 or future versions)
+    // Only support version 3 (AES-CTR with HMAC-SHA256)
+    // Reject all other versions (1, 2, future versions)
     if (version !== EncryptedStorage.CURRENT_ENCRYPTION_VERSION) {
-      if (version === 1) {
-        logger
-          .category("storage")
-          .warn(
-            `Data encrypted with version 1 found. Migration not yet implemented.`,
-          );
-        // TODO: Implement migration from version 1 (AES-CBC) to version 3 (AES-CTR + HMAC-SHA256)
-      } else if (version === 2) {
-        // Version 2 used plain SHA256 (not HMAC-SHA256), which is cryptographically weak
-        // for authentication. Support it for migration but flag as deprecated.
-        logger
-          .category("storage")
-          .warn(
-            `Data encrypted with version 2 (weak SHA256 authentication) found. ` +
-              `This will be re-encrypted with version 3 (proper HMAC-SHA256) on next write.`,
-          );
-        // Continue with decryption using v2 logic (plain SHA256 verification)
-        // But this will be flagged as requiring re-encryption
-      } else {
-        logger
-          .category("storage")
-          .warn(
-            `Data encrypted with unsupported version ${version}. Current version: ${EncryptedStorage.CURRENT_ENCRYPTION_VERSION}`,
-          );
-        throw new UnsupportedVersionError(
-          `Unsupported encryption version: ${version}`,
-          version,
+      logger
+        .category("storage")
+        .warn(
+          `Data encrypted with unsupported version ${version}. Current version: ${EncryptedStorage.CURRENT_ENCRYPTION_VERSION}`,
         );
-      }
+      throw new UnsupportedVersionError(
+        `Unsupported encryption version: ${version}. Only version 3 (HMAC-SHA256) is supported.`,
+        version,
+      );
     }
 
-    // Verify authentication tag
+    // Verify authentication tag (version 3 uses HMAC-SHA256)
     try {
-      let computedAuthTag: string;
-      if (version === 2) {
-        // Version 2: Plain SHA256 (weak, but support for migration)
-        computedAuthTag = await Crypto.digestStringAsync(
-          Crypto.CryptoDigestAlgorithm.SHA256,
-          ivBase64 + ciphertextBase64,
-        );
-      } else {
-        // Version 3+: Proper HMAC-SHA256 (requires key)
-        computedAuthTag = await this.computeHmac(
-          ivBase64 + ciphertextBase64,
-          key,
-        );
-      }
+      const computedAuthTag = await this.computeHmac(
+        ivBase64 + ciphertextBase64,
+        key,
+      );
 
       if (computedAuthTag !== storedHmac) {
         throw new AuthenticationFailureError(
@@ -673,8 +599,9 @@ export class EncryptedStorage {
       this.cachedKey = null;
       // Clear the encryption key from storage
       if (Platform.OS === "web") {
-        if (typeof window !== "undefined" && window.sessionStorage) {
-          window.sessionStorage.removeItem(this.ENCRYPTION_KEY_STORAGE_KEY);
+        // Web and Desktop both use localStorage
+        if (typeof window !== "undefined" && window.localStorage) {
+          window.localStorage.removeItem(this.ENCRYPTION_KEY_STORAGE_KEY);
         }
       } else {
         // Mobile: try SecureStore first, then fall back to AsyncStorage

@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { logger } from "../utils/logger";
 import {
   CacheSchema,
@@ -5,19 +6,61 @@ import {
   validateCacheEntry,
   VersionedCacheEntry,
 } from "./cache-versioning";
+import { getStorageBackend, type StorageBackend } from "./storage-config";
+
+// Type-safe import for AsyncStorage
+let AsyncStorage: any;
+if (typeof window === "undefined" || Platform.OS !== "web") {
+  try {
+    AsyncStorage = require("@react-native-async-storage/async-storage").default;
+  } catch (err) {
+    // AsyncStorage not available in non-RN environments
+  }
+}
 
 /**
- * SecureStorage
+ * Get localStorage safely
+ */
+const getLocalStorage = (): Storage | null => {
+  if (typeof window !== "undefined" && window.localStorage) {
+    return window.localStorage;
+  }
+  return null;
+};
+
+/**
+ * Get sessionStorage safely
+ */
+const getSessionStorage = (): Storage | null => {
+  if (typeof window !== "undefined" && window.sessionStorage) {
+    return window.sessionStorage;
+  }
+  return null;
+};
+
+/**
+ * SecureStorage with Backend Routing
  *
- * Cross-platform encrypted storage for ALL app data.
- * Uses existing EncryptedStorage implementation under the hood.
+ * Cross-platform storage that respects STORAGE_BACKEND_CONFIG:
+ * - localStorage: Persistent, ENCRYPTED sensitive data (user_data, connected_worlds, auth)
+ *   → Routes to EncryptedStorage (which uses localStorage as physical backend)
+ * - sessionStorage: Ephemeral, UNENCRYPTED cache (query_cache, metadata)
+ *   → Routes to FastCache (faster, cleared on session end)
+ * - secure: Persistent, ENCRYPTED (default for sensitive data)
+ *   → Routes to EncryptedStorage (encrypted)
  *
  * Platform support:
- * - Web: localStorage with AES-CTR encryption
+ * - Web: localStorage/sessionStorage with selective encryption
  * - Native (iOS/Android): expo-secure-store + AsyncStorage with encryption
- * - Desktop: TBD (likely Electron secure storage)
+ * - Desktop: Same as web (Electron)
  *
  * All methods are async for consistency across platforms.
+ *
+ * ROUTING LOGIC:
+ * 1. Check STORAGE_BACKEND_CONFIG for the key
+ * 2. If 'localStorage' or 'secure': Route to EncryptedStorage (encrypted, persistent)
+ * 3. If 'sessionStorage': Route to FastCache (unencrypted, ephemeral)
+ * 4. EncryptedStorage internally uses localStorage/AsyncStorage as the physical backend
  */
 class SecureStorageService {
   private encryptedStorage: any = null;
@@ -27,7 +70,7 @@ class SecureStorageService {
    * Lazy-load EncryptedStorage to avoid circular dependencies
    * and ensure platform-specific imports work correctly
    */
-  private async getStorage() {
+  private async getEncryptedStorage() {
     if (this.encryptedStorage) {
       return this.encryptedStorage;
     }
@@ -44,58 +87,201 @@ class SecureStorageService {
   }
 
   /**
-   * Store a value securely (encrypted on all platforms)
+   * Get the appropriate storage backend for a key
+   */
+  private getBackendForKey(key: string): StorageBackend {
+    return getStorageBackend(key);
+  }
+
+  /**
+   * Store a value using the configured backend
    */
   async setItem(key: string, value: string): Promise<void> {
+    const backend = this.getBackendForKey(key);
+
     try {
-      const storage = await this.getStorage();
-      await storage.setItem(key, value);
+      if (backend === "localStorage") {
+        // localStorage keys are ENCRYPTED via EncryptedStorage
+        // This keeps sensitive data (user_data, connected_worlds, auth) encrypted in localStorage
+        const storage = await this.getEncryptedStorage();
+        await storage.setItem(key, value);
+        logger
+          .category("storage")
+          .debug(
+            `[EncryptedStorage→localStorage] Item stored: ${key} (${value.length} chars)`,
+          );
+      } else if (backend === "sessionStorage") {
+        // sessionStorage keys are UNENCRYPTED for performance
+        // Used for query cache and metadata (refetchable from server)
+        // Cleared on session end anyway, so encryption not critical
+        if (Platform.OS === "web") {
+          const storage = getSessionStorage();
+          if (storage) {
+            storage.setItem(key, value);
+            logger
+              .category("storage")
+              .debug(
+                `[sessionStorage] Item stored: ${key} (${value.length} chars)`,
+              );
+          }
+        } else {
+          // Mobile: use AsyncStorage (cleared on app close anyway)
+          await AsyncStorage?.setItem(key, value);
+          logger
+            .category("storage")
+            .debug(
+              `[AsyncStorage/sessionStorage] Item stored: ${key} (${value.length} chars)`,
+            );
+        }
+      } else {
+        // 'secure' backend: use EncryptedStorage (same as localStorage, for clarity)
+        const storage = await this.getEncryptedStorage();
+        await storage.setItem(key, value);
+        logger
+          .category("storage")
+          .debug(
+            `[EncryptedStorage] Item stored: ${key} (${value.length} chars)`,
+          );
+      }
+    } catch (error) {
       logger
         .category("storage")
-        .debug(`Item stored: ${key} (${value.length} chars)`);
-    } catch (error) {
-      logger.category("storage").error("setItem failed", { key, error });
+        .error(`setItem failed [${backend}]`, { key, error });
       throw error;
     }
   }
 
   /**
-   * Retrieve a value from secure storage
+   * Retrieve a value using the configured backend
    * Returns null if key doesn't exist or on error
    */
   async getItem(key: string): Promise<string | null> {
+    const backend = this.getBackendForKey(key);
+
     try {
-      const storage = await this.getStorage();
-      const value = await storage.getItem(key);
-      return value;
+      if (backend === "localStorage") {
+        // localStorage keys are ENCRYPTED via EncryptedStorage
+        const storage = await this.getEncryptedStorage();
+        const value = await storage.getItem(key);
+        if (value) {
+          logger
+            .category("storage")
+            .debug(`[EncryptedStorage→localStorage] Item retrieved: ${key}`);
+        }
+        return value;
+      } else if (backend === "sessionStorage") {
+        // sessionStorage keys are UNENCRYPTED (for performance)
+        if (Platform.OS === "web") {
+          const storage = getSessionStorage();
+          if (storage) {
+            const value = storage.getItem(key);
+            if (value) {
+              logger
+                .category("storage")
+                .debug(`[sessionStorage] Item retrieved: ${key}`);
+            }
+            return value;
+          }
+        } else {
+          // Mobile: use AsyncStorage
+          const value = await AsyncStorage?.getItem(key);
+          if (value) {
+            logger
+              .category("storage")
+              .debug(`[AsyncStorage/sessionStorage] Item retrieved: ${key}`);
+          }
+          return value;
+        }
+      } else {
+        // 'secure' backend: use EncryptedStorage
+        const storage = await this.getEncryptedStorage();
+        const value = await storage.getItem(key);
+        if (value) {
+          logger
+            .category("storage")
+            .debug(`[EncryptedStorage] Item retrieved: ${key}`);
+        }
+        return value;
+      }
+      return null;
     } catch (error) {
-      logger.category("storage").warn("getItem failed", { key, error });
+      logger
+        .category("storage")
+        .warn(`getItem failed [${backend}]`, { key, error });
       return null;
     }
   }
 
   /**
-   * Remove a value from secure storage
+   * Remove a value using the configured backend
    */
   async removeItem(key: string): Promise<void> {
+    const backend = this.getBackendForKey(key);
+
     try {
-      const storage = await this.getStorage();
-      await storage.removeItem(key);
-      logger.category("storage").debug(`Item removed: ${key}`);
+      if (backend === "localStorage") {
+        // localStorage keys are ENCRYPTED via EncryptedStorage
+        const storage = await this.getEncryptedStorage();
+        await storage.removeItem(key);
+        logger
+          .category("storage")
+          .debug(`[EncryptedStorage→localStorage] Item removed: ${key}`);
+      } else if (backend === "sessionStorage") {
+        // sessionStorage keys are UNENCRYPTED
+        if (Platform.OS === "web") {
+          const storage = getSessionStorage();
+          if (storage) {
+            storage.removeItem(key);
+            logger
+              .category("storage")
+              .debug(`[sessionStorage] Item removed: ${key}`);
+          }
+        } else {
+          // Mobile: use AsyncStorage
+          await AsyncStorage?.removeItem(key);
+          logger
+            .category("storage")
+            .debug(`[AsyncStorage/sessionStorage] Item removed: ${key}`);
+        }
+      } else {
+        // 'secure' backend: use EncryptedStorage
+        const storage = await this.getEncryptedStorage();
+        await storage.removeItem(key);
+        logger
+          .category("storage")
+          .debug(`[EncryptedStorage] Item removed: ${key}`);
+      }
     } catch (error) {
-      logger.error(`SecureStorage.removeItem failed for key: ${key}`, error);
+      logger.error(
+        `SecureStorage.removeItem failed [${backend}] for key: ${key}`,
+        error,
+      );
       throw error;
     }
   }
 
   /**
    * Clear all storage (use with caution!)
+   * Encrypted backends: delegates to EncryptedStorage
+   * Unencrypted backends: clears directly from sessionStorage
    */
   async clear(): Promise<void> {
     try {
-      const storage = await this.getStorage();
+      // Clear encrypted storage (includes localStorage-routed keys)
+      const storage = await this.getEncryptedStorage();
       await storage.clear();
-      logger.category("storage").warn("All storage cleared");
+      logger
+        .category("storage")
+        .warn("[EncryptedStorage] All encrypted storage cleared");
+
+      // Clear unencrypted sessionStorage
+      const sessionStorage = getSessionStorage();
+      if (sessionStorage) {
+        sessionStorage.clear();
+        logger
+          .category("storage")
+          .warn("[sessionStorage] All ephemeral cache cleared");
+      }
     } catch (error) {
       logger.error("SecureStorage.clear failed", error);
       throw error;
@@ -129,7 +315,7 @@ class SecureStorageService {
     } catch (error) {
       logger.warn(
         `SecureStorage.getJSON failed for key: ${key} (invalid JSON?)`,
-        error
+        error,
       );
       return null;
     }
@@ -149,7 +335,7 @@ class SecureStorageService {
    */
   async getAllKeys(): Promise<string[]> {
     try {
-      const storage = await this.getStorage();
+      const storage = await this.getEncryptedStorage();
       const keys = await storage.getAllKeys();
       logger.debug(`SecureStorage.getAllKeys: Found ${keys.length} keys`);
       return keys;
@@ -165,7 +351,7 @@ class SecureStorageService {
    */
   async getValidatedJSON<T = any>(
     key: string,
-    schema: CacheSchema<T>
+    schema: CacheSchema<T>,
   ): Promise<T | null> {
     try {
       const rawEntry = await this.getJSON<VersionedCacheEntry>(key);
@@ -180,7 +366,7 @@ class SecureStorageService {
 
       if (validation.valid) {
         logger.debug(
-          `SecureStorage.getValidatedJSON: ${key} validated successfully`
+          `SecureStorage.getValidatedJSON: ${key} validated successfully`,
         );
         return rawEntry.data as T;
       }
@@ -199,7 +385,7 @@ class SecureStorageService {
         // Update storage with migrated data
         await this.setVersionedJSON(key, migrated, schema.version);
         logger.info(
-          `SecureStorage.getValidatedJSON: ${key} migrated and updated`
+          `SecureStorage.getValidatedJSON: ${key} migrated and updated`,
         );
         return migrated;
       }
@@ -207,13 +393,13 @@ class SecureStorageService {
       // Migration failed or not available - clear the entry
       await this.removeItem(key);
       logger.info(
-        `SecureStorage.getValidatedJSON: ${key} cleared due to migration failure`
+        `SecureStorage.getValidatedJSON: ${key} cleared due to migration failure`,
       );
       return null;
     } catch (error) {
       logger.error(
         `SecureStorage.getValidatedJSON failed for key: ${key}`,
-        error
+        error,
       );
       return null;
     }
@@ -225,7 +411,7 @@ class SecureStorageService {
   async setVersionedJSON<T = any>(
     key: string,
     value: T,
-    version: number
+    version: number,
   ): Promise<void> {
     try {
       const versionedEntry: VersionedCacheEntry<T> = {
@@ -239,7 +425,7 @@ class SecureStorageService {
     } catch (error) {
       logger.error(
         `SecureStorage.setVersionedJSON failed for key: ${key}`,
-        error
+        error,
       );
       throw error;
     }
