@@ -16,8 +16,8 @@
 
 import { STORAGE_DEFAULTS } from "@/lib/kernel/storage-defaults";
 import {
-    NetworkDetection,
-    NetworkStatus,
+  NetworkDetection,
+  NetworkStatus,
 } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
 
@@ -128,17 +128,27 @@ class AppKernelClass {
    * Safe to call multiple times - only initializes once
    */
   async initialize(): Promise<void> {
+    console.log(
+      "[KERNEL] initialize() called, initPromise exists:",
+      !!this.initPromise,
+    );
     // If already initializing or initialized, return the same promise
     if (this.initPromise) {
       return this.initPromise;
     }
 
+    console.log(
+      "[KERNEL] Starting new initialization, calling _initializeInternal()",
+    );
     this.initPromise = this._initializeInternal();
     return this.initPromise;
   }
 
   private async _initializeInternal(): Promise<void> {
     try {
+      console.log(
+        '[KERNEL] _initializeInternal() starting, about to log "AppKernel initializing..."',
+      );
       logger.category("bootstrap").info("AppKernel initializing...");
 
       // Validate configuration before proceeding
@@ -687,10 +697,37 @@ class AppKernelClass {
    */
   private async initializeStorageDefaults(): Promise<void> {
     try {
-      const { SecureStorage } = await import("@/lib/storage");
+      // Avoid initializing browser-only storage during server-side rendering
+      // or static export where `window` is undefined. Initializing storage
+      // there can create a mismatched encryption state (keys generated
+      // during SSR are not persisted to the client). Only initialize
+      // storage when running in a real browser/runtime environment.
+      console.log(
+        "[KERNEL] initializeStorageDefaults() checking window:",
+        typeof window,
+      );
+      if (typeof window === "undefined") {
+        console.log(
+          "[KERNEL] initializeStorageDefaults() skipping - no window (SSR)",
+        );
+        logger
+          .category("bootstrap")
+          .debug(
+            "Skipping storage defaults initialization during SSR (no window)",
+          );
+        return;
+      }
 
-      // Initialize each key if it doesn't exist
-      // STORAGE_DEFAULTS is imported from storage-defaults.ts for centralized management
+      console.log(
+        "[KERNEL] initializeStorageDefaults() window exists, importing SecureStorage",
+      );
+      const { SecureStorage } = await import("@/lib/storage");
+      console.log(
+        "[KERNEL] initializeStorageDefaults() SecureStorage imported, iterating defaults",
+      );
+
+      // Initialize each key if it doesn't exist. STORAGE_DEFAULTS is imported
+      // from storage-defaults.ts for centralized management.
       for (const [key, defaultValue] of Object.entries(STORAGE_DEFAULTS)) {
         const existing = await SecureStorage.getItem(key);
         if (existing === null && defaultValue !== null) {
