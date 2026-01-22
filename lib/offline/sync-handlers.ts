@@ -36,10 +36,17 @@ import type { QueuedMutation } from "./types";
 
 /**
  * Result of executing a sync handler
+ *
+ * @param success - Whether the operation succeeded
+ * @param data - Response data (single row/object). Should include server metadata when available:
+ *              - updated_at: ISO8601 or epoch-ms timestamp (optional, for LWW conflict resolution)
+ *              - version or etag: integer version or string etag (optional, for future versioning)
+ * @param error - Error message if failed
+ * @param conflict - Whether this is a conflict error (version mismatch, etag mismatch)
  */
 export interface SyncHandlerResult {
   success: boolean;
-  data?: any;
+  data?: any; // Single row/object, may include updated_at, version, etag
   error?: string;
   conflict?: boolean;
 }

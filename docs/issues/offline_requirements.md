@@ -1,19 +1,18 @@
 **Offline Requirements (blockers / items needing external data)**
 
-Note: `TopBarIndicator` and notification sequencing fixes are completed and not listed here. This file only tracks items we cannot fully fix without additional data or cross-team agreement.
+Note: `TopBarIndicator` and notification sequencing fixes are completed and not listed here. This file tracks outstanding tasks and future extensibility points.
 
-- **Server timestamps (high priority)**: handlers must return a reliable server timestamp (e.g., `updated_at`, `last_modified`, or a monotonic version). When available, the sync layer should pass that timestamp into `executeConflictResolution` so LWW can make correct decisions. Until handlers provide this, treat `timestamp` as `undefined` (conservative server-wins).
+## ✅ Completed
 
-- **Conflict recording / observability**: All detected conflicts must be enqueued to the `ConflictQueueManager` (persisted/telemetry) so UI/analytics can inspect them later. Do not rely solely on transient logs.
+- **Handler contract**: `SyncHandlerResult` now includes optional server metadata fields:
+  - `updated_at?: string | number` — ISO8601 or epoch-ms timestamp for LWW conflict resolution
+  - `version?: number` or `etag?: string` — reserved for future versioning strategies (v2+)
+- **Server timestamp extraction**: `sync-manager` now extracts `handlerResult.data.updated_at` and normalizes to epoch-ms before passing to `executeConflictResolution`. If unavailable, defaults to `undefined` (conservative server-wins).
+- **Conflict recording / observability**: All detected conflicts are enqueued to `ConflictQueueManager` for telemetry and future UI inspection.
 
-- **Handler contract (coordination task)**: Define and publish the required shape for sync handlers (fields: `success`, `data`, `conflict?: boolean`, `error?: string`, `updated_at?: string|number`). Update `sync-handlers` types and docs when teams agree on the field names and formats.
+## 📋 Future Tasks
 
----
-
-When the handler contract is agreed and handlers start returning `updated_at`/server timestamps, the next updates are:
-
-- Wire `handlerResult.data.updated_at` (or response headers) into `sync-manager` and pass it to `executeConflictResolution`.
-- Add unit tests validating `resolveLastWriteWins` with real server timestamps.
-- Ensure `ConflictQueueManager.enqueueConflict` is called for all conflict cases and that recorded entries include the handler's returned metadata (server timestamp, response id/etag).
-
-If you'd like, I can open follow-up tasks (PR-ready) to implement the handler contract, wire `updated_at`, and add tests once you confirm the field names.
+- **Add unit tests**: Cover `resolveLastWriteWins` with real server timestamps (equal timestamps, server-newer, local-newer, undefined).
+- **Versioning strategy (v2+)**: Once `version`/`etag` fields are populated by handlers, implement vector-clock or ETag-based conflict detection for stronger accuracy.
+- **Ensure handlers populate `updated_at`**: DB modules should return server timestamps (e.g., from `updated_at` timestamptz column on Supabase). Without this, LWW defaults to conservative server-wins.
+- **Document handler contract**: Add a runbook in `docs/` explaining how to implement a sync handler (fields, timestamps, conflict detection).

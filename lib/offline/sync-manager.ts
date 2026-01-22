@@ -14,19 +14,19 @@
 
 import { QueryCache } from "@/lib/cache/query-cache";
 import {
-    NetworkDetection,
-    type NetworkStatus,
+  NetworkDetection,
+  type NetworkStatus,
 } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
-import { executeConflictResolution } from "./conflict-resolution";
 import { getConflictQueueManager } from "./conflict-queue-manager";
+import { executeConflictResolution } from "./conflict-resolution";
 import { OfflineMutationQueue } from "./mutation-queue";
 import { executeSyncHandler } from "./sync-handlers";
 import type {
-    OfflineSyncConfig,
-    OfflineSyncStatus,
-    QueuedMutation,
-    SyncResult,
+  OfflineSyncConfig,
+  OfflineSyncStatus,
+  QueuedMutation,
+  SyncResult,
 } from "./types";
 
 /**
@@ -268,10 +268,19 @@ class OnlineSyncManagerService {
           getConflictQueueManager().enqueueConflict(mutation, conflictData);
 
           // v1: Always use Last-Write-Wins (LWW)
-          // TODO: Extract actual server timestamp from handlerResult.data.updated_at or response headers
-          // For now, pass undefined to trigger conservative server-wins behavior when timestamp is unavailable.
+          // Extract server timestamp from handlerResult.data.updated_at (ISO8601 or epoch-ms)
+          // If unavailable, treat as undefined (conservative server-wins behavior)
+          let serverTimestamp: number | undefined;
+          if (handlerResult.data?.updated_at) {
+            const parsed =
+              typeof handlerResult.data.updated_at === "number"
+                ? handlerResult.data.updated_at
+                : new Date(handlerResult.data.updated_at).getTime();
+            serverTimestamp = isNaN(parsed) ? undefined : parsed;
+          }
+
           const resolution = executeConflictResolution(mutation, conflictData, {
-            timestamp: undefined,
+            timestamp: serverTimestamp,
           });
 
           logger
