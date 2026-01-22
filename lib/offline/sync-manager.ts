@@ -19,6 +19,7 @@ import {
 } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
 import { OfflineMutationQueue } from "./mutation-queue";
+import { executeSyncHandler } from "./sync-handlers";
 import type {
     OfflineSyncConfig,
     OfflineSyncStatus,
@@ -234,18 +235,55 @@ class OnlineSyncManagerService {
     }
 
     try {
-      // TODO: Implement actual sync with database
-      // This stub represents where mutations would be applied to Supabase
-      // For Phase 1, this is a placeholder
-      // In Phase 2, integrate with worldsDB.create/update/delete
+      logger
+        .category("storage")
+        .debug(
+          `Syncing mutation ${mutation.id} (${mutation.operation} on ${mutation.table})`,
+        );
 
-      logger.category("storage").debug(`Syncing mutation ${mutation.id}`);
+      // Dynamically import Supabase client
+      const { supabase } = await import("@/lib/database/supabase");
 
-      // Simulate successful sync for now
-      // In Phase 2, call actual DB function:
-      // const result = await worldsDB[mutation.operation](mutation.payload);
+      // Execute via registered handler for this table
+      const handlerResult = await executeSyncHandler(mutation, supabase);
 
-      // Invalidate cache tags after sync
+      if (!handlerResult.success) {
+        const isConflict = handlerResult.conflict || false;
+        const isNetworkError = (handlerResult.error || "").includes("network");
+        const isRateLimited = (handlerResult.error || "").includes("429");
+        const retryable = isNetworkError || isRateLimited;
+
+        if (isConflict) {
+          return {
+            mutationId: mutation.id,
+            success: false,
+            error: handlerResult.error || "Conflict detected",
+            conflict: {
+              mutationId: mutation.id,
+              type: "version_mismatch",
+              message: handlerResult.error || "Conflict detected",
+              suggestedStrategy: this.config.conflictStrategy as any,
+            },
+            retryable: false,
+          };
+        }
+
+        if (retryable) {
+          await OfflineMutationQueue.markFailed(
+            mutation.id,
+            handlerResult.error || "Unknown error",
+          );
+        }
+
+        return {
+          mutationId: mutation.id,
+          success: false,
+          error: handlerResult.error,
+          retryable,
+        };
+      }
+
+      // Success — invalidate cache tags if provided
       if (mutation.invalidateTags && mutation.invalidateTags.length > 0) {
         try {
           await QueryCache.invalidateByTags(mutation.invalidateTags);
@@ -254,12 +292,16 @@ class OnlineSyncManagerService {
         }
       }
 
+      logger
+        .category("storage")
+        .info(
+          `Mutation ${mutation.id} synced successfully (${mutation.table} ${mutation.operation})`,
+        );
+
       return {
         mutationId: mutation.id,
         success: true,
-        data: {
-          /* response from server */
-        },
+        data: handlerResult.data,
         retryable: false,
       };
     } catch (error) {
@@ -267,16 +309,16 @@ class OnlineSyncManagerService {
 
       // Determine if error is retryable
       const isNetworkError =
-        errorMsg.includes("network") || errorMsg.includes("offline");
+        errorMsg.includes("network") ||
+        errorMsg.includes("offline") ||
+        errorMsg.includes("failed to fetch");
       const isRateLimited =
         errorMsg.includes("429") || errorMsg.includes("rate limit");
       const retryable = isNetworkError || isRateLimited;
 
       if (retryable) {
-        // Update retry count
         await OfflineMutationQueue.markFailed(mutation.id, errorMsg);
 
-        // Calculate backoff
         const backoff = this.calculateBackoff(mutation.retryCount);
         logger
           .category("storage")
