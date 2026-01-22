@@ -59,7 +59,7 @@ export function useSyncNotifications(): SyncNotificationsReturn {
         if (status.isSyncing && status.syncedCount === 0) {
           setToastState({
             visible: true,
-            message: `🔄 Syncing ${status.totalQueued} change${status.totalQueued > 1 ? "s" : ""}...`,
+            message: `Syncing ${status.totalQueued} change${status.totalQueued > 1 ? "s" : ""}...`,
             type: "info",
             duration: 2500,
           });
@@ -74,7 +74,7 @@ export function useSyncNotifications(): SyncNotificationsReturn {
         ) {
           setToastState({
             visible: true,
-            message: `✓ ${status.syncedCount} change${status.syncedCount > 1 ? "s" : ""} synced.`,
+            message: `${status.syncedCount} change${status.syncedCount > 1 ? "s" : ""} synced.`,
             type: "success",
             duration: 3000,
           });
@@ -84,7 +84,7 @@ export function useSyncNotifications(): SyncNotificationsReturn {
         if (status.failedCount > 0) {
           setSnackbarState({
             visible: true,
-            message: `⚠ Failed to sync ${status.failedCount} item${status.failedCount > 1 ? "s" : ""}. Retrying...`,
+            message: `Failed to sync ${status.failedCount} item${status.failedCount > 1 ? "s" : ""}. Retrying...`,
             tone: "error",
             actionText: "Retry Now",
             onAction: async () => {

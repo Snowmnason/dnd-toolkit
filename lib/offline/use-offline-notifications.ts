@@ -32,7 +32,7 @@ export function useOfflineNotifications(): OfflineToastState {
         // Going offline
         setToastState({
           visible: true,
-          message: "📡 You are offline. Changes will sync when online.",
+          message: "You are offline. Changes will sync when online.",
           type: "warning",
           duration: 4000,
         });
@@ -40,7 +40,7 @@ export function useOfflineNotifications(): OfflineToastState {
         // Coming back online
         setToastState({
           visible: true,
-          message: "✓ You are back online.",
+          message: "You are back online.",
           type: "info",
           duration: 4000,
         });
