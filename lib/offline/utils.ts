@@ -103,7 +103,7 @@ export function isQueuedMutation(
  * Get the appropriate cache key pattern for a mutation
  * Helps with cache invalidation
  */
-export function getCacheLeyPatternForMutation(
+export function getCacheKeyPatternForMutation(
   table: string,
   resourceId?: string,
 ): string {
@@ -116,32 +116,70 @@ export function getCacheLeyPatternForMutation(
 /**
  * Create optimistic update function for a mutation
  * Used with useMutation's optimisticUpdate option
+ *
+ * @param operation Type of mutation (create, update, delete)
+ * @param payload Mutation payload containing data and optional ID
+ * @param idField Name of the ID field in payload (defaults to 'id').
+ *                For delete operations, this field must be present in payload.
+ *                For update operations, this field is used to match existing items.
+ * @returns Optimistic update function that transforms cached data, or undefined if not applicable
+ *
+ * Delete Payload Example: { id: 'world-123' } or { resourceId: 'char-456' }
+ * Update Payload Example: { id: 'world-123', name: 'New Name' }
+ * Create Payload Example: { name: 'New World', ... } (no id needed)
  */
 export function createOptimisticUpdate(
   operation: MutationOperation,
   payload: Record<string, any>,
+  idField: string = 'id',
 ): ((prev: any) => any) | undefined {
   switch (operation) {
     case "create":
       return (prev: any[]) => [...prev, payload];
 
-    case "update":
+    case "update": {
+      const updateId = payload[idField];
+      if (!updateId) {
+        logger
+          .category("storage")
+          .warn(`Optimistic update skipped: payload missing ${idField} field`, {
+            operation: "update",
+            idField,
+            payloadKeys: Object.keys(payload),
+          });
+        return undefined;
+      }
+
       return (prev: any) => {
         if (Array.isArray(prev)) {
           return prev.map((item) =>
-            item.id === payload.id ? { ...item, ...payload } : item,
+            item[idField] === updateId ? { ...item, ...payload } : item,
           );
         }
         return { ...prev, ...payload };
       };
+    }
 
-    case "delete":
+    case "delete": {
+      const deleteId = payload[idField];
+      if (!deleteId) {
+        logger
+          .category("storage")
+          .warn(`Optimistic delete skipped: payload missing ${idField} field`, {
+            operation: "delete",
+            idField,
+            payloadKeys: Object.keys(payload),
+          });
+        return undefined;
+      }
+
       return (prev: any) => {
         if (Array.isArray(prev)) {
-          return prev.filter((item) => item.id !== payload.id);
+          return prev.filter((item) => item[idField] !== deleteId);
         }
         return null;
       };
+    }
 
     default:
       return undefined;

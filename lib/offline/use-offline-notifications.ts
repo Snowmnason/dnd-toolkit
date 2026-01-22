@@ -9,7 +9,7 @@
  */
 
 import { NetworkDetection, NetworkStatus } from "@/lib/network";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface OfflineToastState {
   visible: boolean;
@@ -26,8 +26,18 @@ export function useOfflineNotifications(): OfflineToastState {
     duration: 2500,
   });
 
+  // Use ref to track the timer ID for cleanup (prevents memory leaks)
+  // Timer can be either a number (browser) or NodeJS.Timeout (Node/Electron)
+  const timerRef = useRef<NodeJS.Timeout | number | null>(null);
+
   useEffect(() => {
     const subscription = NetworkDetection.subscribe((status: NetworkStatus) => {
+      // Clear any existing timer before creating a new one
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+
       if (!status.isOnline) {
         // Going offline
         setToastState({
@@ -46,18 +56,23 @@ export function useOfflineNotifications(): OfflineToastState {
         });
       }
 
-      // Auto-hide after duration (in AppToast component's duration prop)
-      const timer = setTimeout(() => {
+      // Auto-hide after duration
+      // Store timer ID in ref so we can clear it on next status change
+      timerRef.current = setTimeout(() => {
         setToastState((prev) => ({
           ...prev,
           visible: false,
         }));
+        timerRef.current = null;
       }, 4000);
-
-      return () => clearTimeout(timer);
     });
 
+    // Cleanup: clear timer and unsubscribe when component unmounts
     return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
       subscription?.();
     };
   }, []);

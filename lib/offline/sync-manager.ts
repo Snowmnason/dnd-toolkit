@@ -19,6 +19,7 @@ import {
 } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
 import { executeConflictResolution } from "./conflict-resolution";
+import { getConflictQueueManager } from "./conflict-queue-manager";
 import { OfflineMutationQueue } from "./mutation-queue";
 import { executeSyncHandler } from "./sync-handlers";
 import type {
@@ -142,7 +143,7 @@ class OnlineSyncManagerService {
     // Reset status
     this.lastSyncStatus = {
       isSyncing: true,
-      totalQueued: await OfflineMutationQueue.size(),
+      totalQueued: OfflineMutationQueue.size(),
       syncedCount: 0,
       failedCount: 0,
       conflicts: [],
@@ -199,7 +200,7 @@ class OnlineSyncManagerService {
 
       this.lastSyncStatus.syncedCount = totalSynced;
       this.lastSyncStatus.failedCount = totalFailed;
-      this.lastSyncStatus.totalQueued = await OfflineMutationQueue.size();
+      this.lastSyncStatus.totalQueued = OfflineMutationQueue.size();
 
       const duration = Date.now() - startTime;
       logger
@@ -262,9 +263,15 @@ class OnlineSyncManagerService {
             message: handlerResult.error || "Conflict detected",
           };
 
+          // Enqueue conflict for tracking, debugging, and potential future user-choice modal
+          // This records the conflict even though v1 auto-resolves with LWW
+          getConflictQueueManager().enqueueConflict(mutation, conflictData);
+
           // v1: Always use Last-Write-Wins (LWW)
+          // TODO: Extract actual server timestamp from handlerResult.data.updated_at or response headers
+          // For now, pass undefined to trigger conservative server-wins behavior when timestamp is unavailable.
           const resolution = executeConflictResolution(mutation, conflictData, {
-            timestamp: Date.now(),
+            timestamp: undefined,
           });
 
           logger

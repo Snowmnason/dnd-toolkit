@@ -36,7 +36,12 @@ export { OnlineSyncManager } from "./sync-manager";
 export { useConflictQueue } from "./use-conflict-queue";
 export { useOfflineNotifications } from "./use-offline-notifications";
 export { useSyncNotifications } from "./use-sync-notifications";
-export { enqueueIfOffline } from "./utils";
+export {
+    enqueueIfOffline,
+    isQueuedMutation,
+    getCacheKeyPatternForMutation,
+    createOptimisticUpdate
+} from "./utils";
 
 export type {
     MutationOperation,

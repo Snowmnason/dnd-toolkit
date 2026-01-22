@@ -29,22 +29,38 @@ export interface ConflictResolutionResult {
 /**
  * Last-Write-Wins (LWW): Compare timestamps, newer wins
  * Simpler but may lose data. Use for low-stakes content (v1).
+ *
+ * @param mutation - The queued offline mutation
+ * @param conflict - The conflict details
+ * @param serverTimestamp - Server version timestamp (milliseconds). If undefined/null,
+ *                          defaults to server-wins (conservative: discard local mutation)
+ *                          to avoid incorrect local-wins when server time is unknown.
  */
 export function resolveLastWriteWins(
   mutation: QueuedMutation,
   conflict: SyncConflict,
-  serverTimestamp?: number,
+  serverTimestamp?: number | null,
 ): ConflictResolutionResult {
   const localTimestamp = mutation.timestamp;
-  const serverTime = serverTimestamp || 0;
 
-  if (serverTime > localTimestamp) {
+  // If server timestamp is unknown/unavailable, be conservative: server wins
+  // This prevents incorrect local-wins behavior when timestamp info is missing
+  if (serverTimestamp === undefined || serverTimestamp === null) {
+    return {
+      strategy: "last-write-wins",
+      shouldRetry: false,
+      shouldKeep: false,
+      reason: "Server timestamp unavailable; conservative approach: discarding local mutation",
+    };
+  }
+
+  if (serverTimestamp > localTimestamp) {
     // Server is newer, discard offline mutation
     return {
       strategy: "last-write-wins",
       shouldRetry: false,
       shouldKeep: false,
-      reason: `Server version is newer (server: ${serverTime}, local: ${localTimestamp})`,
+      reason: `Server version is newer (server: ${serverTimestamp}, local: ${localTimestamp})`,
     };
   } else {
     // Local is newer or equal, retry with local version
@@ -52,7 +68,7 @@ export function resolveLastWriteWins(
       strategy: "last-write-wins",
       shouldRetry: true,
       shouldKeep: true,
-      reason: `Local version is newer or equal (local: ${localTimestamp}, server: ${serverTime})`,
+      reason: `Local version is newer or equal (local: ${localTimestamp}, server: ${serverTimestamp})`,
     };
   }
 }

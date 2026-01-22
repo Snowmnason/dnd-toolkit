@@ -53,8 +53,8 @@ export const STORAGE_BACKEND_CONFIG: Record<string, StorageBackend> = {
   // Invites - important auth flow state
   "dnd:invite:pending": "localStorage",
 
-  // Offline sync queue - must persist across sessions for offline-first feature
-  "dnd:offline:mutation_queue": "localStorage",
+  // Offline sync queue - user mutations with sensitive payload data, must be encrypted
+  "dnd:offline:mutation_queue": "secure",
 
   // =============== sessionStorage (Ephemeral, Cache) ===============
   // Query cache - refetchable on demand, can use faster unencrypted storage
