@@ -15,10 +15,17 @@
 
 export { OfflineMutationQueue } from "./mutation-queue";
 export {
-    clearAllHandlers, executeSyncHandler, getRegisteredTables, getSyncHandler, registerSyncHandler, type SyncHandler,
+    clearAllHandlers,
+    executeSyncHandler,
+    getRegisteredTables,
+    getSyncHandler,
+    registerSyncHandler,
+    type SyncHandler,
     type SyncHandlerResult
 } from "./sync-handlers";
 export { OnlineSyncManager } from "./sync-manager";
+export { useOfflineNotifications } from "./use-offline-notifications";
+export { useSyncNotifications } from "./use-sync-notifications";
 export { enqueueIfOffline } from "./utils";
 
 export type {
