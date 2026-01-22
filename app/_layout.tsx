@@ -1,11 +1,14 @@
+import {
+  OfflineSyncNotificationLayer
+} from "@/components/offline";
 import { NotificationContainer, TopBar } from "@/components/ui";
 import { useAnalyticsNavigation } from "@/hooks/use-analytics-navigation";
 import { NotificationProvider } from "@/hooks/use-notifications";
 import {
-    AppErrorBoundary,
-    getRouteConfig,
-    resolveBackTarget,
-    resolveTitle,
+  AppErrorBoundary,
+  getRouteConfig,
+  resolveBackTarget,
+  resolveTitle,
 } from "@/lib";
 import { Analytics, sessionManager } from "@/lib/analytics";
 import { getAppConfig } from "@/lib/config/loader";
@@ -18,29 +21,29 @@ import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ThemeProvider, UseTheme } from "@/theme";
 import Constants from "expo-constants";
 import {
-    Stack,
-    useLocalSearchParams,
-    useRouter,
-    useSegments,
+  Stack,
+  useLocalSearchParams,
+  useRouter,
+  useSegments,
 } from "expo-router";
 import { useEffect } from "react";
 import { View } from "react-native";
 import LoadingOverlay from "../components/LoadingOverlay";
 import {
-    CrashFallBack,
-    RouteErrorBoundary,
-    SplashScreen,
+  CrashFallBack,
+  RouteErrorBoundary,
+  SplashScreen,
 } from "../components/SplashScreen";
 import {
-    AppParamsStableProvider,
-    useAppParamsStable,
-    useUserId,
+  AppParamsStableProvider,
+  useAppParamsStable,
+  useUserId,
 } from "../contexts/AppParamsStableContext";
 import {
-    AppParamsVolatileProvider,
-    useAppParamsVolatile,
-    useUserRole,
-    useWorldId,
+  AppParamsVolatileProvider,
+  useAppParamsVolatile,
+  useUserRole,
+  useWorldId,
 } from "../contexts/AppParamsVolatileContext";
 import { PlatformProvider, usePlatform } from "../contexts/PlatformContext";
 import { useSplashScreen } from "../hooks/use-splash-screen";
@@ -127,6 +130,9 @@ function RootLayoutContent() {
   // Data loading hooks
   const kernel = useAppKernel();
   const splash = useSplashScreen();
+
+  // FUTURE: Offline conflict resolution (disabled for v1 - LWW only)
+  // v1 uses automatic Last-Write-Wins for all conflicts
 
   // Log every render with session ID
   // Debug: Uncomment to trace root layout renders
@@ -324,6 +330,12 @@ function RootLayoutContent() {
 
         {/* Notification Container - renders all queued notifications */}
         <NotificationContainer />
+
+        {/* Offline sync status and notifications */}
+        <OfflineSyncNotificationLayer />
+
+        {/* FUTURE: Conflict resolution modal (disabled for v1 - LWW only) */}
+        {/* v1 uses automatic Last-Write-Wins for all conflicts */}
       </View>
     </RouteErrorBoundary>
   );

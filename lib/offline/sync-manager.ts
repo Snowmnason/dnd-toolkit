@@ -18,6 +18,7 @@ import {
     type NetworkStatus,
 } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
+import { executeConflictResolution } from "./conflict-resolution";
 import { OfflineMutationQueue } from "./mutation-queue";
 import { executeSyncHandler } from "./sync-handlers";
 import type {
@@ -254,18 +255,61 @@ class OnlineSyncManagerService {
         const retryable = isNetworkError || isRateLimited;
 
         if (isConflict) {
-          return {
+          // Create conflict object for tracking
+          const conflictData = {
             mutationId: mutation.id,
-            success: false,
-            error: handlerResult.error || "Conflict detected",
-            conflict: {
-              mutationId: mutation.id,
-              type: "version_mismatch",
-              message: handlerResult.error || "Conflict detected",
-              suggestedStrategy: this.config.conflictStrategy as any,
-            },
-            retryable: false,
+            type: "version_mismatch" as const,
+            message: handlerResult.error || "Conflict detected",
           };
+
+          // v1: Always use Last-Write-Wins (LWW)
+          const resolution = executeConflictResolution(mutation, conflictData, {
+            timestamp: Date.now(),
+          });
+
+          logger
+            .category("storage")
+            .info("Conflict detected and resolved (LWW)", {
+              mutationId: mutation.id,
+              conflictType: conflictData.type,
+              strategy: resolution.strategy,
+              shouldRetry: resolution.shouldRetry,
+              shouldKeep: resolution.shouldKeep,
+            });
+
+          // v1: Apply LWW automatically for all content (no user-choice modal)
+          if (resolution.shouldRetry) {
+            // Retry: keep in queue, will retry on next sync
+            await OfflineMutationQueue.markFailed(
+              mutation.id,
+              `Conflict resolved (LWW: local newer): ${handlerResult.error || "Version mismatch"}`,
+            );
+
+            return {
+              mutationId: mutation.id,
+              success: false,
+              error: handlerResult.error || "Conflict detected",
+              conflict: conflictData,
+              retryable: true, // Will retry
+            };
+          } else {
+            // Discard: remove from queue (server won)
+            await OfflineMutationQueue.remove([mutation.id]);
+
+            logger
+              .category("storage")
+              .info("Mutation discarded (LWW: server newer)", {
+                mutationId: mutation.id,
+              });
+
+            return {
+              mutationId: mutation.id,
+              success: false,
+              error: handlerResult.error || "Conflict detected",
+              conflict: conflictData,
+              retryable: false, // Discarded
+            };
+          }
         }
 
         if (retryable) {
