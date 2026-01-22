@@ -267,6 +267,19 @@ class AppKernelClass {
             .debug(
               `Network detection initialized: online=${initialStatus.isOnline}, type=${initialStatus.type}`,
             );
+
+          // Initialize offline sync manager (Phase 1: Foundation)
+          try {
+            const { OnlineSyncManager } = await import("@/lib/offline");
+            await OnlineSyncManager.initialize();
+            logger.category("bootstrap").debug("OnlineSyncManager initialized");
+          } catch (error) {
+            logger
+              .category("bootstrap")
+              .warn("OnlineSyncManager initialization failed (non-critical)", {
+                error: (error as Error).message,
+              });
+          }
         } catch (error) {
           logger
             .category("bootstrap")
