@@ -1,0 +1,213 @@
+/**
+ * Offline Mutation Queue
+ *
+ * Manages a persistent queue of mutations made while offline.
+ * Stores mutations in SecureStorage (encrypted, survives app restart).
+ *
+ * Features:
+ * - FIFO ordering by timestamp
+ * - UUID-based tracking
+ * - Retry counting
+ * - Conflict detection metadata
+ * - Cache invalidation tags
+ */
+
+import { SecureStorage } from "@/lib/storage";
+import { logger } from "@/lib/utils/logger";
+import type { QueuedMutation } from "./types";
+
+/**
+ * Generate a UUID v4
+ */
+function generateUUID(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for older environments
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/**
+ * Storage key for the offline mutation queue
+ */
+const STORAGE_KEY_OFFLINE_QUEUE = "dnd:offline:mutation_queue";
+
+/**
+ * Default configuration for offline sync
+ */
+const DEFAULT_CONFIG = {
+  batchSize: 5,
+  debounceMs: 5000,
+  maxRetries: 5,
+  retryBaseMs: 2000,
+};
+
+class OfflineMutationQueueService {
+  private queue: QueuedMutation[] = [];
+  private initialized = false;
+
+  /**
+   * Initialize the queue from storage
+   * Call once on app startup
+   */
+  async initialize(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+
+    try {
+      const stored = await SecureStorage.getJSON<QueuedMutation[]>(
+        STORAGE_KEY_OFFLINE_QUEUE,
+      );
+
+      if (Array.isArray(stored)) {
+        this.queue = stored;
+        logger
+          .category("storage")
+          .info(`Loaded ${this.queue.length} queued mutations from storage`);
+      }
+      this.initialized = true;
+    } catch (error) {
+      logger
+        .category("error")
+        .error("Failed to initialize offline mutation queue:", error);
+      this.initialized = true; // Don't block app startup
+    }
+  }
+
+  /**
+   * Add a mutation to the queue
+   * Call this when a mutation is made offline
+   */
+  async enqueue(
+    mutation: Omit<QueuedMutation, "id" | "timestamp" | "retryCount">,
+  ): Promise<QueuedMutation> {
+    const queued: QueuedMutation = {
+      ...mutation,
+      id: generateUUID(),
+      timestamp: Date.now(),
+      retryCount: 0,
+    };
+
+    this.queue.push(queued);
+    await this.persist();
+
+    logger
+      .category("storage")
+      .debug(
+        `Queued mutation: ${queued.id} (${queued.operation} on ${queued.table})`,
+      );
+
+    return queued;
+  }
+
+  /**
+   * Get the next batch of mutations to sync
+   */
+  async peek(
+    batchSize: number = DEFAULT_CONFIG.batchSize,
+  ): Promise<QueuedMutation[]> {
+    // Return next N mutations sorted by timestamp (oldest first)
+    return this.queue
+      .slice(0, batchSize)
+      .sort((a, b) => a.timestamp - b.timestamp);
+  }
+
+  /**
+   * Remove a mutation from the queue after successful sync
+   */
+  async remove(ids: string[]): Promise<void> {
+    const beforeCount = this.queue.length;
+    this.queue = this.queue.filter((m) => !ids.includes(m.id));
+    const removedCount = beforeCount - this.queue.length;
+
+    if (removedCount > 0) {
+      await this.persist();
+      logger
+        .category("storage")
+        .debug(`Removed ${removedCount} synced mutations from queue`);
+    }
+  }
+
+  /**
+   * Mark a mutation as failed (increment retry count)
+   */
+  async markFailed(id: string, reason: string): Promise<void> {
+    const mutation = this.queue.find((m) => m.id === id);
+    if (!mutation) {
+      logger.category("error").warn(`Mutation ${id} not found in queue`);
+      return;
+    }
+
+    mutation.retryCount++;
+    await this.persist();
+
+    logger
+      .category("storage")
+      .debug(
+        `Marked mutation ${id} as failed (attempt ${mutation.retryCount}): ${reason}`,
+      );
+  }
+
+  /**
+   * Remove a mutation permanently (after max retries or user action)
+   */
+  async discard(id: string, reason: string): Promise<void> {
+    const before = this.queue.length;
+    this.queue = this.queue.filter((m) => m.id !== id);
+    if (this.queue.length < before) {
+      await this.persist();
+      logger.category("storage").info(`Discarded mutation ${id}: ${reason}`);
+    }
+  }
+
+  /**
+   * Get current queue size
+   */
+  size(): number {
+    return this.queue.length;
+  }
+
+  /**
+   * Get all queued mutations (for debugging/UI)
+   */
+  async getAll(): Promise<QueuedMutation[]> {
+    return [...this.queue];
+  }
+
+  /**
+   * Clear the entire queue (use with caution)
+   */
+  async clear(): Promise<void> {
+    this.queue = [];
+    await SecureStorage.removeItem(STORAGE_KEY_OFFLINE_QUEUE);
+    logger.category("storage").warn("Cleared offline mutation queue");
+  }
+
+  /**
+   * Persist queue to storage
+   */
+  private async persist(): Promise<void> {
+    try {
+      await SecureStorage.setJSON(STORAGE_KEY_OFFLINE_QUEUE, this.queue);
+    } catch (error) {
+      logger
+        .category("error")
+        .error("Failed to persist mutation queue:", error);
+    }
+  }
+
+  /**
+   * Get mutation by ID (for sync manager)
+   */
+  getMutation(id: string): QueuedMutation | undefined {
+    return this.queue.find((m) => m.id === id);
+  }
+}
+
+// Singleton instance
+export const OfflineMutationQueue = new OfflineMutationQueueService();

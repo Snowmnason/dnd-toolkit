@@ -143,7 +143,9 @@ function TopBar({
           >
             {title}
           </Text>
-          {Platform.OS !== "web" && (
+          {(Platform.OS !== "web" ||
+            (typeof navigator !== "undefined" &&
+              navigator.userAgent.includes("Electron"))) && (
             <View
               style={[
                 styles.wifiIndicator,

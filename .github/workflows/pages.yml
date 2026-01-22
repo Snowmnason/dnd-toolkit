@@ -85,7 +85,11 @@ jobs:
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
-        run: npm run predeploy
+        run: |
+          echo "Checking Supabase envs for web build (pages)"
+          if [ -z "$EXPO_PUBLIC_SUPABASE_URL" ] ; then echo "MISSING EXPO_PUBLIC_SUPABASE_URL"; else echo "EXPO_PUBLIC_SUPABASE_URL length: ${#EXPO_PUBLIC_SUPABASE_URL}"; fi
+          if [ -z "$EXPO_PUBLIC_SUPABASE_ANON_KEY" ] ; then echo "MISSING EXPO_PUBLIC_SUPABASE_ANON_KEY"; else echo "EXPO_PUBLIC_SUPABASE_ANON_KEY length: ${#EXPO_PUBLIC_SUPABASE_ANON_KEY}"; fi
+          npm run predeploy
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

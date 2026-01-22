@@ -53,6 +53,9 @@ export const STORAGE_BACKEND_CONFIG: Record<string, StorageBackend> = {
   // Invites - important auth flow state
   "dnd:invite:pending": "localStorage",
 
+  // Offline sync queue - user mutations with sensitive payload data, must be encrypted
+  "dnd:offline:mutation_queue": "secure",
+
   // =============== sessionStorage (Ephemeral, Cache) ===============
   // Query cache - refetchable on demand, can use faster unencrypted storage
   // Pattern: query_cache_*
@@ -81,7 +84,7 @@ export const STORAGE_BACKEND_CONFIG: Record<string, StorageBackend> = {
  */
 export function getStorageBackend(key: string): StorageBackend {
   // Exact match first
-   
+
   if (key in STORAGE_BACKEND_CONFIG) {
     // eslint-disable-next-line security/detect-object-injection
     return STORAGE_BACKEND_CONFIG[key];
@@ -99,7 +102,7 @@ export function getStorageBackend(key: string): StorageBackend {
   }
 
   // Default to secure storage
-   
+
   return STORAGE_BACKEND_CONFIG["*"] || "secure";
 }
 
