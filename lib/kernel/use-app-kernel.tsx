@@ -15,6 +15,9 @@ import {
 import { logger } from "../utils/logger";
 import { AppKernel, AppKernelState } from "./app-kernel";
 
+// Module-level diagnostic
+console.log("[KERNEL_PROVIDER] Module loaded, typeof window:", typeof window);
+
 /**
  * React context for kernel state
  */
@@ -29,16 +32,28 @@ interface AppKernelProviderProps {
  * Initializes the kernel and provides state to all consumers
  */
 export function AppKernelProvider({ children }: AppKernelProviderProps) {
+  console.log("[KERNEL_PROVIDER] Render: Provider component mounted");
   const [state, setState] = useState<AppKernelState>(AppKernel.getState());
 
   useEffect(() => {
+    console.log(
+      "[KERNEL_PROVIDER] useEffect: Hook fired, calling AppKernel.initialize()",
+    );
+
     // Initialize kernel once on mount
     AppKernel.initialize().catch((error: unknown) => {
-      // Error is already logged in kernel, but we can handle it here if needed
+      console.error(
+        "[KERNEL_PROVIDER] useEffect: Kernel initialization failed:",
+        error,
+      );
       logger
         .category("bootstrap")
         .error("[AppKernelProvider] Kernel initialization failed:", error);
     });
+
+    console.log(
+      "[KERNEL_PROVIDER] useEffect: AppKernel.initialize() called (async), subscribing to state",
+    );
 
     // Subscribe to kernel state changes
     const unsubscribe = AppKernel.subscribe((newState: AppKernelState) => {
