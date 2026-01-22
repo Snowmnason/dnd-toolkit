@@ -16,4 +16,4 @@ When the handler contract is agreed and handlers start returning `updated_at`/se
 - Add unit tests validating `resolveLastWriteWins` with real server timestamps.
 - Ensure `ConflictQueueManager.enqueueConflict` is called for all conflict cases and that recorded entries include the handler's returned metadata (server timestamp, response id/etag).
 
-If you'd like, I can open follow-up tasks (PR-ready) to implement the handler contract, wire `updated_at`, and add tests once you confirm the field names. 
+If you'd like, I can open follow-up tasks (PR-ready) to implement the handler contract, wire `updated_at`, and add tests once you confirm the field names.
