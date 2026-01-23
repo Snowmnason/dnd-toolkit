@@ -106,6 +106,13 @@ When creating feature documentation:
 - Include code examples, API reference, troubleshooting, and best practices
 - Check folder structure for highest label Milestone and create subfolder if needed
 
+- When adding or changing public hooks, API behaviors, or storage/cache schemas, add or update a corresponding test guide under `docs/A Testing Guide`.
+- Follow the repository test-case template (H1 title, `##` sections, and `###` test cases with checkboxes, screenshots, and console-log capture).
+- If a feature needs scripts for validation, include a "Scripts" section describing passing/failing scripts and admin execution constraints (Supabase flag). Do not commit runnable or destructive scripts without review.
+- Also create/update `docs/A Testing Guide/MAINTAINING_TEST_GUIDES.md` with environment and reporting notes.
+
+This file exists to make the testing guidance discoverable until `.github/copilot-instructions.md` can be updated directly.
+
 ## Milestone Overview
 
 For a comprehensive overview of all Milestone 1 implementations, see `docs/issues/MileStone 1/MILESTONE_1_OVERVIEW.md`. This document summarizes all features, architectural changes, and provides quick links to detailed documentation.
