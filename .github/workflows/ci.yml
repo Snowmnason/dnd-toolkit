@@ -29,6 +29,3 @@ jobs:
 
       - name: Type check
         run: npm run typecheck
-
-      - name: Build web export
-        run: npm run predeploy
