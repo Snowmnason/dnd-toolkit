@@ -133,20 +133,12 @@ Recommended script specs (create one spec per script; do not commit runnable scr
 This mapping is a short, temporary reference to help authors and QA know which `lib/` areas a hook exercises. Update or remove as the codebase evolves — this is intentionally a snapshot.
 
 - `use-analytics-navigation.tsx` → `lib/analytics`
-- `use-app-navigation.tsx` → `lib/navigation`, `lib/utils/logger`
-- `use-auth-status.tsx` → `lib/` (supabase session)
 - `use-feature-flag.ts` → `lib/feature-flags`
-- `use-invites-mutation.tsx` → `lib/cache`, `lib/database/invites`
 - `use-premium-feature.ts` → `lib/analytics`, `lib/premium`, `lib/utils/logger`
 - `use-render-tracker.tsx` → `lib/config`
 - `use-splash-screen.tsx` → `lib/feature-flags`, `lib/kernel`, `lib/utils/logger`
-- `use-success-navigation.tsx` → `lib/navigation`
 - `use-users-query.tsx` → `lib/cache`, `lib/database/users`
 - `use-users-mutation.tsx` → `lib/database/users`, `lib/cache`, `lib/utils/logger`
-- `use-worlds-query.tsx` → `lib/cache`, `lib/database/worlds`
-- `use-worlds-mutation.tsx` → `lib/cache`, `lib/database/worlds`
-- `use-world-modal.tsx` → `lib/database` (users/worlds/invites), `lib/utils`
-- `use-world-creation.tsx` → `lib/database/worlds`, `lib/utils/logger`
 
 UI-only / local hooks (minimal testing required):
 
