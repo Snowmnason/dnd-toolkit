@@ -14,6 +14,7 @@
  * This is integrated into the kernel initialization as a critical validation step.
  */
 
+import Constants from "expo-constants";
 import { logger } from "@/lib/utils/logger";
 import { AppSettings } from "./loader";
 
@@ -29,6 +30,10 @@ export interface ConfigValidationResult {
 /**
  * DND-Toolkit required environment variables
  * These must be present for the app to function properly
+ * 
+ * NOTE: For Supabase vars, we accept either process.env OR app.json extra values.
+ * This allows builds to embed secrets via app.json (expo export reads from Constants.expoConfig.extra)
+ * and supports CI setups that inject env vars at build time.
  */
 const REQUIRED_ENV_VARS: Record<"production" | "development", string[]> = {
   production: [
@@ -84,6 +89,7 @@ const REQUIRED_FEATURE_FLAGS = [
 
 /**
  * Validate environment variables for DND-Toolkit
+ * Accepts values from process.env OR app.json extras (for expo export embeds)
  */
 function validateEnvironmentVariables(
   environment: "development" | "production",
@@ -97,9 +103,23 @@ function validateEnvironmentVariables(
   const required =
     REQUIRED_ENV_VARS[environment as "production" | "development"] || [];
 
+  // Get expo extra values (for app.json embedded secrets)
+  const expoExtra = Constants.expoConfig?.extra || {};
+
   for (const envVar of required) {
     // eslint-disable-next-line security/detect-object-injection
-    if (!process.env[envVar]) {
+    const envValue = (process.env as Record<string, string | undefined>)[envVar];
+
+    // For Supabase vars, also check app.json extra as fallback
+    let hasValue = !!envValue;
+    if (!hasValue && envVar === "EXPO_PUBLIC_SUPABASE_URL") {
+      hasValue = !!(expoExtra.supabaseUrl && expoExtra.supabaseUrl.length > 0);
+    }
+    if (!hasValue && envVar === "EXPO_PUBLIC_SUPABASE_ANON_KEY") {
+      hasValue = !!(expoExtra.supabaseAnonKey && expoExtra.supabaseAnonKey.length > 0);
+    }
+
+    if (!hasValue) {
       result.valid = false;
       result.errors.push(
         `Missing required environment variable: ${envVar}. ` +

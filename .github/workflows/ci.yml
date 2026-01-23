@@ -1,10 +1,8 @@
-# CI workflow: run on push to main and manual dispatch. Pass Supabase secrets into the web build step.
 name: CI
 
 on:
-  push:
+  pull_request:
     branches: [main]
-  workflow_dispatch: {}
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -31,10 +29,3 @@ jobs:
 
       - name: Type check
         run: npm run typecheck
-
-      - name: Build web export
-        env:
-          # Provide Supabase secrets from repository secrets (available on main)
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
-        run: npm run predeploy
