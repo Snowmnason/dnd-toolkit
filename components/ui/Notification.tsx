@@ -101,13 +101,13 @@ export function Notification({
         .damping(0.7)
         .delay(index * 80)}
       exiting={SlideOutUp.duration(300)}
+      pointerEvents="box-none"
       style={{
         position: "absolute",
         top: baseTop + stackOffset,
         left: isMobile ? S.space.lg : "5%",
         right: isMobile ? S.space.lg : "5%",
         zIndex: 9999 - index,
-        pointerEvents: "box-none" as const,
       }}
     >
       <Pressable onPress={handlePress} disabled={!onPress}>

@@ -13,7 +13,7 @@ import {
   FormAuthInput,
 } from "@/components/auth_components";
 import { useResetPasswordConfirm } from "@/lib";
-import { ZgetPasswordRequirementsText } from "@/lib/schemas/auth.schema";
+import { getPasswordRequirementsForUI } from "@/lib/schemas/auth.schema";
 import { useScale } from "@/theme";
 import { useRef } from "react";
 import { TextInput } from "react-native";
@@ -87,7 +87,7 @@ export default function ResetPasswordScreen() {
             opacity: 0.9,
           }}
         >
-          {ZgetPasswordRequirementsText(password)}
+          {getPasswordRequirementsForUI(password)}
         </AuthSubTitle>
 
         {/* Confirm Password Input */}

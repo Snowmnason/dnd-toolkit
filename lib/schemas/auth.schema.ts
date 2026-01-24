@@ -198,7 +198,7 @@ const validatePasswordCriteria = (password: string) => {
 /**
  * Get password requirements text for real-time feedback
  */
-export const ZgetPasswordRequirementsText = (password: string): string => {
+export const getPasswordRequirementsForUI = (password: string): string => {
   if (!password) {
     return " ";
   }

@@ -7,9 +7,9 @@ import { buildRoute } from "../navigation/uri-helpers";
 import {
   type CompleteProfileFormData,
   completeProfileSchema,
+  getPasswordRequirementsForUI,
   type SignUpFormData,
   signUpSchema,
-  ZgetPasswordRequirementsText,
 } from "../schemas/auth.schema";
 import { SecureStorage, STORAGE_KEYS } from "../storage";
 import { logger } from "../utils/logger";
@@ -200,7 +200,7 @@ export const useSignUpForm = (mode: SignUpMode = "signup", user?: any) => {
 
     // UI helpers
     getPasswordRequirementsText: () =>
-      ZgetPasswordRequirementsText(password || ""),
+      getPasswordRequirementsForUI(password || ""),
     getUsernameDisplayText,
     getPasswordMatchText,
   };

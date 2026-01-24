@@ -1,9 +1,9 @@
 import {
-  generateWorldInviteLink,
-  logger,
-  usersDB,
-  validateWorldName,
-  worldsDB,
+    generateWorldInviteLink,
+    logger,
+    usersDB,
+    validateWorldName,
+    worldsDB,
 } from "@/lib/";
 import { useState } from "react";
 
@@ -38,16 +38,6 @@ export const useWorldModal = (options?: UseWorldModalOptions) => {
     if (!isValid) {
       logger.warn("ui", "World name validation failed:", errors.join("; "));
       return;
-    }
-
-    let currentUserId = userId;
-    if (!currentUserId) {
-      const currentUser = await usersDB.getCurrentUser();
-      if (!currentUser?.id) {
-        logger.error("ui", "No user ID available for update operation");
-        return;
-      }
-      currentUserId = currentUser.id;
     }
 
     try {
@@ -95,7 +85,6 @@ export const useWorldModal = (options?: UseWorldModalOptions) => {
         // Allow user to try again
         setGeneratingLink(false);
       }
-      // Note: generatingLink stays true until modal is reopened (prevents spam clicking)
     };
 
   const createDeleteWorldHandler =
