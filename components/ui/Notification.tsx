@@ -1,30 +1,30 @@
-import { usePlatform } from '@/contexts/PlatformContext'
-import { logger } from '@/lib/utils/logger'
-import { $, S, UseTheme } from '@/theme'
-import { Ionicons } from '@expo/vector-icons'
-import { useMemo } from 'react'
-import { Pressable, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import Animated, { FadeInDown, SlideOutUp } from 'react-native-reanimated'
-import { Body, Caption } from './AppText'
-import { getShadowStyle } from './Resuables/shadows'
+import { logger } from "@/lib/utils/logger";
+import { usePlatform } from "@/providers/PlatformProvider";
+import { $, S, UseTheme } from "@/theme";
+import { Ionicons } from "@expo/vector-icons";
+import { useMemo } from "react";
+import { Pressable, View } from "react-native";
+import Animated, { FadeInDown, SlideOutUp } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Body, Caption } from "./AppText";
+import { getShadowStyle } from "./Resuables/shadows";
 
-export type NotificationType = 'message' | 'update' | 'alert' | 'info'
+export type NotificationType = "message" | "update" | "alert" | "info";
 
 export interface NotificationData {
-  id: string
-  type: NotificationType
-  title: string
-  message: string
-  timestamp?: Date
-  avatar?: string // URL or icon name
-  onPress?: () => void
-  onDismiss?: () => void
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  timestamp?: Date;
+  avatar?: string; // URL or icon name
+  onPress?: () => void;
+  onDismiss?: () => void;
 }
 
 interface NotificationProps extends NotificationData {
-  visible: boolean
-  index?: number // For stacking multiple notifications
+  visible: boolean;
+  index?: number; // For stacking multiple notifications
 }
 
 /**
@@ -45,56 +45,69 @@ export function Notification({
   onDismiss,
   index = 0,
 }: NotificationProps) {
-  const { theme } = UseTheme()
-  const { isMobile } = usePlatform()
-  const insets = useSafeAreaInsets()
-  logger.debug(`[Notification] visible: ${visible}, id=${id}`)
+  const { theme } = UseTheme();
+  const { isMobile } = usePlatform();
+  const insets = useSafeAreaInsets();
+  logger.debug(`[Notification] visible: ${visible}, id=${id}`);
 
   // Icon based on type
-  const iconName = 
-    type === 'message' ? 'chatbubble' :
-    type === 'update' ? 'refresh-circle' :
-    type === 'alert' ? 'warning' :
-    'information-circle'
+  const iconName =
+    type === "message"
+      ? "chatbubble"
+      : type === "update"
+        ? "refresh-circle"
+        : type === "alert"
+          ? "warning"
+          : "information-circle";
 
   // Memoize all colors to prevent re-renders
-  const colors = useMemo(() => ({
-    icon: type === 'message' ? $('accent', theme) :
-          type === 'update' ? $('info', theme) :
-          type === 'alert' ? $('warning', theme) :
-          $('textSecondary', theme),
-    surface: $('surface', theme),
-    border: $('borderSubtle', theme),
-    dismissIcon: $('textSecondary', theme),
-  }), [type, theme])
+  const colors = useMemo(
+    () => ({
+      icon:
+        type === "message"
+          ? $("accent", theme)
+          : type === "update"
+            ? $("info", theme)
+            : type === "alert"
+              ? $("warning", theme)
+              : $("textSecondary", theme),
+      surface: $("surface", theme),
+      border: $("borderSubtle", theme),
+      dismissIcon: $("textSecondary", theme),
+    }),
+    [type, theme],
+  );
 
-  if (!visible) return null
+  if (!visible) return null;
 
   const handlePress = () => {
-    onPress?.()
-  }
+    onPress?.();
+  };
 
   const handleDismiss = () => {
-    onDismiss?.()
-  }
+    onDismiss?.();
+  };
 
   // Calculate vertical offset for stacking
-  const stackOffset = index * (isMobile ? 90 : 100)
-  const baseTop = isMobile ? insets.top + 12 : 80
+  const stackOffset = index * (isMobile ? 90 : 100);
+  const baseTop = isMobile ? insets.top + 12 : 80;
 
-  logger.debug('ui', 'Rendering id:', id, 'type:', type)
+  logger.debug("ui", "Rendering id:", id, "type:", type);
 
   return (
     <Animated.View
-      entering={FadeInDown.duration(500).springify().damping(0.7).delay(index * 80)}
+      entering={FadeInDown.duration(500)
+        .springify()
+        .damping(0.7)
+        .delay(index * 80)}
       exiting={SlideOutUp.duration(300)}
+      pointerEvents="box-none"
       style={{
-        position: 'absolute',
+        position: "absolute",
         top: baseTop + stackOffset,
-        left: isMobile ? S.space.lg : '5%',
-        right: isMobile ? S.space.lg : '5%',
+        left: isMobile ? S.space.lg : "5%",
+        right: isMobile ? S.space.lg : "5%",
         zIndex: 9999 - index,
-        pointerEvents: 'box-none' as const,
       }}
     >
       <Pressable onPress={handlePress} disabled={!onPress}>
@@ -104,13 +117,13 @@ export function Notification({
             borderRadius: S.radius.lg,
             borderWidth: 2,
             borderColor: colors.border,
-            ...getShadowStyle('combined'),
+            ...getShadowStyle("combined"),
           }}
         >
           <View
             style={{
-              flexDirection: 'row',
-              alignItems: 'flex-start',
+              flexDirection: "row",
+              alignItems: "flex-start",
               gap: S.space.sm,
               paddingHorizontal: S.space.md,
               paddingVertical: S.space.sm,
@@ -119,8 +132,8 @@ export function Notification({
             {/* Icon */}
             <View
               style={{
-                alignItems: 'center',
-                justifyContent: 'center',
+                alignItems: "center",
+                justifyContent: "center",
                 paddingTop: 2,
                 minWidth: 24,
               }}
@@ -159,33 +172,29 @@ export function Notification({
             {/* Dismiss button */}
             <Pressable
               onPress={handleDismiss}
-              style={{ padding: S.space.xs, marginLeft: 'auto' }}
+              style={{ padding: S.space.xs, marginLeft: "auto" }}
               hitSlop={8}
             >
-              <Ionicons
-                name="close"
-                size={18}
-                color={colors.dismissIcon}
-              />
+              <Ionicons name="close" size={18} color={colors.dismissIcon} />
             </Pressable>
           </View>
         </View>
       </Pressable>
     </Animated.View>
-  )
+  );
 }
 
 /**
  * Format timestamp to relative time
  */
 function formatTimestamp(date: Date): string {
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
 
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  return date.toLocaleDateString()
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return date.toLocaleDateString();
 }

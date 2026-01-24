@@ -1,10 +1,10 @@
 import { Button, Card, Heading, LazyImage } from "@/components/ui";
-import { useAppParamsStable } from "@/contexts/AppParamsStableContext";
-import { useAppParamsVolatile } from "@/contexts/AppParamsVolatileContext";
-import { usePlatform } from "@/contexts/PlatformContext";
 import { WorldWithAccess } from "@/lib/database/worlds";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
 import { logger } from "@/lib/utils/logger";
+import { useAppParamsStable } from "@/providers/AppParamsStableProvider";
+import { useAppParamsVolatile } from "@/providers/AppParamsVolatileProvider";
+import { usePlatform } from "@/providers/PlatformProvider";
 import { $, useScale, UseTheme } from "@/theme";
 import { useRouter } from "expo-router";
 import { View } from "react-native";

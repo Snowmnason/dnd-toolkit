@@ -1,12 +1,12 @@
 import { ConfirmLeaveModal, EditWorldModal } from "@/components/modals";
 import { AppLoading, AppPage, AppSplit, Body, Button } from "@/components/ui";
+import { usePanelNavigation } from "@/hooks/navigation/use-panel-navigation";
+import { useWorlds } from "@/hooks/queries/use-worlds";
+import { useWorldModal } from "@/hooks/utils/use-world-modal";
 import {
   useAppParamsStable,
   useUserId,
-} from "@/contexts/AppParamsStableContext";
-import { usePanelNavigation } from "@/hooks/use-panel-navigation";
-import { useWorldModal } from "@/hooks/use-world-modal";
-import { useWorlds } from "@/lib";
+} from "@/providers/AppParamsStableProvider";
 import { WorldListPanel } from "@/Screens/select/world-selection/WorldListPanel";
 import { WorldRightPanel } from "@/Screens/select/world-selection/WorldRightPanel";
 import { useState } from "react";
@@ -136,16 +136,16 @@ export default function LandingPage() {
           handleConfirmWorldName(
             selectedWorld?.world_id,
             modalWorldName,
-            userId
+            userId,
           )
         }
         onGenerateInviteLink={createGenerateInviteLinkHandler(
           selectedWorld?.world_id,
-          selectedWorld?.name
+          selectedWorld?.name,
         )}
         onDeleteWorld={createDeleteWorldHandler(
           selectedWorld?.world_id,
-          userId
+          userId,
         )}
         generatingLink={generatingLink}
       />
@@ -155,7 +155,7 @@ export default function LandingPage() {
         worldName={modalWorldName}
         onConfirmLeave={createRemoveFromWorldHandler(
           selectedWorld?.world_id,
-          userId
+          userId,
         )}
       />
     </>

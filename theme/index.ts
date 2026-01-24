@@ -1,21 +1,21 @@
 // 🔮 Central theme entry point — exports, registration & preload
-import { logger } from '@/lib/utils/logger'
-import { allThemes, ThemeFamilyName } from './themeRegistry'
+import { logger } from "@/lib/utils/logger";
+import { allThemes, ThemeFamilyName } from "./themeRegistry";
 
 // 🧱 Theme registry (re-export)
-export { allThemes, ThemeFamilyName } from './themeRegistry'
+export { allThemes, ThemeFamilyName } from "./themeRegistry";
 
 // 🔁 Public exports
-export * from './families/Classic'
-export * from './families/Cyberpunk'
-export * from './ThemeProvider'
-export * from './tokens'
-export * from './ultils/colorUtils'
-export * from './ultils/sizing'
-export * from './ultils/tokens'
+export * from "../providers/ThemeProvider";
+export * from "./families/Classic";
+export * from "./families/Cyberpunk";
+export * from "./tokens";
+export * from "./ultils/colorUtils";
+export * from "./ultils/sizing";
+export * from "./ultils/tokens";
 
 // 🎯 Dynamic sizing hook (re-export from provider)
-export { useScale } from '@/providers/ScaleProvider'
+export { useScale } from "@/providers/ScaleProvider";
 
 /**
  * ⚡ Preload all theme assets (fonts, async color maps, etc.)
@@ -24,14 +24,14 @@ export { useScale } from '@/providers/ScaleProvider'
 export async function preloadThemes() {
   try {
     for (const [name, theme] of Object.entries(allThemes)) {
-      if (typeof (theme as any).preload === 'function') {
-        await (theme as any).preload()
-        logger.debug('other', `Preloaded assets for theme: ${name}`)
+      if (typeof (theme as any).preload === "function") {
+        await (theme as any).preload();
+        logger.debug("other", `Preloaded assets for theme: ${name}`);
       }
     }
-    logger.debug('other', 'All themes preloaded successfully')
+    logger.debug("other", "All themes preloaded successfully");
   } catch (error) {
-    logger.warn('other', 'Theme preload error (non-critical):', error)
+    logger.warn("other", "Theme preload error (non-critical):", error);
   }
 }
 
@@ -40,5 +40,5 @@ export async function preloadThemes() {
  * falls back to "classic" if key not found.
  */
 export function getThemeFamily(name?: string) {
-  return allThemes[name as ThemeFamilyName] ?? allThemes.classic
+  return allThemes[name as ThemeFamilyName] ?? allThemes.classic;
 }

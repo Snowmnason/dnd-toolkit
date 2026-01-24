@@ -1,19 +1,24 @@
-import { Button, Dropdown, Heading, FormTextInput, FormDescInput } from '@/components/ui'
-import { usePlatform } from '@/contexts/PlatformContext'
-import type { WorldFormData } from '@/lib/schemas'
-import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
-import { useScale } from '@/theme'
-import { useRouter } from 'expo-router'
-import React from 'react'
-import { ScrollView, View } from 'react-native'
-import { Controller, type Control } from 'react-hook-form'
+import {
+  Button,
+  Dropdown,
+  FormDescInput,
+  FormTextInput,
+  Heading,
+} from "@/components/ui";
+import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
+import type { WorldFormData } from "@/lib/schemas";
+import { usePlatform } from "@/providers/PlatformProvider";
+import { useScale } from "@/theme";
+import { useRouter } from "expo-router";
+import { Controller, type Control } from "react-hook-form";
+import { ScrollView, View } from "react-native";
 
 interface CreateLeftPanelProps {
-  control: Control<WorldFormData, any>
-  systemItems: { label: string; value: string }[]
-  isCreating: boolean
-  handleCreateWorld: () => void
-  isFormValid: boolean
+  control: Control<WorldFormData, any>;
+  systemItems: { label: string; value: string }[];
+  isCreating: boolean;
+  handleCreateWorld: () => void;
+  isFormValid: boolean;
 }
 
 export function CreateLeftPanel({
@@ -23,11 +28,11 @@ export function CreateLeftPanel({
   handleCreateWorld,
   isFormValid,
 }: CreateLeftPanelProps) {
-  const S = useScale()
-  const router = useRouter()
-  
+  const S = useScale();
+  const router = useRouter();
+
   // Centralized platform detection
-  const { isDesktop } = usePlatform()
+  const { isDesktop } = usePlatform();
 
   return (
     <ScrollView
@@ -61,7 +66,7 @@ export function CreateLeftPanel({
             value={field.value}
             items={systemItems}
             onChange={(value) => {
-              if (value !== null) field.onChange(value)
+              if (value !== null) field.onChange(value);
             }}
             placeholder="Select a tabletop system"
             style={{ marginBottom: S.space.md }}
@@ -78,7 +83,7 @@ export function CreateLeftPanel({
         multiline
         style={{
           height: 300,
-          textAlignVertical: 'top',
+          textAlignVertical: "top",
         }}
       />
 
@@ -95,8 +100,8 @@ export function CreateLeftPanel({
       {/* Action Buttons */}
       <View
         style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
+          flexDirection: "row",
+          justifyContent: "space-between",
           marginTop: S.space.md,
         }}
       >
@@ -104,13 +109,17 @@ export function CreateLeftPanel({
           text="Cancel"
           variant="outlined"
           onPress={() => {
-            const target = buildNavigationTarget('/select/world-selection', {}, []);
+            const target = buildNavigationTarget(
+              "/select/world-selection",
+              {},
+              [],
+            );
             router.replace(target as any);
           }}
           style={{ flex: 1, marginRight: S.space.sm }}
         />
         <Button
-          text={isCreating ? 'Creating...' : 'Create'}
+          text={isCreating ? "Creating..." : "Create"}
           variant="primary"
           onPress={handleCreateWorld}
           disabled={!isFormValid || isCreating}
@@ -118,5 +127,5 @@ export function CreateLeftPanel({
         />
       </View>
     </ScrollView>
-  )
+  );
 }

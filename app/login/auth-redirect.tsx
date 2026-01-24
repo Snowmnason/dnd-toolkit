@@ -1,12 +1,12 @@
-import { AuthModal } from '@/components/auth_components';
-import { Caption } from '@/components/ui';
-import { AuthStateManager, logger, supabase, usersDB, worldsDB } from '@/lib';
-import { SecureStorage, STORAGE_KEYS } from '@/lib/storage';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
-import CustomLoad from '../../components/ui/CustomLoad';
-import { useAppParamsStable } from '../../contexts/AppParamsStableContext';
+import { AuthModal } from "@/components/auth_components";
+import { Caption } from "@/components/ui";
+import { AuthStateManager, logger, supabase, usersDB, worldsDB } from "@/lib";
+import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import { View } from "react-native";
+import CustomLoad from "../../components/ui/CustomLoad";
+import { useAppParamsStable } from "../../providers/AppParamsStableProvider";
 
 interface PendingInvite {
   token: string;
@@ -19,13 +19,15 @@ const savePendingInvite = async (token: string, worldName: string) => {
   const inviteData: PendingInvite = {
     token,
     worldName,
-    timestamp: Date.now()
+    timestamp: Date.now(),
   };
   await SecureStorage.setJSON(STORAGE_KEYS.PENDING_INVITE, inviteData);
 };
 
 const getPendingInvite = async (): Promise<PendingInvite | null> => {
-  const inviteData = await SecureStorage.getJSON<PendingInvite>(STORAGE_KEYS.PENDING_INVITE);
+  const inviteData = await SecureStorage.getJSON<PendingInvite>(
+    STORAGE_KEYS.PENDING_INVITE,
+  );
   if (inviteData) {
     // Check if invite is less than 24 hours old
     if (Date.now() - inviteData.timestamp < 24 * 60 * 60 * 1000) {
@@ -51,9 +53,11 @@ export default function AuthRedirect() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [showAlreadyMemberModal, setShowAlreadyMemberModal] = useState(false);
-  const [worldName, setWorldName] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
-  const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
+  const [worldName, setWorldName] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<string | undefined>(
+    undefined,
+  );
   const lastProcessedRef = useRef<string | undefined>(undefined);
 
   // Helper function to get current user ID (checks storage first)
@@ -62,15 +66,15 @@ export default function AuthRedirect() {
       // Try storage first
       const userId = await AuthStateManager.getUserId();
       if (userId) {
-        logger.debug('auth-redirect', 'User ID loaded from storage:', userId);
+        logger.debug("auth-redirect", "User ID loaded from storage:", userId);
         return userId;
       }
-      
+
       // Fallback to database
       const userProfile = await usersDB.getCurrentUser();
       return userProfile?.id || undefined;
     } catch (error) {
-      logger.error('auth-redirect', 'Error fetching user ID:', error);
+      logger.error("auth-redirect", "Error fetching user ID:", error);
       return undefined;
     }
   };
@@ -80,41 +84,47 @@ export default function AuthRedirect() {
       try {
         const action = params.action as string;
         // Build a processing key to prevent duplicate processing (StrictMode/dev double-run)
-        const key = `${action || 'none'}|${params.token || ''}|${params.worldName || ''}|${
-          typeof window !== 'undefined' ? window.location.hash : ''
+        const key = `${action || "none"}|${params.token || ""}|${params.worldName || ""}|${
+          typeof window !== "undefined" ? window.location.hash : ""
         }`;
         if (lastProcessedRef.current === key) {
-          logger.debug('auth-redirect', 'Duplicate processing detected, skipping');
+          logger.debug(
+            "auth-redirect",
+            "Duplicate processing detected, skipping",
+          );
           setProcessing(false);
           return;
         }
         lastProcessedRef.current = key;
-        logger.debug('auth-redirect', 'Auth redirect action:', action);
+        logger.debug("auth-redirect", "Auth redirect action:", action);
 
         // First, handle any auth tokens from the URL
         let hasValidSession = false;
-        if (typeof window !== 'undefined') {
+        if (typeof window !== "undefined") {
           const hash = window.location.hash;
           if (hash) {
             const hashParams = new URLSearchParams(hash.substring(1));
-            const accessToken = hashParams.get('access_token');
-            const refreshToken = hashParams.get('refresh_token');
+            const accessToken = hashParams.get("access_token");
+            const refreshToken = hashParams.get("refresh_token");
 
             if (accessToken && refreshToken) {
-              logger.debug('auth-redirect', 'Setting session from email link...');
-              
+              logger.debug(
+                "auth-redirect",
+                "Setting session from email link...",
+              );
+
               const { error } = await supabase.auth.setSession({
                 access_token: accessToken,
-                refresh_token: refreshToken
+                refresh_token: refreshToken,
               });
 
               if (error) {
-                logger.error('auth-redirect', 'Session error:', error);
-                setErrorMessage('Invalid or expired link. Please try again.');
+                logger.error("auth-redirect", "Session error:", error);
+                setErrorMessage("Invalid or expired link. Please try again.");
                 setShowErrorModal(true);
                 return;
               }
-              logger.info('auth-redirect', 'Session established');
+              logger.info("auth-redirect", "Session established");
               await AuthStateManager.setHasAccount(true);
               hasValidSession = true;
             }
@@ -123,7 +133,9 @@ export default function AuthRedirect() {
 
         // Check if user already has a session (for direct visits)
         if (!hasValidSession) {
-          const { data: { session } } = await supabase.auth.getSession();
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
           hasValidSession = !!session;
         }
 
@@ -132,68 +144,68 @@ export default function AuthRedirect() {
           // Check storage first, then database
           let userId = await AuthStateManager.getUserId();
           let userProfile = null;
-          
+
           if (userId) {
             // User data in storage, use it
             userProfile = await AuthStateManager.getUserData();
-            logger.debug('auth-redirect', 'User profile loaded from storage');
+            logger.debug("auth-redirect", "User profile loaded from storage");
           } else {
             // Not in storage, fetch from database
             userProfile = await usersDB.getCurrentUser();
           }
-          
+
           if (userProfile) {
             // Update centralized params context
             setUserId(userProfile.id);
             // Check if user has completed profile
             if (userProfile.username) {
               // Profile complete, go to world selection
-              router.replace('/select/world-selection');
+              router.replace("/select/world-selection");
             } else {
               // Profile incomplete, go to complete profile
-              router.replace('/login/complete-profile');
+              router.replace("/login/complete-profile");
             }
           } else {
             // Fallback if we can't get userId
-            router.replace('/login/complete-profile');
+            router.replace("/login/complete-profile");
           }
           return;
         }
 
         // Route based on action
         switch (action) {
-          case 'signup-confirm':
+          case "signup-confirm":
             // User confirmed email from signup -> go to complete profile
-            logger.debug('auth-redirect', 'Redirecting to complete profile...');
-            router.replace('/login/complete-profile');
+            logger.debug("auth-redirect", "Redirecting to complete profile...");
+            router.replace("/login/complete-profile");
             break;
-          
-          case 'reset-password':
+
+          case "reset-password":
             // User clicked password reset link -> go to reset password page
-            logger.debug('auth-redirect', 'Redirecting to reset password...');
-            router.replace('/login/reset-password');
+            logger.debug("auth-redirect", "Redirecting to reset password...");
+            router.replace("/login/reset-password");
             break;
-          
-          case 'world-invite':
+
+          case "world-invite":
             await handleWorldInvite(hasValidSession);
             break;
-          
+
           default:
             // Check for pending invites when user visits any auth page
             await checkForPendingInvites();
-            
+
             // Fallback routing for legacy links
-            if (action === 'signin') {
-              router.replace('/login/sign-in');
-            } else if (action === 'signup') {
-              router.replace('/login/sign-up');
+            if (action === "signin") {
+              router.replace("/login/sign-in");
+            } else if (action === "signup") {
+              router.replace("/login/sign-up");
             } else {
-              router.replace('/');
+              router.replace("/");
             }
         }
       } catch (error) {
-        logger.error('auth-redirect', 'Auth redirect error:', error);
-        setErrorMessage('Something went wrong. Please try again.');
+        logger.error("auth-redirect", "Auth redirect error:", error);
+        setErrorMessage("Something went wrong. Please try again.");
         setShowErrorModal(true);
       } finally {
         setProcessing(false);
@@ -201,28 +213,33 @@ export default function AuthRedirect() {
     };
 
     const handleWorldInvite = async (hasValidSession: boolean) => {
-      logger.debug('auth-redirect', 'Processing world invite...');
-      
+      logger.debug("auth-redirect", "Processing world invite...");
+
       const inviteToken = params.token as string;
       const inviteWorldName = params.worldName as string;
 
       if (!inviteToken || !inviteWorldName) {
-        setErrorMessage('Invalid invite link. Please ask for a new invitation.');
+        setErrorMessage(
+          "Invalid invite link. Please ask for a new invitation.",
+        );
         setShowErrorModal(true);
         return;
       }
 
       const decodedWorldName = decodeURIComponent(inviteWorldName);
 
-  // Import invitesDB dynamically to avoid circular dependencies
-      const { invitesDB } = await import('../../lib/database/invites');
+      // Import invitesDB dynamically to avoid circular dependencies
+      const { invitesDB } = await import("../../lib/database/invites");
 
       // Validate the invite token first
-  logger.debug('auth-redirect', 'Validating invite token...');
+      logger.debug("auth-redirect", "Validating invite token...");
       const validationResult = await invitesDB.validateInviteToken(inviteToken);
 
       if (!validationResult.success || !validationResult.worldId) {
-        setErrorMessage(validationResult.error || 'This invite link is invalid or has expired. Please ask for a new invitation.');
+        setErrorMessage(
+          validationResult.error ||
+            "This invite link is invalid or has expired. Please ask for a new invitation.",
+        );
         setShowErrorModal(true);
         return;
       }
@@ -231,56 +248,72 @@ export default function AuthRedirect() {
 
       if (!hasValidSession) {
         // User not logged in - save invite token and redirect to sign in
-        logger.debug('auth-redirect', 'Saving pending invite for after login...');
+        logger.debug(
+          "auth-redirect",
+          "Saving pending invite for after login...",
+        );
         await savePendingInvite(inviteToken, decodedWorldName);
-        
+
         setWorldName(decodedWorldName);
         setShowInviteModal(true);
         return;
       }
 
       // User is logged in - process invite immediately
-      logger.info('auth-redirect', 'User logged in, processing invite...');
-      
+      logger.info("auth-redirect", "User logged in, processing invite...");
+
       try {
         // Get user's profile
         const userProfile = await usersDB.getCurrentUser();
         if (!userProfile) {
-          throw new Error('User profile not found');
+          throw new Error("User profile not found");
         }
         // Store the userId for navigation
         setCurrentUserId(userProfile.id);
 
         // Check if user is already in the world
-        logger.debug('auth-redirect', 'Checking if user is already in world...');
-        const isAlreadyMember = await worldsDB.isUserInWorld(inviteWorldId, userProfile.id);
+        logger.debug(
+          "auth-redirect",
+          "Checking if user is already in world...",
+        );
+        const isAlreadyMember = await worldsDB.isUserInWorld(
+          inviteWorldId,
+          userProfile.id,
+        );
 
         if (isAlreadyMember) {
-          logger.info('auth-redirect', 'User is already a member of this world');
+          logger.info(
+            "auth-redirect",
+            "User is already a member of this world",
+          );
           setWorldName(decodedWorldName);
           setShowAlreadyMemberModal(true);
           return;
         }
 
         // Add user to world in database
-        logger.info('auth-redirect', 'Adding user to world:', inviteWorldId);
-        await worldsDB.addUserToWorld(inviteWorldId, userProfile.id, 'player');
-        logger.success('auth-redirect', 'User successfully added to world');
-        
+        logger.info("auth-redirect", "Adding user to world:", inviteWorldId);
+        await worldsDB.addUserToWorld(inviteWorldId, userProfile.id, "player");
+        logger.success("auth-redirect", "User successfully added to world");
+
         setWorldName(decodedWorldName);
         setShowWelcomeModal(true);
-        
       } catch (error) {
-        logger.error('auth-redirect', 'Failed to add user to world:', error);
-        
+        logger.error("auth-redirect", "Failed to add user to world:", error);
+
         // Check if user is already in the world (database constraint error)
-        if (error instanceof Error && error.message.includes('duplicate')) {
-          logger.info('auth-redirect', 'User already in world (duplicate key), showing already member modal');
+        if (error instanceof Error && error.message.includes("duplicate")) {
+          logger.info(
+            "auth-redirect",
+            "User already in world (duplicate key), showing already member modal",
+          );
           setWorldName(decodedWorldName);
           setShowAlreadyMemberModal(true);
         } else {
           // Other error - show error message
-          setErrorMessage('Failed to join world. Please try again or contact the world owner.');
+          setErrorMessage(
+            "Failed to join world. Please try again or contact the world owner.",
+          );
           setShowErrorModal(true);
         }
       }
@@ -289,62 +322,106 @@ export default function AuthRedirect() {
     const checkForPendingInvites = async () => {
       const pendingInvite = await getPendingInvite();
       if (pendingInvite) {
-        logger.debug('auth-redirect', 'Found pending invite:', pendingInvite);
-        
+        logger.debug("auth-redirect", "Found pending invite:", pendingInvite);
+
         // Check if user is now logged in
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (session) {
-          logger.info('auth-redirect', 'User logged in, processing pending invite...');
+          logger.info(
+            "auth-redirect",
+            "User logged in, processing pending invite...",
+          );
           await clearPendingInvite();
-          
+
           try {
             // Import invitesDB dynamically
-            const { invitesDB } = await import('../../lib/database/invites');
-            
+            const { invitesDB } = await import("../../lib/database/invites");
+
             // Validate the token and get worldId
-            logger.debug('auth-redirect', 'Validating pending invite token...');
-            const validationResult = await invitesDB.validateInviteToken(pendingInvite.token);
-            
+            logger.debug("auth-redirect", "Validating pending invite token...");
+            const validationResult = await invitesDB.validateInviteToken(
+              pendingInvite.token,
+            );
+
             if (!validationResult.success || !validationResult.worldId) {
-              throw new Error(validationResult.error || 'Invalid or expired invite token');
+              throw new Error(
+                validationResult.error || "Invalid or expired invite token",
+              );
             }
 
             // Get user's profile
             const userProfile = await usersDB.getCurrentUser();
             if (!userProfile) {
-              throw new Error('User profile not found');
+              throw new Error("User profile not found");
             }
             // Check if user is already in the world
-            logger.debug('auth-redirect', 'Checking if user is already in world...');
-            const isAlreadyMember = await worldsDB.isUserInWorld(validationResult.worldId, userProfile.id);
+            logger.debug(
+              "auth-redirect",
+              "Checking if user is already in world...",
+            );
+            const isAlreadyMember = await worldsDB.isUserInWorld(
+              validationResult.worldId,
+              userProfile.id,
+            );
             if (isAlreadyMember) {
-              logger.info('auth-redirect', 'User is already a member of this world (pending invite)');
+              logger.info(
+                "auth-redirect",
+                "User is already a member of this world (pending invite)",
+              );
               setWorldName(pendingInvite.worldName);
               setShowAlreadyMemberModal(true);
               return;
             }
             // Add user to world in database
-            logger.info('auth-redirect', 'Adding user to world from pending invite:', validationResult.worldId);
-            await worldsDB.addUserToWorld(validationResult.worldId, userProfile.id, 'player');
-            logger.success('auth-redirect', 'User successfully added to world from pending invite');
+            logger.info(
+              "auth-redirect",
+              "Adding user to world from pending invite:",
+              validationResult.worldId,
+            );
+            await worldsDB.addUserToWorld(
+              validationResult.worldId,
+              userProfile.id,
+              "player",
+            );
+            logger.success(
+              "auth-redirect",
+              "User successfully added to world from pending invite",
+            );
             setWorldName(pendingInvite.worldName);
             setShowWelcomeModal(true);
-            
           } catch (error) {
-            logger.error('auth-redirect', 'Failed to add user to world from pending invite:', error);
-            
+            logger.error(
+              "auth-redirect",
+              "Failed to add user to world from pending invite:",
+              error,
+            );
+
             // Check if user is already in the world (database constraint error)
-            if (error instanceof Error && error.message.includes('duplicate')) {
-              logger.info('auth-redirect', 'User already in world from pending invite (duplicate key), showing already member modal');
+            if (error instanceof Error && error.message.includes("duplicate")) {
+              logger.info(
+                "auth-redirect",
+                "User already in world from pending invite (duplicate key), showing already member modal",
+              );
               setWorldName(pendingInvite.worldName);
               setShowAlreadyMemberModal(true);
             } else {
               // Other error - show error message but don't completely fail
-              logger.error('auth-redirect', 'Failed to process pending invite, but continuing...');
-              
+              logger.error(
+                "auth-redirect",
+                "Failed to process pending invite, but continuing...",
+              );
+
               // Don't show success modal if invite was invalid/expired
-              if (error instanceof Error && (error.message.includes('Invalid') || error.message.includes('expired'))) {
-                setErrorMessage('This invite link has expired. Please ask for a new invitation.');
+              if (
+                error instanceof Error &&
+                (error.message.includes("Invalid") ||
+                  error.message.includes("expired"))
+              ) {
+                setErrorMessage(
+                  "This invite link has expired. Please ask for a new invitation.",
+                );
                 setShowErrorModal(true);
               }
             }
@@ -358,33 +435,40 @@ export default function AuthRedirect() {
 
   const handleWelcomeModalClose = async () => {
     setShowWelcomeModal(false);
-    
+
     // Get userId and update context
-    const userId = currentUserId || await getCurrentUserId();
-    
+    const userId = currentUserId || (await getCurrentUserId());
+
     if (userId) {
       // Update centralized params context
       setUserId(userId);
     }
-    
-    router.replace('/select/world-selection');
+
+    router.replace("/select/world-selection");
   };
 
   const handleInviteModalSignIn = () => {
     setShowInviteModal(false);
-    router.replace('/login/sign-in');
+    router.replace("/login/sign-in");
   };
 
   const handleInviteModalSignUp = () => {
     setShowInviteModal(false);
-    router.replace('/login/sign-up');
+    router.replace("/login/sign-up");
   };
 
   if (processing) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#2f353d' }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#2f353d",
+        }}
+      >
         <CustomLoad size="large" />
-        <Caption align='center' style={{ marginTop: 16 }}>
+        <Caption align="center" style={{ marginTop: 16 }}>
           Processing authentication...
         </Caption>
       </View>
@@ -393,7 +477,7 @@ export default function AuthRedirect() {
 
   return (
     <>
-    {/* 🌍 World Invite Welcome Modal (for successfully joined worlds) */}
+      {/* 🌍 World Invite Welcome Modal (for successfully joined worlds) */}
       <AuthModal
         visible={showWelcomeModal}
         onClose={handleWelcomeModalClose}
@@ -401,9 +485,9 @@ export default function AuthRedirect() {
         message={`You joined "${worldName}" successfully! Welcome to the party!`}
         buttons={[
           {
-            text: 'Continue to Worlds',
+            text: "Continue to Worlds",
             onPress: handleWelcomeModalClose,
-            variant: 'primary',
+            variant: "primary",
           },
         ]}
       />
@@ -416,23 +500,23 @@ export default function AuthRedirect() {
         message={`You've been invited to join "${worldName}"! Please sign in to your account to accept this invitation. Your invite will be saved and processed after you log in.`}
         buttons={[
           {
-            text: 'Sign In',
+            text: "Sign In",
             onPress: handleInviteModalSignIn,
-            variant: 'primary',
+            variant: "primary",
           },
           {
-            text: 'Create Account',
+            text: "Create Account",
             onPress: handleInviteModalSignUp,
-            variant: 'secondary',
+            variant: "secondary",
           },
           {
-            text: 'Maybe Later',
+            text: "Maybe Later",
             onPress: () => {
-              clearPendingInvite()
-              setShowInviteModal(false)
-              router.replace('/')
+              clearPendingInvite();
+              setShowInviteModal(false);
+              router.replace("/");
             },
-            variant: 'cancel',
+            variant: "cancel",
           },
         ]}
       />
@@ -441,28 +525,28 @@ export default function AuthRedirect() {
       <AuthModal
         visible={showAlreadyMemberModal && !showWelcomeModal}
         onClose={async () => {
-          setShowAlreadyMemberModal(false)
+          setShowAlreadyMemberModal(false);
 
           // Get userId and update context
-          const userId = currentUserId || (await getCurrentUserId())
+          const userId = currentUserId || (await getCurrentUserId());
 
           if (userId) {
             // Update centralized params context
-            setUserId(userId)
+            setUserId(userId);
           }
 
-          router.replace('/select/world-selection')
+          router.replace("/select/world-selection");
         }}
         title="Already a Member! 🎉"
         message={`You're already part of "${worldName}"! No need to join again.`}
         buttons={[
           {
-            text: 'Go to Worlds',
+            text: "Go to Worlds",
             onPress: () => {
-              setShowAlreadyMemberModal(false)
-              router.replace('/select/world-selection')
+              setShowAlreadyMemberModal(false);
+              router.replace("/select/world-selection");
             },
-            variant: 'primary',
+            variant: "primary",
           },
         ]}
       />
@@ -471,23 +555,23 @@ export default function AuthRedirect() {
       <AuthModal
         visible={showErrorModal}
         onClose={() => {
-          setShowErrorModal(false)
-          router.replace('/')
+          setShowErrorModal(false);
+          router.replace("/");
         }}
         title="Oops! ⚠️"
         message={errorMessage}
         buttons={[
           {
-            text: 'OK',
+            text: "OK",
             onPress: () => {
-              setShowErrorModal(false)
-              router.replace('/')
+              setShowErrorModal(false);
+              router.replace("/");
             },
-            variant: 'primary',
+            variant: "primary",
           },
         ]}
-      />      
-      <View style={{ flex: 1, backgroundColor: '#2f353d' }} />
+      />
+      <View style={{ flex: 1, backgroundColor: "#2f353d" }} />
     </>
   );
 }

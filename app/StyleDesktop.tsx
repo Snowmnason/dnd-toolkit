@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { ThemeSelector } from '@/Screens/settings/ThemeSelector'
+import { ThemeSelector } from "@/Screens/settings/ThemeSelector";
 import {
   Accordion,
   AppModal,
@@ -29,66 +29,66 @@ import {
   TextInput,
   TextInputGroup,
   Title,
-  ToggleGroup
-} from '@/components/ui'
-import { AppSplit } from '@/components/ui/AppView'
-import { useNotifications } from '@/hooks/use-notifications'
+  ToggleGroup,
+} from "@/components/ui";
+import { AppSplit } from "@/components/ui/AppView";
+import { useNotifications } from "@/hooks/utils/use-notifications";
 
-import { $, UseTheme, useScale } from '@/theme'
-import { useRef, useState } from 'react'
-import { ScrollView, Text, View } from 'react-native'
+import { $, UseTheme, useScale } from "@/theme";
+import { useRef, useState } from "react";
+import { ScrollView, Text, View } from "react-native";
 
 export default function StyleDesktop() {
-  const S = useScale()
-  const { theme } = UseTheme()
-  const { showNotification } = useNotifications()
-  
-  
+  const S = useScale();
+  const { theme } = UseTheme();
+  const { showNotification } = useNotifications();
+
   // Simple display states (not controlling components, just for right panel display)
-  const [primaryClicks, setPrimaryClicks] = useState(0)
-  const [iconButtonClicks, setIconButtonClicks] = useState('')
-  const [textInputValue, setTextInputValue] = useState('')
-  const [descInputValue, setDescInputValue] = useState('')
-  const [dropdownValue, setDropdownValue] = useState<string | null>(null)
-  const [switchOn, setSwitchOn] = useState(false)
-  const [tabValue, setTabValue] = useState('overview')
-  
+  const [primaryClicks, setPrimaryClicks] = useState(0);
+  const [iconButtonClicks, setIconButtonClicks] = useState("");
+  const [textInputValue, setTextInputValue] = useState("");
+  const [descInputValue, setDescInputValue] = useState("");
+  const [dropdownValue, setDropdownValue] = useState<string | null>(null);
+  const [switchOn, setSwitchOn] = useState(false);
+  const [tabValue, setTabValue] = useState("overview");
+
   // Display-only states for group values (populated when "Get Values" is clicked)
-  const [buttonGroupValue, setButtonGroupValue] = useState<string>('')
-  const [textInputGroupValues, setTextInputGroupValues] = useState<any>({})
-  const [dropdownGroupValues, setDropdownGroupValues] = useState<any>({})
-  const [switchGroupValues, setSwitchGroupValues] = useState<any>({})
-  const [switchGroupExclusiveValue, setSwitchGroupExclusiveValue] = useState<string>('')
-  const [switchGroupMaxValues, setSwitchGroupMaxValues] = useState<any>({})
-  const [radioGroupValue, setRadioGroupValue] = useState<string>('')
-  const [toggleGroupValues, setToggleGroupValues] = useState<any>({})
-  const [colorTabValue, setColorTabValue] = useState('textPrimary')
-  
+  const [buttonGroupValue, setButtonGroupValue] = useState<string>("");
+  const [textInputGroupValues, setTextInputGroupValues] = useState<any>({});
+  const [dropdownGroupValues, setDropdownGroupValues] = useState<any>({});
+  const [switchGroupValues, setSwitchGroupValues] = useState<any>({});
+  const [switchGroupExclusiveValue, setSwitchGroupExclusiveValue] =
+    useState<string>("");
+  const [switchGroupMaxValues, setSwitchGroupMaxValues] = useState<any>({});
+  const [radioGroupValue, setRadioGroupValue] = useState<string>("");
+  const [toggleGroupValues, setToggleGroupValues] = useState<any>({});
+  const [colorTabValue, setColorTabValue] = useState("textPrimary");
+
   // Refs to access group components
-  const buttonGroupRef = useRef<any>(null)
-  const textInputGroupRef = useRef<any>(null)
-  const dropdownGroupRef = useRef<any>(null)
-  const switchGroupRef = useRef<any>(null)
-  const switchGroupExclusiveRef = useRef<any>(null)
-  const switchGroupMaxRef = useRef<any>(null)
-  const radioGroupRef = useRef<any>(null)
-  const toggleGroupRef = useRef<any>(null)
-  
+  const buttonGroupRef = useRef<any>(null);
+  const textInputGroupRef = useRef<any>(null);
+  const dropdownGroupRef = useRef<any>(null);
+  const switchGroupRef = useRef<any>(null);
+  const switchGroupExclusiveRef = useRef<any>(null);
+  const switchGroupMaxRef = useRef<any>(null);
+  const radioGroupRef = useRef<any>(null);
+  const toggleGroupRef = useRef<any>(null);
+
   // Modal/Toast/Snackbar states
-  const [modalVisible, setModalVisible] = useState(false)
-  const [modal2Visible, setModal2Visible] = useState(false)
-  const [toastVisible, setToastVisible] = useState(false)
-  const [toastVisible1, setToastVisible1] = useState(false)
-  const [toastVisible2, setToastVisible2] = useState(false)
-  const [toastVisible3, setToastVisible3] = useState(false)
-  const [snackVisible, setSnackVisible] = useState(false)
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modal2Visible, setModal2Visible] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastVisible1, setToastVisible1] = useState(false);
+  const [toastVisible2, setToastVisible2] = useState(false);
+  const [toastVisible3, setToastVisible3] = useState(false);
+  const [snackVisible, setSnackVisible] = useState(false);
 
   return (
     <AppSplit
       verticalPadding="none"
-      horizontalPadding='xs'
+      horizontalPadding="xs"
       left={
-        <ScrollView style={{  }}>
+        <ScrollView style={{}}>
           {/* Crash tester removed (was a hidden test helper) */}
 
           <ThemeSelector />
@@ -108,43 +108,53 @@ export default function StyleDesktop() {
           {/* Notifications system - re-enabled for testing */}
           <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.lg }}>
             <Heading>Notifications (In-App)</Heading>
-            <Body style={{ marginBottom: S.space.md }}>Test the notification queue system</Body>
+            <Body style={{ marginBottom: S.space.md }}>
+              Test the notification queue system
+            </Body>
             <View style={{ gap: S.space.md, marginTop: S.space.md }}>
-              <Button 
+              <Button
                 variant="primary"
-                text="Show Info" 
-                onPress={() => showNotification({
-                  type: 'info',
-                  title: 'Info',
-                  message: 'This is an info notification',
-                })}
+                text="Show Info"
+                onPress={() =>
+                  showNotification({
+                    type: "info",
+                    title: "Info",
+                    message: "This is an info notification",
+                  })
+                }
               />
-              <Button 
+              <Button
                 variant="secondary"
-                text="Show Update" 
-                onPress={() => showNotification({
-                  type: 'update',
-                  title: 'Update Available',
-                  message: 'A new version is available',
-                })}
+                text="Show Update"
+                onPress={() =>
+                  showNotification({
+                    type: "update",
+                    title: "Update Available",
+                    message: "A new version is available",
+                  })
+                }
               />
-              <Button 
+              <Button
                 variant="solid"
-                text="Show Alert" 
-                onPress={() => showNotification({
-                  type: 'alert',
-                  title: 'Alert',
-                  message: 'Important alert message',
-                })}
+                text="Show Alert"
+                onPress={() =>
+                  showNotification({
+                    type: "alert",
+                    title: "Alert",
+                    message: "Important alert message",
+                  })
+                }
               />
-              <Button 
+              <Button
                 variant="outlined"
-                text="Show Message" 
-                onPress={() => showNotification({
-                  type: 'message',
-                  title: 'Message',
-                  message: 'You have a new message',
-                })}
+                text="Show Message"
+                onPress={() =>
+                  showNotification({
+                    type: "message",
+                    title: "Message",
+                    message: "You have a new message",
+                  })
+                }
               />
             </View>
           </Surface>
@@ -152,12 +162,20 @@ export default function StyleDesktop() {
           <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Button Variants</Heading>
             <View style={{ gap: S.space.md, marginTop: S.space.md }}>
-              <Button variant="primary" text={`Primary`} onPress={() => setPrimaryClicks(c => c + 1)} />
+              <Button
+                variant="primary"
+                text={`Primary`}
+                onPress={() => setPrimaryClicks((c) => c + 1)}
+              />
               <Button variant="secondary" text="Secondary" onPress={() => {}} />
               <Button variant="solid" text="Solid" onPress={() => {}} />
               <Button variant="outlined" text="Outlined" onPress={() => {}} />
               <Button variant="ghost" text="Ghost" onPress={() => {}} />
-              <Button variant="destructive" text="Destructive" onPress={() => {}} />
+              <Button
+                variant="destructive"
+                text="Destructive"
+                onPress={() => {}}
+              />
               <Button variant="cancel" text="Cancel" onPress={() => {}} />
               <Caption>Primary clicks: {primaryClicks}</Caption>
             </View>
@@ -165,12 +183,29 @@ export default function StyleDesktop() {
 
           <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Icon Buttons</Heading>
-            <View style={{ flexDirection: 'row', gap: S.space.sm, marginTop: S.space.md }}>
-              <IconButton content="🗡️" onPress={() => setIconButtonClicks('Sword')} />
-              <IconButton content="🏹" onPress={() => setIconButtonClicks('Bow')} />
-              <IconButton content="🪄" onPress={() => setIconButtonClicks('Wand')} />
+            <View
+              style={{
+                flexDirection: "row",
+                gap: S.space.sm,
+                marginTop: S.space.md,
+              }}
+            >
+              <IconButton
+                content="🗡️"
+                onPress={() => setIconButtonClicks("Sword")}
+              />
+              <IconButton
+                content="🏹"
+                onPress={() => setIconButtonClicks("Bow")}
+              />
+              <IconButton
+                content="🪄"
+                onPress={() => setIconButtonClicks("Wand")}
+              />
             </View>
-            <Caption style={{ marginTop: S.space.sm }}>Last icon clicked: {iconButtonClicks || 'None'}</Caption>
+            <Caption style={{ marginTop: S.space.sm }}>
+              Last icon clicked: {iconButtonClicks || "None"}
+            </Caption>
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg }}>
@@ -179,19 +214,19 @@ export default function StyleDesktop() {
               <ButtonGroup
                 ref={buttonGroupRef}
                 items={[
-                  { key: 'melee', label: 'Melee' },
-                  { key: 'ranged', label: 'Ranged' },
-                  { key: 'magic', label: 'Magic' },
+                  { key: "melee", label: "Melee" },
+                  { key: "ranged", label: "Ranged" },
+                  { key: "magic", label: "Magic" },
                 ]}
                 direction="horizontal"
               />
-              <Button 
-                variant="outlined" 
-                text="Get Selected" 
+              <Button
+                variant="outlined"
+                text="Get Selected"
                 onPress={() => {
-                  const value = buttonGroupRef.current?.getValue()
-                  setButtonGroupValue(value || '')
-                }} 
+                  const value = buttonGroupRef.current?.getValue();
+                  setButtonGroupValue(value || "");
+                }}
               />
             </View>
           </Surface>
@@ -199,21 +234,21 @@ export default function StyleDesktop() {
           <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Text Inputs</Heading>
             <View style={{ gap: S.space.md, marginTop: S.space.md }}>
-              <TextInput 
-                heading="Search" 
-                placeholder="Type here..." 
+              <TextInput
+                heading="Search"
+                placeholder="Type here..."
                 value={textInputValue}
                 onChangeText={setTextInputValue}
               />
-              <Caption>TextInput value: {textInputValue || '(empty)'}</Caption>
-              
-              <DescInput 
-                heading="Notes" 
+              <Caption>TextInput value: {textInputValue || "(empty)"}</Caption>
+
+              <DescInput
+                heading="Notes"
                 placeholder="Enter description..."
                 value={descInputValue}
                 onChangeText={setDescInputValue}
               />
-              <Caption>DescInput value: {descInputValue || '(empty)'}</Caption>
+              <Caption>DescInput value: {descInputValue || "(empty)"}</Caption>
             </View>
           </Surface>
 
@@ -223,17 +258,21 @@ export default function StyleDesktop() {
               <TextInputGroup
                 ref={textInputGroupRef}
                 items={[
-                  { key: 'name', heading: 'Name', placeholder: 'Character name' },
-                  { key: 'level', heading: 'Level', placeholder: 'Level' },
+                  {
+                    key: "name",
+                    heading: "Name",
+                    placeholder: "Character name",
+                  },
+                  { key: "level", heading: "Level", placeholder: "Level" },
                 ]}
               />
-              <Button 
-                variant="outlined" 
-                text="Get All Values" 
+              <Button
+                variant="outlined"
+                text="Get All Values"
                 onPress={() => {
-                  const values = textInputGroupRef.current?.getValues()
-                  setTextInputGroupValues(values || {})
-                }} 
+                  const values = textInputGroupRef.current?.getValues();
+                  setTextInputGroupValues(values || {});
+                }}
               />
             </View>
           </Surface>
@@ -245,23 +284,23 @@ export default function StyleDesktop() {
                 enableSearch={true}
                 heading="Select Class"
                 items={[
-                  { label: 'Barbarian', value: 'barbarian' },
-                  { label: 'Bard', value: 'bard' },
-                  { label: 'Cleric', value: 'cleric' },
-                  { label: 'Druid', value: 'druid' },
-                  { label: 'Fighter', value: 'fighter' },
-                  { label: 'Monk', value: 'monk' },
-                  { label: 'Paladin', value: 'paladin' },
-                  { label: 'Ranger', value: 'ranger' },
-                  { label: 'Rogue', value: 'rogue' },
-                  { label: 'Sorcerer', value: 'sorcerer' },
-                  { label: 'Warlock', value: 'warlock' },
-                  { label: 'Wizard', value: 'wizard' },
+                  { label: "Barbarian", value: "barbarian" },
+                  { label: "Bard", value: "bard" },
+                  { label: "Cleric", value: "cleric" },
+                  { label: "Druid", value: "druid" },
+                  { label: "Fighter", value: "fighter" },
+                  { label: "Monk", value: "monk" },
+                  { label: "Paladin", value: "paladin" },
+                  { label: "Ranger", value: "ranger" },
+                  { label: "Rogue", value: "rogue" },
+                  { label: "Sorcerer", value: "sorcerer" },
+                  { label: "Warlock", value: "warlock" },
+                  { label: "Wizard", value: "wizard" },
                 ]}
                 value={dropdownValue}
                 onChange={setDropdownValue}
               />
-              <Caption>Selected class: {dropdownValue || 'None'}</Caption>
+              <Caption>Selected class: {dropdownValue || "None"}</Caption>
             </View>
           </Surface>
 
@@ -272,40 +311,40 @@ export default function StyleDesktop() {
                 ref={dropdownGroupRef}
                 items={[
                   {
-                    key: 'background',
-                    heading: 'Background',
+                    key: "background",
+                    heading: "Background",
                     options: [
-                      { label: 'Acolyte', value: 'acolyte' },
-                      { label: 'Criminal', value: 'criminal' },
-                      { label: 'Folk Hero', value: 'folk-hero' },
-                      { label: 'Noble', value: 'noble' },
-                      { label: 'Sage', value: 'sage' },
-                      { label: 'Soldier', value: 'soldier' },
+                      { label: "Acolyte", value: "acolyte" },
+                      { label: "Criminal", value: "criminal" },
+                      { label: "Folk Hero", value: "folk-hero" },
+                      { label: "Noble", value: "noble" },
+                      { label: "Sage", value: "sage" },
+                      { label: "Soldier", value: "soldier" },
                     ],
                   },
                   {
-                    key: 'skill',
-                    heading: 'Skill Proficiency',
+                    key: "skill",
+                    heading: "Skill Proficiency",
                     options: [
-                      { label: 'Acrobatics', value: 'acrobatics' },
-                      { label: 'Arcana', value: 'arcana' },
-                      { label: 'Athletics', value: 'athletics' },
-                      { label: 'Deception', value: 'deception' },
-                      { label: 'History', value: 'history' },
-                      { label: 'Insight', value: 'insight' },
-                      { label: 'Intimidation', value: 'intimidation' },
-                      { label: 'Investigation', value: 'investigation' },
+                      { label: "Acrobatics", value: "acrobatics" },
+                      { label: "Arcana", value: "arcana" },
+                      { label: "Athletics", value: "athletics" },
+                      { label: "Deception", value: "deception" },
+                      { label: "History", value: "history" },
+                      { label: "Insight", value: "insight" },
+                      { label: "Intimidation", value: "intimidation" },
+                      { label: "Investigation", value: "investigation" },
                     ],
                   },
                 ]}
               />
-              <Button 
-                variant="outlined" 
-                text="Get All Values" 
+              <Button
+                variant="outlined"
+                text="Get All Values"
                 onPress={() => {
-                  const values = dropdownGroupRef.current?.getValues()
-                  setDropdownGroupValues(values || {})
-                }} 
+                  const values = dropdownGroupRef.current?.getValues();
+                  setDropdownGroupValues(values || {});
+                }}
               />
             </View>
           </Surface>
@@ -313,8 +352,12 @@ export default function StyleDesktop() {
           <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Switch</Heading>
             <View style={{ gap: S.space.md, marginTop: S.space.md }}>
-              <Switch heading="Dark Mode" checked={switchOn} onChange={setSwitchOn} />
-              <Caption>Switch is: {switchOn ? 'ON' : 'OFF'}</Caption>
+              <Switch
+                heading="Dark Mode"
+                checked={switchOn}
+                onChange={setSwitchOn}
+              />
+              <Caption>Switch is: {switchOn ? "ON" : "OFF"}</Caption>
             </View>
           </Surface>
 
@@ -325,18 +368,21 @@ export default function StyleDesktop() {
                 ref={switchGroupRef}
                 title="Features"
                 items={[
-                  { key: 'auto-save', heading: 'Auto Save' },
-                  { key: 'notifications', heading: 'Notifications' },
+                  { key: "auto-save", heading: "Auto Save" },
+                  { key: "notifications", heading: "Notifications" },
                 ]}
               />
-              <Button 
-                variant="outlined" 
-                text="Get All Values" 
+              <Button
+                variant="outlined"
+                text="Get All Values"
                 onPress={() => {
-                  const values = switchGroupRef.current?.getValues() || []
-                  const valuesObj = values.reduce((acc: any, key: string) => ({ ...acc, [key]: true }), {})
-                  setSwitchGroupValues(valuesObj)
-                }} 
+                  const values = switchGroupRef.current?.getValues() || [];
+                  const valuesObj = values.reduce(
+                    (acc: any, key: string) => ({ ...acc, [key]: true }),
+                    {},
+                  );
+                  setSwitchGroupValues(valuesObj);
+                }}
               />
             </View>
           </Surface>
@@ -349,18 +395,18 @@ export default function StyleDesktop() {
                 title="Difficulty"
                 exclusive
                 items={[
-                  { key: 'easy', heading: 'Easy' },
-                  { key: 'normal', heading: 'Normal' },
-                  { key: 'hard', heading: 'Hard' },
+                  { key: "easy", heading: "Easy" },
+                  { key: "normal", heading: "Normal" },
+                  { key: "hard", heading: "Hard" },
                 ]}
               />
-              <Button 
-                variant="outlined" 
-                text="Get Selected" 
+              <Button
+                variant="outlined"
+                text="Get Selected"
                 onPress={() => {
-                  const values = switchGroupExclusiveRef.current?.getValues()
-                  setSwitchGroupExclusiveValue(values?.[0] || '')
-                }} 
+                  const values = switchGroupExclusiveRef.current?.getValues();
+                  setSwitchGroupExclusiveValue(values?.[0] || "");
+                }}
               />
             </View>
           </Surface>
@@ -373,21 +419,24 @@ export default function StyleDesktop() {
                 title="Spell Schools"
                 maxActive={3}
                 items={[
-                  { key: 'abjuration', heading: 'Abjuration' },
-                  { key: 'conjuration', heading: 'Conjuration' },
-                  { key: 'divination', heading: 'Divination' },
-                  { key: 'enchantment', heading: 'Enchantment' },
-                  { key: 'evocation', heading: 'Evocation' },
+                  { key: "abjuration", heading: "Abjuration" },
+                  { key: "conjuration", heading: "Conjuration" },
+                  { key: "divination", heading: "Divination" },
+                  { key: "enchantment", heading: "Enchantment" },
+                  { key: "evocation", heading: "Evocation" },
                 ]}
               />
-              <Button 
-                variant="outlined" 
-                text="Get All Values" 
+              <Button
+                variant="outlined"
+                text="Get All Values"
                 onPress={() => {
-                  const values = switchGroupMaxRef.current?.getValues() || []
-                  const valuesObj = values.reduce((acc: any, key: string) => ({ ...acc, [key]: true }), {})
-                  setSwitchGroupMaxValues(valuesObj)
-                }} 
+                  const values = switchGroupMaxRef.current?.getValues() || [];
+                  const valuesObj = values.reduce(
+                    (acc: any, key: string) => ({ ...acc, [key]: true }),
+                    {},
+                  );
+                  setSwitchGroupMaxValues(valuesObj);
+                }}
               />
             </View>
           </Surface>
@@ -400,17 +449,17 @@ export default function StyleDesktop() {
                 title="Faction"
                 direction="horizontal"
                 items={[
-                  { key: 'order', label: 'Order' },
-                  { key: 'chaos', label: 'Chaos' },
+                  { key: "order", label: "Order" },
+                  { key: "chaos", label: "Chaos" },
                 ]}
               />
-              <Button 
-                variant="outlined" 
-                text="Get Selected" 
+              <Button
+                variant="outlined"
+                text="Get Selected"
                 onPress={() => {
-                  const value = radioGroupRef.current?.getValue()
-                  setRadioGroupValue(value || '')
-                }} 
+                  const value = radioGroupRef.current?.getValue();
+                  setRadioGroupValue(value || "");
+                }}
               />
             </View>
           </Surface>
@@ -422,118 +471,136 @@ export default function StyleDesktop() {
                 ref={toggleGroupRef}
                 title="Tools"
                 items={[
-                  { key: 'map', icon: <Text>🗺️</Text> },
-                  { key: 'quill', icon: <Text>🪶</Text> },
-                  { key: 'potion', icon: <Text>🧪</Text> },
+                  { key: "map", icon: <Text>🗺️</Text> },
+                  { key: "quill", icon: <Text>🪶</Text> },
+                  { key: "potion", icon: <Text>🧪</Text> },
                 ]}
               />
-              <Button 
-                variant="outlined" 
-                text="Get All Values" 
+              <Button
+                variant="outlined"
+                text="Get All Values"
                 onPress={() => {
-                  const values = toggleGroupRef.current?.getValues()
-                  setToggleGroupValues(values || {})
-                }} 
+                  const values = toggleGroupRef.current?.getValues();
+                  setToggleGroupValues(values || {});
+                }}
               />
             </View>
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Tabs</Heading>
-            <View style={{  marginTop: S.space.md }}>
+            <View style={{ marginTop: S.space.md }}>
               <Tabs
-                bottomSpace={tabValue !== 'headings'}
+                bottomSpace={tabValue !== "headings"}
                 tabs={[
-                  { key: 'overview', label: 'Overview' },
-                  { key: 'headings', label: 'Headings' },
-                  { key: 'body', label: 'Body' },
-                  { key: 'other', label: 'Other' },
+                  { key: "overview", label: "Overview" },
+                  { key: "headings", label: "Headings" },
+                  { key: "body", label: "Body" },
+                  { key: "other", label: "Other" },
                 ]}
                 onChange={setTabValue}
               />
               {/* ⚠️ Content container below - marginTop creates spacing between tabs and content */}
               <View style={{ gap: S.space.sm, marginTop: S.space.md }}>
-                {tabValue === 'overview' && (
+                {tabValue === "overview" && (
                   <>
                     <Body style={{ marginBottom: S.space.md }}>
-                      This tab demonstrates all available font sizes and their visual hierarchy. 
-                      Each heading level and text style is designed to work together for consistent typography.
+                      This tab demonstrates all available font sizes and their
+                      visual hierarchy. Each heading level and text style is
+                      designed to work together for consistent typography.
                     </Body>
                   </>
                 )}
-                {tabValue === 'headings' && (
+                {tabValue === "headings" && (
                   <>
                     {/* Nested tabs with bottomSpace={false} to prevent weird spacing */}
                     <Tabs
                       bottomSpace={false}
                       tabs={[
-                      
-                        { key: 'textSecondary', label: 'Secondary' },
-                        { key: 'textInverse', label: 'Inverse' },
-                        { key: 'textOnAccent', label: 'On Accent' },
+                        { key: "textSecondary", label: "Secondary" },
+                        { key: "textInverse", label: "Inverse" },
+                        { key: "textOnAccent", label: "On Accent" },
                       ]}
                       onChange={setColorTabValue}
                     />
-                    <View 
-                      style={{ 
-                        padding: S.space.md, 
+                    <View
+                      style={{
+                        padding: S.space.md,
                         borderRadius: S.radius.md,
-                        backgroundColor: 
-                          colorTabValue === 'textPrimary' ? $('background') :
-                          colorTabValue === 'textSecondary' ? $('surface') :
-                          colorTabValue === 'textInverse' ? $('textPrimary') :
-                          $('accent')
+                        backgroundColor:
+                          colorTabValue === "textPrimary"
+                            ? $("background")
+                            : colorTabValue === "textSecondary"
+                              ? $("surface")
+                              : colorTabValue === "textInverse"
+                                ? $("textPrimary")
+                                : $("accent"),
                       }}
                     >
-                      <Heading 
-                        fontSize='$heading1' 
+                      <Heading
+                        fontSize="$heading1"
                         color={
-                          colorTabValue === 'textPrimary' ? '$textPrimary' :
-                          colorTabValue === 'textSecondary' ? '$textSecondary' :
-                          colorTabValue === 'textInverse' ? '$textInverse' :
-                          '$textOnAccent'
+                          colorTabValue === "textPrimary"
+                            ? "$textPrimary"
+                            : colorTabValue === "textSecondary"
+                              ? "$textSecondary"
+                              : colorTabValue === "textInverse"
+                                ? "$textInverse"
+                                : "$textOnAccent"
                         }
                       >
                         Heading 1
                       </Heading>
-                      <Heading 
-                        fontSize='$heading2' 
+                      <Heading
+                        fontSize="$heading2"
                         color={
-                          colorTabValue === 'textPrimary' ? '$textPrimary' :
-                          colorTabValue === 'textSecondary' ? '$textSecondary' :
-                          colorTabValue === 'textInverse' ? '$textInverse' :
-                          '$textOnAccent'
+                          colorTabValue === "textPrimary"
+                            ? "$textPrimary"
+                            : colorTabValue === "textSecondary"
+                              ? "$textSecondary"
+                              : colorTabValue === "textInverse"
+                                ? "$textInverse"
+                                : "$textOnAccent"
                         }
                       >
                         Heading 2
                       </Heading>
-                      <Heading 
-                        fontSize='$heading3' 
+                      <Heading
+                        fontSize="$heading3"
                         color={
-                          colorTabValue === 'textPrimary' ? '$textPrimary' :
-                          colorTabValue === 'textSecondary' ? '$textSecondary' :
-                          colorTabValue === 'textInverse' ? '$textInverse' :
-                          '$textOnAccent'
+                          colorTabValue === "textPrimary"
+                            ? "$textPrimary"
+                            : colorTabValue === "textSecondary"
+                              ? "$textSecondary"
+                              : colorTabValue === "textInverse"
+                                ? "$textInverse"
+                                : "$textOnAccent"
                         }
                       >
                         Heading 3
                       </Heading>
-                      <ObjHeading 
+                      <ObjHeading
                         color={
-                          colorTabValue === 'textPrimary' ? '$textPrimary' :
-                          colorTabValue === 'textSecondary' ? '$textSecondary' :
-                          colorTabValue === 'textInverse' ? '$textInverse' :
-                          '$textOnAccent'
+                          colorTabValue === "textPrimary"
+                            ? "$textPrimary"
+                            : colorTabValue === "textSecondary"
+                              ? "$textSecondary"
+                              : colorTabValue === "textInverse"
+                                ? "$textInverse"
+                                : "$textOnAccent"
                         }
                       >
                         Object Heading
                       </ObjHeading>
-                      <SubTitle 
+                      <SubTitle
                         color={
-                          colorTabValue === 'textPrimary' ? '$textPrimary' :
-                          colorTabValue === 'textSecondary' ? '$textSecondary' :
-                          colorTabValue === 'textInverse' ? '$textInverse' :
-                          '$textOnAccent'
+                          colorTabValue === "textPrimary"
+                            ? "$textPrimary"
+                            : colorTabValue === "textSecondary"
+                              ? "$textSecondary"
+                              : colorTabValue === "textInverse"
+                                ? "$textInverse"
+                                : "$textOnAccent"
                         }
                       >
                         SubTitle
@@ -541,15 +608,24 @@ export default function StyleDesktop() {
                     </View>
                   </>
                 )}
-                {tabValue === 'body' && (
+                {tabValue === "body" && (
                   <>
-                    <Body fontSize="$body1">Body 1 text example for normal content.</Body>
-                    <Body fontSize="$body2">Body 2 text example for normal content.</Body>
-                    <Body fontSize="$body3">Body 3 text example for normal content.</Body>
-                    <Paragraph>Paragraph component for longer text blocks with proper line height and spacing.</Paragraph>
+                    <Body fontSize="$body1">
+                      Body 1 text example for normal content.
+                    </Body>
+                    <Body fontSize="$body2">
+                      Body 2 text example for normal content.
+                    </Body>
+                    <Body fontSize="$body3">
+                      Body 3 text example for normal content.
+                    </Body>
+                    <Paragraph>
+                      Paragraph component for longer text blocks with proper
+                      line height and spacing.
+                    </Paragraph>
                   </>
                 )}
-                {tabValue === 'other' && (
+                {tabValue === "other" && (
                   <>
                     <Link>Link text for navigation</Link>
                     <Caption>Caption text for small notes</Caption>
@@ -562,14 +638,17 @@ export default function StyleDesktop() {
           <Surface style={{ marginTop: S.space.lg }}>
             <Accordion title="Accordion Component" defaultOpen>
               <Body>
-                The accordion component allows you to collapse and expand content sections. 
-                This is particularly useful for organizing large amounts of information in a compact, 
-                user-friendly way. Click the header to toggle the visibility of this content. 
-                You can use accordions for FAQs, settings panels, or any hierarchical content structure 
-                where users might want to focus on specific sections at a time.
+                The accordion component allows you to collapse and expand
+                content sections. This is particularly useful for organizing
+                large amounts of information in a compact, user-friendly way.
+                Click the header to toggle the visibility of this content. You
+                can use accordions for FAQs, settings panels, or any
+                hierarchical content structure where users might want to focus
+                on specific sections at a time.
               </Body>
               <Caption style={{ marginTop: S.space.sm }}>
-                Toggle the accordion header to test expand/collapse behavior and animations.
+                Toggle the accordion header to test expand/collapse behavior and
+                animations.
               </Caption>
             </Accordion>
           </Surface>
@@ -578,18 +657,42 @@ export default function StyleDesktop() {
             <Heading>Modals, Toasts & Snackbars</Heading>
             <View style={{ gap: S.space.md, marginTop: S.space.md }}>
               <Button text="Open Modal" onPress={() => setModalVisible(true)} />
-              <Button text="Open Custom Modal" onPress={() => setModal2Visible(true)} />
-              <Button text="Show Toast Info" onPress={() => setToastVisible(true)} />
-              <Button text="Show Toast Success" onPress={() => setToastVisible1(true)} />
-              <Button text="Show Toast Warning" onPress={() => setToastVisible2(true)} />
-              <Button text="Show Toast Error" onPress={() => setToastVisible3(true)} />
-              <Button text="Show Snackbar" onPress={() => setSnackVisible(true)} />
+              <Button
+                text="Open Custom Modal"
+                onPress={() => setModal2Visible(true)}
+              />
+              <Button
+                text="Show Toast Info"
+                onPress={() => setToastVisible(true)}
+              />
+              <Button
+                text="Show Toast Success"
+                onPress={() => setToastVisible1(true)}
+              />
+              <Button
+                text="Show Toast Warning"
+                onPress={() => setToastVisible2(true)}
+              />
+              <Button
+                text="Show Toast Error"
+                onPress={() => setToastVisible3(true)}
+              />
+              <Button
+                text="Show Snackbar"
+                onPress={() => setSnackVisible(true)}
+              />
             </View>
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.lg }}>
             <Heading>Loading Spinner</Heading>
-            <View style={{ flexDirection: 'row', gap: S.space.md, marginTop: S.space.md }}>
+            <View
+              style={{
+                flexDirection: "row",
+                gap: S.space.md,
+                marginTop: S.space.md,
+              }}
+            >
               <CustomLoad size="small" />
               <CustomLoad size="large" />
             </View>
@@ -597,175 +700,214 @@ export default function StyleDesktop() {
 
           <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.xl }}>
             <Heading>Tooltips</Heading>
-            <View style={{ gap: S.space.md, marginTop: S.space.md, alignItems: 'flex-start' }}>
+            <View
+              style={{
+                gap: S.space.md,
+                marginTop: S.space.md,
+                alignItems: "flex-start",
+              }}
+            >
               <AppTooltip text="This is a helpful tooltip!">
-                <Button variant="outlined" text="Hover or Press Me" onPress={() => {}} />
+                <Button
+                  variant="outlined"
+                  text="Hover or Press Me"
+                  onPress={() => {}}
+                />
               </AppTooltip>
-              
+
               <AppTooltip text="Tooltips work on any component" delay={300}>
                 <Body>Hover over this text</Body>
               </AppTooltip>
-              
+
               <AppTooltip text="Quick tooltip" delay={100}>
                 <IconButton content="ℹ️" onPress={() => {}} />
               </AppTooltip>
             </View>
           </Surface>
-
-          
         </ScrollView>
       }
       right={
         <ScrollView style={{ padding: S.space.md }}>
           <Surface>
             <Title>Component State Overview</Title>
-            <Body>This panel displays the current state of all interactive components on the left.</Body>
+            <Body>
+              This panel displays the current state of all interactive
+              components on the left.
+            </Body>
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Gradient Demo</Heading>
             <Heading>🌈 Gradient System Demo</Heading>
-                  <Body style={{ marginBottom: S.space.xl }}>
-                    Tight, dramatic gradients from light to dark
-                  </Body>
-            
-                  {/* Cards with Gradients */}
-                  <Heading style={{ marginTop: S.space.xl, marginBottom: S.space.md }}>
-                    Cards (Dramatic Gradient by Default)
-                  </Heading>
-            
-                  <View style={{ marginBottom: S.space.lg, gap: S.space.md }}>
-                    <Card gradient>
-                      <SubTitle>Dramatic Top-to-Bottom (Default)</SubTitle>
-                      <Body>Tight transition at 70% for strong depth effect</Body>
-                    </Card>
-            
-                    <Card gradient gradientDirection={0}>
-                      <SubTitle>Dramatic Bottom-to-Top</SubTitle>
-                      <Body>Inverted gradient for alternative styling</Body>
-                    </Card>
-            
-                    <Card gradient gradientIntensity={20}>
-                      <SubTitle>Moderate Intensity</SubTitle>
-                      <Body>Softer transition, less contrast</Body>
-                    </Card>
-            
-                    <Card gradient gradientIntensity={10}>
-                      <SubTitle>Subtle Intensity</SubTitle>
-                      <Body>Very gentle gradient, barely noticeable</Body>
-                    </Card>
-            
-                    <Card gradient toneVariant="accent">
-                      <SubTitle>Accent Variant with Gradient</SubTitle>
-                      <Body>Gradient applied to accent-toned background</Body>
-                    </Card>
-                  </View>
-            
-                  {/* Surfaces with Gradients */}
-                  <Heading style={{ marginTop: S.space.xl, marginBottom: S.space.md }}>
-                    Surfaces (Subtle Gradient by Default)
-                  </Heading>
-            
-                  <View style={{ marginBottom: S.space.lg, gap: S.space.md }}>
-                    <Surface gradient>
-                      <SubTitle>Subtle Top-to-Bottom (Default)</SubTitle>
-                      <Body>Gentle gradient for large background panels</Body>
-                    </Surface>
-            
-                    <Surface gradient gradientIntensity={30}>
-                      <SubTitle>Dramatic Surface</SubTitle>
-                      <Body>More pronounced gradient on surface</Body>
-                    </Surface>
-            
-                    <Surface gradient variant="alt">
-                      <SubTitle>Elevated Variant with Gradient</SubTitle>
-                      <Body>Gradient on elevated surface tone</Body>
-                    </Surface>
-                  </View>
-            
-                  {/* Comparison */}
-                  <Heading style={{ marginTop: S.space.xl, marginBottom: S.space.md }}>
-                    Side-by-Side Comparison
-                  </Heading>
-            
-                  <View style={{ flexDirection: 'row', gap: S.space.md, marginBottom: S.space.xxl }}>
-                    <Card style={{ flex: 1 }}>
-                      <SubTitle>No Gradient</SubTitle>
-                      <Body>Flat background</Body>
-                    </Card>
-            
-                    <Card gradient style={{ flex: 1 }}>
-                      <SubTitle>With Gradient</SubTitle>
-                      <Body>Dramatic depth</Body>
-                    </Card>
-                  </View>
+            <Body style={{ marginBottom: S.space.xl }}>
+              Tight, dramatic gradients from light to dark
+            </Body>
+
+            {/* Cards with Gradients */}
+            <Heading
+              style={{ marginTop: S.space.xl, marginBottom: S.space.md }}
+            >
+              Cards (Dramatic Gradient by Default)
+            </Heading>
+
+            <View style={{ marginBottom: S.space.lg, gap: S.space.md }}>
+              <Card gradient>
+                <SubTitle>Dramatic Top-to-Bottom (Default)</SubTitle>
+                <Body>Tight transition at 70% for strong depth effect</Body>
+              </Card>
+
+              <Card gradient gradientDirection={0}>
+                <SubTitle>Dramatic Bottom-to-Top</SubTitle>
+                <Body>Inverted gradient for alternative styling</Body>
+              </Card>
+
+              <Card gradient gradientIntensity={20}>
+                <SubTitle>Moderate Intensity</SubTitle>
+                <Body>Softer transition, less contrast</Body>
+              </Card>
+
+              <Card gradient gradientIntensity={10}>
+                <SubTitle>Subtle Intensity</SubTitle>
+                <Body>Very gentle gradient, barely noticeable</Body>
+              </Card>
+
+              <Card gradient toneVariant="accent">
+                <SubTitle>Accent Variant with Gradient</SubTitle>
+                <Body>Gradient applied to accent-toned background</Body>
+              </Card>
+            </View>
+
+            {/* Surfaces with Gradients */}
+            <Heading
+              style={{ marginTop: S.space.xl, marginBottom: S.space.md }}
+            >
+              Surfaces (Subtle Gradient by Default)
+            </Heading>
+
+            <View style={{ marginBottom: S.space.lg, gap: S.space.md }}>
+              <Surface gradient>
+                <SubTitle>Subtle Top-to-Bottom (Default)</SubTitle>
+                <Body>Gentle gradient for large background panels</Body>
+              </Surface>
+
+              <Surface gradient gradientIntensity={30}>
+                <SubTitle>Dramatic Surface</SubTitle>
+                <Body>More pronounced gradient on surface</Body>
+              </Surface>
+
+              <Surface gradient variant="alt">
+                <SubTitle>Elevated Variant with Gradient</SubTitle>
+                <Body>Gradient on elevated surface tone</Body>
+              </Surface>
+            </View>
+
+            {/* Comparison */}
+            <Heading
+              style={{ marginTop: S.space.xl, marginBottom: S.space.md }}
+            >
+              Side-by-Side Comparison
+            </Heading>
+
+            <View
+              style={{
+                flexDirection: "row",
+                gap: S.space.md,
+                marginBottom: S.space.xxl,
+              }}
+            >
+              <Card style={{ flex: 1 }}>
+                <SubTitle>No Gradient</SubTitle>
+                <Body>Flat background</Body>
+              </Card>
+
+              <Card gradient style={{ flex: 1 }}>
+                <SubTitle>With Gradient</SubTitle>
+                <Body>Dramatic depth</Body>
+              </Card>
+            </View>
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg }}>
             <Heading>🔔 Notification Testing</Heading>
-            <Body style={{ marginBottom: S.space.md }}>Test in-app notification queue system</Body>
+            <Body style={{ marginBottom: S.space.md }}>
+              Test in-app notification queue system
+            </Body>
             <View style={{ gap: S.space.md, marginTop: S.space.md }}>
-              <Button 
-                text="Show Info Notification" 
-                onPress={() => showNotification({
-                  type: 'info',
-                  title: 'Info Message',
-                  message: 'This is an info notification to test the system.',
-                })}
+              <Button
+                text="Show Info Notification"
+                onPress={() =>
+                  showNotification({
+                    type: "info",
+                    title: "Info Message",
+                    message: "This is an info notification to test the system.",
+                  })
+                }
               />
-              <Button 
+              <Button
                 variant="outlined"
-                text="Show Update Notification" 
-                onPress={() => showNotification({
-                  type: 'update',
-                  title: 'System Update',
-                  message: 'A new version of the app is available.',
-                })}
+                text="Show Update Notification"
+                onPress={() =>
+                  showNotification({
+                    type: "update",
+                    title: "System Update",
+                    message: "A new version of the app is available.",
+                  })
+                }
               />
-              <Button 
-                text="Show Alert Notification" 
-                onPress={() => showNotification({
-                  type: 'alert',
-                  title: 'Alert',
-                  message: 'This is an important alert notification.',
-                })}
+              <Button
+                text="Show Alert Notification"
+                onPress={() =>
+                  showNotification({
+                    type: "alert",
+                    title: "Alert",
+                    message: "This is an important alert notification.",
+                  })
+                }
               />
-              <Button 
+              <Button
                 variant="outlined"
-                text="Show Message Notification" 
-                onPress={() => showNotification({
-                  type: 'message',
-                  title: 'New Message',
-                  message: 'You have a new message from someone.',
-                })}
+                text="Show Message Notification"
+                onPress={() =>
+                  showNotification({
+                    type: "message",
+                    title: "New Message",
+                    message: "You have a new message from someone.",
+                  })
+                }
               />
-              <Button 
-                text="Queue Multiple Notifications" 
+              <Button
+                text="Queue Multiple Notifications"
                 onPress={() => {
                   showNotification({
-                    type: 'message',
-                    title: 'First',
-                    message: 'This is the first notification',
-                  })
+                    type: "message",
+                    title: "First",
+                    message: "This is the first notification",
+                  });
                   setTimeout(() => {
                     showNotification({
-                      type: 'info',
-                      title: 'Second',
-                      message: 'This is the second notification',
-                    })
-                  }, 100)
+                      type: "info",
+                      title: "Second",
+                      message: "This is the second notification",
+                    });
+                  }, 100);
                   setTimeout(() => {
                     showNotification({
-                      type: 'update',
-                      title: 'Third',
-                      message: 'This is the third notification',
-                    })
-                  }, 200)
+                      type: "update",
+                      title: "Third",
+                      message: "This is the third notification",
+                    });
+                  }, 200);
                 }}
               />
             </View>
-            <Body style={{ marginTop: S.space.md, color: $('textSecondary', theme) }}>
-              Notifications appear in the top-right corner (desktop) or top-center (mobile) and auto-dismiss after 5 seconds.
+            <Body
+              style={{
+                marginTop: S.space.md,
+                color: $("textSecondary", theme),
+              }}
+            >
+              Notifications appear in the top-right corner (desktop) or
+              top-center (mobile) and auto-dismiss after 5 seconds.
             </Body>
           </Surface>
 
@@ -773,21 +915,25 @@ export default function StyleDesktop() {
             <Heading>Button States</Heading>
             <View style={{ gap: S.space.xs, marginTop: S.space.md }}>
               <Body>Primary button clicks: {primaryClicks}</Body>
-              <Body>Last icon clicked: {iconButtonClicks || 'None'}</Body>
-              <Body>Button group: {buttonGroupValue || 'None'}</Body>
+              <Body>Last icon clicked: {iconButtonClicks || "None"}</Body>
+              <Body>Button group: {buttonGroupValue || "None"}</Body>
             </View>
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Input States</Heading>
             <View style={{ gap: S.space.xs, marginTop: S.space.md }}>
-              <Body>TextInput: {textInputValue || '(empty)'}</Body>
-              <Body>DescInput: {descInputValue || '(empty)'}</Body>
+              <Body>TextInput: {textInputValue || "(empty)"}</Body>
+              <Body>DescInput: {descInputValue || "(empty)"}</Body>
               {Object.keys(textInputGroupValues).length > 0 && (
                 <>
-                  <SubTitle style={{ marginTop: S.space.sm }}>Input Group:</SubTitle>
+                  <SubTitle style={{ marginTop: S.space.sm }}>
+                    Input Group:
+                  </SubTitle>
                   {Object.entries(textInputGroupValues).map(([key, value]) => (
-                    <Body key={key}>{key}: {value as string || '(empty)'}</Body>
+                    <Body key={key}>
+                      {key}: {(value as string) || "(empty)"}
+                    </Body>
                   ))}
                 </>
               )}
@@ -797,28 +943,38 @@ export default function StyleDesktop() {
           <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Selection States</Heading>
             <View style={{ gap: S.space.xs, marginTop: S.space.md }}>
-              <Body>Dropdown: {dropdownValue || 'None'}</Body>
+              <Body>Dropdown: {dropdownValue || "None"}</Body>
               {Object.keys(dropdownGroupValues).length > 0 && (
                 <>
-                  <SubTitle style={{ marginTop: S.space.sm }}>Dropdown Group:</SubTitle>
+                  <SubTitle style={{ marginTop: S.space.sm }}>
+                    Dropdown Group:
+                  </SubTitle>
                   {Object.entries(dropdownGroupValues).map(([key, value]) => (
-                    <Body key={key}>{key}: {value as string || 'None'}</Body>
+                    <Body key={key}>
+                      {key}: {(value as string) || "None"}
+                    </Body>
                   ))}
                 </>
               )}
-              <Body style={{ marginTop: S.space.sm }}>Active Tab: {tabValue}</Body>
+              <Body style={{ marginTop: S.space.sm }}>
+                Active Tab: {tabValue}
+              </Body>
             </View>
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg }}>
             <Heading>Radio & Toggle States</Heading>
             <View style={{ gap: S.space.xs, marginTop: S.space.md }}>
-              <Body>Radio Group: {radioGroupValue || 'None'}</Body>
+              <Body>Radio Group: {radioGroupValue || "None"}</Body>
               {Object.keys(toggleGroupValues).length > 0 && (
                 <>
-                  <SubTitle style={{ marginTop: S.space.sm }}>Toggle Group:</SubTitle>
+                  <SubTitle style={{ marginTop: S.space.sm }}>
+                    Toggle Group:
+                  </SubTitle>
                   {Object.entries(toggleGroupValues).map(([key, value]) => (
-                    <Body key={key}>{key}: {value ? 'ON' : 'OFF'}</Body>
+                    <Body key={key}>
+                      {key}: {value ? "ON" : "OFF"}
+                    </Body>
                   ))}
                 </>
               )}
@@ -828,25 +984,49 @@ export default function StyleDesktop() {
           <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.xl }}>
             <Heading>Test All Components</Heading>
             <View style={{ gap: S.space.md, marginTop: S.space.md }}>
-              <Button variant="outlined" text="Refresh All Values" onPress={() => {
-                setButtonGroupValue(buttonGroupRef.current?.getValue() || '')
-                setTextInputGroupValues(textInputGroupRef.current?.getValues() || {})
-                setDropdownGroupValues(dropdownGroupRef.current?.getValues() || {})
-                
-                const switchVals = switchGroupRef.current?.getValues() || []
-                setSwitchGroupValues(switchVals.reduce((acc: any, key: string) => ({ ...acc, [key]: true }), {}))
-                
-                const exclusiveVals = switchGroupExclusiveRef.current?.getValues() || []
-                setSwitchGroupExclusiveValue(exclusiveVals[0] || '')
-                
-                const maxVals = switchGroupMaxRef.current?.getValues() || []
-                setSwitchGroupMaxValues(maxVals.reduce((acc: any, key: string) => ({ ...acc, [key]: true }), {}))
-                
-                setRadioGroupValue(radioGroupRef.current?.getValue() || '')
-                
-                const toggleVals = toggleGroupRef.current?.getValues() || []
-                setToggleGroupValues(toggleVals.reduce((acc: any, key: string) => ({ ...acc, [key]: true }), {}))
-              }} />
+              <Button
+                variant="outlined"
+                text="Refresh All Values"
+                onPress={() => {
+                  setButtonGroupValue(buttonGroupRef.current?.getValue() || "");
+                  setTextInputGroupValues(
+                    textInputGroupRef.current?.getValues() || {},
+                  );
+                  setDropdownGroupValues(
+                    dropdownGroupRef.current?.getValues() || {},
+                  );
+
+                  const switchVals = switchGroupRef.current?.getValues() || [];
+                  setSwitchGroupValues(
+                    switchVals.reduce(
+                      (acc: any, key: string) => ({ ...acc, [key]: true }),
+                      {},
+                    ),
+                  );
+
+                  const exclusiveVals =
+                    switchGroupExclusiveRef.current?.getValues() || [];
+                  setSwitchGroupExclusiveValue(exclusiveVals[0] || "");
+
+                  const maxVals = switchGroupMaxRef.current?.getValues() || [];
+                  setSwitchGroupMaxValues(
+                    maxVals.reduce(
+                      (acc: any, key: string) => ({ ...acc, [key]: true }),
+                      {},
+                    ),
+                  );
+
+                  setRadioGroupValue(radioGroupRef.current?.getValue() || "");
+
+                  const toggleVals = toggleGroupRef.current?.getValues() || [];
+                  setToggleGroupValues(
+                    toggleVals.reduce(
+                      (acc: any, key: string) => ({ ...acc, [key]: true }),
+                      {},
+                    ),
+                  );
+                }}
+              />
             </View>
           </Surface>
         </ScrollView>
@@ -865,7 +1045,10 @@ export default function StyleDesktop() {
         heading="Custom Modal"
       >
         <View style={{ gap: S.space.md }}>
-          <Body>This modal demonstrates using custom children alongside the heading prop</Body>
+          <Body>
+            This modal demonstrates using custom children alongside the heading
+            prop
+          </Body>
           <Button text="Close" onPress={() => setModal2Visible(false)} />
         </View>
       </AppModal>
@@ -904,5 +1087,5 @@ export default function StyleDesktop() {
         onHide={() => setSnackVisible(false)}
       />
     </AppSplit>
-  )
+  );
 }

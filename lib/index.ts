@@ -1,65 +1,66 @@
 /**
- * Lib Module - Single barrel exporter
- * Centralizes all exports from lib/* so consumers can import from '@/lib'
+ * Lib Module - Central barrel exporter
+ *
+ * Exports all public utilities from lib/* subdirectories.
+ * Each subdirectory has its own barrel export (index.ts).
+ *
+ * Import patterns:
+ *   import { logger, AppKernel } from '@/lib';
+ *   import { useAuthGuard, SignUpResult } from '@/lib/auth';
+ *   import { SecureStorage, STORAGE_KEYS } from '@/lib/storage';
  */
 
+// ===== Analytics =====
+export * from "./analytics";
+
 // ===== API =====
-export * from './api/request-manager';
+export * from "./api";
 
-// ===== Cache =====
-export * from './cache';
+// ===== Auth (Authentication & Authorization) =====
+export * from "./auth";
 
-// ===== Kernel (Bootstrap & Lifecycle) =====
-export { AppKernel, AppKernelProvider, KernelErrorCode, KernelPhase, useAppKernel, useAppReady, usePhaseReady } from './kernel';
-export type { AppKernelState, KernelCapabilities, KernelError } from './kernel';
+// ===== Cache (Query & Data Caching) =====
+export * from "./cache";
 
-// ===== Auth =====
-export * from './auth/auth-attempt-guard';
-export * from './auth/authService';
-export * from './auth/emailUtils';
-export * from './auth/redirectSafety';
-export * from './auth/sessionService';
-export * from './auth/useAuthGuard';
-export * from './auth/useResetPasswordConfirm';
-export * from './auth/useSignInForm';
-export * from './auth/useSignUpForm';
-export * from './auth/useWelcomeScreen';
-export * from './auth/validation';
-// ===== Routing config =====
-export * from './routing/route-config';
+// ===== Config (App Configuration) =====
+export * from "./config";
 
-// ===== Navigation =====
-export * from './navigation/navigation-config';
-export * from './navigation/uri-helpers';
-
-// ===== Database =====
-export * from './database/common';
-export * from './database/invites';
-export * from './database/supabase';
-export * from './database/users';
-export * from './database/worlds';
-
-// ===== Settings =====
-export * from './settings/deleteAccount';
-export * from './settings/signOut';
-export * from './settings/updateUsername';
-
-// ===== Utils =====
-export { default as Logger, logger } from './utils/logger';
+// ===== Database (Supabase & Queries) =====
+export * from "./database";
 
 // ===== Error Handling =====
-export * from './error';
+export * from "./error";
 
-// ===== Network Detection & Error Handling =====
-export * from './network';
+// ===== Feature Flags =====
+export * from "./feature-flags";
 
-// ===== Storage (Encryption & Error Handling) =====
-export * from './storage';
+// ===== Kernel (Bootstrap & App Lifecycle) =====
+export * from "./kernel";
 
-// ===== Other top-level lib utilities =====
-export * from './analytics';
-export * from './auth/auth-state';
-export * from './auth/encrypted-storage';
-export * from './worlds/useWorlds';
+// ===== Navigation (Route Configuration & Helpers) =====
+export * from "./navigation";
 
+// ===== Network (Detection & Status) =====
+export * from "./network";
+
+// ===== Offline Support =====
+export * from "./offline";
+
+// ===== Premium Features & Subscriptions =====
+export * from "./premium";
+
+// ===== Routing (Route Authentication) =====
+export * from "./routing";
+
+// ===== Schemas (Validation & Type Definitions) =====
+export * from "./schemas";
+
+// ===== Settings (User Settings & Account) =====
+export * from "./settings";
+
+// ===== Storage (Secure Storage & Encryption) =====
+export * from "./storage";
+
+// ===== Utils (Logging, Versioning, Performance) =====
+export * from "./utils";
 

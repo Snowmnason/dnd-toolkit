@@ -1,7 +1,7 @@
-import { ThemeTokens } from '@/theme/tokens'
-import { UseTheme } from '../ThemeProvider'
-import { $ as cssVarDollar } from './cssVars'
-import { S } from './sizing'
+import { ThemeTokens } from "@/theme/tokens";
+import { UseTheme } from "../../providers/ThemeProvider";
+import { $ as cssVarDollar } from "./cssVars";
+import { S } from "./sizing";
 
 /* ───────────────────────────────
    MERGED TOKEN SOURCE
@@ -9,12 +9,12 @@ import { S } from './sizing'
 ──────────────────────────────── */
 function mergeTokens(theme: ThemeTokens) {
   return {
-    ...theme,          // all color tokens
-    ...S.font,         // font sizes ($sm, $md, etc.)
-    ...S.space,        // spacing ($sm, $md, etc.)
-    ...S.radius,       // radius tokens ($sm, $md, etc.)
-    ...S.border,       // border width tokens
-  }
+    ...theme, // all color tokens
+    ...S.font, // font sizes ($sm, $md, etc.)
+    ...S.space, // spacing ($sm, $md, etc.)
+    ...S.radius, // radius tokens ($sm, $md, etc.)
+    ...S.border, // border width tokens
+  };
 }
 
 /* ───────────────────────────────
@@ -27,15 +27,18 @@ function mergeTokens(theme: ThemeTokens) {
    
    Theme parameter is optional; if omitted, fetches from context.
 ──────────────────────────────── */
-export function $(key: keyof ThemeTokens | keyof typeof S.font | keyof typeof S.space, theme?: ThemeTokens): any {
+export function $(
+  key: keyof ThemeTokens | keyof typeof S.font | keyof typeof S.space,
+  theme?: ThemeTokens,
+): any {
   // Check if this is a sizing/spacing token (not a color)
-  const sizingTokens = { ...S.font, ...S.space, ...S.radius, ...S.border }
+  const sizingTokens = { ...S.font, ...S.space, ...S.radius, ...S.border };
   if (key in sizingTokens) {
-    return sizingTokens[key as keyof typeof sizingTokens]
+    return sizingTokens[key as keyof typeof sizingTokens];
   }
-  
+
   // For color tokens, use the web-optimized cssVar helper
-  return cssVarDollar(key as any, theme)
+  return cssVarDollar(key as any, theme);
 }
 
 /* ───────────────────────────────
@@ -43,39 +46,39 @@ export function $(key: keyof ThemeTokens | keyof typeof S.font | keyof typeof S.
 ──────────────────────────────── */
 export function resolveStyleTokens<T extends Record<string, any>>(
   style: T,
-  theme: ThemeTokens
+  theme: ThemeTokens,
 ): T {
-  const tokens = mergeTokens(theme)
-  const resolved: any = {}
+  const tokens = mergeTokens(theme);
+  const resolved: any = {};
 
   for (const key in style) {
-    const value = style[key]
+    const value = style[key];
 
-    if (typeof value === 'string' && value.startsWith('$')) {
-      const tokenName = value.slice(1)
-      resolved[key] = tokens[tokenName as keyof typeof tokens]
+    if (typeof value === "string" && value.startsWith("$")) {
+      const tokenName = value.slice(1);
+      resolved[key] = tokens[tokenName as keyof typeof tokens];
     } else if (
-      typeof value === 'object' &&
+      typeof value === "object" &&
       value !== null &&
       !Array.isArray(value)
     ) {
-      resolved[key] = resolveStyleTokens(value, theme)
+      resolved[key] = resolveStyleTokens(value, theme);
     } else {
-      resolved[key] = value
+      resolved[key] = value;
     }
   }
 
-  return resolved
+  return resolved;
 }
 
 /* ───────────────────────────────
    useThemeTokens – Hook version
 ──────────────────────────────── */
 export function useThemeTokens() {
-  const { theme } = UseTheme()
+  const { theme } = UseTheme();
   const resolve = <T extends Record<string, any>>(style: T) =>
-    resolveStyleTokens(style, theme)
+    resolveStyleTokens(style, theme);
 
-  const tokens = mergeTokens(theme)
-  return { theme, tokens, resolve }
+  const tokens = mergeTokens(theme);
+  return { theme, tokens, resolve };
 }

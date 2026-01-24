@@ -1,6 +1,6 @@
-import { usePremiumFeature } from '@/hooks/use-premium-feature';
-import { FeatureFlagName, FeatureFlags } from '@/lib/feature-flags';
-import React from 'react';
+import { usePremiumFeature } from "@/hooks/auth/use-premium-feature";
+import { FeatureFlagName, FeatureFlags } from "@/lib/feature-flags";
+import React from "react";
 
 export type FeatureGateProps = {
   children: React.ReactNode;
@@ -26,16 +26,21 @@ export function FeatureGate({
   fallback = null,
 }: FeatureGateProps) {
   // Dev validation: featureKey should only be used with requirePremium
-  const isDev = (process.env.EXPO_PUBLIC_ENVIRONMENT || 'production') === 'development';
+  const isDev =
+    (process.env.EXPO_PUBLIC_ENVIRONMENT || "production") === "development";
   if (isDev && featureKey && !requirePremium) {
-    console.warn('[FeatureGate] featureKey provided without requirePremium=true; key will be ignored.');
+    console.warn(
+      "[FeatureGate] featureKey provided without requirePremium=true; key will be ignored.",
+    );
   }
 
   const flagAllowed = flag ? FeatureFlags.isEnabled(flag) : true;
-  
+
   // Only check premium if explicitly required
-  const premiumCheck = usePremiumFeature(requirePremium ? featureKey : undefined);
-  
+  const premiumCheck = usePremiumFeature(
+    requirePremium ? featureKey : undefined,
+  );
+
   // While loading premium state, avoid flicker
   if (requirePremium && premiumCheck.loading) return fallback;
 

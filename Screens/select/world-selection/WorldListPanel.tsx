@@ -1,28 +1,36 @@
-import { Body, Button } from '@/components/ui'
-import { useAppParamsVolatile } from '@/contexts/AppParamsVolatileContext'
-import { usePlatform } from '@/contexts/PlatformContext'
-import { WorldWithAccess } from '@/lib/database/worlds'
-import { buildNavigationTarget } from '@/lib/navigation/uri-helpers'
-import { useScale } from '@/theme'
-import { useRouter } from 'expo-router'
-import React from 'react'
-import { ScrollView } from 'react-native'
+import { Body, Button } from "@/components/ui";
+import { WorldWithAccess } from "@/lib/database/worlds";
+import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
+import { useAppParamsVolatile } from "@/providers/AppParamsVolatileProvider";
+import { usePlatform } from "@/providers/PlatformProvider";
+import { useScale } from "@/theme";
+import { useRouter } from "expo-router";
+import React from "react";
+import { ScrollView } from "react-native";
 
 interface WorldListPanelProps {
-  worlds: WorldWithAccess[]
-  selectedWorld: WorldWithAccess | null
-  setSelectedWorld: React.Dispatch<React.SetStateAction<WorldWithAccess | null>>
-  setMapImage: (url: string | null) => void
-  onMobileWorldSelect?: (world: WorldWithAccess) => void
+  worlds: WorldWithAccess[];
+  selectedWorld: WorldWithAccess | null;
+  setSelectedWorld: React.Dispatch<
+    React.SetStateAction<WorldWithAccess | null>
+  >;
+  setMapImage: (url: string | null) => void;
+  onMobileWorldSelect?: (world: WorldWithAccess) => void;
 }
 
-export function WorldListPanel({ worlds, selectedWorld, setSelectedWorld, setMapImage, onMobileWorldSelect }: WorldListPanelProps) {
-  const S = useScale()
-  const router = useRouter()
-  const { updateVolatileParams } = useAppParamsVolatile()
+export function WorldListPanel({
+  worlds,
+  selectedWorld,
+  setSelectedWorld,
+  setMapImage,
+  onMobileWorldSelect,
+}: WorldListPanelProps) {
+  const S = useScale();
+  const router = useRouter();
+  const { updateVolatileParams } = useAppParamsVolatile();
 
   // Centralized platform detection
-  const { isDesktop } = usePlatform()
+  const { isDesktop } = usePlatform();
 
   return (
     <>
@@ -35,20 +43,24 @@ export function WorldListPanel({ worlds, selectedWorld, setSelectedWorld, setMap
         showsVerticalScrollIndicator={false}
       >
         {worlds.length === 0 ? (
-          <Body align="center" color="$textSecondary" style={{ marginTop: S.space.md, padding: S.space.lg }}>
+          <Body
+            align="center"
+            color="$textSecondary"
+            style={{ marginTop: S.space.md, padding: S.space.lg }}
+          >
             No worlds yet. Create your first world to get started!
           </Body>
         ) : (
           worlds.map((world) => {
-            const isSelected = selectedWorld?.world_id === world.world_id
-            const isOwner = world.user_role === 'owner'
+            const isSelected = selectedWorld?.world_id === world.world_id;
+            const isOwner = world.user_role === "owner";
 
             // Variant rules
             const variant = isSelected
-              ? 'solid'
+              ? "solid"
               : isOwner
-              ? 'primary'
-              : 'secondary'
+                ? "primary"
+                : "secondary";
 
             return (
               <Button
@@ -59,52 +71,52 @@ export function WorldListPanel({ worlds, selectedWorld, setSelectedWorld, setMap
                   if (isDesktop) {
                     setSelectedWorld((prev) => {
                       if (prev?.world_id === world.world_id) {
-                        setMapImage(null)
-                        return null
+                        setMapImage(null);
+                        return null;
                       } else {
-                        setMapImage(world.map_image_url || null)
-                        return world
+                        setMapImage(world.map_image_url || null);
+                        return world;
                       }
-                    })
+                    });
                   } else {
                     // Update centralized params context
                     updateVolatileParams({
                       worldId: world.world_id,
                       userRole: world.user_role,
-                    })
+                    });
 
                     // Mobile: Use callback to switch panels instead of routing
                     if (onMobileWorldSelect) {
-                      onMobileWorldSelect(world)
+                      onMobileWorldSelect(world);
                     }
                   }
                 }}
                 style={{
-                  width: '100%',
+                  width: "100%",
                   marginBottom: S.space.sm,
                 }}
               />
-            )
+            );
           })
         )}
       </ScrollView>
 
       {/* Create New World button (bottom-aligned) */}
-        <Button
-          text="Create New World"
-          variant="primary"
-          onPress={() => {
-            const target = buildNavigationTarget('/select/create-world', {}, [])
-            router.push(target as any)
-          }}
-          style={{ borderRadius: S.radius.lg,
-            position: 'absolute',
-            left: S.space.md,
-            right: S.space.md,
-            bottom: S.space.xs,
-           }}
-        />
-
+      <Button
+        text="Create New World"
+        variant="primary"
+        onPress={() => {
+          const target = buildNavigationTarget("/select/create-world", {}, []);
+          router.push(target as any);
+        }}
+        style={{
+          borderRadius: S.radius.lg,
+          position: "absolute",
+          left: S.space.md,
+          right: S.space.md,
+          bottom: S.space.xs,
+        }}
+      />
     </>
-  )
+  );
 }

@@ -1,24 +1,26 @@
-import {
-  OfflineSyncNotificationLayer
-} from "@/components/offline";
+import { OfflineSyncNotificationLayer } from "@/components/offline";
 import { NotificationContainer, TopBar } from "@/components/ui";
-import { useAnalyticsNavigation } from "@/hooks/use-analytics-navigation";
-import { NotificationProvider } from "@/hooks/use-notifications";
+import { useAnalyticsNavigation } from "@/hooks/navigation";
+import { useSplashScreen } from "@/hooks/ui";
+import { NotificationProvider } from "@/hooks/utils";
 import {
+  Analytics,
+  APP_VERSION,
   AppErrorBoundary,
+  AppKernelProvider,
+  buildNavigationTarget,
+  getAppConfig,
   getRouteConfig,
+  lazyLoadInBackground,
+  logger,
   resolveBackTarget,
   resolveTitle,
+  sessionManager,
+  useAppKernel,
 } from "@/lib";
-import { Analytics, sessionManager } from "@/lib/analytics";
-import { getAppConfig } from "@/lib/config/loader";
-import { AppKernelProvider, useAppKernel } from "@/lib/kernel";
-import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
-import { lazyLoadInBackground } from "@/lib/utils/lazy-imports";
-import { logger } from "@/lib/utils/logger";
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
-import { ThemeProvider, UseTheme } from "@/theme";
+import { ThemeProvider, UseTheme } from "@/providers/ThemeProvider";
 import Constants from "expo-constants";
 import {
   Stack,
@@ -38,16 +40,14 @@ import {
   AppParamsStableProvider,
   useAppParamsStable,
   useUserId,
-} from "../contexts/AppParamsStableContext";
+} from "../providers/AppParamsStableProvider";
 import {
   AppParamsVolatileProvider,
   useAppParamsVolatile,
   useUserRole,
   useWorldId,
-} from "../contexts/AppParamsVolatileContext";
-import { PlatformProvider, usePlatform } from "../contexts/PlatformContext";
-import { useSplashScreen } from "../hooks/use-splash-screen";
-import { APP_VERSION } from "../lib/version";
+} from "../providers/AppParamsVolatileProvider";
+import { PlatformProvider, usePlatform } from "../providers/PlatformProvider";
 
 // Check if Sentry is enabled via feature flag
 const config = getAppConfig();

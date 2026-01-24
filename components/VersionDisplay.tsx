@@ -1,5 +1,5 @@
-import { APP_VERSION } from '@/lib/version';
-import { Caption } from './ui';
+import { APP_VERSION } from "@/lib/utils/version";
+import { Caption } from "./ui";
 
 interface VersionDisplayProps {
   style?: any;

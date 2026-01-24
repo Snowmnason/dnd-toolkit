@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui";
-import { usePlatform } from "@/contexts/PlatformContext";
-import { useThemeSwitcher } from "@/hooks/useThemeSwitcher";
+import { useThemeSwitcher } from "@/hooks/ui";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
+import { usePlatform } from "@/providers/PlatformProvider";
 import {
   $,
   allThemes,

@@ -1,4 +1,4 @@
-import { usePlatform } from "@/contexts/PlatformContext";
+import { usePlatform } from "@/providers/PlatformProvider";
 import { $, tone, useScale, UseTheme } from "@/theme";
 import * as Haptics from "expo-haptics";
 import React, { useEffect, useMemo } from "react";
@@ -106,7 +106,8 @@ export function AppModal({
   // Memoized color computations
   const overlayColorValue = useMemo(() => {
     if (dimColor) return dimColor;
-    if (accentOverlay) return tone(accentColor, "changeOpacity", undefined, 0.35, theme);
+    if (accentOverlay)
+      return tone(accentColor, "changeOpacity", undefined, 0.35, theme);
     return "rgba(0, 0, 0, 0.45)";
   }, [dimColor, accentOverlay, accentColor, theme]);
 
@@ -116,7 +117,14 @@ export function AppModal({
     if (borderTone === "danger") return dangerColor;
     if (borderTone === "accent") return accentColor;
     return primaryColor;
-  }, [borderTone, successColor, warningColor, dangerColor, accentColor, primaryColor])
+  }, [
+    borderTone,
+    successColor,
+    warningColor,
+    dangerColor,
+    accentColor,
+    primaryColor,
+  ]);
 
   // 🔹 Fade + slide (+scale on web) entry/exit animation
   useEffect(() => {
@@ -138,7 +146,10 @@ export function AppModal({
 
       // Start fade + slide in
       fadeProgress.value = withTiming(1, { duration: 250 });
-      slideProgress.value = withTiming(0, { duration: 280, easing: Easing.out(Easing.cubic) });
+      slideProgress.value = withTiming(0, {
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+      });
       scaleProgress.value = isWeb
         ? withTiming(1, { duration: 280, easing: Easing.out(Easing.cubic) })
         : withTiming(1, { duration: 1 });
@@ -232,18 +243,18 @@ export function AppModal({
   useEffect(() => {
     if (!visible) return;
 
-    const isWebPlatform = Platform.OS === 'web';
+    const isWebPlatform = Platform.OS === "web";
 
     if (isWebPlatform) {
       const handleKeyPress = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') onClose();
+        if (e.key === "Escape") onClose();
       };
-      if (typeof document !== 'undefined' && document.addEventListener) {
-        document.addEventListener('keydown', handleKeyPress);
+      if (typeof document !== "undefined" && document.addEventListener) {
+        document.addEventListener("keydown", handleKeyPress);
       }
       return () => {
-        if (typeof document !== 'undefined' && document.removeEventListener) {
-          document.removeEventListener('keydown', handleKeyPress);
+        if (typeof document !== "undefined" && document.removeEventListener) {
+          document.removeEventListener("keydown", handleKeyPress);
         }
       };
     } else {
@@ -251,7 +262,10 @@ export function AppModal({
         onClose();
         return true;
       };
-      const backSub = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+      const backSub = BackHandler.addEventListener(
+        "hardwareBackPress",
+        handleBackPress,
+      );
       return () => {
         backSub?.remove();
       };
