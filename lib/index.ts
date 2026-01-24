@@ -4,62 +4,69 @@
  */
 
 // ===== API =====
-export * from './api/request-manager';
+export * from "./api/request-manager";
 
 // ===== Cache =====
-export * from './cache';
+export * from "./cache";
 
 // ===== Kernel (Bootstrap & Lifecycle) =====
-export { AppKernel, AppKernelProvider, KernelErrorCode, KernelPhase, useAppKernel, useAppReady, usePhaseReady } from './kernel';
-export type { AppKernelState, KernelCapabilities, KernelError } from './kernel';
+export {
+    AppKernel,
+    AppKernelProvider,
+    KernelErrorCode,
+    KernelPhase,
+    useAppKernel,
+    useAppReady,
+    usePhaseReady
+} from "./kernel";
+export type { AppKernelState, KernelCapabilities, KernelError } from "./kernel";
 
 // ===== Auth =====
-export * from './auth/auth-attempt-guard';
-export * from './auth/authService';
-export * from './auth/emailUtils';
-export * from './auth/redirectSafety';
-export * from './auth/sessionService';
-export * from './auth/useAuthGuard';
-export * from './auth/useResetPasswordConfirm';
-export * from './auth/useSignInForm';
-export * from './auth/useSignUpForm';
-export * from './auth/useWelcomeScreen';
-export * from './auth/validation';
+export * from "./auth/auth-attempt-guard";
+export * from "./auth/authService";
+export * from "./auth/emailUtils";
+export * from "./auth/redirectSafety";
+export * from "./auth/sessionService";
+export * from "./auth/useAuthGuard";
+export * from "./auth/useResetPasswordConfirm";
+export * from "./auth/useSignInForm";
+export * from "./auth/useSignUpForm";
+export * from "./auth/useWelcomeScreen";
+export * from "./auth/validation";
 // ===== Routing config =====
-export * from './routing/route-config';
+export * from "./routing/route-config";
 
 // ===== Navigation =====
-export * from './navigation/navigation-config';
-export * from './navigation/uri-helpers';
+export * from "./navigation/navigation-config";
+export * from "./navigation/uri-helpers";
 
 // ===== Database =====
-export * from './database/common';
-export * from './database/invites';
-export * from './database/supabase';
-export * from './database/users';
-export * from './database/worlds';
+export * from "./database/common";
+export * from "./database/invites";
+export * from "./database/supabase";
+export * from "./database/users";
+export * from "./database/worlds";
 
 // ===== Settings =====
-export * from './settings/deleteAccount';
-export * from './settings/signOut';
-export * from './settings/updateUsername';
+export * from "./settings/deleteAccount";
+export * from "./settings/signOut";
+export * from "./settings/updateUsername";
 
 // ===== Utils =====
-export { default as Logger, logger } from './utils/logger';
+export { default as Logger, logger } from "./utils/logger";
+export * from "./utils/version";
 
 // ===== Error Handling =====
-export * from './error';
+export * from "./error";
 
 // ===== Network Detection & Error Handling =====
-export * from './network';
+export * from "./network";
 
 // ===== Storage (Encryption & Error Handling) =====
-export * from './storage';
+export * from "./storage";
 
 // ===== Other top-level lib utilities =====
-export * from './analytics';
-export * from './auth/auth-state';
-export * from './auth/encrypted-storage';
-export * from './worlds/useWorlds';
-
+export * from "./analytics";
+export * from "./auth/auth-state";
+export * from "./auth/encrypted-storage";
 

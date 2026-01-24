@@ -1,53 +1,133 @@
-# <Feature / Hook Name> — Test Guide
+# <Feature / Screen Name> — Test Guide
 
 ## Overview
 
-- Purpose: one-line description
-- Scope: files and behaviors covered
+- **Purpose:** One-line description of what users will do (e.g., "Create a new world and verify it appears in the world list")
+- **What we're testing:** [Feature name], [behavior], [error handling]
 
 ## Environments
 
-- Web (desktop)
-- Desktop app (Electron)
+- App (Desktop / Mobile / Both)
+- Web
+- Both
 
 ## Prerequisites
 
-- Test accounts, admin flags, world IDs, feature flags
-- Base URL(s) to use
+- **Test accounts:** Free account, Premium account (if testing premium)
+- **Test data:** Any worlds, characters, or other setup needed
+- **Setup steps:** Clear instructions if device needs to be in a certain state
 
-## Test Data
+---
 
-- Test user(s) and roles
-- World IDs and payloads
+## How [Feature] Works
+
+Brief explanation for QA testers (not developers):
+
+- What the feature does
+- What outcomes to expect
+- Any limitations or known behaviors
+
+---
 
 ## Test Cases
 
-### Test Case — Descriptive name
+### ✓ Test 1: [Feature Name] — [Positive Scenario]
 
-- Goal: one-line expected behavior
-- Steps:
-  1. Step-by-step actions (non-dev friendly)
-  2. ...
-- Expected result:
-  - Exact URL or UI text
-  - API outcome if applicable
-- Pass / Fail: [ ] Pass [ ] Fail
-- Evidence:
-  - Screenshot: (attach or paste link)
-  - Console logs: (paste area)
-  - Notes / edge cases
+**Scenario:** [Describe the user's goal]
 
-(repeat `###` blocks for each test)
+**Steps:**
 
-## Scripts (if applicable)
+1. Clear action steps (non-technical, user-facing language)
+2. "Click the [Button Name] button"
+3. "Enter [data] into the [Field Name]"
+4. Wait for response
 
-- Purpose: brief statement of what the script validates (performance, correctness, error-handling, timeouts, etc.).
-- Execution constraints: admin-only (Supabase flag) when required; indicate where to run (desktop app terminal, web dev console, CI job) and any required environment variables or test accounts.
-- Observability / Logs: specify which logs to capture (renderer console, server logs, request IDs, timestamps). Instruct testers to paste full logs (or a trimmed excerpt with timestamps) into the report and remove any secrets.
+**Expected Outcome:**
 
-### Recommended script specs (create one spec per script; do not commit runnable scripts yet):
+- ✅ [Expected result 1]
+- ✅ [Expected result 2]
+- ✅ [Expected result 3]
 
-- Passing script — expected to pass
+**How to Record a Pass:**
+
+- [ ] Screenshot showing the successful outcome
+- [ ] Note: "[Brief description of what worked]"
+
+**How to Record a Fail:**
+
+- [ ] Screenshot showing the error or unexpected behavior
+- [ ] Note: "[What went wrong]"
+
+---
+
+### ✗ Test 2: [Feature Name] — [Negative Scenario]
+
+**Scenario:** [Describe what should be blocked or rejected]
+
+**Steps:**
+
+1. Action steps to trigger the error condition
+2. ...
+
+**Expected Outcome:**
+
+- ✅ Clear error message appears
+- ✅ User is prevented from proceeding
+- ✅ No data corruption or silent failures
+
+**How to Record a Pass:**
+
+- [ ] Screenshot of error message or blocked action
+- [ ] Note: "[Error handled correctly]"
+
+**How to Record a Fail:**
+
+- [ ] Screenshot if error isn't clear
+- [ ] Note: "[What went wrong]"
+
+---
+
+### ⚡ Test 3: [Feature Name] — [Edge Case]
+
+**Scenario:** [Less common but important scenario]
+
+**Steps:**
+
+1. ...
+
+**Expected Outcome:**
+
+- ✅ ...
+
+---
+
+## Platform-Specific Notes
+
+### App (Desktop/Mobile):
+
+- [Any platform-specific behavior]
+
+### Web:
+
+- [Any web-specific behavior]
+
+---
+
+## Troubleshooting
+
+| Issue            | Solution     |
+| ---------------- | ------------ |
+| "[Common issue]" | "[Solution]" |
+
+---
+
+## Success Criteria ✅
+
+All tests pass when:
+
+- ✅ [Criterion 1]
+- ✅ [Criterion 2]
+- ✅ [Criterion 3]
 - Failing script — expected to fail gracefully
 - Realistic simulation script — end-to-end behavior
 - Chaos / Edge-case script — interruptions & timing violations

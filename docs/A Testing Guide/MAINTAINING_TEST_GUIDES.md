@@ -1,166 +1,351 @@
-# Maintaining Test Guides
+# Maintaining & Creating Test Guides
 
-Purpose: Explain when and how to add or update test guides so QA docs stay accurate as the codebase changes.
+This document helps developers write clear, non-technical test guides for QA testers.
 
-## When to create or update a guide
+## When to Create or Update a Guide
 
-- Add a new test guide when you add a public hook, a new `lib/` API surface, or any feature that affects app behavior testers will interact with (navigation, auth, storage, caching, rate-limiting).
-- Update an existing guide when you change URLs, params, API responses, storage schemas, or feature flags that affect user-visible behavior.
+Create a **new test guide** when you:
 
-## File location
+- Add a public feature or hook that users interact with (navigation, auth, worlds, characters, etc.)
+- Add a new `lib/` API surface that affects user-visible behavior
+- Change URLs, permissions, or feature availability
+- Implement error handling that QA should verify
 
-- Place guides in `docs/A Testing Guide`.
-- Name guides with the feature/hook name, e.g. `auth-guard.md`, `navigation.md`, `request-manager.md`.
+Update an **existing guide** when you:
 
-## Required structure (template)
-
-Each guide must use this structure and headings exactly (H1 + `##` sections and `###` for test cases):
-
-# <Feature / Hook Name> — Test Guide
-
-## Overview
-
-- Purpose: one-line description
-- Scope: files and behaviors covered
-
-## Environments
-
-- Web (desktop)
-- Desktop app (Electron)
-
-## Prerequisites
-
-- Test accounts, admin flags, world IDs, feature flags
-- Base URL(s) to use
-
-## Test Data
-
-- Test user(s) and roles
-- World IDs and payloads
-
-## Test Cases
-
-### Test Case — Descriptive name
-
-- Goal: one-line expected behavior
-- Steps:
-  1. Step-by-step actions (non-dev friendly)
-  2. ...
-- Expected result:
-  - Exact URL or UI text
-  - API outcome if applicable
-- Pass / Fail: [ ] Pass [ ] Fail
-- Evidence:
-  - Screenshot: (attach or paste link)
-  - Console logs: (paste area)
-  - Notes / edge cases
-
-(repeat `###` blocks for each test)
-
-## Scripts (if applicable)
-
-- Purpose: brief statement of what the script validates (performance, correctness, error-handling, timeouts, etc.).
-- Execution constraints: admin-only (Supabase flag) when required; indicate where to run (desktop app terminal, web dev console, CI job) and any required environment variables or test accounts.
-- Observability / Logs: specify which logs to capture (renderer console, server logs, request IDs, timestamps). Instruct testers to paste full logs (or a trimmed excerpt with timestamps) into the report and remove any secrets.
-
-Recommended script specs (create one spec per script; do not commit runnable scripts yet):
-
-### Passing script — expected to pass
-
-- Purpose: Validate nominal behavior for the happy path.
-- Inputs: precise parameters, test user/world IDs, payload sizes, concurrency level.
-- Duration / timing: expected runtime and acceptable variance.
-- Expected logs/output: list of success messages, HTTP status codes, metrics (e.g., latency < X ms).
-- Pass criteria: how the tester decides this script passed (exact messages, absence of errors).
-- Evidence: paste console logs, success metrics, and a screenshot of the UI if applicable.
-
-### Failing script — expected to fail gracefully
-
-- Purpose: Force a known error path to confirm graceful handling (validation errors, auth failure, quota exceeded).
-- Inputs: parameters that trigger the error (bad token, malformed payload, permissionless user).
-- Expected error/logs: exact error text or status codes to look for and any UI error messages or fallback screens.
-- Pass criteria: the system fails in the documented way (clear error, no crash, no sensitive data leak).
-- Evidence: paste error logs and screenshots.
-
-### Realistic simulation script — end-to-end behavior
-
-- Purpose: Simulate a real event sequence (user actions/events that occur in production) to validate end-to-end flow.
-- Inputs: ordered sequence of API calls or UI actions, realistic timings between calls, and any background tasks expected to run.
-- Expected outcome: final state, intermediate state transitions, and logs showing the sequence executed correctly.
-- Pass criteria: final state matches expected, no unexpected retries, and observability shows correct sequencing.
-
-### Chaos / Edge-case script — interruptions & timing violations
-
-- Purpose: Test resilience to interruptions (pause mid-execution, network drop, longer-than-allowed duration).
-- Examples to spec:
-  - A task intended to run for 5s is extended to 6s — expect graceful timeout or safe rollback.
-  - Pause/resume mid-function (simulate thread/process pause) — expect consistent state or safe retry.
-  - Sudden network disconnect during critical request — expect retry policy or user-facing error.
-- Expected logs: timeouts, retries, rollback messages, or clear error markers.
-- Pass criteria: no data corruption, sensible error message, and recoverable state.
-
-## How to write a script spec
-
-- Give the script a clear name and short description.
-- Provide exact inputs, environment, and the command or pseudo-command to run (if applicable).
-- Provide sample log lines that demonstrate expected success or failure so testers know what to look for.
-- Mark whether the script is destructive and include safety checks (run only in staging or with test accounts).
-
-## Console-log capture guidance
-
-- Capture full console output with timestamps where possible. If large, trim to the relevant range but keep timestamps.
-- Remove secrets (API keys, tokens) before pasting logs into reports.
-- Paste logs in the issue body or attach as `.log` file; include the test script name and environment.
-
-## Quick checklist for script specs
-
-- [ ] Specified purpose and execution constraints
-- [ ] Provided exact inputs and environment
-- [ ] Included pass/fail criteria and sample log lines
-- [ ] Marked destructive scripts and safety notes
-
-## Risk / Known Issues
-
-- Notes about likely failure modes and root-cause hints
-
-## Related Files
-
-- `hooks/<name>.tsx`
-- `lib/...` (list related files)
-
-## Quick hook → lib mapping (snapshot)
-
-This mapping is a short, temporary reference to help authors and QA know which `lib/` areas a hook exercises. Update or remove as the codebase evolves — this is intentionally a snapshot.
-
-- `use-analytics-navigation.tsx` → `lib/analytics`
-- `use-feature-flag.ts` → `lib/feature-flags`
-- `use-premium-feature.ts` → `lib/analytics`, `lib/premium`, `lib/utils/logger`
-- `use-render-tracker.tsx` → `lib/config`
-- `use-splash-screen.tsx` → `lib/feature-flags`, `lib/kernel`, `lib/utils/logger`
-- `use-users-query.tsx` → `lib/cache`, `lib/database/users`
-- `use-users-mutation.tsx` → `lib/database/users`, `lib/cache`, `lib/utils/logger`
-
-UI-only / local hooks (minimal testing required):
-
-- `use-auth-context.tsx`, `use-image-cache.tsx`, `use-notifications.tsx`, `use-panel-navigation.tsx`, `use-viewport-tracking.tsx`, `useScale.ts`, `useThemeSwitcher.ts`
-
-If a `lib/` folder is not listed above (for example `lib/offline`, `lib/network`, `lib/storage`, `lib/api`), create a short guide describing how to exercise it directly (scripts or targeted UI flows), since it may not be reachable via hooks alone.
-
-## Reporting
-
-- Preferred reporting flow: open a GitHub issue, or add to the QA spreadsheet (manager choice)
-- Required report fields: steps, expected, actual, screenshots, console logs, environment
-
-## Quick checklist for maintainers
-
-- [ ] Created/updated test guide in `docs/A Testing Guide`
-- [ ] Added `Scripts` section if feature introduces scriptable behavior
-- [ ] Credited required test accounts and feature flags
-- [ ] Notified QA channel (Slack/Teams) about new/updated guide
+- Change how a feature works or what it displays
+- Add new validation rules or error messages
+- Modify authentication or permission requirements
+- Add/remove premium feature gates
 
 ---
 
-If you want, I can now:
+## Where to Put Guides
 
-- Add the template as a starter file `docs/A Testing Guide/TEMPLATE.md`, or
-- Begin drafting specific guides (auth-guard, navigation, worlds).
+Place guides in one of these folders:
+
+| Folder  | Purpose                                   | Examples                                                        |
+| ------- | ----------------------------------------- | --------------------------------------------------------------- |
+| `App/`  | Desktop (Electron) & Mobile (iOS/Android) | Sign-in, offline access, app-specific behavior                  |
+| `Web/`  | Web browser only                          | Browser navigation, URL bookmarking, console access             |
+| `Both/` | Any platform                              | Premium features, analytics, feature flags that work everywhere |
+
+**Naming:** Use simple, descriptive names: `auth-signin.md`, `offline-access.md`, `premiumfeatures-featureflags.md`
+
+---
+
+## Guide Structure (Required)
+
+Every guide MUST follow this structure. See `TEMPLATE.md` for a complete template:
+
+```markdown
+# <Feature Name> — Test Guide
+
+## Overview
+
+- **Purpose:** [One sentence describing what users will test]
+- **What we're testing:** [List of behaviors/components]
+
+## Environments
+
+- App (Desktop / Mobile / Both)
+- Web
+- List all applicable platforms
+
+## Prerequisites
+
+- **Test accounts:** [What accounts are needed]
+- **Test data:** [Any setup required]
+
+## How [Feature] Works
+
+Brief, non-technical explanation for QA
+
+## Test Cases
+
+### ✓ Test 1: [Positive Scenario]
+
+**Scenario:** [User's goal]
+**Steps:**
+
+1. [Clear action steps]
+   **Expected Outcome:**
+
+- ✅ [What should happen]
+  **How to Record a Pass:**
+- [ ] Screenshot
+- [ ] Note: "[Brief description]"
+
+### ✗ Test 2: [Negative Scenario]
+
+...
+
+## Platform-Specific Notes
+
+[Any platform differences]
+
+## Troubleshooting
+
+| Issue | Solution |
+...
+
+## Success Criteria ✅
+
+- ✅ [Criterion 1]
+```
+
+---
+
+## Writing Tips for Developers
+
+### 1. Write for QA, Not Developers
+
+❌ **Bad:** "Verify that `useAuthGuard()` hook correctly validates `world_access_*` flags from `SecureStorage`."
+
+✅ **Good:** "Verify that after signing in, you can access the world you own. Try signing in with different accounts to see who can access which worlds."
+
+### 2. Use Simple Language
+
+❌ **Bad:** "Ensure the fetch operation completes before calling `handleConflictResolution()`."
+
+✅ **Good:** "Wait for the data to load (you'll see a loading indicator). Once it appears, verify it's correct."
+
+### 3. Tell QA What to Look For
+
+❌ **Bad:** "Test error handling."
+
+✅ **Good:** "Try to create a world with an empty name. You should see a red error message saying 'World name is required.' Verify you can't submit the form until you enter a name."
+
+### 4. Provide Clear Outcomes
+
+❌ **Bad:** "Verify the system behaves as expected."
+
+✅ **Good:** "Expected: App returns to sign-in screen. You see your email/account name is cleared. You cannot access Main or Settings without signing in again."
+
+### 5. Include Error Cases
+
+Every guide should have at least one test for what **should fail gracefully**:
+
+- Wrong credentials
+- Offline scenarios
+- Invalid input
+- Missing data
+
+### 6. Give Context for Non-obvious Tests
+
+If a test is "weird," explain why it matters:
+
+❌ **Bad:** "Turn off network and try to create a world. It should fail."
+
+✅ **Good:** "Turn off network and try to create a world. This tests that the app prevents accidental data loss—we don't want users to think they created a world when they're actually offline and the creation never reached the server."
+
+---
+
+## Test Case Format Guide
+
+### Use Checkboxes for Pass/Fail
+
+QA will replace `[ ]` with `[x]` when tests pass:
+
+```markdown
+**How to Record a Pass:**
+
+- [ ] Screenshot of successful outcome
+- [ ] Note: "Feature worked as expected"
+
+**How to Record a Fail:**
+
+- [ ] Screenshot of error/unexpected behavior
+- [ ] Note: "[What went wrong]"
+```
+
+### Expected Outcomes Should Be Specific
+
+✅ **Good:**
+
+- ✅ Click the button and wait for loading to complete
+- ✅ You land on the Main screen
+- ✅ Your email is shown in the top menu
+
+❌ **Bad:**
+
+- ✅ Works correctly
+- ✅ Data loads
+- ✅ No errors
+
+---
+
+## Common Test Patterns
+
+### Authentication Test
+
+```markdown
+### ✓ Test: Sign In with Valid Credentials
+
+**Steps:**
+
+1. Open the app
+2. Enter test email
+3. Enter test password
+4. Press "Sign In"
+5. Wait for the screen to load
+
+**Expected Outcome:**
+
+- ✅ Sign-in succeeds within 15 seconds
+- ✅ You land on the main screen
+- ✅ Your email is shown in the menu
+```
+
+### Offline Test
+
+```markdown
+### ✓ Test: View Cached Data Offline
+
+**Steps:**
+
+1. Load data while online (navigate to a screen)
+2. Turn off network (airplane mode)
+3. Navigate back to that screen
+
+**Expected Outcome:**
+
+- ✅ Data loads from cache
+- ✅ No network error message
+```
+
+### Premium Feature Test
+
+```markdown
+### ✓ Test: Free User Sees Premium Lock
+
+**Steps:**
+
+1. Sign in as free user
+2. Find a premium feature
+3. Try to use it
+
+**Expected Outcome:**
+
+- ✅ Feature is locked or shows "Premium Only"
+- ✅ An "Upgrade" button appears
+```
+
+### Error Handling Test
+
+```markdown
+### ✗ Test: Reject Wrong Password
+
+**Steps:**
+
+1. Enter correct email + wrong password
+2. Press "Sign In"
+
+**Expected Outcome:**
+
+- ✅ Error message appears (e.g., "Invalid credentials")
+- ✅ You stay on sign-in screen to retry
+- ✅ App doesn't crash
+```
+
+---
+
+## Platform-Specific Guidance
+
+### App (Desktop/Mobile)
+
+- No console access for QA
+- Focus on UI behavior and user interactions
+- Mention if network toggle is needed (Wi-Fi, airplane mode)
+- If logs are needed, provide a built-in export option
+
+### Web
+
+- QA may have console access for specific tests (e.g., feature flag toggling)
+- Can use browser back/forward buttons for navigation tests
+- Address bar URL changes are valid test scenarios
+- Bookmarking and history are important
+
+---
+
+## Checklist: Before Publishing a Guide
+
+- [ ] Title includes platform (App/Web/Both)
+- [ ] "Overview" section is 1-2 sentences a non-dev can understand
+- [ ] All prerequisites are listed (accounts, setup, knowledge)
+- [ ] At least 3 test cases (positive, negative, edge case)
+- [ ] Every test case has clear "Expected Outcome"
+- [ ] Every test case explains how to record Pass/Fail with checkboxes
+- [ ] No code snippets or technical jargon (except where unavoidable)
+- [ ] "Troubleshooting" section covers common issues
+- [ ] "Success Criteria" is clear and testable
+- [ ] Use emoji/symbols for clarity: ✓ ✗ ⚡ ❌ ✅
+
+---
+
+## Example: Complete Test Guides
+
+See these for reference:
+
+- `App/auth-signin.md` – Authentication flow
+- `App/offline-access.md` – Offline functionality
+- `Both/premiumfeatures-featureflags.md` – Premium features
+- `Web/navigation.md` – Web navigation
+
+---
+
+## When QA Feedback Indicates a Guide is Unclear
+
+If QA says "I don't understand what to test," the guide needs improvement:
+
+1. **Rewrite the "Scenario"** – Make the user goal crystal clear
+2. **Add an extra sentence** to "How [Feature] Works" explaining why this matters
+3. **Simplify the steps** – Break into smaller, more granular actions
+4. **Add a Troubleshooting entry** – If QA got stuck, others will too
+
+---
+
+## Review Checklist for Other Developers
+
+If reviewing a guide written by another dev:
+
+- [ ] Can a non-programmer understand the test?
+- [ ] Are steps actionable (button names, field names visible)?
+- [ ] Is the expected outcome testable (not vague)?
+- [ ] Does it cover happy path + error cases + edge cases?
+- [ ] Are platform differences noted?
+- [ ] Would I know if it failed without developer help?
+- [ ] Is there context explaining _why_ each test matters?
+
+---
+
+## Quick Status
+
+Current guides (13 total):
+
+- **App/** – auth-signin.md, offline-access.md
+- **Both/** – premiumfeatures-featureflags.md, world-selection.md, world-sharing-invites.md, network-error-recovery.md, user-name-editing.md, world-deleting-editing.md, deleting-account.md, sync-conflict.md, analytics-tracking.md
+- **Web/** – navigation.md, secure-storage.md
+
+Guides still needed:
+
+- Character creation and management
+- Character editing
+- World creation (if not yet implemented)
+- Data queries and mutations
+- Accessibility features
+- Mobile-specific gesture interactions
+- Permission / role-based access control
+- Import/export functionality (if applicable)
+- Performance and load time testing
+
+---
+
+## Questions?
+
+If you're unsure how to write a test guide:
+
+1. Check existing guides for examples
+2. Ask QA what would be most helpful
+3. Start simple – 3-5 clear test cases
+4. Can always expand later based on feedback

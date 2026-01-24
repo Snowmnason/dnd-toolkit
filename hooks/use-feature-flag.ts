@@ -1,5 +1,5 @@
-import { FeatureFlagName, FeatureFlags } from '@/lib/feature-flags';
-import { useEffect, useState } from 'react';
+import { FeatureFlagName, FeatureFlags } from "@/lib/feature-flags";
+import { useEffect, useState } from "react";
 
 /**
  * Hook to read a feature flag.

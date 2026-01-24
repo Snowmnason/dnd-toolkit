@@ -29,7 +29,8 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 ## Screen/routing conventions
 
 - Add screens under `app/` using Expo Router. Layouts live in directory-level `_layout.tsx` files.
-- Navigation config: Routes are defined in `lib/navigation/navigation-config.ts` with TopBar title, back behavior, params, modals, redirects. When adding a route, add one config entry—no need to modify layouts.
+- **Route Authentication**: Routes are protected/public via `lib/routing/AUTH_CONFIG`. See `lib/routing/README.md` for which routes require authentication. Use `lib/auth/useAuthGuard` in `_layout.tsx` to enforce protection.
+- **Route Navigation Config**: Routes are defined in `lib/navigation/navigation-config.ts` with TopBar title, back behavior, params, modals, redirects. When adding a route, add one config entry—no need to modify layouts.
 - Legacy TopBar logic: `app/_layout.tsx` still has inline switch/case; migration to use config pending (see follow-up issue).
 - URL params (e.g., `worldId`, `userRole`) are read via `useLocalSearchParams()` and merged into `AppParamsContext`. Don’t pass these deep as props; use the context.
 
@@ -84,7 +85,7 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 ## Where to look
 
 - Layout/routing: `app/_layout.tsx`
-- Bootstrap: `hooks/use-app-bootstrap.tsx`
+- **Kernel/Bootstrap**: `lib/kernel/app-kernel.ts` (AppKernel singleton), `lib/kernel/use-app-kernel.tsx` (AppKernelProvider + hooks). See **`lib/kernel/README.md`** for full documentation.
 - Splash screen: `hooks/use-splash-screen.tsx`
 - Feature flags: `config/appsettings.*.json` (`featureFlags`), `lib/feature-flags.ts` (kind helper + beta warning in prod)
 - **Auth system**: `lib/auth/auth-state.ts` (AuthStateManager), `lib/auth/useAuthGuard.ts` (route guards), `lib/auth/useWorldRole.ts` (FUTURE: role checking)
@@ -92,19 +93,41 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 - **Image optimization**: `components/ui/LazyImage.tsx`, `hooks/use-viewport-tracking.tsx`, `hooks/use-image-cache.tsx`, `lib/utils/image-optimization.ts`. See `docs/issues/MileStone 1/030 - Optimize Image Loading/` for full guide.
 - UI barrel: `components/ui/index.ts`
 - Theme root: `theme/index.ts` (families, tokens, provider)
-- Navigation config: `lib/navigation/navigation-config.ts`, URI helpers: `lib/navigation/uri-helpers.ts`
-- Docs: `docs/COMPONENTS.md`, `docs/SCREENS.md`, `docs/FEATURE_FLAGS.md`, `docs/NOTIFICATIONS_USAGE.md`, `docs/NAVIGATION_CONFIG.md`, **`docs/issues/MileStone 1/082 - Central Storage/SECURE_STORAGE.md`**, **`docs/issues/MileStone 1/030 - Optimize Image Loading/IMAGE_OPTIMIZATION_GUIDE.md`**
+- **Navigation**: `lib/navigation/README.md` (central reference), `lib/navigation/navigation-config.ts` (route matching), `lib/navigation/routes/` (app-specific configs by area), `lib/navigation/uri-helpers.ts` (URL building)
+- Docs: `docs/COMPONENTS.md`, `docs/SCREENS.md`, `docs/FEATURE_FLAGS.md`, `docs/NOTIFICATIONS_USAGE.md`, **`lib/navigation/README.md`** (route config, TopBar, back button), **`lib/navigation/routes/README.md`** (how to add routes), **`docs/issues/MileStone 1/082 - Central Storage/SECURE_STORAGE.md`**, **`docs/issues/MileStone 1/030 - Optimize Image Loading/IMAGE_OPTIMIZATION_GUIDE.md`**, **`lib/kernel/README.md`** (app bootstrap phases, app readiness gating)
 
 ## Documentation Rule
 
-When creating feature documentation:
+### For New lib/\* Enhancements
 
-- Create docs in `docs/issues/MileStone X/NNN - Feature Name/` folder
-- Include 1-2 docs max: one for "How to use" (with examples), one for architecture/implementation if complex
-- Focus on feature functionality and usage, not implementation history or design decisions
-- Omit benefits/why statements (assume reader knows why the feature exists)
-- Include code examples, API reference, troubleshooting, and best practices
-- Check folder structure for highest label Milestone and create subfolder if needed
+**Every new enhancement (anything added to `lib/`) must include:**
+
+1. **Module README** – Create or update `lib/[module]/README.md` with:
+   - "When to Use This Module" section (suitable vs. unsuitable use cases)
+   - Architecture & Data Flow (brief description or diagram)
+   - API Reference (all exports with type signatures and code examples)
+   - Dependencies (external packages + internal lib dependencies)
+   - Error Handling & Edge Cases (known limitations, error patterns)
+   - Performance Notes (caching, overhead, optimization tradeoffs)
+   - Related Modules (links to connected lib/\* modules)
+   - File Breakdown (what each file does in a table)
+   - Testing section (link to test guide if exists, or manual testing tips)
+   - Future Enhancements (planned improvements or tech debt)
+   - **Must be app-agnostic** – no app-specific language; readable by developers using this in future projects
+
+2. **Detailed Issue Docs** – Create docs in `docs/issues/MileStone X/NNN - Feature Name/` folder:
+   - Include 1-2 docs max: one for "How to use" (with examples), one for architecture/implementation if complex
+   - Focus on feature functionality and usage, not implementation history or design decisions
+   - Include code examples, API reference, troubleshooting, and best practices
+   - Check folder structure for highest label Milestone and create subfolder if needed
+
+3. **Suggestions/Improvements** – Create files in `docs/suggestions/` for identified improvements:
+   - Each suggestion is formatted as a GitHub issue (Issue Type, Problem, Solution, Scope, Acceptance Criteria, Notes)
+   - Scope should be meaningful (not one-line fixes); can combine or separate based on complexity
+   - One suggestion per file or group related suggestions in one file (use judgment)
+   - Helps surface future work and documents architectural thinking
+
+### For Test Documentation
 
 - When adding or changing public hooks, API behaviors, or storage/cache schemas, add or update a corresponding test guide under `docs/A Testing Guide`.
 - Follow the repository test-case template (H1 title, `##` sections, and `###` test cases with checkboxes, screenshots, and console-log capture).

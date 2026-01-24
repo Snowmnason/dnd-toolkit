@@ -2,21 +2,25 @@
  * Feature flags system for development and testing
  * Allows toggling features without code changes via appsettings.*.json
  */
-import appSettingsProd from '../config/appsettings.json';
-import { getAppConfig, isProduction } from './config/loader';
+import appSettingsProd from "../../config/appsettings.json";
+import { getAppConfig, isProduction } from "../config/loader";
 
 export type FeatureFlagName = keyof typeof appSettingsProd.featureFlags;
 
-export type FeatureFlagKind = 'free' | 'premium' | 'beta';
+export type FeatureFlagKind = "free" | "premium" | "beta";
 
-export type FeatureFlag = (typeof appSettingsProd.featureFlags)[FeatureFlagName] & {
-  kind?: FeatureFlagKind;
-};
+export type FeatureFlag =
+  (typeof appSettingsProd.featureFlags)[FeatureFlagName] & {
+    kind?: FeatureFlagKind;
+  };
 
 /**
  * Event type for flag change notifications
  */
-type FlagChangeCallback = (flagName: FeatureFlagName | null, kind?: FeatureFlagKind) => void;
+type FlagChangeCallback = (
+  flagName: FeatureFlagName | null,
+  kind?: FeatureFlagKind,
+) => void;
 
 class FeatureFlagsManager {
   private flags: Map<FeatureFlagName, FeatureFlag>;
@@ -24,13 +28,20 @@ class FeatureFlagsManager {
 
   constructor() {
     const featureFlags = getAppConfig().featureFlags || {};
-    this.flags = new Map(Object.entries(featureFlags) as [FeatureFlagName, FeatureFlag][]);
+    this.flags = new Map(
+      Object.entries(featureFlags) as [FeatureFlagName, FeatureFlag][],
+    );
 
     // Warn if production build ships beta-enabled flags
     if (isProduction()) {
-      const betaEnabled = [...this.flags.entries()].filter(([, flag]) => flag.kind === 'beta' && flag.enabled);
+      const betaEnabled = [...this.flags.entries()].filter(
+        ([, flag]) => flag.kind === "beta" && flag.enabled,
+      );
       if (betaEnabled.length > 0) {
-        console.warn('[FeatureFlags] Beta flags enabled in production:', betaEnabled.map(([name]) => name).join(', '));
+        console.warn(
+          "[FeatureFlags] Beta flags enabled in production:",
+          betaEnabled.map(([name]) => name).join(", "),
+        );
       }
     }
   }
@@ -47,7 +58,10 @@ class FeatureFlagsManager {
   /**
    * Notify all listeners of a flag change
    */
-  private notifyListeners(flagName: FeatureFlagName | null = null, kind?: FeatureFlagKind): void {
+  private notifyListeners(
+    flagName: FeatureFlagName | null = null,
+    kind?: FeatureFlagKind,
+  ): void {
     this.changeListeners.forEach((callback) => callback(flagName, kind));
   }
 
@@ -84,7 +98,9 @@ class FeatureFlagsManager {
    * Get all flags by kind
    */
   getByKind(kind: FeatureFlagKind): Record<string, FeatureFlag> {
-    return Object.fromEntries([...this.flags.entries()].filter(([, flag]) => flag.kind === kind));
+    return Object.fromEntries(
+      [...this.flags.entries()].filter(([, flag]) => flag.kind === kind),
+    );
   }
 
   /**
@@ -120,6 +136,6 @@ class FeatureFlagsManager {
 export const FeatureFlags = new FeatureFlagsManager();
 
 // Expose to window for dev console access
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   (window as any).FeatureFlags = FeatureFlags;
 }

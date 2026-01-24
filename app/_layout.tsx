@@ -1,6 +1,4 @@
-import {
-  OfflineSyncNotificationLayer
-} from "@/components/offline";
+import { OfflineSyncNotificationLayer } from "@/components/offline";
 import { NotificationContainer, TopBar } from "@/components/ui";
 import { useAnalyticsNavigation } from "@/hooks/use-analytics-navigation";
 import { NotificationProvider } from "@/hooks/use-notifications";
@@ -47,7 +45,7 @@ import {
 } from "../contexts/AppParamsVolatileContext";
 import { PlatformProvider, usePlatform } from "../contexts/PlatformContext";
 import { useSplashScreen } from "../hooks/use-splash-screen";
-import { APP_VERSION } from "../lib/version";
+import { APP_VERSION } from "../lib/utils/version";
 
 // Check if Sentry is enabled via feature flag
 const config = getAppConfig();
