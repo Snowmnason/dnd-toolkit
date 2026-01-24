@@ -3,6 +3,7 @@
 This index lists app screens (excluding `app/main/*` for now), with a short purpose note and optional components. Fill in components as we solidify each screen.
 
 Legend
+
 - Screen: file path under `app/`
 - Purpose: 1–2 line intent
 - Components: major UI pieces used (leave blank if unsure)
@@ -13,19 +14,19 @@ Legend
 
 - Screen: `app/index.tsx`
   - Purpose: Entry redirect or landing shell
-  - Components: 
+  - Components:
 
 - Screen: `app/settings.tsx`
   - Purpose: App settings page
-  - Components: 
+  - Components:
 
 - Screen: `app/StyleDesktop.tsx`
   - Purpose: Desktop style showcase (design system demo)
-  - Components: 
+  - Components:
 
 - Screen: `app/StyleMobile.tsx`
   - Purpose: Mobile style showcase (design system demo)
-  - Components: 
+  - Components:
 
 ---
 
@@ -33,39 +34,39 @@ Legend
 
 - Screen: `app/login/sign-in.tsx`
   - Purpose: User sign-in
-  - Components: 
+  - Components:
 
 - Screen: `app/login/sign-up.tsx`
   - Purpose: Account registration
-  - Components: 
+  - Components:
 
 - Screen: `app/login/welcome.tsx`
   - Purpose: Post-auth welcome/next steps
-  - Components: 
+  - Components:
 
 - Screen: `app/login/forgot-password.tsx`
   - Purpose: Start password reset (request code)
-  - Components: 
+  - Components:
 
 - Screen: `app/login/reset-password.tsx`
   - Purpose: Complete password reset with code
-  - Components: 
+  - Components:
 
 - Screen: `app/login/confirm-signin.tsx`
   - Purpose: Confirm sign-in (MFA/code)
-  - Components: 
+  - Components:
 
 - Screen: `app/login/email-confirmation.tsx`
   - Purpose: Verify email
-  - Components: 
+  - Components:
 
 - Screen: `app/login/complete-profile.tsx`
   - Purpose: Complete user profile after auth
-  - Components: 
+  - Components:
 
 - Layout: `app/login/_layout.tsx`
   - Purpose: Auth stack layout and common wrappers
-  - Components: 
+  - Components:
 
 ---
 
@@ -73,15 +74,15 @@ Legend
 
 - Screen: `app/select/world-selection.tsx`
   - Purpose: List and choose a world
-  - Components: 
+  - Components:
 
 - Screen: `app/select/create-world.tsx`
   - Purpose: Create a new world
-  - Components: 
+  - Components:
 
 - Layout: `app/select/_layout.tsx`
   - Purpose: Selection stack layout and wrappers
-  - Components: 
+  - Components:
 
 ---
 
@@ -89,17 +90,18 @@ Legend
 
 - Layout: `app/_layout.tsx`
   - Purpose: Root providers and router layout
-  - Components: 
+  - Components:
 
 - Screen: `app/main/_layout.tsx`
   - Purpose: Main app area layout (excluded from detailed mapping for now)
-  - Components: 
+  - Components:
 
 - Screen: `app/main/main-landing.tsx`
   - Purpose: Landing/home inside main app (excluded for now)
-  - Components: 
+  - Components:
 
 Sub-areas under `app/main` (mapping deferred):
+
 - characters-npcs
 - combat-events
 - items-treasure
@@ -109,5 +111,6 @@ Sub-areas under `app/main` (mapping deferred):
 ---
 
 ## Notes
+
 - Leave components blank if unsure. As we document each screen, list primary components (e.g., TopBar, AppView, TextInputs, ButtonGroup, Dropdown, Tabs, Snackbar/AppToast if used).
 - Keep this synced with route changes; add or remove entries as files change.

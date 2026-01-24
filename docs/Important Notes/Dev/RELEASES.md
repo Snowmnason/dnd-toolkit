@@ -34,6 +34,7 @@ All versions are stored in `package.json` at the root:
 ```
 
 The version automatically syncs to:
+
 - `lib/version.ts` (used by version display)
 - Desktop app (via electron-builder)
 - Mobile builds (via EAS)
@@ -135,6 +136,7 @@ npm run desktop:dist:all
 ```
 
 Artifacts are in `dist-desktop/`:
+
 - `DnD-Toolkit-*.exe` (Windows)
 - `DnD-Toolkit-*.dmg` (macOS)
 - `DnD-Toolkit-*.AppImage` (Linux)
@@ -157,6 +159,7 @@ When users launch the desktop app, it automatically checks for updates:
 ### iOS Release
 
 **Prerequisites:**
+
 - Apple Developer account
 - Provisioning profiles set up in Xcode
 
@@ -171,6 +174,7 @@ npm run submit:ios
 ```
 
 **Manual steps:**
+
 1. Wait for EAS to complete the build
 2. Download the `.ipa` file
 3. Use Transporter or Xcode to submit to App Store
@@ -179,6 +183,7 @@ npm run submit:ios
 ### Android Release
 
 **Prerequisites:**
+
 - Google Play Developer account
 - Signed keystore file
 
@@ -193,6 +198,7 @@ npm run submit:android
 ```
 
 **Manual steps:**
+
 1. Wait for EAS to complete the build
 2. Download the `.aab` file
 3. Upload to Google Play Console
@@ -217,19 +223,23 @@ After publishing, update the GitHub Release with:
 ## v1.1.0 - Campaign Features
 
 ### New Features
+
 - Add campaign management system
 - Support for custom NPC creation
 - Improved character sheet UI
 
 ### Bug Fixes
+
 - Fixed login redirect issue
 - Corrected spell damage calculations
 
 ### Contributors
+
 - @Snowmnason
 - @ContributorName
 
 ### Known Issues
+
 - macOS Monterey: Occasional window resize lag (WIP)
 ```
 
@@ -245,18 +255,22 @@ All notable changes to this project will be documented in this file.
 ## [1.1.0] - 2026-01-15
 
 ### Added
+
 - Campaign management system
 - Custom NPC creation
 
 ### Fixed
+
 - Login redirect issue
 
 ### Changed
+
 - Improved character sheet UI
 
 ## [1.0.0] - 2025-12-01
 
 ### Added
+
 - Initial release
 - Web and desktop versions
 ```
@@ -322,18 +336,18 @@ npm run build:android -- --wait
 
 ## Quick Reference
 
-| Platform | Command | Output |
-|----------|---------|--------|
-| Web | `npm run predeploy` | `dist/` |
-| Web (Deploy) | `npm run deploy` | GitHub Pages |
-| Desktop (Win) | `npm run desktop:dist:win` | `dist-desktop/*.exe` |
-| Desktop (Mac) | `npm run desktop:dist:mac` | `dist-desktop/*.dmg` |
+| Platform        | Command                      | Output                    |
+| --------------- | ---------------------------- | ------------------------- |
+| Web             | `npm run predeploy`          | `dist/`                   |
+| Web (Deploy)    | `npm run deploy`             | GitHub Pages              |
+| Desktop (Win)   | `npm run desktop:dist:win`   | `dist-desktop/*.exe`      |
+| Desktop (Mac)   | `npm run desktop:dist:mac`   | `dist-desktop/*.dmg`      |
 | Desktop (Linux) | `npm run desktop:dist:linux` | `dist-desktop/*.AppImage` |
-| Desktop (All) | `npm run desktop:dist:all` | All installers |
-| iOS | `npm run build:ios` | EAS build |
-| Android | `npm run build:android` | EAS build |
-| Submit iOS | `npm run submit:ios` | App Store |
-| Submit Android | `npm run submit:android` | Play Store |
+| Desktop (All)   | `npm run desktop:dist:all`   | All installers            |
+| iOS             | `npm run build:ios`          | EAS build                 |
+| Android         | `npm run build:android`      | EAS build                 |
+| Submit iOS      | `npm run submit:ios`         | App Store                 |
+| Submit Android  | `npm run submit:android`     | Play Store                |
 
 ---
 

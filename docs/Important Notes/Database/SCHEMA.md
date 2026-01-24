@@ -3,9 +3,11 @@
 This document captures the core Postgres tables, indexes, and row level security (RLS) policies for the D&D Toolkit backend.
 
 ---
+
 ## Tables
 
 ### worlds
+
 ```sql
 create table public.worlds (
   world_id uuid not null default gen_random_uuid(),
@@ -23,11 +25,13 @@ create table public.worlds (
 ```
 
 Indexes:
+
 ```sql
 create index if not exists idx_worlds_owner_id on public.worlds using btree (owner_id) tablespace pg_default;
 ```
 
 ### world_access
+
 ```sql
 create table public.world_access (
   id uuid not null default gen_random_uuid(),
@@ -43,6 +47,7 @@ create table public.world_access (
 ```
 
 Indexes:
+
 ```sql
 create index if not exists idx_world_access_world_id on public.world_access using btree (world_id) tablespace pg_default;
 create index if not exists idx_world_access_user_id  on public.world_access using btree (user_id) tablespace pg_default;
@@ -51,6 +56,7 @@ create index if not exists idx_world_access_user_created on public.world_access 
 ```
 
 ### users
+
 ```sql
 create table public.users (
   id uuid not null default gen_random_uuid(),
@@ -64,11 +70,13 @@ create table public.users (
 ```
 
 Indexes:
+
 ```sql
 create index if not exists idx_users_auth_id on public.users using btree (auth_id) tablespace pg_default;
 ```
 
 ### invite_links
+
 ```sql
 create table public.invite_links (
   id uuid not null default gen_random_uuid(),
@@ -85,16 +93,19 @@ create table public.invite_links (
 ```
 
 Indexes:
+
 ```sql
 create index if not exists idx_invite_links_expires_at on public.invite_links using btree (expires_at) tablespace pg_default;
 ```
 
 ---
+
 ## Row Level Security (RLS) Policies
 
 Each policy shows: Name, Command, Roles, USING predicate, and optional WITH CHECK.
 
 ### users
+
 ```text
 users_select_own        | SELECT | authenticated | USING: auth.uid() = auth_id
 users_insert_own        | INSERT | authenticated | CHECK: auth.uid() = auth_id
@@ -104,12 +115,14 @@ users_admin_full_access | ALL    | authenticated | USING: (auth.jwt()->>'role') 
 ```
 
 ### world_access
+
 ```text
 world_owner_any_ops_on_world_access | ALL | authenticated | USING/CHECK: get_world_owner_auth_id(world_id) = auth.uid()
 member_self_manage_access          | ALL | authenticated | USING/CHECK: get_user_auth_id(user_id) = auth.uid()
 ```
 
 ### invite_links
+
 ```text
 invite_links_public_read  | SELECT | public        | USING: true
 invite_links_insert_owner | INSERT | authenticated | CHECK: (created_by matches auth.uid() OR owner/dm of world)
@@ -117,6 +130,7 @@ invite_links_owner_select | SELECT | authenticated | USING: requestor is world o
 ```
 
 ### worlds
+
 ```text
 worlds_owner_full          | ALL    | authenticated | USING/CHECK: world owner auth_id = auth.uid()
 worlds_collaborator_update | UPDATE | authenticated | USING: user has world_access row | CHECK: owner_id remains unchanged
@@ -124,15 +138,20 @@ worlds_collaborator_select | SELECT | authenticated | USING: user has world_acce
 ```
 
 ---
+
 ## Helper Functions Referenced
+
 These server-side functions (not shown here) must exist:
+
 ```text
 get_world_owner_auth_id(world_id uuid) -> uuid
 get_user_auth_id(user_id uuid) -> uuid
 ```
 
 ---
+
 ## Notes
+
 - All UUIDs default via `gen_random_uuid()`.
 - Timestamps normalized to UTC via `now() AT TIME ZONE 'utc'` where needed.
 - Invite links expire after 24 hours by default.
@@ -140,45 +159,13 @@ get_user_auth_id(user_id uuid) -> uuid
 - Policies favor explicit ownership & collaborator rows for flexibility.
 
 ---
+
 ## Potential Improvements
+
 - Add partial index for active invite links: `where expires_at > now()`.
 - Consider materialized view for world membership summary.
 - Add audit triggers for critical tables (worlds, world_access).
 
 ---
+
 _End of schema reference._
-
-# 🧩 Database Index Reference — DnD Toolkit
-
-This file documents the current PostgreSQL indexes in Supabase.  
-**Do not run these manually** — they already exist in production.  
-This is for developer reference only.
-
----
-
-## PUBLIC.USERS
-
-| Index | Columns | Purpose |
-|--------|----------|----------|
-| `idx_users_auth_id` | `auth_id` | Fast lookup by Supabase auth ID. |
-
----
-
-## PUBLIC.WORLDS
-
-| Index | Columns | Purpose |
-|--------|----------|----------|
-| `idx_worlds_owner_id` | `owner_id` | Quickly fetch worlds owned by a user. |
-
----
-
-## PUBLIC.WORLD_ACCESS
-
-| Index | Columns | Purpose |
-|--------|----------|----------|
-| `idx_world_access_world_id` | `world_id` | Find all members in a world. |
-| `idx_world_access_user_id` | `user_id` | Find all worlds a user belongs to. |
-| `idx_world_access_world_user` | `(world_id, user_id)` | Prevent duplicate memberships. |
-| `idx_world_access_user_created` | `(user_id, created_at DESC)` | Sort recent worlds per user. |
-
----

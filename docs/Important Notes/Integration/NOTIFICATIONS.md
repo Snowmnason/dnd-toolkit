@@ -20,63 +20,61 @@ The app now has three distinct notification/feedback systems:
 
 ```tsx
 // app/_layout.tsx
-import { NotificationProvider } from '@/hooks/use-notifications'
-import { NotificationContainer } from '@/components/ui'
+import { NotificationProvider } from "@/hooks/use-notifications";
+import { NotificationContainer } from "@/components/ui";
 
 export default function RootLayout() {
   return (
     <NotificationProvider>
       {/* Your existing providers */}
       <ThemeProvider>
-        <Stack>
-          {/* Your screens */}
-        </Stack>
-        
+        <Stack>{/* Your screens */}</Stack>
+
         {/* Add this at the end */}
         <NotificationContainer />
       </ThemeProvider>
     </NotificationProvider>
-  )
+  );
 }
 ```
 
 #### Step 2: Use anywhere in your app
 
 ```tsx
-import { useNotifications } from '@/hooks/use-notifications'
+import { useNotifications } from "@/hooks/use-notifications";
 
 function SomeComponent() {
-  const { showNotification } = useNotifications()
+  const { showNotification } = useNotifications();
 
   const handleNewMessage = () => {
     showNotification({
-      type: 'message',
-      title: 'New Message',
-      message: 'Sarah sent you a message',
+      type: "message",
+      title: "New Message",
+      message: "Sarah sent you a message",
       timestamp: new Date(),
       onPress: () => {
         // Navigate to message screen
-        router.push('/messages/123')
-      }
-    })
-  }
+        router.push("/messages/123");
+      },
+    });
+  };
 
   const handleUpdate = () => {
     showNotification({
-      type: 'update',
-      title: 'World Updated',
-      message: 'John added a new location to the campaign',
-      onPress: () => router.push('/world/locations')
-    })
-  }
+      type: "update",
+      title: "World Updated",
+      message: "John added a new location to the campaign",
+      onPress: () => router.push("/world/locations"),
+    });
+  };
 
   const handleAlert = () => {
     showNotification({
-      type: 'alert',
-      title: 'Connection Lost',
-      message: 'Attempting to reconnect...'
-    })
-  }
+      type: "alert",
+      title: "Connection Lost",
+      message: "Attempting to reconnect...",
+    });
+  };
 
   return (
     <View>
@@ -84,7 +82,7 @@ function SomeComponent() {
       <Button text="Simulate Update" onPress={handleUpdate} />
       <Button text="Simulate Alert" onPress={handleAlert} />
     </View>
-  )
+  );
 }
 ```
 
@@ -110,20 +108,20 @@ function SomeComponent() {
 - **Mobile**: Top of screen (keyboard-safe)
 
 ```tsx
-import { SnackBar } from '@/components/ui'
+import { SnackBar } from "@/components/ui";
 
 function MyComponent() {
-  const [visible, setVisible] = useState(false)
+  const [visible, setVisible] = useState(false);
 
   const handleSave = () => {
     // Save logic...
-    setVisible(true)
-  }
+    setVisible(true);
+  };
 
   return (
     <>
       <Button text="Save Changes" onPress={handleSave} />
-      
+
       <SnackBar
         visible={visible}
         message="Changes saved successfully"
@@ -131,12 +129,12 @@ function MyComponent() {
         actionText="Undo"
         onAction={() => {
           // Undo logic
-          console.log('Undo clicked')
+          console.log("Undo clicked");
         }}
         onHide={() => setVisible(false)}
       />
     </>
-  )
+  );
 }
 ```
 
@@ -147,7 +145,7 @@ function MyComponent() {
 **Use for**: Quick non-interactive feedback (saved, copied, deleted)
 
 ```tsx
-import { AppToast } from '@/components/ui'
+import { AppToast } from "@/components/ui";
 
 <AppToast
   message="Item copied!"
@@ -155,18 +153,18 @@ import { AppToast } from '@/components/ui'
   type="success"
   duration={2000}
   onHide={() => setToastVisible(false)}
-/>
+/>;
 ```
 
 ---
 
 ## When to Use What?
 
-| Component | Use Case | Position | Interactive | Duration |
-|-----------|----------|----------|-------------|----------|
-| **Notification** | Messages, updates, alerts | Top | Yes (tappable) | 5s auto-dismiss |
-| **SnackBar** | Actionable feedback | Bottom (desktop) / Top (mobile) | Yes (action button) | 4s auto-dismiss |
-| **AppToast** | Quick status updates | Top-right (desktop) | No | 2.5s auto-dismiss |
+| Component        | Use Case                  | Position                        | Interactive         | Duration          |
+| ---------------- | ------------------------- | ------------------------------- | ------------------- | ----------------- |
+| **Notification** | Messages, updates, alerts | Top                             | Yes (tappable)      | 5s auto-dismiss   |
+| **SnackBar**     | Actionable feedback       | Bottom (desktop) / Top (mobile) | Yes (action button) | 4s auto-dismiss   |
+| **AppToast**     | Quick status updates      | Top-right (desktop)             | No                  | 2.5s auto-dismiss |
 
 ### Examples:
 
@@ -181,14 +179,14 @@ import { AppToast } from '@/components/ui'
 ### Notification Types
 
 ```tsx
-type NotificationType = 'message' | 'update' | 'alert' | 'info'
+type NotificationType = "message" | "update" | "alert" | "info";
 
 interface NotificationData {
-  type: NotificationType
-  title: string
-  message: string
-  timestamp?: Date
-  onPress?: () => void
+  type: NotificationType;
+  title: string;
+  message: string;
+  timestamp?: Date;
+  onPress?: () => void;
 }
 ```
 
@@ -196,11 +194,11 @@ interface NotificationData {
 
 ```tsx
 const {
-  showNotification,    // (notification) => void
+  showNotification, // (notification) => void
   dismissNotification, // (id) => void
-  clearAll,           // () => void
-  notifications       // NotificationData[]
-} = useNotifications()
+  clearAll, // () => void
+  notifications, // NotificationData[]
+} = useNotifications();
 ```
 
 ---
@@ -214,15 +212,15 @@ const {
 useEffect(() => {
   const unsubscribe = subscribeToMessages((message) => {
     showNotification({
-      type: 'message',
+      type: "message",
       title: `${message.sender.name}`,
       message: message.text,
       timestamp: message.createdAt,
-      onPress: () => router.push(`/messages/${message.id}`)
-    })
-  })
-  return unsubscribe
-}, [])
+      onPress: () => router.push(`/messages/${message.id}`),
+    });
+  });
+  return unsubscribe;
+}, []);
 ```
 
 ### Campaign Updates
@@ -230,30 +228,30 @@ useEffect(() => {
 ```tsx
 const handleWorldUpdate = (update: WorldUpdate) => {
   showNotification({
-    type: 'update',
-    title: 'World Updated',
+    type: "update",
+    title: "World Updated",
     message: `${update.user.name} ${update.action}`,
-    onPress: () => router.push(`/world/${update.worldId}`)
-  })
-}
+    onPress: () => router.push(`/world/${update.worldId}`),
+  });
+};
 ```
 
 ### Error Handling
 
 ```tsx
 try {
-  await saveCharacter(data)
+  await saveCharacter(data);
   showNotification({
-    type: 'update',
-    title: 'Character Saved',
-    message: 'Your changes have been saved'
-  })
+    type: "update",
+    title: "Character Saved",
+    message: "Your changes have been saved",
+  });
 } catch (error) {
   showNotification({
-    type: 'alert',
-    title: 'Save Failed',
-    message: error.message
-  })
+    type: "alert",
+    title: "Save Failed",
+    message: error.message,
+  });
 }
 ```
 
@@ -262,6 +260,7 @@ try {
 ## Styling Notes
 
 All notification components:
+
 - ✅ Use theme tokens (update live with theme changes)
 - ✅ Respect scaling preferences
 - ✅ Support gradients and shadows
