@@ -10,7 +10,8 @@
  *   // Render: <AppToast {...toastProps} /> and <SnackBar {...snackbarProps} />
  */
 
-import { useEffect, useState } from "react";
+import { getAppConfig } from "@/lib/config";
+import { useEffect, useMemo, useState } from "react";
 import { OnlineSyncManager } from "./sync-manager";
 import { OfflineSyncStatus } from "./types";
 
@@ -36,11 +37,20 @@ interface SyncNotificationsReturn {
 }
 
 export function useSyncNotifications(): SyncNotificationsReturn {
+  const toastDuration = useMemo(
+    () => getAppConfig().ui?.toastDurationMs ?? 2500,
+    [],
+  );
+  const syncToastDuration = useMemo(
+    () => getAppConfig().ui?.syncToastDurationMs ?? 3000,
+    [],
+  );
+
   const [toastState, setToastState] = useState<ToastState>({
     visible: false,
     message: "",
     type: "info",
-    duration: 2500,
+    duration: toastDuration,
   });
 
   const [snackbarState, setSnackbarState] = useState<SnackbarState>({
@@ -61,7 +71,7 @@ export function useSyncNotifications(): SyncNotificationsReturn {
             visible: true,
             message: `Syncing ${status.totalQueued} change${status.totalQueued > 1 ? "s" : ""}...`,
             type: "info",
-            duration: 2500,
+            duration: toastDuration,
           });
         }
 
@@ -76,7 +86,7 @@ export function useSyncNotifications(): SyncNotificationsReturn {
             visible: true,
             message: `${status.syncedCount} change${status.syncedCount > 1 ? "s" : ""} synced.`,
             type: "success",
-            duration: 3000,
+            duration: syncToastDuration,
           });
         }
 
@@ -104,7 +114,7 @@ export function useSyncNotifications(): SyncNotificationsReturn {
     return () => {
       subscription?.();
     };
-  }, []);
+  }, [toastDuration, syncToastDuration]);
 
   return {
     toastProps: {

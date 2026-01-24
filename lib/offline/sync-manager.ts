@@ -13,6 +13,7 @@
  */
 
 import { QueryCache } from "@/lib/cache/query-cache";
+import { getAppConfig } from "@/lib/config";
 import {
   NetworkDetection,
   type NetworkStatus,
@@ -30,15 +31,20 @@ import type {
 } from "./types";
 
 /**
- * Default sync configuration
+ * Get default sync configuration from appsettings
  */
-const DEFAULT_CONFIG: Required<OfflineSyncConfig> = {
-  batchSize: 5,
-  debounceMs: 5000,
-  maxRetries: 5,
-  retryBaseMs: 2000,
-  conflictStrategy: "client_wins",
-};
+function getDefaultConfig(): Required<OfflineSyncConfig> {
+  const config = getAppConfig();
+  return {
+    batchSize: 5,
+    debounceMs: config.sync?.debounceMs ?? 5000,
+    maxRetries: 5,
+    retryBaseMs: config.sync?.retryBaseMs ?? 2000,
+    conflictStrategy: "client_wins",
+  };
+}
+
+const DEFAULT_CONFIG = getDefaultConfig();
 
 class OnlineSyncManagerService {
   private networkUnsubscribe: (() => void) | null = null;
@@ -449,8 +455,45 @@ class OnlineSyncManagerService {
   resume(): void {
     if (this.isOnline) {
       this.triggerSync();
+      // Enqueue feature flag refresh job on app resume
+      this.triggerFeatureFlagRefresh().catch((err) => {
+        logger
+          .category("error")
+          .warn("Failed to trigger feature_flags_refresh on resume", { err });
+      });
     }
     logger.category("storage").info("OnlineSyncManager resumed");
+  }
+
+  /**
+   * Trigger a feature flags refresh via background job queue
+   * Enqueues a "feature_flags_refresh" job that will be executed when online
+   * Uses job queue with requiresNetwork: true to defer if offline
+   */
+  async triggerFeatureFlagRefresh(): Promise<void> {
+    try {
+      const { getJobQueue } = await import("@/lib/jobs");
+      const queue = getJobQueue();
+
+      // Enqueue feature flag refresh job
+      // This will be deferred if offline and executed when network available
+      const jobId = await queue.enqueue({
+        type: "feature_flags_refresh",
+        payload: { triggeredAt: Date.now() },
+        idempotencyKey: `ff-refresh:${Date.now()}`,
+        requiresNetwork: true, // Requires online - will defer if offline
+      });
+
+      logger
+        .category("storage")
+        .debug(`Feature flags refresh job enqueued: ${jobId}`);
+    } catch (error) {
+      logger
+        .category("error")
+        .warn("Failed to enqueue feature_flags_refresh job", {
+          error: (error as Error).message,
+        });
+    }
   }
 
   /**

@@ -25,6 +25,7 @@ type LogCategory =
   | "analytics" // Analytics and tracking
   | "security" // Security-related operations
   | "bootstrap" // App initialization and bootstrap
+  | "jobs" // Background job queue and task processing
   | "error" // Error handling and reporting
   | "other"; // Catch-all for miscellaneous logs
 

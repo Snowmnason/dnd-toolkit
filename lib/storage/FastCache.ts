@@ -1,10 +1,11 @@
-import { Platform } from 'react-native';
-import { logger } from '../utils/logger';
+import { Platform } from "react-native";
+import { getAppConfig } from "../config";
+import { logger } from "../utils/logger";
 
 // Type-safe import for AsyncStorage
 let AsyncStorage: any;
-if (Platform.OS !== 'web') {
-  AsyncStorage = require('@react-native-async-storage/async-storage').default;
+if (Platform.OS !== "web") {
+  AsyncStorage = require("@react-native-async-storage/async-storage").default;
 }
 
 // Storage API interface for type safety
@@ -19,7 +20,7 @@ interface StorageAPI {
 
 // Get sessionStorage for web (ephemeral cache, cleared on session end)
 const getSessionStorage = (): StorageAPI => {
-  if (typeof sessionStorage !== 'undefined') {
+  if (typeof sessionStorage !== "undefined") {
     return sessionStorage;
   }
 
@@ -104,16 +105,19 @@ class FastCacheService {
 
       const entryJson = JSON.stringify(entry);
 
-      if (Platform.OS === 'web') {
+      if (Platform.OS === "web") {
         getSessionStorage().setItem(key, entryJson);
       } else {
         await AsyncStorage.setItem(key, entryJson);
       }
 
       this.notifySubscribers(key, value);
-      logger.debug('cache', `FastCache.setItem: ${key} (${value.length} bytes${ttl ? `, TTL: ${ttl}ms` : ''})`);
+      logger.debug(
+        "cache",
+        `FastCache.setItem: ${key} (${value.length} bytes${ttl ? `, TTL: ${ttl}ms` : ""})`,
+      );
     } catch (error) {
-      logger.error('cache', `FastCache.setItem failed for ${key}:`, error);
+      logger.error("cache", `FastCache.setItem failed for ${key}:`, error);
       throw error;
     }
   }
@@ -126,7 +130,7 @@ class FastCacheService {
     try {
       let rawValue: string | null;
 
-      if (Platform.OS === 'web') {
+      if (Platform.OS === "web") {
         rawValue = getSessionStorage().getItem(key);
       } else {
         rawValue = await AsyncStorage.getItem(key);
@@ -148,7 +152,7 @@ class FastCacheService {
 
       return entry.data;
     } catch (error) {
-      logger.error('cache', `FastCache.getItem failed for ${key}:`, error);
+      logger.error("cache", `FastCache.getItem failed for ${key}:`, error);
       return null;
     }
   }
@@ -160,9 +164,12 @@ class FastCacheService {
     try {
       const json = JSON.stringify(value);
       await this.setItem(key, json, ttl);
-      logger.debug('cache', `FastCache.setJSON: ${key}${ttl ? ` (TTL: ${ttl}ms)` : ''}`);
+      logger.debug(
+        "cache",
+        `FastCache.setJSON: ${key}${ttl ? ` (TTL: ${ttl}ms)` : ""}`,
+      );
     } catch (error) {
-      logger.error('cache', `FastCache.setJSON failed for ${key}:`, error);
+      logger.error("cache", `FastCache.setJSON failed for ${key}:`, error);
       throw error;
     }
   }
@@ -178,7 +185,7 @@ class FastCacheService {
 
       return JSON.parse(value) as T;
     } catch (error) {
-      logger.error('cache', `FastCache.getJSON failed for ${key}:`, error);
+      logger.error("cache", `FastCache.getJSON failed for ${key}:`, error);
       return null;
     }
   }
@@ -188,14 +195,14 @@ class FastCacheService {
    */
   async removeItem(key: string): Promise<void> {
     try {
-      if (Platform.OS === 'web') {
+      if (Platform.OS === "web") {
         getSessionStorage().removeItem(key);
       } else {
         await AsyncStorage.removeItem(key);
       }
-      logger.debug('cache', `FastCache.removeItem: ${key}`);
+      logger.debug("cache", `FastCache.removeItem: ${key}`);
     } catch (error) {
-      logger.error('cache', `FastCache.removeItem failed for ${key}:`, error);
+      logger.error("cache", `FastCache.removeItem failed for ${key}:`, error);
       throw error;
     }
   }
@@ -224,7 +231,7 @@ class FastCacheService {
     try {
       let matchingKeys: string[] = [];
 
-      if (Platform.OS === 'web') {
+      if (Platform.OS === "web") {
         const storage = getSessionStorage();
         for (let i = 0; i < storage.length; i++) {
           const key = storage.key(i);
@@ -232,17 +239,24 @@ class FastCacheService {
             matchingKeys.push(key);
           }
         }
-        matchingKeys.forEach(key => storage.removeItem(key));
+        matchingKeys.forEach((key) => storage.removeItem(key));
       } else {
         const allKeys = await AsyncStorage.getAllKeys();
         matchingKeys = allKeys.filter((key: string) => key.startsWith(prefix));
         await AsyncStorage.multiRemove(matchingKeys);
       }
 
-      logger.debug('cache', `FastCache.removeByPrefix: ${prefix} (removed ${matchingKeys.length} items)`);
+      logger.debug(
+        "cache",
+        `FastCache.removeByPrefix: ${prefix} (removed ${matchingKeys.length} items)`,
+      );
       return matchingKeys.length;
     } catch (error) {
-      logger.error('cache', `FastCache.removeByPrefix failed for ${prefix}:`, error);
+      logger.error(
+        "cache",
+        `FastCache.removeByPrefix failed for ${prefix}:`,
+        error,
+      );
       return 0;
     }
   }
@@ -250,9 +264,11 @@ class FastCacheService {
   /**
    * Set multiple items atomically
    */
-  async multiSet(items: [key: string, value: string, ttl?: number][]): Promise<void> {
+  async multiSet(
+    items: [key: string, value: string, ttl?: number][],
+  ): Promise<void> {
     try {
-      if (Platform.OS === 'web') {
+      if (Platform.OS === "web") {
         for (const [key, value, ttl] of items) {
           await this.setItem(key, value, ttl);
         }
@@ -274,9 +290,9 @@ class FastCacheService {
         }
       }
 
-      logger.debug('cache', `FastCache.multiSet: ${items.length} items`);
+      logger.debug("cache", `FastCache.multiSet: ${items.length} items`);
     } catch (error) {
-      logger.error('cache', 'FastCache.multiSet failed:', error);
+      logger.error("cache", "FastCache.multiSet failed:", error);
       throw error;
     }
   }
@@ -288,7 +304,7 @@ class FastCacheService {
     try {
       const result = new Map<string, string | null>();
 
-      if (Platform.OS === 'web') {
+      if (Platform.OS === "web") {
         for (const key of keys) {
           const value = await this.getItem(key);
           result.set(key, value);
@@ -322,7 +338,7 @@ class FastCacheService {
 
       return result;
     } catch (error) {
-      logger.error('cache', 'FastCache.multiGet failed:', error);
+      logger.error("cache", "FastCache.multiGet failed:", error);
       return new Map();
     }
   }
@@ -354,11 +370,11 @@ class FastCacheService {
   private notifySubscribers(key: string, data: any): void {
     const subs = this.subscribers.get(key);
     if (subs) {
-      subs.forEach(callback => {
+      subs.forEach((callback) => {
         try {
           callback(data);
         } catch (error) {
-          logger.error('cache', 'Subscriber notification failed:', error);
+          logger.error("cache", "Subscriber notification failed:", error);
         }
       });
     }
@@ -376,7 +392,7 @@ class FastCacheService {
       let itemCount = 0;
       let estimatedSize = 0;
 
-      if (Platform.OS === 'web') {
+      if (Platform.OS === "web") {
         const storage = getSessionStorage();
         itemCount = storage.length;
         for (let i = 0; i < storage.length; i++) {
@@ -407,7 +423,7 @@ class FastCacheService {
         quotaPercentage,
       };
     } catch (error) {
-      logger.error('cache', 'FastCache.getStats failed:', error);
+      logger.error("cache", "FastCache.getStats failed:", error);
       return { itemCount: 0, estimatedSize: 0, quotaPercentage: 0 };
     }
   }
@@ -419,14 +435,14 @@ class FastCacheService {
    */
   async clear(): Promise<void> {
     try {
-      if (Platform.OS === 'web') {
+      if (Platform.OS === "web") {
         getSessionStorage().clear();
       } else {
         await AsyncStorage.clear();
       }
-      logger.info('cache', 'FastCache cleared');
+      logger.info("cache", "FastCache cleared");
     } catch (error) {
-      logger.error('cache', 'FastCache.clear failed:', error);
+      logger.error("cache", "FastCache.clear failed:", error);
       throw error;
     }
   }
@@ -438,7 +454,7 @@ class FastCacheService {
     try {
       let keysToRemove: string[] = [];
 
-      if (Platform.OS === 'web') {
+      if (Platform.OS === "web") {
         const storage = getSessionStorage();
         const now = Date.now();
         for (let i = 0; i < storage.length; i++) {
@@ -460,7 +476,7 @@ class FastCacheService {
             }
           }
         }
-        keysToRemove.forEach(key => storage.removeItem(key));
+        keysToRemove.forEach((key) => storage.removeItem(key));
       } else {
         const keys = await AsyncStorage.getAllKeys();
         const now = Date.now();
@@ -488,21 +504,27 @@ class FastCacheService {
       }
 
       if (keysToRemove.length > 0) {
-        logger.debug('cache', `FastCache cleanup: removed ${keysToRemove.length} expired entries`);
+        logger.debug(
+          "cache",
+          `FastCache cleanup: removed ${keysToRemove.length} expired entries`,
+        );
       }
     } catch (error) {
-      logger.error('cache', 'FastCache cleanup failed:', error);
+      logger.error("cache", "FastCache cleanup failed:", error);
     }
   }
 
   private startCleanupTimer(): void {
     if (this.cleanupTimer) return;
 
+    const cleanupIntervalMs =
+      getAppConfig().storage?.cleanupIntervalMs ?? 5 * 60 * 1000;
+
     this.cleanupTimer = setInterval(() => {
       this.cleanupExpired();
-    }, 5 * 60 * 1000); // Every 5 minutes
+    }, cleanupIntervalMs);
 
-    if (typeof this.cleanupTimer === 'object' && 'unref' in this.cleanupTimer) {
+    if (typeof this.cleanupTimer === "object" && "unref" in this.cleanupTimer) {
       (this.cleanupTimer as any).unref();
     }
   }

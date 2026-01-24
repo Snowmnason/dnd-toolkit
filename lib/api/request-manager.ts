@@ -1,7 +1,11 @@
-import * as Sentry from '@sentry/react-native';
-import { Analytics, sanitizeError as sanitizeErrorForAnalytics } from '../analytics';
-import { logger } from '../utils/logger';
-import { QueryCache } from '../cache';
+import * as Sentry from "@sentry/react-native";
+import {
+  Analytics,
+  sanitizeError as sanitizeErrorForAnalytics,
+} from "../analytics";
+import { QueryCache } from "../cache";
+import { getAppConfig } from "../config";
+import { logger } from "../utils/logger";
 
 /**
  * Request Manager: Centralized API request layer with:
@@ -21,33 +25,33 @@ import { QueryCache } from '../cache';
 export interface RequestOptions {
   /** Deduplicate identical concurrent requests (default: true) */
   dedupe?: boolean;
-  
+
   /** Number of retry attempts on failure (default: 3) */
   retries?: number;
-  
+
   /** Initial retry delay in ms, exponentially backed off (default: 1000) */
   retryDelay?: number;
-  
+
   /** If true and request fails, return null instead of throwing (default: false) */
   failOpen?: boolean;
-  
+
   /** Rate limit key - if provided, applies rate limiting (optional) */
   rateLimitKey?: string;
-  
+
   /** Timeout in ms for the request (default: 30000) */
   timeout?: number;
 
   // ===== QueryCache Integration Options =====
-  
+
   /** Use QueryCache for data persistence (default: false) */
   useQueryCache?: boolean;
-  
+
   /** Stale time for QueryCache (only used if useQueryCache is true) */
   staleTime?: number;
-  
+
   /** Cache time for QueryCache (only used if useQueryCache is true) */
   cacheTime?: number;
-  
+
   /** Tags for QueryCache invalidation (only used if useQueryCache is true) */
   tags?: string[];
 }
@@ -67,18 +71,26 @@ interface RateLimitBucket {
 // Configuration
 // ==========================================
 
-const DEFAULT_OPTIONS: Required<RequestOptions> = {
-  dedupe: true,
-  retries: 3,
-  retryDelay: 1000,
-  failOpen: false,
-  timeout: 30000,
-  rateLimitKey: '',
-  useQueryCache: false,
-  staleTime: 2 * 60 * 1000, // 2 minutes - align with typical server-side cache TTL
-  cacheTime: 5 * 60 * 1000, // 5 minutes
-  tags: [],
-};
+/**
+ * Get default options from appsettings
+ */
+function getDefaultOptions(): Required<RequestOptions> {
+  const config = getAppConfig();
+  return {
+    dedupe: true,
+    retries: 3,
+    retryDelay: config.api?.retryDelayMs ?? 1000,
+    failOpen: false,
+    timeout: config.api?.requestTimeoutMs ?? 30000,
+    rateLimitKey: "",
+    useQueryCache: false,
+    staleTime: config.api?.staleTimeMs ?? 2 * 60 * 1000,
+    cacheTime: config.api?.cacheTimeMs ?? 5 * 60 * 1000,
+    tags: [],
+  };
+}
+
+const DEFAULT_OPTIONS = getDefaultOptions();
 
 // Rate limiting: token bucket algorithm
 // Default: 10 requests per second per key
@@ -94,19 +106,21 @@ const RATE_LIMIT_CONFIG = {
 class RequestManagerClass {
   /** Track pending requests to deduplicate */
   private pendingRequests: Map<string, PendingRequest> = new Map();
-  
+
   /** Rate limit buckets by key */
   private rateLimitBuckets: Map<string, RateLimitBucket> = new Map();
-  
+
   /** Periodic cleanup timer to prevent memory leaks */
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
-  
-  /** Cleanup interval: 1 hour */
-  private readonly CLEANUP_INTERVAL = 60 * 60 * 1000;
-  
-  /** Stale entry threshold: 1 hour of inactivity */
-  private readonly STALE_THRESHOLD = 60 * 60 * 1000;
-  
+
+  /** Cleanup interval: configurable from appsettings (default: 1 hour) */
+  private readonly CLEANUP_INTERVAL =
+    getAppConfig().api?.cleanupIntervalMs ?? 60 * 60 * 1000;
+
+  /** Stale entry threshold: configurable from appsettings (default: 1 hour of inactivity) */
+  private readonly STALE_THRESHOLD =
+    getAppConfig().api?.staleThresholdMs ?? 60 * 60 * 1000;
+
   /** Hook for offline detection - can short-circuit to fail-open */
   onOfflineDetect?: () => boolean | Promise<boolean>;
 
@@ -121,13 +135,13 @@ class RequestManagerClass {
   private startCleanupTimer(): void {
     // Only start if not already running
     if (this.cleanupTimer) return;
-    
+
     this.cleanupTimer = setInterval(() => {
       this.cleanupStaleEntries();
     }, this.CLEANUP_INTERVAL);
-    
+
     // Make timer non-blocking (won't prevent process exit) on Node.js
-    if (typeof this.cleanupTimer === 'object' && 'unref' in this.cleanupTimer) {
+    if (typeof this.cleanupTimer === "object" && "unref" in this.cleanupTimer) {
       (this.cleanupTimer as any).unref();
     }
   }
@@ -167,38 +181,38 @@ class RequestManagerClass {
       if (now - request.timestamp > this.STALE_THRESHOLD) {
         this.pendingRequests.delete(key);
         removedRequests++;
-        logger.category('api').warn('Stale request cleaned up', { 
-          key, 
-          staleSinceMinutes: Math.round((now - request.timestamp) / 1000 / 60)
+        logger.category("api").warn("Stale request cleaned up", {
+          key,
+          staleSinceMinutes: Math.round((now - request.timestamp) / 1000 / 60),
         });
       }
     }
 
     if (removedBuckets > 0 || removedRequests > 0) {
-      logger.category('api').debug('Cleanup cycle completed', {
+      logger.category("api").debug("Cleanup cycle completed", {
         buckets: removedBuckets,
         requests: removedRequests,
         totalPendingNow: this.pendingRequests.size,
-        totalBucketsNow: this.rateLimitBuckets.size
+        totalBucketsNow: this.rateLimitBuckets.size,
       });
     }
   }
 
   /**
    * Execute a request with optional dedupe, retry, rate limiting, and QueryCache
-   * 
+   *
    * @param key - Unique key for deduplication (should be deterministic)
    * @param fetcher - Async function that performs the actual request
    * @param options - Request options (dedupe, retries, failOpen, useQueryCache, etc.)
    * @returns The result of the fetcher function
-   * 
+   *
    * @example
    * ```typescript
    * const worlds = await RequestManager.fetch(
    *   `worlds:user:${userId}`,
    *   () => worldsDB.getMyWorlds(userId),
-   *   { 
-   *     dedupe: true, 
+   *   {
+   *     dedupe: true,
    *     rateLimitKey: `user:${userId}`,
    *     useQueryCache: true,
    *     staleTime: 2 * 60 * 60 * 1000, // 2 hours
@@ -210,7 +224,7 @@ class RequestManagerClass {
   async fetch<T>(
     key: string,
     fetcher: () => Promise<T>,
-    options: RequestOptions = {}
+    options: RequestOptions = {},
   ): Promise<T | null> {
     const options_ = { ...DEFAULT_OPTIONS, ...options };
     const startedAt = Date.now();
@@ -225,15 +239,24 @@ class RequestManagerClass {
           const isStale = await QueryCache.isStale(key);
           if (!isStale) {
             // Cache hit and not stale - return immediately
-            logger.debug('api', 'QueryCache hit (not stale):', { key });
-            Analytics.track('api_request', { key, ok: true, source: 'cache_hit', duration_ms: 0 });
+            logger.debug("api", "QueryCache hit (not stale):", { key });
+            Analytics.track("api_request", {
+              key,
+              ok: true,
+              source: "cache_hit",
+              duration_ms: 0,
+            });
             return cached;
           }
           // Cache stale - fall through to fetch, but return cached data while fetching
-          logger.debug('api', 'QueryCache stale (will revalidate in background):', { key });
+          logger.debug(
+            "api",
+            "QueryCache stale (will revalidate in background):",
+            { key },
+          );
         }
       } catch (error) {
-        logger.warn('api', 'QueryCache read error:', { key, error });
+        logger.warn("api", "QueryCache read error:", { key, error });
         // Continue with normal fetch if cache read fails
       }
     }
@@ -243,42 +266,56 @@ class RequestManagerClass {
       return p.then(
         (value) => {
           const duration_ms = Date.now() - started;
-          Analytics.track('api_request', { key, ok: true, duration_ms });
-          const slowRequestThreshold = Analytics.getThreshold?.('slowRequestMs') ?? 3000;
+          Analytics.track("api_request", { key, ok: true, duration_ms });
+          const slowRequestThreshold =
+            Analytics.getThreshold?.("slowRequestMs") ?? 3000;
           if (duration_ms > slowRequestThreshold) {
-            logger.warn('api', `Slow request: ${key} took ${duration_ms}ms`);
+            logger.warn("api", `Slow request: ${key} took ${duration_ms}ms`);
           }
           return value;
         },
         (err) => {
           const duration_ms = Date.now() - started;
-          Analytics.track('api_request', { key, ok: false, duration_ms, ...sanitizeErrorForAnalytics(err) });
-          const slowRequestThreshold = Analytics.getThreshold?.('slowRequestMs') ?? 3000;
+          Analytics.track("api_request", {
+            key,
+            ok: false,
+            duration_ms,
+            ...sanitizeErrorForAnalytics(err),
+          });
+          const slowRequestThreshold =
+            Analytics.getThreshold?.("slowRequestMs") ?? 3000;
           if (duration_ms > slowRequestThreshold) {
-            logger.warn('api', `Slow failed request: ${key} took ${duration_ms}ms`);
+            logger.warn(
+              "api",
+              `Slow failed request: ${key} took ${duration_ms}ms`,
+            );
           }
           throw err;
-        }
+        },
       );
     };
 
     try {
       // ========== DEDUPE CHECK ==========
       if (options_.dedupe && this.pendingRequests.has(key)) {
-        logger.debug('api', 'Returning deduplicated request:', key);
+        logger.debug("api", "Returning deduplicated request:", key);
         const pending = this.pendingRequests.get(key)!;
         const deduplicatedPromise = pending.promise as Promise<T>;
         // Note: Duration tracking uses the original request's timestamp (pending.timestamp)
         // not the current request's startedAt, ensuring accurate duration for deduplicated requests
         return deduplicatedPromise.catch((error) => {
-          logger.error('api', 'Deduplicated request failed:', { key, error });
+          logger.error("api", "Deduplicated request failed:", { key, error });
           this.reportErrorToSentry(error, { key, options: options_ });
-          
+
           if (options_.failOpen) {
-            logger.warn('api', 'Fail-open enabled for deduplicated request, returning null:', key);
+            logger.warn(
+              "api",
+              "Fail-open enabled for deduplicated request, returning null:",
+              key,
+            );
             return null;
           }
-          
+
           throw error;
         });
       }
@@ -287,7 +324,7 @@ class RequestManagerClass {
       if (options_.rateLimitKey) {
         const canProceed = this.checkRateLimit(options_.rateLimitKey);
         if (!canProceed) {
-          logger.warn('api', 'Rate limited:', options_.rateLimitKey);
+          logger.warn("api", "Rate limited:", options_.rateLimitKey);
           if (options_.failOpen) {
             return null;
           }
@@ -300,7 +337,7 @@ class RequestManagerClass {
         fetcher,
         options_.retries,
         options_.retryDelay,
-        options_.timeout
+        options_.timeout,
       );
 
       const trackedPromise = attachTracking(promise, startedAt);
@@ -314,7 +351,7 @@ class RequestManagerClass {
             try {
               // Capture version at request start for race condition prevention
               const versionAtStart = QueryCache.getCurrentVersion();
-              
+
               await QueryCache.set(
                 key,
                 result,
@@ -323,11 +360,14 @@ class RequestManagerClass {
                   cacheTime: options_.cacheTime,
                   tags: options_.tags,
                 },
-                versionAtStart
+                versionAtStart,
               );
-              logger.debug('api', 'Persisted to QueryCache:', { key });
+              logger.debug("api", "Persisted to QueryCache:", { key });
             } catch (error) {
-              logger.warn('api', 'QueryCache persistence failed:', { key, error });
+              logger.warn("api", "QueryCache persistence failed:", {
+                key,
+                error,
+              });
               // Don't throw - cache persistence failure shouldn't break the request
             }
             return result;
@@ -335,7 +375,7 @@ class RequestManagerClass {
           // On error, just rethrow - don't try to cache errors
           (error) => {
             throw error;
-          }
+          },
         );
       }
 
@@ -353,30 +393,45 @@ class RequestManagerClass {
         // The second .catch() handles rare cases where the cleanup operation itself
         // might fail (e.g., if the Map is corrupted). These errors are logged for
         // debugging but don't affect the main request result.
-        cachePersistedPromise.then(
-          () => this.pendingRequests.delete(key),
-          () => this.pendingRequests.delete(key)
-        ).catch((cleanupError) => {
-          // Log cleanup failures for debugging without blocking the main operation.
-          // Cleanup errors are unexpected and indicate potential memory leaks.
-          logger.warn('request-manager', 'Cleanup handler error (unexpected):', cleanupError);
-        });
+        cachePersistedPromise
+          .then(
+            () => this.pendingRequests.delete(key),
+            () => this.pendingRequests.delete(key),
+          )
+          .catch((cleanupError) => {
+            // Log cleanup failures for debugging without blocking the main operation.
+            // Cleanup errors are unexpected and indicate potential memory leaks.
+            logger.warn(
+              "request-manager",
+              "Cleanup handler error (unexpected):",
+              cleanupError,
+            );
+          });
       }
 
       return cachePersistedPromise;
     } catch (error) {
-      logger.error('request-manager', 'Request failed:', { key, error });
+      logger.error("request-manager", "Request failed:", { key, error });
 
       // ========== SENTRY REPORTING ==========
       this.reportErrorToSentry(error, { key, options: options_ });
 
       // Tracking for thrown path (in case promise creation failed early)
       const duration_ms = Date.now() - startedAt;
-      Analytics.track('api_request', { key, ok: false, duration_ms, ...sanitizeErrorForAnalytics(error) });
+      Analytics.track("api_request", {
+        key,
+        ok: false,
+        duration_ms,
+        ...sanitizeErrorForAnalytics(error),
+      });
 
       // ========== FAIL OPEN BEHAVIOR ==========
       if (options_.failOpen) {
-        logger.warn('request-manager', 'Fail-open enabled, returning null:', key);
+        logger.warn(
+          "request-manager",
+          "Fail-open enabled, returning null:",
+          key,
+        );
         return null;
       }
 
@@ -386,7 +441,7 @@ class RequestManagerClass {
 
   /**
    * Execute a function with exponential backoff retry logic
-   * 
+   *
    * @param fn - Async function to execute
    * @param retriesLeft - Number of retries remaining
    * @param delay - Delay before retry in ms
@@ -397,7 +452,7 @@ class RequestManagerClass {
     fn: () => Promise<T>,
     retriesLeft: number,
     delay: number,
-    timeout: number
+    timeout: number,
   ): Promise<T> {
     try {
       return await this.executeWithTimeout(fn, timeout);
@@ -406,22 +461,22 @@ class RequestManagerClass {
         throw error;
       }
 
-      logger.debug('request-manager', 'Retrying after error:', {
+      logger.debug("request-manager", "Retrying after error:", {
         error: (error as Error).message,
         retriesLeft,
         delayMs: delay,
       });
 
       if (retriesLeft === 1) {
-        logger.category('api').warn('Final retry attempt', {
+        logger.category("api").warn("Final retry attempt", {
           error: (error as Error).message,
-          nextDelay: delay * 2
+          nextDelay: delay * 2,
         });
       } else {
-        logger.category('api').debug('Retrying request', {
+        logger.category("api").debug("Retrying request", {
           error: (error as Error).message,
           retriesLeft,
-          delayMs: delay
+          delayMs: delay,
         });
       }
 
@@ -435,21 +490,21 @@ class RequestManagerClass {
 
   /**
    * Execute a function with a timeout
-   * 
+   *
    * @param fn - Async function to execute
    * @param timeout - Timeout in ms
    * @returns Result of the function or throws TimeoutError
    */
   private executeWithTimeout<T>(
     fn: () => Promise<T>,
-    timeout: number
+    timeout: number,
   ): Promise<T> {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const timeoutPromise = new Promise<T>((_, reject) => {
       timeoutId = setTimeout(
         () => reject(new Error(`Request timeout after ${timeout}ms`)),
-        timeout
+        timeout,
       );
     });
 
@@ -468,7 +523,7 @@ class RequestManagerClass {
 
   /**
    * Rate limit check using token bucket algorithm
-   * 
+   *
    * @param key - Rate limit key
    * @returns true if request is allowed, false if rate limited
    */
@@ -493,10 +548,12 @@ class RequestManagerClass {
     // Instead of: (timePassed / 1000) * tokensPerSecond, compute as multiplication first
     // then division to maintain integer precision and avoid accumulated rounding errors.
     const timePassed = now - bucket.lastRefill;
-    const tokensToAdd = Math.round((timePassed * RATE_LIMIT_CONFIG.tokensPerSecond) / 1000);
+    const tokensToAdd = Math.round(
+      (timePassed * RATE_LIMIT_CONFIG.tokensPerSecond) / 1000,
+    );
     bucket.tokens = Math.min(
       RATE_LIMIT_CONFIG.maxTokens,
-      bucket.tokens + tokensToAdd
+      bucket.tokens + tokensToAdd,
     );
     bucket.lastRefill = now;
 
@@ -511,18 +568,18 @@ class RequestManagerClass {
 
   /**
    * Report request errors to Sentry
-   * 
+   *
    * @param error - The error that occurred
    * @param context - Context about the request
    */
   private reportErrorToSentry(
     error: unknown,
-    context: { key: string; options: Required<RequestOptions> }
+    context: { key: string; options: Required<RequestOptions> },
   ): void {
     try {
       Sentry.captureException(error, {
         tags: {
-          component: 'request-manager',
+          component: "request-manager",
           requestKey: context.key,
         },
         contexts: {
@@ -535,13 +592,13 @@ class RequestManagerClass {
             rateLimited: !!context.options.rateLimitKey,
           },
         },
-        level: 'error',
+        level: "error",
       });
     } catch (sentryError) {
       logger.warn(
-        'request-manager',
-        'Failed to report to Sentry:',
-        sentryError
+        "request-manager",
+        "Failed to report to Sentry:",
+        sentryError,
       );
     }
   }
@@ -549,7 +606,7 @@ class RequestManagerClass {
   /**
    * Get current stats about pending requests and rate limits
    * Useful for debugging and monitoring
-   * 
+   *
    * @returns Stats object with pending requests and rate limit info
    */
   getStats() {
@@ -560,7 +617,7 @@ class RequestManagerClass {
         (key) => {
           const bucket = this.rateLimitBuckets.get(key)!;
           return bucket.tokens < 1;
-        }
+        },
       ),
     };
   }
@@ -570,22 +627,22 @@ class RequestManagerClass {
    * WARNING: Only use during logout/cleanup
    */
   clearPending(): void {
-    logger.debug('request-manager', 'Clearing pending requests');
+    logger.debug("request-manager", "Clearing pending requests");
     this.pendingRequests.clear();
   }
 
   /**
    * Reset rate limits for a specific key or all keys
-   * 
+   *
    * @param key - Optional key to reset, if not provided resets all
    */
   resetRateLimit(key?: string): void {
     if (key) {
       this.rateLimitBuckets.delete(key);
-      logger.debug('request-manager', 'Reset rate limit for:', key);
+      logger.debug("request-manager", "Reset rate limit for:", key);
     } else {
       this.rateLimitBuckets.clear();
-      logger.debug('request-manager', 'Reset all rate limits');
+      logger.debug("request-manager", "Reset all rate limits");
     }
   }
 }
