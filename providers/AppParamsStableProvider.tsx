@@ -2,12 +2,12 @@ import { AuthStateManager } from "@/lib/auth/auth-state";
 import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import React, {
-  createContext as createReactContext,
-  ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
+    createContext as createReactContext,
+    ReactNode,
+    useCallback,
+    useContext,
+    useEffect,
+    useState,
 } from "react";
 import { createContext, useContextSelector } from "use-context-selector";
 
@@ -48,12 +48,12 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
       try {
         logger.debug(
           "context",
-          "AppParamsStableProvider: Loading userId from storage"
+          "AppParamsStableProvider: Loading userId from storage",
         );
         const userId = await AuthStateManager.getUserId();
         logger.debug(
           "context",
-          `AppParamsStableProvider: Loaded userId=${userId}`
+          `AppParamsStableProvider: Loaded userId=${userId}`,
         );
         if (userId) {
           setStableParams((prev) => ({ ...prev, userId }));
@@ -63,7 +63,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         }
 
         const worldIds = await SecureStorage.getJSON<string[]>(
-          STORAGE_KEYS.CONNECTED_WORLDS
+          STORAGE_KEYS.CONNECTED_WORLDS,
         );
         if (worldIds && Array.isArray(worldIds)) {
           setStableParams((prev) => ({ ...prev, connectedWorldIds: worldIds }));
@@ -74,7 +74,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
             try {
               logger.debug(
                 "context",
-                "AppParamsStableProvider: Starting background world access verification"
+                "AppParamsStableProvider: Starting background world access verification",
               );
               const verifiedWorldIds: string[] = [];
 
@@ -87,10 +87,10 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
                       logger.warn(
                         "context",
                         `World ${worldId} access revoked:`,
-                        reason
+                        reason,
                       );
                       // Could show a toast here if needed
-                    }
+                    },
                   );
 
                 if (verification.hasAccess) {
@@ -108,13 +108,13 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
                   {
                     cached: worldIds.length,
                     verified: verifiedWorldIds.length,
-                  }
+                  },
                 );
 
                 // Persist verified list to storage
                 await SecureStorage.setJSON(
                   STORAGE_KEYS.CONNECTED_WORLDS,
-                  verifiedWorldIds
+                  verifiedWorldIds,
                 );
 
                 setStableParams((prev) => ({
@@ -126,7 +126,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
               logger.error(
                 "context",
                 "AppParamsStableProvider: Background verification failed:",
-                error
+                error,
               );
               // Keep cached values on error
             }
@@ -136,7 +136,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         logger.error(
           "context",
           "AppParamsStableProvider: Error loading from storage:",
-          error
+          error,
         );
       }
     }
@@ -155,7 +155,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         if (!isSupabaseConfigured()) {
           logger.debug(
             "context",
-            "AppParamsStableProvider: Supabase not configured, skipping auth watcher"
+            "AppParamsStableProvider: Supabase not configured, skipping auth watcher",
           );
           return;
         }
@@ -170,7 +170,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
           ) {
             logger.debug(
               "context",
-              `AppParamsStableProvider: Auth state changed (${event}), reloading userId...`
+              `AppParamsStableProvider: Auth state changed (${event}), reloading userId...`,
             );
             // Small delay to ensure async storage operations complete
             await new Promise((resolve) => setTimeout(resolve, 50));
@@ -184,7 +184,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         logger.debug(
           "context",
           "AppParamsStableProvider: Error setting up auth watcher:",
-          error
+          error,
         );
       }
     };
@@ -210,9 +210,9 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         logger.error(
           "other",
           "Failed to persist connected worlds cache",
-          error
+          error,
         );
-      }
+      },
     );
   }, []);
 
@@ -242,7 +242,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     void SecureStorage.removeItem(STORAGE_KEYS.CONNECTED_WORLDS).catch(
       (error) => {
         logger.error("other", "Failed to clear connected worlds cache", error);
-      }
+      },
     );
   }, []);
 
@@ -250,7 +250,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     (worldId: string) => {
       return stableParams.connectedWorldIds.includes(worldId);
     },
-    [stableParams.connectedWorldIds]
+    [stableParams.connectedWorldIds],
   );
 
   const contextValue = React.useMemo(
@@ -271,7 +271,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
       removeConnectedWorld,
       hasAccessToWorld,
       clearAllParams,
-    ]
+    ],
   );
 
   return (
@@ -287,7 +287,7 @@ export function useAppParamsStable() {
   const context = useContext(AppParamsStableContext);
   if (!context) {
     throw new Error(
-      "useAppParamsStable must be used within AppParamsStableProvider"
+      "useAppParamsStable must be used within AppParamsStableProvider",
     );
   }
   return context;
@@ -298,13 +298,13 @@ export function useAppParamsStable() {
 export function useUserId() {
   return useContextSelector(
     AppParamsStableDataContext,
-    (value) => value.userId
+    (value) => value.userId,
   );
 }
 
 export function useConnectedWorlds() {
   return useContextSelector(
     AppParamsStableDataContext,
-    (value) => value.connectedWorldIds
+    (value) => value.connectedWorldIds,
   );
 }

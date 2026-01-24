@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { Alert } from 'react-native';
-import { worldsDB } from '../lib/database/worlds';
-import { logger } from '../lib/utils/logger';
+import { useState } from "react";
+import { Alert } from "react-native";
+import { worldsDB } from "../../lib/database/worlds";
+import { logger } from "../../lib/utils/logger";
 
 interface WorldFormData {
   name: string;
@@ -12,31 +12,31 @@ interface WorldFormData {
 
 export function useWorldCreation() {
   const [isCreating, setIsCreating] = useState(false);
-  const [successWorldName, setSuccessWorldName] = useState('');
-  const [successWorldId, setSuccessWorldId] = useState('');
+  const [successWorldName, setSuccessWorldName] = useState("");
+  const [successWorldId, setSuccessWorldId] = useState("");
 
   const createWorld = async (formData: WorldFormData) => {
     setIsCreating(true);
-    
+
     try {
       const newWorld = await worldsDB.create({
         name: formData.name.trim(),
-        description: formData.description.trim() || '',
+        description: formData.description.trim() || "",
         system: formData.system,
         is_dm: true, // World creators are always DMs
-        map_image_url: formData.mapImageUrl || '' // Use empty string as default - maps can be added later
+        map_image_url: formData.mapImageUrl || "", // Use empty string as default - maps can be added later
       });
 
       // Capture the world details for success modal and navigation
       setSuccessWorldName(newWorld.name);
       setSuccessWorldId(newWorld.world_id);
-      
+
       return { success: true, world: newWorld };
     } catch (error) {
-      logger.error('storage', 'Create world error:', error);
+      logger.error("storage", "Create world error:", error);
       Alert.alert(
-        'Error', 
-        'Failed to create world. Please check your connection and try again.'
+        "Error",
+        "Failed to create world. Please check your connection and try again.",
       );
       return { success: false, error };
     } finally {
@@ -50,6 +50,6 @@ export function useWorldCreation() {
     successWorldId,
     createWorld,
     setSuccessWorldName,
-    setSuccessWorldId
+    setSuccessWorldId,
   };
 }

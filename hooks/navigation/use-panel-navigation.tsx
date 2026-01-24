@@ -1,4 +1,4 @@
-import { usePlatform } from '@/contexts/PlatformContext'
+import { usePlatform } from '@/providers/PlatformProvider'
 import { useState } from 'react'
 import { Platform } from 'react-native'
 

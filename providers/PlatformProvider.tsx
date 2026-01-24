@@ -17,7 +17,7 @@ interface PlatformContextType {
 }
 
 const PlatformContext = createContext<PlatformContextType | undefined>(
-  undefined
+  undefined,
 );
 
 interface PlatformProviderProps {
@@ -59,7 +59,7 @@ export function PlatformProvider({ children }: PlatformProviderProps) {
       logger
         .category("ui")
         .debug(
-          `PlatformContext: initial platform detected - mobile=${rawIsMobile}, platform=${Platform.OS}, ${width}x${height}`
+          `PlatformContext: initial platform detected - mobile=${rawIsMobile}, platform=${Platform.OS}, ${width}x${height}`,
         );
     } else if (lastWidthRef.current !== null) {
       const widthDiff = Math.abs(width - lastWidthRef.current);
@@ -69,7 +69,7 @@ export function PlatformProvider({ children }: PlatformProviderProps) {
           logger
             .category("ui")
             .debug(
-              `PlatformContext: platform changed - ${isMobileState ? "mobile" : "desktop"} -> ${rawIsMobile ? "mobile" : "desktop"} (${widthDiff}px diff, new width: ${width})`
+              `PlatformContext: platform changed - ${isMobileState ? "mobile" : "desktop"} -> ${rawIsMobile ? "mobile" : "desktop"} (${widthDiff}px diff, new width: ${width})`,
             );
           setIsMobileState(rawIsMobile);
         }
@@ -88,7 +88,7 @@ export function PlatformProvider({ children }: PlatformProviderProps) {
       width,
       height,
     }),
-    [isMobile, isDesktop, width, height]
+    [isMobile, isDesktop, width, height],
   );
 
   return (

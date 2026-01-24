@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * Check for dangerous SQL injection characters (run BEFORE any transforms)
@@ -13,7 +13,8 @@ const hasNoDangerousChars = (val: string) => {
  * Check for SQL keywords (case-insensitive, run BEFORE any transforms)
  */
 const hasNoSqlKeywords = (val: string) => {
-  const sqlKeywords = /\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE|UNION|SCRIPT|JAVASCRIPT|ONERROR|ONLOAD)\b/i;
+  const sqlKeywords =
+    /\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE|UNION|SCRIPT|JAVASCRIPT|ONERROR|ONLOAD)\b/i;
   return !sqlKeywords.test(val);
 };
 
@@ -24,11 +25,11 @@ const hasNoSqlKeywords = (val: string) => {
 export const emailSchema = z
   .string()
   .trim()
-  .min(1, ' ')
-  .refine(hasNoSqlKeywords, 'Email contains invalid characters')
-  .refine(hasNoDangerousChars, 'Email contains invalid characters')
-  .pipe(z.string().email('Please enter a valid email address'))
-  .transform(val => val.toLowerCase());
+  .min(1, " ")
+  .refine(hasNoSqlKeywords, "Email contains invalid characters")
+  .refine(hasNoDangerousChars, "Email contains invalid characters")
+  .pipe(z.string().email("Please enter a valid email address"))
+  .transform((val) => val.toLowerCase());
 
 /**
  * Password validation schema with SQL injection protection
@@ -36,13 +37,19 @@ export const emailSchema = z
  */
 export const passwordSchema = z
   .string()
-  .min(6, 'Password must be at least 6 characters')
-  .refine(hasNoSqlKeywords, 'Password contains invalid characters')
-  .refine(val => !/[\x00-\x1F\x7F]/.test(val), 'Password contains invalid characters')
-  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-  .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-  .regex(/[0-9]/, 'Password must contain at least one number')
-  .regex(/[!@#$%^&*(),.?":{}|<>]/, 'Password must contain at least one special character');
+  .min(6, "Password must be at least 6 characters")
+  .refine(hasNoSqlKeywords, "Password contains invalid characters")
+  .refine(
+    (val) => !/[\x00-\x1F\x7F]/.test(val),
+    "Password contains invalid characters",
+  )
+  .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+  .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+  .regex(/[0-9]/, "Password must contain at least one number")
+  .regex(
+    /[!@#$%^&*(),.?":{}|<>]/,
+    "Password must contain at least one special character",
+  );
 
 /**
  * Username validation schema with SQL injection protection
@@ -52,19 +59,22 @@ export const passwordSchema = z
 export const usernameSchema = z
   .string()
   .trim()
-  .min(3, 'Username must be at least 3 characters')
-  .max(20, 'Username must be 20 characters or less')
-  .refine(hasNoSqlKeywords, 'Username contains reserved words')
-  .refine(hasNoDangerousChars, 'Username contains invalid characters')
-  .refine(val => /^[a-zA-Z]/.test(val), 'Username must start with a letter')
-  .refine(val => /^[a-zA-Z0-9_]*$/.test(val), 'Username can only contain letters, numbers, and underscores');
+  .min(3, "Username must be at least 3 characters")
+  .max(20, "Username must be 20 characters or less")
+  .refine(hasNoSqlKeywords, "Username contains reserved words")
+  .refine(hasNoDangerousChars, "Username contains invalid characters")
+  .refine((val) => /^[a-zA-Z]/.test(val), "Username must start with a letter")
+  .refine(
+    (val) => /^[a-zA-Z0-9_]*$/.test(val),
+    "Username can only contain letters, numbers, and underscores",
+  );
 
 /**
  * Sign-in schema
  */
 export const signInSchema = z.object({
   email: emailSchema,
-  password: z.string().min(1, 'Password is required'), // Don't validate complexity on sign-in
+  password: z.string().min(1, "Password is required"), // Don't validate complexity on sign-in
 });
 
 /**
@@ -74,11 +84,11 @@ export const signUpSchema = z
   .object({
     email: emailSchema,
     password: passwordSchema,
-    confirmPassword: z.string().min(1, 'Please confirm your password'),
+    confirmPassword: z.string().min(1, "Please confirm your password"),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: 'Passwords do not match',
-    path: ['confirmPassword'],
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
   });
 
 /**
@@ -94,11 +104,11 @@ export const forgotPasswordSchema = z.object({
 export const resetPasswordSchema = z
   .object({
     password: passwordSchema,
-    confirmPassword: z.string().min(1, 'Please confirm your password'),
+    confirmPassword: z.string().min(1, "Please confirm your password"),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: 'Passwords do not match',
-    path: ['confirmPassword'],
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
   });
 
 /**
@@ -117,8 +127,8 @@ export const updateUsernameSchema = z
     originalUsername: z.string(),
   })
   .refine((data) => data.username !== data.originalUsername, {
-    message: 'New username must be different',
-    path: ['username'],
+    message: "New username must be different",
+    path: ["username"],
   });
 
 // Infer TypeScript types from schemas
@@ -137,7 +147,7 @@ export type UpdateUsernameFormData = z.infer<typeof updateUsernameSchema>;
  * Validate password and return detailed criteria status
  */
 const validatePasswordCriteria = (password: string) => {
-  if (typeof password !== 'string') {
+  if (typeof password !== "string") {
     return {
       minLength: false,
       hasUppercase: false,
@@ -146,18 +156,24 @@ const validatePasswordCriteria = (password: string) => {
       hasSpecialChar: false,
       criteriaCount: 0,
       isValid: false,
-      strength: 'weak' as const,
+      strength: "weak" as const,
     };
   }
-  
+
   const minLength = password.length >= 6;
   const hasUppercase = /[A-Z]/.test(password);
   const hasLowercase = /[a-z]/.test(password);
   const hasNumber = /\d/.test(password);
   const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>?]/.test(password);
-  
-  const criteriaCount = [minLength, hasUppercase, hasLowercase, hasNumber, hasSpecialChar].filter(Boolean).length;
-  
+
+  const criteriaCount = [
+    minLength,
+    hasUppercase,
+    hasLowercase,
+    hasNumber,
+    hasSpecialChar,
+  ].filter(Boolean).length;
+
   return {
     minLength,
     hasUppercase,
@@ -166,34 +182,40 @@ const validatePasswordCriteria = (password: string) => {
     hasSpecialChar,
     criteriaCount,
     isValid: criteriaCount >= 5,
-    strength: criteriaCount === 0 ? 'weak' as const
-      : criteriaCount <= 2 ? 'weak' as const
-      : criteriaCount <= 3 ? 'medium' as const
-      : criteriaCount === 4 ? 'strong' as const
-      : 'very strong' as const,
+    strength:
+      criteriaCount === 0
+        ? ("weak" as const)
+        : criteriaCount <= 2
+          ? ("weak" as const)
+          : criteriaCount <= 3
+            ? ("medium" as const)
+            : criteriaCount === 4
+              ? ("strong" as const)
+              : ("very strong" as const),
   };
 };
 
 /**
  * Get password requirements text for real-time feedback
  */
-export const getPasswordRequirementsText = (password: string): string => {
+export const ZgetPasswordRequirementsText = (password: string): string => {
   if (!password) {
-    return ' ';
+    return " ";
   }
 
   const validation = validatePasswordCriteria(password);
   const missingCriteria = [];
-  
-  if (!validation.minLength) missingCriteria.push('6+ characters');
-  if (!validation.hasUppercase) missingCriteria.push('uppercase letter');
-  if (!validation.hasLowercase) missingCriteria.push('lowercase letter');
-  if (!validation.hasNumber) missingCriteria.push('number');
-  if (!validation.hasSpecialChar) missingCriteria.push('special character (!@#$%^&*...)');
-  
+
+  if (!validation.minLength) missingCriteria.push("6+ characters");
+  if (!validation.hasUppercase) missingCriteria.push("uppercase letter");
+  if (!validation.hasLowercase) missingCriteria.push("lowercase letter");
+  if (!validation.hasNumber) missingCriteria.push("number");
+  if (!validation.hasSpecialChar)
+    missingCriteria.push("special character (!@#$%^&*...)");
+
   if (validation.isValid) {
     return `✅ Looks great! All requirements met.`;
   } else {
-    return `Need: ${missingCriteria.join(', ')}`;
+    return `Need: ${missingCriteria.join(", ")}`;
   }
 };

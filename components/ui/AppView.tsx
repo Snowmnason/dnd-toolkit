@@ -1,5 +1,5 @@
 import LoadingOverlay from "@/components/LoadingOverlay";
-import { usePlatform } from "@/contexts/PlatformContext";
+import { usePlatform } from "@/providers/PlatformProvider";
 import { $, Sizing, useScale } from "@/theme";
 import { ComponentType, ReactNode, useEffect, useMemo } from "react";
 import {
@@ -142,7 +142,7 @@ export function AppPage({
           : tone === "surface"
             ? bgSurface
             : bgBackground),
-    [customBgColor, tone, bgSurfaceAlt, bgAccentAlt, bgSurface, bgBackground]
+    [customBgColor, tone, bgSurfaceAlt, bgAccentAlt, bgSurface, bgBackground],
   );
 
   /* Handle background image layering */

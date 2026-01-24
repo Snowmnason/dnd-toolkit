@@ -1,6 +1,13 @@
-import { SecureStorage, STORAGE_KEYS } from '@/lib/storage';
-import React, { createContext as createReactContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
-import { createContext, useContextSelector } from 'use-context-selector';
+import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
+import React, {
+    createContext as createReactContext,
+    ReactNode,
+    useCallback,
+    useContext,
+    useEffect,
+    useState,
+} from "react";
+import { createContext, useContextSelector } from "use-context-selector";
 
 interface AppParamsVolatile {
   worldId?: string;
@@ -14,14 +21,20 @@ interface AppParamsVolatileContextType {
   clearWorldParams: () => void;
 }
 
-const AppParamsVolatileContext = createReactContext<AppParamsVolatileContextType | undefined>(undefined);
+const AppParamsVolatileContext = createReactContext<
+  AppParamsVolatileContextType | undefined
+>(undefined);
 // Separate context for data to enable true selectors - using use-context-selector's createContext
 const AppParamsVolatileDataContext = createContext<AppParamsVolatile>({
   worldId: undefined,
   userRole: undefined,
 });
 
-export function AppParamsVolatileProvider({ children }: { children: ReactNode }) {
+export function AppParamsVolatileProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const [volatileParams, setVolatileParams] = useState<AppParamsVolatile>({
     worldId: undefined,
     userRole: undefined,
@@ -29,7 +42,7 @@ export function AppParamsVolatileProvider({ children }: { children: ReactNode })
 
   // ✅ Define functions BEFORE useEffect
   const setWorldId = useCallback((worldId: string | undefined) => {
-    setVolatileParams(prev => ({ ...prev, worldId }));
+    setVolatileParams((prev) => ({ ...prev, worldId }));
     if (worldId) {
       void SecureStorage.setItem(STORAGE_KEYS.LAST_SELECTED_WORLD, worldId);
     } else {
@@ -38,7 +51,7 @@ export function AppParamsVolatileProvider({ children }: { children: ReactNode })
   }, []);
 
   const setUserRole = useCallback((userRole: string | undefined) => {
-    setVolatileParams(prev => ({ ...prev, userRole }));
+    setVolatileParams((prev) => ({ ...prev, userRole }));
     if (userRole) {
       void SecureStorage.setItem(STORAGE_KEYS.LAST_USER_ROLE, userRole);
     } else {
@@ -46,33 +59,46 @@ export function AppParamsVolatileProvider({ children }: { children: ReactNode })
     }
   }, []);
 
-  const updateVolatileParams = useCallback((newParams: Partial<AppParamsVolatile>) => {
-    setVolatileParams(prev => {
-      const updated = { ...prev, ...newParams };
+  const updateVolatileParams = useCallback(
+    (newParams: Partial<AppParamsVolatile>) => {
+      setVolatileParams((prev) => {
+        const updated = { ...prev, ...newParams };
 
-      // ✅ Persist all changes to storage
-      if (updated.worldId !== undefined) {
-        if (updated.worldId) {
-          void SecureStorage.setItem(STORAGE_KEYS.LAST_SELECTED_WORLD, updated.worldId);
-        } else {
-          void SecureStorage.removeItem(STORAGE_KEYS.LAST_SELECTED_WORLD);
+        // ✅ Persist all changes to storage
+        if (updated.worldId !== undefined) {
+          if (updated.worldId) {
+            void SecureStorage.setItem(
+              STORAGE_KEYS.LAST_SELECTED_WORLD,
+              updated.worldId,
+            );
+          } else {
+            void SecureStorage.removeItem(STORAGE_KEYS.LAST_SELECTED_WORLD);
+          }
         }
-      }
 
-      if (updated.userRole !== undefined) {
-        if (updated.userRole) {
-          void SecureStorage.setItem(STORAGE_KEYS.LAST_USER_ROLE, updated.userRole);
-        } else {
-          void SecureStorage.removeItem(STORAGE_KEYS.LAST_USER_ROLE);
+        if (updated.userRole !== undefined) {
+          if (updated.userRole) {
+            void SecureStorage.setItem(
+              STORAGE_KEYS.LAST_USER_ROLE,
+              updated.userRole,
+            );
+          } else {
+            void SecureStorage.removeItem(STORAGE_KEYS.LAST_USER_ROLE);
+          }
         }
-      }
 
-      return updated;
-    });
-  }, []);
+        return updated;
+      });
+    },
+    [],
+  );
 
   const clearWorldParams = useCallback(() => {
-    setVolatileParams(prev => ({ ...prev, worldId: undefined, userRole: undefined }));
+    setVolatileParams((prev) => ({
+      ...prev,
+      worldId: undefined,
+      userRole: undefined,
+    }));
     void SecureStorage.removeItem(STORAGE_KEYS.LAST_SELECTED_WORLD);
     void SecureStorage.removeItem(STORAGE_KEYS.LAST_USER_ROLE);
   }, []);
@@ -80,8 +106,12 @@ export function AppParamsVolatileProvider({ children }: { children: ReactNode })
   // ✅ Now useEffect can safely call the functions
   useEffect(() => {
     async function restoreSession() {
-      const savedWorldId = await SecureStorage.getItem(STORAGE_KEYS.LAST_SELECTED_WORLD);
-      const savedRole = await SecureStorage.getItem(STORAGE_KEYS.LAST_USER_ROLE);
+      const savedWorldId = await SecureStorage.getItem(
+        STORAGE_KEYS.LAST_SELECTED_WORLD,
+      );
+      const savedRole = await SecureStorage.getItem(
+        STORAGE_KEYS.LAST_USER_ROLE,
+      );
       if (savedWorldId) setWorldId(savedWorldId);
       if (savedRole) setUserRole(savedRole);
     }
@@ -89,12 +119,15 @@ export function AppParamsVolatileProvider({ children }: { children: ReactNode })
   }, [setWorldId, setUserRole]);
 
   // ✅ Only stable functions in memoization
-  const contextValue = React.useMemo(() => ({
-    setWorldId,
-    setUserRole,
-    updateVolatileParams,
-    clearWorldParams,
-  }), [setWorldId, setUserRole, updateVolatileParams, clearWorldParams]);
+  const contextValue = React.useMemo(
+    () => ({
+      setWorldId,
+      setUserRole,
+      updateVolatileParams,
+      clearWorldParams,
+    }),
+    [setWorldId, setUserRole, updateVolatileParams, clearWorldParams],
+  );
 
   return (
     <AppParamsVolatileDataContext.Provider value={volatileParams}>
@@ -108,7 +141,9 @@ export function AppParamsVolatileProvider({ children }: { children: ReactNode })
 export function useAppParamsVolatile() {
   const context = useContext(AppParamsVolatileContext);
   if (!context) {
-    throw new Error('useAppParamsVolatile must be used within AppParamsVolatileProvider');
+    throw new Error(
+      "useAppParamsVolatile must be used within AppParamsVolatileProvider",
+    );
   }
   return context;
 }
@@ -116,9 +151,15 @@ export function useAppParamsVolatile() {
 // Selector hooks - using useContextSelector for true selectors
 // ✅ These now only re-render when their specific selected value changes
 export function useWorldId() {
-  return useContextSelector(AppParamsVolatileDataContext, (value) => value.worldId);
+  return useContextSelector(
+    AppParamsVolatileDataContext,
+    (value) => value.worldId,
+  );
 }
 
 export function useUserRole() {
-  return useContextSelector(AppParamsVolatileDataContext, (value) => value.userRole);
+  return useContextSelector(
+    AppParamsVolatileDataContext,
+    (value) => value.userRole,
+  );
 }

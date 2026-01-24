@@ -1,9 +1,9 @@
 import { useCallback, useState } from "react";
-import { CACHE_CONFIG, CACHE_KEYS, CACHE_TAGS } from "../lib/cache/keys";
-import { useQuery } from "../lib/cache/use-query";
-import { worldsDB, WorldWithAccess } from "../lib/database/worlds";
-import { SecureStorage } from "../lib/storage";
-import { logger } from "../lib/utils/logger";
+import { CACHE_CONFIG, CACHE_KEYS, CACHE_TAGS } from "../../lib/cache/keys";
+import { useQuery } from "../../lib/cache/use-query";
+import { worldsDB, WorldWithAccess } from "../../lib/database/worlds";
+import { SecureStorage } from "../../lib/storage";
+import { logger } from "../../lib/utils/logger";
 
 /**
  * Hook for managing world data with SWR (Stale-While-Revalidate) pattern

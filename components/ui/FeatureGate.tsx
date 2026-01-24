@@ -1,4 +1,4 @@
-import { usePremiumFeature } from "@/hooks/use-premium-feature";
+import { usePremiumFeature } from "@/hooks/auth/use-premium-feature";
 import { FeatureFlagName, FeatureFlags } from "@/lib/feature-flags";
 import React from "react";
 

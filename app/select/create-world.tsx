@@ -1,22 +1,22 @@
-import { zodResolver } from '@hookform/resolvers/zod'
-import { useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { View } from 'react-native'
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { View } from "react-native";
 
-import { CreateWorldModals } from '@/components/modals'
-import { AppSplit, Button } from '@/components/ui'
-import { usePlatform } from '@/contexts/PlatformContext'
-import { useAuthStatus } from '@/hooks/use-auth-status'
-import { useSuccessNavigation } from '@/hooks/use-success-navigation'
-import { useWorldCreation } from '@/hooks/use-world-creation'
-import { worldSchema, type WorldFormData } from '@/lib/schemas'
-import { CreateLeftPanel } from '@/Screens/select/create-world/CreateLeftPanel'
-import MapCanvas from '@/Screens/select/create-world/MapCanvas'
-import { useScale } from '@/theme'
+import { CreateWorldModals } from "@/components/modals";
+import { AppSplit, Button } from "@/components/ui";
+import { useAuthStatus } from "@/hooks/auth/use-auth-status";
+import { useSuccessNavigation } from "@/hooks/navigation/use-success-navigation";
+import { useWorldCreation } from "@/hooks/utils/use-world-creation";
+import { worldSchema, type WorldFormData } from "@/lib/schemas";
+import { usePlatform } from "@/providers/PlatformProvider";
+import { CreateLeftPanel } from "@/Screens/select/create-world/CreateLeftPanel";
+import MapCanvas from "@/Screens/select/create-world/MapCanvas";
+import { useScale } from "@/theme";
 
 // Constants
-const tabletopSystems = ['D&D 5e', 'Pathfinder', 'Call of Cthulhu', 'Custom']
-const systemItems = tabletopSystems.map((t) => ({ label: t, value: t }))
+const tabletopSystems = ["D&D 5e", "Pathfinder", "Call of Cthulhu", "Custom"];
+const systemItems = tabletopSystems.map((t) => ({ label: t, value: t }));
 
 /**
  * Default map images
@@ -24,66 +24,72 @@ const systemItems = tabletopSystems.map((t) => ({ label: t, value: t }))
  * 1. Download images and store in assets/images/
  * 2. Use local paths instead of external URLs
  * 3. Or use your backend as an image proxy
- * 
+ *
  * Currently empty - maps can be uploaded via the import feature
  */
-const defaultMapImages: string[] = []
+const defaultMapImages: string[] = [];
 
 export default function CreateWorldScreen() {
-  const S = useScale()
-  
+  const S = useScale();
+
   // Centralized platform detection
-  const { isDesktop } = usePlatform()
+  const { isDesktop } = usePlatform();
 
   // RHF form
-  const { control, handleSubmit, formState: { isValid } } = useForm<WorldFormData>({
+  const {
+    control,
+    handleSubmit,
+    formState: { isValid },
+  } = useForm<WorldFormData>({
     resolver: zodResolver(worldSchema),
-    mode: 'onChange',
+    mode: "onChange",
     defaultValues: {
-      name: '',
-      description: '',
-      system: tabletopSystems[0] as WorldFormData['system'],
+      name: "",
+      description: "",
+      system: tabletopSystems[0] as WorldFormData["system"],
     },
-  })
+  });
   // Local state
-  const [imageImported, setImageImported] = useState(false)
-  const [mapIndex, setMapIndex] = useState(0)
+  const [imageImported, setImageImported] = useState(false);
+  const [mapIndex, setMapIndex] = useState(0);
 
   // Modal state
-  const [showSignInModal, setShowSignInModal] = useState(false)
-  const [showValidationModal, setShowValidationModal] = useState(false)
-  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [showSignInModal, setShowSignInModal] = useState(false);
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // Hooks
-  const { isUserLoggedIn } = useAuthStatus()
-  const { isCreating, successWorldName, successWorldId, createWorld } = useWorldCreation()
+  const { isUserLoggedIn } = useAuthStatus();
+  const { isCreating, successWorldName, successWorldId, createWorld } =
+    useWorldCreation();
   const { navigateToWorld } = useSuccessNavigation({
     showSuccessModal,
     successWorldId,
-  })
+  });
 
   // Logic
   const onSubmit = async (data: WorldFormData) => {
     if (!isUserLoggedIn) {
-      setShowSignInModal(true)
-      return
+      setShowSignInModal(true);
+      return;
     }
 
     const result = await createWorld({
       name: data.name,
-      description: data.description || '',
+      description: data.description || "",
       system: data.system,
       // Use map image if available, otherwise empty string
       // eslint-disable-next-line security/detect-object-injection
-      mapImageUrl: defaultMapImages.length > 0 ? defaultMapImages[mapIndex] : undefined,
-    })
+      mapImageUrl:
+        defaultMapImages.length > 0 ? defaultMapImages[mapIndex] : undefined,
+    });
 
-    if (result.success) setShowSuccessModal(true)
-  }
+    if (result.success) setShowSuccessModal(true);
+  };
 
   const handleSuccessNavigate = () => {
-    navigateToWorld()
-  }
+    navigateToWorld();
+  };
 
   // Left Panel Component
   const LeftPanel = (
@@ -92,9 +98,11 @@ export default function CreateWorldScreen() {
       systemItems={systemItems}
       isCreating={isCreating}
       isFormValid={isValid}
-      handleCreateWorld={handleSubmit(onSubmit, () => setShowValidationModal(true))}
+      handleCreateWorld={handleSubmit(onSubmit, () =>
+        setShowValidationModal(true),
+      )}
     />
-  )
+  );
 
   // Right Panel Component
   const RightPanel = isDesktop ? (
@@ -105,15 +113,17 @@ export default function CreateWorldScreen() {
     >
       <MapCanvas
         onPress={() => {
-          setImageImported(false)
+          setImageImported(false);
           if (defaultMapImages.length > 0) {
-            setMapIndex(Math.floor(Math.random() * defaultMapImages.length))
+            setMapIndex(Math.floor(Math.random() * defaultMapImages.length));
           }
         }}
         imageImported={imageImported}
         // Use map image if available
         // eslint-disable-next-line security/detect-object-injection
-        imageUrl={defaultMapImages.length > 0 ? defaultMapImages[mapIndex] : undefined}
+        imageUrl={
+          defaultMapImages.length > 0 ? defaultMapImages[mapIndex] : undefined
+        }
       />
       <Button
         text="Import Image"
@@ -122,7 +132,7 @@ export default function CreateWorldScreen() {
         style={{ margin: S.space.lg }}
       />
     </View>
-  ) : null
+  ) : null;
 
   return (
     <AppSplit left={LeftPanel} right={RightPanel}>
@@ -138,5 +148,5 @@ export default function CreateWorldScreen() {
         onSuccessNavigate={handleSuccessNavigate}
       />
     </AppSplit>
-  )
+  );
 }

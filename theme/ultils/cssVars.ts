@@ -1,6 +1,6 @@
-import { Platform } from 'react-native'
-import { UseTheme } from '../ThemeProvider'
-import { ThemeTokens, TokenName } from '../tokens'
+import { Platform } from "react-native";
+import { UseTheme } from "../../providers/ThemeProvider";
+import { ThemeTokens, TokenName } from "../tokens";
 
 /**
  * $(token, theme?)
@@ -10,7 +10,7 @@ import { ThemeTokens, TokenName } from '../tokens'
  * - All platforms: returns resolved value for sizing/spacing tokens
  *
  * This is the primary way to access theme tokens in components.
- * 
+ *
  * Examples:
  *   backgroundColor: $('surface')           // CSS var on web, color on native
  *   color: $('textPrimary')                 // CSS var on web, color on native
@@ -20,47 +20,70 @@ import { ThemeTokens, TokenName } from '../tokens'
 export function $(token: TokenName, theme?: ThemeTokens): string {
   // Check if this is a color token (exists in ThemeTokens)
   const isColorToken = [
-    'primary', 'background', 'surface', 'bgInverse',
-    'textPrimary', 'textSecondary', 'textInverse',
-    'border', 'borderSubtle', 'accent', 'success', 'warning', 'danger',
-    'shadow',
-    'primaryButtonBg', 'primaryButtonBorder', 'primaryButtonText', 'primaryButtonHover',
-    'secondaryButtonBg', 'secondaryButtonBorder', 'secondaryButtonText', 'secondaryButtonHover',
-    'destructiveButton', 'destructiveButtonText',
-    'cancelButton', 'cancelButtonText', 'solidOutButton',
-    'fontFamilyTitle', 'fontFamily', 'fontFamilyPara',
+    "primary",
+    "background",
+    "surface",
+    "bgInverse",
+    "textPrimary",
+    "textSecondary",
+    "textInverse",
+    "border",
+    "borderSubtle",
+    "accent",
+    "success",
+    "warning",
+    "danger",
+    "shadow",
+    "primaryButtonBg",
+    "primaryButtonBorder",
+    "primaryButtonText",
+    "primaryButtonHover",
+    "secondaryButtonBg",
+    "secondaryButtonBorder",
+    "secondaryButtonText",
+    "secondaryButtonHover",
+    "destructiveButton",
+    "destructiveButtonText",
+    "cancelButton",
+    "cancelButtonText",
+    "solidOutButton",
+    "fontFamilyTitle",
+    "fontFamily",
+    "fontFamilyPara",
     // Derived tokens synced to CSS vars
-    'surfaceAlt', 'accentAlt', 'borderSubtle'
-  ].includes(token as string)
+    "surfaceAlt",
+    "accentAlt",
+    "borderSubtle",
+  ].includes(token as string);
 
   // If theme is explicitly passed, always return resolved value
   // (this indicates the caller needs the actual color for computations like tone())
   if (theme) {
-    return theme[token]
+    return theme[token];
   }
 
   // For color tokens on web (no theme passed), use CSS variables for instant updates
-  if (isColorToken && Platform.OS === 'web') {
-    return `var(--${token})`
+  if (isColorToken && Platform.OS === "web") {
+    return `var(--${token})`;
   }
 
   // For all other cases, resolve from context
   // Try to get theme; if provider not available, return CSS var or fallback
   try {
-    const ctx = UseTheme()
+    const ctx = UseTheme();
     if (ctx && ctx.theme) {
-      return ctx.theme[token]
+      return ctx.theme[token];
     }
   } catch {
     // Provider not available (e.g., during module load time)
     // This is expected during initialization - silently fall through
   }
-  
+
   // Provider not available or context is undefined
   // Return CSS var for web, generic fallback for native
-  if (isColorToken && Platform.OS === 'web') {
-    return `var(--${token})`
+  if (isColorToken && Platform.OS === "web") {
+    return `var(--${token})`;
   }
   // Return a safe fallback (native at module load time)
-  return '#000000' // Safe fallback color
+  return "#000000"; // Safe fallback color
 }
