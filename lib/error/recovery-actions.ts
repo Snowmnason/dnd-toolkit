@@ -97,11 +97,12 @@ export async function executeRecoveryAction(
       .category("error")
       .error(`[SafeMode] Recovery action ${action} failed:`, error);
 
-    // Track recovery failure
+    // Track recovery failure with additional context
     Analytics.track("safe_mode_recovery_action_failed", {
       action,
       reason: safeMode.reason,
       error_message: error instanceof Error ? error.message : "Unknown error",
+      safe_mode_duration_ms: Date.now() - safeMode.timestamp,
     });
 
     Performance.endMeasure(label);
@@ -144,13 +145,17 @@ async function handleClearCache(
       };
     }
 
-    logger.category("error").info("[SafeMode] Starting CLEAR_CACHE recovery");
+    logger
+      .category("bootstrap")
+      .info("[SafeMode] Starting CLEAR_CACHE recovery");
 
     // Clear the query cache (all cached API responses)
     await QueryCache.clearAll();
-    logger.category("error").info("[SafeMode] Query cache cleared");
+    logger.category("bootstrap").info("[SafeMode] Query cache cleared");
 
-    logger.category("error").info("[SafeMode] CLEAR_CACHE recovery successful");
+    logger
+      .category("bootstrap")
+      .info("[SafeMode] CLEAR_CACHE recovery successful");
 
     // Track recovery success
     Analytics.track("safe_mode_recovery_action_succeeded", {
@@ -214,11 +219,13 @@ async function handleResetAuth(
       };
     }
 
-    logger.category("error").info("[SafeMode] Starting RESET_AUTH recovery");
+    logger
+      .category("bootstrap")
+      .info("[SafeMode] Starting RESET_AUTH recovery");
 
     // Use AuthStateManager's logout flow which handles everything
     await AuthStateManager.clearAuthState();
-    logger.category("error").info("[SafeMode] Authentication cleared");
+    logger.category("bootstrap").info("[SafeMode] Authentication cleared");
 
     // Track recovery success
     Analytics.track("safe_mode_recovery_action_succeeded", {
@@ -362,7 +369,7 @@ async function handleContactSupport(
     }
 
     // Log diagnostics for reference
-    logger.category("error").info("[SafeMode] Diagnostics:", diagnostics);
+    logger.category("bootstrap").info("[SafeMode] Diagnostics:", diagnostics);
 
     // NOTE: onSuccess callback is invoked after navigation to ensure side effects
     // (like clearing safe mode state) don't interfere with the navigation itself
@@ -390,7 +397,7 @@ async function handleContactSupport(
  */
 function handleReinstall(safeMode: SafeModeState): RecoveryResult {
   try {
-    logger.category("error").info("[SafeMode] Guiding user to reinstall");
+    logger.category("bootstrap").info("[SafeMode] Guiding user to reinstall");
 
     // Note: We can't programmatically uninstall, only guide the user
     // Actual uninstall is done manually through device settings

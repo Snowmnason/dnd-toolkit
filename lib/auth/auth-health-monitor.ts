@@ -70,6 +70,15 @@ async function validateAuthHealth(): Promise<void> {
     logger.category("auth").debug("Running auth health check");
 
     // Lazy-import to avoid circular dependency
+    const { isSupabaseConfiguredLazy } =
+      await import("@/lib/database/supabase-lazy");
+    if (!(await isSupabaseConfiguredLazy())) {
+      logger
+        .category("auth")
+        .debug("Supabase not configured, skipping auth health check");
+      return;
+    }
+
     const { AuthStateManager } = await import("./auth-state");
 
     // Check if user had a previous session/account

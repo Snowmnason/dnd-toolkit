@@ -287,14 +287,23 @@ export const SAFE_MODE_DEFINITIONS: Record<
  * Load and initialize safe mode configuration from appsettings
  * Merges app config with typed SafeModeConfig interface
  */
-const appConfig = getAppConfig();
+/**
+ * Load and initialize safe mode configuration from appsettings
+ * Configuration is read dynamically to support runtime value changes
+ * Merges app config with typed SafeModeConfig interface
+ */
+function getDefaultSafeModeConfig(): SafeModeConfig {
+  const appConfig = getAppConfig();
+  return {
+    kernelTimeoutMs: appConfig?.safeMode?.kernelTimeoutMs ?? 10000, // 10 second kernel bootstrap timeout
+    syncFailureThreshold: appConfig?.safeMode?.syncFailureThreshold ?? 3, // Trigger DEGRADED after 3 consecutive sync failures
+    autoRecoveryAttempts: appConfig?.safeMode?.autoRecoveryAttempts ?? 2, // Try to auto-recover twice before escalating
+    autoRecoveryDelayMs: appConfig?.safeMode?.autoRecoveryDelayMs ?? 5000, // Wait 5 seconds between auto-recovery attempts
+  };
+}
 
-export const DEFAULT_SAFE_MODE_CONFIG: SafeModeConfig = {
-  kernelTimeoutMs: appConfig?.safeMode?.kernelTimeoutMs ?? 10000, // 10 second kernel bootstrap timeout
-  syncFailureThreshold: appConfig?.safeMode?.syncFailureThreshold ?? 3, // Trigger DEGRADED after 3 consecutive sync failures
-  autoRecoveryAttempts: appConfig?.safeMode?.autoRecoveryAttempts ?? 2, // Try to auto-recover twice before escalating
-  autoRecoveryDelayMs: appConfig?.safeMode?.autoRecoveryDelayMs ?? 5000, // Wait 5 seconds between auto-recovery attempts
-};
+export const DEFAULT_SAFE_MODE_CONFIG: SafeModeConfig =
+  getDefaultSafeModeConfig();
 
 /**
  * Human-readable messages for each safe mode reason
