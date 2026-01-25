@@ -75,7 +75,7 @@ async function validateStorageHealth(): Promise<void> {
 
       // Attempt auto-recovery: clear QueryCache
       try {
-        await QueryCache.clear();
+        await QueryCache.clearAll();
         logger
           .category("storage")
           .info("Storage recovery successful: cleared QueryCache");
@@ -113,10 +113,23 @@ async function validateStorageHealth(): Promise<void> {
 /**
  * Background job handler for periodic storage health checks.
  * Called by job queue every 5 minutes.
- * Reschedules itself for next check interval.
+ * Reschedules itself for next check interval if app is still active.
+ *
+ * NOTE: Checks if kernel is still active (not reset to IDLE phase) before rescheduling
+ * to prevent unbounded job chains after app reset or destruction.
  */
 async function handleStorageHealthCheck(): Promise<{ nextCheckAt: number }> {
   await validateStorageHealth();
+
+  // Bounds check: only reschedule if app kernel is still active
+  // If kernel was reset (e.g., app destroyed, testing scenario), don't reschedule
+  const kernelState = AppKernel.getState();
+  if (kernelState.currentPhase === "idle") {
+    logger
+      .category("storage")
+      .debug("Storage health check not rescheduling - kernel is idle");
+    return { nextCheckAt: 0 };
+  }
 
   // Reschedule for next check
   const nextCheckAt = Date.now() + STORAGE_HEALTH_CHECK_INTERVAL_MS;

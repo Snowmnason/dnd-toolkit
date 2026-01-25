@@ -96,10 +96,13 @@ export function SafeModeScreen({
     Performance.startMeasure(label);
 
     // Track safe mode event with reason and affected features
+    // Send affected_features as both array (for querying individual features) and string (for display/context)
     Analytics.track("safe_mode_entered", {
       level: state.level,
       reason: state.reason,
-      affected_features: state.affectedFeatures?.join(",") || "none",
+      affected_features: state.affectedFeatures || [], // Array for better queryability
+      affected_features_count: state.affectedFeatures?.length || 0, // Count for aggregation
+      affected_features_list: state.affectedFeatures?.join(", ") || "none", // String for display context
       recovery_options_count: state.recoveryOptions?.length || 0,
       timestamp: state.timestamp,
     });

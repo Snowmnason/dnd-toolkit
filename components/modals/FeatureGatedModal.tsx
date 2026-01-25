@@ -49,9 +49,13 @@ export function FeatureGatedModal({
   onClose,
 }: FeatureGatedModalProps) {
   const S = useScale();
-  const gatingStatus = useFeatureGatingStatus(feature || AffectedFeature.SYNC);
 
-  if (!feature || !gatingStatus.isGated) {
+  // Call hook unconditionally (React Rules of Hooks requirement)
+  // The hook handles null features safely by returning not-gated status
+  const gatingStatus = useFeatureGatingStatus(feature);
+
+  // Only show modal if feature is actually gated
+  if (!gatingStatus.isGated) {
     return null;
   }
 

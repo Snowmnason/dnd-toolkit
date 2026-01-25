@@ -23,16 +23,23 @@ const AUTH_HEALTH_CHECK_INTERVAL_MS =
 /**
  * Initialize auth health monitoring.
  * Performs initial health check and registers background job for periodic checks.
+ *
+ * IMPORTANT: Initial check is awaited to prevent race conditions with kernel's auth phase.
+ * Must complete before returning to ensure safe mode triggers are not missed or duplicated.
  */
 export async function initializeAuthHealthMonitoring(): Promise<void> {
   logger.category("bootstrap").info("Initializing auth health monitoring");
 
-  // Perform initial health check (non-blocking, async)
-  validateAuthHealth().catch((error) => {
+  // Perform initial health check (blocking) to avoid race with kernel auth phase
+  // If auth is invalid, this will trigger safe mode before we continue
+  try {
+    await validateAuthHealth();
+  } catch (error) {
     logger.category("auth").error("Error during initial auth health check", {
       error: String(error),
     });
-  });
+    // Continue anyway - the error is already logged and safe mode may have been triggered
+  }
 
   // Register job handler if not already registered
   const queue = getJobQueue();
@@ -90,10 +97,23 @@ async function validateAuthHealth(): Promise<void> {
 /**
  * Background job handler for periodic auth health checks.
  * Called by job queue every 4 hours.
- * Reschedules itself for next check interval.
+ * Reschedules itself for next check interval if app is still active.
+ *
+ * NOTE: Checks if kernel is still active (not reset to IDLE phase) before rescheduling
+ * to prevent unbounded job chains after app reset or destruction.
  */
 async function handleAuthHealthCheck(): Promise<{ nextCheckAt: number }> {
   await validateAuthHealth();
+
+  // Bounds check: only reschedule if app kernel is still active
+  // If kernel was reset (e.g., app destroyed, testing scenario), don't reschedule
+  const kernelState = AppKernel.getState();
+  if (kernelState.currentPhase === "idle") {
+    logger
+      .category("auth")
+      .debug("Auth health check not rescheduling - kernel is idle");
+    return { nextCheckAt: 0 };
+  }
 
   // Reschedule for next check
   const nextCheckAt = Date.now() + AUTH_HEALTH_CHECK_INTERVAL_MS;

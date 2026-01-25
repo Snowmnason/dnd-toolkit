@@ -10,7 +10,14 @@
  * This detector uses a simple threshold-based approach:
  * - Track consecutive sync failures
  * - After threshold (default 3), trigger DEGRADED safe mode
- * - Reset counter when sync succeeds
+ * - Reset counter when sync succeeds OR when app exits safe mode
+ *
+ * The detector is automatically reset when:
+ * 1. A sync succeeds (recordSuccess is called)
+ * 2. App exits safe mode successfully (AppKernel.setSafeMode(null))
+ *
+ * This ensures that after recovery from a network cascade, the app has a clean
+ * slate and can't easily re-trigger safe mode on the next few minor failures.
  */
 
 import { logger } from "@/lib/utils/logger";

@@ -19,6 +19,7 @@ import {
   sessionManager,
   useAppKernel,
 } from "@/lib";
+import { SafeModeReason } from "@/lib/error/safe-mode";
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ThemeProvider, UseTheme } from "@/providers/ThemeProvider";
@@ -35,6 +36,7 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import {
   CrashFallBack,
   RouteErrorBoundary,
+  SafeModeErrorBoundary,
   SafeModeScreen,
   SplashScreen,
 } from "../components/SplashScreen";
@@ -241,46 +243,86 @@ function RootLayoutContent() {
     );
   }
 
+  // Helper to determine safe navigation target based on safe mode reason
+  const getNavigationTarget = (reason?: string): string => {
+    // Auth failures → must go to login
+    if (
+      reason === SafeModeReason.AUTH_EXPIRED ||
+      reason === SafeModeReason.AUTH_INVALID ||
+      reason === SafeModeReason.SESSION_LOST
+    ) {
+      return "/login/sign-in";
+    }
+
+    // Storage/kernel issues → try world selection (auth should be OK)
+    if (
+      reason === SafeModeReason.STORAGE_UNREADABLE ||
+      reason === SafeModeReason.STORAGE_CORRUPTED ||
+      reason === SafeModeReason.STORAGE_QUOTA_EXCEEDED ||
+      reason === SafeModeReason.KERNEL_TIMEOUT ||
+      reason === SafeModeReason.KERNEL_PRELOAD_FAILED ||
+      reason === SafeModeReason.KERNEL_CONFIG_FAILED
+    ) {
+      return "/select/world-selection";
+    }
+
+    // Network issues → try world selection
+    if (
+      reason === SafeModeReason.NETWORK_SYNC_FAILURES ||
+      reason === SafeModeReason.NETWORK_CASCADE ||
+      reason === SafeModeReason.NETWORK_UNAVAILABLE
+    ) {
+      return "/select/world-selection";
+    }
+
+    // Default/unknown → safest option is index (welcome/splash screen)
+    return "/";
+  };
+
   // Show safe mode screen if app entered safe mode (takes priority over normal rendering)
+  // CRITICAL: SafeModeScreen is wrapped in error boundary - if it crashes, we still have fallback UI
   if (kernel.safeMode) {
     return (
-      <SafeModeScreen
-        state={kernel.safeMode}
-        onNavigateHome={() => {
-          // Navigate back to world selection when user taps "Back to Navigation"
-          router.replace("/select/world-selection");
-        }}
-        onRecoveryAction={async (action) => {
-          // Execute the recovery action
-          logger
-            .category("bootstrap")
-            .info(`[SafeMode] Executing recovery action: ${action}`);
+      <SafeModeErrorBoundary>
+        <SafeModeScreen
+          state={kernel.safeMode}
+          onNavigateHome={() => {
+            // Navigate to appropriate route based on safe mode reason
+            const target = getNavigationTarget(kernel.safeMode?.reason);
+            router.replace(target as any);
+          }}
+          onRecoveryAction={async (action) => {
+            // Execute the recovery action
+            logger
+              .category("bootstrap")
+              .info(`[SafeMode] Executing recovery action: ${action}`);
 
-          try {
-            const result = await executeRecoveryAction(
-              action,
-              kernel.safeMode!,
-              router,
-              () => {
-                // On success, kernel will handle state reset
+            try {
+              const result = await executeRecoveryAction(
+                action,
+                kernel.safeMode!,
+                router,
+                () => {
+                  // On success, kernel will handle state reset
+                  logger
+                    .category("bootstrap")
+                    .info(`[SafeMode] Recovery action succeeded: ${action}`);
+                },
+              );
+
+              if (!result.success) {
                 logger
-                  .category("bootstrap")
-                  .info(`[SafeMode] Recovery action succeeded: ${action}`);
-              },
-            );
-
-            if (!result.success) {
+                  .category("error")
+                  .warn(`[SafeMode] Recovery action failed: ${result.message}`);
+              }
+            } catch (error) {
               logger
                 .category("error")
-                .warn(`[SafeMode] Recovery action failed: ${result.message}`);
+                .error("[SafeMode] Recovery action execution failed:", error);
             }
-          } catch (error) {
-            logger
-              .category("error")
-              .error("[SafeMode] Recovery action execution failed:", error);
-          }
-        }}
-      />
+          }}
+        />
+      </SafeModeErrorBoundary>
     );
   }
 

@@ -15,6 +15,7 @@
  * - ERROR: A critical phase failed
  */
 
+import { NetworkCascadeDetector } from "@/lib/error/network-cascade-detector";
 import type { SafeModeState } from "@/lib/error/safe-mode";
 import {
   createSafeModeState,
@@ -136,6 +137,8 @@ class AppKernelClass {
   private initPromise: Promise<void> | null = null;
   private networkUnsubscribe: (() => void) | null = null;
   private authCompletionTime: number | null = null;
+  private bootstrapTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  private bootstrapTimeoutUnsubscribe: (() => void) | null = null;
 
   /**
    * Initialize the kernel once
@@ -184,11 +187,24 @@ class AppKernelClass {
 
       // Set up kernel timeout - if we don't reach appReady in time, trigger RECOVERY
       const timeoutMs = DEFAULT_SAFE_MODE_CONFIG.kernelTimeoutMs;
-      let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
       const startTimeout = () => {
-        timeoutHandle = setTimeout(() => {
+        this.bootstrapTimeoutHandle = setTimeout(() => {
           if (!this.state.phases.appReady) {
+            // Check if safe mode was already triggered by another system
+            // Only trigger kernel timeout if not already in RECOVERY (highest level)
+            if (
+              this.state.safeMode &&
+              this.state.safeMode.level === SafeModeLevel.RECOVERY
+            ) {
+              logger
+                .category("bootstrap")
+                .debug(
+                  "Kernel timeout occurred but app already in RECOVERY safe mode",
+                );
+              return;
+            }
+
             logger
               .category("bootstrap")
               .error(
@@ -196,6 +212,7 @@ class AppKernelClass {
                 {
                   timeoutMs,
                   currentPhase: this.state.currentPhase,
+                  existingSafeMode: this.state.safeMode?.level,
                 },
               );
 
@@ -211,12 +228,20 @@ class AppKernelClass {
       };
 
       // Subscribe to state changes to clear timeout when appReady
-      const unsubscribe = this.subscribe((state: AppKernelState) => {
-        if (state.phases.appReady && timeoutHandle) {
-          clearTimeout(timeoutHandle);
-          unsubscribe(); // Stop listening after appReady
-        }
-      });
+      // Store unsubscribe function in class instance for cleanup during reset
+      this.bootstrapTimeoutUnsubscribe = this.subscribe(
+        (state: AppKernelState) => {
+          if (state.phases.appReady && this.bootstrapTimeoutHandle) {
+            clearTimeout(this.bootstrapTimeoutHandle);
+            this.bootstrapTimeoutHandle = null;
+            // Stop listening after appReady
+            if (this.bootstrapTimeoutUnsubscribe) {
+              this.bootstrapTimeoutUnsubscribe();
+              this.bootstrapTimeoutUnsubscribe = null;
+            }
+          }
+        },
+      );
 
       startTimeout();
 
@@ -696,6 +721,23 @@ class AppKernelClass {
    */
   reset(): void {
     logger.category("bootstrap").info("AppKernel reset requested");
+
+    // Cleanup bootstrap timeout and subscription
+    if (this.bootstrapTimeoutHandle) {
+      clearTimeout(this.bootstrapTimeoutHandle);
+      this.bootstrapTimeoutHandle = null;
+    }
+    if (this.bootstrapTimeoutUnsubscribe) {
+      this.bootstrapTimeoutUnsubscribe();
+      this.bootstrapTimeoutUnsubscribe = null;
+    }
+
+    // Cleanup network subscription
+    if (this.networkUnsubscribe) {
+      this.networkUnsubscribe();
+      this.networkUnsubscribe = null;
+    }
+
     this.state = {
       currentPhase: KernelPhase.IDLE,
       phases: {
@@ -721,12 +763,6 @@ class AppKernelClass {
     };
     this.initPromise = null;
     this.authCompletionTime = null;
-
-    // Cleanup network subscription
-    if (this.networkUnsubscribe) {
-      this.networkUnsubscribe();
-      this.networkUnsubscribe = null;
-    }
 
     this.notifyListeners();
   }
@@ -912,22 +948,81 @@ class AppKernelClass {
   /**
    * Set safe mode state
    * Called when critical systems fail or recovery is needed
+   *
+   * Guard against double triggers:
+   * - If already in safe mode with same reason, ignore to prevent duplicate events
+   * - If escalating (e.g., DEGRADED → RECOVERY), allow the transition
+   * - Otherwise, replace the current safe mode state
    */
   setSafeMode(safeMode: SafeModeState | null): void {
+    const currentSafeMode = this.state.safeMode;
+
+    // Guard: If already in same safe mode, ignore to prevent duplicate triggers
+    if (
+      currentSafeMode &&
+      safeMode &&
+      currentSafeMode.reason === safeMode.reason &&
+      currentSafeMode.level === safeMode.level
+    ) {
+      logger.category("error").debug("Ignoring duplicate safe mode trigger", {
+        reason: safeMode.reason,
+        level: safeMode.level,
+      });
+      return;
+    }
+
     this.state.safeMode = safeMode;
 
     // Log safe mode transitions
     if (safeMode) {
-      logger.category("error").warn("App entering safe mode", {
-        level: safeMode.level,
-        reason: safeMode.reason,
-        features: safeMode.affectedFeatures,
-      });
+      // Detect escalation vs. transition
+      const isEscalation =
+        currentSafeMode &&
+        this.getLevelSeverity(safeMode.level) >
+          this.getLevelSeverity(currentSafeMode.level);
+
+      logger
+        .category("error")
+        .warn(
+          isEscalation ? "App escalating safe mode" : "App entering safe mode",
+          {
+            level: safeMode.level,
+            reason: safeMode.reason,
+            features: safeMode.affectedFeatures,
+            previousLevel: currentSafeMode?.level,
+          },
+        );
     } else {
       logger.category("error").info("App exiting safe mode (recovered)");
+
+      // Reset network cascade detector when exiting safe mode
+      // This prevents the elevated failure counter from making it too easy to re-trigger safe mode
+      NetworkCascadeDetector.reset();
+      logger
+        .category("network")
+        .debug("Network cascade detector reset on safe mode exit");
     }
 
     this.notifyListeners();
+  }
+
+  /**
+   * Helper to determine severity of a safe mode level for escalation detection
+   * Higher number = more severe
+   */
+  private getLevelSeverity(level: SafeModeLevel): number {
+    switch (level) {
+      case SafeModeLevel.NORMAL:
+        return 0;
+      case SafeModeLevel.DEGRADED:
+        return 1;
+      case SafeModeLevel.SAFE:
+        return 2;
+      case SafeModeLevel.RECOVERY:
+        return 3;
+      default:
+        return 0;
+    }
   }
 
   /**

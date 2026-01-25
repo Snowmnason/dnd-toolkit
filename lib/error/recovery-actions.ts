@@ -13,12 +13,28 @@
  */
 
 import { Router } from "expo-router";
-import { Linking } from "react-native";
 import { Analytics, Performance } from "../analytics";
 import { AuthStateManager } from "../auth/auth-state";
 import { QueryCache } from "../cache/query-cache";
+import { getAllRouteConfigs } from "../navigation/navigation-config";
 import { logger } from "../utils/logger";
 import { RecoveryAction, SafeModeState } from "./safe-mode";
+
+/**
+ * Validate that a route exists in the centralized navigation config
+ */
+function isValidRoute(path: string): boolean {
+  const configs = getAllRouteConfigs();
+  const normalizedPath = path.toLowerCase();
+
+  return configs.some((config) => {
+    const normalizedConfigPath = config.path.toLowerCase();
+    const normalizedAlias = config.aliases?.some(
+      (alias) => alias.toLowerCase() === normalizedPath,
+    );
+    return normalizedConfigPath === normalizedPath || normalizedAlias;
+  });
+}
 
 /**
  * Result of a recovery action execution
@@ -38,11 +54,14 @@ export interface RecoveryResult {
  * @param router - Expo router instance for navigation
  * @param onSuccess - Callback when recovery succeeds
  * @returns Result of the recovery action
+ *
+ * NOTE: router can be null/undefined for actions that don't navigate (e.g., CONTACT_SUPPORT).
+ * Actions that require navigation will fail gracefully with a clear error message.
  */
 export async function executeRecoveryAction(
   action: RecoveryAction,
   safeMode: SafeModeState,
-  router: Router,
+  router: Router | null | undefined,
   onSuccess?: () => void,
 ): Promise<RecoveryResult> {
   const label = `recovery_action:${action}`;
@@ -60,7 +79,7 @@ export async function executeRecoveryAction(
         return await handleRestoreBackup(safeMode, router, onSuccess);
 
       case RecoveryAction.CONTACT_SUPPORT:
-        return await handleContactSupport(safeMode);
+        return await handleContactSupport(safeMode, router, onSuccess);
 
       case RecoveryAction.REINSTALL:
         return handleReinstall(safeMode);
@@ -108,10 +127,22 @@ export async function executeRecoveryAction(
  */
 async function handleClearCache(
   safeMode: SafeModeState,
-  router: Router,
+  router: Router | null | undefined,
   onSuccess?: () => void,
 ): Promise<RecoveryResult> {
   try {
+    // Validate router is available for navigation
+    if (!router) {
+      logger
+        .category("error")
+        .error("[SafeMode] CLEAR_CACHE: router is null/undefined");
+      return {
+        success: false,
+        action: RecoveryAction.CLEAR_CACHE,
+        message: "Navigation is unavailable. Please restart the app.",
+      };
+    }
+
     logger.category("error").info("[SafeMode] Starting CLEAR_CACHE recovery");
 
     // Clear the query cache (all cached API responses)
@@ -128,7 +159,20 @@ async function handleClearCache(
     Performance.endMeasure(`recovery_action:${RecoveryAction.CLEAR_CACHE}`);
 
     // Navigate to world selection (safe starting point)
-    router.push("/select/world-selection");
+    const targetRoute = "/select/world-selection";
+    if (!isValidRoute(targetRoute)) {
+      logger
+        .category("error")
+        .error(
+          `[SafeMode] Route ${targetRoute} not found in navigation config`,
+        );
+      return {
+        success: false,
+        action: RecoveryAction.CLEAR_CACHE,
+        message: "Navigation target not found. Please restart the app.",
+      };
+    }
+    router.push(targetRoute);
     onSuccess?.();
 
     return {
@@ -151,10 +195,22 @@ async function handleClearCache(
  */
 async function handleResetAuth(
   safeMode: SafeModeState,
-  router: Router,
+  router: Router | null | undefined,
   onSuccess?: () => void,
 ): Promise<RecoveryResult> {
   try {
+    // Validate router is available for navigation
+    if (!router) {
+      logger
+        .category("error")
+        .error("[SafeMode] RESET_AUTH: router is null/undefined");
+      return {
+        success: false,
+        action: RecoveryAction.RESET_AUTH,
+        message: "Navigation is unavailable. Please restart the app.",
+      };
+    }
+
     logger.category("error").info("[SafeMode] Starting RESET_AUTH recovery");
 
     // Use AuthStateManager's logout flow which handles everything
@@ -169,7 +225,20 @@ async function handleResetAuth(
     Performance.endMeasure(`recovery_action:${RecoveryAction.RESET_AUTH}`);
 
     // Redirect to login
-    router.push("/login/sign-in");
+    const targetRoute = "/login/sign-in";
+    if (!isValidRoute(targetRoute)) {
+      logger
+        .category("error")
+        .error(
+          `[SafeMode] Route ${targetRoute} not found in navigation config`,
+        );
+      return {
+        success: false,
+        action: RecoveryAction.RESET_AUTH,
+        message: "Navigation target not found. Please restart the app.",
+      };
+    }
+    router.push(targetRoute);
     onSuccess?.();
 
     return {
@@ -196,7 +265,7 @@ async function handleResetAuth(
  */
 async function handleRestoreBackup(
   safeMode: SafeModeState,
-  router: Router,
+  router: Router | null | undefined,
   onSuccess?: () => void,
 ): Promise<RecoveryResult> {
   try {
@@ -218,9 +287,9 @@ async function handleRestoreBackup(
 }
 
 /**
- * CONTACT_SUPPORT: Opens email client with diagnostic information
+ * CONTACT_SUPPORT: Navigates to report bug page with diagnostic information
  *
- * Generates diagnostics summary including:
+ * Stores diagnostics summary including:
  * - Safe mode level and reason
  * - Affected features
  * - Timestamp
@@ -228,44 +297,64 @@ async function handleRestoreBackup(
  */
 async function handleContactSupport(
   safeMode: SafeModeState,
+  router: Router | null | undefined,
+  onSuccess?: () => void,
 ): Promise<RecoveryResult> {
+  const label = `recovery_action:${RecoveryAction.CONTACT_SUPPORT}`;
   try {
-    logger.category("error").info("[SafeMode] Opening support email");
-
-    const diagnostics = generateDiagnostics(safeMode);
-    const emailBody = encodeURIComponent(diagnostics);
-
-    const emailUrl = `mailto:support@example.com?subject=D%26D%20Toolkit%20-%20Safe%20Mode%20Recovery&body=${emailBody}`;
-
-    const canOpen = await Linking.canOpenURL(emailUrl);
-    if (canOpen) {
-      await Linking.openURL(emailUrl);
-      // Track success
-      Analytics.track("safe_mode_recovery_action_succeeded", {
-        action: RecoveryAction.CONTACT_SUPPORT,
-      });
-    } else {
-      logger.category("error").warn("[SafeMode] Cannot open email client");
-      Analytics.track("safe_mode_recovery_action_failed", {
-        action: RecoveryAction.CONTACT_SUPPORT,
-        error_message: "Cannot open email client",
-      });
+    // Validate router is available for navigation
+    if (!router) {
+      logger
+        .category("error")
+        .error("[SafeMode] CONTACT_SUPPORT: router is null/undefined");
+      Performance.endMeasure(label);
       return {
         success: false,
         action: RecoveryAction.CONTACT_SUPPORT,
-        message:
-          "Could not open email client. Please email support@example.com",
+        message: "Navigation is unavailable. Please restart the app.",
       };
     }
 
-    Performance.endMeasure(`recovery_action:${RecoveryAction.CONTACT_SUPPORT}`);
+    logger.category("error").info("[SafeMode] Navigating to report bug page");
+
+    const diagnostics = generateDiagnostics(safeMode);
+
+    // Track success
+    Analytics.track("safe_mode_recovery_action_succeeded", {
+      action: RecoveryAction.CONTACT_SUPPORT,
+    });
+
+    // Navigate to report bug page
+    const targetRoute = "/settings/report-bug";
+    if (!isValidRoute(targetRoute)) {
+      logger
+        .category("error")
+        .error(
+          `[SafeMode] Route ${targetRoute} not found in navigation config`,
+        );
+      Performance.endMeasure(label);
+      return {
+        success: false,
+        action: RecoveryAction.CONTACT_SUPPORT,
+        message: "Navigation target not found. Please restart the app.",
+      };
+    }
+
+    // Log diagnostics for reference
+    logger.category("error").info("[SafeMode] Diagnostics:", diagnostics);
+
+    router.push(targetRoute);
+    onSuccess?.();
+
+    Performance.endMeasure(label);
 
     return {
       success: true,
       action: RecoveryAction.CONTACT_SUPPORT,
-      message: "Email client opened. Please send the diagnostic report.",
+      message: "Opening report bug page...",
     };
   } catch (error) {
+    Performance.endMeasure(label);
     throw error;
   }
 }

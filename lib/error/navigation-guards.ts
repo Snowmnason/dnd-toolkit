@@ -1,30 +1,55 @@
 /**
  * Feature Gating Navigation Guards
  *
- * Helpers to protect routes/screens from access when features are gated.
+ * Provides guards to protect routes/screens from access when features are gated due to safe mode.
  *
- * Usage (in screens/layouts later):
+ * Currently Implemented:
+ * - createFeatureGatingGuard(): Factory function for creating route-level guards
+ *
+ * Future (TODO):
+ * - useFeatureGatingGuard(): Hook for direct use in screen components
+ *
+ * Usage:
  * ```tsx
- * import { useFeatureGatingGuard } from '@/lib/error/navigation-guards';
+ * import { createFeatureGatingGuard } from '@/lib/error/navigation-guards';
  *
- * export default function SyncScreen() {
- *   // Redirect to home if SYNC is gated
- *   useFeatureGatingGuard(AffectedFeature.SYNC, {
- *     fallbackRoute: "/select/world-selection",
- *     showToast: true,
- *   });
+ * const guardFeature = createFeatureGatingGuard(AffectedFeature.SYNC, router, {
+ *   fallbackRoute: "/select/world-selection",
+ *   showToast: true,
+ * });
  *
- *   return <YourScreen />;
+ * // Check guard in screen
+ * if (guardFeature(safeMode)) {
+ *   // Feature is gated, user was redirected
+ * } else {
+ *   // Feature is available, render screen
  * }
  * ```
  */
 
+import type { Href } from "expo-router";
 import { Router } from "expo-router";
-import { useEffect } from "react";
 import { useAppKernel } from "../kernel/use-app-kernel";
+import { getAllRouteConfigs } from "../navigation/navigation-config";
 import { logger } from "../utils/logger";
 import { checkFeatureGating } from "./feature-gating";
 import { AffectedFeature } from "./safe-mode";
+
+/**
+ * Validate that a route exists in the centralized navigation config
+ */
+function isValidRoute(path: string): boolean {
+  const configs = getAllRouteConfigs();
+  const normalizedPath = path.toLowerCase();
+
+  return configs.some((config) => {
+    const normalizedConfigPath = config.path.toLowerCase();
+    const normalizedAlias = config.aliases?.some(
+      (alias) => alias.toLowerCase() === normalizedPath,
+    );
+    return normalizedConfigPath === normalizedPath || normalizedAlias;
+  });
+}
 
 interface FeatureGatingGuardOptions {
   /** Route to redirect to if feature is gated (default: home) */
@@ -72,7 +97,17 @@ export function createFeatureGatingGuard(
         console.info("[FeatureGating]", message);
       }
 
-      router.push(fallbackRoute as any);
+      // Validate route exists in centralized navigation config
+      if (!isValidRoute(fallbackRoute)) {
+        logger
+          .category("navigation")
+          .error(
+            `[FeatureGating] Fallback route ${fallbackRoute} not found in navigation config`,
+          );
+        return false; // Guard not applied due to invalid route
+      }
+
+      router.push(fallbackRoute as unknown as Href);
       return true; // Guard was applied
     }
 
@@ -81,28 +116,36 @@ export function createFeatureGatingGuard(
 }
 
 /**
- * Alternative: Direct hook for use in components
+ * Alternative: Direct hook for use in components (FUTURE IMPLEMENTATION)
  *
- * Automatically redirects if feature is gated
- * FUTURE: Implement when we have better route structure
+ * TODO: Implement when we have better router integration
+ * This hook would automatically redirect if feature is gated
+ *
+ * Requires:
+ * - Router instance from useRouter() hook
+ * - Proper exception handling for navigation errors
+ * - Integration with layout-level navigation guards
+ *
+ * Example (when implemented):
+ * ```tsx
+ * export function useFeatureGatingGuard(
+ *   feature: AffectedFeature,
+ *   options: FeatureGatingGuardOptions = {},
+ * ) {
+ *   const router = useRouter();
+ *   const kernel = useAppKernel();
+ *
+ *   useEffect(() => {
+ *     const gatingStatus = checkFeatureGating(feature, kernel.safeMode);
+ *     if (gatingStatus.isGated) {
+ *       const fallbackRoute = options.fallbackRoute || "/select/world-selection";
+ *       if (isValidRoute(fallbackRoute)) {
+ *         router.push(fallbackRoute);
+ *       }
+ *     }
+ *   }, [feature, kernel.safeMode, router, options]);
+ * }
+ * ```
  */
-export function useFeatureGatingGuard(
-  feature: AffectedFeature,
-  options: FeatureGatingGuardOptions = {},
-) {
-  const kernel = useAppKernel();
-
-  useEffect(() => {
-    const gatingStatus = checkFeatureGating(feature, kernel.safeMode);
-
-    if (gatingStatus.isGated) {
-      logger
-        .category("navigation")
-        .warn(`[FeatureGating] Attempted to access gated feature: ${feature}`);
-
-      // NOTE: Router import would be needed here
-      // For now, this is a placeholder for future implementation
-      // when we have proper router integration
-    }
-  }, [feature, kernel.safeMode]);
-}
+// NOT EXPORTED - Implementation pending
+// export function useFeatureGatingGuard(...)

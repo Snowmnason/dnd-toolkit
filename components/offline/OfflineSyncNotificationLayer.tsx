@@ -67,15 +67,12 @@ export function OfflineSyncNotificationLayer() {
       }, 50);
       return () => clearTimeout(timer);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     offlineToast.visible,
     offlineToast.message,
-    offlineToast.type,
-    offlineToast.duration,
     syncToast.visible,
     syncToast.message,
-    syncToast.type,
-    syncToast.duration,
   ]);
 
   return (
