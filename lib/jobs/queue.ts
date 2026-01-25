@@ -97,12 +97,14 @@ const DEFAULT_CONFIG: Required<
 
 export class BackgroundJobQueue {
   private config: Required<JobQueueConfig> & { storageAdapter: StorageAdapter };
+  private secureStorageAdapter: StorageAdapter | null = null; // Optional secondary adapter for sensitive jobs
   private handlers: Map<string, JobHandler> = new Map();
   private subscribers: Set<JobEventSubscriber> = new Set();
   private runningJobs: Map<string, Promise<void>> = new Map(); // Track in-flight jobs
   private isInitialized: boolean = false;
   private activeCounts: Map<string, number> = new Map(); // Track active jobs per type
   private networkUnsubscribe: (() => void) | null = null; // NetworkDetection subscription
+  private reconnectDebounceTimer: ReturnType<typeof setTimeout> | null = null; // Debounce reconnect flushes
 
   constructor(config: JobQueueConfig = {}) {
     this.config = {
@@ -112,7 +114,68 @@ export class BackgroundJobQueue {
       concurrencyPerType: config.concurrencyPerType || {},
     };
 
+    // Import SecureStorageAdapter for sensitive job routing (lazy-loaded)
+    this.secureStorageAdapter = null;
+
     logger.category("jobs").info("Initialized BackgroundJobQueue");
+  }
+
+  /**
+   * Get the appropriate storage adapter for a job
+   * Routes sensitive jobs to SecureStorageAdapter if available, otherwise uses default
+   */
+  private async getStorageAdapterForJob(
+    sensitive?: boolean,
+  ): Promise<StorageAdapter> {
+    if (sensitive && !this.secureStorageAdapter) {
+      try {
+        // Lazy-load SecureStorageAdapter on first use
+        const { SecureStorageAdapter } =
+          await import("./adapters/secure-storage-adapter");
+        this.secureStorageAdapter = new SecureStorageAdapter();
+        logger
+          .category("jobs")
+          .debug("SecureStorageAdapter initialized for sensitive job routing");
+      } catch (error) {
+        logger
+          .category("jobs")
+          .warn(
+            "Failed to load SecureStorageAdapter, using default adapter",
+            error,
+          );
+        return this.config.storageAdapter;
+      }
+    }
+
+    return sensitive && this.secureStorageAdapter
+      ? this.secureStorageAdapter
+      : this.config.storageAdapter;
+  }
+
+  /**
+   * Get all jobs from both default and secure storage adapters
+   * Merges results and deduplicates by job ID
+   */
+  private async getAllJobs(): Promise<JobRecord[]> {
+    const defaultJobs = await this.config.storageAdapter.getAll();
+
+    // If no secure adapter exists, just return default
+    if (!this.secureStorageAdapter) {
+      return defaultJobs;
+    }
+
+    const secureJobs = await this.secureStorageAdapter.getAll();
+
+    // Merge and deduplicate (prefer whichever adapter has the job)
+    const jobMap = new Map<string, JobRecord>();
+    for (const job of defaultJobs) {
+      jobMap.set(job.id, job);
+    }
+    for (const job of secureJobs) {
+      jobMap.set(job.id, job);
+    }
+
+    return Array.from(jobMap.values());
   }
 
   // ==========================================
@@ -129,7 +192,7 @@ export class BackgroundJobQueue {
     if (this.isInitialized) return;
 
     try {
-      const allJobs = await this.config.storageAdapter.getAll();
+      const allJobs = await this.getAllJobs();
 
       logger
         .category("jobs")
@@ -151,7 +214,8 @@ export class BackgroundJobQueue {
 
           job.status = "pending";
           job.startedAt = undefined;
-          await this.config.storageAdapter.set(job);
+          const adapter = await this.getStorageAdapterForJob(job.sensitive);
+          await adapter.set(job);
           stalledCount++;
         }
       }
@@ -167,12 +231,36 @@ export class BackgroundJobQueue {
         if (status.isOnline) {
           logger
             .category("jobs")
-            .debug("Network online: triggering job processing");
-          this.runNext().catch((err) => {
+            .debug("Network online: debouncing job processing", {
+              debounceMs: this.config.reconnectDebounceMs,
+            });
+
+          // Clear any pending debounce timer
+          if (this.reconnectDebounceTimer) {
+            clearTimeout(this.reconnectDebounceTimer);
+          }
+
+          // Debounce the queue flush to avoid thrashing on rapid on/off toggles
+          this.reconnectDebounceTimer = setTimeout(() => {
+            this.reconnectDebounceTimer = null;
             logger
               .category("jobs")
-              .warn("Error processing jobs on network reconnect", err);
-          });
+              .debug("Reconnect debounce expired: processing jobs");
+            this.runNext().catch((err) => {
+              logger
+                .category("jobs")
+                .warn("Error processing jobs on network reconnect", err);
+            });
+          }, this.config.reconnectDebounceMs);
+        } else {
+          // Network went offline: cancel pending debounce timer
+          if (this.reconnectDebounceTimer) {
+            clearTimeout(this.reconnectDebounceTimer);
+            this.reconnectDebounceTimer = null;
+            logger
+              .category("jobs")
+              .debug("Network offline: cancelled pending reconnect flush");
+          }
         }
       });
 
@@ -295,18 +383,20 @@ export class BackgroundJobQueue {
       requiresNetwork: options.requiresNetwork,
       priority: options.priority ?? "normal",
       ttlMs: options.ttlMs ?? this.config.defaultJobTtlMs,
+      sensitive: options.sensitive ?? false,
     };
 
     // Set expiresAt if TTL is configured (will be set after job completion)
     // For now, we just store the ttlMs value
 
-    // Persist to storage
-    await this.config.storageAdapter.set(jobRecord);
+    // Persist to storage (routes to secure adapter if sensitive)
+    const adapter = await this.getStorageAdapterForJob(jobRecord.sensitive);
+    await adapter.set(jobRecord);
 
     logger
       .category("jobs")
       .info(
-        `Enqueued job: ${jobRecord.id} (type: ${options.type}, runAt: ${new Date(jobRecord.runAt).toISOString()})`,
+        `Enqueued job: ${jobRecord.id} (type: ${options.type}, sensitive: ${jobRecord.sensitive}, runAt: ${new Date(jobRecord.runAt).toISOString()})`,
       );
 
     return jobRecord.id;
@@ -336,7 +426,7 @@ export class BackgroundJobQueue {
     }
 
     try {
-      const allJobs = await this.config.storageAdapter.getAll();
+      const allJobs = await this.getAllJobs();
 
       // Cleanup: Remove expired jobs if auto-cleanup is enabled
       if (this.config.enableAutoCleanup) {
@@ -345,7 +435,8 @@ export class BackgroundJobQueue {
           (job) => job.expiresAt && job.expiresAt <= now,
         );
         for (const job of expiredJobs) {
-          await this.config.storageAdapter.delete(job.id);
+          const adapter = await this.getStorageAdapterForJob(job.sensitive);
+          await adapter.delete(job.id);
           logger
             .category("jobs")
             .debug(
@@ -626,7 +717,7 @@ export class BackgroundJobQueue {
    * Peek at the next job without executing it
    */
   async peek(): Promise<JobRecord | null> {
-    const allJobs = await this.config.storageAdapter.getAll();
+    const allJobs = await this.getAllJobs();
 
     return (
       allJobs
@@ -642,7 +733,7 @@ export class BackgroundJobQueue {
     type?: string,
     status?: JobRecord["status"],
   ): Promise<JobRecord[]> {
-    const allJobs = await this.config.storageAdapter.getAll();
+    const allJobs = await this.getAllJobs();
 
     return allJobs.filter((job) => {
       const matchesType = !type || job.type === type;
@@ -655,7 +746,7 @@ export class BackgroundJobQueue {
    * Get count of pending jobs
    */
   async getPendingCount(): Promise<number> {
-    const allJobs = await this.config.storageAdapter.getAll();
+    const allJobs = await this.getAllJobs();
     return allJobs.filter((job) => job.status === "pending").length;
   }
 
@@ -741,7 +832,7 @@ export class BackgroundJobQueue {
    * Find a job by idempotency key
    */
   private async findByIdempotencyKey(key: string): Promise<JobRecord | null> {
-    const allJobs = await this.config.storageAdapter.getAll();
+    const allJobs = await this.getAllJobs();
     return (
       allJobs.find(
         (job) => job.idempotencyKey === key && job.status === "pending",

@@ -93,6 +93,13 @@ export interface JobRecord {
    * Used for automatic cleanup of old jobs
    */
   expiresAt?: number;
+
+  /**
+   * Whether this job contains sensitive data and should use encrypted storage
+   * If true, job will be stored via SecureStorageAdapter instead of default adapter
+   * Default: false (uses default storage adapter)
+   */
+  sensitive?: boolean;
 }
 
 /**

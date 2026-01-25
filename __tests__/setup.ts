@@ -1,12 +1,27 @@
 import { vi } from "vitest";
 
-// Mock storage modules
+// Mock storage modules with correct FastCache API
 vi.mock("@/lib/storage", () => ({
   FastCache: {
-    get: vi.fn(),
-    set: vi.fn(),
-    remove: vi.fn(),
+    getItem: vi.fn(),
+    setItem: vi.fn(),
+    getJSON: vi.fn(),
+    setJSON: vi.fn(),
+    removeItem: vi.fn(),
+    hasItem: vi.fn(),
+    removeByPrefix: vi.fn(),
+    multiSet: vi.fn(),
     clear: vi.fn(),
+    subscribe: vi.fn(() => () => {}), // Return unsubscribe function
+    getStats: vi.fn(),
+  },
+  SecureStorage: {
+    getItem: vi.fn(),
+    setItem: vi.fn(),
+    getJSON: vi.fn(),
+    setJSON: vi.fn(),
+    removeItem: vi.fn(),
+    hasItem: vi.fn(),
   },
 }));
 

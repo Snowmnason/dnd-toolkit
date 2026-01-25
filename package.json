@@ -43,7 +43,7 @@
     "clean:deps": "node ./scripts/clean.js deps",
     "clean:cache": "node ./scripts/clean.js cache",
     "version:bump": "node ./scripts/bump-version.js",
-    "test": "vitest __test__/"
+    "test": "vitest"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

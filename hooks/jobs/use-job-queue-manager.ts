@@ -89,13 +89,14 @@ export function useJobQueueManager() {
 
   /**
    * Get count of jobs by status
+   * If status is omitted, returns total count of all jobs
    */
   const getJobCount = useCallback(
     async (status?: Parameters<typeof queue.getJobs>[1]): Promise<number> => {
       if (!queue) throw new Error("Job queue not available");
-      // Note: getJobs filters by type, so we'd need a different approach for cross-type counting
-      // For now, just return a placeholder - users should query specific job types
-      return 0;
+      // Query all jobs (no type filter) and optionally filter by status
+      const jobs = await queue.getJobs(undefined, status);
+      return jobs.length;
     },
     [queue],
   );

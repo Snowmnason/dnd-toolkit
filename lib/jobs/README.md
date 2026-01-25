@@ -320,29 +320,35 @@ ENQUEUE
       ↓
   MONITOR
     ├─ On app restart: Reset stalled jobs (running → pending if older than 10min)
-    ├─ On network reconnect: Trigger queue flush (debounced 1s)
+    ├─ On network reconnect: Trigger queue flush (debounced configurable duration, default 1s to avoid thrashing)
     └─ Subscribers notified of completion/failure
 ```
 
 ### Storage
 
-Jobs are persisted to **FastCache** by default (non-sensitive operations). For sensitive operations involving PII or auth tokens, use **SecureStorageAdapter**:
+Jobs are persisted to **FastCache** by default (non-sensitive operations). For sensitive operations involving PII or auth tokens, mark the job as `sensitive: true` and the queue will automatically route it to **SecureStorageAdapter**:
 
 ```typescript
 // Default: FastCache (non-sensitive)
 const queue = getJobQueue();
 
-// For sensitive data: use SecureStorageAdapter
-import { SecureStorageAdapter } from "@/lib/jobs";
-const queue = new BackgroundJobQueue({
-  storageAdapter: new SecureStorageAdapter(),
-});
-
-// Or per-job via enqueue option
+// For sensitive data: mark sensitive: true to route to SecureStorageAdapter
 await queue.enqueue({
   type: "refresh_auth_token",
   payload: { token: "secret..." },
-  storageAdapter: new SecureStorageAdapter(), // Override default
+  sensitive: true, // Routes to encrypted storage automatically
+});
+
+// For queue-level storage override (all jobs in queue use this adapter):
+import { SecureStorageAdapter } from "@/lib/jobs";
+const secureQueue = new BackgroundJobQueue({
+  storageAdapter: new SecureStorageAdapter(),
+});
+
+await secureQueue.enqueue({
+  type: "refresh_auth_token",
+  payload: { token: "secret..." },
+  // All jobs in this queue use SecureStorageAdapter
 });
 ```
 
@@ -351,7 +357,7 @@ await queue.enqueue({
 - **FastCacheAdapter** (default): Non-sensitive background work (feature flags, analytics, cache refresh)
   - Lower latency, suitable for high-frequency jobs
   - Use for: Cache refreshes, telemetry, generic housekeeping
-- **SecureStorageAdapter**: Sensitive operations with encryption at rest
+- **SecureStorageAdapter**: Sensitive operations with encryption at rest (auto-routed when `sensitive: true`)
   - All data encrypted via AES-CTR on all platforms (web, iOS, Android, desktop)
   - Higher latency due to encryption/decryption overhead
   - Use for: Auth tokens, PII, encryption keys, compliance-sensitive operations
