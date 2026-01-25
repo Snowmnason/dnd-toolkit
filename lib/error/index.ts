@@ -1,4 +1,14 @@
 export { AppErrorBoundary } from "./ErrorBoundary";
+export {
+    checkFeatureGating,
+    getFeatureGatingReason,
+    getGatedFeatures,
+    type FeatureGatingStatus
+} from "./feature-gating";
+export {
+    createFeatureGatingGuard,
+    useFeatureGatingGuard
+} from "./navigation-guards";
 export { NetworkCascadeDetector } from "./network-cascade-detector";
 export {
     executeRecoveryAction,
