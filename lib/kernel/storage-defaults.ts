@@ -7,9 +7,40 @@
  * - Update defaults across the codebase in one place
  * - Understand what the "zero state" is for each feature
  * - Validate storage migrations
+ *
+ * NOTE: Storage keys are inlined to avoid circular dependency with lib/storage/index.ts
+ * If updating keys, ensure both this file and STORAGE_KEYS in lib/storage/index.ts are in sync
  */
 
-import { STORAGE_KEYS } from "@/lib/storage";
+/**
+ * Storage key constants (inlined to avoid circular dependency)
+ * Must match STORAGE_KEYS in lib/storage/index.ts
+ */
+const STORAGE_KEY_CONSTANTS = {
+  // World Management
+  CONNECTED_WORLDS: "dnd:app:connected_worlds",
+  LAST_SELECTED_WORLD: "dnd:session:last_selected_world",
+  LAST_USER_ROLE: "dnd:session:last_user_role",
+
+  // Authentication & Account
+  HAS_ACCOUNT: "dnd:auth:has_account",
+  USER_DATA: "dnd:auth:user_data",
+  USER_DATA_TIMESTAMP: "dnd:auth:user_data_timestamp",
+  LAST_LOGGED_IN: "dnd:auth:last_logged_in",
+  AUTH_ATTEMPTS: "dnd:auth:attempts",
+  PENDING_INVITE: "dnd:invite:pending",
+
+  // UI Preferences
+  THEME_PREFERENCE: "dnd:user:theme",
+  THEME_MODE: "dnd:user:theme_mode",
+  SCALE_PREFERENCE: "dnd:user:scale",
+
+  // Safe Mode
+  SAFE_MODE_DIAGNOSTICS: "dnd:session:safe_mode_diagnostics",
+
+  // Developer
+  DEV_MODE: "dnd:dev:mode",
+} as const;
 
 /**
  * Default value type for each storage key
@@ -19,34 +50,48 @@ import { STORAGE_KEYS } from "@/lib/storage";
 export type StorageDefaultValue = string | null;
 
 /**
- * Storage defaults mapped by STORAGE_KEYS
+ * Storage defaults mapped by key constant strings
  *
  * Format:
  * - `string`: JSON-serialized default (will be stored as-is)
  * - `null`: Key is optional and should not be initialized
+ *
+ * Built using inlined constants to avoid circular dependency on STORAGE_KEYS
  */
-export const STORAGE_DEFAULTS: Record<string, StorageDefaultValue> = {
-  // World Management
-  [STORAGE_KEYS.CONNECTED_WORLDS]: JSON.stringify([]),
-  [STORAGE_KEYS.LAST_SELECTED_WORLD]: null,
-  [STORAGE_KEYS.LAST_USER_ROLE]: null,
+function createStorageDefaults(): Record<string, StorageDefaultValue> {
+  return {
+    // World Management
+    [STORAGE_KEY_CONSTANTS.CONNECTED_WORLDS]: JSON.stringify([]),
+    [STORAGE_KEY_CONSTANTS.LAST_SELECTED_WORLD]: null,
+    [STORAGE_KEY_CONSTANTS.LAST_USER_ROLE]: null,
 
-  // Authentication & Account
-  [STORAGE_KEYS.HAS_ACCOUNT]: JSON.stringify(false),
-  [STORAGE_KEYS.USER_DATA]: null,
-  [STORAGE_KEYS.USER_DATA_TIMESTAMP]: JSON.stringify(0),
-  [STORAGE_KEYS.LAST_LOGGED_IN]: JSON.stringify(null),
-  [STORAGE_KEYS.AUTH_ATTEMPTS]: JSON.stringify(0),
-  [STORAGE_KEYS.PENDING_INVITE]: null,
+    // Authentication & Account
+    [STORAGE_KEY_CONSTANTS.HAS_ACCOUNT]: JSON.stringify(false),
+    [STORAGE_KEY_CONSTANTS.USER_DATA]: null,
+    [STORAGE_KEY_CONSTANTS.USER_DATA_TIMESTAMP]: JSON.stringify(0),
+    [STORAGE_KEY_CONSTANTS.LAST_LOGGED_IN]: JSON.stringify(null),
+    [STORAGE_KEY_CONSTANTS.AUTH_ATTEMPTS]: JSON.stringify(0),
+    [STORAGE_KEY_CONSTANTS.PENDING_INVITE]: null,
 
-  // UI Preferences
-  [STORAGE_KEYS.THEME_PREFERENCE]: JSON.stringify("classic"),
-  [STORAGE_KEYS.THEME_MODE]: JSON.stringify("dark"),
-  [STORAGE_KEYS.SCALE_PREFERENCE]: JSON.stringify(1),
+    // UI Preferences
+    [STORAGE_KEY_CONSTANTS.THEME_PREFERENCE]: JSON.stringify("classic"),
+    [STORAGE_KEY_CONSTANTS.THEME_MODE]: JSON.stringify("dark"),
+    [STORAGE_KEY_CONSTANTS.SCALE_PREFERENCE]: JSON.stringify(1),
 
-  // Developer
-  [STORAGE_KEYS.DEV_MODE]: JSON.stringify(false),
-};
+    // Safe Mode
+    [STORAGE_KEY_CONSTANTS.SAFE_MODE_DIAGNOSTICS]: null,
+
+    // Developer
+    [STORAGE_KEY_CONSTANTS.DEV_MODE]: JSON.stringify(false),
+  };
+}
+
+// Cache storage defaults (immutable after first access)
+const STORAGE_DEFAULTS_CACHE = createStorageDefaults();
+
+export function getStorageDefaults(): Record<string, StorageDefaultValue> {
+  return STORAGE_DEFAULTS_CACHE;
+}
 
 /**
  * Get default value for a storage key
@@ -54,7 +99,7 @@ export const STORAGE_DEFAULTS: Record<string, StorageDefaultValue> = {
  * @returns The default value, or null if key is optional
  */
 export function getStorageDefault(key: string): StorageDefaultValue {
-  return STORAGE_DEFAULTS[key] ?? null;
+  return STORAGE_DEFAULTS_CACHE[key] ?? null;
 }
 
 /**
@@ -63,7 +108,7 @@ export function getStorageDefault(key: string): StorageDefaultValue {
  * @returns true if the key should be initialized, false if it's optional
  */
 export function shouldInitializeStorageKey(key: string): boolean {
-  return STORAGE_DEFAULTS[key] !== null;
+  return STORAGE_DEFAULTS_CACHE[key] !== null;
 }
 
 /**
@@ -71,7 +116,7 @@ export function shouldInitializeStorageKey(key: string): boolean {
  * Useful for resetting storage to defaults or validating initial state
  */
 export function getRequiredStorageKeys(): string[] {
-  return Object.entries(STORAGE_DEFAULTS)
+  return Object.entries(STORAGE_DEFAULTS_CACHE)
     .filter(([, value]) => value !== null)
     .map(([key]) => key);
 }
@@ -81,7 +126,7 @@ export function getRequiredStorageKeys(): string[] {
  * Useful for cleanup or migration logic
  */
 export function getOptionalStorageKeys(): string[] {
-  return Object.entries(STORAGE_DEFAULTS)
+  return Object.entries(STORAGE_DEFAULTS_CACHE)
     .filter(([, value]) => value === null)
     .map(([key]) => key);
 }

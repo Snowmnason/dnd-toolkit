@@ -31,7 +31,8 @@ export function OfflineSyncNotificationLayer() {
 
   // State machine to prevent race condition between offline and sync toasts
   // When offline toast becomes invisible, delay showing sync toast to avoid flicker
-  const [activeToast, setActiveToast] = useState<ActiveToastState>(offlineToast);
+  const [activeToast, setActiveToast] =
+    useState<ActiveToastState>(offlineToast);
 
   useEffect(() => {
     if (offlineToast.visible) {
@@ -66,7 +67,13 @@ export function OfflineSyncNotificationLayer() {
       }, 50);
       return () => clearTimeout(timer);
     }
-  }, [offlineToast.visible, offlineToast, syncToast.visible, syncToast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    offlineToast.visible,
+    offlineToast.message,
+    syncToast.visible,
+    syncToast.message,
+  ]);
 
   return (
     <>

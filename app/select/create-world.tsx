@@ -79,8 +79,8 @@ export default function CreateWorldScreen() {
       description: data.description || "",
       system: data.system,
       // Use map image if available, otherwise empty string
-      // eslint-disable-next-line security/detect-object-injection
       mapImageUrl:
+        // eslint-disable-next-line security/detect-object-injection
         defaultMapImages.length > 0 ? defaultMapImages[mapIndex] : undefined,
     });
 
@@ -120,8 +120,8 @@ export default function CreateWorldScreen() {
         }}
         imageImported={imageImported}
         // Use map image if available
-        // eslint-disable-next-line security/detect-object-injection
         imageUrl={
+          // eslint-disable-next-line security/detect-object-injection
           defaultMapImages.length > 0 ? defaultMapImages[mapIndex] : undefined
         }
       />

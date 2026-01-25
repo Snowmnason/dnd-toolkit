@@ -19,6 +19,9 @@ export * from "./navigation";
 // Authentication
 export * from "./auth";
 
+// Error & Safe Mode
+export * from "./error";
+
 // UI & Rendering
 export * from "./ui";
 
@@ -30,4 +33,3 @@ export * from "./jobs";
 
 // Utilities
 export * from "./utils";
-

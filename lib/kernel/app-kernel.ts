@@ -15,7 +15,15 @@
  * - ERROR: A critical phase failed
  */
 
-import { STORAGE_DEFAULTS } from "@/lib/kernel/storage-defaults";
+import { NetworkCascadeDetector } from "@/lib/error/network-cascade-detector";
+import type { SafeModeState } from "@/lib/error/safe-mode";
+import {
+  createSafeModeState,
+  DEFAULT_SAFE_MODE_CONFIG,
+  SafeModeLevel,
+  SafeModeReason,
+} from "@/lib/error/safe-mode";
+import { getStorageDefaults } from "@/lib/kernel/storage-defaults";
 import {
   NetworkDetection,
   NetworkStatus,
@@ -95,6 +103,7 @@ export interface AppKernelState {
   timing: Record<string, number>; // Phase timing in milliseconds
   capabilities: KernelCapabilities;
   networkStatus: NetworkStatus | null;
+  safeMode: SafeModeState | null; // Safe mode state (null = NORMAL)
 }
 
 type KernelListener = (state: AppKernelState) => void;
@@ -121,12 +130,15 @@ class AppKernelClass {
       platform: "unknown", // Will be detected on initialize()
     },
     networkStatus: null,
+    safeMode: null, // NORMAL state (no safe mode active)
   };
 
   private listeners: Set<KernelListener> = new Set();
   private initPromise: Promise<void> | null = null;
   private networkUnsubscribe: (() => void) | null = null;
   private authCompletionTime: number | null = null;
+  private bootstrapTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  private bootstrapTimeoutUnsubscribe: (() => void) | null = null;
 
   /**
    * Initialize the kernel once
@@ -172,6 +184,66 @@ class AppKernelClass {
 
       // Detect platform and initial capabilities
       await this.detectCapabilities();
+
+      // Set up kernel timeout - if we don't reach appReady in time, trigger RECOVERY
+      const timeoutMs = DEFAULT_SAFE_MODE_CONFIG.kernelTimeoutMs;
+
+      const startTimeout = () => {
+        this.bootstrapTimeoutHandle = setTimeout(() => {
+          if (!this.state.phases.appReady) {
+            // Check if safe mode was already triggered by another system
+            // Only trigger kernel timeout if not already in RECOVERY (highest level)
+            if (
+              this.state.safeMode &&
+              this.state.safeMode.level === SafeModeLevel.RECOVERY
+            ) {
+              logger
+                .category("bootstrap")
+                .debug(
+                  "Kernel timeout occurred but app already in RECOVERY safe mode",
+                );
+              return;
+            }
+
+            logger
+              .category("bootstrap")
+              .error(
+                "Kernel timeout - appReady not reached within configured time",
+                {
+                  timeoutMs,
+                  currentPhase: this.state.currentPhase,
+                  existingSafeMode: this.state.safeMode?.level,
+                },
+              );
+
+            const safeMode = createSafeModeState(
+              SafeModeReason.KERNEL_TIMEOUT,
+              {
+                details: `Kernel bootstrap exceeded ${timeoutMs}ms timeout at phase: ${this.state.currentPhase}`,
+              },
+            );
+            this.setSafeMode(safeMode);
+          }
+        }, timeoutMs);
+      };
+
+      // Subscribe to state changes to clear timeout when appReady
+      // Store unsubscribe function in class instance for cleanup during reset
+      this.bootstrapTimeoutUnsubscribe = this.subscribe(
+        (state: AppKernelState) => {
+          if (state.phases.appReady && this.bootstrapTimeoutHandle) {
+            clearTimeout(this.bootstrapTimeoutHandle);
+            this.bootstrapTimeoutHandle = null;
+            // Stop listening after appReady
+            if (this.bootstrapTimeoutUnsubscribe) {
+              this.bootstrapTimeoutUnsubscribe();
+              this.bootstrapTimeoutUnsubscribe = null;
+            }
+          }
+        },
+      );
+
+      startTimeout();
 
       // Phase 0: CONFIG (initialize Supabase env vars and client FIRST)
       // This MUST run before PRELOAD, STORAGE, and AUTH so that Supabase is ready
@@ -268,6 +340,11 @@ class AppKernelClass {
       // Phase 2: Storage (cache validation/migrations and initialization)
       await this.runPhase("storage", async () => {
         try {
+          // Initialize storage health monitoring (validates storage + starts polling)
+          const { initializeStorageHealthMonitoring } =
+            await import("@/lib/storage/storage-health-monitor");
+          await initializeStorageHealthMonitoring();
+
           // Initialize all storage keys with safe defaults on startup
           await this.initializeStorageDefaults();
 
@@ -382,6 +459,11 @@ class AppKernelClass {
           const { AuthStateManager } = await import("@/lib/auth/auth-state");
           await AuthStateManager.getAuthState();
           logger.category("bootstrap").debug("Auth state loaded");
+
+          // Initialize auth health monitoring (validates auth + starts polling)
+          const { initializeAuthHealthMonitoring } =
+            await import("@/lib/auth/auth-health-monitor");
+          await initializeAuthHealthMonitoring();
 
           // Track auth completion time (completes after appReady)
           this.authCompletionTime = performance.now() - authPhaseStart;
@@ -639,6 +721,23 @@ class AppKernelClass {
    */
   reset(): void {
     logger.category("bootstrap").info("AppKernel reset requested");
+
+    // Cleanup bootstrap timeout and subscription
+    if (this.bootstrapTimeoutHandle) {
+      clearTimeout(this.bootstrapTimeoutHandle);
+      this.bootstrapTimeoutHandle = null;
+    }
+    if (this.bootstrapTimeoutUnsubscribe) {
+      this.bootstrapTimeoutUnsubscribe();
+      this.bootstrapTimeoutUnsubscribe = null;
+    }
+
+    // Cleanup network subscription
+    if (this.networkUnsubscribe) {
+      this.networkUnsubscribe();
+      this.networkUnsubscribe = null;
+    }
+
     this.state = {
       currentPhase: KernelPhase.IDLE,
       phases: {
@@ -660,15 +759,10 @@ class AppKernelClass {
         platform: "unknown", // Will be detected on next initialize()
       },
       networkStatus: null,
+      safeMode: null, // Reset safe mode to NORMAL
     };
     this.initPromise = null;
     this.authCompletionTime = null;
-
-    // Cleanup network subscription
-    if (this.networkUnsubscribe) {
-      this.networkUnsubscribe();
-      this.networkUnsubscribe = null;
-    }
 
     this.notifyListeners();
   }
@@ -824,9 +918,10 @@ class AppKernelClass {
         "[KERNEL] initializeStorageDefaults() SecureStorage imported, iterating defaults",
       );
 
-      // Initialize each key if it doesn't exist. STORAGE_DEFAULTS is imported
-      // from storage-defaults.ts for centralized management.
-      for (const [key, defaultValue] of Object.entries(STORAGE_DEFAULTS)) {
+      // Initialize each key if it doesn't exist. Storage defaults are lazily
+      // loaded from storage-defaults.ts for centralized management.
+      const defaults = getStorageDefaults();
+      for (const [key, defaultValue] of Object.entries(defaults)) {
         const existing = await SecureStorage.getItem(key);
         if (existing === null && defaultValue !== null) {
           // Key doesn't exist and we have a default - set it
@@ -848,6 +943,107 @@ class AppKernelClass {
         });
       // Non-critical - app can still boot
     }
+  }
+
+  /**
+   * Set safe mode state
+   * Called when critical systems fail or recovery is needed
+   *
+   * Guard against double triggers:
+   * - If already in safe mode with same reason, ignore to prevent duplicate events
+   * - If escalating (e.g., DEGRADED → RECOVERY), allow the transition
+   * - Otherwise, replace the current safe mode state
+   */
+  setSafeMode(safeMode: SafeModeState | null): void {
+    const currentSafeMode = this.state.safeMode;
+
+    // Guard: If already in same safe mode, ignore to prevent duplicate triggers
+    if (
+      currentSafeMode &&
+      safeMode &&
+      currentSafeMode.reason === safeMode.reason &&
+      currentSafeMode.level === safeMode.level
+    ) {
+      logger.category("error").debug("Ignoring duplicate safe mode trigger", {
+        reason: safeMode.reason,
+        level: safeMode.level,
+      });
+      return;
+    }
+
+    this.state.safeMode = safeMode;
+
+    // Log safe mode transitions
+    if (safeMode) {
+      // Detect escalation vs. transition
+      const isEscalation =
+        currentSafeMode &&
+        this.getLevelSeverity(safeMode.level) >
+          this.getLevelSeverity(currentSafeMode.level);
+
+      logger
+        .category("error")
+        .warn(
+          isEscalation ? "App escalating safe mode" : "App entering safe mode",
+          {
+            level: safeMode.level,
+            reason: safeMode.reason,
+            features: safeMode.affectedFeatures,
+            previousLevel: currentSafeMode?.level,
+          },
+        );
+    } else {
+      logger.category("error").info("App exiting safe mode (recovered)");
+
+      // Reset network cascade detector when exiting safe mode
+      // This prevents the elevated failure counter from making it too easy to re-trigger safe mode
+      NetworkCascadeDetector.reset();
+      logger
+        .category("network")
+        .debug("Network cascade detector reset on safe mode exit");
+    }
+
+    this.notifyListeners();
+  }
+
+  /**
+   * Helper to determine severity of a safe mode level for escalation detection
+   * Higher number = more severe
+   */
+  private getLevelSeverity(level: SafeModeLevel): number {
+    switch (level) {
+      case SafeModeLevel.NORMAL:
+        return 0;
+      case SafeModeLevel.DEGRADED:
+        return 1;
+      case SafeModeLevel.SAFE:
+        return 2;
+      case SafeModeLevel.RECOVERY:
+        return 3;
+      default:
+        return 0;
+    }
+  }
+
+  /**
+   * Check if app is in safe mode
+   */
+  isSafeMode(): boolean {
+    return this.state.safeMode !== null;
+  }
+
+  /**
+   * Get current safe mode state (null if NORMAL)
+   */
+  getSafeMode(): SafeModeState | null {
+    return this.state.safeMode;
+  }
+
+  /**
+   * Check if app is in a specific safe mode level
+   */
+  isInSafeModeLevel(level: SafeModeLevel): boolean {
+    return this.state.safeMode?.level === level;
   }
 
   /**
