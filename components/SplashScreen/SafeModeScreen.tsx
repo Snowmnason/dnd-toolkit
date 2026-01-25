@@ -91,6 +91,10 @@ export function SafeModeScreen({
   const showDetailedErrors = config.overrides?.verboseErrorMessages ?? isDev;
 
   // Track safe mode entry when component mounts
+  // Use state.timestamp + state.level as dependencies instead of entire state object
+  // This ensures analytics are only sent once per safe mode session (unique timestamp per entry)
+  // Intentionally exclude state.reason, state.affectedFeatures, and state.recoveryOptions
+  // to prevent duplicate analytics events if those properties change within the same session
   useEffect(() => {
     const label = `safe_mode_${state.level}`;
     Performance.startMeasure(label);
@@ -111,7 +115,8 @@ export function SafeModeScreen({
     return () => {
       Performance.endMeasure(label, 60000); // 60s warning threshold for safe mode duration
     };
-  }, [state]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.timestamp, state.level]);
 
   const isRecovery = state.level === SafeModeLevel.RECOVERY;
 

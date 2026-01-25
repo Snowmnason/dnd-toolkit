@@ -10,10 +10,24 @@
  * - Exponential backoff retry
  * - Basic conflict detection (timestamp comparison)
  * - Cache invalidation on successful sync
+ *
+ * Network Cascade Detection (Phase 4):
+ * Tracks consecutive sync failures and automatically enters DEGRADED safe mode
+ * if a cascade is detected (repeated failures that could cause data inconsistencies).
+ * - NetworkCascadeDetector.recordFailure() called when sync completely fails
+ * - NetworkCascadeDetector.recordSuccess() called when sync completes (even partially)
+ * - Safe mode triggered when cascade threshold is exceeded
+ * - Detector auto-resets when app exits safe mode
  */
 
 import { QueryCache } from "@/lib/cache/query-cache";
 import { getAppConfig } from "@/lib/config";
+import {
+  createSafeModeState,
+  NetworkCascadeDetector,
+  SafeModeReason
+} from "@/lib/error";
+import { AppKernel } from "@/lib/kernel/app-kernel";
 import {
   NetworkDetection,
   type NetworkStatus,
@@ -214,9 +228,29 @@ class OnlineSyncManagerService {
         .info(
           `Sync complete: ${totalSynced}/${totalProcessed} succeeded in ${duration}ms`,
         );
+
+      // Network cascade detector: record success when sync completes
+      // This resets the failure counter even if some items failed
+      NetworkCascadeDetector.recordSuccess();
     } catch (error) {
       this.lastSyncStatus.lastError = (error as Error).message;
       logger.category("error").error("Sync failed:", error);
+
+      // Network cascade detector: record failure and check if cascade detected
+      const cascadeDetected = NetworkCascadeDetector.recordFailure();
+      if (cascadeDetected) {
+        logger
+          .category("network")
+          .error("Network cascade detected - entering DEGRADED safe mode", {
+            consecutiveFailures:
+              NetworkCascadeDetector.getConsecutiveFailures(),
+          });
+        AppKernel.setSafeMode(
+          createSafeModeState(SafeModeReason.NETWORK_CASCADE, {
+            details: `Consecutive sync failures: ${NetworkCascadeDetector.getConsecutiveFailures()}`,
+          }),
+        );
+      }
     } finally {
       this.isSyncing = false;
       this.lastSyncStatus.isSyncing = false;

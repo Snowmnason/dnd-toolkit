@@ -18,6 +18,15 @@
  *
  * This ensures that after recovery from a network cascade, the app has a clean
  * slate and can't easily re-trigger safe mode on the next few minor failures.
+ *
+ * ACTIVE INTEGRATION (Phase 4):
+ * The detector is integrated with OnlineSyncManager (lib/offline/sync-manager.ts):
+ * - recordFailure() called when sync completely fails
+ * - recordSuccess() called when sync completes (even partially)
+ * - Safe mode automatically triggered when cascade threshold exceeded
+ * - Detector resets when app exits safe mode via AppKernel.setSafeMode(null)
+ *
+ * This provides automatic network cascade resilience without requiring app restart.
  */
 
 import { logger } from "@/lib/utils/logger";

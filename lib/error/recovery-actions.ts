@@ -8,7 +8,7 @@
  * - CLEAR_CACHE: Clears query cache and app data, keeps structural/account data
  * - RESET_AUTH: Clears session, logs out user, redirects to login
  * - RESTORE_BACKUP: Restores app state from backup (if available)
- * - CONTACT_SUPPORT: Opens email client with diagnostic info
+ * - CONTACT_SUPPORT: Opens report-bug page with diagnostic info
  * - REINSTALL: Guides user to uninstall and reinstall app
  */
 
@@ -17,6 +17,7 @@ import { Analytics, Performance } from "../analytics";
 import { AuthStateManager } from "../auth/auth-state";
 import { QueryCache } from "../cache/query-cache";
 import { getAllRouteConfigs } from "../navigation/navigation-config";
+import { SecureStorage, STORAGE_KEYS } from "../storage";
 import { logger } from "../utils/logger";
 import { RecoveryAction, SafeModeState } from "./safe-mode";
 
@@ -159,6 +160,8 @@ async function handleClearCache(
     Performance.endMeasure(`recovery_action:${RecoveryAction.CLEAR_CACHE}`);
 
     // Navigate to world selection (safe starting point)
+    // NOTE: onSuccess callback is invoked after navigation to ensure side effects
+    // (like clearing safe mode state) don't interfere with the navigation itself
     const targetRoute = "/select/world-selection";
     if (!isValidRoute(targetRoute)) {
       logger
@@ -225,6 +228,8 @@ async function handleResetAuth(
     Performance.endMeasure(`recovery_action:${RecoveryAction.RESET_AUTH}`);
 
     // Redirect to login
+    // NOTE: onSuccess callback is invoked after navigation to ensure side effects
+    // (like clearing safe mode state) don't interfere with the navigation itself
     const targetRoute = "/login/sign-in";
     if (!isValidRoute(targetRoute)) {
       logger
@@ -319,6 +324,22 @@ async function handleContactSupport(
 
     const diagnostics = generateDiagnostics(safeMode);
 
+    // Store diagnostics in session storage so report-bug page can retrieve them
+    try {
+      await SecureStorage.setItem(
+        STORAGE_KEYS.SAFE_MODE_DIAGNOSTICS,
+        diagnostics,
+      );
+      logger
+        .category("error")
+        .info("[SafeMode] Diagnostics stored for report-bug page");
+    } catch (storageError) {
+      logger
+        .category("error")
+        .error("[SafeMode] Failed to store diagnostics:", storageError);
+      // Continue anyway - not critical to recovery
+    }
+
     // Track success
     Analytics.track("safe_mode_recovery_action_succeeded", {
       action: RecoveryAction.CONTACT_SUPPORT,
@@ -343,6 +364,8 @@ async function handleContactSupport(
     // Log diagnostics for reference
     logger.category("error").info("[SafeMode] Diagnostics:", diagnostics);
 
+    // NOTE: onSuccess callback is invoked after navigation to ensure side effects
+    // (like clearing safe mode state) don't interfere with the navigation itself
     router.push(targetRoute);
     onSuccess?.();
 

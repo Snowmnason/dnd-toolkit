@@ -101,6 +101,9 @@ export const STORAGE_KEYS = {
   LAST_SELECTED_WORLD: "dnd:session:last_selected_world",
   LAST_USER_ROLE: "dnd:session:last_user_role",
 
+  // Safe mode diagnostics (transient, cleared when user recovers or restarts)
+  SAFE_MODE_DIAGNOSTICS: "dnd:session:safe_mode_diagnostics",
+
   // Add more keys as needed...
 } as const;
 

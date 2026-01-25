@@ -53,7 +53,7 @@ export async function initializeStorageHealthMonitoring(): Promise<void> {
 
 /**
  * One-time storage health validation (run on app start).
- * Tests if SecureStorage is readable and attempts recovery if it fails.
+ * Tests if SecureStorage is readable and writable, and attempts recovery if it fails.
  */
 async function validateStorageHealth(): Promise<void> {
   try {
@@ -63,9 +63,30 @@ async function validateStorageHealth(): Promise<void> {
     const { SecureStorage } = await import("./SecureStorage");
     const { QueryCache } = await import("@/lib/cache/query-cache");
 
-    // Test read from SecureStorage
+    // Test write to SecureStorage (critical for functionality)
     try {
-      await SecureStorage.getItem(STORAGE_HEALTH_TEST_KEY);
+      const testValue = `health_check_${Date.now()}`;
+      await SecureStorage.setItem(STORAGE_HEALTH_TEST_KEY, testValue);
+
+      // Test read to verify write succeeded
+      const readValue = await SecureStorage.getItem(STORAGE_HEALTH_TEST_KEY);
+      if (readValue !== testValue) {
+        throw new Error(
+          `Storage write/read mismatch: wrote "${testValue}", read "${readValue}"`,
+        );
+      }
+
+      // Clean up test key
+      try {
+        await SecureStorage.removeItem(STORAGE_HEALTH_TEST_KEY);
+      } catch (cleanupError) {
+        // Non-critical if cleanup fails, but log it
+        logger
+          .category("storage")
+          .debug("Storage health test key cleanup failed (non-critical)", {
+            error: String(cleanupError),
+          });
+      }
     } catch (storageError) {
       logger
         .category("storage")

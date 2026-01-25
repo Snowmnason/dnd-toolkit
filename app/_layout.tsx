@@ -7,6 +7,7 @@ import {
   Analytics,
   APP_VERSION,
   AppErrorBoundary,
+  AppKernel,
   AppKernelProvider,
   buildNavigationTarget,
   executeRecoveryAction,
@@ -303,10 +304,12 @@ function RootLayoutContent() {
                 kernel.safeMode!,
                 router,
                 () => {
-                  // On success, kernel will handle state reset
+                  // On success, clear the safe mode state to exit safe mode
+                  // This allows the app to resume normal operation after recovery
                   logger
                     .category("bootstrap")
                     .info(`[SafeMode] Recovery action succeeded: ${action}`);
+                  AppKernel.setSafeMode(null);
                 },
               );
 

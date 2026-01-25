@@ -61,6 +61,8 @@ export async function initializeAuthHealthMonitoring(): Promise<void> {
 /**
  * One-time auth health validation (run during bootstrap).
  * Checks if current session is valid.
+ * Only triggers safe mode if a user was previously authenticated but the session is now invalid.
+ * Does NOT trigger safe mode for unauthenticated first-time users (intentional state).
  * If expired, triggers SAFE safe mode and UI layer redirects to login.
  */
 async function validateAuthHealth(): Promise<void> {
@@ -70,19 +72,35 @@ async function validateAuthHealth(): Promise<void> {
     // Lazy-import to avoid circular dependency
     const { AuthStateManager } = await import("./auth-state");
 
-    // Check if user is authenticated
+    // Check if user had a previous session/account
+    const authState = await AuthStateManager.getAuthState();
+    const hadPreviousAccount = authState.hasAccount;
+
+    // Check if user is currently authenticated
     const isAuthenticated = await AuthStateManager.isAuthenticated();
 
     if (!isAuthenticated) {
-      logger
-        .category("auth")
-        .warn("Auth health check failed: session not authenticated");
+      // Only trigger safe mode if user HAD an account but is now unauthenticated
+      // (Session expired or invalidated)
+      // Do NOT trigger safe mode for intentionally unauthenticated users (fresh install, logged out)
+      if (hadPreviousAccount) {
+        logger
+          .category("auth")
+          .warn(
+            "Auth health check failed: previously authenticated user session is now invalid",
+          );
 
-      // Trigger safe mode - UI routing layer will detect and redirect to login
-      const safeMode = createSafeModeState(SafeModeReason.AUTH_EXPIRED, {
-        details: "User session is not authenticated or has expired",
-      });
-      AppKernel.setSafeMode(safeMode);
+        // Trigger safe mode - UI routing layer will detect and redirect to login
+        const safeMode = createSafeModeState(SafeModeReason.AUTH_EXPIRED, {
+          details:
+            "User session was valid but has expired. Please log in again.",
+        });
+        AppKernel.setSafeMode(safeMode);
+      } else {
+        logger
+          .category("auth")
+          .debug("Auth health check: user is not authenticated (intentional)");
+      }
       return;
     }
 

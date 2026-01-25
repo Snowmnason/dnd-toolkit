@@ -19,8 +19,8 @@
 const STORAGE_KEY_CONSTANTS = {
   // World Management
   CONNECTED_WORLDS: "dnd:app:connected_worlds",
-  LAST_SELECTED_WORLD: "dnd:app:last_selected_world",
-  LAST_USER_ROLE: "dnd:app:last_user_role",
+  LAST_SELECTED_WORLD: "dnd:session:last_selected_world",
+  LAST_USER_ROLE: "dnd:session:last_user_role",
 
   // Authentication & Account
   HAS_ACCOUNT: "dnd:auth:has_account",
@@ -34,6 +34,9 @@ const STORAGE_KEY_CONSTANTS = {
   THEME_PREFERENCE: "dnd:user:theme",
   THEME_MODE: "dnd:user:theme_mode",
   SCALE_PREFERENCE: "dnd:user:scale",
+
+  // Safe Mode
+  SAFE_MODE_DIAGNOSTICS: "dnd:session:safe_mode_diagnostics",
 
   // Developer
   DEV_MODE: "dnd:dev:mode",
@@ -74,6 +77,9 @@ function createStorageDefaults(): Record<string, StorageDefaultValue> {
     [STORAGE_KEY_CONSTANTS.THEME_PREFERENCE]: JSON.stringify("classic"),
     [STORAGE_KEY_CONSTANTS.THEME_MODE]: JSON.stringify("dark"),
     [STORAGE_KEY_CONSTANTS.SCALE_PREFERENCE]: JSON.stringify(1),
+
+    // Safe Mode
+    [STORAGE_KEY_CONSTANTS.SAFE_MODE_DIAGNOSTICS]: null,
 
     // Developer
     [STORAGE_KEY_CONSTANTS.DEV_MODE]: JSON.stringify(false),
