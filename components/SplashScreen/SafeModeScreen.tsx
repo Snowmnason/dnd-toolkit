@@ -1,3 +1,4 @@
+import { Analytics, Performance } from "@/lib/analytics";
 import { getAppConfig } from "@/lib/config/loader";
 import {
   RecoveryAction,
@@ -5,6 +6,7 @@ import {
   SafeModeReason,
   SafeModeState,
 } from "@/lib/error/safe-mode";
+import { useEffect } from "react";
 import VersionDisplay from "../VersionDisplay";
 import { ErrorFallbackShell } from "./ErrorFallbackShell";
 
@@ -88,6 +90,26 @@ export function SafeModeScreen({
     (process.env.EXPO_PUBLIC_ENVIRONMENT || "production") === "development";
   const showDetailedErrors = config.overrides?.verboseErrorMessages ?? isDev;
 
+  // Track safe mode entry when component mounts
+  useEffect(() => {
+    const label = `safe_mode_${state.level}`;
+    Performance.startMeasure(label);
+
+    // Track safe mode event with reason and affected features
+    Analytics.track("safe_mode_entered", {
+      level: state.level,
+      reason: state.reason,
+      affected_features: state.affectedFeatures?.join(",") || "none",
+      recovery_options_count: state.recoveryOptions?.length || 0,
+      timestamp: state.timestamp,
+    });
+
+    // On unmount, record time spent in safe mode
+    return () => {
+      Performance.endMeasure(label, 60000); // 60s warning threshold for safe mode duration
+    };
+  }, [state]);
+
   const isRecovery = state.level === SafeModeLevel.RECOVERY;
 
   const description = getSafeModeDescription(state.reason);
@@ -108,13 +130,27 @@ export function SafeModeScreen({
 
   // Determine primary action
   let primaryButtonText = "Back to Navigation";
-  let onPrimaryAction: () => void = () => onNavigateHome?.();
+  let onPrimaryAction: () => void = () => {
+    Analytics.track("safe_mode_action", {
+      action: "navigate_home",
+      level: state.level,
+      reason: state.reason,
+    });
+    onNavigateHome?.();
+  };
 
   // If in recovery state, use first recovery option as primary
   if (isRecovery && state.recoveryOptions?.[0]) {
     const firstAction = state.recoveryOptions[0];
     primaryButtonText = getRecoveryActionLabel(firstAction);
-    onPrimaryAction = () => onRecoveryAction?.(firstAction);
+    onPrimaryAction = () => {
+      Analytics.track("safe_mode_recovery_action_selected", {
+        action: firstAction,
+        level: state.level,
+        reason: state.reason,
+      });
+      onRecoveryAction?.(firstAction);
+    };
   }
 
   // Secondary button (if recovery has multiple options)
@@ -125,7 +161,15 @@ export function SafeModeScreen({
 
   const onSecondaryAction =
     isRecovery && state.recoveryOptions?.[1]
-      ? () => onRecoveryAction?.(state.recoveryOptions![1])
+      ? () => {
+          const secondAction = state.recoveryOptions![1];
+          Analytics.track("safe_mode_recovery_action_selected", {
+            action: secondAction,
+            level: state.level,
+            reason: state.reason,
+          });
+          onRecoveryAction?.(secondAction);
+        }
       : undefined;
 
   return (

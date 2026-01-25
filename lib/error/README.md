@@ -223,6 +223,23 @@ function SyncButton() {
 - Component hooks use `useEffect` + state to avoid rerenders on unrelated kernel updates
 - Avoid checking safe mode in high-frequency renderers (like list items)
 
+## Observability & Analytics
+
+Safe mode events are automatically tracked via [lib/analytics](../analytics) when users interact with the system:
+
+**Events Tracked:**
+- `safe_mode_entered` – When app enters safe mode (reason, affected features, recovery options)
+- `safe_mode_action` – When user taps "Back to Navigation" (DEGRADED/SAFE states)
+- `safe_mode_recovery_action_selected` – When user selects a recovery action (RECOVERY state)
+- `safe_mode_recovery_action_succeeded` – When recovery completes successfully
+- `safe_mode_recovery_action_failed` – When recovery fails (includes error context)
+
+**Performance Metrics:**
+- `safe_mode_${level}` – Total time spent in safe mode UI (fires if > 60s)
+- `recovery_action:${action}` – Duration of recovery action execution
+
+All events respect analytics consent and don't include sensitive data. See [docs/issues/MileStone 2/173 - Safe Mode Implementation/IMPLEMENTATION_OVERVIEW.md](../../docs/issues/MileStone%202/173%20-%20Safe%20Mode%20Implementation/IMPLEMENTATION_OVERVIEW.md) for event schemas and dashboard queries.
+
 ## Related Modules
 
 - [lib/kernel/app-kernel.ts](../kernel/app-kernel.ts) – Bootstrap and state management
@@ -248,7 +265,7 @@ Safe mode should be tested in:
 - **E2E tests** – User flow: trigger failure → see safe mode UI → recover
 - **Manual testing** – Test each recovery action on each platform
 
-See [docs/A Testing Guide](../../docs/A%20Testing%20Guide/) for detailed testing procedures.
+See [docs/A Testing Guide/SAFE_MODE_TESTING.md](../../docs/A%20Testing%20Guide/SAFE_MODE_TESTING.md) for detailed testing procedures, test cases, and dev testing tools.
 
 ## Future Enhancements
 

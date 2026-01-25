@@ -14,6 +14,7 @@
 
 import { Router } from "expo-router";
 import { Linking } from "react-native";
+import { Analytics, Performance } from "../analytics";
 import { AuthStateManager } from "../auth/auth-state";
 import { QueryCache } from "../cache/query-cache";
 import { logger } from "../utils/logger";
@@ -44,6 +45,9 @@ export async function executeRecoveryAction(
   router: Router,
   onSuccess?: () => void,
 ): Promise<RecoveryResult> {
+  const label = `recovery_action:${action}`;
+  Performance.startMeasure(label);
+
   try {
     switch (action) {
       case RecoveryAction.CLEAR_CACHE:
@@ -72,6 +76,15 @@ export async function executeRecoveryAction(
     logger
       .category("error")
       .error(`[SafeMode] Recovery action ${action} failed:`, error);
+
+    // Track recovery failure
+    Analytics.track("safe_mode_recovery_action_failed", {
+      action,
+      reason: safeMode.reason,
+      error_message: error instanceof Error ? error.message : "Unknown error",
+    });
+
+    Performance.endMeasure(label);
 
     return {
       success: false,
@@ -107,6 +120,13 @@ async function handleClearCache(
 
     logger.category("error").info("[SafeMode] CLEAR_CACHE recovery successful");
 
+    // Track recovery success
+    Analytics.track("safe_mode_recovery_action_succeeded", {
+      action: RecoveryAction.CLEAR_CACHE,
+    });
+
+    Performance.endMeasure(`recovery_action:${RecoveryAction.CLEAR_CACHE}`);
+
     // Navigate to world selection (safe starting point)
     router.push("/select/world-selection");
     onSuccess?.();
@@ -140,6 +160,13 @@ async function handleResetAuth(
     // Use AuthStateManager's logout flow which handles everything
     await AuthStateManager.clearAuthState();
     logger.category("error").info("[SafeMode] Authentication cleared");
+
+    // Track recovery success
+    Analytics.track("safe_mode_recovery_action_succeeded", {
+      action: RecoveryAction.RESET_AUTH,
+    });
+
+    Performance.endMeasure(`recovery_action:${RecoveryAction.RESET_AUTH}`);
 
     // Redirect to login
     router.push("/login/sign-in");
@@ -213,8 +240,16 @@ async function handleContactSupport(
     const canOpen = await Linking.canOpenURL(emailUrl);
     if (canOpen) {
       await Linking.openURL(emailUrl);
+      // Track success
+      Analytics.track("safe_mode_recovery_action_succeeded", {
+        action: RecoveryAction.CONTACT_SUPPORT,
+      });
     } else {
       logger.category("error").warn("[SafeMode] Cannot open email client");
+      Analytics.track("safe_mode_recovery_action_failed", {
+        action: RecoveryAction.CONTACT_SUPPORT,
+        error_message: "Cannot open email client",
+      });
       return {
         success: false,
         action: RecoveryAction.CONTACT_SUPPORT,
@@ -222,6 +257,8 @@ async function handleContactSupport(
           "Could not open email client. Please email support@example.com",
       };
     }
+
+    Performance.endMeasure(`recovery_action:${RecoveryAction.CONTACT_SUPPORT}`);
 
     return {
       success: true,
