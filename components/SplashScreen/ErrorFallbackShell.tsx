@@ -1,7 +1,7 @@
-import { Body, Button, Card, Title } from '@/components/ui';
-import { UseTheme, useScale } from '@/theme';
-import { useMemo } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Body, Button, Card, Title } from "@/components/ui";
+import { UseTheme, useScale } from "@/theme";
+import { useMemo } from "react";
+import { ScrollView, View } from "react-native";
 
 // Fun D&D-themed error messages (shared across all error fallbacks)
 const ERROR_MESSAGES = [
@@ -18,6 +18,20 @@ const ERROR_MESSAGES = [
   "Oops! Your spell fizzled!",
   "Oops! The mimic was actually the treasure chest!",
 ];
+
+// Safe mode-specific messages (when app enters degraded/recovery)
+const SAFE_MODE_MESSAGES = [
+  "⚠️ The DM needs to pause the session",
+  "⚠️ A critical scroll was lost!",
+  "⚠️ The tavern is temporarily closed",
+  "⚠️ Your map is unraveling!",
+  "⚠️ The dungeon is unstable",
+  "⚠️ Your dice are acting strange",
+  "⚠️ The spell backfired!",
+  "⚠️ A magical barrier appeared",
+];
+
+type ErrorMessagePack = "default" | "safe-mode";
 
 export interface ErrorFallbackShellProps {
   /** The error object to display */
@@ -36,15 +50,18 @@ export interface ErrorFallbackShellProps {
   onSecondaryAction?: () => void;
   /** Optional footer content (e.g., VersionDisplay) */
   footer?: React.ReactNode;
+  /** Message pack to use ('default' or 'safe-mode') */
+  messagePack?: ErrorMessagePack;
 }
 
 /**
  * Shared error fallback UI shell
- * 
+ *
  * Consolidates the visual and messaging patterns used by both RouteErrorBoundary
  * and CrashFallBack, ensuring consistency across error handling.
- * 
+ *
  * Props allow callers to customize recovery behavior without duplicating UI code.
+ * Use messagePack='safe-mode' for Safe Mode screens, 'default' for regular errors.
  */
 export function ErrorFallbackShell({
   error,
@@ -55,21 +72,24 @@ export function ErrorFallbackShell({
   secondaryButtonText,
   onSecondaryAction,
   footer,
+  messagePack = "default",
 }: ErrorFallbackShellProps) {
   const { theme } = UseTheme();
   const S = useScale();
 
-  // Pick a random fun message
+  // Pick a random fun message from the selected pack
+  const messages =
+    messagePack === "safe-mode" ? SAFE_MODE_MESSAGES : ERROR_MESSAGES;
   const funMessage = useMemo(
-    () => ERROR_MESSAGES[Math.floor(Math.random() * ERROR_MESSAGES.length)],
-    []
+    () => messages[Math.floor(Math.random() * messages.length)],
+    [messages],
   );
 
   return (
     <View
       style={{
-        alignItems: 'center',
-        justifyContent: 'center',
+        alignItems: "center",
+        justifyContent: "center",
         flex: 1,
         backgroundColor: theme.background,
         padding: S.space.lg,
@@ -79,7 +99,7 @@ export function ErrorFallbackShell({
         padded
         bordered
         style={{
-          width: '100%',
+          width: "100%",
           padding: S.space.xl,
         }}
       >
@@ -113,13 +133,13 @@ export function ErrorFallbackShell({
             padded
             style={{
               marginBottom: S.space.lg,
-              width: '100%',
+              width: "100%",
               backgroundColor: theme.surface,
             }}
           >
             <Body
               style={{
-                fontFamily: 'monospace',
+                fontFamily: "monospace",
                 fontSize: 12,
                 opacity: 0.8,
                 color: theme.textSecondary,
@@ -131,7 +151,7 @@ export function ErrorFallbackShell({
               <ScrollView style={{ maxHeight: 150, marginTop: S.space.sm }}>
                 <Body
                   style={{
-                    fontFamily: 'monospace',
+                    fontFamily: "monospace",
                     fontSize: 10,
                     opacity: 0.6,
                     color: theme.textSecondary,
@@ -148,18 +168,30 @@ export function ErrorFallbackShell({
         <View
           style={{
             gap: S.space.sm,
-            flexDirection: 'column',
-            alignItems: 'stretch',
+            flexDirection: "column",
+            alignItems: "stretch",
           }}
         >
-          <Button text={primaryButtonText} variant="primary" onPress={onPrimaryAction} />
+          <Button
+            text={primaryButtonText}
+            variant="primary"
+            onPress={onPrimaryAction}
+          />
           {secondaryButtonText && onSecondaryAction && (
-            <Button text={secondaryButtonText} variant="secondary" onPress={onSecondaryAction} />
+            <Button
+              text={secondaryButtonText}
+              variant="secondary"
+              onPress={onSecondaryAction}
+            />
           )}
         </View>
 
         {/* Footer (e.g., VersionDisplay) */}
-        {footer && <View style={{ alignItems: 'center', marginTop: S.space.xs }}>{footer}</View>}
+        {footer && (
+          <View style={{ alignItems: "center", marginTop: S.space.xs }}>
+            {footer}
+          </View>
+        )}
       </Card>
     </View>
   );

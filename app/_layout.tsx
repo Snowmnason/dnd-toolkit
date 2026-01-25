@@ -34,6 +34,7 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import {
   CrashFallBack,
   RouteErrorBoundary,
+  SafeModeScreen,
   SplashScreen,
 } from "../components/SplashScreen";
 import {
@@ -235,6 +236,26 @@ function RootLayoutContent() {
         message="Loading D&D Toolkit..."
         error={kernel.error}
         assetsLoaded={kernel.phases.preloadReady}
+      />
+    );
+  }
+
+  // Show safe mode screen if app entered safe mode (takes priority over normal rendering)
+  if (kernel.safeMode) {
+    return (
+      <SafeModeScreen
+        state={kernel.safeMode}
+        onNavigateHome={() => {
+          // Navigate back to world selection when user taps "Back to Navigation"
+          router.replace("/select/world-selection");
+        }}
+        onRecoveryAction={(action) => {
+          // Recovery actions handled elsewhere (Phase 4)
+          logger.info(
+            "bootstrap",
+            `[SafeMode] User selected recovery action: ${action}`,
+          );
+        }}
       />
     );
   }
