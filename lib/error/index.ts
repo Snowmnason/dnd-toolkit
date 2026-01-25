@@ -5,10 +5,7 @@ export {
     getGatedFeatures,
     type FeatureGatingStatus
 } from "./feature-gating";
-export {
-    createFeatureGatingGuard,
-    useFeatureGatingGuard
-} from "./navigation-guards";
+export { createFeatureGatingGuard } from "./navigation-guards";
 export { NetworkCascadeDetector } from "./network-cascade-detector";
 export {
     executeRecoveryAction,
