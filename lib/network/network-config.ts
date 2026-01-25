@@ -3,8 +3,10 @@
  *
  * Centralized configuration for network detection and monitoring.
  * These constants define behavior for ping detection, timeouts, and external endpoints.
+ * Configuration is loaded from appsettings.json/appsettings.dev.json.
  */
 
+import { getAppConfig } from "@/lib/config";
 import Constants from "expo-constants";
 
 /**
@@ -47,16 +49,28 @@ export function getSupabaseHealthEndpoint(): string {
 export const SUPABASE_HEALTH_ENDPOINT = getSupabaseHealthEndpoint();
 
 /**
- * Web platform ping interval (5 minutes)
+ * Get web platform ping interval from config (default: 5 minutes)
  * How often to perform network health checks when app is visible
  */
-export const WEB_PING_INTERVAL = 5 * 60 * 1000;
+export function getWebPingInterval(): number {
+  return getAppConfig().network?.pingIntervalMs ?? 5 * 60 * 1000;
+}
 
 /**
- * Web platform ping timeout (5 seconds)
+ * Get web platform ping timeout from config (default: 5 seconds)
  * Maximum time to wait for ping response before considering it failed
  */
-export const WEB_PING_TIMEOUT = 5000;
+export function getWebPingTimeout(): number {
+  return getAppConfig().network?.pingTimeoutMs ?? 5000;
+}
+
+/**
+ * Get status check timeout from config (default: 30 seconds)
+ * Maximum time for network status checks before timeout
+ */
+export function getStatusCheckTimeout(): number {
+  return getAppConfig().network?.statusCheckTimeoutMs ?? 30000;
+}
 
 /**
  * Latency threshold for poor connection detection (500ms)

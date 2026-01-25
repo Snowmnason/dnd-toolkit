@@ -9,20 +9,24 @@
  */
 
 export {
-    ConnectionQuality, NetworkDetection,
+    ConnectionQuality,
+    NetworkDetection,
     useNetworkStatus
 } from "./network-detection";
 export type { NetworkStatus, NetworkStatusCallback } from "./network-detection";
 
 export {
-    handleErrorGracefully, isNetworkError, logNetworkError, shouldServeStaleOnError
+    handleErrorGracefully,
+    isNetworkError,
+    logNetworkError,
+    shouldServeStaleOnError
 } from "./error-handling";
 export type { GracefulErrorOptions } from "./error-handling";
 
 export {
-    LATENCY_THRESHOLD,
-    LOW_BATTERY_THRESHOLD, SUPABASE_HEALTH_ENDPOINT,
-    WEB_PING_INTERVAL,
-    WEB_PING_TIMEOUT, getSupabaseHealthEndpoint
+    getSupabaseHealthEndpoint, getWebPingInterval,
+    getWebPingTimeout, LATENCY_THRESHOLD,
+    LOW_BATTERY_THRESHOLD,
+    SUPABASE_HEALTH_ENDPOINT
 } from "./network-config";
 

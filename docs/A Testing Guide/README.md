@@ -2,6 +2,8 @@
 
 Welcome! This folder contains step-by-step testing guides for non-developers (QA testers, product managers, etc.). These guides help you verify that app features work correctly without needing to understand code or use developer tools.
 
+Install vitest package
+
 ## What's Inside
 
 - **App/** – Tests for desktop (Electron) and mobile (iOS/Android) apps

@@ -42,7 +42,8 @@
     "clean:web": "node ./scripts/clean.js web",
     "clean:deps": "node ./scripts/clean.js deps",
     "clean:cache": "node ./scripts/clean.js cache",
-    "version:bump": "node ./scripts/bump-version.js"
+    "version:bump": "node ./scripts/bump-version.js",
+    "test": "vitest"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -96,7 +97,8 @@
     "eslint-config-expo": "~10.0.0",
     "eslint-plugin-security": "^3.0.1",
     "gh-pages": "^6.3.0",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "vitest": "^4.0.18"
   },
   "private": true
 }

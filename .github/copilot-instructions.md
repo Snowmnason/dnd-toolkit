@@ -98,6 +98,12 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 
 ## Documentation Rule
 
+**AVOID MAKING PHASE COMPLETION DOCS** UNLESS ABSOLUTELY NECESSARY.\*\* Most documentation should go into module READMEs, issue docs, or suggestion files as outlined below. Only create milestone completion docs when a feature is large/complex enough to warrant end-to-end explanation beyond module-level docs. Phase completion docs tend to become outdated and are hard to maintain. (and waste tokens) Phase completion docs should only be created when:
+
+- The feature spans multiple modules and requires cross-module explanation
+- There are complex architectural decisions that need to be documented in one place
+- There is significant usage guidance that cannot be captured in module READMEs or issue docs
+
 ### For New lib/\* Enhancements
 
 **Every new enhancement (anything added to `lib/`) must include:**

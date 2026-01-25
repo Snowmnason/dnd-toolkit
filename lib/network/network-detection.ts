@@ -15,11 +15,11 @@
  */
 
 import {
-    LATENCY_THRESHOLD,
-    LOW_BATTERY_THRESHOLD,
-    SUPABASE_HEALTH_ENDPOINT,
-    WEB_PING_INTERVAL,
-    WEB_PING_TIMEOUT,
+  LATENCY_THRESHOLD,
+  LOW_BATTERY_THRESHOLD,
+  getSupabaseHealthEndpoint,
+  getWebPingInterval,
+  getWebPingTimeout,
 } from "@/lib/network/network-config";
 import { logger } from "@/lib/utils/logger";
 import * as React from "react";
@@ -386,13 +386,13 @@ class NetworkDetectionClass {
     // Start ping timer
     this.webPingTimer = setInterval(() => {
       this.performWebPing();
-    }, WEB_PING_INTERVAL);
+    }, getWebPingInterval());
 
     // Do initial ping
     this.performWebPing();
 
     logger.category("network").debug("Web periodic ping initialized", {
-      interval: WEB_PING_INTERVAL,
+      interval: getWebPingInterval(),
     });
   }
 
@@ -402,13 +402,13 @@ class NetworkDetectionClass {
   private async performWebPing(): Promise<void> {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), WEB_PING_TIMEOUT);
+      const timeout = setTimeout(() => controller.abort(), getWebPingTimeout());
       const startTime = performance.now();
 
       // Use Supabase health endpoint instead of Cloudflare for CSP compliance
       // Supabase is already whitelisted in CSP for API calls
       // Endpoint is configured in network-config.ts
-      const response = await fetch(SUPABASE_HEALTH_ENDPOINT, {
+      const response = await fetch(getSupabaseHealthEndpoint(), {
         method: "HEAD",
         signal: controller.signal,
       });

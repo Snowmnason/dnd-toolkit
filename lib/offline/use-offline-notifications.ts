@@ -8,6 +8,7 @@
  *   // Render: <AppToast {...offlineToastProps} />
  */
 
+import { getAppConfig } from "@/lib/config";
 import { NetworkDetection, NetworkStatus } from "@/lib/network";
 import { useEffect, useRef, useState } from "react";
 
@@ -19,11 +20,13 @@ interface OfflineToastState {
 }
 
 export function useOfflineNotifications(): OfflineToastState {
+  const toastDuration = getAppConfig().ui?.toastDurationMs ?? 2500;
+
   const [toastState, setToastState] = useState<OfflineToastState>({
     visible: false,
     message: "",
     type: "info",
-    duration: 2500,
+    duration: toastDuration,
   });
 
   // Use ref to track the timer ID for cleanup (prevents memory leaks)

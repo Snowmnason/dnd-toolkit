@@ -24,6 +24,36 @@
 - Direct Supabase calls without offline support (wrap with `enqueueIfOffline()` or use [lib/api](../api/README.md) for online-only operations)
 - Analytics or telemetry data (should use their own event queue; see [lib/analytics](../analytics/README.md) instead)
 - Non-DB mutations (network requests, client-side operations without server sync)
+- Background refresh/sync operations that don't involve user mutations (use [lib/jobs](../jobs/README.md) instead)
+
+---
+
+## Relationship to Background Job Queue
+
+The **OfflineMutationQueue** (this module) handles **user-driven mutations** (create/update/delete) that need to sync to server.
+
+The **[BackgroundJobQueue](../jobs/README.md)** handles **automatic, deferred work** like refreshing feature flags or periodic syncs that don't originate from user actions.
+
+**Key Differences:**
+
+| Aspect               | OfflineMutationQueue                                       | BackgroundJobQueue                                    |
+| -------------------- | ---------------------------------------------------------- | ----------------------------------------------------- |
+| **Purpose**          | Queue user mutations (create/update/delete)                | Schedule background tasks (refreshes, cleanup)        |
+| **Trigger**          | User action (explicit call to enqueueIfOffline)            | System events (app resume, network reconnect)         |
+| **Idempotency**      | Handled per-table by sync handlers                         | Built-in via idempotency keys                         |
+| **Retry Logic**      | Exponential backoff with conflict detection                | Exponential backoff with network deferral             |
+| **Offline Behavior** | Always queued if offline                                   | Can defer (requiresNetwork: true) or run offline      |
+| **Example**          | User edits note → queued while offline → syncs when online | Feature flags stale → job enqueued → runs when online |
+
+**Integration Point:**
+
+`OnlineSyncManager.resume()` automatically enqueues a `feature_flags_refresh` job when the app resumes, using the BackgroundJobQueue. This ensures:
+
+- Feature flags are refreshed when user returns to app
+- Refresh is deferred gracefully if offline
+- No separate timer or listener needed
+
+See [lib/jobs](../jobs/README.md) usage guide for details on registering and enqueueing background jobs.
 
 ---
 

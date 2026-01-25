@@ -337,6 +337,33 @@ class AppKernelClass {
                 error: (error as Error).message,
               });
           }
+
+          // Register feature_flags_refresh job handler (Phase 4: Integration)
+          try {
+            const { getJobQueue } = await import("@/lib/jobs");
+            const queue = getJobQueue();
+            queue.registerHandler("feature_flags_refresh", async (payload) => {
+              // Import SubscriptionManager to refresh subscription state
+              const { SubscriptionManager } = await import("@/lib/premium");
+              await SubscriptionManager.refresh();
+              logger
+                .category("jobs")
+                .info("feature_flags_refresh job completed");
+              return { updatedAt: Date.now() };
+            });
+            logger
+              .category("bootstrap")
+              .debug("feature_flags_refresh job handler registered");
+          } catch (error) {
+            logger
+              .category("bootstrap")
+              .warn(
+                "Failed to register feature_flags_refresh job handler (non-critical)",
+                {
+                  error: (error as Error).message,
+                },
+              );
+          }
         } catch (error) {
           logger
             .category("bootstrap")

@@ -25,6 +25,9 @@ export * from "./ui";
 // Assets & Images
 export * from "./assets";
 
+// Background Jobs
+export * from "./jobs";
+
 // Utilities
 export * from "./utils";
 

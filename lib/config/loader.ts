@@ -17,7 +17,7 @@
 
 export interface AppSettings {
   description: string;
-  environment: 'development' | 'production';
+  environment: "development" | "production";
   features: {
     consoleLogging: boolean;
     devBypass: boolean;
@@ -36,6 +36,40 @@ export interface AppSettings {
     enableReduxDevTools: boolean;
     enableReactDevTools: boolean;
   };
+  backgroundJobs?: {
+    reconnectDebounceMs?: number;
+    pollIntervalMs?: number;
+    description?: string;
+  };
+  network?: {
+    pingIntervalMs?: number;
+    pingTimeoutMs?: number;
+    statusCheckTimeoutMs?: number;
+    description?: string;
+  };
+  api?: {
+    requestTimeoutMs?: number;
+    retryDelayMs?: number;
+    staleTimeMs?: number;
+    cacheTimeMs?: number;
+    cleanupIntervalMs?: number;
+    staleThresholdMs?: number;
+    description?: string;
+  };
+  sync?: {
+    debounceMs?: number;
+    retryBaseMs?: number;
+    description?: string;
+  };
+  storage?: {
+    cleanupIntervalMs?: number;
+    description?: string;
+  };
+  ui?: {
+    toastDurationMs?: number;
+    syncToastDurationMs?: number;
+    description?: string;
+  };
   thresholds?: {
     slowScreenMs?: number;
     slowRequestMs?: number;
@@ -45,7 +79,7 @@ export interface AppSettings {
     {
       enabled: boolean;
       description?: string;
-      kind?: 'free' | 'premium' | 'beta';
+      kind?: "free" | "premium" | "beta";
     }
   >;
 }
@@ -56,56 +90,63 @@ let cachedConfig: AppSettings | null = null;
  * Get the current app settings.
  * Respects EXPO_PUBLIC_ENVIRONMENT; defaults to 'production' for safety.
  * Result is cached after first call.
- * 
+ *
  * Throws if the required appsettings file is missing or malformed.
  */
 export function getAppConfig(): AppSettings {
   if (cachedConfig) return cachedConfig;
 
-  const environment = process.env.EXPO_PUBLIC_ENVIRONMENT || 'production';
+  const environment = process.env.EXPO_PUBLIC_ENVIRONMENT || "production";
   let config: AppSettings;
 
   try {
-    if (environment === 'development') {
-      config = require('../../config/appsettings.dev.json') as AppSettings;
+    if (environment === "development") {
+      config = require("../../config/appsettings.dev.json") as AppSettings;
     } else {
-      config = require('../../config/appsettings.json') as AppSettings;
+      config = require("../../config/appsettings.json") as AppSettings;
     }
   } catch (err) {
-    const configFile = environment === 'development' 
-      ? 'config/appsettings.dev.json' 
-      : 'config/appsettings.json';
+    const configFile =
+      environment === "development"
+        ? "config/appsettings.dev.json"
+        : "config/appsettings.json";
     const errorMessage = err instanceof Error ? err.message : String(err);
-    
-    const failureMsg = 
-      environment === 'development'
+
+    const failureMsg =
+      environment === "development"
         ? `[AppConfig] Failed to load development settings (${configFile}). ` +
-          'Ensure the file exists and is valid JSON. ' +
-          'Common causes: missing file, syntax error, or incorrect strip-dev-appsettings cleanup.\n' +
+          "Ensure the file exists and is valid JSON. " +
+          "Common causes: missing file, syntax error, or incorrect strip-dev-appsettings cleanup.\n" +
           `Original error: ${errorMessage}`
         : `[AppConfig] Failed to load production settings (${configFile}). ` +
-          'This file is required and should be present in all production builds.\n' +
+          "This file is required and should be present in all production builds.\n" +
           `Original error: ${errorMessage}`;
-    
+
     console.error(failureMsg);
     throw new Error(failureMsg);
   }
 
   // Validate that the loaded config has the expected structure
-  if (!config.environment || !config.features || !config.overrides || !config.devTools) {
+  if (
+    !config.environment ||
+    !config.features ||
+    !config.overrides ||
+    !config.devTools
+  ) {
     const missingFields = [];
-    if (!config.environment) missingFields.push('environment');
-    if (!config.features) missingFields.push('features');
-    if (!config.overrides) missingFields.push('overrides');
-    if (!config.devTools) missingFields.push('devTools');
+    if (!config.environment) missingFields.push("environment");
+    if (!config.features) missingFields.push("features");
+    if (!config.overrides) missingFields.push("overrides");
+    if (!config.devTools) missingFields.push("devTools");
 
-    const configFile = environment === 'development' 
-      ? 'config/appsettings.dev.json' 
-      : 'config/appsettings.json';
+    const configFile =
+      environment === "development"
+        ? "config/appsettings.dev.json"
+        : "config/appsettings.json";
     const validationMsg =
-      `[AppConfig] ${configFile} is missing required fields: ${missingFields.join(', ')}. ` +
-      'Ensure the file matches the AppSettings interface.';
-    
+      `[AppConfig] ${configFile} is missing required fields: ${missingFields.join(", ")}. ` +
+      "Ensure the file matches the AppSettings interface.";
+
     console.error(validationMsg);
     throw new Error(validationMsg);
   }
@@ -119,7 +160,7 @@ export function getAppConfig(): AppSettings {
  * Useful for compile-time guards.
  */
 export function isDevelopment(): boolean {
-  return process.env.EXPO_PUBLIC_ENVIRONMENT === 'development';
+  return process.env.EXPO_PUBLIC_ENVIRONMENT === "development";
 }
 
 /**
@@ -127,5 +168,5 @@ export function isDevelopment(): boolean {
  * Use this to ensure code paths are safe for production.
  */
 export function isProduction(): boolean {
-  return (process.env.EXPO_PUBLIC_ENVIRONMENT || 'production') === 'production';
+  return (process.env.EXPO_PUBLIC_ENVIRONMENT || "production") === "production";
 }
