@@ -1,6 +1,11 @@
 export { AppErrorBoundary } from "./ErrorBoundary";
 export { NetworkCascadeDetector } from "./network-cascade-detector";
 export {
+    executeRecoveryAction,
+    isRecoveryActionAvailable,
+    type RecoveryResult
+} from "./recovery-actions";
+export {
     AffectedFeature,
     createSafeModeState,
     getSafeModeDefinition,

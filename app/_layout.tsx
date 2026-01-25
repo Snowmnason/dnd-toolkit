@@ -9,6 +9,7 @@ import {
   AppErrorBoundary,
   AppKernelProvider,
   buildNavigationTarget,
+  executeRecoveryAction,
   getAppConfig,
   getRouteConfig,
   lazyLoadInBackground,
@@ -249,12 +250,35 @@ function RootLayoutContent() {
           // Navigate back to world selection when user taps "Back to Navigation"
           router.replace("/select/world-selection");
         }}
-        onRecoveryAction={(action) => {
-          // Recovery actions handled elsewhere (Phase 4)
-          logger.info(
-            "bootstrap",
-            `[SafeMode] User selected recovery action: ${action}`,
-          );
+        onRecoveryAction={async (action) => {
+          // Execute the recovery action
+          logger
+            .category("bootstrap")
+            .info(`[SafeMode] Executing recovery action: ${action}`);
+
+          try {
+            const result = await executeRecoveryAction(
+              action,
+              kernel.safeMode!,
+              router,
+              () => {
+                // On success, kernel will handle state reset
+                logger
+                  .category("bootstrap")
+                  .info(`[SafeMode] Recovery action succeeded: ${action}`);
+              },
+            );
+
+            if (!result.success) {
+              logger
+                .category("error")
+                .warn(`[SafeMode] Recovery action failed: ${result.message}`);
+            }
+          } catch (error) {
+            logger
+              .category("error")
+              .error("[SafeMode] Recovery action execution failed:", error);
+          }
         }}
       />
     );
