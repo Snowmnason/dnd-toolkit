@@ -9,8 +9,6 @@
  * - Validate storage migrations
  */
 
-import { STORAGE_KEYS } from "@/lib/storage";
-
 /**
  * Default value type for each storage key
  * - string: JSON-serialized value to store
@@ -20,33 +18,49 @@ export type StorageDefaultValue = string | null;
 
 /**
  * Storage defaults mapped by STORAGE_KEYS
+ * Lazily constructed to avoid circular dependency on STORAGE_KEYS initialization
  *
  * Format:
  * - `string`: JSON-serialized default (will be stored as-is)
  * - `null`: Key is optional and should not be initialized
  */
-export const STORAGE_DEFAULTS: Record<string, StorageDefaultValue> = {
-  // World Management
-  [STORAGE_KEYS.CONNECTED_WORLDS]: JSON.stringify([]),
-  [STORAGE_KEYS.LAST_SELECTED_WORLD]: null,
-  [STORAGE_KEYS.LAST_USER_ROLE]: null,
+function createStorageDefaults(): Record<string, StorageDefaultValue> {
+  // Lazy-import to avoid circular dependency
+  const { STORAGE_KEYS } = require("@/lib/storage");
 
-  // Authentication & Account
-  [STORAGE_KEYS.HAS_ACCOUNT]: JSON.stringify(false),
-  [STORAGE_KEYS.USER_DATA]: null,
-  [STORAGE_KEYS.USER_DATA_TIMESTAMP]: JSON.stringify(0),
-  [STORAGE_KEYS.LAST_LOGGED_IN]: JSON.stringify(null),
-  [STORAGE_KEYS.AUTH_ATTEMPTS]: JSON.stringify(0),
-  [STORAGE_KEYS.PENDING_INVITE]: null,
+  return {
+    // World Management
+    [STORAGE_KEYS.CONNECTED_WORLDS]: JSON.stringify([]),
+    [STORAGE_KEYS.LAST_SELECTED_WORLD]: null,
+    [STORAGE_KEYS.LAST_USER_ROLE]: null,
 
-  // UI Preferences
-  [STORAGE_KEYS.THEME_PREFERENCE]: JSON.stringify("classic"),
-  [STORAGE_KEYS.THEME_MODE]: JSON.stringify("dark"),
-  [STORAGE_KEYS.SCALE_PREFERENCE]: JSON.stringify(1),
+    // Authentication & Account
+    [STORAGE_KEYS.HAS_ACCOUNT]: JSON.stringify(false),
+    [STORAGE_KEYS.USER_DATA]: null,
+    [STORAGE_KEYS.USER_DATA_TIMESTAMP]: JSON.stringify(0),
+    [STORAGE_KEYS.LAST_LOGGED_IN]: JSON.stringify(null),
+    [STORAGE_KEYS.AUTH_ATTEMPTS]: JSON.stringify(0),
+    [STORAGE_KEYS.PENDING_INVITE]: null,
 
-  // Developer
-  [STORAGE_KEYS.DEV_MODE]: JSON.stringify(false),
-};
+    // UI Preferences
+    [STORAGE_KEYS.THEME_PREFERENCE]: JSON.stringify("classic"),
+    [STORAGE_KEYS.THEME_MODE]: JSON.stringify("dark"),
+    [STORAGE_KEYS.SCALE_PREFERENCE]: JSON.stringify(1),
+
+    // Developer
+    [STORAGE_KEYS.DEV_MODE]: JSON.stringify(false),
+  };
+}
+
+// Lazy-load storage defaults on first access
+let STORAGE_DEFAULTS_CACHE: Record<string, StorageDefaultValue> | null = null;
+
+export function getStorageDefaults(): Record<string, StorageDefaultValue> {
+  if (!STORAGE_DEFAULTS_CACHE) {
+    STORAGE_DEFAULTS_CACHE = createStorageDefaults();
+  }
+  return STORAGE_DEFAULTS_CACHE;
+}
 
 /**
  * Get default value for a storage key
@@ -54,7 +68,7 @@ export const STORAGE_DEFAULTS: Record<string, StorageDefaultValue> = {
  * @returns The default value, or null if key is optional
  */
 export function getStorageDefault(key: string): StorageDefaultValue {
-  return STORAGE_DEFAULTS[key] ?? null;
+  return getStorageDefaults()[key] ?? null;
 }
 
 /**
@@ -63,7 +77,7 @@ export function getStorageDefault(key: string): StorageDefaultValue {
  * @returns true if the key should be initialized, false if it's optional
  */
 export function shouldInitializeStorageKey(key: string): boolean {
-  return STORAGE_DEFAULTS[key] !== null;
+  return getStorageDefaults()[key] !== null;
 }
 
 /**
@@ -71,7 +85,7 @@ export function shouldInitializeStorageKey(key: string): boolean {
  * Useful for resetting storage to defaults or validating initial state
  */
 export function getRequiredStorageKeys(): string[] {
-  return Object.entries(STORAGE_DEFAULTS)
+  return Object.entries(getStorageDefaults())
     .filter(([, value]) => value !== null)
     .map(([key]) => key);
 }
@@ -81,7 +95,7 @@ export function getRequiredStorageKeys(): string[] {
  * Useful for cleanup or migration logic
  */
 export function getOptionalStorageKeys(): string[] {
-  return Object.entries(STORAGE_DEFAULTS)
+  return Object.entries(getStorageDefaults())
     .filter(([, value]) => value === null)
     .map(([key]) => key);
 }

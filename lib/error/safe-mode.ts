@@ -133,9 +133,6 @@ export interface SafeModeConfig {
   /** Network sync failure threshold before triggering DEGRADED state */
   syncFailureThreshold: number;
 
-  /** Interval (ms) for periodic health checks */
-  healthCheckIntervalMs: number;
-
   /** Auto-recovery attempts before escalating to manual recovery */
   autoRecoveryAttempts: number;
 
@@ -295,7 +292,6 @@ const appConfig = getAppConfig();
 export const DEFAULT_SAFE_MODE_CONFIG: SafeModeConfig = {
   kernelTimeoutMs: appConfig?.safeMode?.kernelTimeoutMs ?? 10000, // 10 second kernel bootstrap timeout
   syncFailureThreshold: appConfig?.safeMode?.syncFailureThreshold ?? 3, // Trigger DEGRADED after 3 consecutive sync failures
-  healthCheckIntervalMs: appConfig?.safeMode?.healthCheckIntervalMs ?? 30000, // Check health every 30 seconds (production)
   autoRecoveryAttempts: appConfig?.safeMode?.autoRecoveryAttempts ?? 2, // Try to auto-recover twice before escalating
   autoRecoveryDelayMs: appConfig?.safeMode?.autoRecoveryDelayMs ?? 5000, // Wait 5 seconds between auto-recovery attempts
 };

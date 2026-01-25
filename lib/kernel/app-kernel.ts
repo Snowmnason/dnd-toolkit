@@ -15,14 +15,19 @@
  * - ERROR: A critical phase failed
  */
 
-import { STORAGE_DEFAULTS } from "@/lib/kernel/storage-defaults";
+import type { SafeModeState } from "@/lib/error/safe-mode";
+import {
+  createSafeModeState,
+  DEFAULT_SAFE_MODE_CONFIG,
+  SafeModeLevel,
+  SafeModeReason,
+} from "@/lib/error/safe-mode";
+import { getStorageDefaults } from "@/lib/kernel/storage-defaults";
 import {
   NetworkDetection,
   NetworkStatus,
 } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
-import type { SafeModeState } from "@/lib/error/safe-mode";
-import { SafeModeLevel } from "@/lib/error/safe-mode";
 
 // FUTURE ENHANCEMENT: Phase Progress Callbacks
 // To add progress tracking for phases (e.g., "Loading fonts... 50%"):
@@ -177,6 +182,44 @@ class AppKernelClass {
       // Detect platform and initial capabilities
       await this.detectCapabilities();
 
+      // Set up kernel timeout - if we don't reach appReady in time, trigger RECOVERY
+      const timeoutMs = DEFAULT_SAFE_MODE_CONFIG.kernelTimeoutMs;
+      let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
+      const startTimeout = () => {
+        timeoutHandle = setTimeout(() => {
+          if (!this.state.phases.appReady) {
+            logger
+              .category("bootstrap")
+              .error(
+                "Kernel timeout - appReady not reached within configured time",
+                {
+                  timeoutMs,
+                  currentPhase: this.state.currentPhase,
+                },
+              );
+
+            const safeMode = createSafeModeState(
+              SafeModeReason.KERNEL_TIMEOUT,
+              {
+                details: `Kernel bootstrap exceeded ${timeoutMs}ms timeout at phase: ${this.state.currentPhase}`,
+              },
+            );
+            this.setSafeMode(safeMode);
+          }
+        }, timeoutMs);
+      };
+
+      // Subscribe to state changes to clear timeout when appReady
+      const unsubscribe = this.subscribe((state: AppKernelState) => {
+        if (state.phases.appReady && timeoutHandle) {
+          clearTimeout(timeoutHandle);
+          unsubscribe(); // Stop listening after appReady
+        }
+      });
+
+      startTimeout();
+
       // Phase 0: CONFIG (initialize Supabase env vars and client FIRST)
       // This MUST run before PRELOAD, STORAGE, and AUTH so that Supabase is ready
       // and the auth adapter can safely restore session tokens from storage.
@@ -272,6 +315,11 @@ class AppKernelClass {
       // Phase 2: Storage (cache validation/migrations and initialization)
       await this.runPhase("storage", async () => {
         try {
+          // Initialize storage health monitoring (validates storage + starts polling)
+          const { initializeStorageHealthMonitoring } =
+            await import("@/lib/storage/storage-health-monitor");
+          await initializeStorageHealthMonitoring();
+
           // Initialize all storage keys with safe defaults on startup
           await this.initializeStorageDefaults();
 
@@ -386,6 +434,11 @@ class AppKernelClass {
           const { AuthStateManager } = await import("@/lib/auth/auth-state");
           await AuthStateManager.getAuthState();
           logger.category("bootstrap").debug("Auth state loaded");
+
+          // Initialize auth health monitoring (validates auth + starts polling)
+          const { initializeAuthHealthMonitoring } =
+            await import("@/lib/auth/auth-health-monitor");
+          await initializeAuthHealthMonitoring();
 
           // Track auth completion time (completes after appReady)
           this.authCompletionTime = performance.now() - authPhaseStart;
@@ -829,9 +882,10 @@ class AppKernelClass {
         "[KERNEL] initializeStorageDefaults() SecureStorage imported, iterating defaults",
       );
 
-      // Initialize each key if it doesn't exist. STORAGE_DEFAULTS is imported
-      // from storage-defaults.ts for centralized management.
-      for (const [key, defaultValue] of Object.entries(STORAGE_DEFAULTS)) {
+      // Initialize each key if it doesn't exist. Storage defaults are lazily
+      // loaded from storage-defaults.ts for centralized management.
+      const defaults = getStorageDefaults();
+      for (const [key, defaultValue] of Object.entries(defaults)) {
         const existing = await SecureStorage.getItem(key);
         if (existing === null && defaultValue !== null) {
           // Key doesn't exist and we have a default - set it
@@ -861,20 +915,16 @@ class AppKernelClass {
    */
   setSafeMode(safeMode: SafeModeState | null): void {
     this.state.safeMode = safeMode;
-    
+
     // Log safe mode transitions
     if (safeMode) {
-      logger
-        .category("error")
-        .warn("App entering safe mode", {
-          level: safeMode.level,
-          reason: safeMode.reason,
-          features: safeMode.affectedFeatures,
-        });
+      logger.category("error").warn("App entering safe mode", {
+        level: safeMode.level,
+        reason: safeMode.reason,
+        features: safeMode.affectedFeatures,
+      });
     } else {
-      logger
-        .category("error")
-        .info("App exiting safe mode (recovered)");
+      logger.category("error").info("App exiting safe mode (recovered)");
     }
 
     this.notifyListeners();

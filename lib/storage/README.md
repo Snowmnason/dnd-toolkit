@@ -868,6 +868,7 @@ const prefs = (await SecureStorage.getJSON(key)) ?? { theme: "light" };
 | storage-error-handling.ts | Error handling, graceful fallback            | ~500  |
 | world-access-cache.ts     | World access flag sync, non-throwing helpers | ~80   |
 | update-storage-cache.ts   | Cache update orchestration (see file)        | ~50   |
+| storage-health-monitor.ts | Periodic health checks via background jobs   | ~130  |
 | index.ts                  | Barrel export, key constants                 | ~100  |
 
 ---

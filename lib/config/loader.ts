@@ -77,7 +77,8 @@ export interface AppSettings {
   safeMode?: {
     kernelTimeoutMs?: number;
     syncFailureThreshold?: number;
-    healthCheckIntervalMs?: number;
+    storageHealthCheckIntervalMs?: number;
+    authHealthCheckIntervalMs?: number;
     autoRecoveryAttempts?: number;
     autoRecoveryDelayMs?: number;
     description?: string;
