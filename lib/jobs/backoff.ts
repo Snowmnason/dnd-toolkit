@@ -118,8 +118,8 @@ export function isRetryable(error: any): boolean {
     return true;
   }
 
-  // Default: treat as non-retryable unless proven otherwise
-  return false;
+  // Default: treat as retryable (safe default for unknown errors)
+  return true;
 }
 
 /**

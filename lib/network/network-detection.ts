@@ -17,7 +17,7 @@
 import {
   LATENCY_THRESHOLD,
   LOW_BATTERY_THRESHOLD,
-  SUPABASE_HEALTH_ENDPOINT,
+  getSupabaseHealthEndpoint,
   getWebPingInterval,
   getWebPingTimeout,
 } from "@/lib/network/network-config";
@@ -408,7 +408,7 @@ class NetworkDetectionClass {
       // Use Supabase health endpoint instead of Cloudflare for CSP compliance
       // Supabase is already whitelisted in CSP for API calls
       // Endpoint is configured in network-config.ts
-      const response = await fetch(SUPABASE_HEALTH_ENDPOINT, {
+      const response = await fetch(getSupabaseHealthEndpoint(), {
         method: "HEAD",
         signal: controller.signal,
       });
