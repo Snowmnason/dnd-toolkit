@@ -21,6 +21,8 @@ import {
   NetworkStatus,
 } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
+import type { SafeModeState } from "@/lib/error/safe-mode";
+import { SafeModeLevel } from "@/lib/error/safe-mode";
 
 // FUTURE ENHANCEMENT: Phase Progress Callbacks
 // To add progress tracking for phases (e.g., "Loading fonts... 50%"):
@@ -95,6 +97,7 @@ export interface AppKernelState {
   timing: Record<string, number>; // Phase timing in milliseconds
   capabilities: KernelCapabilities;
   networkStatus: NetworkStatus | null;
+  safeMode: SafeModeState | null; // Safe mode state (null = NORMAL)
 }
 
 type KernelListener = (state: AppKernelState) => void;
@@ -121,6 +124,7 @@ class AppKernelClass {
       platform: "unknown", // Will be detected on initialize()
     },
     networkStatus: null,
+    safeMode: null, // NORMAL state (no safe mode active)
   };
 
   private listeners: Set<KernelListener> = new Set();
@@ -660,6 +664,7 @@ class AppKernelClass {
         platform: "unknown", // Will be detected on next initialize()
       },
       networkStatus: null,
+      safeMode: null, // Reset safe mode to NORMAL
     };
     this.initPromise = null;
     this.authCompletionTime = null;
@@ -848,6 +853,52 @@ class AppKernelClass {
         });
       // Non-critical - app can still boot
     }
+  }
+
+  /**
+   * Set safe mode state
+   * Called when critical systems fail or recovery is needed
+   */
+  setSafeMode(safeMode: SafeModeState | null): void {
+    this.state.safeMode = safeMode;
+    
+    // Log safe mode transitions
+    if (safeMode) {
+      logger
+        .category("error")
+        .warn("App entering safe mode", {
+          level: safeMode.level,
+          reason: safeMode.reason,
+          features: safeMode.affectedFeatures,
+        });
+    } else {
+      logger
+        .category("error")
+        .info("App exiting safe mode (recovered)");
+    }
+
+    this.notifyListeners();
+  }
+
+  /**
+   * Check if app is in safe mode
+   */
+  isSafeMode(): boolean {
+    return this.state.safeMode !== null;
+  }
+
+  /**
+   * Get current safe mode state (null if NORMAL)
+   */
+  getSafeMode(): SafeModeState | null {
+    return this.state.safeMode;
+  }
+
+  /**
+   * Check if app is in a specific safe mode level
+   */
+  isInSafeModeLevel(level: SafeModeLevel): boolean {
+    return this.state.safeMode?.level === level;
   }
 
   /**

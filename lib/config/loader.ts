@@ -74,6 +74,14 @@ export interface AppSettings {
     slowScreenMs?: number;
     slowRequestMs?: number;
   };
+  safeMode?: {
+    kernelTimeoutMs?: number;
+    syncFailureThreshold?: number;
+    healthCheckIntervalMs?: number;
+    autoRecoveryAttempts?: number;
+    autoRecoveryDelayMs?: number;
+    description?: string;
+  };
   featureFlags: Record<
     string,
     {
