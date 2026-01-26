@@ -55,6 +55,9 @@ export type SpecificTransitionHook = () => Promise<void> | void;
 /**
  * Network state machine
  * Manages state transitions with validation and hooks
+ *
+ * Transitions are serialized to prevent race conditions where concurrent calls
+ * could validate against stale state or leave the machine in an unexpected state.
  */
 class NetworkStateMachine {
   private currentState: NetworkState = "INITIALIZING";
@@ -63,6 +66,7 @@ class NetworkStateMachine {
   private recoveryRetries = 0;
   private maxRecoveryRetries = 5;
   private recoveryBackoffMs = 1000; // Start at 1s, exponential backoff
+  private transitionQueue: Promise<void> = Promise.resolve(); // Serialize transitions
 
   /**
    * Get current network state
@@ -83,14 +87,33 @@ class NetworkStateMachine {
    * Transition to a new state
    * Validates transition, executes hooks, and updates state
    *
+   * Transitions are serialized internally to prevent race conditions.
+   * If multiple transitionTo() calls are made concurrently, they will
+   * be applied in call order, each validating against the actual current state.
+   *
    * @param toState - Target state
    * @param reason - Optional reason for transition (for logging)
    * @throws Error if transition is invalid
    */
   async transitionTo(toState: NetworkState, reason?: string): Promise<void> {
+    // Chain this transition onto the queue to serialize it
+    this.transitionQueue = this.transitionQueue.then(
+      () => this.performTransition(toState, reason),
+      () => this.performTransition(toState, reason), // Even if previous failed, try this one
+    );
+    return this.transitionQueue;
+  }
+
+  /**
+   * Perform the actual state transition (serialized via transitionQueue)
+   */
+  private async performTransition(
+    toState: NetworkState,
+    reason?: string,
+  ): Promise<void> {
     const fromState = this.currentState;
 
-    // Validate transition
+    // Validate transition (against current state, not stale state)
     if (!this.isValidTransition(fromState, toState)) {
       const error = `Invalid state transition: ${fromState} → ${toState}`;
       logger.warn("network", error);
@@ -258,6 +281,7 @@ class NetworkStateMachine {
     this.globalHooks.clear();
     this.recoveryRetries = 0;
     this.recoveryBackoffMs = 1000;
+    this.transitionQueue = Promise.resolve(); // Reset transition queue
   }
 }
 

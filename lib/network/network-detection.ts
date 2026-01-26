@@ -713,17 +713,45 @@ class NetworkDetectionClass {
 
   /**
    * Trigger state machine transition
+   *
+   * Handles the required OFFLINE → RECOVERING → Connected state sequence.
+   * The state machine enforces that OFFLINE can only transition to RECOVERING,
+   * not directly to connected states. This method enforces that constraint.
    */
   private async triggerStateTransition(
     oldState: NetworkState,
     newState: NetworkState,
   ): Promise<void> {
     try {
+      // If transitioning FROM offline TO a connected state (GOOD/BAD/NO_WIFI),
+      // we must go through RECOVERING first (state machine constraint)
+      if (oldState === "OFFLINE" && newState !== "OFFLINE") {
+        const isConnectedState = ["GOOD", "BAD", "NO_WIFI"].includes(newState);
+        if (isConnectedState) {
+          // Transition through RECOVERING: OFFLINE → RECOVERING → newState
+          logger.info(
+            "network",
+            `Offline recovery detected: ${oldState} → RECOVERING → ${newState}`,
+          );
+          await NetworkStateManager.transitionTo(
+            "RECOVERING",
+            "offline recovery start",
+          );
+          // Now transition to the final connected state
+          await NetworkStateManager.transitionTo(
+            newState,
+            "offline recovery complete",
+          );
+          return;
+        }
+      }
+
+      // For all other transitions, go directly
       await NetworkStateManager.transitionTo(newState, `from ${oldState}`);
     } catch (error) {
       logger.warn(
         "network",
-        `Invalid state transition ${oldState} → ${newState}: ${error}`,
+        `Failed state transition ${oldState} → ${newState}: ${error}`,
       );
     }
   }
@@ -785,13 +813,31 @@ class NetworkDetectionClass {
   /**
    * Register hook for specific state transition
    * Called when transitioning from → to
+   *
+   * @param from - Source state
+   * @param to - Target state
+   * @param hook - Callback to execute on transition
+   * @returns Unsubscribe function to remove the hook
    */
-  onTransition(
+  onSpecificTransition(
     from: NetworkState,
     to: NetworkState,
     hook: () => Promise<void> | void,
   ): () => void {
     return NetworkStateManager.onSpecificTransition(from, to, hook);
+  }
+
+  /**
+   * Register hook for any state transition
+   * Called on every state change
+   *
+   * @param hook - Callback to execute on any transition
+   * @returns Unsubscribe function to remove the hook
+   */
+  onAnyTransition(
+    hook: (from: NetworkState, to: NetworkState) => Promise<void> | void,
+  ): () => void {
+    return NetworkStateManager.onTransition(hook);
   }
 
   /**

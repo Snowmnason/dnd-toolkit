@@ -286,14 +286,14 @@ The network detection system uses an explicit state machine (`lib/network/state-
 
 Six states define the network lifecycle:
 
-| State          | Meaning                                 | Transitions To         |
-| -------------- | --------------------------------------- | ---------------------- |
-| `INITIALIZING` | App starting, no status yet             | GOOD, BAD, OFFLINE     |
-| `GOOD`         | Network available, responsive           | BAD, NO_WIFI, OFFLINE  |
-| `BAD`          | Network present but slow/high-latency   | GOOD, NO_WIFI, OFFLINE |
-| `NO_WIFI`      | Cellular/offline detected (iOS/Android) | GOOD, OFFLINE          |
-| `OFFLINE`      | No connectivity at all                  | RECOVERING             |
-| `RECOVERING`   | Attempting reconnection with backoff    | GOOD, OFFLINE          |
+| State          | Meaning                                 | Transitions To                     |
+| -------------- | --------------------------------------- | ---------------------------------- |
+| `INITIALIZING` | App starting, no status yet             | GOOD, BAD, NO_WIFI, OFFLINE        |
+| `GOOD`         | Network available, responsive           | BAD, NO_WIFI, OFFLINE, RECOVERING  |
+| `BAD`          | Network present but slow/high-latency   | GOOD, NO_WIFI, OFFLINE, RECOVERING |
+| `NO_WIFI`      | Cellular/offline detected (iOS/Android) | GOOD, BAD, OFFLINE, RECOVERING     |
+| `OFFLINE`      | No connectivity at all                  | INITIALIZING, RECOVERING           |
+| `RECOVERING`   | Attempting reconnection with backoff    | GOOD, BAD, NO_WIFI, OFFLINE        |
 
 ### Valid Transitions
 
@@ -330,7 +330,7 @@ Execute on every state change:
 
 ```ts
 // Log all transitions
-NetworkStateManager.onAnyTransition((from, to) => {
+NetworkStateManager.onTransition((from, to) => {
   logger.info("network", `State: ${from} → ${to}`);
 });
 ```

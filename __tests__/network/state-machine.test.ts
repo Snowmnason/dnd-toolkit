@@ -360,4 +360,84 @@ describe("NetworkStateManager", () => {
       expect(NetworkStateManager.getRecoveryRetries()).toBe(0);
     });
   });
+
+  describe("Concurrency & Serialization", () => {
+    it("should serialize concurrent transitions", async () => {
+      // Fire multiple transitions without awaiting
+      // They should be serialized internally
+      const promise1 = NetworkStateManager.transitionTo("OFFLINE");
+      const promise2 = NetworkStateManager.transitionTo("RECOVERING");
+      const promise3 = NetworkStateManager.transitionTo("GOOD");
+
+      // Wait for all to complete
+      await Promise.all([promise1, promise2, promise3]);
+
+      // Final state should be GOOD (last transition applied)
+      expect(NetworkStateManager.getState()).toBe("GOOD");
+    });
+
+    it("should validate each transition against current state (not stale state)", async () => {
+      // Start at INITIALIZING
+      // Call 1: INITIALIZING → OFFLINE (valid)
+      // Call 2: INITIALIZING → GOOD (valid, but will actually happen after Call 1)
+      const call1 = NetworkStateManager.transitionTo("OFFLINE");
+      const call2 = NetworkStateManager.transitionTo("RECOVERING");
+
+      // Both should succeed
+      await Promise.all([call1, call2]);
+
+      // Final state: OFFLINE → RECOVERING
+      expect(NetworkStateManager.getState()).toBe("RECOVERING");
+    });
+
+    it("should handle invalid concurrent transitions gracefully", async () => {
+      // Set up state: GOOD
+      await NetworkStateManager.transitionTo("GOOD");
+
+      // Try two invalid transitions concurrently
+      // GOOD → INITIALIZING is invalid
+      const promise1 = NetworkStateManager.transitionTo("INITIALIZING").catch(
+        () => "rejected",
+      );
+      const promise2 = NetworkStateManager.transitionTo("BAD");
+
+      const result1 = await promise1;
+      await promise2;
+
+      // First should reject, second should succeed
+      expect(result1).toBe("rejected");
+      expect(NetworkStateManager.getState()).toBe("BAD");
+    });
+
+    it("should execute hooks in order for serialized transitions", async () => {
+      const sequence: string[] = [];
+
+      NetworkStateManager.onSpecificTransition(
+        "INITIALIZING",
+        "OFFLINE",
+        () => {
+          sequence.push("INIT→OFF");
+        },
+      );
+
+      NetworkStateManager.onSpecificTransition("OFFLINE", "RECOVERING", () => {
+        sequence.push("OFF→REC");
+      });
+
+      NetworkStateManager.onSpecificTransition("RECOVERING", "GOOD", () => {
+        sequence.push("REC→GOOD");
+      });
+
+      // Fire all at once (they'll be serialized)
+      const p1 = NetworkStateManager.transitionTo("OFFLINE");
+      const p2 = NetworkStateManager.transitionTo("RECOVERING");
+      const p3 = NetworkStateManager.transitionTo("GOOD");
+
+      await Promise.all([p1, p2, p3]);
+
+      // Hooks should have executed in order
+      expect(sequence).toEqual(["INIT→OFF", "OFF→REC", "REC→GOOD"]);
+      expect(NetworkStateManager.getState()).toBe("GOOD");
+    });
+  });
 });
