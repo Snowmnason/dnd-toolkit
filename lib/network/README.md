@@ -278,6 +278,110 @@ LOW_BATTERY_THRESHOLD = 0.2; // 20% = mark as expensive
 
 Adjust these for different network conditions or battery strategies.
 
+## State Machine
+
+The network detection system uses an explicit state machine (`lib/network/state-machine.ts`) to manage recovery logic and side effects reliably.
+
+### NetworkState Type
+
+Six states define the network lifecycle:
+
+| State          | Meaning                                 | Transitions To                     |
+| -------------- | --------------------------------------- | ---------------------------------- |
+| `INITIALIZING` | App starting, no status yet             | GOOD, BAD, NO_WIFI, OFFLINE        |
+| `GOOD`         | Network available, responsive           | BAD, NO_WIFI, OFFLINE, RECOVERING  |
+| `BAD`          | Network present but slow/high-latency   | GOOD, NO_WIFI, OFFLINE, RECOVERING |
+| `NO_WIFI`      | Cellular/offline detected (iOS/Android) | GOOD, BAD, OFFLINE, RECOVERING     |
+| `OFFLINE`      | No connectivity at all                  | INITIALIZING, RECOVERING           |
+| `RECOVERING`   | Attempting reconnection with backoff    | GOOD, BAD, NO_WIFI, OFFLINE        |
+
+### Valid Transitions
+
+The `VALID_TRANSITIONS` map enforces a strict directed graph. Key rules:
+
+- **Recovery path**: `OFFLINE` can only reach `GOOD` via `RECOVERING` (ensures recovery side effects execute)
+- **Initialization**: `INITIALIZING` only reachable at startup
+- **WiFi switch**: `NO_WIFI` ↔ `GOOD` allowed (iOS/Android WiFi toggles)
+
+Invalid transitions are rejected with an error.
+
+### Transition Hooks
+
+Register callbacks to execute on specific transitions or any state change:
+
+#### Specific Transition Hooks
+
+Execute when a particular transition occurs (e.g., recovery completed):
+
+```ts
+import { NetworkStateManager } from "@/lib/network";
+
+// Sync offline queue when recovering → good
+NetworkStateManager.onSpecificTransition("RECOVERING", "GOOD", async () => {
+  await syncOfflineQueue();
+  await invalidateCacheOlderThan(2 * 60 * 60 * 1000); // 2 hours stale
+  AppToast.show("Connection restored");
+});
+```
+
+#### Global Transition Hooks
+
+Execute on every state change:
+
+```ts
+// Log all transitions
+NetworkStateManager.onTransition((from, to) => {
+  logger.info("network", `State: ${from} → ${to}`);
+});
+```
+
+Hooks are registered once (typically at app bootstrap in `AppKernelProvider`) and execute for all subsequent transitions. Unsubscribe by calling the returned function.
+
+### Recovery Backoff
+
+When transitioning to `RECOVERING`, the manager applies exponential backoff with a 30-second cap:
+
+- 1st retry: 1s delay
+- 2nd retry: 2s delay
+- 3rd retry: 4s delay
+- ... (2^n pattern)
+- Cap: 30s max
+
+Query retry state:
+
+```ts
+const retries = NetworkStateManager.getRecoveryRetries();
+const backoffMs = NetworkStateManager.getRecoveryBackoff(); // milliseconds until next retry
+
+// Use in recovery logic:
+await delay(backoffMs);
+await attemptReconnection();
+```
+
+### Testing & Simulation
+
+For unit tests, manually transition the state machine and verify hook execution:
+
+```ts
+import { NetworkStateManager } from "@/lib/network";
+
+// Register test hook
+let transitioned = false;
+NetworkStateManager.onSpecificTransition("OFFLINE", "RECOVERING", () => {
+  transitioned = true;
+});
+
+// Simulate offline → recovering → good sequence
+await NetworkStateManager.transitionTo("OFFLINE");
+await NetworkStateManager.transitionTo("RECOVERING");
+await NetworkStateManager.transitionTo("GOOD");
+
+expect(transitioned).toBe(true);
+
+// Reset for next test
+NetworkStateManager.reset(); // clears state, hooks, retry count
+```
+
 ## Related Modules
 
 - **`lib/api`** – RequestManager uses network detection for retry logic

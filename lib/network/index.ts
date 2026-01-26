@@ -5,28 +5,37 @@
  * - Cross-platform network status detection (web, iOS, Android)
  * - Graceful degradation (return stale cache on network errors)
  * - Network error classification
+ * - Explicit state machine for network states
+ * - Transition hooks for recovery logic
  * - Foundation for future offline mode (Milestone 3+)
  */
 
 export {
-    ConnectionQuality,
-    NetworkDetection,
-    useNetworkStatus
+  ConnectionQuality,
+  NetworkDetection,
+  useNetworkStatus
 } from "./network-detection";
 export type { NetworkStatus, NetworkStatusCallback } from "./network-detection";
 
+export { NetworkStateManager, VALID_TRANSITIONS } from "./state-machine";
+export type {
+  NetworkState, SpecificTransitionHook, TransitionHook
+} from "./state-machine";
+
 export {
-    handleErrorGracefully,
-    isNetworkError,
-    logNetworkError,
-    shouldServeStaleOnError
+  handleErrorGracefully,
+  isNetworkError,
+  logNetworkError,
+  shouldServeStaleOnError
 } from "./error-handling";
 export type { GracefulErrorOptions } from "./error-handling";
 
 export {
-    getSupabaseHealthEndpoint, getWebPingInterval,
-    getWebPingTimeout, LATENCY_THRESHOLD,
-    LOW_BATTERY_THRESHOLD,
-    SUPABASE_HEALTH_ENDPOINT
+  getSupabaseHealthEndpoint,
+  getWebPingInterval,
+  getWebPingTimeout,
+  LATENCY_THRESHOLD,
+  LOW_BATTERY_THRESHOLD,
+  SUPABASE_HEALTH_ENDPOINT
 } from "./network-config";
 
