@@ -27,6 +27,56 @@
 
 ---
 
+## Data Classification & Privacy Policy
+
+All data stored in this module is classified by **sensitivity level** to determine encryption, retention, and logging behavior.
+
+### Classification Levels
+
+| Level             | Sensitivity | Storage       | Encryption    | Retention  | Example                         |
+| ----------------- | ----------- | ------------- | ------------- | ---------- | ------------------------------- |
+| **PUBLIC**        | None        | FastCache     | No            | Permanent  | App version, theme              |
+| **NON_SENSITIVE** | Low         | FastCache     | No            | App update | World metadata, game rules      |
+| **SENSITIVE**     | High        | SecureStorage | Yes (AES-256) | On logout  | User world list, character data |
+| **PII**           | Critical    | SecureStorage | Yes (AES-256) | On logout  | Email, session tokens           |
+
+**Full policy documentation:** See [docs/issues/MileStone 2/168 - Privacy PII Data/PRIVACY_POLICY.md](../../docs/issues/MileStone%202/168%20-%20Privacy%20PII%20Data/PRIVACY_POLICY.md)
+
+### For Developers
+
+When adding new keys:
+
+1. **Classify it** – Is it PUBLIC, NON_SENSITIVE, SENSITIVE, or PII?
+2. **Register it** – Add to `DATA_CLASSIFICATIONS` in [data-classification.ts](./data-classification.ts)
+3. **Use helpers** – Let `getStorageBackend(key)` route automatically
+4. **Redact logs** – Use `redactForLogs(data, key)` when logging
+
+```typescript
+import {
+  DATA_CLASSIFICATIONS,
+  DataSensitivity,
+  getStorageBackend,
+  redactForLogs,
+} from "@/lib/storage";
+
+// Register
+DATA_CLASSIFICATIONS["secure:my_data"] = {
+  key: "secure:my_data",
+  sensitivity: DataSensitivity.SENSITIVE,
+  description: "User-scoped game data",
+  ttl: 7 * 24 * 60 * 60 * 1000, // 7 days
+};
+
+// Use
+const backend = getStorageBackend("secure:my_data"); // Auto-routes to SecureStorage
+await backend.setItem("secure:my_data", userData);
+
+// Log safely
+logger.info("game", redactForLogs(userData, "secure:my_data"));
+```
+
+---
+
 ## Architecture & Data Flow
 
 ```
