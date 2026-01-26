@@ -22,10 +22,11 @@ export enum DataSensitivity {
   PUBLIC = "public",
 
   /**
-   * NON_SENSITIVE - App data, but not user-specific PII
-   * Examples: world metadata, character templates, cached list of public worlds
-   * Storage: FastCache (fast, unencrypted)
-   * Retention: Can be cleared on app update
+   * NON_SENSITIVE - App data that doesn't contain user-specific PII
+   * Must persist across app restarts (encrypted + persistent storage)
+   * Examples: user's theme preference, UI scale, world metadata, character templates
+   * Storage: SecureStorage (encrypted, persists across restarts)
+   * Retention: Persists until user clears app data or logs out
    * Logging: Safe to log (no user IDs embedded)
    */
   NON_SENSITIVE = "non-sensitive",
@@ -62,8 +63,8 @@ export interface DataClassification {
  * Every storage key used in the app must be registered here.
  *
  * Guidelines:
- * - PUBLIC/NON_SENSITIVE → FastCache (unencrypted, fast)
- * - SENSITIVE/PII → SecureStorage (encrypted, all platforms)
+ * - PUBLIC → FastCache (unencrypted, session-only)
+ * - SENSITIVE, PII, NON_SENSITIVE → SecureStorage (encrypted, persists)
  * - If unsure, default to SENSITIVE
  */
 export const DATA_CLASSIFICATIONS: Record<string, DataClassification> = {

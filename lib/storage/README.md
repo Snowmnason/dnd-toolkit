@@ -35,8 +35,8 @@ All data stored in this module is classified by **sensitivity level** to determi
 
 | Level             | Sensitivity | Storage       | Encryption    | Retention  | Example                         |
 | ----------------- | ----------- | ------------- | ------------- | ---------- | ------------------------------- |
-| **PUBLIC**        | None        | FastCache     | No            | Permanent  | App version, theme              |
-| **NON_SENSITIVE** | Low         | FastCache     | No            | App update | World metadata, game rules      |
+| **PUBLIC**        | None        | FastCache     | No            | Session    | App version, feature flags      |
+| **NON_SENSITIVE** | Low         | SecureStorage | Yes (AES-256) | Persistent | User theme, UI scale, metadata  |
 | **SENSITIVE**     | High        | SecureStorage | Yes (AES-256) | On logout  | User world list, character data |
 | **PII**           | Critical    | SecureStorage | Yes (AES-256) | On logout  | Email, session tokens           |
 

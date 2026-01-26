@@ -10,10 +10,14 @@
  *
  * Usage:
  * ```ts
- * import { SecureStorage, STORAGE_KEYS } from '@/lib/storage';
+ * import { SecureStorage, STORAGE_KEYS, getPrivacyStorageBackend } from '@/lib/storage';
  *
  * // Store data (backend routing is automatic)
  * await SecureStorage.setItem(STORAGE_KEYS.CONNECTED_WORLDS, worldIds);
+ *
+ * // Or route backend manually based on privacy classification
+ * const backend = getPrivacyStorageBackend(STORAGE_KEYS.THEME_PREFERENCE);
+ * await backend.setItem(STORAGE_KEYS.THEME_PREFERENCE, 'classic');
  *
  * // Store JSON
  * await SecureStorage.setJSON(STORAGE_KEYS.USER_PREFERENCES, { theme: 'dark' });
@@ -23,8 +27,11 @@
  * const prefs = await SecureStorage.getJSON(STORAGE_KEYS.USER_PREFERENCES);
  * ```
  *
- * Storage routing is defined in STORAGE_BACKEND_CONFIG (storage-config.ts).
- * Add new keys there when extending storage.
+ * Storage routing is defined in:
+ * - STORAGE_BACKEND_CONFIG (storage-config.ts) - low-level backend routing
+ * - DATA_CLASSIFICATIONS (data-classification.ts) - privacy-based routing (use this for app code)
+ *
+ * Add new keys to DATA_CLASSIFICATIONS when extending storage.
  */
 
 export {
@@ -46,11 +53,7 @@ export {
   shouldUseSecureStorage
 } from "./privacy";
 export { SecureStorage } from "./SecureStorage";
-export {
-  getStorageBackend,
-  STORAGE_BACKEND_CONFIG,
-  type StorageBackend
-} from "./storage-config";
+export { STORAGE_BACKEND_CONFIG, type StorageBackend } from "./storage-config";
 export {
   batchStorageOperation,
   checkStorageHealth,
