@@ -1,8 +1,9 @@
 import { AuthStateManager } from "../auth/auth-state";
 import {
-    getSupabaseClientLazy,
-    isSupabaseConfiguredLazy,
+  getSupabaseClientLazy,
+  isSupabaseConfiguredLazy,
 } from "../database/supabase-lazy";
+import { getPrivacyStorageBackend, STORAGE_KEYS } from "../storage";
 import { logger } from "../utils/logger";
 
 /**
@@ -13,7 +14,8 @@ import { logger } from "../utils/logger";
  * 2. Clears all auth-related storage keys
  * 3. Clears QueryCache (user-specific cached queries)
  * 4. Clears world access verification cache
- * 5. Preserves user preferences (theme, scale, etc.)
+ * 5. Resets theme to classic/dark mode (for clean slate for next user)
+ * 6. Preserves other preferences (scale, etc.) as app-level defaults
  *
  * @throws Error if sign out fails
  */
@@ -21,7 +23,7 @@ export async function signOutUser(): Promise<void> {
   try {
     logger.info(
       "auth",
-      "🔓 Starting sign out process - clearing all user data and caches"
+      "🔓 Starting sign out process - clearing all user data and caches",
     );
 
     // Sign out from Supabase if configured
@@ -40,9 +42,19 @@ export async function signOutUser(): Promise<void> {
     // This is comprehensive and handles all user-specific data
     await AuthStateManager.clearAuthState();
 
+    // Reset theme to defaults (classic, dark mode) for next user
+    const themeBackend = getPrivacyStorageBackend(
+      STORAGE_KEYS.THEME_PREFERENCE,
+    );
+    const modeBackend = getPrivacyStorageBackend(STORAGE_KEYS.THEME_MODE);
+    await Promise.all([
+      themeBackend.setItem(STORAGE_KEYS.THEME_PREFERENCE, "classic"),
+      modeBackend.setItem(STORAGE_KEYS.THEME_MODE, "dark"),
+    ]);
+
     logger.info(
       "auth",
-      "✅ Sign out completed successfully - all user data and caches cleared"
+      "✅ Sign out completed successfully - all user data and caches cleared",
     );
   } catch (error) {
     logger.error("auth", "❌ Sign out error:", error);
@@ -51,13 +63,13 @@ export async function signOutUser(): Promise<void> {
       await AuthStateManager.clearAuthState();
       logger.info(
         "auth",
-        "⚠️ Supabase signout failed but local state was cleared"
+        "⚠️ Supabase signout failed but local state was cleared",
       );
     } catch (clearError) {
       logger.error(
         "auth",
         "Failed to clear local state during error recovery:",
-        clearError
+        clearError,
       );
     }
     throw new Error("Failed to sign out. Please try again.");

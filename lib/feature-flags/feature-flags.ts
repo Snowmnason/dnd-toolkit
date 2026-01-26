@@ -1,9 +1,21 @@
 /**
  * Feature flags system for development and testing
  * Allows toggling features without code changes via appsettings.*.json
+ *
+ * PRIVACY & DATA CLASSIFICATION NOTE:
+ * - Non-user-specific feature flags → FastCache (PUBLIC/NON_SENSITIVE)
+ * - User-specific entitlements (premium features) → SecureStorage (SENSITIVE)
+ *   See lib/storage/data-classification.ts for the privacy policy.
  */
 import appSettingsProd from "../../config/appsettings.json";
 import { getAppConfig, isProduction } from "../config/loader";
+import { SecureStorage, getPrivacyStorageBackend } from "../storage";
+import { logger } from "../utils/logger";
+
+export interface Entitlements {
+  tier: "free" | "premium";
+  features: string[];
+}
 
 export type FeatureFlagName = keyof typeof appSettingsProd.featureFlags;
 
@@ -129,6 +141,73 @@ class FeatureFlagsManager {
       flag.enabled = enabled;
       console.log(`[FeatureFlags] ${flagName} = ${enabled}`);
       this.notifyListeners(flagName);
+    }
+  }
+
+  /**
+   * Persist feature flags to FastCache per privacy policy.
+   * Non-user-specific flags stay in FastCache (fast, unencrypted).
+   */
+  async persistFlags(flags: Record<string, FeatureFlag>): Promise<void> {
+    try {
+      const backend = getPrivacyStorageBackend("feature_flags:v1");
+      await backend.setJSON("feature_flags:v1", flags);
+      logger.debug("feature-flags", "Persisted feature flags");
+    } catch (error) {
+      logger.error("feature-flags", "Failed to persist feature flags:", error);
+    }
+  }
+
+  /**
+   * Load feature flags from FastCache if available.
+   * Fallback to config if cache miss.
+   */
+  async loadFlags(): Promise<Record<string, FeatureFlag>> {
+    try {
+      const backend = getPrivacyStorageBackend("feature_flags:v1");
+      const cached =
+        await backend.getJSON<Record<string, FeatureFlag>>("feature_flags:v1");
+      if (cached) {
+        logger.debug("feature-flags", "Loaded feature flags from cache");
+        return cached;
+      }
+    } catch (error) {
+      logger.warn(
+        "feature-flags",
+        "Failed to load feature flags from cache:",
+        error,
+      );
+    }
+    return this.getAllFlags();
+  }
+
+  /**
+   * Persist user entitlements to SecureStorage per privacy policy.
+   * User-specific entitlements must be encrypted (SENSITIVE data).
+   */
+  async persistEntitlements(entitlements: Entitlements): Promise<void> {
+    try {
+      const backend = getPrivacyStorageBackend("secure:entitlements");
+      await backend.setJSON("secure:entitlements", entitlements);
+      logger.debug("feature-flags", "Persisted user entitlements");
+    } catch (error) {
+      logger.error("feature-flags", "Failed to persist entitlements:", error);
+    }
+  }
+
+  /**
+   * Get user entitlements from SecureStorage per privacy policy.
+   * Always reads from SecureStorage (encrypted backend) for security.
+   */
+  async getEntitlements(): Promise<Entitlements | null> {
+    try {
+      const entitlements = await SecureStorage.getJSON<Entitlements>(
+        "secure:entitlements",
+      );
+      return entitlements ?? null;
+    } catch (error) {
+      logger.warn("feature-flags", "Failed to retrieve entitlements:", error);
+      return null;
     }
   }
 }

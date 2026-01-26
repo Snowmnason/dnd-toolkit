@@ -67,12 +67,14 @@ export interface DataClassification {
  * - If unsure, default to SENSITIVE
  */
 export const DATA_CLASSIFICATIONS: Record<string, DataClassification> = {
+  // ========== APP & VERSION ==========
   "app:version": {
     key: "app:version",
     sensitivity: DataSensitivity.PUBLIC,
     description: "Current app version",
   },
 
+  // ========== FEATURE FLAGS & ENTITLEMENTS ==========
   "feature_flags:v1": {
     key: "feature_flags:v1",
     sensitivity: DataSensitivity.NON_SENSITIVE,
@@ -85,6 +87,58 @@ export const DATA_CLASSIFICATIONS: Record<string, DataClassification> = {
     sensitivity: DataSensitivity.SENSITIVE,
     description: "User premium entitlements",
     ttl: 7 * 24 * 60 * 60 * 1000, // 7 days
+  },
+
+  // ========== AUTHENTICATION & ACCOUNT ==========
+  "dnd:auth:has_account": {
+    key: "dnd:auth:has_account",
+    sensitivity: DataSensitivity.SENSITIVE,
+    description: "Whether user has created an account",
+  },
+
+  "dnd:auth:user_data": {
+    key: "dnd:auth:user_data",
+    sensitivity: DataSensitivity.SENSITIVE,
+    description: "User profile data (ID, email, etc.)",
+  },
+
+  "dnd:auth:user_data_meta": {
+    key: "dnd:auth:user_data_meta",
+    sensitivity: DataSensitivity.SENSITIVE,
+    description: "Metadata for user profile cache (timestamp, version)",
+  },
+
+  "dnd:auth:user_data_timestamp": {
+    key: "dnd:auth:user_data_timestamp",
+    sensitivity: DataSensitivity.SENSITIVE,
+    description: "Timestamp of last user data update",
+  },
+
+  "dnd:auth:last_logged_in": {
+    key: "dnd:auth:last_logged_in",
+    sensitivity: DataSensitivity.SENSITIVE,
+    description: "Timestamp of last successful login",
+  },
+
+  "dnd:auth:attempts": {
+    key: "dnd:auth:attempts",
+    sensitivity: DataSensitivity.SENSITIVE,
+    description: "Failed auth attempt tracking for brute-force protection",
+    ttl: 15 * 60 * 1000, // 15 minutes
+  },
+
+  "dnd:invite:pending": {
+    key: "dnd:invite:pending",
+    sensitivity: DataSensitivity.SENSITIVE,
+    description: "Pending world invite data (token, world name)",
+    ttl: 24 * 60 * 60 * 1000, // 24 hours
+  },
+
+  dnd_session_user_email: {
+    key: "dnd_session_user_email",
+    sensitivity: DataSensitivity.PII,
+    description: "Session email cache",
+    redactionPattern: /[\w\.-]+@[\w\.-]+\.\w+/g,
   },
 
   "secure:auth_token": {
@@ -101,16 +155,96 @@ export const DATA_CLASSIFICATIONS: Record<string, DataClassification> = {
     redactionPattern: /[\w\.-]+@[\w\.-]+\.\w+/g,
   },
 
+  // ========== WORLD & APP STATE ==========
+  "dnd:app:connected_worlds": {
+    key: "dnd:app:connected_worlds",
+    sensitivity: DataSensitivity.SENSITIVE,
+    description: "List of world IDs user has access to",
+  },
+
+  "dnd:session:last_selected_world": {
+    key: "dnd:session:last_selected_world",
+    sensitivity: DataSensitivity.NON_SENSITIVE,
+    description: "Last world selected by user (session state)",
+  },
+
+  "dnd:session:last_user_role": {
+    key: "dnd:session:last_user_role",
+    sensitivity: DataSensitivity.NON_SENSITIVE,
+    description: "Last user role in world (session state)",
+  },
+
+  // ========== DYNAMIC WORLD ACCESS CACHE ==========
+  // Pattern: world_access_{worldId} - user access flag for a world
+  // Pattern: world_access_{worldId}_meta - access metadata (timestamp, version)
+  "world_access_*": {
+    key: "world_access_*",
+    sensitivity: DataSensitivity.SENSITIVE,
+    description:
+      "Dynamic cache keys for user world access (pattern: world_access_{worldId})",
+  },
+
+  "world_access_*_meta": {
+    key: "world_access_*_meta",
+    sensitivity: DataSensitivity.SENSITIVE,
+    description:
+      "Metadata for world access cache (pattern: world_access_{worldId}_meta)",
+  },
+
+  // ========== UI PREFERENCES ==========
+  "dnd:user:theme": {
+    key: "dnd:user:theme",
+    sensitivity: DataSensitivity.NON_SENSITIVE,
+    description:
+      "User theme preference (classic, cyberpunk, etc.) - persists across restarts",
+  },
+
+  "dnd:user:theme_mode": {
+    key: "dnd:user:theme_mode",
+    sensitivity: DataSensitivity.NON_SENSITIVE,
+    description: "User theme mode (light, dark) - persists across restarts",
+  },
+
+  "dnd:user:scale": {
+    key: "dnd:user:scale",
+    sensitivity: DataSensitivity.NON_SENSITIVE,
+    description: "UI scale multiplier preference - persists across restarts",
+  },
+
+  // ========== DEV & DEBUG ==========
+  "dnd:dev:mode": {
+    key: "dnd:dev:mode",
+    sensitivity: DataSensitivity.PUBLIC,
+    description: "Developer mode flag",
+  },
+
+  // ========== CACHE KEYS ==========
   "cache:worlds_list": {
     key: "cache:worlds_list",
     sensitivity: DataSensitivity.SENSITIVE,
-    description: "User world list",
+    description: "User world list cache",
   },
 
   "cache:character_sheets": {
     key: "cache:character_sheets",
     sensitivity: DataSensitivity.SENSITIVE,
-    description: "User character data",
+    description: "User character data cache",
+  },
+
+  // ========== OFFLINE & JOB QUEUE ==========
+  // Pattern: job:* - offline job state persistence
+  "job:*": {
+    key: "job:*",
+    sensitivity: DataSensitivity.SENSITIVE,
+    description: "Dynamic job state keys (pattern: job:*)",
+  },
+
+  // ========== RECOVERY & DIAGNOSTICS ==========
+  // Pattern: dnd:recovery:* - recovery and diagnostic data
+  "dnd:recovery:*": {
+    key: "dnd:recovery:*",
+    sensitivity: DataSensitivity.SENSITIVE,
+    description: "Recovery and diagnostic data (pattern: dnd:recovery:*)",
   },
 };
 

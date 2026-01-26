@@ -1,10 +1,11 @@
-import { logger } from '../utils/logger';
-import { SecureStorage, STORAGE_KEYS } from '../storage';
+import { STORAGE_KEYS } from "../storage/index";
+import { getStorageBackend } from "../storage/privacy";
+import { logger } from "../utils/logger";
 
 // Lazy import Sentry only when needed to reduce bundle size when disabled
 const getSentry = async () => {
   try {
-    return await import('@sentry/react-native');
+    return await import("@sentry/react-native");
   } catch {
     return null;
   }
@@ -18,7 +19,7 @@ const initSentryInstance = async () => {
   return sentryInstance;
 };
 
-export type AuthGuardScope = 'signin' | 'signup' | 'reset';
+export type AuthGuardScope = "signin" | "signup" | "reset";
 
 interface AttemptRecord {
   attempts: number;
@@ -36,28 +37,34 @@ const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
 
-const normalizeKey = (email: string, scope: AuthGuardScope) => `${scope}:${email.trim().toLowerCase()}`;
+const normalizeKey = (email: string, scope: AuthGuardScope) =>
+  `${scope}:${email.trim().toLowerCase()}`;
 
 const loadStore = async (): Promise<Record<string, AttemptRecord>> => {
   try {
-    const raw = await SecureStorage.getItem(STORAGE_KEYS.AUTH_ATTEMPTS);
+    const backend = getStorageBackend(STORAGE_KEYS.AUTH_ATTEMPTS);
+    const raw = await backend.getItem(STORAGE_KEYS.AUTH_ATTEMPTS);
     if (!raw) return {};
     return JSON.parse(raw);
   } catch (error) {
-    logger.error('security', 'Failed to load auth attempt store', error);
+    logger.error("security", "Failed to load auth attempt store", error);
     return {};
   }
 };
 
 const persistStore = async (store: Record<string, AttemptRecord>) => {
   try {
-    await SecureStorage.setJSON(STORAGE_KEYS.AUTH_ATTEMPTS, store);
+    const backend = getStorageBackend(STORAGE_KEYS.AUTH_ATTEMPTS);
+    await backend.setJSON(STORAGE_KEYS.AUTH_ATTEMPTS, store);
   } catch (error) {
-    logger.error('security', 'Failed to persist auth attempt store', error);
+    logger.error("security", "Failed to persist auth attempt store", error);
   }
 };
 
-export const checkAuthGuard = async (email: string, scope: AuthGuardScope = 'signin'): Promise<GuardResult> => {
+export const checkAuthGuard = async (
+  email: string,
+  scope: AuthGuardScope = "signin",
+): Promise<GuardResult> => {
   const key = normalizeKey(email, scope);
   const store = await loadStore();
   const now = Date.now();
@@ -85,7 +92,10 @@ export const checkAuthGuard = async (email: string, scope: AuthGuardScope = 'sig
   return { allowed: remaining > 0, remaining };
 };
 
-export const recordAuthSuccess = async (email: string, scope: AuthGuardScope = 'signin'): Promise<void> => {
+export const recordAuthSuccess = async (
+  email: string,
+  scope: AuthGuardScope = "signin",
+): Promise<void> => {
   const key = normalizeKey(email, scope);
   const store = await loadStore();
   // eslint-disable-next-line security/detect-object-injection
@@ -96,7 +106,10 @@ export const recordAuthSuccess = async (email: string, scope: AuthGuardScope = '
   }
 };
 
-export const recordAuthFailure = async (email: string, scope: AuthGuardScope = 'signin'): Promise<GuardResult> => {
+export const recordAuthFailure = async (
+  email: string,
+  scope: AuthGuardScope = "signin",
+): Promise<GuardResult> => {
   const key = normalizeKey(email, scope);
   const store = await loadStore();
   const now = Date.now();
@@ -113,28 +126,33 @@ export const recordAuthFailure = async (email: string, scope: AuthGuardScope = '
   if (record.attempts >= MAX_ATTEMPTS) {
     record.lockedUntil = now + LOCKOUT_MS;
     // Report lockout to Sentry asynchronously if available (don't block rate limit logic)
-    initSentryInstance().then((Sentry) => {
-      try {
-        if (Sentry?.captureMessage) {
-          Sentry.captureMessage('auth.lockout', {
-            level: 'warning',
-            tags: {
-              scope,
-              emailDomain: email.split('@')[1] || 'unknown',
-            },
-            extra: {
-              attempts: record.attempts,
-              windowMs: WINDOW_MS,
-              lockoutMs: LOCKOUT_MS,
-            },
-          });
+    initSentryInstance()
+      .then((Sentry) => {
+        try {
+          if (Sentry?.captureMessage) {
+            Sentry.captureMessage("auth.lockout", {
+              level: "warning",
+              tags: {
+                scope,
+                emailDomain: email.split("@")[1] || "unknown",
+              },
+              extra: {
+                attempts: record.attempts,
+                windowMs: WINDOW_MS,
+                lockoutMs: LOCKOUT_MS,
+              },
+            });
+          }
+        } catch {
+          logger.debug(
+            "security",
+            "Sentry disabled or failed to report lockout",
+          );
         }
-      } catch {
-        logger.debug('security', 'Sentry disabled or failed to report lockout');
-      }
-    }).catch(() => {
-      // Sentry init failed, continue without reporting
-    });
+      })
+      .catch(() => {
+        // Sentry init failed, continue without reporting
+      });
   }
 
   // eslint-disable-next-line security/detect-object-injection

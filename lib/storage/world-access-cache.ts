@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger';
-import { SecureStorage } from './SecureStorage';
+import { getPrivacyStorageBackend } from './index';
 
 /**
  * World Access Cache Helper
@@ -32,18 +32,20 @@ export const worldAccessCache = {
       const cacheKey = `world_access_${worldId}`;
       const metaKey = `world_access_meta_${worldId}`;
 
+      const backend = getPrivacyStorageBackend(cacheKey);
+
       if (hasAccess) {
         // Set access flag and metadata
-        await SecureStorage.setJSON(cacheKey, true);
-        await SecureStorage.setJSON(metaKey, {
+        await backend.setJSON(cacheKey, true);
+        await backend.setJSON(metaKey, {
           timestamp: Date.now(),
           source: `db_mutation:${source}`,
         });
         logger.debug('storage', `Updated world access flag for ${worldId}`);
       } else {
         // Remove access flag, update metadata to reflect removal
-        await SecureStorage.removeItem(cacheKey);
-        await SecureStorage.setJSON(metaKey, {
+        await backend.removeItem(cacheKey);
+        await backend.setJSON(metaKey, {
           timestamp: Date.now(),
           source: `db_mutation:${source}`,
           removed: true,
@@ -69,8 +71,9 @@ export const worldAccessCache = {
       const cacheKey = `world_access_${worldId}`;
       const metaKey = `world_access_meta_${worldId}`;
 
-      await SecureStorage.removeItem(cacheKey);
-      await SecureStorage.removeItem(metaKey);
+      const backend = getPrivacyStorageBackend(cacheKey);
+      await backend.removeItem(cacheKey);
+      await backend.removeItem(metaKey);
       logger.debug('storage', `Cleared all access flags for world ${worldId}`);
     } catch (error) {
       logger.error(

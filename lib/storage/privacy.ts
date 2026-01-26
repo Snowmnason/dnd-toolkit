@@ -7,7 +7,6 @@
  * See docs/issues/MileStone 2/168 - Privacy PII Data/PRIVACY.md for policy documentation.
  */
 
-import { logger } from "@/lib";
 import { DATA_CLASSIFICATIONS, DataSensitivity } from "./data-classification";
 import { FastCache } from "./FastCache";
 import { SecureStorage } from "./SecureStorage";
@@ -24,14 +23,15 @@ export function classifyKey(key: string): DataSensitivity | null {
 
 /**
  * Determine which storage backend to use for a key.
- * SENSITIVE and PII data → SecureStorage (encrypted)
- * PUBLIC and NON_SENSITIVE → FastCache (unencrypted, fast)
+ * SENSITIVE, PII, and NON_SENSITIVE → SecureStorage (encrypted + persistent)
+ * PUBLIC only → FastCache (unencrypted, session-only, temporary)
  */
 export function shouldUseSecureStorage(key: string): boolean {
   const sensitivity = classifyKey(key);
   return (
     sensitivity === DataSensitivity.SENSITIVE ||
-    sensitivity === DataSensitivity.PII
+    sensitivity === DataSensitivity.PII ||
+    sensitivity === DataSensitivity.NON_SENSITIVE
   );
 }
 
@@ -130,17 +130,31 @@ export async function clearAllUserData(): Promise<void> {
       successCount++;
     } catch (error) {
       failureCount++;
-      logger.error(
-        "privacy",
-        `Failed to clear key ${key}: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      // Lazy import logger to avoid circular dependency
+      import("@/lib/utils/logger")
+        .then(({ logger }) => {
+          logger.error(
+            "privacy",
+            `Failed to clear key ${key}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        })
+        .catch(() => {
+          // Ignore logger import errors
+        });
     }
   }
 
-  logger.info(
-    "privacy",
-    `Cleared user data: ${successCount} keys cleared, ${failureCount} failures`,
-  );
+  // Lazy import logger to avoid circular dependency
+  import("@/lib/utils/logger")
+    .then(({ logger }) => {
+      logger.info(
+        "privacy",
+        `Cleared user data: ${successCount} keys cleared, ${failureCount} failures`,
+      );
+    })
+    .catch(() => {
+      // Ignore logger import errors
+    });
 }
 
 /**

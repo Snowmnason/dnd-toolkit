@@ -1,4 +1,4 @@
-import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
+import { STORAGE_KEYS, getPrivacyStorageBackend } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import {
   createContext,
@@ -41,9 +41,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const loadThemePreferences = async () => {
       try {
+        const familyBackend = getPrivacyStorageBackend(
+          STORAGE_KEYS.THEME_PREFERENCE,
+        );
+        const modeBackend = getPrivacyStorageBackend(STORAGE_KEYS.THEME_MODE);
         const [savedFamily, savedMode] = await Promise.all([
-          SecureStorage.getItem(STORAGE_KEYS.THEME_PREFERENCE),
-          SecureStorage.getItem(STORAGE_KEYS.THEME_MODE),
+          familyBackend.getItem(STORAGE_KEYS.THEME_PREFERENCE),
+          modeBackend.getItem(STORAGE_KEYS.THEME_MODE),
         ]);
 
         if (savedFamily && allThemes[savedFamily as ThemeFamily]) {
@@ -55,7 +59,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             });
         } else {
           setFamilyState("classic");
-          SecureStorage.setItem(STORAGE_KEYS.THEME_PREFERENCE, "classic").catch(
+          familyBackend.setItem(STORAGE_KEYS.THEME_PREFERENCE, "classic").catch(
             (e) =>
               logger
                 .category("ui")
@@ -74,7 +78,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             .debug("ThemeProvider: loaded saved mode", { mode: savedMode });
         } else {
           setModeState("dark");
-          SecureStorage.setItem(STORAGE_KEYS.THEME_MODE, "dark").catch((e) =>
+          const modeBackend = getPrivacyStorageBackend(STORAGE_KEYS.THEME_MODE);
+          modeBackend.setItem(STORAGE_KEYS.THEME_MODE, "dark").catch((e) =>
             logger
               .category("ui")
               .error("Failed to save corrected theme mode", {
@@ -115,7 +120,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           fallback: "classic",
         });
       setFamilyState("classic");
-      SecureStorage.setItem(STORAGE_KEYS.THEME_PREFERENCE, "classic").catch(
+      const backend = getPrivacyStorageBackend(STORAGE_KEYS.THEME_PREFERENCE);
+      backend.setItem(STORAGE_KEYS.THEME_PREFERENCE, "classic").catch(
         (e) =>
           logger
             .category("ui")
@@ -126,7 +132,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       logger
         .category("ui")
         .debug("ThemeProvider: family changed", { family: f });
-      SecureStorage.setItem(STORAGE_KEYS.THEME_PREFERENCE, f).catch((e) =>
+      const backend = getPrivacyStorageBackend(STORAGE_KEYS.THEME_PREFERENCE);
+      backend.setItem(STORAGE_KEYS.THEME_PREFERENCE, f).catch((e) =>
         logger
           .category("ui")
           .error("Failed to save theme preference", { error: String(e) }),
@@ -138,7 +145,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const setMode = useCallback((m: ThemeMode) => {
     setModeState(m);
     logger.category("ui").debug("ThemeProvider: mode changed", { mode: m });
-    SecureStorage.setItem(STORAGE_KEYS.THEME_MODE, m).catch((e) =>
+    const backend = getPrivacyStorageBackend(STORAGE_KEYS.THEME_MODE);
+    backend.setItem(STORAGE_KEYS.THEME_MODE, m).catch((e) =>
       logger
         .category("ui")
         .error("Failed to save theme mode", { error: String(e) }),
@@ -147,6 +155,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   /** Update both family + mode and persist */
   const setTheme = useCallback((f: ThemeFamily, m: ThemeMode) => {
+    const familyBackend = getPrivacyStorageBackend(STORAGE_KEYS.THEME_PREFERENCE);
+    const modeBackend = getPrivacyStorageBackend(STORAGE_KEYS.THEME_MODE);
+    
     if (!allThemes[f]) {
       logger
         .category("ui")
@@ -154,7 +165,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           requested: f,
           fallback: "classic",
         });
-      SecureStorage.setItem(STORAGE_KEYS.THEME_PREFERENCE, "classic").catch(
+      familyBackend.setItem(STORAGE_KEYS.THEME_PREFERENCE, "classic").catch(
         (e) =>
           logger
             .category("ui")
@@ -162,7 +173,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       );
     } else {
       setFamilyState(f);
-      SecureStorage.setItem(STORAGE_KEYS.THEME_PREFERENCE, f).catch((e) =>
+      familyBackend.setItem(STORAGE_KEYS.THEME_PREFERENCE, f).catch((e) =>
         logger
           .category("ui")
           .error("Failed to save theme preference", { error: String(e) }),
@@ -175,7 +186,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         family: f || "classic",
         mode: m,
       });
-    SecureStorage.setItem(STORAGE_KEYS.THEME_MODE, m).catch((e) =>
+    modeBackend.setItem(STORAGE_KEYS.THEME_MODE, m).catch((e) =>
       logger
         .category("ui")
         .error("Failed to save theme mode", { error: String(e) }),

@@ -37,8 +37,11 @@ export { FastCache } from "./FastCache";
 export {
   classifyKey,
   clearAllUserData,
-  getKeysBySensitivity, getStorageBackend as getPrivacyStorageBackend, getRetentionInfo,
-  getSensitiveKeys, isSensitiveData,
+  getKeysBySensitivity,
+  getStorageBackend as getPrivacyStorageBackend,
+  getRetentionInfo,
+  getSensitiveKeys,
+  isSensitiveData,
   redactForLogs,
   shouldUseSecureStorage
 } from "./privacy";
@@ -98,6 +101,9 @@ export const STORAGE_KEYS = {
 
   // Invites - important auth flow state
   PENDING_INVITE: "dnd:invite:pending",
+
+  // Session email cache
+  SESSION_USER_EMAIL: "dnd_session_user_email",
 
   // User preferences - must persist
   THEME_PREFERENCE: "dnd:user:theme",

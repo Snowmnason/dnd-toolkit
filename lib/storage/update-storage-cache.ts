@@ -1,7 +1,7 @@
 import { logger } from "../utils/logger";
-// Import directly from SecureStorage.ts to avoid circular dependency with index.ts
-// index.ts exports updateStorageCache, and this file needs SecureStorage
-import { SecureStorage } from "./SecureStorage";
+// Import directly from storage modules to avoid circular dependency with index.ts
+// index.ts exports updateStorageCache, and this file needs storage functions
+import { getStorageBackend } from "./privacy";
 
 // Define STORAGE_KEYS locally to avoid importing from index.ts (which would create a cycle)
 const STORAGE_KEYS = {
@@ -36,7 +36,8 @@ export const updateStorageCache = {
   async refreshAllWorldsCache(): Promise<void> {
     try {
       // Get userId from SecureStorage (never stale)
-      const userData = await SecureStorage.getJSON<{ id: string }>(
+      const backend = getStorageBackend(STORAGE_KEYS.USER_DATA);
+      const userData = await backend.getJSON<{ id: string }>(
         STORAGE_KEYS.USER_DATA
       );
       const userId = userData?.id;
@@ -67,8 +68,9 @@ export const updateStorageCache = {
           const cacheKey = `world_access_${world.world_id}`;
           const metaKey = `world_access_meta_${world.world_id}`;
 
-          await SecureStorage.setJSON(cacheKey, true);
-          await SecureStorage.setJSON(metaKey, {
+          const worldBackend = getStorageBackend(cacheKey);
+          await worldBackend.setJSON(cacheKey, true);
+          await worldBackend.setJSON(metaKey, {
             timestamp,
             source: "supabase",
           });
@@ -147,10 +149,13 @@ export const updateStorageCache = {
       }
 
       // Update SecureStorage cache with fresh profile
-      await SecureStorage.setJSON(STORAGE_KEYS.USER_DATA, userProfile);
+      const userDataBackend = getStorageBackend(STORAGE_KEYS.USER_DATA);
+      await userDataBackend.setJSON(STORAGE_KEYS.USER_DATA, userProfile);
 
       // Update metadata with fresh timestamp
-      await SecureStorage.setJSON(`${STORAGE_KEYS.USER_DATA}_meta`, {
+      const userDataMetaKey = `${STORAGE_KEYS.USER_DATA}_meta`;
+      const metaBackend = getStorageBackend(userDataMetaKey);
+      await metaBackend.setJSON(userDataMetaKey, {
         timestamp: Date.now(),
         source: "supabase",
       });

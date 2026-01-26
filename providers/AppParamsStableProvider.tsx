@@ -1,5 +1,5 @@
 import { AuthStateManager } from "@/lib/auth/auth-state";
-import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
+import { STORAGE_KEYS, getPrivacyStorageBackend } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import React, {
     createContext as createReactContext,
@@ -62,7 +62,8 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
           setStableParams((prev) => ({ ...prev, userId: undefined }));
         }
 
-        const worldIds = await SecureStorage.getJSON<string[]>(
+        const backend = getPrivacyStorageBackend(STORAGE_KEYS.CONNECTED_WORLDS);
+        const worldIds = await backend.getJSON<string[]>(
           STORAGE_KEYS.CONNECTED_WORLDS,
         );
         if (worldIds && Array.isArray(worldIds)) {
@@ -112,7 +113,10 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
                 );
 
                 // Persist verified list to storage
-                await SecureStorage.setJSON(
+                const verifyBackend = getPrivacyStorageBackend(
+                  STORAGE_KEYS.CONNECTED_WORLDS,
+                );
+                await verifyBackend.setJSON(
                   STORAGE_KEYS.CONNECTED_WORLDS,
                   verifiedWorldIds,
                 );
@@ -205,7 +209,8 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
 
   const setConnectedWorldIds = useCallback((worldIds: string[]) => {
     setStableParams((prev) => ({ ...prev, connectedWorldIds: worldIds }));
-    void SecureStorage.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, worldIds).catch(
+    const backend = getPrivacyStorageBackend(STORAGE_KEYS.CONNECTED_WORLDS);
+    void backend.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, worldIds).catch(
       (error) => {
         logger.error(
           "other",
@@ -220,7 +225,8 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     setStableParams((prev) => {
       if (prev.connectedWorldIds.includes(worldId)) return prev;
       const updated = [...prev.connectedWorldIds, worldId];
-      void SecureStorage.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, updated);
+      const backend = getPrivacyStorageBackend(STORAGE_KEYS.CONNECTED_WORLDS);
+      void backend.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, updated);
       return { ...prev, connectedWorldIds: updated };
     });
   }, []);
@@ -229,7 +235,8 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     setStableParams((prev) => {
       if (!prev.connectedWorldIds.includes(worldId)) return prev;
       const updated = prev.connectedWorldIds.filter((id) => id !== worldId);
-      void SecureStorage.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, updated);
+      const backend = getPrivacyStorageBackend(STORAGE_KEYS.CONNECTED_WORLDS);
+      void backend.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, updated);
       return { ...prev, connectedWorldIds: updated };
     });
   }, []);
@@ -239,7 +246,8 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     setStableParams({ userId: undefined, connectedWorldIds: [] });
 
     // Always clear storage, regardless of state (prevents stale data if storage/state mismatch occurs)
-    void SecureStorage.removeItem(STORAGE_KEYS.CONNECTED_WORLDS).catch(
+    const backend = getPrivacyStorageBackend(STORAGE_KEYS.CONNECTED_WORLDS);
+    void backend.removeItem(STORAGE_KEYS.CONNECTED_WORLDS).catch(
       (error) => {
         logger.error("other", "Failed to clear connected worlds cache", error);
       },

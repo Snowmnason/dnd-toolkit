@@ -1,5 +1,5 @@
 import { logger, useAppKernel } from "@/lib";
-import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
+import { STORAGE_KEYS, getPrivacyStorageBackend } from "@/lib/storage";
 import { useRouter } from "expo-router";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -71,7 +71,8 @@ export default function HomePage() {
       try {
         // CRITICAL: Check hasAccount first - if user logged out, don't use cached login time
         // This prevents the redirect loop after logout
-        const authState = await SecureStorage.getJSON(STORAGE_KEYS.HAS_ACCOUNT);
+        const hasAccountBackend = getPrivacyStorageBackend(STORAGE_KEYS.HAS_ACCOUNT);
+        const authState = await hasAccountBackend.getJSON<{ hasAccount: boolean }>(STORAGE_KEYS.HAS_ACCOUNT);
         const hasAccount = authState?.hasAccount === true;
 
         // If user explicitly logged out (hasAccount is false/null/undefined), show welcome
@@ -86,7 +87,10 @@ export default function HomePage() {
         }
 
         // User is logged in, check if their last login is recent
-        const lastLoggedInStr = await SecureStorage.getItem(
+        const lastLoggedInBackend = getPrivacyStorageBackend(
+          STORAGE_KEYS.LAST_LOGGED_IN
+        );
+        const lastLoggedInStr = await lastLoggedInBackend.getItem(
           STORAGE_KEYS.LAST_LOGGED_IN
         );
 
