@@ -28,10 +28,20 @@
  */
 
 export {
-  DATA_CLASSIFICATIONS, DataSensitivity, validateClassifications,
+  DATA_CLASSIFICATIONS,
+  DataSensitivity,
+  validateClassifications,
   type DataClassification
 } from "./data-classification";
 export { FastCache } from "./FastCache";
+export {
+  classifyKey,
+  clearAllUserData,
+  getKeysBySensitivity, getStorageBackend as getPrivacyStorageBackend, getRetentionInfo,
+  getSensitiveKeys, isSensitiveData,
+  redactForLogs,
+  shouldUseSecureStorage
+} from "./privacy";
 export { SecureStorage } from "./SecureStorage";
 export {
   getStorageBackend,
