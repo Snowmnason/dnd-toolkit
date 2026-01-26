@@ -1,4 +1,9 @@
-import { SecureStorage, STORAGE_KEYS } from "../storage";
+import {
+  clearAllUserData,
+  getPrivacyStorageBackend,
+  SecureStorage,
+  STORAGE_KEYS,
+} from "../storage";
 import { logger } from "../utils/logger";
 
 // Cache dynamic imports to prevent re-importing modules on every auth check
@@ -41,7 +46,8 @@ export const AuthStateManager = {
     try {
       const newState: SupabaseAuthState = { hasAccount };
       const storageKey = STORAGE_KEYS.HAS_ACCOUNT;
-      await SecureStorage.setJSON(storageKey, newState);
+      const backend = getPrivacyStorageBackend(storageKey);
+      await backend.setJSON(storageKey, newState);
     } catch (error) {
       logger.error("auth", "Error setting hasAccount:", error);
     }
@@ -53,11 +59,12 @@ export const AuthStateManager = {
       // Update auth state
       await this.setHasAccount(true);
 
-      // Optionally cache minimal session info (encrypted via SecureStorage)
+      // Optionally cache minimal session info (privacy-routed)
       if (session?.user?.email) {
         try {
-          const key = "dnd_session_user_email";
-          await SecureStorage.setItem(key, session.user.email);
+          const key = STORAGE_KEYS.SESSION_USER_EMAIL;
+          const backend = getPrivacyStorageBackend(key);
+          await backend.setItem(key, session.user.email);
         } catch (error) {
           logger.error("auth", "Error caching session email:", error);
         }
@@ -82,10 +89,26 @@ export const AuthStateManager = {
       // Clear user-specific data (but keep storage keys for reuse by next user)
       // Clear LAST_LOGGED_IN by setting to empty string (will fail !lastLoggedInStr check)
       await Promise.all([
-        SecureStorage.removeItem(STORAGE_KEYS.USER_DATA),
-        SecureStorage.removeItem(STORAGE_KEYS.CONNECTED_WORLDS),
-        SecureStorage.setItem(STORAGE_KEYS.LAST_LOGGED_IN, ""), // Explicitly clear (empty string fails falsy checks)
-        SecureStorage.removeItem("dnd_session_user_email"), // Session email cache
+        (async () => {
+          const backend = getPrivacyStorageBackend(STORAGE_KEYS.USER_DATA);
+          await backend.removeItem(STORAGE_KEYS.USER_DATA);
+        })(),
+        (async () => {
+          const backend = getPrivacyStorageBackend(
+            STORAGE_KEYS.CONNECTED_WORLDS,
+          );
+          await backend.removeItem(STORAGE_KEYS.CONNECTED_WORLDS);
+        })(),
+        (async () => {
+          const backend = getPrivacyStorageBackend(STORAGE_KEYS.LAST_LOGGED_IN);
+          await backend.setItem(STORAGE_KEYS.LAST_LOGGED_IN, "");
+        })(),
+        (async () => {
+          const backend = getPrivacyStorageBackend(
+            STORAGE_KEYS.SESSION_USER_EMAIL,
+          );
+          await backend.removeItem(STORAGE_KEYS.SESSION_USER_EMAIL);
+        })(),
       ]);
 
       // Clear world access cache entries (pattern-based)
@@ -95,30 +118,30 @@ export const AuthStateManager = {
         const worldAccessKeys = allStorageKeys.filter(
           (key) =>
             key.startsWith("world_access_") ||
-            key.startsWith("world_access_meta_")
+            key.startsWith("world_access_meta_"),
         );
         await Promise.all(
-          worldAccessKeys.map((key) => SecureStorage.removeItem(key))
+          worldAccessKeys.map((key) => SecureStorage.removeItem(key)),
         );
 
         if (worldAccessKeys.length > 0) {
           logger.debug(
             "auth",
-            `Cleared ${worldAccessKeys.length} world access cache entries`
+            `Cleared ${worldAccessKeys.length} world access cache entries`,
           );
         }
       } catch (error) {
         logger.warn(
           "auth",
           "Could not clear world access cache entries:",
-          error
+          error,
         );
         // Continue even if this fails - world access cache is non-critical
       }
 
       logger.debug(
         "auth",
-        "Cleared all auth storage keys and user-specific caches"
+        "Cleared all auth storage keys and user-specific caches",
       );
     } catch (error) {
       logger.error("auth", "Error clearing auth state:", error);
@@ -128,8 +151,9 @@ export const AuthStateManager = {
   // Get stored user ID (convenience method)
   async getUserId(): Promise<string | undefined> {
     try {
-      const userData = await SecureStorage.getJSON<{ id: string }>(
-        STORAGE_KEYS.USER_DATA
+      const backend = getPrivacyStorageBackend(STORAGE_KEYS.USER_DATA);
+      const userData = await backend.getJSON<{ id: string }>(
+        STORAGE_KEYS.USER_DATA,
       );
       return userData?.id;
     } catch (error) {
@@ -141,7 +165,8 @@ export const AuthStateManager = {
   // Get stored user data (full profile)
   async getUserData(): Promise<any> {
     try {
-      const userData = await SecureStorage.getJSON(STORAGE_KEYS.USER_DATA);
+      const backend = getPrivacyStorageBackend(STORAGE_KEYS.USER_DATA);
+      const userData = await backend.getJSON(STORAGE_KEYS.USER_DATA);
       return userData;
     } catch (error) {
       logger.error("auth", "Error getting user data:", error);
@@ -152,7 +177,8 @@ export const AuthStateManager = {
   // Save user data to storage
   async saveUserData(userData: any): Promise<void> {
     try {
-      await SecureStorage.setJSON(STORAGE_KEYS.USER_DATA, userData);
+      const backend = getPrivacyStorageBackend(STORAGE_KEYS.USER_DATA);
+      await backend.setJSON(STORAGE_KEYS.USER_DATA, userData);
     } catch (error) {
       logger.error("auth", "Error saving user data:", error);
     }
@@ -194,9 +220,9 @@ export const AuthStateManager = {
           (resolve) => {
             timeoutId = setTimeout(
               () => resolve({ data: { session: null } }),
-              2000
+              2000,
             ); // 2 second timeout
-          }
+          },
         );
 
         const {
@@ -252,19 +278,34 @@ export const AuthStateManager = {
         }
       }
 
+      // Clear all user data per privacy policy (SENSITIVE and PII keys)
+      await clearAllUserData();
+
       // Clear local auth state (includes all cache keys)
       await this.clearAuthState();
+
+      // Reset theme to defaults (classic, dark mode) for next user
+      const themeBackend = getPrivacyStorageBackend(
+        STORAGE_KEYS.THEME_PREFERENCE,
+      );
+      const modeBackend = getPrivacyStorageBackend(STORAGE_KEYS.THEME_MODE);
+      await Promise.all([
+        themeBackend.setItem(STORAGE_KEYS.THEME_PREFERENCE, "classic"),
+        modeBackend.setItem(STORAGE_KEYS.THEME_MODE, "dark"),
+      ]);
+
       logger.info("auth", "✅ Logout complete");
     } catch (error) {
       logger.error("auth", "Error during logout:", error);
       // Don't throw - fail gracefully and ensure auth state is cleared
       try {
+        await clearAllUserData();
         await this.clearAuthState();
       } catch (clearError) {
         logger.error(
           "auth",
           "Failed to clear auth state during error recovery:",
-          clearError
+          clearError,
         );
       }
     }
@@ -287,7 +328,7 @@ export const AuthStateManager = {
   async verifyWorldAccessWithDatabase(
     worldId: string,
     onAccessRevoked?: (reason: string) => void,
-    options?: { forceFresh?: boolean }
+    options?: { forceFresh?: boolean },
   ): Promise<{
     hasAccess: boolean;
     fromCache: boolean;
@@ -295,7 +336,7 @@ export const AuthStateManager = {
   }> {
     logger.info(
       "auth",
-      `[VERIFY:START] Verifying world ${worldId}, forceFresh=${options?.forceFresh}`
+      `[VERIFY:START] Verifying world ${worldId}, forceFresh=${options?.forceFresh}`,
     );
 
     // Cache freshness window: only trust cache younger than 4 hours
@@ -309,7 +350,7 @@ export const AuthStateManager = {
       if (options?.forceFresh) {
         logger.info(
           "auth",
-          `[VERIFY:FORCE] Force fresh check for world ${worldId}`
+          `[VERIFY:FORCE] Force fresh check for world ${worldId}`,
         );
 
         // Refresh all worlds cache (if one is stale, all are stale)
@@ -318,7 +359,8 @@ export const AuthStateManager = {
         await updateStorageCache.refreshAllWorldsCache();
 
         // Now check cache - it's been refreshed
-        const freshCached = await SecureStorage.getJSON<boolean>(cacheKey);
+        const backend = getPrivacyStorageBackend(cacheKey);
+        const freshCached = await backend.getJSON<boolean>(cacheKey);
         logger.info("auth", `[VERIFY:FORCE-RESULT] hasAccess=${freshCached}`);
 
         return {
@@ -329,22 +371,23 @@ export const AuthStateManager = {
       }
 
       // Step 1: Check SecureStorage cache
-      const cached = await SecureStorage.getJSON<boolean>(cacheKey);
-      const cacheMeta = await SecureStorage.getJSON<CacheMetadata>(metaKey);
+      const backend = getPrivacyStorageBackend(cacheKey);
+      const cached = await backend.getJSON<boolean>(cacheKey);
+      const cacheMeta = await backend.getJSON<CacheMetadata>(metaKey);
 
       const cacheAge = cacheMeta ? Date.now() - cacheMeta.timestamp : Infinity;
       const isCacheFresh = cacheAge < CACHE_FRESH_THRESHOLD;
 
       logger.info(
         "auth",
-        `[VERIFY:CACHE] world=${worldId}, hasCache=${cached !== null}, ageMs=${cacheAge}, isCacheFresh=${isCacheFresh}`
+        `[VERIFY:CACHE] world=${worldId}, hasCache=${cached !== null}, ageMs=${cacheAge}, isCacheFresh=${isCacheFresh}`,
       );
 
       // Step 2: If cache is fresh AND exists, trust it
       if (isCacheFresh && cached !== null) {
         logger.info(
           "auth",
-          `[VERIFY:FRESH] Cache fresh for world ${worldId}, trusting cache, hasAccess=${cached}`
+          `[VERIFY:FRESH] Cache fresh for world ${worldId}, trusting cache, hasAccess=${cached}`,
         );
         return {
           hasAccess: cached === true,
@@ -357,7 +400,7 @@ export const AuthStateManager = {
       // If one world is stale, all worlds are stale - refresh everything at once
       logger.info(
         "auth",
-        `[VERIFY:STALE] Cache ${cached === null ? "missing" : "stale"}, refreshing all worlds from database`
+        `[VERIFY:STALE] Cache ${cached === null ? "missing" : "stale"}, refreshing all worlds from database`,
       );
 
       // Refresh all worlds cache (userId from SecureStorage never stale)
@@ -366,7 +409,7 @@ export const AuthStateManager = {
       await updateStorageCache.refreshAllWorldsCache();
 
       // Now check cache again - it's been refreshed
-      const freshCached = await SecureStorage.getJSON<boolean>(cacheKey);
+      const freshCached = await backend.getJSON<boolean>(cacheKey);
       logger.info("auth", `[VERIFY:FRESH-RESULT] hasAccess=${freshCached}`);
 
       return {
@@ -392,7 +435,7 @@ export const AuthStateManager = {
         logger.error(
           "auth",
           `[VERIFY:FAIL] Database refresh also failed:`,
-          dbError
+          dbError,
         );
         // On complete failure, deny access for security
         return {
@@ -408,7 +451,7 @@ export const AuthStateManager = {
    * This is the "slow" source of truth
    */
   async checkWorldAccessInSupabase(
-    worldId: string
+    worldId: string,
   ): Promise<{ hasAccess: boolean; reason?: string }> {
     try {
       if (!isSupabaseConfiguredCache) {
@@ -420,7 +463,7 @@ export const AuthStateManager = {
       if (!isSupabaseConfiguredCache()) {
         logger.warn(
           "auth",
-          "[VERIFY] Supabase not configured, allowing access"
+          "[VERIFY] Supabase not configured, allowing access",
         );
         return { hasAccess: true };
       }
@@ -499,7 +542,7 @@ export const AuthStateManager = {
       if (session && !authState.hasAccount) {
         logger.info(
           "auth",
-          "🔄 [getRoutingDecision] Found Supabase session but local hasAccount=false, syncing..."
+          "🔄 [getRoutingDecision] Found Supabase session but local hasAccount=false, syncing...",
         );
         await this.setHasAccount(true);
       }

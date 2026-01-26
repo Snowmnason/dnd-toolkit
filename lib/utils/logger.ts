@@ -8,9 +8,11 @@
  * - Automatic production log stripping preparation
  * - Consistent formatting with emojis for easy scanning
  * - Module/context tagging for better debugging
+ * - Automatic PII redaction for sensitive data (emails, tokens, IDs)
  */
 
 import { getAppConfig } from "@/lib/config/loader";
+import { redactForLogs } from "@/lib/storage/privacy";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -42,7 +44,7 @@ interface LoggerConfig {
 class CategoryLogger {
   constructor(
     private logger: Logger,
-    private category: LogCategory
+    private category: LogCategory,
   ) {}
 
   debug(context: string | undefined, ...args: any[]): void;
@@ -190,6 +192,7 @@ class Logger {
 
   /**
    * Format log message with optional context and timestamp
+   * Automatically redacts PII/sensitive data from all arguments
    */
   private formatMessage(
     emoji: string,
@@ -211,7 +214,16 @@ class Logger {
     }
 
     parts.push(emoji);
-    parts.push(...args);
+
+    // Automatically redact PII/sensitive data from all arguments
+    const redactedArgs = args.map((arg) => {
+      if (typeof arg === "string" || typeof arg === "object") {
+        return redactForLogs(arg);
+      }
+      return arg;
+    });
+
+    parts.push(...redactedArgs);
 
     return parts;
   }
@@ -318,7 +330,7 @@ class Logger {
     if (!this.isEnabled("warn", category)) return;
 
     console.warn(
-      ...this.formatMessage("⚠️", context, category, ...messageArgs)
+      ...this.formatMessage("⚠️", context, category, ...messageArgs),
     );
   }
 
@@ -352,7 +364,7 @@ class Logger {
     if (!this.isEnabled("error", category)) return;
 
     console.error(
-      ...this.formatMessage("❌", context, category, ...messageArgs)
+      ...this.formatMessage("❌", context, category, ...messageArgs),
     );
   }
 
@@ -394,7 +406,7 @@ class Logger {
   group(
     label: string,
     collapsed: boolean = false,
-    category?: LogCategory
+    category?: LogCategory,
   ): void {
     if (!this.isEnabled("info", category)) return;
 

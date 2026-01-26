@@ -1,4 +1,4 @@
-import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
+import { getPrivacyStorageBackend, STORAGE_KEYS } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import {
   createContext,
@@ -37,32 +37,41 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>("dark");
   const [isLoading, setIsLoading] = useState(true);
 
+  // Cache backend references at function scope to avoid repeated lookups
+  const familyBackend = useMemo(
+    () => getPrivacyStorageBackend(STORAGE_KEYS.THEME_PREFERENCE),
+    [],
+  );
+  const modeBackend = useMemo(
+    () => getPrivacyStorageBackend(STORAGE_KEYS.THEME_MODE),
+    [],
+  );
+
   // Load saved theme preferences on mount
   useEffect(() => {
     const loadThemePreferences = async () => {
       try {
         const [savedFamily, savedMode] = await Promise.all([
-          SecureStorage.getItem(STORAGE_KEYS.THEME_PREFERENCE),
-          SecureStorage.getItem(STORAGE_KEYS.THEME_MODE),
+          familyBackend.getItem(STORAGE_KEYS.THEME_PREFERENCE),
+          modeBackend.getItem(STORAGE_KEYS.THEME_MODE),
         ]);
 
         if (savedFamily && allThemes[savedFamily as ThemeFamily]) {
           setFamilyState(savedFamily as ThemeFamily);
-          logger
-            .category("ui")
-            .debug("ThemeProvider: loaded saved family", {
-              family: savedFamily,
-            });
+          logger.category("ui").debug("ThemeProvider: loaded saved family", {
+            family: savedFamily,
+          });
         } else {
           setFamilyState("classic");
-          SecureStorage.setItem(STORAGE_KEYS.THEME_PREFERENCE, "classic").catch(
-            (e) =>
+          familyBackend
+            .setItem(STORAGE_KEYS.THEME_PREFERENCE, "classic")
+            .catch((e) =>
               logger
                 .category("ui")
                 .error("Failed to save corrected theme preference", {
                   error: String(e),
                 }),
-          );
+            );
           logger
             .category("ui")
             .debug("ThemeProvider: invalid saved family, defaulted to classic");
@@ -74,12 +83,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             .debug("ThemeProvider: loaded saved mode", { mode: savedMode });
         } else {
           setModeState("dark");
-          SecureStorage.setItem(STORAGE_KEYS.THEME_MODE, "dark").catch((e) =>
-            logger
-              .category("ui")
-              .error("Failed to save corrected theme mode", {
-                error: String(e),
-              }),
+          modeBackend.setItem(STORAGE_KEYS.THEME_MODE, "dark").catch((e) =>
+            logger.category("ui").error("Failed to save corrected theme mode", {
+              error: String(e),
+            }),
           );
           logger
             .category("ui")
@@ -97,7 +104,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     };
 
     loadThemePreferences();
-  }, []);
+  }, [familyBackend, modeBackend]);
 
   // Resolve active theme tokens from family + mode
   const theme: ThemeTokens = useMemo(() => {
@@ -106,81 +113,94 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [family, mode]);
 
   /** Update family and persist */
-  const setFamily = useCallback((f: ThemeFamily) => {
-    if (!allThemes[f]) {
-      logger
-        .category("ui")
-        .warn("ThemeProvider: unknown theme", {
+  const setFamily = useCallback(
+    (f: ThemeFamily) => {
+      if (!allThemes[f]) {
+        logger.category("ui").warn("ThemeProvider: unknown theme", {
           requested: f,
           fallback: "classic",
         });
-      setFamilyState("classic");
-      SecureStorage.setItem(STORAGE_KEYS.THEME_PREFERENCE, "classic").catch(
-        (e) =>
-          logger
-            .category("ui")
-            .error("Failed to save theme preference", { error: String(e) }),
-      );
-    } else {
-      setFamilyState(f);
-      logger
-        .category("ui")
-        .debug("ThemeProvider: family changed", { family: f });
-      SecureStorage.setItem(STORAGE_KEYS.THEME_PREFERENCE, f).catch((e) =>
+        setFamilyState("classic");
+        familyBackend
+          .setItem(STORAGE_KEYS.THEME_PREFERENCE, "classic")
+          .catch((e) =>
+            logger
+              .category("ui")
+              .error("Failed to save theme preference", { error: String(e) }),
+          );
+      } else {
+        setFamilyState(f);
         logger
           .category("ui")
-          .error("Failed to save theme preference", { error: String(e) }),
-      );
-    }
-  }, []);
+          .debug("ThemeProvider: family changed", { family: f });
+        familyBackend
+          .setItem(STORAGE_KEYS.THEME_PREFERENCE, f)
+          .catch((e) =>
+            logger
+              .category("ui")
+              .error("Failed to save theme preference", { error: String(e) }),
+          );
+      }
+    },
+    [familyBackend],
+  );
 
   /** Update mode and persist */
-  const setMode = useCallback((m: ThemeMode) => {
-    setModeState(m);
-    logger.category("ui").debug("ThemeProvider: mode changed", { mode: m });
-    SecureStorage.setItem(STORAGE_KEYS.THEME_MODE, m).catch((e) =>
-      logger
-        .category("ui")
-        .error("Failed to save theme mode", { error: String(e) }),
-    );
-  }, []);
+  const setMode = useCallback(
+    (m: ThemeMode) => {
+      setModeState(m);
+      logger.category("ui").debug("ThemeProvider: mode changed", { mode: m });
+      modeBackend
+        .setItem(STORAGE_KEYS.THEME_MODE, m)
+        .catch((e) =>
+          logger
+            .category("ui")
+            .error("Failed to save theme mode", { error: String(e) }),
+        );
+    },
+    [modeBackend],
+  );
 
   /** Update both family + mode and persist */
-  const setTheme = useCallback((f: ThemeFamily, m: ThemeMode) => {
-    if (!allThemes[f]) {
-      logger
-        .category("ui")
-        .warn("ThemeProvider: unknown theme", {
+  const setTheme = useCallback(
+    (f: ThemeFamily, m: ThemeMode) => {
+      if (!allThemes[f]) {
+        logger.category("ui").warn("ThemeProvider: unknown theme", {
           requested: f,
           fallback: "classic",
         });
-      SecureStorage.setItem(STORAGE_KEYS.THEME_PREFERENCE, "classic").catch(
-        (e) =>
-          logger
-            .category("ui")
-            .error("Failed to save theme preference", { error: String(e) }),
-      );
-    } else {
-      setFamilyState(f);
-      SecureStorage.setItem(STORAGE_KEYS.THEME_PREFERENCE, f).catch((e) =>
-        logger
-          .category("ui")
-          .error("Failed to save theme preference", { error: String(e) }),
-      );
-    }
-    setModeState(m);
-    logger
-      .category("ui")
-      .debug("ThemeProvider: theme changed", {
+        familyBackend
+          .setItem(STORAGE_KEYS.THEME_PREFERENCE, "classic")
+          .catch((e) =>
+            logger
+              .category("ui")
+              .error("Failed to save theme preference", { error: String(e) }),
+          );
+      } else {
+        setFamilyState(f);
+        familyBackend
+          .setItem(STORAGE_KEYS.THEME_PREFERENCE, f)
+          .catch((e) =>
+            logger
+              .category("ui")
+              .error("Failed to save theme preference", { error: String(e) }),
+          );
+      }
+      setModeState(m);
+      logger.category("ui").debug("ThemeProvider: theme changed", {
         family: f || "classic",
         mode: m,
       });
-    SecureStorage.setItem(STORAGE_KEYS.THEME_MODE, m).catch((e) =>
-      logger
-        .category("ui")
-        .error("Failed to save theme mode", { error: String(e) }),
-    );
-  }, []);
+      modeBackend
+        .setItem(STORAGE_KEYS.THEME_MODE, m)
+        .catch((e) =>
+          logger
+            .category("ui")
+            .error("Failed to save theme mode", { error: String(e) }),
+        );
+    },
+    [familyBackend, modeBackend],
+  );
 
   // Memoize context value to prevent unnecessary re-renders of all consumers
   const contextValue = useMemo(

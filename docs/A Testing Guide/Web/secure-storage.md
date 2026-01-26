@@ -293,6 +293,91 @@ Why this matters: If sensitive data is stored in plain-text, anyone with browser
 
 ---
 
+### ✓ Test 10: Privacy Data Classification Respected
+
+**Scenario:** Verify that data is stored/cleared according to privacy classification (SENSITIVE, PII, NON_SENSITIVE, PUBLIC)
+
+**Steps:**
+
+1. Sign in to the app
+2. Open DevTools → Storage → Local Storage / Session Storage
+3. Note what's stored (watch for theme, preferences, tokens, etc.)
+4. Sign out of the app
+5. Check storage again for what remains
+
+**Expected Outcome:**
+
+- ✅ **SENSITIVE/PII data cleared:** Auth tokens, user email, refresh tokens removed
+- ✅ **NON_SENSITIVE data cleared:** Theme preferences, selected world ID removed on logout
+- ✅ **PUBLIC data may remain:** Query caches, non-sensitive UI state (optional)
+- ✅ User cannot see what they were doing before logout (privacy reset)
+
+**How to Record a Pass:**
+
+- [ ] Screenshot showing what's stored BEFORE logout
+- [ ] Screenshot showing what's cleared AFTER logout
+- [ ] Note: "Privacy classification respected; SENSITIVE/PII/NON_SENSITIVE data cleared on logout"
+
+---
+
+### ✓ Test 11: Logout Resets Theme to Default
+
+**Scenario:** Verify that theme is reset to "classic" dark mode after logout (clean slate for next user)
+
+**Steps:**
+
+1. Sign in to the app
+2. Change theme to something other than "classic" (e.g., "cyberpunk", "light mode")
+3. Take note of the theme
+4. Sign out
+5. Observe the theme—it should be back to "classic" dark mode
+6. Reload the page and verify it stays as default
+
+**Expected Outcome:**
+
+- ✅ After logout, theme immediately reverts to "classic" dark mode
+- ✅ Next user does not see previous user's theme choice
+- ✅ Reloading page maintains default theme (data was saved)
+
+**How to Record a Pass:**
+
+- [ ] Screenshot of app with custom theme before logout
+- [ ] Screenshot of app with default theme after logout
+- [ ] Note: "Theme correctly reset to classic/dark mode on logout"
+
+---
+
+### ✓ Test 12: PII Not Visible in Browser Console Logs
+
+**Scenario:** Verify that sensitive data (emails, tokens, user IDs) is redacted in browser logs
+
+**Steps:**
+
+1. Sign in to the app with an account
+2. Open DevTools → Console tab
+3. Perform various actions (navigate, load world, etc.)
+4. Search the console logs for:
+   - Email address used to sign in
+   - Auth token (if visible anywhere)
+   - User ID
+   - Session ID
+
+**Expected Outcome:**
+
+- ✅ Email is NOT visible in logs (or shows as `[REDACTED]`)
+- ✅ Auth tokens are NOT visible in logs (or show as `[REDACTED]`)
+- ✅ User IDs are NOT visible in logs (or show as `[REDACTED]`)
+- ✅ Session IDs are NOT visible in logs (or show as `[REDACTED]`)
+- ✅ General log messages are still readable (not excessively redacted)
+
+**How to Record a Pass:**
+
+- [ ] Screenshot of browser console showing logs
+- [ ] Search results showing PII is redacted or absent
+- [ ] Note: "Console logs do not expose PII; sensitive data is redacted"
+
+---
+
 ## Success Criteria ✅
 
 - ✅ Auth tokens are not in plain-text Local Storage or Session Storage
@@ -305,3 +390,6 @@ Why this matters: If sensitive data is stored in plain-text, anyone with browser
 - ✅ Auth cookies are marked with security flags (HttpOnly, Secure, SameSite)
 - ✅ No plain-text API keys or secrets in storage
 - ✅ Browser security features are not disabled or bypassed
+- ✅ Privacy classification respected (SENSITIVE/PII/NON_SENSITIVE/PUBLIC data cleared appropriately)
+- ✅ Theme reset to default ("classic" dark mode) on logout
+- ✅ PII not visible in browser console logs (redacted or absent)

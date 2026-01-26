@@ -28,6 +28,7 @@ import {
   NetworkDetection,
   NetworkStatus,
 } from "@/lib/network/network-detection";
+import { validateClassifications } from "@/lib/storage/data-classification";
 import { logger } from "@/lib/utils/logger";
 
 // FUTURE ENHANCEMENT: Phase Progress Callbacks
@@ -340,6 +341,13 @@ class AppKernelClass {
       // Phase 2: Storage (cache validation/migrations and initialization)
       await this.runPhase("storage", async () => {
         try {
+          // Validate data classification registry integrity early
+          // Catch configuration errors (mismatched keys, invalid sensitivity, bad patterns) immediately
+          validateClassifications();
+          logger
+            .category("bootstrap")
+            .debug("Data classification registry validated");
+
           // Initialize storage health monitoring (validates storage + starts polling)
           const { initializeStorageHealthMonitoring } =
             await import("@/lib/storage/storage-health-monitor");

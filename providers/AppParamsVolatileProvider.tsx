@@ -1,4 +1,4 @@
-import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
+import { STORAGE_KEYS, getPrivacyStorageBackend } from "@/lib/storage";
 import React, {
     createContext as createReactContext,
     ReactNode,
@@ -44,18 +44,22 @@ export function AppParamsVolatileProvider({
   const setWorldId = useCallback((worldId: string | undefined) => {
     setVolatileParams((prev) => ({ ...prev, worldId }));
     if (worldId) {
-      void SecureStorage.setItem(STORAGE_KEYS.LAST_SELECTED_WORLD, worldId);
+      const backend = getPrivacyStorageBackend(STORAGE_KEYS.LAST_SELECTED_WORLD);
+      void backend.setItem(STORAGE_KEYS.LAST_SELECTED_WORLD, worldId);
     } else {
-      void SecureStorage.removeItem(STORAGE_KEYS.LAST_SELECTED_WORLD);
+      const backend = getPrivacyStorageBackend(STORAGE_KEYS.LAST_SELECTED_WORLD);
+      void backend.removeItem(STORAGE_KEYS.LAST_SELECTED_WORLD);
     }
   }, []);
 
   const setUserRole = useCallback((userRole: string | undefined) => {
     setVolatileParams((prev) => ({ ...prev, userRole }));
     if (userRole) {
-      void SecureStorage.setItem(STORAGE_KEYS.LAST_USER_ROLE, userRole);
+      const backend = getPrivacyStorageBackend(STORAGE_KEYS.LAST_USER_ROLE);
+      void backend.setItem(STORAGE_KEYS.LAST_USER_ROLE, userRole);
     } else {
-      void SecureStorage.removeItem(STORAGE_KEYS.LAST_USER_ROLE);
+      const backend = getPrivacyStorageBackend(STORAGE_KEYS.LAST_USER_ROLE);
+      void backend.removeItem(STORAGE_KEYS.LAST_USER_ROLE);
     }
   }, []);
 
@@ -66,24 +70,30 @@ export function AppParamsVolatileProvider({
 
         // ✅ Persist all changes to storage
         if (updated.worldId !== undefined) {
+          const worldBackend = getPrivacyStorageBackend(
+            STORAGE_KEYS.LAST_SELECTED_WORLD,
+          );
           if (updated.worldId) {
-            void SecureStorage.setItem(
+            void worldBackend.setItem(
               STORAGE_KEYS.LAST_SELECTED_WORLD,
               updated.worldId,
             );
           } else {
-            void SecureStorage.removeItem(STORAGE_KEYS.LAST_SELECTED_WORLD);
+            void worldBackend.removeItem(STORAGE_KEYS.LAST_SELECTED_WORLD);
           }
         }
 
         if (updated.userRole !== undefined) {
+          const roleBackend = getPrivacyStorageBackend(
+            STORAGE_KEYS.LAST_USER_ROLE,
+          );
           if (updated.userRole) {
-            void SecureStorage.setItem(
+            void roleBackend.setItem(
               STORAGE_KEYS.LAST_USER_ROLE,
               updated.userRole,
             );
           } else {
-            void SecureStorage.removeItem(STORAGE_KEYS.LAST_USER_ROLE);
+            void roleBackend.removeItem(STORAGE_KEYS.LAST_USER_ROLE);
           }
         }
 
@@ -99,19 +109,25 @@ export function AppParamsVolatileProvider({
       worldId: undefined,
       userRole: undefined,
     }));
-    void SecureStorage.removeItem(STORAGE_KEYS.LAST_SELECTED_WORLD);
-    void SecureStorage.removeItem(STORAGE_KEYS.LAST_USER_ROLE);
+    const worldBackend = getPrivacyStorageBackend(
+      STORAGE_KEYS.LAST_SELECTED_WORLD,
+    );
+    const roleBackend = getPrivacyStorageBackend(STORAGE_KEYS.LAST_USER_ROLE);
+    void worldBackend.removeItem(STORAGE_KEYS.LAST_SELECTED_WORLD);
+    void roleBackend.removeItem(STORAGE_KEYS.LAST_USER_ROLE);
   }, []);
 
   // ✅ Now useEffect can safely call the functions
   useEffect(() => {
     async function restoreSession() {
-      const savedWorldId = await SecureStorage.getItem(
+      const worldBackend = getPrivacyStorageBackend(
         STORAGE_KEYS.LAST_SELECTED_WORLD,
       );
-      const savedRole = await SecureStorage.getItem(
-        STORAGE_KEYS.LAST_USER_ROLE,
+      const roleBackend = getPrivacyStorageBackend(STORAGE_KEYS.LAST_USER_ROLE);
+      const savedWorldId = await worldBackend.getItem(
+        STORAGE_KEYS.LAST_SELECTED_WORLD,
       );
+      const savedRole = await roleBackend.getItem(STORAGE_KEYS.LAST_USER_ROLE);
       if (savedWorldId) setWorldId(savedWorldId);
       if (savedRole) setUserRole(savedRole);
     }

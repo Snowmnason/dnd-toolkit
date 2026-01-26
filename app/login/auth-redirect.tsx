@@ -1,7 +1,7 @@
 import { AuthModal } from "@/components/auth_components";
 import { Caption } from "@/components/ui";
 import { AuthStateManager, logger, supabase, usersDB, worldsDB } from "@/lib";
-import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
+import { getPrivacyStorageBackend, STORAGE_KEYS } from "@/lib/storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
@@ -14,18 +14,20 @@ interface PendingInvite {
   timestamp: number;
 }
 
-// Helper functions for invite storage (encrypted via SecureStorage)
+// Helper functions for invite storage (privacy-routed)
 const savePendingInvite = async (token: string, worldName: string) => {
   const inviteData: PendingInvite = {
     token,
     worldName,
     timestamp: Date.now(),
   };
-  await SecureStorage.setJSON(STORAGE_KEYS.PENDING_INVITE, inviteData);
+  const backend = getPrivacyStorageBackend(STORAGE_KEYS.PENDING_INVITE);
+  await backend.setJSON(STORAGE_KEYS.PENDING_INVITE, inviteData);
 };
 
 const getPendingInvite = async (): Promise<PendingInvite | null> => {
-  const inviteData = await SecureStorage.getJSON<PendingInvite>(
+  const backend = getPrivacyStorageBackend(STORAGE_KEYS.PENDING_INVITE);
+  const inviteData = await backend.getJSON<PendingInvite>(
     STORAGE_KEYS.PENDING_INVITE,
   );
   if (inviteData) {
@@ -34,14 +36,15 @@ const getPendingInvite = async (): Promise<PendingInvite | null> => {
       return inviteData;
     } else {
       // Clean up expired invite
-      await SecureStorage.removeItem(STORAGE_KEYS.PENDING_INVITE);
+      await backend.removeItem(STORAGE_KEYS.PENDING_INVITE);
     }
   }
   return null;
 };
 
 const clearPendingInvite = async () => {
-  await SecureStorage.removeItem(STORAGE_KEYS.PENDING_INVITE);
+  const backend = getPrivacyStorageBackend(STORAGE_KEYS.PENDING_INVITE);
+  await backend.removeItem(STORAGE_KEYS.PENDING_INVITE);
 };
 
 export default function AuthRedirect() {

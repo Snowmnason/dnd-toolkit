@@ -50,6 +50,15 @@ Platform-specific or cross-platform implementation
 - Supports context tagging, grouping, and table output
 - Configurable via appsettings feature flags
 - Used throughout the app for diagnostics, analytics, and error reporting
+- Automatic PII redaction via lib/utils/pii-redaction
+
+### pii-redaction.ts
+
+- Comprehensive PII (Personally Identifiable Information) pattern detection and redaction
+- Supports both prefixed fields (email: ..., token: ...) and standalone values (bare emails, JWTs, UUIDs)
+- Used by logger and storage privacy module
+- Patterns include: emails, JWT tokens, API keys, session IDs, UUIDs, phone numbers, URLs with sensitive params
+- Safe import guards to prevent circular dependencies with storage module
 
 ### image-optimization.ts
 
@@ -192,6 +201,85 @@ logger.category("api").table([
   { endpoint: "/worlds", duration: 567, status: 200 },
 ]);
 ```
+
+---
+
+### PII Redaction (`pii-redaction.ts`)
+
+Utilities for detecting and redacting personally identifiable information (PII) in logs and error messages.
+
+#### `redactPII(value, options?): string`
+
+Redact PII from a string or object using comprehensive patterns.
+
+**Parameters:**
+
+- `value`: String, object, or any value to redact
+- `options.includeStandalone?`: boolean (default: true) - Also apply standalone patterns (bare emails, JWTs, UUIDs)
+
+**Returns:** String with PII replaced by `[REDACTED]`
+
+**Example:**
+
+```ts
+import { redactPII } from "@/lib/utils";
+
+redactPII("email: user@example.com");
+// "email: [REDACTED]"
+
+redactPII("user@example.com");
+// "[REDACTED]"
+
+redactPII({
+  token: "eyJhbGc...",
+  userId: "123e4567-e89b-12d3-a456-426614174000",
+});
+// "{\"token\": \"[REDACTED]\", \"userId\": \"[REDACTED]\"}"
+
+// Only prefixed patterns (more conservative)
+redactPII("Session: xyz123", { includeStandalone: false });
+// "Session: [REDACTED]"
+```
+
+#### `containsPII(value): boolean`
+
+Check if a string contains any PII patterns.
+
+**Parameters:**
+
+- `value`: String to check
+
+**Returns:** true if PII is detected, false otherwise
+
+**Example:**
+
+```ts
+import { containsPII } from "@/lib/utils";
+
+containsPII("email: user@example.com"); // true
+containsPII("Hello world"); // false
+containsPII("eyJhbGc..."); // true (JWT token)
+```
+
+#### Pattern Coverage
+
+**Prefixed Patterns** (field name + value):
+
+- Email: `email: user@example.com`, `email="..."`
+- Token/JWT: `token: abc123`, `jwt: eyJhbGc...`
+- Session ID: `session: xyz123`, `session: ...`
+- User ID: `userid: 123`, `user_id: ...`
+- UUID: `id: 8-4-4-4-12 format`
+- API Key: `apikey: ...`, `api_key: ...`
+- Phone: `phone: +1-555-123-4567`, `tel: ...`
+- URL params: `?email=user@example.com&token=abc123`
+
+**Standalone Patterns** (values without prefix):
+
+- Email format: `user@example.com` (bare email)
+- JWT: `eyJhbGc...` (starts with `ey`, contains dots)
+- UUID: `8-4-4-4-12 hex format`
+- API Keys: `32+ character alphanumeric strings`
 
 ---
 
@@ -635,6 +723,7 @@ try {
 | File                  | Purpose                                  |
 | --------------------- | ---------------------------------------- |
 | logger.ts             | Category-based, environment-aware logger |
+| pii-redaction.ts      | PII detection and redaction patterns     |
 | image-optimization.ts | Supabase image optimization helpers      |
 | image-proxy.ts        | CORS-safe image loading utilities        |
 | entitlements.ts       | Centralized premium feature limits       |
@@ -648,6 +737,7 @@ try {
 ## Testing
 
 - [ ] Logger: Test all log levels and categories, verify feature flag control
+- [ ] PII Redaction: Test all pattern types (prefixed, standalone, combined), verify [REDACTED] output
 - [ ] Image Optimization: Test URL transformation, responsive sizing
 - [ ] Image Proxy: Test CORS proxy and local asset fallback
 - [ ] Entitlements: Test all limits and feature checks (stubbed)
