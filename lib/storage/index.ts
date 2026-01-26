@@ -27,6 +27,10 @@
  * Add new keys there when extending storage.
  */
 
+export {
+  DATA_CLASSIFICATIONS, DataSensitivity, validateClassifications,
+  type DataClassification
+} from "./data-classification";
 export { FastCache } from "./FastCache";
 export { SecureStorage } from "./SecureStorage";
 export {
