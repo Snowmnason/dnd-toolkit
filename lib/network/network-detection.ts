@@ -21,6 +21,10 @@ import {
   getWebPingInterval,
   getWebPingTimeout,
 } from "@/lib/network/network-config";
+import {
+  NetworkStateManager,
+  type NetworkState,
+} from "@/lib/network/state-machine";
 import { logger } from "@/lib/utils/logger";
 import * as React from "react";
 import { Platform } from "react-native";
@@ -152,6 +156,20 @@ class NetworkDetectionClass {
       }
 
       this.isInitialized = true;
+
+      // Initialize state machine to detected state
+      const initialNetworkState = this.qualityToNetworkState(
+        this.currentStatus.connectionQuality,
+      );
+      try {
+        await NetworkStateManager.transitionTo(
+          initialNetworkState,
+          "initial detection",
+        );
+      } catch (error) {
+        logger.warn("network", `Failed to set initial network state: ${error}`);
+      }
+
       logger
         .category("network")
         .info(
@@ -626,11 +644,38 @@ class NetworkDetectionClass {
   }
 
   /**
+   * Convert ConnectionQuality to NetworkState
+   */
+  private qualityToNetworkState(quality: ConnectionQuality): NetworkState {
+    switch (quality) {
+      case ConnectionQuality.GOOD:
+        return "GOOD";
+      case ConnectionQuality.BAD:
+        return "BAD";
+      case ConnectionQuality.NO_WIFI:
+        return "NO_WIFI";
+      case ConnectionQuality.OFFLINE:
+        return "OFFLINE";
+    }
+  }
+
+  /**
    * Update status and notify listeners
    */
   private updateStatus(partial: Partial<NetworkStatus>): void {
     const oldStatus = { ...this.currentStatus };
     this.currentStatus = { ...this.currentStatus, ...partial };
+
+    // Trigger state transition if connection quality changed
+    if (oldStatus.connectionQuality !== this.currentStatus.connectionQuality) {
+      const oldState = this.qualityToNetworkState(oldStatus.connectionQuality);
+      const newState = this.qualityToNetworkState(
+        this.currentStatus.connectionQuality,
+      );
+      this.triggerStateTransition(oldState, newState).catch((error) => {
+        logger.warn("network", `Failed to transition state: ${error}`);
+      });
+    }
 
     // Log significant changes
     if (oldStatus.isOnline !== this.currentStatus.isOnline) {
@@ -664,6 +709,23 @@ class NetworkDetectionClass {
     }
 
     this.notifyListeners();
+  }
+
+  /**
+   * Trigger state machine transition
+   */
+  private async triggerStateTransition(
+    oldState: NetworkState,
+    newState: NetworkState,
+  ): Promise<void> {
+    try {
+      await NetworkStateManager.transitionTo(newState, `from ${oldState}`);
+    } catch (error) {
+      logger.warn(
+        "network",
+        `Invalid state transition ${oldState} → ${newState}: ${error}`,
+      );
+    }
   }
 
   /**
@@ -711,6 +773,49 @@ class NetworkDetectionClass {
     return () => {
       this.listeners.delete(callback);
     };
+  }
+
+  /**
+   * Get current network state from state machine
+   */
+  getNetworkState(): NetworkState {
+    return NetworkStateManager.getState();
+  }
+
+  /**
+   * Register hook for specific state transition
+   * Called when transitioning from → to
+   */
+  onTransition(
+    from: NetworkState,
+    to: NetworkState,
+    hook: () => Promise<void> | void,
+  ): () => void {
+    return NetworkStateManager.onSpecificTransition(from, to, hook);
+  }
+
+  /**
+   * Get recovery backoff time (for implementing retry logic)
+   */
+  getRecoveryBackoff(): number {
+    return NetworkStateManager.getRecoveryBackoff();
+  }
+
+  /**
+   * Check if currently in RECOVERING state
+   */
+  isRecovering(): boolean {
+    return NetworkStateManager.isRecovering();
+  }
+
+  /**
+   * Transition to a specific state (for testing)
+   */
+  transitionTo(state: NetworkState): Promise<void> {
+    return NetworkStateManager.transitionTo(
+      state,
+      "manual transition (testing)",
+    );
   }
 }
 
