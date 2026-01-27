@@ -299,6 +299,356 @@ Cleanup runs every 1 hour and is O(n) where n = number of rate limit buckets/pen
 | File                 | Purpose                                                                                                                                                                                                                                    |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `request-manager.ts` | Main RequestManager class. Implements request deduplication, retry with exponential backoff, rate limiting (token bucket), QueryCache integration, timeout handling, and error reporting. Singleton instance exported as `RequestManager`. |
+| `auth-layer.ts`      | AuthLayer singleton, auth strategy registration, token injection, 401 handling. Integrates with RequestManager middleware chain.                                                                                                           |
+
+---
+
+# AuthLayer: Centralized Authentication Middleware
+
+This module provides a pluggable auth strategy system integrated into RequestManager for centralized token management.
+
+## When to Use AuthLayer
+
+**Use AuthLayer when:**
+
+- You need to inject Bearer tokens into API requests
+- You want centralized token refresh logic (avoid scattering auth across the app)
+- You need per-request auth strategy selection (user token vs service account)
+- You want to handle 401 responses uniformly across the app
+- You're building a multi-strategy auth system (future: Stripe API, GitHub, etc.)
+
+**Don't use AuthLayer when:**
+
+- Requests don't require authentication (public endpoints)
+- You need OAuth/social login flows (use SessionService directly)
+- You need fine-grained per-endpoint auth rules (use Structured Clients #9 later)
+
+## Architecture & Data Flow
+
+```
+Request Flow with AuthLayer:
+┌─────────────────────────────────────────────────────────────┐
+│ RequestManager.fetch(url, fetcher, { authStrategy: 'user' }) │
+└────────────────┬────────────────────────────────────────────┘
+                 │
+                 ▼
+    ┌────────────────────────────┐
+    │ Dedupe / Rate Limit Check   │
+    └────────────┬────────────────┘
+                 │
+                 ▼
+    ┌────────────────────────────┐
+    │ executeWithAuthLayer()      │
+    │ - Inject token header      │
+    │ - Execute fetcher()        │
+    │ - Catch 401 response       │
+    └────────────┬────────────────┘
+                 │
+          ┌──────┴──────┐
+          │             │
+          ▼ (2xx)      ▼ (401)
+       Success    ┌─────────────────┐
+                  │ Acquire Lock    │
+                  │ (per-strategy)  │
+                  └────────┬────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │ Call onTokenExpire│
+                  │ (SessionService) │
+                  └────────┬────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │ Release Lock    │
+                  │ Retry Request   │
+                  └────────┬────────┘
+                           │
+                    ┌──────┴──────┐
+                    │             │
+                    ▼ (success)  ▼ (fail)
+                 Return        Throw
+```
+
+**Key Principles:**
+
+- **Per-Strategy Locking:** Prevents thundering herd on concurrent 401s (only one token refresh per strategy)
+- **One Retry:** Retries once after token refresh; if still fails, throws original error
+- **Token Caching:** Strategies cache tokens with TTL to avoid redundant refresh calls
+- **Cascading Logout:** Failed refresh triggers logout, which clears route guards and redirects to /login
+
+## AuthLayer API
+
+### AuthContext
+
+Lightweight context passed to strategy methods:
+
+```typescript
+interface AuthContext {
+  url: string;
+  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD";
+  endpoint?: string; // e.g., 'users', 'worlds', 'admin'
+  retryCount?: number; // 0 on initial attempt, increments on retry
+}
+```
+
+### AuthStrategy
+
+Interface for auth token management:
+
+```typescript
+interface AuthStrategy {
+  getToken(context: AuthContext): Promise<string | null>;
+  onTokenExpire?(context: AuthContext): Promise<void>;
+  shouldClearAuthStateOn401?: boolean; // If true, 401 handler clears global auth state
+}
+```
+
+### Key Methods
+
+#### registerAuthStrategy(name, strategy)
+
+Register a new auth strategy. **Throws if name already registered.**
+
+```typescript
+const userStrategy: AuthStrategy = {
+  async getToken(context) {
+    const session = await SessionService.getCurrentSession();
+    return session?.access_token ?? null;
+  },
+  async onTokenExpire(context) {
+    await supabase.auth.refreshSession();
+    // Refresh succeeds = new token cached, retry will use it
+    // Refresh fails = throw, triggers clearAuthState() if shouldClearAuthStateOn401: true
+  },
+  shouldClearAuthStateOn401: true, // Only user strategy should logout
+};
+
+AuthLayer.registerAuthStrategy("user", userStrategy);
+```
+
+#### getAuthStrategy(name)
+
+Get registered strategy by name:
+
+```typescript
+const strategy = AuthLayer.getAuthStrategy("user");
+```
+
+#### injectAuthHeader(headers, strategyName, context)
+
+Inject auth header before fetcher:
+
+```typescript
+const headers = await AuthLayer.injectAuthHeader(
+  { "Content-Type": "application/json" },
+  "user",
+  { url: "/api/worlds", method: "GET", endpoint: "worlds" },
+);
+// Returns: { 'Content-Type': ..., 'Authorization': 'Bearer ...' }
+```
+
+#### handle401Response(strategyName, context)
+
+Handle 401 with per-strategy locking:
+
+```typescript
+if (response.status === 401) {
+  await AuthLayer.handle401Response("user", context);
+  // Token refresh complete, can retry request
+}
+```
+
+#### isRefreshing(strategyName)
+
+Check if strategy is currently refreshing:
+
+```typescript
+if (AuthLayer.isRefreshing("user")) {
+  console.log("Token refresh in progress");
+}
+```
+
+## Integration with RequestManager
+
+AuthLayer is automatically integrated into RequestManager's middleware chain:
+
+```
+RequestManager.fetch()
+  → Dedupe & Rate Limit Check
+    → Auth Header Injection Middleware (AuthLayer.injectAuthHeader)
+      → 401 Handling & Token Refresh Middleware (AuthLayer.handle401Response)
+        → Retry Middleware (exponential backoff)
+          → Actual Fetcher (user-provided)
+```
+
+When you specify `authStrategy` in RequestOptions, the middleware automatically:
+
+1. **Injects token** before fetcher (calls strategy.getToken())
+2. **Detects 401** responses
+3. **Acquires per-strategy lock** (prevents thundering herd)
+4. **Calls onTokenExpire()** to refresh token
+5. **Retries once** with refreshed token
+
+## Error Handling
+
+### Concurrent 401s (Same Strategy)
+
+Multiple requests with same strategy getting 401 simultaneously:
+
+```
+T0:   Request A gets 401 → acquires lock['user']
+T10:  Request B gets 401 → waits for lock['user']
+T100: Request A's refresh completes, releases lock
+T100: Request B acquires lock → proceeds to retry (uses refreshed token from A)
+```
+
+**Result:** Only ONE token refresh, both requests retry with same token.
+
+### Concurrent 401s (Different Strategies)
+
+User request and Stripe request both get 401:
+
+```
+T0:  User request 401 → acquires lock['user']
+T0:  Stripe request 401 → acquires lock['stripe'] (independent!)
+```
+
+**Result:** Both refresh independently without blocking.
+
+### Token Refresh Fails
+
+If onTokenExpire() throws:
+
+1. Error is logged
+2. If `shouldClearAuthStateOn401: true`, AuthStateManager.clearAuthState() is called
+3. Original 401 error is thrown to caller
+4. RequestManager doesn't retry further
+
+### Strategy Not Found
+
+If strategy name not registered:
+
+1. Warning logged
+2. Function returns quietly
+3. Original error still thrown
+
+## Fetcher Patterns
+
+### Supabase Client (Auto-Auth)
+
+Supabase client handles auth internally, no header manipulation needed:
+
+```typescript
+const worlds = await RequestManager.fetch(
+  `worlds:user:${userId}`,
+  async () => {
+    const supabase = await getSupabaseClientLazy();
+    const { data, error } = await supabase.from("worlds").select("*");
+    if (error) throw error;
+    return data;
+  },
+  {
+    authStrategy: "user",
+    useQueryCache: true,
+  },
+);
+```
+
+### Raw HTTP Fetch (Header-Based Auth)
+
+For direct HTTP calls, fetcher receives headers from middleware:
+
+```typescript
+const data = await RequestManager.fetch(
+  "api:GET:/api/worlds",
+  async (headers?: Record<string, string>) => {
+    const response = await fetch("https://api.example.com/worlds", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...headers, // Includes auth header from middleware
+      },
+    });
+    if (!response.ok) {
+      const error = new Error("HTTP error");
+      (error as any).status = response.status;
+      throw error;
+    }
+    return response.json();
+  },
+  {
+    authStrategy: "user",
+  },
+);
+```
+
+## Multi-Strategy Scenarios (Current & Future)
+
+### Phase 1: Single User Strategy
+
+```typescript
+RequestManager.fetch("/api/worlds", fetcher, {
+  authStrategy: "user", // Supabase session token
+});
+```
+
+### Phase 2+: Service Account Strategy
+
+```typescript
+const serviceStrategy: AuthStrategy = {
+  async getToken(context) {
+    if (!context.endpoint?.startsWith("admin/")) return null;
+    return await SecureStorage.get(STORAGE_KEYS.SERVICE_ACCOUNT_TOKEN);
+  },
+  async onTokenExpire(context) {
+    logger.error("auth", "Service account token expired");
+    // Don't logout user - independent auth
+  },
+  shouldClearAuthStateOn401: false, // Never clear user session
+};
+
+AuthLayer.registerAuthStrategy("service", serviceStrategy);
+
+// Same session uses both strategies
+await RequestManager.fetch("/api/worlds", { authStrategy: "user" });
+await RequestManager.fetch("/api/admin/users", { authStrategy: "service" });
+```
+
+### Phase 2+: External API Strategies
+
+```typescript
+const stripeStrategy: AuthStrategy = {
+  async getToken(context) {
+    if (!context.endpoint?.startsWith("stripe/")) return null;
+    return getStripeAPIKey();
+  },
+  async onTokenExpire(context) {
+    logger.warn("stripe", "API key invalid");
+  },
+  shouldClearAuthStateOn401: false,
+};
+
+AuthLayer.registerAuthStrategy("stripe", stripeStrategy);
+
+await RequestManager.fetch("https://api.stripe.com/v1/charges", fetcher, {
+  authStrategy: "stripe",
+});
+```
+
+## Performance Notes
+
+- **Token Injection:** ~1ms per request (async strategy.getToken())
+- **Lock Efficiency:** O(1) Map lookup for per-strategy locks
+- **Concurrent 401s:** Lock prevents N token refreshes, reduces to 1
+- **Memory:** One Promise per active strategy refresh, cleaned up immediately
+
+## Related Modules
+
+- **`lib/auth/auth-state.ts`** (AuthStateManager) – Stores auth state, clears on logout
+- **`lib/auth/sessionService.ts`** (SessionService) – Manages Supabase session and tokens
+- **`lib/cache`** (QueryCache) – Data persistence for cached responses
+- **`lib/network`** (NetworkDetection) – Network status; prevents refresh when offline
 
 ---
 
@@ -306,7 +656,17 @@ Cleanup runs every 1 hour and is O(n) where n = number of rate limit buckets/pen
 
 Currently, no dedicated test guide exists for this module. When adding tests, create a guide at `docs/A Testing Guide/api.md` following the repository's testing guide template.
 
-**Manual testing tips:**
+**Manual testing tips for AuthLayer:**
+
+- Auth injection: Call with `authStrategy`, verify Authorization header present
+- 401 handling: Mock 401 response, verify onTokenExpire called once
+- Concurrent 401s: Trigger two concurrent 401s on same strategy, verify lock prevents multiple refreshes
+- Token refresh succeeds: Verify retry succeeds with new token
+- Token refresh fails: Verify original 401 thrown, user logged out if `shouldClearAuthStateOn401: true`
+- Per-strategy locking: Different strategies get 401 simultaneously, verify both refresh independently
+- Strategy not found: Verify warning logged, original error thrown
+
+**Manual testing tips for RequestManager:**
 
 - Dedupe: Call `fetch()` twice with same key; verify second request returns same promise
 - Retry: Mock fetcher to fail 2 times then succeed; verify retries with exponential backoff
@@ -322,3 +682,4 @@ Currently, no dedicated test guide exists for this module. When adding tests, cr
 
 - **Request Batching**: Batch multiple requests into a single HTTP call (e.g., GraphQL batch)
 - **Dependency Injection**: Make Sentry, Logger, Analytics optional for portability to non-framework environments
+- **Proactive Token Refresh**: Refresh tokens before expiry instead of reactively on 401

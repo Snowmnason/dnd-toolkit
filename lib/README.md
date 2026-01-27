@@ -195,12 +195,12 @@ const config = getRouteConfig(context);
 
 **Purpose:** Network detection, connectivity status, offline support.
 
-**Exports:** `NetworkStatus`, `isOnline()`, `useNetworkStatus()`
+**Exports:** `NetworkDetection`, `NetworkStatus`, `useNetworkStatus()`
 
 ```tsx
-import { isOnline, useNetworkStatus } from "@/lib/network";
+import { NetworkDetection, useNetworkStatus } from "@/lib/network";
 
-if (!isOnline()) return <OfflineMessage />;
+if (!NetworkDetection.getStatus().isOnline) return <OfflineMessage />;
 ```
 
 ---
