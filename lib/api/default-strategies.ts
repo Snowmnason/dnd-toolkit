@@ -4,12 +4,12 @@
  * Concrete implementations of AuthStrategy for common auth patterns
  */
 
-import { AuthStrategy, type AuthContext } from "./auth-layer";
-import { logger } from "../utils/logger";
 import {
   getSupabaseClientLazy,
   isSupabaseConfiguredLazy,
 } from "../database/supabase-lazy";
+import { logger } from "../utils/logger";
+import { AuthStrategy, type AuthContext } from "./auth-layer";
 
 /**
  * User Auth Strategy: Manages Supabase user session tokens
@@ -93,33 +93,65 @@ export function createUserAuthStrategy(): AuthStrategy {
 
     async onTokenExpire(context: AuthContext): Promise<void> {
       try {
-        logger.warn("auth", "User token expired, logging out", {
+        logger.debug("auth", "Token expired, attempting refresh", {
           endpoint: context.endpoint,
+          retryCount: context.retryCount,
         });
 
-        // Clear token cache
+        // Clear token cache to force fresh fetch after refresh
         cachedToken = null;
 
         // Check if Supabase is configured
         const configured = await isSupabaseConfiguredLazy();
-        if (configured) {
-          const supabase = await getSupabaseClientLazy();
-          await supabase.auth.signOut();
+        if (!configured) {
+          logger.warn("auth", "Supabase not configured, cannot refresh token", {
+            endpoint: context.endpoint,
+          });
+          throw new Error("Supabase not configured for token refresh");
         }
 
-        // Clear app auth state (hasAccount: false)
-        const { AuthStateManager } = await import("../auth/auth-state");
-        await AuthStateManager.clearAuthState();
+        const supabase = await getSupabaseClientLazy();
+        const { data, error } = await supabase.auth.refreshSession();
 
-        logger.info("auth", "User logged out due to token expiry");
+        if (error || !data.session) {
+          // Refresh failed - session is truly invalid
+          logger.warn("auth", "Token refresh failed, session invalid", {
+            error: error?.message || "No session after refresh",
+            endpoint: context.endpoint,
+          });
+
+          // Log out user since refresh is no longer possible
+          try {
+            await supabase.auth.signOut();
+          } catch (signOutError) {
+            logger.error("auth", "Failed to sign out after refresh failure:", {
+              signOutError,
+            });
+          }
+
+          // Clear app auth state (hasAccount: false)
+          const { AuthStateManager } = await import("../auth/auth-state");
+          await AuthStateManager.clearAuthState();
+
+          logger.info("auth", "User logged out due to failed token refresh");
+
+          throw new Error("Token refresh failed and session is invalid");
+        }
+
+        // Refresh succeeded - new token is now in Supabase session
+        // Next getToken() call will fetch it and cache it
+        logger.info("auth", "Token refresh succeeded", {
+          endpoint: context.endpoint,
+        });
       } catch (error) {
         logger.error("auth", "Failed to handle token expiry:", { error });
-        // Clear cache defensively even if logout fails
-        cachedToken = null;
-        // Re-throw so auth layer can handle the error
+        // Re-throw so auth layer can handle the error and request-manager knows retry failed
         throw error;
       }
     },
+
+    // CRITICAL: User session failures MUST trigger logout
+    shouldClearAuthStateOn401: true,
   };
 }
 
@@ -152,10 +184,133 @@ export function createPublicAuthStrategy(): AuthStrategy {
 
     async onTokenExpire(context: AuthContext): Promise<void> {
       // Public endpoints don't have tokens, so this should never be called
-      logger.debug("auth", "Token expire called on public strategy (unexpected)", {
-        endpoint: context.endpoint,
-      });
+      logger.debug(
+        "auth",
+        "Token expire called on public strategy (unexpected)",
+        {
+          endpoint: context.endpoint,
+        },
+      );
     },
+
+    // Public strategy has no auth, so never clear auth state on 401
+    shouldClearAuthStateOn401: false,
   };
 }
 
+/**
+ * Invite Auth Strategy: Optional authentication for invite validation
+ *
+ * Use for:
+ * - Invite token validation (works with or without user session)
+ * - Optional-auth endpoints where user token enhances but isn't required
+ *
+ * Behavior:
+ * - If user has valid session: injects token (like "user" strategy)
+ * - If user has no session: proceeds without token (like "public" strategy)
+ * - On 401: does NOT clear auth state (invite is optional auth, 401 just means invalid invite)
+ *
+ * This prevents RLS policy changes or misconfigurations from clearing app auth state
+ * during login/signup flow.
+ *
+ * @example
+ * ```typescript
+ * AuthLayer.registerAuthStrategy('invite', createInviteAuthStrategy());
+ *
+ * // Validate invite on login page (with or without user session)
+ * await RequestManager.fetch('/api/validate-invite', fetcher, {
+ *   authStrategy: 'invite'
+ * });
+ * ```
+ */
+export function createInviteAuthStrategy(): AuthStrategy {
+  // Token cache (same as user strategy)
+  let cachedToken: { token: string; expiresAt: number } | null = null;
+
+  return {
+    async getToken(context: AuthContext): Promise<string | null> {
+      try {
+        // OPTIMIZATION: Check cached token first
+        if (cachedToken && Date.now() < cachedToken.expiresAt) {
+          logger.debug("auth", "Using cached token for invite", {
+            endpoint: context.endpoint,
+          });
+          return cachedToken.token;
+        }
+
+        // Check if Supabase is configured
+        const configured = await isSupabaseConfiguredLazy();
+        if (!configured) {
+          logger.debug(
+            "auth",
+            "Supabase not configured for invite, proceeding without token",
+          );
+          cachedToken = null;
+          return null;
+        }
+
+        const supabase = await getSupabaseClientLazy();
+        const { data, error } = await supabase.auth.getSession();
+
+        if (error || !data.session) {
+          logger.debug(
+            "auth",
+            "No valid session for invite, proceeding without token",
+          );
+          cachedToken = null;
+          return null;
+        }
+
+        const token = data.session.access_token;
+        const tokenTTL = 3600 * 1000; // 1 hour
+        cachedToken = {
+          token,
+          expiresAt: Date.now() + tokenTTL * 0.8, // Refresh at 80% TTL
+        };
+
+        logger.debug("auth", "Got token for invite strategy", {
+          endpoint: context.endpoint,
+        });
+
+        return token;
+      } catch (error) {
+        logger.error("auth", "Failed to get invite token:", {
+          error,
+          endpoint: context.endpoint,
+        });
+        cachedToken = null;
+        return null;
+      }
+    },
+
+    async onTokenExpire(context: AuthContext): Promise<void> {
+      // CRITICAL: Invite is optional auth. 401 doesn't mean session is invalid.
+      // It might just mean:
+      // - Invite token is invalid/expired
+      // - RLS policy changed
+      // - User doesn't have permission for this specific invite
+      //
+      // We MUST NOT clear auth state here because:
+      // 1. User session is still valid (just not for this invite)
+      // 2. Clearing auth state would log user out during signup/login flow
+      // 3. Invite validation is NOT a security-critical auth operation
+      //
+      // Simply log and let RequestManager handle the 401 as a normal error.
+      logger.warn(
+        "auth",
+        "Invite validation got 401, not clearing auth state",
+        {
+          endpoint: context.endpoint,
+        },
+      );
+
+      // Clear cached token since it's now invalid
+      cachedToken = null;
+
+      // Do NOT call clearAuthState() - that's the whole point of this strategy!
+    },
+
+    // Invite is optional auth, never clear auth state on 401
+    shouldClearAuthStateOn401: false,
+  };
+}

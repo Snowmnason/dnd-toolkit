@@ -18,15 +18,15 @@
 import { NetworkCascadeDetector } from "@/lib/error/network-cascade-detector";
 import type { SafeModeState } from "@/lib/error/safe-mode";
 import {
-  createSafeModeState,
-  DEFAULT_SAFE_MODE_CONFIG,
-  SafeModeLevel,
-  SafeModeReason,
+    createSafeModeState,
+    DEFAULT_SAFE_MODE_CONFIG,
+    SafeModeLevel,
+    SafeModeReason,
 } from "@/lib/error/safe-mode";
 import { getStorageDefaults } from "@/lib/kernel/storage-defaults";
 import {
-  NetworkDetection,
-  NetworkStatus,
+    NetworkDetection,
+    NetworkStatus,
 } from "@/lib/network/network-detection";
 import { validateClassifications } from "@/lib/storage/data-classification";
 import { logger } from "@/lib/utils/logger";
@@ -470,10 +470,19 @@ class AppKernelClass {
 
           // Initialize AuthLayer with default strategies
           const { AuthLayer } = await import("@/lib/api/auth-layer");
-          const { createUserAuthStrategy, createPublicAuthStrategy } = await import("@/lib/api/default-strategies");
+          const {
+            createUserAuthStrategy,
+            createPublicAuthStrategy,
+            createInviteAuthStrategy,
+          } = await import("@/lib/api/default-strategies");
           AuthLayer.registerAuthStrategy("user", createUserAuthStrategy());
           AuthLayer.registerAuthStrategy("public", createPublicAuthStrategy());
-          logger.category("bootstrap").debug("AuthLayer initialized with user and public strategies");
+          AuthLayer.registerAuthStrategy("invite", createInviteAuthStrategy());
+          logger
+            .category("bootstrap")
+            .debug(
+              "AuthLayer initialized with user, public, and invite strategies",
+            );
 
           // Initialize auth health monitoring (validates auth + starts polling)
           const { initializeAuthHealthMonitoring } =

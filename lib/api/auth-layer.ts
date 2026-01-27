@@ -77,6 +77,25 @@ export interface AuthStrategy {
    * @returns Promise that resolves when refresh is complete
    */
   onTokenExpire?(context: AuthContext): Promise<void>;
+
+  /**
+   * If true, 401 response or token refresh failure will trigger app logout
+   * (clear auth state, redirect to login).
+   *
+   * CRITICAL: Only set to true for strategies managing user sessions.
+   *
+   * Default: false (safe default - don't clear auth on 401)
+   *
+   * Use case:
+   * - "user" strategy: true (401 means session invalid, logout needed)
+   * - "public" strategy: false (no session, no logout needed)
+   * - "invite" strategy: false (optional auth, 401 is not auth failure)
+   * - External API strategies (Stripe, etc): false (external 401 doesn't invalidate user session)
+   *
+   * Prevents unrelated 401s from logging out user during login/signup flows
+   * or when calling optional-auth/public endpoints.
+   */
+  shouldClearAuthStateOn401?: boolean;
 }
 
 /**
@@ -104,7 +123,11 @@ class AuthLayerClass {
    */
   registerAuthStrategy(name: string, strategy: AuthStrategy): void {
     if (this.strategies.has(name)) {
-      logger.warn("auth", `Strategy '${name}' already registered, overwriting`);
+      const error = new Error(
+        `Strategy '${name}' already registered. Call clearAuthStrategies() first if re-registration is intended.`,
+      );
+      logger.error("auth", `Cannot register strategy: ${error.message}`);
+      throw error;
     }
     this.strategies.set(name, strategy);
     logger.debug("auth", `Registered auth strategy: ${name}`);

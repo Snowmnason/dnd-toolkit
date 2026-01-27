@@ -44,8 +44,8 @@ export interface RequestOptions {
 
   // ===== AuthLayer Integration =====
 
-  /** Auth strategy name for this request (required) */
-  authStrategy: string;
+  /** Auth strategy name for this request (optional). If not specified, request proceeds without auth layer wrapping. */
+  authStrategy?: string;
 
   // ===== QueryCache Integration Options =====
 
@@ -79,9 +79,12 @@ interface RateLimitBucket {
 
 /**
  * Get default options from appsettings (for optional fields only)
- * Note: authStrategy is REQUIRED and must be specified by caller
+ * Returns all optional RequestOptions fields with non-undefined defaults
  */
-function getDefaultOptions(): Omit<Required<RequestOptions>, "authStrategy"> {
+function getDefaultOptions(): Omit<
+  Required<Omit<RequestOptions, "authStrategy">>,
+  never
+> {
   const config = getAppConfig();
   return {
     dedupe: true,
@@ -210,15 +213,23 @@ class RequestManagerClass {
    *
    * @param key - Unique key for deduplication (should be deterministic)
    * @param fetcher - Async function that performs the actual request
-   * @param options - Request options (dedupe, retries, failOpen, useQueryCache, etc.)
+   * @param options - Request options (dedupe, retries, failOpen, useQueryCache, authStrategy, etc.) (optional, defaults to {})
    * @returns The result of the fetcher function
    *
    * @example
    * ```typescript
+   * // Without auth strategy (no auth layer wrapping)
+   * const data = await RequestManager.fetch(
+   *   `data:key`,
+   *   () => fetchData()
+   * );
+   *
+   * // With auth strategy
    * const worlds = await RequestManager.fetch(
    *   `worlds:user:${userId}`,
    *   () => worldsDB.getMyWorlds(userId),
    *   {
+   *     authStrategy: 'user',
    *     dedupe: true,
    *     rateLimitKey: `user:${userId}`,
    *     useQueryCache: true,
@@ -231,9 +242,11 @@ class RequestManagerClass {
   async fetch<T>(
     key: string,
     fetcher: () => Promise<T>,
-    options: RequestOptions,
+    options?: RequestOptions,
   ): Promise<T | null> {
-    const options_ = { ...DEFAULT_OPTIONS, ...options };
+    const options_ = { ...DEFAULT_OPTIONS, ...options } as Required<
+      Omit<RequestOptions, "authStrategy">
+    > & { authStrategy?: string };
     const startedAt = Date.now();
     const trackingEnabled = Analytics.enabled();
 
@@ -351,48 +364,53 @@ class RequestManagerClass {
       // - Raw HTTP fetch: Accept `headers` param and merge into fetch options
       //   Example: fetcher(headers) => fetch(url, { headers: {...defaultHeaders, ...headers} })
 
-      let wrappedFetcher = fetcher;
-
       // Wrap with auth header injection (if strategy specified)
-      if (options_.authStrategy) {
-        wrappedFetcher = async () => {
-          const context: AuthContext = {
-            url: key,
-            method: "GET", // Note: Could be enhanced to accept method in options
-            endpoint: key.split(":")[0],
-            retryCount: 0,
-          };
+      // Higher-order function: accepts attemptNumber so AuthContext gets accurate retry count
+      const wrappedFetcher =
+        (attemptNumber: number = 0) =>
+        async () => {
+          if (options_.authStrategy) {
+            const context: AuthContext = {
+              url: key,
+              method: "GET", // Note: Could be enhanced to accept method in options
+              endpoint: key.split(":")[0],
+              retryCount: attemptNumber,
+            };
 
-          // Get headers from auth layer
-          const headers = await AuthLayer.injectAuthHeader(
-            {},
-            options_.authStrategy!,
-            context,
-          );
+            // Get headers from auth layer
+            const headers = await AuthLayer.injectAuthHeader(
+              {},
+              options_.authStrategy,
+              context,
+            );
 
-          logger.debug("api", "Auth middleware: prepared headers", {
-            key,
-            strategy: options_.authStrategy,
-            hasAuth: !!headers["Authorization"],
-          });
+            logger.debug("api", "Auth middleware: prepared headers", {
+              key,
+              strategy: options_.authStrategy,
+              hasAuth: !!headers["Authorization"],
+              attemptNumber,
+            });
 
-          // If fetcher accepts headers param, it will use them (e.g., raw fetch wrapper)
-          // Otherwise, it's a no-op (e.g., Supabase client handles its own auth)
-          return await (fetcher as any)(headers);
+            // If fetcher accepts headers param, it will use them (e.g., raw fetch wrapper)
+            // Otherwise, it's a no-op (e.g., Supabase client handles its own auth)
+            return await (fetcher as any)(headers);
+          }
+
+          // No auth strategy - just call fetcher directly
+          return await (fetcher as any)();
         };
-      }
 
       // Wrap with 401 handling & token refresh
-      let authLayerWrappedFetcher = wrappedFetcher;
-      if (options_.authStrategy) {
-        authLayerWrappedFetcher = () =>
+      // Higher-order function: accepts attemptNumber and passes it to auth layer + header injection
+      const authLayerWrappedFetcher =
+        (attemptNumber: number = 0) =>
+        () =>
           this.executeWithAuthLayer(
-            wrappedFetcher,
+            wrappedFetcher(attemptNumber),
             key,
             options_.authStrategy!,
-            0, // retryCount starts at 0
+            attemptNumber,
           );
-      }
 
       const promise = this.executeWithRetry(
         authLayerWrappedFetcher,
@@ -578,29 +596,55 @@ class RequestManagerClass {
           });
           return await fetcher();
         } catch (refreshError) {
-          // CRITICAL: If token refresh failed, ensure auth state is cleared
-          // This prevents infinite 401 loops and ensures route guards redirect to login
-          logger.error("api", "Token refresh failed—clearing auth state", {
+          // Token refresh failed - check if we should clear auth state
+          // Only user-session strategies should trigger logout on auth failure
+          // This prevents unrelated 401s (e.g., public/invite/external strategies)
+          // from logging out the user
+          logger.error("api", "Token refresh failed", {
             key,
             strategy: strategyName,
             error: refreshError,
           });
 
-          try {
-            // CRITICAL: Clear auth state as single source of truth for logout
-            // This ensures:
-            // 1. hasAccount flag is set to false (auth state cleared)
-            // 2. SecureStorage is wiped (session data, refresh token cleared)
-            // 3. Route guards detect cleared state and redirect to /login
-            // 4. Prevents infinite 401 loops (token can't be refreshed)
-            const { AuthStateManager } = await import("@/lib/auth/auth-state");
-            await AuthStateManager.clearAuthState();
-          } catch (clearError) {
-            logger.error(
+          // Check if this strategy says we should clear auth on 401
+          const strategyObj = AuthLayer.getAuthStrategy(strategyName);
+          const shouldClear = strategyObj?.shouldClearAuthStateOn401 ?? false;
+
+          if (shouldClear) {
+            try {
+              // CRITICAL: Clear auth state as single source of truth for logout
+              // This ensures:
+              // 1. hasAccount flag is set to false (auth state cleared)
+              // 2. SecureStorage is wiped (session data, refresh token cleared)
+              // 3. Route guards detect cleared state and redirect to /login
+              // 4. Prevents infinite 401 loops (token can't be refreshed)
+              logger.warn(
+                "api",
+                "Clearing auth state due to 401 on auth strategy",
+                {
+                  key,
+                  strategy: strategyName,
+                },
+              );
+              const { AuthStateManager } =
+                await import("@/lib/auth/auth-state");
+              await AuthStateManager.clearAuthState();
+            } catch (clearError) {
+              logger.error(
+                "api",
+                "Failed to clear auth state on refresh failure",
+                {
+                  error: clearError,
+                },
+              );
+            }
+          } else {
+            logger.debug(
               "api",
-              "Failed to clear auth state on refresh failure",
+              "Not clearing auth state (strategy does not require it)",
               {
-                error: clearError,
+                key,
+                strategy: strategyName,
               },
             );
           }
@@ -618,20 +662,25 @@ class RequestManagerClass {
   /**
    * Execute a request with retry logic and exponential backoff
    *
-   * @param fn - Async function to execute
+   * @param fn - Function that accepts attemptNumber and returns an async fetcher
    * @param retriesLeft - Number of retries remaining
    * @param delay - Current delay in ms
    * @param timeout - Timeout per attempt in ms
+   * @param totalRetries - Total retries configured (used to calculate attempt number)
    * @returns Result of the function
    */
   private async executeWithRetry<T>(
-    fn: () => Promise<T>,
+    fn: (attemptNumber: number) => () => Promise<T>,
     retriesLeft: number,
     delay: number,
     timeout: number,
+    totalRetries: number = retriesLeft,
   ): Promise<T> {
+    // Calculate current attempt number (0-indexed)
+    const attemptNumber = totalRetries - retriesLeft;
+
     try {
-      return await this.executeWithTimeout(fn, timeout);
+      return await this.executeWithTimeout(fn(attemptNumber), timeout);
     } catch (error) {
       if (retriesLeft <= 0) {
         throw error;
@@ -640,18 +689,21 @@ class RequestManagerClass {
       logger.debug("request-manager", "Retrying after error:", {
         error: (error as Error).message,
         retriesLeft,
+        attemptNumber,
         delayMs: delay,
       });
 
       if (retriesLeft === 1) {
         logger.category("api").warn("Final retry attempt", {
           error: (error as Error).message,
+          attemptNumber,
           nextDelay: delay * 2,
         });
       } else {
         logger.category("api").debug("Retrying request", {
           error: (error as Error).message,
           retriesLeft,
+          attemptNumber,
           delayMs: delay,
         });
       }
@@ -660,7 +712,13 @@ class RequestManagerClass {
       await new Promise((resolve) => setTimeout(resolve, delay));
 
       // Exponential backoff: delay *= 2
-      return this.executeWithRetry(fn, retriesLeft - 1, delay * 2, timeout);
+      return this.executeWithRetry(
+        fn,
+        retriesLeft - 1,
+        delay * 2,
+        timeout,
+        totalRetries,
+      );
     }
   }
 
@@ -750,7 +808,12 @@ class RequestManagerClass {
    */
   private reportErrorToSentry(
     error: unknown,
-    context: { key: string; options: Required<RequestOptions> },
+    context: {
+      key: string;
+      options: Omit<Required<Omit<RequestOptions, "authStrategy">>, never> & {
+        authStrategy?: string;
+      };
+    },
   ): void {
     try {
       Sentry.captureException(error, {
