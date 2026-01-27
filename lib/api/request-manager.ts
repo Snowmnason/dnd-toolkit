@@ -75,6 +75,50 @@ interface RateLimitBucket {
 }
 
 // ==========================================
+// Utility Functions
+// ==========================================
+
+/**
+ * Normalize HeadersInit to Record<string, string>
+ *
+ * Supports all HeadersInit formats:
+ * - Headers object: Convert with Object.fromEntries(headers.entries())
+ * - Array of tuples: Convert with Object.fromEntries(headers)
+ * - Plain object: Use as-is
+ *
+ * @param headersInit - Headers in any supported format
+ * @returns Plain object with string keys and values
+ */
+function normalizeHeaders(
+  headersInit: HeadersInit | undefined,
+): Record<string, string> {
+  if (!headersInit) {
+    return {};
+  }
+
+  // Plain object: use as-is
+  if (
+    typeof headersInit === "object" &&
+    !Array.isArray(headersInit) &&
+    !(headersInit instanceof Headers)
+  ) {
+    return headersInit as Record<string, string>;
+  }
+
+  // Headers object: convert to plain object
+  if (headersInit instanceof Headers) {
+    return Object.fromEntries(headersInit.entries());
+  }
+
+  // Array of tuples: convert to plain object
+  if (Array.isArray(headersInit)) {
+    return Object.fromEntries(headersInit);
+  }
+
+  return {};
+}
+
+// ==========================================
 // Configuration
 // ==========================================
 
@@ -371,8 +415,11 @@ class RequestManagerClass {
         (attemptNumber: number = 0) =>
         async () => {
           // ========== INTERCEPTOR: onBeforeRequest ==========
-          const endpoint = parseEndpoint(key);
+          // Create a fresh requestInit for each retry attempt
+          // This ensures each attempt starts with clean state and avoids header accumulation
+          // across retries. Interceptors will be called fresh on each attempt.
           const requestInit: RequestInit = {};
+          const endpoint = parseEndpoint(key);
 
           await InterceptorManager.executeBeforeRequestHooks({
             url: key,
@@ -380,13 +427,8 @@ class RequestManagerClass {
             endpoint,
           });
 
-          // Prepare headers object for auth layer
-          let headers: Record<string, string> = {};
-          if (requestInit.headers) {
-            if (typeof requestInit.headers === "object" && !Array.isArray(requestInit.headers)) {
-              headers = requestInit.headers as Record<string, string>;
-            }
-          }
+          // Normalize headers to Record<string, string> (supports Headers object, array, or plain object)
+          let headers = normalizeHeaders(requestInit.headers);
 
           if (options_.authStrategy) {
             const context: AuthContext = {
@@ -717,21 +759,12 @@ class RequestManagerClass {
       const result = await this.executeWithTimeout(fn(attemptNumber), timeout);
 
       // ========== INTERCEPTOR: onAfterResponse ==========
-      // Only call if we have the response object attached to result (from executeWithAuthLayer)
-      if (result && typeof result === "object" && "_isRequestManagerResponse" in result) {
-        const responseData = (result as any)._responseData;
-        const responseObj = (result as any)._response;
-        delete (result as any)._isRequestManagerResponse;
-        delete (result as any)._responseData;
-        delete (result as any)._response;
-
-        if (responseObj) {
-          await InterceptorManager.executeAfterResponseHooks({
-            response: responseObj,
-            data: responseData ?? result,
-            cacheKey: requestContext?.key,
-          });
-        }
+      // Call after successful fetch, before data returned to caller
+      if (requestContext) {
+        await InterceptorManager.executeAfterResponseHooks({
+          data: result,
+          cacheKey: requestContext.key,
+        });
       }
 
       return result;
@@ -742,14 +775,15 @@ class RequestManagerClass {
         // (not for AuthLayer 401 handling—that's handled by AuthLayer.onTokenExpire)
         const statusCode = (error as any)?.status || (error as any)?.code;
         const isNetworkError =
-          !(error as any)?.status && (error as Error).message.includes("network");
+          !(error as any)?.status &&
+          (error as Error).message.includes("network");
 
         // Only call error interceptors if not a 401 (401 is handled by AuthLayer)
         if (statusCode !== 401 && requestContext) {
           await InterceptorManager.executeErrorHooks({
             error: error as Error,
             url: requestContext.key,
-            init: {}, // RequestInit not available at this point
+            init: {}, // Fresh requestInit not available here; onError is observational only
             statusCode,
             isNetworkError,
             endpoint: requestContext.endpoint,

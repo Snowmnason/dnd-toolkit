@@ -32,12 +32,11 @@ export interface RequestInterceptor {
 
   /**
    * Called after successful response (before data returned to caller)
-   * Can mutate res.data (transform, parse, extract nested structure)
+   * Can mutate data (transform, parse, extract nested structure)
    *
-   * @param res - Response object with Response, data (mutable), cacheKey
+   * @param res - Response object with data (mutable), cacheKey
    */
   onAfterResponse?(res: {
-    response: Response;
     data: any; // Mutable
     cacheKey?: string; // From QueryCache
   }): Promise<void> | void;
@@ -194,9 +193,11 @@ class InterceptorManagerClass {
     // Lazy import to avoid circular dependency issues in tests
     const { NetworkDetection } = await import("../network");
     const isOffline = !NetworkDetection.getStatus().isOnline;
-    
+
     // Explicitly construct context with known properties only (prevents object injection warning)
-    const context: Parameters<Exclude<RequestInterceptor["onBeforeRequest"], undefined>>[0] = {
+    const context: Parameters<
+      Exclude<RequestInterceptor["onBeforeRequest"], undefined>
+    >[0] = {
       url: req.url,
       init: req.init,
       endpoint: req.endpoint,
@@ -210,7 +211,6 @@ class InterceptorManagerClass {
    * Execute onAfterResponse hooks for all interceptors
    */
   async executeAfterResponseHooks(res: {
-    response: Response;
     data: any;
     cacheKey?: string;
   }): Promise<void> {
@@ -221,8 +221,9 @@ class InterceptorManagerClass {
     if (hooks.length === 0) return;
 
     // Explicitly construct context with known properties only (prevents object injection warning)
-    const context: Parameters<Exclude<RequestInterceptor["onAfterResponse"], undefined>>[0] = {
-      response: res.response,
+    const context: Parameters<
+      Exclude<RequestInterceptor["onAfterResponse"], undefined>
+    >[0] = {
       data: res.data,
       cacheKey: res.cacheKey,
     };
@@ -248,7 +249,9 @@ class InterceptorManagerClass {
     if (hooks.length === 0) return;
 
     // Explicitly construct context with known properties only (prevents object injection warning)
-    const context: Parameters<Exclude<RequestInterceptor["onError"], undefined>>[0] = {
+    const context: Parameters<
+      Exclude<RequestInterceptor["onError"], undefined>
+    >[0] = {
       error: err.error,
       url: err.url,
       init: err.init,

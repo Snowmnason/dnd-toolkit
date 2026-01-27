@@ -745,15 +745,18 @@ export interface RequestInterceptor {
   }): Promise<void> | void;
 
   onAfterResponse?(res: {
-    response: Response;
-    data: any; // Mutable
+    data: any; // Mutable - parsed response data
     cacheKey?: string; // From QueryCache
   }): Promise<void> | void;
 
   onError?(err: {
     error: Error;
     url: string;
-    init: RequestInit;
+    // `init` is not guaranteed to be available in the error hook because
+    // `RequestManager` creates a fresh `RequestInit` per attempt and the
+    // error handler runs outside the per-attempt scope. Treat `init` as
+    // optional and avoid relying on it for critical logic.
+    init?: RequestInit;
     statusCode?: number; // HTTP status (500, 429, etc.)
     isNetworkError?: boolean; // True if network error, false if HTTP error
     endpoint?: string;
@@ -776,7 +779,7 @@ const loggingInterceptor: RequestInterceptor = {
     });
   },
   onAfterResponse: (res) => {
-    console.log(`[API] Response received`, { status: res.response.status });
+    console.log(`[API] Response received`, { data: res.data });
   },
 };
 

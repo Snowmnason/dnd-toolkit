@@ -101,9 +101,7 @@ describe("Interceptor System", () => {
       InterceptorManager.registerInterceptor(interceptor1);
       InterceptorManager.registerInterceptor(interceptor2);
 
-      const mockResponse = new Response("test");
       await InterceptorManager.executeAfterResponseHooks({
-        response: mockResponse,
         data: {},
       });
 
@@ -162,10 +160,8 @@ describe("Interceptor System", () => {
       InterceptorManager.registerInterceptor(interceptor1);
       InterceptorManager.registerInterceptor(interceptor2);
 
-      const mockResponse = new Response("test");
       await expect(
         InterceptorManager.executeAfterResponseHooks({
-          response: mockResponse,
           data: {},
         }),
       ).resolves.toBeUndefined();
@@ -216,15 +212,15 @@ describe("Interceptor System", () => {
 
       InterceptorManager.registerInterceptor(interceptor);
 
-      const mockResponse = new Response("test");
       const data: any = { value: 1 };
 
       await InterceptorManager.executeAfterResponseHooks({
-        response: mockResponse,
         data,
       });
 
       expect(data.transformed).toBe(true);
+
+      InterceptorManager.unregisterInterceptor(interceptor);
     });
 
     it("should pass statusCode and isNetworkError to onError", async () => {
