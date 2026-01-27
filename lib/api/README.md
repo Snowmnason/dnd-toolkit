@@ -18,7 +18,6 @@ Provides a robust, feature-rich HTTP request layer with built-in deduplication, 
 
 **Don't use this if:**
 
-- You need custom HTTP client configuration (auth headers, interceptors); consider wrapping this module
 - You need real-time WebSocket communication (this module handles REST requests only)
 - You need batching/GraphQL optimizations (consider adding a layer on top)
 - You're calling browser-only APIs (e.g., Fetch API with specific credentials modes)
@@ -296,10 +295,13 @@ Cleanup runs every 1 hour and is O(n) where n = number of rate limit buckets/pen
 
 ## File Breakdown
 
-| File                 | Purpose                                                                                                                                                                                                                                    |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `request-manager.ts` | Main RequestManager class. Implements request deduplication, retry with exponential backoff, rate limiting (token bucket), QueryCache integration, timeout handling, and error reporting. Singleton instance exported as `RequestManager`. |
-| `auth-layer.ts`      | AuthLayer singleton, auth strategy registration, token injection, 401 handling. Integrates with RequestManager middleware chain.                                                                                                           |
+| File                    | Purpose                                                                                                                                                                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `request-manager.ts`    | Main RequestManager class. Implements request deduplication, retry with exponential backoff, rate limiting (token bucket), QueryCache integration, timeout handling, and error reporting. Singleton instance exported as `RequestManager`. |
+| `auth-layer.ts`         | AuthLayer singleton, auth strategy registration, token injection, 401 handling. Integrates with RequestManager middleware chain.                                                                                                           |
+| `interceptor.ts`        | RequestInterceptor interface and InterceptorManager singleton. Registers hooks for onBeforeRequest, onAfterResponse, onError lifecycle points. Hooks run serially with error isolation. Integrated into RequestManager pipeline.           |
+| `default-strategies.ts` | Default auth strategies (user, public, invite, external). Includes token management, session refresh, and per-strategy 401 handling configuration.                                                                                         |
+| `index.ts`              | Barrel export for public API (RequestManager, AuthLayer, InterceptorManager, RequestInterceptor, etc.).                                                                                                                                    |
 
 ---
 
@@ -675,6 +677,223 @@ Currently, no dedicated test guide exists for this module. When adding tests, cr
 - QueryCache: Call with `useQueryCache: true`, `staleTime: 1s`; verify cache hit on second call within 1s
 - Fail-open: Call with `failOpen: true` and error fetcher; verify returns null instead of throwing
 - Cleanup: Call `getStats()` periodically; verify stale entries are removed after 1+ hour
+
+---
+
+# RequestInterceptor: Pluggable Request/Response Hooks
+
+Provides a hook system for cross-cutting concerns—logging, metrics, request/response transformation, privacy redaction—without coupling to the core request layer.
+
+## When to Use RequestInterceptor
+
+**Use RequestInterceptor when you need to:**
+
+- Log or monitor all API requests/responses (analytics, performance tracking)
+- Transform request headers (add custom headers, authentication enrichment)
+- Transform response data (extract nested fields, validate schema, enrich objects)
+- Handle domain-specific errors (redirect on 403, retry on 429, etc.)
+- Apply privacy filters (redact PII before logging)
+- Implement request/response caching at the hook level
+
+**Don't use RequestInterceptor when:**
+
+- You need to suppress/replace errors (interceptors are observational for errors, not transformational)
+- You need to make decisions based on response status (use AuthLayer strategies instead for auth-specific logic)
+- You need to cancel requests mid-flight (hooks run after RequestManager decisions)
+
+## Architecture: RequestInterceptor Integration
+
+Interceptors run at three lifecycle points in the RequestManager pipeline:
+
+```
+Request Call (with key, fetcher, options)
+        ↓
+    **onBeforeRequest Hook** ← Interceptors can mutate request headers/body
+        ↓
+    Fetch + Retry Logic
+        ↓
+    **onAfterResponse Hook** ← Interceptors can mutate response data
+        ↓
+    Persist to QueryCache
+        ↓
+    **onError Hook** (on retry exhaustion) ← Interceptors can observe error (not suppress)
+        ↓
+    Return Result
+```
+
+**Key Principles:**
+
+- **Serial Execution**: Hooks run in registration order. One hook's error doesn't block the next.
+- **Mutation Model**: Hooks mutate request/response in-place. No return values used.
+- **Error Isolation**: Errors in hooks are caught, logged, and execution continues.
+- **Contextual Data**: Each hook receives endpoint name (parsed), isOffline flag, statusCode, etc.
+- **Orthogonal to AuthLayer**: 401 errors are handled by AuthLayer, not passed to interceptors.
+
+## RequestInterceptor API
+
+### Interface Definition
+
+```ts
+export interface RequestInterceptor {
+  name?: string; // Optional name for debugging
+
+  onBeforeRequest?(req: {
+    url: string;
+    init: RequestInit; // Mutable
+    endpoint?: string; // Parsed endpoint (e.g., "worlds", "users")
+    isOffline?: boolean; // From NetworkDetection
+  }): Promise<void> | void;
+
+  onAfterResponse?(res: {
+    response: Response;
+    data: any; // Mutable
+    cacheKey?: string; // From QueryCache
+  }): Promise<void> | void;
+
+  onError?(err: {
+    error: Error;
+    url: string;
+    init: RequestInit;
+    statusCode?: number; // HTTP status (500, 429, etc.)
+    isNetworkError?: boolean; // True if network error, false if HTTP error
+    endpoint?: string;
+  }): Promise<void> | void;
+}
+```
+
+### InterceptorManager API
+
+```ts
+import { InterceptorManager, type RequestInterceptor } from "@/lib/api";
+
+// Register an interceptor
+const loggingInterceptor: RequestInterceptor = {
+  name: "request-logger",
+  onBeforeRequest: (req) => {
+    console.log(`[API] ${req.endpoint}`, {
+      url: req.url,
+      offline: req.isOffline,
+    });
+  },
+  onAfterResponse: (res) => {
+    console.log(`[API] Response received`, { status: res.response.status });
+  },
+};
+
+InterceptorManager.registerInterceptor(loggingInterceptor);
+
+// Unregister when done (e.g., on app shutdown or during testing)
+InterceptorManager.unregisterInterceptor(loggingInterceptor);
+
+// Get all registered interceptors
+const interceptors = InterceptorManager.getInterceptors();
+
+// Clear all interceptors (mainly for testing)
+InterceptorManager.clearInterceptors();
+```
+
+## Example Patterns
+
+### Example 1: Request/Response Logging
+
+```ts
+const analyticsInterceptor: RequestInterceptor = {
+  name: "analytics",
+  onBeforeRequest: (req) => {
+    // Log request start
+    console.time(`${req.endpoint}:fetch`);
+  },
+  onAfterResponse: (res) => {
+    // Log response time
+    console.timeEnd(`${res.cacheKey}:fetch`);
+  },
+};
+
+InterceptorManager.registerInterceptor(analyticsInterceptor);
+```
+
+### Example 2: Response Data Transformation
+
+```ts
+const normalizerInterceptor: RequestInterceptor = {
+  name: "data-normalizer",
+  onAfterResponse: (res) => {
+    // Extract nested data structure
+    if (res.data?.result) {
+      res.data = res.data.result; // Mutate in-place
+    }
+    // Convert timestamps to Date objects
+    if (res.data?.createdAt) {
+      res.data.createdAt = new Date(res.data.createdAt);
+    }
+  },
+};
+
+InterceptorManager.registerInterceptor(normalizerInterceptor);
+```
+
+### Example 3: Error Observation
+
+```ts
+const errorTrackerInterceptor: RequestInterceptor = {
+  name: "error-tracker",
+  onError: (err) => {
+    // Log errors for analytics (don't throw or suppress)
+    if (err.statusCode === 429) {
+      console.warn(`Rate limited on ${err.endpoint}`);
+    }
+    if (err.isNetworkError) {
+      console.warn(`Network error on ${err.url}`);
+    }
+  },
+};
+
+InterceptorManager.registerInterceptor(errorTrackerInterceptor);
+```
+
+### Example 4: Privacy Redaction
+
+```ts
+const privacyInterceptor: RequestInterceptor = {
+  name: "privacy-redaction",
+  onAfterResponse: (res) => {
+    // Remove PII before logging
+    if (res.data?.email) {
+      res.data.email = res.data.email.replace(/(.{2}).*(@.*)/, "$1***$2");
+    }
+    if (res.data?.phone) {
+      res.data.phone = "***-***-****";
+    }
+  },
+};
+
+InterceptorManager.registerInterceptor(privacyInterceptor);
+```
+
+## Integration with RequestManager
+
+Interceptors are automatically called by RequestManager at the appropriate lifecycle points. No additional configuration needed:
+
+```ts
+// RequestManager automatically calls:
+// 1. onBeforeRequest (before each retry attempt)
+// 2. onAfterResponse (after successful fetch, before QueryCache write)
+// 3. onError (when RequestManager exhausts retries, excluding 401)
+
+const data = await RequestManager.fetch("users:list", fetcher, {
+  retries: 3,
+  useQueryCache: true,
+  // Any registered interceptors are called automatically
+});
+```
+
+## Error Handling in Interceptors
+
+- **onBeforeRequest/onAfterResponse errors**: Caught and logged, execution continues to next hook
+- **onError hook errors**: Caught and logged, doesn't suppress the underlying error
+- **No suppression**: Interceptors cannot suppress, cancel, or replace errors; only observe
+
+Useful for non-critical logic (analytics, logging); critical auth/error handling belongs in AuthLayer strategies.
 
 ---
 

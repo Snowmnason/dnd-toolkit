@@ -7,6 +7,7 @@ import { QueryCache } from "../cache";
 import { getAppConfig } from "../config";
 import { logger } from "../utils/logger";
 import { AuthLayer, type AuthContext } from "./auth-layer";
+import { InterceptorManager, parseEndpoint } from "./interceptor";
 
 /**
  * Request Manager: Centralized API request layer with:
@@ -369,31 +370,52 @@ class RequestManagerClass {
       const wrappedFetcher =
         (attemptNumber: number = 0) =>
         async () => {
+          // ========== INTERCEPTOR: onBeforeRequest ==========
+          const endpoint = parseEndpoint(key);
+          const requestInit: RequestInit = {};
+
+          await InterceptorManager.executeBeforeRequestHooks({
+            url: key,
+            init: requestInit,
+            endpoint,
+          });
+
+          // Prepare headers object for auth layer
+          let headers: Record<string, string> = {};
+          if (requestInit.headers) {
+            if (typeof requestInit.headers === "object" && !Array.isArray(requestInit.headers)) {
+              headers = requestInit.headers as Record<string, string>;
+            }
+          }
+
           if (options_.authStrategy) {
             const context: AuthContext = {
               url: key,
               method: "GET", // Note: Could be enhanced to accept method in options
-              endpoint: key.split(":")[0],
+              endpoint,
               retryCount: attemptNumber,
             };
 
             // Get headers from auth layer
-            const headers = await AuthLayer.injectAuthHeader(
-              {},
+            const authHeaders = await AuthLayer.injectAuthHeader(
+              headers,
               options_.authStrategy,
               context,
             );
 
+            // Update requestInit with new headers
+            requestInit.headers = authHeaders;
+
             logger.debug("api", "Auth middleware: prepared headers", {
               key,
               strategy: options_.authStrategy,
-              hasAuth: !!headers["Authorization"],
+              hasAuth: !!authHeaders["Authorization"],
               attemptNumber,
             });
 
             // If fetcher accepts headers param, it will use them (e.g., raw fetch wrapper)
             // Otherwise, it's a no-op (e.g., Supabase client handles its own auth)
-            return await (fetcher as any)(headers);
+            return await (fetcher as any)(authHeaders);
           }
 
           // No auth strategy - just call fetcher directly
@@ -417,6 +439,12 @@ class RequestManagerClass {
         options_.retries,
         options_.retryDelay,
         options_.timeout,
+        undefined, // totalRetries (defaults to retriesLeft)
+        {
+          key,
+          endpoint: parseEndpoint(key),
+          authStrategy: options_.authStrategy,
+        },
       );
 
       const trackedPromise = attachTracking(promise, startedAt);
@@ -667,6 +695,7 @@ class RequestManagerClass {
    * @param delay - Current delay in ms
    * @param timeout - Timeout per attempt in ms
    * @param totalRetries - Total retries configured (used to calculate attempt number)
+   * @param requestContext - Context for error handling (key, endpoint, authStrategy)
    * @returns Result of the function
    */
   private async executeWithRetry<T>(
@@ -675,14 +704,58 @@ class RequestManagerClass {
     delay: number,
     timeout: number,
     totalRetries: number = retriesLeft,
+    requestContext?: {
+      key: string;
+      endpoint?: string;
+      authStrategy?: string;
+    },
   ): Promise<T> {
     // Calculate current attempt number (0-indexed)
     const attemptNumber = totalRetries - retriesLeft;
 
     try {
-      return await this.executeWithTimeout(fn(attemptNumber), timeout);
+      const result = await this.executeWithTimeout(fn(attemptNumber), timeout);
+
+      // ========== INTERCEPTOR: onAfterResponse ==========
+      // Only call if we have the response object attached to result (from executeWithAuthLayer)
+      if (result && typeof result === "object" && "_isRequestManagerResponse" in result) {
+        const responseData = (result as any)._responseData;
+        const responseObj = (result as any)._response;
+        delete (result as any)._isRequestManagerResponse;
+        delete (result as any)._responseData;
+        delete (result as any)._response;
+
+        if (responseObj) {
+          await InterceptorManager.executeAfterResponseHooks({
+            response: responseObj,
+            data: responseData ?? result,
+            cacheKey: requestContext?.key,
+          });
+        }
+      }
+
+      return result;
     } catch (error) {
       if (retriesLeft <= 0) {
+        // ========== INTERCEPTOR: onError ==========
+        // Only call error interceptors when RequestManager exhausts retries
+        // (not for AuthLayer 401 handling—that's handled by AuthLayer.onTokenExpire)
+        const statusCode = (error as any)?.status || (error as any)?.code;
+        const isNetworkError =
+          !(error as any)?.status && (error as Error).message.includes("network");
+
+        // Only call error interceptors if not a 401 (401 is handled by AuthLayer)
+        if (statusCode !== 401 && requestContext) {
+          await InterceptorManager.executeErrorHooks({
+            error: error as Error,
+            url: requestContext.key,
+            init: {}, // RequestInit not available at this point
+            statusCode,
+            isNetworkError,
+            endpoint: requestContext.endpoint,
+          });
+        }
+
         throw error;
       }
 
@@ -718,6 +791,7 @@ class RequestManagerClass {
         delay * 2,
         timeout,
         totalRetries,
+        requestContext,
       );
     }
   }
