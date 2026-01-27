@@ -47,6 +47,7 @@ interface CircuitState {
   state: "Closed" | "Open" | "Half-Open";
   consecutiveFailures: number;
   failureWindow: number[]; // timestamps of failures in sliding window
+  requestWindow: number[]; // timestamps of all requests (success or failure) in sliding window
   lastTransitionAt: number;
   nextRecoveryAt: number;
   consecutiveHalfOpenFailures: number;
@@ -57,7 +58,7 @@ interface CircuitState {
  * Get default circuit breaker thresholds from config
  */
 function getDefaultThresholds(): Required<CircuitThresholds> {
-  const config = getAppConfig() as any;
+  const config = getAppConfig();
   const cb = config.circuitBreaker;
   return {
     failures: cb?.failures ?? 10,
@@ -101,6 +102,7 @@ class CircuitBreakerManagerClass {
     // If Open and recovery timeout elapsed, transition to Half-Open
     if (circuit.state === "Open" && Date.now() >= circuit.nextRecoveryAt) {
       circuit.state = "Half-Open";
+      circuit.lastTransitionAt = Date.now();
       circuit.halfOpenProbeInFlight = false;
       logger.warn("api", `Circuit breaker Half-Open (recovery test): ${key}`, {
         endpoint: key,
@@ -114,6 +116,8 @@ class CircuitBreakerManagerClass {
   /**
    * Get stats for one or all circuits
    */
+  getStats(key: string): CircuitStats;
+  getStats(): CircuitStats[];
   getStats(key?: string): CircuitStats | CircuitStats[] {
     if (key) {
       const circuit = this.circuits.get(key);
@@ -148,6 +152,13 @@ class CircuitBreakerManagerClass {
   recordSuccess(key: string): void {
     const circuit = this.circuits.get(key);
     if (!circuit) return; // No circuit for this key yet
+
+    // Add successful request to sliding window for failure rate calculation
+    const now = Date.now();
+    circuit.requestWindow.push(now);
+    circuit.requestWindow = circuit.requestWindow.filter(
+      (t) => now - t < DEFAULT_THRESHOLDS.rateWindowMs,
+    );
 
     if (circuit.state === "Half-Open") {
       circuit.state = "Closed";
@@ -190,6 +201,7 @@ class CircuitBreakerManagerClass {
         state: "Closed",
         consecutiveFailures: 0,
         failureWindow: [],
+        requestWindow: [],
         lastTransitionAt: Date.now(),
         nextRecoveryAt: 0,
         consecutiveHalfOpenFailures: 0,
@@ -200,9 +212,13 @@ class CircuitBreakerManagerClass {
 
     circuit.halfOpenProbeInFlight = false;
 
-    // Add failure to sliding window
+    // Add request and failure to sliding windows
     const now = Date.now();
+    circuit.requestWindow.push(now);
     circuit.failureWindow.push(now);
+    circuit.requestWindow = circuit.requestWindow.filter(
+      (t) => now - t < thresholds.rateWindowMs,
+    );
     circuit.failureWindow = circuit.failureWindow.filter(
       (t) => now - t < thresholds.rateWindowMs,
     );
@@ -211,12 +227,14 @@ class CircuitBreakerManagerClass {
     circuit.consecutiveFailures++;
 
     // Check if should open circuit
+    // Either: N consecutive failures, OR failure rate > ratePercent (actual percentage)
+    const failureRate =
+      circuit.requestWindow.length > 0
+        ? (circuit.failureWindow.length / circuit.requestWindow.length) * 100
+        : 0;
     const shouldOpen =
       circuit.consecutiveFailures >= thresholds.failures ||
-      (circuit.failureWindow.length /
-        Math.max(1, thresholds.rateWindowMs / 1000)) *
-        100 >=
-        thresholds.ratePercent;
+      failureRate >= thresholds.ratePercent;
 
     if (circuit.state === "Closed" && shouldOpen) {
       circuit.state = "Open";
@@ -225,10 +243,7 @@ class CircuitBreakerManagerClass {
       logger.warn("api", `Circuit breaker Open: ${key}`, {
         endpoint: key,
         failures: circuit.consecutiveFailures,
-        failureRate:
-          (circuit.failureWindow.length /
-            Math.max(1, thresholds.rateWindowMs / 1000)) *
-          100,
+        failureRate: failureRate.toFixed(1),
         recoveryAt: circuit.nextRecoveryAt,
       });
     } else if (circuit.state === "Half-Open") {
@@ -285,6 +300,7 @@ class CircuitBreakerManagerClass {
         circuit.state = "Closed";
         circuit.consecutiveFailures = 0;
         circuit.failureWindow = [];
+        circuit.requestWindow = [];
         circuit.nextRecoveryAt = 0;
         circuit.consecutiveHalfOpenFailures = 0;
         circuit.lastTransitionAt = Date.now();
@@ -298,6 +314,7 @@ class CircuitBreakerManagerClass {
         circuit.state = "Closed";
         circuit.consecutiveFailures = 0;
         circuit.failureWindow = [];
+        circuit.requestWindow = [];
         circuit.nextRecoveryAt = 0;
         circuit.consecutiveHalfOpenFailures = 0;
         circuit.lastTransitionAt = Date.now();

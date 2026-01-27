@@ -433,12 +433,12 @@ class RequestManagerClass {
           const stats = CircuitBreakerManager.getStats(cbKey);
           logger.warn("api", "Circuit breaker open, fast-failing:", {
             endpoint: cbKey,
-            recoveryAt: (stats as any).nextRecoveryAt,
+            recoveryAt: stats.nextRecoveryAt,
           });
           const error = new CircuitBreakerOpenError(
             cbKey,
             "Open",
-            (stats as any).nextRecoveryAt ?? 0,
+            stats.nextRecoveryAt ?? 0,
           );
           if (options_.failOpen) {
             return null;
@@ -462,7 +462,7 @@ class RequestManagerClass {
           const error = new CircuitBreakerOpenError(
             cbKey,
             "Open",
-            (stats as any).nextRecoveryAt ?? 0,
+            stats.nextRecoveryAt ?? 0,
           );
           if (options_.failOpen) {
             return null;
@@ -623,31 +623,38 @@ class RequestManagerClass {
               error?.message?.includes("fetch") ||
               error?.name === "AbortError";
 
-            // Record failure in circuit breaker
-            CircuitBreakerManager.recordFailure(
-              cbKey,
-              isNetworkError,
-              thresholds
-                ? {
-                    failures:
-                      thresholds.failures ?? DEFAULT_THRESHOLDS.failures,
-                    ratePercent:
-                      thresholds.ratePercent ?? DEFAULT_THRESHOLDS.ratePercent,
-                    rateWindowMs:
-                      thresholds.rateWindowMs ??
-                      DEFAULT_THRESHOLDS.rateWindowMs,
-                    baseTimeoutMs:
-                      thresholds.baseTimeoutMs ??
-                      DEFAULT_THRESHOLDS.baseTimeoutMs,
-                    maxTimeoutMs:
-                      thresholds.maxTimeoutMs ??
-                      DEFAULT_THRESHOLDS.maxTimeoutMs,
-                    treatNetworkErrors:
-                      thresholds.treatNetworkErrors ??
-                      DEFAULT_THRESHOLDS.treatNetworkErrors,
-                  }
-                : undefined,
-            );
+            // Skip recording auth errors (401, 403) - AuthLayer handles these separately
+            // and they should not trigger circuit breaker failures
+            const isAuthError = error?.status === 401 || error?.status === 403;
+
+            if (!isAuthError) {
+              // Record failure in circuit breaker
+              CircuitBreakerManager.recordFailure(
+                cbKey,
+                isNetworkError,
+                thresholds
+                  ? {
+                      failures:
+                        thresholds.failures ?? DEFAULT_THRESHOLDS.failures,
+                      ratePercent:
+                        thresholds.ratePercent ??
+                        DEFAULT_THRESHOLDS.ratePercent,
+                      rateWindowMs:
+                        thresholds.rateWindowMs ??
+                        DEFAULT_THRESHOLDS.rateWindowMs,
+                      baseTimeoutMs:
+                        thresholds.baseTimeoutMs ??
+                        DEFAULT_THRESHOLDS.baseTimeoutMs,
+                      maxTimeoutMs:
+                        thresholds.maxTimeoutMs ??
+                        DEFAULT_THRESHOLDS.maxTimeoutMs,
+                      treatNetworkErrors:
+                        thresholds.treatNetworkErrors ??
+                        DEFAULT_THRESHOLDS.treatNetworkErrors,
+                    }
+                  : undefined,
+              );
+            }
 
             // Rethrow the error so it propagates to the caller
             throw error;
@@ -685,7 +692,7 @@ class RequestManagerClass {
           });
       }
 
-      return circuitBreakerRecordedPromise;
+      return await circuitBreakerRecordedPromise;
     } catch (error) {
       logger.error("request-manager", "Request failed:", { key, error });
 
