@@ -6,6 +6,7 @@ import {
 import { QueryCache } from "../cache";
 import { getAppConfig } from "../config";
 import { logger } from "../utils/logger";
+import { AuthLayer, type AuthContext } from "./auth-layer";
 
 /**
  * Request Manager: Centralized API request layer with:
@@ -41,6 +42,11 @@ export interface RequestOptions {
   /** Timeout in ms for the request (default: 30000) */
   timeout?: number;
 
+  // ===== AuthLayer Integration =====
+
+  /** Auth strategy name for this request (required) */
+  authStrategy: string;
+
   // ===== QueryCache Integration Options =====
 
   /** Use QueryCache for data persistence (default: false) */
@@ -72,9 +78,10 @@ interface RateLimitBucket {
 // ==========================================
 
 /**
- * Get default options from appsettings
+ * Get default options from appsettings (for optional fields only)
+ * Note: authStrategy is REQUIRED and must be specified by caller
  */
-function getDefaultOptions(): Required<RequestOptions> {
+function getDefaultOptions(): Omit<Required<RequestOptions>, "authStrategy"> {
   const config = getAppConfig();
   return {
     dedupe: true,
@@ -224,7 +231,7 @@ class RequestManagerClass {
   async fetch<T>(
     key: string,
     fetcher: () => Promise<T>,
-    options: RequestOptions = {},
+    options: RequestOptions,
   ): Promise<T | null> {
     const options_ = { ...DEFAULT_OPTIONS, ...options };
     const startedAt = Date.now();
@@ -332,9 +339,63 @@ class RequestManagerClass {
         }
       }
 
-      // ========== EXECUTE WITH RETRY ==========
+      // ========== EXECUTE WITH RETRY & AUTH ==========
+      // Middleware chain (bottom-up execution order):
+      // 1. Retry middleware: Retries on failure with exponential backoff
+      // 2. Auth layer middleware: Handles 401 responses + token refresh
+      // 3. Auth header injection middleware: Prepares Bearer token
+      // 4. Actual fetcher: User-provided function (Supabase client, raw fetch, etc.)
+      //
+      // Usage pattern for fetchers:
+      // - Supabase client: Handles auth automatically, just pass the client call
+      // - Raw HTTP fetch: Accept `headers` param and merge into fetch options
+      //   Example: fetcher(headers) => fetch(url, { headers: {...defaultHeaders, ...headers} })
+
+      let wrappedFetcher = fetcher;
+
+      // Wrap with auth header injection (if strategy specified)
+      if (options_.authStrategy) {
+        wrappedFetcher = async () => {
+          const context: AuthContext = {
+            url: key,
+            method: "GET", // Note: Could be enhanced to accept method in options
+            endpoint: key.split(":")[0],
+            retryCount: 0,
+          };
+
+          // Get headers from auth layer
+          const headers = await AuthLayer.injectAuthHeader(
+            {},
+            options_.authStrategy!,
+            context,
+          );
+
+          logger.debug("api", "Auth middleware: prepared headers", {
+            key,
+            strategy: options_.authStrategy,
+            hasAuth: !!headers["Authorization"],
+          });
+
+          // If fetcher accepts headers param, it will use them (e.g., raw fetch wrapper)
+          // Otherwise, it's a no-op (e.g., Supabase client handles its own auth)
+          return await (fetcher as any)(headers);
+        };
+      }
+
+      // Wrap with 401 handling & token refresh
+      let authLayerWrappedFetcher = wrappedFetcher;
+      if (options_.authStrategy) {
+        authLayerWrappedFetcher = () =>
+          this.executeWithAuthLayer(
+            wrappedFetcher,
+            key,
+            options_.authStrategy!,
+            0, // retryCount starts at 0
+          );
+      }
+
       const promise = this.executeWithRetry(
-        fetcher,
+        authLayerWrappedFetcher,
         options_.retries,
         options_.retryDelay,
         options_.timeout,
@@ -446,6 +507,121 @@ class RequestManagerClass {
    * @param retriesLeft - Number of retries remaining
    * @param delay - Delay before retry in ms
    * @param timeout - Timeout for the function in ms
+   * @returns Result of the function
+   */
+  /**
+   * Execute request with auth layer handling
+   * - Injects auth headers if strategy specified
+   * - On 401 response: triggers token refresh and retries once
+   *
+   * @param fetcher - Original request function
+   * @param key - Request key for logging
+   * @param strategyName - Auth strategy name
+   * @param retryCount - Current retry attempt (0 on first)
+   * @returns Result from fetcher
+   */
+  private async executeWithAuthLayer<T>(
+    fetcher: () => Promise<T>,
+    key: string,
+    strategyName: string,
+    retryCount: number,
+  ): Promise<T> {
+    try {
+      return await fetcher();
+    } catch (error) {
+      // Check if this is a 401 Unauthorized response
+      // HTTP 401 Unauthorized means authentication failed or token expired
+      // (distinct from 403 Forbidden which means auth succeeded but permission denied)
+      const status = (error as any)?.status || (error as any)?.code;
+
+      if (status === 401 && retryCount < 1) {
+        // Only retry once on 401
+        logger.info("api", "Got 401, attempting token refresh", {
+          key,
+          strategy: strategyName,
+        });
+
+        try {
+          // OPTIMIZATION: Skip token refresh if offline (no point, will fail anyway)
+          // Let offline mode queue the request for retry when connection restored
+          const { NetworkDetection } = await import("@/lib/network");
+          if (!NetworkDetection.getStatus().isOnline) {
+            logger.debug(
+              "api",
+              "Offline detected—skipping token refresh, letting offline queue handle retry",
+              {
+                key,
+                strategy: strategyName,
+              },
+            );
+            throw error; // Re-throw 401; offline will queue for retry
+          }
+
+          // Extract URL and method from error context if available
+          // For now, use generic context since fetcher is a black box
+          const context: AuthContext = {
+            url: key, // Use key as proxy for URL (typically includes URL info)
+            method: "GET", // Default; real implementation would pass this through
+            endpoint: key.split(":")[0], // Extract endpoint from key pattern
+            retryCount: retryCount + 1,
+          };
+
+          // Handle 401 with per-strategy locking
+          // Phase 2+ Enhancement: Consider rate-limiting per-strategy refreshes if token TTL is short
+          // (currently: per-strategy lock prevents thundering herd, but high-frequency refreshes still create 100+ calls for 100 concurrent users)
+          await AuthLayer.handle401Response(strategyName, context);
+
+          // Retry the request once after token refresh
+          logger.debug("api", "Retrying request after token refresh", {
+            key,
+            strategy: strategyName,
+          });
+          return await fetcher();
+        } catch (refreshError) {
+          // CRITICAL: If token refresh failed, ensure auth state is cleared
+          // This prevents infinite 401 loops and ensures route guards redirect to login
+          logger.error("api", "Token refresh failed—clearing auth state", {
+            key,
+            strategy: strategyName,
+            error: refreshError,
+          });
+
+          try {
+            // CRITICAL: Clear auth state as single source of truth for logout
+            // This ensures:
+            // 1. hasAccount flag is set to false (auth state cleared)
+            // 2. SecureStorage is wiped (session data, refresh token cleared)
+            // 3. Route guards detect cleared state and redirect to /login
+            // 4. Prevents infinite 401 loops (token can't be refreshed)
+            const { AuthStateManager } = await import("@/lib/auth/auth-state");
+            await AuthStateManager.clearAuthState();
+          } catch (clearError) {
+            logger.error(
+              "api",
+              "Failed to clear auth state on refresh failure",
+              {
+                error: clearError,
+              },
+            );
+          }
+
+          // Re-throw original 401 error (don't retry)
+          throw error;
+        }
+      }
+
+      // Not a 401 or already retried once - just throw
+      throw error;
+    }
+  }
+
+  /**
+   * Execute a request with retry logic and exponential backoff
+   *
+   * @param fn - Async function to execute
+   * @param retriesLeft - Number of retries remaining
+   * @param delay - Current delay in ms
+   * @param timeout - Timeout per attempt in ms
    * @returns Result of the function
    */
   private async executeWithRetry<T>(
@@ -644,6 +820,17 @@ class RequestManagerClass {
       this.rateLimitBuckets.clear();
       logger.debug("request-manager", "Reset all rate limits");
     }
+  }
+
+  /**
+   * Shutdown RequestManager and clean up all resources
+   * Should be called during app termination or hard reset
+   */
+  shutdown(): void {
+    logger.debug("request-manager", "Shutting down RequestManager");
+    this.stopCleanupTimer();
+    this.clearPending();
+    this.resetRateLimit();
   }
 }
 

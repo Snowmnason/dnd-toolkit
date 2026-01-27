@@ -468,6 +468,13 @@ class AppKernelClass {
           await AuthStateManager.getAuthState();
           logger.category("bootstrap").debug("Auth state loaded");
 
+          // Initialize AuthLayer with default strategies
+          const { AuthLayer } = await import("@/lib/api/auth-layer");
+          const { createUserAuthStrategy, createPublicAuthStrategy } = await import("@/lib/api/default-strategies");
+          AuthLayer.registerAuthStrategy("user", createUserAuthStrategy());
+          AuthLayer.registerAuthStrategy("public", createPublicAuthStrategy());
+          logger.category("bootstrap").debug("AuthLayer initialized with user and public strategies");
+
           // Initialize auth health monitoring (validates auth + starts polling)
           const { initializeAuthHealthMonitoring } =
             await import("@/lib/auth/auth-health-monitor");

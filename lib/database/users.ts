@@ -92,6 +92,7 @@ export const usersDB = {
         dedupe: false,
         retries: 3,
         timeout: 15000,
+        authStrategy: "user",
       }
     );
   },
@@ -188,7 +189,8 @@ export const usersDB = {
       {
         dedupe: true,
         retries: 2,
-        timeout: 15000
+        timeout: 15000,
+        authStrategy: "user",
       }
     );
     
@@ -267,6 +269,7 @@ export const usersDB = {
         dedupe: false,
         retries: 3,
         timeout: 15000,
+        authStrategy: "user",
       }
     );
   },
@@ -290,11 +293,11 @@ export const usersDB = {
         dedupe: false,
         retries: 3,
         timeout: 15000,
+        authStrategy: "user",
       }
     );
 
     // RequestManager may return null if failOpen is enabled; normalize to boolean
     return result ?? false;
   }
-
 };

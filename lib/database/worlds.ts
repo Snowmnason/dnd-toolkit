@@ -107,6 +107,7 @@ export const worldsDB = {
         dedupe: false,
         retries: 3,
         timeout: 15000,
+        authStrategy: "user",
       }
     );
   },
@@ -338,6 +339,7 @@ export const worldsDB = {
         dedupe: false,
         retries: 3,
         timeout: 15000,
+        authStrategy: "user",
       }
     );
   },
@@ -380,6 +382,7 @@ export const worldsDB = {
         dedupe: false,
         retries: 3,
         timeout: 15000,
+        authStrategy: "user",
       }
     );
   },
@@ -416,6 +419,7 @@ export const worldsDB = {
         dedupe: false,
         retries: 3,
         timeout: 15000,
+        authStrategy: "user",
       }
     );
 
@@ -454,6 +458,7 @@ export const worldsDB = {
         dedupe: false,
         retries: 3,
         timeout: 15000,
+        authStrategy: "user",
       }
     );
 
@@ -491,6 +496,7 @@ export const worldsDB = {
         dedupe: true,
         retries: 2,
         timeout: 10000,
+        authStrategy: "user",
       }
     );
 
@@ -543,6 +549,7 @@ export const worldsDB = {
         dedupe: false,
         retries: 3,
         timeout: 15000,
+        authStrategy: "user",
       }
     );
   },
@@ -578,6 +585,7 @@ export const worldsDB = {
         dedupe: true,
         retries: 2,
         timeout: 15000,
+        authStrategy: "user",
       }
     );
   },
@@ -618,6 +626,7 @@ export const worldsDB = {
         dedupe: true,
         retries: 3,
         timeout: 15000,
+        authStrategy: "user",
       }
     );
   },

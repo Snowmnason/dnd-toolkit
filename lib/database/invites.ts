@@ -127,7 +127,8 @@ export async function validateInviteToken(
       {
         dedupe: true,
         retries: 2,
-        timeout: 10000
+        timeout: 10000,
+        authStrategy: "user",
       }
     );
 
@@ -221,7 +222,8 @@ export async function getWorldInviteLinks(
       {
         dedupe: true,
         retries: 2,
-        timeout: 15000
+        timeout: 15000,
+        authStrategy: "user",
       }
     );
 

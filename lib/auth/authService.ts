@@ -109,6 +109,7 @@ export const signUpUser = async (
         rateLimitKey: `auth:signup:${sanitizedEmail}`,
         retries: 1,
         timeout: 10000,
+        authStrategy: "public",
       },
     );
 
@@ -247,6 +248,7 @@ export const signInUser = async (
         rateLimitKey: `auth:signin:${sanitizedEmail}`,
         retries: 1,
         timeout: 10000,
+        authStrategy: "public",
       },
     );
 
@@ -460,6 +462,7 @@ export const sendPasswordReset = async (
         rateLimitKey: `auth:reset:${sanitizedEmail}`,
         retries: 1,
         timeout: 10000,
+        authStrategy: "public",
       },
     );
 
