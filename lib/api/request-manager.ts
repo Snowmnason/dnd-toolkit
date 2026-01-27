@@ -7,6 +7,12 @@ import { QueryCache } from "../cache";
 import { getAppConfig } from "../config";
 import { logger } from "../utils/logger";
 import { AuthLayer, type AuthContext } from "./auth-layer";
+import {
+  CircuitBreakerManager,
+  CircuitBreakerOpenError,
+  DEFAULT_THRESHOLDS,
+  type CircuitThresholds,
+} from "./circuit-breaker";
 import { InterceptorManager, parseEndpoint } from "./interceptor";
 
 /**
@@ -61,6 +67,14 @@ export interface RequestOptions {
 
   /** Tags for QueryCache invalidation (only used if useQueryCache is true) */
   tags?: string[];
+
+  // ===== Circuit Breaker Integration =====
+
+  /** Circuit breaker key (defaults to cache key prefix if not specified; set to null to disable) */
+  circuitBreakerKey?: string | null;
+
+  /** Circuit breaker thresholds for this request (overrides global defaults if provided) */
+  circuitThresholds?: CircuitThresholds;
 }
 
 interface PendingRequest {
@@ -127,9 +141,17 @@ function normalizeHeaders(
  * Returns all optional RequestOptions fields with non-undefined defaults
  */
 function getDefaultOptions(): Omit<
-  Required<Omit<RequestOptions, "authStrategy">>,
+  Required<
+    Omit<
+      RequestOptions,
+      "authStrategy" | "circuitBreakerKey" | "circuitThresholds"
+    >
+  >,
   never
-> {
+> & {
+  circuitBreakerKey: undefined;
+  circuitThresholds: undefined;
+} {
   const config = getAppConfig();
   return {
     dedupe: true,
@@ -142,6 +164,8 @@ function getDefaultOptions(): Omit<
     staleTime: config.api?.staleTimeMs ?? 2 * 60 * 1000,
     cacheTime: config.api?.cacheTimeMs ?? 5 * 60 * 1000,
     tags: [],
+    circuitBreakerKey: undefined,
+    circuitThresholds: undefined,
   };
 }
 
@@ -397,6 +421,56 @@ class RequestManagerClass {
         }
       }
 
+      // ========== CIRCUIT BREAKER CHECK ==========
+      const cbKey =
+        options_.circuitBreakerKey === null
+          ? undefined
+          : (options_.circuitBreakerKey ?? parseEndpoint(key));
+
+      if (cbKey) {
+        const cbState = CircuitBreakerManager.getState(cbKey);
+        if (cbState === "Open") {
+          const stats = CircuitBreakerManager.getStats(cbKey);
+          logger.warn("api", "Circuit breaker open, fast-failing:", {
+            endpoint: cbKey,
+            recoveryAt: stats.nextRecoveryAt,
+          });
+          const error = new CircuitBreakerOpenError(
+            cbKey,
+            "Open",
+            stats.nextRecoveryAt ?? 0,
+          );
+          if (options_.failOpen) {
+            return null;
+          }
+          throw error;
+        }
+
+        // If Half-Open, try to acquire probe slot
+        if (
+          cbState === "Half-Open" &&
+          !CircuitBreakerManager.tryAcquireProbe(cbKey)
+        ) {
+          logger.debug(
+            "api",
+            "Circuit breaker Half-Open probe already in flight, fast-failing:",
+            {
+              endpoint: cbKey,
+            },
+          );
+          const stats = CircuitBreakerManager.getStats(cbKey);
+          const error = new CircuitBreakerOpenError(
+            cbKey,
+            "Open",
+            stats.nextRecoveryAt ?? 0,
+          );
+          if (options_.failOpen) {
+            return null;
+          }
+          throw error;
+        }
+      }
+
       // ========== EXECUTE WITH RETRY & AUTH ==========
       // Middleware chain (bottom-up execution order):
       // 1. Retry middleware: Retries on failure with exponential backoff
@@ -528,10 +602,70 @@ class RequestManagerClass {
         );
       }
 
+      // ========== CIRCUIT BREAKER RECORDING ==========
+      // Record success/failure in the promise chain
+      // This happens after all other processing (caching, auth, etc.)
+      // so the circuit breaker sees the actual outcome
+      let circuitBreakerRecordedPromise = cachePersistedPromise;
+      if (cbKey) {
+        const thresholds = options_.circuitThresholds;
+        circuitBreakerRecordedPromise = cachePersistedPromise.then(
+          (result) => {
+            // Success: record success in circuit breaker
+            CircuitBreakerManager.recordSuccess(cbKey);
+            return result;
+          },
+          (error) => {
+            // Failure: determine if it's a network error
+            const isNetworkError =
+              error instanceof TypeError ||
+              error?.message?.includes("network") ||
+              error?.message?.includes("fetch") ||
+              error?.name === "AbortError";
+
+            // Skip recording auth errors (401, 403) - AuthLayer handles these separately
+            // and they should not trigger circuit breaker failures
+            const isAuthError = error?.status === 401 || error?.status === 403;
+
+            if (!isAuthError) {
+              // Record failure in circuit breaker
+              CircuitBreakerManager.recordFailure(
+                cbKey,
+                isNetworkError,
+                thresholds
+                  ? {
+                      failures:
+                        thresholds.failures ?? DEFAULT_THRESHOLDS.failures,
+                      ratePercent:
+                        thresholds.ratePercent ??
+                        DEFAULT_THRESHOLDS.ratePercent,
+                      rateWindowMs:
+                        thresholds.rateWindowMs ??
+                        DEFAULT_THRESHOLDS.rateWindowMs,
+                      baseTimeoutMs:
+                        thresholds.baseTimeoutMs ??
+                        DEFAULT_THRESHOLDS.baseTimeoutMs,
+                      maxTimeoutMs:
+                        thresholds.maxTimeoutMs ??
+                        DEFAULT_THRESHOLDS.maxTimeoutMs,
+                      treatNetworkErrors:
+                        thresholds.treatNetworkErrors ??
+                        DEFAULT_THRESHOLDS.treatNetworkErrors,
+                    }
+                  : undefined,
+              );
+            }
+
+            // Rethrow the error so it propagates to the caller
+            throw error;
+          },
+        );
+      }
+
       // ========== TRACK PENDING REQUEST ==========
       if (options_.dedupe) {
         this.pendingRequests.set(key, {
-          promise: cachePersistedPromise,
+          promise: circuitBreakerRecordedPromise,
           timestamp: startedAt,
         });
 
@@ -542,7 +676,7 @@ class RequestManagerClass {
         // The second .catch() handles rare cases where the cleanup operation itself
         // might fail (e.g., if the Map is corrupted). These errors are logged for
         // debugging but don't affect the main request result.
-        cachePersistedPromise
+        circuitBreakerRecordedPromise
           .then(
             () => this.pendingRequests.delete(key),
             () => this.pendingRequests.delete(key),
@@ -558,7 +692,7 @@ class RequestManagerClass {
           });
       }
 
-      return cachePersistedPromise;
+      return await circuitBreakerRecordedPromise;
     } catch (error) {
       logger.error("request-manager", "Request failed:", { key, error });
 
