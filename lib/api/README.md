@@ -213,6 +213,77 @@ const data = await RequestManager.fetch("key", fetcher, {
 });
 ```
 
+### Circuit Breaker
+
+Circuit breaker prevents cascading failures by fast-failing when a downstream service is unhealthy. Requests automatically fail fast when the circuit is **Open**, and recovery is tested in **Half-Open** state.
+
+**States:**
+
+- **Closed** (default): Requests proceed normally
+- **Open**: Circuit breaker detected too many failures; requests fast-fail with `CircuitBreakerOpenError`
+- **Half-Open**: Recovery test phase; one request is allowed to test if the service recovered
+
+**Configuration:**
+
+```ts
+const data = await RequestManager.fetch("api:users", fetcher, {
+  // Use auto-detected endpoint from key prefix or explicit key
+  circuitBreakerKey: "users-service",
+
+  // Override default thresholds (optional)
+  circuitThresholds: {
+    failures: 10, // Open after 10 consecutive failures
+    ratePercent: 50, // or 50% failure rate in sliding window
+    rateWindowMs: 60000, // Sliding window: 60 seconds
+    baseTimeoutMs: 30000, // Wait 30s before allowing Half-Open test
+    maxTimeoutMs: 300000, // Max wait: 5 minutes
+    treatNetworkErrors: true, // Count network errors toward threshold
+  },
+
+  failOpen: true, // Return null on CircuitBreakerOpenError instead of throwing
+});
+```
+
+**Circuit Breaker States & Transitions:**
+
+```
+     [Closed]
+   (normal ops)
+        ↓ (failures exceed threshold)
+     [Open]
+   (fast-fail all requests)
+        ↓ (timeout elapsed)
+  [Half-Open]
+  (test recovery with one probe)
+        ↓ (probe succeeds)
+     [Closed]
+   (back to normal)
+        ↓ (probe fails)
+     [Open]
+   (with exponential backoff)
+```
+
+**Default Configuration:** 10 consecutive failures OR 50% failure rate within 60 seconds opens the circuit.
+
+**Recovery Timeout:** Starts at 30 seconds, doubles on each Half-Open failure (max 5 minutes).
+
+**Example:** Monitor circuit breaker state programmatically:
+
+```ts
+import { CircuitBreakerManager } from "@/lib/api";
+
+// Check state
+const state = CircuitBreakerManager.getState("users-service");
+console.log(state); // "Closed" | "Open" | "Half-Open" | undefined
+
+// Get detailed stats
+const stats = CircuitBreakerManager.getStats("users-service");
+console.log(stats); // { failureCount, failureWindowCount, nextRecoveryAt, ... }
+
+// Reset manually (for testing/admin)
+CircuitBreakerManager.reset("users-service");
+```
+
 ### Deduplication Coalescing
 
 Multiple requests with the same key return the same promise. If the first request fails, deduplicated requests also fail with the same error.
@@ -237,7 +308,7 @@ const p2 = RequestManager.fetch("users", fetcher2); // Uses promise from p1, ign
 
 ### Fail-Open Behavior
 
-When `failOpen: true`, any error (timeout, network, rate limit, retry exhaustion) returns `null` instead of throwing. Useful for optional/non-critical requests.
+When `failOpen: true`, any error (timeout, network, rate limit, retry exhaustion, circuit breaker open) returns `null` instead of throwing. Useful for optional/non-critical requests.
 
 ```ts
 const analytics = await RequestManager.fetch("analytics", fetcher, {
@@ -266,6 +337,10 @@ Deduplication is O(1) (Map lookup). Negligible cost. Benefits far outweigh cost 
 ### Rate Limiting Overhead
 
 Rate limiting uses token bucket algorithm. Refill is O(1) (single timestamp math). No background processing.
+
+### Circuit Breaker Overhead
+
+Circuit breaker uses O(1) state checks and O(n) sliding window cleanup (where n = failures in window, typically <100). Minimal cost for the benefit of preventing cascading failures.
 
 ### QueryCache Integration Cost
 

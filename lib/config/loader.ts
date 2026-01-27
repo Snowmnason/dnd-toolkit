@@ -56,6 +56,15 @@ export interface AppSettings {
     staleThresholdMs?: number;
     description?: string;
   };
+  circuitBreaker?: {
+    failures?: number;
+    ratePercent?: number;
+    rateWindowMs?: number;
+    baseTimeoutMs?: number;
+    maxTimeoutMs?: number;
+    treatNetworkErrors?: boolean;
+    description?: string;
+  };
   sync?: {
     debounceMs?: number;
     retryBaseMs?: number;
