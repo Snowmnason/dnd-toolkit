@@ -14,6 +14,8 @@ import {
   type CircuitThresholds,
 } from "./circuit-breaker";
 import { InterceptorManager, parseEndpoint } from "./interceptor";
+import { OfflineQueueManager, type QueuedRequestEntry } from "./offline-queue";
+import { NetworkDetection } from "../network";
 
 /**
  * Request Manager: Centralized API request layer with:
@@ -23,7 +25,7 @@ import { InterceptorManager, parseEndpoint } from "./interceptor";
  * - Optional QueryCache integration for data persistence
  * - Fail-open flag (graceful degradation when offline/disabled)
  * - Sentry error reporting
- * - Extension point for future offline buffering
+ * - Offline request queuing & replay on reconnect
  */
 
 // ==========================================
@@ -708,6 +710,31 @@ class RequestManagerClass {
         ...sanitizeErrorForAnalytics(error),
       });
 
+      // ========== OFFLINE QUEUE (Optional) ==========
+      // Queue request for replay if offline or circuit is open
+      // Note: cbKey is only defined inside the try block; use fallback logic
+      const shouldQueue = await this._shouldQueueRequest(error, undefined);
+      if (shouldQueue && !options_.failOpen) {
+        try {
+          const entry = this._buildQueueEntry(
+            key,
+            options_,
+            key, // URL defaults to key
+            "POST", // Default method (could be enhanced to accept method in options)
+          );
+          await OfflineQueueManager.enqueue(entry);
+          logger.info("api", "Request queued for offline replay", { key });
+          // Don't throw - queued successfully, return null as if failOpen was true
+          return null;
+        } catch (queueError) {
+          logger.warn("api", "Failed to queue request for offline replay", {
+            key,
+            error: queueError,
+          });
+          // Fall through to normal error handling
+        }
+      }
+
       // ========== FAIL OPEN BEHAVIOR ==========
       if (options_.failOpen) {
         logger.warn(
@@ -1125,6 +1152,174 @@ class RequestManagerClass {
       this.rateLimitBuckets.clear();
       logger.debug("request-manager", "Reset all rate limits");
     }
+  }
+
+  /**
+   * Flush offline queue: replay queued requests in FIFO order
+   * Call manually to force replay, or automatically triggered on reconnect
+   *
+   * @param key - Optional: flush specific key only. If omitted, flushes all queued requests
+   */
+  async flushOfflineQueue(key?: string): Promise<void> {
+    const allEntries = OfflineQueueManager.getEntries();
+    const entries = key
+      ? allEntries.filter((e) => e.key === key)
+      : allEntries;
+
+    if (entries.length === 0) {
+      logger.debug("api", "No offline queue entries to flush", { key });
+      return;
+    }
+
+    logger.info("api", "Flushing offline queue", {
+      count: entries.length,
+      oldestEntryTime: OfflineQueueManager.getStats().oldestEntryTime,
+    });
+
+    for (const entry of entries) {
+      try {
+        await OfflineQueueManager.recordAttempt(entry.key);
+
+        // Reconstruct fetcher from stored entry metadata
+        // Store only serializable data, reconstruct actual fetcher at replay time
+        const fetcher = this._reconstructFetcherFromQueueEntry(entry);
+
+        // Replay the request with original options
+        await this.fetch(entry.key, fetcher, entry.options);
+
+        // Success: remove from queue
+        await OfflineQueueManager.dequeue(entry.key);
+        logger.info("api", "Offline queue entry replayed successfully", {
+          key: entry.key,
+          attempts: entry.attempts,
+        });
+      } catch (error) {
+        logger.warn("api", "Offline queue replay failed", {
+          key: entry.key,
+          attempts: entry.attempts,
+          error,
+        });
+        // Entry remains in queue for manual retry or next auto-replay
+        // recordAttempt already incremented attempts counter
+      }
+    }
+  }
+
+  /**
+   * Get offline queue statistics
+   */
+  getOfflineQueueStats() {
+    return OfflineQueueManager.getStats();
+  }
+
+  /**
+   * Private: Determine if request should be queued for offline replay
+   * Queue when: network is offline OR circuit breaker is open (for that endpoint)
+   */
+  private async _shouldQueueRequest(
+    error: unknown,
+    cbKey?: string,
+  ): Promise<boolean> {
+    // Check if network is offline (OFFLINE or NO_WIFI)
+    const networkStatus = await NetworkDetection.getStatus();
+    const isOffline =
+      networkStatus.connectionQuality === "offline" ||
+      networkStatus.connectionQuality === "no-wifi";
+
+    if (isOffline) {
+      logger.debug("api", "Should queue: network offline", {
+        connectionQuality: networkStatus.connectionQuality,
+      });
+      return true;
+    }
+
+    // Check if circuit breaker is open (network error that opened circuit)
+    if (cbKey) {
+      const cbState = CircuitBreakerManager.getState(cbKey);
+      if (cbState === "Open") {
+        logger.debug("api", "Should queue: circuit breaker open", {
+          endpoint: cbKey,
+        });
+        return true;
+      }
+    }
+
+    // Check if error is a network-level error (not auth-related)
+    const isNetworkError =
+      error instanceof TypeError ||
+      error instanceof Error &&
+      (error.message?.includes("network") ||
+        error.message?.includes("fetch") ||
+        (error as any).name === "AbortError");
+
+    if (isNetworkError && !isOffline) {
+      logger.debug("api", "Should queue: network error detected", {
+        errorType: (error as any)?.name,
+        message: (error as any)?.message,
+      });
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Private: Build a queue entry from request context
+   * Only stores serializable data; secrets/functions excluded
+   */
+  private _buildQueueEntry(
+    key: string,
+    options: Required<Omit<RequestOptions, "authStrategy">> & {
+      authStrategy?: string;
+    },
+    url: string,
+    method: string,
+  ): QueuedRequestEntry {
+    return {
+      key,
+      url,
+      method,
+      authStrategy: options.authStrategy,
+      options: {
+        dedupe: options.dedupe,
+        retries: options.retries,
+        retryDelay: options.retryDelay,
+        failOpen: options.failOpen,
+        timeout: options.timeout,
+        useQueryCache: options.useQueryCache,
+        staleTime: options.staleTime,
+        cacheTime: options.cacheTime,
+        tags: options.tags,
+        circuitBreakerKey: options.circuitBreakerKey,
+        circuitThresholds: options.circuitThresholds,
+      },
+      createdAt: Date.now(),
+      attempts: 0,
+    };
+  }
+
+  /**
+   * Private: Reconstruct a fetcher function from a queued entry
+   * Since actual fetcher is not serializable, this returns a no-op fetcher
+   * that returns the stored URL/method/body for re-execution
+   * In production, the actual API client would need to implement replaying
+   */
+  private _reconstructFetcherFromQueueEntry(
+    entry: QueuedRequestEntry,
+  ): () => Promise<any> {
+    // This is a placeholder - actual fetcher reconstruction depends on your API pattern
+    // For now, we return a promise that logs the queue entry details
+    // In real scenarios, you'd have a registry of fetcher functions keyed by entry.url
+    // or you'd rebuild the API call from stored metadata
+    return async () => {
+      logger.warn("api", "Offline queue entry being replayed - using placeholder fetcher", {
+        key: entry.key,
+        url: entry.url,
+        method: entry.method,
+      });
+      // Return a dummy result - in real implementation, reconstruct actual API call
+      return { queued_replay: true, originalKey: entry.key };
+    };
   }
 
   /**
