@@ -5,6 +5,7 @@ import {
 } from "../analytics";
 import { QueryCache } from "../cache";
 import { getAppConfig } from "../config";
+import { NetworkDetection } from "../network";
 import { logger } from "../utils/logger";
 import { AuthLayer, type AuthContext } from "./auth-layer";
 import {
@@ -15,7 +16,6 @@ import {
 } from "./circuit-breaker";
 import { InterceptorManager, parseEndpoint } from "./interceptor";
 import { OfflineQueueManager, type QueuedRequestEntry } from "./offline-queue";
-import { NetworkDetection } from "../network";
 
 /**
  * Request Manager: Centralized API request layer with:
@@ -191,6 +191,9 @@ class RequestManagerClass {
   /** Rate limit buckets by key */
   private rateLimitBuckets: Map<string, RateLimitBucket> = new Map();
 
+  /** Registry of fetcher functions for offline queue replay */
+  private fetcherRegistry: Map<string, () => Promise<any>> = new Map();
+
   /** Periodic cleanup timer to prevent memory leaks */
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -321,6 +324,11 @@ class RequestManagerClass {
     const startedAt = Date.now();
     const trackingEnabled = Analytics.enabled();
 
+    // ========== FETCHER REGISTRY (for offline replay) ==========
+    // Register this fetcher for offline queue replay
+    // This allows queued requests to be replayed with the original fetcher function
+    this.fetcherRegistry.set(key, fetcher);
+
     // ========== QueryCache CHECK (Optional) ==========
     // If useQueryCache is enabled, check cache first before dedupe/retry logic
     if (options_.useQueryCache) {
@@ -386,6 +394,9 @@ class RequestManagerClass {
       );
     };
 
+    // Hoist cbKey outside try block so it's available in catch block for offline queueing
+    let cbKey: string | undefined;
+
     try {
       // ========== DEDUPE CHECK ==========
       if (options_.dedupe && this.pendingRequests.has(key)) {
@@ -424,7 +435,7 @@ class RequestManagerClass {
       }
 
       // ========== CIRCUIT BREAKER CHECK ==========
-      const cbKey =
+      cbKey =
         options_.circuitBreakerKey === null
           ? undefined
           : (options_.circuitBreakerKey ?? parseEndpoint(key));
@@ -614,7 +625,7 @@ class RequestManagerClass {
         circuitBreakerRecordedPromise = cachePersistedPromise.then(
           (result) => {
             // Success: record success in circuit breaker
-            CircuitBreakerManager.recordSuccess(cbKey);
+            CircuitBreakerManager.recordSuccess(cbKey!);
             return result;
           },
           (error) => {
@@ -632,7 +643,7 @@ class RequestManagerClass {
             if (!isAuthError) {
               // Record failure in circuit breaker
               CircuitBreakerManager.recordFailure(
-                cbKey,
+                cbKey!,
                 isNetworkError,
                 thresholds
                   ? {
@@ -712,8 +723,8 @@ class RequestManagerClass {
 
       // ========== OFFLINE QUEUE (Optional) ==========
       // Queue request for replay if offline or circuit is open
-      // Note: cbKey is only defined inside the try block; use fallback logic
-      const shouldQueue = await this._shouldQueueRequest(error, undefined);
+      // Pass cbKey so circuit breaker state is checked when deciding to queue
+      const shouldQueue = await this._shouldQueueRequest(error, cbKey);
       if (shouldQueue && !options_.failOpen) {
         try {
           const entry = this._buildQueueEntry(
@@ -1162,9 +1173,7 @@ class RequestManagerClass {
    */
   async flushOfflineQueue(key?: string): Promise<void> {
     const allEntries = OfflineQueueManager.getEntries();
-    const entries = key
-      ? allEntries.filter((e) => e.key === key)
-      : allEntries;
+    const entries = key ? allEntries.filter((e) => e.key === key) : allEntries;
 
     if (entries.length === 0) {
       logger.debug("api", "No offline queue entries to flush", { key });
@@ -1178,7 +1187,19 @@ class RequestManagerClass {
 
     for (const entry of entries) {
       try {
-        await OfflineQueueManager.recordAttempt(entry.key);
+        // Record attempt and check if entry is still eligible for replay
+        const isEligible = await OfflineQueueManager.recordAttempt(entry.key);
+        if (!isEligible) {
+          // Entry exceeded max retries and was removed; skip replay
+          logger.debug(
+            "api",
+            "Offline queue entry skipped (max retries exceeded)",
+            {
+              key: entry.key,
+            },
+          );
+          continue;
+        }
 
         // Reconstruct fetcher from stored entry metadata
         // Store only serializable data, reconstruct actual fetcher at replay time
@@ -1213,6 +1234,15 @@ class RequestManagerClass {
   }
 
   /**
+   * Clear fetcher registry (used for testing or memory cleanup)
+   * Called during app shutdown or hard reset
+   */
+  clearFetcherRegistry(): void {
+    this.fetcherRegistry.clear();
+    logger.debug("api", "Fetcher registry cleared");
+  }
+
+  /**
    * Private: Determine if request should be queued for offline replay
    * Queue when: network is offline OR circuit breaker is open (for that endpoint)
    */
@@ -1244,18 +1274,15 @@ class RequestManagerClass {
       }
     }
 
-    // Check if error is a network-level error (not auth-related)
+    // Only queue on SPECIFIC, reliable network error types
+    // NOT on string matching which is too broad
     const isNetworkError =
-      error instanceof TypeError ||
-      error instanceof Error &&
-      (error.message?.includes("network") ||
-        error.message?.includes("fetch") ||
-        (error as any).name === "AbortError");
+      error instanceof TypeError || // Actual fetch failure
+      (error as any)?.name === "AbortError"; // Request aborted
 
     if (isNetworkError && !isOffline) {
-      logger.debug("api", "Should queue: network error detected", {
+      logger.debug("api", "Should queue: network-level error detected", {
         errorType: (error as any)?.name,
-        message: (error as any)?.message,
       });
       return true;
     }
@@ -1307,18 +1334,78 @@ class RequestManagerClass {
   private _reconstructFetcherFromQueueEntry(
     entry: QueuedRequestEntry,
   ): () => Promise<any> {
-    // This is a placeholder - actual fetcher reconstruction depends on your API pattern
-    // For now, we return a promise that logs the queue entry details
-    // In real scenarios, you'd have a registry of fetcher functions keyed by entry.url
-    // or you'd rebuild the API call from stored metadata
-    return async () => {
-      logger.warn("api", "Offline queue entry being replayed - using placeholder fetcher", {
+    // Attempt to retrieve the fetcher from the registry
+    // The registry is populated when requests go through RequestManager.fetch()
+    const registeredFetcher = this.fetcherRegistry.get(entry.key);
+
+    if (registeredFetcher) {
+      logger.debug(
+        "api",
+        "Offline queue entry: using registered fetcher from registry",
+        {
+          key: entry.key,
+          url: entry.url,
+        },
+      );
+      return registeredFetcher;
+    }
+
+    // Fallback: if fetcher not in registry, reconstruct a basic fetch call
+    // This allows replays even if the original fetcher isn't registered
+    // Supports simple HTTP operations
+    logger.debug(
+      "api",
+      "Offline queue entry: reconstructing fetcher from stored metadata",
+      {
         key: entry.key,
         url: entry.url,
         method: entry.method,
-      });
-      // Return a dummy result - in real implementation, reconstruct actual API call
-      return { queued_replay: true, originalKey: entry.key };
+      },
+    );
+
+    return async () => {
+      // Build fetch options from stored metadata
+      const fetchOptions: RequestInit = {
+        method: entry.method,
+      };
+
+      // Add headers if present
+      if (entry.headers) {
+        fetchOptions.headers = entry.headers;
+      }
+
+      // Add body if present and not a GET request
+      if (entry.body && entry.method !== "GET") {
+        fetchOptions.body =
+          typeof entry.body === "string"
+            ? entry.body
+            : JSON.stringify(entry.body);
+      }
+
+      // Build URL with query parameters
+      let url = entry.url;
+      if (entry.params && Object.keys(entry.params).length > 0) {
+        const queryString = new URLSearchParams(entry.params).toString();
+        url = `${url}?${queryString}`;
+      }
+
+      // Perform the actual fetch
+      const response = await fetch(url, fetchOptions);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Offline replay failed: ${response.status} ${response.statusText} - ${errorText}`,
+        );
+      }
+
+      // Parse response based on content-type
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        return await response.json();
+      }
+
+      return await response.text();
     };
   }
 

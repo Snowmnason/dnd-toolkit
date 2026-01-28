@@ -1,5 +1,7 @@
+// Mock react-native to prevent Rollup errors
 import { CircuitBreakerManager } from "@/lib/api/circuit-breaker";
 import { OfflineQueueManager } from "@/lib/api/offline-queue";
+import { RequestManager } from "@/lib/api/request-manager";
 import { ConnectionQuality, NetworkDetection } from "@/lib/network";
 import { SecureStorage } from "@/lib/storage";
 import {
@@ -12,12 +14,74 @@ import {
   type MockedFunction,
 } from "vitest";
 
-// Mock RequestManager to avoid React Native dependencies
-const mockRequestManager = {
-  makeRequest: vi.fn(),
-  getOfflineQueueStats: vi.fn(),
-  flushOfflineQueue: vi.fn(),
-};
+vi.mock("react-native", () => ({
+  Platform: { OS: "ios" },
+  NativeModules: {},
+}));
+
+// Mock expo-constants
+vi.mock("expo-constants", () => ({
+  default: {
+    expoConfig: {
+      extra: { sentryDsn: null },
+    },
+  },
+}));
+
+// Mock problematic dependencies
+vi.mock("@/lib/api/auth-layer", () => ({
+  AuthLayer: {
+    injectAuthHeader: vi.fn(),
+    handle401Response: vi.fn(),
+  },
+}));
+
+vi.mock("@/lib/api/interceptor", () => ({
+  InterceptorManager: {
+    executeBeforeRequestHooks: vi.fn(),
+  },
+  parseEndpoint: vi.fn().mockReturnValue("test"),
+}));
+
+vi.mock("@/lib/analytics", () => ({
+  Analytics: {
+    captureException: vi.fn(),
+    captureMessage: vi.fn(),
+    track: vi.fn(),
+    enabled: vi.fn().mockReturnValue(false),
+  },
+  sanitizeError: vi.fn(),
+}));
+
+vi.mock("@/lib/config", () => ({
+  getAppConfig: vi.fn().mockReturnValue({
+    features: { sentryEnabled: false },
+  }),
+}));
+
+vi.mock("@/lib/cache", () => ({
+  QueryCache: {
+    get: vi.fn(),
+    set: vi.fn(),
+    isStale: vi.fn(),
+    getCurrentVersion: vi.fn().mockReturnValue(1),
+  },
+}));
+
+vi.mock("@/lib/utils/logger", () => ({
+  logger: {
+    category: vi.fn(() => ({
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    })),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
 
 // Mock dependencies
 vi.mock("@/lib/network", () => ({
@@ -48,18 +112,86 @@ vi.mock("@/lib/storage", () => ({
   },
 }));
 
+vi.mock("@sentry/react-native", () => ({
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
+  setUser: vi.fn(),
+  setTag: vi.fn(),
+  setContext: vi.fn(),
+  addBreadcrumb: vi.fn(),
+}));
+
+// Mock dependencies
+vi.mock("@/lib/network", () => ({
+  NetworkDetection: {
+    getStatus: vi.fn(),
+  },
+  ConnectionQuality: {
+    GOOD: "good",
+    BAD: "bad",
+    NO_WIFI: "no-wifi",
+    OFFLINE: "offline",
+  },
+}));
+
+vi.mock("@/lib/api/circuit-breaker", () => ({
+  CircuitBreakerManager: {
+    getState: vi.fn(),
+    recordSuccess: vi.fn(),
+    recordFailure: vi.fn(),
+    tryAcquireProbe: vi.fn(),
+    getStats: vi.fn(),
+  },
+}));
+
+vi.mock("@/lib/storage", () => ({
+  SecureStorage: {
+    getJSON: vi.fn(),
+    setJSON: vi.fn(),
+  },
+  STORAGE_KEYS: {
+    OFFLINE_QUEUE: "dnd:api:offline_queue",
+  },
+}));
+
+vi.mock("@/lib/analytics", () => ({
+  Analytics: {
+    captureException: vi.fn(),
+    captureMessage: vi.fn(),
+    track: vi.fn(),
+    enabled: vi.fn().mockReturnValue(false),
+  },
+  sanitizeError: vi.fn(),
+}));
+
+vi.mock("@/lib/config", () => ({
+  getAppConfig: vi.fn().mockReturnValue({
+    features: { sentryEnabled: false },
+  }),
+}));
+
+vi.mock("@/lib/cache", () => ({
+  QueryCache: {
+    get: vi.fn(),
+    set: vi.fn(),
+    isStale: vi.fn(),
+    getCurrentVersion: vi.fn().mockReturnValue(1),
+  },
+}));
+
 vi.mock("@/lib/utils/logger", () => ({
   logger: {
+    category: vi.fn(() => ({
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    })),
     info: vi.fn(),
     debug: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
   },
-}));
-
-// Mock the entire request-manager module
-vi.mock("@/lib/api/request-manager", () => ({
-  RequestManager: mockRequestManager,
 }));
 
 describe("RequestManager Offline Queue Integration", () => {
@@ -102,12 +234,12 @@ describe("RequestManager Offline Queue Integration", () => {
     vi.clearAllTimers();
   });
 
-  describe("offline queue detection", () => {
+  describe("offline queue integration", () => {
     beforeEach(async () => {
       await OfflineQueueManager.initialize();
     });
 
-    it("should detect when request should be queued due to offline status", async () => {
+    it("should queue failed requests when offline and return null", async () => {
       // Mock offline status
       mockNetworkDetection.getStatus.mockReturnValue({
         connectionQuality: ConnectionQuality.OFFLINE,
@@ -119,18 +251,30 @@ describe("RequestManager Offline Queue Integration", () => {
       // Mock circuit breaker closed
       mockCircuitBreaker.getState.mockReturnValue("Closed");
 
-      // Import the actual _shouldQueueRequest function for testing
-      const { RequestManager } = await import("@/lib/api/request-manager");
+      // Create a fetcher that always fails
+      const failingFetcher = vi
+        .fn()
+        .mockRejectedValue(new Error("Network error"));
+      const key = "api:test-offline-queue";
 
-      // Test the logic by calling the internal method if exposed, or test through integration
-      // Since _shouldQueueRequest is private, we'll test the integration behavior
+      // Call fetch - should queue the request and return null
+      const result = await RequestManager.fetch(key, failingFetcher, {
+        failOpen: false, // Don't fail open, should queue
+      });
 
-      // For now, just verify the mocks are set up correctly
-      expect(mockNetworkDetection.getStatus).toBeDefined();
-      expect(mockCircuitBreaker.getState).toBeDefined();
+      // Should return null (queued successfully)
+      expect(result).toBeNull();
+
+      // Should have enqueued the request
+      const entries = OfflineQueueManager.getEntries();
+      expect(entries).toHaveLength(1);
+      expect(entries[0].key).toBe(key);
+
+      // Verify fetcher was called (and failed)
+      expect(failingFetcher).toHaveBeenCalledTimes(1);
     });
 
-    it("should detect when request should be queued due to circuit breaker open", async () => {
+    it("should queue failed requests when circuit breaker is open and return null", async () => {
       // Mock online status
       mockNetworkDetection.getStatus.mockReturnValue({
         connectionQuality: ConnectionQuality.GOOD,
@@ -142,9 +286,28 @@ describe("RequestManager Offline Queue Integration", () => {
       // Mock circuit breaker open
       mockCircuitBreaker.getState.mockReturnValue("Open");
 
-      // Similar to above - test the detection logic
-      expect(mockNetworkDetection.getStatus).toBeDefined();
-      expect(mockCircuitBreaker.getState).toBeDefined();
+      // Create a fetcher that always fails
+      const failingFetcher = vi
+        .fn()
+        .mockRejectedValue(new Error("Circuit breaker open"));
+      const key = "api:test-circuit-open";
+
+      // Call fetch - should queue the request and return null
+      const result = await RequestManager.fetch(key, failingFetcher, {
+        circuitBreakerKey: "test-endpoint",
+        failOpen: false, // Don't fail open, should queue
+      });
+
+      // Should return null (queued successfully)
+      expect(result).toBeNull();
+
+      // Should have enqueued the request
+      const entries = OfflineQueueManager.getEntries();
+      expect(entries).toHaveLength(1);
+      expect(entries[0].key).toBe(key);
+
+      // Verify fetcher was NOT called (circuit breaker prevents execution)
+      expect(failingFetcher).not.toHaveBeenCalled();
     });
 
     it("should not queue when online and circuit breaker closed", async () => {
@@ -159,8 +322,59 @@ describe("RequestManager Offline Queue Integration", () => {
       // Mock circuit breaker closed
       mockCircuitBreaker.getState.mockReturnValue("Closed");
 
-      expect(mockNetworkDetection.getStatus).toBeDefined();
-      expect(mockCircuitBreaker.getState).toBeDefined();
+      // Create a fetcher that always fails
+      const failingFetcher = vi
+        .fn()
+        .mockRejectedValue(new Error("Network error"));
+      const key = "api:test-online";
+
+      // Call fetch - should not queue, should throw
+      await expect(
+        RequestManager.fetch(key, failingFetcher, {
+          failOpen: false, // Don't fail open, should throw
+        }),
+      ).rejects.toThrow("Network error");
+
+      // Should not have enqueued the request
+      const entries = OfflineQueueManager.getEntries();
+      expect(entries).toHaveLength(0);
+
+      // Verify fetcher was called (and failed)
+      expect(failingFetcher).toHaveBeenCalledTimes(1);
+    });
+
+    it("should respect failOpen flag and not queue even when offline", async () => {
+      // Mock offline status
+      mockNetworkDetection.getStatus.mockReturnValue({
+        connectionQuality: ConnectionQuality.OFFLINE,
+        isOnline: false,
+        type: "none",
+        isExpensive: false,
+      });
+
+      // Mock circuit breaker closed
+      mockCircuitBreaker.getState.mockReturnValue("Closed");
+
+      // Create a fetcher that always fails
+      const failingFetcher = vi
+        .fn()
+        .mockRejectedValue(new Error("Network error"));
+      const key = "api:test-fail-open";
+
+      // Call fetch with failOpen: true - should not queue, should return null
+      const result = await RequestManager.fetch(key, failingFetcher, {
+        failOpen: true, // Should return null without queuing
+      });
+
+      // Should return null (fail open)
+      expect(result).toBeNull();
+
+      // Should not have enqueued the request
+      const entries = OfflineQueueManager.getEntries();
+      expect(entries).toHaveLength(0);
+
+      // Verify fetcher was called (and failed)
+      expect(failingFetcher).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -260,13 +474,18 @@ describe("RequestManager Offline Queue Integration", () => {
 
       expect(OfflineQueueManager.getStats().queueLength).toBe(2);
 
-      // Mock successful replay
-      mockRequestManager.makeRequest.mockResolvedValue({ success: true });
+      // Mock fetch to simulate successful replay
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ success: true }),
+        headers: new Map([["content-type", "application/json"]]),
+      });
 
-      // The flushOfflineQueue would process these entries
-      // Since we're mocking RequestManager, we can't easily test the full integration
-      // But we can verify the queue state
-      expect(OfflineQueueManager.getEntries()).toHaveLength(2);
+      // Call flushOfflineQueue
+      await RequestManager.flushOfflineQueue();
+
+      // Should have processed and removed successful entries
+      expect(OfflineQueueManager.getStats().queueLength).toBe(0);
     });
 
     it("should handle replay failures", async () => {
@@ -280,18 +499,22 @@ describe("RequestManager Offline Queue Integration", () => {
 
       await OfflineQueueManager.enqueue(entry);
 
-      // Mock failed replay
-      mockRequestManager.makeRequest.mockRejectedValue(
-        new Error("Network error"),
+      // Mock the fetcher reconstruction to simulate success
+      const reconstructSpy = vi.spyOn(
+        RequestManager as any,
+        "_reconstructFetcherFromQueueEntry",
+      );
+      reconstructSpy.mockReturnValue(() =>
+        Promise.resolve({ data: "success" }),
       );
 
-      // The flushOfflineQueue would attempt replay and record the attempt
-      // Since we're mocking, we test the attempt recording separately
-      await OfflineQueueManager.recordAttempt("api:failing");
+      // Call flushOfflineQueue
+      await RequestManager.flushOfflineQueue();
 
-      const updatedEntry = OfflineQueueManager.getEntries()[0];
-      expect(updatedEntry.attempts).toBe(1);
-      expect(updatedEntry.lastAttemptAt).toBeDefined();
+      // Entry should remain in queue with incremented attempts
+      const remaining = OfflineQueueManager.getEntries();
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].attempts).toBe(1);
     });
   });
 

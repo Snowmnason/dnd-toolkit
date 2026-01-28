@@ -261,9 +261,9 @@ export const OfflineQueueManager = {
   /**
    * Mark a queued entry as attempted
    */
-  async recordAttempt(key: string): Promise<void> {
+  async recordAttempt(key: string): Promise<boolean> {
     const entry = this._queue.get(key);
-    if (!entry) return;
+    if (!entry) return false;
 
     entry.attempts++;
     entry.lastAttemptAt = Date.now();
@@ -275,9 +275,12 @@ export const OfflineQueueManager = {
         attempts: entry.attempts,
       });
       this._queue.delete(key);
+      await this._persist();
+      return false; // Entry removed, not eligible for replay
     }
 
     await this._persist();
+    return true; // Entry still eligible for replay
   },
 
   /**
