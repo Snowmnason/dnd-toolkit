@@ -502,6 +502,27 @@ class AppKernelClass {
             .info(
               `Auth phase completed asynchronously (${this.authCompletionTime}ms delay, after app ready)`,
             );
+
+          // Initialize offline queue system
+          try {
+            const { OfflineQueueManager } = await import("@/lib/api/offline-queue");
+            const { initializeOfflineQueueReplay } = await import("@/lib/api/offline-queue-replay");
+            
+            // Load persisted queue from storage
+            await OfflineQueueManager.initialize();
+            
+            // Set up network listener for automatic replay on reconnect
+            await initializeOfflineQueueReplay();
+            
+            logger.category("bootstrap").info("Offline queue system initialized");
+          } catch (queueError) {
+            logger
+              .category("bootstrap")
+              .warn("Failed to initialize offline queue system", {
+                error: (queueError as Error).message,
+              });
+            // Non-critical: app continues without offline queue
+          }
         } catch (e) {
           this.authCompletionTime = performance.now() - authPhaseStart;
           logger

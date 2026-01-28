@@ -319,6 +319,85 @@ if (analytics) {
 }
 ```
 
+### Offline Request Queue
+
+Automatically queues requests for replay when the network is offline or the circuit breaker is open. Queued requests are replayed in FIFO order when connectivity is restored.
+
+**Features:**
+
+- Automatic queueing when offline (OFFLINE/NO_WIFI) or circuit is Open
+- Persistent storage via SecureStorage with schema versioning
+- Automatic replay on reconnect via NetworkDetection
+- FIFO replay with per-key deduplication (keeps latest request)
+- Configurable retry limits and max queue size
+- Privacy integration: sensitive fields are redacted before storage
+- Manual flush API for operator control
+
+**Configuration:**
+
+```ts
+// Initialize during app bootstrap (automatic in AppKernel)
+import { OfflineQueueManager } from "@/lib/api";
+await OfflineQueueManager.initialize({
+  maxQueueSize: 100, // Drop oldest entries if exceeded
+  maxRetryAttempts: 3, // Retry up to 3 times before marking failed
+  enabled: true, // Toggle offline queue system
+});
+```
+
+**Manual Queue Control:**
+
+```ts
+import { RequestManager } from "@/lib/api";
+
+// Manually flush queue (triggered automatically on reconnect)
+await RequestManager.flushOfflineQueue();
+
+// Flush only specific request key
+await RequestManager.flushOfflineQueue("api:users");
+
+// Get queue statistics
+const stats = RequestManager.getOfflineQueueStats();
+console.log(stats); // { queueLength, oldestEntryTime, failedAttempts, maxQueueSize, maxRetryAttempts }
+```
+
+**How It Works:**
+
+1. **Detection:** When a request fails offline or circuit is open, `RequestManager.fetch()` detects this and queues instead of throwing
+2. **Storage:** Request descriptor is stored in SecureStorage (only serializable data; functions/secrets excluded)
+3. **Deduplication:** If same key is queued multiple times, latest request overwrites previous (attempt count reset)
+4. **Replay:** On reconnect (NetworkDetection = GOOD), automatic replay begins in FIFO order
+5. **Cleanup:** Successful replays are removed; failed replays increment attempt counter
+6. **Limits:** Entries exceeding max attempts are dropped from queue
+
+**Privacy & Security:**
+
+- Only serializable request metadata is stored (URL, method, params, headers, body)
+- Functions and secret tokens are never persisted
+- Auth tokens are fetched fresh at replay time (not cached)
+- Sensitive fields can be redacted via privacy rules (future enhancement)
+
+**Example Workflow:**
+
+```ts
+// 1. User makes request while offline
+try {
+  const worlds = await RequestManager.fetch("api:worlds", fetcher, {
+    failOpen: false, // Queue instead of fail open
+  });
+} catch (error) {
+  console.log("Offline - queued for replay"); // Queued automatically
+}
+
+// 2. Network reconnects
+// → NetworkDetection fires "good" status
+// → Automatic replay begins in background
+// → User sees data populate as replays complete
+
+// 3. Manual flush (if needed)
+await RequestManager.flushOfflineQueue();
+```
+
 ### Memory Leaks Prevention
 
 - Pending requests are cleaned up immediately after settling

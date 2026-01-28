@@ -1,5 +1,20 @@
 import { vi } from "vitest";
 
+// Mock react-native to prevent Rollup errors in tests
+vi.mock("react-native", () => ({
+  Platform: { OS: "ios" },
+  NativeModules: {},
+}));
+
+// Mock expo-constants
+vi.mock("expo-constants", () => ({
+  default: {
+    expoConfig: {
+      extra: { sentryDsn: null },
+    },
+  },
+}));
+
 // Mock storage modules with correct FastCache API
 vi.mock("@/lib/storage", () => ({
   FastCache: {

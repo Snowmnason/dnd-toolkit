@@ -45,7 +45,7 @@ export interface RequestInterceptor {
    * Called when RequestManager exhausts retries (not for AuthLayer 401 handling)
    * Cannot suppress/replace errors; can only observe and log
    *
-   * @param err - Error object with error, url, init, statusCode, isNetworkError, endpoint
+   * @param err - Error object with error, url, init, statusCode, isNetworkError, endpoint, queued
    */
   onError?(err: {
     error: Error;
@@ -54,6 +54,7 @@ export interface RequestInterceptor {
     statusCode?: number; // HTTP status if available (401, 500, etc.)
     isNetworkError?: boolean; // True if network failure, false if HTTP error
     endpoint?: string;
+    queued?: boolean; // True if request was queued for offline replay
   }): Promise<void> | void;
 }
 
@@ -241,6 +242,7 @@ class InterceptorManagerClass {
     statusCode?: number;
     isNetworkError?: boolean;
     endpoint?: string;
+    queued?: boolean;
   }): Promise<void> {
     const hooks = this.interceptors
       .filter((i) => i.onError)
@@ -258,6 +260,7 @@ class InterceptorManagerClass {
       statusCode: err.statusCode,
       isNetworkError: err.isNetworkError,
       endpoint: err.endpoint,
+      queued: err.queued,
     };
 
     await executeHooksSerially(hooks, context, "onError");

@@ -16,6 +16,14 @@ export {
     parseEndpoint,
     type RequestInterceptor
 } from "./interceptor";
+export {
+    OfflineQueueManager,
+    type OfflineQueueConfig,
+    type OfflineQueueStats,
+    type QueuedRequestEntry
+} from "./offline-queue";
+export {
+    initializeOfflineQueueReplay,
+    cleanupOfflineQueueReplay
+} from "./offline-queue-replay";
 export { RequestManager, type RequestOptions } from "./request-manager";
-
-//export default RequestManager;

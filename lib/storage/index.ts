@@ -127,6 +127,9 @@ export const STORAGE_KEYS = {
   // Safe mode diagnostics (transient, cleared when user recovers or restarts)
   SAFE_MODE_DIAGNOSTICS: "dnd:session:safe_mode_diagnostics",
 
+  // Offline request queue (persistent, survives app restart)
+  OFFLINE_QUEUE: "dnd:api:offline_queue",
+
   // Add more keys as needed...
 } as const;
 
