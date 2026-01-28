@@ -453,10 +453,55 @@ class RequestManagerClass {
             "Open",
             stats.nextRecoveryAt ?? 0,
           );
+          // If caller chose failOpen, short-circuit and return null
           if (options_.failOpen) {
             return null;
           }
-          throw error;
+
+          // Otherwise, attempt to queue the request for offline replay instead
+          try {
+            const entry = this._buildQueueEntry(
+              key,
+              options_,
+              key, // URL defaults to key
+              "POST",
+            );
+            await OfflineQueueManager.enqueue(entry);
+            logger.info(
+              "api",
+              "Circuit-breaker open: request queued for offline replay",
+              { key },
+            );
+
+            // Notify error interceptors that the request was queued
+            try {
+              await InterceptorManager.executeErrorHooks({
+                error,
+                url: key,
+                init: {},
+                statusCode: (error as any)?.status || (error as any)?.code,
+                isNetworkError: false,
+                endpoint: cbKey,
+                queued: true,
+              });
+            } catch (hookErr) {
+              logger.warn(
+                "api",
+                "Interceptor error while reporting queued circuit-breaker request",
+                hookErr,
+              );
+            }
+
+            return null;
+          } catch (queueErr) {
+            logger.warn(
+              "api",
+              "Failed to queue request while circuit breaker open, falling back to error",
+              { key, error: queueErr },
+            );
+            // If queuing failed, fall back to throwing the original circuit error
+            throw error;
+          }
         }
 
         // If Half-Open, try to acquire probe slot
@@ -735,6 +780,25 @@ class RequestManagerClass {
           );
           await OfflineQueueManager.enqueue(entry);
           logger.info("api", "Request queued for offline replay", { key });
+          // Notify error interceptors that the request was queued
+          try {
+            await InterceptorManager.executeErrorHooks({
+              error: error as Error,
+              url: key,
+              init: {},
+              statusCode: (error as any)?.status || (error as any)?.code,
+              isNetworkError: false,
+              endpoint: cbKey ?? parseEndpoint(key),
+              queued: true,
+            });
+          } catch (hookErr) {
+            logger.warn(
+              "api",
+              "Interceptor error while reporting queued request",
+              hookErr,
+            );
+          }
+
           // Don't throw - queued successfully, return null as if failOpen was true
           return null;
         } catch (queueError) {
