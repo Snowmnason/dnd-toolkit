@@ -7,6 +7,20 @@ export {
     type CircuitThresholds
 } from "./circuit-breaker";
 export {
+    APIClient,
+    type APIClientConfig,
+    type ApiErrorType,
+    type MutationOptions,
+    type QueryOptions
+} from "./client-factory";
+export { CACHE_DEFAULTS } from "./clients/defaults";
+export { UsersAPI, type User as APIUser, type UpdateUserRequest } from "./clients/users";
+export {
+    WorldsAPI, type World as APIWorld, type CreateWorldRequest,
+    type UpdateWorldRequest,
+    type WorldMember
+} from "./clients/worlds";
+export {
     createInviteAuthStrategy,
     createPublicAuthStrategy,
     createUserAuthStrategy
@@ -23,7 +37,8 @@ export {
     type QueuedRequestEntry
 } from "./offline-queue";
 export {
-    initializeOfflineQueueReplay,
-    cleanupOfflineQueueReplay
+    cleanupOfflineQueueReplay,
+    initializeOfflineQueueReplay
 } from "./offline-queue-replay";
 export { RequestManager, type RequestOptions } from "./request-manager";
+
