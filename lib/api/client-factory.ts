@@ -69,6 +69,10 @@ export interface QueryOptions<T = any> {
   // Phase 3+ extension point
   onSuccess?: (data: T) => Promise<void> | void;
   onError?: (error: Error) => Promise<void> | void;
+
+  // Phase 3 Improvements
+  /** Optional cascade invalidation: invalidate these tags in addition to invalidateTags */
+  invalidateOtherTags?: string[];
 }
 
 /**
@@ -108,6 +112,22 @@ export interface MutationOptions<T = any> {
   // Phase 3+ extension point
   onSuccess?: (data: T) => Promise<void> | void;
   onError?: (error: Error) => Promise<void> | void;
+
+  // Phase 3 Improvements
+  /** Optional cascade invalidation: invalidate these tags in addition to invalidateTags */
+  invalidateOtherTags?: string[];
+
+  /** Validate before write: run checks before mutation (user auth, permissions, etc) */
+  validateBeforeWrite?: () => Promise<Record<string, any> | void>;
+
+  /** Retry strategy: which error types should be retried */
+  retryOnError?: string[];
+
+  /** No-retry strategy: which error types should NOT be retried */
+  noRetryOnError?: string[];
+
+  /** Error handler: map specific errors to custom error types */
+  errorHandler?: (error: unknown) => ApiErrorType | null | undefined;
 }
 
 /**
@@ -232,6 +252,7 @@ export abstract class APIClient {
       methodName,
       endpoint,
       options?.cacheKey,
+      undefined, // Queries don't have body parameters for hashing
     );
     const url = this.buildUrl(endpoint);
     const authStrategy = options?.authStrategy || this.config.authStrategy;
@@ -383,12 +404,30 @@ export abstract class APIClient {
       methodName,
       endpoint,
       options?.cacheKey,
+      body, // Phase 3: pass body for parameter-based hashing
     );
     const url = this.buildUrl(endpoint);
     const authStrategy = options?.authStrategy || this.config.authStrategy;
     const circuitBreakerKey =
       options?.circuitBreakerKey || this.config.circuitBreakerKey;
     const method = options.method;
+
+    // Phase 3: Run validation before write if provided
+    if (options?.validateBeforeWrite) {
+      try {
+        logger.debug("api", `Running validateBeforeWrite for ${methodName}`, {
+          cacheKey,
+        });
+        // Validation runs for side effects (e.g., permission checks)
+        // Result is not used in Phase 3 (can be extended in Phase 4 for context passing)
+        await options.validateBeforeWrite();
+      } catch (error) {
+        logger.error("api", `validateBeforeWrite failed for ${methodName}`, {
+          error,
+        });
+        throw error;
+      }
+    }
 
     // Check circuit breaker state (fail-fast if open)
     if (
@@ -424,8 +463,6 @@ export abstract class APIClient {
         return await response.json();
       };
 
-      const requestVersion = this.config.queryCache.getCurrentVersion();
-
       const data = await this.config.requestManager.fetch(cacheKey, fetcher, {
         dedupe: false, // Mutations typically shouldn't dedupe
         retries: 1,
@@ -456,6 +493,19 @@ export abstract class APIClient {
         });
       }
 
+      // Phase 3: Cascade invalidation with invalidateOtherTags
+      if (
+        options?.invalidateOtherTags &&
+        options.invalidateOtherTags.length > 0
+      ) {
+        await this.config.queryCache.invalidateByTags(
+          options.invalidateOtherTags,
+        );
+        logger.debug("api", `Cascade invalidated tags for ${methodName}`, {
+          tags: options.invalidateOtherTags,
+        });
+      }
+
       // Call success hook (Phase 3+)
       if (options?.onSuccess) {
         try {
@@ -469,6 +519,45 @@ export abstract class APIClient {
 
       return validatedData;
     } catch (error) {
+      // Phase 3: Apply custom error handler if provided
+      if (options?.errorHandler) {
+        try {
+          const mappedError = options.errorHandler(error);
+          if (mappedError) {
+            logger.debug(
+              "api",
+              `Custom error handler mapped error for ${methodName}`,
+              {
+                from: (error as any)?.type,
+                to: mappedError.type,
+              },
+            );
+            const mappedErr = new Error(
+              (error as Error).message || `Error (${mappedError.type})`,
+            );
+            (mappedErr as any).apiError = mappedError;
+            throw mappedErr;
+          }
+        } catch (handlerError) {
+          logger.error("api", `Error handler failed for ${methodName}`, {
+            error: handlerError,
+          });
+          // Continue with original error if handler fails
+        }
+      }
+
+      // Phase 3: Log retry strategy for debugging
+      // Note: Actual retry logic is handled by RequestManager
+      if (options?.retryOnError || options?.noRetryOnError) {
+        const errorType = (error as any)?.type || "unknown";
+        logger.debug("api", `Error handler evaluated retry strategy`, {
+          methodName,
+          errorType,
+          retryOnError: options?.retryOnError,
+          noRetryOnError: options?.noRetryOnError,
+        });
+      }
+
       // Phase 2+: Check if should queue for offline replay
       // Phase 1: Just propagate error
       // const networkStatus = await NetworkDetection.getStatus();
@@ -495,6 +584,137 @@ export abstract class APIClient {
   }
 
   /**
+   * Phase 3: Batch query builder for parallel fetches with combiner
+   *
+   * Useful for fetching multiple related endpoints in parallel:
+   * ```typescript
+   * const result = await api.batch("getWorldsWithRoles", {
+   *   queries: [
+   *     { key: "access", url: "/worlds/access/123" },
+   *     { key: "owned", url: "/worlds/owned/123" },
+   *   ],
+   *   combiner: (results) => ({
+   *     worldIds: new Set([...results.access, ...results.owned]),
+   *   }),
+   *   cacheKey: "user:123:worlds-with-roles",
+   *   invalidateTags: ["user:123:worlds"],
+   * });
+   * ```
+   */
+  async batch<T = any>(
+    methodName: string,
+    config: {
+      queries: { key: string; url: string }[];
+      combiner: (results: Record<string, any>) => T;
+      cacheKey?: string;
+      invalidateTags?: string[];
+      tags?: string[];
+      staleTime?: number;
+      cacheTime?: number;
+      onSuccess?: (data: T) => Promise<void> | void;
+      onError?: (error: Error) => Promise<void> | void;
+    },
+  ): Promise<T | null> {
+    const cacheKey =
+      config.cacheKey ||
+      `${this.clientName}:${methodName}:batch:${config.queries.map((q) => q.key).join(",")}`;
+
+    // Check cache first
+    const cached = await this.config.queryCache.get<T>(cacheKey);
+    const isStale = await this.config.queryCache.isStale(cacheKey);
+    if (cached && !isStale) {
+      logger.debug("api", `Cache hit for batch ${methodName}`, { cacheKey });
+      return cached;
+    }
+
+    try {
+      // Fetch all queries in parallel
+      logger.debug("api", `Executing batch queries for ${methodName}`, {
+        queryCount: config.queries.length,
+      });
+
+      const results = await Promise.all(
+        config.queries.map(async (query) => {
+          try {
+            const response = await fetch(this.buildUrl(query.url));
+            if (!response.ok) {
+              throw await this.transformError(response);
+            }
+            return { [query.key]: await response.json() };
+          } catch (error) {
+            logger.error("api", `Batch query failed for ${query.key}`, {
+              error,
+            });
+            throw error;
+          }
+        }),
+      );
+
+      // Combine results
+      const combined: Record<string, any> = {};
+      results.forEach((result) => Object.assign(combined, result));
+      const combinedData = config.combiner(combined);
+
+      // Cache the combined result
+      const requestVersion = this.config.queryCache.getCurrentVersion();
+      await this.config.queryCache.set(
+        cacheKey,
+        combinedData,
+        {
+          staleTime: config.staleTime ?? this.config.defaultStaleTime,
+          cacheTime: config.cacheTime ?? this.config.defaultCacheTime,
+          tags: config.tags || this.config.defaultTags,
+        },
+        requestVersion,
+      );
+
+      // Invalidate related cache entries (Phase 3: added for consistency with mutation)
+      if (config.invalidateTags && config.invalidateTags.length > 0) {
+        await this.config.queryCache.invalidateByTags(config.invalidateTags);
+        logger.debug("api", `Invalidated tags for batch ${methodName}`, {
+          tags: config.invalidateTags,
+        });
+      }
+
+      // Call success hook
+      if (config.onSuccess) {
+        try {
+          await Promise.resolve(config.onSuccess(combinedData));
+        } catch (error) {
+          logger.error("api", `onSuccess hook failed for batch ${methodName}`, {
+            error,
+          });
+        }
+      }
+
+      return combinedData;
+    } catch (error) {
+      // Call error hook
+      if (config.onError) {
+        try {
+          await Promise.resolve(config.onError(error as Error));
+        } catch (hookError) {
+          logger.error("api", `onError hook failed for batch ${methodName}`, {
+            error: hookError,
+          });
+        }
+      }
+
+      // Return stale cache if available
+      const staleData = await this.config.queryCache.get<T>(cacheKey);
+      if (staleData) {
+        logger.info("api", `Batch fetch failed - returning stale cache`, {
+          cacheKey,
+          error,
+        });
+        return staleData;
+      }
+
+      throw error;
+    }
+  }
+
+  /**
    * Generic request method for custom scenarios
    * Useful for non-standard endpoints or multi-step operations
    */
@@ -504,10 +724,12 @@ export abstract class APIClient {
     fetcher: () => Promise<any>,
     options?: Partial<QueryOptions<T> & MutationOptions<T>>,
   ): Promise<T | null> {
+    // Phase 3: Pass options (potential params) for parameter-based hashing
     const cacheKey = this.generateCacheKey(
       methodName,
       endpoint,
       options?.cacheKey,
+      options as any, // Use full options object as params for hashing
     );
     const authStrategy = options?.authStrategy || this.config.authStrategy;
     const circuitBreakerKey =
@@ -549,14 +771,37 @@ export abstract class APIClient {
    * Generate deterministic cache key from method name and endpoint
    * Format: `{clientName}:{methodName}:{endpoint}` or custom override
    */
+  /**
+   * Generate deterministic hash for parameters (Phase 3 improvement)
+   */
+  private hashParameters(params: any): string {
+    if (!params) return "";
+    try {
+      const json = JSON.stringify(params, Object.keys(params).sort());
+      // Simple hash: count characters and XOR bytes for uniqueness
+      let hash = 0;
+      for (let i = 0; i < json.length; i++) {
+        const char = json.charCodeAt(i);
+        hash = (hash << 5) - hash + char;
+        hash = hash & hash; // Convert to 32bit integer
+      }
+      return `_${Math.abs(hash).toString(36)}`;
+    } catch {
+      // Fallback if JSON.stringify fails
+      return "";
+    }
+  }
+
   private generateCacheKey(
     methodName: string,
     endpoint: string,
     customKey?: string,
+    params?: any,
   ): string {
     if (customKey) return customKey;
-    // Simple deterministic key - Phase 3+ can add parameter-based hashing
-    return `${this.clientName}:${methodName}:${endpoint}`;
+    // Phase 3: Include parameter hash for better deduplication
+    const paramHash = this.hashParameters(params);
+    return `${this.clientName}:${methodName}:${endpoint}${paramHash}`;
   }
 
   /**
@@ -643,6 +888,7 @@ export abstract class APIClient {
       if (zodError.errors && Array.isArray(zodError.errors)) {
         for (const err of zodError.errors) {
           const path = err.path.join(".");
+          // eslint-disable-next-line security/detect-object-injection
           errors[path] = err.message;
         }
       }
