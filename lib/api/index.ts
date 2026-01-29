@@ -14,9 +14,15 @@ export {
     type QueryOptions
 } from "./client-factory";
 export { CACHE_DEFAULTS } from "./clients/defaults";
-export { UsersAPI, type User as APIUser, type UpdateUserRequest } from "./clients/users";
 export {
-    WorldsAPI, type World as APIWorld, type CreateWorldRequest,
+    UsersAPI,
+    type User as APIUser,
+    type UpdateUserRequest
+} from "./clients/users";
+export {
+    WorldsAPI,
+    type World as APIWorld,
+    type CreateWorldRequest,
     type UpdateWorldRequest,
     type WorldMember
 } from "./clients/worlds";
@@ -31,6 +37,16 @@ export {
     type RequestInterceptor
 } from "./interceptor";
 export {
+    NetworkRecoveryManager,
+    registerNetworkRecoveryHooks,
+    type NotificationCallback,
+    type RecoveryState
+} from "./network-recovery";
+export {
+    NetworkRecoveryRetryJobManager,
+    type NetworkRecoveryRetryJobConfig
+} from "./network-recovery-retry-job";
+export {
     OfflineQueueManager,
     type OfflineQueueConfig,
     type OfflineQueueStats,
@@ -40,5 +56,4 @@ export {
     cleanupOfflineQueueReplay,
     initializeOfflineQueueReplay
 } from "./offline-queue-replay";
-export { RequestManager, type RequestOptions } from "./request-manager";
 

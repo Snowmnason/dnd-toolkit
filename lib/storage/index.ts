@@ -130,6 +130,9 @@ export const STORAGE_KEYS = {
   // Offline request queue (persistent, survives app restart)
   OFFLINE_QUEUE: "dnd:api:offline_queue",
 
+  // Network recovery state (retry count, backoff timing)
+  NETWORK_RECOVERY_STATE: "dnd:network:recovery_state",
+
   // Add more keys as needed...
 } as const;
 
