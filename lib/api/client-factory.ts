@@ -386,11 +386,16 @@ export abstract class APIClient {
     try {
       const requestVersion = this.config.queryCache.getCurrentVersion();
 
-      const fetcher = async (injectedHeaders?: HeadersInit) => {
-        const response = await fetch(
-          url,
-          injectedHeaders ? { headers: injectedHeaders } : undefined,
-        );
+      const fetcher = async (injectedHeaders?: Record<string, string>) => {
+        const headers: Record<string, string> = {
+          // Merge in any injected headers from RequestManager/AuthLayer
+          // (includes Authorization, interceptor-modified headers, etc.)
+          ...(injectedHeaders || {}),
+        };
+
+        const response = await fetch(url, {
+          headers: Object.keys(headers).length > 0 ? headers : undefined,
+        });
         if (!response.ok) {
           const apiError = await this.transformError(response);
           throw new AppError(apiError);
@@ -546,12 +551,16 @@ export abstract class APIClient {
     }
 
     try {
-      const fetcher = async () => {
+      const fetcher = async (injectedHeaders?: Record<string, string>) => {
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
+          // Merge in any injected headers from RequestManager/AuthLayer
+          // (includes Authorization, interceptor-modified headers, etc.)
+          ...(injectedHeaders || {}),
         };
 
         // Phase 4: Add idempotency key header if provided
+        // (explicitly set after injectedHeaders to ensure it's not overridden)
         if (options?.idempotencyKey) {
           headers["Idempotency-Key"] = options.idempotencyKey;
           logger.debug("api", `Adding idempotency key for ${methodName}`, {
@@ -997,8 +1006,16 @@ export abstract class APIClient {
       const url = this.buildUrl(endpoint);
       const authStrategy = options?.authStrategy || this.config.authStrategy;
 
-      const fetcher = async () => {
-        const response = await fetch(url);
+      const fetcher = async (injectedHeaders?: Record<string, string>) => {
+        const headers: Record<string, string> = {
+          // Merge in any injected headers from RequestManager/AuthLayer
+          // (includes Authorization, interceptor-modified headers, etc.)
+          ...(injectedHeaders || {}),
+        };
+
+        const response = await fetch(url, {
+          headers: Object.keys(headers).length > 0 ? headers : undefined,
+        });
         if (!response.ok) {
           throw await this.transformError(response);
         }

@@ -228,7 +228,10 @@ export interface OfflineQueueStats {
   /** Total mutations in queue */
   totalQueued: number;
 
-  /** Mutations by error type */
+  /** Mutations that have never failed (retryCount=0 and no lastErrorType) - awaiting first sync */
+  pending: number;
+
+  /** Mutations by error type (only counts mutations with retryCount > 0 or lastErrorType set) */
   failuresByType: {
     network: number;
     auth: number;

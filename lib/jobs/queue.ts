@@ -41,15 +41,15 @@ import { logger } from "@/lib/utils/logger";
 import { FastCacheAdapter } from "./adapters/fastcache-adapter";
 import { calculateNextRetryTime, formatDelay, isRetryable } from "./backoff";
 import {
-    EnqueueOptions,
-    JobCompletedEvent,
-    JobEventSubscriber,
-    JobFailedEvent,
-    JobHandler,
-    JobHandlerContext,
-    JobQueueConfig,
-    JobRecord,
-    StorageAdapter,
+  EnqueueOptions,
+  JobCompletedEvent,
+  JobEventSubscriber,
+  JobFailedEvent,
+  JobHandler,
+  JobHandlerContext,
+  JobQueueConfig,
+  JobRecord,
+  StorageAdapter,
 } from "./types";
 
 // ==========================================
@@ -105,6 +105,8 @@ export class BackgroundJobQueue {
   private activeCounts: Map<string, number> = new Map(); // Track active jobs per type
   private networkUnsubscribe: (() => void) | null = null; // NetworkDetection subscription
   private reconnectDebounceTimer: ReturnType<typeof setTimeout> | null = null; // Debounce reconnect flushes
+  private scheduledJobTimer: ReturnType<typeof setTimeout> | null = null; // Timer for scheduled job wakeup (runAt in future)
+  private nextScheduledTime: number = Infinity; // Track next job's scheduled time to avoid redundant timers
 
   constructor(config: JobQueueConfig = {}) {
     this.config = {
@@ -176,6 +178,93 @@ export class BackgroundJobQueue {
     }
 
     return Array.from(jobMap.values());
+  }
+
+  /**
+   * Schedule a timer to wake up the queue at the next job's runAt time
+   * Prevents scheduled jobs from stalling indefinitely when they're enqueued with future runAt
+   *
+   * @param jobs - All jobs in queue
+   */
+  private scheduleNextJobWakeup(jobs: JobRecord[]): void {
+    // Find the earliest pending job that's scheduled for the future
+    const now = Date.now();
+    let nextJobTime = Infinity;
+
+    for (const job of jobs) {
+      if (
+        job.status === "pending" &&
+        job.runAt > now &&
+        job.runAt < nextJobTime
+      ) {
+        nextJobTime = job.runAt;
+      }
+    }
+
+    // Clear existing timer if we don't need it or if the next job time hasn't changed
+    if (nextJobTime === Infinity) {
+      if (this.scheduledJobTimer !== null) {
+        clearTimeout(this.scheduledJobTimer);
+        this.scheduledJobTimer = null;
+        this.nextScheduledTime = Infinity;
+        logger
+          .category("jobs")
+          .debug("Cleared scheduled job timer (no pending jobs)");
+      }
+      return;
+    }
+
+    // Only set a new timer if the scheduled time changed
+    if (this.nextScheduledTime === nextJobTime) {
+      logger
+        .category("jobs")
+        .debug("Scheduled job timer already set for next job", {
+          delay: nextJobTime - now,
+        });
+      return;
+    }
+
+    // Clear old timer
+    if (this.scheduledJobTimer !== null) {
+      clearTimeout(this.scheduledJobTimer);
+    }
+
+    // Schedule new timer
+    const delayMs = Math.max(0, nextJobTime - now);
+    this.nextScheduledTime = nextJobTime;
+
+    logger.category("jobs").debug("Scheduled job timer set", {
+      delay: formatDelay(delayMs),
+      nextJobTime: new Date(nextJobTime).toISOString(),
+    });
+
+    this.scheduledJobTimer = setTimeout(() => {
+      this.scheduledJobTimer = null;
+      this.nextScheduledTime = Infinity;
+      logger
+        .category("jobs")
+        .debug("Scheduled job timer fired: processing queue");
+      this.runNext().catch((err) => {
+        logger
+          .category("jobs")
+          .warn("Error processing jobs after scheduled timer wakeup", err);
+      });
+    }, delayMs);
+  }
+
+  /**
+   * Clear any pending scheduled job timer
+   * Called during cleanup or when queue state changes
+   */
+  private clearScheduledJobTimer(): void {
+    if (this.scheduledJobTimer !== null) {
+      clearTimeout(this.scheduledJobTimer);
+      this.scheduledJobTimer = null;
+      this.nextScheduledTime = Infinity;
+      logger
+        .category("jobs")
+        .debug("Cleared scheduled job timer during cleanup");
+    }
   }
 
   // ==========================================
@@ -506,6 +595,8 @@ export class BackgroundJobQueue {
         } else {
           logger.category("jobs").debug("No pending jobs ready to run");
         }
+        // Schedule wakeup for next batch of pending jobs (before returning)
+        this.scheduleNextJobWakeup(allJobs);
         return 0;
       }
 
@@ -561,6 +652,8 @@ export class BackgroundJobQueue {
         processedCount++;
       }
 
+      // Schedule wakeup for next batch of pending jobs (before returning)
+      this.scheduleNextJobWakeup(allJobs);
       return processedCount;
     } catch (error) {
       logger.category("jobs").error(`Error running next batch: ${error}`);
@@ -851,6 +944,16 @@ export class BackgroundJobQueue {
         .category("jobs")
         .debug("Queue destroyed, network subscription unsubscribed");
     }
+
+    // Clear any pending scheduled job timer
+    this.clearScheduledJobTimer();
+
+    if (this.reconnectDebounceTimer) {
+      clearTimeout(this.reconnectDebounceTimer);
+      this.reconnectDebounceTimer = null;
+    }
+
+    logger.category("jobs").debug("Queue destroyed, all timers cleared");
   }
 }
 

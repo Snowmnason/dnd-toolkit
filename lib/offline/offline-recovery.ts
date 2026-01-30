@@ -586,6 +586,7 @@ export const OfflineQueueStatsCollector = {
   ): OfflineQueueStats {
     const stats: OfflineQueueStats = {
       totalQueued: mutations.length,
+      pending: 0,
       failuresByType: {
         network: 0,
         auth: 0,
@@ -607,12 +608,18 @@ export const OfflineQueueStatsCollector = {
     let oldestTimestamp = Infinity;
 
     for (const mutation of mutations) {
-      // Count by error type
-      let errorType: keyof typeof stats.failuresByType = "unknown";
-      if (mutation.lastErrorType) {
-        errorType = mutation.lastErrorType;
+      // Distinguish between pending (never-failed) and actual failures
+      const hasFailed = mutation.retryCount > 0 || mutation.lastErrorType;
+
+      if (hasFailed) {
+        // Count by error type only for mutations that have actually failed
+        const errorType: keyof typeof stats.failuresByType =
+          mutation.lastErrorType || "unknown";
+        stats.failuresByType[errorType]++;
+      } else {
+        // Track mutations awaiting their first sync attempt
+        stats.pending++;
       }
-      stats.failuresByType[errorType]++;
 
       // Track retry count
       totalRetries += mutation.retryCount;

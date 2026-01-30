@@ -69,6 +69,8 @@ class OnlineSyncManagerService {
   private isOnline = false;
   private isSyncing = false;
   private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private scheduledRetryTimer: ReturnType<typeof setTimeout> | null = null; // Timer for next scheduled retry
+  private nextScheduledRetryTime: number = Infinity; // Track next scheduled time
   private config: Required<OfflineSyncConfig> = DEFAULT_CONFIG;
   private lastSyncStatus: OfflineSyncStatus = {
     isSyncing: false,
@@ -186,6 +188,8 @@ class OnlineSyncManagerService {
           this.config.batchSize,
         );
         if (batch.length === 0) {
+          // No ready mutations: schedule a timer for the next scheduled retry (if any)
+          await this.scheduleNextRetryWakeup();
           break;
         }
 
@@ -265,6 +269,91 @@ class OnlineSyncManagerService {
     }
 
     return this.lastSyncStatus;
+  }
+
+  /**
+   * Schedule a timer to wake up the sync manager at the next scheduled retry time
+   * Prevents scheduled retries from stalling indefinitely when all ready mutations are processed
+   *
+   * Phase 4: Ensures scheduled retries (nextAttemptAt in future) actually execute
+   */
+  private async scheduleNextRetryWakeup(): Promise<void> {
+    // Get all mutations to find the earliest scheduled retry
+    const allMutations = await OfflineMutationQueue.getAll();
+
+    if (allMutations.length === 0) {
+      // No mutations left: clear any pending timer
+      this.clearScheduledRetryTimer();
+      logger
+        .category("storage")
+        .debug("Queue empty: cleared scheduled retry timer");
+      return;
+    }
+
+    // Find the earliest mutation that's scheduled for the future
+    const now = Date.now();
+    let nextRetryTime = Infinity;
+
+    for (const mutation of allMutations) {
+      if (
+        mutation.nextAttemptAt &&
+        mutation.nextAttemptAt > now &&
+        mutation.nextAttemptAt < nextRetryTime
+      ) {
+        nextRetryTime = mutation.nextAttemptAt;
+      }
+    }
+
+    // If no scheduled retries in the future, we're done
+    if (nextRetryTime === Infinity) {
+      this.clearScheduledRetryTimer();
+      logger.category("storage").debug("No scheduled retries: cleared timer");
+      return;
+    }
+
+    // Only set a new timer if the scheduled time changed
+    if (this.nextScheduledRetryTime === nextRetryTime) {
+      logger
+        .category("storage")
+        .debug("Scheduled retry timer already set for next attempt", {
+          delay: nextRetryTime - now,
+        });
+      return;
+    }
+
+    // Clear old timer
+    this.clearScheduledRetryTimer();
+
+    // Schedule new timer
+    const delayMs = Math.max(0, nextRetryTime - now);
+    this.nextScheduledRetryTime = nextRetryTime;
+
+    logger.category("storage").debug("Scheduled retry timer set", {
+      delayMs,
+      nextRetryTime: new Date(nextRetryTime).toISOString(),
+    });
+
+    this.scheduledRetryTimer = setTimeout(() => {
+      this.scheduledRetryTimer = null;
+      this.nextScheduledRetryTime = Infinity;
+      logger
+        .category("storage")
+        .debug("Scheduled retry timer fired: triggering sync");
+      this.triggerSync();
+    }, delayMs);
+  }
+
+  /**
+   * Clear any pending scheduled retry timer
+   * Called during cleanup or when a new sync completes
+   */
+  private clearScheduledRetryTimer(): void {
+    if (this.scheduledRetryTimer !== null) {
+      clearTimeout(this.scheduledRetryTimer);
+      this.scheduledRetryTimer = null;
+      this.nextScheduledRetryTime = Infinity;
+      logger.category("storage").debug("Cleared scheduled retry timer");
+    }
   }
 
   /**
@@ -585,6 +674,8 @@ class OnlineSyncManagerService {
     if (this.syncDebounceTimer) {
       clearTimeout(this.syncDebounceTimer);
     }
+    // Clear scheduled retry timer
+    this.clearScheduledRetryTimer();
     logger.category("storage").info("OnlineSyncManager destroyed");
   }
 }

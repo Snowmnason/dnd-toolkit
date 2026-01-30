@@ -57,10 +57,29 @@ export interface RequestOptions {
 
   // ===== Phase 4 Enhancements =====
 
-  /** Request context for logging, tracing, and interceptor access */
+  /**
+   * Request context for logging, tracing, and interceptor access.
+   *
+   * Passed to all interceptor hooks (onBeforeRequest, onAfterResponse, onError),
+   * allowing interceptors to access request-specific metadata without relying on
+   * global state or closures. Also preserved in offline queue entries for replay.
+   *
+   * Example:
+   *   context: { userId: 'user_123', feature: 'campaign_creation' }
+   */
   context?: Record<string, any>;
 
-  /** Idempotency key: sent to backend to prevent duplicate operations */
+  /**
+   * Idempotency key: sent to backend to prevent duplicate operations.
+   *
+   * Injected as the 'Idempotency-Key' HTTP header on each request (including retries).
+   * Allows the backend to deduplicate requests and provide at-most-once semantics.
+   * Also preserved in offline queue entries, ensuring replayed requests maintain
+   * idempotency across app restarts and network disconnections.
+   *
+   * Example:
+   *   idempotencyKey: 'create_campaign_' + Date.now() + '_' + uuid()
+   */
   idempotencyKey?: string;
 
   // ===== AuthLayer Integration =====
@@ -161,13 +180,20 @@ function getDefaultOptions(): Omit<
   Required<
     Omit<
       RequestOptions,
-      "authStrategy" | "circuitBreakerKey" | "circuitThresholds"
+      | "authStrategy"
+      | "circuitBreakerKey"
+      | "circuitThresholds"
+      | "interceptors"
+      | "context"
+      | "idempotencyKey"
     >
   >,
   never
 > & {
   circuitBreakerKey: undefined;
   circuitThresholds: undefined;
+  context: undefined;
+  idempotencyKey: undefined;
 } {
   const config = getAppConfig();
   return {
@@ -181,15 +207,32 @@ function getDefaultOptions(): Omit<
     staleTime: config.api?.staleTimeMs ?? 2 * 60 * 1000,
     cacheTime: config.api?.cacheTimeMs ?? 5 * 60 * 1000,
     tags: [],
-    context: {},
-    idempotencyKey: "",
-    interceptors: [],
+    context: undefined,
+    idempotencyKey: undefined,
     circuitBreakerKey: undefined,
     circuitThresholds: undefined,
   };
 }
 
-const DEFAULT_OPTIONS = getDefaultOptions();
+const DEFAULT_OPTIONS = getDefaultOptions() as Omit<
+  Required<
+    Omit<
+      RequestOptions,
+      | "authStrategy"
+      | "circuitBreakerKey"
+      | "circuitThresholds"
+      | "interceptors"
+      | "context"
+      | "idempotencyKey"
+    >
+  >,
+  never
+> & {
+  circuitBreakerKey: undefined;
+  circuitThresholds: undefined;
+  context: undefined;
+  idempotencyKey: undefined;
+};
 
 // Rate limiting: token bucket algorithm
 // Default: 10 requests per second per key
@@ -336,9 +379,16 @@ class RequestManagerClass {
     fetcher: () => Promise<T>,
     options?: RequestOptions,
   ): Promise<T | null> {
-    const options_ = { ...DEFAULT_OPTIONS, ...options } as Required<
+    // Create options with all defaults applied
+    const options_ = { ...DEFAULT_OPTIONS, ...options } as unknown as Required<
       Omit<RequestOptions, "authStrategy">
     > & { authStrategy?: string };
+
+    // Extract context and idempotencyKey for later use, since they're optional
+    const requestContext = options
+      ? { context: options.context, idempotencyKey: options.idempotencyKey }
+      : {};
+
     const startedAt = Date.now();
     const trackingEnabled = Analytics.enabled();
 
@@ -483,6 +533,7 @@ class RequestManagerClass {
               options_,
               key, // URL defaults to key
               "POST",
+              requestContext, // Pass context and idempotencyKey for queue preservation
             );
             await OfflineQueueManager.enqueue(entry);
             logger.info(
@@ -586,6 +637,13 @@ class RequestManagerClass {
           // Normalize headers to Record<string, string> (supports Headers object, array, or plain object)
           let headers = normalizeHeaders(requestInit.headers);
 
+          // ========== INJECT IDEMPOTENCY KEY ==========
+          // If provided, add Idempotency-Key header for at-most-once semantics
+          // This allows the backend to deduplicate requests and prevent duplicate operations
+          if (requestContext.idempotencyKey) {
+            headers["Idempotency-Key"] = requestContext.idempotencyKey;
+          }
+
           if (options_.authStrategy) {
             const context: AuthContext = {
               url: key,
@@ -643,6 +701,7 @@ class RequestManagerClass {
           endpoint: parseEndpoint(key),
           authStrategy: options_.authStrategy,
           interceptors: options_.interceptors,
+          context: options_.context, // Pass context through retry chain
         },
       );
 
@@ -802,6 +861,7 @@ class RequestManagerClass {
             options_,
             key, // URL defaults to key
             "POST", // Default method (could be enhanced to accept method in options)
+            requestContext, // Pass context and idempotencyKey for queue preservation
           );
           await OfflineQueueManager.enqueue(entry);
           logger.info("api", "Request queued for offline replay", { key });
@@ -1015,6 +1075,7 @@ class RequestManagerClass {
       endpoint?: string;
       authStrategy?: string;
       interceptors?: RequestInterceptor[];
+      context?: Record<string, any>; // Pass context through interceptor hooks
     },
   ): Promise<T> {
     // Calculate current attempt number (0-indexed)
@@ -1191,6 +1252,7 @@ class RequestManagerClass {
       key: string;
       options: Omit<Required<Omit<RequestOptions, "authStrategy">>, never> & {
         authStrategy?: string;
+        interceptors?: RequestInterceptor[];
       };
     },
   ): void {
@@ -1395,13 +1457,14 @@ class RequestManagerClass {
    */
   private _buildQueueEntry(
     key: string,
-    options: Required<Omit<RequestOptions, "authStrategy">> & {
+    options: Required<Omit<RequestOptions, "authStrategy" | "interceptors">> & {
       authStrategy?: string;
     },
     url: string,
     method: string,
+    requestContext?: { context?: Record<string, any>; idempotencyKey?: string },
   ): QueuedRequestEntry {
-    return {
+    const entry: QueuedRequestEntry = {
       key,
       url,
       method,
@@ -1418,10 +1481,20 @@ class RequestManagerClass {
         tags: options.tags,
         circuitBreakerKey: options.circuitBreakerKey,
         circuitThresholds: options.circuitThresholds,
+        idempotencyKey: requestContext?.idempotencyKey, // Preserve idempotency key for replay
+        context: requestContext?.context, // Preserve context for replay interceptor hooks
       },
       createdAt: Date.now(),
       attempts: 0,
     };
+
+    // Include idempotency key in the entry headers if provided
+    // This ensures replayed requests maintain at-most-once semantics
+    if (requestContext?.idempotencyKey) {
+      entry.headers = { "Idempotency-Key": requestContext.idempotencyKey };
+    }
+
+    return entry;
   }
 
   /**
