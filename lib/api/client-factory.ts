@@ -73,6 +73,13 @@ export interface QueryOptions<T = any> {
   // Phase 3 Improvements
   /** Optional cascade invalidation: invalidate these tags in addition to invalidateTags */
   invalidateOtherTags?: string[];
+
+  // Phase 4 Enhancements
+  /** Enable stale-while-revalidate: return stale cache while fetching fresh in background */
+  staleWhileRevalidate?: boolean;
+
+  /** Request context for logging, tracing, and interceptor access */
+  context?: Record<string, any>;
 }
 
 /**
@@ -128,6 +135,13 @@ export interface MutationOptions<T = any> {
 
   /** Error handler: map specific errors to custom error types */
   errorHandler?: (error: unknown) => ApiErrorType | null | undefined;
+
+  // Phase 4 Enhancements
+  /** Idempotency key: prevents duplicate operations on retry (sent to backend) */
+  idempotencyKey?: string;
+
+  /** Request context for logging, tracing, and interceptor access */
+  context?: Record<string, any>;
 }
 
 /**
@@ -215,6 +229,24 @@ export abstract class APIClient {
       authLayer: config.authLayer || AuthLayer,
     };
 
+    // Phase 5: Validate auth strategy if declared
+    if (config.authStrategy) {
+      logger.debug("api", `Validating auth strategy for ${this.clientName}`, {
+        authStrategy: config.authStrategy,
+      });
+      // Note: Full validation would require checking AuthLayer registry
+      // For now, we log at debug level to help catch misconfiguration
+      if (!config.authStrategy.match(/^[a-z-]+$/)) {
+        logger.warn(
+          "api",
+          `Invalid auth strategy format: ${config.authStrategy}`,
+          {
+            clientName: this.clientName,
+          },
+        );
+      }
+    }
+
     logger.debug("api", `Initialized ${this.clientName}`, {
       baseUrl: this.config.baseUrl,
       authStrategy: this.config.authStrategy,
@@ -292,6 +324,19 @@ export abstract class APIClient {
       return cached;
     }
 
+    // Phase 4: Stale-while-revalidate pattern
+    // If cache is stale AND staleWhileRevalidate is enabled, return stale immediately
+    // and revalidate in background
+    if (cached && isStale && options?.staleWhileRevalidate) {
+      logger.debug("api", `Stale-while-revalidate for ${methodName}`, {
+        cacheKey,
+      });
+      // Return stale data immediately
+      // Fire background revalidation without awaiting
+      this._revalidateInBackground(methodName, endpoint, options);
+      return cached;
+    }
+
     // Fetch fresh data
     try {
       const requestVersion = this.config.queryCache.getCurrentVersion();
@@ -312,6 +357,7 @@ export abstract class APIClient {
         circuitBreakerKey,
         ...(authStrategy && { authStrategy }),
         tags: options?.tags || this.config.defaultTags,
+        context: options?.context,
         ...options?.requestOptions,
       });
 
@@ -448,11 +494,21 @@ export abstract class APIClient {
 
     try {
       const fetcher = async () => {
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+
+        // Phase 4: Add idempotency key header if provided
+        if (options?.idempotencyKey) {
+          headers["Idempotency-Key"] = options.idempotencyKey;
+          logger.debug("api", `Adding idempotency key for ${methodName}`, {
+            idempotencyKey: options.idempotencyKey,
+          });
+        }
+
         const response = await fetch(url, {
           method,
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers,
           body: body ? JSON.stringify(body) : undefined,
         });
 
@@ -471,6 +527,8 @@ export abstract class APIClient {
         circuitBreakerKey,
         ...(authStrategy && { authStrategy }),
         tags: options?.tags || this.config.defaultTags,
+        context: options?.context,
+        idempotencyKey: options?.idempotencyKey,
         ...options?.requestOptions,
       });
 
@@ -633,7 +691,8 @@ export abstract class APIClient {
         queryCount: config.queries.length,
       });
 
-      const results = await Promise.all(
+      // Phase 4: Use allSettled for partial failure handling instead of Promise.all
+      const settled = await Promise.allSettled(
         config.queries.map(async (query) => {
           try {
             const response = await fetch(this.buildUrl(query.url));
@@ -650,10 +709,45 @@ export abstract class APIClient {
         }),
       );
 
-      // Combine results
+      // Phase 4: Process partial results, don't fail on individual errors
       const combined: Record<string, any> = {};
-      results.forEach((result) => Object.assign(combined, result));
-      const combinedData = config.combiner(combined);
+      const errors: Record<string, Error> = {};
+      let successCount = 0;
+
+      settled.forEach((result, index) => {
+        // eslint-disable-next-line security/detect-object-injection
+        const query = config.queries[index];
+        if (result.status === "fulfilled") {
+          Object.assign(combined, result.value);
+          successCount++;
+        } else {
+          errors[query.key] = result.reason;
+          logger.warn("api", `Batch query partial failure for ${query.key}`, {
+            error: result.reason,
+          });
+        }
+      });
+
+      // Log partial failure summary
+      if (Object.keys(errors).length > 0) {
+        logger.info(
+          "api",
+          `Batch completed with partial failures: ${successCount}/${config.queries.length}`,
+          {
+            failedKeys: Object.keys(errors),
+          },
+        );
+      }
+
+      // Combine results with partial data
+      const combinedData = config.combiner({
+        ...combined,
+        _metadata: {
+          successCount,
+          failureCount: Object.keys(errors).length,
+          failed: errors,
+        },
+      });
 
       // Cache the combined result
       const requestVersion = this.config.queryCache.getCurrentVersion();
@@ -789,6 +883,89 @@ export abstract class APIClient {
     } catch {
       // Fallback if JSON.stringify fails
       return "";
+    }
+  }
+
+  /**
+   * Phase 4: Revalidate stale cache in background (stale-while-revalidate pattern)
+   * Doesn't await; runs in background
+   */
+  private async _revalidateInBackground<T = any>(
+    methodName: string,
+    endpoint: string,
+    options?: QueryOptions<T>,
+  ): Promise<void> {
+    try {
+      logger.debug("api", `Background revalidation started for ${methodName}`);
+
+      const cacheKey = this.generateCacheKey(
+        methodName,
+        endpoint,
+        options?.cacheKey,
+      );
+      const url = this.buildUrl(endpoint);
+      const authStrategy = options?.authStrategy || this.config.authStrategy;
+
+      const fetcher = async () => {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw await this.transformError(response);
+        }
+        return await response.json();
+      };
+
+      const data = await this.config.requestManager.fetch(cacheKey, fetcher, {
+        dedupe: true,
+        retries: 2,
+        failOpen: true, // Don't throw on revalidation failure
+        timeout: 30000,
+        ...(authStrategy && { authStrategy }),
+        tags: options?.tags || this.config.defaultTags,
+        context: options?.context,
+        ...options?.requestOptions,
+      });
+
+      if (data) {
+        // Validate if schema provided
+        let validatedData = data;
+        if (options?.responseSchema) {
+          try {
+            validatedData = options.responseSchema.parse(data);
+          } catch (error) {
+            logger.error(
+              "api",
+              `Revalidation validation failed for ${methodName}`,
+              {
+                error,
+              },
+            );
+            return; // Don't update cache on validation failure
+          }
+        }
+
+        // Update cache with fresh data
+        const requestVersion = this.config.queryCache.getCurrentVersion();
+        await this.config.queryCache.set(
+          cacheKey,
+          validatedData,
+          {
+            staleTime: options?.staleTime ?? this.config.defaultStaleTime,
+            cacheTime: options?.cacheTime ?? this.config.defaultCacheTime,
+            tags: options?.tags || this.config.defaultTags,
+          },
+          requestVersion,
+        );
+
+        logger.debug(
+          "api",
+          `Background revalidation successful for ${methodName}`,
+        );
+      }
+    } catch (error) {
+      logger.debug("api", `Background revalidation failed for ${methodName}`, {
+        error,
+      });
+      // Silently fail - don't disrupt user experience
     }
   }
 

@@ -107,14 +107,23 @@ export const NetworkRecoveryManager = {
     this._recoveryState.retries++;
     this._recoveryState.lastAttemptAt = Date.now();
 
-    // Update nextRetryAt with exponential backoff
-    const backoffMs = Math.min(
+    // Update nextRetryAt with exponential backoff + jitter (Phase 4 enhancement)
+    const baseBackoffMs = Math.min(
       1000 * Math.pow(2, this._recoveryState.retries - 1),
       30000,
     ); // Cap at 30s
-    this._recoveryState.nextRetryAt = Date.now() + backoffMs;
+    // Add ±10% jitter to prevent thundering herd
+    const jitterFactor = 0.9 + Math.random() * 0.2; // 0.9 to 1.1
+    const jitteredBackoffMs = Math.floor(baseBackoffMs * jitterFactor);
+    this._recoveryState.nextRetryAt = Date.now() + jitteredBackoffMs;
 
     await this._persistRecoveryState();
+
+    logger.debug("api", "Recovery backoff scheduled", {
+      retries: this._recoveryState.retries,
+      baseBackoffMs,
+      jitteredBackoffMs,
+    });
   },
 
   /**
@@ -184,6 +193,20 @@ export async function registerNetworkRecoveryHooks(
 ): Promise<void> {
   logger.info("network", "Registering network recovery hooks");
 
+  // Phase 4: Helper to wrap recovery steps with error boundaries
+  async function executeRecoveryStep(
+    name: string,
+    fn: () => Promise<void>,
+  ): Promise<boolean> {
+    try {
+      await fn();
+      return true;
+    } catch (error) {
+      logger.error("network", `Recovery step failed: ${name}`, error);
+      return false;
+    }
+  }
+
   // RECOVERING → GOOD: Sync queue + invalidate stale cache
   networkStateMachine.onSpecificTransition(
     "RECOVERING" as NetworkState,
@@ -191,39 +214,43 @@ export async function registerNetworkRecoveryHooks(
     async () => {
       logger.info("network", "Executing RECOVERING → GOOD recovery hooks");
 
-      try {
-        // Step 1: Sync pending offline queue mutations
-        logger.debug("network", "Syncing offline queue mutations");
-        await RequestManager.flushOfflineQueue();
-        const stats = OfflineQueueManager.getStats();
-        logger.info("network", "Offline queue synced", {
-          remaining: stats.queueLength,
-          maxRetries: stats.maxRetryAttempts,
-        });
+      // Phase 4: Execute recovery steps with error boundaries (don't fail on individual step errors)
+      const stepResults = {
+        queueSync: await executeRecoveryStep("queue-sync", async () => {
+          logger.debug("network", "Syncing offline queue mutations");
+          await RequestManager.flushOfflineQueue();
+          const stats = OfflineQueueManager.getStats();
+          logger.info("network", "Offline queue synced", {
+            remaining: stats.queueLength,
+            maxRetries: stats.maxRetryAttempts,
+          });
+        }),
 
-        // Step 2: Invalidate queries older than 2 hours (stale data)
-        logger.debug("network", "Invalidating stale cache entries");
-        const staleDuration = 2 * 60 * 60 * 1000; // 2 hours
-        const invalidatedCount =
-          await QueryCache.invalidateOlderThan(staleDuration);
-        logger.info("network", "Stale cache invalidated", {
-          count: invalidatedCount,
-          staleDuration,
-        });
+        cacheInvalidation: await executeRecoveryStep(
+          "cache-invalidation",
+          async () => {
+            logger.debug("network", "Invalidating stale cache entries");
+            const staleDuration = 2 * 60 * 60 * 1000; // 2 hours
+            const invalidatedCount =
+              await QueryCache.invalidateOlderThan(staleDuration);
+            logger.info("network", "Stale cache invalidated", {
+              count: invalidatedCount,
+              staleDuration,
+            });
+          },
+        ),
 
-        // Step 3: Reset recovery retry state
-        await NetworkRecoveryManager.resetRecoveryState();
+        stateReset: await executeRecoveryStep("state-reset", async () => {
+          await NetworkRecoveryManager.resetRecoveryState();
+        }),
+      };
 
-        // Step 4: Notify user
+      // Notify user if at least one critical step succeeded
+      if (stepResults.queueSync || stepResults.cacheInvalidation) {
         NetworkRecoveryManager._notify(
           "Connection restored - syncing your changes",
         );
-      } catch (error) {
-        logger.error(
-          "network",
-          "Error during RECOVERING → GOOD recovery",
-          error,
-        );
+      } else {
         NetworkRecoveryManager._notify(
           "Connection restored but sync failed - please retry",
         );
@@ -238,17 +265,11 @@ export async function registerNetworkRecoveryHooks(
     async () => {
       logger.info("network", "Executing GOOD → OFFLINE notification");
 
-      try {
+      await executeRecoveryStep("offline-notification", async () => {
         NetworkRecoveryManager._notify(
           "You are offline - changes will sync when online",
         );
-      } catch (error) {
-        logger.error(
-          "network",
-          "Error during GOOD → OFFLINE notification",
-          error,
-        );
-      }
+      });
     },
   );
 
@@ -258,17 +279,11 @@ export async function registerNetworkRecoveryHooks(
     "OFFLINE" as NetworkState,
     async () => {
       logger.info("network", "Executing BAD → OFFLINE notification");
-      try {
+      await executeRecoveryStep("bad-offline-notification", async () => {
         NetworkRecoveryManager._notify(
           "Connection lost - changes will sync when online",
         );
-      } catch (error) {
-        logger.error(
-          "network",
-          "Error during BAD → OFFLINE notification",
-          error,
-        );
-      }
+      });
     },
   );
 
@@ -277,17 +292,11 @@ export async function registerNetworkRecoveryHooks(
     "OFFLINE" as NetworkState,
     async () => {
       logger.info("network", "Executing NO_WIFI → OFFLINE notification");
-      try {
+      await executeRecoveryStep("no-wifi-offline-notification", async () => {
         NetworkRecoveryManager._notify(
           "No connection - changes will sync when online",
         );
-      } catch (error) {
-        logger.error(
-          "network",
-          "Error during NO_WIFI → OFFLINE notification",
-          error,
-        );
-      }
+      });
     },
   );
 

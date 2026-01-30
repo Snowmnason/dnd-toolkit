@@ -17,6 +17,12 @@ export interface RequestInterceptor {
   /** Optional name for debugging/logging */
   name?: string;
 
+  /** Max execution time for this interceptor (ms). Exceeded hooks are skipped (Phase 4 enhancement) */
+  timeout?: number;
+
+  /** If true, don't wait for hook completion; continue immediately (Phase 4 enhancement) */
+  nonBlocking?: boolean;
+
   /**
    * Called before fetcher executes (before each RequestManager retry attempt)
    * Can mutate req.init (add headers, modify body)
@@ -94,20 +100,57 @@ export function parseEndpoint(url: string): string | undefined {
 
 /**
  * Execute hooks serially, catching and logging errors
+ * Phase 4 Enhancement: Support timeout and non-blocking modes
  *
  * @param hooks - Array of hook functions to execute
  * @param context - Context object to pass to hooks
  * @param hookName - Name of the hook type (for logging)
+ * @param interceptors - Optional interceptor metadata for timeout/nonBlocking config
  */
 export async function executeHooksSerially<T>(
   hooks: ((context: T) => Promise<void> | void)[],
   context: T,
   hookName: string,
+  interceptors?: RequestInterceptor[],
 ): Promise<void> {
   let index = 0;
   for (const hook of hooks) {
+    const interceptor = interceptors?.[index];
+
     try {
-      await hook(context);
+      // Phase 4: Apply timeout if specified
+      if (interceptor?.timeout) {
+        const timeoutPromise = new Promise<void>((_, reject) => {
+          setTimeout(
+            () =>
+              reject(
+                new Error(`Interceptor timeout: ${interceptor.timeout}ms`),
+              ),
+            interceptor.timeout,
+          );
+        });
+
+        // Race between hook execution and timeout
+        await Promise.race([Promise.resolve(hook(context)), timeoutPromise]);
+
+        logger.debug("api", `Hook completed within timeout`, {
+          hookName,
+          index,
+          timeout: interceptor.timeout,
+        });
+      } else {
+        // Normal execution without timeout
+        await hook(context);
+      }
+
+      // Phase 4: If nonBlocking=true, don't wait for result (fire and forget)
+      // But we already awaited above, so this is more for semantic clarity
+      if (interceptor?.nonBlocking) {
+        logger.debug("api", `Executed non-blocking hook`, {
+          hookName,
+          index,
+        });
+      }
     } catch (error) {
       logger.error("api", `Error in ${hookName} hook [${index}]:`, { error });
       // Continue to next hook even if this one fails

@@ -291,6 +291,37 @@ class CircuitBreakerManagerClass {
   }
 
   /**
+   * Phase 4: Check if Half-Open recovery probe is allowed
+   * Used by NetworkRecoveryRetryJobManager to coordinate recovery attempts
+   */
+  isHalfOpenProbeAllowed(key: string): boolean {
+    const circuit = this.circuits.get(key);
+    if (!circuit) return false;
+
+    // Only allow probe if circuit is Open and recovery window has passed
+    if (circuit.state === "Open" && Date.now() >= circuit.nextRecoveryAt) {
+      if (!circuit.halfOpenProbeInFlight) {
+        circuit.halfOpenProbeInFlight = true;
+        circuit.state = "Half-Open";
+        circuit.lastTransitionAt = Date.now();
+
+        logger.info(
+          "api",
+          `Circuit breaker Half-Open (recovery probe): ${key}`,
+          {
+            endpoint: key,
+            consecutiveHalfOpenFailures: circuit.consecutiveHalfOpenFailures,
+          },
+        );
+
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Manually reset a circuit or all circuits to Closed
    */
   reset(key?: string): void {

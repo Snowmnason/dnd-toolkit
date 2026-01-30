@@ -1,7 +1,7 @@
 import * as Sentry from "@sentry/react-native";
 import {
-  Analytics,
-  sanitizeError as sanitizeErrorForAnalytics,
+    Analytics,
+    sanitizeError as sanitizeErrorForAnalytics,
 } from "../analytics";
 import { QueryCache } from "../cache";
 import { getAppConfig } from "../config";
@@ -9,10 +9,10 @@ import { NetworkDetection } from "../network";
 import { logger } from "../utils/logger";
 import { AuthLayer, type AuthContext } from "./auth-layer";
 import {
-  CircuitBreakerManager,
-  CircuitBreakerOpenError,
-  DEFAULT_THRESHOLDS,
-  type CircuitThresholds,
+    CircuitBreakerManager,
+    CircuitBreakerOpenError,
+    DEFAULT_THRESHOLDS,
+    type CircuitThresholds,
 } from "./circuit-breaker";
 import { InterceptorManager, parseEndpoint } from "./interceptor";
 import { OfflineQueueManager, type QueuedRequestEntry } from "./offline-queue";
@@ -50,6 +50,14 @@ export interface RequestOptions {
 
   /** Timeout in ms for the request (default: 30000) */
   timeout?: number;
+
+  // ===== Phase 4 Enhancements =====
+
+  /** Request context for logging, tracing, and interceptor access */
+  context?: Record<string, any>;
+
+  /** Idempotency key: sent to backend to prevent duplicate operations */
+  idempotencyKey?: string;
 
   // ===== AuthLayer Integration =====
 
