@@ -22,7 +22,7 @@ import { logger } from "@/lib/utils/logger";
 import type { ZodType } from "zod";
 import { AuthLayer } from "./auth-layer";
 import { CircuitBreakerManager } from "./circuit-breaker";
-import { InterceptorManager, type RequestInterceptor } from "./interceptor";
+import { type RequestInterceptor } from "./interceptor";
 import { RequestManager, type RequestOptions } from "./request-manager";
 
 /**
@@ -37,6 +37,50 @@ export type ApiErrorType =
   | { type: "timeout" }
   | { type: "rate_limited"; retryAfter?: number }
   | { type: "unknown"; message: string };
+
+/**
+ * AppError: Error wrapper that includes ApiErrorType metadata
+ * Ensures error.message and error.stack are available for downstream consumers
+ * (RequestManager analytics, Sentry, interceptor onError handlers)
+ */
+export class AppError extends Error {
+  public apiError: ApiErrorType;
+
+  constructor(apiError: ApiErrorType) {
+    const message = AppError.messageFromApiError(apiError);
+    super(message);
+    this.name = "AppError";
+    this.apiError = apiError;
+    // Maintain proper stack trace (Node.js/V8)
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, AppError);
+    }
+  }
+
+  /**
+   * Extract a human-readable message from ApiErrorType
+   */
+  private static messageFromApiError(error: ApiErrorType): string {
+    switch (error.type) {
+      case "validation":
+        return `Validation failed: ${Object.entries(error.errors)
+          .map(([field, msg]) => `${field}: ${msg}`)
+          .join("; ")}`;
+      case "auth":
+        return `Authentication error: ${error.code}`;
+      case "not_found":
+        return "Resource not found (404)";
+      case "network":
+        return error.message || "Network error";
+      case "timeout":
+        return "Request timeout";
+      case "rate_limited":
+        return `Rate limited${error.retryAfter ? ` - retry after ${error.retryAfter}s` : ""}`;
+      case "unknown":
+        return error.message || "Unknown error";
+    }
+  }
+}
 
 /**
  * Query options for read operations (auto-cached, not queued)
@@ -256,12 +300,11 @@ export abstract class APIClient {
 
   /**
    * Register a domain-specific interceptor
-   * Interceptors are invoked serially for each request
+   * Interceptors are invoked serially for each request made by this client only
+   * (not registered globally; this prevents leaking client-specific behavior into unrelated requests)
    */
   use(interceptor: RequestInterceptor): this {
     this.interceptors.push(interceptor);
-    // Wire interceptor into global InterceptorManager so it executes on all requests
-    InterceptorManager.registerInterceptor(interceptor);
     logger.debug("api", `Registered interceptor on ${this.clientName}`, {
       interceptorName: interceptor.name || "unnamed",
     });
@@ -349,7 +392,8 @@ export abstract class APIClient {
           injectedHeaders ? { headers: injectedHeaders } : undefined,
         );
         if (!response.ok) {
-          throw await this.transformError(response);
+          const apiError = await this.transformError(response);
+          throw new AppError(apiError);
         }
         return await response.json();
       };
@@ -376,7 +420,8 @@ export abstract class APIClient {
           validatedData = options.responseSchema.parse(data);
         } catch (error) {
           logger.error("api", `Validation failed for ${methodName}`, { error });
-          throw this.transformValidationError(error);
+          const apiError = this.transformValidationError(error);
+          throw new AppError(apiError);
         }
       }
 
@@ -521,7 +566,8 @@ export abstract class APIClient {
         });
 
         if (!response.ok) {
-          throw await this.transformError(response);
+          const apiError = await this.transformError(response);
+          throw new AppError(apiError);
         }
 
         return await response.json();
@@ -550,7 +596,8 @@ export abstract class APIClient {
           validatedData = options.responseSchema.parse(data);
         } catch (error) {
           logger.error("api", `Validation failed for ${methodName}`, { error });
-          throw this.transformValidationError(error);
+          const apiError = this.transformValidationError(error);
+          throw new AppError(apiError);
         }
       }
 
@@ -708,7 +755,8 @@ export abstract class APIClient {
           try {
             const response = await fetch(this.buildUrl(query.url));
             if (!response.ok) {
-              throw await this.transformError(response);
+              const apiError = await this.transformError(response);
+              throw new AppError(apiError);
             }
             return { [query.key]: await response.json() };
           } catch (error) {
@@ -861,7 +909,8 @@ export abstract class APIClient {
         try {
           validatedData = options.responseSchema.parse(data);
         } catch (error) {
-          throw this.transformValidationError(error);
+          const apiError = this.transformValidationError(error);
+          throw new AppError(apiError);
         }
       }
 

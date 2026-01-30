@@ -185,7 +185,8 @@ function getDefaultOptions(): Omit<
     idempotencyKey: "",
     circuitBreakerKey: undefined,
     circuitThresholds: undefined,
-    interceptors: [],
+    // Note: interceptors intentionally omitted (undefined by default) to avoid unnecessary array allocations
+    // when requests have no client-specific interceptors
   };
 }
 

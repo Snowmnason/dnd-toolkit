@@ -118,46 +118,9 @@ export async function executeHooksSerially<T>(
     const interceptor = interceptors?.[index];
 
     try {
-      // Phase 4: Apply timeout if specified
-      if (interceptor?.timeout) {
-        let timeoutHandle:
-          | NodeJS.Timeout
-          | ReturnType<typeof setTimeout>
-          | undefined;
-        const timeoutPromise = new Promise<void>((_, reject) => {
-          timeoutHandle = setTimeout(
-            () =>
-              reject(
-                new Error(`Interceptor timeout: ${interceptor.timeout}ms`),
-              ),
-            interceptor.timeout,
-          );
-        });
-
-        try {
-          // Race between hook execution and timeout
-          await Promise.race([Promise.resolve(hook(context)), timeoutPromise]);
-          // Clear timeout if hook completes first
-          if (timeoutHandle) clearTimeout(timeoutHandle as any);
-        } catch (timeoutError) {
-          // Clear timeout handle on timeout error
-          if (timeoutHandle) clearTimeout(timeoutHandle as any);
-          throw timeoutError;
-        }
-
-        logger.debug("api", `Hook completed within timeout`, {
-          hookName,
-          index,
-          timeout: interceptor.timeout,
-        });
-      } else {
-        // Normal execution without timeout
-        await hook(context);
-      }
-
-      // Phase 4: Support non-blocking + timeout behavior
+      // Phase 4: Determine execution mode based on nonBlocking flag
       if (interceptor?.nonBlocking) {
-        // Fire-and-forget execution: do not await, but attach catch to avoid unhandled rejections
+        // Fire-and-forget: schedule with optional timeout, don't await
         let executionPromise: Promise<void>;
         if (interceptor.timeout) {
           const timeoutPromise = new Promise<void>((_, reject) => {
@@ -177,6 +140,7 @@ export async function executeHooksSerially<T>(
         } else {
           executionPromise = Promise.resolve(hook(context));
         }
+        // Attach error handler to avoid unhandled rejections
         executionPromise.catch((error) => {
           logger.error(
             "api",
@@ -189,6 +153,46 @@ export async function executeHooksSerially<T>(
           index,
           timeout: interceptor.timeout,
         });
+      } else {
+        // Blocking (normal) execution: await completion (optionally with timeout)
+        if (interceptor?.timeout) {
+          let timeoutHandle:
+            | NodeJS.Timeout
+            | ReturnType<typeof setTimeout>
+            | undefined;
+          const timeoutPromise = new Promise<void>((_, reject) => {
+            timeoutHandle = setTimeout(
+              () =>
+                reject(
+                  new Error(`Interceptor timeout: ${interceptor.timeout}ms`),
+                ),
+              interceptor.timeout,
+            );
+          });
+
+          try {
+            // Race between hook execution and timeout
+            await Promise.race([
+              Promise.resolve(hook(context)),
+              timeoutPromise,
+            ]);
+            // Clear timeout if hook completes first
+            if (timeoutHandle) clearTimeout(timeoutHandle as any);
+          } catch (timeoutError) {
+            // Clear timeout handle on timeout error
+            if (timeoutHandle) clearTimeout(timeoutHandle as any);
+            throw timeoutError;
+          }
+
+          logger.debug("api", `Hook completed within timeout`, {
+            hookName,
+            index,
+            timeout: interceptor.timeout,
+          });
+        } else {
+          // Normal execution without timeout
+          await hook(context);
+        }
       }
     } catch (error) {
       logger.error("api", `Error in ${hookName} hook [${index}]:`, { error });
@@ -270,12 +274,17 @@ class InterceptorManagerClass {
     },
     additionalInterceptors?: RequestInterceptor[],
   ): Promise<void> {
-    const allInterceptors = additionalInterceptors
+    const allInterceptors = additionalInterceptors?.length
       ? [...this.interceptors, ...additionalInterceptors]
       : this.interceptors;
-    const hooks = allInterceptors
-      .filter((i) => i.onBeforeRequest)
-      .map((i) => (ctx: any) => i.onBeforeRequest!(ctx));
+
+    // Filter to only interceptors with onBeforeRequest hook
+    const filteredInterceptors = allInterceptors.filter(
+      (i) => i.onBeforeRequest,
+    );
+    const hooks = filteredInterceptors.map(
+      (i) => (ctx: any) => i.onBeforeRequest!(ctx),
+    );
 
     if (hooks.length === 0) return;
 
@@ -293,7 +302,13 @@ class InterceptorManagerClass {
       isOffline,
     };
 
-    await executeHooksSerially(hooks, context, "onBeforeRequest");
+    // Pass filtered interceptors so timeout/nonBlocking metadata aligns with hooks
+    await executeHooksSerially(
+      hooks,
+      context,
+      "onBeforeRequest",
+      filteredInterceptors,
+    );
   }
 
   /**
@@ -306,12 +321,17 @@ class InterceptorManagerClass {
     },
     additionalInterceptors?: RequestInterceptor[],
   ): Promise<void> {
-    const allInterceptors = additionalInterceptors
+    const allInterceptors = additionalInterceptors?.length
       ? [...this.interceptors, ...additionalInterceptors]
       : this.interceptors;
-    const hooks = allInterceptors
-      .filter((i) => i.onAfterResponse)
-      .map((i) => (ctx: any) => i.onAfterResponse!(ctx));
+
+    // Filter to only interceptors with onAfterResponse hook
+    const filteredInterceptors = allInterceptors.filter(
+      (i) => i.onAfterResponse,
+    );
+    const hooks = filteredInterceptors.map(
+      (i) => (ctx: any) => i.onAfterResponse!(ctx),
+    );
 
     if (hooks.length === 0) return;
 
@@ -323,7 +343,13 @@ class InterceptorManagerClass {
       cacheKey: res.cacheKey,
     };
 
-    await executeHooksSerially(hooks, context, "onAfterResponse");
+    // Pass filtered interceptors so timeout/nonBlocking metadata aligns with hooks
+    await executeHooksSerially(
+      hooks,
+      context,
+      "onAfterResponse",
+      filteredInterceptors,
+    );
   }
 
   /**
@@ -341,12 +367,15 @@ class InterceptorManagerClass {
     },
     additionalInterceptors?: RequestInterceptor[],
   ): Promise<void> {
-    const allInterceptors = additionalInterceptors
+    const allInterceptors = additionalInterceptors?.length
       ? [...this.interceptors, ...additionalInterceptors]
       : this.interceptors;
-    const hooks = allInterceptors
-      .filter((i) => i.onError)
-      .map((i) => (ctx: any) => i.onError!(ctx));
+
+    // Filter to only interceptors with onError hook
+    const filteredInterceptors = allInterceptors.filter((i) => i.onError);
+    const hooks = filteredInterceptors.map(
+      (i) => (ctx: any) => i.onError!(ctx),
+    );
 
     if (hooks.length === 0) return;
 
@@ -363,7 +392,8 @@ class InterceptorManagerClass {
       queued: err.queued,
     };
 
-    await executeHooksSerially(hooks, context, "onError");
+    // Pass filtered interceptors so timeout/nonBlocking metadata aligns with hooks
+    await executeHooksSerially(hooks, context, "onError", filteredInterceptors);
   }
 }
 

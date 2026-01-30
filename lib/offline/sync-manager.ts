@@ -38,7 +38,7 @@ import { executeConflictResolution } from "./conflict-resolution";
 import { OfflineMutationQueue } from "./mutation-queue";
 import {
   CircuitBreakerReplayManager,
-  NetworkErrorClassifier
+  NetworkErrorClassifier,
 } from "./offline-recovery";
 import { executeSyncHandler } from "./sync-handlers";
 import type {
@@ -298,9 +298,11 @@ class OnlineSyncManagerService {
 
       if (!handlerResult.success) {
         const isConflict = handlerResult.conflict || false;
-        const isNetworkError = (handlerResult.error || "").includes("network");
-        const isRateLimited = (handlerResult.error || "").includes("429");
-        const retryable = isNetworkError || isRateLimited;
+
+        // Phase 4: Use standardized error classification as source of truth
+        const errorContract = NetworkErrorClassifier.classify(
+          new Error(handlerResult.error),
+        );
 
         if (isConflict) {
           // Create conflict object for tracking
@@ -375,18 +377,18 @@ class OnlineSyncManagerService {
           }
         }
 
+        // Use error contract's retryable decision (not string matching)
+        const retryable = errorContract.retryable;
+
         if (retryable) {
-          // Phase 4: Use standardized error classification
-          const errorContract = NetworkErrorClassifier.classify(
-            new Error(handlerResult.error),
-          );
+          // Record error type from standardized classification
           await OfflineMutationQueue.markFailed(
             mutation.id,
             handlerResult.error || "Unknown error",
             errorContract.type,
           );
 
-          // Phase 4: Record failure in circuit breaker to prevent cascading
+          // Record failure in circuit breaker to prevent cascading
           const isNetworkError = errorContract.type === "network";
           await CircuitBreakerReplayManager.recordReplayFailure(
             mutation,

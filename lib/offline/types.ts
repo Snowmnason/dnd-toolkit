@@ -236,7 +236,7 @@ export interface OfflineQueueStats {
     validation: number;
     rate_limit: number;
     server: number;
-    other: number;
+    unknown: number;
   };
 
   /** Oldest queued mutation timestamp */

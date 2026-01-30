@@ -16,13 +16,14 @@
  * - BackoffScheduler: Manages scheduled retry timing with jitter
  */
 
+import type { AuthContext } from "@/lib/api/auth-layer";
 import { logger } from "@/lib/utils/logger";
 import type {
-    AuthReplayMetadata,
-    NetworkErrorContract,
-    OfflineQueueStats,
-    QueuedMutation,
-    RedactionRule,
+  AuthReplayMetadata,
+  NetworkErrorContract,
+  OfflineQueueStats,
+  QueuedMutation,
+  RedactionRule,
 } from "./types";
 
 /**
@@ -34,6 +35,10 @@ import type {
 export const RedactionManager: {
   defaultRules: RedactionRule[];
   shouldRedact(fieldPath: string, rules: RedactionRule[]): boolean;
+  findMatchingRule(
+    fieldPath: string,
+    rules: RedactionRule[],
+  ): RedactionRule | undefined;
   redactObject(
     obj: Record<string, any>,
     rules?: RedactionRule[],
@@ -81,70 +86,106 @@ export const RedactionManager: {
   },
 
   /**
+   * Find the matching rule for a field path using the same logic as shouldRedact
+   * Reuses path-matching logic (exact, suffix, prefix) to ensure consistency
+   *
+   * @param fieldPath - Path to match
+   * @param rules - Rules to search
+   * @returns The first matching rule, or undefined if no match
+   */
+  findMatchingRule(
+    fieldPath: string,
+    rules: RedactionRule[],
+  ): RedactionRule | undefined {
+    const normalizedPath = fieldPath.toLowerCase();
+    return rules.find((rule) =>
+      rule.fields.some((field) => {
+        const normalizedField = field.toLowerCase();
+        // Match exact field or path segment (same as shouldRedact)
+        return (
+          normalizedPath === normalizedField ||
+          normalizedPath.endsWith(`.${normalizedField}`) ||
+          normalizedPath.startsWith(`${normalizedField}.`)
+        );
+      }),
+    );
+  },
+
+  /**
    * Recursively redact sensitive fields from an object
    *
    * @param obj - Object to redact
    * @param rules - Redaction rules
    * @param path - Current path (used internally for recursion)
+   * @param visited - Set of visited objects to prevent circular references
    * @returns Redacted copy of object
    */
   redactObject(
     obj: Record<string, any>,
     rules: RedactionRule[] = RedactionManager.defaultRules,
     path: string = "",
+    visited: Set<any> = new Set(),
   ): Record<string, any> | undefined {
-    // Check if any field in this object matches a rule with redactParent
-    // Only apply to nested objects (path is not empty)
-    if (path) {
-      for (const [key, value] of Object.entries(obj)) {
-        const currentPath = path ? `${path}.${key}` : key;
-        if (this.shouldRedact(currentPath, rules)) {
-          const rule = rules.find((r) =>
-            r.fields.some((f) => f.toLowerCase() === currentPath.toLowerCase()),
-          );
-          if (rule?.redactParent) {
-            // Redact the entire parent object
-            return undefined;
+    // Prevent circular references
+    if (visited.has(obj)) {
+      return undefined; // Break circular reference
+    }
+    visited.add(obj);
+
+    try {
+      // Check if any field in this object matches a rule with redactParent
+      // Only apply to nested objects (path is not empty)
+      if (path) {
+        for (const [key] of Object.entries(obj)) {
+          const currentPath = `${path}.${key}`;
+          if (this.shouldRedact(currentPath, rules)) {
+            const rule = this.findMatchingRule(currentPath, rules);
+            if (rule?.redactParent) {
+              // Redact the entire parent object
+              return undefined;
+            }
           }
         }
       }
-    }
 
-    const redacted: Record<string, any> = {};
+      const redacted: Record<string, any> = {};
 
-    for (const [key, value] of Object.entries(obj)) {
-      const currentPath = path ? `${path}.${key}` : key;
+      for (const [key, value] of Object.entries(obj)) {
+        const currentPath = path ? `${path}.${key}` : key;
 
-      if (this.shouldRedact(currentPath, rules)) {
-        // Find the matching rule to get replacement value
-        const rule = rules.find((r) =>
-          r.fields.some((f) => f.toLowerCase() === currentPath.toLowerCase()),
-        );
-        redacted[key] =
-          rule?.replacement !== undefined ? rule.replacement : undefined;
-        continue;
-      }
-
-      if (value !== null && typeof value === "object") {
-        if (Array.isArray(value)) {
-          // Redact array items if they're objects
-          redacted[key] = value.map((item) =>
-            typeof item === "object" && item !== null
-              ? this.redactObject(item, rules, currentPath)
-              : item,
-          );
-        } else {
-          // Recursively redact nested objects
-          const redactedNested = this.redactObject(value, rules, currentPath);
+        if (value !== null && typeof value === "object") {
+          if (Array.isArray(value)) {
+            // Redact array items if they're objects
+            redacted[key] = value.map((item) =>
+              typeof item === "object" && item !== null
+                ? this.redactObject(item, rules, currentPath, visited)
+                : item,
+            );
+          } else {
+            // Recursively redact nested objects
+            const redactedNested = this.redactObject(
+              value,
+              rules,
+              currentPath,
+              visited,
+            );
+            redacted[key] =
+              redactedNested !== undefined ? redactedNested : undefined;
+          }
+        } else if (this.shouldRedact(currentPath, rules)) {
+          // Find the matching rule to get replacement value
+          const rule = this.findMatchingRule(currentPath, rules);
           redacted[key] =
-            redactedNested !== undefined ? redactedNested : undefined;
+            rule?.replacement !== undefined ? rule.replacement : undefined;
+        } else {
+          redacted[key] = value;
         }
-      } else {
-        redacted[key] = value;
       }
-    }
 
-    return redacted;
+      return redacted;
+    } finally {
+      visited.delete(obj);
+    }
   },
 
   /**
@@ -238,16 +279,30 @@ export const AuthReplayManager = {
     }
 
     try {
-      // Get fresh token from auth layer
-      const token = await authLayer.getToken(mutation.authStrategy);
+      // Build auth context for the mutation replay
+      // Determine HTTP method based on operation type
+      const methodMap: Record<string, "POST" | "PUT" | "DELETE"> = {
+        create: "POST",
+        update: "PUT",
+        delete: "DELETE",
+      };
+      const method = methodMap[mutation.operation] || "POST";
 
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      } else {
-        logger
-          .category("auth")
-          .warn(`Failed to get token for strategy: ${mutation.authStrategy}`);
-      }
+      const context: AuthContext = {
+        url: `mutations/${mutation.table}`, // Simplified context URL
+        method,
+        endpoint: mutation.table, // Table name as endpoint
+        retryCount: mutation.retryCount,
+      };
+
+      // Use proper AuthLayer API: injectAuthHeader with AuthContext
+      const headersWithAuth = await authLayer.injectAuthHeader(
+        headers,
+        mutation.authStrategy,
+        context,
+      );
+
+      return headersWithAuth;
     } catch (error) {
       logger
         .category("error")
@@ -302,9 +357,8 @@ export const NetworkErrorClassifier = {
     const message = error?.message || String(error) || "Unknown error";
     const lowerMsg = message.toLowerCase();
 
-    // Network errors (offline, timeout, DNS failure)
+    // Network errors (offline, timeout, DNS failure) - check message patterns
     if (
-      statusCode === undefined ||
       lowerMsg.includes("network") ||
       lowerMsg.includes("offline") ||
       lowerMsg.includes("timeout") ||
@@ -384,7 +438,7 @@ export const NetworkErrorClassifier = {
     }
 
     // Server errors (5xx)
-    if (!statusCode || statusCode >= 500) {
+    if (statusCode && statusCode >= 500) {
       return {
         type: "server",
         statusCode,
@@ -392,6 +446,17 @@ export const NetworkErrorClassifier = {
         shouldQueue: true,
         suggestedBackoffMs: 5000,
         message: "Server error - temporary service disruption",
+      };
+    }
+
+    // Errors without status code are treated as network errors
+    if (statusCode === undefined) {
+      return {
+        type: "network",
+        retryable: true,
+        shouldQueue: true,
+        suggestedBackoffMs: 2000,
+        message,
       };
     }
 
@@ -506,7 +571,7 @@ export const OfflineQueueStatsCollector = {
         validation: 0,
         rate_limit: 0,
         server: 0,
-        other: 0,
+        unknown: 0,
       },
       avgRetryCount: 0,
       scheduledForRetry: 0,
@@ -521,10 +586,11 @@ export const OfflineQueueStatsCollector = {
 
     for (const mutation of mutations) {
       // Count by error type
-      const errorType = mutation.lastErrorType || "unknown";
-      if (errorType in stats.failuresByType) {
-        stats.failuresByType[errorType as keyof typeof stats.failuresByType]++;
+      let errorType: keyof typeof stats.failuresByType = "unknown";
+      if (mutation.lastErrorType) {
+        errorType = mutation.lastErrorType;
       }
+      stats.failuresByType[errorType]++;
 
       // Track retry count
       totalRetries += mutation.retryCount;
@@ -731,14 +797,39 @@ export const FetcherRegistryFallback = {
       const fullUrl = url.startsWith("http") ? url : `${baseUrl}${url}`;
 
       // Prepare headers with auth if available
-      const headers = new Headers(options?.headers);
+      let headerObject: Record<string, string> = {};
+      if (options?.headers instanceof Headers) {
+        options.headers.forEach((value, key) => {
+          headerObject[key] = value;
+        });
+      } else if (options?.headers) {
+        headerObject = { ...(options.headers as Record<string, string>) };
+      }
 
       if (authLayer && mutation.authStrategy) {
         try {
-          const token = await authLayer.getToken(mutation.authStrategy);
-          if (token) {
-            headers.set("Authorization", `Bearer ${token}`);
-          }
+          // Build auth context for this request
+          const method = (options?.method || "GET") as
+            | "GET"
+            | "POST"
+            | "PUT"
+            | "DELETE"
+            | "PATCH"
+            | "HEAD";
+
+          const context: AuthContext = {
+            url: fullUrl,
+            method,
+            endpoint: mutation.table,
+            retryCount: mutation.retryCount,
+          };
+
+          // Use proper AuthLayer API: injectAuthHeader with AuthContext
+          headerObject = await authLayer.injectAuthHeader(
+            headerObject,
+            mutation.authStrategy,
+            context,
+          );
         } catch (err) {
           logger
             .category("error")
@@ -750,7 +841,7 @@ export const FetcherRegistryFallback = {
       try {
         const response = await fetch(fullUrl, {
           ...options,
-          headers,
+          headers: headerObject,
         });
 
         return response;
