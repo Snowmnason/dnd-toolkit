@@ -26,6 +26,9 @@ import type {
   RedactionRule,
 } from "./types";
 
+// Re-export QueuedMutation for test imports
+export type { QueuedMutation };
+
 /**
  * Phase 4: Deterministic Redaction Manager
  *
@@ -43,6 +46,12 @@ export const RedactionManager: {
     obj: Record<string, any>,
     rules?: RedactionRule[],
     path?: string,
+  ): Record<string, any> | undefined;
+  _redactObjectImpl(
+    obj: Record<string, any>,
+    rules?: RedactionRule[],
+    path?: string,
+    visited?: Set<any>,
   ): Record<string, any> | undefined;
   validateRedaction(
     obj: Record<string, any>,
@@ -124,6 +133,19 @@ export const RedactionManager: {
     obj: Record<string, any>,
     rules: RedactionRule[] = RedactionManager.defaultRules,
     path: string = "",
+  ): Record<string, any> | undefined {
+    // Use internal implementation with circular reference tracking
+    return this._redactObjectImpl(obj, rules, path, new Set());
+  },
+
+  /**
+   * Internal implementation that tracks visited objects
+   * @internal
+   */
+  _redactObjectImpl(
+    obj: Record<string, any>,
+    rules: RedactionRule[] = RedactionManager.defaultRules,
+    path: string = "",
     visited: Set<any> = new Set(),
   ): Record<string, any> | undefined {
     // Prevent circular references
@@ -158,12 +180,12 @@ export const RedactionManager: {
             // Redact array items if they're objects
             redacted[key] = value.map((item) =>
               typeof item === "object" && item !== null
-                ? this.redactObject(item, rules, currentPath, visited)
+                ? this._redactObjectImpl(item, rules, currentPath, visited)
                 : item,
             );
           } else {
             // Recursively redact nested objects
-            const redactedNested = this.redactObject(
+            const redactedNested = this._redactObjectImpl(
               value,
               rules,
               currentPath,

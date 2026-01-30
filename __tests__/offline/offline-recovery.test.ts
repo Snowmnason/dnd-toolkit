@@ -201,7 +201,7 @@ describe("Offline Recovery Module", () => {
     describe("classify", () => {
       it("should classify network errors", () => {
         const error = new Error("Network request failed");
-        const result = NetworkErrorClassifier.classify(error, undefined, false);
+        const result = NetworkErrorClassifier.classify(error, undefined);
 
         expect(result).toEqual({
           type: "network",
@@ -214,7 +214,7 @@ describe("Offline Recovery Module", () => {
 
       it("should classify auth errors (401)", () => {
         const error = new Error("Unauthorized");
-        const result = NetworkErrorClassifier.classify(error, 401, false);
+        const result = NetworkErrorClassifier.classify(error, 401);
 
         expect(result).toEqual({
           type: "auth",
@@ -228,7 +228,7 @@ describe("Offline Recovery Module", () => {
 
       it("should classify auth errors (403)", () => {
         const error = new Error("Forbidden");
-        const result = NetworkErrorClassifier.classify(error, 403, false);
+        const result = NetworkErrorClassifier.classify(error, 403);
 
         expect(result).toEqual({
           type: "auth",
@@ -241,7 +241,7 @@ describe("Offline Recovery Module", () => {
 
       it("should classify not found errors (404)", () => {
         const error = new Error("Not Found");
-        const result = NetworkErrorClassifier.classify(error, 404, false);
+        const result = NetworkErrorClassifier.classify(error, 404);
 
         expect(result).toEqual({
           type: "unknown",
@@ -254,7 +254,7 @@ describe("Offline Recovery Module", () => {
 
       it("should classify validation errors (400)", () => {
         const error = new Error("Bad Request");
-        const result = NetworkErrorClassifier.classify(error, 400, false);
+        const result = NetworkErrorClassifier.classify(error, 400);
 
         expect(result).toEqual({
           type: "validation",
@@ -267,7 +267,7 @@ describe("Offline Recovery Module", () => {
 
       it("should classify rate limit errors (429)", () => {
         const error = new Error("Too Many Requests");
-        const result = NetworkErrorClassifier.classify(error, 429, false);
+        const result = NetworkErrorClassifier.classify(error, 429);
 
         expect(result).toEqual({
           type: "rate_limit",
@@ -281,7 +281,7 @@ describe("Offline Recovery Module", () => {
 
       it("should classify server errors (5xx)", () => {
         const error = new Error("Internal Server Error");
-        const result = NetworkErrorClassifier.classify(error, 500, false);
+        const result = NetworkErrorClassifier.classify(error, 500);
 
         expect(result).toEqual({
           type: "server",
@@ -295,7 +295,7 @@ describe("Offline Recovery Module", () => {
 
       it("should classify timeout errors", () => {
         const error = new Error("Request timeout");
-        const result = NetworkErrorClassifier.classify(error, undefined, true);
+        const result = NetworkErrorClassifier.classify(error, undefined);
 
         expect(result).toEqual({
           type: "network",
@@ -308,7 +308,7 @@ describe("Offline Recovery Module", () => {
 
       it("should classify unknown errors", () => {
         const error = new Error("Unknown error");
-        const result = NetworkErrorClassifier.classify(error, undefined, false);
+        const result = NetworkErrorClassifier.classify(error, undefined);
 
         expect(result).toEqual({
           type: "network",
@@ -321,18 +321,14 @@ describe("Offline Recovery Module", () => {
 
       it("should handle statusCode undefined gracefully", () => {
         const error = new Error("Some error");
-        const result = NetworkErrorClassifier.classify(error, undefined, false);
+        const result = NetworkErrorClassifier.classify(error, undefined);
 
         expect(result.type).toBe("network");
         expect(result.retryable).toBe(true);
       });
 
       it("should handle null/undefined error gracefully", () => {
-        const result = NetworkErrorClassifier.classify(
-          null as any,
-          undefined,
-          false,
-        );
+        const result = NetworkErrorClassifier.classify(null as any, undefined);
 
         expect(result.type).toBe("network");
         expect(result.retryable).toBe(true);

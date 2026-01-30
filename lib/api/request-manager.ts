@@ -1,7 +1,7 @@
 import * as Sentry from "@sentry/react-native";
 import {
-    Analytics,
-    sanitizeError as sanitizeErrorForAnalytics,
+  Analytics,
+  sanitizeError as sanitizeErrorForAnalytics,
 } from "../analytics";
 import { QueryCache } from "../cache";
 import { getAppConfig } from "../config";
@@ -9,15 +9,15 @@ import { NetworkDetection } from "../network";
 import { logger } from "../utils/logger";
 import { AuthLayer, type AuthContext } from "./auth-layer";
 import {
-    CircuitBreakerManager,
-    CircuitBreakerOpenError,
-    DEFAULT_THRESHOLDS,
-    type CircuitThresholds,
+  CircuitBreakerManager,
+  CircuitBreakerOpenError,
+  DEFAULT_THRESHOLDS,
+  type CircuitThresholds,
 } from "./circuit-breaker";
 import {
-    InterceptorManager,
-    parseEndpoint,
-    type RequestInterceptor,
+  InterceptorManager,
+  parseEndpoint,
+  type RequestInterceptor,
 } from "./interceptor";
 import { OfflineQueueManager, type QueuedRequestEntry } from "./offline-queue";
 
@@ -183,10 +183,9 @@ function getDefaultOptions(): Omit<
     tags: [],
     context: {},
     idempotencyKey: "",
+    interceptors: [],
     circuitBreakerKey: undefined,
     circuitThresholds: undefined,
-    // Note: interceptors intentionally omitted (undefined by default) to avoid unnecessary array allocations
-    // when requests have no client-specific interceptors
   };
 }
 
