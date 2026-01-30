@@ -14,6 +14,12 @@ export type MutationOperation = "create" | "update" | "delete";
  * A mutation queued while offline, waiting to sync when online
  *
  * Stored in SecureStorage with key: dnd:offline:mutation_queue
+ *
+ * Phase 4 Enhancements:
+ * - authStrategy: Ensures replayed requests use fresh tokens from AuthLayer
+ * - payload: Redacted (stripped of tokens/PII before storage)
+ * - nextAttemptAt: Scheduled retry with backoff + jitter (survives restarts)
+ * - lastFailureReason: Per-entry failure tracking for observability
  */
 export interface QueuedMutation {
   /** Unique identifier for this queued mutation (UUID) */
@@ -25,7 +31,7 @@ export interface QueuedMutation {
   /** Supabase table name (e.g., 'worlds', 'notes', 'characters') */
   table: string;
 
-  /** Mutation payload (data to send to server) */
+  /** Mutation payload (data to send to server) - REDACTED (Phase 4) */
   payload: Record<string, any>;
 
   /** Resource owner ID (for client-wins conflict resolution) */
@@ -45,6 +51,28 @@ export interface QueuedMutation {
 
   /** Tags to invalidate after successful sync */
   invalidateTags?: string[];
+
+  /** Auth strategy for replay (Phase 4): ensures fresh token injection */
+  authStrategy?: string;
+
+  /** When to attempt next sync (Phase 4): persisted with backoff + jitter */
+  nextAttemptAt?: number;
+
+  /** Backoff state for recovery (Phase 4): tracks retry timing */
+  backoffState?: {
+    /** Base backoff interval (ms) */
+    baseMs: number;
+    /** Current multiplier (2^retryCount) */
+    multiplier: number;
+    /** Jitter factor (0.9-1.1) */
+    jitter: number;
+  };
+
+  /** Last failure reason (Phase 4): for observability and debugging */
+  lastFailureReason?: string;
+
+  /** Error type for network/error contract (Phase 4) */
+  lastErrorType?: "network" | "auth" | "conflict" | "validation" | "other";
 }
 
 /**
@@ -153,4 +181,104 @@ export interface OfflineSyncConfig {
 
   /** Conflict resolution strategy (default: 'client_wins' for user-owned resources) */
   conflictStrategy?: "client_wins" | "server_wins" | "user_choose";
+}
+/**
+ * Phase 4: Network/Error Contract (standardized error types)
+ * Used by _shouldQueueRequest and error handling to classify errors
+ */
+export interface NetworkErrorContract {
+  /** Error classification */
+  type:
+    | "network"
+    | "auth"
+    | "conflict"
+    | "validation"
+    | "rate_limit"
+    | "server"
+    | "unknown";
+
+  /** HTTP status code if applicable */
+  statusCode?: number;
+
+  /** Whether error is retryable */
+  retryable: boolean;
+
+  /** Whether to queue for offline replay */
+  shouldQueue: boolean;
+
+  /** Suggested backoff (ms) for retries */
+  suggestedBackoffMs?: number;
+
+  /** Human-readable error message */
+  message: string;
+}
+
+/**
+ * Phase 4: Failure Statistics for OfflineQueueManager.getStats()
+ * Tracks per-entry telemetry for observability
+ */
+export interface OfflineQueueStats {
+  /** Total mutations in queue */
+  totalQueued: number;
+
+  /** Mutations by error type */
+  failuresByType: {
+    network: number;
+    auth: number;
+    conflict: number;
+    validation: number;
+    rate_limit: number;
+    server: number;
+    other: number;
+  };
+
+  /** Oldest queued mutation timestamp */
+  oldestMutationAge?: number;
+
+  /** Average retry count */
+  avgRetryCount: number;
+
+  /** Mutations scheduled for future retry */
+  scheduledForRetry: number;
+
+  /** Last sync attempt result */
+  lastSyncResult?: {
+    timestamp: number;
+    succeeded: number;
+    failed: number;
+    conflicted: number;
+  };
+}
+
+/**
+ * Phase 4: Privacy Redaction Rules
+ * Defines which fields should be stripped before persisting mutations
+ */
+export interface RedactionRule {
+  /** Field paths to redact (e.g., "password", "token", "email") */
+  fields: string[];
+
+  /** Whether to redact entire object if field matches */
+  redactParent?: boolean;
+
+  /** Replacement value (default: undefined to delete field) */
+  replacement?: string | null;
+}
+
+/**
+ * Phase 4: Auth Retry Metadata
+ * Tracks auth state for replay attempts
+ */
+export interface AuthReplayMetadata {
+  /** Auth strategy that was used (e.g., "user", "service") */
+  authStrategy: string;
+
+  /** Whether to refresh token before replay */
+  shouldRefreshToken: boolean;
+
+  /** When token was last refreshed */
+  lastTokenRefreshAt?: number;
+
+  /** Number of auth failures during replay */
+  authFailureCount: number;
 }

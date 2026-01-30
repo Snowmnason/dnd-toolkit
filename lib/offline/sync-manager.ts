@@ -25,7 +25,7 @@ import { getAppConfig } from "@/lib/config";
 import {
   createSafeModeState,
   NetworkCascadeDetector,
-  SafeModeReason
+  SafeModeReason,
 } from "@/lib/error";
 import { AppKernel } from "@/lib/kernel/app-kernel";
 import {
@@ -36,6 +36,10 @@ import { logger } from "@/lib/utils/logger";
 import { getConflictQueueManager } from "./conflict-queue-manager";
 import { executeConflictResolution } from "./conflict-resolution";
 import { OfflineMutationQueue } from "./mutation-queue";
+import {
+  CircuitBreakerReplayManager,
+  NetworkErrorClassifier
+} from "./offline-recovery";
 import { executeSyncHandler } from "./sync-handlers";
 import type {
   OfflineSyncConfig,
@@ -177,7 +181,10 @@ class OnlineSyncManagerService {
       let totalFailed = 0;
 
       while (this.isOnline) {
-        const batch = await OfflineMutationQueue.peek(this.config.batchSize);
+        // Phase 4: Use getReadyBatch() to respect scheduled retry times
+        const batch = await OfflineMutationQueue.getReadyBatch(
+          this.config.batchSize,
+        );
         if (batch.length === 0) {
           break;
         }
@@ -369,9 +376,22 @@ class OnlineSyncManagerService {
         }
 
         if (retryable) {
+          // Phase 4: Use standardized error classification
+          const errorContract = NetworkErrorClassifier.classify(
+            new Error(handlerResult.error),
+          );
           await OfflineMutationQueue.markFailed(
             mutation.id,
             handlerResult.error || "Unknown error",
+            errorContract.type,
+          );
+
+          // Phase 4: Record failure in circuit breaker to prevent cascading
+          const isNetworkError = errorContract.type === "network";
+          await CircuitBreakerReplayManager.recordReplayFailure(
+            mutation,
+            new Error(handlerResult.error),
+            isNetworkError,
           );
         }
 
@@ -392,6 +412,9 @@ class OnlineSyncManagerService {
         }
       }
 
+      // Phase 4: Record success in circuit breaker
+      await CircuitBreakerReplayManager.recordReplaySuccess(mutation);
+
       logger
         .category("storage")
         .info(
@@ -407,17 +430,24 @@ class OnlineSyncManagerService {
     } catch (error) {
       const errorMsg = (error as Error).message;
 
-      // Determine if error is retryable
-      const isNetworkError =
-        errorMsg.includes("network") ||
-        errorMsg.includes("offline") ||
-        errorMsg.includes("failed to fetch");
-      const isRateLimited =
-        errorMsg.includes("429") || errorMsg.includes("rate limit");
-      const retryable = isNetworkError || isRateLimited;
+      // Phase 4: Use standardized error classification for robust decisions
+      const errorContract = NetworkErrorClassifier.classify(error);
+      const retryable = errorContract.retryable;
 
       if (retryable) {
-        await OfflineMutationQueue.markFailed(mutation.id, errorMsg);
+        await OfflineMutationQueue.markFailed(
+          mutation.id,
+          errorMsg,
+          errorContract.type,
+        );
+
+        // Phase 4: Record failure in circuit breaker
+        const isNetworkError = errorContract.type === "network";
+        await CircuitBreakerReplayManager.recordReplayFailure(
+          mutation,
+          error,
+          isNetworkError,
+        );
 
         const backoff = this.calculateBackoff(mutation.retryCount);
         logger
@@ -440,10 +470,14 @@ class OnlineSyncManagerService {
 
   /**
    * Calculate exponential backoff time
+   * Phase 4: Uses BackoffScheduler with jitter for better recovery
    */
   private calculateBackoff(retryCount: number): number {
     const baseMs = this.config.retryBaseMs;
-    return baseMs * Math.pow(2, retryCount);
+    const multiplier = Math.pow(2, retryCount);
+    const jitter = 0.9 + Math.random() * 0.2; // ±10% factor
+    const backoffMs = Math.floor(baseMs * multiplier * jitter);
+    return Math.min(backoffMs, 300000); // Cap at 5 minutes
   }
 
   /**
@@ -528,6 +562,15 @@ class OnlineSyncManagerService {
           error: (error as Error).message,
         });
     }
+  }
+
+  /**
+   * Phase 4: Get comprehensive queue statistics
+   *
+   * Includes failure types, retry counts, timing info for observability
+   */
+  async getQueueStats() {
+    return OfflineMutationQueue.getStats(this.lastSyncStatus);
   }
 
   /**

@@ -174,6 +174,8 @@ function getDefaultOptions(): Omit<
     staleTime: config.api?.staleTimeMs ?? 2 * 60 * 1000,
     cacheTime: config.api?.cacheTimeMs ?? 5 * 60 * 1000,
     tags: [],
+    context: {},
+    idempotencyKey: "",
     circuitBreakerKey: undefined,
     circuitThresholds: undefined,
   };

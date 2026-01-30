@@ -14,7 +14,38 @@
 export * from "./analytics";
 
 // ===== API =====
-export * from "./api";
+// Re-export everything except OfflineQueueStats (use offline's version instead)
+export {
+    APIClient,
+    AuthLayer,
+    CACHE_DEFAULTS,
+    CircuitBreakerManager,
+    CircuitBreakerOpenError,
+    DEFAULT_THRESHOLDS,
+    InterceptorManager,
+    NetworkRecoveryManager,
+    NetworkRecoveryRetryJobManager,
+    UsersAPI,
+    WorldsAPI, cleanupOfflineQueueReplay, createInviteAuthStrategy,
+    createPublicAuthStrategy,
+    createUserAuthStrategy, initializeOfflineQueueReplay, parseEndpoint,
+    registerNetworkRecoveryHooks,
+    type APIClientConfig, type APIUser,
+    type APIWorld, type ApiErrorType,
+    type AuthContext,
+    type AuthStrategy,
+    type CircuitStats,
+    type CircuitThresholds,
+    type MutationOptions,
+    type NetworkRecoveryRetryJobConfig,
+    type NotificationCallback,
+    type QueryOptions,
+    // Omit OfflineQueueStats and OfflineQueueConfig (see offline module instead)
+    type QueuedRequestEntry, type RecoveryState,
+    type RequestInterceptor,
+    type UpdateUserRequest,
+    type UpdateWorldRequest, type WorldMember
+} from "./api";
 
 // ===== Auth (Authentication & Authorization) =====
 export * from "./auth";
@@ -44,6 +75,8 @@ export * from "./navigation";
 export * from "./network";
 
 // ===== Offline Support =====
+// Note: Both api and offline modules export OfflineQueueStats.
+// Export offline's version (Phase 4 enhancements) to take precedence.
 export * from "./offline";
 
 // ===== Premium Features & Subscriptions =====
@@ -63,4 +96,3 @@ export * from "./storage";
 
 // ===== Utils (Logging, Versioning, Performance) =====
 export * from "./utils";
-

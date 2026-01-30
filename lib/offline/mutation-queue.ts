@@ -14,6 +14,11 @@
 
 import { SecureStorage } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
+import {
+  BackoffScheduler,
+  OfflineQueueStatsCollector,
+  Phase4Enhancements,
+} from "./offline-recovery";
 import type { QueuedMutation } from "./types";
 
 /**
@@ -86,11 +91,18 @@ class OfflineMutationQueueService {
   async enqueue(
     mutation: Omit<QueuedMutation, "id" | "timestamp" | "retryCount">,
   ): Promise<QueuedMutation> {
+    // Phase 4: Apply deterministic redaction and prepare for queueing
+    const prepared = await Phase4Enhancements.prepareForQueue(mutation);
+
     const queued: QueuedMutation = {
-      ...mutation,
+      ...prepared,
       id: generateUUID(),
       timestamp: Date.now(),
       retryCount: 0,
+      // Phase 4: Initialize auth metadata if authStrategy is present
+      authStrategy: mutation.authStrategy,
+      // Phase 4: Set initial nextAttemptAt if provided, otherwise will be set on first failure
+      nextAttemptAt: mutation.nextAttemptAt,
     };
 
     this.queue.push(queued);
@@ -99,7 +111,8 @@ class OfflineMutationQueueService {
     logger
       .category("storage")
       .debug(
-        `Queued mutation: ${queued.id} (${queued.operation} on ${queued.table})`,
+        `Queued mutation: ${queued.id} (${queued.operation} on ${queued.table})` +
+          (mutation.authStrategy ? ` [auth: ${mutation.authStrategy}]` : ""),
       );
 
     return queued;
@@ -136,7 +149,11 @@ class OfflineMutationQueueService {
   /**
    * Mark a mutation as failed (increment retry count)
    */
-  async markFailed(id: string, reason: string): Promise<void> {
+  async markFailed(
+    id: string,
+    reason: string,
+    errorType?: string,
+  ): Promise<void> {
     const mutation = this.queue.find((m) => m.id === id);
     if (!mutation) {
       logger.category("error").warn(`Mutation ${id} not found in queue`);
@@ -144,6 +161,19 @@ class OfflineMutationQueueService {
     }
 
     mutation.retryCount++;
+    mutation.lastFailureReason = reason;
+
+    // Phase 4: Track error type for telemetry
+    if (errorType) {
+      mutation.lastErrorType = errorType as any;
+    }
+
+    // Phase 4: Schedule next retry with backoff + jitter
+    mutation.nextAttemptAt = BackoffScheduler.calculateNextAttemptAt(
+      mutation,
+      2000, // Base backoff: 2 seconds
+    );
+
     await this.persist();
 
     logger
@@ -206,6 +236,58 @@ class OfflineMutationQueueService {
    */
   getMutation(id: string): QueuedMutation | undefined {
     return this.queue.find((m) => m.id === id);
+  }
+
+  /**
+   * Phase 4: Get next batch of mutations ready for retry
+   *
+   * Filters by nextAttemptAt to avoid retry storms
+   */
+  async getReadyBatch(
+    batchSize: number = DEFAULT_CONFIG.batchSize,
+  ): Promise<QueuedMutation[]> {
+    const ready = BackoffScheduler.filterReadyMutations(this.queue);
+    return ready.slice(0, batchSize).sort((a, b) => a.timestamp - b.timestamp);
+  }
+
+  /**
+   * Phase 4: Update mutation with scheduled retry info
+   *
+   * Called when sync fails to schedule next retry attempt
+   */
+  async updateScheduledRetry(
+    id: string,
+    nextAttemptAt: number,
+    errorType?: string,
+  ): Promise<void> {
+    const mutation = this.queue.find((m) => m.id === id);
+    if (!mutation) {
+      return;
+    }
+
+    mutation.nextAttemptAt = nextAttemptAt;
+    if (errorType) {
+      mutation.lastErrorType = errorType as any;
+    }
+    await this.persist();
+  }
+
+  /**
+   * Phase 4: Get comprehensive queue statistics
+   *
+   * Includes failure types, retry counts, and timing info
+   */
+  async getStats(lastSyncResult?: any) {
+    return OfflineQueueStatsCollector.collectStats(this.queue, lastSyncResult);
+  }
+
+  /**
+   * Phase 4: Get mutations that have failed with specific error type
+   *
+   * Useful for debugging or targeted recovery
+   */
+  async getMutationsByErrorType(errorType: string): Promise<QueuedMutation[]> {
+    return this.queue.filter((m) => m.lastErrorType === errorType);
   }
 }
 
