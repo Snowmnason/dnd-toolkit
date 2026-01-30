@@ -18,11 +18,11 @@
 
 import { logger } from "@/lib/utils/logger";
 import type {
-  AuthReplayMetadata,
-  NetworkErrorContract,
-  OfflineQueueStats,
-  QueuedMutation,
-  RedactionRule,
+    AuthReplayMetadata,
+    NetworkErrorContract,
+    OfflineQueueStats,
+    QueuedMutation,
+    RedactionRule,
 } from "./types";
 
 /**
@@ -38,7 +38,7 @@ export const RedactionManager: {
     obj: Record<string, any>,
     rules?: RedactionRule[],
     path?: string,
-  ): Record<string, any>;
+  ): Record<string, any> | undefined;
   validateRedaction(
     obj: Record<string, any>,
     forbiddenFields?: string[],
@@ -92,7 +92,24 @@ export const RedactionManager: {
     obj: Record<string, any>,
     rules: RedactionRule[] = RedactionManager.defaultRules,
     path: string = "",
-  ): Record<string, any> {
+  ): Record<string, any> | undefined {
+    // Check if any field in this object matches a rule with redactParent
+    // Only apply to nested objects (path is not empty)
+    if (path) {
+      for (const [key, value] of Object.entries(obj)) {
+        const currentPath = path ? `${path}.${key}` : key;
+        if (this.shouldRedact(currentPath, rules)) {
+          const rule = rules.find((r) =>
+            r.fields.some((f) => f.toLowerCase() === currentPath.toLowerCase()),
+          );
+          if (rule?.redactParent) {
+            // Redact the entire parent object
+            return undefined;
+          }
+        }
+      }
+    }
+
     const redacted: Record<string, any> = {};
 
     for (const [key, value] of Object.entries(obj)) {
@@ -118,7 +135,9 @@ export const RedactionManager: {
           );
         } else {
           // Recursively redact nested objects
-          redacted[key] = this.redactObject(value, rules, currentPath);
+          const redactedNested = this.redactObject(value, rules, currentPath);
+          redacted[key] =
+            redactedNested !== undefined ? redactedNested : undefined;
         }
       } else {
         redacted[key] = value;
@@ -249,7 +268,6 @@ export const AuthReplayManager = {
    * @returns true if should retry
    */
   isAuthFailureRetryable(error: any, authFailureCount: number): boolean {
-    const errorMsg = (error?.message || "").toLowerCase();
     const errorCode = error?.statusCode;
 
     // Unauthorized (401) - token expired, refresh and retry
@@ -503,7 +521,7 @@ export const OfflineQueueStatsCollector = {
 
     for (const mutation of mutations) {
       // Count by error type
-      const errorType = mutation.lastErrorType || "other";
+      const errorType = mutation.lastErrorType || "unknown";
       if (errorType in stats.failuresByType) {
         stats.failuresByType[errorType as keyof typeof stats.failuresByType]++;
       }
@@ -896,7 +914,8 @@ export const Phase4Enhancements = {
     mutation: Omit<QueuedMutation, "id" | "timestamp" | "retryCount">,
   ): Promise<Omit<QueuedMutation, "id" | "timestamp" | "retryCount">> {
     // Apply redaction to payload
-    const redactedPayload = RedactionManager.redactObject(mutation.payload);
+    const redactedPayload =
+      RedactionManager.redactObject(mutation.payload) || {};
 
     // Log validation for testing
     const foundSensitive = RedactionManager.validateRedaction(redactedPayload);

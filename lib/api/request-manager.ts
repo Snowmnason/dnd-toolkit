@@ -14,7 +14,11 @@ import {
     DEFAULT_THRESHOLDS,
     type CircuitThresholds,
 } from "./circuit-breaker";
-import { InterceptorManager, parseEndpoint } from "./interceptor";
+import {
+    InterceptorManager,
+    parseEndpoint,
+    type RequestInterceptor,
+} from "./interceptor";
 import { OfflineQueueManager, type QueuedRequestEntry } from "./offline-queue";
 
 /**
@@ -85,6 +89,9 @@ export interface RequestOptions {
 
   /** Circuit breaker thresholds for this request (overrides global defaults if provided) */
   circuitThresholds?: CircuitThresholds;
+
+  /** Client-specific interceptors to execute for this request */
+  interceptors?: RequestInterceptor[];
 }
 
 interface PendingRequest {
@@ -178,6 +185,7 @@ function getDefaultOptions(): Omit<
     idempotencyKey: "",
     circuitBreakerKey: undefined,
     circuitThresholds: undefined,
+    interceptors: [],
   };
 }
 
@@ -485,15 +493,18 @@ class RequestManagerClass {
 
             // Notify error interceptors that the request was queued
             try {
-              await InterceptorManager.executeErrorHooks({
-                error,
-                url: key,
-                init: {},
-                statusCode: (error as any)?.status || (error as any)?.code,
-                isNetworkError: false,
-                endpoint: cbKey,
-                queued: true,
-              });
+              await InterceptorManager.executeErrorHooks(
+                {
+                  error,
+                  url: key,
+                  init: {},
+                  statusCode: (error as any)?.status || (error as any)?.code,
+                  isNetworkError: false,
+                  endpoint: cbKey,
+                  queued: true,
+                },
+                options_.interceptors,
+              );
             } catch (hookErr) {
               logger.warn(
                 "api",
@@ -563,11 +574,14 @@ class RequestManagerClass {
           const requestInit: RequestInit = {};
           const endpoint = parseEndpoint(key);
 
-          await InterceptorManager.executeBeforeRequestHooks({
-            url: key,
-            init: requestInit,
-            endpoint,
-          });
+          await InterceptorManager.executeBeforeRequestHooks(
+            {
+              url: key,
+              init: requestInit,
+              endpoint,
+            },
+            options_.interceptors,
+          );
 
           // Normalize headers to Record<string, string> (supports Headers object, array, or plain object)
           let headers = normalizeHeaders(requestInit.headers);
@@ -628,6 +642,7 @@ class RequestManagerClass {
           key,
           endpoint: parseEndpoint(key),
           authStrategy: options_.authStrategy,
+          interceptors: options_.interceptors,
         },
       );
 
@@ -792,15 +807,18 @@ class RequestManagerClass {
           logger.info("api", "Request queued for offline replay", { key });
           // Notify error interceptors that the request was queued
           try {
-            await InterceptorManager.executeErrorHooks({
-              error: error as Error,
-              url: key,
-              init: {},
-              statusCode: (error as any)?.status || (error as any)?.code,
-              isNetworkError: false,
-              endpoint: cbKey ?? parseEndpoint(key),
-              queued: true,
-            });
+            await InterceptorManager.executeErrorHooks(
+              {
+                error: error as Error,
+                url: key,
+                init: {},
+                statusCode: (error as any)?.status || (error as any)?.code,
+                isNetworkError: false,
+                endpoint: cbKey ?? parseEndpoint(key),
+                queued: true,
+              },
+              options_.interceptors,
+            );
           } catch (hookErr) {
             logger.warn(
               "api",
@@ -996,6 +1014,7 @@ class RequestManagerClass {
       key: string;
       endpoint?: string;
       authStrategy?: string;
+      interceptors?: RequestInterceptor[];
     },
   ): Promise<T> {
     // Calculate current attempt number (0-indexed)
@@ -1007,10 +1026,13 @@ class RequestManagerClass {
       // ========== INTERCEPTOR: onAfterResponse ==========
       // Call after successful fetch, before data returned to caller
       if (requestContext) {
-        await InterceptorManager.executeAfterResponseHooks({
-          data: result,
-          cacheKey: requestContext.key,
-        });
+        await InterceptorManager.executeAfterResponseHooks(
+          {
+            data: result,
+            cacheKey: requestContext.key,
+          },
+          requestContext.interceptors,
+        );
       }
 
       return result;
@@ -1026,14 +1048,17 @@ class RequestManagerClass {
 
         // Only call error interceptors if not a 401 (401 is handled by AuthLayer)
         if (statusCode !== 401 && requestContext) {
-          await InterceptorManager.executeErrorHooks({
-            error: error as Error,
-            url: requestContext.key,
-            init: {}, // Fresh requestInit not available here; onError is observational only
-            statusCode,
-            isNetworkError,
-            endpoint: requestContext.endpoint,
-          });
+          await InterceptorManager.executeErrorHooks(
+            {
+              error: error as Error,
+              url: requestContext.key,
+              init: {}, // Fresh requestInit not available here; onError is observational only
+              statusCode,
+              isNetworkError,
+              endpoint: requestContext.endpoint,
+            },
+            requestContext.interceptors,
+          );
         }
 
         throw error;

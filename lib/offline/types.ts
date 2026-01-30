@@ -79,8 +79,7 @@ export interface QueuedMutation {
     | "validation"
     | "rate_limit"
     | "server"
-    | "unknown"
-    | "other";
+    | "unknown";
 }
 
 /**

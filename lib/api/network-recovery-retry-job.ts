@@ -38,6 +38,7 @@ export const NetworkRecoveryRetryJobManager = {
   _jobQueue: null as any, // BackgroundJobQueue instance
   _isRunning: false,
   _isAppInBackground: false,
+  _config: null as NetworkRecoveryRetryJobConfig | null,
 
   /**
    * Initialize the retry job manager
@@ -50,6 +51,7 @@ export const NetworkRecoveryRetryJobManager = {
   ): Promise<void> {
     this._networkStateMachine = networkStateMachine;
     this._jobQueue = jobQueue;
+    this._config = config || {};
 
     const enabled = config?.enabled ?? true;
     if (!enabled) {
@@ -186,8 +188,8 @@ export const NetworkRecoveryRetryJobManager = {
     }
 
     const retryState = NetworkRecoveryManager.getRecoveryState();
-    // Default to 5 retries; can be extended in Phase 2+ for config-driven limits
-    const maxRetries = 5;
+    // Use configured maxRetries or default to 5
+    const maxRetries = this._config?.maxRetries ?? 5;
 
     if (retryState.retries >= maxRetries) {
       logger.warn("network", "Max recovery retries exceeded", {
@@ -208,6 +210,7 @@ export const NetworkRecoveryRetryJobManager = {
         await this._jobQueue.enqueue({
           type: "network_recovery_retry",
           payload,
+          runAt: Date.now() + backoffMs,
           idempotencyKey: "network_recovery_retry:main",
           maxRetries: 0,
         });

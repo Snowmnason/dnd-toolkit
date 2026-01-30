@@ -120,7 +120,10 @@ export async function executeHooksSerially<T>(
     try {
       // Phase 4: Apply timeout if specified
       if (interceptor?.timeout) {
-        let timeoutHandle: NodeJS.Timeout | ReturnType<typeof setTimeout> | undefined;
+        let timeoutHandle:
+          | NodeJS.Timeout
+          | ReturnType<typeof setTimeout>
+          | undefined;
         const timeoutPromise = new Promise<void>((_, reject) => {
           timeoutHandle = setTimeout(
             () =>
@@ -259,12 +262,18 @@ class InterceptorManagerClass {
   /**
    * Execute onBeforeRequest hooks for all interceptors
    */
-  async executeBeforeRequestHooks(req: {
-    url: string;
-    init: RequestInit;
-    endpoint?: string;
-  }): Promise<void> {
-    const hooks = this.interceptors
+  async executeBeforeRequestHooks(
+    req: {
+      url: string;
+      init: RequestInit;
+      endpoint?: string;
+    },
+    additionalInterceptors?: RequestInterceptor[],
+  ): Promise<void> {
+    const allInterceptors = additionalInterceptors
+      ? [...this.interceptors, ...additionalInterceptors]
+      : this.interceptors;
+    const hooks = allInterceptors
       .filter((i) => i.onBeforeRequest)
       .map((i) => (ctx: any) => i.onBeforeRequest!(ctx));
 
@@ -290,11 +299,17 @@ class InterceptorManagerClass {
   /**
    * Execute onAfterResponse hooks for all interceptors
    */
-  async executeAfterResponseHooks(res: {
-    data: any;
-    cacheKey?: string;
-  }): Promise<void> {
-    const hooks = this.interceptors
+  async executeAfterResponseHooks(
+    res: {
+      data: any;
+      cacheKey?: string;
+    },
+    additionalInterceptors?: RequestInterceptor[],
+  ): Promise<void> {
+    const allInterceptors = additionalInterceptors
+      ? [...this.interceptors, ...additionalInterceptors]
+      : this.interceptors;
+    const hooks = allInterceptors
       .filter((i) => i.onAfterResponse)
       .map((i) => (ctx: any) => i.onAfterResponse!(ctx));
 
@@ -314,16 +329,22 @@ class InterceptorManagerClass {
   /**
    * Execute onError hooks for all interceptors
    */
-  async executeErrorHooks(err: {
-    error: Error;
-    url: string;
-    init: RequestInit;
-    statusCode?: number;
-    isNetworkError?: boolean;
-    endpoint?: string;
-    queued?: boolean;
-  }): Promise<void> {
-    const hooks = this.interceptors
+  async executeErrorHooks(
+    err: {
+      error: Error;
+      url: string;
+      init: RequestInit;
+      statusCode?: number;
+      isNetworkError?: boolean;
+      endpoint?: string;
+      queued?: boolean;
+    },
+    additionalInterceptors?: RequestInterceptor[],
+  ): Promise<void> {
+    const allInterceptors = additionalInterceptors
+      ? [...this.interceptors, ...additionalInterceptors]
+      : this.interceptors;
+    const hooks = allInterceptors
       .filter((i) => i.onError)
       .map((i) => (ctx: any) => i.onError!(ctx));
 

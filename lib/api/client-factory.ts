@@ -363,6 +363,9 @@ export abstract class APIClient {
         ...(authStrategy && { authStrategy }),
         tags: options?.tags || this.config.defaultTags,
         context: options?.context,
+        ...(this.interceptors.length > 0 && {
+          interceptors: this.interceptors,
+        }),
         ...options?.requestOptions,
       });
 
@@ -534,6 +537,9 @@ export abstract class APIClient {
         tags: options?.tags || this.config.defaultTags,
         context: options?.context,
         idempotencyKey: options?.idempotencyKey,
+        ...(this.interceptors.length > 0 && {
+          interceptors: this.interceptors,
+        }),
         ...options?.requestOptions,
       });
 
@@ -843,6 +849,9 @@ export abstract class APIClient {
         circuitBreakerKey,
         ...(authStrategy && { authStrategy }),
         tags: options?.tags || this.config.defaultTags,
+        ...(this.interceptors.length > 0 && {
+          interceptors: this.interceptors,
+        }),
         ...options?.requestOptions,
       });
 
