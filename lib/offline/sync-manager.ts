@@ -25,7 +25,7 @@ import { getAppConfig } from "@/lib/config";
 import {
   createSafeModeState,
   NetworkCascadeDetector,
-  SafeModeReason
+  SafeModeReason,
 } from "@/lib/error";
 import { AppKernel } from "@/lib/kernel/app-kernel";
 import {
@@ -36,6 +36,10 @@ import { logger } from "@/lib/utils/logger";
 import { getConflictQueueManager } from "./conflict-queue-manager";
 import { executeConflictResolution } from "./conflict-resolution";
 import { OfflineMutationQueue } from "./mutation-queue";
+import {
+  CircuitBreakerReplayManager,
+  NetworkErrorClassifier,
+} from "./offline-recovery";
 import { executeSyncHandler } from "./sync-handlers";
 import type {
   OfflineSyncConfig,
@@ -65,6 +69,8 @@ class OnlineSyncManagerService {
   private isOnline = false;
   private isSyncing = false;
   private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private scheduledRetryTimer: ReturnType<typeof setTimeout> | null = null; // Timer for next scheduled retry
+  private nextScheduledRetryTime: number = Infinity; // Track next scheduled time
   private config: Required<OfflineSyncConfig> = DEFAULT_CONFIG;
   private lastSyncStatus: OfflineSyncStatus = {
     isSyncing: false,
@@ -177,8 +183,13 @@ class OnlineSyncManagerService {
       let totalFailed = 0;
 
       while (this.isOnline) {
-        const batch = await OfflineMutationQueue.peek(this.config.batchSize);
+        // Phase 4: Use getReadyBatch() to respect scheduled retry times
+        const batch = await OfflineMutationQueue.getReadyBatch(
+          this.config.batchSize,
+        );
         if (batch.length === 0) {
+          // No ready mutations: schedule a timer for the next scheduled retry (if any)
+          await this.scheduleNextRetryWakeup();
           break;
         }
 
@@ -261,6 +272,91 @@ class OnlineSyncManagerService {
   }
 
   /**
+   * Schedule a timer to wake up the sync manager at the next scheduled retry time
+   * Prevents scheduled retries from stalling indefinitely when all ready mutations are processed
+   *
+   * Phase 4: Ensures scheduled retries (nextAttemptAt in future) actually execute
+   */
+  private async scheduleNextRetryWakeup(): Promise<void> {
+    // Get all mutations to find the earliest scheduled retry
+    const allMutations = await OfflineMutationQueue.getAll();
+
+    if (allMutations.length === 0) {
+      // No mutations left: clear any pending timer
+      this.clearScheduledRetryTimer();
+      logger
+        .category("storage")
+        .debug("Queue empty: cleared scheduled retry timer");
+      return;
+    }
+
+    // Find the earliest mutation that's scheduled for the future
+    const now = Date.now();
+    let nextRetryTime = Infinity;
+
+    for (const mutation of allMutations) {
+      if (
+        mutation.nextAttemptAt &&
+        mutation.nextAttemptAt > now &&
+        mutation.nextAttemptAt < nextRetryTime
+      ) {
+        nextRetryTime = mutation.nextAttemptAt;
+      }
+    }
+
+    // If no scheduled retries in the future, we're done
+    if (nextRetryTime === Infinity) {
+      this.clearScheduledRetryTimer();
+      logger.category("storage").debug("No scheduled retries: cleared timer");
+      return;
+    }
+
+    // Only set a new timer if the scheduled time changed
+    if (this.nextScheduledRetryTime === nextRetryTime) {
+      logger
+        .category("storage")
+        .debug("Scheduled retry timer already set for next attempt", {
+          delay: nextRetryTime - now,
+        });
+      return;
+    }
+
+    // Clear old timer
+    this.clearScheduledRetryTimer();
+
+    // Schedule new timer
+    const delayMs = Math.max(0, nextRetryTime - now);
+    this.nextScheduledRetryTime = nextRetryTime;
+
+    logger.category("storage").debug("Scheduled retry timer set", {
+      delayMs,
+      nextRetryTime: new Date(nextRetryTime).toISOString(),
+    });
+
+    this.scheduledRetryTimer = setTimeout(() => {
+      this.scheduledRetryTimer = null;
+      this.nextScheduledRetryTime = Infinity;
+      logger
+        .category("storage")
+        .debug("Scheduled retry timer fired: triggering sync");
+      this.triggerSync();
+    }, delayMs);
+  }
+
+  /**
+   * Clear any pending scheduled retry timer
+   * Called during cleanup or when a new sync completes
+   */
+  private clearScheduledRetryTimer(): void {
+    if (this.scheduledRetryTimer !== null) {
+      clearTimeout(this.scheduledRetryTimer);
+      this.scheduledRetryTimer = null;
+      this.nextScheduledRetryTime = Infinity;
+      logger.category("storage").debug("Cleared scheduled retry timer");
+    }
+  }
+
+  /**
    * Sync a single mutation
    * Handles retry logic and conflict detection
    */
@@ -291,9 +387,11 @@ class OnlineSyncManagerService {
 
       if (!handlerResult.success) {
         const isConflict = handlerResult.conflict || false;
-        const isNetworkError = (handlerResult.error || "").includes("network");
-        const isRateLimited = (handlerResult.error || "").includes("429");
-        const retryable = isNetworkError || isRateLimited;
+
+        // Phase 4: Use standardized error classification as source of truth
+        const errorContract = NetworkErrorClassifier.classify(
+          new Error(handlerResult.error),
+        );
 
         if (isConflict) {
           // Create conflict object for tracking
@@ -368,10 +466,23 @@ class OnlineSyncManagerService {
           }
         }
 
+        // Use error contract's retryable decision (not string matching)
+        const retryable = errorContract.retryable;
+
         if (retryable) {
+          // Record error type from standardized classification
           await OfflineMutationQueue.markFailed(
             mutation.id,
             handlerResult.error || "Unknown error",
+            errorContract.type,
+          );
+
+          // Record failure in circuit breaker to prevent cascading
+          const isNetworkError = errorContract.type === "network";
+          await CircuitBreakerReplayManager.recordReplayFailure(
+            mutation,
+            new Error(handlerResult.error),
+            isNetworkError,
           );
         }
 
@@ -392,6 +503,9 @@ class OnlineSyncManagerService {
         }
       }
 
+      // Phase 4: Record success in circuit breaker
+      await CircuitBreakerReplayManager.recordReplaySuccess(mutation);
+
       logger
         .category("storage")
         .info(
@@ -407,17 +521,24 @@ class OnlineSyncManagerService {
     } catch (error) {
       const errorMsg = (error as Error).message;
 
-      // Determine if error is retryable
-      const isNetworkError =
-        errorMsg.includes("network") ||
-        errorMsg.includes("offline") ||
-        errorMsg.includes("failed to fetch");
-      const isRateLimited =
-        errorMsg.includes("429") || errorMsg.includes("rate limit");
-      const retryable = isNetworkError || isRateLimited;
+      // Phase 4: Use standardized error classification for robust decisions
+      const errorContract = NetworkErrorClassifier.classify(error);
+      const retryable = errorContract.retryable;
 
       if (retryable) {
-        await OfflineMutationQueue.markFailed(mutation.id, errorMsg);
+        await OfflineMutationQueue.markFailed(
+          mutation.id,
+          errorMsg,
+          errorContract.type,
+        );
+
+        // Phase 4: Record failure in circuit breaker
+        const isNetworkError = errorContract.type === "network";
+        await CircuitBreakerReplayManager.recordReplayFailure(
+          mutation,
+          error,
+          isNetworkError,
+        );
 
         const backoff = this.calculateBackoff(mutation.retryCount);
         logger
@@ -440,10 +561,14 @@ class OnlineSyncManagerService {
 
   /**
    * Calculate exponential backoff time
+   * Phase 4: Uses BackoffScheduler with jitter for better recovery
    */
   private calculateBackoff(retryCount: number): number {
     const baseMs = this.config.retryBaseMs;
-    return baseMs * Math.pow(2, retryCount);
+    const multiplier = Math.pow(2, retryCount);
+    const jitter = 0.9 + Math.random() * 0.2; // ±10% factor
+    const backoffMs = Math.floor(baseMs * multiplier * jitter);
+    return Math.min(backoffMs, 300000); // Cap at 5 minutes
   }
 
   /**
@@ -531,6 +656,15 @@ class OnlineSyncManagerService {
   }
 
   /**
+   * Phase 4: Get comprehensive queue statistics
+   *
+   * Includes failure types, retry counts, timing info for observability
+   */
+  async getQueueStats() {
+    return OfflineMutationQueue.getStats(this.lastSyncStatus);
+  }
+
+  /**
    * Cleanup on app shutdown
    */
   destroy(): void {
@@ -540,6 +674,8 @@ class OnlineSyncManagerService {
     if (this.syncDebounceTimer) {
       clearTimeout(this.syncDebounceTimer);
     }
+    // Clear scheduled retry timer
+    this.clearScheduledRetryTimer();
     logger.category("storage").info("OnlineSyncManager destroyed");
   }
 }

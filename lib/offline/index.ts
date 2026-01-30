@@ -49,8 +49,24 @@ export type {
     OfflineSyncStatus,
     QueuedMutation,
     SyncConflict,
-    SyncResult
+    SyncResult,
+    // Phase 4 types
+    NetworkErrorContract,
+    OfflineQueueStats,
+    RedactionRule,
+    AuthReplayMetadata,
 } from "./types";
 
 export { SyncStatus } from "./types";
 
+// Phase 4 Enhancements
+export {
+    Phase4Enhancements,
+    RedactionManager,
+    AuthReplayManager,
+    NetworkErrorClassifier,
+    BackoffScheduler,
+    OfflineQueueStatsCollector,
+    CircuitBreakerReplayManager,
+    FetcherRegistryFallback,
+} from "./offline-recovery";

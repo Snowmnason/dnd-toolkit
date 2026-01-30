@@ -1,9 +1,9 @@
 import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
 import {
-    handleCacheMigration,
-    validateCacheEntry,
-    type CacheSchema,
-    type VersionedCacheEntry,
+  handleCacheMigration,
+  validateCacheEntry,
+  type CacheSchema,
+  type VersionedCacheEntry,
 } from "@/lib/storage/cache-versioning";
 import { logger } from "@/lib/utils/logger";
 import type { RequestOptions } from "./request-manager";
@@ -52,8 +52,11 @@ export interface QueuedRequestEntry {
   /** Auth strategy name for replay (optional) */
   authStrategy?: string;
 
-  /** RequestManager options (redacted/serializable only) - subset excluding authStrategy and rateLimitKey */
-  options?: Omit<RequestOptions, "authStrategy" | "rateLimitKey">;
+  /** RequestManager options (redacted/serializable only) - subset excluding authStrategy, rateLimitKey, and interceptors */
+  options?: Omit<
+    RequestOptions,
+    "authStrategy" | "rateLimitKey" | "interceptors"
+  >;
 
   /** Timestamp when request was queued */
   createdAt: number;

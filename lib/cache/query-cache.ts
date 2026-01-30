@@ -133,7 +133,7 @@ class QueryCacheClass {
     key: string,
     data: T,
     options: CacheOptions = {},
-    requestVersion?: number
+    requestVersion?: number,
   ): Promise<void> {
     try {
       // Race condition prevention: Check if invalidation happened during request
@@ -220,7 +220,7 @@ class QueryCacheClass {
    */
   applyOptimisticUpdate(
     updater: (prev: any) => any,
-    options?: { tags?: string[]; keyPattern?: RegExp }
+    options?: { tags?: string[]; keyPattern?: RegExp },
   ): () => void {
     const affectedKeys: string[] = [];
     const previousValues: Map<string, any> = new Map();
@@ -229,7 +229,7 @@ class QueryCacheClass {
       // Filter by tags if specified
       if (options?.tags && entry.tags) {
         const hasMatchingTag = entry.tags.some((tag) =>
-          options.tags!.includes(tag)
+          options.tags!.includes(tag),
         );
         if (!hasMatchingTag) continue;
       }
@@ -302,7 +302,7 @@ class QueryCacheClass {
 
       // Remove from FastCache
       await Promise.all(
-        keys.map((key) => FastCache.removeItem(this.toCacheKey(key)))
+        keys.map((key) => FastCache.removeItem(this.toCacheKey(key))),
       );
 
       logger.info("cache", "Cleared all query cache");
@@ -351,7 +351,7 @@ class QueryCacheClass {
         {
           tags,
           newVersion: this.globalVersion,
-        }
+        },
       );
     } catch (error) {
       logger.error("cache", "Error invalidating by tags:", error);
@@ -394,10 +394,50 @@ class QueryCacheClass {
         {
           pattern: pattern.toString(),
           newVersion: this.globalVersion,
-        }
+        },
       );
     } catch (error) {
       logger.error("cache", "Error invalidating by pattern:", error);
+    }
+  }
+
+  /**
+   * Invalidate cache entries older than a given duration
+   * Used during recovery to clear stale data that may be inconsistent
+   *
+   * @param maxAgeMs - Maximum age in milliseconds (e.g., 2 * 60 * 60 * 1000 for 2 hours)
+   * @returns Number of entries invalidated
+   */
+  async invalidateOlderThan(maxAgeMs: number): Promise<number> {
+    try {
+      // Bump version to invalidate in-flight requests
+      this.globalVersion++;
+
+      const now = Date.now();
+      const keysToInvalidate: string[] = [];
+
+      for (const [key, entry] of this.inMemoryCache.entries()) {
+        const age = now - entry.timestamp;
+        if (age > maxAgeMs) {
+          keysToInvalidate.push(key);
+        }
+      }
+
+      await Promise.all(keysToInvalidate.map((key) => this.remove(key)));
+
+      logger.info(
+        "cache",
+        `Invalidated ${keysToInvalidate.length} entries older than ${maxAgeMs}ms`,
+        {
+          maxAgeMs,
+          newVersion: this.globalVersion,
+        },
+      );
+
+      return keysToInvalidate.length;
+    } catch (error) {
+      logger.error("cache", "Error invalidating old entries:", error);
+      return 0;
     }
   }
 
@@ -490,7 +530,7 @@ class QueryCacheClass {
       () => {
         this.cleanupExpired();
       },
-      60 * 60 * 1000
+      60 * 60 * 1000,
     ); // Every hour
 
     if (typeof this.cleanupTimer === "object" && "unref" in this.cleanupTimer) {
@@ -514,7 +554,7 @@ class QueryCacheClass {
     if (keysToRemove.length > 0) {
       logger.info(
         "cache",
-        `Cleaned up ${keysToRemove.length} expired cache entries`
+        `Cleaned up ${keysToRemove.length} expired cache entries`,
       );
     }
   }
