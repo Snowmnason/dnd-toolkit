@@ -71,8 +71,16 @@ export interface QueuedMutation {
   /** Last failure reason (Phase 4): for observability and debugging */
   lastFailureReason?: string;
 
-  /** Error type for network/error contract (Phase 4) */
-  lastErrorType?: "network" | "auth" | "conflict" | "validation" | "other";
+  /** Error type for network/error contract (Phase 4): keep in sync with NetworkErrorContract.type */
+  lastErrorType?:
+    | "network"
+    | "auth"
+    | "conflict"
+    | "validation"
+    | "rate_limit"
+    | "server"
+    | "unknown"
+    | "other";
 }
 
 /**
@@ -258,7 +266,7 @@ export interface RedactionRule {
   /** Field paths to redact (e.g., "password", "token", "email") */
   fields: string[];
 
-  /** Whether to redact entire object if field matches */
+  /** Whether to redact entire object if field matches (implemented in RedactionManager.redactObject) */
   redactParent?: boolean;
 
   /** Replacement value (default: undefined to delete field) */

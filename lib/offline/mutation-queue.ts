@@ -247,7 +247,9 @@ class OfflineMutationQueueService {
     batchSize: number = DEFAULT_CONFIG.batchSize,
   ): Promise<QueuedMutation[]> {
     const ready = BackoffScheduler.filterReadyMutations(this.queue);
-    return ready.slice(0, batchSize).sort((a, b) => a.timestamp - b.timestamp);
+    // Sort by timestamp first to ensure FIFO order, then slice to batch size
+    const sortedReady = [...ready].sort((a, b) => a.timestamp - b.timestamp);
+    return sortedReady.slice(0, batchSize);
   }
 
   /**

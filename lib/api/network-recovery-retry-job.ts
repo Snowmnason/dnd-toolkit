@@ -186,6 +186,7 @@ export const NetworkRecoveryRetryJobManager = {
     }
 
     const retryState = NetworkRecoveryManager.getRecoveryState();
+    // Default to 5 retries; can be extended in Phase 2+ for config-driven limits
     const maxRetries = 5;
 
     if (retryState.retries >= maxRetries) {
@@ -302,3 +303,4 @@ export const NetworkRecoveryRetryJobManager = {
 };
 
 export type { NetworkRecoveryRetryJobConfig };
+

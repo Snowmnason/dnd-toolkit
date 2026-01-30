@@ -22,7 +22,7 @@ import { logger } from "@/lib/utils/logger";
 import type { ZodType } from "zod";
 import { AuthLayer } from "./auth-layer";
 import { CircuitBreakerManager } from "./circuit-breaker";
-import type { RequestInterceptor } from "./interceptor";
+import { InterceptorManager, type RequestInterceptor } from "./interceptor";
 import { RequestManager, type RequestOptions } from "./request-manager";
 
 /**
@@ -260,6 +260,8 @@ export abstract class APIClient {
    */
   use(interceptor: RequestInterceptor): this {
     this.interceptors.push(interceptor);
+    // Wire interceptor into global InterceptorManager so it executes on all requests
+    InterceptorManager.registerInterceptor(interceptor);
     logger.debug("api", `Registered interceptor on ${this.clientName}`, {
       interceptorName: interceptor.name || "unnamed",
     });
@@ -341,8 +343,11 @@ export abstract class APIClient {
     try {
       const requestVersion = this.config.queryCache.getCurrentVersion();
 
-      const fetcher = async () => {
-        const response = await fetch(url);
+      const fetcher = async (injectedHeaders?: HeadersInit) => {
+        const response = await fetch(
+          url,
+          injectedHeaders ? { headers: injectedHeaders } : undefined,
+        );
         if (!response.ok) {
           throw await this.transformError(response);
         }
@@ -866,12 +871,40 @@ export abstract class APIClient {
    * Format: `{clientName}:{methodName}:{endpoint}` or custom override
    */
   /**
+   * Stable JSON stringify that preserves all nested fields while
+   * producing a deterministic key order for objects.
+   */
+  private stableStringify(value: any): string {
+    const seen = new WeakSet<object>();
+    const normalize = (val: any): any => {
+      if (val === null || typeof val !== "object") {
+        return val;
+      }
+      if (seen.has(val)) {
+        // Avoid crashes on circular references; mark cycle location.
+        return "[Circular]";
+      }
+      seen.add(val);
+      if (Array.isArray(val)) {
+        return val.map((item) => normalize(item));
+      }
+      const obj: Record<string, any> = {};
+      const keys = Object.keys(val).sort();
+      for (const key of keys) {
+        obj[key] = normalize((val as any)[key]);
+      }
+      return obj;
+    };
+    return JSON.stringify(normalize(value));
+  }
+
+  /**
    * Generate deterministic hash for parameters (Phase 3 improvement)
    */
   private hashParameters(params: any): string {
     if (!params) return "";
     try {
-      const json = JSON.stringify(params, Object.keys(params).sort());
+      const json = this.stableStringify(params);
       // Simple hash: count characters and XOR bytes for uniqueness
       let hash = 0;
       for (let i = 0; i < json.length; i++) {
@@ -881,7 +914,7 @@ export abstract class APIClient {
       }
       return `_${Math.abs(hash).toString(36)}`;
     } catch {
-      // Fallback if JSON.stringify fails
+      // Fallback if stringify fails
       return "";
     }
   }

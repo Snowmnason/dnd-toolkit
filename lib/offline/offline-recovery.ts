@@ -158,7 +158,9 @@ export const RedactionManager: {
         const lowerKey = key.toLowerCase();
 
         if (forbiddenFields.some((f) => lowerKey.includes(f.toLowerCase()))) {
-          found.push(`${currentPath}: ${value}`);
+          // Do not include raw values here to avoid leaking PII/tokens into logs.
+          // Only record the field path for audit purposes.
+          found.push(currentPath);
         }
 
         if (value !== null && typeof value === "object") {
@@ -898,12 +900,12 @@ export const Phase4Enhancements = {
 
     // Log validation for testing
     const foundSensitive = RedactionManager.validateRedaction(redactedPayload);
-    if (foundSensitive.length > 0) {
+    const remainingSensitiveCount = foundSensitive.length;
+    if (remainingSensitiveCount > 0) {
       logger
         .category("security")
         .warn(
-          `WARNING: Found ${foundSensitive.length} potentially sensitive fields after redaction:`,
-          foundSensitive,
+          `WARNING: Detected ${remainingSensitiveCount} potentially sensitive fields remaining after redaction. Review redaction rules to ensure all sensitive data is stripped before queueing.`,
         );
     }
 

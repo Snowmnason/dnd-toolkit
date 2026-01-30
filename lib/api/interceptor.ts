@@ -120,8 +120,9 @@ export async function executeHooksSerially<T>(
     try {
       // Phase 4: Apply timeout if specified
       if (interceptor?.timeout) {
+        let timeoutHandle: NodeJS.Timeout | ReturnType<typeof setTimeout> | undefined;
         const timeoutPromise = new Promise<void>((_, reject) => {
-          setTimeout(
+          timeoutHandle = setTimeout(
             () =>
               reject(
                 new Error(`Interceptor timeout: ${interceptor.timeout}ms`),
@@ -130,8 +131,16 @@ export async function executeHooksSerially<T>(
           );
         });
 
-        // Race between hook execution and timeout
-        await Promise.race([Promise.resolve(hook(context)), timeoutPromise]);
+        try {
+          // Race between hook execution and timeout
+          await Promise.race([Promise.resolve(hook(context)), timeoutPromise]);
+          // Clear timeout if hook completes first
+          if (timeoutHandle) clearTimeout(timeoutHandle as any);
+        } catch (timeoutError) {
+          // Clear timeout handle on timeout error
+          if (timeoutHandle) clearTimeout(timeoutHandle as any);
+          throw timeoutError;
+        }
 
         logger.debug("api", `Hook completed within timeout`, {
           hookName,
@@ -143,12 +152,39 @@ export async function executeHooksSerially<T>(
         await hook(context);
       }
 
-      // Phase 4: If nonBlocking=true, don't wait for result (fire and forget)
-      // But we already awaited above, so this is more for semantic clarity
+      // Phase 4: Support non-blocking + timeout behavior
       if (interceptor?.nonBlocking) {
-        logger.debug("api", `Executed non-blocking hook`, {
+        // Fire-and-forget execution: do not await, but attach catch to avoid unhandled rejections
+        let executionPromise: Promise<void>;
+        if (interceptor.timeout) {
+          const timeoutPromise = new Promise<void>((_, reject) => {
+            setTimeout(
+              () =>
+                reject(
+                  new Error(`Interceptor timeout: ${interceptor.timeout}ms`),
+                ),
+              interceptor.timeout,
+            );
+          });
+          // Race between hook execution and timeout
+          executionPromise = Promise.race([
+            Promise.resolve(hook(context)),
+            timeoutPromise,
+          ]) as Promise<void>;
+        } else {
+          executionPromise = Promise.resolve(hook(context));
+        }
+        executionPromise.catch((error) => {
+          logger.error(
+            "api",
+            `Error in non-blocking ${hookName} hook [${index}]:`,
+            { error },
+          );
+        });
+        logger.debug("api", `Scheduled non-blocking hook`, {
           hookName,
           index,
+          timeout: interceptor.timeout,
         });
       }
     } catch (error) {
