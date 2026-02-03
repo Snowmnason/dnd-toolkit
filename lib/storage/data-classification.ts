@@ -76,18 +76,27 @@ export const DATA_CLASSIFICATIONS: Record<string, DataClassification> = {
   },
 
   // ========== FEATURE FLAGS & ENTITLEMENTS ==========
-  "feature_flags:v1": {
-    key: "feature_flags:v1",
-    sensitivity: DataSensitivity.NON_SENSITIVE,
-    description: "Cached feature flags (non-user-specific)",
-    ttl: 24 * 60 * 60 * 1000, // 24h
+  "dnd:feature_flags:v1": {
+    key: "dnd:feature_flags:v1",
+    sensitivity: DataSensitivity.PUBLIC,
+    description:
+      "Server-synced feature flags (non-user-specific, client-driven cache)",
+    ttl: 24 * 60 * 60 * 1000, // 24h (soft TTL)
   },
 
-  "secure:entitlements": {
-    key: "secure:entitlements",
+  "dnd:entitlements:v1": {
+    key: "dnd:entitlements:v1",
     sensitivity: DataSensitivity.SENSITIVE,
-    description: "User premium entitlements",
+    description:
+      "User premium entitlements with expiry and clock-safety checks",
     ttl: 7 * 24 * 60 * 60 * 1000, // 7 days
+  },
+
+  "dnd:clock_invalid": {
+    key: "dnd:clock_invalid",
+    sensitivity: DataSensitivity.NON_SENSITIVE,
+    description:
+      "Marker indicating device clock manipulation was detected (stale entitlements rejected)",
   },
 
   // ========== AUTHENTICATION & ACCOUNT ==========

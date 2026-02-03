@@ -545,6 +545,47 @@ class AppKernelClass {
         phases: { ...this.state.phases, appReady: true },
       });
 
+      // Initialize Feature Flags Manager (non-blocking)
+      try {
+        const { FeatureFlagsManager } =
+          await import("@/lib/feature-flags/server-sync");
+        const { getSupabaseClient } = await import("@/lib/database/supabase");
+
+        // Initialize with Supabase client
+        const supClient = getSupabaseClient();
+        await FeatureFlagsManager.initialize(supClient);
+
+        // Verify device clock validity early
+        const clockValid = await FeatureFlagsManager.verifyDeviceClock();
+        if (!clockValid) {
+          logger
+            .category("bootstrap")
+            .warn(
+              "Device clock validation failed - premium features may be restricted",
+            );
+        }
+
+        // Refresh flags from server (non-blocking, after appReady)
+        FeatureFlagsManager.refreshFromServer().catch((error) => {
+          logger
+            .category("bootstrap")
+            .debug("Feature flags refresh failed on startup (using cache):", {
+              error: (error as Error).message,
+            });
+        });
+
+        logger
+          .category("bootstrap")
+          .debug("Feature flags manager initialized and refresh initiated");
+      } catch (flagsError) {
+        logger
+          .category("bootstrap")
+          .warn("Failed to initialize feature flags manager", {
+            error: (flagsError as Error).message,
+          });
+        // Non-critical: app continues without feature flags
+      }
+
       const totalBootstrapTime = Object.values(this.state.timing).reduce(
         (a, b) => a + b,
         0,
