@@ -240,13 +240,36 @@ export async function registerNetworkRecoveryHooks(
           },
         ),
 
+        flagsRefresh: await executeRecoveryStep(
+          "feature-flags-refresh",
+          async () => {
+            logger.debug("network", "Refreshing feature flags on recovery");
+            try {
+              const { FeatureFlagsManager } =
+                await import("@/lib/feature-flags/server-sync");
+              await FeatureFlagsManager.refreshFromServer();
+              logger.info("network", "Feature flags refreshed on recovery");
+            } catch (error) {
+              logger.warn(
+                "network",
+                "Feature flags refresh failed on recovery (using cache):",
+                error,
+              );
+            }
+          },
+        ),
+
         stateReset: await executeRecoveryStep("state-reset", async () => {
           await NetworkRecoveryManager.resetRecoveryState();
         }),
       };
 
       // Notify user if at least one critical step succeeded
-      if (stepResults.queueSync || stepResults.cacheInvalidation) {
+      if (
+        stepResults.queueSync ||
+        stepResults.cacheInvalidation ||
+        stepResults.flagsRefresh
+      ) {
         NetworkRecoveryManager._notify(
           "Connection restored - syncing your changes",
         );

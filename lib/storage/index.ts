@@ -35,43 +35,43 @@
  */
 
 export {
-  DATA_CLASSIFICATIONS,
-  DataSensitivity,
-  validateClassifications,
-  type DataClassification
+    DATA_CLASSIFICATIONS,
+    DataSensitivity,
+    validateClassifications,
+    type DataClassification
 } from "./data-classification";
 export { FastCache } from "./FastCache";
 export {
-  classifyKey,
-  clearAllUserData,
-  getKeysBySensitivity,
-  getStorageBackend as getPrivacyStorageBackend,
-  getRetentionInfo,
-  getSensitiveKeys,
-  isSensitiveData,
-  redactForLogs,
-  shouldUseSecureStorage
+    classifyKey,
+    clearAllUserData,
+    getKeysBySensitivity,
+    getStorageBackend as getPrivacyStorageBackend,
+    getRetentionInfo,
+    getSensitiveKeys,
+    isSensitiveData,
+    redactForLogs,
+    shouldUseSecureStorage
 } from "./privacy";
 export { SecureStorage } from "./SecureStorage";
 export { STORAGE_BACKEND_CONFIG, type StorageBackend } from "./storage-config";
 export {
-  batchStorageOperation,
-  checkStorageHealth,
-  classifyStorageError,
-  handleStorageErrorGracefully,
-  isStorageError,
-  logStorageError,
-  safeStorageGet,
-  safeStorageGetJSON,
-  safeStorageRemove,
-  safeStorageSet,
-  safeStorageSetJSON,
-  shouldServeFallbackOnStorageError,
-  type BatchStorageResult,
-  type StorageErrorInfo,
-  type StorageGracefulResult,
-  type StorageOperation,
-  type StorageOperationOptions
+    batchStorageOperation,
+    checkStorageHealth,
+    classifyStorageError,
+    handleStorageErrorGracefully,
+    isStorageError,
+    logStorageError,
+    safeStorageGet,
+    safeStorageGetJSON,
+    safeStorageRemove,
+    safeStorageSet,
+    safeStorageSetJSON,
+    shouldServeFallbackOnStorageError,
+    type BatchStorageResult,
+    type StorageErrorInfo,
+    type StorageGracefulResult,
+    type StorageOperation,
+    type StorageOperationOptions
 } from "./storage-error-handling";
 export { updateStorageCache } from "./update-storage-cache";
 
@@ -132,6 +132,11 @@ export const STORAGE_KEYS = {
 
   // Network recovery state (retry count, backoff timing)
   NETWORK_RECOVERY_STATE: "dnd:network:recovery_state",
+
+  // Feature flags and premium entitlements
+  FEATURE_FLAGS: "dnd:feature_flags:v1",
+  ENTITLEMENTS: "dnd:entitlements:v1",
+  CLOCK_INVALID: "dnd:clock_invalid",
 
   // Add more keys as needed...
 } as const;

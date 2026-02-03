@@ -1,22 +1,22 @@
-import { AppModal, Body, Button, FormTextInput } from '@/components/ui'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { editWorldNameSchema, type EditWorldNameFormData } from '@/lib/schemas'
-import { logger } from '@/lib/utils/logger'
-import { $, useScale, UseTheme } from '@/theme'
-import React, { useEffect, useState } from 'react'
-import { Platform, View } from 'react-native'
+import { AppModal, Body, Button, FormTextInput } from "@/components/ui";
+import { editWorldNameSchema, type EditWorldNameFormData } from "@/lib/schemas";
+import { logger } from "@/lib/utils/logger";
+import { $, useScale, UseTheme } from "@/theme";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { Platform, View } from "react-native";
 
 interface EditWorldModalProps {
-  visible: boolean
-  onClose: () => void
-  worldName: string
-  originalWorldName?: string
-  onWorldNameChange: (name: string) => void
-  onConfirmWorldName: () => void
-  onGenerateInviteLink: () => Promise<void>
-  onDeleteWorld: () => Promise<void>
-  generatingLink: boolean
+  visible: boolean;
+  onClose: () => void;
+  worldName: string;
+  originalWorldName?: string;
+  onWorldNameChange: (name: string) => void;
+  onConfirmWorldName: () => void;
+  onGenerateInviteLink: () => Promise<void>;
+  onDeleteWorld: () => Promise<void>;
+  generatingLink: boolean;
 }
 
 /**
@@ -34,86 +34,91 @@ export function EditWorldModal({
   onDeleteWorld,
   generatingLink,
 }: EditWorldModalProps) {
-  const S = useScale()
-  const { theme } = UseTheme()
-  const [deleting, setDeleting] = useState(false)
-  const [deleteDisabled, setDeleteDisabled] = useState(false)
+  const S = useScale();
+  const { theme } = UseTheme();
+  const [deleting, setDeleting] = useState(false);
+  const [deleteDisabled, setDeleteDisabled] = useState(false);
 
   // RHF for name editing
-  const { control, handleSubmit, formState: { isValid }, reset } = useForm<EditWorldNameFormData>({
+  const {
+    control,
+    handleSubmit,
+    formState: { isValid },
+    reset,
+  } = useForm<EditWorldNameFormData>({
     resolver: zodResolver(editWorldNameSchema),
-    mode: 'onChange',
+    mode: "onChange",
     defaultValues: {
-      name: worldName || '',
-      originalName: originalWorldName || '',
-    }
-  })
+      name: worldName || "",
+      originalName: originalWorldName || "",
+    },
+  });
 
   const isDesktop =
-    Platform.OS === 'web' ||
-    Platform.OS === 'windows' ||
-    Platform.OS === 'macos'
+    Platform.OS === "web" ||
+    Platform.OS === "windows" ||
+    Platform.OS === "macos";
 
   const handleGenerateInviteLinkClick = async () => {
-    if (generatingLink) return
+    if (generatingLink) return;
     try {
-      await onGenerateInviteLink()
+      await onGenerateInviteLink();
     } catch (error) {
-      logger.error('ui', 'Failed to generate invite link:', error)
+      logger.error("ui", "Failed to generate invite link:", error);
     }
-  }
+  };
 
   const handleDeleteClick = async () => {
-    if (deleteDisabled) return
+    if (deleteDisabled) return;
 
     if (!deleting) {
       // 🕓 First click: trigger shake + disable briefly
-      setDeleting(true)
-      setDeleteDisabled(true)
-      setTimeout(() => setDeleteDisabled(false), 1500)
+      setDeleting(true);
+      setDeleteDisabled(true);
+      setTimeout(() => setDeleteDisabled(false), 1500);
     } else {
       // 🗑️ Second click: confirm delete
       try {
-        setDeleteDisabled(true)
-        await onDeleteWorld()
-        onClose()
+        setDeleteDisabled(true);
+        await onDeleteWorld();
+        onClose();
       } catch (error) {
-        logger.error('ui', 'Failed to delete world:', error)
-        setDeleteDisabled(false)
+        logger.error("ui", "Failed to delete world:", error);
+        setDeleteDisabled(false);
       }
     }
-  }
+  };
 
   // Reset transient state whenever modal closes to avoid stale flags affecting next open
   useEffect(() => {
     if (!visible) {
-      setDeleting(false)
-      setDeleteDisabled(false)
+      setDeleting(false);
+      setDeleteDisabled(false);
       reset({
-        name: worldName || '',
-        originalName: originalWorldName || '',
-      })
+        name: worldName || "",
+        originalName: originalWorldName || "",
+      });
     }
-  }, [visible, reset, worldName, originalWorldName])
+  }, [visible, reset, worldName, originalWorldName]);
 
   return (
     <AppModal
       visible={visible}
       onClose={onClose}
-      heading={worldName ? `Edit ${worldName}` : 'Edit This World'}
+      heading={worldName ? `Edit ${worldName}` : "Edit This World"}
       body="Rename your world, share it with others, or delete it permanently."
       borderTone="accent"
       animateOnDestruction={deleting} // 💥 modal shakes on delete confirmation
     >
       {/* 🏷️ Edit Name Section */}
-      <Body style={{ marginBottom: S.space.xs, fontWeight: '600' }}>
+      <Body style={{ marginBottom: S.space.xs, fontWeight: "600" }}>
         Edit World Name
       </Body>
 
       <View
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
+          flexDirection: "row",
+          alignItems: "center",
           marginBottom: S.space.md,
           gap: S.space.sm,
         }}
@@ -127,11 +132,9 @@ export function EditWorldModal({
           style={{
             flex: 1,
             borderWidth: 1,
-            borderColor: $('border'),
+            borderColor: $("border"),
             borderRadius: S.radius.md,
             padding: S.space.sm,
-            color: $('textPrimary', theme),
-            backgroundColor: $('surface', theme),
             fontSize: isDesktop ? S.s(18) : S.s(16),
           }}
         />
@@ -145,13 +148,15 @@ export function EditWorldModal({
       {/* Field-level errors are displayed inline via TextInput error prop */}
 
       {/* 🔗 Invite Section */}
-      <Body style={{ marginBottom: S.space.xs, fontWeight: '600' }}>
-        Share {worldName || 'this world'} with others
+      <Body style={{ marginBottom: S.space.xs, fontWeight: "600" }}>
+        Share {worldName || "this world"} with others
       </Body>
 
       <Button
         text={
-          generatingLink ? '📋 Link Saved to Clipboard' : '🔗 Generate Invite Link'
+          generatingLink
+            ? "📋 Link Saved to Clipboard"
+            : "🔗 Generate Invite Link"
         }
         variant="secondary"
         onPress={handleGenerateInviteLinkClick}
@@ -164,8 +169,8 @@ export function EditWorldModal({
       <Body
         style={{
           fontSize: S.s(14),
-          color: $('textSecondary', theme),
-          textAlign: 'center',
+          color: $("textSecondary", theme),
+          textAlign: "center",
           marginBottom: S.space.md,
         }}
       >
@@ -174,7 +179,7 @@ export function EditWorldModal({
 
       {/* 💀 Delete Button */}
       <Button
-        text={deleting ? 'Confirm Delete' : 'Delete'}
+        text={deleting ? "Confirm Delete" : "Delete"}
         variant="destructive"
         onPress={handleDeleteClick}
         disabled={deleteDisabled}
@@ -195,5 +200,5 @@ export function EditWorldModal({
         <Button text="Close" variant="secondary" onPress={onClose} />
       </View>*/}
     </AppModal>
-  )
+  );
 }
