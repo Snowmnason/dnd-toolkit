@@ -83,6 +83,11 @@ export interface AppSettings {
     slowScreenMs?: number;
     slowRequestMs?: number;
   };
+  remoteConfig?: {
+    clockSkewToleranceMs?: number;
+    entitlementPollIntervalMs?: number;
+    description?: string;
+  };
   safeMode?: {
     kernelTimeoutMs?: number;
     syncFailureThreshold?: number;

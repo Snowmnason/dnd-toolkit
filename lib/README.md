@@ -156,18 +156,18 @@ import { useFeatureFlag, useFeatureFlags, useEntitlement } from "@/hooks";
 const isNewUIEnabled = useFeatureFlag("newUI");
 
 // Server-synced flags
-const flagsData = useFeatureFlags();
+const { enabled, loading } = useFeatureFlags("premiumUI");
 
 // Premium entitlements with clock safety
 const { granted, expiresAt } = useEntitlement("premium");
 ```
 
 **Key features:**
+
 - Config-driven toggles for dev/testing (no network)
-- Server-synced entitlements for production (with AuthLayer, circuit breaker, offline caching)
+- Server-synced entitlements for production (with offline caching, clock safety)
 - Clock manipulation detection for fail-secure premium gating
-- ETag/304 caching optimization
-- Integration with `lib/api` (AuthLayer, CircuitBreaker) and `lib/storage` (SecureStorage, FastCache)
+- Integration with `lib/storage` (SecureStorage for encrypted persistence)
 
 ---
 

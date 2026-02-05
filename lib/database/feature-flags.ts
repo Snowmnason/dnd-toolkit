@@ -2,8 +2,8 @@
  * Feature Flags Database Queries
  *
  * This module provides client-side REST API helpers for querying global feature flags
- * from the Supabase `feature_flags` table. Used by `lib/feature-flags/remote.ts` to fetch
- * flags during sync operations.
+ * from the Supabase `feature_flags` table. Used by `lib/feature-flags/server-sync.ts` (FeatureFlagsManager)
+ * to bootstrap flags during app startup.
  *
  * **NOTE:** These are client-side queries. Do not use directly in components;
  * use `lib/feature-flags/FeatureFlagsManager` and React hooks instead.
@@ -26,7 +26,7 @@ export interface FeatureFlagRow {
  * @param supabase - Supabase client
  * @returns List of feature flags
  */
-export async function fetchFeatureFlagsByEnv(
+export async function fetchFeatureFlags(
   supabase: SupabaseClient,
 ): Promise<FeatureFlagRow[]> {
   const { data, error } = await supabase

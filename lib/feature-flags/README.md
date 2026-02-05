@@ -49,12 +49,14 @@ Component/Service Decision Logic
 - ✅ **Fetched ONCE** at app startup (non-blocking)
 - Server values **OVERWRITE** hardcoded config
 - Used throughout app lifecycle without re-fetching
+- **Storage Strategy**: Persisted to `SecureStorage` for offline access. One-time bootstrap simplifies logic and reduces points of failure.
 - Offline: Uses last startup values from `SecureStorage`
 
 **Entitlements:**
 
 - ✅ **Fetched FRESH** on each check (real-time verification)
 - Expiry checking: `expires_at` field automatically evaluated
+- **Storage Strategy**: Persisted to `SecureStorage` (encrypted)
 - Offline: Caches last known values with expiry metadata
 - Clock manipulation detection: Denies access if device time is invalid
 
@@ -65,9 +67,9 @@ FeatureFlagsManager.initialize(supabaseClient)
 FeatureFlagsManager.verifyDeviceClock()
 FeatureFlagsManager.bootstrapFlags() [ONE-TIME, non-blocking]
     ↓
-Supabase REST API → feature_flags table (env-specific)
+Supabase REST API → feature_flags table
     ↓
-SecureStorage: Store flags + timestamp
+SecureStorage: Store flags + timestamp (encrypted)
     ↓
 Runtime Checks (getFlag, getEntitlement)
     ↓
@@ -462,9 +464,9 @@ export async function checkPremiumFeature(featureKey: string) {
 
 **Server-Driven (FeatureFlagsManager):**
 
-- `lib/database/feature-flags.ts` – `fetchFeatureFlagsByEnv()` REST query helper
+- `lib/database/feature-flags.ts` – `fetchFeatureFlags()` REST query helper
 - `lib/database/entitlements.ts` – `fetchEntitlementsByUserId()`, `hasEntitlement()` REST query helpers
-- `lib/storage` – `SecureStorage`, `STORAGE_KEYS` (encrypted persistence, versioned)
+- `lib/storage/SecureStorage` – Encrypted persistence for flags and entitlements (single storage layer, versioned)
 - `lib/config` – `getAppConfig()` (environment detection, hardcoded defaults)
 - `lib/kernel` – `AppKernel` (automatic initialization on startup, clock verification)
 - `lib/utils/logger.ts` – Logging with categories
@@ -506,13 +508,8 @@ export async function checkPremiumFeature(featureKey: string) {
 
 - **lib/config** – Environment-aware configuration loading (used to load legacy feature flags)
 - **lib/premium** – Subscription/tier management (combine with flags for premium gating)
-- **lib/api/auth-layer** – Token injection for Edge Function calls (`FeatureFlagsManager`)
-- **lib/api/circuit-breaker** – Circuit breaker state for preventing retry storms
 - **lib/cache/QueryCache** – Request deduplication (Phase 2 enhancement)
-- **lib/storage/SecureStorage** – Encrypted entitlements persistence
-- **lib/storage/FastCache** – Unencrypted flag caching
-- **lib/network/state-machine** – Network state transitions triggering flag refresh
-- **lib/api/network-recovery** – Hooks for flag refresh on network recovery
+- **lib/storage/SecureStorage** – Encrypted persistence for both flags (bootstrap only) and entitlements
 - **lib/kernel/app-kernel** – Bootstrap clock verification and manager initialization
 - **hooks/use-feature-flag** – Legacy hook for config-driven flags
 - **hooks/use-feature-flags** – Server-synced flags hook
@@ -524,9 +521,8 @@ export async function checkPremiumFeature(featureKey: string) {
 | ---------------- | ---------------------------------------------------------------- | ----- |
 | feature-flags.ts | Legacy `FeatureFlags` class, config-driven toggles, window setup | ~130  |
 | server-sync.ts   | `FeatureFlagsManager`, server-sync, entitlements, clock checks   | ~350  |
-| remote.ts        | Edge Function client, ETag/304 handling, AuthLayer token inject  | ~114  |
 | index.ts         | Barrel export (legacy + new manager + hooks)                     | 10    |
-| README.md        | This file                                                        | ~520  |
+| README.md        | This file                                                        | ~574  |
 
 ## Testing
 

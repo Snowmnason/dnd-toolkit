@@ -110,7 +110,7 @@ CREATE TABLE invite_links (
 );
 ```
 
-**feature_flags** – Server-side feature gates (global, env-specific)
+**feature_flags** – Server-side feature gates (global)
 
 ```sql
 CREATE TABLE feature_flags (
@@ -118,12 +118,9 @@ CREATE TABLE feature_flags (
   enabled boolean NOT NULL,
   kind text NOT NULL, -- "free", "premium", "beta"
   description text,
-  env text NOT NULL, -- "production", "staging", "development"
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
-
-CREATE INDEX idx_feature_flags_env ON feature_flags(env);
 ```
 
 **entitlements** – User subscription tier and feature access (with expiry)
@@ -131,9 +128,8 @@ CREATE INDEX idx_feature_flags_env ON feature_flags(env);
 ```sql
 CREATE TABLE entitlements (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES users(id) ON DELETE CASCADE,
+  user_id uuid NULL REFERENCES users(id) ON DELETE CASCADE,
   key text NOT NULL, -- e.g., "premium", "beta_access"
-  env text NOT NULL, -- "production", "staging", "development"
   expires_at timestamptz NULL, -- NULL = never expires
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
@@ -141,8 +137,6 @@ CREATE TABLE entitlements (
 
 CREATE INDEX idx_entitlements_user_id ON entitlements(user_id);
 CREATE INDEX idx_entitlements_key ON entitlements(key);
-CREATE INDEX idx_entitlements_env ON entitlements(env);
-CREATE INDEX idx_entitlements_user_key_env ON entitlements(user_id, key, env);
 CREATE INDEX idx_entitlements_expires_at ON entitlements(expires_at);
 ```
 
@@ -376,58 +370,46 @@ const [user, worlds, invites] = await executeParallelQueries([
 
 **Note:** These helpers are used internally by `FeatureFlagsManager` and are not typically called directly from components. Use the manager or React hooks instead.
 
-#### `fetchFeatureFlagsByEnv(supabase: SupabaseClient, env: string): Promise<FeatureFlagRow[]>`
+#### `fetchFeatureFlags(supabase: SupabaseClient): Promise<FeatureFlagRow[]>`
 
-Fetches all feature flags for a specific environment. Called by `FeatureFlagsManager.bootstrapFlags()` at app startup.
+Fetches all global feature flags. Called by `FeatureFlagsManager.bootstrapFlags()` at app startup.
 
 ```ts
-import { fetchFeatureFlagsByEnv } from "@/lib/database/feature-flags";
+import { fetchFeatureFlags } from "@/lib/database/feature-flags";
 
-const flags = await fetchFeatureFlagsByEnv(supabaseClient, "production");
-// Returns: [{ flag_name: "darkModeV2", enabled: true, kind: "free", env: "production", ... }]
+const flags = await fetchFeatureFlags(supabaseClient);
+// Returns: [{ flag_name: "darkModeV2", enabled: true, kind: "free", ... }]
 ```
 
-**Parameters:**
-
-- `env` – Environment: `"production"` | `"staging"` | `"development"`
+**Parameters:** None
 
 **Returns:** Array of `FeatureFlagRow` objects (or empty array if none found)
 
-#### `fetchEntitlementsByUserId(supabase: SupabaseClient, userId: string, env: string): Promise<EntitlementRow[]>`
+#### `fetchEntitlementsByUserId(supabase: SupabaseClient, userId: string): Promise<EntitlementRow[]>`
 
 Fetches all entitlements for a user. Called by `FeatureFlagsManager.getEntitlement()` for fresh checks.
 
 ```ts
 import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
 
-const entitlements = await fetchEntitlementsByUserId(
-  supabaseClient,
-  userId,
-  "production",
-);
-// Returns: [{ id: "uuid", user_id: "uuid", key: "premium", expires_at: "2026-12-31T...", env: "production" }]
+const entitlements = await fetchEntitlementsByUserId(supabaseClient, userId);
+// Returns: [{ id: "uuid", user_id: "uuid", key: "premium", expires_at: "2026-12-31T..." }]
 ```
 
 **Parameters:**
 
 - `userId` – User ID (UUID)
-- `env` – Environment: `"production"` | `"staging"` | `"development"`
 
 **Returns:** Array of `EntitlementRow` objects (or empty array if none found)
 
-#### `hasEntitlement(supabase: SupabaseClient, userId: string, key: string, env: string): Promise<boolean>`
+#### `hasEntitlement(supabase: SupabaseClient, userId: string, key: string): Promise<boolean>`
 
 Checks if a user has an active entitlement. Automatically handles expiry checking.
 
 ```ts
 import { hasEntitlement } from "@/lib/database/entitlements";
 
-const isPremium = await hasEntitlement(
-  supabaseClient,
-  userId,
-  "premium",
-  "production",
-);
+const isPremium = await hasEntitlement(supabaseClient, userId, "premium");
 // Returns true if:
 //   - Entitlement exists for user
 //   - expires_at is null (never expires) OR expires_at > now()
@@ -438,7 +420,6 @@ const isPremium = await hasEntitlement(
 
 - `userId` – User ID (UUID)
 - `key` – Entitlement key (e.g., `"premium"`, `"beta_access"`)
-- `env` – Environment: `"production"` | `"staging"` | `"development"`
 
 **Returns:** Boolean (true if active, false if missing or expired)
 

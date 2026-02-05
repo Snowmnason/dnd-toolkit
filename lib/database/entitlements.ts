@@ -8,8 +8,8 @@
  * - id: uuid (PK)
  * - user_id: uuid (FK to users)
  * - key: text (entitlement name)
- * - env: text (production | staging | development)
  * - created_at, updated_at: timestamps
+ * - expires_at: timestamp (nullable)
  *
  * **NOTE:** These are client-side queries. Do not use directly in components;
  * use `lib/feature-flags/FeatureFlagsManager` and React hooks instead.

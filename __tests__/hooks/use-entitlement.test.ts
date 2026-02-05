@@ -9,7 +9,6 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useEntitlement } from "@/hooks/feature/use-entitlements";
 import { FeatureFlagsManager } from "@/lib/feature-flags/server-sync";
 
 // Mock FeatureFlagsManager

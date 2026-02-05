@@ -10,13 +10,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FeatureFlagsManager } from "@/lib/feature-flags/server-sync";
-import { createClient } from "@supabase/supabase-js";
+import { SecureStorage } from "@/lib/storage";
 
-import { fetchFeatureFlagsByEnv } from "@/lib/database/feature-flags";
-import {
-  fetchEntitlementsByUserId,
-  hasEntitlement,
-} from "@/lib/database/entitlements";
+import { fetchFeatureFlags } from "@/lib/database/feature-flags";
+import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
 
 // Mock Supabase
 const mockSupabase = {
@@ -30,29 +27,37 @@ const mockSupabase = {
   })),
 };
 
+// Mock SecureStorage
+vi.mock("@/lib/storage", () => ({
+  SecureStorage: {
+    setJSON: vi.fn(),
+    getJSON: vi.fn(),
+    removeItem: vi.fn(),
+  },
+  STORAGE_KEYS: {
+    FEATURE_FLAGS: "dnd:feature_flags:v1",
+    CLOCK_INVALID: "dnd:clock_invalid",
+  },
+}));
+
 // Mock database helpers
 vi.mock("@/lib/database/feature-flags", () => ({
-  fetchFeatureFlagsByEnv: vi.fn(),
+  fetchFeatureFlags: vi.fn(),
 }));
 
 vi.mock("@/lib/database/entitlements", () => ({
   fetchEntitlementsByUserId: vi.fn(),
-  hasEntitlement: vi.fn(),
-}));
-
-// Mock database helpers
-vi.mock("@/lib/database/feature-flags", () => ({
-  fetchFeatureFlagsByEnv: vi.fn(),
-}));
-
-vi.mock("@/lib/database/entitlements", () => ({
-  fetchEntitlementsByUserId: vi.fn(),
-  hasEntitlement: vi.fn(),
 }));
 
 describe("FeatureFlagsManager", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+
+    // Mock SecureStorage methods to return null by default (no cached data)
+    (SecureStorage.getJSON as any).mockResolvedValue(null);
+    (SecureStorage.setJSON as any).mockResolvedValue(undefined);
+    (SecureStorage.removeItem as any).mockResolvedValue(undefined);
+
     // Reset manager state
     await FeatureFlagsManager.clearCache();
     FeatureFlagsManager.clearAllOverrides();
@@ -69,18 +74,16 @@ describe("FeatureFlagsManager", () => {
       const mockFlags = [
         { flag_name: "testFlag", enabled: true, kind: "feature" as const },
       ];
-      (fetchFeatureFlagsByEnv as any).mockResolvedValue(mockFlags);
+      (fetchFeatureFlags as any).mockResolvedValue(mockFlags);
 
       await FeatureFlagsManager.initialize(mockSupabase as any);
       await FeatureFlagsManager.bootstrapFlags();
 
-      expect(fetchFeatureFlagsByEnv).toHaveBeenCalledWith(mockSupabase);
+      expect(fetchFeatureFlags).toHaveBeenCalledWith(mockSupabase);
     });
 
     it("should handle fetch errors gracefully", async () => {
-      (fetchFeatureFlagsByEnv as any).mockRejectedValue(
-        new Error("Network error"),
-      );
+      (fetchFeatureFlags as any).mockRejectedValue(new Error("Network error"));
 
       await FeatureFlagsManager.initialize(mockSupabase as any);
       await FeatureFlagsManager.bootstrapFlags();
@@ -177,9 +180,11 @@ describe("FeatureFlagsManager", () => {
         new Error("Network error"),
       );
 
-      // Mock the getCachedEntitlement method to return cached value
+      // Mock the getCachedEntitlementWithExpiry method to return cached value
       const manager = FeatureFlagsManager as any;
-      manager.getCachedEntitlement = vi.fn().mockResolvedValue(true);
+      manager.getCachedEntitlementWithExpiry = vi
+        .fn()
+        .mockResolvedValue({ granted: true, expiresAt: null });
 
       const result = await FeatureFlagsManager.getEntitlement(
         "premium",

@@ -20,7 +20,7 @@
 
 import { getAppConfig } from "@/lib/config/loader";
 import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
-import { fetchFeatureFlagsByEnv } from "@/lib/database/feature-flags";
+import { fetchFeatureFlags } from "@/lib/database/feature-flags";
 import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 
@@ -48,8 +48,15 @@ export type FlagsSubscriber = (flags: Record<string, FeatureFlagState>) => void;
 // Configuration
 // ==========================================
 
-const CLOCK_SKEW_TOLERANCE_MS = 60 * 1000; // 60 seconds
 const ENTITLEMENT_CACHE_KEY_PREFIX = "entitlement:";
+
+/**
+ * Get clock skew tolerance from config (default: 60 seconds)
+ */
+function getClockSkewToleranceMs(): number {
+  const config = getAppConfig();
+  return config.remoteConfig?.clockSkewToleranceMs || 60 * 1000;
+}
 
 // ==========================================
 // Feature Flags Manager
@@ -94,7 +101,7 @@ class FeatureFlagsManagerClass {
       }
 
       // Fetch server flags
-      const serverFlags = await fetchFeatureFlagsByEnv(this.supabaseClient);
+      const serverFlags = await fetchFeatureFlags(this.supabaseClient);
 
       // Convert to state object
       const newFlags: Map<string, FeatureFlagState> = new Map();
@@ -252,7 +259,7 @@ class FeatureFlagsManagerClass {
   async getEntitlement(
     name: string,
     userId: string,
-  ): Promise<{ granted: boolean; source: string }> {
+  ): Promise<{ granted: boolean; source: string; expiresAt?: string | null }> {
     // Priority 1: User override (admin testing)
     const overrideKey = `${userId}:${name}`;
     if (this.userOverrides.has(overrideKey)) {
@@ -264,6 +271,7 @@ class FeatureFlagsManagerClass {
       return {
         granted: value,
         source: "override",
+        expiresAt: undefined,
       };
     }
 
@@ -275,7 +283,7 @@ class FeatureFlagsManagerClass {
         "Device clock invalid, denying entitlement",
         { name },
       );
-      return { granted: false, source: "clock_invalid" };
+      return { granted: false, source: "clock_invalid", expiresAt: undefined };
     }
 
     // Priority 2: Fresh server check
@@ -318,7 +326,7 @@ class FeatureFlagsManagerClass {
           expiresAt: entitlement?.expires_at,
         },
       );
-      return { granted, source: "server" };
+      return { granted, source: "server", expiresAt: entitlement?.expires_at };
     } catch (error) {
       logger.warn(
         "feature_flags",
@@ -327,18 +335,23 @@ class FeatureFlagsManagerClass {
       );
 
       // Priority 3: Last known value (offline)
-      const cached = await this.getCachedEntitlement(userId, name);
+      const cached = await this.getCachedEntitlementWithExpiry(userId, name);
       if (cached !== null) {
         logger.debug(
           "feature_flags",
-          `Entitlement ${name} from cache: ${cached}`,
+          `Entitlement ${name} from cache: ${cached.granted}`,
+          { expiresAt: cached.expiresAt },
         );
-        return { granted: cached, source: "cache" };
+        return {
+          granted: cached.granted,
+          source: "cache",
+          expiresAt: cached.expiresAt,
+        };
       }
 
       // No cache available
       logger.debug("feature_flags", `Entitlement ${name} not found, denying`);
-      return { granted: false, source: "not_found" };
+      return { granted: false, source: "not_found", expiresAt: undefined };
     }
   }
 
@@ -364,12 +377,12 @@ class FeatureFlagsManagerClass {
   }
 
   /**
-   * Get cached entitlement (checks expiry)
+   * Get cached entitlement with expiry info
    */
-  private async getCachedEntitlement(
+  private async getCachedEntitlementWithExpiry(
     userId: string,
     name: string,
-  ): Promise<boolean | null> {
+  ): Promise<{ granted: boolean; expiresAt: string | null } | null> {
     try {
       const cacheKey = `${STORAGE_KEYS.ENTITLEMENTS}:${ENTITLEMENT_CACHE_KEY_PREFIX}${userId}:${name}`;
       const cached = await SecureStorage.getJSON<{
@@ -390,11 +403,11 @@ class FeatureFlagsManagerClass {
             "feature_flags",
             `Cached entitlement ${name} has expired`,
           );
-          return false;
+          return { granted: false, expiresAt: cached.expiresAt };
         }
       }
 
-      return cached.granted;
+      return { granted: cached.granted, expiresAt: cached.expiresAt };
     } catch {
       return null;
     }
@@ -435,12 +448,13 @@ class FeatureFlagsManagerClass {
 
       const now = Date.now();
       const skew = lastCheck.timestamp - now;
+      const tolerance = getClockSkewToleranceMs();
 
-      if (skew > CLOCK_SKEW_TOLERANCE_MS) {
+      if (skew > tolerance) {
         // Clock went backward
         logger.error("feature_flags", "Clock manipulation detected", {
           skew,
-          tolerance: CLOCK_SKEW_TOLERANCE_MS,
+          tolerance,
         });
 
         await SecureStorage.setJSON(STORAGE_KEYS.CLOCK_INVALID, {
@@ -528,15 +542,41 @@ class FeatureFlagsManagerClass {
 
   /**
    * Clear all cached data (for logout)
+   * Properly clears feature flags, clock validation, and all entitlement cache entries
    */
   async clearCache(): Promise<void> {
     try {
+      // Clear core flag caches
       await SecureStorage.removeItem(STORAGE_KEYS.FEATURE_FLAGS);
       await SecureStorage.removeItem(STORAGE_KEYS.CLOCK_INVALID);
       await SecureStorage.removeItem("dnd:last_clock_check");
 
-      // Clear entitlement cache (pattern match)
-      // Note: This is a simplified approach; proper implementation would track keys
+      // Clear all entitlement cache entries by pattern
+      try {
+        const allKeys = await SecureStorage.getAllKeys();
+        const entitlementPattern = `${STORAGE_KEYS.ENTITLEMENTS}:${ENTITLEMENT_CACHE_KEY_PREFIX}`;
+        const entitlementKeys = allKeys.filter((key) =>
+          key.startsWith(entitlementPattern),
+        );
+
+        for (const key of entitlementKeys) {
+          await SecureStorage.removeItem(key);
+        }
+
+        if (entitlementKeys.length > 0) {
+          logger.debug("feature_flags", "Cleared entitlement cache entries", {
+            count: entitlementKeys.length,
+          });
+        }
+      } catch (error) {
+        logger.warn(
+          "feature_flags",
+          "Failed to clear entitlement cache",
+          error,
+        );
+        // Continue with other cleanup steps
+      }
+
       logger.info("feature_flags", "Cleared all cached flags and entitlements");
 
       this.currentFlags = new Map();
