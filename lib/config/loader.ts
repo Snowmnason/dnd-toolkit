@@ -103,7 +103,7 @@ export interface AppSettings {
       enabled: boolean;
       description?: string;
       kind?: "free" | "premium" | "beta";
-    }
+    } & Record<string, any> // Allow additional properties for specific flags
   >;
 }
 

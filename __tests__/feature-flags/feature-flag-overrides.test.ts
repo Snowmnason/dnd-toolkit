@@ -74,7 +74,8 @@ describe("Feature Flag Remote Overrides", () => {
         {
           id: "override-1",
           user_id: userId,
-          flag_name: "testFlag",
+          target_type: "flag",
+          target_name: "testFlag",
           enabled: true,
           expires_at: null,
           revoked: false,
@@ -100,7 +101,8 @@ describe("Feature Flag Remote Overrides", () => {
         {
           id: "override-1",
           user_id: userId,
-          flag_name: "testFlag",
+          target_type: "flag",
+          target_name: "testFlag",
           enabled: false,
           expires_at: null,
           revoked: false,
@@ -143,7 +145,8 @@ describe("Feature Flag Remote Overrides", () => {
         {
           id: "override-1",
           user_id: userId,
-          flag_name: "testFlag",
+          target_type: "flag",
+          target_name: "testFlag",
           enabled: true,
           expires_at: null,
           revoked: true, // Revoked
@@ -197,7 +200,8 @@ describe("Feature Flag Remote Overrides", () => {
         {
           id: "override-1",
           user_id: userId,
-          flag_name: "testFlag",
+          target_type: "flag",
+          target_name: "testFlag",
           enabled: true,
           expires_at: futureDate,
           revoked: false,
@@ -223,7 +227,8 @@ describe("Feature Flag Remote Overrides", () => {
         {
           id: "override-1",
           user_id: userId,
-          flag_name: "testFlag",
+          target_type: "flag",
+          target_name: "testFlag",
           enabled: true,
           expires_at: null,
           revoked: false,
@@ -249,7 +254,8 @@ describe("Feature Flag Remote Overrides", () => {
         {
           id: "override-1",
           user_id: userId,
-          flag_name: "testFlag",
+          target_type: "flag",
+          target_name: "testFlag",
           enabled: true,
           expires_at: null,
           revoked: false,
@@ -308,7 +314,8 @@ describe("Feature Flag Remote Overrides", () => {
         {
           id: "override-1",
           user_id: userId,
-          flag_name: "testFlag",
+          target_type: "flag",
+          target_name: "testFlag",
           enabled: true,
           expires_at: null,
           revoked: false,
@@ -337,7 +344,8 @@ describe("Feature Flag Remote Overrides", () => {
         {
           id: "override-1",
           user_id: userId,
-          flag_name: "testFlag",
+          target_type: "flag",
+          target_name: "testFlag",
           enabled: true,
           expires_at: null,
           revoked: false,
@@ -379,7 +387,8 @@ describe("Feature Flag Remote Overrides", () => {
         {
           id: "override-1",
           user_id: userId,
-          flag_name: "testFlag",
+          target_type: "flag",
+          target_name: "testFlag",
           enabled: true,
           expires_at: null,
           revoked: false,

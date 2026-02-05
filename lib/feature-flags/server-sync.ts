@@ -136,7 +136,7 @@ class FeatureFlagsManagerClass {
             this.userId,
           );
           this.remoteOverrides = new Map(
-            overrides.map((o) => [o.flag_name, o]),
+            overrides.map((o) => [o.target_name, o]),
           );
           await SecureStorage.setJSON(
             `${STORAGE_KEYS.FEATURE_FLAGS}:${OVERRIDE_CACHE_KEY_PREFIX}${this.userId}`,
