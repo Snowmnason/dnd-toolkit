@@ -42,23 +42,38 @@ Runtime Checks (isEnabled, getKind, toggle) or Dev Console
 Component/Service Decision Logic
 ```
 
-### New Server-Driven Path (FeatureFlagsManager)
+### New Server-Driven Path (FeatureFlagsManager, Phase 1)
+
+**Feature Flags:**
+
+- ✅ **Fetched ONCE** at app startup (non-blocking)
+- Server values **OVERWRITE** hardcoded config
+- Used throughout app lifecycle without re-fetching
+- **Storage Strategy**: Persisted to `SecureStorage` for offline access. One-time bootstrap simplifies logic and reduces points of failure.
+- Offline: Uses last startup values from `SecureStorage`
+
+**Entitlements:**
+
+- ✅ **Fetched FRESH** on each check (real-time verification)
+- Expiry checking: `expires_at` field automatically evaluated
+- **Storage Strategy**: Persisted to `SecureStorage` (encrypted)
+- Offline: Caches last known values with expiry metadata
+- Clock manipulation detection: Denies access if device time is invalid
 
 ```
-AppKernel Startup
-    ↓ (after appReady)
-FeatureFlagsManager.initialize() + refreshFromServer()
+AppKernel Startup (Phase 3: appReady)
     ↓
-Supabase Edge Function (with AuthLayer token injection)
+FeatureFlagsManager.initialize(supabaseClient)
+FeatureFlagsManager.verifyDeviceClock()
+FeatureFlagsManager.bootstrapFlags() [ONE-TIME, non-blocking]
     ↓
-FastCache: flags (with ETag/version dedupe)
-SecureStorage: entitlements (encrypted, versioned)
+Supabase REST API → feature_flags table
     ↓
-Runtime Checks (getFlag, getEntitlement, verifyDeviceClock)
-    ↓ (stale-while-revalidate on network errors)
-Component/Service Decision Logic
-    ↓ (on network recovery)
-Automatic refresh via NetworkRecoveryManager
+SecureStorage: Store flags + timestamp (encrypted)
+    ↓
+Runtime Checks (getFlag, getEntitlement)
+    ↓
+Components/Services use hooks: useFeatureFlags(), useEntitlement()
 ```
 
 ### Key Patterns
@@ -176,95 +191,117 @@ const unsubscribe = FeatureFlags.subscribe((flagName, kind) => {
 // Later: unsubscribe()
 ```
 
-### `FeatureFlagsManager` (Server-Driven, Phase 1)
+### `FeatureFlagsManager` (Server-Driven, Phase 1 ✅ Complete)
 
-**Runtime manager for premium entitlements and server-synced feature gates.** Initialized automatically by `AppKernel` on startup; no manual initialization typically needed.
+**Runtime manager for premium entitlements and server-synced feature gates.**
+
+**How it works:**
+
+- Feature flags are fetched **once** at app startup and cached
+- Entitlements are fetched **fresh** on each call (real-time verification)
+- Server values override hardcoded defaults
+- Expired entitlements are automatically denied
+- Device clock manipulation is detected and blocks access
+
+Initialized automatically by `AppKernel` on startup; no manual initialization typically needed.
 
 #### Methods
 
-**`async initialize(supabaseClient?: SupabaseClient): Promise<void>`**
+**`async initialize(supabaseClient: SupabaseClient): Promise<void>`**
 
-Initializes the manager with a Supabase client. Called automatically by `AppKernel` after `appReady`. Only needed if you're setting up outside the kernel.
+Initializes the manager with a Supabase client. Called automatically by `AppKernel` during Phase 3 (appReady).
 
 ```typescript
 import { FeatureFlagsManager } from "@/lib/feature-flags";
+const { getSupabaseClient } = await import("@/lib/database/supabase");
 
-await FeatureFlagsManager.initialize(supabaseClient);
-```
-
-**`async refreshFromServer(): Promise<void>`**
-
-Fetches flags and entitlements from the Edge Function. Non-blocking; logs errors but never throws. Uses `AuthLayer.injectAuthHeader()` for token injection.
-
-- Checks `ETag`/`version` to avoid redundant updates (304 Not Modified)
-- Stores flags in `FastCache` (soft 24h TTL), entitlements in `SecureStorage` (encrypted, 7d TTL)
-- On network error, falls back to cached values (stale-while-revalidate)
-- Records success/failure with `CircuitBreakerManager` for endpoint health
-
-```typescript
-// Manual refresh (testing, settings button)
-await FeatureFlagsManager.refreshFromServer();
-```
-
-**`async getFlag(name: string, fallback?: boolean): Promise<boolean>`**
-
-Reads a flag from cache. Returns cached value if available (even if stale); uses stale-while-revalidate pattern offline. Returns `fallback` if flag is unknown.
-
-```typescript
-const enabled = await FeatureFlagsManager.getFlag("premiumUI", false);
-if (enabled) {
-  /* show premium feature */
-}
-```
-
-**`async getEntitlement(name: string): Promise<{ granted: boolean; expiresAt?: number }>`**
-
-Reads a premium entitlement. Includes clock-safety checks:
-
-- Expired entitlements return `granted: false`
-- Device clock backward-skew (>60s) returns `granted: false` + marks `STORAGE_KEYS.CLOCK_INVALID`
-- Returns `granted: false` if not found
-
-```typescript
-const ent = await FeatureFlagsManager.getEntitlement("premium");
-if (ent.granted && (!ent.expiresAt || ent.expiresAt > Date.now())) {
-  // User is premium
-}
+await FeatureFlagsManager.initialize(getSupabaseClient());
 ```
 
 **`async verifyDeviceClock(): Promise<boolean>`**
 
-Performs a clock skew check against server time. Returns `true` if device clock is safe (within 60s tolerance).
+Performs a clock skew check against server time. Returns `true` if device clock is safe (within 60 seconds tolerance). Called at startup to detect device time manipulation.
 
 ```typescript
-const isSafe = await FeatureFlagsManager.verifyDeviceClock();
-if (!isSafe) {
-  console.warn("Device clock is suspect; entitlements denied");
+const clockValid = await FeatureFlagsManager.verifyDeviceClock();
+if (!clockValid) {
+  logger.warn("Device clock invalid - denying premium access");
 }
 ```
 
-**`subscribe(callback: (flags: FeatureFlagsData) => void): () => void`**
+**`async bootstrapFlags(): Promise<void>`**
 
-Subscribes to flag/entitlement updates. Callback receives the full cached snapshot.
+Fetches feature flags from server **once** at app startup. Server values overwrite hardcoded config. Non-blocking; logs errors but never throws.
 
 ```typescript
-const unsubscribe = FeatureFlagsManager.subscribe((data) => {
-  console.log("Flags/entitlements updated:", data);
+// Called automatically by AppKernel, but can be called manually for refresh
+await FeatureFlagsManager.bootstrapFlags();
+```
+
+**`getFlag(name: string, fallback?: boolean): boolean`**
+
+Synchronous check of a feature flag. Returns cached value from bootstrap, or fallback if not found.
+
+**Priority:** Override → Server (bootstrapped) → Hardcoded → Fallback
+
+```typescript
+const enabled = FeatureFlagsManager.getFlag("darkModeV2", false);
+if (enabled) {
+  // Use new dark mode
+}
+```
+
+**`async getEntitlement(name: string, userId: string): Promise<{ granted: boolean; source: string }>`**
+
+Fetches entitlement **fresh** on each call (real-time verification). Checks expiry automatically.
+
+**Priority:** Override → Fresh Server Check → Cached Value
+
+- `expires_at = null` → Never expires (always granted)
+- `expires_at > now()` → Currently valid (granted)
+- `expires_at <= now()` → Expired (denied)
+- Device clock invalid → Denied (fail-secure)
+
+```typescript
+const { granted } = await FeatureFlagsManager.getEntitlement("premium", userId);
+if (granted) {
+  // User has premium access
+}
+```
+
+**`subscribe(callback: (flags: Record<string, FeatureFlagState>) => void): () => void`**
+
+Subscribes to flag updates (fires when bootstrapFlags completes). Callback receives all flags.
+
+```typescript
+const unsubscribe = FeatureFlagsManager.subscribe((flags) => {
+  console.log("Flags updated:", flags);
 });
 // Later: unsubscribe();
 ```
 
-#### Cache & Storage Helpers
+**`setOverride(key: string, value: boolean): void`**
 
-**`getCachedFlags(): FeatureFlagsData | null`**
-**`getCachedEntitlements(): PremiumEntitlements | null`**
-**`clearCache(): Promise<void>`**
+Set admin override for testing. Key format:
 
-Direct cache access for dev tools or testing.
+- Flag override: `"flagName"`
+- Entitlement override: `"userId:entitlementKey"`
 
 ```typescript
-const cached = FeatureFlagsManager.getCachedFlags();
-await FeatureFlagsManager.clearCache(); // Full refresh on next call
+// Override a feature flag for testing
+FeatureFlagsManager.setOverride("darkModeV2", true);
+
+// Override an entitlement for a user
+FeatureFlagsManager.setOverride("user-123:premium", true);
+```
+
+**`clearOverride(key: string): void` / `clearAllOverrides(): void`**
+
+Clear specific override or all overrides.
+
+```typescript
+FeatureFlagsManager.clearOverride("darkModeV2");
+FeatureFlagsManager.clearAllOverrides(); // Clear all when testing done
 ```
 
 ## Interfaces
@@ -361,6 +398,30 @@ export function ComponentWithToggle() {
 }
 ```
 
+### Server-Synced Flags & Entitlements (React Hooks)
+
+```typescript
+import { useFeatureFlags, useEntitlement } from '@/hooks';
+
+export function PremiumFeature() {
+  // Feature flags are checked synchronously (bootstrapped at startup)
+  const { enabled: hasDarkModeV2 } = useFeatureFlags("darkModeV2");
+
+  // Check premium entitlement (fresh check, async)
+  const { granted: isPremium, loading } = useEntitlement("premium", userId);
+
+  if (loading) return <div>Checking access...</div>;
+  if (!isPremium) return <PaywallModal />;
+
+  return <PremiumContent useDarkMode={hasDarkModeV2} />;
+}
+```
+
+**Key Differences:**
+
+- `useFeatureFlags()` - Synchronous, cached from bootstrap
+- `useEntitlement()` - Asynchronous, always fresh from server (or cached if offline)
+
 ### Dev Console Runtime Toggle
 
 Open browser dev console and run:
@@ -403,12 +464,12 @@ export async function checkPremiumFeature(featureKey: string) {
 
 **Server-Driven (FeatureFlagsManager):**
 
-- `lib/database` – `getSupabaseClient()` (Supabase Edge Function invocation)
-- `lib/auth` – `AuthLayer.injectAuthHeader()` (token injection for auth headers)
-- `lib/api/circuit-breaker` – `CircuitBreakerManager` (endpoint health tracking)
-- `lib/storage` – `FastCache`, `SecureStorage`, `STORAGE_KEYS` (persistence + encryption)
-- `lib/api/network-recovery.ts` – `NetworkRecoveryManager` (refresh on RECOVERING→GOOD)
-- `lib/kernel` – `AppKernel` (automatic initialization on startup)
+- `lib/database/feature-flags.ts` – `fetchFeatureFlags()` REST query helper
+- `lib/database/entitlements.ts` – `fetchEntitlementsByUserId()`, `hasEntitlement()` REST query helpers
+- `lib/storage/SecureStorage` – Encrypted persistence for flags and entitlements (single storage layer, versioned)
+- `lib/config` – `getAppConfig()` (environment detection, hardcoded defaults)
+- `lib/kernel` – `AppKernel` (automatic initialization on startup, clock verification)
+- `lib/utils/logger.ts` – Logging with categories
 
 ### External
 
@@ -418,22 +479,17 @@ export async function checkPremiumFeature(featureKey: string) {
 
 ### Known Limitations
 
-1. **No Persistence**: Runtime toggles (`toggle()`, `toggleKind()`) are in-memory only. Page refresh resets to config values.
+1. **No Remote Config for Feature Flags**: Flags are loaded once at startup from Supabase REST API. To update flags, you must restart the app (no hot-reload).
 
-2. **No Remote Config Yet**: Flags are loaded from static config files. Future enhancement: fetch from Supabase/CDN for runtime updates without deploy.
+2. **Clock Skew Detection**: Device time manipulation (>60 seconds backward) denies all entitlements. Check `FeatureFlagsManager.verifyDeviceClock()` before relying on premium features.
 
-3. **Kind Conflicts**: Flags can have multiple concerns (e.g., both `beta` and `premium`). Use separate flags if both qualities are needed:
+3. **Entitlement Expiry**: Requires `expires_at` to be set in database. Missing `expires_at` means the entitlement never expires.
 
-   ```json
-   {
-     "experimentalPremium": { "kind": "beta" }, // Experimental version
-     "stablePremium": { "kind": "premium" } // Stable version
-   }
-   ```
+4. **Offline Access**: While offline, cached entitlements are used but expiry is still checked locally (cached `expiresAt` timestamp).
 
-4. **Production Beta Warning**: Only logged to console on startup. No enforcement (beta flags CAN be enabled in production; it's just warned).
+5. **Admin Overrides**: `setOverride()` is in-memory only. Overrides are cleared when app reloads or on logout.
 
-5. **No Rollout Targeting**: Flags are global (all or nothing). No per-user rollout yet.
+6. **No Rollout Targeting**: Flags are global (all or nothing). No per-user rollout yet (Phase 2 feature).
 
 ### Security Considerations
 
@@ -450,20 +506,23 @@ export async function checkPremiumFeature(featureKey: string) {
 
 ## Related Modules
 
-- **lib/config** – Environment-aware configuration loading (used to load feature flags)
+- **lib/config** – Environment-aware configuration loading (used to load legacy feature flags)
 - **lib/premium** – Subscription/tier management (combine with flags for premium gating)
-- **hooks/use-feature-flag** – React hook for re-rendering on flag changes
-- **components/ui/FeatureGate** – React component wrapper for conditional rendering
+- **lib/cache/QueryCache** – Request deduplication (Phase 2 enhancement)
+- **lib/storage/SecureStorage** – Encrypted persistence for both flags (bootstrap only) and entitlements
+- **lib/kernel/app-kernel** – Bootstrap clock verification and manager initialization
+- **hooks/use-feature-flag** – Legacy hook for config-driven flags
+- **hooks/use-feature-flags** – Server-synced flags hook
+- **hooks/use-entitlements** – Premium entitlement status hook
 
 ## File Breakdown
 
 | File             | Purpose                                                          | Lines |
 | ---------------- | ---------------------------------------------------------------- | ----- |
 | feature-flags.ts | Legacy `FeatureFlags` class, config-driven toggles, window setup | ~130  |
-| server-sync.ts   | `FeatureFlagsManager`, server-sync, entitlements, clock checks   | ~200  |
-| remote.ts        | Edge Function client, ETag/304 handling, AuthLayer token inject  | ~60   |
-| index.ts         | Barrel export (both legacy + new manager)                        | 5     |
-| README.md        | This file                                                        | ~480  |
+| server-sync.ts   | `FeatureFlagsManager`, server-sync, entitlements, clock checks   | ~350  |
+| index.ts         | Barrel export (legacy + new manager + hooks)                     | 10    |
+| README.md        | This file                                                        | ~574  |
 
 ## Testing
 
@@ -493,19 +552,20 @@ console.log(FeatureFlags.getByKind("beta")); // All beta flags enabled
 
 ## Future Enhancements
 
-**Phase 1 (Server-Sync)** — ✅ Implemented
+**Phase 1** — ✅ **COMPLETE**
 
-- Server-driven feature flags and entitlements
-- ETag/version-based deduplication
-- Stale-while-revalidate offline behavior
-- Device clock manipulation detection
-- CircuitBreaker endpoint health tracking
+- ✅ Server-driven feature flags (bootstrap at startup)
+- ✅ Premium entitlements with expiry checking
+- ✅ Device clock manipulation detection
+- ✅ Offline caching with fallback
+- ✅ Admin override support for testing
+- ✅ Security hardening (Map-based access, no object injection)
 
 **Phase 2 (Planned):**
 
 - **Recurring Sync** – Background job to refresh flags/entitlements at configurable intervals (24h default)
-- **UI Hooks** – `useFeatureFlags()` and `useEntitlements()` hooks for React components with auto-subscription
+- **UI Hooks Enhanced** – Better error handling and loading states in hooks
 - **Admin Debug Screen** – Built-in UI to view cached flags, trigger refresh, inspect clock state
 - **Telemetry** – Track flag check counts and entitlement denials for analytics
-- **Rollout Targeting** – Per-user flag rollout (requires backend flagging service upgrade)
+- **Per-User Rollout** – Gradual rollout of flags to user segments
 - **A/B Testing Integration** – Link flag variants to user cohorts

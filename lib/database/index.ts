@@ -10,8 +10,9 @@ export { getSupabaseClient, isSupabaseConfigured, supabase } from "./supabase";
 
 // Common utilities
 export {
-    executeParallelQueries, getCurrentUserProfile,
-    validateUserForWrite
+  executeParallelQueries,
+  getCurrentUserProfile,
+  validateUserForWrite,
 } from "./common";
 
 // User operations
@@ -21,15 +22,29 @@ export type { CreateUserData, UpdateUserData, User } from "./users";
 // World operations
 export { worldsDB } from "./worlds";
 export type {
-    AccessRole,
-    CreateWorldData, UserRole, World,
-    WorldAccess,
-    WorldWithAccess
+  AccessRole,
+  CreateWorldData,
+  UserRole,
+  World,
+  WorldAccess,
+  WorldWithAccess,
 } from "./worlds";
 
 // Invite operations
 export {
-    createInviteLink, deleteInviteLink,
-    getWorldInviteLinks, invitesDB, validateInviteToken
+  createInviteLink,
+  deleteInviteLink,
+  getWorldInviteLinks,
+  invitesDB,
+  validateInviteToken,
 } from "./invites";
 
+// Feature Flags operations
+export { fetchFeatureFlags, type FeatureFlagRow } from "./feature-flags";
+
+// Entitlements operations
+export {
+  fetchEntitlementsByUserId,
+  hasEntitlement,
+  type EntitlementRow,
+} from "./entitlements";

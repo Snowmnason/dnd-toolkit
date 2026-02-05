@@ -110,7 +110,7 @@ CREATE TABLE invite_links (
 );
 ```
 
-**feature_flags** – Server-side feature gates
+**feature_flags** – Server-side feature gates (global)
 
 ```sql
 CREATE TABLE feature_flags (
@@ -118,22 +118,26 @@ CREATE TABLE feature_flags (
   enabled boolean NOT NULL,
   kind text NOT NULL, -- "free", "premium", "beta"
   description text,
-  env text NOT NULL,
+  created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
 ```
 
-**entitlements** – User subscription tier and feature access
+**entitlements** – User subscription tier and feature access (with expiry)
 
 ```sql
 CREATE TABLE entitlements (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES users(id) ON DELETE CASCADE,
-  key text NOT NULL,
-  value jsonb NOT NULL,
-  env text NOT NULL,
+  user_id uuid NULL REFERENCES users(id) ON DELETE CASCADE,
+  key text NOT NULL, -- e.g., "premium", "beta_access"
+  expires_at timestamptz NULL, -- NULL = never expires
+  created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
+
+CREATE INDEX idx_entitlements_user_id ON entitlements(user_id);
+CREATE INDEX idx_entitlements_key ON entitlements(key);
+CREATE INDEX idx_entitlements_expires_at ON entitlements(expires_at);
 ```
 
 ## API Reference
@@ -359,6 +363,67 @@ const [user, worlds, invites] = await executeParallelQueries([
   getWorldInviteLinks(worldId),
 ]);
 ```
+
+---
+
+### Feature Flags & Entitlements (Phase 1)
+
+**Note:** These helpers are used internally by `FeatureFlagsManager` and are not typically called directly from components. Use the manager or React hooks instead.
+
+#### `fetchFeatureFlags(supabase: SupabaseClient): Promise<FeatureFlagRow[]>`
+
+Fetches all global feature flags. Called by `FeatureFlagsManager.bootstrapFlags()` at app startup.
+
+```ts
+import { fetchFeatureFlags } from "@/lib/database/feature-flags";
+
+const flags = await fetchFeatureFlags(supabaseClient);
+// Returns: [{ flag_name: "darkModeV2", enabled: true, kind: "free", ... }]
+```
+
+**Parameters:** None
+
+**Returns:** Array of `FeatureFlagRow` objects (or empty array if none found)
+
+#### `fetchEntitlementsByUserId(supabase: SupabaseClient, userId: string): Promise<EntitlementRow[]>`
+
+Fetches all entitlements for a user. Called by `FeatureFlagsManager.getEntitlement()` for fresh checks.
+
+```ts
+import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
+
+const entitlements = await fetchEntitlementsByUserId(supabaseClient, userId);
+// Returns: [{ id: "uuid", user_id: "uuid", key: "premium", expires_at: "2026-12-31T..." }]
+```
+
+**Parameters:**
+
+- `userId` – User ID (UUID)
+
+**Returns:** Array of `EntitlementRow` objects (or empty array if none found)
+
+#### `hasEntitlement(supabase: SupabaseClient, userId: string, key: string): Promise<boolean>`
+
+Checks if a user has an active entitlement. Automatically handles expiry checking.
+
+```ts
+import { hasEntitlement } from "@/lib/database/entitlements";
+
+const isPremium = await hasEntitlement(supabaseClient, userId, "premium");
+// Returns true if:
+//   - Entitlement exists for user
+//   - expires_at is null (never expires) OR expires_at > now()
+// Returns false otherwise
+```
+
+**Parameters:**
+
+- `userId` – User ID (UUID)
+- `key` – Entitlement key (e.g., `"premium"`, `"beta_access"`)
+
+**Returns:** Boolean (true if active, false if missing or expired)
+
+**Security Note:** Expiry checking happens on the client side. For sensitive operations, verify entitlements on the backend as well.
 
 ---
 

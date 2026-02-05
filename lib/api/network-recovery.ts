@@ -240,24 +240,8 @@ export async function registerNetworkRecoveryHooks(
           },
         ),
 
-        flagsRefresh: await executeRecoveryStep(
-          "feature-flags-refresh",
-          async () => {
-            logger.debug("network", "Refreshing feature flags on recovery");
-            try {
-              const { FeatureFlagsManager } =
-                await import("@/lib/feature-flags/server-sync");
-              await FeatureFlagsManager.refreshFromServer();
-              logger.info("network", "Feature flags refreshed on recovery");
-            } catch (error) {
-              logger.warn(
-                "network",
-                "Feature flags refresh failed on recovery (using cache):",
-                error,
-              );
-            }
-          },
-        ),
+        // Feature flags are bootstrapped once at startup, no need to refresh on network recovery
+        flagsRefresh: { success: true, skipped: true },
 
         stateReset: await executeRecoveryStep("state-reset", async () => {
           await NetworkRecoveryManager.resetRecoveryState();

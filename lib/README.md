@@ -145,15 +145,29 @@ throw new AppError("World not found", { code: "WORLD_NOT_FOUND", status: 404 });
 
 ### Feature Flags (`feature-flags/`)
 
-**Purpose:** Runtime feature toggles, beta features, A/B testing.
+**Purpose:** Dual-mode feature toggles: legacy config-driven flags + server-synced runtime flags/entitlements.
 
-**Exports:** `FeatureFlags`, `useFeatureFlag()`, `toggleFlag()`
+**Exports:** `FeatureFlags`, `useFeatureFlag()`, `FeatureFlagsManager`, `useFeatureFlags()`, `useEntitlement()`
 
 ```tsx
-import { useFeatureFlag } from "@/lib/feature-flags";
+import { useFeatureFlag, useFeatureFlags, useEntitlement } from "@/hooks";
 
+// Legacy config-driven flags
 const isNewUIEnabled = useFeatureFlag("newUI");
+
+// Server-synced flags
+const { enabled, loading } = useFeatureFlags("premiumUI");
+
+// Premium entitlements with clock safety
+const { granted, expiresAt } = useEntitlement("premium");
 ```
+
+**Key features:**
+
+- Config-driven toggles for dev/testing (no network)
+- Server-synced entitlements for production (with offline caching, clock safety)
+- Clock manipulation detection for fail-secure premium gating
+- Integration with `lib/storage` (SecureStorage for encrypted persistence)
 
 ---
 

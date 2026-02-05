@@ -1,18 +1,26 @@
 /**
  * Feature Flags Manager
  *
- * Manages runtime feature flags and premium entitlements with:
- * - Server sync (refresh from Edge Function)
- * - FastCache persistence for flags (unencrypted, fast)
- * - SecureStorage persistence for entitlements (encrypted, TTL-aware)
- * - Clock manipulation detection (fail-secure on backward clock)
- * - Offline graceful degradation
+ * Manages runtime feature flags and premium entitlements with proper priority:
+ * 1. User-specific overrides (admin testing)
+ * 2. Server values (source of truth)
+ * 3. Hardcoded fallback (offline/error scenarios)
+ *
+ * **Feature Flags:**
+ * - Fetched ONCE at app startup
+ * - Server values OVERWRITE hardcoded config
+ * - Used throughout app lifecycle
+ * - Offline: Use last startup values
+ *
+ * **Entitlements:**
+ * - Fetched FRESH on each check
+ * - Real-time verification
+ * - Offline: Use last known values
  */
 
-import { CircuitBreakerManager } from "@/lib/api/circuit-breaker";
-import { getFeatureFlagsFromServer } from "./remote";
-import { QueryCache } from "@/lib/cache";
-import { FastCache } from "@/lib/storage";
+import { getAppConfig } from "@/lib/config/loader";
+import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
+import { fetchFeatureFlags } from "@/lib/database/feature-flags";
 import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 
@@ -20,40 +28,46 @@ import { logger } from "@/lib/utils/logger";
 // Types
 // ==========================================
 
-export interface FeatureFlagsData {
-  flags: Record<string, { enabled: boolean; ttlMs?: number }>;
-  fetchedAt: number;
-  ttlMs?: number;
-  etag?: string;
-  version?: string;
+export interface FeatureFlagState {
+  enabled: boolean;
+  kind?: string;
+  description?: string;
+  source: "server" | "hardcoded" | "override";
 }
 
-export interface EntitlementsData {
-  entitlements: Record<
-    string,
-    { granted: boolean; expiresAt?: string | null }
-  >;
-  fetchedAt: number;
-  expiresAt?: string;
-  lastVerifiedAt: number; // For clock manipulation detection
+export interface EntitlementState {
+  granted: boolean;
+  expiresAt?: string | null;
+  source: "server" | "cache" | "override";
+  lastChecked: number;
 }
 
-export type FlagsSubscriber = (flags: FeatureFlagsData) => void;
+export type FlagsSubscriber = (flags: Record<string, FeatureFlagState>) => void;
 
 // ==========================================
 // Configuration
 // ==========================================
 
-const CLOCK_SKEW_TOLERANCE_MS = 60 * 1000; // 60 seconds (configurable per RFC)
-const CIRCUIT_BREAKER_KEY = "feature_flags:endpoint";
+const ENTITLEMENT_CACHE_KEY_PREFIX = "entitlement:";
+
+/**
+ * Get clock skew tolerance from config (default: 60 seconds)
+ */
+function getClockSkewToleranceMs(): number {
+  const config = getAppConfig();
+  return config.remoteConfig?.clockSkewToleranceMs || 60 * 1000;
+}
 
 // ==========================================
 // Feature Flags Manager
 // ==========================================
 
 class FeatureFlagsManagerClass {
-  private subscribers: Set<FlagsSubscriber> = new Set();
   private supabaseClient: any = null;
+  private currentFlags: Map<string, FeatureFlagState> = new Map(); // Use Map for safe access
+  private userOverrides: Map<string, boolean> = new Map(); // Admin testing overrides
+  private subscribers: Set<FlagsSubscriber> = new Set();
+  private bootstrapped = false;
 
   /**
    * Initialize with Supabase client
@@ -65,12 +79,441 @@ class FeatureFlagsManagerClass {
   }
 
   /**
+   * Bootstrap feature flags from server (called ONCE at app startup)
+   * Server values OVERWRITE hardcoded config
+   *
+   * Priority:
+   * 1. Server values (if reachable)
+   * 2. Last known values (offline)
+   * 3. Hardcoded fallback
+   */
+  async bootstrapFlags(): Promise<void> {
+    if (this.bootstrapped) {
+      logger.debug("feature_flags", "Already bootstrapped, skipping");
+      return;
+    }
+
+    logger.info("feature_flags", "Bootstrapping feature flags from server");
+
+    try {
+      if (!this.supabaseClient) {
+        throw new Error("Supabase client not initialized");
+      }
+
+      // Fetch server flags
+      const serverFlags = await fetchFeatureFlags(this.supabaseClient);
+
+      // Convert to state object
+      const newFlags: Map<string, FeatureFlagState> = new Map();
+      for (const flag of serverFlags) {
+        newFlags.set(flag.flag_name, {
+          enabled: flag.enabled,
+          kind: flag.kind,
+          description: flag.description,
+          source: "server",
+        });
+      }
+
+      // Store as current state
+      this.currentFlags = newFlags;
+      this.bootstrapped = true;
+
+      // Persist for offline use (convert Map to object for storage)
+      await SecureStorage.setJSON(STORAGE_KEYS.FEATURE_FLAGS, {
+        flags: Object.fromEntries(newFlags),
+        fetchedAt: Date.now(),
+      });
+
+      logger.info("feature_flags", "Bootstrapped from server", {
+        flagCount: newFlags.size,
+      });
+
+      // Notify subscribers
+      this.notifySubscribers(newFlags);
+    } catch (error) {
+      logger.warn(
+        "feature_flags",
+        "Server bootstrap failed, using fallback",
+        error,
+      );
+
+      // Try to load last known values
+      try {
+        const cached = await SecureStorage.getJSON<{
+          flags: Record<string, FeatureFlagState>;
+          fetchedAt: number;
+        }>(STORAGE_KEYS.FEATURE_FLAGS);
+
+        if (cached?.flags) {
+          this.currentFlags = new Map(Object.entries(cached.flags));
+          this.bootstrapped = true;
+          logger.info("feature_flags", "Loaded from last known state", {
+            flagCount: this.currentFlags.size,
+            age: Date.now() - cached.fetchedAt,
+          });
+          this.notifySubscribers(this.currentFlags);
+          return;
+        }
+      } catch {
+        logger.debug("feature_flags", "No cached flags available");
+      }
+
+      // Final fallback: Load hardcoded config
+      this.loadHardcodedFlags();
+      this.bootstrapped = true;
+      logger.info("feature_flags", "Using hardcoded fallback", {
+        flagCount: this.currentFlags.size,
+      });
+      this.notifySubscribers(this.currentFlags);
+    }
+  }
+
+  /**
+   * Load hardcoded flags from appsettings (fallback only)
+   */
+  private loadHardcodedFlags(): void {
+    const config = getAppConfig();
+    const hardcodedFlags = config.featureFlags || {};
+
+    const flags: Map<string, FeatureFlagState> = new Map();
+    for (const [key, value] of Object.entries(hardcodedFlags)) {
+      if (typeof value === "object" && value !== null && "enabled" in value) {
+        flags.set(key, {
+          enabled: !!value.enabled,
+          kind: value.kind,
+          description: value.description,
+          source: "hardcoded",
+        });
+      }
+    }
+
+    this.currentFlags = flags;
+  }
+
+  /**
+   * Get feature flag value
+   *
+   * Priority:
+   * 1. User override (admin testing)
+   * 2. Current state (from server bootstrap)
+   * 3. Hardcoded fallback
+   */
+  getFlag(name: string, fallback: boolean = false): boolean {
+    // Priority 1: User override (admin testing)
+    if (this.userOverrides.has(name)) {
+      const value = this.userOverrides.get(name);
+      logger.debug("feature_flags", `Flag ${name} from override: ${value}`);
+      return value ?? fallback;
+    }
+
+    // Priority 2: Current state (from server or last known)
+    const flagState = this.currentFlags.get(name);
+    if (flagState !== undefined) {
+      const value = flagState.enabled;
+      logger.debug(
+        "feature_flags",
+        `Flag ${name} from ${flagState.source}: ${value}`,
+      );
+      return value;
+    }
+
+    // Priority 3: Hardcoded fallback (if not bootstrapped yet)
+    if (!this.bootstrapped) {
+      const config = getAppConfig();
+      const featureFlags = config.featureFlags || {};
+      // Safely access property using hasOwnProperty check
+      const hardcoded = Object.prototype.hasOwnProperty.call(featureFlags, name)
+        ? featureFlags[String(name)]
+        : null;
+      if (
+        hardcoded &&
+        typeof hardcoded === "object" &&
+        "enabled" in hardcoded
+      ) {
+        logger.debug(
+          "feature_flags",
+          `Flag ${name} from hardcoded: ${hardcoded.enabled}`,
+        );
+        return !!hardcoded.enabled;
+      }
+    }
+
+    // Default fallback
+    logger.debug(
+      "feature_flags",
+      `Flag ${name} not found, using fallback: ${fallback}`,
+    );
+    return fallback;
+  }
+
+  /**
+   * Get entitlement status (FRESH check on each call)
+   *
+   * Priority:
+   * 1. User override (admin testing)
+   * 2. Fresh server check
+   * 3. Last known value (offline)
+   *
+   * Includes clock manipulation detection for security
+   */
+  async getEntitlement(
+    name: string,
+    userId: string,
+  ): Promise<{ granted: boolean; source: string; expiresAt?: string | null }> {
+    // Priority 1: User override (admin testing)
+    const overrideKey = `${userId}:${name}`;
+    if (this.userOverrides.has(overrideKey)) {
+      const value = this.userOverrides.get(overrideKey) ?? false;
+      logger.debug(
+        "feature_flags",
+        `Entitlement ${name} from override: ${value}`,
+      );
+      return {
+        granted: value,
+        source: "override",
+        expiresAt: undefined,
+      };
+    }
+
+    // Check for invalid clock first (fail-secure)
+    const clockInvalid = await this.checkClockValidity();
+    if (clockInvalid) {
+      logger.warn(
+        "feature_flags",
+        "Device clock invalid, denying entitlement",
+        { name },
+      );
+      return { granted: false, source: "clock_invalid", expiresAt: undefined };
+    }
+
+    // Priority 2: Fresh server check
+    try {
+      if (!this.supabaseClient) {
+        throw new Error("Supabase client not initialized");
+      }
+
+      // Fetch full entitlement data to get expiry
+      const entitlements = await fetchEntitlementsByUserId(
+        this.supabaseClient,
+        userId,
+      );
+      const entitlement = entitlements.find((e) => e.key === name);
+
+      let granted = false;
+      if (entitlement) {
+        // If expires_at is null, the entitlement never expires
+        if (entitlement.expires_at === null) {
+          granted = true;
+        } else {
+          // Check if the entitlement has expired
+          const expiryTime = new Date(entitlement.expires_at).getTime();
+          granted = expiryTime > Date.now();
+        }
+      }
+
+      // Cache result for offline use with expiry info
+      await this.cacheEntitlement(
+        userId,
+        name,
+        granted,
+        entitlement?.expires_at || null,
+      );
+
+      logger.debug(
+        "feature_flags",
+        `Entitlement ${name} from server: ${granted}`,
+        {
+          expiresAt: entitlement?.expires_at,
+        },
+      );
+      return { granted, source: "server", expiresAt: entitlement?.expires_at };
+    } catch (error) {
+      logger.warn(
+        "feature_flags",
+        `Fresh entitlement check failed for ${name}, using cache`,
+        error,
+      );
+
+      // Priority 3: Last known value (offline)
+      const cached = await this.getCachedEntitlementWithExpiry(userId, name);
+      if (cached !== null) {
+        logger.debug(
+          "feature_flags",
+          `Entitlement ${name} from cache: ${cached.granted}`,
+          { expiresAt: cached.expiresAt },
+        );
+        return {
+          granted: cached.granted,
+          source: "cache",
+          expiresAt: cached.expiresAt,
+        };
+      }
+
+      // No cache available
+      logger.debug("feature_flags", `Entitlement ${name} not found, denying`);
+      return { granted: false, source: "not_found", expiresAt: undefined };
+    }
+  }
+
+  /**
+   * Cache entitlement for offline use
+   */
+  private async cacheEntitlement(
+    userId: string,
+    name: string,
+    granted: boolean,
+    expiresAt: string | null,
+  ): Promise<void> {
+    try {
+      const cacheKey = `${STORAGE_KEYS.ENTITLEMENTS}:${ENTITLEMENT_CACHE_KEY_PREFIX}${userId}:${name}`;
+      await SecureStorage.setJSON(cacheKey, {
+        granted,
+        expiresAt,
+        cachedAt: Date.now(),
+      });
+    } catch (error) {
+      logger.error("feature_flags", "Failed to cache entitlement", error);
+    }
+  }
+
+  /**
+   * Get cached entitlement with expiry info
+   */
+  private async getCachedEntitlementWithExpiry(
+    userId: string,
+    name: string,
+  ): Promise<{ granted: boolean; expiresAt: string | null } | null> {
+    try {
+      const cacheKey = `${STORAGE_KEYS.ENTITLEMENTS}:${ENTITLEMENT_CACHE_KEY_PREFIX}${userId}:${name}`;
+      const cached = await SecureStorage.getJSON<{
+        granted: boolean;
+        expiresAt: string | null;
+        cachedAt: number;
+      }>(cacheKey);
+
+      if (!cached) {
+        return null;
+      }
+
+      // If the cached entitlement has expired, deny access
+      if (cached.expiresAt) {
+        const expiryTime = new Date(cached.expiresAt).getTime();
+        if (expiryTime <= Date.now()) {
+          logger.debug(
+            "feature_flags",
+            `Cached entitlement ${name} has expired`,
+          );
+          return { granted: false, expiresAt: cached.expiresAt };
+        }
+      }
+
+      return { granted: cached.granted, expiresAt: cached.expiresAt };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Check device clock validity (detect manipulation)
+   */
+  private async checkClockValidity(): Promise<boolean> {
+    try {
+      const clockInvalid = await SecureStorage.getJSON<{
+        detected: number;
+        skew: number;
+      }>(STORAGE_KEYS.CLOCK_INVALID);
+
+      return !!clockInvalid;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Verify device clock on app startup
+   */
+  async verifyDeviceClock(): Promise<boolean> {
+    try {
+      const lastCheck = await SecureStorage.getJSON<{ timestamp: number }>(
+        "dnd:last_clock_check",
+      );
+
+      if (!lastCheck?.timestamp) {
+        // First run, record baseline
+        await SecureStorage.setJSON("dnd:last_clock_check", {
+          timestamp: Date.now(),
+        });
+        return true;
+      }
+
+      const now = Date.now();
+      const skew = lastCheck.timestamp - now;
+      const tolerance = getClockSkewToleranceMs();
+
+      if (skew > tolerance) {
+        // Clock went backward
+        logger.error("feature_flags", "Clock manipulation detected", {
+          skew,
+          tolerance,
+        });
+
+        await SecureStorage.setJSON(STORAGE_KEYS.CLOCK_INVALID, {
+          detected: now,
+          skew,
+        });
+
+        return false;
+      }
+
+      // Update baseline
+      await SecureStorage.setJSON("dnd:last_clock_check", { timestamp: now });
+      return true;
+    } catch (error) {
+      logger.error("feature_flags", "Clock verification failed", error);
+      return true; // Default to valid (don't block on verification error)
+    }
+  }
+
+  /**
+   * Set user override (admin testing)
+   */
+  setOverride(key: string, value: boolean): void {
+    this.userOverrides.set(key, value);
+    logger.info("feature_flags", `Override set: ${key} = ${value}`);
+
+    // If it's a flag override, notify subscribers
+    if (!key.includes(":")) {
+      this.notifySubscribers(this.currentFlags);
+    }
+  }
+
+  /**
+   * Clear user override
+   */
+  clearOverride(key: string): void {
+    this.userOverrides.delete(key);
+    logger.info("feature_flags", `Override cleared: ${key}`);
+
+    // If it's a flag override, notify subscribers
+    if (!key.includes(":")) {
+      this.notifySubscribers(this.currentFlags);
+    }
+  }
+
+  /**
+   * Clear all overrides
+   */
+  clearAllOverrides(): void {
+    this.userOverrides.clear();
+    logger.info("feature_flags", "All overrides cleared");
+    this.notifySubscribers(this.currentFlags);
+  }
+
+  /**
    * Subscribe to flag updates
-   * Called when flags are refreshed from server
    */
   subscribe(callback: FlagsSubscriber): () => void {
     this.subscribers.add(callback);
-
     return () => {
       this.subscribers.delete(callback);
     };
@@ -79,306 +522,68 @@ class FeatureFlagsManagerClass {
   /**
    * Notify subscribers of flag updates
    */
-  private notifySubscribers(flags: FeatureFlagsData): void {
+  private notifySubscribers(flags: Map<string, FeatureFlagState>): void {
+    const flagsObject = Object.fromEntries(flags);
     for (const callback of this.subscribers) {
       try {
-        callback(flags);
+        callback(flagsObject);
       } catch (error) {
-        logger.error("feature_flags", "Subscriber notification failed:", error);
+        logger.error("feature_flags", "Subscriber notification failed", error);
       }
     }
   }
 
   /**
-   * Refresh feature flags and entitlements from server
-   * Non-blocking: returns silently on error, uses cache as fallback
-   *
-   * Integrates with CircuitBreaker to prevent retry storms
-   * Respects ETag/version to avoid unnecessary downloads
+   * Get all current flags (for debugging)
    */
-  async refreshFromServer(): Promise<void> {
-    if (!this.supabaseClient) {
-      logger.warn("feature_flags", "Supabase client not initialized");
-      return;
-    }
-
-    try {
-      // Check circuit breaker state
-      const cbState = CircuitBreakerManager.getState(CIRCUIT_BREAKER_KEY);
-      if (cbState === "Open") {
-        logger.debug(
-          "feature_flags",
-          "Circuit breaker open for feature flags endpoint - using cache",
-        );
-        return; // Use cache silently
-      }
-
-      // Get current cache to extract ETag/version for change detection
-      const cachedFlags = await FastCache.getJSON<FeatureFlagsData>(
-        STORAGE_KEYS.FEATURE_FLAGS,
-      );
-
-      // Call Edge Function
-      const response = await getFeatureFlagsFromServer(this.supabaseClient, {
-        version: cachedFlags?.version,
-        etag: cachedFlags?.etag,
-      });
-
-      // Handle 304 Not Modified or network error
-      if (!response) {
-        logger.debug(
-          "feature_flags",
-          "No new data from server (304 or error) - using cache",
-        );
-        CircuitBreakerManager.recordSuccess(CIRCUIT_BREAKER_KEY);
-        return; // Use cache silently
-      }
-
-      // Record success for circuit breaker
-      CircuitBreakerManager.recordSuccess(CIRCUIT_BREAKER_KEY);
-
-      // Store flags to FastCache with per-flag TTL
-      const flagsData: FeatureFlagsData = {
-        flags: response.flags,
-        fetchedAt: response.fetchedAt,
-        etag: response.etag,
-        version: response.version,
-      };
-
-      await FastCache.setJSON(STORAGE_KEYS.FEATURE_FLAGS, flagsData);
-      logger.info("feature_flags", "Feature flags cached", {
-        flagCount: Object.keys(response.flags).length,
-      });
-
-      // Store entitlements to SecureStorage (encrypted, TTL-aware)
-      const entitlementsData: EntitlementsData = {
-        entitlements: response.entitlements,
-        fetchedAt: response.fetchedAt,
-        lastVerifiedAt: Date.now(), // For clock manipulation detection
-      };
-
-      await SecureStorage.setJSON(STORAGE_KEYS.ENTITLEMENTS, entitlementsData);
-      logger.info("feature_flags", "Entitlements cached", {
-        entitlementCount: Object.keys(response.entitlements).length,
-      });
-
-      // Notify subscribers
-      this.notifySubscribers(flagsData);
-    } catch (error) {
-      // Record failure for circuit breaker
-      CircuitBreakerManager.recordFailure(CIRCUIT_BREAKER_KEY, false);
-
-      logger.warn(
-        "feature_flags",
-        "Feature flags refresh failed (using cache as fallback):",
-        error,
-      );
-      // Non-blocking: continue with cache
-    }
+  getAllFlags(): Record<string, FeatureFlagState> {
+    return Object.fromEntries(this.currentFlags);
   }
 
   /**
-   * Get feature flag value
-   * Respects TTL and offline state
-   *
-   * @param name - Flag name
-   * @param fallback - Default value if flag not found (default: false)
-   * @returns Flag value or fallback
-   */
-  async getFlag(name: string, fallback: boolean = false): Promise<boolean> {
-    try {
-      const cached = await FastCache.getJSON<FeatureFlagsData>(
-        STORAGE_KEYS.FEATURE_FLAGS,
-      );
-
-      if (!cached || !cached.flags[name]) {
-        logger.debug("feature_flags", `Flag not found: ${name}`, {
-          fallback,
-        });
-        return fallback;
-      }
-
-      // Check if flag is stale
-      const now = Date.now();
-      const flagMeta = cached.flags[name];
-      const ttlMs = flagMeta.ttlMs || 30 * 24 * 60 * 60 * 1000; // 30 days default
-      const age = now - cached.fetchedAt;
-
-      if (age > ttlMs) {
-        logger.debug("feature_flags", `Flag is stale: ${name}`, {
-          age,
-          ttlMs,
-        });
-        // Stale but cached - use value but background refresh recommended
-        // (background refresh would be done by calling refreshFromServer again)
-      }
-
-      const value = flagMeta.enabled;
-      logger.debug("feature_flags", `Flag ${name}: ${value}`);
-      return value;
-    } catch (error) {
-      logger.error("feature_flags", `Failed to get flag ${name}:`, error);
-      return fallback;
-    }
-  }
-
-  /**
-   * Get entitlement status
-   * Includes clock manipulation detection for security
-   *
-   * @param name - Entitlement name
-   * @returns { granted, expiresAt? }
-   */
-  async getEntitlement(
-    name: string,
-  ): Promise<{ granted: boolean; expiresAt?: number }> {
-    try {
-      // First check for invalid clock flag
-      const clockInvalid = await SecureStorage.getJSON<{
-        detected: number;
-        skew: number;
-      }>(STORAGE_KEYS.CLOCK_INVALID);
-
-      if (clockInvalid) {
-        logger.warn("feature_flags", "Device clock marked as invalid", {
-          skew: clockInvalid.skew,
-        });
-        return { granted: false }; // Fail-secure
-      }
-
-      const cached = await SecureStorage.getJSON<EntitlementsData>(
-        STORAGE_KEYS.ENTITLEMENTS,
-      );
-
-      if (!cached || !cached.entitlements[name]) {
-        logger.debug("feature_flags", `Entitlement not found: ${name}`);
-        return { granted: false };
-      }
-
-      // Clock manipulation detection (fail-secure if clock went backward)
-      const now = Date.now();
-      const lastVerified = cached.lastVerifiedAt;
-
-      if (lastVerified && now < lastVerified - CLOCK_SKEW_TOLERANCE_MS) {
-        const skew = lastVerified - now;
-        logger.error("feature_flags", "Clock manipulation detected", {
-          name,
-          skew,
-          lastVerified,
-          now,
-        });
-
-        // Mark clock as invalid for future checks
-        await SecureStorage.setJSON(STORAGE_KEYS.CLOCK_INVALID, {
-          detected: now,
-          skew,
-        });
-
-        return { granted: false }; // Fail-secure: deny access
-      }
-
-      // Check expiry
-      const entitlementData = cached.entitlements[name];
-      if (!entitlementData.expiresAt) {
-        // No expiry: entitlement is permanent
-        logger.debug(
-          "feature_flags",
-          `Entitlement ${name}: granted (no expiry)`,
-        );
-        return { granted: entitlementData.granted };
-      }
-
-      const expiryTime = new Date(entitlementData.expiresAt).getTime();
-      const isExpired = now >= expiryTime;
-
-      if (isExpired) {
-        logger.debug("feature_flags", `Entitlement ${name}: expired`, {
-          expiryTime,
-          now,
-        });
-        return { granted: false };
-      }
-
-      logger.debug("feature_flags", `Entitlement ${name}: granted`, {
-        expiresAt: expiryTime,
-      });
-
-      return {
-        granted: entitlementData.granted,
-        expiresAt: expiryTime,
-      };
-    } catch (error) {
-      logger.error("feature_flags", `Failed to get entitlement ${name}:`, error);
-      return { granted: false };
-    }
-  }
-
-  /**
-   * Verify device clock validity (called early in app bootstrap)
-   * Returns false if clock appears to have been manipulated backward
-   */
-  async verifyDeviceClock(): Promise<boolean> {
-    try {
-      const entitlements = await SecureStorage.getJSON<EntitlementsData>(
-        STORAGE_KEYS.ENTITLEMENTS,
-      );
-
-      if (!entitlements?.lastVerifiedAt) {
-        return true; // No baseline, allow
-      }
-
-      const lastVerified = entitlements.lastVerifiedAt;
-      const now = Date.now();
-      const skew = lastVerified - now;
-
-      if (skew > CLOCK_SKEW_TOLERANCE_MS) {
-        // Clock was set backward
-        logger.error("feature_flags", "Device clock appears manipulated", {
-          skew,
-          tolerance: CLOCK_SKEW_TOLERANCE_MS,
-        });
-
-        // Lock out premium features
-        await SecureStorage.setJSON(STORAGE_KEYS.CLOCK_INVALID, {
-          detected: now,
-          skew,
-        });
-
-        return false; // Clock invalid
-      }
-
-      return true; // Clock valid
-    } catch (error) {
-      logger.error("feature_flags", "Clock verification failed:", error);
-      return true; // Default to valid (don't block on verification error)
-    }
-  }
-
-  /**
-   * Get cached flags data (for debugging/testing)
-   */
-  async getCachedFlags(): Promise<FeatureFlagsData | null> {
-    return FastCache.getJSON<FeatureFlagsData>(STORAGE_KEYS.FEATURE_FLAGS);
-  }
-
-  /**
-   * Get cached entitlements data (for debugging/testing)
-   */
-  async getCachedEntitlements(): Promise<EntitlementsData | null> {
-    return SecureStorage.getJSON<EntitlementsData>(STORAGE_KEYS.ENTITLEMENTS);
-  }
-
-  /**
-   * Clear all cached data (for logout scenarios)
+   * Clear all cached data (for logout)
+   * Properly clears feature flags, clock validation, and all entitlement cache entries
    */
   async clearCache(): Promise<void> {
     try {
-      await FastCache.removeItem(STORAGE_KEYS.FEATURE_FLAGS);
-      await SecureStorage.removeItem(STORAGE_KEYS.ENTITLEMENTS);
+      // Clear core flag caches
+      await SecureStorage.removeItem(STORAGE_KEYS.FEATURE_FLAGS);
       await SecureStorage.removeItem(STORAGE_KEYS.CLOCK_INVALID);
+      await SecureStorage.removeItem("dnd:last_clock_check");
+
+      // Clear all entitlement cache entries by pattern
+      try {
+        const allKeys = await SecureStorage.getAllKeys();
+        const entitlementPattern = `${STORAGE_KEYS.ENTITLEMENTS}:${ENTITLEMENT_CACHE_KEY_PREFIX}`;
+        const entitlementKeys = allKeys.filter((key) =>
+          key.startsWith(entitlementPattern),
+        );
+
+        for (const key of entitlementKeys) {
+          await SecureStorage.removeItem(key);
+        }
+
+        if (entitlementKeys.length > 0) {
+          logger.debug("feature_flags", "Cleared entitlement cache entries", {
+            count: entitlementKeys.length,
+          });
+        }
+      } catch (error) {
+        logger.warn(
+          "feature_flags",
+          "Failed to clear entitlement cache",
+          error,
+        );
+        // Continue with other cleanup steps
+      }
+
       logger.info("feature_flags", "Cleared all cached flags and entitlements");
+
+      this.currentFlags = new Map();
+      this.userOverrides.clear();
+      this.bootstrapped = false;
     } catch (error) {
-      logger.error("feature_flags", "Failed to clear cache:", error);
+      logger.error("feature_flags", "Failed to clear cache", error);
     }
   }
 }
