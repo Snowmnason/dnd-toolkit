@@ -18,15 +18,15 @@
 import { NetworkCascadeDetector } from "@/lib/error/network-cascade-detector";
 import type { SafeModeState } from "@/lib/error/safe-mode";
 import {
-    createSafeModeState,
-    DEFAULT_SAFE_MODE_CONFIG,
-    SafeModeLevel,
-    SafeModeReason,
+  createSafeModeState,
+  DEFAULT_SAFE_MODE_CONFIG,
+  SafeModeLevel,
+  SafeModeReason,
 } from "@/lib/error/safe-mode";
 import { getStorageDefaults } from "@/lib/kernel/storage-defaults";
 import {
-    NetworkDetection,
-    NetworkStatus,
+  NetworkDetection,
+  NetworkStatus,
 } from "@/lib/network/network-detection";
 import { validateClassifications } from "@/lib/storage/data-classification";
 import { logger } from "@/lib/utils/logger";
@@ -505,16 +505,20 @@ class AppKernelClass {
 
           // Initialize offline queue system
           try {
-            const { OfflineQueueManager } = await import("@/lib/api/offline-queue");
-            const { initializeOfflineQueueReplay } = await import("@/lib/api/offline-queue-replay");
-            
+            const { OfflineQueueManager } =
+              await import("@/lib/api/offline-queue");
+            const { initializeOfflineQueueReplay } =
+              await import("@/lib/api/offline-queue-replay");
+
             // Load persisted queue from storage
             await OfflineQueueManager.initialize();
-            
+
             // Set up network listener for automatic replay on reconnect
             await initializeOfflineQueueReplay();
-            
-            logger.category("bootstrap").info("Offline queue system initialized");
+
+            logger
+              .category("bootstrap")
+              .info("Offline queue system initialized");
           } catch (queueError) {
             logger
               .category("bootstrap")
@@ -553,7 +557,17 @@ class AppKernelClass {
 
         // Initialize with Supabase client
         const supClient = getSupabaseClient();
-        await FeatureFlagsManager.initialize(supClient);
+        // Try to get userId from storage (may be available from a previous session)
+        // Auth runs asynchronously, so we can't guarantee it's available yet,
+        // but SecureStorage may have the user data from a prior session.
+        let userId: string | undefined;
+        try {
+          const { AuthStateManager } = await import("@/lib/auth/auth-state");
+          userId = await AuthStateManager.getUserId();
+        } catch {
+          // userId unavailable - remote per-user overrides won't load this time
+        }
+        await FeatureFlagsManager.initialize(supClient, userId);
 
         // Verify device clock validity early
         const clockValid = await FeatureFlagsManager.verifyDeviceClock();
@@ -570,6 +584,40 @@ class AppKernelClass {
         logger
           .category("bootstrap")
           .info("Feature flags bootstrapped successfully");
+
+        // Bridge server-synced flags to the legacy FeatureFlags system
+        // and reconfigure the Logger so it respects the remote debugLogs value.
+        try {
+          const { FeatureFlags } =
+            await import("@/lib/feature-flags/feature-flags");
+          const serverFlags = FeatureFlagsManager.getAllFlags();
+
+          // 1. Sync legacy system so useFeatureFlag hooks see server values
+          FeatureFlags.syncFromServer(serverFlags);
+
+          // 2. Reconfigure Logger with the resolved debugLogs value
+          const debugLogsEnabled = FeatureFlagsManager.getFlag(
+            "debugLogs",
+            false,
+          );
+          console.log(
+            "[BRIDGE] Reconfiguring logger with debugLogsEnabled =",
+            debugLogsEnabled,
+          );
+          logger.reconfigure(debugLogsEnabled);
+          console.log("[BRIDGE] Logger reconfigured successfully");
+        } catch (bridgeError) {
+          console.error(
+            "[BRIDGE] Bridge failed:",
+            (bridgeError as Error).message,
+          );
+          logger
+            .category("bootstrap")
+            .warn(
+              "Failed to bridge server flags to legacy system (non-critical):",
+              { error: (bridgeError as Error).message },
+            );
+        }
       } catch (error) {
         logger
           .category("bootstrap")

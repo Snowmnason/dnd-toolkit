@@ -18,9 +18,13 @@
  * - Offline: Use last known values
  */
 
-import { getAppConfig } from "@/lib/config/loader";
+import { getAppConfig, isDevelopment } from "@/lib/config/loader";
 import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
 import { fetchFeatureFlags } from "@/lib/database/feature-flags";
+import {
+  fetchOverridesByUserId,
+  FeatureFlagOverrideRow,
+} from "@/lib/database/feature-flag-overrides";
 import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 
@@ -49,6 +53,7 @@ export type FlagsSubscriber = (flags: Record<string, FeatureFlagState>) => void;
 // ==========================================
 
 const ENTITLEMENT_CACHE_KEY_PREFIX = "entitlement:";
+const OVERRIDE_CACHE_KEY_PREFIX = "feature_flag_override:";
 
 /**
  * Get clock skew tolerance from config (default: 60 seconds)
@@ -65,27 +70,35 @@ function getClockSkewToleranceMs(): number {
 class FeatureFlagsManagerClass {
   private supabaseClient: any = null;
   private currentFlags: Map<string, FeatureFlagState> = new Map(); // Use Map for safe access
-  private userOverrides: Map<string, boolean> = new Map(); // Admin testing overrides
+  private userOverrides: Map<string, boolean> = new Map(); // Admin testing overrides (local)
+  private remoteOverrides: Map<string, FeatureFlagOverrideRow> = new Map(); // Remote server overrides (per-user)
   private subscribers: Set<FlagsSubscriber> = new Set();
   private bootstrapped = false;
+  private userId: string | null = null;
 
   /**
-   * Initialize with Supabase client
+   * Initialize with Supabase client and user ID
    * Called during app kernel bootstrap
    */
-  async initialize(supabaseClient: any): Promise<void> {
+  async initialize(supabaseClient: any, userId?: string): Promise<void> {
     this.supabaseClient = supabaseClient;
-    logger.debug("feature_flags", "FeatureFlagsManager initialized");
+    this.userId = userId || null;
+    logger.debug("feature_flags", "FeatureFlagsManager initialized", {
+      userId,
+    });
   }
 
   /**
-   * Bootstrap feature flags from server (called ONCE at app startup)
-   * Server values OVERWRITE hardcoded config
+   * Bootstrap feature flags and remote overrides from server (called ONCE at app startup)
+   * In development: Uses local config only (no remote fetch)
+   * In production: Server values OVERWRITE hardcoded config, with remote overrides for QA
+   * Remote overrides take precedence over flags
    *
-   * Priority:
-   * 1. Server values (if reachable)
-   * 2. Last known values (offline)
-   * 3. Hardcoded fallback
+   * Priority for flags:
+   * 1. Remote override (per-user, admin-controlled - production only)
+   * 2. Server values (production) OR Local config (development)
+   * 3. Last known values (offline)
+   * 4. Hardcoded fallback
    */
   async bootstrapFlags(): Promise<void> {
     if (this.bootstrapped) {
@@ -93,6 +106,18 @@ class FeatureFlagsManagerClass {
       return;
     }
 
+    const isDev = isDevelopment();
+
+    if (isDev) {
+      // Development: Use local config only, no remote fetch
+      logger.info("feature_flags", "Development mode: using local config only");
+      this.loadHardcodedFlags();
+      this.bootstrapped = true;
+      this.notifySubscribers(this.currentFlags);
+      return;
+    }
+
+    // Production: Fetch from server
     logger.info("feature_flags", "Bootstrapping feature flags from server");
 
     try {
@@ -103,15 +128,54 @@ class FeatureFlagsManagerClass {
       // Fetch server flags
       const serverFlags = await fetchFeatureFlags(this.supabaseClient);
 
+      // Fetch remote overrides for current user (if user ID available)
+      if (this.userId) {
+        try {
+          const overrides = await fetchOverridesByUserId(
+            this.supabaseClient,
+            this.userId,
+          );
+          this.remoteOverrides = new Map(
+            overrides.map((o) => [o.flag_name, o]),
+          );
+          await SecureStorage.setJSON(
+            `${STORAGE_KEYS.FEATURE_FLAGS}:${OVERRIDE_CACHE_KEY_PREFIX}${this.userId}`,
+            Object.fromEntries(this.remoteOverrides),
+          );
+          logger.debug("feature_flags", "Fetched remote overrides", {
+            count: this.remoteOverrides.size,
+          });
+        } catch (error) {
+          logger.warn(
+            "feature_flags",
+            "Failed to fetch remote overrides",
+            error,
+          );
+          // Try to load cached overrides
+          await this.loadCachedRemoteOverrides();
+        }
+      }
+
       // Convert to state object
       const newFlags: Map<string, FeatureFlagState> = new Map();
-      for (const flag of serverFlags) {
-        newFlags.set(flag.flag_name, {
-          enabled: flag.enabled,
-          kind: flag.kind,
-          description: flag.description,
-          source: "server",
-        });
+
+      if (serverFlags.length > 0) {
+        // Use server flags (production mode)
+        for (const flag of serverFlags) {
+          newFlags.set(flag.flag_name, {
+            enabled: flag.enabled,
+            kind: flag.kind,
+            description: flag.description,
+            source: "server",
+          });
+        }
+      } else {
+        // Use hardcoded config (dev mode or fallback)
+        this.loadHardcodedFlags();
+        // Copy from the loaded hardcoded flags
+        for (const [name, state] of this.currentFlags) {
+          newFlags.set(name, state);
+        }
       }
 
       // Store as current state
@@ -124,9 +188,14 @@ class FeatureFlagsManagerClass {
         fetchedAt: Date.now(),
       });
 
-      logger.info("feature_flags", "Bootstrapped from server", {
-        flagCount: newFlags.size,
-      });
+      logger.info(
+        "feature_flags",
+        `Bootstrapped successfully (${isDev ? "dev config" : "server"})`,
+        {
+          flagCount: newFlags.size,
+          overrideCount: this.remoteOverrides.size,
+        },
+      );
 
       // Notify subscribers
       this.notifySubscribers(newFlags);
@@ -147,8 +216,11 @@ class FeatureFlagsManagerClass {
         if (cached?.flags) {
           this.currentFlags = new Map(Object.entries(cached.flags));
           this.bootstrapped = true;
+          // Also try to load cached overrides
+          await this.loadCachedRemoteOverrides();
           logger.info("feature_flags", "Loaded from last known state", {
             flagCount: this.currentFlags.size,
+            overrideCount: this.remoteOverrides.size,
             age: Date.now() - cached.fetchedAt,
           });
           this.notifySubscribers(this.currentFlags);
@@ -165,6 +237,32 @@ class FeatureFlagsManagerClass {
         flagCount: this.currentFlags.size,
       });
       this.notifySubscribers(this.currentFlags);
+    }
+  }
+
+  /**
+   * Load cached remote overrides from storage
+   */
+  private async loadCachedRemoteOverrides(): Promise<void> {
+    if (!this.userId) return;
+    try {
+      const cached = await SecureStorage.getJSON<
+        Record<string, FeatureFlagOverrideRow>
+      >(
+        `${STORAGE_KEYS.FEATURE_FLAGS}:${OVERRIDE_CACHE_KEY_PREFIX}${this.userId}`,
+      );
+      if (cached) {
+        this.remoteOverrides = new Map(Object.entries(cached));
+        logger.debug("feature_flags", "Loaded cached remote overrides", {
+          count: this.remoteOverrides.size,
+        });
+      }
+    } catch (error) {
+      logger.warn(
+        "feature_flags",
+        "Failed to load cached remote overrides",
+        error,
+      );
     }
   }
 
@@ -193,20 +291,42 @@ class FeatureFlagsManagerClass {
   /**
    * Get feature flag value
    *
-   * Priority:
-   * 1. User override (admin testing)
-   * 2. Current state (from server bootstrap)
-   * 3. Hardcoded fallback
+   * Priority (merge logic: override > entitlement > global flag):
+   * 1. Remote override (per-user, admin-controlled)
+   * 2. Local user override (admin testing)
+   * 3. Current state (from server bootstrap)
+   * 4. Hardcoded fallback
    */
   getFlag(name: string, fallback: boolean = false): boolean {
-    // Priority 1: User override (admin testing)
+    // Priority 1: Remote override (per-user, server-side control)
+    const remoteOverride = this.remoteOverrides.get(name);
+    if (remoteOverride) {
+      // Defensive client-side filtering (revoked, expired)
+      if (!remoteOverride.revoked) {
+        if (
+          remoteOverride.expires_at === null ||
+          new Date(remoteOverride.expires_at).getTime() > Date.now()
+        ) {
+          logger.debug(
+            "feature_flags",
+            `Flag ${name} from remote override: ${remoteOverride.enabled}`,
+          );
+          return remoteOverride.enabled;
+        }
+      }
+    }
+
+    // Priority 2: Local user override (admin testing)
     if (this.userOverrides.has(name)) {
       const value = this.userOverrides.get(name);
-      logger.debug("feature_flags", `Flag ${name} from override: ${value}`);
+      logger.debug(
+        "feature_flags",
+        `Flag ${name} from local override: ${value}`,
+      );
       return value ?? fallback;
     }
 
-    // Priority 2: Current state (from server or last known)
+    // Priority 3: Current state (from server or last known)
     const flagState = this.currentFlags.get(name);
     if (flagState !== undefined) {
       const value = flagState.enabled;
@@ -217,7 +337,7 @@ class FeatureFlagsManagerClass {
       return value;
     }
 
-    // Priority 3: Hardcoded fallback (if not bootstrapped yet)
+    // Priority 4: Hardcoded fallback (if not bootstrapped yet)
     if (!this.bootstrapped) {
       const config = getAppConfig();
       const featureFlags = config.featureFlags || {};
@@ -542,7 +662,7 @@ class FeatureFlagsManagerClass {
 
   /**
    * Clear all cached data (for logout)
-   * Properly clears feature flags, clock validation, and all entitlement cache entries
+   * Properly clears feature flags, clock validation, entitlements, and overrides
    */
   async clearCache(): Promise<void> {
     try {
@@ -555,32 +675,43 @@ class FeatureFlagsManagerClass {
       try {
         const allKeys = await SecureStorage.getAllKeys();
         const entitlementPattern = `${STORAGE_KEYS.ENTITLEMENTS}:${ENTITLEMENT_CACHE_KEY_PREFIX}`;
-        const entitlementKeys = allKeys.filter((key) =>
-          key.startsWith(entitlementPattern),
+        const overridePattern = `${STORAGE_KEYS.FEATURE_FLAGS}:${OVERRIDE_CACHE_KEY_PREFIX}`;
+        const keysToRemove = allKeys.filter(
+          (key) =>
+            key.startsWith(entitlementPattern) ||
+            key.startsWith(overridePattern),
         );
 
-        for (const key of entitlementKeys) {
+        for (const key of keysToRemove) {
           await SecureStorage.removeItem(key);
         }
 
-        if (entitlementKeys.length > 0) {
-          logger.debug("feature_flags", "Cleared entitlement cache entries", {
-            count: entitlementKeys.length,
-          });
+        if (keysToRemove.length > 0) {
+          logger.debug(
+            "feature_flags",
+            "Cleared entitlement and override cache entries",
+            {
+              count: keysToRemove.length,
+            },
+          );
         }
       } catch (error) {
         logger.warn(
           "feature_flags",
-          "Failed to clear entitlement cache",
+          "Failed to clear entitlement/override cache",
           error,
         );
         // Continue with other cleanup steps
       }
 
-      logger.info("feature_flags", "Cleared all cached flags and entitlements");
+      logger.info(
+        "feature_flags",
+        "Cleared all cached flags, entitlements, and overrides",
+      );
 
       this.currentFlags = new Map();
       this.userOverrides.clear();
+      this.remoteOverrides.clear();
       this.bootstrapped = false;
     } catch (error) {
       logger.error("feature_flags", "Failed to clear cache", error);

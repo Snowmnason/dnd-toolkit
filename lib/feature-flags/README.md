@@ -42,15 +42,22 @@ Runtime Checks (isEnabled, getKind, toggle) or Dev Console
 Component/Service Decision Logic
 ```
 
-### New Server-Driven Path (FeatureFlagsManager, Phase 1)
+### New Server-Driven Path (FeatureFlagsManager, Phase 1 ✅ Complete)
 
-**Feature Flags:**
+**Development Mode:**
+
+- Uses `appsettings.dev.json` as source of truth (no remote fetch)
+- No remote overrides (dev environment has no QA testers)
+- Fast startup, full local control
+
+**Production Mode:**
 
 - ✅ **Fetched ONCE** at app startup (non-blocking)
 - Server values **OVERWRITE** hardcoded config
+- **Per-User Remote Overrides** (Phase 1a): Admin-controlled per-user flag toggles override server values
 - Used throughout app lifecycle without re-fetching
 - **Storage Strategy**: Persisted to `SecureStorage` for offline access. One-time bootstrap simplifies logic and reduces points of failure.
-- Offline: Uses last startup values from `SecureStorage`
+- Offline: Uses last startup values from `SecureStorage` (including cached overrides)
 
 **Entitlements:**
 
@@ -63,20 +70,40 @@ Component/Service Decision Logic
 ```
 AppKernel Startup (Phase 3: appReady)
     ↓
-FeatureFlagsManager.initialize(supabaseClient)
+FeatureFlagsManager.initialize(supabaseClient, userId)
 FeatureFlagsManager.verifyDeviceClock()
-FeatureFlagsManager.bootstrapFlags() [ONE-TIME, non-blocking]
+FeatureFlagsManager.bootstrapFlags() [fetch flags + user overrides, ONE-TIME, non-blocking]
     ↓
-Supabase REST API → feature_flags table
+Supabase REST API → feature_flags table + feature_flag_overrides table (per-user)
     ↓
-SecureStorage: Store flags + timestamp (encrypted)
+SecureStorage: Store flags + overrides + timestamp (encrypted)
+    ↓
+Bridge Phase (automatic, in AppKernel):
+  FeatureFlags.syncFromServer(serverFlags)  → Legacy system sees server values
+  logger.reconfigure(debugLogsEnabled)       → Logger respects remote debugLogs flag
     ↓
 Runtime Checks (getFlag, getEntitlement)
     ↓
-Components/Services use hooks: useFeatureFlags(), useEntitlement()
+Components/Services use hooks: useFeatureFlags(), useFeatureFlag(), useEntitlement()
 ```
 
-### Key Patterns
+### Merge Priority (Override > Entitlement > Flag)
+
+**Feature Flag Resolution:**
+
+1. **Remote Override** (highest) – Per-user admin-controlled override (can enable/disable any flag)
+2. **Local Override** – In-memory admin testing override (for debugging)
+3. **Server Flag** – Global feature flag (applies to all users)
+4. **Hardcoded Default** – Fallback from `appsettings.*.json`
+
+**Entitlement Resolution:**
+
+1. **Override** (if set) – Admin override (rarely needed)
+2. **Fresh Server Check** – Real-time entitlement fetch from `entitlements` table
+3. **Cached Value** – Last known value (when offline or on error)
+4. **Default: Denied** – Fail-secure
+
+**Example:** If admin sets a remote override for user "admin-controlled-flag" to `enabled: true`, all checks for that flag will return `true` regardless of the global flag state.
 
 **Kind Classification**: Each flag can be tagged:
 
@@ -191,6 +218,19 @@ const unsubscribe = FeatureFlags.subscribe((flagName, kind) => {
 // Later: unsubscribe()
 ```
 
+#### Server Sync Bridge
+
+**`syncFromServer(serverFlags: Record<string, { enabled: boolean; kind?: string; description?: string }>): void`**
+
+Bulk-updates the legacy flag map from server-synced values and notifies listeners once.
+Called automatically by `AppKernel` after `FeatureFlagsManager.bootstrapFlags()` so that components using the `useFeatureFlag` hook see server-resolved values.
+
+```typescript
+// Typically called automatically in the kernel—no manual invocation needed.
+const serverFlags = FeatureFlagsManager.getAllFlags();
+FeatureFlags.syncFromServer(serverFlags);
+```
+
 ### `FeatureFlagsManager` (Server-Driven, Phase 1 ✅ Complete)
 
 **Runtime manager for premium entitlements and server-synced feature gates.**
@@ -207,14 +247,20 @@ Initialized automatically by `AppKernel` on startup; no manual initialization ty
 
 #### Methods
 
-**`async initialize(supabaseClient: SupabaseClient): Promise<void>`**
+**`async initialize(supabaseClient: SupabaseClient, userId?: string): Promise<void>`**
 
-Initializes the manager with a Supabase client. Called automatically by `AppKernel` during Phase 3 (appReady).
+Initializes the manager with a Supabase client and optional user ID. Called automatically by `AppKernel` during Phase 3 (appReady).
+
+User ID is used to fetch per-user remote overrides during `bootstrapFlags()`.
 
 ```typescript
 import { FeatureFlagsManager } from "@/lib/feature-flags";
 const { getSupabaseClient } = await import("@/lib/database/supabase");
 
+// With user ID (recommended for authenticated users)
+await FeatureFlagsManager.initialize(getSupabaseClient(), userId);
+
+// Without user ID (anonymous)
 await FeatureFlagsManager.initialize(getSupabaseClient());
 ```
 
@@ -231,7 +277,12 @@ if (!clockValid) {
 
 **`async bootstrapFlags(): Promise<void>`**
 
-Fetches feature flags from server **once** at app startup. Server values overwrite hardcoded config. Non-blocking; logs errors but never throws.
+Fetches feature flags **and per-user remote overrides** from server **once** at app startup. Server values overwrite hardcoded config. Remote overrides take precedence over server values. Non-blocking; logs errors but never throws.
+
+Overrides are automatically filtered for:
+
+- `revoked = false` – Active overrides only
+- `expires_at IS NULL OR expires_at > now()` – Not expired
 
 ```typescript
 // Called automatically by AppKernel, but can be called manually for refresh
@@ -242,12 +293,15 @@ await FeatureFlagsManager.bootstrapFlags();
 
 Synchronous check of a feature flag. Returns cached value from bootstrap, or fallback if not found.
 
-**Priority:** Override → Server (bootstrapped) → Hardcoded → Fallback
+**Priority (merge logic):** Remote Override → Local Override → Server Flag → Hardcoded → Fallback
+
+- Remote Override takes precedence for admin-controlled per-user feature toggling
+- Server Flag is the global default (applies to all users)
 
 ```typescript
 const enabled = FeatureFlagsManager.getFlag("darkModeV2", false);
 if (enabled) {
-  // Use new dark mode
+  // Use new dark mode (either via remote override or server value)
 }
 ```
 

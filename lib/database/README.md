@@ -425,6 +425,45 @@ const isPremium = await hasEntitlement(supabaseClient, userId, "premium");
 
 **Security Note:** Expiry checking happens on the client side. For sensitive operations, verify entitlements on the backend as well.
 
+#### `fetchOverridesByUserId(supabase: SupabaseClient, userId: string): Promise<FeatureFlagOverrideRow[]>`
+
+Fetches all active per-user feature flag overrides. Called by `FeatureFlagsManager.bootstrapFlags()` during app startup.
+
+Server-side filters for non-revoked, non-expired overrides. Returns only active overrides.
+
+```ts
+import { fetchOverridesByUserId } from "@/lib/database/feature-flag-overrides";
+
+const overrides = await fetchOverridesByUserId(supabaseClient, userId);
+// Returns: [
+//   {
+//     id: "uuid",
+//     user_id: "uuid",
+//     flag_name: "darkModeV2",
+//     enabled: true,
+//     expires_at: "2026-12-31T..." | null,
+//     revoked: false,
+//     reason: "internal testing",
+//     created_by: "uuid",
+//     created_at: "2026-02-05T...",
+//     updated_at: "2026-02-05T..."
+//   }
+// ]
+```
+
+**Parameters:**
+
+- `userId` – User ID (UUID)
+
+**Returns:** Array of `FeatureFlagOverrideRow` objects (or empty array if none found)
+
+**Filtering:**
+
+- Server-side: `revoked = false AND (expires_at IS NULL OR expires_at > now())`
+- Client-side defensive check: overrides are re-validated before use
+
+**Priority:** Remote overrides take precedence over global flags (see [lib/feature-flags](../feature-flags/README.md#merge-priority-override--entitlement--flag))
+
 ---
 
 ## Dependencies

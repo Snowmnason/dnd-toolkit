@@ -61,6 +61,13 @@ Phase: READY
   - All critical phases complete
   - App safe to render main UI
   - UI can now call useAppKernel() and check kernel.phases.appReady
+        ↓
+Post-READY: Feature Flags (non-blocking)
+  - Initialize FeatureFlagsManager with Supabase client + userId (if available)
+  - Verify device clock validity
+  - Bootstrap flags from server (one-time fetch)
+  - Bridge: Sync legacy FeatureFlags with server values
+  - Bridge: Reconfigure Logger to respect remote debugLogs flag
 ```
 
 **Key Principles:**

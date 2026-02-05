@@ -145,6 +145,39 @@ class FeatureFlagsManager {
   }
 
   /**
+   * Sync legacy flags from server-synced FeatureFlagsManager values.
+   *
+   * Called after FeatureFlagsManager.bootstrapFlags() so that the legacy
+   * system (and hooks like useFeatureFlag) reflect server-resolved values.
+   *
+   * Updates all matching flags silently and notifies listeners once
+   * to trigger React re-renders.
+   */
+  syncFromServer(
+    serverFlags: Record<
+      string,
+      { enabled: boolean; kind?: string; description?: string }
+    >,
+  ): void {
+    let changed = false;
+    for (const [name, state] of Object.entries(serverFlags)) {
+      const flag = this.flags.get(name as FeatureFlagName);
+      if (flag && flag.enabled !== state.enabled) {
+        flag.enabled = state.enabled;
+        changed = true;
+      }
+    }
+    if (changed) {
+      logger.info(
+        "bootstrap",
+        "[FeatureFlags] Synced from server-synced flags",
+      );
+      // null = all flags changed, triggers re-render in all useFeatureFlag consumers
+      this.notifyListeners(null);
+    }
+  }
+
+  /**
    * Persist feature flags to FastCache per privacy policy.
    * Non-user-specific flags stay in FastCache (fast, unencrypted).
    */
