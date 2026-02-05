@@ -98,6 +98,50 @@ Indexes:
 create index if not exists idx_invite_links_expires_at on public.invite_links using btree (expires_at) tablespace pg_default;
 ```
 
+### feature_flags
+
+```sql
+create table public.feature_flags (
+  flag_name text not null,
+  enabled boolean not null default false,
+  kind text not null,
+  description text null,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone null default now(),
+  constraint feature_flags_pkey primary key (flag_name)
+) tablespace pg_default;
+```
+
+Indexes:
+
+```sql
+create index if not exists idx_feature_flags_updated_at on public.feature_flags using btree (updated_at desc) tablespace pg_default;
+```
+
+### entitlements
+
+```sql
+create table public.entitlements (
+  id uuid not null default gen_random_uuid(),
+  user_id uuid null,
+  key text not null,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  expires_at timestamp with time zone null,
+  constraint entitlements_pkey primary key (id),
+  constraint entitlements_user_id_fkey foreign KEY (user_id) references users (id)
+) TABLESPACE pg_default;
+```
+
+Indexes:
+
+```sql
+create index IF not exists idx_entitlements_user_id on public.entitlements using btree (user_id) TABLESPACE pg_default;
+create index IF not exists idx_entitlements_key on public.entitlements using btree (key) TABLESPACE pg_default;
+create index IF not exists idx_entitlements_id on public.entitlements using btree (id) TABLESPACE pg_default;
+create index IF not exists idx_entitlements_expires_at on public.entitlements using btree (expires_at) TABLESPACE pg_default;
+```
+
 ---
 
 ## Row Level Security (RLS) Policies
@@ -135,6 +179,20 @@ invite_links_owner_select | SELECT | authenticated | USING: requestor is world o
 worlds_owner_full          | ALL    | authenticated | USING/CHECK: world owner auth_id = auth.uid()
 worlds_collaborator_update | UPDATE | authenticated | USING: user has world_access row | CHECK: owner_id remains unchanged
 worlds_collaborator_select | SELECT | authenticated | USING: user has world_access row
+```
+
+### feature_flags
+
+```text
+feature_flags_public_read | SELECT | public, authenticated | USING: true
+feature_flags_admin_write | INSERT, UPDATE, DELETE | authenticated | CHECK: (auth.jwt()->>'role') = 'admin'
+```
+
+### entitlements
+
+```text
+entitlements_user_read_own     | SELECT | authenticated | USING: user_id = auth.uid()
+entitlements_admin_full_access | ALL    | authenticated | USING/CHECK: (auth.jwt()->>'role') = 'admin'
 ```
 
 ---

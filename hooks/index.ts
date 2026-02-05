@@ -28,6 +28,10 @@ export * from "./ui";
 // Assets & Images
 export * from "./assets";
 
+// Feature Flags & Entitlements
+export * from "./feature/use-feature-flags";
+export * from "./feature/use-entitlements";
+
 // Background Jobs
 export * from "./jobs";
 

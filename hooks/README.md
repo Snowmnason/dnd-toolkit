@@ -94,6 +94,8 @@ import { useAppNavigation } from "@/hooks/navigation";
 | Hook                       | Purpose                                                                                                                      |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `useFeatureFlag(flagName)` | Check if feature is enabled (respects runtime toggles and beta status). Subscribes to flag changes and re-renders on toggle. |
+| `useFeatureFlags()`        | Access all server-synced feature flags and entitlements. Returns full `FeatureFlagsData` with flags + metadata. Re-renders on flag updates. |
+| `useEntitlement(name, autoRefresh?)` | Check premium entitlement status with clock safety. Returns `{ granted, expiresAt?, loading, error? }`. Optional auto-refresh on mount. |
 
 ### Notifications
 

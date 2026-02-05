@@ -565,25 +565,17 @@ class AppKernelClass {
             );
         }
 
-        // Refresh flags from server (non-blocking, after appReady)
-        FeatureFlagsManager.refreshFromServer().catch((error) => {
-          logger
-            .category("bootstrap")
-            .debug("Feature flags refresh failed on startup (using cache):", {
-              error: (error as Error).message,
-            });
-        });
-
+        // Bootstrap flags from server (one-time fetch at startup)
+        await FeatureFlagsManager.bootstrapFlags();
         logger
           .category("bootstrap")
-          .debug("Feature flags manager initialized and refresh initiated");
-      } catch (flagsError) {
+          .info("Feature flags bootstrapped successfully");
+      } catch (error) {
         logger
           .category("bootstrap")
-          .warn("Failed to initialize feature flags manager", {
-            error: (flagsError as Error).message,
+          .warn("Feature flags bootstrap failed (using hardcoded fallback):", {
+            error: (error as Error).message,
           });
-        // Non-critical: app continues without feature flags
       }
 
       const totalBootstrapTime = Object.values(this.state.timing).reduce(
