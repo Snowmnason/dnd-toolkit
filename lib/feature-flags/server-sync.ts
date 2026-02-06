@@ -135,8 +135,14 @@ class FeatureFlagsManagerClass {
             this.supabaseClient,
             this.userId,
           );
+          // Filter to only include flag-type overrides for the remoteOverrides Map
+          // Note: Entitlement overrides are handled separately in getEntitlement()
+          // TODO: Phase 1b will consolidate this with Edge Functions
+          const flagOverrides = overrides.filter(
+            (o) => o.target_type === "flag",
+          );
           this.remoteOverrides = new Map(
-            overrides.map((o) => [o.target_name, o]),
+            flagOverrides.map((o) => [o.target_name, o]),
           );
           await SecureStorage.setJSON(
             `${STORAGE_KEYS.FEATURE_FLAGS}:${OVERRIDE_CACHE_KEY_PREFIX}${this.userId}`,

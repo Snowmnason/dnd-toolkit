@@ -173,7 +173,8 @@ describe("Feature Flag Remote Overrides", () => {
         {
           id: "override-1",
           user_id: userId,
-          flag_name: "testFlag",
+          target_type: "flag",
+          target_name: "testFlag",
           enabled: true,
           expires_at: pastDate,
           revoked: false,
@@ -289,10 +290,14 @@ describe("Feature Flag Remote Overrides", () => {
       (SecureStorage.getJSON as any).mockResolvedValue({
         testFlag: {
           id: "override-1",
-          flag_name: "testFlag",
+          user_id: userId,
+          target_type: "flag",
+          target_name: "testFlag",
           enabled: true,
           expires_at: null,
           revoked: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         },
       });
 
@@ -363,10 +368,14 @@ describe("Feature Flag Remote Overrides", () => {
       (SecureStorage.getJSON as any).mockResolvedValue({
         testFlag: {
           id: "override-1",
-          flag_name: "testFlag",
+          user_id: userId,
+          target_type: "flag",
+          target_name: "testFlag",
           enabled: true,
           expires_at: null,
           revoked: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         },
       });
 

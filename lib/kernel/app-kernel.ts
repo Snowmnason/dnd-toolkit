@@ -146,27 +146,17 @@ class AppKernelClass {
    * Safe to call multiple times - only initializes once
    */
   async initialize(): Promise<void> {
-    console.log(
-      "[KERNEL] initialize() called, initPromise exists:",
-      !!this.initPromise,
-    );
     // If already initializing or initialized, return the same promise
     if (this.initPromise) {
       return this.initPromise;
     }
 
-    console.log(
-      "[KERNEL] Starting new initialization, calling _initializeInternal()",
-    );
     this.initPromise = this._initializeInternal();
     return this.initPromise;
   }
 
   private async _initializeInternal(): Promise<void> {
     try {
-      console.log(
-        '[KERNEL] _initializeInternal() starting, about to log "AppKernel initializing..."',
-      );
       logger.category("bootstrap").info("AppKernel initializing...");
 
       // Validate configuration before proceeding
@@ -600,12 +590,7 @@ class AppKernelClass {
             "debugLogs",
             false,
           );
-          console.log(
-            "[BRIDGE] Reconfiguring logger with debugLogsEnabled =",
-            debugLogsEnabled,
-          );
           logger.reconfigure(debugLogsEnabled);
-          console.log("[BRIDGE] Logger reconfigured successfully");
         } catch (bridgeError) {
           console.error(
             "[BRIDGE] Bridge failed:",
@@ -1020,14 +1005,7 @@ class AppKernelClass {
       // there can create a mismatched encryption state (keys generated
       // during SSR are not persisted to the client). Only initialize
       // storage when running in a real browser/runtime environment.
-      console.log(
-        "[KERNEL] initializeStorageDefaults() checking window:",
-        typeof window,
-      );
       if (typeof window === "undefined") {
-        console.log(
-          "[KERNEL] initializeStorageDefaults() skipping - no window (SSR)",
-        );
         logger
           .category("bootstrap")
           .debug(
@@ -1036,13 +1014,7 @@ class AppKernelClass {
         return;
       }
 
-      console.log(
-        "[KERNEL] initializeStorageDefaults() window exists, importing SecureStorage",
-      );
       const { SecureStorage } = await import("@/lib/storage");
-      console.log(
-        "[KERNEL] initializeStorageDefaults() SecureStorage imported, iterating defaults",
-      );
 
       // Initialize each key if it doesn't exist. Storage defaults are lazily
       // loaded from storage-defaults.ts for centralized management.

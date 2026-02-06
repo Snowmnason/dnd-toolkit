@@ -439,7 +439,8 @@ const overrides = await fetchOverridesByUserId(supabaseClient, userId);
 //   {
 //     id: "uuid",
 //     user_id: "uuid",
-//     flag_name: "darkModeV2",
+//     target_type: "flag",
+//     target_name: "darkModeV2",
 //     enabled: true,
 //     expires_at: "2026-12-31T..." | null,
 //     revoked: false,

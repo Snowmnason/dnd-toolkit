@@ -76,12 +76,16 @@ if (typeof window !== "undefined") {
   const originalError = console.error;
 
   console.warn = (...args: any[]) => {
-    const message = args[0]?.toString?.() || "";
-    if (
-      message.includes("Blocked aria-hidden") &&
-      message.includes("descendant retained focus")
-    ) {
-      return; // Suppress this specific warning
+    try {
+      const message = args[0]?.toString?.() || "";
+      if (
+        message.includes("Blocked aria-hidden") &&
+        message.includes("descendant retained focus")
+      ) {
+        return; // Suppress this specific warning
+      }
+    } catch {
+      // Ignore errors in filter logic, pass through to original warn
     }
     originalWarn(...args);
   };
@@ -90,13 +94,17 @@ if (typeof window !== "undefined") {
   // The network detection code treats 401 as "network is online, just auth failed"
   // which is the correct behavior. We suppress the console error to avoid noise.
   console.error = (...args: any[]) => {
-    const message = args[0]?.toString?.() || "";
-    if (
-      message.includes("HEAD") &&
-      message.includes("supabase.co/rest/v1/") &&
-      message.includes("401")
-    ) {
-      return; // Suppress expected auth errors from network pings
+    try {
+      const message = args[0]?.toString?.() || "";
+      if (
+        message.includes("HEAD") &&
+        message.includes("supabase.co/rest/v1/") &&
+        message.includes("401")
+      ) {
+        return; // Suppress expected auth errors from network pings
+      }
+    } catch {
+      // Ignore errors in filter logic, pass through to original error
     }
     originalError(...args);
   };

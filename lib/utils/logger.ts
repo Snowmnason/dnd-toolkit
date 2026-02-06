@@ -128,18 +128,6 @@ class Logger {
       showTimestamp: debugLogsEnabled,
       showContext: debugLogsEnabled,
     };
-    console.log(
-      "[LOGGER RECONFIGURE] Old levels:",
-      oldConfig.enabledLevels,
-      "→ New levels:",
-      this.config.enabledLevels,
-    );
-    console.log(
-      "[LOGGER RECONFIGURE] Old categories:",
-      oldConfig.enabledCategories.length,
-      "→ New categories:",
-      this.config.enabledCategories.length,
-    );
   }
 
   /**
