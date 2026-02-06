@@ -15,7 +15,12 @@ export function useFeatureFlag(flagName: FeatureFlagName): boolean {
       // Re-render if:
       // 1. A specific flag was toggled and it matches this one
       // 2. A kind was toggled (we can't know which flags were affected, so re-render to be safe)
-      if (changedFlagName === flagName || kind !== undefined) {
+      // 3. All flags changed (changedFlagName === null, e.g. syncFromServer)
+      if (
+        changedFlagName === flagName ||
+        changedFlagName === null ||
+        kind !== undefined
+      ) {
         setToggleCount((prev) => prev + 1);
       }
     });

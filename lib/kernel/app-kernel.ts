@@ -18,15 +18,15 @@
 import { NetworkCascadeDetector } from "@/lib/error/network-cascade-detector";
 import type { SafeModeState } from "@/lib/error/safe-mode";
 import {
-    createSafeModeState,
-    DEFAULT_SAFE_MODE_CONFIG,
-    SafeModeLevel,
-    SafeModeReason,
+  createSafeModeState,
+  DEFAULT_SAFE_MODE_CONFIG,
+  SafeModeLevel,
+  SafeModeReason,
 } from "@/lib/error/safe-mode";
 import { getStorageDefaults } from "@/lib/kernel/storage-defaults";
 import {
-    NetworkDetection,
-    NetworkStatus,
+  NetworkDetection,
+  NetworkStatus,
 } from "@/lib/network/network-detection";
 import { validateClassifications } from "@/lib/storage/data-classification";
 import { logger } from "@/lib/utils/logger";
@@ -146,27 +146,17 @@ class AppKernelClass {
    * Safe to call multiple times - only initializes once
    */
   async initialize(): Promise<void> {
-    console.log(
-      "[KERNEL] initialize() called, initPromise exists:",
-      !!this.initPromise,
-    );
     // If already initializing or initialized, return the same promise
     if (this.initPromise) {
       return this.initPromise;
     }
 
-    console.log(
-      "[KERNEL] Starting new initialization, calling _initializeInternal()",
-    );
     this.initPromise = this._initializeInternal();
     return this.initPromise;
   }
 
   private async _initializeInternal(): Promise<void> {
     try {
-      console.log(
-        '[KERNEL] _initializeInternal() starting, about to log "AppKernel initializing..."',
-      );
       logger.category("bootstrap").info("AppKernel initializing...");
 
       // Validate configuration before proceeding
@@ -505,16 +495,20 @@ class AppKernelClass {
 
           // Initialize offline queue system
           try {
-            const { OfflineQueueManager } = await import("@/lib/api/offline-queue");
-            const { initializeOfflineQueueReplay } = await import("@/lib/api/offline-queue-replay");
-            
+            const { OfflineQueueManager } =
+              await import("@/lib/api/offline-queue");
+            const { initializeOfflineQueueReplay } =
+              await import("@/lib/api/offline-queue-replay");
+
             // Load persisted queue from storage
             await OfflineQueueManager.initialize();
-            
+
             // Set up network listener for automatic replay on reconnect
             await initializeOfflineQueueReplay();
-            
-            logger.category("bootstrap").info("Offline queue system initialized");
+
+            logger
+              .category("bootstrap")
+              .info("Offline queue system initialized");
           } catch (queueError) {
             logger
               .category("bootstrap")
@@ -553,7 +547,17 @@ class AppKernelClass {
 
         // Initialize with Supabase client
         const supClient = getSupabaseClient();
-        await FeatureFlagsManager.initialize(supClient);
+        // Try to get userId from storage (may be available from a previous session)
+        // Auth runs asynchronously, so we can't guarantee it's available yet,
+        // but SecureStorage may have the user data from a prior session.
+        let userId: string | undefined;
+        try {
+          const { AuthStateManager } = await import("@/lib/auth/auth-state");
+          userId = await AuthStateManager.getUserId();
+        } catch {
+          // userId unavailable - remote per-user overrides won't load this time
+        }
+        await FeatureFlagsManager.initialize(supClient, userId);
 
         // Verify device clock validity early
         const clockValid = await FeatureFlagsManager.verifyDeviceClock();
@@ -570,6 +574,35 @@ class AppKernelClass {
         logger
           .category("bootstrap")
           .info("Feature flags bootstrapped successfully");
+
+        // Bridge server-synced flags to the legacy FeatureFlags system
+        // and reconfigure the Logger so it respects the remote debugLogs value.
+        try {
+          const { FeatureFlags } =
+            await import("@/lib/feature-flags/feature-flags");
+          const serverFlags = FeatureFlagsManager.getAllFlags();
+
+          // 1. Sync legacy system so useFeatureFlag hooks see server values
+          FeatureFlags.syncFromServer(serverFlags);
+
+          // 2. Reconfigure Logger with the resolved debugLogs value
+          const debugLogsEnabled = FeatureFlagsManager.getFlag(
+            "debugLogs",
+            false,
+          );
+          logger.reconfigure(debugLogsEnabled);
+        } catch (bridgeError) {
+          console.error(
+            "[BRIDGE] Bridge failed:",
+            (bridgeError as Error).message,
+          );
+          logger
+            .category("bootstrap")
+            .warn(
+              "Failed to bridge server flags to legacy system (non-critical):",
+              { error: (bridgeError as Error).message },
+            );
+        }
       } catch (error) {
         logger
           .category("bootstrap")
@@ -972,14 +1005,7 @@ class AppKernelClass {
       // there can create a mismatched encryption state (keys generated
       // during SSR are not persisted to the client). Only initialize
       // storage when running in a real browser/runtime environment.
-      console.log(
-        "[KERNEL] initializeStorageDefaults() checking window:",
-        typeof window,
-      );
       if (typeof window === "undefined") {
-        console.log(
-          "[KERNEL] initializeStorageDefaults() skipping - no window (SSR)",
-        );
         logger
           .category("bootstrap")
           .debug(
@@ -988,13 +1014,7 @@ class AppKernelClass {
         return;
       }
 
-      console.log(
-        "[KERNEL] initializeStorageDefaults() window exists, importing SecureStorage",
-      );
       const { SecureStorage } = await import("@/lib/storage");
-      console.log(
-        "[KERNEL] initializeStorageDefaults() SecureStorage imported, iterating defaults",
-      );
 
       // Initialize each key if it doesn't exist. Storage defaults are lazily
       // loaded from storage-defaults.ts for centralized management.

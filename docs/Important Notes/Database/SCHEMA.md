@@ -142,6 +142,34 @@ create index IF not exists idx_entitlements_id on public.entitlements using btre
 create index IF not exists idx_entitlements_expires_at on public.entitlements using btree (expires_at) TABLESPACE pg_default;
 ```
 
+### feature_flag_overrides
+
+```sql
+create table public.feature_flag_overrides (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  target_type text not null,        -- 'flag' or 'entitlement'
+  target_name text not null,        -- flag_name or entitlement_key
+  enabled boolean not null,
+  expires_at timestamp with time zone null,
+  reason text,
+  created_by uuid null,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  revoked boolean not null default false,
+  constraint fk_user_id foreign key (user_id) references users(id) on delete cascade,
+  constraint fk_created_by foreign key (created_by) references users(id) on delete set null
+) tablespace pg_default;
+```
+
+Indexes:
+
+```sql
+create unique index idx_overrides_user_target on public.feature_flag_overrides(user_id, target_type, target_name) tablespace pg_default;
+create index idx_overrides_expires_at on public.feature_flag_overrides(expires_at) tablespace pg_default;
+create index idx_overrides_user_id on public.feature_flag_overrides(user_id) tablespace pg_default;
+```
+
 ---
 
 ## Row Level Security (RLS) Policies
@@ -193,6 +221,13 @@ feature_flags_admin_write | INSERT, UPDATE, DELETE | authenticated | CHECK: (aut
 ```text
 entitlements_user_read_own     | SELECT | authenticated | USING: user_id = auth.uid()
 entitlements_admin_full_access | ALL    | authenticated | USING/CHECK: (auth.jwt()->>'role') = 'admin'
+```
+
+### feature_flag_overrides
+
+```text
+overrides_user_read_own  | SELECT | authenticated | USING: user_id = auth.uid()
+overrides_admin_write    | INSERT, UPDATE, DELETE | authenticated | CHECK: (auth.jwt()->>'role') = 'admin'
 ```
 
 ---

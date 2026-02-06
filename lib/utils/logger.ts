@@ -103,7 +103,28 @@ class Logger {
       enabledLevels: debugLogsEnabled
         ? ["debug", "info", "warn", "error"] // All levels when debug logging enabled
         : ["error"], // Production: only errors
-      enabledCategories: this.getEnabledCategories(appConfig),
+      enabledCategories: this.getEnabledCategories(debugLogsEnabled),
+      showTimestamp: debugLogsEnabled,
+      showContext: debugLogsEnabled,
+    };
+  }
+
+  /**
+   * Reconfigure logger with updated feature flag state.
+   *
+   * Called after server-synced feature flags are bootstrapped so the Logger
+   * respects the remote `debugLogs` value instead of only the static
+   * appsettings.json config.
+   *
+   * @param debugLogsEnabled - The server-resolved value for debugLogs.enabled
+   */
+  reconfigure(debugLogsEnabled: boolean): void {
+    const oldConfig = { ...this.config };
+    this.config = {
+      enabledLevels: debugLogsEnabled
+        ? ["debug", "info", "warn", "error"]
+        : ["error"],
+      enabledCategories: this.getEnabledCategories(debugLogsEnabled),
       showTimestamp: debugLogsEnabled,
       showContext: debugLogsEnabled,
     };
@@ -112,9 +133,7 @@ class Logger {
   /**
    * Determine which categories are enabled based on config
    */
-  private getEnabledCategories(appConfig: any): LogCategory[] {
-    const debugLogsEnabled = appConfig.featureFlags.debugLogs?.enabled ?? false;
-
+  private getEnabledCategories(debugLogsEnabled: boolean): LogCategory[] {
     // In production, only enable critical categories
     if (!debugLogsEnabled) {
       return ["error", "security"];
@@ -122,6 +141,7 @@ class Logger {
 
     // In development/debug mode, check for category-specific flags
     // Default to enabling all categories if no specific config
+    const appConfig = getAppConfig();
     const categoryConfig = appConfig.featureFlags.loggerCategories;
     if (!categoryConfig || !categoryConfig.categories) {
       return [
