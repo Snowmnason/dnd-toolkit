@@ -6,17 +6,33 @@
  * - Override management
  * - Entitlement checks with expiry and clock skew
  * - Caching behavior
+ *
+ * NOTE: After Phase 1b refactoring, bootstrapFlags invokes the get_feature_flags
+ * Edge Function instead of direct database queries.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FeatureFlagsManager } from "@/lib/feature-flags/server-sync";
 import { SecureStorage } from "@/lib/storage";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchFeatureFlags } from "@/lib/database/feature-flags";
 import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
 
-// Mock Supabase
-const mockSupabase = {
+// Mock Supabase with functions.invoke capability
+const createMockSupabase = (invokeFn?: any) => ({
+  functions: {
+    invoke:
+      invokeFn ||
+      vi.fn().mockResolvedValue({
+        data: {
+          flags: [],
+          entitlements: [],
+          overrides: [],
+          fetchedAt: Date.now(),
+          version: "v1",
+        },
+        error: null,
+      }),
+  },
   from: vi.fn(() => ({
     select: vi.fn(() => ({
       eq: vi.fn(() => ({
@@ -25,7 +41,7 @@ const mockSupabase = {
       })),
     })),
   })),
-};
+});
 
 // Mock SecureStorage
 vi.mock("@/lib/storage", () => ({
@@ -40,11 +56,7 @@ vi.mock("@/lib/storage", () => ({
   },
 }));
 
-// Mock database helpers
-vi.mock("@/lib/database/feature-flags", () => ({
-  fetchFeatureFlags: vi.fn(),
-}));
-
+// Mock database helpers (only entitlements are still direct)
 vi.mock("@/lib/database/entitlements", () => ({
   fetchEntitlementsByUserId: vi.fn(),
 }));
@@ -70,20 +82,50 @@ describe("FeatureFlagsManager", () => {
   });
 
   describe("bootstrapFlags", () => {
-    it("should fetch flags from server", async () => {
-      const mockFlags = [
-        { flag_name: "testFlag", enabled: true, kind: "feature" as const },
-      ];
-      (fetchFeatureFlags as any).mockResolvedValue(mockFlags);
+    it("should fetch flags from server via Edge Function", async () => {
+      const mockSupabase = createMockSupabase(
+        vi.fn().mockResolvedValue({
+          data: {
+            flags: [
+              {
+                flag_name: "testFlag",
+                enabled: true,
+                kind: "feature",
+                created_at: "2026-02-05T00:00:00Z",
+                updated_at: "2026-02-05T00:00:00Z",
+              },
+            ],
+            entitlements: [],
+            overrides: [],
+            fetchedAt: Date.now(),
+            version: "v1",
+          },
+          error: null,
+        }),
+      );
 
       await FeatureFlagsManager.initialize(mockSupabase as any);
       await FeatureFlagsManager.bootstrapFlags();
 
-      expect(fetchFeatureFlags).toHaveBeenCalledWith(mockSupabase);
+      expect(mockSupabase.functions.invoke).toHaveBeenCalledWith(
+        "get_feature_flags",
+        expect.objectContaining({ method: "POST" }),
+      );
     });
 
     it("should handle fetch errors gracefully", async () => {
-      (fetchFeatureFlags as any).mockRejectedValue(new Error("Network error"));
+      const mockSupabase = createMockSupabase(
+        vi.fn().mockResolvedValue({
+          data: null,
+          error: new Error("Network error"),
+        }),
+      );
+
+      // Mock cached data as fallback
+      (SecureStorage.getJSON as any).mockResolvedValueOnce({
+        flags: {},
+        fetchedAt: Date.now(),
+      });
 
       await FeatureFlagsManager.initialize(mockSupabase as any);
       await FeatureFlagsManager.bootstrapFlags();
@@ -95,6 +137,7 @@ describe("FeatureFlagsManager", () => {
 
   describe("getFlag", () => {
     beforeEach(async () => {
+      const mockSupabase = createMockSupabase();
       await FeatureFlagsManager.initialize(mockSupabase as any);
     });
 
@@ -141,8 +184,10 @@ describe("FeatureFlagsManager", () => {
 
   describe("getEntitlement", () => {
     const userId = "user-123";
+    let mockSupabase: any;
 
     beforeEach(async () => {
+      mockSupabase = createMockSupabase();
       await FeatureFlagsManager.initialize(mockSupabase as any);
     });
 
@@ -175,16 +220,26 @@ describe("FeatureFlagsManager", () => {
     });
 
     it("should return cached value when offline", async () => {
+      // Setup: Cache an entitlement
+      const manager = FeatureFlagsManager as any;
+      manager.cachedEntitlements = new Map([
+        [
+          "premium",
+          {
+            id: "ent-1",
+            user_id: userId,
+            key: "premium",
+            created_at: "2026-02-06T00:00:00Z",
+            updated_at: "2026-02-06T00:00:00Z",
+            expires_at: null,
+          },
+        ],
+      ]);
+
       // Mock server failure (offline)
       (fetchEntitlementsByUserId as any).mockRejectedValue(
         new Error("Network error"),
       );
-
-      // Mock the getCachedEntitlementWithExpiry method to return cached value
-      const manager = FeatureFlagsManager as any;
-      manager.getCachedEntitlementWithExpiry = vi
-        .fn()
-        .mockResolvedValue({ granted: true, expiresAt: null });
 
       const result = await FeatureFlagsManager.getEntitlement(
         "premium",

@@ -20,11 +20,7 @@
 
 import { getAppConfig, isDevelopment } from "@/lib/config/loader";
 import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
-import { fetchFeatureFlags } from "@/lib/database/feature-flags";
-import {
-  fetchOverridesByUserId,
-  FeatureFlagOverrideRow,
-} from "@/lib/database/feature-flag-overrides";
+import { FeatureFlagOverrideRow } from "@/lib/database/feature-flag-overrides";
 import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 
@@ -46,13 +42,24 @@ export interface EntitlementState {
   lastChecked: number;
 }
 
+/**
+ * Cached entitlement from Edge Function bootstrap or Realtime update
+ */
+export interface CachedEntitlement {
+  id: string;
+  user_id: string;
+  key: string;
+  created_at: string;
+  updated_at: string;
+  expires_at: string | null;
+}
+
 export type FlagsSubscriber = (flags: Record<string, FeatureFlagState>) => void;
 
 // ==========================================
 // Configuration
 // ==========================================
 
-const ENTITLEMENT_CACHE_KEY_PREFIX = "entitlement:";
 const OVERRIDE_CACHE_KEY_PREFIX = "feature_flag_override:";
 
 /**
@@ -72,9 +79,11 @@ class FeatureFlagsManagerClass {
   private currentFlags: Map<string, FeatureFlagState> = new Map(); // Use Map for safe access
   private userOverrides: Map<string, boolean> = new Map(); // Admin testing overrides (local)
   private remoteOverrides: Map<string, FeatureFlagOverrideRow> = new Map(); // Remote server overrides (per-user)
+  private cachedEntitlements: Map<string, CachedEntitlement> = new Map(); // Cached from bootstrap + Realtime
   private subscribers: Set<FlagsSubscriber> = new Set();
   private bootstrapped = false;
   private userId: string | null = null;
+  private realtimeSubscriptions: Map<string, any> = new Map(); // Track Realtime channel subscriptions
 
   /**
    * Initialize with Supabase client and user ID
@@ -86,6 +95,61 @@ class FeatureFlagsManagerClass {
     logger.debug("feature_flags", "FeatureFlagsManager initialized", {
       userId,
     });
+  }
+
+  /**
+   * Invoke get_feature_flags Edge Function to fetch consolidated data
+   * Returns flags, entitlements, and overrides in a single request
+   *
+   * Phase 1b refactoring: Consolidates three direct queries into one Edge Function call
+   */
+  private async invokeGetFeatureFlagsFunction(): Promise<{
+    flags: {
+      flag_name: string;
+      enabled: boolean;
+      kind: string;
+      description?: string;
+      created_at: string;
+      updated_at: string;
+    }[];
+    entitlements: any[];
+    overrides: FeatureFlagOverrideRow[];
+    fetchedAt: number;
+    version: string;
+  } | null> {
+    try {
+      if (!this.supabaseClient) {
+        throw new Error("Supabase client not initialized");
+      }
+
+      logger.debug("feature_flags", "Invoking get_feature_flags Edge Function");
+
+      const response = await this.supabaseClient.functions.invoke(
+        "get_feature_flags",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (response.error) {
+        throw new Error(`Edge Function error: ${response.error.message}`);
+      }
+
+      logger.debug("feature_flags", "Edge Function response received", {
+        flagCount: response.data?.flags?.length || 0,
+        entitlementCount: response.data?.entitlements?.length || 0,
+        overrideCount: response.data?.overrides?.length || 0,
+      });
+
+      return response.data;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.warn("feature_flags", "Failed to invoke Edge Function", errorMsg);
+      return null;
+    }
   }
 
   /**
@@ -117,7 +181,7 @@ class FeatureFlagsManagerClass {
       return;
     }
 
-    // Production: Fetch from server
+    // Production: Fetch from server via Edge Function
     logger.info("feature_flags", "Bootstrapping feature flags from server");
 
     try {
@@ -125,39 +189,67 @@ class FeatureFlagsManagerClass {
         throw new Error("Supabase client not initialized");
       }
 
-      // Fetch server flags
-      const serverFlags = await fetchFeatureFlags(this.supabaseClient);
+      // Invoke Edge Function to get consolidated flags, entitlements, and overrides
+      const data = await this.invokeGetFeatureFlagsFunction();
 
-      // Fetch remote overrides for current user (if user ID available)
-      if (this.userId) {
+      if (!data) {
+        throw new Error("Edge Function did not return data");
+      }
+
+      const {
+        flags: serverFlags,
+        overrides: allOverrides,
+        entitlements: allEntitlements,
+      } = data;
+
+      // Process entitlements
+      if (allEntitlements && allEntitlements.length > 0) {
         try {
-          const overrides = await fetchOverridesByUserId(
-            this.supabaseClient,
-            this.userId,
+          this.cachedEntitlements = new Map(
+            allEntitlements.map((e) => [e.key, e]),
           );
-          // Filter to only include flag-type overrides for the remoteOverrides Map
-          // Note: Entitlement overrides are handled separately in getEntitlement()
-          // TODO: Phase 1b will consolidate this with Edge Functions
-          const flagOverrides = overrides.filter(
+
+          // Cache entitlements for offline use
+          await SecureStorage.setJSON(
+            `${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`,
+            Object.fromEntries(this.cachedEntitlements),
+          );
+
+          logger.debug("feature_flags", "Cached entitlements", {
+            count: this.cachedEntitlements.size,
+          });
+        } catch (error) {
+          logger.warn("feature_flags", "Failed to process entitlements", error);
+          await this.loadCachedEntitlements();
+        }
+      }
+
+      // Process flag-type overrides for remote override map
+      if (this.userId && allOverrides && allOverrides.length > 0) {
+        try {
+          // Filter to only include flag-type overrides
+          const flagOverrides = allOverrides.filter(
             (o) => o.target_type === "flag",
           );
           this.remoteOverrides = new Map(
             flagOverrides.map((o) => [o.target_name, o]),
           );
+
+          // Cache flag overrides for offline use
           await SecureStorage.setJSON(
             `${STORAGE_KEYS.FEATURE_FLAGS}:${OVERRIDE_CACHE_KEY_PREFIX}${this.userId}`,
             Object.fromEntries(this.remoteOverrides),
           );
-          logger.debug("feature_flags", "Fetched remote overrides", {
+
+          logger.debug("feature_flags", "Processed remote flag overrides", {
             count: this.remoteOverrides.size,
           });
         } catch (error) {
           logger.warn(
             "feature_flags",
-            "Failed to fetch remote overrides",
+            "Failed to process flag overrides",
             error,
           );
-          // Try to load cached overrides
           await this.loadCachedRemoteOverrides();
         }
       }
@@ -165,7 +257,7 @@ class FeatureFlagsManagerClass {
       // Convert to state object
       const newFlags: Map<string, FeatureFlagState> = new Map();
 
-      if (serverFlags.length > 0) {
+      if (serverFlags && serverFlags.length > 0) {
         // Use server flags (production mode)
         for (const flag of serverFlags) {
           newFlags.set(flag.flag_name, {
@@ -176,9 +268,8 @@ class FeatureFlagsManagerClass {
           });
         }
       } else {
-        // Use hardcoded config (dev mode or fallback)
+        // Use hardcoded config (fallback)
         this.loadHardcodedFlags();
-        // Copy from the loaded hardcoded flags
         for (const [name, state] of this.currentFlags) {
           newFlags.set(name, state);
         }
@@ -194,14 +285,10 @@ class FeatureFlagsManagerClass {
         fetchedAt: Date.now(),
       });
 
-      logger.info(
-        "feature_flags",
-        `Bootstrapped successfully (${isDev ? "dev config" : "server"})`,
-        {
-          flagCount: newFlags.size,
-          overrideCount: this.remoteOverrides.size,
-        },
-      );
+      logger.info("feature_flags", "Bootstrapped successfully from server", {
+        flagCount: newFlags.size,
+        overrideCount: this.remoteOverrides.size,
+      });
 
       // Notify subscribers
       this.notifySubscribers(newFlags);
@@ -244,6 +331,11 @@ class FeatureFlagsManagerClass {
       });
       this.notifySubscribers(this.currentFlags);
     }
+
+    // Setup Realtime subscriptions for live updates (after bootstrap)
+    if (!isDev) {
+      await this.subscribeToRealtimeUpdates();
+    }
   }
 
   /**
@@ -269,6 +361,241 @@ class FeatureFlagsManagerClass {
         "Failed to load cached remote overrides",
         error,
       );
+    }
+  }
+
+  /**
+   * Load cached entitlements from storage
+   */
+  private async loadCachedEntitlements(): Promise<void> {
+    if (!this.userId) return;
+    try {
+      const cached = await SecureStorage.getJSON<
+        Record<string, CachedEntitlement>
+      >(`${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`);
+      if (cached) {
+        this.cachedEntitlements = new Map(Object.entries(cached));
+        logger.debug("feature_flags", "Loaded cached entitlements", {
+          count: this.cachedEntitlements.size,
+        });
+      }
+    } catch (error) {
+      logger.warn("feature_flags", "Failed to load cached entitlements", error);
+    }
+  }
+
+  /**
+   * Subscribe to Realtime updates for feature flags, entitlements, and overrides
+   * Allows server-side changes to be pushed to the client immediately
+   * Reduces polling and moves control to the server
+   */
+  private async subscribeToRealtimeUpdates(): Promise<void> {
+    if (!this.supabaseClient || !this.userId) {
+      logger.debug("feature_flags", "Realtime subscriptions not available");
+      return;
+    }
+
+    try {
+      // Subscribe to feature flags table (all users, all changes)
+      const flagsChannel = this.supabaseClient
+        .channel("public:feature_flags")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "feature_flags",
+          },
+          (payload: any) => {
+            this.handleFlagChange(payload);
+          },
+        )
+        .subscribe((status: string) => {
+          if (status === "SUBSCRIBED") {
+            logger.debug("feature_flags", "Subscribed to feature_flags table");
+          }
+        });
+
+      this.realtimeSubscriptions.set("feature_flags", flagsChannel);
+
+      // Subscribe to entitlements for this user
+      const entitlementsChannel = this.supabaseClient
+        .channel(`public:entitlements:user.eq.${this.userId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "entitlements",
+            filter: `user_id=eq.${this.userId}`,
+          },
+          (payload: any) => {
+            this.handleEntitlementChange(payload);
+          },
+        )
+        .subscribe((status: string) => {
+          if (status === "SUBSCRIBED") {
+            logger.debug(
+              "feature_flags",
+              "Subscribed to entitlements for user",
+            );
+          }
+        });
+
+      this.realtimeSubscriptions.set("entitlements", entitlementsChannel);
+
+      // Subscribe to feature flag overrides for this user
+      const overridesChannel = this.supabaseClient
+        .channel(`public:feature_flag_overrides:user.eq.${this.userId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "feature_flag_overrides",
+            filter: `user_id=eq.${this.userId}`,
+          },
+          (payload: any) => {
+            this.handleOverrideChange(payload);
+          },
+        )
+        .subscribe((status: string) => {
+          if (status === "SUBSCRIBED") {
+            logger.debug(
+              "feature_flags",
+              "Subscribed to feature_flag_overrides for user",
+            );
+          }
+        });
+
+      this.realtimeSubscriptions.set("overrides", overridesChannel);
+
+      logger.info("feature_flags", "Realtime subscriptions established");
+    } catch (error) {
+      logger.warn(
+        "feature_flags",
+        "Failed to setup Realtime subscriptions",
+        error,
+      );
+    }
+  }
+
+  /**
+   * Handle feature flag changes from Realtime
+   */
+  private async handleFlagChange(payload: any): Promise<void> {
+    try {
+      const { new: flagData, eventType } = payload;
+
+      if (eventType === "DELETE") {
+        // Flag was deleted, remove from current flags
+        if (flagData?.flag_name) {
+          this.currentFlags.delete(flagData.flag_name);
+        }
+      } else {
+        // Flag was inserted or updated
+        if (flagData?.flag_name) {
+          this.currentFlags.set(flagData.flag_name, {
+            enabled: flagData.enabled,
+            kind: flagData.kind,
+            description: flagData.description,
+            source: "server",
+          });
+        }
+      }
+
+      // Cache updated flags to storage
+      await SecureStorage.setJSON(STORAGE_KEYS.FEATURE_FLAGS, {
+        flags: Object.fromEntries(this.currentFlags),
+        fetchedAt: Date.now(),
+      });
+
+      logger.debug("feature_flags", `Flag ${eventType}:`, flagData?.flag_name);
+      this.notifySubscribers(this.currentFlags);
+    } catch (error) {
+      logger.warn("feature_flags", "Error handling flag change", error);
+    }
+  }
+
+  /**
+   * Handle entitlement changes from Realtime
+   */
+  private async handleEntitlementChange(payload: any): Promise<void> {
+    try {
+      const {
+        new: entitlementData,
+        old: oldEntitlementData,
+        eventType,
+      } = payload;
+
+      if (!this.userId) return;
+
+      const entitlementKey = entitlementData?.key || oldEntitlementData?.key;
+
+      if (eventType === "DELETE") {
+        // Entitlement was revoked/deleted
+        this.cachedEntitlements.delete(entitlementKey);
+        logger.debug("feature_flags", `Entitlement revoked: ${entitlementKey}`);
+      } else if (eventType === "INSERT" || eventType === "UPDATE") {
+        // Entitlement was granted or updated
+        if (entitlementData) {
+          this.cachedEntitlements.set(
+            entitlementKey,
+            entitlementData as CachedEntitlement,
+          );
+          logger.debug(
+            "feature_flags",
+            `Entitlement ${eventType}:`,
+            entitlementKey,
+          );
+        }
+      }
+
+      // Cache updated entitlements to storage
+      await SecureStorage.setJSON(
+        `${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`,
+        Object.fromEntries(this.cachedEntitlements),
+      );
+    } catch (error) {
+      logger.warn("feature_flags", "Error handling entitlement change", error);
+    }
+  }
+
+  /**
+   * Handle feature flag override changes from Realtime
+   */
+  private async handleOverrideChange(payload: any): Promise<void> {
+    try {
+      const { new: overrideData, old: oldOverrideData, eventType } = payload;
+
+      if (!this.userId) return;
+
+      const targetName =
+        overrideData?.target_name || oldOverrideData?.target_name;
+
+      if (eventType === "DELETE") {
+        // Override was revoked, remove from map
+        this.remoteOverrides.delete(targetName);
+        logger.debug("feature_flags", `Override revoked: ${targetName}`);
+      } else if (overrideData?.target_type === "flag") {
+        // Only track flag-type overrides
+        this.remoteOverrides.set(
+          targetName,
+          overrideData as FeatureFlagOverrideRow,
+        );
+        logger.debug("feature_flags", `Override ${eventType}: ${targetName}`);
+      }
+
+      // Cache updated overrides
+      await SecureStorage.setJSON(
+        `${STORAGE_KEYS.FEATURE_FLAGS}:${OVERRIDE_CACHE_KEY_PREFIX}${this.userId}`,
+        Object.fromEntries(this.remoteOverrides),
+      );
+
+      // Notify subscribers of flag changes
+      this.notifySubscribers(this.currentFlags);
+    } catch (error) {
+      logger.warn("feature_flags", "Error handling override change", error);
     }
   }
 
@@ -412,13 +739,99 @@ class FeatureFlagsManagerClass {
       return { granted: false, source: "clock_invalid", expiresAt: undefined };
     }
 
-    // Priority 2: Fresh server check
+    // Priority 2: Check cache first (event-driven design)
+    const cached = this.cachedEntitlements.get(name);
+
+    if (cached) {
+      // Check if expired
+      const isExpired =
+        cached.expires_at !== null &&
+        new Date(cached.expires_at).getTime() <= Date.now();
+
+      if (!isExpired) {
+        // Cache is still valid
+        logger.debug("feature_flags", `Entitlement ${name} from cache: true`, {
+          expiresAt: cached.expires_at,
+        });
+        return {
+          granted: true,
+          source: "cache",
+          expiresAt: cached.expires_at,
+        };
+      }
+
+      // Cache expired, try fresh query as security check
+      logger.debug(
+        "feature_flags",
+        `Entitlement ${name} has expired, verifying with server`,
+      );
+      try {
+        if (!this.supabaseClient) {
+          // Offline and expired: deny access (security: fail-secure)
+          logger.warn(
+            "feature_flags",
+            `Entitlement ${name} expired and offline, denying`,
+          );
+          return {
+            granted: false,
+            source: "expired_offline",
+            expiresAt: cached.expires_at,
+          };
+        }
+
+        // Fetch fresh to verify
+        const entitlements = await fetchEntitlementsByUserId(
+          this.supabaseClient,
+          userId,
+        );
+        const fresh = entitlements.find((e) => e.key === name);
+
+        let granted = false;
+        if (fresh) {
+          granted =
+            fresh.expires_at === null ||
+            new Date(fresh.expires_at).getTime() > Date.now();
+        }
+
+        // Update cache with fresh data
+        if (fresh) {
+          this.cachedEntitlements.set(name, fresh);
+          await SecureStorage.setJSON(
+            `${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`,
+            Object.fromEntries(this.cachedEntitlements),
+          );
+        } else {
+          // Entitlement no longer exists, remove from cache
+          this.cachedEntitlements.delete(name);
+        }
+
+        logger.debug(
+          "feature_flags",
+          `Entitlement ${name} verified: ${granted}`,
+          { expiresAt: fresh?.expires_at },
+        );
+        return { granted, source: "server", expiresAt: fresh?.expires_at };
+      } catch (error) {
+        // Server check failed, offline and expired: deny access (fail-secure)
+        logger.warn(
+          "feature_flags",
+          `Fresh entitlement check failed for ${name}, expired and offline, denying`,
+          error,
+        );
+        return {
+          granted: false,
+          source: "expired_offline",
+          expiresAt: cached.expires_at,
+        };
+      }
+    }
+
+    // No cache: try fresh query
     try {
       if (!this.supabaseClient) {
         throw new Error("Supabase client not initialized");
       }
 
-      // Fetch full entitlement data to get expiry
       const entitlements = await fetchEntitlementsByUserId(
         this.supabaseClient,
         userId,
@@ -427,23 +840,16 @@ class FeatureFlagsManagerClass {
 
       let granted = false;
       if (entitlement) {
-        // If expires_at is null, the entitlement never expires
-        if (entitlement.expires_at === null) {
-          granted = true;
-        } else {
-          // Check if the entitlement has expired
-          const expiryTime = new Date(entitlement.expires_at).getTime();
-          granted = expiryTime > Date.now();
-        }
+        granted =
+          entitlement.expires_at === null ||
+          new Date(entitlement.expires_at).getTime() > Date.now();
+        // Cache for future use
+        this.cachedEntitlements.set(name, entitlement);
+        await SecureStorage.setJSON(
+          `${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`,
+          Object.fromEntries(this.cachedEntitlements),
+        );
       }
-
-      // Cache result for offline use with expiry info
-      await this.cacheEntitlement(
-        userId,
-        name,
-        granted,
-        entitlement?.expires_at || null,
-      );
 
       logger.debug(
         "feature_flags",
@@ -456,86 +862,15 @@ class FeatureFlagsManagerClass {
     } catch (error) {
       logger.warn(
         "feature_flags",
-        `Fresh entitlement check failed for ${name}, using cache`,
+        `Server check failed for ${name}, denying access`,
         error,
       );
-
-      // Priority 3: Last known value (offline)
-      const cached = await this.getCachedEntitlementWithExpiry(userId, name);
-      if (cached !== null) {
-        logger.debug(
-          "feature_flags",
-          `Entitlement ${name} from cache: ${cached.granted}`,
-          { expiresAt: cached.expiresAt },
-        );
-        return {
-          granted: cached.granted,
-          source: "cache",
-          expiresAt: cached.expiresAt,
-        };
-      }
-
-      // No cache available
-      logger.debug("feature_flags", `Entitlement ${name} not found, denying`);
-      return { granted: false, source: "not_found", expiresAt: undefined };
-    }
-  }
-
-  /**
-   * Cache entitlement for offline use
-   */
-  private async cacheEntitlement(
-    userId: string,
-    name: string,
-    granted: boolean,
-    expiresAt: string | null,
-  ): Promise<void> {
-    try {
-      const cacheKey = `${STORAGE_KEYS.ENTITLEMENTS}:${ENTITLEMENT_CACHE_KEY_PREFIX}${userId}:${name}`;
-      await SecureStorage.setJSON(cacheKey, {
-        granted,
-        expiresAt,
-        cachedAt: Date.now(),
-      });
-    } catch (error) {
-      logger.error("feature_flags", "Failed to cache entitlement", error);
-    }
-  }
-
-  /**
-   * Get cached entitlement with expiry info
-   */
-  private async getCachedEntitlementWithExpiry(
-    userId: string,
-    name: string,
-  ): Promise<{ granted: boolean; expiresAt: string | null } | null> {
-    try {
-      const cacheKey = `${STORAGE_KEYS.ENTITLEMENTS}:${ENTITLEMENT_CACHE_KEY_PREFIX}${userId}:${name}`;
-      const cached = await SecureStorage.getJSON<{
-        granted: boolean;
-        expiresAt: string | null;
-        cachedAt: number;
-      }>(cacheKey);
-
-      if (!cached) {
-        return null;
-      }
-
-      // If the cached entitlement has expired, deny access
-      if (cached.expiresAt) {
-        const expiryTime = new Date(cached.expiresAt).getTime();
-        if (expiryTime <= Date.now()) {
-          logger.debug(
-            "feature_flags",
-            `Cached entitlement ${name} has expired`,
-          );
-          return { granted: false, expiresAt: cached.expiresAt };
-        }
-      }
-
-      return { granted: cached.granted, expiresAt: cached.expiresAt };
-    } catch {
-      return null;
+      // No cache and server unavailable: deny access (fail-secure)
+      return {
+        granted: false,
+        source: "server_unavailable",
+        expiresAt: undefined,
+      };
     }
   }
 
@@ -672,20 +1007,39 @@ class FeatureFlagsManagerClass {
    */
   async clearCache(): Promise<void> {
     try {
+      // Unsubscribe from Realtime channels
+      try {
+        for (const channel of this.realtimeSubscriptions.values()) {
+          await this.supabaseClient?.removeChannel(channel);
+        }
+        this.realtimeSubscriptions.clear();
+        logger.debug("feature_flags", "Unsubscribed from Realtime channels");
+      } catch (error) {
+        logger.warn(
+          "feature_flags",
+          "Failed to unsubscribe from Realtime",
+          error,
+        );
+      }
+
       // Clear core flag caches
       await SecureStorage.removeItem(STORAGE_KEYS.FEATURE_FLAGS);
       await SecureStorage.removeItem(STORAGE_KEYS.CLOCK_INVALID);
       await SecureStorage.removeItem("dnd:last_clock_check");
 
-      // Clear all entitlement cache entries by pattern
+      // Clear entitlements cache
+      if (this.userId) {
+        await SecureStorage.removeItem(
+          `${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`,
+        );
+      }
+
+      // Clear all override cache entries by pattern
       try {
         const allKeys = await SecureStorage.getAllKeys();
-        const entitlementPattern = `${STORAGE_KEYS.ENTITLEMENTS}:${ENTITLEMENT_CACHE_KEY_PREFIX}`;
         const overridePattern = `${STORAGE_KEYS.FEATURE_FLAGS}:${OVERRIDE_CACHE_KEY_PREFIX}`;
-        const keysToRemove = allKeys.filter(
-          (key) =>
-            key.startsWith(entitlementPattern) ||
-            key.startsWith(overridePattern),
+        const keysToRemove = allKeys.filter((key) =>
+          key.startsWith(overridePattern),
         );
 
         for (const key of keysToRemove) {
@@ -693,20 +1047,12 @@ class FeatureFlagsManagerClass {
         }
 
         if (keysToRemove.length > 0) {
-          logger.debug(
-            "feature_flags",
-            "Cleared entitlement and override cache entries",
-            {
-              count: keysToRemove.length,
-            },
-          );
+          logger.debug("feature_flags", "Cleared override cache entries", {
+            count: keysToRemove.length,
+          });
         }
       } catch (error) {
-        logger.warn(
-          "feature_flags",
-          "Failed to clear entitlement/override cache",
-          error,
-        );
+        logger.warn("feature_flags", "Failed to clear override cache", error);
         // Continue with other cleanup steps
       }
 
@@ -718,6 +1064,7 @@ class FeatureFlagsManagerClass {
       this.currentFlags = new Map();
       this.userOverrides.clear();
       this.remoteOverrides.clear();
+      this.cachedEntitlements.clear();
       this.bootstrapped = false;
     } catch (error) {
       logger.error("feature_flags", "Failed to clear cache", error);

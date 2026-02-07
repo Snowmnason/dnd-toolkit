@@ -1,9 +1,16 @@
 /**
- * Feature Flag Overrides Database Queries
+ * Feature Flag Overrides - Types Only
  *
- * This module provides client-side REST API helpers for querying per-user feature flag/entitlement overrides
- * from the Supabase `feature_flag_overrides` table. Used by `lib/feature-flags/server-sync.ts`
- * (FeatureFlagsManager) to fetch and cache user-specific overrides during app startup or refresh.
+ * @deprecated Phase 1b: Query functions are no longer used.
+ * Feature flag overrides are now fetched via the Edge Function `get_feature_flags`
+ * (consolidated call) and updated via Supabase Realtime subscriptions.
+ *
+ * **TYPES EXPORTED HERE:** This file maintains type definitions and schema documentation
+ * for feature flag overrides. These types are imported by `lib/feature-flags/server-sync.ts`
+ * for type safety across the event-driven architecture.
+ *
+ * See: lib/feature-flags/server-sync.ts (FeatureFlagsManager.bootstrapFlags)
+ * See: supabase/functions/get_feature_flags/
  *
  * **Schema:**
  * - id: uuid (PK)
@@ -16,12 +23,7 @@
  * - reason: text (optional, e.g., "internal testing", "customer request")
  * - created_by: uuid (optional, FK to users, who created the override)
  * - created_at, updated_at: timestamps
- *
- * **NOTE:** These are client-side queries. Do not use directly in components;
- * use `lib/feature-flags/FeatureFlagsManager` and React hooks instead.
  */
-
-import { SupabaseClient } from "@supabase/supabase-js";
 
 export type OverrideTargetType = "flag" | "entitlement";
 
@@ -40,6 +42,7 @@ export interface FeatureFlagOverrideRow {
 }
 
 /**
+ * @deprecated
  * Fetch all active overrides for a given user
  *
  * Filters for non-revoked overrides that have not expired.
@@ -48,7 +51,7 @@ export interface FeatureFlagOverrideRow {
  * @param supabase - Supabase client
  * @param userId - User ID (UUID) to fetch overrides for
  * @returns List of active user overrides
- */
+
 export async function fetchOverridesByUserId(
   supabase: SupabaseClient,
   userId: string,
@@ -72,3 +75,4 @@ export async function fetchOverridesByUserId(
 
   return (data || []) as FeatureFlagOverrideRow[];
 }
+ */

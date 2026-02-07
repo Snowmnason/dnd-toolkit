@@ -7,39 +7,27 @@
  */
 
 import { getAppConfig } from "@/lib/config";
-import Constants from "expo-constants";
+import { getHealthEndpointUrl } from "@/lib/edge-functions/constants";
 
 /**
  * Get the Supabase health endpoint for network checks
  *
- * Why Supabase?
- * - Already whitelisted in Content Security Policy for API calls
- * - Reliable health endpoint at /rest/v1/
- * - Avoids CSP violations that would occur with Cloudflare or other endpoints
+ * Why the health Edge Function?
+ * - Public endpoint (no authentication required)
+ * - Returns 200 OK on success
+ * - No 401 errors from unauthenticated pings
+ * - CSP policy already permits /functions/v1/ calls
+ * - Avoids 401 noise in console logs
  *
- * Uses environment variables for environment-agnostic configuration:
- * - EXPO_PUBLIC_SUPABASE_URL: Configured via .env or app.json
- * - Falls back to Constants.expoConfig?.extra?.supabaseUrl for development
+ * Configuration:
+ * - EXPO_PUBLIC_SUPABASE_HEALTH_ENDPOINT: Explicit override (for testing)
+ * - Falls back to SUPABASE_URL + /functions/v1/health
  *
  * @returns The Supabase health endpoint URL, or empty string if not configured
+ * @see lib/edge-functions/constants.ts#getHealthEndpointUrl
  */
 export function getSupabaseHealthEndpoint(): string {
-  // Allow explicit override of the health endpoint for testing or to point
-  // to a public, unauthenticated health route (recommended to avoid 401 noise).
-  const explicit = process.env.EXPO_PUBLIC_SUPABASE_HEALTH_ENDPOINT;
-  if (explicit) return explicit;
-
-  const supabaseUrl =
-    process.env.EXPO_PUBLIC_SUPABASE_URL ||
-    Constants.expoConfig?.extra?.supabaseUrl;
-
-  if (!supabaseUrl) {
-    return "";
-  }
-
-  // Normalize: strip any trailing slashes then append the path
-  const normalized = supabaseUrl.replace(/\/+$|\s+/g, "");
-  return `${normalized}/rest/v1/`;
+  return getHealthEndpointUrl();
 }
 
 /**

@@ -20,19 +20,15 @@ export {
     AuthLayer,
     CACHE_DEFAULTS,
     CircuitBreakerManager,
-    CircuitBreakerOpenError,
-    DEFAULT_THRESHOLDS,
-    InterceptorManager,
-    NetworkRecoveryManager,
-    NetworkRecoveryRetryJobManager,
-    UsersAPI,
-    WorldsAPI, cleanupOfflineQueueReplay, createInviteAuthStrategy,
+    CircuitBreakerOpenError, cleanupOfflineQueueReplay,
+    createInviteAuthStrategy,
     createPublicAuthStrategy,
-    createUserAuthStrategy, initializeOfflineQueueReplay, parseEndpoint,
-    registerNetworkRecoveryHooks,
-    type APIClientConfig, type APIUser,
-    type APIWorld, type ApiErrorType,
-    type AuthContext,
+    createUserAuthStrategy, DEFAULT_THRESHOLDS, initializeOfflineQueueReplay, InterceptorManager,
+    NetworkRecoveryManager,
+    NetworkRecoveryRetryJobManager, parseEndpoint,
+    registerNetworkRecoveryHooks, UsersAPI,
+    WorldsAPI, type APIClientConfig, type ApiErrorType, type APIUser,
+    type APIWorld, type AuthContext,
     type AuthStrategy,
     type CircuitStats,
     type CircuitThresholds,
@@ -41,10 +37,12 @@ export {
     type NotificationCallback,
     type QueryOptions,
     // Omit OfflineQueueStats and OfflineQueueConfig (see offline module instead)
-    type QueuedRequestEntry, type RecoveryState,
+    type QueuedRequestEntry,
+    type RecoveryState,
     type RequestInterceptor,
     type UpdateUserRequest,
-    type UpdateWorldRequest, type WorldMember
+    type UpdateWorldRequest,
+    type WorldMember
 } from "./api";
 
 // ===== Auth (Authentication & Authorization) =====
@@ -58,6 +56,9 @@ export * from "./config";
 
 // ===== Database (Supabase & Queries) =====
 export * from "./database";
+
+// ===== Edge Functions (Supabase Edge Function URLs & Helpers) =====
+export * from "./edge-functions";
 
 // ===== Error Handling =====
 export * from "./error";
@@ -96,3 +97,4 @@ export * from "./storage";
 
 // ===== Utils (Logging, Versioning, Performance) =====
 export * from "./utils";
+

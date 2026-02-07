@@ -12,7 +12,7 @@ export { getSupabaseClient, isSupabaseConfigured, supabase } from "./supabase";
 export {
   executeParallelQueries,
   getCurrentUserProfile,
-  validateUserForWrite,
+  validateUserForWrite
 } from "./common";
 
 // User operations
@@ -27,7 +27,7 @@ export type {
   UserRole,
   World,
   WorldAccess,
-  WorldWithAccess,
+  WorldWithAccess
 } from "./worlds";
 
 // Invite operations
@@ -36,15 +36,24 @@ export {
   deleteInviteLink,
   getWorldInviteLinks,
   invitesDB,
-  validateInviteToken,
+  validateInviteToken
 } from "./invites";
-
-// Feature Flags operations
-export { fetchFeatureFlags, type FeatureFlagRow } from "./feature-flags";
 
 // Entitlements operations
 export {
   fetchEntitlementsByUserId,
   hasEntitlement,
-  type EntitlementRow,
+  type EntitlementRow
 } from "./entitlements";
+
+// Feature flags operations
+export type {
+  FeatureFlagRow
+} from "./feature-flags";
+
+// Feature flag overrides operations
+export type {
+  FeatureFlagOverrideRow,
+  OverrideTargetType
+} from "./feature-flag-overrides";
+
