@@ -1,11 +1,12 @@
 # lib/feature-flags
 
-**Dual-mode feature flag system:** config-driven toggles for development + server-driven runtime flags + premium entitlements.
+**Triple-mode feature flag system:** config-driven toggles for development + server-driven runtime flags + premium entitlements + percentage-based rollouts.
 
-This module provides two complementary systems:
+This module provides three complementary systems:
 
 1. **Legacy (Config-Driven):** `FeatureFlags` for dev/testing toggles from `appsettings.*.json`
 2. **Server-Sync (Runtime):** `FeatureFlagsManager` for production entitlements and feature gates synced from Supabase Edge Function
+3. **Rollout System:** Deterministic percentage-based user bucketing for gradual feature deployment and A/B testing
 
 ## When to Use This Module
 
@@ -19,6 +20,8 @@ This module provides two complementary systems:
 - **Graceful Degradation**: Disable features on older versions or during maintenance
 - **Runtime Premium Gates** (new `FeatureFlagsManager`): Fetch entitlements from server, enforce clock safety, stale-while-revalidate offline fallback
 - **Feature Entitlements**: Gate premium features with expiry checks and device clock manipulation detection
+- **Percentage-Based Rollouts** (new): Gradual feature deployment with deterministic user bucketing
+- **Route Variants**: A/B testing for UI components and user flows
 
 **Do NOT use this module for:**
 
@@ -543,7 +546,7 @@ export async function checkPremiumFeature(featureKey: string) {
 
 5. **Admin Overrides**: `setOverride()` is in-memory only. Overrides are cleared when app reloads or on logout.
 
-6. **No Rollout Targeting**: Flags are global (all or nothing). No per-user rollout yet (Phase 2 feature).
+6. **Rollout Targeting**: ✅ **Implemented** - Use `evaluateRollout()` for percentage-based user bucketing. Deterministic hashing ensures same user always sees same variant.
 
 ### Security Considerations
 

@@ -12,6 +12,10 @@ export {
     type FlagsSubscriber
 } from "./server-sync";
 
+export {
+    bucketPercent, clearBucketCache, getBucketMemoized, isInRollout, isInRolloutMemoized, type RolloutConfig
+} from "./rollout";
+
 export { useFeatureFlags } from "@/hooks/feature/use-feature-flags";
 
 export {

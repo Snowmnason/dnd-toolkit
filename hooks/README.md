@@ -103,6 +103,12 @@ import { useAppNavigation } from "@/hooks/navigation";
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `useNotifications()` | Queue, display, and dismiss toast/snackbar notifications. Returns `{ toast, success, error, info }` notification methods. |
 
+### Analytics & A/B Testing
+
+| Hook                   | Purpose                                                                                                                                                    |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useVariantTracking()` | Track user engagement with A/B test variants. Returns `{ trackEngagement, trackPerformance }` methods. Automatically includes user ID and is non-blocking. |
+
 ---
 
 ## Common Patterns
@@ -245,6 +251,7 @@ hooks/
     ├── index.ts                      # Barrel export
     ├── use-feature-flag.ts           # Runtime feature flag checking
     ├── use-notifications.tsx         # Toast/snackbar notifications
+    ├── use-variant-tracking.ts       # A/B test variant engagement tracking
     ├── use-world-creation.tsx        # Full world creation flow
     └── use-world-modal.tsx           # World selection/creation modal
 ```

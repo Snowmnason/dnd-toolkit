@@ -1,27 +1,33 @@
 /**
  * Navigation Configuration Service
- * 
+ *
  * Centralized route configuration for D&D Toolkit.
  * Each route defines TopBar appearance, back behavior, modals, aliases, and more.
- * 
+ *
  * ## Modals
  * Modal components (SettingsModal, CreateWorldModals, etc.) are **presentational only**.
  * They do not have route URLs and are controlled via React state (visible prop).
  * The `modal` config field is reserved for future modal-as-route patterns.
- * 
+ *
  * ## Animations
  * Animation types are defined in route config but not yet implemented in Expo Router.
  * Use `getTransitionAnimation()` helper for future integration.
  */
 
-import { Router } from 'expo-router';
-import { logger } from '../utils/logger';
-import { LOGIN_ROUTES } from './routes/login-routes';
-import { MAIN_ROUTES } from './routes/main-routes';
-import { SELECT_ROUTES } from './routes/select-routes';
-import { SETTINGS_ROUTES } from './routes/settings-routes';
-import { WEB_ROUTES } from './routes/web-routes';
-import { normalizePath, pathEquals, pathStartsWith, RouteParams } from './uri-helpers';
+import { Router } from "expo-router";
+import { trackVariantAssignment } from "../analytics/variant-tracking";
+import { logger } from "../utils/logger";
+import { LOGIN_ROUTES } from "./routes/login-routes";
+import { MAIN_ROUTES } from "./routes/main-routes";
+import { SELECT_ROUTES } from "./routes/select-routes";
+import { SETTINGS_ROUTES } from "./routes/settings-routes";
+import { WEB_ROUTES } from "./routes/web-routes";
+import {
+  normalizePath,
+  pathEquals,
+  pathStartsWith,
+  RouteParams,
+} from "./uri-helpers";
 
 /**
  * A11y focus target on route navigation
@@ -29,12 +35,12 @@ import { normalizePath, pathEquals, pathStartsWith, RouteParams } from './uri-he
  * - 'firstInteractive': Focus first interactive element
  * - 'none': No automatic focus (for modals, etc.)
  */
-export type A11yFocusTarget = 'title' | 'firstInteractive' | 'none';
+export type A11yFocusTarget = "title" | "firstInteractive" | "none";
 
 /**
  * Animation type for route transitions (placeholder for future use)
  */
-export type AnimationType = 'slide' | 'fade' | 'modal' | 'none';
+export type AnimationType = "slide" | "fade" | "modal" | "none";
 
 /**
  * Modal configuration for routes that open as modals
@@ -47,6 +53,41 @@ export interface ModalConfig {
   /** Custom dismiss handler */
   onDismiss?: (context: NavigationContext) => void;
 }
+
+/**
+ * Route variant configuration for A/B testing and gradual rollouts
+ * Allows running multiple versions of a route with percentage-based user bucketing
+ *
+ * **Note:** Variant IDs are the map keys in RouteVariantsMap, not stored in RouteVariant.
+ * The map key is the single source of truth for variant identification.
+ */
+export interface RouteVariant {
+  /** Display title for this variant (can override route title) */
+  title?: string;
+
+  /** Rollout percentage for this variant (0-100) */
+  percentage: number;
+
+  /** Optional seed for rebalancing (e.g., "2026-02-07") */
+  seed?: string;
+
+  /** Custom metadata for tracking or analytics */
+  metadata?: Record<string, string | number | boolean>;
+}
+
+/**
+ * Route variants mapping for A/B testing
+ * Maps variant IDs (keys) to their configurations
+ *
+ * @example
+ * ```ts
+ * variants: {
+ *   'v1': { title: 'Legacy', percentage: 90 },  // Key 'v1' is the variant ID
+ *   'v2': { title: 'New', percentage: 10 },      // Key 'v2' is the variant ID
+ * }
+ * ```
+ */
+export type RouteVariantsMap = Record<string, RouteVariant>;
 
 /**
  * Conditional redirect hook for access control
@@ -78,45 +119,51 @@ export interface NavigationContext {
 export interface RouteConfig {
   /** Route path pattern (e.g., '/main/characters-npcs') */
   path: string;
-  
+
   /** Route aliases for case-insensitive or alternative paths */
   aliases?: string[];
-  
+
   /** TopBar title (can be function for dynamic titles) */
   title: string | ((context: NavigationContext) => string);
-  
+
   /** Back button target path or handler */
   back?: string | ((context: NavigationContext) => string);
-  
+
   /** Show hamburger menu button */
   showHamburger?: boolean;
-  
+
   /** Show TopBar entirely (default true, false for login/public routes) */
   showTopBar?: boolean;
-  
+
   /** Required params for this route */
   requiredParams?: string[];
-  
+
   /** Preserve these params when navigating away */
   preserveParamsOnBack?: string[];
-  
+
   /** Modal configuration */
   modal?: ModalConfig;
-  
+
   /** Conditional redirect (e.g., unauthorized world access) */
   redirectIf?: RedirectIfHook;
-  
+
   /** Analytics tracking name */
   analyticsName?: string;
-  
+
   /** Animation type for transitions */
   animation?: AnimationType;
-  
+
   /** A11y focus target on navigation */
   a11yFocusTarget?: A11yFocusTarget;
-  
+
   /** Custom error boundary handler */
   onError?: (error: Error, context: NavigationContext) => void;
+
+  /** NEW: Route variants for A/B testing and gradual rollouts */
+  variants?: RouteVariantsMap;
+
+  /** NEW: Default variant ID if no rollout evaluation is needed */
+  defaultVariant?: string;
 }
 
 /**
@@ -136,73 +183,76 @@ const ROUTE_CONFIGS: RouteConfig[] = [
  * Uses intelligent matching: exact path, aliases, first segment, default
  */
 export function getRouteConfig(context: NavigationContext): RouteConfig {
-  const currentPath = '/' + context.segments.join('/');
-  
-  logger.category('navigation').debug('Resolving route config', { 
-    path: currentPath, 
+  const currentPath = "/" + context.segments.join("/");
+
+  logger.category("navigation").debug("Resolving route config", {
+    path: currentPath,
     segments: context.segments,
-    params: context.params 
+    params: context.params,
   });
-  
+
   // Strategy 1: Exact match
-  let match = ROUTE_CONFIGS.find((config) => 
-    pathEquals(config.path, currentPath) ||
-    config.aliases?.some((alias) => pathEquals(alias, currentPath))
+  let match = ROUTE_CONFIGS.find(
+    (config) =>
+      pathEquals(config.path, currentPath) ||
+      config.aliases?.some((alias) => pathEquals(alias, currentPath)),
   );
-  
+
   if (match) {
-    logger.category('navigation').debug('Route matched (exact)', { 
-      path: currentPath, 
+    logger.category("navigation").debug("Route matched (exact)", {
+      path: currentPath,
       matched: match.path,
-      strategy: 'exact' 
+      strategy: "exact",
     });
     return applyDefaults(match);
   }
-  
+
   // Strategy 2: Starts with (for nested routes like /main/characters-npcs/[id])
   match = ROUTE_CONFIGS.find((config) =>
-    pathStartsWith(currentPath, config.path)
+    pathStartsWith(currentPath, config.path),
   );
-  
+
   if (match) {
-    logger.category('navigation').debug('Route matched (starts with)', { 
-      path: currentPath, 
+    logger.category("navigation").debug("Route matched (starts with)", {
+      path: currentPath,
       matched: match.path,
-      strategy: 'starts_with' 
+      strategy: "starts_with",
     });
     return applyDefaults(match);
   }
-  
+
   // Strategy 3: First segment match (e.g., /main/* matches /main/main-landing)
   const firstSegment = context.segments[0];
   if (firstSegment) {
     match = ROUTE_CONFIGS.find((config) => {
-      const configFirstSegment = config.path.split('/').filter(Boolean)[0];
-      return normalizePath(firstSegment) === normalizePath(configFirstSegment || '');
+      const configFirstSegment = config.path.split("/").filter(Boolean)[0];
+      return (
+        normalizePath(firstSegment) === normalizePath(configFirstSegment || "")
+      );
     });
-    
+
     if (match) {
-      logger.category('navigation').debug('Route matched (first segment)', { 
-        path: currentPath, 
+      logger.category("navigation").debug("Route matched (first segment)", {
+        path: currentPath,
         matched: match.path,
-        strategy: 'first_segment',
-        firstSegment 
+        strategy: "first_segment",
+        firstSegment,
       });
       return applyDefaults(match);
     }
   }
-  
+
   // Strategy 4: Default fallback
-  logger.category('navigation').warn('Route not found, using default', { 
+  logger.category("navigation").warn("Route not found, using default", {
     path: currentPath,
-    availableRoutes: ROUTE_CONFIGS.map(c => c.path)
+    availableRoutes: ROUTE_CONFIGS.map((c) => c.path),
   });
   return applyDefaults({
     path: currentPath,
-    title: 'D&D Toolkit',
+    title: "D&D Toolkit",
     showTopBar: true,
     showHamburger: false,
-    analyticsName: 'unknown_route',
+    analyticsName: "unknown_route",
   });
 }
 
@@ -213,8 +263,8 @@ function applyDefaults(config: RouteConfig): RouteConfig {
   return {
     showTopBar: true,
     showHamburger: false,
-    a11yFocusTarget: 'title',
-    animation: 'none',
+    a11yFocusTarget: "title",
+    animation: "none",
     ...config,
   };
 }
@@ -222,8 +272,11 @@ function applyDefaults(config: RouteConfig): RouteConfig {
 /**
  * Resolve dynamic title if it's a function
  */
-export function resolveTitle(config: RouteConfig, context: NavigationContext): string {
-  if (typeof config.title === 'function') {
+export function resolveTitle(
+  config: RouteConfig,
+  context: NavigationContext,
+): string {
+  if (typeof config.title === "function") {
     return config.title(context);
   }
   return config.title;
@@ -234,16 +287,16 @@ export function resolveTitle(config: RouteConfig, context: NavigationContext): s
  */
 export function resolveBackTarget(
   config: RouteConfig,
-  context: NavigationContext
+  context: NavigationContext,
 ): string | undefined {
   if (!config.back) {
     return undefined;
   }
-  
-  if (typeof config.back === 'function') {
+
+  if (typeof config.back === "function") {
     return config.back(context);
   }
-  
+
   return config.back;
 }
 
@@ -252,13 +305,120 @@ export function resolveBackTarget(
  */
 export function shouldRedirect(
   config: RouteConfig,
-  context: NavigationContext
+  context: NavigationContext,
 ): string | undefined {
   if (!config.redirectIf) {
     return undefined;
   }
-  
+
   return config.redirectIf(context);
+}
+
+/**
+ * Evaluate route variant for user using deterministic bucketing
+ *
+ * Uses pure bucketing (FNV-1a) to map users to variants based on cumulative percentages.
+ * Guarantees exactly one variant is selected per user per route.
+ *
+ * **Algorithm:**
+ * 1. Calculate bucket for user+route: bucketPercent(userId, config.path) → 0-99
+ * 2. Iterate variants in order, accumulating percentages
+ * 3. Return variant whose cumulative range contains the bucket
+ * 4. Fall back to defaultVariant if percentages don't cover 0-99
+ *
+ * **Usage:**
+ * ```ts
+ * const variantId = await evaluateRouteVariant(config, userId);
+ * const variant = config.variants?.[variantId] ?? config.variants?.[config.defaultVariant!];
+ * // Use variant.title, metadata, etc. for analytics
+ * ```
+ *
+ * @param config - Route configuration with variants
+ * @param userId - User ID for deterministic bucketing
+ * @returns Variant ID that owns this user's bucket, or defaultVariant ID, or undefined
+ */
+export async function evaluateRouteVariant(
+  config: RouteConfig,
+  userId: string,
+): Promise<string | undefined> {
+  if (!config.variants) {
+    return undefined;
+  }
+
+  try {
+    // Import bucketPercent for pure deterministic bucketing
+    const { bucketPercent } = await import("../feature-flags/rollout");
+
+    // Calculate a single bucket for this route (0-99)
+    const bucket = bucketPercent(userId, config.path);
+
+    // Iterate variants and accumulate percentages to find matching variant
+    let cumulativePercentage = 0;
+    for (const [variantId, variant] of Object.entries(config.variants)) {
+      cumulativePercentage += variant.percentage;
+
+      // If bucket falls within this variant's range, select it
+      if (bucket < cumulativePercentage) {
+        logger.category("navigation").debug("Route variant matched", {
+          path: config.path,
+          variant: variantId,
+          bucket,
+          percentage: variant.percentage,
+          cumulativePercentage,
+          userId,
+        });
+
+        // Track variant assignment for A/B testing analytics (async, non-blocking)
+        trackVariantAssignment({
+          flagName: config.path,
+          variant: variantId,
+          userId,
+          percentage: variant.percentage,
+          context: { route_path: config.path },
+        });
+
+        return variantId;
+      }
+    }
+
+    // If no variant matched (shouldn't happen if percentages sum to 100),
+    // fall back to default
+    if (config.defaultVariant) {
+      logger
+        .category("navigation")
+        .debug("Using default route variant (no bucket match)", {
+          path: config.path,
+          variant: config.defaultVariant,
+          bucket,
+          cumulativePercentage,
+          userId,
+        });
+
+      // Track default variant assignment for analytics
+      trackVariantAssignment({
+        flagName: config.path,
+        variant: config.defaultVariant,
+        userId,
+        context: { route_path: config.path, reason: "default_fallback" },
+      });
+
+      return config.defaultVariant;
+    }
+
+    logger.category("navigation").debug("No route variant matched", {
+      path: config.path,
+      bucket,
+      cumulativePercentage,
+      userId,
+    });
+    return undefined;
+  } catch (error) {
+    logger
+      .category("navigation")
+      .warn("Failed to evaluate route variant", error);
+    // Fallback: return defaultVariant
+    return config.defaultVariant;
+  }
 }
 
 /**
@@ -271,22 +431,24 @@ export function getAllRouteConfigs(): RouteConfig[] {
 /**
  * Get animation type for route transition (placeholder for future implementation)
  * Returns the animation type from route config, defaults to 'none'
- * 
+ *
  * Future: This will integrate with Expo Router stack options or custom transition handlers
  */
 export function getTransitionAnimation(
   config: RouteConfig,
-  context: NavigationContext
+  context: NavigationContext,
 ): AnimationType {
-  return config.animation || 'none';
+  return config.animation || "none";
 }
 
 /**
  * Add or update a route config (for dynamic routes or testing)
  */
 export function registerRouteConfig(config: RouteConfig): void {
-  const existingIndex = ROUTE_CONFIGS.findIndex((c) => pathEquals(c.path, config.path));
-  
+  const existingIndex = ROUTE_CONFIGS.findIndex((c) =>
+    pathEquals(c.path, config.path),
+  );
+
   if (existingIndex >= 0) {
     // eslint-disable-next-line security/detect-object-injection
     ROUTE_CONFIGS[existingIndex] = config;

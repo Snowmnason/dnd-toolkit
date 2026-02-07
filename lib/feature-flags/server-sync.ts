@@ -18,11 +18,13 @@
  * - Offline: Use last known values
  */
 
+import { trackVariantAssignment } from "@/lib/analytics/variant-tracking";
 import { getAppConfig, isDevelopment } from "@/lib/config/loader";
 import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
 import { FeatureFlagOverrideRow } from "@/lib/database/feature-flag-overrides";
 import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
+import { isInRolloutMemoized } from "./rollout";
 
 // ==========================================
 // Types
@@ -69,6 +71,15 @@ export interface CachedFeatureFlag {
 }
 
 /**
+ * Cached rollout configuration row from Edge Function
+ * (mirrors RolloutConfigRow from supabase/functions/get_feature_flags/types.ts)
+ */
+export interface CachedRolloutConfig {
+  percentage: number; // 0-100
+  seed?: string; // Optional seed for rebalancing
+}
+
+/**
  * Typed response from get_feature_flags Edge Function
  * (mirrors GetFeatureFlagsResponse from supabase/functions/get_feature_flags/types.ts)
  */
@@ -76,6 +87,7 @@ export interface GetFeatureFlagsResponse {
   flags: CachedFeatureFlag[];
   entitlements: CachedEntitlement[];
   overrides: FeatureFlagOverrideRow[];
+  rollouts: Record<string, CachedRolloutConfig>; // NEW: rollout config by flag name
   fetchedAt: number;
   version: "v1";
 }
@@ -106,6 +118,7 @@ class FeatureFlagsManagerClass {
   private userOverrides: Map<string, boolean> = new Map(); // Admin testing overrides (local)
   private remoteOverrides: Map<string, FeatureFlagOverrideRow> = new Map(); // Remote server overrides (per-user)
   private cachedEntitlements: Map<string, CachedEntitlement> = new Map(); // Cached from bootstrap + Realtime
+  private cachedRollouts: Map<string, CachedRolloutConfig> = new Map(); // NEW: Rollout config for percentage-based rollouts
   private subscribers: Set<FlagsSubscriber> = new Set();
   private bootstrapped = false;
   private userId: string | null = null;
@@ -213,6 +226,7 @@ class FeatureFlagsManagerClass {
         flags: serverFlags,
         overrides: allOverrides,
         entitlements: allEntitlements,
+        rollouts: allRollouts, // Extract rollout config from response (no default value)
       } = data;
 
       // Process entitlements (only cache if userId is available)
@@ -279,7 +293,56 @@ class FeatureFlagsManagerClass {
         }
       }
 
-      // Convert to state object
+      // Process rollout configuration
+      // Distinguish between: explicitly cleared (empty {}), missing (old server), and populated
+      if (allRollouts && Object.keys(allRollouts).length > 0) {
+        // Server returned populated rollouts, cache them
+        try {
+          this.cachedRollouts = new Map(Object.entries(allRollouts));
+
+          // Cache rollouts for offline use (non-sensitive, same key prefix as flags)
+          await SecureStorage.setJSON(
+            `${STORAGE_KEYS.FEATURE_FLAGS}:rollouts`,
+            Object.fromEntries(this.cachedRollouts),
+          );
+
+          logger.debug("feature_flags", "Cached rollout config", {
+            count: this.cachedRollouts.size,
+          });
+        } catch (error) {
+          logger.warn(
+            "feature_flags",
+            "Failed to process rollout config",
+            error,
+          );
+          await this.loadCachedRollouts();
+        }
+      } else if (allRollouts !== undefined && allRollouts !== null) {
+        // Server explicitly returned empty {} (intentional disable of rollouts)
+        // Clear cached rollouts to prevent stale configs from applying
+        this.cachedRollouts = new Map();
+        try {
+          await SecureStorage.removeItem(
+            `${STORAGE_KEYS.FEATURE_FLAGS}:rollouts`,
+          );
+          logger.debug(
+            "feature_flags",
+            "Cleared rollout config (server disabled)",
+          );
+        } catch (error) {
+          logger.warn(
+            "feature_flags",
+            "Failed to clear cached rollouts",
+            error,
+          );
+          // Still clear in-memory cache even if storage remove fails
+          this.cachedRollouts = new Map();
+        }
+      } else {
+        // rollouts field missing from response (old server/client or fetch error)
+        // Load from cache for backward compatibility and offline support
+        await this.loadCachedRollouts();
+      }
       const newFlags: Map<string, FeatureFlagState> = new Map();
 
       if (serverFlags && serverFlags.length > 0) {
@@ -334,8 +397,9 @@ class FeatureFlagsManagerClass {
         if (cached?.flags) {
           this.currentFlags = new Map(Object.entries(cached.flags));
           this.bootstrapped = true;
-          // Also try to load cached overrides
+          // Also try to load cached overrides and rollouts
           await this.loadCachedRemoteOverrides();
+          await this.loadCachedRollouts(); // NEW: Load cached rollouts
           logger.info("feature_flags", "Loaded from last known state", {
             flagCount: this.currentFlags.size,
             overrideCount: this.remoteOverrides.size,
@@ -406,6 +470,25 @@ class FeatureFlagsManagerClass {
       }
     } catch (error) {
       logger.warn("feature_flags", "Failed to load cached entitlements", error);
+    }
+  }
+
+  /**
+   * NEW: Load cached rollout config from storage
+   */
+  private async loadCachedRollouts(): Promise<void> {
+    try {
+      const cached = await SecureStorage.getJSON<
+        Record<string, CachedRolloutConfig>
+      >(`${STORAGE_KEYS.FEATURE_FLAGS}:rollouts`);
+      if (cached) {
+        this.cachedRollouts = new Map(Object.entries(cached));
+        logger.debug("feature_flags", "Loaded cached rollout config", {
+          count: this.cachedRollouts.size,
+        });
+      }
+    } catch (error) {
+      logger.warn("feature_flags", "Failed to load cached rollouts", error);
     }
   }
 
@@ -1064,6 +1147,9 @@ class FeatureFlagsManagerClass {
       await SecureStorage.removeItem(STORAGE_KEYS.CLOCK_INVALID);
       await SecureStorage.removeItem("dnd:last_clock_check");
 
+      // Clear rollout cache (persisted and in-memory)
+      await SecureStorage.removeItem(`${STORAGE_KEYS.FEATURE_FLAGS}:rollouts`);
+
       // Clear entitlements cache
       if (this.userId) {
         await SecureStorage.removeItem(
@@ -1102,10 +1188,118 @@ class FeatureFlagsManagerClass {
       this.userOverrides.clear();
       this.remoteOverrides.clear();
       this.cachedEntitlements.clear();
+      this.cachedRollouts.clear(); // NEW: Clear rollouts cache too
       this.bootstrapped = false;
     } catch (error) {
       logger.error("feature_flags", "Failed to clear cache", error);
     }
+  }
+
+  /**
+   * NEW: Check if user is in percentage-based rollout
+   *
+   * **Resolution Order (in priority):**
+   * 1. Remote override (if exists, skip rollout)
+   * 2. Local user override (if exists, skip rollout)
+   * 3. Rollout evaluation (if rollout config exists)
+   * 4. Default to false (not in rollout)
+   *
+   * **Usage:**
+   * ```ts
+   * // Check if user can access new feature
+   * const inRollout = await FeatureFlagsManager.evaluateRollout(userId, "new_api_v2", true);
+   * if (inRollout) {
+   *   callNewEndpoint();
+   * } else {
+   *   callLegacyEndpoint();
+   * }
+   *
+   * // Route variant selection
+   * const useNewScreen = await FeatureFlagsManager.evaluateRollout(userId, "characters_v2", false);
+   * const screen = useNewScreen ? CharactersScreenV2 : CharactersScreenV1;
+   * ```
+   *
+   * @param userId - User ID for bucketing
+   * @param flagName - Feature flag name
+   * @param fallback - Default if no rollout config exists (default: false)
+   * @returns true if user is in rollout, false otherwise
+   */
+  async evaluateRollout(
+    userId: string,
+    flagName: string,
+    fallback: boolean = false,
+  ): Promise<boolean> {
+    // Priority 1: If remote override exists for this flag, it takes precedence (skip rollout)
+    const remoteOverride = this.remoteOverrides.get(flagName);
+    if (remoteOverride) {
+      // Defensive check: ensure not revoked and not expired
+      if (!remoteOverride.revoked) {
+        if (
+          remoteOverride.expires_at === null ||
+          new Date(remoteOverride.expires_at).getTime() > Date.now()
+        ) {
+          logger.debug(
+            "feature_flags",
+            `Rollout ${flagName}: remote override exists, skipping rollout evaluation`,
+          );
+          // Override takes precedence; rollout not evaluated
+          return remoteOverride.enabled;
+        }
+      }
+    }
+
+    // Priority 2: If local user override exists, it takes precedence (skip rollout)
+    if (this.userOverrides.has(flagName)) {
+      logger.debug(
+        "feature_flags",
+        `Rollout ${flagName}: local override exists, skipping rollout evaluation`,
+      );
+      return this.userOverrides.get(flagName) ?? fallback;
+    }
+
+    // Priority 3: Evaluate rollout if config exists
+    const rolloutConfig = this.cachedRollouts.get(flagName);
+    if (rolloutConfig) {
+      // Use memoized evaluation for performance
+      const inRollout = isInRolloutMemoized(
+        userId,
+        flagName,
+        rolloutConfig.percentage,
+        rolloutConfig.seed,
+      );
+
+      logger.debug(
+        "feature_flags",
+        `Rollout ${flagName}: user=${userId}, percentage=${rolloutConfig.percentage}%, in_rollout=${inRollout}`,
+      );
+
+      // Track variant assignment: user is in rollout or control group
+      // This creates the groundwork for A/B testing analytics
+      const variant = inRollout ? "B" : "A"; // B = in rollout, A = control group
+      trackVariantAssignment({
+        flagName,
+        variant,
+        userId,
+        percentage: rolloutConfig.percentage,
+        context: { rollout_type: "feature_flag", in_rollout: inRollout },
+      });
+
+      return inRollout;
+    }
+
+    // No rollout config: return fallback
+    logger.debug(
+      "feature_flags",
+      `Rollout ${flagName}: no config, using fallback=${fallback}`,
+    );
+    return fallback;
+  }
+
+  /**
+   * Get all cached rollouts (for debugging/logging)
+   */
+  getRollouts(): Record<string, CachedRolloutConfig> {
+    return Object.fromEntries(this.cachedRollouts);
   }
 }
 
