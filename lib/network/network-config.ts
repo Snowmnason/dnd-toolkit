@@ -19,12 +19,19 @@ import { getHealthEndpointUrl } from "@/lib/edge-functions/constants";
  * - CSP policy already permits /functions/v1/ calls
  * - Avoids 401 noise in console logs
  *
- * Configuration:
- * - EXPO_PUBLIC_SUPABASE_HEALTH_ENDPOINT: Explicit override (for testing)
- * - Falls back to SUPABASE_URL + /functions/v1/health
+ * Configuration fallback chain:
+ * 1. EXPO_PUBLIC_SUPABASE_HEALTH_ENDPOINT: Explicit override (for testing)
+ * 2. EXPO_PUBLIC_SUPABASE_URL: Environment variable
+ * 3. Constants.expoConfig?.extra?.supabaseUrl: From app.json (supports dev/ejected builds)
+ * Falls back to: SUPABASE_URL + /functions/v1/health (see lib/edge-functions/constants.ts)
+ *
+ * This ensures network detection works in all configurations:
+ * - Production (env vars set)
+ * - Development (app.json extra.supabaseUrl)
+ * - Testing (explicit override via EXPO_PUBLIC_SUPABASE_HEALTH_ENDPOINT)
  *
  * @returns The Supabase health endpoint URL, or empty string if not configured
- * @see lib/edge-functions/constants.ts#getHealthEndpointUrl
+ * @see lib/edge-functions/constants.ts#getHealthEndpointUrl for full fallback logic
  */
 export function getSupabaseHealthEndpoint(): string {
   return getHealthEndpointUrl();

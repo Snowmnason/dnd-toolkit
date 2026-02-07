@@ -44,6 +44,7 @@ export interface EntitlementState {
 
 /**
  * Cached entitlement from Edge Function bootstrap or Realtime update
+ * (mirrors EntitlementRow from supabase/functions/get_feature_flags/types.ts)
  */
 export interface CachedEntitlement {
   id: string;
@@ -52,6 +53,31 @@ export interface CachedEntitlement {
   created_at: string;
   updated_at: string;
   expires_at: string | null;
+}
+
+/**
+ * Cached feature flag row from Edge Function
+ * (mirrors FeatureFlagRow from supabase/functions/get_feature_flags/types.ts)
+ */
+export interface CachedFeatureFlag {
+  flag_name: string;
+  enabled: boolean;
+  kind: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Typed response from get_feature_flags Edge Function
+ * (mirrors GetFeatureFlagsResponse from supabase/functions/get_feature_flags/types.ts)
+ */
+export interface GetFeatureFlagsResponse {
+  flags: CachedFeatureFlag[];
+  entitlements: CachedEntitlement[];
+  overrides: FeatureFlagOverrideRow[];
+  fetchedAt: number;
+  version: "v1";
 }
 
 export type FlagsSubscriber = (flags: Record<string, FeatureFlagState>) => void;
@@ -103,20 +129,7 @@ class FeatureFlagsManagerClass {
    *
    * Phase 1b refactoring: Consolidates three direct queries into one Edge Function call
    */
-  private async invokeGetFeatureFlagsFunction(): Promise<{
-    flags: {
-      flag_name: string;
-      enabled: boolean;
-      kind: string;
-      description?: string;
-      created_at: string;
-      updated_at: string;
-    }[];
-    entitlements: any[];
-    overrides: FeatureFlagOverrideRow[];
-    fetchedAt: number;
-    version: string;
-  } | null> {
+  private async invokeGetFeatureFlagsFunction(): Promise<GetFeatureFlagsResponse | null> {
     try {
       if (!this.supabaseClient) {
         throw new Error("Supabase client not initialized");
@@ -202,14 +215,14 @@ class FeatureFlagsManagerClass {
         entitlements: allEntitlements,
       } = data;
 
-      // Process entitlements
-      if (allEntitlements && allEntitlements.length > 0) {
+      // Process entitlements (only cache if userId is available)
+      if (this.userId && allEntitlements && allEntitlements.length > 0) {
         try {
           this.cachedEntitlements = new Map(
             allEntitlements.map((e) => [e.key, e]),
           );
 
-          // Cache entitlements for offline use
+          // Cache entitlements for offline use (keyed per-user)
           await SecureStorage.setJSON(
             `${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`,
             Object.fromEntries(this.cachedEntitlements),
@@ -222,6 +235,18 @@ class FeatureFlagsManagerClass {
           logger.warn("feature_flags", "Failed to process entitlements", error);
           await this.loadCachedEntitlements();
         }
+      } else if (allEntitlements && allEntitlements.length > 0) {
+        // Still populate in-memory cache even if userId is unavailable (for bootstrap)
+        this.cachedEntitlements = new Map(
+          allEntitlements.map((e) => [e.key, e]),
+        );
+        logger.debug(
+          "feature_flags",
+          "Loaded entitlements (in-memory only, userId unavailable)",
+          {
+            count: this.cachedEntitlements.size,
+          },
+        );
       }
 
       // Process flag-type overrides for remote override map
@@ -485,22 +510,28 @@ class FeatureFlagsManagerClass {
    */
   private async handleFlagChange(payload: any): Promise<void> {
     try {
-      const { new: flagData, eventType } = payload;
+      const { new: flagData, old: oldFlagData, eventType } = payload;
+
+      // For DELETE events, payload.new is null; use payload.old instead
+      // For INSERT/UPDATE events, payload.new has the data
+      const flag = flagData || oldFlagData;
 
       if (eventType === "DELETE") {
         // Flag was deleted, remove from current flags
-        if (flagData?.flag_name) {
-          this.currentFlags.delete(flagData.flag_name);
+        if (flag?.flag_name) {
+          this.currentFlags.delete(flag.flag_name);
+          logger.debug("feature_flags", `Flag deleted:`, flag.flag_name);
         }
-      } else {
+      } else if (eventType === "INSERT" || eventType === "UPDATE") {
         // Flag was inserted or updated
-        if (flagData?.flag_name) {
-          this.currentFlags.set(flagData.flag_name, {
-            enabled: flagData.enabled,
-            kind: flagData.kind,
-            description: flagData.description,
+        if (flag?.flag_name) {
+          this.currentFlags.set(flag.flag_name, {
+            enabled: flag.enabled,
+            kind: flag.kind,
+            description: flag.description,
             source: "server",
           });
+          logger.debug("feature_flags", `Flag ${eventType}:`, flag.flag_name);
         }
       }
 
@@ -510,7 +541,6 @@ class FeatureFlagsManagerClass {
         fetchedAt: Date.now(),
       });
 
-      logger.debug("feature_flags", `Flag ${eventType}:`, flagData?.flag_name);
       this.notifySubscribers(this.currentFlags);
     } catch (error) {
       logger.warn("feature_flags", "Error handling flag change", error);
@@ -793,14 +823,19 @@ class FeatureFlagsManagerClass {
             new Date(fresh.expires_at).getTime() > Date.now();
         }
 
-        // Update cache with fresh data
-        if (fresh) {
+        // Update cache with fresh data (only if userId is set)
+        if (fresh && this.userId) {
           this.cachedEntitlements.set(name, fresh);
           await SecureStorage.setJSON(
             `${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`,
             Object.fromEntries(this.cachedEntitlements),
           );
-        } else {
+        } else if (fresh) {
+          // Still update in-memory cache even if userId is not set
+          this.cachedEntitlements.set(name, fresh);
+        }
+
+        if (!fresh) {
           // Entitlement no longer exists, remove from cache
           this.cachedEntitlements.delete(name);
         }
@@ -843,12 +878,14 @@ class FeatureFlagsManagerClass {
         granted =
           entitlement.expires_at === null ||
           new Date(entitlement.expires_at).getTime() > Date.now();
-        // Cache for future use
+        // Cache for future use (only if userId is set)
         this.cachedEntitlements.set(name, entitlement);
-        await SecureStorage.setJSON(
-          `${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`,
-          Object.fromEntries(this.cachedEntitlements),
-        );
+        if (this.userId) {
+          await SecureStorage.setJSON(
+            `${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`,
+            Object.fromEntries(this.cachedEntitlements),
+          );
+        }
       }
 
       logger.debug(

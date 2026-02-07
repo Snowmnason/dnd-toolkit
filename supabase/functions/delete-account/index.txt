@@ -1,0 +1,305 @@
+/**
+ * Delete Account Edge Function
+ *
+ * Securely deletes a user account and all associated data.
+ * Requires valid JWT authentication - user can only delete their own account.
+ *
+ * **Flow:**
+ * 1. Validate caller using JWT token
+ * 2. Delete user data from app tables (cascades handle dependents)
+ * 3. Delete the Supabase auth user
+ * 4. Return success
+ *
+ * **Request:**
+ * ```
+ * POST /functions/v1/delete-account
+ * Authorization: Bearer {JWT_TOKEN}
+ * ```
+ *
+ * **Response (Success):**
+ * ```
+ * HTTP 200 OK
+ * {
+ *   "success": true,
+ *   "message": "Account deleted successfully",
+ *   "timestamp": 1707230400000
+ * }
+ * ```
+ *
+ * **Response (Unauthorized):**
+ * ```
+ * HTTP 401 Unauthorized
+ * {
+ *   "error": "Missing or invalid Authorization header"
+ * }
+ * ```
+ *
+ * **Response (Error):**
+ * ```
+ * HTTP 500 Internal Server Error
+ * {
+ *   "error": "Failed to delete account",
+ *   "message": "Database error message",
+ *   "timestamp": 1707230400000
+ * }
+ * ```
+ */
+
+// Setup type definitions for built-in Supabase Runtime APIs
+import { createClient } from "npm:@supabase/supabase-js@2.39.0";
+
+// CORS helper (adjust origin if you want to restrict)
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+console.info("delete-account function: initialized");
+
+// Deno.serve entry
+Deno.serve(async (req: Request) => {
+  const startTime = Date.now();
+
+  // Handle preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  // Only allow POST requests
+  if (req.method !== "POST") {
+    return json({ error: "Method not allowed" }, 405, { Allow: "POST" });
+  }
+
+  try {
+    // 1) Validate caller (must be logged in) using the user's JWT
+    // NOTE: Never log authHeader or token values; they are sensitive credentials
+    const authHeader = req.headers.get("Authorization") ?? "";
+    if (!authHeader.startsWith("Bearer ")) {
+      console.warn("Missing or invalid Authorization header");
+      return json({ error: "Unauthorized" }, 401, {
+        "WWW-Authenticate": 'Bearer realm="delete-account"',
+      });
+    }
+
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+      console.error("Missing Supabase environment variables");
+      return json({ error: "Server misconfigured" }, 500);
+    }
+
+    // Admin client (service role) to verify token and bypass RLS
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    // Use service client to verify token
+    // admin.auth.getUser(token) returns { data: { user } } — defensive handling below
+    const token = authHeader.substring(7);
+    const { data: userData, error: userErr } = await admin.auth.getUser(token);
+    const user = userData?.user ?? null;
+
+    if (userErr || !user) {
+      console.warn("User authentication failed:", userErr?.message);
+      return json({ error: "Unauthorized" }, 401, {
+        "WWW-Authenticate": 'Bearer realm="delete-account"',
+      });
+    }
+
+    // Optional: Require recent authentication (e.g., token issued within last 5 minutes)
+    // Uncomment to enforce higher security for account deletion
+    // const tokenIssuedAt = (user.user_metadata?.iat as number) ?? 0;
+    // const tokenAge = Math.floor(Date.now() / 1000) - tokenIssuedAt;
+    // const MAX_TOKEN_AGE_SECONDS = 300; // 5 minutes
+    // if (tokenAge > MAX_TOKEN_AGE_SECONDS) {
+    //   console.warn(`Token too old for account deletion: ${tokenAge}s (max ${MAX_TOKEN_AGE_SECONDS}s)`);
+    //   return json({ error: "Recent re-authentication required" }, 403);
+    // }
+
+    console.info(`Deleting account for user: ${user.id}`);
+
+    // 2) Delete from app tables first (cascades will clear dependents)
+    //    Assumes public.users.auth_id stores auth.users.id
+    try {
+      const { error: appDelErr } = await admin
+        .from("users")
+        .delete()
+        .eq("auth_id", user.id);
+
+      if (appDelErr) {
+        console.error(
+          "App data deletion failed:",
+          appDelErr?.message ?? String(appDelErr),
+        );
+        return json(
+          {
+            error: "Failed to delete account data",
+          },
+          400,
+        );
+      }
+
+      console.info(`App delete completed (rows may be 0) for user: ${user.id}`);
+    } catch (appDeleteError) {
+      console.error(
+        "App deletion error:",
+        appDeleteError?.message ?? String(appDeleteError),
+      );
+      return json(
+        {
+          error: "Failed to delete account data",
+        },
+        500,
+      );
+    }
+
+    // 2b) Delete the auth user
+    try {
+      // Defensive check for SDK availability
+      if (!admin.auth?.admin?.deleteUser) {
+        console.error(
+          "admin.auth.admin.deleteUser is not available on this SDK version",
+        );
+        return json({ error: "Server misconfigured" }, 500);
+      }
+
+      const { error: authDelErr } = await admin.auth.admin.deleteUser(user.id);
+
+      if (authDelErr) {
+        console.error(
+          "Auth deletion failed:",
+          authDelErr?.message ?? String(authDelErr),
+        );
+        return json(
+          {
+            error: "Failed to delete auth account",
+          },
+          400,
+        );
+      }
+
+      console.info(`Auth deleted for user: ${user.id}`);
+    } catch (authDeleteError) {
+      console.error(
+        "Auth deletion error:",
+        authDeleteError?.message ?? String(authDeleteError),
+      );
+      return json(
+        {
+          error: "Failed to delete auth account",
+        },
+        500,
+      );
+    }
+
+    // Optional: Schedule Storage cleanup in background
+    // Uncomment if you store user files
+    // const cleanup = (async () => {
+    //   try {
+    //     const { data: files } = await admin.storage.from("user-files").list(user.id);
+    //     if (files?.length) {
+    //       await admin.storage.from("user-files").remove(
+    //         files.map((f) => `${user.id}/${f.name}`),
+    //       );
+    //     }
+    //   } catch (err) {
+    //     console.error("Storage cleanup failed:", err?.message ?? String(err));
+    //   }
+    // })();
+    // @ts-ignore EdgeRuntime is available in Supabase Edge Functions
+    // EdgeRuntime.waitUntil(cleanup);
+
+    // Optional: Log audit entry for compliance/recovery
+    // Uncomment to write immutable deletion audit trail
+    // const audit = (async () => {
+    //   try {
+    //     const userAgent = req.headers.get("User-Agent") ?? "unknown";
+    //     const ip = req.headers.get("X-Forwarded-For")?.split(",")[0] ?? "unknown";
+    //     await admin
+    //       .from("audit_log")
+    //       .insert({
+    //         event_type: "account_deletion",
+    //         user_id: user.id,
+    //         user_agent: userAgent,
+    //         ip_address: ip,
+    //         timestamp: new Date().toISOString(),
+    //       });
+    //   } catch (err) {
+    //     console.error("Audit logging failed:", err?.message ?? String(err));
+    //   }
+    // })();
+    // @ts-ignore EdgeRuntime is available in Supabase Edge Functions
+    // EdgeRuntime.waitUntil(audit);
+
+    // Optional: Log audit entry for compliance/recovery
+    // Uncomment to write immutable deletion audit trail
+    // const audit = (async () => {
+    //   try {
+    //     const userAgent = req.headers.get("User-Agent") ?? "unknown";
+    //     const ip = req.headers.get("X-Forwarded-For")?.split(",")[0] ?? "unknown";
+    //     await admin
+    //       .from("audit_log")
+    //       .insert({
+    //         event_type: "account_deletion",
+    //         user_id: user.id,
+    //         user_agent: userAgent,
+    //         ip_address: ip,
+    //         timestamp: new Date().toISOString(),
+    //       });
+    //   } catch (err) {
+    //     console.error("Audit logging failed:", err?.message ?? String(err));
+    //   }
+    // })();
+    // @ts-ignore EdgeRuntime is available in Supabase Edge Functions
+    // EdgeRuntime.waitUntil(audit);
+
+    return json(
+      {
+        success: true,
+        message: "Account deleted successfully",
+        timestamp: Date.now(),
+      },
+      200,
+    );
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : String(e);
+    console.error("Unexpected error in delete-account:", errorMsg);
+    return json(
+      {
+        error: "Failed to delete account",
+        timestamp: Date.now(),
+      },
+      500,
+    );
+  }
+});
+
+// Small helper for JSON responses
+// Accepts optional headers, sets no-store for error responses
+function json(
+  body: unknown,
+  status = 200,
+  headers: Record<string, string> = {},
+) {
+  const baseHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+    Connection: "keep-alive",
+    ...corsHeaders,
+    ...headers,
+  };
+
+  // Set Cache-Control based on status
+  if (status >= 400) {
+    baseHeaders["Cache-Control"] = "no-store";
+  } else {
+    baseHeaders["Cache-Control"] = "no-cache, max-age=0";
+  }
+
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: baseHeaders,
+  });
+}

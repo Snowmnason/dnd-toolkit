@@ -46,13 +46,22 @@
  * ```
  */
 
-import process from "node:process";
 import { Client } from "npm:pg@8.11.0";
 
-const DATABASE_URL = process.env.SUPABASE_DB_URL;
+const DATABASE_URL = Deno.env.get("SUPABASE_DB_URL");
 
 Deno.serve(async (req: Request) => {
   const startTime = Date.now();
+
+  // Handle OPTIONS preflight requests
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        Allow: "POST, OPTIONS",
+      },
+    });
+  }
 
   // Only allow POST requests
   if (req.method !== "POST") {
@@ -62,6 +71,7 @@ Deno.serve(async (req: Request) => {
         allowed: ["POST"],
       },
       405,
+      { Allow: "POST, OPTIONS" },
     );
   }
 
@@ -70,7 +80,7 @@ Deno.serve(async (req: Request) => {
     return json(
       {
         status: "error",
-        message: "Database not configured",
+        message: "Cleanup service is misconfigured",
         timestamp: Date.now(),
       },
       500,
@@ -84,6 +94,9 @@ Deno.serve(async (req: Request) => {
     await client.connect();
     connected = true;
     console.log("Connected to database");
+
+    // Set statement timeout to prevent long-running queries from blocking the function
+    await client.queryArray("SET statement_timeout = 5000;"); // 5s timeout
 
     // Support dry run: ?dry_run=true returns count without deleting
     const url = new URL(req.url);
@@ -109,6 +122,21 @@ Deno.serve(async (req: Request) => {
           timestamp: Date.now(),
         },
         200,
+      );
+    }
+
+    // Safety check: require explicit env var to allow actual deletions
+    const cleanupEnabled = Deno.env.get("CLEANUP_ENABLED") === "true";
+    if (!cleanupEnabled) {
+      console.warn("Cleanup disabled: CLEANUP_ENABLED not set");
+      return json(
+        {
+          status: "error",
+          message:
+            "Cleanup disabled. Set CLEANUP_ENABLED=true to enable deletions.",
+          timestamp: Date.now(),
+        },
+        403,
       );
     }
 
@@ -139,11 +167,11 @@ Deno.serve(async (req: Request) => {
       duration: Date.now() - startTime,
     });
 
+    // Do not expose internal error details to clients
     return json(
       {
         status: "error",
         message: "Failed to run cleanup",
-        details: errorMsg,
         timestamp: Date.now(),
       },
       500,
@@ -161,18 +189,41 @@ Deno.serve(async (req: Request) => {
         // Don't return error - connection close failure shouldn't fail the request
       }
     }
+
+    // Optional: Log audit entry for compliance
+    // Uncomment to track cleanup operations
+    // const audit = (async () => {
+    //   try {
+    //     console.info("Audit: Invite link cleanup completed", {
+    //     //   timestamp: new Date().toISOString(),
+    //     //   operation: "invite_link_cleanup",
+    //     //   connected,
+    //     //   duration: Date.now() - startTime,
+    //     // });
+    //   } catch (err) {
+    //     console.error("Audit logging failed:", err?.message ?? String(err));
+    //   }
+    // })();
+    // @ts-ignore EdgeRuntime is available in Supabase Edge Functions
+    // EdgeRuntime.waitUntil(audit);
   }
 });
 
 /**
  * Helper to return JSON responses with consistent formatting
+ * Supports optional headers parameter
  */
-function json(data: any, status: number = 200): Response {
+function json(
+  data: any,
+  status: number = 200,
+  headers: Record<string, string> = {},
+): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
-      "Content-Type": "application/json",
+      "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-cache, no-store, must-revalidate",
+      ...headers,
     },
   });
 }
