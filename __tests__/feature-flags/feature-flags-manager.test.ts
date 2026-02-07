@@ -12,7 +12,7 @@
  */
 
 import { FeatureFlagsManager } from "@/lib/feature-flags/server-sync";
-import { SecureStorage } from "@/lib/storage";
+import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
@@ -49,10 +49,6 @@ vi.mock("@/lib/storage", () => ({
     setJSON: vi.fn(),
     getJSON: vi.fn(),
     removeItem: vi.fn(),
-  },
-  STORAGE_KEYS: {
-    FEATURE_FLAGS: "dnd:feature_flags:v1",
-    CLOCK_INVALID: "dnd:clock_invalid",
   },
 }));
 
