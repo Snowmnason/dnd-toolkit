@@ -18,6 +18,7 @@
  * - Offline: Use last known values
  */
 
+import { trackVariantAssignment } from "@/lib/analytics/variant-tracking";
 import { getAppConfig, isDevelopment } from "@/lib/config/loader";
 import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
 import { FeatureFlagOverrideRow } from "@/lib/database/feature-flag-overrides";
@@ -225,7 +226,7 @@ class FeatureFlagsManagerClass {
         flags: serverFlags,
         overrides: allOverrides,
         entitlements: allEntitlements,
-        rollouts: allRollouts = {}, // NEW: Extract rollout config from response
+        rollouts: allRollouts, // Extract rollout config from response (no default value)
       } = data;
 
       // Process entitlements (only cache if userId is available)
@@ -292,8 +293,10 @@ class FeatureFlagsManagerClass {
         }
       }
 
-      // NEW: Process rollout configuration
+      // Process rollout configuration
+      // Distinguish between: explicitly cleared (empty {}), missing (old server), and populated
       if (allRollouts && Object.keys(allRollouts).length > 0) {
+        // Server returned populated rollouts, cache them
         try {
           this.cachedRollouts = new Map(Object.entries(allRollouts));
 
@@ -314,8 +317,30 @@ class FeatureFlagsManagerClass {
           );
           await this.loadCachedRollouts();
         }
-      } else if (allRollouts) {
-        // Load cached rollouts if available
+      } else if (allRollouts !== undefined && allRollouts !== null) {
+        // Server explicitly returned empty {} (intentional disable of rollouts)
+        // Clear cached rollouts to prevent stale configs from applying
+        this.cachedRollouts = new Map();
+        try {
+          await SecureStorage.removeItem(
+            `${STORAGE_KEYS.FEATURE_FLAGS}:rollouts`,
+          );
+          logger.debug(
+            "feature_flags",
+            "Cleared rollout config (server disabled)",
+          );
+        } catch (error) {
+          logger.warn(
+            "feature_flags",
+            "Failed to clear cached rollouts",
+            error,
+          );
+          // Still clear in-memory cache even if storage remove fails
+          this.cachedRollouts = new Map();
+        }
+      } else {
+        // rollouts field missing from response (old server/client or fetch error)
+        // Load from cache for backward compatibility and offline support
         await this.loadCachedRollouts();
       }
       const newFlags: Map<string, FeatureFlagState> = new Map();
@@ -1122,6 +1147,9 @@ class FeatureFlagsManagerClass {
       await SecureStorage.removeItem(STORAGE_KEYS.CLOCK_INVALID);
       await SecureStorage.removeItem("dnd:last_clock_check");
 
+      // Clear rollout cache (persisted and in-memory)
+      await SecureStorage.removeItem(`${STORAGE_KEYS.FEATURE_FLAGS}:rollouts`);
+
       // Clear entitlements cache
       if (this.userId) {
         await SecureStorage.removeItem(
@@ -1179,16 +1207,16 @@ class FeatureFlagsManagerClass {
    * **Usage:**
    * ```ts
    * // Check if user can access new feature
-   * if await FeatureFlagsManager.evaluateRollout(userId, "new_api_v2", fallback: true)) {
+   * const inRollout = await FeatureFlagsManager.evaluateRollout(userId, "new_api_v2", true);
+   * if (inRollout) {
    *   callNewEndpoint();
    * } else {
    *   callLegacyEndpoint();
    * }
    *
    * // Route variant selection
-   * const screen = await FeatureFlagsManager.evaluateRollout(userId, "characters_v2", 0)
-   *   ? CharactersScreenV2
-   *   : CharactersScreenV1;
+   * const useNewScreen = await FeatureFlagsManager.evaluateRollout(userId, "characters_v2", false);
+   * const screen = useNewScreen ? CharactersScreenV2 : CharactersScreenV1;
    * ```
    *
    * @param userId - User ID for bucketing
@@ -1244,6 +1272,18 @@ class FeatureFlagsManagerClass {
         "feature_flags",
         `Rollout ${flagName}: user=${userId}, percentage=${rolloutConfig.percentage}%, in_rollout=${inRollout}`,
       );
+
+      // Track variant assignment: user is in rollout or control group
+      // This creates the groundwork for A/B testing analytics
+      const variant = inRollout ? "B" : "A"; // B = in rollout, A = control group
+      trackVariantAssignment({
+        flagName,
+        variant,
+        userId,
+        percentage: rolloutConfig.percentage,
+        context: { rollout_type: "feature_flag", in_rollout: inRollout },
+      });
+
       return inRollout;
     }
 

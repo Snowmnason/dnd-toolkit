@@ -2,9 +2,9 @@
 export { useFeatureFlag } from "./use-feature-flag";
 export {
     useFeatureGatingStatus,
-    useGatedFeatures, useIsFeatureGated
+    useGatedFeatures,
+    useIsFeatureGated
 } from "./use-feature-gating";
 export { NotificationProvider, useNotifications } from "./use-notifications";
-export { useWorldCreation } from "./use-world-creation";
-export { useWorldModal } from "./use-world-modal";
+export { useVariantTracking } from "./use-variant-tracking";
 

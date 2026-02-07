@@ -80,12 +80,13 @@ interface RouteConfig {
 }
 
 interface RouteVariant {
-  id: string;
   title?: string;
   percentage: number;
   seed?: string;
   metadata?: Record<string, any>;
 }
+
+// Note: Variant IDs are the map keys in RouteVariantsMap, not stored in RouteVariant
 ```
 
 #### Variant Evaluation
@@ -94,7 +95,11 @@ interface RouteVariant {
 evaluateRouteVariant(config: RouteConfig, userId: string): Promise<string | undefined>
 ```
 
-Uses flag name format: `${route.path}:${variantId}` for rollout evaluation.
+**Algorithm:** Uses deterministic bucketing (FNV-1a hash) to map user to variant:
+1. Calculate bucket: `bucketPercent(userId, config.path)` → 0-99
+2. Accumulate variant percentages to find which variant's range contains the bucket
+3. Return the variant ID, or defaultVariant if no match
+4. Guarantees exactly one variant is selected per user per route
 
 ## Database Schema
 

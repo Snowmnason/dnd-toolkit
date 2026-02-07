@@ -87,13 +87,11 @@ export const charactersRoute: RouteConfig = {
   title: 'Characters',
   variants: {
     'v1': {
-      id: 'v1',
       percentage: 90,
       title: 'Characters (Legacy)',
       metadata: { version: '1.0' }
     },
     'v2': {
-      id: 'v2',
       percentage: 10,
       title: 'Characters (New)',
       metadata: { version: '2.0' }

@@ -15,6 +15,7 @@
  */
 
 import { Router } from "expo-router";
+import { trackVariantAssignment } from "../analytics/variant-tracking";
 import { logger } from "../utils/logger";
 import { LOGIN_ROUTES } from "./routes/login-routes";
 import { MAIN_ROUTES } from "./routes/main-routes";
@@ -56,11 +57,11 @@ export interface ModalConfig {
 /**
  * Route variant configuration for A/B testing and gradual rollouts
  * Allows running multiple versions of a route with percentage-based user bucketing
+ *
+ * **Note:** Variant IDs are the map keys in RouteVariantsMap, not stored in RouteVariant.
+ * The map key is the single source of truth for variant identification.
  */
 export interface RouteVariant {
-  /** Variant identifier (e.g., 'v1', 'v2', 'control', 'treatment') */
-  id: string;
-
   /** Display title for this variant (can override route title) */
   title?: string;
 
@@ -76,7 +77,15 @@ export interface RouteVariant {
 
 /**
  * Route variants mapping for A/B testing
- * Maps variant IDs to their configuration
+ * Maps variant IDs (keys) to their configurations
+ *
+ * @example
+ * ```ts
+ * variants: {
+ *   'v1': { title: 'Legacy', percentage: 90 },  // Key 'v1' is the variant ID
+ *   'v2': { title: 'New', percentage: 10 },      // Key 'v2' is the variant ID
+ * }
+ * ```
  */
 export type RouteVariantsMap = Record<string, RouteVariant>;
 
@@ -306,13 +315,16 @@ export function shouldRedirect(
 }
 
 /**
- * NEW: Evaluate route variants for A/B testing and rollouts
+ * Evaluate route variant for user using deterministic bucketing
  *
- * **Resolution Order:**
- * 1. Check each variant's percentage-based rollout
- * 2. Return first matching variant ID
- * 3. Fall back to defaultVariant if specified
- * 4. Return undefined if no variant matches
+ * Uses pure bucketing (FNV-1a) to map users to variants based on cumulative percentages.
+ * Guarantees exactly one variant is selected per user per route.
+ *
+ * **Algorithm:**
+ * 1. Calculate bucket for user+route: bucketPercent(userId, config.path) → 0-99
+ * 2. Iterate variants in order, accumulating percentages
+ * 3. Return variant whose cumulative range contains the bucket
+ * 4. Fall back to defaultVariant if percentages don't cover 0-99
  *
  * **Usage:**
  * ```ts
@@ -323,7 +335,7 @@ export function shouldRedirect(
  *
  * @param config - Route configuration with variants
  * @param userId - User ID for deterministic bucketing
- * @returns Variant ID if user is in that variant's rollout, or defaultVariant ID, or undefined
+ * @returns Variant ID that owns this user's bucket, or defaultVariant ID, or undefined
  */
 export async function evaluateRouteVariant(
   config: RouteConfig,
@@ -333,41 +345,70 @@ export async function evaluateRouteVariant(
     return undefined;
   }
 
-  // Try to import FeatureFlagsManager dynamically (may not be available in all contexts)
   try {
-    const { FeatureFlagsManager } = await import("../feature-flags");
+    // Import bucketPercent for pure deterministic bucketing
+    const { bucketPercent } = await import("../feature-flags/rollout");
 
-    // Evaluate each variant's rollout percentage
+    // Calculate a single bucket for this route (0-99)
+    const bucket = bucketPercent(userId, config.path);
+
+    // Iterate variants and accumulate percentages to find matching variant
+    let cumulativePercentage = 0;
     for (const [variantId, variant] of Object.entries(config.variants)) {
-      const inRollout = await FeatureFlagsManager.evaluateRollout(
-        userId,
-        `${config.path}:${variantId}`, // Use route path + variant ID as flag name
-        false, // Default: false (user not in rollout)
-      );
+      cumulativePercentage += variant.percentage;
 
-      if (inRollout) {
+      // If bucket falls within this variant's range, select it
+      if (bucket < cumulativePercentage) {
         logger.category("navigation").debug("Route variant matched", {
           path: config.path,
           variant: variantId,
+          bucket,
           percentage: variant.percentage,
+          cumulativePercentage,
           userId,
         });
+
+        // Track variant assignment for A/B testing analytics (async, non-blocking)
+        trackVariantAssignment({
+          flagName: config.path,
+          variant: variantId,
+          userId,
+          percentage: variant.percentage,
+          context: { route_path: config.path },
+        });
+
         return variantId;
       }
     }
 
-    // No variant matched: return default if specified
+    // If no variant matched (shouldn't happen if percentages sum to 100),
+    // fall back to default
     if (config.defaultVariant) {
-      logger.category("navigation").debug("Using default route variant", {
-        path: config.path,
+      logger
+        .category("navigation")
+        .debug("Using default route variant (no bucket match)", {
+          path: config.path,
+          variant: config.defaultVariant,
+          bucket,
+          cumulativePercentage,
+          userId,
+        });
+
+      // Track default variant assignment for analytics
+      trackVariantAssignment({
+        flagName: config.path,
         variant: config.defaultVariant,
         userId,
+        context: { route_path: config.path, reason: "default_fallback" },
       });
+
       return config.defaultVariant;
     }
 
     logger.category("navigation").debug("No route variant matched", {
       path: config.path,
+      bucket,
+      cumulativePercentage,
       userId,
     });
     return undefined;

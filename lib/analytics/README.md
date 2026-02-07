@@ -268,6 +268,84 @@ trackFeatureBlocked({ feature: "export_world", reason: "requires_premium" });
 
 ---
 
+### A/B Testing & Variant Tracking
+
+Import from `lib/analytics/variant-tracking`:
+
+#### `trackVariantAssignment(event: VariantAssignmentEvent): void`
+
+Tracks when a user is assigned to a variant (A or B). **Automatically called** by the rollout system; manual calls are rarely needed.
+
+```ts
+import { trackVariantAssignment } from "@/lib/analytics/variant-tracking";
+
+trackVariantAssignment({
+  flagName: "characters_v2_screen",
+  variant: "B",
+  userId: "user-123",
+  percentage: 50,
+});
+```
+
+#### `trackVariantEngagement(event: VariantEngagementEvent): void`
+
+Tracks user engagement with a variant feature (clicks, form submissions, etc.).
+
+```ts
+import { trackVariantEngagement } from "@/lib/analytics/variant-tracking";
+
+trackVariantEngagement({
+  flagName: "characters_v2_screen",
+  variant: "B",
+  action: "edit_button_clicked",
+  userId: "user-123",
+  metadata: { button_name: "edit_character" },
+});
+```
+
+#### `trackVariantPerformance(event: VariantPerformanceEvent): void`
+
+Tracks performance metrics per variant for comparison (e.g., screen load times, API response times).
+
+```ts
+import { trackVariantPerformance } from "@/lib/analytics/variant-tracking";
+
+trackVariantPerformance({
+  flagName: "characters_v2_screen",
+  variant: "B",
+  userId: "user-123",
+  metric: "screen_load_ms",
+  value: 1250,
+});
+```
+
+**For component-level tracking**, use the `useVariantTracking()` hook from `@/hooks`:
+
+```tsx
+import { useVariantTracking } from "@/hooks";
+
+export function CharactersV2Screen() {
+  const { trackEngagement, trackPerformance } = useVariantTracking(
+    "characters_v2_screen",
+    "B",
+  );
+
+  return (
+    <Button
+      onPress={() => {
+        trackEngagement("view_details");
+      }}
+    >
+      View Details
+    </Button>
+  );
+}
+```
+
+For detailed A/B testing guide, see [docs/issues/MileStone 2/Tier 3/058 - Per-Variant Tracking/VARIANT_TRACKING_GUIDE.md](../../docs/issues/MileStone%202/Tier%203/058%20-%20Per-Variant%20Tracking/VARIANT_TRACKING_GUIDE.md).
+
+---
+
 ## Dependencies
 
 ### External Packages
@@ -343,13 +421,14 @@ Session tracking is lightweight (only stores a few integers and strings). `isSes
 
 ## File Breakdown
 
-| File                      | Purpose                                                                                                                                                                                         |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `index.ts`                | Main entry point. Exports `Analytics`, `Performance`, `trackFeatureBlocked()`. Includes event tracking, user identification, sanitization, and performance measurement with Sentry integration. |
-| `consent.ts`              | Consent level management. Defaults to 'basic' (GDPR compliant). Provides `AnalyticsConsent` manager with `setLevel()`, `getLevel()`, and `isAllowed()` methods.                                 |
-| `session.ts`              | Session tracking. Provides `sessionManager` to start/end sessions, track screen views and errors, and query session activity.                                                                   |
-| `error-categorization.ts` | Error categorization utility. `categorizeError()` classifies errors into network, auth, validation, timeout, or unknown categories.                                                             |
-| `utils.ts`                | Shared utilities. Includes `sanitizeError()` to extract safe error fields and `getThreshold()` to retrieve performance thresholds from config.                                                  |
+| File                      | Purpose                                                                                                                                                                                             |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `index.ts`                | Main entry point. Exports `Analytics`, `Performance`, `trackFeatureBlocked()`. Includes event tracking, user identification, sanitization, and performance measurement with Sentry integration.     |
+| `consent.ts`              | Consent level management. Defaults to 'basic' (GDPR compliant). Provides `AnalyticsConsent` manager with `setLevel()`, `getLevel()`, and `isAllowed()` methods.                                     |
+| `session.ts`              | Session tracking. Provides `sessionManager` to start/end sessions, track screen views and errors, and query session activity.                                                                       |
+| `error-categorization.ts` | Error categorization utility. `categorizeError()` classifies errors into network, auth, validation, timeout, or unknown categories.                                                                 |
+| `utils.ts`                | Shared utilities. Includes `sanitizeError()` to extract safe error fields and `getThreshold()` to retrieve performance thresholds from config.                                                      |
+| `variant-tracking.ts`     | A/B testing and variant analytics. Exports `trackVariantAssignment()`, `trackVariantEngagement()`, `trackVariantPerformance()` for tracking variant assignments and user engagement with A/B tests. |
 
 ---
 

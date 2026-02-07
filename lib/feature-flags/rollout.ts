@@ -71,14 +71,12 @@ export interface RolloutConfig {
 /**
  * Check if user is in percentage-based rollout
  *
- * Deterministic evaluation: same user+flag+seed always returns same result.
+ * Pure deterministic bucketing function: same user+flag+seed always returns same result.
+ * Uses FNV-1a hash to map user to bucket (0-99), then checks if bucket < percentage.
  * Percentage clamped to 0-100 range; invalid percentages treated as 0% or 100%.
  *
- * **Resolution Order (in FeatureFlagsManager):**
- * 1. Override (admin testing)
- * 2. Entitlement (premium features)
- * 3. Rollout (gradual rollout) ← this function
- * 4. Global flag (all-or-nothing)
+ * **Note:** This function only performs bucketing. System-wide flag resolution order
+ * (override > entitlement > rollout > global flag) is handled by FeatureFlagsManager.
  *
  * @param userId - User ID for bucketing
  * @param flagName - Feature flag name
@@ -88,25 +86,22 @@ export interface RolloutConfig {
  *
  * @example
  * ```ts
- * // Dark mode rollout for 50% of users
+ * // Deterministic bucketing: 50% of users
  * if (isInRollout(userId, "dark_mode", 50)) {
- *   applyDarkTheme();
+ *   // ~50% of users are in this bucket
  * }
  *
- * // Canary release: 10% of users see new endpoint
+ * // Canary: 10% of users
  * if (isInRollout(userId, "api_v2_endpoint", 10)) {
- *   callNewEndpoint();
- * } else {
- *   callLegacyEndpoint();
+ *   // ~10% of users are in this bucket
  * }
  *
  * // A/B testing: 50/50 split
  * const variant = isInRollout(userId, "ui_variant_b", 50) ? "B" : "A";
  *
- * // Route variant selection (navigation layer)
- * const component = isInRollout(userId, "characters_v2", 20)
- *   ? CharactersScreenV2
- *   : CharactersScreenV1; // Default
+ * // Rebalance with seed
+ * isInRollout(userId, "feature", 50, "v1") // User in bucket X
+ * isInRollout(userId, "feature", 50, "v2") // Same user, possibly different bucket
  * ```
  */
 export function isInRollout(

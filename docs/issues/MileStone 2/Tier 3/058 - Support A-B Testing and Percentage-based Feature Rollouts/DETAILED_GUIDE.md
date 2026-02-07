@@ -21,6 +21,7 @@ Result: 76 < 50? No → User NOT in rollout
 ```
 
 **Properties:**
+
 - **Deterministic**: Same inputs always produce same bucket
 - **Uniform**: Even distribution across 0-99
 - **Fast**: O(n) where n = input string length
@@ -42,6 +43,7 @@ WHERE flag_name = 'feature_a';
 ```
 
 **Use Cases:**
+
 - **Performance Issues**: Move users away from problematic variants
 - **A/B Test Refinement**: Adjust user distribution mid-experiment
 - **Gradual Migration**: Smooth transitions between implementations
@@ -51,16 +53,18 @@ WHERE flag_name = 'feature_a';
 Two complementary approaches:
 
 #### Feature Flags (Global)
+
 ```typescript
 // Affects all users of a feature
 const showNewUI = await FeatureFlagsManager.evaluateRollout(
   userId,
-  'new_ui_global',
-  false
+  "new_ui_global",
+  false,
 );
 ```
 
 #### Route Variants (Per-Screen)
+
 ```typescript
 // Affects specific screen/route
 const variant = await evaluateRouteVariant(routeConfig, userId);
@@ -68,6 +72,7 @@ const variant = await evaluateRouteVariant(routeConfig, userId);
 ```
 
 **When to use each:**
+
 - **Feature Flags**: Cross-cutting features, API changes, global toggles
 - **Route Variants**: UI experiments, screen redesigns, user flow testing
 
@@ -77,13 +82,13 @@ const variant = await evaluateRouteVariant(routeConfig, userId);
 
 ```typescript
 // Valid ranges
-isInRollout(userId, 'flag', 0)   // → false (0% rollout)
-isInRollout(userId, 'flag', 50)  // → true/false (50% rollout)
-isInRollout(userId, 'flag', 100) // → true (100% rollout)
+isInRollout(userId, "flag", 0); // → false (0% rollout)
+isInRollout(userId, "flag", 50); // → true/false (50% rollout)
+isInRollout(userId, "flag", 100); // → true (100% rollout)
 
 // Auto-clamped
-isInRollout(userId, 'flag', -5)  // → false (clamped to 0%)
-isInRollout(userId, 'flag', 150) // → true (clamped to 100%)
+isInRollout(userId, "flag", -5); // → false (clamped to 0%)
+isInRollout(userId, "flag", 150); // → true (clamped to 100%)
 ```
 
 ### Missing Configurations
@@ -92,8 +97,8 @@ isInRollout(userId, 'flag', 150) // → true (clamped to 100%)
 // No rollout configured in database
 const result = await FeatureFlagsManager.evaluateRollout(
   userId,
-  'nonexistent_flag',
-  false // fallback value
+  "nonexistent_flag",
+  false, // fallback value
 );
 // → false (uses fallback)
 ```
@@ -126,19 +131,24 @@ Entitlements include clock validation, but rollouts don't (by design):
 **Symptoms:** User should be in rollout but isn't seeing new feature
 
 **Debug Steps:**
+
 ```typescript
 // Check rollout configuration
 const rollouts = FeatureFlagsManager.getRollouts();
-console.log('Rollouts:', rollouts);
+console.log("Rollouts:", rollouts);
 
 // Check specific evaluation
-const result = await FeatureFlagsManager.evaluateRollout(userId, 'flag_name', false);
-console.log('Evaluation result:', result);
+const result = await FeatureFlagsManager.evaluateRollout(
+  userId,
+  "flag_name",
+  false,
+);
+console.log("Evaluation result:", result);
 
 // Check bucket calculation
-import { bucketPercent } from '@/lib/feature-flags/rollout';
-const bucket = bucketPercent(userId, 'flag_name');
-console.log('User bucket:', bucket);
+import { bucketPercent } from "@/lib/feature-flags/rollout";
+const bucket = bucketPercent(userId, "flag_name");
+console.log("User bucket:", bucket);
 ```
 
 #### Inconsistent User Experience
@@ -146,6 +156,7 @@ console.log('User bucket:', bucket);
 **Symptoms:** Same user sees different variants across sessions
 
 **Possible Causes:**
+
 - **Cache corruption**: Clear SecureStorage cache
 - **Seed changes**: Check if rollout seed was modified
 - **Memoization issues**: Try `clearBucketCache()`
@@ -155,18 +166,19 @@ console.log('User bucket:', bucket);
 **Symptoms:** `evaluateRouteVariant()` returns undefined
 
 **Debug Steps:**
+
 ```typescript
 // Check route config
 const config = getRouteConfig(context);
-console.log('Route config variants:', config.variants);
+console.log("Route config variants:", config.variants);
 
 // Check flag name format
 const expectedFlagName = `${config.path}:${variantId}`;
-console.log('Expected flag name:', expectedFlagName);
+console.log("Expected flag name:", expectedFlagName);
 
 // Verify rollout exists
 const rollouts = FeatureFlagsManager.getRollouts();
-console.log('Rollout exists:', rollouts[expectedFlagName]);
+console.log("Rollout exists:", rollouts[expectedFlagName]);
 ```
 
 ### Performance Issues
@@ -176,6 +188,7 @@ console.log('Rollout exists:', rollouts[expectedFlagName]);
 **Symptoms:** `evaluateRollout()` calls are slow
 
 **Solutions:**
+
 - Use `isInRolloutMemoized()` for repeated calls
 - Check if `clearBucketCache()` is called too frequently
 - Verify database indexes are present
@@ -185,6 +198,7 @@ console.log('Rollout exists:', rollouts[expectedFlagName]);
 **Symptoms:** Memory grows over time
 
 **Solutions:**
+
 - Memoization cache is session-based (cleared on restart)
 - Limit rollout configurations in database
 - Monitor `bucketCache` size in development
@@ -196,6 +210,7 @@ console.log('Rollout exists:', rollouts[expectedFlagName]);
 **Symptoms:** Changed percentage in DB but users still see old behavior
 
 **Solutions:**
+
 - **Cache invalidation**: Rollouts cached at bootstrap
 - **App restart required**: Users need to restart app
 - **Check is_active**: Only active rollouts are fetched
@@ -209,6 +224,7 @@ VALUES ('nonexistent_flag', 50);
 ```
 
 **Solution:** Always create feature flag first:
+
 ```sql
 INSERT INTO feature_flags (flag_name, enabled, kind)
 VALUES ('new_feature', false, 'beta');
@@ -224,19 +240,19 @@ VALUES ('new_feature', 10);
 ```typescript
 // Track variant exposure
 const variant = await evaluateRouteVariant(config, userId);
-analytics.track('variant_exposed', {
+analytics.track("variant_exposed", {
   route: config.path,
-  variant: variant || 'default',
+  variant: variant || "default",
   userId,
   timestamp: Date.now(),
 });
 
 // Track feature usage
-if (await FeatureFlagsManager.evaluateRollout(userId, 'feature', false)) {
-  analytics.track('feature_used', {
-    feature: 'feature_name',
+if (await FeatureFlagsManager.evaluateRollout(userId, "feature", false)) {
+  analytics.track("feature_used", {
+    feature: "feature_name",
     userId,
-    variant: 'rollout',
+    variant: "rollout",
   });
 }
 ```
@@ -275,10 +291,13 @@ const checkRolloutDistribution = async (flagName: string) => {
 
   // Check uniformity (should be ~100 users per bucket)
   const avgPerBucket = sampleSize / 100;
-  const variance = distribution.reduce((acc, count) =>
-    acc + Math.pow(count - avgPerBucket, 2), 0) / 100;
+  const variance =
+    distribution.reduce(
+      (acc, count) => acc + Math.pow(count - avgPerBucket, 2),
+      0,
+    ) / 100;
 
-  console.log('Distribution variance:', variance); // Should be low
+  console.log("Distribution variance:", variance); // Should be low
 };
 ```
 
@@ -289,6 +308,7 @@ const checkRolloutDistribution = async (flagName: string) => {
 Current system supports percentage-based rollouts. Future enhancements:
 
 #### Geographic Targeting
+
 ```sql
 -- Future: Add location-based targeting
 ALTER TABLE feature_flag_rollouts
@@ -297,6 +317,7 @@ ADD COLUMN target_regions text[];
 ```
 
 #### User Property Targeting
+
 ```sql
 -- Future: Target by user properties
 ALTER TABLE feature_flag_rollouts
@@ -305,6 +326,7 @@ ADD COLUMN target_app_versions text[]; -- '1.0.0', '1.1.0'
 ```
 
 #### Time-Based Rollouts
+
 ```sql
 -- Future: Scheduled rollouts
 ALTER TABLE feature_flag_rollouts
@@ -333,23 +355,26 @@ Future: Dynamic percentages based on metrics
 const optimalPercentage = await calculateOptimalRollout(
   flagName,
   targetConversionRate,
-  currentMetrics
+  currentMetrics,
 );
 ```
 
 ### Integration Points
 
 #### Feature Flags Service
+
 - Centralized rollout management UI
 - Real-time rollout adjustments
 - Automated gradual rollouts
 
 #### Analytics Platform
+
 - Automatic experiment setup
 - Statistical significance testing
 - Automated winner determination
 
 #### CI/CD Pipeline
+
 - Automated rollout progression
 - Rollback triggers based on error rates
 - Deployment gating based on rollout success
@@ -359,11 +384,12 @@ const optimalPercentage = await calculateOptimalRollout(
 ### From Legacy Systems
 
 #### Hardcoded Rollouts
+
 ```typescript
 // Legacy: Hardcoded in code
 const ROLLOUTS = {
-  'feature_a': 10,
-  'feature_b': 25,
+  feature_a: 10,
+  feature_b: 25,
 };
 
 // Migration: Move to database
@@ -374,6 +400,7 @@ const ROLLOUTS = {
 ```
 
 #### Third-Party Services
+
 ```typescript
 // From LaunchDarkly/Optimizely
 // Migration: Export configurations to database
@@ -428,6 +455,95 @@ const ROLLOUTS = {
 - **Index efficiency**: >99% for flag name lookups
 - **Connection pooling**: Shared with other feature flag queries
 
+## Critical Fixes & Post-Implementation Corrections
+
+### 1. Route Variant Selection Algorithm Fix
+
+**Problem**: Initial `evaluateRouteVariant()` attempted to use synthetic feature flag names (`${config.path}:${variantId}`), which don't exist in the database, causing:
+
+- Variants to never actually match (always fell back to defaultVariant)
+- Impossible to A/B test routes
+
+**Solution**: Refactored to use **direct deterministic bucketing with cumulative percentage mapping**:
+
+```typescript
+// Calculate single bucket for route (0-99)
+const bucket = bucketPercent(userId, config.path);
+
+// Map bucket across cumulative percentages
+let cumulativePercentage = 0;
+for (const [variantId, variant] of Object.entries(config.variants)) {
+  cumulativePercentage += variant.percentage;
+
+  if (bucket < cumulativePercentage) {
+    return variantId; // Exactly one match guaranteed
+  }
+}
+```
+
+**Why this works**:
+
+- **Deterministic**: Same user always gets same variant
+- **Mutually exclusive**: Each bucket owns exactly one variant
+- **Fair distribution**: Variants receive intended percentages
+- **No server calls**: Pure bucketing, fully offline-capable
+
+Example (90/10 split):
+
+```
+v1: 90%  → owns buckets 0-89
+v2: 10%  → owns buckets 90-99
+
+User with bucket 45 → Select v1 ✓
+User with bucket 95 → Select v2 ✓
+```
+
+**Impact**: Route variants now actually work for A/B testing.
+
+### 2. Rollout Cache Control Fix
+
+**Problem**: Rollout caching couldn't distinguish between:
+
+- Server intentionally sending `rollouts: {}` (disable rollouts)
+- Server missing the field (old server/client)
+
+Both were treated the same, always loading stale cached rollouts when server sent empty object.
+
+**Solution**: Removed default value and added explicit branch for empty object:
+
+```typescript
+// Before (broken)
+const { rollouts: allRollouts = {} } = data; // Can't tell if {} came from server
+if (allRollouts && Object.keys(allRollouts).length > 0) {
+  cache(allRollouts);
+} else if (allRollouts) {
+  // ❌ {} is truthy, loads stale cache even when server meant to disable
+  loadFromCache();
+}
+
+// After (fixed)
+const { rollouts: allRollouts } = data; // undefined if missing, {} if explicit
+if (allRollouts && Object.keys(allRollouts).length > 0) {
+  cache(allRollouts); // Populated: use server
+} else if (allRollouts !== undefined && allRollouts !== null) {
+  clearCache(); // Empty: server disabled, clear stale data
+} else {
+  loadFromCache(); // Missing: old server, use cache for compatibility
+}
+```
+
+**Three distinct paths** now correctly handled:
+
+| Server Response            | Action          | Result                                  |
+| -------------------------- | --------------- | --------------------------------------- |
+| Doesn't include `rollouts` | Load from cache | Old configs apply (backward compatible) |
+| Includes `rollouts: {}`    | Clear cache     | All rollouts disabled server-side ✓     |
+| Includes `rollouts: {...}` | Cache it        | Active rollouts applied                 |
+
+**Impact**: Servers can now disable rollouts by sending empty object; no more stale configs applying indefinitely.
+
+---
+
 ## Conclusion
 
 The rollout system provides a solid foundation for:
@@ -436,6 +552,7 @@ The rollout system provides a solid foundation for:
 - **Data-driven development** via A/B testing
 - **User segmentation** for targeted feature delivery
 - **Operational flexibility** with admin-controlled configurations
+- **Server-side control** with proper cache invalidation
 
 The architecture supports future enhancements while maintaining backward compatibility and performance.</content>
 <parameter name="filePath">p:\CodingProjects\dnd-toolkit\docs\issues\MileStone 1\058 - Support A-B Testing and Percentage-based Feature Rollouts\DETAILED_GUIDE.md
