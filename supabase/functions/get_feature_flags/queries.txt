@@ -109,3 +109,40 @@ export async function fetchOverridesByUserId(
 
   return (data || []) as FeatureFlagOverrideRow[];
 }
+
+/**
+ * NEW: Fetch all active rollout configurations
+ * Server-side filtered to only return active rollouts (is_active = true)
+ *
+ * @param supabase - Already initialized Supabase client (created once per request)
+ * @returns Map of rollout configs by flag name { flagName: { percentage, seed? } }
+ */
+export async function fetchRolloutConfigs(
+  supabase: SupabaseClient,
+): Promise<Record<string, { percentage: number; seed?: string }>> {
+  const { data, error } = await supabase
+    .from("feature_flag_rollouts")
+    .select("flag_name, percentage, seed")
+    .eq("is_active", true);
+
+  if (error) {
+    console.error("Error fetching rollout configs:", error?.message ?? error);
+    throw new Error(
+      `Failed to fetch rollout configs: ${error?.message ?? String(error)}`,
+    );
+  }
+
+  // Convert array to map for fast lookups
+  const rollouts: Record<string, { percentage: number; seed?: string }> = {};
+  if (data && data.length > 0) {
+    for (const row of data) {
+      rollouts[row.flag_name] = {
+        percentage: row.percentage,
+        seed: row.seed || undefined,
+      };
+    }
+  }
+
+  return rollouts;
+}
+

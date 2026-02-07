@@ -33,6 +33,7 @@ import {
     fetchEntitlementsByUserId,
     fetchFeatureFlags,
     fetchOverridesByUserId,
+    fetchRolloutConfigs,
 } from "./queries.ts";
 import type { GetFeatureFlagsResponse } from "./types.ts";
 
@@ -115,13 +116,14 @@ Deno.serve(async (req: Request) => {
     console.info(`Authenticated user: ${userId}`);
 
     // 3. Fetch all three data sources in parallel
-    let flags, entitlements, overrides;
+    let flags, entitlements, overrides, rollouts;
 
     try {
-      [flags, entitlements, overrides] = await Promise.all([
+      [flags, entitlements, overrides, rollouts] = await Promise.all([
         fetchFeatureFlags(supabase),
         fetchEntitlementsByUserId(supabase, userId),
         fetchOverridesByUserId(supabase, userId),
+        fetchRolloutConfigs(supabase),
       ]);
     } catch (fetchError) {
       console.error(
@@ -140,6 +142,7 @@ Deno.serve(async (req: Request) => {
       flags: Array.isArray(flags) ? flags.length : 0,
       entitlements: Array.isArray(entitlements) ? entitlements.length : 0,
       overrides: Array.isArray(overrides) ? overrides.length : 0,
+      rollouts: Object.keys(rollouts || {}).length,
     });
 
     // 4. Build response
@@ -147,6 +150,7 @@ Deno.serve(async (req: Request) => {
       flags,
       entitlements,
       overrides, // Both flag and entitlement type overrides; client filters as needed
+      rollouts: rollouts || {}, // Rollout config from database
       fetchedAt: Date.now(),
       version: "v1",
     };

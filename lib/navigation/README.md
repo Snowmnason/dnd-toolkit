@@ -1,6 +1,6 @@
 # lib/navigation
 
-Centralized declarative navigation and routing system. Manages TopBar appearance, back button behavior, modals, animations, redirects, and accessibility for all routes. Single source of truth for route configuration across the entire app.
+Centralized declarative navigation and routing system. Manages TopBar appearance, back button behavior, modals, animations, redirects, accessibility, and A/B testing variants for all routes. Single source of truth for route configuration across the entire app.
 
 ## When to Use This Module
 
@@ -14,6 +14,8 @@ Centralized declarative navigation and routing system. Manages TopBar appearance
 - Configure analytics tracking points per route
 - Set up accessibility focus targets and screen reader labels
 - Register and override dynamic routes at runtime
+- **A/B test route variants** with percentage-based user bucketing
+- **Gradually roll out new screens** to subsets of users
 
 **Do NOT use this module for:**
 
@@ -44,8 +46,11 @@ Returns RouteConfig with:
   - Modal/full-screen behavior
   - Conditional redirects
   - Animations, A11y focus, analytics
+  - Route variants (A/B testing)
         ↓
-Renderer uses config to display TopBar + screen
+evaluateRouteVariant() determines user variant (if configured)
+        ↓
+Renderer uses config + variant to display TopBar + screen
 ```
 
 **Key Principles:**

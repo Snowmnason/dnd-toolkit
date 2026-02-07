@@ -47,6 +47,15 @@ export interface FeatureFlagOverrideRow {
 }
 
 /**
+ * Rollout configuration for gradual feature rollouts
+ * Returned by Edge Function alongside flags/entitlements/overrides
+ */
+export interface RolloutConfigRow {
+  percentage: number; // 0-100
+  seed?: string; // Optional seed for rebalancing (e.g., "2026-02-07")
+}
+
+/**
  * Response structure from Edge Function
  * Client expects this exact structure for caching and merge logic
  */
@@ -54,6 +63,7 @@ export interface GetFeatureFlagsResponse {
   flags: FeatureFlagRow[];
   entitlements: EntitlementRow[];
   overrides: FeatureFlagOverrideRow[]; // Only includes non-revoked, non-expired overrides
+  rollouts: Record<string, RolloutConfigRow>; // Rollout config by flag name
   fetchedAt: number;
   version: "v1";
 }

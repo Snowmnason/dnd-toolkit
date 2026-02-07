@@ -170,6 +170,42 @@ create index idx_overrides_expires_at on public.feature_flag_overrides(expires_a
 create index idx_overrides_user_id on public.feature_flag_overrides(user_id) tablespace pg_default;
 ```
 
+### feature_flag_rollouts
+
+```sql
+create table public.feature_flag_rollouts (
+  id uuid not null default gen_random_uuid(),
+  flag_name text not null,
+  percentage smallint not null,
+  seed text null,
+  created_at timestamp with time zone not null default CURRENT_TIMESTAMP,
+  updated_at timestamp with time zone not null default CURRENT_TIMESTAMP,
+  created_by uuid null,
+  description text null,
+  is_active boolean not null default true,
+  constraint feature_flag_rollouts_pkey primary key (id),
+  constraint feature_flag_rollouts_flag_name_key unique (flag_name),
+  constraint feature_flag_rollouts_created_by_fkey foreign KEY (created_by) references auth.users (id) on delete set null,
+  constraint feature_flag_rollouts_flag_name_fkey foreign KEY (flag_name) references feature_flags (flag_name) on delete CASCADE,
+  constraint feature_flag_rollouts_percentage_check check (
+    (
+      (percentage >= 0)
+      and (percentage <= 100)
+    )
+  )
+) TABLESPACE pg_default;
+```
+
+Indexes:
+
+```sql
+create index IF not exists idx_feature_flag_rollouts_flag_name on public.feature_flag_rollouts using btree (flag_name) TABLESPACE pg_default;
+
+create index IF not exists idx_feature_flag_rollouts_flag_name_active on public.feature_flag_rollouts using btree (flag_name, is_active) TABLESPACE pg_default;
+
+create index IF not exists idx_feature_flag_rollouts_is_active on public.feature_flag_rollouts using btree (is_active) TABLESPACE pg_default;
+```
+
 ---
 
 ## Row Level Security (RLS) Policies
@@ -228,6 +264,13 @@ entitlements_admin_full_access | ALL    | authenticated | USING/CHECK: (auth.jwt
 ```text
 overrides_user_read_own  | SELECT | authenticated | USING: user_id = auth.uid()
 overrides_admin_write    | INSERT, UPDATE, DELETE | authenticated | CHECK: (auth.jwt()->>'role') = 'admin'
+```
+
+### feature_flag_rollouts
+
+```text
+rollouts_authenticated_read | SELECT | authenticated | USING: true
+rollouts_admin_write        | INSERT, UPDATE, DELETE | authenticated | CHECK: (auth.jwt()->>'role') = 'admin'
 ```
 
 ---
