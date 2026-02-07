@@ -1,15 +1,24 @@
 /**
- * Feature Flags Database Queries
+ * Feature Flags - Types Only
  *
- * This module provides client-side REST API helpers for querying global feature flags
- * from the Supabase `feature_flags` table. Used by `lib/feature-flags/server-sync.ts` (FeatureFlagsManager)
- * to bootstrap flags during app startup.
+ * @deprecated Phase 1b: Query functions are no longer used.
+ * Feature flags are now fetched via the Edge Function `get_feature_flags`
+ * (consolidated call) and updated via Supabase Realtime subscriptions.
  *
- * **NOTE:** These are client-side queries. Do not use directly in components;
- * use `lib/feature-flags/FeatureFlagsManager` and React hooks instead.
+ * **TYPES EXPORTED HERE:** This file maintains type definitions and schema documentation
+ * for feature flags. These types are imported by `lib/feature-flags/server-sync.ts`
+ * for type safety across the event-driven architecture.
+ *
+ * See: lib/feature-flags/server-sync.ts (FeatureFlagsManager.bootstrapFlags)
+ * See: supabase/functions/get_feature_flags/
+ *
+ * **Schema:**
+ * - flag_name: text (PK) - unique identifier for the flag
+ * - enabled: boolean - whether the flag is enabled
+ * - kind: text - category/type of the flag (for grouping or special handling)
+ * - description: text (nullable) - markdown description of what the flag does
+ * - created_at, updated_at: timestamps
  */
-
-import { SupabaseClient } from "@supabase/supabase-js";
 
 export interface FeatureFlagRow {
   flag_name: string;
@@ -21,11 +30,12 @@ export interface FeatureFlagRow {
 }
 
 /**
+ * @deprecated
  * Fetch all global feature flags from server
  *
  * @param supabase - Supabase client
  * @returns List of feature flags
- */
+
 export async function fetchFeatureFlags(
   supabase: SupabaseClient,
 ): Promise<FeatureFlagRow[]> {
@@ -39,3 +49,4 @@ export async function fetchFeatureFlags(
 
   return (data || []) as FeatureFlagRow[];
 }
+ */

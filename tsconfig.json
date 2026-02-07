@@ -9,27 +9,19 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"]
     },
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ]
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
-    "types/**/*.d.ts"
+    "types/**/*.d.ts",
+    "lib/database/feature-flags.ts",
+    "lib/database/feature-flag-overrides.ts"
   ],
-  "exclude": [
-    "desktop/**",
-    "dist-desktop/**",
-    "node_modules"
-  ],
+  "exclude": ["desktop/**", "dist-desktop/**", "node_modules", "supabase/**"],
   "extends": "expo/tsconfig.base.json"
 }

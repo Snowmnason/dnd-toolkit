@@ -73,7 +73,6 @@ const environment =
 // This is a focus management timing issue in the navigation library and doesn't affect functionality
 if (typeof window !== "undefined") {
   const originalWarn = console.warn;
-  const originalError = console.error;
 
   console.warn = (...args: any[]) => {
     try {
@@ -88,25 +87,6 @@ if (typeof window !== "undefined") {
       // Ignore errors in filter logic, pass through to original warn
     }
     originalWarn(...args);
-  };
-
-  // Suppress expected 401 errors from Supabase health endpoint pings
-  // The network detection code treats 401 as "network is online, just auth failed"
-  // which is the correct behavior. We suppress the console error to avoid noise.
-  console.error = (...args: any[]) => {
-    try {
-      const message = args[0]?.toString?.() || "";
-      if (
-        message.includes("HEAD") &&
-        message.includes("supabase.co/rest/v1/") &&
-        message.includes("401")
-      ) {
-        return; // Suppress expected auth errors from network pings
-      }
-    } catch {
-      // Ignore errors in filter logic, pass through to original error
-    }
-    originalError(...args);
   };
 }
 

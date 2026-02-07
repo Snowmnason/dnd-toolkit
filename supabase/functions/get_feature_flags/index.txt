@@ -1,0 +1,206 @@
+/**
+ * get_feature_flags Edge Function
+ *
+ * Consolidates feature flags, entitlements, and per-user overrides into a single RPC call.
+ * Runs server-side to optimize performance and prepare for Phase 2 additions (bucketing, conditions, audit).
+ *
+ * **Flow:**
+ * 1. Validate Bearer token (JWT from Supabase auth)
+ * 2. Extract userId from token
+ * 3. Fetch flags + entitlements + overrides in parallel (server-side filtering for expiry/revocation)
+ * 4. Return consolidated response (all override types; client filters by target_type as needed)
+ *
+ * **Server-side filtering:**
+ * - Feature flags: None (all returned)
+ * - Entitlements: Non-expired only (expires_at IS NULL OR expires_at > now())
+ * - Overrides: Non-revoked and non-expired only
+ *
+ * **Client-side responsibilities (unchanged):**
+ * - Filter overrides by target_type (flag vs entitlement)
+ * - Cache response (SecureStorage)
+ * - Merge logic (override > entitlement > flag)
+ * - Offline handling (use cached values)
+ *
+ * **Priority (in FeatureFlagsManager):**
+ * 1. Manual override (admin testing, local)
+ * 2. Remote override (server-side, per-user)
+ * 3. Remote config (server flags + entitlements)
+ * 4. Local config (hardcoded fallback)
+ */
+
+import { createClient } from "npm:@supabase/supabase-js@2.39.0";
+import {
+    fetchEntitlementsByUserId,
+    fetchFeatureFlags,
+    fetchOverridesByUserId,
+} from "./queries.ts";
+import type { GetFeatureFlagsResponse } from "./types.ts";
+
+/**
+ * Verify JWT token and extract user info using Supabase auth.getUser
+ * This approach is simpler and more robust than manual JWT verification
+ */
+async function verifyToken(
+  authHeader: string | null,
+  supabase: ReturnType<typeof createClient>,
+): Promise<{ id: string } | null> {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    console.log("Missing or invalid Authorization header");
+    return null;
+  }
+
+  const token = authHeader.substring(7); // Remove "Bearer " prefix
+
+  try {
+    // Use Supabase's built-in auth verification
+    const { data, error } = await supabase.auth.getUser(token);
+
+    if (error || !data?.user) {
+      console.log("auth.getUser failed:", error?.message);
+      return null;
+    }
+
+    return { id: data.user.id };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.log("Token verification error:", errorMsg);
+    return null;
+  }
+}
+
+/**
+ * Main handler for get_feature_flags function
+ */
+Deno.serve(async (req: Request) => {
+  const startTime = Date.now();
+
+  // Health-check endpoint (GET/HEAD) — no auth required, useful for monitoring
+  if (req.method === "GET" || req.method === "HEAD") {
+    return json({ status: "ok", version: "v1" }, 200);
+  }
+
+  // Only allow POST requests
+  if (req.method !== "POST") {
+    return json({ error: "Method not allowed" }, 405, {
+      Allow: "POST, GET, HEAD",
+    });
+  }
+
+  try {
+    // 1. Initialize Supabase client
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+      return json({ error: "Server misconfiguration" }, 500);
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
+    });
+
+    // 2. Validate Bearer token
+    const authHeader = req.headers.get("Authorization");
+    const user = await verifyToken(authHeader, supabase);
+
+    if (!user) {
+      console.warn("Token verification failed");
+      return json({ error: "Unauthorized" }, 401, {
+        "WWW-Authenticate": 'Bearer realm="get_feature_flags"',
+      });
+    }
+
+    const userId = user.id;
+    console.info(`Authenticated user: ${userId}`);
+
+    // 3. Fetch all three data sources in parallel
+    let flags, entitlements, overrides;
+
+    try {
+      [flags, entitlements, overrides] = await Promise.all([
+        fetchFeatureFlags(supabase),
+        fetchEntitlementsByUserId(supabase, userId),
+        fetchOverridesByUserId(supabase, userId),
+      ]);
+    } catch (fetchError) {
+      console.error(
+        "Failed to fetch data sources:",
+        fetchError?.message ?? String(fetchError),
+      );
+      return json(
+        {
+          error: "Failed to fetch configuration",
+        },
+        500,
+      );
+    }
+
+    console.info("Data fetched successfully", {
+      flags: Array.isArray(flags) ? flags.length : 0,
+      entitlements: Array.isArray(entitlements) ? entitlements.length : 0,
+      overrides: Array.isArray(overrides) ? overrides.length : 0,
+    });
+
+    // 4. Build response
+    const response: GetFeatureFlagsResponse = {
+      flags,
+      entitlements,
+      overrides, // Both flag and entitlement type overrides; client filters as needed
+      fetchedAt: Date.now(),
+      version: "v1",
+    };
+
+    const duration = Date.now() - startTime;
+    console.info(`Request completed in ${duration}ms`);
+
+    return json(response, 200);
+  } catch (error) {
+    console.error(
+      "Unexpected error in get_feature_flags:",
+      error?.message ?? String(error),
+    );
+
+    return json(
+      {
+        error: "Internal server error",
+        timestamp: Date.now(),
+      },
+      500,
+    );
+  }
+});
+
+/**
+ * Helper to return JSON responses with consistent formatting
+ * Supports optional headers parameter
+ * Sets Cache-Control based on response status: cache success, no-store for errors
+ * Includes security headers for stricter clients
+ */
+function json(
+  data: any,
+  status: number = 200,
+  headers?: Record<string, string>,
+): Response {
+  const baseHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+    Vary: "Authorization",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+    ...headers,
+  };
+
+  // Short cache for successful responses, no-store for errors
+  if (status >= 200 && status < 300) {
+    baseHeaders["Cache-Control"] =
+      "max-age=5, stale-while-revalidate=10, must-revalidate";
+  } else {
+    baseHeaders["Cache-Control"] = "no-store";
+  }
+
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: baseHeaders,
+  });
+}
