@@ -1,12 +1,14 @@
 # 🧩 Database Index Reference — DnD Toolkit
 
-This file documents the current PostgreSQL indexes in Supabase.  
+This file documents the current PostgreSQL indexes in Supabase, organized by schema.  
 **Do not run these manually** — they already exist in production.  
 This is for developer reference only.
 
 ---
 
-## PUBLIC.USERS
+## PUBLIC Schema Indexes
+
+### PUBLIC.USERS
 
 | Index               | Columns   | Purpose                          |
 | ------------------- | --------- | -------------------------------- |
@@ -14,7 +16,7 @@ This is for developer reference only.
 
 ---
 
-## PUBLIC.WORLDS
+### PUBLIC.WORLDS
 
 | Index                 | Columns    | Purpose                               |
 | --------------------- | ---------- | ------------------------------------- |
@@ -22,7 +24,7 @@ This is for developer reference only.
 
 ---
 
-## PUBLIC.WORLD_ACCESS
+### PUBLIC.WORLD_ACCESS
 
 | Index                           | Columns                      | Purpose                            |
 | ------------------------------- | ---------------------------- | ---------------------------------- |
@@ -33,7 +35,38 @@ This is for developer reference only.
 
 ---
 
-## PUBLIC.FEATURE_FLAG_ROLLOUTS
+## FEATURE_FLAGS Schema Indexes
+
+### FEATURE_FLAGS.FEATURE_FLAGS
+
+| Index                          | Columns           | Purpose                       |
+| ------------------------------ | ----------------- | ----------------------------- |
+| `idx_feature_flags_updated_at` | `updated_at DESC` | Fetch recently updated flags. |
+
+---
+
+### FEATURE_FLAGS.ENTITLEMENTS
+
+| Index                         | Columns      | Purpose                                    |
+| ----------------------------- | ------------ | ------------------------------------------ |
+| `idx_entitlements_user_id`    | `user_id`    | Find all entitlements for a user.          |
+| `idx_entitlements_key`        | `key`        | Fast lookup by entitlement key.            |
+| `idx_entitlements_id`         | `id`         | Direct lookup by entitlement ID.           |
+| `idx_entitlements_expires_at` | `expires_at` | Identify expired entitlements for cleanup. |
+
+---
+
+### FEATURE_FLAGS.FEATURE_FLAG_OVERRIDES
+
+| Index                       | Columns                                      | Purpose                               |
+| --------------------------- | -------------------------------------------- | ------------------------------------- |
+| `idx_overrides_user_target` | `(user_id, target_type, target_name)` UNIQUE | Prevent duplicate overrides per user. |
+| `idx_overrides_expires_at`  | `expires_at`                                 | Identify expired overrides.           |
+| `idx_overrides_user_id`     | `user_id`                                    | Find all overrides for a user.        |
+
+---
+
+### FEATURE_FLAGS.FEATURE_FLAG_ROLLOUTS
 
 | Index                                        | Columns                  | Purpose                                                       |
 | -------------------------------------------- | ------------------------ | ------------------------------------------------------------- |

@@ -16,6 +16,7 @@
  */
 
 export interface AppSettings {
+  version: number;
   description: string;
   environment: "development" | "production";
   features: {
@@ -114,19 +115,26 @@ let cachedConfig: AppSettings | null = null;
  * Respects EXPO_PUBLIC_ENVIRONMENT; defaults to 'production' for safety.
  * Result is cached after first call.
  *
- * Throws if the required appsettings file is missing or malformed.
+ * **Migration Flow:**
+ * 1. Load config file (JSON)
+ * 2. Detect and validate version field (required)
+ * 3. Auto-migrate to current version if version mismatch
+ * 4. Validate migrated config structure
+ * 5. Cache and return
+ *
+ * Throws if the required appsettings file is missing, malformed, version invalid, migration fails, or validation fails.
  */
 export function getAppConfig(): AppSettings {
   if (cachedConfig) return cachedConfig;
 
   const environment = process.env.EXPO_PUBLIC_ENVIRONMENT || "production";
-  let config: AppSettings;
+  let config: any;
 
   try {
     if (environment === "development") {
-      config = require("../../config/appsettings.dev.json") as AppSettings;
+      config = require("../../config/appsettings.dev.json") as any;
     } else {
-      config = require("../../config/appsettings.json") as AppSettings;
+      config = require("../../config/appsettings.json") as any;
     }
   } catch (err) {
     const configFile =
@@ -149,14 +157,45 @@ export function getAppConfig(): AppSettings {
     throw new Error(failureMsg);
   }
 
-  // Validate that the loaded config has the expected structure
+  // Detect config version (required field)
+  const detectedVersion = config.version;
+  if (typeof detectedVersion !== 'number') {
+    throw new Error(
+      `[AppConfig] Config version field must be a number. Got: ${typeof detectedVersion}. ` +
+        `File: ${environment === 'development' ? 'config/appsettings.dev.json' : 'config/appsettings.json'}`
+    );
+  }
+
+  // Auto-migrate config to current version
+  try {
+    const { migrateConfig, CURRENT_CONFIG_VERSION } = require("./migrations");
+    config = migrateConfig(config, detectedVersion, CURRENT_CONFIG_VERSION);
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    const configFile =
+      environment === "development"
+        ? "config/appsettings.dev.json"
+        : "config/appsettings.json";
+
+    const migrationFailMsg =
+      `[AppConfig] Configuration migration failed (v${detectedVersion}). ` +
+      `File: ${configFile}. ` +
+      `Error: ${errorMessage}`;
+
+    console.error(migrationFailMsg);
+    throw new Error(migrationFailMsg);
+  }
+
+  // Validate that the migrated config has the expected structure
   if (
+    !config.version ||
     !config.environment ||
     !config.features ||
     !config.overrides ||
     !config.devTools
   ) {
     const missingFields = [];
+    if (!config.version) missingFields.push("version");
     if (!config.environment) missingFields.push("environment");
     if (!config.features) missingFields.push("features");
     if (!config.overrides) missingFields.push("overrides");
@@ -167,15 +206,15 @@ export function getAppConfig(): AppSettings {
         ? "config/appsettings.dev.json"
         : "config/appsettings.json";
     const validationMsg =
-      `[AppConfig] ${configFile} is missing required fields: ${missingFields.join(", ")}. ` +
-      "Ensure the file matches the AppSettings interface.";
+      `[AppConfig] ${configFile} validation failed after migration. Missing required fields: ${missingFields.join(", ")}. ` +
+      "Ensure the file matches the AppSettings interface and migration completed successfully.";
 
     console.error(validationMsg);
     throw new Error(validationMsg);
   }
 
-  cachedConfig = config;
-  return config;
+  cachedConfig = config as AppSettings;
+  return cachedConfig;
 }
 
 /**

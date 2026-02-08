@@ -5,13 +5,13 @@ import { RequestManager } from "@/lib/api/request-manager";
 import { ConnectionQuality, NetworkDetection } from "@/lib/network";
 import { SecureStorage } from "@/lib/storage";
 import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-  type MockedFunction,
+    afterEach,
+    beforeEach,
+    describe,
+    expect,
+    it,
+    vi,
+    type MockedFunction,
 } from "vitest";
 
 vi.mock("react-native", () => ({
@@ -57,6 +57,7 @@ vi.mock("@/lib/analytics", () => ({
 
 vi.mock("@/lib/config", () => ({
   getAppConfig: vi.fn().mockReturnValue({
+    version: 1,
     features: { sentryEnabled: false },
   }),
 }));

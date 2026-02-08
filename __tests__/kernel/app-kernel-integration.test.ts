@@ -17,6 +17,21 @@ import {
 } from "@/lib/error/safe-mode";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Mock config loader to prevent real config loading during tests
+vi.mock("@/lib/config/loader", () => ({
+  getAppConfig: vi.fn(() => ({
+    version: 1,
+    safeMode: {
+      kernelTimeoutMs: 10000,
+      syncFailureThreshold: 3,
+      storageHealthCheckIntervalMs: 300000,
+      authHealthCheckIntervalMs: 14400000,
+      autoRecoveryAttempts: 2,
+      autoRecoveryDelayMs: 5000,
+    },
+  })),
+}));
+
 // Mock implementations
 const mockLogger = {
   category: vi.fn(() => ({

@@ -1,32 +1,41 @@
 # 🔒 Row Level Security (RLS) Policies — DnD Toolkit
 
-This document defines all Row Level Security (RLS) policies for the D&D Toolkit database. Use these as the canonical reference when creating or debugging policies in Supabase/Postgres.
+This document defines all Row Level Security (RLS) policies for the D&D Toolkit database, organized by schema. Use these as the canonical reference when creating or debugging policies in Supabase/Postgres.
 
 ---
 
-## Policy Summary by Table
+## Policy Summary by Schema
 
-| Table                      | Policy Name                             | Command | Role(s)               | Purpose                                                  |
-| -------------------------- | --------------------------------------- | ------- | --------------------- | -------------------------------------------------------- |
-| **users**                  | `users_select_own`                      | SELECT  | authenticated         | Users can read their own profile                         |
-| **users**                  | `users_insert_own`                      | INSERT  | authenticated         | Users can create their own profile                       |
-| **users**                  | `users_update_own`                      | UPDATE  | authenticated         | Users can update their own profile                       |
-| **users**                  | `users_delete_own`                      | DELETE  | authenticated         | Users can delete their own profile                       |
-| **users**                  | `users_admin_full_access`               | ALL     | authenticated (admin) | Admins have full access to all user records              |
-| **worlds**                 | `worlds_owner_all`                      | ALL     | authenticated         | World owners have full access to their worlds            |
-| **worlds**                 | `worlds_collaborator_select`            | SELECT  | authenticated         | Collaborators can view worlds they have access to        |
-| **worlds**                 | `worlds_collaborator_update`            | UPDATE  | authenticated         | Collaborators can update worlds (without changing owner) |
-| **world_access**           | `world_owner_any_ops_on_world_access`   | ALL     | authenticated         | World owners manage all access grants for their worlds   |
-| **world_access**           | `member_self_manage_access`             | ALL     | authenticated         | Members can manage their own access records              |
-| **invite_links**           | `invite_links_public_read`              | SELECT  | public                | Public can view any active invite links                  |
-| **invite_links**           | `invite_links_owner_select`             | SELECT  | authenticated         | World owners can view their own invite links             |
-| **invite_links**           | `invite_links_insert_owner`             | INSERT  | authenticated         | World owners/DMs can create invite links                 |
-| **feature_flag**           | `feature_flag_select_authenticated`     | SELECT  | public                | Feature flags publicly readable (for client checks)      |
-| **feature_flag_overrides** | `feature_flag_overrides`                | SELECT  | public                | Overrides publicly readable                              |
-| **entitlements**           | `entitlements_select_authenticated`     | SELECT  | authenticated         | Users can read their own entitlements                    |
-| **rollouts**               | `Authenticated users can read rollouts` | SELECT  | authenticated         | Users can read rollout configurations                    |
-| **rollouts**               | `Service role can manage rollouts`      | ALL     | service_role          | Service role (Edge Functions) can manage rollouts        |
-| **member**                 | `member_self_manage_access`             | ALL     | authenticated         | Members can manage their own access records              |
+### PUBLIC Schema
+
+| Table            | Policy Name                           | Command | Role(s)               | Purpose                                     |
+| ---------------- | ------------------------------------- | ------- | --------------------- | ------------------------------------------- |
+| **users**        | `users_select_own`                    | SELECT  | authenticated         | Users can read their own profile            |
+| **users**        | `users_insert_own`                    | INSERT  | authenticated         | Users can create their own profile          |
+| **users**        | `users_update_own`                    | UPDATE  | authenticated         | Users can update their own profile          |
+| **users**        | `users_delete_own`                    | DELETE  | authenticated         | Users can delete their own profile          |
+| **users**        | `users_admin_full_access`             | ALL     | authenticated (admin) | Admins have full access to all user records |
+| **worlds**       | `worlds_owner_all`                    | ALL     | authenticated         | World owners have full access               |
+| **worlds**       | `worlds_collaborator_select`          | SELECT  | authenticated         | Collaborators can view worlds they access   |
+| **worlds**       | `worlds_collaborator_update`          | UPDATE  | authenticated         | Collaborators can update worlds             |
+| **world_access** | `world_owner_any_ops_on_world_access` | ALL     | authenticated         | Owners manage access grants                 |
+| **world_access** | `member_self_manage_access`           | ALL     | authenticated         | Members manage their own access             |
+| **invite_links** | `invite_links_public_read`            | SELECT  | public                | Public can view active invite links         |
+| **invite_links** | `invite_links_owner_select`           | SELECT  | authenticated         | Owners can view their invite links          |
+| **invite_links** | `invite_links_insert_owner`           | INSERT  | authenticated         | Owners/DMs can create invite links          |
+
+### FEATURE_FLAGS Schema
+
+| Table                      | Policy Name                      | Command                | Role(s)               | Purpose                               |
+| -------------------------- | -------------------------------- | ---------------------- | --------------------- | ------------------------------------- |
+| **feature_flags**          | `feature_flags_public_read`      | SELECT                 | public, authenticated | Public can read feature flags         |
+| **feature_flags**          | `feature_flags_admin_write`      | INSERT, UPDATE, DELETE | authenticated (admin) | Admins can manage flags               |
+| **entitlements**           | `entitlements_user_read_own`     | SELECT                 | authenticated         | Users can read their own entitlements |
+| **entitlements**           | `entitlements_admin_full_access` | ALL                    | authenticated (admin) | Admins have full access               |
+| **feature_flag_overrides** | `overrides_user_read_own`        | SELECT                 | authenticated         | Users can read their own overrides    |
+| **feature_flag_overrides** | `overrides_admin_write`          | INSERT, UPDATE, DELETE | authenticated (admin) | Admins can manage overrides           |
+| **feature_flag_rollouts**  | `rollouts_authenticated_read`    | SELECT                 | authenticated         | Authenticated users can read rollouts |
+| **feature_flag_rollouts**  | `rollouts_admin_write`           | INSERT, UPDATE, DELETE | authenticated (admin) | Admins can manage rollouts            |
 
 ---
 
@@ -34,16 +43,27 @@ This document defines all Row Level Security (RLS) policies for the D&D Toolkit 
 
 ### Enable RLS on All Tables
 
+**PUBLIC Schema:**
+
 ```sql
-ALTER TABLE IF EXISTS public."entitlements" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public."users" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public."worlds" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public."world_access" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public."feature_flag" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public."invite_links" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public."rollouts" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public."member" ENABLE ROW LEVEL SECURITY;
 ```
+
+**FEATURE_FLAGS Schema:**
+
+```sql
+ALTER TABLE IF EXISTS feature_flags."feature_flags" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS feature_flags."entitlements" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS feature_flags."feature_flag_overrides" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS feature_flags."feature_flag_rollouts" ENABLE ROW LEVEL SECURITY;
+```
+
+---
+
+## PUBLIC Schema Policies
 
 ### USERS Policies
 
@@ -166,46 +186,64 @@ CREATE POLICY "invite_links_insert_owner" ON public."invite_links"
   );
 ```
 
-### FEATURE_FLAG Policies
+---
+
+## FEATURE_FLAGS Schema Policies
+
+### FEATURE_FLAGS.FEATURE_FLAGS Policies
 
 ```sql
--- feature_flag_select_authenticated: Public can read feature flags
-CREATE POLICY "feature_flag_select_authenticated" ON public."feature_flag"
+-- feature_flags_public_read: Public can read feature flags
+CREATE POLICY "feature_flags_public_read" ON feature_flags."feature_flags"
   FOR SELECT TO public
   USING (true);
+
+-- feature_flags_admin_write: Admins can manage feature flags
+CREATE POLICY "feature_flags_admin_write" ON feature_flags."feature_flags"
+  FOR INSERT, UPDATE, DELETE TO authenticated
+  WITH CHECK (((auth.jwt() ->> 'role'::text) = 'admin'::text));
 ```
 
-### FEATURE_FLAG_OVERRIDES Policies
+### FEATURE_FLAGS.ENTITLEMENTS Policies
 
 ```sql
--- feature_flag_overrides: Public can read overrides
-CREATE POLICY "feature_flag_overrides" ON public."feature_flag_overrides"
-  FOR SELECT TO public
-  USING (true);
+-- entitlements_user_read_own: Users can read their own entitlements
+CREATE POLICY "entitlements_user_read_own" ON feature_flags."entitlements"
+  FOR SELECT TO authenticated
+  USING ((user_id = (SELECT id FROM public."users" u WHERE (u.auth_id = auth.uid()))));
+
+-- entitlements_admin_full_access: Admins have full access
+CREATE POLICY "entitlements_admin_full_access" ON feature_flags."entitlements"
+  FOR ALL TO authenticated
+  USING (((auth.jwt() ->> 'role'::text) = 'admin'::text));
 ```
 
-### ENTITLEMENTS Policies
+### FEATURE_FLAGS.FEATURE_FLAG_OVERRIDES Policies
 
 ```sql
--- entitlements_select_authenticated: Users can read authentic entitlements
-CREATE POLICY "entitlements_select_authenticated" ON public."entitlements"
+-- overrides_user_read_own: Users can read their own overrides
+CREATE POLICY "overrides_user_read_own" ON feature_flags."feature_flag_overrides"
+  FOR SELECT TO authenticated
+  USING ((user_id = (SELECT id FROM public."users" u WHERE (u.auth_id = auth.uid()))));
+
+-- overrides_admin_write: Admins can manage overrides
+CREATE POLICY "overrides_admin_write" ON feature_flags."feature_flag_overrides"
+  FOR INSERT, UPDATE, DELETE TO authenticated
+  WITH CHECK (((auth.jwt() ->> 'role'::text) = 'admin'::text));
+```
+
+### FEATURE_FLAGS.FEATURE_FLAG_ROLLOUTS Policies
+
+```sql
+-- rollouts_authenticated_read: Authenticated users can read rollouts
+CREATE POLICY "rollouts_authenticated_read" ON feature_flags."feature_flag_rollouts"
   FOR SELECT TO authenticated
   USING (true);
-```
 
-### ROLLOUTS Policies
-
-```sql
--- Authenticated users can read rollouts
-CREATE POLICY "Authenticated users can read rollouts" ON public."rollouts"
-  FOR SELECT TO authenticated
-  USING (true);
-
--- Service role can manage rollouts (Edge Functions)
-CREATE POLICY "Service role can manage rollouts" ON public."rollouts"
-  FOR ALL TO service_role
-  USING (true)
-  WITH CHECK (true);
+-- rollouts_admin_write: Admins can manage rollouts (Edge Functions use service_role)
+CREATE POLICY "rollouts_admin_write" ON feature_flags."feature_flag_rollouts"
+  FOR INSERT, UPDATE, DELETE TO authenticated
+  WITH CHECK (((auth.jwt() ->> 'role'::text) = 'admin'::text));
 ```
 
 ---
