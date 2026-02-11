@@ -53,7 +53,8 @@ export async function createInviteLink(
 
     // Insert and let Supabase generate token and default expiration
     const { data, error } = await supabase
-      .from("invite_links")
+      .schema('public')
+      .from('invite_links')
       .insert([insertData])
       .select()
       .single();
@@ -100,7 +101,8 @@ export async function validateInviteToken(
       `invite:validate:${token}`,
       async () => {
         const { data, error } = await supabase
-          .from("invite_links")
+          .schema('public')
+          .from('invite_links')
           .select("world_id, expires_at")
           .eq("token", token)
           .single();
@@ -170,7 +172,8 @@ export async function deleteInviteLink(
     logger.info("storage", `Deleting invite link: ${token}`);
 
     const { error } = await supabase
-      .from("invite_links")
+      .schema('public')
+      .from('invite_links')
       .delete()
       .eq("token", token);
 
@@ -205,7 +208,8 @@ export async function getWorldInviteLinks(
       `invites:world:${worldId}`,
       async () => {
         const { data, error } = await supabase
-          .from("invite_links")
+          .schema('public')
+          .from('invite_links')
           .select("*")
           .eq("world_id", worldId)
           .gt("expires_at", new Date().toISOString())

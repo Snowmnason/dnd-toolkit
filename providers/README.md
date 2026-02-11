@@ -261,38 +261,6 @@ export function WorldInfo() {
 
 ---
 
-### AuthProvider
-
-**File:** `auth-provider.tsx`
-
-**Purpose:** Manages authentication state (session, profile, login/logout).
-
-**Exports:** `useAuthContext()` hook
-
-**Usage:**
-
-```tsx
-import { useAuthContext } from "@/hooks/use-auth-context";
-
-export function UserProfile() {
-  const { session, profile, isLoading } = useAuthContext();
-
-  if (!session) return <Text>Not logged in</Text>;
-  return <Text>Hello, {profile?.name}</Text>;
-}
-```
-
-**What it does:**
-
-- Fetches current session on app startup
-- Subscribes to auth state changes (login, logout, token refresh)
-- Stores session in context for global access
-- Handles Supabase auth events
-
-**Related:** `lib/auth/`, `lib/auth/auth-state.ts` (userId management)
-
----
-
 ## Advanced Usage
 
 ### Creating a Custom Provider

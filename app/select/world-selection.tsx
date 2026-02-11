@@ -9,6 +9,7 @@ import {
 } from "@/providers/AppParamsStableProvider";
 import { WorldListPanel } from "@/Screens/select/world-selection/WorldListPanel";
 import { WorldRightPanel } from "@/Screens/select/world-selection/WorldRightPanel";
+import { useScale } from "@/theme";
 import { useState } from "react";
 
 // Fallback image
@@ -22,6 +23,8 @@ export default function LandingPage() {
   // Panel navigation hook - manages left/right panel switching
   const { showRightPanel, goToRightPanel, goToLeftPanel, isDesktop } =
     usePanelNavigation();
+
+  const S = useScale();
 
   const {
     selectedWorld,
@@ -65,8 +68,8 @@ export default function LandingPage() {
   // Error state
   if (error) {
     return (
-      <AppPage center gap="md">
-        <Body align="center" color="$destructive">
+      <AppPage center gap="lg">
+        <Body align="center" color="$destructive" style={{ marginBottom: S.space.md }}>
           {error}
         </Body>
         <Button variant="outlined" text="Try Again" onPress={retry} />

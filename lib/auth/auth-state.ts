@@ -478,7 +478,7 @@ export const AuthStateManager = {
       // Query world_access table (the actual table in Supabase)
       // This is the slow database call
       const { data, error } = await supabase
-        .from("world_access") // Correct table name
+        .from("worlds.world_access") // Correct table name
         .select("id")
         .eq("world_id", worldId)
         .eq("user_id", userId)

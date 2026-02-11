@@ -48,7 +48,7 @@ export default function HomePage() {
       if (!isAuthChecked) {
         logger.warn(
           "bootstrap",
-          "⏱️ Failsafe timeout reached, showing manual navigation button"
+          "⏱️ Failsafe timeout reached, showing manual navigation button",
         );
         setShowFailsafe(true);
       }
@@ -71,15 +71,19 @@ export default function HomePage() {
       try {
         // CRITICAL: Check hasAccount first - if user logged out, don't use cached login time
         // This prevents the redirect loop after logout
-        const hasAccountBackend = getPrivacyStorageBackend(STORAGE_KEYS.HAS_ACCOUNT);
-        const authState = await hasAccountBackend.getJSON<{ hasAccount: boolean }>(STORAGE_KEYS.HAS_ACCOUNT);
+        const hasAccountBackend = getPrivacyStorageBackend(
+          STORAGE_KEYS.HAS_ACCOUNT,
+        );
+        const authState = await hasAccountBackend.getJSON<{
+          hasAccount: boolean;
+        }>(STORAGE_KEYS.HAS_ACCOUNT);
         const hasAccount = authState?.hasAccount === true;
 
         // If user explicitly logged out (hasAccount is false/null/undefined), show welcome
         if (!hasAccount) {
           logger.debug(
             "bootstrap",
-            "⏭️ User not logged in (hasAccount=false), showing welcome"
+            "⏭️ User not logged in (hasAccount=false), showing welcome",
           );
           setIsAuthChecked(true);
           setHasAccount(false);
@@ -88,16 +92,16 @@ export default function HomePage() {
 
         // User is logged in, check if their last login is recent
         const lastLoggedInBackend = getPrivacyStorageBackend(
-          STORAGE_KEYS.LAST_LOGGED_IN
+          STORAGE_KEYS.LAST_LOGGED_IN,
         );
         const lastLoggedInStr = await lastLoggedInBackend.getItem(
-          STORAGE_KEYS.LAST_LOGGED_IN
+          STORAGE_KEYS.LAST_LOGGED_IN,
         );
 
         if (!lastLoggedInStr) {
           logger.debug(
             "bootstrap",
-            "⏭️ No recent login found, showing welcome"
+            "⏭️ No recent login found, showing welcome",
           );
           setIsAuthChecked(true);
           setHasAccount(false);
@@ -125,7 +129,7 @@ export default function HomePage() {
 
         logger.debug(
           "bootstrap",
-          "⏭️ Login is stale (>7 days), showing welcome"
+          "⏭️ Login is stale (>7 days), showing welcome",
         );
         setIsAuthChecked(true);
         setHasAccount(false);
@@ -134,7 +138,7 @@ export default function HomePage() {
         logger.debug(
           "bootstrap",
           "⚠️ Login recency check failed, showing welcome:",
-          error
+          error,
         );
         setIsAuthChecked(true);
         setHasAccount(false);
@@ -152,7 +156,7 @@ export default function HomePage() {
     logger.debug(
       "bootstrap",
       "⏳ Rendering index loading overlay:",
-      loadingMessage
+      loadingMessage,
     );
 
     return (
@@ -172,7 +176,7 @@ export default function HomePage() {
   if (isAuthChecked) {
     logger.debug(
       "bootstrap",
-      `📋 Rendering welcome screen (hasAccount: ${hasAccount})`
+      `📋 Rendering welcome screen (hasAccount: ${hasAccount})`,
     );
 
     return (
@@ -186,7 +190,7 @@ export default function HomePage() {
               onPress={() => {
                 logger.info(
                   "bootstrap",
-                  "🚪 User clicked failsafe button, navigating to welcome"
+                  "🚪 User clicked failsafe button, navigating to welcome",
                 );
                 // Welcome screen is already showing, so this is a manual refresh
               }}

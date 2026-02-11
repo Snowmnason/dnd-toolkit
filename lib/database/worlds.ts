@@ -12,7 +12,7 @@ import { supabase } from "./supabase";
 
 // User role types for better type safety and maintainability
 export type UserRole = "owner" | "dm" | "player";
-export type AccessRole = "dm" | "player"; // Roles that can be assigned via world_access table
+export type AccessRole = "dm" | "gm" | "player" | "spectator" | "observer"; // Roles that can be assigned via world_access table
 
 export interface World {
   world_id: string;
@@ -61,7 +61,7 @@ export const worldsDB = {
         logger
           .category("storage")
           .debug(
-            `Creating world: ${worldData.name} (${worldData.system}) for user ${currentUser.id}`
+            `Creating world: ${worldData.name} (${worldData.system}) for user ${currentUser.id}`,
           );
 
         // Store profile ID as owner_id (proper FK relationship)
@@ -71,7 +71,8 @@ export const worldsDB = {
         };
 
         const { data, error } = await supabase
-          .from("worlds")
+          .schema('public')
+          .from('worlds')
           .insert(insertData)
           .select()
           .single();
@@ -108,7 +109,7 @@ export const worldsDB = {
         retries: 3,
         timeout: 15000,
         authStrategy: "user",
-      }
+      },
     );
   },
 
@@ -125,7 +126,7 @@ export const worldsDB = {
   // Get paginated worlds for current user (both owned and member of)
   async getMyWorldsPaginated(
     userId?: string,
-    options: { page?: number; limit?: number } = {}
+    options: { page?: number; limit?: number } = {},
   ): Promise<{ items: WorldWithAccess[]; total: number }> {
     const { page = 1, limit = 20 } = options;
     const offset = (page - 1) * limit;
@@ -161,7 +162,7 @@ export const worldsDB = {
         `Using cached world IDs for user ${currentUserId}`,
         {
           count: worldIdSet.size,
-        }
+        },
       );
     } else {
       // STEP 1: Get world IDs from both world_access and owned worlds in parallel
@@ -174,25 +175,27 @@ export const worldsDB = {
         >(
           // Get world_access records where user_id matches (includes world_id and role)
           supabase
+            .schema('public')
             .from("world_access")
             .select("world_id, user_role, permissions")
             .eq("user_id", currentUserId),
 
           // Get world IDs where owner_id matches
           supabase
-            .from("worlds")
+            .schema('public')
+            .from('worlds')
             .select("world_id")
-            .eq("owner_id", currentUserId)
+            .eq("owner_id", currentUserId),
         );
 
       if (accessRecordsResult.error) {
         logger.error(
           "storage",
           "Error fetching access records:",
-          accessRecordsResult.error
+          accessRecordsResult.error,
         );
         throw new Error(
-          accessRecordsResult.error.message || "Failed to fetch access records"
+          accessRecordsResult.error.message || "Failed to fetch access records",
         );
       }
 
@@ -200,10 +203,11 @@ export const worldsDB = {
         logger.error(
           "storage",
           "Error fetching owned world IDs:",
-          ownedWorldIdsResult.error
+          ownedWorldIdsResult.error,
         );
         throw new Error(
-          ownedWorldIdsResult.error.message || "Failed to fetch owned world IDs"
+          ownedWorldIdsResult.error.message ||
+            "Failed to fetch owned world IDs",
         );
       }
 
@@ -240,7 +244,7 @@ export const worldsDB = {
           staleTime: 5 * 60 * 1000, // 5 minutes
           cacheTime: 15 * 60 * 1000, // 15 minutes
           tags: ["worlds", `user:${currentUserId}`],
-        }
+        },
       );
 
       logger.debug("storage", `Cached world IDs for user ${currentUserId}`, {
@@ -266,7 +270,8 @@ export const worldsDB = {
     // - Or implement server-side cursor pagination
     const worldIds = Array.from(worldIdSet);
     const { data: worldsData, error: worldsError } = await supabase
-      .from("worlds")
+      .schema('public')
+      .from('worlds')
       .select("*")
       .in("world_id", worldIds)
       .order("created_at", { ascending: false })
@@ -297,7 +302,7 @@ export const worldsDB = {
                 }
               : undefined,
         };
-      }
+      },
     );
 
     return {
@@ -315,7 +320,8 @@ export const worldsDB = {
         const user = await validateUserForWrite();
 
         const { data, error } = await supabase
-          .from("worlds")
+          .schema('public')
+          .from('worlds')
           .update({ name: newName, updated_at: "now()" })
           .eq("world_id", worldId)
           .eq("owner_id", user.id)
@@ -340,14 +346,14 @@ export const worldsDB = {
         retries: 3,
         timeout: 15000,
         authStrategy: "user",
-      }
+      },
     );
   },
 
   // Update a world
   async update(
     worldId: string,
-    updates: Partial<CreateWorldData>
+    updates: Partial<CreateWorldData>,
   ): Promise<World> {
     return RequestManager.fetch(
       `worlds:update:${worldId}`,
@@ -356,7 +362,8 @@ export const worldsDB = {
         await validateUserForWrite();
 
         const { data, error } = await supabase
-          .from("worlds")
+          .schema('public')
+          .from('worlds')
           .update({
             ...updates,
             updated_at: "now()",
@@ -383,7 +390,7 @@ export const worldsDB = {
         retries: 3,
         timeout: 15000,
         authStrategy: "user",
-      }
+      },
     );
   },
 
@@ -396,7 +403,8 @@ export const worldsDB = {
         const user = await validateUserForWrite();
 
         const { error } = await supabase
-          .from("worlds")
+          .schema('public')
+          .from('worlds')
           .delete()
           .eq("world_id", worldId)
           .eq("owner_id", user.id); // Ensure only owner can delete
@@ -420,7 +428,7 @@ export const worldsDB = {
         retries: 3,
         timeout: 15000,
         authStrategy: "user",
-      }
+      },
     );
 
     return;
@@ -432,6 +440,7 @@ export const worldsDB = {
       `worlds:removeUserFromWorld:${worldId}:${userId}`,
       async () => {
         const { error } = await supabase
+          .schema('public')
           .from("world_access")
           .delete()
           .eq("world_id", worldId)
@@ -459,7 +468,7 @@ export const worldsDB = {
         retries: 3,
         timeout: 15000,
         authStrategy: "user",
-      }
+      },
     );
 
     return;
@@ -476,18 +485,20 @@ export const worldsDB = {
           [{ data: any | null; error: any }, { data: any | null; error: any }]
         >(
           supabase
-            .from("worlds")
+            .schema('public')
+            .from('worlds')
             .select("owner_id")
             .eq("world_id", worldId)
             .eq("owner_id", userId)
             .maybeSingle(),
 
           supabase
+            .schema('public')
             .from("world_access")
             .select("id")
             .eq("world_id", worldId)
             .eq("user_id", userId)
-            .maybeSingle()
+            .maybeSingle(),
         );
 
         return !!worldResult.data || !!accessResult.data;
@@ -497,7 +508,7 @@ export const worldsDB = {
         retries: 2,
         timeout: 10000,
         authStrategy: "user",
-      }
+      },
     );
 
     // If RequestManager returns null (failOpen flag), default to false for safety
@@ -509,12 +520,13 @@ export const worldsDB = {
     worldId: string,
     userId: string,
     userRole: AccessRole = "player",
-    permissions: any = {}
+    permissions: any = {},
   ): Promise<WorldAccess> {
     return RequestManager.fetch(
       `worlds:addUserToWorld:${worldId}:${userId}`,
       async () => {
         const { data, error } = await supabase
+          .schema('public')
           .from("world_access")
           .insert({
             world_id: worldId,
@@ -550,7 +562,7 @@ export const worldsDB = {
         retries: 3,
         timeout: 15000,
         authStrategy: "user",
-      }
+      },
     );
   },
 
@@ -558,18 +570,19 @@ export const worldsDB = {
   // Uses RequestManager for deduplication and retry
   // Note: Returns null if RequestManager fails with failOpen enabled
   async getWorldMembers(
-    worldId: string
+    worldId: string,
   ): Promise<(WorldAccess & { user: any })[] | null> {
     return RequestManager.fetch(
       `world:members:${worldId}`,
       async () => {
         const { data, error } = await supabase
+          .schema('public')
           .from("world_access")
           .select(
             `
             *,
             users(id, username)
-          `
+          `,
           )
           .eq("world_id", worldId)
           .order("created_at", { ascending: false });
@@ -586,7 +599,7 @@ export const worldsDB = {
         retries: 2,
         timeout: 15000,
         authStrategy: "user",
-      }
+      },
     );
   },
 
@@ -606,7 +619,8 @@ export const worldsDB = {
       `world:detail:${worldId}`,
       async () => {
         const { data, error } = await supabase
-          .from("worlds")
+          .schema('public')
+          .from('worlds')
           .select("*")
           .eq("world_id", worldId)
           .single();
@@ -627,7 +641,7 @@ export const worldsDB = {
         retries: 3,
         timeout: 15000,
         authStrategy: "user",
-      }
+      },
     );
   },
 };

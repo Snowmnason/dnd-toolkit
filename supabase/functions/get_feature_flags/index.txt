@@ -30,10 +30,11 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.39.0";
 import {
-    fetchEntitlementsByUserId,
-    fetchFeatureFlags,
-    fetchOverridesByUserId,
-    fetchRolloutConfigs,
+  fetchEntitlementOverridesByUserId,
+  fetchEntitlementsByUserId,
+  fetchFeatureFlags,
+  fetchOverridesByUserId,
+  fetchRolloutConfigs,
 } from "./queries.ts";
 import type { GetFeatureFlagsResponse } from "./types.ts";
 
@@ -116,15 +117,17 @@ Deno.serve(async (req: Request) => {
     console.info(`Authenticated user: ${userId}`);
 
     // 3. Fetch all three data sources in parallel
-    let flags, entitlements, overrides, rollouts;
+    let flags, entitlements, flagOverrides, entitlementOverrides, rollouts;
 
     try {
-      [flags, entitlements, overrides, rollouts] = await Promise.all([
-        fetchFeatureFlags(supabase),
-        fetchEntitlementsByUserId(supabase, userId),
-        fetchOverridesByUserId(supabase, userId),
-        fetchRolloutConfigs(supabase),
-      ]);
+      [flags, entitlements, flagOverrides, entitlementOverrides, rollouts] =
+        await Promise.all([
+          fetchFeatureFlags(supabase),
+          fetchEntitlementsByUserId(supabase, userId),
+          fetchOverridesByUserId(supabase, userId),
+          fetchEntitlementOverridesByUserId(supabase, userId),
+          fetchRolloutConfigs(supabase),
+        ]);
     } catch (fetchError) {
       console.error(
         "Failed to fetch data sources:",
@@ -141,15 +144,24 @@ Deno.serve(async (req: Request) => {
     console.info("Data fetched successfully", {
       flags: Array.isArray(flags) ? flags.length : 0,
       entitlements: Array.isArray(entitlements) ? entitlements.length : 0,
-      overrides: Array.isArray(overrides) ? overrides.length : 0,
+      flagOverrides: Array.isArray(flagOverrides) ? flagOverrides.length : 0,
+      entitlementOverrides: Array.isArray(entitlementOverrides)
+        ? entitlementOverrides.length
+        : 0,
       rollouts: Object.keys(rollouts || {}).length,
     });
+
+    // Merge both override types into single array for response
+    const allOverrides = [
+      ...(flagOverrides || []),
+      ...(entitlementOverrides || []),
+    ];
 
     // 4. Build response
     const response: GetFeatureFlagsResponse = {
       flags,
       entitlements,
-      overrides, // Both flag and entitlement type overrides; client filters as needed
+      overrides: allOverrides, // Both flag and entitlement overrides with synthetic target_type
       rollouts: rollouts || {}, // Rollout config from database
       fetchedAt: Date.now(),
       version: "v1",

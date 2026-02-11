@@ -10,16 +10,14 @@ import {
     AuthRoot,
     AuthSubTitle,
     AuthTitle,
-    FormAuthInput
-} from '@/components/auth_components';
-import { Body } from '@/components/ui';
-import { logger, supabase, usersDB, useSignUpForm } from '@/lib';
-import { useScale } from '@/theme';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { View } from 'react-native';
-
-
+    FormAuthInput,
+} from "@/components/auth_components";
+import { Body } from "@/components/ui";
+import { logger, supabase, usersDB, useSignUpForm } from "@/lib";
+import { useScale } from "@/theme";
+import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { View } from "react-native";
 
 export default function CompleteProfileScreen() {
   const S = useScale();
@@ -30,38 +28,44 @@ export default function CompleteProfileScreen() {
   // Check if user is authenticated and needs to complete profile
   useEffect(() => {
     const checkAuthAndProfile = async () => {
-      logger.info('auth', 'Starting auth and profile check');
+      logger.info("auth", "Starting auth and profile check");
       try {
         // Use cached session instead of making network call
-        const { data: { session }, error: authError } = await supabase.auth.getSession();
-        logger.debug('auth', 'Auth session check result:', { 
-          hasSession: !!session, 
+        const {
+          data: { session },
+          error: authError,
+        } = await supabase.auth.getSession();
+        logger.debug("auth", "Auth session check result:", {
+          hasSession: !!session,
           userId: session?.user?.id,
-          authError: authError?.message 
+          authError: authError?.message,
         });
 
         if (authError) {
-          logger.error('auth', 'Auth session error:', authError);
-          router.replace('/login/sign-in');
+          logger.error("auth", "Auth session error:", authError);
+          router.replace("/login/sign-in");
           return;
         }
 
         if (!session?.user) {
-          logger.warn('auth', 'No authenticated user found, redirecting to sign-in');
-          router.replace('/login/sign-in');
+          logger.warn(
+            "auth",
+            "No authenticated user found, redirecting to sign-in",
+          );
+          router.replace("/login/sign-in");
           return;
         }
-        
+
         const authUser = session.user;
 
         // Try to get existing profile (might not exist for new users)
-        logger.debug('auth', 'Fetching user profile from database');
+        logger.debug("auth", "Fetching user profile from database");
         const existingProfile = await usersDB.getCurrentUser();
-        logger.info('auth', 'Profile fetch result:', { 
+        logger.info("auth", "Profile fetch result:", {
           hasProfile: !!existingProfile,
           profileId: existingProfile?.id,
           profileUsername: existingProfile?.username,
-          profileAuthId: existingProfile?.auth_id
+          profileAuthId: existingProfile?.auth_id,
         });
 
         if (existingProfile) {
@@ -70,37 +74,47 @@ export default function CompleteProfileScreen() {
         } else {
           // No profile exists - this is expected for new users
           // Use the auth user data to create the profile
-          logger.info('auth', 'No database profile found - this is expected for new users');
+          logger.info(
+            "auth",
+            "No database profile found - this is expected for new users",
+          );
           setUser(authUser);
         }
-        
+
         // Robust profile validation - only redirect if profile is truly complete
-        const hasValidProfile = existingProfile && 
-                               existingProfile.username && 
-                               existingProfile.username.trim().length > 0;
-        
-        logger.debug('auth', 'Profile validation:', { 
+        const hasValidProfile =
+          existingProfile &&
+          existingProfile.username &&
+          existingProfile.username.trim().length > 0;
+
+        logger.debug("auth", "Profile validation:", {
           hasValidProfile,
           hasExistingProfile: !!existingProfile,
           username: existingProfile?.username,
-          usernameLength: existingProfile?.username?.length
+          usernameLength: existingProfile?.username?.length,
         });
 
         if (hasValidProfile) {
-          logger.info('auth', 'User already has complete profile, redirecting to world selection');
-          router.replace('/select/world-selection');
+          logger.info(
+            "auth",
+            "User already has complete profile, redirecting to world selection",
+          );
+          router.replace("/select/world-selection");
           return;
         }
-        logger.info('auth', 'User needs to complete profile, staying on this screen');
+        logger.info(
+          "auth",
+          "User needs to complete profile, staying on this screen",
+        );
       } catch (error) {
-        logger.error('auth', 'Auth check error:', error);
-        router.replace('/login/sign-in');
+        logger.error("auth", "Auth check error:", error);
+        router.replace("/login/sign-in");
       } finally {
         setInitializing(false);
-        logger.debug('auth', 'Auth check completed, initializing set to false');
+        logger.debug("auth", "Auth check completed, initializing set to false");
       }
     };
-    
+
     checkAuthAndProfile();
   }, [router]);
 
@@ -112,26 +126,30 @@ export default function CompleteProfileScreen() {
     loading,
     authError,
     isValid,
-    
+
     // Handlers
     handleSignUp: handleCompleteProfile,
-    
-    // UI helpers
-    getUsernameDisplayText,
-  } = useSignUpForm('complete-profile', user);
+  } = useSignUpForm("complete-profile", user);
 
   // Show loading while checking authentication
   if (initializing || !user) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#2f353d' }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#2f353d",
+        }}
+      >
         <Body color="#F5E6D3" fontSize="$para">
-          {initializing ? 'Checking authentication...' : 'Loading...'}
+          {initializing ? "Checking authentication..." : "Loading..."}
         </Body>
       </View>
     );
   }
 
- return (
+  return (
     <AuthRoot>
       {/* 🧠 Header */}
       <AuthTitle>Complete Your Profile</AuthTitle>
@@ -143,19 +161,19 @@ export default function CompleteProfileScreen() {
       {/* 🏷️ Welcome Message Card */}
       <View
         style={{
-          backgroundColor: 'rgba(245, 230, 211, 0.95)',
+          backgroundColor: "rgba(245, 230, 211, 0.95)",
           padding: S.space.lg,
           borderRadius: S.radius.md,
           marginBottom: S.space.xl,
           borderWidth: 2,
-          borderColor: '#8B4513',
-          width: '100%',
+          borderColor: "#8B4513",
+          width: "100%",
           maxWidth: S.s(400),
-          alignSelf: 'center',
+          alignSelf: "center",
         }}
       >
         <AuthBody.InCard style={{ marginBottom: S.space.xs }}>
-          Welcome, {username ? username : 'Adventurer'}!
+          Welcome, {username ? username : "Adventurer"}!
         </AuthBody.InCard>
 
         <AuthBody.InCard>
@@ -164,7 +182,7 @@ export default function CompleteProfileScreen() {
       </View>
 
       {/* 🧾 Form */}
-  <AuthForm style={{ marginBottom: authError ? S.space.md : S.space.xxl }}>
+      <AuthForm style={{ marginBottom: authError ? S.space.md : S.space.xxl }}>
         <FormAuthInput
           control={control}
           name="username"
@@ -176,23 +194,6 @@ export default function CompleteProfileScreen() {
         />
 
         <AuthError error={authError} />
-
-        {/* Reserve space for validation message to prevent layout shift */}
-        <View style={{ minHeight: S.font.body2 + 2 + S.space.xs, marginTop: (S.space.sm * -1), marginBottom: S.space.xs }}>
-          {username.length > 0 && (
-            <AuthSubTitle
-              fontSize='$para'
-              style={{
-                textAlign: 'left',
-                color: isValid ? '#82cc7eff' : '#f78888ff',
-                lineHeight: S.font.body2 + 2,
-                opacity: 0.9,
-              }}
-            >
-              {getUsernameDisplayText()}
-            </AuthSubTitle>
-          )}
-        </View>
       </AuthForm>
 
       {/* 🔘 Actions */}
@@ -206,7 +207,7 @@ export default function CompleteProfileScreen() {
 
         <AuthButtonSecondary
           text="Sign Out"
-          onPress={() => router.push('/login/sign-up')}
+          onPress={() => router.push("/login/sign-up")}
           disabled={loading}
         />
       </AuthActionGroup>
@@ -220,5 +221,5 @@ export default function CompleteProfileScreen() {
         © 2025 The Snow Post · Forged for storytellers & adventurers
       </AuthCaption>
     </AuthRoot>
-  )
+  );
 }

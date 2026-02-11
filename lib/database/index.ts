@@ -41,15 +41,15 @@ export {
 
 // Entitlements operations
 export {
+  fetchEntitlementOverridesByUserId,
   fetchEntitlementsByUserId,
   hasEntitlement,
+  type EntitlementOverrideRow,
   type EntitlementRow
 } from "./entitlements";
 
 // Feature flags operations
-export type {
-  FeatureFlagRow
-} from "./feature-flags";
+export type { FeatureFlagRow } from "./feature-flags";
 
 // Feature flag overrides operations
 export type {

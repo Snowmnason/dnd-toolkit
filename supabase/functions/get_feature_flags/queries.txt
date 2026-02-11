@@ -6,9 +6,10 @@
 
 import { type SupabaseClient } from "npm:@supabase/supabase-js@2.39.0";
 import type {
-    EntitlementRow,
-    FeatureFlagOverrideRow,
-    FeatureFlagRow,
+  EntitlementOverrideRow,
+  EntitlementRow,
+  FeatureFlagOverrideRow,
+  FeatureFlagRow,
 } from "./types.ts";
 
 /**
@@ -22,7 +23,8 @@ export async function fetchFeatureFlags(
   supabase: SupabaseClient,
 ): Promise<FeatureFlagRow[]> {
   const { data, error } = await supabase
-    .from("feature_flags")
+    .schema('public')
+    .from('feature_flags')
     .select("flag_name, enabled, kind, description, created_at, updated_at");
 
   if (error) {
@@ -39,11 +41,15 @@ export async function fetchFeatureFlags(
  * Fetch all entitlements for a specific user (server-side filtered for active)
  * Moved from lib/database/entitlements.ts
  *
- * Server-side filters: non-expired (expires_at IS NULL OR expires_at > now())
+ * Server-side filters:
+ * - is_active = true (excludes soft-deleted/revoked entitlements marked by background job or admin)
+ * - non-expired (expires_at IS NULL OR expires_at > now())
+ *
+ * Includes new 003 schema columns: is_active, remind_user
  *
  * @param supabase - Already initialized Supabase client (created once per request)
  * @param userId - User ID (UUID) to fetch entitlements for
- * @returns List of active user entitlements (non-expired only)
+ * @returns List of active user entitlements (is_active=true, non-expired only)
  */
 export async function fetchEntitlementsByUserId(
   supabase: SupabaseClient,
@@ -52,9 +58,13 @@ export async function fetchEntitlementsByUserId(
   const now = new Date().toISOString();
 
   const { data, error } = await supabase
-    .from("entitlements")
-    .select("id, user_id, key, created_at, updated_at, expires_at")
+    .schema('public')
+    .from('entitlements')
+    .select(
+      "id, user_id, key, is_active, remind_user, created_at, updated_at, expires_at",
+    )
     .eq("user_id", userId)
+    .eq("is_active", true)
     .or(`expires_at.is.null,expires_at.gt.${now}`);
 
   if (error) {
@@ -71,16 +81,17 @@ export async function fetchEntitlementsByUserId(
 }
 
 /**
- * Fetch all active overrides for a specific user
+ * Fetch all active overrides for feature flags for a specific user
  * Moved from lib/database/feature-flag-overrides.ts
  *
+ * 003 Schema Change: Removed target_type column from database (simplified to single table for flags).
+ * target_type is now set synthetically by Edge Function to "flag" for client compatibility.
+ *
  * Server-side filters for non-revoked, non-expired overrides.
- * Returns both flag-type and entitlement-type overrides.
- * Client-side filtering happens in FeatureFlagsManager.
  *
  * @param supabase - Already initialized Supabase client (created once per request)
  * @param userId - User ID (UUID) to fetch overrides for
- * @returns List of active user overrides (non-revoked, non-expired)
+ * @returns List of active feature flag overrides (non-revoked, non-expired) with synthetic target_type="flag"
  */
 export async function fetchOverridesByUserId(
   supabase: SupabaseClient,
@@ -89,9 +100,10 @@ export async function fetchOverridesByUserId(
   const now = new Date().toISOString();
 
   const { data, error } = await supabase
-    .from("feature_flag_overrides")
+    .schema('public')
+    .from('feature_flag_overrides')
     .select(
-      "id, user_id, target_type, target_name, enabled, expires_at, revoked, reason, created_by, created_at, updated_at",
+      "id, user_id, flag_name, enabled, expires_at, revoked, reason, created_by, created_at, updated_at",
     )
     .eq("user_id", userId)
     .eq("revoked", false)
@@ -107,7 +119,72 @@ export async function fetchOverridesByUserId(
     );
   }
 
-  return (data || []) as FeatureFlagOverrideRow[];
+  // Add synthetic fields for client compatibility:
+  // - target_type: always "flag" (distinguishes from entitlement overrides)
+  // - target_name: maps DB column flag_name → client-expected field
+  return (data || []).map((row: any) => ({
+    ...row,
+    target_type: "flag" as const,
+    target_name: row.flag_name,
+  })) as FeatureFlagOverrideRow[];
+}
+
+/**
+ * Fetch all active overrides for entitlements for a specific user
+ * NEW in 003: Separate table for admin overrides (grant/revoke) on entitlements
+ *
+ * Server-side filters for non-revoked, non-expired overrides.
+ * Allows admins to temporarily grant/revoke entitlements outside normal expiry logic.
+ *
+ * @param supabase - Already initialized Supabase client (created once per request)
+ * @param userId - User ID (UUID) to fetch entitlement overrides for
+ * @returns List of active entitlement overrides (non-revoked, non-expired) with synthetic target_type="entitlement"
+ */
+export async function fetchEntitlementOverridesByUserId(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<EntitlementOverrideRow[]> {
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .schema('public')
+    .from('entitlements_overrides')
+    .select(
+      "id, user_id, entitlement_key, is_active, expires_at, revoked, reason, created_by, created_at, updated_at",
+    )
+    .eq("user_id", userId)
+    .eq("revoked", false)
+    .or(`expires_at.is.null,expires_at.gt.${now}`);
+
+  if (error) {
+    console.error(
+      `Error fetching entitlement overrides for user ${userId}:`,
+      error?.message ?? error,
+    );
+    throw new Error(
+      `Failed to fetch entitlement overrides for user ${userId}: ${error?.message ?? String(error)}`,
+    );
+  }
+
+  // Map DB columns to client-expected synthetic fields:
+  // - target_type: always "entitlement" (distinguishes from flag overrides)
+  // - target_name: maps DB column entitlement_key → client-expected field
+  // - action: maps DB boolean is_active → "grant"/"revoke" string for client
+  // - enabled: maps DB boolean is_active → boolean for client compatibility
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    user_id: row.user_id,
+    target_type: "entitlement" as const,
+    target_name: row.entitlement_key,
+    action: row.is_active ? "grant" : "revoke",
+    expires_at: row.expires_at,
+    revoked: row.revoked,
+    reason: row.reason,
+    created_by: row.created_by,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    enabled: row.is_active, // Synthetic: maps boolean to enabled/disabled for client compatibility
+  })) as EntitlementOverrideRow[];
 }
 
 /**
@@ -121,7 +198,8 @@ export async function fetchRolloutConfigs(
   supabase: SupabaseClient,
 ): Promise<Record<string, { percentage: number; seed?: string }>> {
   const { data, error } = await supabase
-    .from("feature_flag_rollouts")
+    .schema('public')
+    .from('feature_flag_rollouts')
     .select("flag_name, percentage, seed")
     .eq("is_active", true);
 
@@ -145,4 +223,3 @@ export async function fetchRolloutConfigs(
 
   return rollouts;
 }
-

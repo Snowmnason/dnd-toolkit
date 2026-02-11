@@ -38,14 +38,14 @@ export const updateStorageCache = {
       // Get userId from SecureStorage (never stale)
       const backend = getStorageBackend(STORAGE_KEYS.USER_DATA);
       const userData = await backend.getJSON<{ id: string }>(
-        STORAGE_KEYS.USER_DATA
+        STORAGE_KEYS.USER_DATA,
       );
       const userId = userData?.id;
 
       if (!userId) {
         logger.warn(
           "storage",
-          "No userId in SecureStorage, skipping cache refresh"
+          "No userId in SecureStorage, skipping cache refresh",
         );
         return;
       }
@@ -58,7 +58,7 @@ export const updateStorageCache = {
 
       logger.info(
         "storage",
-        `Fetched ${userWorlds.length} worlds from database`
+        `Fetched ${userWorlds.length} worlds from database`,
       );
 
       // Update SecureStorage for each world in parallel
@@ -74,7 +74,7 @@ export const updateStorageCache = {
             timestamp,
             source: "supabase",
           });
-        })
+        }),
       );
 
       logger.info("storage", `Updated cache for ${userWorlds.length} worlds`);
@@ -107,7 +107,7 @@ export const updateStorageCache = {
       if (!isSupabaseConfigured()) {
         logger.warn(
           "storage",
-          "Supabase not configured, skipping user profile refresh"
+          "Supabase not configured, skipping user profile refresh",
         );
         return;
       }
@@ -126,14 +126,15 @@ export const updateStorageCache = {
       if (!session?.user?.id) {
         logger.warn(
           "storage",
-          "No active session, skipping user profile refresh"
+          "No active session, skipping user profile refresh",
         );
         return;
       }
 
       // Fetch fresh user profile from Supabase
       const { data: userProfile, error: profileError } = await supabase
-        .from("users")
+        .schema('public')
+        .from('users')
         .select("*")
         .eq("auth_id", session.user.id)
         .single();
@@ -162,7 +163,7 @@ export const updateStorageCache = {
 
       logger.info(
         "storage",
-        `User profile cache updated for user ${userProfile.id}`
+        `User profile cache updated for user ${userProfile.id}`,
       );
     } catch (error) {
       logger.error("storage", "Error refreshing user profile cache:", error);

@@ -103,23 +103,6 @@ export default function ResetPasswordScreen() {
           onSubmitEditing={handleResetPassword}
         />
 
-        {/* Password Match Indicator */}
-        {confirmPassword.length > 0 && (
-          <AuthSubTitle
-            color={doPasswordsMatch ? "#A3D4A0" : "#F5A5A5"}
-            align="left"
-            fontSize={11}
-            style={{
-              lineHeight: 16,
-              opacity: 0.9,
-              marginBottom: 6,
-              marginTop: -14,
-            }}
-          >
-            {getPasswordMatchText()}
-          </AuthSubTitle>
-        )}
-
         {/* Authentication Error */}
         <AuthError error={error} />
       </AuthForm>

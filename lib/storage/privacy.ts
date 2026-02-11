@@ -81,7 +81,24 @@ export function getStorageBackend(
 export function redactForLogs(value: unknown, key?: string): string {
   if (value === null || value === undefined) return "";
 
-  let str = typeof value === "string" ? value : JSON.stringify(value);
+  let str: string;
+  if (typeof value === "string") {
+    str = value;
+  } else if (value instanceof Error) {
+    // JSON.stringify(new Error('x')) => '{}', which destroys useful debugging info.
+    // Preserve common fields while still running through our redaction pipeline.
+    str = JSON.stringify({
+      name: value.name,
+      message: value.message,
+      stack: value.stack,
+    });
+  } else {
+    try {
+      str = JSON.stringify(value);
+    } catch {
+      str = String(value);
+    }
+  }
 
   // If specific key provided, use its redaction pattern
   if (key) {

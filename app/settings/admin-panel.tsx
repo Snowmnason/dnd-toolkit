@@ -68,7 +68,7 @@ export default function AdminPanelScreen() {
           return;
         }
 
-        setAuthorized(!!user.isAdmin);
+        setAuthorized(!!user.is_admin);
 
         // Load all settings from config (features, overrides, devTools, featureFlags)
         try {

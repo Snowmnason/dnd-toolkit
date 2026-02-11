@@ -27,7 +27,12 @@ const systemItems = tabletopSystems.map((t) => ({ label: t, value: t }));
  *
  * Currently empty - maps can be uploaded via the import feature
  */
-const defaultMapImages: string[] = [];
+const defaultMapImages: string[] = [
+  "https://xxoibawslmysvfllozyb.supabase.co/storage/v1/object/public/Maps/map%20(1).jpg", 
+  "https://xxoibawslmysvfllozyb.supabase.co/storage/v1/object/public/Maps/map%20(2).jpg",
+  "https://xxoibawslmysvfllozyb.supabase.co/storage/v1/object/public/Maps/map%20(3).jpg",
+  "https://xxoibawslmysvfllozyb.supabase.co/storage/v1/object/public/Maps/map%20(4).jpg",
+];
 
 export default function CreateWorldScreen() {
   const S = useScale();

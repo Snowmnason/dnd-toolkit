@@ -18,13 +18,14 @@ import { z } from "zod";
 
 /**
  * Define your Zod schema with comprehensive validation
+ * Zod v4: Use standalone validators (z.uuid(), z.datetime(), z.email())
  */
 const UserSchema = z.object({
-  id: z.string().uuid("Invalid user ID"),
-  email: z.string().email("Invalid email format"),
+  id: z.string().uuid(),
+  email: z.string().email(),
   name: z.string().min(1).max(255),
   createdAt: z.string().datetime(),
-  isAdmin: z.boolean().default(false),
+  is_admin: z.boolean().default(false),
 });
 
 /**
@@ -38,7 +39,7 @@ type User = z.infer<typeof UserSchema>;
 //   email: string;
 //   name: string;
 //   createdAt: string;
-//   isAdmin: boolean;
+//   is_admin: boolean;
 // }
 
 // ==========================================
@@ -206,16 +207,16 @@ type FlexibleUser = z.infer<typeof FlexibleUserSchema>;
 
 /**
  * Zod can transform data during parsing, and inferred types reflect the output
+ * Modern Zod v4 approach: Use z.coerce.date() for Date objects
  */
 
-const DateStringSchema = z
-  .string()
-  .datetime()
-  .transform((str) => new Date(str));
+// Zod v4 best practice for Date objects:
+const DateStringSchema = z.coerce.date();
 
-// After transform, the type is Date, not string
+// z.coerce.date() automatically converts strings/numbers to Date objects
+// The inferred type is Date, not string
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-type TransformedDate = z.infer<typeof DateStringSchema>;
+type TransformedDate = z.infer<typeof DateStringSchema>; // Date
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const UserWithParsedDatesSchema = UserSchema.extend({
@@ -252,11 +253,26 @@ type UserWithParsedDates = z.infer<typeof UserWithParsedDatesSchema>;
  */
 
 export type {
-    ApiResponse, AuditedUser, CreateUserRequest, FlexibleUser, UpdateUserRequest, User, UserWithParsedDates, UserWithWorlds, World,
-    WorldList
+  ApiResponse,
+  AuditedUser,
+  CreateUserRequest,
+  FlexibleUser,
+  UpdateUserRequest,
+  User,
+  UserWithParsedDates,
+  UserWithWorlds,
+  World,
+  WorldList
 };
 
-    export {
-        ApiResponseSchema, AuditedUserSchema, CreateUserRequestSchema, FlexibleUserSchema, UpdateUserRequestSchema, UserSchema, UserWithWorldsSchema, WorldSchema
-    };
+  export {
+    ApiResponseSchema,
+    AuditedUserSchema,
+    CreateUserRequestSchema,
+    FlexibleUserSchema,
+    UpdateUserRequestSchema,
+    UserSchema,
+    UserWithWorldsSchema,
+    WorldSchema
+  };
 

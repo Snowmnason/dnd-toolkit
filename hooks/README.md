@@ -40,7 +40,6 @@ import { useAppNavigation } from "@/hooks/navigation";
 
 | Hook                             | Purpose                                                                                                                            |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `useAuthContext()`               | Access session, profile, and login state from auth provider. Returns `{ session, profile, isLoading, isLoggedIn }`.                |
 | `useAuthStatus()`                | Check if user is authenticated and if session is valid. Lightweight wrapper over AuthContext for simple auth checks.               |
 | `usePremiumFeature(featureKey?)` | Check if current user has access to premium features. Returns `{ isPremium, isAvailable, loading }` with feature entitlement info. |
 

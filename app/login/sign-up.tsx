@@ -1,22 +1,29 @@
 import {
-  AuthActionGroup, AuthBackButtonContainer,
-  AuthBodyFooter,
-  AuthButton, AuthButtonBack,
-  AuthButtonSecondary, AuthCaption, AuthError, AuthForm,
-  AuthModal,
-  AuthRoot, AuthSubTitle, AuthTitle,
-  FormAuthInput
-} from '@/components/auth_components';
-import { AppToast } from '@/components/ui';
-import { useSignUpForm } from '@/lib';
-import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { TextInput } from 'react-native';
+    AuthActionGroup,
+    AuthBackButtonContainer,
+    AuthBodyFooter,
+    AuthButton,
+    AuthButtonBack,
+    AuthButtonSecondary,
+    AuthCaption,
+    AuthError,
+    AuthForm,
+    AuthModal,
+    AuthRoot,
+    AuthSubTitle,
+    AuthTitle,
+    FormAuthInput,
+} from "@/components/auth_components";
+import { AppToast } from "@/components/ui";
+import { useSignUpForm } from "@/lib";
+import { useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import { TextInput } from "react-native";
 
 export default function SignUpScreen() {
   const router = useRouter();
   const [showValidationToast, setShowValidationToast] = useState(false);
-  
+
   // Refs for keyboard navigation
   const passwordInputRef = useRef<TextInput>(null);
   const confirmPasswordInputRef = useRef<TextInput>(null);
@@ -50,7 +57,7 @@ export default function SignUpScreen() {
       <AuthBackButtonContainer>
         <AuthButtonBack
           text="← Back"
-          onPress={() => router.replace('/')}
+          onPress={() => router.replace("/")}
           disabled={loading}
         />
       </AuthBackButtonContainer>
@@ -103,18 +110,6 @@ export default function SignUpScreen() {
           onSubmitEditing={handleSignUp}
         />
 
-        {/* Password Match Indicator */}
-        {confirmPassword.length > 0 && (
-          <AuthSubTitle
-            color={passwordsMatch ? '#A3D4A0' : '#F5A5A5'}
-            align="left"
-            fontSize={11}
-            style={{ lineHeight: 16, opacity: 0.9, marginBottom: 6, marginTop: -14 }}
-          >
-            {getPasswordMatchText()}
-          </AuthSubTitle>
-        )}
-
         {/* Authentication Error Display */}
         <AuthError error={authError} />
       </AuthForm>
@@ -130,14 +125,15 @@ export default function SignUpScreen() {
 
         <AuthButtonSecondary
           text="Already have an account? Sign In"
-          onPress={() => router.push('/login/sign-in')}
+          onPress={() => router.push("/login/sign-in")}
           disabled={loading}
         />
       </AuthActionGroup>
 
       {/* Info / Footer */}
       <AuthBodyFooter>
-        After confirming your email, you’ll choose a username to complete your account setup.
+        After confirming your email, you’ll choose a username to complete your
+        account setup.
       </AuthBodyFooter>
 
       <AuthCaption>
@@ -152,17 +148,17 @@ export default function SignUpScreen() {
         message={`An account with ${email} already exists. Would you like to sign in instead?`}
         buttons={[
           {
-            text: 'Cancel',
+            text: "Cancel",
             onPress: () => setShowEmailExistsModal(false),
-            variant: 'cancel',
+            variant: "cancel",
           },
           {
-            text: 'Sign In',
+            text: "Sign In",
             onPress: () => {
-              setShowEmailExistsModal(false)
-              router.push('/login/sign-in')
+              setShowEmailExistsModal(false);
+              router.push("/login/sign-in");
             },
-            variant: 'primary',
+            variant: "primary",
           },
         ]}
       />
@@ -175,5 +171,5 @@ export default function SignUpScreen() {
         onHide={() => setShowValidationToast(false)}
       />
     </AuthRoot>
-  )
+  );
 }

@@ -1,0 +1,421 @@
+-- ============================================================
+-- 002: WORLDS SCHEMA
+-- Tables: worlds, world_access
+-- Also: helper functions, invite_links FK + policies, triggers
+-- ============================================================
+-- EXECUTION ORDER: Run AFTER 001_public_schema.sql
+-- PREREQUISITES: public.users table must exist
+-- AFTER THIS: Run 003_feature_flags_schema.sql
+-- ============================================================
+-- IMPORTANT: After running this file, add 'worlds' to:
+--   Supabase Dashboard → Settings → API → Exposed Schemas
+-- ============================================================
+
+BEGIN;
+
+-- ========================
+-- SCHEMA
+-- ========================
+-- NOTE: For development convenience this migration places these objects in the
+-- `public` schema instead of the original `worlds` schema. If you later want to
+-- restore a separate schema, revert these edits and re-add the `CREATE SCHEMA`
+-- / GRANT blocks. Using `public` keeps client REST endpoints stable for dev.
+-- (No explicit schema creation necessary for `public`.)
+-- Ensure default privileges apply to public (adjust if your environment differs)
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
+
+-- ========================
+-- ENUMS
+-- ========================
+
+-- World access roles with strict hierarchy and permissions.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'world_access_role') THEN
+    CREATE TYPE public.world_access_role AS ENUM (
+      'dm',         -- Owner: full authority, can delete/modify worlds, see everything
+      'gm',         -- Co-owner: same dm visibility, cannot delete worlds, can see full player data (future boolean)
+      'player',     -- Limited visibility, can edit own character data, cannot see dm-only content
+      'spectator',  -- Read-only with dm view (for sharing modules/campaigns to other dms)
+      'observer'    -- Read-only with player view (for sharing character stuff without dm content)
+    );
+  END IF;
+END$$;
+
+-- ========================
+-- TABLES
+-- ========================
+
+-- WORLDS: Represents a D&D campaign world.
+-- Each world has exactly one owner (the creating DM).
+-- Additional members are managed via worlds.world_access.
+CREATE TABLE public.worlds (
+  world_id      uuid        NOT NULL DEFAULT gen_random_uuid(),
+  owner_id      uuid        NOT NULL,
+  name          text        NOT NULL DEFAULT 'World',
+  description   text        NULL     DEFAULT '',
+  system        text        NULL     DEFAULT 'D&D 5e',
+  is_dm         boolean     NOT NULL DEFAULT true,       -- Future multi-DM support
+  map_image_url text        NULL,
+  settings      jsonb       NOT NULL DEFAULT '{}',       -- Extensible: homebrew rules, preferences
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  deleted_at    timestamptz NULL,                        -- Soft delete
+
+  CONSTRAINT worlds_pkey PRIMARY KEY (world_id),
+  CONSTRAINT worlds_owner_id_fkey FOREIGN KEY (owner_id)
+    REFERENCES public.users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT ck_world_name_not_empty CHECK (length(trim(name)) > 0)
+);
+
+-- Ensure owner_id FK exists and is idempotent for re-runs of this migration.
+-- Use DROP CONSTRAINT IF EXISTS then ADD to guarantee presence without error.
+ALTER TABLE public.worlds
+  DROP CONSTRAINT IF EXISTS worlds_owner_id_fkey;
+
+ALTER TABLE public.worlds
+  ADD CONSTRAINT worlds_owner_id_fkey FOREIGN KEY (owner_id)
+    REFERENCES public.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+-- WORLD_ACCESS: RBAC join table granting users access to worlds with roles.
+-- One row per (world, user) pair. Owner also gets a row with role 'dm'.
+CREATE TABLE public.world_access (
+  id          uuid                  NOT NULL DEFAULT gen_random_uuid(),
+  world_id    uuid                  NOT NULL,
+  user_id     uuid                  NOT NULL,
+  user_role   public.world_access_role NOT NULL DEFAULT 'player',
+  permissions jsonb                 NULL,                        -- Future: per-user capability overrides
+  created_at  timestamptz           NOT NULL DEFAULT now(),
+  updated_at  timestamptz           NOT NULL DEFAULT now(),
+
+  CONSTRAINT world_access_pkey PRIMARY KEY (id),
+  CONSTRAINT world_access_user_id_fkey FOREIGN KEY (user_id)
+    REFERENCES public.users(id) ON DELETE CASCADE,
+  CONSTRAINT world_access_world_id_fkey FOREIGN KEY (world_id)
+    REFERENCES public.worlds(world_id) ON DELETE CASCADE
+);
+
+-- Unique constraint: one membership per user per world (also acts as fast lookup index)
+CREATE UNIQUE INDEX idx_world_access_world_user
+  ON public.world_access USING btree (world_id, user_id);
+
+-- ========================
+-- CROSS-SCHEMA FK: invite_links → worlds
+-- ========================
+
+-- This FK could not be added in 001 because worlds.worlds didn't exist yet.
+ALTER TABLE public.invite_links
+  ADD CONSTRAINT invite_links_world_id_fkey
+  FOREIGN KEY (world_id) REFERENCES public.worlds(world_id) ON DELETE CASCADE;
+
+-- Fix consistency: invite_links.created_at should be NOT NULL (enforces audit trail)
+-- Update any existing NULL values to now() first to avoid constraint violation
+UPDATE public.invite_links SET created_at = now() WHERE created_at IS NULL;
+ALTER TABLE public.invite_links
+  ALTER COLUMN created_at SET NOT NULL;
+
+-- ========================
+-- HELPER FUNCTIONS
+-- ========================
+
+-- Get the auth_id of a world's owner.
+-- Used in RLS policies for world_access management.
+CREATE OR REPLACE FUNCTION public.get_world_owner_auth_id(p_world_id uuid)
+RETURNS uuid
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT u.auth_id
+  FROM public.worlds w
+  JOIN public.users u ON u.id = w.owner_id
+  WHERE w.world_id = p_world_id
+  LIMIT 1;
+$$;
+
+-- Check if a user owns a specific world.
+CREATE OR REPLACE FUNCTION public.user_owns_world(p_user_id uuid, p_world_id uuid)
+RETURNS boolean
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS(
+    SELECT 1 FROM public.worlds
+    WHERE world_id = p_world_id
+      AND owner_id = p_user_id
+      AND deleted_at IS NULL
+  );
+$$;
+
+-- Check if a user has any access to a world (owner OR member).
+-- Both checks verify the world is not soft-deleted.
+CREATE OR REPLACE FUNCTION public.user_has_access(p_user_id uuid, p_world_id uuid)
+RETURNS boolean
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS(
+    SELECT 1 FROM public.worlds
+    WHERE world_id = p_world_id AND owner_id = p_user_id AND deleted_at IS NULL
+  )
+  OR EXISTS(
+    SELECT 1 FROM public.world_access wa
+    JOIN public.worlds w ON w.world_id = wa.world_id
+    WHERE wa.world_id = p_world_id AND wa.user_id = p_user_id AND w.deleted_at IS NULL
+  );
+$$;
+
+-- Change a user's role in a world (with validation and permission checks).
+-- Only world owner or GMs can change roles. Cannot demote self or promote above own role.
+-- Raises exception on permission denial, invalid role, or invalid state.
+CREATE OR REPLACE FUNCTION public.change_user_role(
+  p_world_id uuid,
+  p_target_user_id uuid,
+  p_new_role public.world_access_role
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_caller_id uuid := public.get_current_user_id();
+  v_caller_role public.world_access_role;
+  v_target_role public.world_access_role;
+BEGIN
+  -- Fetch caller's current role
+  SELECT user_role INTO v_caller_role
+  FROM public.world_access
+  WHERE world_id = p_world_id AND user_id = v_caller_id
+  LIMIT 1;
+
+  -- Caller must be owner or GM (DM-level permissions)
+  IF v_caller_role IS NULL OR v_caller_role NOT IN ('dm', 'gm') THEN
+    RAISE EXCEPTION 'Permission denied: only owners and GMs can change user roles';
+  END IF;
+
+  -- Cannot change roles for non-existent memberships
+  SELECT user_role INTO v_target_role
+  FROM public.world_access
+  WHERE world_id = p_world_id AND user_id = p_target_user_id
+  LIMIT 1;
+
+  IF v_target_role IS NULL THEN
+    RAISE EXCEPTION 'Target user is not a member of this world';
+  END IF;
+
+  -- Cannot demote self
+  IF p_target_user_id = v_caller_id THEN
+    RAISE EXCEPTION 'Cannot change your own role';
+  END IF;
+
+  -- Non-owner GMs cannot promote others above GM or change other GMs
+  IF v_caller_role = 'gm' AND (p_new_role IN ('dm', 'gm') OR v_target_role = 'gm') THEN
+    RAISE EXCEPTION 'GMs can only change player/spectator/observer roles';
+  END IF;
+
+  -- Perform role change
+  UPDATE public.world_access
+  SET user_role = p_new_role
+  WHERE world_id = p_world_id AND user_id = p_target_user_id;
+
+END;
+$$;
+
+-- ========================
+-- INDEXES
+-- ========================
+
+-- Fast lookup: all worlds owned by a user
+CREATE INDEX idx_worlds_owner_id
+  ON public.worlds USING btree (owner_id);
+
+-- Sort worlds by creation date (newest first)
+CREATE INDEX idx_worlds_created_at
+  ON public.worlds USING btree (created_at DESC);
+
+-- Fast lookup: all worlds a user belongs to
+CREATE INDEX idx_world_access_user_id
+  ON public.world_access USING btree (user_id);
+
+-- Fast lookup: all members in a world
+CREATE INDEX idx_world_access_world_id
+  ON public.world_access USING btree (world_id);
+
+-- Optimizes "recent worlds for user" queries (sorted newest-first)
+CREATE INDEX idx_world_access_user_created
+  ON public.world_access USING btree (user_id, created_at DESC);
+
+-- Partial indexes: optimize queries filtering by soft-delete status
+-- Speeds up "list active worlds" and "list active memberships" queries
+CREATE INDEX idx_worlds_not_deleted
+  ON public.worlds (created_at DESC) WHERE deleted_at IS NULL;
+
+-- ========================
+-- TRIGGERS
+-- ========================
+
+-- Auto-update updated_at on worlds
+CREATE TRIGGER trg_worlds_updated_at
+  BEFORE UPDATE ON public.worlds
+  FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
+
+-- Auto-update updated_at on world_access
+CREATE TRIGGER trg_world_access_updated_at
+  BEFORE UPDATE ON public.world_access
+  FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
+
+-- Prevent changing owner_id via UPDATE.
+-- Ownership transfer should be done via a dedicated function (future).
+CREATE OR REPLACE FUNCTION public.prevent_owner_change()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF OLD.owner_id IS DISTINCT FROM NEW.owner_id THEN
+    RAISE EXCEPTION 'Cannot change world owner via UPDATE. Use ownership transfer function.';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_prevent_owner_change
+  BEFORE UPDATE ON public.worlds
+  FOR EACH ROW EXECUTE FUNCTION public.prevent_owner_change();
+
+-- Auto-create owner membership in world_access when world is created.
+-- Ensures owner always has a row in world_access with role 'dm'.
+CREATE OR REPLACE FUNCTION public.create_owner_access()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  INSERT INTO public.world_access (world_id, user_id, user_role)
+  VALUES (NEW.world_id, NEW.owner_id, 'dm'::public.world_access_role)
+  ON CONFLICT (world_id, user_id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_create_owner_access
+  AFTER INSERT ON public.worlds
+  FOR EACH ROW EXECUTE FUNCTION public.create_owner_access();
+
+-- ========================
+-- ROW LEVEL SECURITY
+-- ========================
+
+ALTER TABLE public.worlds ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.world_access ENABLE ROW LEVEL SECURITY;
+-- Simplified RLS policies to avoid recursion between `worlds` and `world_access`.
+-- Pattern: `worlds` may consult `world_access` for membership checks, but
+-- `world_access` policies must not consult `worlds` (avoids circular RLS evaluation).
+
+-- Make `world_access` readable by the member themself only; deny client-side writes.
+DROP POLICY IF EXISTS allow_self ON public.world_access;
+CREATE POLICY allow_self ON public.world_access
+  FOR SELECT
+  TO authenticated
+  USING (user_id = public.get_current_user_id());
+
+-- NOTE: INSERT policy removed - use server-side functions to manage world_access
+-- Client INSERT/UPDATE/DELETE are blocked by RLS logic, not explicit policies
+
+DROP POLICY IF EXISTS deny_updates ON public.world_access;
+CREATE POLICY deny_updates ON public.world_access
+  FOR UPDATE
+  TO authenticated
+  USING (false)
+  WITH CHECK (false);
+
+DROP POLICY IF EXISTS deny_deletes ON public.world_access;
+CREATE POLICY deny_deletes ON public.world_access
+  FOR DELETE
+  TO authenticated
+  USING (false);
+
+-- `worlds`: allow owner OR member to SELECT (membership checked via world_access)
+DROP POLICY IF EXISTS select_if_owner_or_member ON public.worlds;
+CREATE POLICY select_if_owner_or_member ON public.worlds
+  FOR SELECT
+  USING (
+    owner_id = public.get_current_user_id()
+    OR EXISTS (
+      SELECT 1 FROM public.world_access wa
+      WHERE wa.world_id = public.worlds.world_id
+        AND wa.user_id = public.get_current_user_id()
+    )
+  );
+
+-- Owner-only semantics for writes to worlds (keeps existing behavior simplified)
+DROP POLICY IF EXISTS worlds_owner_write ON public.worlds;
+CREATE POLICY worlds_owner_write ON public.worlds
+  FOR ALL
+  USING (owner_id = public.get_current_user_id())
+  WITH CHECK (owner_id = public.get_current_user_id());
+
+-- ---- INVITE_LINKS POLICIES (deferred from 001) ----
+
+-- World owners can view ALL their invite links (including expired, for management)
+DROP POLICY IF EXISTS invite_links_owner_select ON public.invite_links;
+CREATE POLICY "invite_links_owner_select" ON public.invite_links
+  FOR SELECT TO authenticated
+  USING (
+    created_by = public.get_current_user_id()
+    OR EXISTS (
+      SELECT 1 FROM public.worlds w
+      WHERE w.world_id = invite_links.world_id
+        AND w.owner_id = public.get_current_user_id()
+    )
+  );
+
+-- NOTE: INSERT policy removed - use server-side functions for invite link creation
+-- RLS prevents unauthorized access via SELECT policies on world membership
+
+-- Owners can delete invite links for their worlds
+DROP POLICY IF EXISTS invite_links_delete_owner ON public.invite_links;
+CREATE POLICY "invite_links_delete_owner" ON public.invite_links
+  FOR DELETE TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.worlds w
+      WHERE w.world_id = invite_links.world_id
+        AND w.owner_id = public.get_current_user_id()
+    )
+  );
+
+-- Admins can manage all invite links
+DROP POLICY IF EXISTS invite_links_admin_all ON public.invite_links;
+CREATE POLICY "invite_links_admin_all" ON public.invite_links
+  FOR ALL TO authenticated
+  USING (public.is_admin());
+
+-- ========================
+-- COMMENTS (Documentation)
+-- ========================
+
+COMMENT ON TABLE public.worlds IS
+  'D&D campaign worlds. Each world has exactly one owner (the DM). Soft-deleted via deleted_at.';
+
+COMMENT ON COLUMN public.worlds.owner_id IS
+  'User ID of the world owner (DM). Cannot be changed after creation.';
+
+COMMENT ON COLUMN public.worlds.deleted_at IS
+  'Soft-delete timestamp. NULL = active. Used in RLS policies to filter out deleted worlds.';
+
+COMMENT ON TABLE public.world_access IS
+  'RBAC join: users to worlds with roles (dm, gm, player, spectator, observer). One row per (world, user) pair.';
+
+COMMENT ON COLUMN public.world_access.user_role IS
+  'Role enum (public.world_access_role): dm=owner/full authority, gm=co-owner/see all, player=limited, spectator=read-only dm view, observer=read-only player view.';
+
+COMMENT ON FUNCTION public.user_has_access(uuid, uuid) IS
+  'Returns TRUE if user_id is owner of world OR has a world_access row (member). Both checks verify world not soft-deleted.';
+
+COMMENT ON FUNCTION public.create_owner_access() IS
+  'Trigger: auto-inserts owner into world_access with role=dm after world creation. Ensures owner membership row always exists.';
+
+COMMENT ON FUNCTION public.change_user_role(uuid, uuid, public.world_access_role) IS
+  'Change a users role in a world (owner/gm only). Validates permissions, prevents self-demotion, prevents promotion above caller rank. Changes are captured by audit triggers.';
+
+COMMIT;

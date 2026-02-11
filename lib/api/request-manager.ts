@@ -1,7 +1,7 @@
 import * as Sentry from "@sentry/react-native";
 import {
-  Analytics,
-  sanitizeError as sanitizeErrorForAnalytics,
+    Analytics,
+    sanitizeError as sanitizeErrorForAnalytics,
 } from "../analytics";
 import { QueryCache } from "../cache";
 import { getAppConfig } from "../config";
@@ -9,15 +9,15 @@ import { NetworkDetection } from "../network";
 import { logger } from "../utils/logger";
 import { AuthLayer, type AuthContext } from "./auth-layer";
 import {
-  CircuitBreakerManager,
-  CircuitBreakerOpenError,
-  DEFAULT_THRESHOLDS,
-  type CircuitThresholds,
+    CircuitBreakerManager,
+    CircuitBreakerOpenError,
+    DEFAULT_THRESHOLDS,
+    type CircuitThresholds,
 } from "./circuit-breaker";
 import {
-  InterceptorManager,
-  parseEndpoint,
-  type RequestInterceptor,
+    InterceptorManager,
+    parseEndpoint,
+    type RequestInterceptor,
 } from "./interceptor";
 import { OfflineQueueManager, type QueuedRequestEntry } from "./offline-queue";
 
@@ -1559,6 +1559,18 @@ class RequestManagerClass {
       if (entry.params && Object.keys(entry.params).length > 0) {
         const queryString = new URLSearchParams(entry.params).toString();
         url = `${url}?${queryString}`;
+      }
+
+      // Reject replay for non-HTTP URLs to avoid Fetch API errors
+      if (!/^https?:\/\//i.test(url) && !url.startsWith('/')) {
+        logger.warn(
+          "api",
+          "Offline replay: stored url is not HTTP(S) or absolute path, cannot replay",
+          { key: entry.key, url },
+        );
+        throw new Error(
+          `Offline replay not supported for non-HTTP URL: ${url}`,
+        );
       }
 
       // Perform the actual fetch

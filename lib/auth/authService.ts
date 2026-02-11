@@ -263,13 +263,20 @@ export const signInUser = async (
       logger.error("auth", `❌ Sign-in error:`, signInError.message);
       if (
         signInError.message.includes("Invalid login credentials") ||
-        signInError.message.includes("invalid credentials") ||
-        signInError.message.includes("Email not confirmed")
+        signInError.message.includes("invalid credentials")
       ) {
         return {
           success: false,
           error:
-            "Invalid email or password. Please check your credentials and try again.",
+            "No account found or incorrect password. Don't have an account? Sign up to get started. 🎲",
+        };
+      }
+
+      if (signInError.message.includes("Email not confirmed")) {
+        return {
+          success: false,
+          error:
+            "Please confirm your email first. Check your inbox for a verification link.",
         };
       }
 
@@ -386,7 +393,9 @@ export const signInUser = async (
     logger.error("auth", "Sign in error:", error);
     const message = (error as Error)?.message?.includes("Request timeout")
       ? "The server took too long to respond. Please try again."
-      : "An unexpected error occurred. Please try again.";
+      : (error as Error)?.message?.includes("fetch")
+        ? "Connection error. Please check your internet and try again."
+        : "Sign in failed. Please try again.";
     return { success: false, error: message };
   }
 };
