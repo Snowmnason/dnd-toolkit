@@ -32,7 +32,7 @@
  * ```
  */
 
-import { AppSettings } from "./loader";
+import type { AppSettings } from "./loader";
 
 /**
  * Current schema version. Increment when making breaking changes to AppSettings.

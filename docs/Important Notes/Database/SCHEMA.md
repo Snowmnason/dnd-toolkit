@@ -242,7 +242,7 @@ Unified immutable audit log. No foreign keys intentionally — records persist a
 
 Generic SECURITY DEFINER trigger function. Auto-detects schema, table, and PK (tries `id`, `world_id`, `user_id`, `flag_name`, `key`). Attached to all tracked tables via `AFTER INSERT OR UPDATE OR DELETE` triggers.
 
-**Tracked tables**: `public.users`, `public.user_settings`, `worlds.worlds`, `worlds.world_access`, `worlds.invite_links`, `feature_flag.feature_flags`, `feature_flag.entitlements`, `feature_flag.entitlements_overrides`, `feature_flag.feature_flag_overrides`, `feature_flag.feature_flag_rollouts`
+**Tracked tables**: `public.users`, `public.user_settings`, `worlds.worlds`, `worlds.world_access`, `worlds.invite_links`, `feature_flags.feature_flags`, `feature_flags.entitlements`, `feature_flags.entitlements_overrides`, `feature_flags.feature_flag_overrides`, `feature_flags.feature_flag_rollouts`
 
 ---
 

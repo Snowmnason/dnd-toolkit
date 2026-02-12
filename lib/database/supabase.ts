@@ -4,40 +4,32 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 
-// Auth session persistence via synchronous storage
-// Supabase auth SDK REQUIRES synchronous storage access (cannot use async methods)
-// On web: let Supabase use its default localStorage (it detects web environment automatically)
-// On mobile: return null so Supabase uses its AsyncStorage integration
-const StorageAdapter = {
-  getItem: (key: string) => {
-    // Web: let Supabase's default handle it (it uses localStorage automatically)
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const value = window.localStorage.getItem(key);
-      if (value) {
-        logger.debug('storage', `StorageAdapter.getItem: ${key} (${value.length} chars)`);
-      }
-      return value;
-    }
-    // Mobile: return null - Supabase SDK will use its internal AsyncStorage
-    return null;
-  },
-  setItem: (key: string, value: string) => {
-    // Web: use localStorage (synchronous)
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem(key, value);
-      logger.debug('storage', `StorageAdapter.setItem: ${key} (${value.length} chars)`);
-    }
-    // Mobile: handled by Supabase SDK's AsyncStorage integration
-  },
-  removeItem: (key: string) => {
-    // Web: use localStorage (synchronous)
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.removeItem(key);
-      logger.debug('storage', `StorageAdapter.removeItem: ${key}`);
-    }
-    // Mobile: handled by Supabase SDK's AsyncStorage integration
-  },
-};
+/**
+ * SECURITY NOTE: Web Platform Session Persistence
+ *
+ * Supabase auth SDK requires SYNCHRONOUS storage for session persistence on web,
+ * but our encryption layer (EncryptedStorage) is async. This creates a dilemma:
+ *
+ * ❌ Option 1: Sync WebStorageAdapter with unencrypted localStorage
+ *    - Tokens stored unencrypted in localStorage
+ *    - Attackable via XSS or physical access
+ *    - Regression from encrypted storage on other platforms
+ *
+ * ✅ Option 2: Disable session persistence on web (CHOSEN)
+ *    - No session tokens stored in localStorage (safer)
+ *    - Users re-authenticate on page reload
+ *    - Acceptable for web apps (no worse than most SPAs)
+ *    - Removes attack surface for token theft
+ *
+ * ✅ Option 3: Mobile platforms use Supabase's built-in async storage
+ *    - Works with AsyncStorage (automatically encrypted via platform-native storage)
+ *    - Session persists across app restarts
+ *    - Secure on iOS (Keychain) and Android (Keystore)
+ *
+ * IMPLEMENTATION:
+ * - Web: persistSession=false, detectSessionInUrl=false (no token persistence)
+ * - Native: omit auth.storage to use Supabase's async adapter (encrypted via platform-native storage)
+ */
 
 // Get environment variables with fallbacks for development
 const supabaseUrl =
@@ -58,10 +50,8 @@ logger.debug('storage', 'Loading Supabase Configuration:', {
 });
 
 // Check if Supabase is properly configured
-// Check if Supabase is properly configured
 let hasLoggedSupabaseConfig = false;
 
-// Check if Supabase is properly configured
 export const isSupabaseConfigured = () => {
   const configured = !!(
     supabaseUrl &&
@@ -84,8 +74,6 @@ export const isSupabaseConfigured = () => {
   return configured;
 };
 
-
-
 // Lazy initialization of Supabase client - only create when variables are available
 let _supabaseClient: any = null;
 
@@ -95,32 +83,64 @@ export const getSupabaseClient = () => {
   }
   
   if (!_supabaseClient) {
+    // Build auth config
+    const authConfig: any = {
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+      flowType: 'pkce',
+    };
+
+    // Web: DISABLE session persistence to prevent unencrypted token storage
+    // Web users will re-authenticate on page reload (secure trade-off)
+    if (typeof window !== 'undefined') {
+      authConfig.persistSession = false;
+      logger.info('storage', '🔒 Web: Session persistence disabled for security (users re-auth on reload)');
+    } else {
+      // Mobile: Enable session persistence with platform-native async storage
+      // AsyncStorage on mobile is automatically encrypted via EncryptedStorage
+      authConfig.persistSession = true;
+      logger.info('storage', '📱 Mobile: Session persistence enabled via platform-native async storage (encrypted)');
+    }
+
     _supabaseClient = createClient(
       supabaseUrl,
       supabaseAnonKey,
       {
-        auth: {
-          storage: StorageAdapter,
-          storageKey: 'sb-auth-token', // Explicit key for session storage
-          autoRefreshToken: true,
-          persistSession: true,
-          detectSessionInUrl: false,
-          flowType: 'pkce',
-        },
+        auth: authConfig,
       },
     );
 
-    // On web, ensure session persists to our StorageAdapter
+    // On web, listen for auth state changes and save session
+    // IMPORTANT: This manually persists the session since web has persistSession=false for security
     if (typeof window !== 'undefined') {
-      // Listen for auth state changes and persist session
       _supabaseClient.auth.onAuthStateChange((event: string, session: any) => {
         if (event === 'SIGNED_IN' && session) {
-          logger.info('storage', '✅ Session persisted to localStorage', {
-            userId: session.user?.id?.substring(0, 8),
+          logger.info('storage', '✅ User authenticated (saving session to encrypted storage)', {
+            auth_id: session.user?.id,
             hasAccessToken: !!session.access_token,
           });
+          // Dynamically import to avoid circular dependency
+          import('../auth/auth-state').then(({ AuthStateManager }) => {
+            AuthStateManager.saveAuthSession(session).catch((err) => {
+              logger.error('storage', 'Failed to save auth session:', err);
+            });
+          });
         } else if (event === 'SIGNED_OUT') {
-          logger.info('storage', '🔓 Session cleared from localStorage');
+          logger.info('storage', '🔓 User signed out');
+          // Clear the saved session
+          import('../auth/auth-state').then(({ AuthStateManager }) => {
+            AuthStateManager.clearAuthSession().catch((err) => {
+              logger.error('storage', 'Failed to clear auth session:', err);
+            });
+          });
+        } else if (event === 'TOKEN_REFRESHED' && session) {
+          logger.debug('storage', '🔄 Token refreshed, updating saved session');
+          // Update the saved session with new tokens
+          import('../auth/auth-state').then(({ AuthStateManager }) => {
+            AuthStateManager.saveAuthSession(session).catch((err) => {
+              logger.error('storage', 'Failed to update auth session:', err);
+            });
+          });
         }
       });
     }

@@ -19,17 +19,31 @@ BEGIN;
 
 CREATE SCHEMA IF NOT EXISTS audit;
 
-GRANT USAGE ON SCHEMA audit TO anon, authenticated, service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA audit TO anon, authenticated, service_role;
-GRANT ALL ON ALL ROUTINES IN SCHEMA audit TO anon, authenticated, service_role;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA audit TO anon, authenticated, service_role;
+-- Schema access: allow usage for authenticated users and internal service role only.
+-- Do NOT grant schema usage to anon to prevent discovery of audit objects.
+GRANT USAGE ON SCHEMA audit TO authenticated, service_role;
+
+-- Tables: grant SELECT only to authenticated and service_role. No write privileges
+-- (INSERT/UPDATE/DELETE) are granted — writes must happen via SECURITY DEFINER triggers.
+GRANT SELECT ON ALL TABLES IN SCHEMA audit TO authenticated, service_role;
+
+-- Routines (functions) should not be executable by PUBLIC. Revoke broad EXECUTE
+-- and only grant EXECUTE to the internal service role and the DB admin role for maintenance.
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA audit FROM PUBLIC;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA audit TO service_role, postgres;
+
+-- Sequences: restrict usage to service_role and postgres (no anon/authenticated).
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA audit TO service_role, postgres;
 
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA audit
-  GRANT ALL ON TABLES TO anon, authenticated, service_role;
+  GRANT SELECT ON TABLES TO authenticated, service_role;
+-- Default privileges for routines: do not grant EXECUTE to PUBLIC by default.
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA audit
-  GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
+  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA audit
-  GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+  GRANT EXECUTE ON FUNCTIONS TO service_role, postgres;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA audit
+  GRANT USAGE ON SEQUENCES TO service_role, postgres;
 
 -- ========================
 -- TABLES
@@ -58,7 +72,7 @@ COMMENT ON TABLE audit.audit_events IS
   'Admins can read all records; users can read records they initiated (initiated_by = current user).';
 
 COMMENT ON COLUMN audit.audit_events.id IS 'Unique audit event identifier.';
-COMMENT ON COLUMN audit.audit_events.table_schema IS 'Source schema: public, worlds, or feature_flag.';
+COMMENT ON COLUMN audit.audit_events.table_schema IS 'Source schema: public, worlds, or feature_flags.';
 COMMENT ON COLUMN audit.audit_events.table_name IS 'Source table name (e.g., users, entitlements, feature_flags).';
 COMMENT ON COLUMN audit.audit_events.record_id IS 'Primary key of the affected row (text to handle uuid/text columns).';
 COMMENT ON COLUMN audit.audit_events.event_type IS 'Operation type: insert, update, or delete (lowercase).';
@@ -163,6 +177,10 @@ COMMENT ON FUNCTION audit.log_change() IS
   'Called only via SECURITY DEFINER triggers; not directly executable by users. '
   'Do NOT call directly—attach to tables via CREATE TRIGGER ... EXECUTE FUNCTION audit.log_change().';
 
+-- Security: ensure the generic trigger function is not executable by PUBLIC.
+REVOKE EXECUTE ON FUNCTION audit.log_change() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION audit.log_change() TO service_role, postgres;
+
 -- ========================
 -- ATTACH AUDIT TRIGGERS TO ALL TABLES
 -- ========================
@@ -195,29 +213,29 @@ CREATE TRIGGER trg_audit_world_access
   FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
 -- Feature flags schema tables
-DROP TRIGGER IF EXISTS trg_audit_feature_flags ON feature_flag.feature_flags;
+DROP TRIGGER IF EXISTS trg_audit_feature_flags ON feature_flags.feature_flags;
 CREATE TRIGGER trg_audit_feature_flags
-  AFTER INSERT OR UPDATE OR DELETE ON feature_flag.feature_flags
+  AFTER INSERT OR UPDATE OR DELETE ON feature_flags.feature_flags
   FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
-DROP TRIGGER IF EXISTS trg_audit_entitlements ON feature_flag.entitlements;
+DROP TRIGGER IF EXISTS trg_audit_entitlements ON feature_flags.entitlements;
 CREATE TRIGGER trg_audit_entitlements
-  AFTER INSERT OR UPDATE OR DELETE ON feature_flag.entitlements
+  AFTER INSERT OR UPDATE OR DELETE ON feature_flags.entitlements
   FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
-DROP TRIGGER IF EXISTS trg_audit_entitlements_overrides ON feature_flag.entitlements_overrides;
+DROP TRIGGER IF EXISTS trg_audit_entitlements_overrides ON feature_flags.entitlements_overrides;
 CREATE TRIGGER trg_audit_entitlements_overrides
-  AFTER INSERT OR UPDATE OR DELETE ON feature_flag.entitlements_overrides
+  AFTER INSERT OR UPDATE OR DELETE ON feature_flags.entitlements_overrides
   FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
-DROP TRIGGER IF EXISTS trg_audit_feature_flag_overrides ON feature_flag.feature_flag_overrides;
+DROP TRIGGER IF EXISTS trg_audit_feature_flag_overrides ON feature_flags.feature_flag_overrides;
 CREATE TRIGGER trg_audit_feature_flag_overrides
-  AFTER INSERT OR UPDATE OR DELETE ON feature_flag.feature_flag_overrides
+  AFTER INSERT OR UPDATE OR DELETE ON feature_flags.feature_flag_overrides
   FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
-DROP TRIGGER IF EXISTS trg_audit_feature_flag_rollouts ON feature_flag.feature_flag_rollouts;
+DROP TRIGGER IF EXISTS trg_audit_feature_flag_rollouts ON feature_flags.feature_flag_rollouts;
 CREATE TRIGGER trg_audit_feature_flag_rollouts
-  AFTER INSERT OR UPDATE OR DELETE ON feature_flag.feature_flag_rollouts
+  AFTER INSERT OR UPDATE OR DELETE ON feature_flags.feature_flag_rollouts
   FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
 -- ========================

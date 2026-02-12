@@ -55,7 +55,7 @@ Return Result to UI
 
 **IMPORTANT**: This app uses a **4-schema architecture** for logical separation:
 
-1. **`public`** - User accounts, settings, invite links
+1. **`public`** - User accounts, settings
 2. **`worlds`** - Campaign worlds and access control (RBAC)
 3. **`feature_flags`** - Feature gates, entitlements, overrides, rollouts
 4. **`audit`** - Audit trail for all database changes (see [TRIGGERS.md](../../docs/Important Notes/Database/TRIGGERS.md))
@@ -125,10 +125,10 @@ CREATE TABLE worlds.world_access (
 );
 ```
 
-**public.public.invite_links** – Shareable world invitations
+**worlds.invite_links** – Shareable world invitations
 
 ```sql
-CREATE TABLE public.invite_links (
+CREATE TABLE worlds.invite_links (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   world_id uuid NOT NULL REFERENCES worlds.worlds(world_id) ON DELETE CASCADE,
   created_by uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,

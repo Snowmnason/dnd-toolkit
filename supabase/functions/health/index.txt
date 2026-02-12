@@ -15,7 +15,6 @@ const COMMON_HEADERS = {
 };
 
 Deno.serve(async (req: Request) => {
-  const url = new URL(req.url);
   const method = req.method.toUpperCase();
 
   // OPTIONS preflight

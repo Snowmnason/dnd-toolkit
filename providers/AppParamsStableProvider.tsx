@@ -1,13 +1,13 @@
 import { AuthStateManager } from "@/lib/auth/auth-state";
-import { STORAGE_KEYS, getPrivacyStorageBackend } from "@/lib/storage";
+import { getPrivacyStorageBackend, STORAGE_KEYS } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import React, {
-    createContext as createReactContext,
-    ReactNode,
-    useCallback,
-    useContext,
-    useEffect,
-    useState,
+  createContext as createReactContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
 } from "react";
 import { createContext, useContextSelector } from "use-context-selector";
 
@@ -67,74 +67,80 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
           STORAGE_KEYS.CONNECTED_WORLDS,
         );
         if (worldIds && Array.isArray(worldIds)) {
-          setStableParams((prev) => ({ ...prev, connectedWorldIds: worldIds }));
+          // EAGER VERIFICATION: Verify world access before setting UI state
+          // This prevents stale worlds from being briefly shown to the user
+          // Uses cache-first strategy for speed (fresh cache <4h = instant)
+          try {
+            logger.debug(
+              "context",
+              "AppParamsStableProvider: Starting eager verification of worlds",
+            );
 
-          // Background verification against Supabase
-          // Verify each world access with Supabase (lazy verification)
-          setTimeout(async () => {
-            try {
-              logger.debug(
-                "context",
-                "AppParamsStableProvider: Starting background world access verification",
-              );
-              const verifiedWorldIds: string[] = [];
+            // Verify all worlds in parallel (faster than serial verification)
+            const verificationResults = await Promise.allSettled(
+              worldIds.map((worldId) =>
+                AuthStateManager.verifyWorldAccessWithDatabase(worldId),
+              ),
+            );
 
-              for (const worldId of worldIds) {
-                const verification =
-                  await AuthStateManager.verifyWorldAccessWithDatabase(
-                    worldId,
-                    (reason: string) => {
-                      // Access revoked for this world
-                      logger.warn(
-                        "context",
-                        `World ${worldId} access revoked:`,
-                        reason,
-                      );
-                      // Could show a toast here if needed
-                    },
-                  );
+            const verifiedWorldIds: string[] = [];
+            for (let i = 0; i < verificationResults.length; i++) {
+              const result = verificationResults[i];
+              const worldId = worldIds[i];
 
-                if (verification.hasAccess) {
-                  verifiedWorldIds.push(worldId);
-                }
-              }
-
-              // Update context with verified list if changed
               if (
-                JSON.stringify(verifiedWorldIds) !== JSON.stringify(worldIds)
+                result.status === "fulfilled" &&
+                result.value.hasAccess
               ) {
-                logger.info(
+                verifiedWorldIds.push(worldId);
+              } else if (result.status === "rejected") {
+                logger.warn(
                   "context",
-                  "AppParamsStableProvider: World access list updated from Supabase",
-                  {
-                    cached: worldIds.length,
-                    verified: verifiedWorldIds.length,
-                  },
+                  `World ${worldId} verification failed:`,
+                  result.reason,
                 );
-
-                // Persist verified list to storage
-                const verifyBackend = getPrivacyStorageBackend(
-                  STORAGE_KEYS.CONNECTED_WORLDS,
-                );
-                await verifyBackend.setJSON(
-                  STORAGE_KEYS.CONNECTED_WORLDS,
-                  verifiedWorldIds,
-                );
-
-                setStableParams((prev) => ({
-                  ...prev,
-                  connectedWorldIds: verifiedWorldIds,
-                }));
               }
-            } catch (error) {
-              logger.error(
-                "context",
-                "AppParamsStableProvider: Background verification failed:",
-                error,
-              );
-              // Keep cached values on error
             }
-          }, 500); // Delay to not block initial render
+
+            logger.info(
+              "context",
+              "AppParamsStableProvider: Verification complete",
+              {
+                cached: worldIds.length,
+                verified: verifiedWorldIds.length,
+              },
+            );
+
+            // Set state with verified-only worlds
+            setStableParams((prev) => ({
+              ...prev,
+              connectedWorldIds: verifiedWorldIds,
+            }));
+
+            // Update storage if list changed (user lost access to some worlds)
+            if (
+              JSON.stringify(verifiedWorldIds) !== JSON.stringify(worldIds)
+            ) {
+              const verifyBackend = getPrivacyStorageBackend(
+                STORAGE_KEYS.CONNECTED_WORLDS,
+              );
+              await verifyBackend.setJSON(
+                STORAGE_KEYS.CONNECTED_WORLDS,
+                verifiedWorldIds,
+              );
+            }
+          } catch (verificationError) {
+            logger.warn(
+              "context",
+              "AppParamsStableProvider: Verification error, using cached list",
+              verificationError,
+            );
+            // On verification error, use cached list but alert user
+            setStableParams((prev) => ({
+              ...prev,
+              connectedWorldIds: worldIds,
+            }));
+          }
         }
       } catch (error) {
         logger.error(

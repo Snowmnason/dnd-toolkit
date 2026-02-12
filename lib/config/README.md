@@ -73,7 +73,7 @@ AppSettings uses simple integer versioning to safely evolve schema over time wit
 ```
 appsettings.json { version: 1 }
                 ↓
-getAppConfig() → Detect version (default 1 if missing)
+getAppConfig() → Detect version (throws if missing or invalid)
                 ↓
 migrateConfig(config, detectedVersion) → Apply migration chain v1→v2→v3...
                 ↓
@@ -86,7 +86,7 @@ Cache & return
 
 - **Current Version**: 1 (first versioned release)
 - **Numbering**: Simple integers (1, 2, 3, ...); no semantic versioning
-- **Backward Compatibility**: Missing `version` field defaults to 1
+- **Backward Compatibility**: Missing or invalid `version` now causes the loader to throw; do not rely on an implicit default
 - **Forward Compatibility**: Config at v2+ works with app expecting v1 (no migration if already at/above target)
 - **Rollback**: Keep all old migrations indefinitely (don't delete; supports rollback scenarios)
 

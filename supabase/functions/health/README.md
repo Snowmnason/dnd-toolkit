@@ -1,5 +1,5 @@
 # health Edge Function
-at https://xxoibawslmysvfllozyb.supabase.co/functions/v1/health
+at https://<project>.supabase.co/functions/v1/health
 
 Simple public health-check endpoint for monitoring network connectivity to Supabase.
 

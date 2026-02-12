@@ -1,12 +1,13 @@
 import { RequestManager } from "../api/request-manager";
 import { QueryCache } from "../cache";
 import { CACHE_TAGS } from "../cache/keys";
+import { SecureStorage, STORAGE_KEYS } from "../storage";
 import { worldAccessCache } from "../storage/world-access-cache";
 import { logger } from "../utils/logger";
 import {
-    executeParallelQueries,
-    getCurrentUserProfile,
-    validateUserForWrite,
+  executeParallelQueries,
+  getCurrentUserProfile,
+  validateUserForWrite,
 } from "./common";
 import { supabase } from "./supabase";
 
@@ -148,8 +149,8 @@ export const worldsDB = {
     // OPTIMIZATION: Try to get world IDs from cache first
     // This avoids re-fetching the same world access data for every page
     const cacheKey = `worlds:ids:${currentUserId}`;
-    let worldIdSet: Set<string>;
-    let roleMap: Map<string, { role: UserRole; permissions: any }>;
+    let worldIdSet: Set<string> = new Set<string>();
+    let roleMap: Map<string, { role: UserRole; permissions: any }> = new Map();
 
     const cachedData = await QueryCache.get<{
       worldIds: string[];
@@ -168,91 +169,146 @@ export const worldsDB = {
         },
       );
     } else {
-      // STEP 1: Get world IDs from both world_access and owned worlds in parallel
-      const [accessRecordsResult, ownedWorldIdsResult] =
-        await executeParallelQueries<
-          [
-            { data: any[] | null; error: any },
-            { data: any[] | null; error: any },
-          ]
-        >(
-          // Get world_access records where user_id matches (includes world_id and role)
-          supabase
-            .schema('worlds')
-            .from("world_access")
-            .select("world_id, user_role, permissions")
-            .eq("user_id", currentUserId),
-
-          // Get world IDs where owner_id matches
-          supabase
-            .schema('worlds')
-            .from('worlds')
-            .select("world_id")
-            .eq("owner_id", currentUserId),
+      // Try a persistent fallback: use encrypted connected_worlds stored in localStorage
+      // This improves initial app startup UX when sessionStorage is empty
+      let seededFromPersist = false;
+      try {
+        const persisted = await SecureStorage.getJSON<string[]>(
+          STORAGE_KEYS.CONNECTED_WORLDS,
         );
+        if (persisted && Array.isArray(persisted) && persisted.length > 0) {
+          worldIdSet = new Set(persisted);
+          roleMap = new Map();
 
-      if (accessRecordsResult.error) {
-        logger.error(
+          // Seed QueryCache so other callers see the same cached shape
+          await QueryCache.set(
+            cacheKey,
+            { worldIds: Array.from(worldIdSet), roles: Array.from(roleMap.entries()) },
+            {
+              staleTime: 5 * 60 * 1000,
+              cacheTime: 15 * 60 * 1000,
+              tags: ["worlds", `user:${currentUserId}`],
+            },
+          );
+
+          logger.debug(
+            "storage",
+            `Using persisted connected_worlds for user ${currentUserId}`,
+            { count: worldIdSet.size },
+          );
+
+          seededFromPersist = true;
+        }
+      } catch (err) {
+        logger.debug(
           "storage",
-          "Error fetching access records:",
-          accessRecordsResult.error,
-        );
-        throw new Error(
-          accessRecordsResult.error.message || "Failed to fetch access records",
+          "Error reading persisted connected_worlds (non-fatal)",
+          err,
         );
       }
 
-      if (ownedWorldIdsResult.error) {
-        logger.error(
-          "storage",
-          "Error fetching owned world IDs:",
-          ownedWorldIdsResult.error,
+      // If not seeded from persisted storage, fetch from DB as before
+      if (!seededFromPersist) {
+        // STEP 1: Get world IDs from both world_access and owned worlds in parallel
+        const [accessRecordsResult, ownedWorldIdsResult] =
+          await executeParallelQueries<
+            [
+              { data: any[] | null; error: any },
+              { data: any[] | null; error: any },
+            ]
+          >(
+            // Get world_access records where user_id matches (includes world_id and role)
+            supabase
+              .schema('worlds')
+              .from("world_access")
+              .select("world_id, user_role, permissions")
+              .eq("user_id", currentUserId),
+
+            // Get world IDs where owner_id matches
+            supabase
+              .schema('worlds')
+              .from("worlds")
+              .select("world_id")
+              .eq("owner_id", currentUserId)
+          );
+
+        if (accessRecordsResult.error) {
+          logger.error(
+            "storage",
+            "Error fetching access records:",
+            accessRecordsResult.error,
+          );
+          throw new Error(
+            accessRecordsResult.error.message || "Failed to fetch access records",
+          );
+        }
+
+        if (ownedWorldIdsResult.error) {
+          logger.error(
+            "storage",
+            "Error fetching owned world IDs:",
+            ownedWorldIdsResult.error,
+          );
+          throw new Error(
+            ownedWorldIdsResult.error.message ||
+              "Failed to fetch owned world IDs",
+          );
+        }
+
+        // STEP 2: Collect all unique world IDs and build role mapping
+        worldIdSet = new Set<string>();
+        roleMap = new Map<string, { role: UserRole; permissions: any }>();
+
+        // Add world IDs from world_access (user is a member/dm)
+        (accessRecordsResult.data || []).forEach((access: any) => {
+          worldIdSet.add(access.world_id);
+          roleMap.set(access.world_id, {
+            role: access.user_role,
+            permissions: access.permissions || {},
+          });
+        });
+
+        // Add world IDs from owned worlds (user is owner) - owner takes precedence
+        (ownedWorldIdsResult.data || []).forEach((world: any) => {
+          worldIdSet.add(world.world_id);
+          roleMap.set(world.world_id, {
+            role: "owner",
+            permissions: {},
+          });
+        });
+
+        // Cache the world IDs and roles (short TTL since membership can change)
+        await QueryCache.set(
+          cacheKey,
+          {
+            worldIds: Array.from(worldIdSet),
+            roles: Array.from(roleMap.entries()),
+          },
+          {
+            staleTime: 5 * 60 * 1000, // 5 minutes
+            cacheTime: 15 * 60 * 1000, // 15 minutes
+            tags: ["worlds", `user:${currentUserId}`],
+          }
         );
-        throw new Error(
-          ownedWorldIdsResult.error.message ||
-            "Failed to fetch owned world IDs",
+
+        // IMPORTANT: Update persistent storage with fresh world IDs from DB
+        // This ensures that on next session/tab refresh, we load the latest accurate list
+        // instead of stale data from before the last logout
+        const freshWorldIds = Array.from(worldIdSet);
+        await SecureStorage.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, freshWorldIds).catch(
+          (err) => {
+            logger.warn(
+              "storage",
+              "Failed to update connected_worlds after DB fetch (non-critical)",
+              err,
+            );
+          }
         );
+
+        logger.debug("storage", `Cached world IDs for user ${currentUserId}`, {
+          count: worldIdSet.size,
+        });
       }
-
-      // STEP 2: Collect all unique world IDs and build role mapping
-      worldIdSet = new Set<string>();
-      roleMap = new Map<string, { role: UserRole; permissions: any }>();
-
-      // Add world IDs from world_access (user is a member/dm)
-      (accessRecordsResult.data || []).forEach((access: any) => {
-        worldIdSet.add(access.world_id);
-        roleMap.set(access.world_id, {
-          role: access.user_role,
-          permissions: access.permissions || {},
-        });
-      });
-
-      // Add world IDs from owned worlds (user is owner) - owner takes precedence
-      (ownedWorldIdsResult.data || []).forEach((world: any) => {
-        worldIdSet.add(world.world_id);
-        roleMap.set(world.world_id, {
-          role: "owner",
-          permissions: {},
-        });
-      });
-
-      // Cache the world IDs and roles (short TTL since membership can change)
-      await QueryCache.set(
-        cacheKey,
-        {
-          worldIds: Array.from(worldIdSet),
-          roles: Array.from(roleMap.entries()),
-        },
-        {
-          staleTime: 5 * 60 * 1000, // 5 minutes
-          cacheTime: 15 * 60 * 1000, // 15 minutes
-          tags: ["worlds", `user:${currentUserId}`],
-        },
-      );
-
-      logger.debug("storage", `Cached world IDs for user ${currentUserId}`, {
-        count: worldIdSet.size,
-      });
     }
 
     const totalWorlds = worldIdSet.size;

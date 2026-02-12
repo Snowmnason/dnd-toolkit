@@ -1,7 +1,7 @@
 /**
  * Feature Flags - Types Only
  *
- * **Schema**: feature_flag.feature_flags (NOT public.feature_flags)
+ * **Schema**: feature_flags.feature_flags (NOT public.feature_flags)
  *
  * @deprecated Phase 1b: Query functions are no longer used.
  * Feature flags are now fetched via the Edge Function `get_feature_flags`
@@ -14,7 +14,7 @@
  * See: lib/feature-flags/server-sync.ts (FeatureFlagsManager.bootstrapFlags)
  * See: supabase/functions/get_feature_flags/
  *
- * **Schema**: feature_flag.feature_flags
+* **Schema**: feature_flags.feature_flags
  * - flag_name: text (PK) - unique identifier for the flag
  * - enabled: boolean - whether the flag is enabled
  * - kind: text - category/type of the flag (for grouping or special handling)
@@ -42,7 +42,7 @@ export async function fetchFeatureFlags(
   supabase: SupabaseClient,
 ): Promise<FeatureFlagRow[]> {
   const { data, error } = await supabase
-    .schema('feature_flag')
+    .schema('feature_flags')
     .from('feature_flags')
     .select("flag_name, enabled, kind, description, created_at, updated_at");
 

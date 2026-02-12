@@ -14,9 +14,9 @@
  * This is integrated into the kernel initialization as a critical validation step.
  */
 
-import Constants from "expo-constants";
 import { logger } from "@/lib/utils/logger";
-import { AppSettings } from "./loader";
+import Constants from "expo-constants";
+import type { AppSettings } from "./loader";
 
 /**
  * Result of config validation

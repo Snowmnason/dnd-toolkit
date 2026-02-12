@@ -455,6 +455,13 @@ class AppKernelClass {
         const authPhaseStart = performance.now();
         try {
           const { AuthStateManager } = await import("@/lib/auth/auth-state");
+          
+          // CRITICAL: Restore the auth session first (web platform support)
+          // On web, session persistence is disabled for security, so we manually restore it
+          // This must happen BEFORE checking auth state or any authenticated requests
+          logger.category("bootstrap").debug("Restoring auth session from storage...");
+          await AuthStateManager.restoreAuthSession();
+          
           await AuthStateManager.getAuthState();
           logger.category("bootstrap").debug("Auth state loaded");
 

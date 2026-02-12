@@ -2,16 +2,16 @@ import type { AuthResponse, AuthTokenResponse } from "@supabase/supabase-js";
 
 import { RequestManager } from "../api/request-manager";
 import {
-  getSupabaseClientLazy,
-  isSupabaseConfiguredLazy,
+    getSupabaseClientLazy,
+    isSupabaseConfiguredLazy,
 } from "../database/supabase-lazy";
 import { usersDB } from "../database/users";
 import { SecureStorage, STORAGE_KEYS } from "../storage";
 import { logger } from "../utils/logger";
 import {
-  checkAuthGuard,
-  recordAuthFailure,
-  recordAuthSuccess,
+    checkAuthGuard,
+    recordAuthFailure,
+    recordAuthSuccess,
 } from "./auth-attempt-guard";
 import { isExistingUser, validateEmail, validatePassword } from "./validation";
 
@@ -295,6 +295,24 @@ export const signInUser = async (
 
       // Set local auth state so route guards work immediately
       const { AuthStateManager } = await import("./auth-state");
+      
+      // CRITICAL: Save the session tokens to encrypted storage (web platform)
+      // This must happen BEFORE setHasAccount to ensure tokens are persisted
+      logger.debug("auth", "🔐 signInData structure:", {
+        hasUser: !!signInData.user,
+        hasSession: !!signInData.session,
+        sessionKeys: signInData.session ? Object.keys(signInData.session) : [],
+        hasAccessToken: !!signInData.session?.access_token,
+        hasRefreshToken: !!signInData.session?.refresh_token,
+      });
+
+      if (signInData.session) {
+        logger.debug("auth", "💾 Persisting auth session tokens to storage...");
+        await AuthStateManager.setSession(signInData.session);
+      } else {
+        logger.warn("auth", "⚠️ No session data in sign-in response (signInData.session is null/undefined)");
+      }
+      
       await AuthStateManager.setHasAccount(true);
 
       // Record successful login timestamp (for welcome screen skip - valid for 7 days)

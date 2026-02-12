@@ -42,7 +42,7 @@ export async function fetchEntitlementsByUserId(
   userId: string,
 ): Promise<EntitlementRow[]> {
   const { data, error } = await supabase
-      .schema('feature_flag')
+      .schema('feature_flags')
     .from('entitlements')
     .select(
       "id, user_id, key, is_active, remind_user, created_at, updated_at, expires_at",
@@ -75,7 +75,7 @@ export async function hasEntitlement(
   entitlementKey: string,
 ): Promise<boolean> {
   const { data, error } = await supabase
-    .schema('feature_flag')
+    .schema('feature_flags')
     .from('entitlements')
     .select("is_active, expires_at")
     .eq("user_id", userId)
@@ -133,7 +133,7 @@ export async function fetchEntitlementOverridesByUserId(
   const now = new Date().toISOString();
 
   const { data, error } = await supabase
-    .schema('feature_flag')
+    .schema('feature_flags')
     .from('entitlements_overrides')
     .select(
       "id, user_id, entitlement_key, is_active, expires_at, reason, created_by, created_at, updated_at, revoked",

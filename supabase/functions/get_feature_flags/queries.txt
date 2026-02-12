@@ -23,7 +23,7 @@ export async function fetchFeatureFlags(
   supabase: SupabaseClient,
 ): Promise<FeatureFlagRow[]> {
   const { data, error } = await supabase
-    .schema('feature_flag')
+    .schema('feature_flags')
     .from('feature_flags')
     .select("flag_name, enabled, kind, description, created_at, updated_at");
 
@@ -58,7 +58,7 @@ export async function fetchEntitlementsByUserId(
   const now = new Date().toISOString();
 
   const { data, error } = await supabase
-    .schema('feature_flag')
+    .schema('feature_flags')
     .from('entitlements')
     .select(
       "id, user_id, key, is_active, remind_user, created_at, updated_at, expires_at",
@@ -100,7 +100,7 @@ export async function fetchOverridesByUserId(
   const now = new Date().toISOString();
 
   const { data, error } = await supabase
-    .schema('feature_flag')
+    .schema('feature_flags')
     .from('feature_flag_overrides')
     .select(
       "id, user_id, flag_name, enabled, expires_at, revoked, reason, created_by, created_at, updated_at",
@@ -147,7 +147,7 @@ export async function fetchEntitlementOverridesByUserId(
   const now = new Date().toISOString();
 
   const { data, error } = await supabase
-    .schema('feature_flag')
+    .schema('feature_flags')
     .from('entitlements_overrides')
     .select(
       "id, user_id, entitlement_key, is_active, expires_at, revoked, reason, created_by, created_at, updated_at",
@@ -198,7 +198,7 @@ export async function fetchRolloutConfigs(
   supabase: SupabaseClient,
 ): Promise<Record<string, { percentage: number; seed?: string }>> {
   const { data, error } = await supabase
-    .schema('feature_flag')
+    .schema('feature_flags')
     .from('feature_flag_rollouts')
     .select("flag_name, percentage, seed")
     .eq("is_active", true);
