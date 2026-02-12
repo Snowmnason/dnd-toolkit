@@ -444,7 +444,19 @@ class NetworkDetectionClass {
       // Consider online if we got ANY response (including auth errors like 401/403)
       // Auth errors indicate network is working, just auth failed
       // Only offline on network errors (>= 500 or connection refused, etc)
-      const isNowOnline = response.ok || response.status < 500;
+      let isNowOnline = response.ok || response.status < 500;
+
+      // If the health endpoint responds with 401, the function may require JWT
+      // at the project level. Treat 401 as "online" to avoid noisy auth errors
+      // in the console and keep connectivity semantics intact.
+      if (response.status === 401) {
+        logger
+          .category("network")
+          .debug(
+            `Health endpoint returned 401 - treating as online (project requires auth). (${latency}ms)`,
+          );
+        isNowOnline = true;
+      }
 
       if (wasOnline !== isNowOnline) {
         logger

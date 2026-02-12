@@ -1,7 +1,7 @@
 /**
  * Feature Flag Overrides - Types Only
  *
- * **Schema**: feature_flags.feature_flag_overrides (NOT feature_flags.entitlements_overrides)
+ * **Schema**: feature_flag.feature_flag_overrides (NOT feature_flag.entitlements_overrides)
  * **Note**: This table only handles FLAG overrides. Entitlement overrides use a separate table.
  *
  * @deprecated Phase 1b: Query functions are no longer used.
@@ -15,7 +15,7 @@
  * See: lib/feature-flags/server-sync.ts (FeatureFlagsManager.bootstrapFlags)
  * See: supabase/functions/get_feature_flags/
  *
- * **Schema**: feature_flags.feature_flag_overrides
+ * **Schema**: feature_flag.feature_flag_overrides
  * - id: uuid (PK)
  * - user_id: uuid (FK to users)
  * - flag_name: text (feature flag being overridden, FK to feature_flags)
@@ -56,40 +56,3 @@ export interface FeatureFlagOverrideRow {
   created_at: string;
   updated_at: string;
 }
-
-/**
- * @deprecated
- * Fetch all active overrides for a given user
- *
- * Filters for non-revoked overrides that have not expired.
- * Filtering happens server-side to minimize data transfer.
- *
- * @param supabase - Supabase client
- * @param userId - User ID (UUID) to fetch overrides for
- * @returns List of active user overrides
-
-export async function fetchOverridesByUserId(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<FeatureFlagOverrideRow[]> {
-  const now = new Date().toISOString();
-
-  const { data, error } = await supabase
-    .schema('public')
-    .from('feature_flag_overrides')
-    .select(
-      "id, user_id, target_type, target_name, enabled, expires_at, revoked, reason, created_by, created_at, updated_at",
-    )
-    .eq("user_id", userId)
-    .eq("revoked", false)
-    .or(`expires_at.is.null,expires_at.gt.${now}`);
-
-  if (error) {
-    throw new Error(
-      `Failed to fetch feature flag overrides for user ${userId}: ${error.message}`,
-    );
-  }
-
-  return (data || []) as FeatureFlagOverrideRow[];
-}
- */

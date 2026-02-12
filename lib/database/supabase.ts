@@ -1,18 +1,42 @@
-import { SecureStorage } from '@/lib/storage';
 import { logger } from '@/lib/utils/logger';
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 
-// Auth session persistence via SecureStorage
-// SecureStorage handles encryption on all platforms (web, iOS, Android)
-
-// Supabase auth adapter using SecureStorage (encrypted on all platforms)
-const SecureStorageAdapter = {
-  getItem: (key: string) => SecureStorage.getItem(key),
-  setItem: (key: string, value: string) => SecureStorage.setItem(key, value),
-  removeItem: (key: string) => SecureStorage.removeItem(key),
+// Auth session persistence via synchronous storage
+// Supabase auth SDK REQUIRES synchronous storage access (cannot use async methods)
+// On web: let Supabase use its default localStorage (it detects web environment automatically)
+// On mobile: return null so Supabase uses its AsyncStorage integration
+const StorageAdapter = {
+  getItem: (key: string) => {
+    // Web: let Supabase's default handle it (it uses localStorage automatically)
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const value = window.localStorage.getItem(key);
+      if (value) {
+        logger.debug('storage', `StorageAdapter.getItem: ${key} (${value.length} chars)`);
+      }
+      return value;
+    }
+    // Mobile: return null - Supabase SDK will use its internal AsyncStorage
+    return null;
+  },
+  setItem: (key: string, value: string) => {
+    // Web: use localStorage (synchronous)
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(key, value);
+      logger.debug('storage', `StorageAdapter.setItem: ${key} (${value.length} chars)`);
+    }
+    // Mobile: handled by Supabase SDK's AsyncStorage integration
+  },
+  removeItem: (key: string) => {
+    // Web: use localStorage (synchronous)
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem(key);
+      logger.debug('storage', `StorageAdapter.removeItem: ${key}`);
+    }
+    // Mobile: handled by Supabase SDK's AsyncStorage integration
+  },
 };
 
 // Get environment variables with fallbacks for development
@@ -76,7 +100,8 @@ export const getSupabaseClient = () => {
       supabaseAnonKey,
       {
         auth: {
-          storage: SecureStorageAdapter,
+          storage: StorageAdapter,
+          storageKey: 'sb-auth-token', // Explicit key for session storage
           autoRefreshToken: true,
           persistSession: true,
           detectSessionInUrl: false,
@@ -84,6 +109,21 @@ export const getSupabaseClient = () => {
         },
       },
     );
+
+    // On web, ensure session persists to our StorageAdapter
+    if (typeof window !== 'undefined') {
+      // Listen for auth state changes and persist session
+      _supabaseClient.auth.onAuthStateChange((event: string, session: any) => {
+        if (event === 'SIGNED_IN' && session) {
+          logger.info('storage', '✅ Session persisted to localStorage', {
+            userId: session.user?.id?.substring(0, 8),
+            hasAccessToken: !!session.access_token,
+          });
+        } else if (event === 'SIGNED_OUT') {
+          logger.info('storage', '🔓 Session cleared from localStorage');
+        }
+      });
+    }
   }
   
   return _supabaseClient;
@@ -101,6 +141,7 @@ export const supabase = new Proxy({} as any, {
         }
       });
     }
+    // eslint-disable-next-line security/detect-object-injection
     return getSupabaseClient()[prop];
   }
 });

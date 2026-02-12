@@ -18,9 +18,6 @@ export {
 
 // NOTE: useFeatureFlags is NOT exported here to avoid circular dependency
 // Import directly from hooks/feature/use-feature-flags instead
-
-export {
-    useEntitlement,
-    type EntitlementStatus
-} from "@/hooks/feature/use-entitlements";
+// NOTE: useEntitlement is NOT exported here to avoid circular dependency
+// Import directly from hooks/feature/use-entitlements instead
 

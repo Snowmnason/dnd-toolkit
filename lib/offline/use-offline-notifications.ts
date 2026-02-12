@@ -32,9 +32,20 @@ export function useOfflineNotifications(): OfflineToastState {
   // Use ref to track the timer ID for cleanup (prevents memory leaks)
   // Timer can be either a number (browser) or NodeJS.Timeout (Node/Electron)
   const timerRef = useRef<NodeJS.Timeout | number | null>(null);
+  const lastOnlineStateRef = useRef<boolean | null>(null);
 
   useEffect(() => {
     const subscription = NetworkDetection.subscribe((status: NetworkStatus) => {
+      // Only show toast if online status CHANGED (not on every status update)
+      // This prevents toast spam from connection quality changes during pings
+      const onlineChanged = lastOnlineStateRef.current !== status.isOnline;
+      lastOnlineStateRef.current = status.isOnline;
+
+      if (!onlineChanged) {
+        // No change in online status, skip notification
+        return;
+      }
+
       // Clear any existing timer before creating a new one
       if (timerRef.current) {
         clearTimeout(timerRef.current);

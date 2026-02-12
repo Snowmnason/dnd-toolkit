@@ -17,11 +17,19 @@ BEGIN;
 -- SCHEMA
 -- ========================
 
--- Audit records are stored in `public.audit_events` for compatibility with
--- existing application code and to simplify REST exposure. The trigger
--- function runs with `SECURITY DEFINER` and writes into `public.audit_events`.
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT ON TABLES TO authenticated;
+CREATE SCHEMA IF NOT EXISTS audit;
+
+GRANT USAGE ON SCHEMA audit TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA audit TO anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA audit TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA audit TO anon, authenticated, service_role;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA audit
+  GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA audit
+  GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA audit
+  GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
 
 -- ========================
 -- TABLES
@@ -30,7 +38,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 -- EVENTS: Single unified audit log for all schemas.
 -- Captures every INSERT, UPDATE, and DELETE across tracked tables.
 -- No foreign keys intentionally — audit records persist after source data deletion.
-CREATE TABLE public.audit_events (
+CREATE TABLE audit.audit_events (
   id            uuid        NOT NULL DEFAULT gen_random_uuid(),
   table_schema  text        NOT NULL,    -- Source schema (public, worlds, feature_flags)
   table_name    text        NOT NULL,    -- Source table name
@@ -44,20 +52,20 @@ CREATE TABLE public.audit_events (
   CONSTRAINT audit_events_pkey PRIMARY KEY (id)
 );
 
-COMMENT ON TABLE public.audit_events IS
+COMMENT ON TABLE audit.audit_events IS
   'Unified audit log capturing all INSERT/UPDATE/DELETE operations across tracked tables. '
   'NoFK references—audit records persist after source data deletion. Only writable via SECURITY DEFINER triggers. '
   'Admins can read all records; users can read records they initiated (initiated_by = current user).';
 
-COMMENT ON COLUMN public.audit_events.id IS 'Unique audit event identifier.';
-COMMENT ON COLUMN public.audit_events.table_schema IS 'Source schema: public, worlds, or feature_flags.';
-COMMENT ON COLUMN public.audit_events.table_name IS 'Source table name (e.g., users, entitlements, feature_flags).';
-COMMENT ON COLUMN public.audit_events.record_id IS 'Primary key of the affected row (text to handle uuid/text columns).';
-COMMENT ON COLUMN public.audit_events.event_type IS 'Operation type: insert, update, or delete (lowercase).';
-COMMENT ON COLUMN public.audit_events.initiated_by IS 'public.users.id of the user who initiated the change; NULL for service_role or system ops.';
-COMMENT ON COLUMN public.audit_events.old_data IS 'JSONB snapshot of row state before change (NULL on INSERT).';
-COMMENT ON COLUMN public.audit_events.new_data IS 'JSONB snapshot of row state after change (NULL on DELETE).';
-COMMENT ON COLUMN public.audit_events.created_at IS 'Timestamp when the audit event was recorded.';
+COMMENT ON COLUMN audit.audit_events.id IS 'Unique audit event identifier.';
+COMMENT ON COLUMN audit.audit_events.table_schema IS 'Source schema: public, worlds, or feature_flag.';
+COMMENT ON COLUMN audit.audit_events.table_name IS 'Source table name (e.g., users, entitlements, feature_flags).';
+COMMENT ON COLUMN audit.audit_events.record_id IS 'Primary key of the affected row (text to handle uuid/text columns).';
+COMMENT ON COLUMN audit.audit_events.event_type IS 'Operation type: insert, update, or delete (lowercase).';
+COMMENT ON COLUMN audit.audit_events.initiated_by IS 'public.users.id of the user who initiated the change; NULL for service_role or system ops.';
+COMMENT ON COLUMN audit.audit_events.old_data IS 'JSONB snapshot of row state before change (NULL on INSERT).';
+COMMENT ON COLUMN audit.audit_events.new_data IS 'JSONB snapshot of row state after change (NULL on DELETE).';
+COMMENT ON COLUMN audit.audit_events.created_at IS 'Timestamp when the audit event was recorded.';
 
 -- ========================
 -- INDEXES
@@ -65,23 +73,23 @@ COMMENT ON COLUMN public.audit_events.created_at IS 'Timestamp when the audit ev
 
 -- Find all events for a specific table
 CREATE INDEX idx_audit_events_table
-  ON public.audit_events USING btree (table_schema, table_name);
+  ON audit.audit_events USING btree (table_schema, table_name);
 
 -- Find all events for a specific record
 CREATE INDEX idx_audit_events_record
-  ON public.audit_events USING btree (record_id);
+  ON audit.audit_events USING btree (record_id);
 
 -- Find all events by a specific user
 CREATE INDEX idx_audit_events_initiated_by
-  ON public.audit_events USING btree (initiated_by);
+  ON audit.audit_events USING btree (initiated_by);
 
 -- Sort by time (most recent events first — admin dashboard)
 CREATE INDEX idx_audit_events_created_at
-  ON public.audit_events USING btree (created_at DESC);
+  ON audit.audit_events USING btree (created_at DESC);
 
 -- Composite: recent events per table (common admin query)
 CREATE INDEX idx_audit_events_table_time
-  ON public.audit_events USING btree (table_schema, table_name, created_at DESC);
+  ON audit.audit_events USING btree (table_schema, table_name, created_at DESC);
 
 -- ========================
 -- GENERIC AUDIT TRIGGER FUNCTION
@@ -92,11 +100,11 @@ CREATE INDEX idx_audit_events_table_time
 --   - Current user via get_current_user_id() (NULL for service_role)
 --   - Old/new data via to_jsonb()
 
-CREATE OR REPLACE FUNCTION public.log_change()
+CREATE OR REPLACE FUNCTION audit.log_change()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = audit, public
 AS $$
 DECLARE
   v_record_id text;
@@ -131,7 +139,7 @@ BEGIN
   END;
 
   -- Write audit record
-  INSERT INTO public.audit_events (
+  INSERT INTO audit.audit_events (
     table_schema, table_name, record_id, event_type,
     initiated_by, old_data, new_data
   ) VALUES (
@@ -148,12 +156,12 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.log_change() IS
+COMMENT ON FUNCTION audit.log_change() IS
   'Generic audit trigger function. Captures INSERT/UPDATE/DELETE operations on any table. '
   'Auto-detects schema, table name, and primary key (tries id, world_id, user_id, flag_name, key). '
   'Records initiated_by user and full old_data/new_data snapshots as JSONB. '
   'Called only via SECURITY DEFINER triggers; not directly executable by users. '
-  'Do NOT call directly—attach to tables via CREATE TRIGGER ... EXECUTE FUNCTION public.log_change().';
+  'Do NOT call directly—attach to tables via CREATE TRIGGER ... EXECUTE FUNCTION audit.log_change().';
 
 -- ========================
 -- ATTACH AUDIT TRIGGERS TO ALL TABLES
@@ -163,72 +171,72 @@ COMMENT ON FUNCTION public.log_change() IS
 DROP TRIGGER IF EXISTS trg_audit_users ON public.users;
 CREATE TRIGGER trg_audit_users
   AFTER INSERT OR UPDATE OR DELETE ON public.users
-  FOR EACH ROW EXECUTE FUNCTION public.log_change();
+  FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
 DROP TRIGGER IF EXISTS trg_audit_user_settings ON public.user_settings;
 CREATE TRIGGER trg_audit_user_settings
   AFTER INSERT OR UPDATE OR DELETE ON public.user_settings
-  FOR EACH ROW EXECUTE FUNCTION public.log_change();
+  FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
-DROP TRIGGER IF EXISTS trg_audit_invite_links ON public.invite_links;
+DROP TRIGGER IF EXISTS trg_audit_invite_links ON worlds.invite_links;
 CREATE TRIGGER trg_audit_invite_links
-  AFTER INSERT OR UPDATE OR DELETE ON public.invite_links
-  FOR EACH ROW EXECUTE FUNCTION public.log_change();
+  AFTER INSERT OR UPDATE OR DELETE ON worlds.invite_links
+  FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
 -- Worlds schema tables
-DROP TRIGGER IF EXISTS trg_audit_worlds ON public.worlds;
+DROP TRIGGER IF EXISTS trg_audit_worlds ON worlds.worlds;
 CREATE TRIGGER trg_audit_worlds
-  AFTER INSERT OR UPDATE OR DELETE ON public.worlds
-  FOR EACH ROW EXECUTE FUNCTION public.log_change();
+  AFTER INSERT OR UPDATE OR DELETE ON worlds.worlds
+  FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
-DROP TRIGGER IF EXISTS trg_audit_world_access ON public.world_access;
+DROP TRIGGER IF EXISTS trg_audit_world_access ON worlds.world_access;
 CREATE TRIGGER trg_audit_world_access
-  AFTER INSERT OR UPDATE OR DELETE ON public.world_access
-  FOR EACH ROW EXECUTE FUNCTION public.log_change();
+  AFTER INSERT OR UPDATE OR DELETE ON worlds.world_access
+  FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
 -- Feature flags schema tables
-DROP TRIGGER IF EXISTS trg_audit_feature_flags ON public.feature_flags;
+DROP TRIGGER IF EXISTS trg_audit_feature_flags ON feature_flag.feature_flags;
 CREATE TRIGGER trg_audit_feature_flags
-  AFTER INSERT OR UPDATE OR DELETE ON public.feature_flags
-  FOR EACH ROW EXECUTE FUNCTION public.log_change();
+  AFTER INSERT OR UPDATE OR DELETE ON feature_flag.feature_flags
+  FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
-DROP TRIGGER IF EXISTS trg_audit_entitlements ON public.entitlements;
+DROP TRIGGER IF EXISTS trg_audit_entitlements ON feature_flag.entitlements;
 CREATE TRIGGER trg_audit_entitlements
-  AFTER INSERT OR UPDATE OR DELETE ON public.entitlements
-  FOR EACH ROW EXECUTE FUNCTION public.log_change();
+  AFTER INSERT OR UPDATE OR DELETE ON feature_flag.entitlements
+  FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
-DROP TRIGGER IF EXISTS trg_audit_entitlements_overrides ON public.entitlements_overrides;
+DROP TRIGGER IF EXISTS trg_audit_entitlements_overrides ON feature_flag.entitlements_overrides;
 CREATE TRIGGER trg_audit_entitlements_overrides
-  AFTER INSERT OR UPDATE OR DELETE ON public.entitlements_overrides
-  FOR EACH ROW EXECUTE FUNCTION public.log_change();
+  AFTER INSERT OR UPDATE OR DELETE ON feature_flag.entitlements_overrides
+  FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
-DROP TRIGGER IF EXISTS trg_audit_feature_flag_overrides ON public.feature_flag_overrides;
+DROP TRIGGER IF EXISTS trg_audit_feature_flag_overrides ON feature_flag.feature_flag_overrides;
 CREATE TRIGGER trg_audit_feature_flag_overrides
-  AFTER INSERT OR UPDATE OR DELETE ON public.feature_flag_overrides
-  FOR EACH ROW EXECUTE FUNCTION public.log_change();
+  AFTER INSERT OR UPDATE OR DELETE ON feature_flag.feature_flag_overrides
+  FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
-DROP TRIGGER IF EXISTS trg_audit_feature_flag_rollouts ON public.feature_flag_rollouts;
+DROP TRIGGER IF EXISTS trg_audit_feature_flag_rollouts ON feature_flag.feature_flag_rollouts;
 CREATE TRIGGER trg_audit_feature_flag_rollouts
-  AFTER INSERT OR UPDATE OR DELETE ON public.feature_flag_rollouts
-  FOR EACH ROW EXECUTE FUNCTION public.log_change();
+  AFTER INSERT OR UPDATE OR DELETE ON feature_flag.feature_flag_rollouts
+  FOR EACH ROW EXECUTE FUNCTION audit.log_change();
 
 -- ========================
 -- ROW LEVEL SECURITY
 -- ========================
 
-ALTER TABLE public.audit_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit.audit_events ENABLE ROW LEVEL SECURITY;
 
 -- No INSERT/UPDATE/DELETE policies.
 -- All writes happen through the SECURITY DEFINER trigger function only.
 -- API callers cannot directly modify audit records.
 
-DROP POLICY IF EXISTS "audit_admin_select" ON public.audit_events;
-CREATE POLICY "audit_admin_select" ON public.audit_events
+DROP POLICY IF EXISTS "audit_admin_select" ON audit.audit_events;
+CREATE POLICY "audit_admin_select" ON audit.audit_events
   FOR SELECT TO authenticated
   USING (public.is_admin());
 
-DROP POLICY IF EXISTS "audit_own_select" ON public.audit_events;
-CREATE POLICY "audit_own_select" ON public.audit_events
+DROP POLICY IF EXISTS "audit_own_select" ON audit.audit_events;
+CREATE POLICY "audit_own_select" ON audit.audit_events
   FOR SELECT TO authenticated
   USING (initiated_by = public.get_current_user_id());
 

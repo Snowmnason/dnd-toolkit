@@ -1,6 +1,5 @@
 import { Platform } from "react-native";
 import { getAppConfig } from "../config";
-import logger from "../utils/logger";
 
 // Lazy import logger to avoid circular dependency with config
 let loggerCache: any = null;
@@ -121,12 +120,12 @@ class FastCacheService {
       }
 
       this.notifySubscribers(key, value);
-      logger.debug(
+      getLogger().debug(
         "cache",
         `FastCache.setItem: ${key} (${value.length} bytes${ttl ? `, TTL: ${ttl}ms` : ""})`,
       );
     } catch (error) {
-      logger.error("cache", `FastCache.setItem failed for ${key}:`, error);
+      getLogger().error("cache", `FastCache.setItem failed for ${key}:`, error);
       throw error;
     }
   }

@@ -1,332 +1,124 @@
-# ⏱️ Triggers — DnD Toolkit
+# Triggers — DnD Toolkit
 
-This document describes all database triggers used in the D&D Toolkit schema. Triggers are automatic actions that run on INSERT, UPDATE, or DELETE events.
-
----
-
-## Overview
-
-**Trigger Organization:**
-
-- **schema-based:** Triggers defined in their respective schema (public, feature_flags, audit)
-- **purpose-based:** Maintenance (timestamps), enforcement (constraints), audit logging
+All triggers documented here match migrations 001–004. Source of truth: `supabase/migrations/`.
 
 ---
 
-## Public Schema Triggers
+## Trigger Summary
 
-### 1. `trg_updated_at` (Multiple Tables)
+| Trigger | Table | Event | Function | Purpose |
+| --- | --- | --- | --- | --- |
+| `on_auth_user_created` | `auth.users` | AFTER INSERT | `public.handle_new_user()` | Auto-create users + user_settings on signup |
+| `trg_users_updated_at` | `public.users` | BEFORE UPDATE | `public.update_timestamp()` | Auto-update `updated_at` |
+| `trg_user_settings_updated_at` | `public.user_settings` | BEFORE UPDATE | `public.update_timestamp()` | Auto-update `updated_at` |
+| `trg_worlds_updated_at` | `worlds.worlds` | BEFORE UPDATE | `public.update_timestamp()` | Auto-update `updated_at` |
+| `trg_world_access_updated_at` | `worlds.world_access` | BEFORE UPDATE | `public.update_timestamp()` | Auto-update `updated_at` |
+| `trg_prevent_owner_change` | `worlds.worlds` | BEFORE UPDATE | `worlds.prevent_owner_change()` | Block `owner_id` changes |
+| `trg_create_owner_access` | `worlds.worlds` | AFTER INSERT | `worlds.create_owner_access()` | Auto-grant owner DM access |
+| `trg_feature_flags_updated_at` | `feature_flag.feature_flags` | BEFORE UPDATE | `public.update_timestamp()` | Auto-update `updated_at` |
+| `trg_entitlements_updated_at` | `feature_flag.entitlements` | BEFORE UPDATE | `public.update_timestamp()` | Auto-update `updated_at` |
+| `trg_overrides_updated_at` | `feature_flag.feature_flag_overrides` | BEFORE UPDATE | `public.update_timestamp()` | Auto-update `updated_at` |
+| `trg_entitlements_overrides_updated_at` | `feature_flag.entitlements_overrides` | BEFORE UPDATE | `public.update_timestamp()` | Auto-update `updated_at` |
+| `trg_rollouts_updated_at` | `feature_flag.feature_flag_rollouts` | BEFORE UPDATE | `public.update_timestamp()` | Auto-update `updated_at` |
+| `trg_audit_users` | `public.users` | AFTER INS/UPD/DEL | `audit.log_change()` | Audit log |
+| `trg_audit_user_settings` | `public.user_settings` | AFTER INS/UPD/DEL | `audit.log_change()` | Audit log |
+| `trg_audit_invite_links` | `worlds.invite_links` | AFTER INS/UPD/DEL | `audit.log_change()` | Audit log |
+| `trg_audit_worlds` | `worlds.worlds` | AFTER INS/UPD/DEL | `audit.log_change()` | Audit log |
+| `trg_audit_world_access` | `worlds.world_access` | AFTER INS/UPD/DEL | `audit.log_change()` | Audit log |
+| `trg_audit_feature_flags` | `feature_flag.feature_flags` | AFTER INS/UPD/DEL | `audit.log_change()` | Audit log |
+| `trg_audit_entitlements` | `feature_flag.entitlements` | AFTER INS/UPD/DEL | `audit.log_change()` | Audit log |
+| `trg_audit_entitlements_overrides` | `feature_flag.entitlements_overrides` | AFTER INS/UPD/DEL | `audit.log_change()` | Audit log |
+| `trg_audit_feature_flag_overrides` | `feature_flag.feature_flag_overrides` | AFTER INS/UPD/DEL | `audit.log_change()` | Audit log |
+| `trg_audit_feature_flag_rollouts` | `feature_flag.feature_flag_rollouts` | AFTER INS/UPD/DEL | `audit.log_change()` | Audit log |
 
-**Tables:** `users`, `worlds`, `world_access`, `invite_links`
+---
 
-**Event:** BEFORE UPDATE
+## Trigger Functions
 
-**Purpose:** Automatically update the `updated_at` timestamp whenever a row is modified.
+### public.update_timestamp()
 
-**PostgreSQL:**
+Shared `BEFORE UPDATE` trigger function used by all tables with `updated_at`.
 
 ```sql
 CREATE OR REPLACE FUNCTION public.update_timestamp()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER trg_updated_at BEFORE UPDATE ON public.users
-  FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
-```
-
-**Behavior:**
-
-- Fires on: UPDATE to any row
-- Action: Sets `NEW.updated_at := now()`
-- Effect: Maintains accurate cache invalidation & audit timestamps
-
----
-
-### 2. `trg_handle_new_user` (New User Creation)
-
-**Table:** `public.users`
-
-**Event:** After INSERT via Supabase Auth signup
-
-**Purpose:** Create a new `public.users` row whenever `auth.users` is created.
-
-**Trigger Location:** Supabase Auth → Trigger to public.users on auth.uid change
-
-**Expected Behavior:**
-
-- When user signs up: `auth.users` row created
-- Trigger fires: inserts row into `public.users` with `auth_id = new_auth_user.id`
-- New user ready for world creation, entitlements, etc.
-
-**Current Status:** ⚠️ **Not yet implemented** — See backend setup guide
-
----
-
-## Worlds Schema Triggers
-
-### 1. `trg_create_owner_access`
-
-**Table:** `worlds.world_access`
-
-**Event:** AFTER INSERT
-
-**Purpose:** Automatically create a `world_access` row giving the world owner access with role `'dm'`.
-
-**PostgreSQL:**
-
-```sql
-CREATE OR REPLACE FUNCTION worlds.create_owner_access()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  INSERT INTO worlds.world_access (world_id, user_id, user_role)
-  VALUES (NEW.world_id, NEW.owner_id, 'dm')
-  ON CONFLICT DO NOTHING;
-  RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER trg_create_owner_access AFTER INSERT ON worlds.worlds
-  FOR EACH ROW EXECUTE FUNCTION worlds.create_owner_access();
-```
-
-**Behavior:**
-
-- Fires on: INSERT to `worlds` table (creating a new campaign)
-- Action: Inserts row into `world_access(world_id, user_id, user_role)`
-- Effect: Ensures owner automatically has `'dm'` access; no manual grant needed
-
----
-
-### 2. `trg_updated_at` (Worlds Tables)
-
-**Tables:** `worlds.worlds`, `worlds.world_access`
-
-**Event:** BEFORE UPDATE
-
-**Purpose:** Update `updated_at` timestamp on modification.
-
-**PostgreSQL:**
-
-```sql
-CREATE TRIGGER trg_updated_at BEFORE UPDATE ON worlds.worlds
-  FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
-
-CREATE TRIGGER trg_updated_at BEFORE UPDATE ON worlds.world_access
-  FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
-```
-
----
-
-### 3. `trg_prevent_owner_change`
-
-**Table:** `worlds.world_access`
-
-**Event:** BEFORE UPDATE
-
-**Purpose:** Prevent removal or modification of the owner's `'dm'` access grant.
-
-**PostgreSQL:**
-
-```sql
-CREATE OR REPLACE FUNCTION worlds.prevent_owner_change()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  IF (NEW.user_role != OLD.user_role OR NEW.user_id != OLD.user_id)
-    AND EXISTS (
-      SELECT 1 FROM worlds.worlds w
-      WHERE w.world_id = NEW.world_id AND w.owner_id = OLD.user_id
-    )
-  THEN
-    RAISE EXCEPTION 'Cannot modify owner access grant';
+  IF (TG_OP = 'UPDATE') THEN
+    IF ROW(OLD.*) IS DISTINCT FROM ROW(NEW.*) THEN
+      NEW.updated_at = now();
+    END IF;
+  ELSE
+    NEW.updated_at = now();
   END IF;
   RETURN NEW;
 END;
 $$;
-
-CREATE TRIGGER trg_prevent_owner_change BEFORE UPDATE ON worlds.world_access
-  FOR EACH ROW EXECUTE FUNCTION worlds.prevent_owner_change();
 ```
 
-**Behavior:**
-
-- Fires on: UPDATE to `world_access`
-- Checks: Is this row the owner's access grant?
-- Action: RAISE EXCEPTION if attempting to change owner role
-- Effect: Prevents accidental owner lock-out
+**Key behavior**: Only updates `updated_at` if the row actually changed (`IS DISTINCT FROM`). This prevents churn from no-op updates that would otherwise generate unnecessary audit events and cache invalidations.
 
 ---
 
-## Feature Flags Schema Triggers
+### public.handle_new_user()
 
-### 1. `trg_updated_at` (Feature Flag Tables)
+Auth signup trigger (SECURITY DEFINER). Fires `AFTER INSERT` on `auth.users`.
 
-**Tables:** `feature_flags.feature_flags`, `feature_flags.entitlements`, `feature_flags.feature_flag_overrides`, `feature_flags.entitlements_overrides`, `feature_flags.feature_flag_rollouts`
+- Creates `public.users` row with `auth_id` linked to the new auth user
+- Creates `public.user_settings` row with defaults
+- Idempotent via `ON CONFLICT` — safe against duplicate trigger calls
+- Extracts `username` from `raw_user_meta_data` (falls back to `'changeling'`)
 
-**Event:** BEFORE UPDATE
-
-**Purpose:** Automatically maintain `updated_at` timestamps.
-
-**PostgreSQL:**
-
-```sql
-CREATE TRIGGER trg_updated_at BEFORE UPDATE ON feature_flags.feature_flags
-  FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
-```
+**Status**: Implemented in migration 001. Trigger name: `on_auth_user_created`.
 
 ---
 
-## Audit Schema Triggers
+### worlds.prevent_owner_change()
 
-### 1. `trg_audit` (All Tables)
-
-**Tables:**
-
-- `public.users`, `public.user_settings`, `public.invite_links`
-- `worlds.worlds`, `worlds.world_access`
-- `feature_flags.feature_flags`, `feature_flags.entitlements`, `feature_flags.entitlements_overrides`, `feature_flags.feature_flag_overrides`, `feature_flags.feature_flag_rollouts`
-
-**Event:** AFTER INSERT, UPDATE, or DELETE
-
-**Purpose:** Log all data changes to the unified `audit.events` table for compliance and audit trails.
-
-**PostgreSQL:**
+`BEFORE UPDATE` on `worlds.worlds`. Prevents any modification to `owner_id`.
 
 ```sql
-CREATE TRIGGER trg_audit AFTER INSERT OR UPDATE OR DELETE ON public.users
-  FOR EACH ROW EXECUTE FUNCTION audit.log_change();
-
-CREATE TRIGGER trg_audit AFTER INSERT OR UPDATE OR DELETE ON feature_flags.entitlements
-  FOR EACH ROW EXECUTE FUNCTION audit.log_change();
--- ... etc for all tracked tables
+IF OLD.owner_id IS DISTINCT FROM NEW.owner_id THEN
+  RAISE EXCEPTION 'Cannot change world owner via UPDATE. Use ownership transfer function.';
+END IF;
 ```
 
-**Trigger Function (`audit.log_change`):**
-
-- Auto-detects schema, table, and primary key
-- Captures `initiatedby` user (NULL for service_role ops)
-- Stores `old_data` (on UPDATE/DELETE) and `new_data` (on INSERT/UPDATE) as JSONB
-- Writes immutable record to `audit.events`
-
-**Behavior:**
-
-- Fires on: Any INSERT, UPDATE, DELETE across all tracked tables
-- Action: Calls `audit.log_change()` with trigger context
-- Effect: Produces comprehensive audit trail; all changes queryable later
-
-**Audit Record Example:**
-
-```json
-{
-  "id": "uuid...",
-  "table_schema": "feature_flags",
-  "table_name": "entitlements",
-  "record_id": "uuid...",
-  "event_type": "update",
-  "initiated_by": "uuid...",
-  "old_data": { "is_active": true, "expires_at": null },
-  "new_data": { "is_active": false, "expires_at": "2026-03-01T00:00:00Z" },
-  "created_at": "2026-02-08T15:30:00Z"
-}
-```
+**Note**: This trigger is on `worlds.worlds`, NOT `worlds.world_access`. It prevents changing world ownership — not membership roles. Role changes go through `worlds.change_user_role()` RPC.
 
 ---
 
-## Maintenance Triggers
+### worlds.create_owner_access()
 
-### Background Job: `mark_expired_entitlements_inactive()`
-
-**Table:** `feature_flags.entitlements`
-
-**Event:** Periodic (scheduled), not a database trigger
-
-**Purpose:** Mark expired entitlements as `is_active = false` for cleanup and soft-delete.
-
-**PostgreSQL:**
+`AFTER INSERT` on `worlds.worlds` (SECURITY DEFINER). Auto-creates a `world_access` row granting the world owner the `'dm'` role.
 
 ```sql
-CREATE OR REPLACE FUNCTION feature_flags.mark_expired_entitlements_inactive()
-RETURNS void
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = feature_flags
-AS $$
-  UPDATE entitlements
-  SET is_active = false
-  WHERE is_active = true
-    AND expires_at IS NOT NULL
-    AND expires_at <= now();
-$$;
+INSERT INTO worlds.world_access (world_id, user_id, user_role)
+VALUES (NEW.world_id, NEW.owner_id, 'dm'::worlds.world_access_role)
+ON CONFLICT (world_id, user_id) DO NOTHING;
 ```
 
-**Execution:**
-
-- Called via background job system (see `lib/jobs/`)
-- Typically runs every hour or on-demand
-- Updates expired entitlements WITHOUT deleting them (maintains audit trail)
+Ensures the owner always has a membership row without requiring a separate client-side insert.
 
 ---
 
-## Trigger Best Practices
+### audit.log_change()
 
-✅ **DO:**
+Generic `AFTER INSERT OR UPDATE OR DELETE` trigger (SECURITY DEFINER). Writes to `audit.audit_events`.
 
-- Use BEFORE triggers for validation/transformation
-- Use AFTER triggers for logging/cascading actions
-- Keep trigger logic simple and fast (defer heavy computation to app layer)
-- Document trigger purpose and behavior clearly
-- Update audit trail when modifying critical data
-
-❌ **DON'T:**
-
-- Create recursive triggers (trigger fires trigger fires recursively → deadlock)
-- Use triggers for complex business logic (app layer is clearer)
-- Modify other tables without audit logging
-- Ignore performance impact of triggers on bulk operations
+- Auto-detects `table_schema` and `table_name` from trigger context (`TG_TABLE_SCHEMA`, `TG_TABLE_NAME`)
+- Extracts PK by trying common column names: `id` → `world_id` → `user_id` → `flag_name` → `key` → `'unknown'`
+- Captures `old_data`/`new_data` as JSONB snapshots
+- Resolves `initiated_by` via `public.get_current_user_id()` (NULL for service_role/system)
+- Attached to **all 10 tracked tables** across all schemas
 
 ---
 
-## Testing Triggers
+## Tables Without updated_at Triggers
 
-**Verify timestamp updates:**
-
-```sql
-SELECT created_at, updated_at FROM public.users WHERE id = 'uuid...';
--- created_at should differ from updated_at after UPDATE
-```
-
-**Verify owner access creation:**
-
-```sql
-SELECT * FROM worlds.world_access WHERE world_id = 'uuid...' AND user_role = 'dm';
--- Should exist immediately after world creation
-```
-
-**Verify audit logging:**
-
-```sql
-SELECT * FROM audit.events WHERE table_name = 'entitlements' ORDER BY created_at DESC LIMIT 5;
--- Should show recent changes to entitlements
-```
-
-**Verify prevent_owner_change:**
-
-```sql
-UPDATE worlds.world_access SET user_role = 'player'
-WHERE user_id = (SELECT owner_id FROM worlds.worlds WHERE world_id = 'uuid...')
-  AND world_id = 'uuid...';
--- Should return: ERROR: Cannot modify owner access grant
-```
+| Table | Reason |
+| --- | --- |
+| `worlds.invite_links` | No `updated_at` column — invites are created then expired/deleted, never updated |
+| `audit.audit_events` | Immutable — no updates allowed |
 
 ---
 
-_Last Updated: Feb 8, 2026_
+_Last Updated: Feb 11, 2026 (Post-Audit — matches migrations 001–004)_

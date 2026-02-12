@@ -119,7 +119,6 @@ class Logger {
    * @param debugLogsEnabled - The server-resolved value for debugLogs.enabled
    */
   reconfigure(debugLogsEnabled: boolean): void {
-    const oldConfig = { ...this.config };
     this.config = {
       enabledLevels: debugLogsEnabled
         ? ["debug", "info", "warn", "error"]
@@ -235,8 +234,14 @@ class Logger {
 
     parts.push(emoji);
 
-    // Automatically redact PII/sensitive data from all arguments
+    // Automatically redact PII/sensitive data from all arguments (production only)
+    // In dev mode, show full error messages for easier debugging
     const redactedArgs = args.map((arg) => {
+      if (__DEV__) {
+        // In dev environment, don't redact - show full errors for debugging
+        return arg;
+      }
+      // In production, redact sensitive data
       if (typeof arg === "string" || typeof arg === "object") {
         return redactForLogs(arg);
       }

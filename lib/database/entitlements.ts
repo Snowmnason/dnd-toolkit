@@ -2,9 +2,9 @@
  * Entitlements Database Queries
  *
  * This module provides client-side REST API helpers for querying user entitlements
- * from the Supabase `feature_flags.entitlements` table.
+ * from the Supabase `feature_flag.entitlements` table.
  *
- * **Schema**: feature_flags.entitlements
+ * **Schema**: feature_flag.entitlements
  * - id: uuid (PK)
  * - user_id: uuid (FK to users)
  * - key: text (entitlement name)
@@ -42,7 +42,7 @@ export async function fetchEntitlementsByUserId(
   userId: string,
 ): Promise<EntitlementRow[]> {
   const { data, error } = await supabase
-    .schema('public')
+      .schema('feature_flag')
     .from('entitlements')
     .select(
       "id, user_id, key, is_active, remind_user, created_at, updated_at, expires_at",
@@ -75,7 +75,7 @@ export async function hasEntitlement(
   entitlementKey: string,
 ): Promise<boolean> {
   const { data, error } = await supabase
-    .schema('public')
+    .schema('feature_flag')
     .from('entitlements')
     .select("is_active, expires_at")
     .eq("user_id", userId)
@@ -133,7 +133,7 @@ export async function fetchEntitlementOverridesByUserId(
   const now = new Date().toISOString();
 
   const { data, error } = await supabase
-    .schema('public')
+    .schema('feature_flag')
     .from('entitlements_overrides')
     .select(
       "id, user_id, entitlement_key, is_active, expires_at, reason, created_by, created_at, updated_at, revoked",

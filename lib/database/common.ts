@@ -232,6 +232,18 @@ export async function validateCurrentUser(): Promise<{
   } = await supabase.auth.getUser();
 
   if (error || !user) {
+    // Dev mode: if no RLS policies, allow writes without auth for testing
+    if (__DEV__) {
+      logger.warn(
+        "storage",
+        "⚠️ DEV MODE: Auth validation skipped (no RLS). Use real auth in production.",
+      );
+      // Return a fake auth_id for testing - this will pass validation
+      return {
+        auth_id: "dev-test-user",
+        email: "dev@test.local",
+      };
+    }
     logger.debug("storage", "User validation failed:", error?.message);
     return null;
   }

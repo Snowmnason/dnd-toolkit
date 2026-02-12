@@ -22,8 +22,10 @@ export interface World {
   system: string;
   is_dm: boolean;
   map_image_url: string | null;
+  settings: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
 }
 
 export interface WorldAccess {
@@ -33,6 +35,7 @@ export interface WorldAccess {
   user_role: AccessRole; // Using the AccessRole type for better type safety
   permissions: any; // JSONB field
   created_at: string;
+  updated_at: string;
 }
 
 export interface WorldWithAccess extends World {
@@ -71,7 +74,7 @@ export const worldsDB = {
         };
 
         const { data, error } = await supabase
-          .schema('public')
+          .schema('worlds')
           .from('worlds')
           .insert(insertData)
           .select()
@@ -175,14 +178,14 @@ export const worldsDB = {
         >(
           // Get world_access records where user_id matches (includes world_id and role)
           supabase
-            .schema('public')
+            .schema('worlds')
             .from("world_access")
             .select("world_id, user_role, permissions")
             .eq("user_id", currentUserId),
 
           // Get world IDs where owner_id matches
           supabase
-            .schema('public')
+            .schema('worlds')
             .from('worlds')
             .select("world_id")
             .eq("owner_id", currentUserId),
@@ -270,10 +273,11 @@ export const worldsDB = {
     // - Or implement server-side cursor pagination
     const worldIds = Array.from(worldIdSet);
     const { data: worldsData, error: worldsError } = await supabase
-      .schema('public')
+      .schema('worlds')
       .from('worlds')
       .select("*")
       .in("world_id", worldIds)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -320,9 +324,9 @@ export const worldsDB = {
         const user = await validateUserForWrite();
 
         const { data, error } = await supabase
-          .schema('public')
+          .schema('worlds')
           .from('worlds')
-          .update({ name: newName, updated_at: "now()" })
+          .update({ name: newName })
           .eq("world_id", worldId)
           .eq("owner_id", user.id)
           .select()
@@ -359,16 +363,14 @@ export const worldsDB = {
       `worlds:update:${worldId}`,
       async () => {
         // Validate before write
-        await validateUserForWrite();
+        const user = await validateUserForWrite();
 
         const { data, error } = await supabase
-          .schema('public')
+          .schema('worlds')
           .from('worlds')
-          .update({
-            ...updates,
-            updated_at: "now()",
-          })
+          .update(updates)
           .eq("world_id", worldId)
+          .eq("owner_id", user.id)
           .select()
           .single();
 
@@ -394,7 +396,7 @@ export const worldsDB = {
     );
   },
 
-  // Delete a world
+  // Soft-delete a world (sets deleted_at; filtered out by RLS and queries)
   async delete(worldId: string): Promise<void> {
     await RequestManager.fetch(
       `worlds:delete:${worldId}`,
@@ -403,9 +405,9 @@ export const worldsDB = {
         const user = await validateUserForWrite();
 
         const { error } = await supabase
-          .schema('public')
+          .schema('worlds')
           .from('worlds')
-          .delete()
+          .update({ deleted_at: new Date().toISOString() })
           .eq("world_id", worldId)
           .eq("owner_id", user.id); // Ensure only owner can delete
 
@@ -439,12 +441,11 @@ export const worldsDB = {
     await RequestManager.fetch(
       `worlds:removeUserFromWorld:${worldId}:${userId}`,
       async () => {
+        // Uses server-side function to avoid client-side DELETE policies on world_access.
+        // The RPC always applies to the current authenticated user.
         const { error } = await supabase
-          .schema('public')
-          .from("world_access")
-          .delete()
-          .eq("world_id", worldId)
-          .eq("user_id", userId);
+          .schema('worlds')
+          .rpc("leave_world", { p_world_id: worldId });
 
         if (error) {
           logger.error("storage", "Error removing user from world:", error);
@@ -485,7 +486,7 @@ export const worldsDB = {
           [{ data: any | null; error: any }, { data: any | null; error: any }]
         >(
           supabase
-            .schema('public')
+            .schema('worlds')
             .from('worlds')
             .select("owner_id")
             .eq("world_id", worldId)
@@ -493,7 +494,7 @@ export const worldsDB = {
             .maybeSingle(),
 
           supabase
-            .schema('public')
+            .schema('worlds')
             .from("world_access")
             .select("id")
             .eq("world_id", worldId)
@@ -519,22 +520,21 @@ export const worldsDB = {
   async addUserToWorld(
     worldId: string,
     userId: string,
+    inviteToken: string,
     userRole: AccessRole = "player",
-    permissions: any = {},
   ): Promise<WorldAccess> {
     return RequestManager.fetch(
       `worlds:addUserToWorld:${worldId}:${userId}`,
       async () => {
+        // Joining via invite is enforced server-side; userId is ignored by the RPC.
+        // We keep userId in the API to minimize callsite changes and for cache tagging.
         const { data, error } = await supabase
-          .schema('public')
-          .from("world_access")
-          .insert({
-            world_id: worldId,
-            user_id: userId,
-            user_role: userRole,
-            permissions,
+          .schema('worlds')
+          .rpc("join_world_with_invite", {
+            p_world_id: worldId,
+            p_token: inviteToken,
+            p_user_role: userRole,
           })
-          .select()
           .single();
 
         if (error) {
@@ -576,7 +576,7 @@ export const worldsDB = {
       `world:members:${worldId}`,
       async () => {
         const { data, error } = await supabase
-          .schema('public')
+          .schema('worlds')
           .from("world_access")
           .select(
             `
@@ -619,7 +619,7 @@ export const worldsDB = {
       `world:detail:${worldId}`,
       async () => {
         const { data, error } = await supabase
-          .schema('public')
+          .schema('worlds')
           .from('worlds')
           .select("*")
           .eq("world_id", worldId)

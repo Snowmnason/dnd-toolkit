@@ -9,8 +9,10 @@ export interface User {
   id: string;
   auth_id: string;
   username: string;
-  created_at: string;
   is_admin: boolean;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
 }
 
 export interface CreateUserData {

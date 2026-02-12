@@ -27,9 +27,9 @@ const savePendingInvite = async (token: string, worldName: string) => {
 
 const getPendingInvite = async (): Promise<PendingInvite | null> => {
   const backend = getPrivacyStorageBackend(STORAGE_KEYS.PENDING_INVITE);
-  const inviteData = await backend.getJSON<PendingInvite>(
+  const inviteData = (await backend.getJSON(
     STORAGE_KEYS.PENDING_INVITE,
-  );
+  )) as PendingInvite | null;
   if (inviteData) {
     // Check if invite is less than 24 hours old
     if (Date.now() - inviteData.timestamp < 24 * 60 * 60 * 1000) {
@@ -296,7 +296,12 @@ export default function AuthRedirect() {
 
         // Add user to world in database
         logger.info("auth-redirect", "Adding user to world:", inviteWorldId);
-        await worldsDB.addUserToWorld(inviteWorldId, userProfile.id, "player");
+        await worldsDB.addUserToWorld(
+          inviteWorldId,
+          userProfile.id,
+          inviteToken,
+          "player",
+        );
         logger.success("auth-redirect", "User successfully added to world");
 
         setWorldName(decodedWorldName);
@@ -386,6 +391,7 @@ export default function AuthRedirect() {
             await worldsDB.addUserToWorld(
               validationResult.worldId,
               userProfile.id,
+              pendingInvite.token,
               "player",
             );
             logger.success(

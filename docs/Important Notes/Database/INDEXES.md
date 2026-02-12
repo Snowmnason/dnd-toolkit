@@ -1,205 +1,149 @@
-# 🧩 Database Index Reference — DnD Toolkit
+# Database Index Reference — DnD Toolkit
 
-Complete PostgreSQL index documentation, organized by schema. These indexes are created by migrations 001-004 and **already exist in production**—do not run manually.
-
----
-
-## PUBLIC Schema Indexes
-
-### PUBLIC.USERS
-
-| Index               | Columns      | Type   | Purpose                                 |
-| ------------------- | ------------ | ------ | --------------------------------------- |
-| (primary key)       | `id`         | btree  | Primary key lookup                      |
-| `idx_users_auth_id` | `auth_id`    | btree  | Fast lookup by Supabase auth ID; unique |
+All indexes documented here match migrations 001–004. Source of truth: `supabase/migrations/`.
 
 ---
 
-### PUBLIC.USER_SETTINGS
+## PUBLIC Schema (001)
 
-| Index               | Columns   | Type  | Purpose                    |
-| ------------------- | --------- | ----- | -------------------------- |
-| (primary key)       | `id`      | btree | Primary key lookup         |
-| (foreign key index) | `user_id` | btree | Lookup settings by user ID |
+### public.users
 
----
+| Index | Columns | Type | Notes |
+| --- | --- | --- | --- |
+| `users_pkey` | `id` | PK (btree) | Primary key |
+| `users_auth_id_key` | `auth_id` | UNIQUE (btree) | Auto-created by UNIQUE constraint |
+| `idx_users_created_at` | `created_at DESC` | btree | Sort by signup date |
+| `idx_users_not_deleted` | `deleted_at` WHERE `deleted_at IS NULL` | btree (partial) | Fast lookup of active users |
 
-### PUBLIC.INVITE_LINKS
+### public.user_settings
 
-| Index                      | Columns      | Type  | Purpose                                         |
-| -------------------------- | ------------ | ----- | ----------------------------------------------- |
-| (primary key)              | `id`         | btree | Primary key lookup                              |
-| `idx_invite_links_expires_at` | `expires_at` | btree | Identify expired invites for cleanup; validity checks |
-| (unique)                   | `token`      | btree | Fast lookup by shareable token; prevent duplicates |
-
----
-
-## WORLDS Schema Indexes
-
-### WORLDS.WORLDS
-
-| Index                    | Columns    | Type | Purpose                                       |
-| ------------------------ | ---------- | ---- | --------------------------------------------- |
-| (primary key)            | `world_id` | btree | Primary key lookup                            |
-| `idx_worlds_owner_id`    | `owner_id` | btree | Quickly fetch all worlds owned by a user      |
-| `idx_worlds_created_at`  | `created_at DESC` | btree | Sort newly created worlds (admin dashboard) |
+| Index | Columns | Type | Notes |
+| --- | --- | --- | --- |
+| `user_settings_pkey` | `user_id` | PK (btree) | Primary key (user_id, not id) |
 
 ---
 
-### WORLDS.WORLD_ACCESS
+## WORLDS Schema (002)
 
-| Index                                | Columns                      | Type        | Purpose                              |
-| ------------------------------------ | ---------------------------- | ----------- | ------------------------------------ |
-| (primary key)                        | `id`                         | btree       | Primary key lookup                   |
-| `idx_world_access_world_id`          | `world_id`                   | btree       | Find all members in a world          |
-| `idx_world_access_user_id`           | `user_id`                    | btree       | Find all worlds a user belongs to    |
-| `idx_world_access_world_user`        | `(world_id, user_id)`        | btree UNIQUE | Prevent duplicate memberships; fast "is_member?" check |
-| `idx_world_access_user_created`      | `(user_id, created_at DESC)` | btree       | Recent members in world; sorted newest first |
+### worlds.worlds
 
----
+| Index | Columns | Type | Notes |
+| --- | --- | --- | --- |
+| `worlds_pkey` | `world_id` | PK (btree) | Primary key |
+| `idx_worlds_owner_id` | `owner_id` | btree | Fetch worlds by owner |
+| `idx_worlds_created_at` | `created_at DESC` | btree | Sort newest first |
+| `idx_worlds_not_deleted` | `created_at DESC` WHERE `deleted_at IS NULL` | btree (partial) | Active worlds only, sorted |
 
-## FEATURE_FLAGS Schema Indexes
+### worlds.world_access
 
-### FEATURE_FLAGS.FEATURE_FLAGS
+| Index | Columns | Type | Notes |
+| --- | --- | --- | --- |
+| `world_access_pkey` | `id` | PK (btree) | Primary key |
+| `idx_world_access_world_user` | `(world_id, user_id)` | UNIQUE btree | Prevents duplicate memberships |
+| `idx_world_access_user_id` | `user_id` | btree | All worlds a user belongs to |
+| `idx_world_access_world_id` | `world_id` | btree | All members in a world |
+| `idx_world_access_user_created` | `(user_id, created_at DESC)` | btree | Recent memberships per user |
 
-| Index                          | Columns               | Type  | Purpose                              |
-| ------------------------------ | --------------------- | ----- | ------------------------------------ |
-| (primary key)                  | `flag_name`           | btree | Primary key lookup                   |
-| `idx_feature_flags_updated_at` | `updated_at DESC`     | btree | Fetch recently updated flags (admin) |
+### worlds.invite_links
 
----
-
-### FEATURE_FLAGS.ENTITLEMENTS
-
-| Index                                | Columns           | Type        | Purpose                                    |
-| ------------------------------------ | ----------------- | ----------- | ------------------------------------------ |
-| (primary key)                        | `id`              | btree       | Primary key lookup                         |
-| `idx_entitlements_user_id`           | `user_id`         | btree       | Find all entitlements for a user           |
-| `idx_entitlements_key`               | `key`             | btree       | Fast lookup by entitlement key (flag name)  |
-| `idx_entitlements_expires_at`        | `expires_at`      | btree       | Identify expired entitlements for cleanup   |
-| `idx_entitlements_user_key`          | `(user_id, key)`  | btree UNIQUE | Prevent duplicate entitlements per user     |
-| (partial unique)                     | `(key) WHERE user_id IS NULL` | btree UNIQUE | Org-wide entitlements unique constraint |
-| `idx_entitlements_is_active`         | `is_active` WHERE `is_active = true` | btree PARTIAL | Find active entitlements (soft-delete) |
-| `idx_entitlements_not_active`        | `is_active` WHERE `is_active = false` | btree PARTIAL | Find revoked/expired entitlements (cleanup) |
+| Index | Columns | Type | Notes |
+| --- | --- | --- | --- |
+| `invite_links_pkey` | `id` | PK (btree) | Primary key |
+| `invite_links_token_key` | `token` | UNIQUE (btree) | Auto-created by UNIQUE constraint |
+| `idx_invite_links_expires_at` | `expires_at` | btree | Expiration cleanup |
+| `idx_invite_links_world_id` | `world_id` | btree | Invites by world |
+| `idx_invite_links_created_by` | `created_by` | btree | Invites by creator |
 
 ---
 
-### FEATURE_FLAGS.ENTITLEMENTS_OVERRIDES
+## FEATURE_FLAG Schema (003)
 
-| Index                                    | Columns                    | Type  | Purpose                                    |
-| ---------------------------------------- | -------------------------- | ----- | ------------------------------------------ |
-| (primary key)                            | `id`                       | btree | Primary key lookup                         |
-| `idx_entitlements_overrides_user_id`     | `user_id`                  | btree | Find all overrides for a user              |
-| `idx_entitlements_overrides_target`      | `(user_id, target_name)`   | btree | Fast lookup of override for specific entitlement |
-| `idx_entitlements_overrides_expires_at`  | `expires_at`               | btree | Identify expired overrides                 |
-| `idx_entitlements_overrides_not_revoked` | `revoked` WHERE `revoked = false` | btree PARTIAL | Find active overrides (soft-delete) |
+### feature_flag.feature_flags
+
+| Index | Columns | Type | Notes |
+| --- | --- | --- | --- |
+| `feature_flags_pkey` | `flag_name` | PK (btree) | Primary key (text, not uuid) |
+| `idx_feature_flags_updated_at` | `updated_at DESC` | btree | Recently modified flags |
+
+### feature_flag.entitlements
+
+| Index | Columns | Type | Notes |
+| --- | --- | --- | --- |
+| `entitlements_pkey` | `id` | PK (btree) | Primary key |
+| `entitlements_user_key_unique` | `(user_id, key)` | UNIQUE (btree) | One entitlement per user+key |
+| `one_org_entitlement_per_key` | `key` WHERE `user_id IS NULL` | UNIQUE partial | Org-wide uniqueness |
+| `idx_entitlements_user_id` | `user_id` | btree | Entitlements by user |
+| `idx_entitlements_key` | `key` | btree | Users with a specific entitlement |
+| `idx_entitlements_expires_at` | `expires_at` | btree | Expiration cleanup |
+| `idx_entitlements_active` | `user_id` WHERE `is_active = true` | btree (partial) | Active entitlements only |
+
+### feature_flag.feature_flag_overrides
+
+| Index | Columns | Type | Notes |
+| --- | --- | --- | --- |
+| `overrides_pkey` | `id` | PK (btree) | Primary key |
+| `idx_overrides_user_flag` | `(user_id, flag_name)` | UNIQUE (btree) | One override per user+flag |
+| `idx_overrides_user_id` | `user_id` | btree | Overrides by user |
+| `idx_overrides_expires_at` | `expires_at` | btree | Expiration cleanup |
+| `idx_overrides_active` | `user_id` WHERE `revoked = false` | btree (partial) | Active overrides only |
+
+### feature_flag.entitlements_overrides
+
+| Index | Columns | Type | Notes |
+| --- | --- | --- | --- |
+| `entitlements_overrides_pkey` | `id` | PK (btree) | Primary key |
+| `entitlements_overrides_user_key_unique` | `(user_id, entitlement_key)` | UNIQUE (btree) | One override per user+key |
+| `idx_entitlements_overrides_user_id` | `user_id` | btree | Overrides by user |
+| `idx_entitlements_overrides_expires_at` | `expires_at` | btree | Expiration cleanup |
+| `idx_entitlements_overrides_key` | `entitlement_key` | btree | Bulk ops by key |
+| `idx_entitlements_overrides_active` | `user_id` WHERE `revoked = false` | btree (partial) | Active overrides only |
+
+### feature_flag.feature_flag_rollouts
+
+| Index | Columns | Type | Notes |
+| --- | --- | --- | --- |
+| `rollouts_pkey` | `id` | PK (btree) | Primary key |
+| `rollouts_flag_name_key` | `flag_name` | UNIQUE (btree) | One rollout per flag |
+| `idx_rollouts_flag_name` | `flag_name` | btree | Lookup by flag |
+| `idx_rollouts_flag_name_active` | `(flag_name, is_active)` | btree | Filter active by flag |
+| `idx_rollouts_is_active` | `is_active` | btree | All active/inactive rollouts |
+| `idx_rollouts_active_time` | `flag_name` WHERE `is_active = true` | btree (partial) | Active rollouts only |
 
 ---
 
-### FEATURE_FLAGS.FEATURE_FLAG_OVERRIDES
+## AUDIT Schema (004)
 
-| Index                                  | Columns                   | Type        | Purpose                                    |
-| -------------------------------------- | ------------------------- | ----------- | ------------------------------------------ |
-| (primary key)                          | `id`                      | btree       | Primary key lookup                         |
-| `idx_feature_flag_overrides_user_id`   | `user_id`                 | btree       | Find all overrides for a user              |
-| `idx_feature_flag_overrides_target`    | `(user_id, target_name)`  | btree UNIQUE | Prevent duplicate overrides; fast lookup   |
-| `idx_feature_flag_overrides_expires_at` | `expires_at`             | btree       | Identify expired overrides                 |
-| `idx_feature_flag_overrides_not_revoked` | `revoked` WHERE `revoked = false` | btree PARTIAL | Find active overrides (soft-delete) |
+### audit.audit_events
 
----
-
-### FEATURE_FLAGS.FEATURE_FLAG_ROLLOUTS
-
-| Index                                        | Columns                  | Type        | Purpose                                                       |
-| -------------------------------------------- | ------------------------ | ----------- | ------------------------------------------------------------- |
-| (primary key)                                | `id`                     | btree       | Primary key lookup                                            |
-| `idx_feature_flag_rollouts_flag_name`        | `flag_name`              | btree       | Fast lookup of rollout config by flag name                    |
-| `idx_feature_flag_rollouts_is_active`        | `is_active` WHERE `is_active = true` | btree PARTIAL | Filter only active rollouts during Edge Function fetch |
-| `idx_feature_flag_rollouts_flag_name_active` | `(flag_name, is_active)` | btree       | Efficient lookup when filtering active rollouts by flag name  |
-
----
-
-## AUDIT Schema Indexes
-
-### AUDIT.EVENTS
-
-| Index                            | Columns                                     | Type  | Purpose                                           |
-| -------------------------------- | ------------------------------------------- | ----- | ------------------------------------------------- |
-| (primary key)                    | `id`                                        | btree | Primary key lookup; unique audit event ID        |
-| `idx_audit_events_table`         | `(table_schema, table_name)`                | btree | Find all events for a specific table             |
-| `idx_audit_events_record`        | `record_id`                                 | btree | Find all events for a specific record            |
-| `idx_audit_events_initiated_by`  | `initiated_by`                              | btree | Find all events by a specific user; audit trail |
-| `idx_audit_events_created_at`    | `created_at DESC`                           | btree | Most recent events; admin dashboard sorted newest first |
-| `idx_audit_events_table_time`    | `(table_schema, table_name, created_at DESC)` | btree | Recent events per table (common admin query)    |
+| Index | Columns | Type | Notes |
+| --- | --- | --- | --- |
+| `audit_events_pkey` | `id` | PK (btree) | Primary key |
+| `idx_audit_events_table` | `(table_schema, table_name)` | btree | Events by table |
+| `idx_audit_events_record` | `record_id` | btree | Events by record |
+| `idx_audit_events_initiated_by` | `initiated_by` | btree | Events by user |
+| `idx_audit_events_created_at` | `created_at DESC` | btree | Most recent events |
+| `idx_audit_events_table_time` | `(table_schema, table_name, created_at DESC)` | btree | Recent events per table |
 
 ---
 
 ## Index Design Notes
 
-### Partial Indexes (Efficient Soft-Delete)
+### Partial Indexes
 
-Several indexes use `WHERE` clauses for efficiency:
-- **`is_active = true`**: Find only active entitlements (skip revoked/expired)
-- **`revoked = false`**: Find only active overrides (skip revoked)
+Used for efficient soft-delete and status filtering:
+- `WHERE deleted_at IS NULL` — active users/worlds only (small set vs full table)
+- `WHERE is_active = true` — active entitlements (skip expired/revoked)
+- `WHERE revoked = false` — active overrides (skip soft-revoked)
+- Predicates use **stable columns** (not `now()`), so PostgreSQL can maintain and use these indexes efficiently.
 
-These **stable predicates** (not volatile `now()`) keep indexes small and queryable.
+### Composite Unique Indexes
 
-### Composite Indexes
-
-- **`(user_id, key)`**: Prevents duplicate entitlements; enables fast "does user have entitlement X?" queries
-- **`(table_schema, table_name, created_at DESC)`**: Admin dashboard queries for "recent changes per table"
-
-### Unique Indexes
-
-- Enforce data integrity (e.g., one entitlement per user+key combo)
-- Automatically prevent duplicates; much faster than application-layer checks
+Enforce data integrity at the DB level:
+- `(world_id, user_id)` on `world_access` — one membership per user per world
+- `(user_id, key)` on `entitlements` — one entitlement per user per key
+- `(user_id, flag_name)` on `feature_flag_overrides` — one override per user per flag
+- `(user_id, entitlement_key)` on `entitlements_overrides` — one override per user per key
 
 ---
 
-## Performance Implications
-
-### Lookups Optimized:
-
-```sql
--- Fast: single table lookup
-SELECT * FROM feature_flags.entitlements WHERE user_id = ? AND key = ?;
-
--- Fast: recent audits
-SELECT * FROM audit.events WHERE table_schema = ? AND table_name = ? ORDER BY created_at DESC LIMIT 10;
-
--- Fast: all user's active overrides
-SELECT * FROM feature_flags.feature_flag_overrides WHERE user_id = ? AND revoked = false;
-```
-
-### Bulk Operations:
-
-Mark expired entitlements as inactive (background job):
-```sql
-UPDATE feature_flags.entitlements
-SET is_active = false
-WHERE is_active = true AND expires_at <= now();
-```
-This scan uses `idx_entitlements_is_active` partial index (small set) instead of full table scan.
-
----
-
-## Testing Index Usage
-
-**Verify index is used in query plan:**
-```sql
-EXPLAIN ANALYZE
-SELECT * FROM feature_flags.entitlements
-WHERE user_id = 'uuid-here' AND is_active = true;
--- Output should show: Index Scan using idx_entitlements_user_id ...
-```
-
-**Check index size:**
-```sql
-SELECT schemaname, tablename, indexname, pg_size_pretty(pg_relation_size(indexrelid)) as size
-FROM pg_stat_user_indexes
-WHERE schemaname IN ('public', 'worlds', 'feature_flags', 'audit');
-```
-
----
-
-_Last Updated: Feb 8, 2026 (Post-Migration 001-004)_
+_Last Updated: Feb 11, 2026 (Post-Audit — matches migrations 001–004)_

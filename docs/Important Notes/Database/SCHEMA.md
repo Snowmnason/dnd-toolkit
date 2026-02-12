@@ -1,473 +1,249 @@
 # Database Schema — DnD Toolkit
 
-Comprehensive documentation of the D&D Toolkit PostgreSQL schema, organized by 4 logical schemas.
+Complete schema documentation matching migrations 001–004. Source of truth: `supabase/migrations/`.
 
 ---
 
-## Architecture Overview
-
-The database is organized into **4 schemas** for separation of concerns:
-
-| Schema            | Purpose                                | Tables                                                                                             |
-| ----------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **public**        | Core app identity & session management | users, user_settings, invite_links                                                                 |
-| **worlds**        | Campaign worlds & access control       | worlds, world_access (+ world_access_role ENUM)                                                    |
-| **feature_flags** | Feature control system                 | feature_flags, entitlements, entitlements_overrides, feature_flag_overrides, feature_flag_rollouts |
-| **audit**         | Immutable audit log for compliance     | events                                                                                             |
-
----
-
-# PUBLIC Schema
-
-Core identity and session management.
-
-## Tables
+## PUBLIC Schema (001_public_schema.sql)
 
 ### public.users
 
-**Purpose:** Internal user representation linked to Supabase Auth. One row per authenticated user; created on signup via Auth trigger.
+Core identity table bridging Supabase `auth.users` to app data. One row per authenticated user; auto-created on signup via trigger.
 
-**Key Design Points:**
-
-- Separate from Supabase `auth.users` to allow custom user data
-- `auth_id` enforces 1:1 relationship; CASCADE DELETE removes user on account deletion
-- `isAdmin` flag for admin panel access (future)
-- `username` defaults to 'changeling'; not unique; customizable in settings
-
-**Fields:**
-
-| Field        | Type      | Nullable | Default             | Purpose                                        |
-| ------------ | --------- | -------- | ------------------- | ---------------------------------------------- |
-| `id`         | uuid      | No       | `gen_random_uuid()` | Primary key; stable user identifier            |
-| `auth_id`    | uuid      | No       | —                   | Foreign key to `auth.users.id`; 1:1 link       |
-| `username`   | text      | No       | 'changeling'        | Display name; not unique; customizable         |
-| `created_at` | timestamp | No       | current UTC         | Audit timestamp; account creation time         |
-| `isAdmin`    | boolean   | No       | false               | Admin flag; reserved for future admin features |
-
-**Constraints:**
-
-- `users_pkey`: Primary key
-- `users_auth_id_fkey`: Foreign key to auth.users.id (CASCADE DELETE)
-
-_See [INDEXES.md](INDEXES.md) for index definitions._
-
----
+| Column       | Type        | Nullable | Default             | Notes                                       |
+| ------------ | ----------- | -------- | ------------------- | ------------------------------------------- |
+| `id`         | uuid        | No       | `gen_random_uuid()` | PK — stable internal user ID               |
+| `auth_id`    | uuid        | No       | —                   | FK → `auth.users(id)` ON UPDATE/DELETE CASCADE; UNIQUE |
+| `username`   | text        | No       | `'changeling'`      | Display name; CHECK: `length(trim(username)) > 0` |
+| `is_admin`   | boolean     | No       | `false`             | Admin flag; checked by `public.is_admin()`  |
+| `created_at` | timestamptz | No       | `now()`             | Account creation time                       |
+| `updated_at` | timestamptz | No       | `now()`             | Auto-updated by trigger                     |
+| `deleted_at` | timestamptz | Yes      | `NULL`              | Soft-delete; NULL = active                  |
 
 ### public.user_settings
 
-**Purpose:** User preferences and account settings (theme, notifications, etc.).
+Per-user preferences. One row per user; auto-created on signup via trigger.
 
-**Key Design Points:**
+| Column        | Type        | Nullable | Default  | Notes                                    |
+| ------------- | ----------- | -------- | -------- | ---------------------------------------- |
+| `user_id`     | uuid        | No       | —        | PK + FK → `users(id)` ON DELETE CASCADE  |
+| `theme`       | text        | No       | `'auto'` | CHECK: `theme IN ('light', 'dark', 'auto')` |
+| `language`    | text        | No       | `'en'`   | Language preference                       |
+| `timezone`    | text        | No       | `'UTC'`  | Timezone preference                       |
+| `preferences` | jsonb       | No       | `'{}'`   | Future: notifications, accessibility      |
+| `updated_at`  | timestamptz | No       | `now()`  | Auto-updated by trigger                   |
 
-- Optional extended user data without bloating main `users` table
-- Future expansion: notifications, theme preferences, privacy settings
-- Linked to users.id; deleted when user deleted (CASCADE)
+### Utility Functions
 
-**Fields:**
-
-| Field        | Type      | Nullable | Default             | Purpose                                     |
-| ------------ | --------- | -------- | ------------------- | ------------------------------------------- |
-| `id`         | uuid      | No       | `gen_random_uuid()` | Primary key                                 |
-| `user_id`    | uuid      | No       | —                   | Foreign key to `users.id` (CASCADE)         |
-| `theme`      | text      | Yes      | 'dark'              | UI theme preference (dark, light, auto)     |
-| `updated_at` | timestamp | No       | now()               | Audit timestamp; when settings last changed |
-
-**Constraints:**
-
-- `user_settings_pkey`: Primary key
-- `user_settings_user_id_fkey`: Foreign key to users.id (CASCADE DELETE)
-
----
-
-### public.invite_links
-
-**Purpose:** Time-limited shareable invite tokens for joining worlds (24-hour expiry).
-
-**Key Design Points:**
-
-- Public table: unauthenticated users can query by token
-- Token is UUID (strongly random); brute-force proof
-- Expiration (24h) auto-expires stale invites
-- `world_id` nullable for future org-level invites
-- `created_by` for audit trails
-
-**Fields:**
-
-| Field        | Type      | Nullable | Default             | Purpose                                 |
-| ------------ | --------- | -------- | ------------------- | --------------------------------------- |
-| `id`         | uuid      | No       | `gen_random_uuid()` | Primary key                             |
-| `world_id`   | uuid      | Yes      | null                | Foreign key to `worlds.worlds.world_id` |
-| `created_by` | uuid      | Yes      | null                | Foreign key to `users.id`; audit trail  |
-| `token`      | uuid      | No       | `gen_random_uuid()` | Unique shareable token                  |
-| `expires_at` | timestamp | No       | now() + 24h         | Expiration time; queries filter by this |
-| `created_at` | timestamp | Yes      | now()               | Audit timestamp; when generated         |
-
-**Constraints:**
-
-- `invite_links_pkey`: Primary key
-- `invite_links_token_key`: Unique constraint on token
-- `invite_links_created_by_fkey`: Foreign key (no CASCADE; invites persist)
-- `invite_links_world_id_fkey`: Foreign key (CASCADE DELETE; deleting world removes invites)
-
-_See [INDEXES.md](INDEXES.md) for index definitions._
+| Function | Returns | Purpose |
+| --- | --- | --- |
+| `public.update_timestamp()` | trigger | Generic `BEFORE UPDATE` trigger; sets `updated_at = now()` only if row data actually changed |
+| `public.get_current_user_id()` | uuid | Returns internal `users.id` for current auth session; excludes soft-deleted users; SECURITY DEFINER |
+| `public.get_user_auth_id(p_user_id uuid)` | uuid | Maps `users.id` → `auth_id`; SECURITY DEFINER |
+| `public.is_admin()` | boolean | Returns `true` if current auth user has `is_admin = true`; checks DB not JWT; SECURITY DEFINER |
+| `public.handle_new_user()` | trigger | Auth signup trigger on `auth.users`; creates `users` row + `user_settings` row; idempotent via ON CONFLICT |
 
 ---
 
-# WORLDS Schema
+## WORLDS Schema (002_worlds_schema.sql)
 
-Campaign worlds and access control.
-
-## Enums
-
-### worlds.world_access_role
-
-**Purpose:** Defines the role types for world access grants.
-
-**Values:**
-
-- `'dm'` — Dungeon Master; owns the world; full control
-- `'gm'` — Game Master; co-DM (future multi-DM support)
-- `'player'` — Player character; normal participant
-- `'spectator'` — Observer; can view but not participate (future)
-- `'observer'` — Background observer; minimal permissions (future)
-
-**SQL:**
+### worlds.world_access_role (ENUM)
 
 ```sql
 CREATE TYPE worlds.world_access_role AS ENUM ('dm', 'gm', 'player', 'spectator', 'observer');
 ```
 
----
-
-## Tables
+| Value        | Description                                                |
+| ------------ | ---------------------------------------------------------- |
+| `dm`         | Owner/full authority; can delete/modify worlds             |
+| `gm`         | Co-owner; same visibility as DM, cannot delete worlds      |
+| `player`     | Limited visibility; can edit own character data             |
+| `spectator`  | Read-only with DM view (sharing modules between DMs)       |
+| `observer`   | Read-only with player view (sharing character data)        |
 
 ### worlds.worlds
 
-**Purpose:** Represents a D&D campaign world. Each world has one owner (DM) and multiple participants via `world_access`.
+Represents a D&D campaign world. One owner per world.
 
-**Key Design Points:**
+| Column          | Type        | Nullable | Default             | Notes                                                |
+| --------------- | ----------- | -------- | ------------------- | ---------------------------------------------------- |
+| `world_id`      | uuid        | No       | `gen_random_uuid()` | PK                                                   |
+| `owner_id`      | uuid        | No       | —                   | FK → `public.users(id)` ON UPDATE/DELETE CASCADE     |
+| `name`          | text        | No       | `'World'`           | CHECK: `length(trim(name)) > 0`                     |
+| `description`   | text        | Yes      | `''`                | Campaign notes/lore                                  |
+| `system`        | text        | Yes      | `'D&D 5e'`          | Game system ID                                       |
+| `is_dm`         | boolean     | No       | `true`              | Reserved for future multi-DM support                 |
+| `map_image_url` | text        | Yes      | `NULL`              | Optional world map image URL                         |
+| `settings`      | jsonb       | No       | `'{}'`              | Extensible: homebrew rules, preferences              |
+| `created_at`    | timestamptz | No       | `now()`             | —                                                    |
+| `updated_at`    | timestamptz | No       | `now()`             | Auto-updated by trigger                              |
+| `deleted_at`    | timestamptz | Yes      | `NULL`              | Soft-delete; NULL = active; filtered by RLS          |
 
-- One owner per world; future support for multi-DM via role transitions
-- `system` stores game system ID (D&D 5e, Pathfinder 2e, etc.)
-- `is_dm` reserved for future multi-DM; currently always true
-- No soft delete; deletion cascades to `world_access` and related tables
-- `map_image_url` optional for visual campaigns
-
-**Fields:**
-
-| Field           | Type      | Nullable | Default             | Purpose                                           |
-| --------------- | --------- | -------- | ------------------- | ------------------------------------------------- |
-| `world_id`      | uuid      | No       | `gen_random_uuid()` | Primary key; stable world reference               |
-| `owner_id`      | uuid      | No       | —                   | Foreign key to `users.id`; world owner (DM)       |
-| `name`          | text      | No       | 'World'             | Campaign name; displayed in UI                    |
-| `description`   | text      | Yes      | ''                  | Campaign notes/lore; optional metadata            |
-| `system`        | text      | Yes      | 'D&D 5e'            | Game system ID; determines rules/character sheets |
-| `created_at`    | timestamp | Yes      | now()               | Audit timestamp                                   |
-| `updated_at`    | timestamp | Yes      | now()               | Audit timestamp; cache invalidation trigger       |
-| `map_image_url` | text      | Yes      | null                | Optional world map image URL                      |
-| `is_dm`         | boolean   | No       | true                | Reserved for multi-DM support                     |
-
-**Constraints:**
-
-- `worlds_pkey`: Primary key
-- `worlds_owner_id_fkey`: Foreign key to users.id (CASCADE DELETE)
-
-_See [INDEXES.md](INDEXES.md) for index definitions._
-
----
+**Trigger**: `trg_prevent_owner_change` — prevents changing `owner_id` via UPDATE.
 
 ### worlds.world_access
 
-**Purpose:** Join table implementing role-based access control (RBAC). Each row grants a user specific access with a defined role.
+RBAC join table. One row per (world, user) pair. Owner gets auto-created row with role `'dm'`.
 
-**Key Design Points:**
+| Column        | Type                     | Nullable | Default             | Notes                                    |
+| ------------- | ------------------------ | -------- | ------------------- | ---------------------------------------- |
+| `id`          | uuid                     | No       | `gen_random_uuid()` | PK                                       |
+| `world_id`    | uuid                     | No       | —                   | FK → `worlds(world_id)` ON DELETE CASCADE |
+| `user_id`     | uuid                     | No       | —                   | FK → `public.users(id)` ON DELETE CASCADE |
+| `user_role`   | `worlds.world_access_role` | No     | `'player'`          | Role for this membership                 |
+| `permissions` | jsonb                    | Yes      | `NULL`              | Future: per-user capability overrides    |
+| `created_at`  | timestamptz              | No       | `now()`             | —                                        |
+| `updated_at`  | timestamptz              | No       | `now()`             | Auto-updated by trigger                  |
 
-- Flexible role system: `user_role` stored as `worlds.world_access_role` ENUM
-- Unique constraint on `(world_id, user_id)` prevents duplicate memberships
-- Optional `permissions` JSONB for future per-user capability overrides
-- Cascading deletes ensure no orphaned access rows
+**Unique**: `(world_id, user_id)` — one membership per user per world.
 
-**Fields:**
+### worlds.invite_links
 
-| Field         | Type                       | Nullable | Default             | Purpose                                      |
-| ------------- | -------------------------- | -------- | ------------------- | -------------------------------------------- |
-| `id`          | uuid                       | No       | `gen_random_uuid()` | Primary key; stable access grant ref         |
-| `world_id`    | uuid                       | No       | —                   | Foreign key to `worlds.world_id`             |
-| `user_id`     | uuid                       | No       | —                   | Foreign key to `users.id`                    |
-| `user_role`   | `worlds.world_access_role` | No       | 'player'            | Role identifier (dm, player, spectator, etc) |
-| `permissions` | jsonb                      | Yes      | null                | Future capability override structure         |
-| `created_at`  | timestamp                  | No       | now()               | Audit timestamp; when user added to world    |
+Time-limited shareable invite tokens for joining worlds.
 
-**Constraints:**
+| Column       | Type        | Nullable | Default                        | Notes                                         |
+| ------------ | ----------- | -------- | ------------------------------ | --------------------------------------------- |
+| `id`         | uuid        | No       | `gen_random_uuid()`            | PK                                            |
+| `world_id`   | uuid        | No       | —                              | FK → `worlds(world_id)` ON DELETE CASCADE     |
+| `created_by` | uuid        | Yes      | `NULL`                         | FK → `public.users(id)` ON DELETE SET NULL    |
+| `token`      | uuid        | No       | `gen_random_uuid()`            | UNIQUE; shareable invite token                |
+| `expires_at` | timestamptz | No       | `now() + interval '24 hours'`  | Expiration time                               |
+| `created_at` | timestamptz | No       | `now()`                        | —                                             |
 
-- `world_access_pkey`: Primary key
-- `world_access_user_id_fkey`: Foreign key to users.id (CASCADE DELETE)
-- `world_access_world_id_fkey`: Foreign key to worlds.world_id (CASCADE DELETE)
-- `world_access_world_user_key`: Unique on `(world_id, user_id)` (prevents duplicates)
+### RPC Functions (worlds schema)
 
-_See [INDEXES.md](INDEXES.md) and [TRIGGERS.md](TRIGGERS.md) for index and trigger definitions._
-
----
-
-# FEATURE_FLAGS Schema
-
-Feature control system with entitlements and overrides.
-
-## Tables
-
-### feature_flags.feature_flags
-
-**Purpose:** Global feature flag definitions. Available to all users unless restricted by entitlements/overrides.
-
-**Key Design Points:**
-
-- `flag_name` is the unique identifier; used throughout app
-- `kind` describes the type (boolean, percentage, string, etc.)
-- All flags public by default; access control via RLS + entitlements
-- `enabled` is the global default; overridden per-user via entitlements/overrides
-
-**Fields:**
-
-| Field         | Type      | Nullable | Default   | Purpose                                 |
-| ------------- | --------- | -------- | --------- | --------------------------------------- |
-| `flag_name`   | text      | No       | —         | Primary key; feature identifier         |
-| `enabled`     | boolean   | No       | false     | Global default; overridable per-user    |
-| `kind`        | text      | No       | 'boolean' | Type: boolean, percentage, string, etc. |
-| `description` | text      | Yes      | ''        | Human-readable purpose & usage          |
-| `created_at`  | timestamp | Yes      | now()     | Audit timestamp                         |
-| `updated_at`  | timestamp | Yes      | now()     | Audit timestamp; cache invalidation     |
-
-**Constraints:**
-
-- `feature_flags_pkey`: Primary key on `flag_name`
-
-_See [INDEXES.md](INDEXES.md) for index definitions._
+| Function | Purpose |
+| --- | --- |
+| `worlds.resolve_invite_token(p_token uuid)` | Resolves token → world_id (SECURITY DEFINER; available to anon) |
+| `worlds.create_invite_link(p_world_id, p_hours_valid)` | Creates invite link (owner/admin only; 1–168 hours) |
+| `worlds.delete_invite_link(p_token uuid)` | Deletes invite by token (owner/admin only; no-op if not found) |
+| `worlds.get_world_owner_auth_id(p_world_id uuid)` | Returns auth_id of world owner |
+| `worlds.user_owns_world(p_user_id, p_world_id)` | Returns true if user owns active world |
+| `worlds.user_has_access(p_user_id, p_world_id)` | Returns true if user is owner OR member of active world |
+| `worlds.change_user_role(p_world_id, p_target_user_id, p_new_role)` | Change member role (owner/GM only; validates permissions) |
+| `worlds.join_world_with_invite(p_world_id, p_token, p_user_role)` | Join world via invite token (player/spectator/observer only) |
+| `worlds.leave_world(p_world_id)` | Remove current user's membership (owners cannot leave) |
 
 ---
 
-### feature_flags.entitlements
+## FEATURE_FLAG Schema (003_feature_flags_schema.sql)
 
-**Purpose:** User feature entitlements with optional expiry and soft-delete support.
+### feature_flag.feature_flags
 
-**Key Design Points:**
+Master list of feature flags. Resolution order: overrides > entitlements > rollouts > `enabled`.
 
-- Links `users.id` to entitlement `key` (references feature flag name)
-- `is_active` soft-delete flag; marked false by background job when expired
-- `remind_user` tracks whether user was reminded before expiry
-- `expires_at` null = never expires; used for time-limited trials/promotions
-- Unique constraint on `(user_id, key)` prevents duplicate entitlements
+| Column        | Type        | Nullable | Default | Notes                                   |
+| ------------- | ----------- | -------- | ------- | --------------------------------------- |
+| `flag_name`   | text        | No       | —       | PK — unique flag identifier             |
+| `enabled`     | boolean     | No       | `false` | Global default; overridable per-user    |
+| `kind`        | text        | No       | —       | Type: `'boolean'`, `'string'`, `'percentage'`, `'entitlement'` |
+| `description` | text        | Yes      | `NULL`  | Human-readable purpose                  |
+| `created_at`  | timestamptz | No       | `now()` | —                                       |
+| `updated_at`  | timestamptz | No       | `now()` | Auto-updated by trigger                 |
 
-**Fields:**
+### feature_flag.entitlements
 
-| Field         | Type      | Nullable | Default             | Purpose                                      |
-| ------------- | --------- | -------- | ------------------- | -------------------------------------------- |
-| `id`          | uuid      | No       | `gen_random_uuid()` | Primary key; stable entitlement ref          |
-| `user_id`     | uuid      | No       | —                   | Foreign key to `users.id`                    |
-| `key`         | text      | No       | —                   | Entitlement key (feature flag name)          |
-| `is_active`   | boolean   | No       | true                | Soft-delete flag; false = revoked/expired    |
-| `remind_user` | boolean   | No       | false               | True = user should be reminded before expiry |
-| `created_at`  | timestamp | No       | now()               | Audit timestamp; when granted                |
-| `updated_at`  | timestamp | No       | now()               | Audit timestamp; when modified               |
-| `expires_at`  | timestamp | Yes      | null                | Expiry time (null = never); cleanup trigger  |
+User capability unlocks (premium, beta, etc.). Can be permanent or temporary.
 
-**Constraints:**
+| Column        | Type        | Nullable | Default             | Notes                                               |
+| ------------- | ----------- | -------- | ------------------- | --------------------------------------------------- |
+| `id`          | uuid        | No       | `gen_random_uuid()` | PK                                                  |
+| `user_id`     | uuid        | Yes      | —                   | FK → `public.users(id)` ON DELETE CASCADE; NULL for org-wide |
+| `key`         | text        | No       | —                   | Entitlement identifier (e.g., `'premium_subscription'`) |
+| `is_active`   | boolean     | No       | `true`              | Manual revoke + auto-marked false when expired       |
+| `remind_user` | boolean     | No       | `false`             | Flag to prompt user for renewal                      |
+| `created_at`  | timestamptz | No       | `now()`             | —                                                    |
+| `updated_at`  | timestamptz | No       | `now()`             | Auto-updated by trigger                              |
+| `expires_at`  | timestamptz | Yes      | `NULL`              | NULL = permanent; CHECK: `expires_at > created_at`   |
 
-- `entitlements_pkey`: Primary key
-- `entitlements_user_id_fkey`: Foreign key to users.id (CASCADE DELETE)
-- `entitlements_user_key_key`: Unique on `(user_id, key)` (prevents duplicates)
-- `entitlements_key_key`: **Org-wide unique** on `(key)` WHERE `user_id IS NULL` (org-level entitlements)
+**Constraints**: UNIQUE `(user_id, key)`; partial UNIQUE on `(key) WHERE user_id IS NULL` for org-wide.
 
-_See [INDEXES.md](INDEXES.md) for index definitions._
+### feature_flag.feature_flag_overrides
 
----
+Admin tool to override feature flags per user.
 
-### feature_flags.entitlements_overrides
+| Column       | Type        | Nullable | Default             | Notes                                                    |
+| ------------ | ----------- | -------- | ------------------- | -------------------------------------------------------- |
+| `id`         | uuid        | No       | `gen_random_uuid()` | PK                                                       |
+| `user_id`    | uuid        | No       | —                   | FK → `public.users(id)` ON DELETE CASCADE                |
+| `flag_name`  | text        | No       | —                   | FK → `feature_flags(flag_name)` ON UPDATE/DELETE CASCADE |
+| `enabled`    | boolean     | No       | —                   | true = force ON, false = force OFF                       |
+| `expires_at` | timestamptz | Yes      | `NULL`              | NULL = permanent override                                |
+| `reason`     | text        | Yes      | `NULL`              | Admin notes                                              |
+| `created_by` | uuid        | Yes      | `NULL`              | FK → `public.users(id)` ON DELETE SET NULL               |
+| `created_at` | timestamptz | No       | `now()`             | —                                                        |
+| `updated_at` | timestamptz | No       | `now()`             | Auto-updated by trigger                                  |
+| `revoked`    | boolean     | No       | `false`             | Soft-revoke for audit trail                              |
 
-**Purpose:** Admin-created temporary grants/revokes of entitlements, independent of base entitlements.
+**Unique**: `(user_id, flag_name)` — one override per user per flag.
 
-**Key Design Points:**
+### feature_flag.entitlements_overrides
 
-- `action: 'grant'` = admin grants; `'revoke'` = admin revokes
-- `expires_at` independent from base entitlement expiry
-- `revoked` soft-delete flag (admin can unrevoke or let expire)
-- Allows fine-grained admin control for testing/special cases
+Admin tool to temporarily grant/revoke entitlements.
 
-**Fields:**
+| Column            | Type        | Nullable | Default             | Notes                                      |
+| ----------------- | ----------- | -------- | ------------------- | ------------------------------------------ |
+| `id`              | uuid        | No       | `gen_random_uuid()` | PK                                         |
+| `user_id`         | uuid        | No       | —                   | FK → `public.users(id)` ON DELETE CASCADE  |
+| `entitlement_key` | text        | No       | —                   | The entitlement key being overridden       |
+| `is_active`       | boolean     | No       | —                   | true = force grant, false = force revoke   |
+| `expires_at`      | timestamptz | Yes      | `NULL`              | NULL = permanent override                  |
+| `reason`          | text        | Yes      | `NULL`              | Admin notes                                |
+| `created_by`      | uuid        | Yes      | `NULL`              | FK → `public.users(id)` ON DELETE SET NULL |
+| `created_at`      | timestamptz | No       | `now()`             | —                                          |
+| `updated_at`      | timestamptz | No       | `now()`             | Auto-updated by trigger                    |
+| `revoked`         | boolean     | No       | `false`             | Soft-revoke for audit trail                |
 
-| Field         | Type      | Nullable | Default             | Purpose                                        |
-| ------------- | --------- | -------- | ------------------- | ---------------------------------------------- |
-| `id`          | uuid      | No       | `gen_random_uuid()` | Primary key                                    |
-| `user_id`     | uuid      | No       | —                   | Foreign key to `users.id`                      |
-| `target_name` | text      | No       | —                   | Entitlement key being overridden               |
-| `action`      | text      | No       | —                   | 'grant' or 'revoke' (admin action)             |
-| `expires_at`  | timestamp | Yes      | null                | Override expiry (independent of base)          |
-| `revoked`     | boolean   | No       | false               | Soft-delete flag                               |
-| `reason`      | text      | Yes      | null                | Admin reason for override                      |
-| `created_by`  | uuid      | Yes      | null                | Foreign key to `users.id`; which admin created |
-| `created_at`  | timestamp | No       | now()               | Audit timestamp                                |
-| `updated_at`  | timestamp | No       | now()               | Audit timestamp                                |
+**Unique**: `(user_id, entitlement_key)` — one override per user per key.
 
-**Constraints:**
+### feature_flag.feature_flag_rollouts
 
-- `entitlements_overrides_pkey`: Primary key
-- `entitlements_overrides_user_id_fkey`: Foreign key to users.id (CASCADE DELETE)
-- `entitlements_overrides_created_by_fkey`: Foreign key to users.id (no CASCADE; preserves admin audit)
+Percentage-based A/B rollout. Users bucketed by FNV-1a hash of (user_id + seed).
 
-_See [INDEXES.md](INDEXES.md) for index definitions._
+| Column        | Type        | Nullable | Default             | Notes                                                    |
+| ------------- | ----------- | -------- | ------------------- | -------------------------------------------------------- |
+| `id`          | uuid        | No       | `gen_random_uuid()` | PK                                                       |
+| `flag_name`   | text        | No       | —                   | FK → `feature_flags(flag_name)` ON UPDATE/DELETE CASCADE; UNIQUE |
+| `percentage`  | smallint    | No       | —                   | 0–100; CHECK enforced                                    |
+| `seed`        | text        | Yes      | `NULL`              | Optional re-seed to re-bucket users                      |
+| `created_at`  | timestamptz | No       | `now()`             | —                                                        |
+| `updated_at`  | timestamptz | No       | `now()`             | Auto-updated by trigger                                  |
+| `created_by`  | uuid        | Yes      | `NULL`              | FK → `public.users(id)` ON DELETE SET NULL               |
+| `description` | text        | Yes      | `NULL`              | —                                                        |
+| `is_active`   | boolean     | No       | `true`              | Enable/disable without deleting                          |
 
----
+### Helper Functions
 
-### feature_flags.feature_flag_overrides
-
-**Purpose:** Per-user feature flag overrides (admin testing, A/B testing, etc.).
-
-**Key Design Points:**
-
-- Simplified schema (003 redesign): only flags, not entitlements
-- `target_name` is the feature flag name being overridden
-- `enabled` true/false can override global flag default
-- `revoked` soft-delete; `expires_at` for time-limited overrides
-- Unique constraint on `(user_id, target_name)` prevents duplicate overrides
-
-**Fields:**
-
-| Field         | Type      | Nullable | Default             | Purpose                                |
-| ------------- | --------- | -------- | ------------------- | -------------------------------------- |
-| `id`          | uuid      | No       | `gen_random_uuid()` | Primary key                            |
-| `user_id`     | uuid      | No       | —                   | Foreign key to `users.id`              |
-| `target_name` | text      | No       | —                   | Feature flag name being overridden     |
-| `enabled`     | boolean   | No       | —                   | Override value (true/false)            |
-| `expires_at`  | timestamp | Yes      | null                | Override expiry (null = permanent)     |
-| `revoked`     | boolean   | No       | false               | Soft-delete flag                       |
-| `reason`      | text      | Yes      | null                | Admin reason for override              |
-| `created_by`  | uuid      | Yes      | null                | Foreign key to `users.id`; which admin |
-| `created_at`  | timestamp | No       | now()               | Audit timestamp                        |
-| `updated_at`  | timestamp | No       | now()               | Audit timestamp                        |
-
-**Constraints:**
-
-- `feature_flag_overrides_pkey`: Primary key
-- `feature_flag_overrides_user_id_fkey`: Foreign key to users.id (CASCADE DELETE)
-- `feature_flag_overrides_created_by_fkey`: Foreign key to users.id (no CASCADE)
-- `feature_flag_overrides_user_target_key`: Unique on `(user_id, target_name)` (prevents duplicates)
-
-_See [INDEXES.md](INDEXES.md) for index definitions._
+| Function | Purpose |
+| --- | --- |
+| `feature_flag.mark_expired_entitlements_inactive()` | Sets `is_active = false` for expired entitlements; call via cron/app code |
 
 ---
 
-### feature_flags.feature_flag_rollouts
+## AUDIT Schema (004_audit_schema.sql)
 
-**Purpose:** A/B rollout configuration for gradual feature releases.
+### audit.audit_events
 
-**Key Design Points:**
+Unified immutable audit log. No foreign keys intentionally — records persist after source data deletion.
 
-- `percentage: 0-100` controls rollout %
-- `seed` optional for consistent bucketing across rebalances
-- `is_active` enables/disables rollout without deleting config
-- Client applies rollout logic: `userHash % 100 < percentage`
+| Column         | Type        | Nullable | Default             | Notes                                          |
+| -------------- | ----------- | -------- | ------------------- | ---------------------------------------------- |
+| `id`           | uuid        | No       | `gen_random_uuid()` | PK                                             |
+| `table_schema` | text        | No       | —                   | Source schema: `public`, `worlds`, `feature_flag` |
+| `table_name`   | text        | No       | —                   | Source table name                              |
+| `record_id`    | text        | No       | —                   | PK of affected row (text to handle uuid/text)  |
+| `event_type`   | text        | No       | —                   | `'insert'`, `'update'`, `'delete'`             |
+| `initiated_by` | uuid        | Yes      | `NULL`              | `public.users.id`; NULL for service_role/system |
+| `old_data`     | jsonb       | Yes      | `NULL`              | Row state before change (NULL on INSERT)       |
+| `new_data`     | jsonb       | Yes      | `NULL`              | Row state after change (NULL on DELETE)         |
+| `created_at`   | timestamptz | No       | `now()`             | When the audit event was recorded              |
 
-**Fields:**
+### audit.log_change() (Trigger Function)
 
-| Field        | Type      | Nullable | Default             | Purpose                                   |
-| ------------ | --------- | -------- | ------------------- | ----------------------------------------- |
-| `id`         | uuid      | No       | `gen_random_uuid()` | Primary key                               |
-| `flag_name`  | text      | No       | —                   | Feature flag name; links to feature_flags |
-| `percentage` | integer   | No       | —                   | Rollout % (0-100); client bucketing rule  |
-| `seed`       | text      | Yes      | null                | Optional seed for consistent bucketing    |
-| `is_active`  | boolean   | No       | true                | Enable/disable rollout without deleting   |
-| `created_at` | timestamp | No       | now()               | Audit timestamp                           |
-| `updated_at` | timestamp | No       | now()               | Audit timestamp                           |
+Generic SECURITY DEFINER trigger function. Auto-detects schema, table, and PK (tries `id`, `world_id`, `user_id`, `flag_name`, `key`). Attached to all tracked tables via `AFTER INSERT OR UPDATE OR DELETE` triggers.
 
-**Constraints:**
-
-- `feature_flag_rollouts_pkey`: Primary key
-- `feature_flag_rollouts_flag_name_fkey`: Foreign key to feature_flags.flag_name (CASCADE DELETE)
-
-_See [INDEXES.md](INDEXES.md) for index definitions._
+**Tracked tables**: `public.users`, `public.user_settings`, `worlds.worlds`, `worlds.world_access`, `worlds.invite_links`, `feature_flag.feature_flags`, `feature_flag.entitlements`, `feature_flag.entitlements_overrides`, `feature_flag.feature_flag_overrides`, `feature_flag.feature_flag_rollouts`
 
 ---
 
-# AUDIT Schema
-
-Immutable audit log for compliance and debugging.
-
-## Tables
-
-### audit.events
-
-**Purpose:** Unified immutable audit log capturing all INSERT/UPDATE/DELETE operations across tracked tables.
-
-**Key Design Points:**
-
-- No foreign keys intentionally; audit records persist after source data deletion
-- `table_schema` + `table_name` + `record_id` identifies the affected row
-- `initiated_by` null for service_role or system operations
-- `old_data`/`new_data` JSONB snapshots enable full historical reconstruction
-- Only writable via SECURITY DEFINER triggers; not directly by API
-
-**Fields:**
-
-| Field          | Type      | Nullable | Default             | Purpose                                           |
-| -------------- | --------- | -------- | ------------------- | ------------------------------------------------- |
-| `id`           | uuid      | No       | `gen_random_uuid()` | Primary key; unique audit event ID                |
-| `table_schema` | text      | No       | —                   | Source schema (public, worlds, feature_flags)     |
-| `table_name`   | text      | No       | —                   | Source table name                                 |
-| `record_id`    | text      | No       | —                   | PK of affected row (text handles uuid/text)       |
-| `event_type`   | text      | No       | —                   | 'insert', 'update', or 'delete'                   |
-| `initiated_by` | uuid      | Yes      | null                | User who initiated change (null for service_role) |
-| `old_data`     | jsonb     | Yes      | null                | Row state before UPDATE/DELETE (null on INSERT)   |
-| `new_data`     | jsonb     | Yes      | null                | Row state after INSERT/UPDATE (null on DELETE)    |
-| `created_at`   | timestamp | No       | now()               | Audit timestamp; when event was logged            |
-
-**Constraints:**
-
-- `audit_events_pkey`: Primary key
-
-_See [INDEXES.md](INDEXES.md) for index definitions._
-
----
-
-## Tracked Tables (Audit Triggers)
-
-Audit triggers attached to all tables in: public, worlds, feature_flags schemas.
-
-**Public Schema:**
-
-- public.users
-- public.user_settings
-- public.invite_links
-
-**Worlds Schema:**
-
-- worlds.worlds
-- worlds.world_access
-
-**Feature_Flags Schema:**
-
-- feature_flags.feature_flags
-- feature_flags.entitlements
-- feature_flags.entitlements_overrides
-- feature_flags.feature_flag_overrides
-- feature_flags.feature_flag_rollouts
-
-_See [TRIGGERS.md](TRIGGERS.md) for trigger implementation._
-
----
-
-## Migration & Version Notes
-
-These schemas represent the **Phase 1 complete** database design (migrations 001-004). Key features:
-
-- ✅ Multi-schema architecture (separation of concerns)
-- ✅ RBAC with flexible roles (future multi-DM support)
-- ✅ Feature flags with entitlements & overrides
-- ✅ A/B rollout support
-- ✅ Immutable audit trail
-- ✅ Soft-delete support for entitlements
-- ✅ Admin override system for testing
-
-_See [INDEXES.md](INDEXES.md), [RLS.md](RLS.md), [TRIGGERS.md](TRIGGERS.md), and [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md) for supporting infrastructure._
-
----
-
-_Last Updated: Feb 8, 2026 (Post-Migration 001-004)_
+_Last Updated: Feb 11, 2026 (Post-Audit — matches migrations 001–004)_

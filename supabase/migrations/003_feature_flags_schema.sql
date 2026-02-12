@@ -7,9 +7,13 @@
 -- PREREQUISITES: public.users table must exist
 -- AFTER THIS: Run 004_audit_schema.sql
 -- ============================================================
+
 -- IMPORTANT: After running this file, add 'feature_flags' to:
 --   Supabase Dashboard → Settings → API → Exposed Schemas
 -- ============================================================
+
+-- This migration creates objects in the `feature_flags` schema.
+-- Expose `feature_flags` (not `public`) in Supabase Dashboard → API → Exposed Schemas.
 
 BEGIN;
 
@@ -17,12 +21,19 @@ BEGIN;
 -- SCHEMA
 -- ========================
 
--- NOTE: For development convenience these objects are created in `public` schema.
--- If you later want a separate `feature_flags` schema, revert this file and
--- recreate the schema-specific objects. Using `public` keeps REST endpoints
--- stable for development environments.
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
+CREATE SCHEMA IF NOT EXISTS feature_flags;
+
+GRANT USAGE ON SCHEMA feature_flags TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA feature_flags TO anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA feature_flags TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA feature_flags TO anon, authenticated, service_role;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA feature_flags
+  GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA feature_flags
+  GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA feature_flags
+  GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
 
 -- ========================
 -- TABLES
@@ -37,7 +48,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 --   2. entitlements (user-granted capabilities)
 --   3. feature_flag_rollouts (percentage-based A/B)
 --   4. feature_flags.enabled (global default)
-CREATE TABLE public.feature_flags (
+CREATE TABLE feature_flags.feature_flags (
   flag_name   text        NOT NULL,
   enabled     boolean     NOT NULL DEFAULT false,
   kind        text        NOT NULL,   -- 'boolean', 'string', 'percentage', 'entitlement'
@@ -48,14 +59,11 @@ CREATE TABLE public.feature_flags (
   CONSTRAINT feature_flags_pkey PRIMARY KEY (flag_name)
 );
 
--- Explicit: allow public read at the SQL privilege level to match the public-read policy.
--- RLS still governs row-level access; this grant ensures PostgREST can expose the endpoint.
-GRANT SELECT ON public.feature_flags TO PUBLIC;
 
 -- ENTITLEMENTS: Grants explicit feature access to specific users.
 -- Each entitlement is a capability unlock (premium, beta, admin feature, etc.).
 -- Entitlements can be permanent (expires_at = NULL) or temporary.
-CREATE TABLE public.entitlements (
+CREATE TABLE feature_flags.entitlements (
   id          uuid        NOT NULL DEFAULT gen_random_uuid(),
   user_id     uuid        NULL,       -- Nullable for future org-wide entitlements
   key         text        NOT NULL,   -- Entitlement identifier (e.g., 'premium_subscription')
@@ -78,13 +86,13 @@ CREATE TABLE public.entitlements (
 
 -- Org-wide entitlements: ensure uniqueness when user_id is NULL
 CREATE UNIQUE INDEX one_org_entitlement_per_key
-  ON public.entitlements (key)
+  ON feature_flags.entitlements (key)
   WHERE user_id IS NULL;
 
 -- FEATURE_FLAG_OVERRIDES: Admin tool to override global feature flags per user.
 -- Supports temporarily enabling/disabling features for testing, early access,
 -- or bug mitigation.
-CREATE TABLE public.feature_flag_overrides (
+CREATE TABLE feature_flags.feature_flag_overrides (
   id          uuid        NOT NULL DEFAULT gen_random_uuid(),
   user_id     uuid        NOT NULL,
   flag_name   text        NOT NULL,   -- The flag being overridden
@@ -102,17 +110,17 @@ CREATE TABLE public.feature_flag_overrides (
   CONSTRAINT overrides_created_by_fkey FOREIGN KEY (created_by)
     REFERENCES public.users(id) ON DELETE SET NULL,
   CONSTRAINT overrides_flag_name_fkey FOREIGN KEY (flag_name)
-    REFERENCES public.feature_flags(flag_name) ON DELETE CASCADE
+    REFERENCES feature_flags.feature_flags(flag_name) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 -- Unique: one override per user per flag
 CREATE UNIQUE INDEX idx_overrides_user_flag
-  ON public.feature_flag_overrides (user_id, flag_name);
+  ON feature_flags.feature_flag_overrides (user_id, flag_name);
 
 -- ENTITLEMENTS_OVERRIDES: Admin tool to temporarily grant/revoke entitlements.
 -- Allows admins to override entitlements without modifying the base entitlement rows.
 -- When override expires or is revoked, the entitlement reverts to its original state.
-CREATE TABLE public.entitlements_overrides (
+CREATE TABLE feature_flags.entitlements_overrides (
   id          uuid        NOT NULL DEFAULT gen_random_uuid(),
   user_id     uuid        NOT NULL,
   entitlement_key text     NOT NULL,   -- The entitlement key being overridden
@@ -138,7 +146,7 @@ CREATE TABLE public.entitlements_overrides (
 -- ========================
 -- Users are bucketed by FNV-1a hash of (user_id + seed).
 -- One rollout config per flag (UNIQUE on flag_name).
-CREATE TABLE public.feature_flag_rollouts (
+CREATE TABLE feature_flags.feature_flag_rollouts (
   id          uuid        NOT NULL DEFAULT gen_random_uuid(),
   flag_name   text        NOT NULL,
   percentage  smallint    NOT NULL,   -- 0-100
@@ -152,7 +160,7 @@ CREATE TABLE public.feature_flag_rollouts (
   CONSTRAINT rollouts_pkey PRIMARY KEY (id),
   CONSTRAINT rollouts_flag_name_key UNIQUE (flag_name),
   CONSTRAINT rollouts_flag_name_fkey FOREIGN KEY (flag_name)
-    REFERENCES public.feature_flags(flag_name) ON DELETE CASCADE,
+    REFERENCES feature_flags.feature_flags(flag_name) ON UPDATE CASCADE ON DELETE CASCADE,
   CONSTRAINT rollouts_created_by_fkey FOREIGN KEY (created_by)
     REFERENCES public.users(id) ON DELETE SET NULL,
   CONSTRAINT ck_percentage_valid CHECK (percentage >= 0 AND percentage <= 100)
@@ -164,71 +172,71 @@ CREATE TABLE public.feature_flag_rollouts (
 
 -- feature_flags: Recently modified flags (admin dashboard sorting)
 CREATE INDEX idx_feature_flags_updated_at
-  ON public.feature_flags USING btree (updated_at DESC);
+  ON feature_flags.feature_flags USING btree (updated_at DESC);
 
 -- entitlements: Find all entitlements for a user
 CREATE INDEX idx_entitlements_user_id
-  ON public.entitlements USING btree (user_id);
+  ON feature_flags.entitlements USING btree (user_id);
 
 -- entitlements: Find all users with a specific entitlement
 CREATE INDEX idx_entitlements_key
-  ON public.entitlements USING btree (key);
+  ON feature_flags.entitlements USING btree (key);
 
 -- entitlements: Identify expired entitlements for cleanup
 CREATE INDEX idx_entitlements_expires_at
-  ON public.entitlements USING btree (expires_at);
+  ON feature_flags.entitlements USING btree (expires_at);
 
 -- overrides: Find all overrides for a user
 CREATE INDEX idx_overrides_user_id
-  ON public.feature_flag_overrides USING btree (user_id);
+  ON feature_flags.feature_flag_overrides USING btree (user_id);
 
 -- overrides: Expiration cleanup
 CREATE INDEX idx_overrides_expires_at
-  ON public.feature_flag_overrides USING btree (expires_at);
+  ON feature_flags.feature_flag_overrides USING btree (expires_at);
 
 -- entitlements_overrides: Find all overrides for a user
 CREATE INDEX idx_entitlements_overrides_user_id
-  ON public.entitlements_overrides USING btree (user_id);
+  ON feature_flags.entitlements_overrides USING btree (user_id);
 
 -- entitlements_overrides: Expiration cleanup
 CREATE INDEX idx_entitlements_overrides_expires_at
-  ON public.entitlements_overrides USING btree (expires_at);
+  ON feature_flags.entitlements_overrides USING btree (expires_at);
 
 -- entitlements_overrides: Lookup by entitlement key for bulk operations
 CREATE INDEX idx_entitlements_overrides_key
-  ON public.entitlements_overrides USING btree (entitlement_key);
+  ON feature_flags.entitlements_overrides USING btree (entitlement_key);
 
 -- rollouts: Lookup by flag name
 CREATE INDEX idx_rollouts_flag_name
-  ON public.feature_flag_rollouts USING btree (flag_name);
+  ON feature_flags.feature_flag_rollouts USING btree (flag_name);
 
 -- rollouts: Active rollouts by flag (most common query path)
 CREATE INDEX idx_rollouts_flag_name_active
-  ON public.feature_flag_rollouts USING btree (flag_name, is_active);
+  ON feature_flags.feature_flag_rollouts USING btree (flag_name, is_active);
 
 -- rollouts: Filter only active rollouts
 CREATE INDEX idx_rollouts_is_active
-  ON public.feature_flag_rollouts USING btree (is_active);
+  ON feature_flags.feature_flag_rollouts USING btree (is_active);
 
 -- Partial indexes: optimize common filter queries
 -- Find active (non-expired, non-revoked) entitlements using stable is_active column
 CREATE INDEX idx_entitlements_active
-  ON public.entitlements (user_id) 
+  ON feature_flags.entitlements (user_id) 
   WHERE is_active = true;
 
 -- Find active (non-revoked, non-expired) overrides using stable is_active column
 CREATE INDEX idx_overrides_active
-  ON public.feature_flag_overrides (user_id) 
+  ON feature_flags.feature_flag_overrides (user_id) 
   WHERE revoked = false;
 
 -- Find active (non-revoked, non-expired) entitlements_overrides using stable columns
 CREATE INDEX idx_entitlements_overrides_active
-  ON public.entitlements_overrides (user_id) 
+  ON feature_flags.entitlements_overrides (user_id) 
   WHERE revoked = false;
 
 -- Find active rollouts using stable is_active column
 CREATE INDEX idx_rollouts_active_time
-  ON public.feature_flag_rollouts (flag_name) 
+  ON feature_flags.feature_flag_rollouts (flag_name) 
   WHERE is_active = true;
 
 -- ========================
@@ -236,24 +244,24 @@ CREATE INDEX idx_rollouts_active_time
 -- ========================
 
 CREATE TRIGGER trg_feature_flags_updated_at
-  BEFORE UPDATE ON public.feature_flags
+  BEFORE UPDATE ON feature_flags.feature_flags
   FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
 
 CREATE TRIGGER trg_entitlements_updated_at
-  BEFORE UPDATE ON public.entitlements
+  BEFORE UPDATE ON feature_flags.entitlements
   FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
 
 CREATE TRIGGER trg_overrides_updated_at
-  BEFORE UPDATE ON public.feature_flag_overrides
+  BEFORE UPDATE ON feature_flags.feature_flag_overrides
   FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
 
 CREATE TRIGGER trg_rollouts_updated_at
-  BEFORE UPDATE ON public.feature_flag_rollouts
+  BEFORE UPDATE ON feature_flags.feature_flag_rollouts
   FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
 
 -- Auto-update updated_at on entitlements_overrides
 CREATE TRIGGER trg_entitlements_overrides_updated_at
-  BEFORE UPDATE ON public.entitlements_overrides
+  BEFORE UPDATE ON feature_flags.entitlements_overrides
   FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
 
 -- ========================
@@ -263,13 +271,13 @@ CREATE TRIGGER trg_entitlements_overrides_updated_at
 -- Mark expired entitlements as inactive.
 -- Call this via cron job or application code to clean up expired entitlements.
 -- Note: This does NOT delete rows; it sets is_active = false for audit/analytics.
-CREATE OR REPLACE FUNCTION public.mark_expired_entitlements_inactive()
+CREATE OR REPLACE FUNCTION feature_flags.mark_expired_entitlements_inactive()
 RETURNS void
 LANGUAGE SQL
 SECURITY DEFINER
-SET search_path = public
+SET search_path = feature_flags, public
 AS $$
-  UPDATE public.entitlements
+  UPDATE feature_flags.entitlements
   SET is_active = false
   WHERE is_active = true
     AND expires_at IS NOT NULL
@@ -280,111 +288,111 @@ $$;
 -- ROW LEVEL SECURITY
 -- ========================
 
-ALTER TABLE public.feature_flags ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.entitlements ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.feature_flag_overrides ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.entitlements_overrides ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.feature_flag_rollouts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feature_flags.feature_flags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feature_flags.entitlements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feature_flags.feature_flag_overrides ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feature_flags.entitlements_overrides ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feature_flags.feature_flag_rollouts ENABLE ROW LEVEL SECURITY;
 
 -- ---- FEATURE_FLAGS POLICIES ----
 
 -- Anyone can read feature flags (needed for unauthenticated feature gating)
-DROP POLICY IF EXISTS "feature_flags_public_read" ON public.feature_flags;
-CREATE POLICY "feature_flags_public_read" ON public.feature_flags
+DROP POLICY IF EXISTS "feature_flags_public_read" ON feature_flags.feature_flags;
+CREATE POLICY "feature_flags_public_read" ON feature_flags.feature_flags
   FOR SELECT TO PUBLIC
   USING (true);
 
 -- NOTE: INSERT policy removed - feature flags managed server-side only
 -- Use Edge Functions or admin UI for all flag changes
 
-DROP POLICY IF EXISTS "feature_flags_admin_update" ON public.feature_flags;
-CREATE POLICY "feature_flags_admin_update" ON public.feature_flags
+DROP POLICY IF EXISTS "feature_flags_admin_update" ON feature_flags.feature_flags;
+CREATE POLICY "feature_flags_admin_update" ON feature_flags.feature_flags
   FOR UPDATE TO authenticated
   USING (public.is_admin())
   WITH CHECK (public.is_admin());
 
-DROP POLICY IF EXISTS "feature_flags_admin_delete" ON public.feature_flags;
-CREATE POLICY "feature_flags_admin_delete" ON public.feature_flags
+DROP POLICY IF EXISTS "feature_flags_admin_delete" ON feature_flags.feature_flags;
+CREATE POLICY "feature_flags_admin_delete" ON feature_flags.feature_flags
   FOR DELETE TO authenticated
   USING (public.is_admin());
 
 -- ---- ENTITLEMENTS POLICIES ----
 
 -- Users can read their own entitlements
-DROP POLICY IF EXISTS "entitlements_user_read_own" ON public.entitlements;
-CREATE POLICY "entitlements_user_read_own" ON public.entitlements
+DROP POLICY IF EXISTS "entitlements_user_read_own" ON feature_flags.entitlements;
+CREATE POLICY "entitlements_user_read_own" ON feature_flags.entitlements
   FOR SELECT TO authenticated
   USING (user_id = public.get_current_user_id());
 
 -- Admins have full access to all entitlements
-DROP POLICY IF EXISTS "entitlements_admin_full_access" ON public.entitlements;
-CREATE POLICY "entitlements_admin_full_access" ON public.entitlements
+DROP POLICY IF EXISTS "entitlements_admin_full_access" ON feature_flags.entitlements;
+CREATE POLICY "entitlements_admin_full_access" ON feature_flags.entitlements
   FOR ALL TO authenticated
   USING (public.is_admin());
 
 -- ---- ENTITLEMENTS_OVERRIDES POLICIES ----
 
 -- Users can read their own entitlements_overrides
-DROP POLICY IF EXISTS "entitlements_overrides_user_read_own" ON public.entitlements_overrides;
-CREATE POLICY "entitlements_overrides_user_read_own" ON public.entitlements_overrides
+DROP POLICY IF EXISTS "entitlements_overrides_user_read_own" ON feature_flags.entitlements_overrides;
+CREATE POLICY "entitlements_overrides_user_read_own" ON feature_flags.entitlements_overrides
   FOR SELECT TO authenticated
   USING (user_id = public.get_current_user_id());
 
 -- NOTE: INSERT policy removed - entitlement overrides managed server-side only
 -- Use Edge Functions or admin UI for all override changes
 
-DROP POLICY IF EXISTS "entitlements_overrides_admin_update" ON public.entitlements_overrides;
-CREATE POLICY "entitlements_overrides_admin_update" ON public.entitlements_overrides
+DROP POLICY IF EXISTS "entitlements_overrides_admin_update" ON feature_flags.entitlements_overrides;
+CREATE POLICY "entitlements_overrides_admin_update" ON feature_flags.entitlements_overrides
   FOR UPDATE TO authenticated
   USING (public.is_admin())
   WITH CHECK (public.is_admin());
 
-DROP POLICY IF EXISTS "entitlements_overrides_admin_delete" ON public.entitlements_overrides;
-CREATE POLICY "entitlements_overrides_admin_delete" ON public.entitlements_overrides
+DROP POLICY IF EXISTS "entitlements_overrides_admin_delete" ON feature_flags.entitlements_overrides;
+CREATE POLICY "entitlements_overrides_admin_delete" ON feature_flags.entitlements_overrides
   FOR DELETE TO authenticated
   USING (public.is_admin());
 
 -- ---- FEATURE_FLAG_OVERRIDES POLICIES ----
 
 -- Users can read their own overrides
-DROP POLICY IF EXISTS "overrides_user_read_own" ON public.feature_flag_overrides;
-CREATE POLICY "overrides_user_read_own" ON public.feature_flag_overrides
+DROP POLICY IF EXISTS "overrides_user_read_own" ON feature_flags.feature_flag_overrides;
+CREATE POLICY "overrides_user_read_own" ON feature_flags.feature_flag_overrides
   FOR SELECT TO authenticated
   USING (user_id = public.get_current_user_id());
 
 -- NOTE: INSERT policy removed - feature flag overrides managed server-side only
 -- Use Edge Functions or admin UI for all override changes
 
-DROP POLICY IF EXISTS "overrides_admin_update" ON public.feature_flag_overrides;
-CREATE POLICY "overrides_admin_update" ON public.feature_flag_overrides
+DROP POLICY IF EXISTS "overrides_admin_update" ON feature_flags.feature_flag_overrides;
+CREATE POLICY "overrides_admin_update" ON feature_flags.feature_flag_overrides
   FOR UPDATE TO authenticated
   USING (public.is_admin())
   WITH CHECK (public.is_admin());
 
-DROP POLICY IF EXISTS "overrides_admin_delete" ON public.feature_flag_overrides;
-CREATE POLICY "overrides_admin_delete" ON public.feature_flag_overrides
+DROP POLICY IF EXISTS "overrides_admin_delete" ON feature_flags.feature_flag_overrides;
+CREATE POLICY "overrides_admin_delete" ON feature_flags.feature_flag_overrides
   FOR DELETE TO authenticated
   USING (public.is_admin());
 
 -- ---- FEATURE_FLAG_ROLLOUTS POLICIES ----
 
 -- Authenticated users can read rollouts (needed for client-side bucketing)
-DROP POLICY IF EXISTS "rollouts_authenticated_read" ON public.feature_flag_rollouts;
-CREATE POLICY "rollouts_authenticated_read" ON public.feature_flag_rollouts
+DROP POLICY IF EXISTS "rollouts_authenticated_read" ON feature_flags.feature_flag_rollouts;
+CREATE POLICY "rollouts_authenticated_read" ON feature_flags.feature_flag_rollouts
   FOR SELECT TO authenticated
   USING (true);
 
 -- NOTE: INSERT policy removed - feature flag rollouts managed server-side only
 -- Use Edge Functions or admin UI for all rollout changes
 
-DROP POLICY IF EXISTS "rollouts_admin_update" ON public.feature_flag_rollouts;
-CREATE POLICY "rollouts_admin_update" ON public.feature_flag_rollouts
+DROP POLICY IF EXISTS "rollouts_admin_update" ON feature_flags.feature_flag_rollouts;
+CREATE POLICY "rollouts_admin_update" ON feature_flags.feature_flag_rollouts
   FOR UPDATE TO authenticated
   USING (public.is_admin())
   WITH CHECK (public.is_admin());
 
-DROP POLICY IF EXISTS "rollouts_admin_delete" ON public.feature_flag_rollouts;
-CREATE POLICY "rollouts_admin_delete" ON public.feature_flag_rollouts
+DROP POLICY IF EXISTS "rollouts_admin_delete" ON feature_flags.feature_flag_rollouts;
+CREATE POLICY "rollouts_admin_delete" ON feature_flags.feature_flag_rollouts
   FOR DELETE TO authenticated
   USING (public.is_admin());
 
@@ -392,55 +400,55 @@ CREATE POLICY "rollouts_admin_delete" ON public.feature_flag_rollouts
 -- COMMENTS (Documentation)
 -- ========================
 
-COMMENT ON TABLE public.feature_flags IS
+COMMENT ON TABLE feature_flags.feature_flags IS
   'Master list of feature flags. Resolution order: overrides > entitlements > rollouts > global enabled flag.';
 
-COMMENT ON TABLE public.entitlements IS
+COMMENT ON TABLE feature_flags.entitlements IS
   'User capability unlocks (premium, beta access, etc.). Can be permanent or temporary (via expires_at). is_active tracks auto-expiry; remind_user prompts for renewal.';
 
-COMMENT ON TABLE public.feature_flag_overrides IS
+COMMENT ON TABLE feature_flags.feature_flag_overrides IS
   'Admin-only overrides for global feature flags per user. Supports temporarily enabling/disabling features for testing, early access, or emergency bug mitigation.';
 
-COMMENT ON COLUMN public.feature_flag_overrides.flag_name IS
+COMMENT ON COLUMN feature_flags.feature_flag_overrides.flag_name IS
   'The flag being overridden. Must exist in feature_flags.feature_flags table.';
 
-COMMENT ON TABLE public.entitlements_overrides IS
+COMMENT ON TABLE feature_flags.entitlements_overrides IS
   'Admin tool to temporarily grant/revoke entitlements. Separate from feature_flag_overrides for cleaner entitlement management.';
 
-COMMENT ON TABLE public.feature_flag_rollouts IS
+COMMENT ON TABLE feature_flags.feature_flag_rollouts IS
   'Percentage-based A/B testing via deterministic hashing. Users bucketed by FNV-1a(user_id + seed).';
 
-COMMENT ON COLUMN public.entitlements.is_active IS
+COMMENT ON COLUMN feature_flags.entitlements.is_active IS
   'Active flag. Auto-set to false when expires_at is reached (via mark_expired_entitlements_inactive). Can be manually revoked by admins.';
 
-COMMENT ON COLUMN public.entitlements.remind_user IS
+COMMENT ON COLUMN feature_flags.entitlements.remind_user IS
   'Reminder flag for expired entitlements. Set to true when expiry is detected; app can prompt user for renewal. Reset to false after user action (yes/no/skip).';
 
-COMMENT ON COLUMN public.entitlements.expires_at IS
+COMMENT ON COLUMN feature_flags.entitlements.expires_at IS
   'Expiration timestamp. NULL = permanent. Index supports fast cleanup queries.';
 
-COMMENT ON COLUMN public.feature_flag_overrides.revoked IS
+COMMENT ON COLUMN feature_flags.feature_flag_overrides.revoked IS
   'Soft-revoke flag (true = revoked, not deleted). Preserves audit trail via triggers.';
 
-COMMENT ON COLUMN public.feature_flag_overrides.reason IS
+COMMENT ON COLUMN feature_flags.feature_flag_overrides.reason IS
   'Admin notes explaining why this override was applied (for audit and future reference).';
 
-COMMENT ON COLUMN public.entitlements_overrides.is_active IS
+COMMENT ON COLUMN feature_flags.entitlements_overrides.is_active IS
   'Override state. true = force grant, false = force revoke.';
 
-COMMENT ON COLUMN public.entitlements_overrides.revoked IS
+COMMENT ON COLUMN feature_flags.entitlements_overrides.revoked IS
   'Soft-revoke flag. true = this override is no longer applied.';
 
-COMMENT ON COLUMN public.entitlements_overrides.reason IS
+COMMENT ON COLUMN feature_flags.entitlements_overrides.reason IS
   'Admin notes (e.g., "testing premium access", "early access grant").';
 
-COMMENT ON COLUMN public.feature_flag_rollouts.percentage IS
+COMMENT ON COLUMN feature_flags.feature_flag_rollouts.percentage IS
   'Rollout percentage (0-100). Users are deterministically bucketed by hash; consistent across sessions.';
 
-COMMENT ON COLUMN public.feature_flag_rollouts.seed IS
+COMMENT ON COLUMN feature_flags.feature_flag_rollouts.seed IS
   'Optional re-seed value to re-bucket users without changing percentage. Useful for refreshing A/B tests.';
 
-COMMENT ON FUNCTION public.mark_expired_entitlements_inactive() IS
+COMMENT ON FUNCTION feature_flags.mark_expired_entitlements_inactive() IS
   'Call via cron or application code to mark expired entitlements as inactive (is_active = false). Does not delete rows; preserves audit history.';
 
 COMMIT;

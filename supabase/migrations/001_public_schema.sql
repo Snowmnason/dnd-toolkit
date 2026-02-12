@@ -1,14 +1,13 @@
 -- ============================================================
 -- 001: PUBLIC SCHEMA
--- Tables: users, user_settings, invite_links
+-- Tables: users, user_settings
 -- Also: utility functions, auth signup trigger
 -- ============================================================
 -- EXECUTION ORDER: Run this FIRST (before 002, 003, 004)
 -- PREREQUISITES: Fresh Supabase project with auth.users table
 -- AFTER THIS: Run 002_worlds_schema.sql
 -- ============================================================
--- NOTE: invite_links.world_id FK is added in 002_worlds_schema.sql
---       after the worlds.worlds table exists.
+-- NOTE: invite_links is created in 002_worlds_schema.sql in the `worlds` schema.
 -- ============================================================
 
 -- ========================
@@ -57,21 +56,6 @@ CREATE TABLE public.user_settings (
   CONSTRAINT ck_theme_valid CHECK (theme IN ('light', 'dark', 'auto'))
 );
 
--- INVITE_LINKS: Time-limited shareable invite tokens for joining worlds.
--- NOTE: world_id FK is added in 002_worlds_schema.sql after worlds table exists.
-CREATE TABLE public.invite_links (
-  id          uuid        NOT NULL DEFAULT gen_random_uuid(),
-  world_id    uuid        NULL,           -- FK added in 002_worlds_schema.sql
-  created_by  uuid        NULL,
-  token       uuid        NOT NULL DEFAULT gen_random_uuid(),
-  expires_at  timestamptz NOT NULL DEFAULT (now() + interval '24 hours'),
-  created_at  timestamptz NOT NULL DEFAULT now(),
-
-  CONSTRAINT invite_links_pkey PRIMARY KEY (id),
-  CONSTRAINT invite_links_token_key UNIQUE (token),
-  CONSTRAINT invite_links_created_by_fkey FOREIGN KEY (created_by)
-    REFERENCES public.users(id) ON DELETE SET NULL
-);
 
 -- ========================
 -- UTILITY FUNCTIONS (created AFTER tables so they can reference them)
@@ -155,10 +139,6 @@ CREATE INDEX idx_users_created_at ON public.users USING btree (created_at DESC);
 CREATE INDEX idx_users_not_deleted
   ON public.users USING btree (deleted_at) WHERE deleted_at IS NULL;
 
--- invite_links: token UNIQUE constraint auto-creates index.
--- Additional index for expiration cleanup queries.
-CREATE INDEX idx_invite_links_expires_at ON public.invite_links USING btree (expires_at);
-CREATE INDEX idx_invite_links_world_id ON public.invite_links USING btree (world_id);
 
 -- ========================
 -- TRIGGERS: updated_at
@@ -216,7 +196,6 @@ CREATE TRIGGER on_auth_user_created
 
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.invite_links ENABLE ROW LEVEL SECURITY;
 
 -- ---- USERS POLICIES ----
 
@@ -264,17 +243,5 @@ CREATE POLICY "user_settings_update_own" ON public.user_settings
 CREATE POLICY "user_settings_admin_full_access" ON public.user_settings
   FOR ALL TO authenticated
   USING (public.is_admin());
-
--- ---- INVITE_LINKS POLICIES ----
-
--- Public can read ONLY active (non-expired) invite links (for token lookup during signup).
--- FIX: Previous policy used USING(true) which exposed all invites including expired ones.
-CREATE POLICY "invite_links_public_read" ON public.invite_links
-  FOR SELECT TO public
-  USING (expires_at > now());
-
--- NOTE: Owner/DM management policies (SELECT all, INSERT, DELETE) are added in
--- 002_worlds_schema.sql after the worlds.worlds table exists, because they
--- reference worlds.worlds for ownership verification.
 
 COMMIT;
