@@ -2,9 +2,9 @@ import { useMutation } from '@/lib/cache';
 import { createInviteLink, validateInviteToken } from '@/lib/database/invites';
 
 export interface InviteLink {
-  id: string;
+  id?: string;
   world_id: string;
-  created_by: string;
+  created_by?: string;
   token: string;
   expires_at: string;
   created_at: string;
