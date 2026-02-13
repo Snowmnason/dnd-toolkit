@@ -44,11 +44,12 @@ export function getSupabaseHealthEndpoint(): string {
 export const SUPABASE_HEALTH_ENDPOINT = getSupabaseHealthEndpoint();
 
 /**
- * Get web platform ping interval from config (default: 5 minutes)
+ * Get web platform ping interval from config (default: 10 minutes)
  * How often to perform network health checks when app is visible
+ * Note: Increased from 5 to 10 minutes to reduce health check spam
  */
 export function getWebPingInterval(): number {
-  return getAppConfig().network?.pingIntervalMs ?? 5 * 60 * 1000;
+  return getAppConfig().network?.pingIntervalMs ?? 10 * 60 * 1000;
 }
 
 /**

@@ -1,4 +1,5 @@
-import { STORAGE_KEYS, getPrivacyStorageBackend } from "@/lib/storage";
+import type { AccessRole } from "@/lib/database/worlds";
+import { getPrivacyStorageBackend, STORAGE_KEYS } from "@/lib/storage";
 import React, {
     createContext as createReactContext,
     ReactNode,
@@ -11,12 +12,12 @@ import { createContext, useContextSelector } from "use-context-selector";
 
 interface AppParamsVolatile {
   worldId?: string;
-  userRole?: string;
+  userRole?: AccessRole;
 }
 
 interface AppParamsVolatileContextType {
   setWorldId: (worldId: string | undefined) => void;
-  setUserRole: (userRole: string | undefined) => void;
+  setUserRole: (userRole: AccessRole | undefined) => void;
   updateVolatileParams: (newParams: Partial<AppParamsVolatile>) => void;
   clearWorldParams: () => void;
 }
@@ -52,7 +53,7 @@ export function AppParamsVolatileProvider({
     }
   }, []);
 
-  const setUserRole = useCallback((userRole: string | undefined) => {
+  const setUserRole = useCallback((userRole: AccessRole | undefined) => {
     setVolatileParams((prev) => ({ ...prev, userRole }));
     if (userRole) {
       const backend = getPrivacyStorageBackend(STORAGE_KEYS.LAST_USER_ROLE);
@@ -129,7 +130,8 @@ export function AppParamsVolatileProvider({
       );
       const savedRole = await roleBackend.getItem(STORAGE_KEYS.LAST_USER_ROLE);
       if (savedWorldId) setWorldId(savedWorldId);
-      if (savedRole) setUserRole(savedRole);
+      // Cast saved role to AccessRole (it was stored as a valid AccessRole value)
+      if (savedRole) setUserRole(savedRole as AccessRole);
     }
     restoreSession();
   }, [setWorldId, setUserRole]);

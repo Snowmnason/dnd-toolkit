@@ -535,7 +535,7 @@ export class EncryptedStorage {
       const encryptedValue = await this.platformGetItem(key);
 
       if (!encryptedValue) {
-        logger.category("storage").warn(`Item not found in storage: ${key}`);
+        logger.category("storage").debug(`Item not found in storage: ${key}`);
         return null;
       }
 

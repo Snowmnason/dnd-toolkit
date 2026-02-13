@@ -1,6 +1,14 @@
 import { Platform } from "react-native";
 import { getAppConfig } from "../config";
-import { logger } from "../utils/logger";
+
+// Lazy import logger to avoid circular dependency with config
+let loggerCache: any = null;
+const getLogger = () => {
+  if (!loggerCache) {
+    loggerCache = require("../utils/logger").logger;
+  }
+  return loggerCache;
+};
 
 // Type-safe import for AsyncStorage
 let AsyncStorage: any;
@@ -112,12 +120,12 @@ class FastCacheService {
       }
 
       this.notifySubscribers(key, value);
-      logger.debug(
+      getLogger().debug(
         "cache",
         `FastCache.setItem: ${key} (${value.length} bytes${ttl ? `, TTL: ${ttl}ms` : ""})`,
       );
     } catch (error) {
-      logger.error("cache", `FastCache.setItem failed for ${key}:`, error);
+      getLogger().error("cache", `FastCache.setItem failed for ${key}:`, error);
       throw error;
     }
   }
@@ -152,7 +160,7 @@ class FastCacheService {
 
       return entry.data;
     } catch (error) {
-      logger.error("cache", `FastCache.getItem failed for ${key}:`, error);
+      getLogger().error("cache", `FastCache.getItem failed for ${key}:`, error);
       return null;
     }
   }
@@ -164,12 +172,12 @@ class FastCacheService {
     try {
       const json = JSON.stringify(value);
       await this.setItem(key, json, ttl);
-      logger.debug(
+      getLogger().debug(
         "cache",
         `FastCache.setJSON: ${key}${ttl ? ` (TTL: ${ttl}ms)` : ""}`,
       );
     } catch (error) {
-      logger.error("cache", `FastCache.setJSON failed for ${key}:`, error);
+      getLogger().error("cache", `FastCache.setJSON failed for ${key}:`, error);
       throw error;
     }
   }
@@ -185,7 +193,7 @@ class FastCacheService {
 
       return JSON.parse(value) as T;
     } catch (error) {
-      logger.error("cache", `FastCache.getJSON failed for ${key}:`, error);
+      getLogger().error("cache", `FastCache.getJSON failed for ${key}:`, error);
       return null;
     }
   }
@@ -200,9 +208,9 @@ class FastCacheService {
       } else {
         await AsyncStorage.removeItem(key);
       }
-      logger.debug("cache", `FastCache.removeItem: ${key}`);
+      getLogger().debug("cache", `FastCache.removeItem: ${key}`);
     } catch (error) {
-      logger.error("cache", `FastCache.removeItem failed for ${key}:`, error);
+      getLogger().error("cache", `FastCache.removeItem failed for ${key}:`, error);
       throw error;
     }
   }
@@ -246,13 +254,13 @@ class FastCacheService {
         await AsyncStorage.multiRemove(matchingKeys);
       }
 
-      logger.debug(
+      getLogger().debug(
         "cache",
         `FastCache.removeByPrefix: ${prefix} (removed ${matchingKeys.length} items)`,
       );
       return matchingKeys.length;
     } catch (error) {
-      logger.error(
+      getLogger().error(
         "cache",
         `FastCache.removeByPrefix failed for ${prefix}:`,
         error,
@@ -290,9 +298,9 @@ class FastCacheService {
         }
       }
 
-      logger.debug("cache", `FastCache.multiSet: ${items.length} items`);
+      getLogger().debug("cache", `FastCache.multiSet: ${items.length} items`);
     } catch (error) {
-      logger.error("cache", "FastCache.multiSet failed:", error);
+      getLogger().error("cache", "FastCache.multiSet failed:", error);
       throw error;
     }
   }
@@ -338,7 +346,7 @@ class FastCacheService {
 
       return result;
     } catch (error) {
-      logger.error("cache", "FastCache.multiGet failed:", error);
+      getLogger().error("cache", "FastCache.multiGet failed:", error);
       return new Map();
     }
   }
@@ -374,7 +382,7 @@ class FastCacheService {
         try {
           callback(data);
         } catch (error) {
-          logger.error("cache", "Subscriber notification failed:", error);
+          getLogger().error("cache", "Subscriber notification failed:", error);
         }
       });
     }
@@ -423,7 +431,7 @@ class FastCacheService {
         quotaPercentage,
       };
     } catch (error) {
-      logger.error("cache", "FastCache.getStats failed:", error);
+      getLogger().error("cache", "FastCache.getStats failed:", error);
       return { itemCount: 0, estimatedSize: 0, quotaPercentage: 0 };
     }
   }
@@ -440,9 +448,9 @@ class FastCacheService {
       } else {
         await AsyncStorage.clear();
       }
-      logger.info("cache", "FastCache cleared");
+      getLogger().info("cache", "FastCache cleared");
     } catch (error) {
-      logger.error("cache", "FastCache.clear failed:", error);
+      getLogger().error("cache", "FastCache.clear failed:", error);
       throw error;
     }
   }
@@ -504,13 +512,13 @@ class FastCacheService {
       }
 
       if (keysToRemove.length > 0) {
-        logger.debug(
+        getLogger().debug(
           "cache",
           `FastCache cleanup: removed ${keysToRemove.length} expired entries`,
         );
       }
     } catch (error) {
-      logger.error("cache", "FastCache cleanup failed:", error);
+      getLogger().error("cache", "FastCache cleanup failed:", error);
     }
   }
 

@@ -9,7 +9,8 @@ import {
 } from "@/providers/AppParamsStableProvider";
 import { WorldListPanel } from "@/Screens/select/world-selection/WorldListPanel";
 import { WorldRightPanel } from "@/Screens/select/world-selection/WorldRightPanel";
-import { useState } from "react";
+import { useScale } from "@/theme";
+import { useEffect, useState } from "react";
 
 // Fallback image
 const noImageSelected = require("../../assets/images/Miku.png");
@@ -23,6 +24,8 @@ export default function LandingPage() {
   const { showRightPanel, goToRightPanel, goToLeftPanel, isDesktop } =
     usePanelNavigation();
 
+  const S = useScale();
+
   const {
     selectedWorld,
     setSelectedWorld,
@@ -33,6 +36,25 @@ export default function LandingPage() {
     refetch,
   } = useWorlds(userId, setConnectedWorldIds);
   const [mapImage, setMapImage] = useState<string | null>(null);
+  
+  // Race condition fix: Keep splash screen visible until worlds load or timeout expires
+  // This prevents empty world list UI during fresh login
+  const [loadingTimeoutExpired, setLoadingTimeoutExpired] = useState(false);
+  
+  useEffect(() => {
+    // Reset timeout when loading starts
+    if (isLoading) {
+      setLoadingTimeoutExpired(false);
+    }
+    
+    // Set timeout: wait up to 5 seconds for worlds to load
+    // After 5s, show the UI anyway (assumes fresh account with no worlds)
+    const timer = setTimeout(() => {
+      setLoadingTimeoutExpired(true);
+    }, 5000);
+    
+    return () => clearTimeout(timer);
+  }, [isLoading]);
 
   // Modal controls via hook
   const {
@@ -58,15 +80,16 @@ export default function LandingPage() {
   });
 
   // Loading state (use your modern loader view)
-  if (isLoading) {
+  // Show splash screen while loading, unless timeout expired (handles fresh account with 0 worlds)
+  if (isLoading && !loadingTimeoutExpired) {
     return <AppLoading loadMessage="Loading your worlds..." />;
   }
 
   // Error state
   if (error) {
     return (
-      <AppPage center gap="md">
-        <Body align="center" color="$destructive">
+      <AppPage center gap="lg">
+        <Body align="center" color="$destructive" style={{ marginBottom: S.space.md }}>
           {error}
         </Body>
         <Button variant="outlined" text="Try Again" onPress={retry} />
@@ -106,7 +129,7 @@ export default function LandingPage() {
       mapImage={mapImage}
       noImageSelected={noImageSelected}
       onEditOrLeave={
-        selectedWorld?.user_role === "owner"
+        selectedWorld && (selectedWorld.user_role === "dm" || selectedWorld.owner_id === userId)
           ? () => openEditModal(selectedWorld.name)
           : () => openLeaveModal(selectedWorld?.name || "")
       }

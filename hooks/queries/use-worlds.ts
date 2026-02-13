@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { CACHE_CONFIG, CACHE_KEYS, CACHE_TAGS } from "../../lib/cache/keys";
 import { useQuery } from "../../lib/cache/use-query";
 import { worldsDB, WorldWithAccess } from "../../lib/database/worlds";
+import { useAppKernel } from "../../lib/kernel/use-app-kernel";
 import { SecureStorage } from "../../lib/storage";
 import { logger } from "../../lib/utils/logger";
 
@@ -21,6 +22,7 @@ export function useWorlds(
   userId?: string,
   onWorldsLoaded?: (worldIds: string[]) => void,
 ) {
+  const kernel = useAppKernel();
   const [selectedWorld, setSelectedWorld] = useState<WorldWithAccess | null>(
     null,
   );
@@ -61,11 +63,13 @@ export function useWorlds(
     {
       ...CACHE_CONFIG.metadata, // Default: staleTime 2h, cacheTime 4h
       tags: [CACHE_TAGS.worlds, CACHE_TAGS.user(userId || "current")],
+      // Query fires immediately, skipCache forces DB fetch on fresh sign-in
       onError: (err) => {
         logger.error("cache", "Error loading worlds:", err);
       },
     },
   );
+
 
   // Format error message
   const errorMessage = error

@@ -12,7 +12,15 @@
  */
 
 import { logger } from "../utils/logger";
-import { Analytics } from "./index";
+
+// Lazy import to avoid circular dependency with index.ts
+let AnalyticsModule: any = null;
+const getAnalytics = () => {
+  if (!AnalyticsModule) {
+    AnalyticsModule = require("./index");
+  }
+  return AnalyticsModule.Analytics;
+};
 
 /**
  * Variant assignment event (fired when user is assigned to a variant)
@@ -76,7 +84,7 @@ export function trackVariantAssignment(event: VariantAssignmentEvent): void {
     });
 
     // Fire async (non-blocking)
-    Analytics.track("variant_assigned", {
+    getAnalytics().track("variant_assigned", {
       flag_name: flagName,
       variant,
       user_id: userId,
@@ -128,7 +136,7 @@ export function trackVariantEngagement(event: VariantEngagementEvent): void {
     });
 
     // Fire async (non-blocking)
-    Analytics.track("variant_engagement", {
+    getAnalytics().track("variant_engagement", {
       flag_name: flagName,
       variant,
       user_id: userId,
@@ -173,7 +181,7 @@ export function trackVariantPerformance(event: VariantPerformanceEvent): void {
     });
 
     // Fire async (non-blocking)
-    Analytics.track("variant_performance", {
+    getAnalytics().track("variant_performance", {
       flag_name: flagName,
       variant,
       user_id: userId,

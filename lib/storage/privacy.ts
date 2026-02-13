@@ -8,8 +8,37 @@
  */
 
 import { DATA_CLASSIFICATIONS, DataSensitivity } from "./data-classification";
-import { FastCache } from "./FastCache";
-import { SecureStorage } from "./SecureStorage";
+
+export interface PrivacyStorageBackend {
+  getItem(key: string): Promise<string | null>;
+  setItem(key: string, value: string): Promise<void>;
+  removeItem(key: string): Promise<void>;
+  setJSON<T = any>(key: string, value: T): Promise<void>;
+  getJSON<T = any>(key: string): Promise<T | null>;
+
+  // Optional capabilities (not all backends implement these)
+  getAllKeys?: () => Promise<string[]>;
+  removeByPrefix?: (prefix: string) => Promise<number | void>;
+}
+
+// Lazy-load storage backends to avoid circular dependencies
+let FastCacheCache: PrivacyStorageBackend | null = null;
+let SecureStorageCache: PrivacyStorageBackend | null = null;
+
+const getFastCache = () => {
+  if (!FastCacheCache) {
+    FastCacheCache = require("./FastCache").FastCache as PrivacyStorageBackend;
+  }
+  return FastCacheCache;
+};
+
+const getSecureStorageInstance = () => {
+  if (!SecureStorageCache) {
+    SecureStorageCache = require("./SecureStorage")
+      .SecureStorage as PrivacyStorageBackend;
+  }
+  return SecureStorageCache;
+};
 
 /**
  * Classify data by key to determine handling.
@@ -63,8 +92,11 @@ export function shouldUseSecureStorage(key: string): boolean {
  */
 export function getStorageBackend(
   key: string,
-): typeof SecureStorage | typeof FastCache {
-  return shouldUseSecureStorage(key) ? SecureStorage : FastCache;
+): PrivacyStorageBackend {
+  if (shouldUseSecureStorage(key)) {
+    return getSecureStorageInstance();
+  }
+  return getFastCache();
 }
 
 /**
@@ -81,7 +113,24 @@ export function getStorageBackend(
 export function redactForLogs(value: unknown, key?: string): string {
   if (value === null || value === undefined) return "";
 
-  let str = typeof value === "string" ? value : JSON.stringify(value);
+  let str: string;
+  if (typeof value === "string") {
+    str = value;
+  } else if (value instanceof Error) {
+    // JSON.stringify(new Error('x')) => '{}', which destroys useful debugging info.
+    // Preserve common fields while still running through our redaction pipeline.
+    str = JSON.stringify({
+      name: value.name,
+      message: value.message,
+      stack: value.stack,
+    });
+  } else {
+    try {
+      str = JSON.stringify(value);
+    } catch {
+      str = String(value);
+    }
+  }
 
   // If specific key provided, use its redaction pattern
   if (key) {
@@ -153,8 +202,11 @@ export async function clearAllUserData(): Promise<void> {
   // 2. Get actual keys from storage backends to find dynamic/pattern-matched keys
   let allStorageKeys: string[] = [];
   try {
+    const secureStorage = getSecureStorageInstance();
     const [secureKeys, fastKeys] = await Promise.all([
-      SecureStorage.getAllKeys().catch(() => []),
+      (secureStorage.getAllKeys ? secureStorage.getAllKeys() : Promise.resolve([])).catch(
+        () => [],
+      ),
       // FastCache doesn't have getAllKeys(), so we'll remove by pattern instead
       Promise.resolve([] as string[]),
     ]);
@@ -199,12 +251,12 @@ export async function clearAllUserData(): Promise<void> {
   for (const key of allKeysToDelete) {
     try {
       // Try to remove from SecureStorage
-      await SecureStorage.removeItem(key).catch(() => {
+      await getSecureStorageInstance().removeItem(key).catch(() => {
         // Silent fail if key doesn't exist
       });
 
       // Try to remove from FastCache
-      await FastCache.removeItem(key).catch(() => {
+      await getFastCache().removeItem(key).catch(() => {
         // Silent fail if key doesn't exist
       });
 
@@ -231,7 +283,10 @@ export async function clearAllUserData(): Promise<void> {
     if (registryKey.endsWith("*")) {
       const prefix = registryKey.slice(0, -1);
       try {
-        await FastCache.removeByPrefix(prefix);
+        const fastCache = getFastCache();
+        if (fastCache.removeByPrefix) {
+          await fastCache.removeByPrefix(prefix);
+        }
       } catch (error) {
         // Log error but continue
         import("@/lib/utils/logger")

@@ -24,6 +24,7 @@ vi.mock("../../lib/utils/logger", () => ({
 // Mock config
 vi.mock("../../lib/config", () => ({
   getAppConfig: vi.fn(() => ({
+    version: 1,
     circuitBreaker: {
       failures: 10,
       ratePercent: 50,

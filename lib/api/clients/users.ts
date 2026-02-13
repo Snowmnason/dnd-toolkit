@@ -6,9 +6,9 @@
  */
 
 import {
-    APIClient,
-    type MutationOptions,
-    type QueryOptions,
+  APIClient,
+  type MutationOptions,
+  type QueryOptions,
 } from "../client-factory";
 import { CACHE_DEFAULTS } from "./defaults";
 
@@ -21,7 +21,7 @@ export interface User {
   email: string;
   name: string;
   createdAt: string;
-  isAdmin: boolean;
+  is_admin: boolean;
 }
 
 export interface UpdateUserRequest {

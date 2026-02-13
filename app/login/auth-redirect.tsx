@@ -27,9 +27,9 @@ const savePendingInvite = async (token: string, worldName: string) => {
 
 const getPendingInvite = async (): Promise<PendingInvite | null> => {
   const backend = getPrivacyStorageBackend(STORAGE_KEYS.PENDING_INVITE);
-  const inviteData = await backend.getJSON<PendingInvite>(
+  const inviteData = (await backend.getJSON(
     STORAGE_KEYS.PENDING_INVITE,
-  );
+  )) as PendingInvite | null;
   if (inviteData) {
     // Check if invite is less than 24 hours old
     if (Date.now() - inviteData.timestamp < 24 * 60 * 60 * 1000) {
@@ -162,7 +162,18 @@ export default function AuthRedirect() {
             setUserId(userProfile.id);
             // Check if user has completed profile
             if (userProfile.username) {
-              // Profile complete, go to world selection
+              // Profile complete - preload worlds before navigating to world selection
+              // This ensures the cache is warm when the page mounts, avoiding the loading race condition
+              try {
+                logger.debug("auth-redirect", "Preloading worlds for user:", userProfile.id);
+                await worldsDB.getMyWorlds(userProfile.id);
+                logger.debug("auth-redirect", "Worlds preloaded successfully");
+              } catch (preloadError) {
+                logger.warn("auth-redirect", "Failed to preload worlds (non-critical):", preloadError);
+                // Non-critical: app works even if preload fails, just shows loading screen longer
+              }
+              
+              // Now navigate to world selection with warm cache
               router.replace("/select/world-selection");
             } else {
               // Profile incomplete, go to complete profile
@@ -296,7 +307,12 @@ export default function AuthRedirect() {
 
         // Add user to world in database
         logger.info("auth-redirect", "Adding user to world:", inviteWorldId);
-        await worldsDB.addUserToWorld(inviteWorldId, userProfile.id, "player");
+        await worldsDB.addUserToWorld(
+          inviteWorldId,
+          userProfile.id,
+          inviteToken,
+          "player",
+        );
         logger.success("auth-redirect", "User successfully added to world");
 
         setWorldName(decodedWorldName);
@@ -386,6 +402,7 @@ export default function AuthRedirect() {
             await worldsDB.addUserToWorld(
               validationResult.worldId,
               userProfile.id,
+              pendingInvite.token,
               "player",
             );
             logger.success(
@@ -445,6 +462,14 @@ export default function AuthRedirect() {
     if (userId) {
       // Update centralized params context
       setUserId(userId);
+      
+      // Preload worlds before navigating to ensure cache is warm
+      try {
+        logger.debug("auth-redirect", "Preloading worlds after invite welcome");
+        await worldsDB.getMyWorlds(userId);
+      } catch (preloadError) {
+        logger.warn("auth-redirect", "Failed to preload worlds (non-critical):", preloadError);
+      }
     }
 
     router.replace("/select/world-selection");
@@ -536,6 +561,14 @@ export default function AuthRedirect() {
           if (userId) {
             // Update centralized params context
             setUserId(userId);
+            
+            // Preload worlds before navigating to ensure cache is warm
+            try {
+              logger.debug("auth-redirect", "Preloading worlds after already member");
+              await worldsDB.getMyWorlds(userId);
+            } catch (preloadError) {
+              logger.warn("auth-redirect", "Failed to preload worlds (non-critical):", preloadError);
+            }
           }
 
           router.replace("/select/world-selection");
@@ -545,8 +578,20 @@ export default function AuthRedirect() {
         buttons={[
           {
             text: "Go to Worlds",
-            onPress: () => {
+            onPress: async () => {
               setShowAlreadyMemberModal(false);
+              
+              // Preload worlds before navigating to ensure cache is warm
+              try {
+                const userId = currentUserId || (await getCurrentUserId());
+                if (userId) {
+                  logger.debug("auth-redirect", "Preloading worlds before navigate to world selection");
+                  await worldsDB.getMyWorlds(userId);
+                }
+              } catch (preloadError) {
+                logger.warn("auth-redirect", "Failed to preload worlds (non-critical):", preloadError);
+              }
+              
               router.replace("/select/world-selection");
             },
             variant: "primary",

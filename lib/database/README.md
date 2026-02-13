@@ -53,12 +53,29 @@ Return Result to UI
 
 ## Database Schema Overview
 
+**IMPORTANT**: This app uses a **4-schema architecture** for logical separation:
+
+1. **`public`** - User accounts, settings
+2. **`worlds`** - Campaign worlds and access control (RBAC)
+3. **`feature_flags`** - Feature gates, entitlements, overrides, rollouts
+4. **`audit`** - Audit trail for all database changes (see [TRIGGERS.md](../../docs/Important Notes/Database/TRIGGERS.md))
+
+**Schema Prefixes**: All queries use explicit schema prefixes (e.g., `worlds.worlds`, `feature_flags.entitlements`). This prevents naming collisions and improves clarity.
+
+For comprehensive schema documentation, see:
+
+- [SCHEMA.md](../../docs/Important Notes/Database/SCHEMA.md) - Complete table definitions
+- [INDEXES.md](../../docs/Important Notes/Database/INDEXES.md) - Performance indexes
+- [RLS.md](../../docs/Important Notes/Database/RLS.md) - Row-Level Security policies
+- [TRIGGERS.md](../../docs/Important Notes/Database/TRIGGERS.md) - Database triggers
+- [EDGE_FUNCTIONS.md](../../docs/Important Notes/Database/EDGE_FUNCTIONS.md) - Serverless functions
+
 ### Core Tables
 
-**users** – User profiles (created after auth signup)
+**public.users** – User profiles (created after auth signup)
 
 ```sql
-CREATE TABLE users (
+CREATE TABLE public.users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   auth_id uuid NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
   username text NOT NULL UNIQUE,
@@ -67,77 +84,109 @@ CREATE TABLE users (
 );
 ```
 
-**worlds** – D&D campaign worlds (owned by users)
+**worlds.worlds** – D&D campaign worlds (owned by users)
 
 ```sql
-CREATE TABLE worlds (
+CREATE TABLE worlds.worlds (
   world_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  owner_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  owner_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   name text NOT NULL,
   description text,
   system text NOT NULL, -- e.g., "dnd5e", "pathfinder2e"
   is_dm boolean NOT NULL,
   map_image_url text,
+  settings jsonb DEFAULT '{}', -- Extensible preferences
   created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
+  updated_at timestamptz DEFAULT now(),
+  deleted_at timestamptz NULL -- Soft delete
 );
 ```
 
-**world_access** – User access to worlds (multi-tenant role assignment)
+**worlds.world_access** – User access to worlds (multi-tenant RBAC)
 
 ```sql
-CREATE TABLE world_access (
+CREATE TYPE worlds.world_access_role AS ENUM (
+  'dm',         -- Owner: full authority
+  'gm',         -- Co-owner: dm visibility, cannot delete worlds
+  'player',     -- Limited visibility, can edit own character data
+  'spectator',  -- Read-only with dm view (for sharing modules)
+  'observer'    -- Read-only with player view (for sharing characters)
+);
+
+CREATE TABLE worlds.world_access (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  world_id uuid NOT NULL REFERENCES worlds(world_id) ON DELETE CASCADE,
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  user_role text NOT NULL, -- "dm" or "player"
-  permissions jsonb, -- Future: granular permissions
+  world_id uuid NOT NULL REFERENCES worlds.worlds(world_id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  user_role worlds.world_access_role NOT NULL DEFAULT 'player',
+  permissions jsonb, -- Future: granular capability overrides
   created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
   UNIQUE(world_id, user_id)
 );
 ```
 
-**invite_links** – Shareable world invitations
+**worlds.invite_links** – Shareable world invitations
 
 ```sql
-CREATE TABLE invite_links (
+CREATE TABLE worlds.invite_links (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  world_id uuid NOT NULL REFERENCES worlds(world_id) ON DELETE CASCADE,
-  created_by uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  world_id uuid NOT NULL REFERENCES worlds.worlds(world_id) ON DELETE CASCADE,
+  created_by uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   token text NOT NULL UNIQUE,
   expires_at timestamptz NOT NULL,
   created_at timestamptz DEFAULT now()
 );
 ```
 
-**feature_flags** – Server-side feature gates (global)
+**feature_flags.feature_flags** – Server-side feature gates (global)
 
 ```sql
-CREATE TABLE feature_flags (
+CREATE TABLE feature_flags.feature_flags (
   flag_name text PRIMARY KEY,
   enabled boolean NOT NULL,
-  kind text NOT NULL, -- "free", "premium", "beta"
+  kind text NOT NULL, -- "boolean", "string", "percentage", "entitlement"
   description text,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
 ```
 
-**entitlements** – User subscription tier and feature access (with expiry)
+**feature_flags.entitlements** – User subscription tier and feature access
 
 ```sql
-CREATE TABLE entitlements (
+CREATE TABLE feature_flags.entitlements (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id uuid NULL REFERENCES public.users(id) ON DELETE CASCADE,
   key text NOT NULL, -- e.g., "premium", "beta_access"
+  is_active boolean NOT NULL DEFAULT true,    -- Soft-delete + auto-marked when expired
+  remind_user boolean NOT NULL DEFAULT false, -- Flag to remind user when expired
   expires_at timestamptz NULL, -- NULL = never expires
   created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
+  updated_at timestamptz DEFAULT now(),
+  CONSTRAINT entitlements_user_key_unique UNIQUE (user_id, key)
 );
 
-CREATE INDEX idx_entitlements_user_id ON entitlements(user_id);
-CREATE INDEX idx_entitlements_key ON entitlements(key);
-CREATE INDEX idx_entitlements_expires_at ON entitlements(expires_at);
+CREATE INDEX idx_entitlements_user_id ON feature_flags.entitlements(user_id);
+CREATE INDEX idx_entitlements_key ON feature_flags.entitlements(key);
+CREATE INDEX idx_entitlements_expires_at ON feature_flags.entitlements(expires_at);
+```
+
+**feature_flags.entitlements_overrides** – Admin tool to temporarily grant/revoke entitlements
+
+```sql
+CREATE TABLE feature_flags.entitlements_overrides (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  entitlement_key text NOT NULL, -- The entitlement key being overridden
+  is_active boolean NOT NULL,    -- true = force grant, false = force revoke
+  expires_at timestamptz NULL,   -- NULL = permanent override
+  reason text NULL,              -- Admin notes: why this override was applied
+  created_by uuid NULL REFERENCES public.users(id) ON DELETE SET NULL,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  revoked boolean NOT NULL DEFAULT false, -- Soft-revoke for audit trail
+  CONSTRAINT entitlements_overrides_user_key_unique UNIQUE (user_id, entitlement_key)
+);
 ```
 
 ## API Reference
@@ -206,7 +255,8 @@ Fetches single world with user's access role. Respects RLS (only sees worlds use
 
 ```ts
 const world = await worldsDB.getById("world-123");
-console.log(world.user_role); // "owner", "dm", or "player"
+console.log(world.user_role); // "dm", "gm", "player", "spectator", or "observer"
+// Note: Owners have user_role of "dm" (owner-level access via role)
 ```
 
 #### `worldsDB.getUserWorlds(): Promise<WorldWithAccess[]>`
@@ -215,7 +265,7 @@ Fetches all worlds current user has access to (owned + invited).
 
 ```ts
 const worlds = await worldsDB.getUserWorlds();
-// Returns [owned worlds, worlds user is DM/player in]
+// Returns [owned worlds, worlds user is DM/GM/player/spectator/observer in]
 ```
 
 #### `worldsDB.update(worldId: string, data: UpdateWorldData): Promise<World>`
@@ -238,10 +288,16 @@ await worldsDB.delete("world-123");
 
 #### `worldsDB.grantAccess(worldId: string, userId: string, role: AccessRole): Promise<WorldAccess>`
 
-Grants user access to world with specified role ("dm" or "player").
+Grants user access to world with specified role.
+
+**Available Roles**: `"dm"`, `"gm"`, `"player"`, `"spectator"`, `"observer"`
 
 ```ts
-await worldsDB.grantAccess("world-123", "user-456", "player");
+// Grant co-owner access (can see everything, cannot delete worlds)
+await worldsDB.grantAccess("world-123", "user-456", "gm");
+
+// Grant player access (limited visibility, can edit own character)
+await worldsDB.grantAccess("world-123", "user-789", "player");
 ```
 
 #### `worldsDB.revokeAccess(worldId: string, userId: string): Promise<void>`
@@ -774,7 +830,7 @@ Currently, no dedicated test guide exists. When adding tests, create a guide at 
 | `supabase.ts`      | Lazy-loaded Supabase client with auth persistence via SecureStorage. Checks if Supabase is configured; fails gracefully if not. | `getSupabaseClient()`, `isSupabaseConfigured()`, `supabase` proxy                                                  |
 | `common.ts`        | Shared utilities: user validation, caching strategy, parallel query execution. Used by domain operations.                       | `getCurrentUserProfile()`, `validateUserForWrite()`, `verifyWorldAccessWithDatabase()`, `executeParallelQueries()` |
 | `users.ts`         | User profile CRUD (create, get, update). Called after auth signup; integrated with AuthStateManager.                            | `usersDB`, `User`, `CreateUserData`, `UpdateUserData`                                                              |
-| `worlds.ts`        | World CRUD (create, get, list, update, delete) and world access management (grant/revoke). Core gameplay entity.                | `worldsDB`, `World`, `WorldAccess`, `WorldWithAccess`, `UserRole`, `AccessRole`                                    |
+| `worlds.ts`        | World CRUD (create, get, list, update, delete) and world access management (grant/revoke). Core gameplay entity.                | `worldsDB`, `World`, `WorldAccess`, `WorldWithAccess`, `AccessRole`                                                |
 | `invites.ts`       | Invite link operations (create, redeem, list, revoke). Enables world sharing and multi-player onboarding.                       | `createInviteLink()`, `redeemInviteLink()`, `getInvitesByWorld()`, `revokeInviteLink()`, `InviteLink`              |
 | `supabase-lazy.ts` | Legacy/deprecated lazy-loading logic (if exists; may be merged into supabase.ts).                                               | TBD                                                                                                                |
 

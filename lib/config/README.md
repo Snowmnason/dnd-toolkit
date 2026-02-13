@@ -64,6 +64,174 @@ At app startup (kernel Phase 0), validation runs in two stages:
 
 Validation blocks app startup on error; warnings are logged but allow continuation. Production dev features (devBypass, mockData) are fatal errors.
 
+## Configuration Versioning
+
+AppSettings uses simple integer versioning to safely evolve schema over time without breaking deployments.
+
+### Version Flow
+
+```
+appsettings.json { version: 1 }
+                ↓
+getAppConfig() → Detect version (throws if missing or invalid)
+                ↓
+migrateConfig(config, detectedVersion) → Apply migration chain v1→v2→v3...
+                ↓
+Validate structure (required fields)
+                ↓
+Cache & return
+```
+
+### Version Strategy
+
+- **Current Version**: 1 (first versioned release)
+- **Numbering**: Simple integers (1, 2, 3, ...); no semantic versioning
+- **Backward Compatibility**: Missing or invalid `version` now causes the loader to throw; do not rely on an implicit default
+- **Forward Compatibility**: Config at v2+ works with app expecting v1 (no migration if already at/above target)
+- **Rollback**: Keep all old migrations indefinitely (don't delete; supports rollback scenarios)
+
+### When to Bump Version
+
+**Bump version (breaking change):**
+
+- Add new **required** field
+- Remove existing field
+- Change field type
+- Rename field
+- Change behavior of existing field
+
+**Don't bump (non-breaking):**
+
+- Add optional field with default value
+- Add new feature flag
+- Performance tuning
+- Description/comment changes
+
+### Adding a New Version
+
+1. **Update AppSettings interface** (`lib/config/loader.ts`)
+
+   ```typescript
+   export interface AppSettings {
+     version: number;
+     // Add new required field
+     newFeature?: { ... };
+   }
+   ```
+
+2. **Create migration function** (`lib/config/migrations.ts`)
+
+   ```typescript
+   export const migrateV2ToV3 = (config: any): any => ({
+     ...config,
+     newFeature:
+       config.newFeature ??
+       {
+         /* defaults */
+       },
+   });
+   ```
+
+3. **Register migration** (`lib/config/migrations.ts`)
+
+   ```typescript
+   export const CURRENT_CONFIG_VERSION = 3;
+
+   const MIGRATION_CHAIN = [
+     [2, migrateV1ToV2],
+     [3, migrateV2ToV3], // Add new entry
+   ] as const;
+   ```
+
+4. **Update config files** (both `appsettings.json` and `appsettings.dev.json`)
+
+   ```json
+   {
+     "version": 3,
+     "newFeature": { ... }
+   }
+   ```
+
+5. **Document change** in migration function comments with rationale
+
+### Example: Adding a New Field
+
+**Change:** AppSettings v1 → v2 adds required field `analytics.enabled`
+
+**Step 1: Update interface** (`loader.ts`)
+
+```typescript
+export interface AppSettings {
+  version: number;
+  // ... existing fields ...
+  analytics: {
+    enabled: boolean;
+    sampleRate?: number;
+  };
+}
+```
+
+**Step 2: Create migration** (`migrations.ts`)
+
+```typescript
+export const migrateV1ToV2 = (config: any): any => ({
+  ...config,
+  analytics: {
+    enabled: config.analytics?.enabled ?? false, // Default: disabled
+    sampleRate: config.analytics?.sampleRate ?? 1.0,
+  },
+});
+```
+
+**Step 3: Register migration** (`migrations.ts`)
+
+```typescript
+export const CURRENT_CONFIG_VERSION = 2;
+
+const MIGRATION_CHAIN = [[2, migrateV1ToV2]] as const;
+```
+
+**Step 4: Update config files**
+
+```json
+{
+  "version": 2,
+  "analytics": {
+    "enabled": true,
+    "sampleRate": 1.0
+  }
+}
+```
+
+### Migration Errors
+
+If migration fails, `getAppConfig()` throws with details:
+
+```
+[AppConfig] Configuration migration failed (v1).
+File: config/appsettings.json.
+Error: [ConfigMigration] Failed to migrate from v1 to v2: ...
+```
+
+**Resolution:**
+
+- Check config file JSON syntax
+- Verify all required fields for target version are present
+- If downgrading, ensure old migration still works (don't delete migrations)
+- Run `npm run typecheck` to catch type errors
+
+### Relationship to Cache Versioning
+
+This is **distinct** from `lib/storage/cache-versioning.ts`:
+
+| Aspect              | Config Versioning          | Cache Versioning                      |
+| ------------------- | -------------------------- | ------------------------------------- |
+| **What**            | AppSettings JSON schema    | SecureStorage data schemas            |
+| **When**            | App startup (every boot)   | On first access to cached data        |
+| **Example**         | Adding new config field    | Changing stored user preference shape |
+| **Backward Compat** | Migrations for old configs | Migrations for old storage entries    |
+| **Dependencies**    | None                       | Depends on cache-versioning.ts        |
+
 ## API Reference
 
 ### Loader (`loader.ts`)
@@ -84,6 +252,58 @@ console.log(config.featureFlags.splashScreen.enabled); // boolean
 **Returns:** `AppSettings` object (cached after first call)
 
 **Throws:** If required `appsettings.json` or `appsettings.dev.json` is missing, malformed, or missing required fields
+
+**Performance:** O(1) after first call (cached); first call is O(n) where n = JSON parsing
+
+### Migrations (`migrations.ts`)
+
+#### `migrateConfig(config: unknown, detectedVersion: number, targetVersion?: number): AppSettings`
+
+Migrate configuration from detected version to target version. Called automatically by `getAppConfig()`.
+
+```typescript
+import { migrateConfig, CURRENT_CONFIG_VERSION } from "@/lib/config";
+
+const config = require("./appsettings.json");
+// The loader and migration chain expect a valid numeric `version` field.
+// WARNING: If `config.version` is missing or invalid the loader will throw.
+// Explicitly validate before calling `migrateConfig` when working with
+// externally-provided or hand-edited files:
+const detectedVersion = (() => {
+  if (typeof config.version !== "number" || config.version < 1) {
+    throw new Error("Missing or invalid config.version; cannot migrate");
+  }
+  return config.version;
+})();
+
+const migratedConfig = migrateConfig(
+  config,
+  detectedVersion,
+  CURRENT_CONFIG_VERSION,
+);
+```
+
+**Parameters:**
+
+- `config` - Loaded config object (any shape; defensive handling)
+- `detectedVersion` - Version field from `config`. The loader expects a valid numeric `version` and will throw if it is missing or invalid; callers should validate `config.version` before calling when the source may be unreliable.
+- `targetVersion` - Target version (default: `CURRENT_CONFIG_VERSION`)
+
+**Returns:** `AppSettings` - Migrated config with `version` field set to `targetVersion`
+
+**Throws:** If version unsupported (<1) or migration fails
+
+**Migration Chain:** Applies v1→v2, v2→v3, etc. in sequence until `targetVersion` reached
+
+#### `CURRENT_CONFIG_VERSION: number`
+
+Current schema version (exported constant). Increment when making breaking changes.
+
+```typescript
+import { CURRENT_CONFIG_VERSION } from "@/lib/config";
+
+console.log(CURRENT_CONFIG_VERSION); // 1
+```
 
 **Performance:** O(1) after first call (cached); first call is O(n) where n = JSON parsing
 
@@ -246,6 +466,7 @@ Complete configuration schema. Loaded from `appsettings.json` or `appsettings.de
 
 ```typescript
 interface AppSettings {
+  version: number; // Schema version (currently 1); auto-migrated on load
   description: string;
   environment: "development" | "production";
 

@@ -1,16 +1,16 @@
 import {
-  AuthActionGroup,
-  AuthBody,
-  AuthBodyFooter,
-  AuthButton,
-  AuthCaption,
-  AuthError,
-  AuthForm,
-  AuthRoot,
-  AuthSubTitle,
-  AuthSuccess,
-  AuthTitle,
-  FormAuthInput,
+    AuthActionGroup,
+    AuthBody,
+    AuthBodyFooter,
+    AuthButton,
+    AuthCaption,
+    AuthError,
+    AuthForm,
+    AuthRoot,
+    AuthSubTitle,
+    AuthSuccess,
+    AuthTitle,
+    FormAuthInput,
 } from "@/components/auth_components";
 import { useResetPasswordConfirm } from "@/lib";
 import { getPasswordRequirementsForUI } from "@/lib/schemas/auth.schema";
@@ -26,23 +26,18 @@ export default function ResetPasswordScreen() {
     control,
     isValid,
     password,
-    confirmPassword,
     loading,
     error,
     success,
     successMessage,
     showPassword,
     userEmail,
-    doPasswordsMatch,
     handleResetPassword,
     setShowPassword,
     goToSignIn,
   } = useResetPasswordConfirm();
 
-  const getPasswordMatchText = () => {
-    if (confirmPassword.length === 0) return "";
-    return doPasswordsMatch ? "✓ Passwords match" : "✗ Passwords do not match";
-  };
+
 
   return (
     <AuthRoot>
@@ -102,23 +97,6 @@ export default function ResetPasswordScreen() {
           returnKeyType="go"
           onSubmitEditing={handleResetPassword}
         />
-
-        {/* Password Match Indicator */}
-        {confirmPassword.length > 0 && (
-          <AuthSubTitle
-            color={doPasswordsMatch ? "#A3D4A0" : "#F5A5A5"}
-            align="left"
-            fontSize={11}
-            style={{
-              lineHeight: 16,
-              opacity: 0.9,
-              marginBottom: 6,
-              marginTop: -14,
-            }}
-          >
-            {getPasswordMatchText()}
-          </AuthSubTitle>
-        )}
 
         {/* Authentication Error */}
         <AuthError error={error} />

@@ -4,53 +4,54 @@ import { useAnalyticsNavigation } from "@/hooks/navigation";
 import { useSplashScreen } from "@/hooks/ui";
 import { NotificationProvider } from "@/hooks/utils";
 import {
-  Analytics,
-  APP_VERSION,
-  AppErrorBoundary,
-  AppKernel,
-  AppKernelProvider,
-  buildNavigationTarget,
-  executeRecoveryAction,
-  getAppConfig,
-  getRouteConfig,
-  lazyLoadInBackground,
-  logger,
-  resolveBackTarget,
-  resolveTitle,
-  sessionManager,
-  useAppKernel,
+    Analytics,
+    APP_VERSION,
+    AppErrorBoundary,
+    AppKernel,
+    AppKernelProvider,
+    buildNavigationTarget,
+    executeRecoveryAction,
+    getAppConfig,
+    getRouteConfig,
+    lazyLoadInBackground,
+    logger,
+    resolveBackTarget,
+    resolveTitle,
+    sessionManager,
+    useAppKernel,
 } from "@/lib";
+import type { AccessRole } from "@/lib/database/worlds";
 import { SafeModeReason } from "@/lib/error/safe-mode";
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ThemeProvider, UseTheme } from "@/providers/ThemeProvider";
 import Constants from "expo-constants";
 import {
-  Stack,
-  useLocalSearchParams,
-  useRouter,
-  useSegments,
+    Stack,
+    useLocalSearchParams,
+    useRouter,
+    useSegments,
 } from "expo-router";
 import { useEffect } from "react";
 import { View } from "react-native";
 import LoadingOverlay from "../components/LoadingOverlay";
 import {
-  CrashFallBack,
-  RouteErrorBoundary,
-  SafeModeErrorBoundary,
-  SafeModeScreen,
-  SplashScreen,
+    CrashFallBack,
+    RouteErrorBoundary,
+    SafeModeErrorBoundary,
+    SafeModeScreen,
+    SplashScreen,
 } from "../components/SplashScreen";
 import {
-  AppParamsStableProvider,
-  useAppParamsStable,
-  useUserId,
+    AppParamsStableProvider,
+    useAppParamsStable,
+    useUserId,
 } from "../providers/AppParamsStableProvider";
 import {
-  AppParamsVolatileProvider,
-  useAppParamsVolatile,
-  useUserRole,
-  useWorldId,
+    AppParamsVolatileProvider,
+    useAppParamsVolatile,
+    useUserRole,
+    useWorldId,
 } from "../providers/AppParamsVolatileProvider";
 import { PlatformProvider, usePlatform } from "../providers/PlatformProvider";
 
@@ -194,7 +195,7 @@ function RootLayoutContent() {
       const urlWorldId =
         typeof urlParams.worldId === "string" ? urlParams.worldId : undefined;
       const urlUserRole =
-        typeof urlParams.userRole === "string" ? urlParams.userRole : undefined;
+        typeof urlParams.userRole === "string" ? (urlParams.userRole as AccessRole) : undefined;
 
       // If no world in context yet, seed from URL once (owner navigating directly to their world)
       if (!worldId && urlWorldId) {
@@ -211,11 +212,11 @@ function RootLayoutContent() {
     const currentWorldId =
       typeof urlParams.worldId === "string" ? urlParams.worldId : undefined;
     const currentUserRole =
-      typeof urlParams.userRole === "string" ? urlParams.userRole : undefined;
+      typeof urlParams.userRole === "string" ? (urlParams.userRole as AccessRole) : undefined;
 
     // Only update if values are different from context (userId is loaded from storage, not URL)
     let shouldUpdate = false;
-    const updates: { worldId?: string; userRole?: string } = {};
+    const updates: { worldId?: string; userRole?: AccessRole } = {};
     if (currentWorldId && currentWorldId !== worldId) {
       updates.worldId = currentWorldId;
       shouldUpdate = true;

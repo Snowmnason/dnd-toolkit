@@ -137,6 +137,14 @@ export const DATA_CLASSIFICATIONS: Record<string, DataClassification> = {
     ttl: 15 * 60 * 1000, // 15 minutes
   },
 
+  "dnd:auth:session": {
+    key: "dnd:auth:session",
+    sensitivity: DataSensitivity.PII,
+    description:
+      "Supabase session tokens (access + refresh) for web platform (persistSession=false workaround)",
+    redactionPattern: /token=[a-z0-9]+/gi,
+  },
+
   "dnd:invite:pending": {
     key: "dnd:invite:pending",
     sensitivity: DataSensitivity.SENSITIVE,

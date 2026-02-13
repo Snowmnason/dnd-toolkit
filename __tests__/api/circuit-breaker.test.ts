@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
     CircuitBreakerManager,
-    type CircuitThresholds
+    type CircuitThresholds,
 } from "../../lib/api/circuit-breaker";
 
 // Mock logger
@@ -23,6 +23,7 @@ vi.mock("../../lib/utils/logger", () => ({
 // Mock config
 vi.mock("../../lib/config", () => ({
   getAppConfig: vi.fn(() => ({
+    version: 1,
     circuitBreaker: {
       failures: 10,
       ratePercent: 50,

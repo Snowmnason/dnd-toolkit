@@ -125,7 +125,8 @@ Deno.serve(async (req: Request) => {
     //    Assumes public.users.auth_id stores auth.users.id
     try {
       const { error: appDelErr } = await admin
-        .from("users")
+        .schema('public')
+        .from('users')
         .delete()
         .eq("auth_id", user.id);
 

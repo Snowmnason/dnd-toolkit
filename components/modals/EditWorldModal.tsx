@@ -111,10 +111,6 @@ export function EditWorldModal({
       animateOnDestruction={deleting} // 💥 modal shakes on delete confirmation
     >
       {/* 🏷️ Edit Name Section */}
-      <Body style={{ marginBottom: S.space.xs, fontWeight: "600" }}>
-        Edit World Name
-      </Body>
-
       <View
         style={{
           flexDirection: "row",
@@ -126,7 +122,7 @@ export function EditWorldModal({
         <FormTextInput
           control={control}
           name="name"
-          heading="World Name"
+          heading="Edit World Name"
           placeholder="Enter world name..."
           onChangeText={onWorldNameChange}
           style={{
@@ -134,7 +130,6 @@ export function EditWorldModal({
             borderWidth: 1,
             borderColor: $("border"),
             borderRadius: S.radius.md,
-            padding: S.space.sm,
             fontSize: isDesktop ? S.s(18) : S.s(16),
           }}
         />
@@ -143,6 +138,9 @@ export function EditWorldModal({
           variant="primary"
           onPress={handleSubmit(() => onConfirmWorldName())}
           disabled={!isValid}
+          style={{
+            marginBottom: S.space.xl * -1.5,
+          }}
         />
       </View>
       {/* Field-level errors are displayed inline via TextInput error prop */}

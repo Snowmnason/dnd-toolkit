@@ -16,10 +16,8 @@ export {
     bucketPercent, clearBucketCache, getBucketMemoized, isInRollout, isInRolloutMemoized, type RolloutConfig
 } from "./rollout";
 
-export { useFeatureFlags } from "@/hooks/feature/use-feature-flags";
-
-export {
-    useEntitlement,
-    type EntitlementStatus
-} from "@/hooks/feature/use-entitlements";
+// NOTE: useFeatureFlags is NOT exported here to avoid circular dependency
+// Import directly from hooks/feature/use-feature-flags instead
+// NOTE: useEntitlement is NOT exported here to avoid circular dependency
+// Import directly from hooks/feature/use-entitlements instead
 

@@ -19,6 +19,7 @@ import { describe, expect, it, vi } from "vitest";
 // Mock modules
 vi.mock("@/lib/config/loader", () => ({
   getAppConfig: vi.fn(() => ({
+    version: 1,
     safeMode: {
       kernelTimeoutMs: 100, // Short timeout for tests
       syncFailureThreshold: 3,

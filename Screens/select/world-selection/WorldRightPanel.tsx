@@ -2,7 +2,7 @@ import { Button, Card, Heading, LazyImage } from "@/components/ui";
 import { WorldWithAccess } from "@/lib/database/worlds";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
 import { logger } from "@/lib/utils/logger";
-import { useAppParamsStable } from "@/providers/AppParamsStableProvider";
+import { useAppParamsStable, useUserId } from "@/providers/AppParamsStableProvider";
 import { useAppParamsVolatile } from "@/providers/AppParamsVolatileProvider";
 import { usePlatform } from "@/providers/PlatformProvider";
 import { $, useScale, UseTheme } from "@/theme";
@@ -25,6 +25,7 @@ export function WorldRightPanel({
   const S = useScale();
   const { theme } = UseTheme();
   const router = useRouter();
+  const userId = useUserId();
   const { updateVolatileParams } = useAppParamsVolatile();
   const { addConnectedWorld } = useAppParamsStable();
   const { isDesktop } = usePlatform();
@@ -95,7 +96,7 @@ export function WorldRightPanel({
             }}
           >
             <Button
-              text={selectedWorld.user_role === "owner" ? "Edit" : "Leave"}
+              text={selectedWorld.user_role === "dm" || selectedWorld.owner_id === userId ? "Edit" : "Leave"}
               variant="secondary"
               onPress={onEditOrLeave}
               style={{ width: 160 }}

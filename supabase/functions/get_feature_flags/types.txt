@@ -19,29 +19,51 @@ export interface FeatureFlagRow {
 
 /**
  * Entitlement row from database
+ * Includes new 003 schema columns: is_active (soft-delete flag), remind_user (expiry reminder)
  */
 export interface EntitlementRow {
   id: string;
   user_id: string;
   key: string;
+  is_active: boolean; // false = marked inactive by background job or manual revocation
+  remind_user: boolean; // true = user should be reminded before expiry
   created_at: string;
   updated_at: string;
   expires_at: string | null;
 }
 
 /**
- * Feature flag override row from database
+ * Feature flag override row from database (003 simplified schema, no target_type in DB)
+ * target_type added synthetically by Edge Function for client compatibility
  */
 export interface FeatureFlagOverrideRow {
   id: string;
   user_id: string;
-  target_type: OverrideTargetType;
-  target_name: string;
+  target_type: "flag"; // Synthetic: identifies this as a feature flag override
+  target_name: string; // Feature flag name (from feature_flags.flag_name)
   enabled: boolean;
   expires_at: string | null;
   revoked: boolean;
   reason?: string;
   created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Entitlement override row from database (NEW in 003: entitlements_overrides table)
+ * Allows admins to manually grant/revoke entitlements independent of expiry logic
+ */
+export interface EntitlementOverrideRow {
+  id: string;
+  user_id: string;
+  target_type: "entitlement"; // Synthetic: identifies this as an entitlement override
+  target_name: string; // Entitlement key (from feature_flags.entitlements.key)
+  action: "grant" | "revoke"; // Override action
+  expires_at: string | null; // Override expiry (independent of base entitlement)
+  revoked: boolean; // Soft-delete flag
+  reason?: string; // Admin reason for override
+  created_by?: string | null; // Admin who created override
   created_at: string;
   updated_at: string;
 }
@@ -58,11 +80,12 @@ export interface RolloutConfigRow {
 /**
  * Response structure from Edge Function
  * Client expects this exact structure for caching and merge logic
+ * Overrides array includes both flag and entitlement overrides (differentiated by target_type)
  */
 export interface GetFeatureFlagsResponse {
   flags: FeatureFlagRow[];
   entitlements: EntitlementRow[];
-  overrides: FeatureFlagOverrideRow[]; // Only includes non-revoked, non-expired overrides
+  overrides: (FeatureFlagOverrideRow | EntitlementOverrideRow)[]; // Both flag and entitlement overrides (non-revoked, non-expired)
   rollouts: Record<string, RolloutConfigRow>; // Rollout config by flag name
   fetchedAt: number;
   version: "v1";

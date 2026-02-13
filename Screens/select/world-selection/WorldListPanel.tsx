@@ -1,6 +1,7 @@
 import { Body, Button } from "@/components/ui";
 import { WorldWithAccess } from "@/lib/database/worlds";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
+import { useUserId } from "@/providers/AppParamsStableProvider";
 import { useAppParamsVolatile } from "@/providers/AppParamsVolatileProvider";
 import { usePlatform } from "@/providers/PlatformProvider";
 import { useScale } from "@/theme";
@@ -26,8 +27,7 @@ export function WorldListPanel({
   onMobileWorldSelect,
 }: WorldListPanelProps) {
   const S = useScale();
-  const router = useRouter();
-  const { updateVolatileParams } = useAppParamsVolatile();
+  const router = useRouter();  const userId = useUserId();  const { updateVolatileParams } = useAppParamsVolatile();
 
   // Centralized platform detection
   const { isDesktop } = usePlatform();
@@ -53,7 +53,8 @@ export function WorldListPanel({
         ) : (
           worlds.map((world) => {
             const isSelected = selectedWorld?.world_id === world.world_id;
-            const isOwner = world.user_role === "owner";
+            // Owner has dm role (owner-level access) or is identified by owner_id
+            const isOwner = world.user_role === "dm" || world.owner_id === userId;
 
             // Variant rules
             const variant = isSelected

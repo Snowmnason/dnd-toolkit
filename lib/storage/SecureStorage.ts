@@ -1,5 +1,4 @@
 import { Platform } from "react-native";
-import { logger } from "../utils/logger";
 import {
   CacheSchema,
   handleCacheMigration,
@@ -7,6 +6,15 @@ import {
   VersionedCacheEntry,
 } from "./cache-versioning";
 import { getStorageBackend, type StorageBackend } from "./storage-config";
+
+// Lazy-load logger to avoid circular dependency with storage
+let loggerCache: any = null;
+const getLogger = () => {
+  if (!loggerCache) {
+    loggerCache = require("../utils/logger").logger;
+  }
+  return loggerCache;
+};
 
 // Type-safe import for AsyncStorage
 let AsyncStorage: any;
@@ -81,7 +89,7 @@ class SecureStorageService {
       this.initialized = true;
       return this.encryptedStorage;
     } catch (error) {
-      logger.error("storage", "Failed to load EncryptedStorage", error);
+      getLogger().error("storage", "Failed to load EncryptedStorage", error);
       throw new Error("SecureStorage initialization failed");
     }
   }
@@ -105,7 +113,7 @@ class SecureStorageService {
         // This keeps sensitive data (user_data, connected_worlds, auth) encrypted in localStorage
         const storage = await this.getEncryptedStorage();
         await storage.setItem(key, value);
-        logger
+        getLogger()
           .category("storage")
           .debug(
             `[EncryptedStorage→localStorage] Item stored: ${key} (${value.length} chars)`,
@@ -118,7 +126,7 @@ class SecureStorageService {
           const storage = getSessionStorage();
           if (storage) {
             storage.setItem(key, value);
-            logger
+            getLogger()
               .category("storage")
               .debug(
                 `[sessionStorage] Item stored: ${key} (${value.length} chars)`,
@@ -127,7 +135,7 @@ class SecureStorageService {
         } else {
           // Mobile: use AsyncStorage (cleared on app close anyway)
           await AsyncStorage?.setItem(key, value);
-          logger
+          getLogger()
             .category("storage")
             .debug(
               `[AsyncStorage/sessionStorage] Item stored: ${key} (${value.length} chars)`,
@@ -137,14 +145,14 @@ class SecureStorageService {
         // 'secure' backend: use EncryptedStorage (same as localStorage, for clarity)
         const storage = await this.getEncryptedStorage();
         await storage.setItem(key, value);
-        logger
+        getLogger()
           .category("storage")
           .debug(
             `[EncryptedStorage] Item stored: ${key} (${value.length} chars)`,
           );
       }
     } catch (error) {
-      logger
+      getLogger()
         .category("storage")
         .error(`setItem failed [${backend}]`, { key, error });
       throw error;
@@ -164,7 +172,7 @@ class SecureStorageService {
         const storage = await this.getEncryptedStorage();
         const value = await storage.getItem(key);
         if (value) {
-          logger
+          getLogger()
             .category("storage")
             .debug(`[EncryptedStorage→localStorage] Item retrieved: ${key}`);
         }
@@ -176,7 +184,7 @@ class SecureStorageService {
           if (storage) {
             const value = storage.getItem(key);
             if (value) {
-              logger
+              getLogger()
                 .category("storage")
                 .debug(`[sessionStorage] Item retrieved: ${key}`);
             }
@@ -186,7 +194,7 @@ class SecureStorageService {
           // Mobile: use AsyncStorage
           const value = await AsyncStorage?.getItem(key);
           if (value) {
-            logger
+            getLogger()
               .category("storage")
               .debug(`[AsyncStorage/sessionStorage] Item retrieved: ${key}`);
           }
@@ -197,7 +205,7 @@ class SecureStorageService {
         const storage = await this.getEncryptedStorage();
         const value = await storage.getItem(key);
         if (value) {
-          logger
+          getLogger()
             .category("storage")
             .debug(`[EncryptedStorage] Item retrieved: ${key}`);
         }
@@ -205,7 +213,7 @@ class SecureStorageService {
       }
       return null;
     } catch (error) {
-      logger
+      getLogger()
         .category("storage")
         .warn(`getItem failed [${backend}]`, { key, error });
       return null;
@@ -223,7 +231,7 @@ class SecureStorageService {
         // localStorage keys are ENCRYPTED via EncryptedStorage
         const storage = await this.getEncryptedStorage();
         await storage.removeItem(key);
-        logger
+        getLogger()
           .category("storage")
           .debug(`[EncryptedStorage→localStorage] Item removed: ${key}`);
       } else if (backend === "sessionStorage") {
@@ -232,14 +240,14 @@ class SecureStorageService {
           const storage = getSessionStorage();
           if (storage) {
             storage.removeItem(key);
-            logger
+            getLogger()
               .category("storage")
               .debug(`[sessionStorage] Item removed: ${key}`);
           }
         } else {
           // Mobile: use AsyncStorage
           await AsyncStorage?.removeItem(key);
-          logger
+          getLogger()
             .category("storage")
             .debug(`[AsyncStorage/sessionStorage] Item removed: ${key}`);
         }
@@ -247,12 +255,12 @@ class SecureStorageService {
         // 'secure' backend: use EncryptedStorage
         const storage = await this.getEncryptedStorage();
         await storage.removeItem(key);
-        logger
+        getLogger()
           .category("storage")
           .debug(`[EncryptedStorage] Item removed: ${key}`);
       }
     } catch (error) {
-      logger.error(
+      getLogger().error(
         `SecureStorage.removeItem failed [${backend}] for key: ${key}`,
         error,
       );
@@ -270,7 +278,7 @@ class SecureStorageService {
       // Clear encrypted storage (includes localStorage-routed keys)
       const storage = await this.getEncryptedStorage();
       await storage.clear();
-      logger
+      getLogger()
         .category("storage")
         .warn("[EncryptedStorage] All encrypted storage cleared");
 
@@ -278,12 +286,12 @@ class SecureStorageService {
       const sessionStorage = getSessionStorage();
       if (sessionStorage) {
         sessionStorage.clear();
-        logger
+        getLogger()
           .category("storage")
           .warn("[sessionStorage] All ephemeral cache cleared");
       }
     } catch (error) {
-      logger.error("SecureStorage.clear failed", error);
+      getLogger().error("SecureStorage.clear failed", error);
       throw error;
     }
   }
@@ -296,7 +304,7 @@ class SecureStorageService {
       const jsonString = JSON.stringify(value);
       await this.setItem(key, jsonString);
     } catch (error) {
-      logger.error(`SecureStorage.setJSON failed for key: ${key}`, error);
+      getLogger().error(`SecureStorage.setJSON failed for key: ${key}`, error);
       throw error;
     }
   }
@@ -313,7 +321,7 @@ class SecureStorageService {
       }
       return JSON.parse(value) as T;
     } catch (error) {
-      logger.warn(
+      getLogger().warn(
         `SecureStorage.getJSON failed for key: ${key} (invalid JSON?)`,
         error,
       );
@@ -337,10 +345,10 @@ class SecureStorageService {
     try {
       const storage = await this.getEncryptedStorage();
       const keys = await storage.getAllKeys();
-      logger.debug(`SecureStorage.getAllKeys: Found ${keys.length} keys`);
+      getLogger().debug(`SecureStorage.getAllKeys: Found ${keys.length} keys`);
       return keys;
     } catch (error) {
-      logger.warn("SecureStorage.getAllKeys failed", error);
+      getLogger().warn("SecureStorage.getAllKeys failed", error);
       return [];
     }
   }
@@ -357,7 +365,7 @@ class SecureStorageService {
       const rawEntry = await this.getJSON<VersionedCacheEntry>(key);
 
       if (!rawEntry) {
-        logger.debug(`SecureStorage.getValidatedJSON: ${key} not found`);
+        getLogger().debug(`SecureStorage.getValidatedJSON: ${key} not found`);
         return null;
       }
 
@@ -365,14 +373,14 @@ class SecureStorageService {
       const validation = validateCacheEntry(rawEntry, schema);
 
       if (validation.valid) {
-        logger.debug(
-          `SecureStorage.getValidatedJSON: ${key} validated successfully`,
-        );
+      getLogger().debug(
+        `SecureStorage.getValidatedJSON: ${key} validated successfully`,
+      );
         return rawEntry.data as T;
       }
 
       // Handle validation failure
-      logger.warn(`SecureStorage.getValidatedJSON: ${key} failed validation`, {
+      getLogger().warn(`SecureStorage.getValidatedJSON: ${key} failed validation`, {
         reason: validation.reason,
         oldVersion: validation.oldVersion,
         currentVersion: validation.currentVersion,
@@ -384,7 +392,7 @@ class SecureStorageService {
       if (migrated !== null) {
         // Update storage with migrated data
         await this.setVersionedJSON(key, migrated, schema.version);
-        logger.info(
+        getLogger().info(
           `SecureStorage.getValidatedJSON: ${key} migrated and updated`,
         );
         return migrated;
@@ -392,12 +400,12 @@ class SecureStorageService {
 
       // Migration failed or not available - clear the entry
       await this.removeItem(key);
-      logger.info(
+      getLogger().info(
         `SecureStorage.getValidatedJSON: ${key} cleared due to migration failure`,
       );
       return null;
     } catch (error) {
-      logger.error(
+      getLogger().error(
         `SecureStorage.getValidatedJSON failed for key: ${key}`,
         error,
       );
@@ -421,9 +429,9 @@ class SecureStorageService {
       };
       const jsonString = JSON.stringify(versionedEntry);
       await this.setItem(key, jsonString);
-      logger.debug(`SecureStorage.setVersionedJSON: ${key} (v${version})`);
+      getLogger().debug(`SecureStorage.setVersionedJSON: ${key} (v${version})`);
     } catch (error) {
-      logger.error(
+      getLogger().error(
         `SecureStorage.setVersionedJSON failed for key: ${key}`,
         error,
       );

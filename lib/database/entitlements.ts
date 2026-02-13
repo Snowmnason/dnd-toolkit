@@ -2,12 +2,14 @@
  * Entitlements Database Queries
  *
  * This module provides client-side REST API helpers for querying user entitlements
- * from the Supabase `entitlements` table.
+ * from the Supabase `feature_flag.entitlements` table.
  *
- * **Schema:**
+ * **Schema**: feature_flag.entitlements
  * - id: uuid (PK)
  * - user_id: uuid (FK to users)
  * - key: text (entitlement name)
+ * - is_active: boolean (soft-delete flag, auto-marked when expired)
+ * - remind_user: boolean (flag to remind user when expired)
  * - created_at, updated_at: timestamps
  * - expires_at: timestamp (nullable)
  *
@@ -21,6 +23,8 @@ export interface EntitlementRow {
   id: string;
   user_id: string;
   key: string;
+  is_active: boolean; // Manual revoke + auto-marked when expired
+  remind_user: boolean; // Flag to remind user when expired
   created_at: string;
   updated_at: string;
   expires_at: string | null;
@@ -38,9 +42,13 @@ export async function fetchEntitlementsByUserId(
   userId: string,
 ): Promise<EntitlementRow[]> {
   const { data, error } = await supabase
-    .from("entitlements")
-    .select("id, user_id, key, created_at, updated_at, expires_at")
-    .eq("user_id", userId);
+      .schema('feature_flags')
+    .from('entitlements')
+    .select(
+      "id, user_id, key, is_active, remind_user, created_at, updated_at, expires_at",
+    )
+    .eq("user_id", userId)
+    .eq("is_active", true); // Only fetch active entitlements
 
   if (error) {
     throw new Error(
@@ -67,10 +75,12 @@ export async function hasEntitlement(
   entitlementKey: string,
 ): Promise<boolean> {
   const { data, error } = await supabase
-    .from("entitlements")
-    .select("expires_at")
+    .schema('feature_flags')
+    .from('entitlements')
+    .select("is_active, expires_at")
     .eq("user_id", userId)
     .eq("key", entitlementKey)
+    .eq("is_active", true) // Only check active entitlements
     .maybeSingle();
 
   if (error || !data) {
@@ -85,4 +95,58 @@ export async function hasEntitlement(
   // Check if the entitlement has expired
   const expiryTime = new Date(data.expires_at).getTime();
   return expiryTime > Date.now();
+}
+
+/**
+ * Entitlement override row (admin grant/revoke tool)
+ *
+ * Overrides allow admins to temporarily grant or revoke entitlements
+ * without modifying the base entitlement rows.
+ */
+export interface EntitlementOverrideRow {
+  id: string;
+  user_id: string;
+  entitlement_key: string;
+  is_active: boolean; // true = force grant, false = force revoke
+  expires_at: string | null;
+  reason: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  revoked: boolean; // Soft-revoke for audit trail
+}
+
+/**
+ * Fetch all active entitlement overrides for a given user
+ *
+ * Filters for non-revoked overrides that have not expired.
+ * Overrides provide temporary admin-controlled grants/revokes.
+ *
+ * @param supabase - Supabase client
+ * @param userId - User ID (UUID) to fetch overrides for
+ * @returns List of active user entitlement overrides
+ */
+export async function fetchEntitlementOverridesByUserId(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<EntitlementOverrideRow[]> {
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .schema('feature_flags')
+    .from('entitlements_overrides')
+    .select(
+      "id, user_id, entitlement_key, is_active, expires_at, reason, created_by, created_at, updated_at, revoked",
+    )
+    .eq("user_id", userId)
+    .eq("revoked", false)
+    .or(`expires_at.is.null,expires_at.gt.${now}`);
+
+  if (error) {
+    throw new Error(
+      `Failed to fetch entitlement overrides for user ${userId}: ${error.message}`,
+    );
+  }
+
+  return (data || []) as EntitlementOverrideRow[];
 }

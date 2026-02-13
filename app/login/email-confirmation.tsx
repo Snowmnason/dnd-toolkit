@@ -1,16 +1,16 @@
 import {
-    AuthActionGroup,
-    AuthBackButtonContainer,
-    AuthBodyFooter,
-    AuthButton, AuthButtonBack,
-    AuthCaption,
-    AuthModal,
-    AuthRoot,
-    AuthSubTitle,
-    AuthTitle
+  AuthActionGroup,
+  AuthBackButtonContainer,
+  AuthBodyFooter,
+  AuthButton, AuthButtonBack,
+  AuthCaption,
+  AuthModal,
+  AuthRoot,
+  AuthSubTitle,
+  AuthTitle
 } from '@/components/auth_components';
 import { Body } from '@/components/ui';
-import { AuthStateManager, logger, openEmailApp, supabase, usersDB } from '@/lib';
+import { logger, openEmailApp, supabase } from '@/lib';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -46,23 +46,10 @@ export default function EmailConfirmationScreen() {
   logger.debug('auth', 'Auth state change:', event, session?.user?.email);
       
       if (event === 'SIGNED_IN' && session?.user?.email === userEmail) {
-        // User successfully confirmed email and is now signed in
-        await AuthStateManager.setHasAccount(true);
-        
-        // Check if user has completed their profile
-        try {
-          const profile = await usersDB.getCurrentUser();
-          if (profile && profile.username) {
-            // Profile is complete, go to world selection
-            router.replace('/select/world-selection');
-          } else {
-            // Profile needs completion
-            router.replace('/login/complete-profile');
-          }
-        } catch {
-          // No profile exists, redirect to complete profile
-          router.replace('/login/complete-profile');
-        }
+        // User successfully confirmed email
+        // Redirect to sign-in so they can manually complete their account setup
+        logger.info('auth', 'Email confirmed, redirecting to sign-in');
+        router.replace('/login/sign-in');
       }
     });
 

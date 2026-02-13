@@ -1,242 +1,149 @@
-# 🔒 Row Level Security (RLS) Policies — DnD Toolkit
+# Row Level Security (RLS) Policies — DnD Toolkit
 
-This document defines all Row Level Security (RLS) policies for the D&D Toolkit database. Use these as the canonical reference when creating or debugging policies in Supabase/Postgres.
+All policies documented here match migrations 001–004. Source of truth: `supabase/migrations/`.
 
----
-
-## Policy Summary by Table
-
-| Table                      | Policy Name                             | Command | Role(s)               | Purpose                                                  |
-| -------------------------- | --------------------------------------- | ------- | --------------------- | -------------------------------------------------------- |
-| **users**                  | `users_select_own`                      | SELECT  | authenticated         | Users can read their own profile                         |
-| **users**                  | `users_insert_own`                      | INSERT  | authenticated         | Users can create their own profile                       |
-| **users**                  | `users_update_own`                      | UPDATE  | authenticated         | Users can update their own profile                       |
-| **users**                  | `users_delete_own`                      | DELETE  | authenticated         | Users can delete their own profile                       |
-| **users**                  | `users_admin_full_access`               | ALL     | authenticated (admin) | Admins have full access to all user records              |
-| **worlds**                 | `worlds_owner_all`                      | ALL     | authenticated         | World owners have full access to their worlds            |
-| **worlds**                 | `worlds_collaborator_select`            | SELECT  | authenticated         | Collaborators can view worlds they have access to        |
-| **worlds**                 | `worlds_collaborator_update`            | UPDATE  | authenticated         | Collaborators can update worlds (without changing owner) |
-| **world_access**           | `world_owner_any_ops_on_world_access`   | ALL     | authenticated         | World owners manage all access grants for their worlds   |
-| **world_access**           | `member_self_manage_access`             | ALL     | authenticated         | Members can manage their own access records              |
-| **invite_links**           | `invite_links_public_read`              | SELECT  | public                | Public can view any active invite links                  |
-| **invite_links**           | `invite_links_owner_select`             | SELECT  | authenticated         | World owners can view their own invite links             |
-| **invite_links**           | `invite_links_insert_owner`             | INSERT  | authenticated         | World owners/DMs can create invite links                 |
-| **feature_flag**           | `feature_flag_select_authenticated`     | SELECT  | public                | Feature flags publicly readable (for client checks)      |
-| **feature_flag_overrides** | `feature_flag_overrides`                | SELECT  | public                | Overrides publicly readable                              |
-| **entitlements**           | `entitlements_select_authenticated`     | SELECT  | authenticated         | Users can read their own entitlements                    |
-| **rollouts**               | `Authenticated users can read rollouts` | SELECT  | authenticated         | Users can read rollout configurations                    |
-| **rollouts**               | `Service role can manage rollouts`      | ALL     | service_role          | Service role (Edge Functions) can manage rollouts        |
-| **member**                 | `member_self_manage_access`             | ALL     | authenticated         | Members can manage their own access records              |
+**Key pattern**: Admin checks use `public.is_admin()` (queries DB), **never** `auth.jwt()->>'role'`. User identity is resolved via `public.get_current_user_id()` (maps `auth.uid()` → internal `users.id`, excludes soft-deleted users).
 
 ---
 
-## SQL Definitions (Canonical)
+## PUBLIC Schema (001)
 
-### Enable RLS on All Tables
+All tables have RLS enabled.
 
-```sql
-ALTER TABLE IF EXISTS public."entitlements" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public."users" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public."worlds" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public."world_access" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public."feature_flag" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public."invite_links" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public."rollouts" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public."member" ENABLE ROW LEVEL SECURITY;
-```
+### public.users
 
-### USERS Policies
+| Policy | Command | Role | Condition |
+| --- | --- | --- | --- |
+| `users_select_own` | SELECT | authenticated | `auth_id = auth.uid() AND deleted_at IS NULL` |
+| `users_update_own` | UPDATE | authenticated | Own row, not soft-deleted |
+| `users_delete_own` | DELETE | authenticated | Own row (initiates soft/hard delete) |
+| `users_admin_full_access` | ALL | authenticated | `public.is_admin()` |
 
-```sql
--- users_select_own: Users can read their own profile
-CREATE POLICY "users_select_own" ON public."users"
-  FOR SELECT TO authenticated
-  USING (((SELECT auth.uid() AS uid) = auth_id));
+No INSERT policy — rows are created by the `handle_new_user()` auth trigger.
 
--- users_insert_own: Users can create their own profile
-CREATE POLICY "users_insert_own" ON public."users"
-  FOR INSERT TO authenticated
-  WITH CHECK (((SELECT auth.uid() AS uid) = auth_id));
+### public.user_settings
 
--- users_update_own: Users can update their own profile
-CREATE POLICY "users_update_own" ON public."users"
-  FOR UPDATE TO authenticated
-  USING (((SELECT auth.uid() AS uid) = auth_id))
-  WITH CHECK (((SELECT auth.uid() AS uid) = auth_id));
+| Policy | Command | Role | Condition |
+| --- | --- | --- | --- |
+| `user_settings_select_own` | SELECT | authenticated | `user_id = get_current_user_id()` |
+| `user_settings_update_own` | UPDATE | authenticated | Own row |
+| `user_settings_admin_full_access` | ALL | authenticated | `public.is_admin()` |
 
--- users_delete_own: Users can delete their own profile
-CREATE POLICY "users_delete_own" ON public."users"
-  FOR DELETE TO authenticated
-  USING (((SELECT auth.uid() AS uid) = auth_id));
-
--- users_admin_full_access: Admins have full access
-CREATE POLICY "users_admin_full_access" ON public."users"
-  FOR ALL TO authenticated
-  USING (((auth.jwt() ->> 'role'::text) = 'admin'::text));
-```
-
-### WORLDS Policies
-
-```sql
--- worlds_owner_all: Owners have full access to their worlds
-CREATE POLICY "worlds_owner_all" ON public."worlds"
-  FOR ALL TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public."users" u
-    WHERE (u.id = worlds.owner_id) AND (u.auth_id = auth.uid())
-  ))
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM public."users" u
-    WHERE (u.id = worlds.owner_id) AND (u.auth_id = auth.uid())
-  ));
-
--- worlds_collaborator_select: Collaborators can view worlds they have access to
-CREATE POLICY "worlds_collaborator_select" ON public."worlds"
-  FOR SELECT TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public."world_access" wa
-    JOIN public."users" u ON (u.id = wa.user_id)
-    WHERE (wa.world_id = worlds.world_id) AND (u.auth_id = auth.uid())
-  ));
-
--- worlds_collaborator_update: Collaborators can update worlds
-CREATE POLICY "worlds_collaborator_update" ON public."worlds"
-  FOR UPDATE TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public."world_access" wa
-    JOIN public."users" u ON (u.id = wa.user_id)
-    WHERE (wa.world_id = worlds.world_id) AND (u.auth_id = auth.uid())
-  ))
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM public."world_access" wa
-    JOIN public."users" u ON (u.id = wa.user_id)
-    WHERE (wa.world_id = worlds.world_id) AND (u.auth_id = auth.uid())
-  ));
-```
-
-### WORLD_ACCESS Policies
-
-```sql
--- world_owner_any_ops_on_world_access: Owners manage all access grants
-CREATE POLICY "world_owner_any_ops_on_world_access" ON public."world_access"
-  FOR ALL TO authenticated
-  USING ((get_world_owner_auth_id(world_id) = (SELECT auth.uid() AS uid)))
-  WITH CHECK ((get_world_owner_auth_id(world_id) = (SELECT auth.uid() AS uid)));
-
--- member_self_manage_access: Members manage their own access records
-CREATE POLICY "member_self_manage_access" ON public."member"
-  FOR ALL TO authenticated
-  USING ((get_user_auth_id(user_id) = (SELECT auth.uid() AS uid)))
-  WITH CHECK ((get_user_auth_id(user_id) = (SELECT auth.uid() AS uid)));
-```
-
-### INVITE_LINKS Policies
-
-```sql
--- invite_links_public_read: Public can view active invite links
-CREATE POLICY "invite_links_public_read" ON public."invite_links"
-  FOR SELECT TO public
-  USING (true);
-
--- invite_links_owner_select: Owners can view their invite links
-CREATE POLICY "invite_links_owner_select" ON public."invite_links"
-  FOR SELECT TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM public."worlds" w
-    JOIN public."users" u ON (u.id = w.owner_id)
-    WHERE (w.world_id = invite_links.world_id) AND (u.auth_id = (SELECT auth.uid() AS uid))
-  ));
-
--- invite_links_insert_owner: Owners/DMs can create invite links
-CREATE POLICY "invite_links_insert_owner" ON public."invite_links"
-  FOR INSERT TO authenticated
-  WITH CHECK (
-    (
-      (created_by IS NOT NULL) AND
-      (created_by = (SELECT u.id FROM public."users" u WHERE (u.auth_id = (SELECT auth.uid() AS uid)) LIMIT 1))
-    ) OR (EXISTS (
-      SELECT 1 FROM public."worlds" w
-      JOIN public."users" owner ON (owner.id = w.owner_id)
-      WHERE (w.world_id = invite_links.world_id) AND (owner.auth_id = (SELECT auth.uid() AS uid))
-    )) OR (EXISTS (
-      SELECT 1 FROM public."world_access" wa
-      JOIN public."users" u ON (u.id = wa.user_id)
-      WHERE (wa.world_id = invite_links.world_id) AND (u.auth_id = (SELECT auth.uid() AS uid)) AND (wa.user_role = 'dm'::text)
-    ))
-  );
-```
-
-### FEATURE_FLAG Policies
-
-```sql
--- feature_flag_select_authenticated: Public can read feature flags
-CREATE POLICY "feature_flag_select_authenticated" ON public."feature_flag"
-  FOR SELECT TO public
-  USING (true);
-```
-
-### FEATURE_FLAG_OVERRIDES Policies
-
-```sql
--- feature_flag_overrides: Public can read overrides
-CREATE POLICY "feature_flag_overrides" ON public."feature_flag_overrides"
-  FOR SELECT TO public
-  USING (true);
-```
-
-### ENTITLEMENTS Policies
-
-```sql
--- entitlements_select_authenticated: Users can read authentic entitlements
-CREATE POLICY "entitlements_select_authenticated" ON public."entitlements"
-  FOR SELECT TO authenticated
-  USING (true);
-```
-
-### ROLLOUTS Policies
-
-```sql
--- Authenticated users can read rollouts
-CREATE POLICY "Authenticated users can read rollouts" ON public."rollouts"
-  FOR SELECT TO authenticated
-  USING (true);
-
--- Service role can manage rollouts (Edge Functions)
-CREATE POLICY "Service role can manage rollouts" ON public."rollouts"
-  FOR ALL TO service_role
-  USING (true)
-  WITH CHECK (true);
-```
+No INSERT policy — rows are created by the `handle_new_user()` auth trigger.
 
 ---
 
-## Critical Notes
+## WORLDS Schema (002)
 
-⚠️ **Helper Functions Required:**
+All tables have RLS enabled: `worlds.worlds`, `worlds.world_access`, `worlds.invite_links`.
 
-- `get_world_owner_auth_id(world_id)` — Must return the `auth_id` of the world's owner
-- `get_user_auth_id(user_id)` — Must return the `auth_id` for a given user ID
+### worlds.worlds
 
-⚠️ **JWT Claims:**
+| Policy | Command | Role | Condition |
+| --- | --- | --- | --- |
+| `select_if_owner_or_member` | SELECT | all | `deleted_at IS NULL AND (owner = current_user OR EXISTS in world_access)` |
+| `worlds_owner_write` | ALL | all | `owner_id = get_current_user_id()` (USING + WITH CHECK) |
 
-- `auth.jwt()->>'role'` must be set to `'admin'` for admin users
-- Verify this is configured in your Supabase custom claims or auth rules
+The SELECT policy explicitly filters `deleted_at IS NULL` + checks `owner_id` or membership in `world_access`. The ALL policy covers INSERT/UPDATE/DELETE for the owner.
 
-⚠️ **Service Role:**
+### worlds.world_access
 
-- The `service_role` token is used by Edge Functions for internal operations
-- Protect this carefully — it bypasses all RLS policies
+| Policy | Command | Role | Condition |
+| --- | --- | --- | --- |
+| `world_access_roster_select` | SELECT | authenticated | `worlds.user_has_access(get_current_user_id(), world_id)` |
+| `deny_updates` | UPDATE | authenticated | `USING (false)` — blocked |
+| `deny_deletes` | DELETE | authenticated | `USING (false)` — blocked |
+
+**No INSERT policy** — client-side inserts are implicitly denied. All membership changes go through SECURITY DEFINER RPC functions (`join_world_with_invite`, `change_user_role`, `leave_world`).
+
+The previous `allow_self` policy was removed as a redundant subset of `world_access_roster_select`.
+
+### worlds.invite_links
+
+| Policy | Command | Role | Condition |
+| --- | --- | --- | --- |
+| `invite_links_owner_select` | SELECT | authenticated | Creator or world owner |
+| `invite_links_delete_owner` | DELETE | authenticated | World owner |
+| `invite_links_admin_all` | ALL | authenticated | `public.is_admin()` |
+
+No public SELECT — anon access is via `worlds.resolve_invite_token()` RPC.
+No INSERT policy — invites created via `worlds.create_invite_link()` RPC.
 
 ---
 
-## Testing Checklist
+## FEATURE_FLAG Schema (003)
 
-- [ ] Admin users have `role = 'admin'` in their JWT token
-- [ ] `get_world_owner_auth_id()` and `get_user_auth_id()` functions exist and return correct values
-- [ ] Test queries as `public` (anon), `authenticated` (logged-in), and `service_role`
-- [ ] Test as owner, collaborator, and non-member to verify access boundaries
-- [ ] Monitor query performance on policies with JOINs (worlds, world_access)
+All tables have RLS enabled.
+
+### feature_flag.feature_flags
+
+| Policy | Command | Role | Condition |
+| --- | --- | --- | --- |
+| `feature_flags_public_read` | SELECT | PUBLIC | `true` (anyone can read flags) |
+| `feature_flags_admin_update` | UPDATE | authenticated | `public.is_admin()` |
+| `feature_flags_admin_delete` | DELETE | authenticated | `public.is_admin()` |
+
+No INSERT policy — flags created via server-side/Edge Functions only.
+
+### feature_flag.entitlements
+
+| Policy | Command | Role | Condition |
+| --- | --- | --- | --- |
+| `entitlements_user_read_own` | SELECT | authenticated | `user_id = get_current_user_id()` |
+| `entitlements_admin_full_access` | ALL | authenticated | `public.is_admin()` |
+
+### feature_flag.entitlements_overrides
+
+| Policy | Command | Role | Condition |
+| --- | --- | --- | --- |
+| `entitlements_overrides_user_read_own` | SELECT | authenticated | `user_id = get_current_user_id()` |
+| `entitlements_overrides_admin_update` | UPDATE | authenticated | `public.is_admin()` |
+| `entitlements_overrides_admin_delete` | DELETE | authenticated | `public.is_admin()` |
+
+No INSERT policy — overrides created server-side only.
+
+### feature_flag.feature_flag_overrides
+
+| Policy | Command | Role | Condition |
+| --- | --- | --- | --- |
+| `overrides_user_read_own` | SELECT | authenticated | `user_id = get_current_user_id()` |
+| `overrides_admin_update` | UPDATE | authenticated | `public.is_admin()` |
+| `overrides_admin_delete` | DELETE | authenticated | `public.is_admin()` |
+
+No INSERT policy — overrides created server-side only.
+
+### feature_flag.feature_flag_rollouts
+
+| Policy | Command | Role | Condition |
+| --- | --- | --- | --- |
+| `rollouts_authenticated_read` | SELECT | authenticated | `true` (needed for client-side bucketing) |
+| `rollouts_admin_update` | UPDATE | authenticated | `public.is_admin()` |
+| `rollouts_admin_delete` | DELETE | authenticated | `public.is_admin()` |
+
+No INSERT policy — rollouts created server-side only.
 
 ---
 
-_Last Updated: Feb 7, 2026_
+## AUDIT Schema (004)
+
+### audit.audit_events
+
+| Policy | Command | Role | Condition |
+| --- | --- | --- | --- |
+| `audit_admin_select` | SELECT | authenticated | `public.is_admin()` |
+| `audit_own_select` | SELECT | authenticated | `initiated_by = get_current_user_id()` |
+
+No INSERT/UPDATE/DELETE policies — all writes go through the `audit.log_change()` SECURITY DEFINER trigger function.
+
+---
+
+## Design Principles
+
+1. **No JWT role checks** — all admin checks use `public.is_admin()` which queries the DB.
+2. **No recursion** — `world_access` policies call `worlds.user_has_access()` (SECURITY DEFINER), which queries `worlds` and `world_access` without re-triggering RLS.
+3. **Server-side writes** — tables that don't need client-side INSERT have no INSERT policies (implicitly denied). Changes go through SECURITY DEFINER RPCs.
+4. **Soft-delete awareness** — `get_current_user_id()` excludes deleted users; `select_if_owner_or_member` checks `deleted_at IS NULL`.
+
+---
+
+_Last Updated: Feb 11, 2026 (Post-Audit — matches migrations 001–004)_

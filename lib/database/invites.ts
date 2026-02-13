@@ -9,9 +9,9 @@ import { supabase } from "./supabase";
  */
 
 interface InviteLink {
-  id: string;
+  id?: string;
   world_id: string;
-  created_by: string;
+  created_by?: string;
   token: string;
   expires_at: string;
   created_at: string;
@@ -33,49 +33,44 @@ export async function createInviteLink(
     const { worldId, hoursValid = 24 } = params;
 
     // Validate before write operation
-    const currentUser = await validateUserForWrite();
-
-    // Calculate custom expiration if not using default 24 hours
-    const insertData: any = {
-      world_id: worldId,
-      created_by: currentUser.id, // Use profile ID to satisfy FK to users(id)
-    };
-
-    // Only set custom expiration if different from default
-    if (hoursValid !== 24) {
-      const expiresAt = new Date(Date.now() + hoursValid * 60 * 60 * 1000);
-      insertData.expires_at = expiresAt.toISOString();
-    }
+    await validateUserForWrite();
 
     logger.info("storage", `Creating invite link for world ${worldId}`, {
       hoursValid,
     });
 
-    // Insert and let Supabase generate token and default expiration
     const { data, error } = await supabase
-      .from("invite_links")
-      .insert([insertData])
-      .select()
-      .single();
+      .schema('worlds')
+      .rpc('create_invite_link', {
+        p_world_id: worldId,
+        p_hours_valid: hoursValid,
+      });
 
     if (error) {
       logger.error("storage", "Failed to create invite link", error);
       return { success: false, error: error.message };
     }
 
-    if (!data) {
-      logger.error("storage", "No data returned from insert");
+    const created = Array.isArray(data) ? data[0] : data;
+
+    if (!created) {
+      logger.error("storage", "No data returned from create_invite_link RPC");
       return { success: false, error: "Failed to create invite link" };
     }
 
-    logger.success(`Invite link created with token: ${data.token}`);
+    logger.success(`Invite link created with token: ${created.token}`);
 
     // Invalidate invite links cache for this world
     await QueryCache.invalidate(`world:${worldId}:invites`);
 
     return {
       success: true,
-      inviteLink: data as InviteLink,
+      inviteLink: {
+        world_id: worldId,
+        token: created.token,
+        expires_at: created.expires_at,
+        created_at: created.created_at,
+      },
     };
   } catch (error) {
     logger.error("storage", "Unexpected error creating invite link", error);
@@ -100,30 +95,32 @@ export async function validateInviteToken(
       `invite:validate:${token}`,
       async () => {
         const { data, error } = await supabase
-          .from("invite_links")
-          .select("world_id, expires_at")
-          .eq("token", token)
-          .single();
+          .schema('worlds')
+          .rpc("resolve_invite_token", {
+            p_token: token,
+          });
 
         if (error) {
           logger.error("storage", "Invalid invite token", error);
           throw new Error("Invalid or expired invite link");
         }
 
-        if (!data) {
+        const invite = Array.isArray(data) ? data[0] : data;
+
+        if (!invite) {
           logger.error("storage", "No invite found for token");
           throw new Error("Invalid invite link");
         }
 
         // Check if expired
-        const expiresAt = new Date(data.expires_at);
+        const expiresAt = new Date(invite.expires_at);
         if (expiresAt < new Date()) {
           logger.warn("storage", "Invite token expired", { expiresAt });
           throw new Error("This invite link has expired");
         }
 
-        logger.success(`Valid invite token for world: ${data.world_id}`);
-        return data;
+        logger.success(`Valid invite token for world: ${invite.world_id}`);
+        return invite;
       },
       {
         dedupe: true,
@@ -170,9 +167,10 @@ export async function deleteInviteLink(
     logger.info("storage", `Deleting invite link: ${token}`);
 
     const { error } = await supabase
-      .from("invite_links")
-      .delete()
-      .eq("token", token);
+      .schema('worlds')
+      .rpc('delete_invite_link', {
+        p_token: token,
+      });
 
     if (error) {
       logger.error("storage", "Failed to delete invite link", error);
@@ -205,7 +203,8 @@ export async function getWorldInviteLinks(
       `invites:world:${worldId}`,
       async () => {
         const { data, error } = await supabase
-          .from("invite_links")
+          .schema('worlds')
+          .from('invite_links')
           .select("*")
           .eq("world_id", worldId)
           .gt("expires_at", new Date().toISOString())

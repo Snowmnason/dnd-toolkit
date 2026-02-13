@@ -10,6 +10,7 @@ import { logger } from "../utils/logger";
 let supabaseCache: any = null;
 let isSupabaseConfiguredCache: any = null;
 let usersDBCache: any = null;
+let worldsDBCache: any = null;
 
 export interface SupabaseAuthState {
   hasAccount: boolean;
@@ -21,6 +22,147 @@ export interface CacheMetadata {
 }
 
 export const AuthStateManager = {
+  // Save the Supabase session to encrypted storage (web platform workaround)
+  // Since web has persistSession=false for security, we manually save/restore the session
+  async saveAuthSession(session: any): Promise<void> {
+    try {
+      if (!session) {
+        logger.debug("auth", "saveAuthSession: null session, clearing");
+        await this.clearAuthSession();
+        return;
+      }
+
+      logger.info("auth", "📝 Saving auth session (SIGNED_IN event)", {
+        auth_id: session.user?.id,
+        hasAccessToken: !!session.access_token,
+        hasRefreshToken: !!session.refresh_token,
+        email: session.user?.email,
+      });
+
+      const key = STORAGE_KEYS.AUTH_SESSION;
+      logger.debug("auth", "📍 Getting storage backend for key", { key });
+      
+      const backend = getPrivacyStorageBackend(key);
+      if (!backend) {
+        logger.error("auth", "❌ Failed to get storage backend - returned null");
+        return;
+      }
+      
+      // Save only the essential session data needed to restore
+      const sessionData = {
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+        expires_at: session.expires_at,
+        expires_in: session.expires_in,
+        token_type: session.token_type,
+        user: {
+          id: session.user?.id,
+          email: session.user?.email,
+        },
+      };
+      
+      logger.debug("auth", "💾 Calling backend.setJSON...", { keyLength: key.length, dataSize: JSON.stringify(sessionData).length });
+      await backend.setJSON(key, sessionData);
+      
+      logger.info(
+        "auth",
+        "✅ Successfully saved AUTH_SESSION to encrypted storage",
+        { auth_id: session.user?.id },
+      );
+    } catch (error) {
+      logger.error("auth", "❌ ERROR in saveAuthSession:", {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+      });
+    }
+  },
+
+  // Restore the Supabase session from encrypted storage (web platform workaround)
+  async restoreAuthSession(): Promise<void> {
+    try {
+      const key = STORAGE_KEYS.AUTH_SESSION;
+      const backend = getPrivacyStorageBackend(key);
+      const sessionData = await backend.getJSON<any>(key);
+
+      if (!sessionData) {
+        logger.debug("auth", "🔍 No AUTH_SESSION key in storage to restore");
+        return;
+      }
+
+      logger.info("auth", "🔄 Restoring auth session from storage", {
+        auth_id: sessionData.user?.id,
+        email: sessionData.user?.email,
+        hasAccessToken: !!sessionData.access_token,
+      });
+
+      // Only restore on web platform (mobile uses Supabase's built-in async storage)
+      if (typeof window === "undefined") {
+        logger.debug("auth", "Skipping manual session restore on mobile (uses platform-native storage)");
+        return;
+      }
+
+      // Import Supabase dynamically
+      const imported = await import("../database/supabase");
+      const { getSupabaseClient, isSupabaseConfigured } = imported;
+
+      if (!isSupabaseConfigured()) {
+        logger.debug("auth", "Supabase not configured, skipping session restore");
+        return;
+      }
+
+      try {
+        const supabase = getSupabaseClient();
+        
+        // Set the session on the Supabase client
+        // This tells Supabase to use this session for authenticated requests
+        // Pass full session data including user object for proper restoration
+        const { error } = await supabase.auth.setSession({
+          access_token: sessionData.access_token,
+          refresh_token: sessionData.refresh_token,
+          expires_at: sessionData.expires_at,
+          expires_in: sessionData.expires_in,
+          token_type: sessionData.token_type,
+          user: sessionData.user,
+        });
+
+        if (error) {
+          logger.warn(
+            "auth",
+            "❌ Failed to restore session to Supabase client",
+            { error: error.message },
+          );
+          // If restoration fails (e.g., token expired), clear the stale session
+          await this.clearAuthSession();
+          return;
+        }
+
+        logger.info(
+          "auth",
+          "✅ AUTH_SESSION restored! User should now be authenticated",
+          { auth_id: sessionData.user?.id },
+        );
+      } catch (error) {
+        logger.error("auth", "Error restoring auth session to Supabase:", error);
+        // Clear stale session on error
+        await this.clearAuthSession();
+      }
+    } catch (error) {
+      logger.error("auth", "Error restoring auth session:", error);
+    }
+  },
+
+  // Clear the saved auth session
+  async clearAuthSession(): Promise<void> {
+    try {
+      const key = STORAGE_KEYS.AUTH_SESSION;
+      const backend = getPrivacyStorageBackend(key);
+      await backend.removeItem(key);
+      logger.debug("auth", "Cleared auth session from storage");
+    } catch (error) {
+      logger.error("auth", "Error clearing auth session:", error);
+    }
+  },
+
   // Get current auth state
   // IMPORTANT: Always returns an object with hasAccount as a boolean (never null/undefined)
   // - undefined/first init → hasAccount: false (go to welcome)
@@ -56,8 +198,26 @@ export const AuthStateManager = {
   // Store session information or mark that user has an account when a session exists
   async setSession(session: any): Promise<void> {
     try {
+      logger.info("auth", "🔐 setSession called with:", {
+        hasSession: !!session,
+        hasUser: !!session?.user,
+        hasAccessToken: !!session?.access_token,
+        hasRefreshToken: !!session?.refresh_token,
+        auth_id: session?.user?.id,
+        email: session?.user?.email,
+      });
+
+      if (!session) {
+        logger.warn("auth", "⚠️ setSession received null/undefined session - not saving");
+        return;
+      }
+
       // Update auth state
       await this.setHasAccount(true);
+
+      // Save the actual Supabase session (critical for web platform!)
+      // This ensures the session persists across app restarts
+      await this.saveAuthSession(session);
 
       // Optionally cache minimal session info (privacy-routed)
       if (session?.user?.email) {
@@ -77,6 +237,10 @@ export const AuthStateManager = {
   // Clear all auth state (logout)
   async clearAuthState(): Promise<void> {
     try {
+      // Clear the saved auth session first
+      // This ensures Supabase and storage are in sync
+      await this.clearAuthSession();
+
       // Clear query cache (all user-specific cached queries)
       const { QueryCache } = await import("../cache/query-cache");
       await QueryCache.clearAll();
@@ -167,6 +331,20 @@ export const AuthStateManager = {
     try {
       const backend = getPrivacyStorageBackend(STORAGE_KEYS.USER_DATA);
       const userData = await backend.getJSON(STORAGE_KEYS.USER_DATA);
+      
+      if (userData) {
+        logger.debug("auth", "📖 getUserData returning from storage:", {
+          id: userData.id,
+          id_length: userData.id?.length,
+          auth_id: userData.auth_id,
+          auth_id_length: userData.auth_id?.length,
+          username: userData.username,
+          isFullProfile: userData.id && userData.id.length === 36,
+        });
+      } else {
+        logger.debug("auth", "📖 getUserData: storage is empty (no user data)");
+      }
+      
       return userData;
     } catch (error) {
       logger.error("auth", "Error getting user data:", error);
@@ -177,8 +355,25 @@ export const AuthStateManager = {
   // Save user data to storage
   async saveUserData(userData: any): Promise<void> {
     try {
+      if (!userData) {
+        logger.warn("auth", "saveUserData: received null/undefined userData");
+        return;
+      }
+
+      logger.info("auth", "💾 Saving user data to storage", {
+        id: userData.id,
+        auth_id: userData.auth_id,
+        username: userData.username,
+        is_admin: userData.is_admin,
+        idLength: userData.id?.length,
+      });
+
       const backend = getPrivacyStorageBackend(STORAGE_KEYS.USER_DATA);
       await backend.setJSON(STORAGE_KEYS.USER_DATA, userData);
+      
+      logger.info("auth", "✅ User data saved successfully", {
+        id: userData.id,
+      });
     } catch (error) {
       logger.error("auth", "Error saving user data:", error);
     }
@@ -475,26 +670,32 @@ export const AuthStateManager = {
         return { hasAccess: false, reason: "Not authenticated" };
       }
 
-      // Query world_access table (the actual table in Supabase)
-      // This is the slow database call
-      const { data, error } = await supabase
-        .from("world_access") // Correct table name
-        .select("id")
-        .eq("world_id", worldId)
-        .eq("user_id", userId)
-        .single();
+      logger.debug(
+        "auth",
+        `[VERIFY:DB] Checking world access - worldId=${worldId}, userId=${userId}`,
+      );
 
-      if (error) {
-        if (error.code === "PGRST116") {
-          // No row found - user not a member
-          return { hasAccess: false, reason: "Not a member of this world" };
-        }
-        throw error;
+      // Use worldsDB helper to check access (checks both owner and member status)
+      if (!worldsDBCache) {
+        const imported = await import("../database/worlds");
+        worldsDBCache = imported.worldsDB;
       }
 
-      // User is a member
-      logger.debug("auth", `[VERIFY] Supabase confirmed access:`, data);
-      return { hasAccess: true };
+      try {
+        const hasAccess = await worldsDBCache.isUserInWorld(worldId, userId);
+        logger.debug(
+          "auth",
+          `[VERIFY:DB] isUserInWorld result - worldId=${worldId}, userId=${userId}, hasAccess=${hasAccess}`,
+        );
+        if (hasAccess) {
+          return { hasAccess: true };
+        } else {
+          return { hasAccess: false, reason: "Not a member of this world" };
+        }
+      } catch (error) {
+        logger.debug("auth", `[VERIFY] World access check failed (database layer):`, error);
+        throw error;
+      }
     } catch (error) {
       logger.error("auth", `[VERIFY] Supabase query failed:`, error);
       throw error; // Let caller handle

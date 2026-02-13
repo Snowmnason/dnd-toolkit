@@ -185,6 +185,51 @@ Why this matters: If world selection breaks, users get stuck viewing the wrong w
 
 ---
 
+### ⚡ Test 7: Worlds Load Immediately After Login (No Refresh Needed)
+
+**Scenario:** User logs in and worlds are available immediately without requiring a manual refresh
+
+**Purpose:** Verify that worlds are eagerly fetched during login bootstrap (race condition fix)
+
+**Steps:**
+
+1. **Mobile/App**: Close the app completely
+   - Or **Web**: Clear browser cache or open in private/incognito tab
+2. Open the app or navigate to the website
+3. Sign in with your test account (have 2+ worlds)
+4. Observe the world selection screen as it loads **DO NOT REFRESH**
+5. Note whether worlds appear immediately or if you see a loading spinner
+
+**Expected Outcome:**
+
+- ✅ After sign-in, you are navigated to world selection screen
+- ✅ Worlds appear immediately (within 1 second) without a loading spinner
+- ✅ All your worlds are visible in the list
+- ✅ No "No worlds found" message appears temporarily
+- ✅ **Critical**: You can interact with the world list immediately without needing to refresh
+- ✅ Selecting a world works immediately without additional loading
+
+**How to Record a Pass:**
+
+- [ ] Screenshot of world selection screen showing worlds loaded immediately after login
+- [ ] Note: "Worlds loaded immediately on login without refresh needed"
+- [ ] Confirm you were able to select and open a world without any delays
+
+**How to Record a Fail:**
+
+- [ ] Screenshot showing empty world list or "Loading..." after login
+- [ ] Note when forcing a refresh resolves the issue
+- [ ] Note how long it took before worlds appeared
+
+**Performance Notes:**
+
+- **Ideal**: Worlds appear instantly (<500ms after screen render)
+- **Acceptable**: Worlds appear within 1 second
+- **Poor**: Requires manual refresh or back-navigation to populate worlds
+- **Broken**: Worlds never appear, or appear with errors
+
+---
+
 ## Platform-Specific Notes
 
 ### App (Electron / Mobile)
