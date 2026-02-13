@@ -1,16 +1,16 @@
 import {
-  AuthActionGroup,
-  AuthBody,
-  AuthBodyFooter,
-  AuthButton,
-  AuthCaption,
-  AuthError,
-  AuthForm,
-  AuthRoot,
-  AuthSubTitle,
-  AuthSuccess,
-  AuthTitle,
-  FormAuthInput,
+    AuthActionGroup,
+    AuthBody,
+    AuthBodyFooter,
+    AuthButton,
+    AuthCaption,
+    AuthError,
+    AuthForm,
+    AuthRoot,
+    AuthSubTitle,
+    AuthSuccess,
+    AuthTitle,
+    FormAuthInput,
 } from "@/components/auth_components";
 import { useResetPasswordConfirm } from "@/lib";
 import { getPasswordRequirementsForUI } from "@/lib/schemas/auth.schema";
@@ -26,23 +26,18 @@ export default function ResetPasswordScreen() {
     control,
     isValid,
     password,
-    confirmPassword,
     loading,
     error,
     success,
     successMessage,
     showPassword,
     userEmail,
-    doPasswordsMatch,
     handleResetPassword,
     setShowPassword,
     goToSignIn,
   } = useResetPasswordConfirm();
 
-  const getPasswordMatchText = () => {
-    if (confirmPassword.length === 0) return "";
-    return doPasswordsMatch ? "✓ Passwords match" : "✗ Passwords do not match";
-  };
+
 
   return (
     <AuthRoot>

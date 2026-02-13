@@ -1,18 +1,18 @@
 import {
-    AuthActionGroup,
-    AuthBackButtonContainer,
-    AuthBodyFooter,
-    AuthButton,
-    AuthButtonBack,
-    AuthButtonSecondary,
-    AuthCaption,
-    AuthError,
-    AuthForm,
-    AuthModal,
-    AuthRoot,
-    AuthSubTitle,
-    AuthTitle,
-    FormAuthInput,
+  AuthActionGroup,
+  AuthBackButtonContainer,
+  AuthBodyFooter,
+  AuthButton,
+  AuthButtonBack,
+  AuthButtonSecondary,
+  AuthCaption,
+  AuthError,
+  AuthForm,
+  AuthModal,
+  AuthRoot,
+  AuthSubTitle,
+  AuthTitle,
+  FormAuthInput,
 } from "@/components/auth_components";
 import { AppToast } from "@/components/ui";
 import { useSignUpForm } from "@/lib";
@@ -31,17 +31,15 @@ export default function SignUpScreen() {
     control,
     isValid,
     email,
-    confirmPassword,
     loading,
     authError,
     validationWarning,
     showPassword,
     showEmailExistsModal,
-    passwordsMatch,
     handleSignUp,
     setShowPassword,
     setShowEmailExistsModal,
-    getPasswordMatchText,
+    
   } = useSignUpForm();
 
   // Show toast when validation warning occurs
