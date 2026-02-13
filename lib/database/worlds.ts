@@ -11,9 +11,17 @@ import {
 } from "./common";
 import { supabase } from "./supabase";
 
-// User role types for better type safety and maintainability
-export type UserRole = "owner" | "dm" | "player";
-export type AccessRole = "dm" | "gm" | "player" | "spectator" | "observer"; // Roles that can be assigned via world_access table
+// Access role types for better type safety and maintainability
+// 'dm' (dungeon master) is the only role with owner-level access to worlds
+// TODO: Extend access levels for 'gm' (game master) and 'spectator' to have similar permissions to 'dm'
+export type AccessRole = "dm" | "gm" | "player" | "spectator" | "observer";
+/**
+ * Dm- Owner of world has full control of the world, including managing members, deleting world, etc. 
+ * Gm- Game master with elevated permissions to manage files/data inside the world
+ * Player- Regular player with standard permissions
+ * Spectator- has GM like observer permissions but cannot interact with world elements (read-only)
+ * Observer- has player like read-only permissions with even more restrictions
+ **/
 
 export interface World {
   world_id: string;
@@ -33,7 +41,7 @@ export interface WorldAccess {
   id: string;
   world_id: string;
   user_id: string;
-  user_role: AccessRole; // Using the AccessRole type for better type safety
+  user_role: AccessRole; // Role in the world (dm = owner-level access)
   permissions: any; // JSONB field
   created_at: string;
   updated_at: string;
@@ -41,7 +49,7 @@ export interface WorldAccess {
 
 export interface WorldWithAccess extends World {
   world_access?: WorldAccess;
-  user_role: UserRole; // Using the UserRole type for complete role coverage
+  user_role: AccessRole; // Role of the current user in this world
 }
 
 export interface CreateWorldData {
@@ -124,7 +132,12 @@ export const worldsDB = {
     // Call the paginated version without pagination params to get all worlds
     // This ensures we get the caching benefits without code duplication
     const result = await this.getMyWorldsPaginated(userId);
-    return result.items;
+    // Ensure we always return an array, never the paginated object
+    if (Array.isArray(result)) {
+      // In case result is already an array (shouldn't happen, but defensive)
+      return result;
+    }
+    return result.items || [];
   },
 
   // Get paginated worlds for current user (both owned and member of)
@@ -150,11 +163,11 @@ export const worldsDB = {
     // This avoids re-fetching the same world access data for every page
     const cacheKey = `worlds:ids:${currentUserId}`;
     let worldIdSet: Set<string> = new Set<string>();
-    let roleMap: Map<string, { role: UserRole; permissions: any }> = new Map();
+    let roleMap: Map<string, { role: AccessRole; permissions: any }> = new Map();
 
     const cachedData = await QueryCache.get<{
       worldIds: string[];
-      roles: [string, { role: UserRole; permissions: any }][];
+      roles: [string, { role: AccessRole; permissions: any }][];
     }>(cacheKey);
 
     if (cachedData) {
@@ -171,7 +184,7 @@ export const worldsDB = {
     } else {
       // Try a persistent fallback: use encrypted connected_worlds stored in localStorage
       // This improves initial app startup UX when sessionStorage is empty
-      let seededFromPersist = false;
+      // BUT: We still need to fetch from DB to get role information (owner vs member)
       try {
         const persisted = await SecureStorage.getJSON<string[]>(
           STORAGE_KEYS.CONNECTED_WORLDS,
@@ -180,24 +193,11 @@ export const worldsDB = {
           worldIdSet = new Set(persisted);
           roleMap = new Map();
 
-          // Seed QueryCache so other callers see the same cached shape
-          await QueryCache.set(
-            cacheKey,
-            { worldIds: Array.from(worldIdSet), roles: Array.from(roleMap.entries()) },
-            {
-              staleTime: 5 * 60 * 1000,
-              cacheTime: 15 * 60 * 1000,
-              tags: ["worlds", `user:${currentUserId}`],
-            },
-          );
-
           logger.debug(
             "storage",
             `Using persisted connected_worlds for user ${currentUserId}`,
             { count: worldIdSet.size },
           );
-
-          seededFromPersist = true;
         }
       } catch (err) {
         logger.debug(
@@ -207,11 +207,29 @@ export const worldsDB = {
         );
       }
 
-      // If not seeded from persisted storage, fetch from DB as before
-      if (!seededFromPersist) {
-        // STEP 1: Get world IDs from both world_access and owned worlds in parallel
-        const [accessRecordsResult, ownedWorldIdsResult] =
-          await executeParallelQueries<
+      // ALWAYS fetch from DB to get role information, even if seeded from persistent
+      // Persistent storage gives us world IDs quickly, but we need DB to determine owner vs member roles
+      {
+        // DEBUG: Log session state and userId being used for queries
+        const { getSupabaseClient, isSupabaseConfigured } = await import("./supabase");
+        if (isSupabaseConfigured()) {
+          try {
+            const client = getSupabaseClient();
+            const { data: sesData } = await client.auth.getSession();
+            logger.debug("storage", "🔍 World query debug info", {
+              userId: currentUserId,
+              hasSession: !!sesData?.session,
+              sessionAuthId: sesData?.session?.user?.id,
+              sessionEmail: sesData?.session?.user?.email,
+            });
+          } catch (sessionCheckErr) {
+            logger.warn("storage", "Failed to check session state during world query debug", sessionCheckErr);
+          }
+        }
+
+        // Helper function to execute the queries
+        const executeWorldQueries = async () => {
+          return await executeParallelQueries<
             [
               { data: any[] | null; error: any },
               { data: any[] | null; error: any },
@@ -231,6 +249,48 @@ export const worldsDB = {
               .select("world_id")
               .eq("owner_id", currentUserId)
           );
+        };
+
+        // STEP 1: Get world IDs from both world_access and owned worlds in parallel
+        let [accessRecordsResult, ownedWorldIdsResult] = await executeWorldQueries();
+        let retryAttempt = 0;
+
+        // RACE CONDITION FIX: If we get 0 results on first attempt, retry after short delay
+        // This handles fresh sign-in where RLS policies might not be fully synced yet
+        const accessCount = accessRecordsResult.data?.length || 0;
+        const ownedCount = ownedWorldIdsResult.data?.length || 0;
+        
+        if (accessCount === 0 && ownedCount === 0 && retryAttempt === 0) {
+          logger.debug("storage", "⏳ Got 0 worlds on first query, retrying after 500ms (RLS sync delay)");
+          // Wait for RLS to sync with the authenticated session
+          await new Promise(resolve => setTimeout(resolve, 500));
+          retryAttempt = 1;
+          [accessRecordsResult, ownedWorldIdsResult] = await executeWorldQueries();
+        }
+
+        // DEBUG: Log query results
+        const finalAccessCount = accessRecordsResult.data?.length || 0;
+        const finalOwnedCount = ownedWorldIdsResult.data?.length || 0;
+        const totalCount = finalAccessCount + finalOwnedCount;
+        
+        if (totalCount === 0) {
+          logger.warn("storage", "⚠️ World query returned 0 results after retry", {
+            userId: currentUserId,
+            accessRecordsCount: finalAccessCount,
+            ownedWorldsCount: finalOwnedCount,
+            retryAttempt,
+            accessRecordsError: accessRecordsResult.error?.message,
+            ownedWorldsError: ownedWorldIdsResult.error?.message,
+            note: "User likely has no worlds, or RLS is blocking all access",
+          });
+        } else {
+          logger.debug("storage", "🌍 World query results", {
+            accessRecordsCount: finalAccessCount,
+            ownedWorldsCount: finalOwnedCount,
+            total: totalCount,
+            retryAttempt,
+          });
+        }
 
         if (accessRecordsResult.error) {
           logger.error(
@@ -257,7 +317,7 @@ export const worldsDB = {
 
         // STEP 2: Collect all unique world IDs and build role mapping
         worldIdSet = new Set<string>();
-        roleMap = new Map<string, { role: UserRole; permissions: any }>();
+        roleMap = new Map<string, { role: AccessRole; permissions: any }>();
 
         // Add world IDs from world_access (user is a member/dm)
         (accessRecordsResult.data || []).forEach((access: any) => {
@@ -271,8 +331,10 @@ export const worldsDB = {
         // Add world IDs from owned worlds (user is owner) - owner takes precedence
         (ownedWorldIdsResult.data || []).forEach((world: any) => {
           worldIdSet.add(world.world_id);
+          // Owner gets 'dm' role for owner-level access
+          // TODO: Consider 'gm' and 'spectator' roles with similar access levels
           roleMap.set(world.world_id, {
-            role: "owner",
+            role: "dm",
             permissions: {},
           });
         });
@@ -345,13 +407,17 @@ export const worldsDB = {
     // STEP 5: Map worlds with their roles
     const paginatedWorlds: WorldWithAccess[] = (worldsData || []).map(
       (world: World) => {
-        const roleInfo = roleMap.get(world.world_id);
+        let roleInfo = roleMap.get(world.world_id);
 
         return {
           ...world,
           user_role: roleInfo?.role || "player",
+          // Only include world_access for non-owners
+          // Owners are identified by world.owner_id matching currentUserId
+          // and have 'dm' role for owner-level access
+          // TODO: Extend access metadata for 'gm' and 'spectator' roles with similar permissions
           world_access:
-            roleInfo?.role !== "owner"
+            world.owner_id !== currentUserId
               ? {
                   id: "",
                   world_id: world.world_id,
@@ -558,7 +624,16 @@ export const worldsDB = {
             .maybeSingle(),
         );
 
-        return !!worldResult.data || !!accessResult.data;
+        const isOwner = !!worldResult.data;
+        const isMember = !!accessResult.data;
+        const hasAccess = isOwner || isMember;
+
+        logger.debug(
+          "storage",
+          `[isUserInWorld] worldId=${worldId}, userId=${userId}, isOwner=${isOwner}, isMember=${isMember}, hasAccess=${hasAccess}`,
+        );
+
+        return hasAccess;
       },
       {
         dedupe: true,

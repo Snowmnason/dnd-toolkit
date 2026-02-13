@@ -1,5 +1,6 @@
 import { AppPage, Button, Heading } from "@/components/ui";
 import { getShadowStyle } from "@/components/ui/Resuables/shadows";
+import type { AccessRole } from "@/lib/database/worlds";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
 import { useAppParamsVolatile } from "@/providers/AppParamsVolatileProvider";
 import { usePlatform } from "@/providers/PlatformProvider";
@@ -11,7 +12,7 @@ import { PanelConfig } from "./PanelData";
 interface PanelViewProps {
   config: PanelConfig;
   worldId?: string;
-  userRole?: string;
+  userRole?: AccessRole;
   style?: any;
   image?: string;
   /** Show right-hand divider border (desktop only). Useful to hide on last panel. */

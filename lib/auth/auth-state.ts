@@ -1,8 +1,8 @@
 import {
-    clearAllUserData,
-    getPrivacyStorageBackend,
-    SecureStorage,
-    STORAGE_KEYS,
+  clearAllUserData,
+  getPrivacyStorageBackend,
+  SecureStorage,
+  STORAGE_KEYS,
 } from "../storage";
 import { logger } from "../utils/logger";
 
@@ -10,6 +10,7 @@ import { logger } from "../utils/logger";
 let supabaseCache: any = null;
 let isSupabaseConfiguredCache: any = null;
 let usersDBCache: any = null;
+let worldsDBCache: any = null;
 
 export interface SupabaseAuthState {
   hasAccount: boolean;
@@ -669,26 +670,32 @@ export const AuthStateManager = {
         return { hasAccess: false, reason: "Not authenticated" };
       }
 
-      // Query world_access table (the actual table in Supabase)
-      // This is the slow database call
-      const { data, error } = await supabase
-        .from("worlds.world_access") // Correct table name
-        .select("id")
-        .eq("world_id", worldId)
-        .eq("user_id", userId)
-        .single();
+      logger.debug(
+        "auth",
+        `[VERIFY:DB] Checking world access - worldId=${worldId}, userId=${userId}`,
+      );
 
-      if (error) {
-        if (error.code === "PGRST116") {
-          // No row found - user not a member
-          return { hasAccess: false, reason: "Not a member of this world" };
-        }
-        throw error;
+      // Use worldsDB helper to check access (checks both owner and member status)
+      if (!worldsDBCache) {
+        const imported = await import("../database/worlds");
+        worldsDBCache = imported.worldsDB;
       }
 
-      // User is a member
-      logger.debug("auth", `[VERIFY] Supabase confirmed access:`, data);
-      return { hasAccess: true };
+      try {
+        const hasAccess = await worldsDBCache.isUserInWorld(worldId, userId);
+        logger.debug(
+          "auth",
+          `[VERIFY:DB] isUserInWorld result - worldId=${worldId}, userId=${userId}, hasAccess=${hasAccess}`,
+        );
+        if (hasAccess) {
+          return { hasAccess: true };
+        } else {
+          return { hasAccess: false, reason: "Not a member of this world" };
+        }
+      } catch (error) {
+        logger.debug("auth", `[VERIFY] World access check failed (database layer):`, error);
+        throw error;
+      }
     } catch (error) {
       logger.error("auth", `[VERIFY] Supabase query failed:`, error);
       throw error; // Let caller handle

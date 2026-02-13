@@ -1,6 +1,7 @@
 import { panelConfigs } from "@/Screens/main-panels/PanelData";
 import { PanelView } from "@/Screens/main-panels/PanelView";
 import { AppPage } from "@/components/ui";
+import type { AccessRole } from "@/lib/database/worlds";
 import { usePlatform } from "@/providers/PlatformProvider";
 import { useLocalSearchParams } from "expo-router";
 import { View } from "react-native";
@@ -10,7 +11,7 @@ export default function MainLanding() {
   const worldId =
     typeof params.worldId === "string" ? params.worldId : undefined;
   const userRole =
-    typeof params.userRole === "string" ? params.userRole : undefined;
+    typeof params.userRole === "string" ? (params.userRole as AccessRole) : undefined;
   const tab = typeof params.tab === "string" ? params.tab : "characters";
 
   // Centralized platform detection

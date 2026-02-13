@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { CACHE_CONFIG, CACHE_KEYS, CACHE_TAGS } from "../../lib/cache/keys";
 import { useQuery } from "../../lib/cache/use-query";
 import { worldsDB, WorldWithAccess } from "../../lib/database/worlds";
@@ -36,14 +36,6 @@ export function useWorlds(
   } = useQuery<WorldWithAccess[]>(
     CACHE_KEYS.worlds.list(userId || "current"),
     async () => {
-      // CRITICAL: Wait for auth phase to complete before querying worlds
-      // Without this, RLS policies fail because Supabase session isn't authenticated yet
-      if (!kernel.phases.authReady) {
-        logger.debug("cache", "⏳ Waiting for auth phase to complete before loading worlds...");
-        // Return empty for now; it will refetch when auth is ready
-        return [];
-      }
-
       const userWorlds = await worldsDB.getMyWorlds(userId);
 
       // Update world access cache for all loaded worlds
@@ -71,20 +63,13 @@ export function useWorlds(
     {
       ...CACHE_CONFIG.metadata, // Default: staleTime 2h, cacheTime 4h
       tags: [CACHE_TAGS.worlds, CACHE_TAGS.user(userId || "current")],
+      // Query fires immediately, skipCache forces DB fetch on fresh sign-in
       onError: (err) => {
         logger.error("cache", "Error loading worlds:", err);
       },
     },
   );
 
-  // When auth phase completes, immediately refetch worlds
-  // This ensures worlds load on initial login without requiring a page refresh
-  useEffect(() => {
-    if (kernel.phases.authReady && worlds.length === 0) {
-      logger.debug("cache", "✅ Auth phase ready - refetching worlds...");
-      refetch();
-    }
-  }, [kernel.phases.authReady, refetch, worlds.length]);
 
   // Format error message
   const errorMessage = error

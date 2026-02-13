@@ -460,7 +460,12 @@ class AppKernelClass {
           // On web, session persistence is disabled for security, so we manually restore it
           // This must happen BEFORE checking auth state or any authenticated requests
           logger.category("bootstrap").debug("Restoring auth session from storage...");
+          const restoreStart = performance.now();
           await AuthStateManager.restoreAuthSession();
+          const restoreTime = performance.now() - restoreStart;
+          logger.category("bootstrap").info("✅ Auth session restored", { 
+            restoreTimeMs: restoreTime,
+          });
           
           await AuthStateManager.getAuthState();
           logger.category("bootstrap").debug("Auth state loaded");
@@ -497,7 +502,7 @@ class AppKernelClass {
           logger
             .category("bootstrap")
             .info(
-              `Auth phase completed asynchronously (${this.authCompletionTime}ms delay, after app ready)`,
+              `✅ authReady = true (${this.authCompletionTime}ms delay, after app ready)`,
             );
 
           // Initialize offline queue system
@@ -545,6 +550,10 @@ class AppKernelClass {
         currentPhase: KernelPhase.READY,
         phases: { ...this.state.phases, appReady: true },
       });
+
+      logger
+        .category("bootstrap")
+        .info(`✅ appReady = true (auth phase still running in background)`);
 
       // Initialize Feature Flags Manager (non-blocking)
       try {

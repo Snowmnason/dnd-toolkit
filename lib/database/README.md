@@ -255,7 +255,8 @@ Fetches single world with user's access role. Respects RLS (only sees worlds use
 
 ```ts
 const world = await worldsDB.getById("world-123");
-console.log(world.user_role); // "owner", "dm", "gm", "player", "spectator", or "observer"
+console.log(world.user_role); // "dm", "gm", "player", "spectator", or "observer"
+// Note: Owners have user_role of "dm" (owner-level access via role)
 ```
 
 #### `worldsDB.getUserWorlds(): Promise<WorldWithAccess[]>`
@@ -829,7 +830,7 @@ Currently, no dedicated test guide exists. When adding tests, create a guide at 
 | `supabase.ts`      | Lazy-loaded Supabase client with auth persistence via SecureStorage. Checks if Supabase is configured; fails gracefully if not. | `getSupabaseClient()`, `isSupabaseConfigured()`, `supabase` proxy                                                  |
 | `common.ts`        | Shared utilities: user validation, caching strategy, parallel query execution. Used by domain operations.                       | `getCurrentUserProfile()`, `validateUserForWrite()`, `verifyWorldAccessWithDatabase()`, `executeParallelQueries()` |
 | `users.ts`         | User profile CRUD (create, get, update). Called after auth signup; integrated with AuthStateManager.                            | `usersDB`, `User`, `CreateUserData`, `UpdateUserData`                                                              |
-| `worlds.ts`        | World CRUD (create, get, list, update, delete) and world access management (grant/revoke). Core gameplay entity.                | `worldsDB`, `World`, `WorldAccess`, `WorldWithAccess`, `UserRole`, `AccessRole`                                    |
+| `worlds.ts`        | World CRUD (create, get, list, update, delete) and world access management (grant/revoke). Core gameplay entity.                | `worldsDB`, `World`, `WorldAccess`, `WorldWithAccess`, `AccessRole`                                                |
 | `invites.ts`       | Invite link operations (create, redeem, list, revoke). Enables world sharing and multi-player onboarding.                       | `createInviteLink()`, `redeemInviteLink()`, `getInvitesByWorld()`, `revokeInviteLink()`, `InviteLink`              |
 | `supabase-lazy.ts` | Legacy/deprecated lazy-loading logic (if exists; may be merged into supabase.ts).                                               | TBD                                                                                                                |
 

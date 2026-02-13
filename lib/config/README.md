@@ -265,7 +265,17 @@ Migrate configuration from detected version to target version. Called automatica
 import { migrateConfig, CURRENT_CONFIG_VERSION } from "@/lib/config";
 
 const config = require("./appsettings.json");
-const detectedVersion = config.version ?? 1;
+// The loader and migration chain expect a valid numeric `version` field.
+// WARNING: If `config.version` is missing or invalid the loader will throw.
+// Explicitly validate before calling `migrateConfig` when working with
+// externally-provided or hand-edited files:
+const detectedVersion = (() => {
+  if (typeof config.version !== "number" || config.version < 1) {
+    throw new Error("Missing or invalid config.version; cannot migrate");
+  }
+  return config.version;
+})();
+
 const migratedConfig = migrateConfig(
   config,
   detectedVersion,
@@ -276,7 +286,7 @@ const migratedConfig = migrateConfig(
 **Parameters:**
 
 - `config` - Loaded config object (any shape; defensive handling)
-- `detectedVersion` - Version field from config (or 1 if missing)
+- `detectedVersion` - Version field from `config`. The loader expects a valid numeric `version` and will throw if it is missing or invalid; callers should validate `config.version` before calling when the source may be unreliable.
 - `targetVersion` - Target version (default: `CURRENT_CONFIG_VERSION`)
 
 **Returns:** `AppSettings` - Migrated config with `version` field set to `targetVersion`

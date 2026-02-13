@@ -219,6 +219,14 @@ export async function getCurrentAuthId(): Promise<string | null> {
  *
  * For normal operations, use getCurrentUserProfile() which is cache-first.
  *
+ * NOTE: This function is intentionally strict and WILL NOT bypass auth in
+ * development. Returning a fake authenticated identity here weakens the
+ * server-side validation contract and can allow writes to proceed with an
+ * identity that doesn't exist in `public.users`.
+ *
+ * For local/testing needs, use dedicated test utilities or a config-driven
+ * mock Supabase client rather than altering this function.
+ *
  * @returns Validated user or null if not authenticated
  */
 export async function validateCurrentUser(): Promise<{
@@ -232,19 +240,15 @@ export async function validateCurrentUser(): Promise<{
   } = await supabase.auth.getUser();
 
   if (error || !user) {
-    // Dev mode: if no RLS policies, allow writes without auth for testing
+    logger.debug("storage", "User validation failed:", error?.message);
+
     if (__DEV__) {
       logger.warn(
         "storage",
-        "⚠️ DEV MODE: Auth validation skipped (no RLS). Use real auth in production.",
+        "DEV MODE: Auth validation failed. Do NOT bypass authentication here; use test utilities to mock identity.",
       );
-      // Return a fake auth_id for testing - this will pass validation
-      return {
-        auth_id: "dev-test-user",
-        email: "dev@test.local",
-      };
     }
-    logger.debug("storage", "User validation failed:", error?.message);
+
     return null;
   }
 

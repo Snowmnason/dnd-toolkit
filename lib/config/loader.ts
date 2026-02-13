@@ -159,10 +159,17 @@ export function getAppConfig(): AppSettings {
 
   // Detect config version (required field)
   const detectedVersion = config.version;
-  if (typeof detectedVersion !== 'number') {
+  // Validate version: must be a finite integer >= 1
+  if (
+    typeof detectedVersion !== "number" ||
+    !Number.isFinite(detectedVersion) ||
+    !Number.isInteger(detectedVersion) ||
+    detectedVersion < 1
+  ) {
     throw new Error(
-      `[AppConfig] Config version field must be a number. Got: ${typeof detectedVersion}. ` +
-        `File: ${environment === 'development' ? 'config/appsettings.dev.json' : 'config/appsettings.json'}`
+      `[AppConfig] Invalid config version: ${String(detectedVersion)}. ` +
+        "Expected a finite integer >= 1. " +
+        `File: ${environment === "development" ? "config/appsettings.dev.json" : "config/appsettings.json"}`
     );
   }
 
@@ -187,19 +194,25 @@ export function getAppConfig(): AppSettings {
   }
 
   // Validate that the migrated config has the expected structure
-  if (
-    !config.version ||
-    !config.environment ||
-    !config.features ||
-    !config.overrides ||
-    !config.devTools
-  ) {
+  // Validate that the migrated config has the expected structure
+  const versionValid =
+    typeof config.version === "number" &&
+    Number.isFinite(config.version) &&
+    Number.isInteger(config.version) &&
+    config.version >= 1;
+
+  const environmentValid = !!config.environment;
+  const featuresValid = !!config.features;
+  const overridesValid = !!config.overrides;
+  const devToolsValid = !!config.devTools;
+
+  if (!versionValid || !environmentValid || !featuresValid || !overridesValid || !devToolsValid) {
     const missingFields = [];
-    if (!config.version) missingFields.push("version");
-    if (!config.environment) missingFields.push("environment");
-    if (!config.features) missingFields.push("features");
-    if (!config.overrides) missingFields.push("overrides");
-    if (!config.devTools) missingFields.push("devTools");
+    if (!versionValid) missingFields.push("version (invalid or missing)");
+    if (!environmentValid) missingFields.push("environment");
+    if (!featuresValid) missingFields.push("features");
+    if (!overridesValid) missingFields.push("overrides");
+    if (!devToolsValid) missingFields.push("devTools");
 
     const configFile =
       environment === "development"
