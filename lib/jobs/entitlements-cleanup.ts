@@ -10,8 +10,8 @@
 
 import { getAppConfig } from '../config';
 import {
-    deactivateEntitlements,
-    fetchExpiredEntitlements,
+  deactivateEntitlements,
+  fetchExpiredEntitlements,
 } from '../database/entitlements';
 import { supabase } from '../database/supabase';
 import { logger } from '../utils/logger';
@@ -35,7 +35,7 @@ export async function handleEntitlementsCleanup(
   const dryRun = payload.dryRun ?? entitlementsConfig.dryRunMode ?? false;
   const retryAttempt = ctx?.retryCount ?? 0;
 
-  logger.category('other').info(
+  logger.category('jobs').info(
     `Starting entitlements cleanup (attempt ${retryAttempt + 1}, dryRun=${dryRun}, grace=${gracePeriodDays} days)`,
   );
 
@@ -43,12 +43,12 @@ export async function handleEntitlementsCleanup(
     // Fetch expired entitlements past grace period using DB helper
     const cleanupList = await fetchExpiredEntitlements(supabase, gracePeriodDays);
 
-    logger.category('other').info(
+    logger.category('jobs').info(
       `Found ${cleanupList.length} expired entitlements to deactivate`,
     );
 
     if (cleanupList.length === 0) {
-      logger.category('other').info('No expired entitlements to process');
+      logger.category('jobs').info('No expired entitlements to process');
       return {
         cleaned: 0,
         dryRun,
@@ -56,7 +56,7 @@ export async function handleEntitlementsCleanup(
     }
 
     if (dryRun) {
-      logger.category('other').info('DRY RUN: Would deactivate entitlements:', {
+      logger.category('jobs').info('DRY RUN: Would deactivate entitlements:', {
         count: cleanupList.length,
         ids: cleanupList.map((e) => e.id),
       });
@@ -70,7 +70,7 @@ export async function handleEntitlementsCleanup(
     const expiredIds = cleanupList.map((e) => e.id);
     const cleaned = await deactivateEntitlements(supabase, expiredIds);
 
-    logger.category('other').info(
+    logger.category('jobs').info(
       `Successfully marked ${cleaned} entitlements as inactive`,
     );
 
@@ -79,7 +79,7 @@ export async function handleEntitlementsCleanup(
       dryRun: false,
     };
   } catch (error) {
-    logger.category('other').error(
+    logger.category('jobs').error(
       'Entitlements cleanup job failed:',
       error instanceof Error ? error.message : String(error),
     );

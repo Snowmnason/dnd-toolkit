@@ -41,12 +41,12 @@ export async function handleEntitlementsReminders(
   const dryRun = payload.dryRun ?? entitlementsConfig.dryRunMode ?? false;
   const retryAttempt = ctx?.retryCount ?? 0;
 
-  logger.category('other').info(
+  logger.category('jobs').info(
     `Starting entitlements reminder check (attempt ${retryAttempt + 1}, dryRun=${dryRun}, window=${daysBeforeExpiry} days)`,
   );
 
   // STUB: Deferred implementation
-  logger.category('other').warn(
+  logger.category('jobs').warn(
     'Entitlements reminder job is not yet implemented (placeholder stage)',
   );
 
