@@ -1,24 +1,26 @@
+import { EntitlementExpiredModal } from "@/components/modals";
 import { OfflineSyncNotificationLayer } from "@/components/offline";
 import { NotificationContainer, TopBar } from "@/components/ui";
+import { useEntitlementExpiredModal } from "@/hooks";
 import { useAnalyticsNavigation } from "@/hooks/navigation";
 import { useSplashScreen } from "@/hooks/ui";
 import { NotificationProvider } from "@/hooks/utils";
 import {
-    Analytics,
-    APP_VERSION,
-    AppErrorBoundary,
-    AppKernel,
-    AppKernelProvider,
-    buildNavigationTarget,
-    executeRecoveryAction,
-    getAppConfig,
-    getRouteConfig,
-    lazyLoadInBackground,
-    logger,
-    resolveBackTarget,
-    resolveTitle,
-    sessionManager,
-    useAppKernel,
+  Analytics,
+  APP_VERSION,
+  AppErrorBoundary,
+  AppKernel,
+  AppKernelProvider,
+  buildNavigationTarget,
+  executeRecoveryAction,
+  getAppConfig,
+  getRouteConfig,
+  lazyLoadInBackground,
+  logger,
+  resolveBackTarget,
+  resolveTitle,
+  sessionManager,
+  useAppKernel,
 } from "@/lib";
 import type { AccessRole } from "@/lib/database/worlds";
 import { SafeModeReason } from "@/lib/error/safe-mode";
@@ -27,31 +29,31 @@ import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ThemeProvider, UseTheme } from "@/providers/ThemeProvider";
 import Constants from "expo-constants";
 import {
-    Stack,
-    useLocalSearchParams,
-    useRouter,
-    useSegments,
+  Stack,
+  useLocalSearchParams,
+  useRouter,
+  useSegments,
 } from "expo-router";
 import { useEffect } from "react";
 import { View } from "react-native";
 import LoadingOverlay from "../components/LoadingOverlay";
 import {
-    CrashFallBack,
-    RouteErrorBoundary,
-    SafeModeErrorBoundary,
-    SafeModeScreen,
-    SplashScreen,
+  CrashFallBack,
+  RouteErrorBoundary,
+  SafeModeErrorBoundary,
+  SafeModeScreen,
+  SplashScreen,
 } from "../components/SplashScreen";
 import {
-    AppParamsStableProvider,
-    useAppParamsStable,
-    useUserId,
+  AppParamsStableProvider,
+  useAppParamsStable,
+  useUserId,
 } from "../providers/AppParamsStableProvider";
 import {
-    AppParamsVolatileProvider,
-    useAppParamsVolatile,
-    useUserRole,
-    useWorldId,
+  AppParamsVolatileProvider,
+  useAppParamsVolatile,
+  useUserRole,
+  useWorldId,
 } from "../providers/AppParamsVolatileProvider";
 import { PlatformProvider, usePlatform } from "../providers/PlatformProvider";
 
@@ -158,6 +160,7 @@ function RootLayoutContent() {
   // Data loading hooks
   const kernel = useAppKernel();
   const splash = useSplashScreen();
+  const entitlementModal = useEntitlementExpiredModal();
 
   // FUTURE: Offline conflict resolution (disabled for v1 - LWW only)
   // v1 uses automatic Last-Write-Wins for all conflicts
@@ -446,6 +449,13 @@ function RootLayoutContent() {
 
         {/* Offline sync status and notifications */}
         <OfflineSyncNotificationLayer />
+
+        {/* Entitlement Expired Modal - placeholder for reminder/renewal flows */}
+        <EntitlementExpiredModal
+          visible={entitlementModal.isVisible}
+          entitlementName={entitlementModal.entitlementName}
+          onClose={entitlementModal.hide}
+        />
 
         {/* FUTURE: Conflict resolution modal (disabled for v1 - LWW only) */}
         {/* v1 uses automatic Last-Write-Wins for all conflicts */}

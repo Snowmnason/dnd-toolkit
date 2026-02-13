@@ -26,6 +26,15 @@ export interface UpdateUserData {
   is_admin?: boolean;
 }
 
+export interface UserSettings {
+  user_id: string;
+  theme: string;
+  language: string;
+  timezone: string;
+  preferences: Record<string, unknown>;
+  updated_at: string;
+}
+
 export const usersDB = {
   // Create a new user profile (called after auth signup) with input validation
   async create(userData: CreateUserData): Promise<User> {

@@ -68,7 +68,7 @@ CREATE TABLE feature_flags.entitlements (
   user_id     uuid        NULL,       -- Nullable for future org-wide entitlements
   key         text        NOT NULL,   -- Entitlement identifier (e.g., 'premium_subscription')
   is_active   boolean     NOT NULL DEFAULT true,    -- Manual revoke + auto-marked when expired
-  remind_user boolean     NOT NULL DEFAULT false,   -- Flag to remind user when expired
+  remind_user boolean     NOT NULL DEFAULT true,    -- Flag to remind user when expired (default: true = always remind)
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now(),
   expires_at  timestamptz NULL,       -- NULL = permanent

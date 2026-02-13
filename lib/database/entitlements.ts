@@ -42,7 +42,7 @@ export async function fetchEntitlementsByUserId(
   userId: string,
 ): Promise<EntitlementRow[]> {
   const { data, error } = await supabase
-      .schema('feature_flags')
+    .schema('feature_flags')
     .from('entitlements')
     .select(
       "id, user_id, key, is_active, remind_user, created_at, updated_at, expires_at",
@@ -150,3 +150,136 @@ export async function fetchEntitlementOverridesByUserId(
 
   return (data || []) as EntitlementOverrideRow[];
 }
+
+/**
+ * Set the remind_user flag for a specific entitlement
+ *
+ * Updates whether users should be reminded about this entitlement's expiration.
+ *
+ * @param supabase - Supabase client
+ * @param entitlementId - Entitlement ID (UUID)
+ * @param remindUser - true to enable reminders, false to disable
+ * @returns true on success, throws error on failure
+ */
+export async function setEntitlementReminderFlag(
+  supabase: SupabaseClient,
+  entitlementId: string,
+  remindUser: boolean,
+): Promise<boolean> {
+  const { error } = await supabase
+    .schema('feature_flags')
+    .from('entitlements')
+    .update({ remind_user: remindUser, updated_at: new Date().toISOString() })
+    .eq('id', entitlementId);
+
+  if (error) {
+    throw new Error(
+      `Failed to update remind_user for entitlement ${entitlementId}: ${error.message}`,
+    );
+  }
+
+  return true;
+}
+
+/**
+ * Fetch entitlements that should trigger reminders
+ *
+ * Returns entitlements where:
+ * - is_active = true
+ * - remind_user = true
+ * - expires_at is within the reminder window (optional filter on client)
+ *
+ * @param supabase - Supabase client
+ * @param userId - User ID (UUID) to fetch remindable entitlements for
+ * @returns List of entitlements that should trigger reminders
+ */
+export async function fetchRemindableEntitlements(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<EntitlementRow[]> {
+  const { data, error } = await supabase
+    .schema('feature_flags')
+    .from('entitlements')
+    .select(
+      'id, user_id, key, is_active, remind_user, created_at, updated_at, expires_at',
+    )
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .eq('remind_user', true)
+    .not('expires_at', 'is', null); // Only include entitlements that expire
+
+  if (error) {
+    throw new Error(
+      `Failed to fetch remindable entitlements for user ${userId}: ${error.message}`,
+    );
+  }
+
+  return (data || []) as EntitlementRow[];
+}
+
+/**
+ * Fetch entitlements that have expired beyond the grace period
+ *
+ * Returns active entitlements where:
+ * - is_active = true
+ * - expires_at < (now - gracePeriodDays)
+ *
+ * @param supabase - Supabase client
+ * @param gracePeriodDays - Number of days after expiry to wait before deactivation
+ * @returns List of expired entitlements past the grace period
+ */
+export async function fetchExpiredEntitlements(
+  supabase: SupabaseClient,
+  gracePeriodDays: number,
+): Promise<EntitlementRow[]> {
+  const now = new Date();
+  const graceCutoffDate = new Date(now.getTime() - gracePeriodDays * 24 * 60 * 60 * 1000);
+
+  const { data, error } = await supabase
+    .schema('feature_flags')
+    .from('entitlements')
+    .select('id, user_id, key, is_active, remind_user, created_at, updated_at, expires_at')
+    .eq('is_active', true)
+    .lt('expires_at', graceCutoffDate.toISOString());
+
+  if (error) {
+    throw new Error(
+      `Failed to fetch expired entitlements: ${error.message}`,
+    );
+  }
+
+  return (data || []) as EntitlementRow[];
+}
+
+/**
+ * Deactivate a batch of entitlements
+ *
+ * Marks the given entitlements as is_active = false.
+ *
+ * @param supabase - Supabase client
+ * @param entitlementIds - Array of entitlement IDs (UUIDs) to deactivate
+ * @returns Number of entitlements deactivated
+ */
+export async function deactivateEntitlements(
+  supabase: SupabaseClient,
+  entitlementIds: string[],
+): Promise<number> {
+  if (entitlementIds.length === 0) {
+    return 0;
+  }
+
+  const { error } = await supabase
+    .schema('feature_flags')
+    .from('entitlements')
+    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .in('id', entitlementIds);
+
+  if (error) {
+    throw new Error(
+      `Failed to deactivate entitlements: ${error.message}`,
+    );
+  }
+
+  return entitlementIds.length;
+}
+

@@ -33,6 +33,8 @@ Per-user preferences. One row per user; auto-created on signup via trigger.
 | `preferences` | jsonb       | No       | `'{}'`   | Future: notifications, accessibility      |
 | `updated_at`  | timestamptz | No       | `now()`  | Auto-updated by trigger                   |
 
+**Note**: Reminder preferences are stored per-entitlement in `feature_flag.entitlements.remind_user`, not globally.
+
 ### Utility Functions
 
 | Function | Returns | Purpose |
@@ -151,7 +153,7 @@ User capability unlocks (premium, beta, etc.). Can be permanent or temporary.
 | `user_id`     | uuid        | Yes      | —                   | FK → `public.users(id)` ON DELETE CASCADE; NULL for org-wide |
 | `key`         | text        | No       | —                   | Entitlement identifier (e.g., `'premium_subscription'`) |
 | `is_active`   | boolean     | No       | `true`              | Manual revoke + auto-marked false when expired       |
-| `remind_user` | boolean     | No       | `false`             | Flag to prompt user for renewal                      |
+| `remind_user` | boolean     | No       | `true`              | Flag to prompt user for renewal on expiry (default: true = always remind) |
 | `created_at`  | timestamptz | No       | `now()`             | —                                                    |
 | `updated_at`  | timestamptz | No       | `now()`             | Auto-updated by trigger                              |
 | `expires_at`  | timestamptz | Yes      | `NULL`              | NULL = permanent; CHECK: `expires_at > created_at`   |
