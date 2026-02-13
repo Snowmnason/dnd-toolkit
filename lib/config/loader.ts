@@ -115,6 +115,12 @@ export interface AppSettings {
       kind?: "free" | "premium" | "beta";
     } & Record<string, any> // Allow additional properties for specific flags
   >;
+  platforms?: {
+    web?: Partial<AppSettings>;
+    ios?: Partial<AppSettings>;
+    android?: Partial<AppSettings>;
+    desktop?: Partial<AppSettings>;
+  };
 }
 
 let cachedConfig: AppSettings | null = null;
@@ -200,6 +206,26 @@ export function getAppConfig(): AppSettings {
 
     console.error(migrationFailMsg);
     throw new Error(migrationFailMsg);
+  }
+
+  // Apply platform-specific config overrides
+  try {
+    const { mergeConfigForPlatform } = require("./platform-config");
+    config = mergeConfigForPlatform(config as AppSettings);
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    const configFile =
+      environment === "development"
+        ? "config/appsettings.dev.json"
+        : "config/appsettings.json";
+
+    const platformMergeFailMsg =
+      `[AppConfig] Platform config merge failed. ` +
+      `File: ${configFile}. ` +
+      `Error: ${errorMessage}`;
+
+    console.error(platformMergeFailMsg);
+    throw new Error(platformMergeFailMsg);
   }
 
   // Validate that the migrated config has the expected structure

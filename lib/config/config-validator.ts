@@ -306,6 +306,35 @@ function validateAppSettings(config: AppSettings): ConfigValidationResult {
     }
   }
 
+  // Validate platforms (if present)
+  const VALID_PLATFORM_NAMES = ["web", "ios", "android", "desktop"];
+  if (config.platforms) {
+    if (typeof config.platforms !== "object") {
+      result.valid = false;
+      result.errors.push("platforms must be an object");
+    } else {
+      for (const platformName of Object.keys(config.platforms)) {
+        // Validate platform name
+        if (!VALID_PLATFORM_NAMES.includes(platformName)) {
+          result.valid = false;
+          result.errors.push(
+            `Invalid platform name: "${platformName}". ` +
+              `Valid platforms are: ${VALID_PLATFORM_NAMES.join(", ")}.`
+          );
+        }
+
+        // Validate platform config is an object (Partial<AppSettings>)
+        const platformConfig = (config.platforms as any)[platformName];
+        if (platformConfig !== undefined && typeof platformConfig !== "object") {
+          result.valid = false;
+          result.errors.push(
+            `platforms.${platformName} must be an object (Partial<AppSettings>)`
+          );
+        }
+      }
+    }
+  }
+
   // Warn if dev features are enabled in production
   if (config.environment === "production") {
     if (config.features.devBypass) {
