@@ -101,7 +101,7 @@ Fired when user is assigned to a variant (automatic).
   variant: 'A' | 'B' | string;
   percentage?: number;
   route_path?: string;
-  rollout_type?: 'feature_flag';
+  rollout_type?: 'feature_flags';
 }
 ```
 

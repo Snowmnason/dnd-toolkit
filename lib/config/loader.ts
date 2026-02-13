@@ -98,6 +98,15 @@ export interface AppSettings {
     autoRecoveryDelayMs?: number;
     description?: string;
   };
+  entitlements?: {
+    gracePeriodDays?: number;
+    reminderWindowDays?: number;
+    rereminderIntervalHours?: number;
+    maxRemindersPerExpiry?: number;
+    dryRunMode?: boolean;
+    debugLogging?: boolean;
+    description?: string;
+  };
   featureFlags: Record<
     string,
     {

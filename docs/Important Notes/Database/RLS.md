@@ -31,6 +31,8 @@ No INSERT policy — rows are created by the `handle_new_user()` auth trigger.
 
 No INSERT policy — rows are created by the `handle_new_user()` auth trigger.
 
+Note: The `public.user_settings` table includes a `remind_user` boolean column (default `true`) which controls whether the user receives entitlement reminders. Existing owner/update policies apply — users may read and update their own `remind_user` value via the standard `user_settings_update_own` policy.
+
 ---
 
 ## WORLDS Schema (002)
