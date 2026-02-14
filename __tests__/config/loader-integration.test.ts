@@ -50,8 +50,8 @@ describe("getAppConfig - platform merging integration", () => {
 
   beforeEach(() => {
     // Mock the config loading to return our test config
-    vi.doMock("@/lib/config/appsettings.json", () => ({ default: mockConfig }), { virtual: true });
-    vi.doMock("@/lib/config/appsettings.dev.json", () => ({ default: mockConfig }), { virtual: true });
+    vi.doMock("@/lib/config/appsettings.json", () => ({ default: mockConfig }));
+    vi.doMock("@/lib/config/appsettings.dev.json", () => ({ default: mockConfig }));
   });
 
   afterEach(() => {
@@ -100,8 +100,8 @@ describe("getAppConfig - platform merging integration", () => {
     delete configWithoutPlatforms.platforms;
 
     // Re-mock without platforms
-    vi.doMock("@/lib/config/appsettings.json", () => ({ default: configWithoutPlatforms }), { virtual: true });
-    vi.doMock("@/lib/config/appsettings.dev.json", () => ({ default: configWithoutPlatforms }), { virtual: true });
+    vi.doMock("@/lib/config/appsettings.json", () => ({ default: configWithoutPlatforms }));
+    vi.doMock("@/lib/config/appsettings.dev.json", () => ({ default: configWithoutPlatforms }));
 
     mockGetPlatformName.mockReturnValue("ios");
 
@@ -127,8 +127,8 @@ describe("getAppConfig - platform merging integration", () => {
       },
     };
 
-    vi.doMock("@/lib/config/appsettings.json", () => ({ default: configWithDeepOverrides }), { virtual: true });
-    vi.doMock("@/lib/config/appsettings.dev.json", () => ({ default: configWithDeepOverrides }), { virtual: true });
+    vi.doMock("@/lib/config/appsettings.json", () => ({ default: configWithDeepOverrides }));
+    vi.doMock("@/lib/config/appsettings.dev.json", () => ({ default: configWithDeepOverrides }));
 
     mockGetPlatformName.mockReturnValue("ios");
 
@@ -155,8 +155,8 @@ describe("getAppConfig - platform merging integration", () => {
       },
     } as AppSettings;
 
-    vi.doMock("@/lib/config/appsettings.json", () => ({ default: configWithNestedOverrides }), { virtual: true });
-    vi.doMock("@/lib/config/appsettings.dev.json", () => ({ default: configWithNestedOverrides }), { virtual: true });
+    vi.doMock("@/lib/config/appsettings.json", () => ({ default: configWithNestedOverrides }));
+    vi.doMock("@/lib/config/appsettings.dev.json", () => ({ default: configWithNestedOverrides }));
 
     mockGetPlatformName.mockReturnValue("ios");
 
@@ -177,8 +177,8 @@ describe("getAppConfig - platform merging integration", () => {
       },
     };
 
-    vi.doMock("@/lib/config/appsettings.json", () => ({ default: configWithNulls }), { virtual: true });
-    vi.doMock("@/lib/config/appsettings.dev.json", () => ({ default: configWithNulls }), { virtual: true });
+    vi.doMock("@/lib/config/appsettings.json", () => ({ default: configWithNulls }));
+    vi.doMock("@/lib/config/appsettings.dev.json", () => ({ default: configWithNulls }));
 
     mockGetPlatformName.mockReturnValue("ios");
 

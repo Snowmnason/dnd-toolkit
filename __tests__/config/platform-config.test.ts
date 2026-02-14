@@ -171,10 +171,10 @@ describe("mergeConfigForPlatform", () => {
           someArray: [4, 5],
         },
       },
-    };
+    } as AppSettings;
     const result = mergeConfigForPlatform(config, "ios");
 
-    expect(result.someArray).toEqual([4, 5]); // Replaced, not merged
+    expect((result as any).someArray).toEqual([4, 5]); // Replaced, not merged
   });
 
   it("ignores null/undefined values in overrides", () => {
