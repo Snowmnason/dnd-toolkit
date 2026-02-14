@@ -12,7 +12,7 @@ import { Platform } from "react-native";
 // Mock react-native Platform
 vi.mock("react-native", () => ({
   Platform: {
-    OS: "unknown",
+    OS: "unknown" as any,
   },
 }));
 
@@ -23,7 +23,7 @@ describe("getPlatformName", () => {
   beforeEach(() => {
     // Reset globals
     delete (globalThis as any).window;
-    Platform.OS = "unknown";
+    (Platform as any).OS = "unknown";
   });
 
   afterEach(() => {
@@ -31,36 +31,36 @@ describe("getPlatformName", () => {
     if (originalWindow !== undefined) {
       (globalThis as any).window = originalWindow;
     }
-    Platform.OS = originalPlatformOS;
+    (Platform as any).OS = originalPlatformOS;
   });
 
   it("detects desktop (Electron) when window.electron exists", () => {
     (globalThis as any).window = { electron: {} };
-    Platform.OS = "web";
+    (Platform as any).OS = "web";
 
     expect(getPlatformName()).toBe("desktop");
   });
 
   it("detects web when Platform.OS is web", () => {
-    Platform.OS = "web";
+    (Platform as any).OS = "web";
 
     expect(getPlatformName()).toBe("web");
   });
 
   it("detects ios when Platform.OS is ios", () => {
-    Platform.OS = "ios";
+    (Platform as any).OS = "ios";
 
     expect(getPlatformName()).toBe("ios");
   });
 
   it("detects android when Platform.OS is android", () => {
-    Platform.OS = "android";
+    (Platform as any).OS = "android";
 
     expect(getPlatformName()).toBe("android");
   });
 
   it("returns unknown for unrecognized Platform.OS", () => {
-    Platform.OS = "unknown";
+    (Platform as any).OS = "unknown";
 
     expect(getPlatformName()).toBe("unknown");
   });

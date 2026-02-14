@@ -19,6 +19,7 @@ export interface AppSettings {
   version: number;
   description: string;
   environment: "development" | "production";
+  platformNotes?: string; // Documentation for platform-specific overrides
   features: {
     consoleLogging: boolean;
     devBypass: boolean;

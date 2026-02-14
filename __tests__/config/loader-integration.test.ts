@@ -31,19 +31,15 @@ describe("getAppConfig - platform merging integration", () => {
     platforms: {
       ios: {
         thresholds: { slowScreenMs: 2000 },
-        platformNotes: "iOS: stricter thresholds for slower devices",
       },
       android: {
         thresholds: { slowScreenMs: 2000 },
-        platformNotes: "Android: stricter thresholds for slower devices",
       },
       web: {
         thresholds: { slowScreenMs: 5000 },
-        platformNotes: "Web: more lenient thresholds for desktop browsers",
       },
       desktop: {
         thresholds: { slowScreenMs: 4000 },
-        platformNotes: "Desktop: moderate thresholds for native performance",
       },
     },
   };
