@@ -13,6 +13,11 @@ export type { AppSettings } from "./loader";
 export { logValidationResults, validateConfig } from "./config-validator";
 export type { ConfigValidationResult } from "./config-validator";
 
+// Hot-Reload: Runtime config updates for development (no-op in production)
+export {
+    ConfigHotReload, getHotReload, initializeHotReload, isHotReloadAvailable
+} from "./hot-reload";
+
 // Dev-Only: Safe dev utilities with no-op production versions
 export {
     createDevTimer, devAssert, isDevBypassEnabled, useDevConsole
