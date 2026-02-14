@@ -28,6 +28,17 @@ export interface ConfigValidationResult {
 }
 
 /**
+ * Validates app settings structure and values
+ * Made compatible with both internal validation and external test imports
+ */
+export function validateAppSettings(
+  config: AppSettings,
+): ConfigValidationResult {
+  // Delegated to the internal function implementation
+  return validateAppSettingsImpl(config);
+}
+
+/**
  * DND-Toolkit required environment variables
  * These must be present for the app to function properly
  * 
@@ -144,7 +155,9 @@ function validateEnvironmentVariables(
 /**
  * Validate app settings structure for DND-Toolkit
  */
-function validateAppSettings(config: AppSettings): ConfigValidationResult {
+// Note: validateAppSettings function is now defined at the top,
+// this is just the implementation
+function validateAppSettingsImpl(config: AppSettings): ConfigValidationResult {
   const result: ConfigValidationResult = {
     valid: true,
     errors: [],
@@ -303,6 +316,35 @@ function validateAppSettings(config: AppSettings): ConfigValidationResult {
     if (typeof config.thresholds !== "object") {
       result.valid = false;
       result.errors.push("thresholds must be an object");
+    }
+  }
+
+  // Validate platforms (if present)
+  const VALID_PLATFORM_NAMES = ["web", "ios", "android", "desktop"];
+  if (config.platforms) {
+    if (typeof config.platforms !== "object") {
+      result.valid = false;
+      result.errors.push("platforms must be an object");
+    } else {
+      for (const platformName of Object.keys(config.platforms)) {
+        // Validate platform name
+        if (!VALID_PLATFORM_NAMES.includes(platformName)) {
+          result.valid = false;
+          result.errors.push(
+            `Invalid platform name: "${platformName}". ` +
+              `Valid platforms are: ${VALID_PLATFORM_NAMES.join(", ")}.`
+          );
+        }
+
+        // Validate platform config is an object (Partial<AppSettings>)
+        const platformConfig = (config.platforms as any)[platformName];
+        if (platformConfig !== undefined && typeof platformConfig !== "object") {
+          result.valid = false;
+          result.errors.push(
+            `platforms.${platformName} must be an object (Partial<AppSettings>)`
+          );
+        }
+      }
     }
   }
 

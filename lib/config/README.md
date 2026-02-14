@@ -55,6 +55,18 @@ All configuration is centralized in two JSON files (`appsettings.json` and `apps
 - **featureFlags**: Dynamic flags with metadata (enabled, description, kind, optional categories for logger)
 - **thresholds**: Performance thresholds (slowScreenMs, slowRequestMs)
 
+## Platform-Specific Overrides
+
+This project supports per-platform partial overrides for infrastructure settings via the new `platforms` section in the appsettings files and the helper in `lib/config/platform-config.ts`.
+
+- Purpose: allow small, focused differences per platform (web, ios, android, desktop) without duplicating the whole config file.
+- Location: add a `platforms` object in `config/appsettings.json` or `config/appsettings.dev.json`. Each key is a platform name and its value is a `Partial<AppSettings>` containing only the fields you want to override.
+- Detection: `getPlatformName()` (in `lib/config/platform-config.ts`) returns `"web" | "ios" | "android" | "desktop"`.
+- Merge: `mergeConfigForPlatform(config)` applies the platform partial on top of shared defaults using a deep-merge (objects merged, arrays replaced). The merged config is applied in `getAppConfig()` at startup and then cached.
+- Validation: `lib/config/config-validator.ts` now validates the optional `platforms` section and rejects unknown platform keys.
+
+See `docs/issues/MileStone 2/Tier 3/194 - Platform Specific Config/USAGE_GUIDE.md` for examples, rationale, and troubleshooting. For a concise developer-oriented list of added files and integration points, see `docs/issues/MileStone 2/Tier 3/194 - Platform Specific Config/IMPLEMENTATION.md`.
+
 ### Validation Flow
 
 At app startup (kernel Phase 0), validation runs in two stages:

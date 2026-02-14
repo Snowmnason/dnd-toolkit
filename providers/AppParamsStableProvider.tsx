@@ -11,6 +11,34 @@ import React, {
 } from "react";
 import { createContext, useContextSelector } from "use-context-selector";
 
+// Get the metadata key
+const CONNECTED_WORLDS_METADATA =
+  STORAGE_KEYS.CONNECTED_WORLDS_METADATA || "dnd:app:connected_worlds_metadata";
+
+/**
+ * Rich cache structure for connected worlds
+ * Mirrors structure from update-storage-cache.ts
+ */
+interface ConnectedWorldsCache {
+  list: string[];
+  roleMap: {
+    dm: string[];
+    player: string[];
+    gm: string[];
+    spectator: string[];
+    observer: string[];
+  };
+  counts: {
+    dm: number;
+    player: number;
+    gm: number;
+    spectator: number;
+    observer: number;
+    total: number;
+  };
+  lastVerifiedAt: number;
+}
+
 interface AppParamsStable {
   userId?: string;
   connectedWorldIds: string[];
@@ -62,84 +90,93 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
           setStableParams((prev) => ({ ...prev, userId: undefined }));
         }
 
-        const backend = getPrivacyStorageBackend(STORAGE_KEYS.CONNECTED_WORLDS);
+        // Load richer cache structure with role breakdown
+        const backend = getPrivacyStorageBackend(
+          STORAGE_KEYS.CONNECTED_WORLDS,
+        );
         const worldIds = await backend.getJSON<string[]>(
           STORAGE_KEYS.CONNECTED_WORLDS,
         );
-        if (worldIds && Array.isArray(worldIds)) {
-          // EAGER VERIFICATION: Verify world access before setting UI state
-          // This prevents stale worlds from being briefly shown to the user
-          // Uses cache-first strategy for speed (fresh cache <4h = instant)
-          try {
+
+        // Load rich cache metadata for staleness check and verification
+        const metadataBackend = getPrivacyStorageBackend(
+          CONNECTED_WORLDS_METADATA,
+        );
+        const richCache = await metadataBackend.getJSON<ConnectedWorldsCache>(
+          CONNECTED_WORLDS_METADATA,
+        );
+
+        // SAFETY CHECK: Determine error state based on cache freshness
+        // - Empty cache with OLD/MISSING metadata = error state (needs recovery)
+        // - Empty cache with FRESH metadata = confirmed empty (no error)
+        // - Non-empty cache = normal state (may need staleness check)
+        const isEmptyCache = !worldIds || !Array.isArray(worldIds) || worldIds.length === 0;
+        const isCacheRecent = isCacheWithinThreshold(richCache, 4 * 60 * 60 * 1000); // 4 hours
+        const isErrorState = isEmptyCache && !isCacheRecent;
+        const shouldVerify = isErrorState || isVerificationStale(richCache);
+
+        if (isEmptyCache) {
+          if (isCacheRecent) {
+            // Fresh verification returned 0 worlds - not an error, just confirmed empty
             logger.debug(
               "context",
-              "AppParamsStableProvider: Starting eager verification of worlds",
+              `AppParamsStableProvider: Cache is empty but recently verified (${getTimeSinceVerification(richCache)}m ago) - confirmed empty state`,
             );
-
-            // Verify all worlds in parallel (faster than serial verification)
-            const verificationResults = await Promise.allSettled(
-              worldIds.map((worldId) =>
-                AuthStateManager.verifyWorldAccessWithDatabase(worldId),
-              ),
-            );
-
-            const verifiedWorldIds: string[] = [];
-            for (let i = 0; i < verificationResults.length; i++) {
-              const result = verificationResults[i];
-              const worldId = worldIds[i];
-
-              if (
-                result.status === "fulfilled" &&
-                result.value.hasAccess
-              ) {
-                verifiedWorldIds.push(worldId);
-              } else if (result.status === "rejected") {
-                logger.warn(
-                  "context",
-                  `World ${worldId} verification failed:`,
-                  result.reason,
-                );
-              }
-            }
-
-            logger.info(
-              "context",
-              "AppParamsStableProvider: Verification complete",
-              {
-                cached: worldIds.length,
-                verified: verifiedWorldIds.length,
-              },
-            );
-
-            // Set state with verified-only worlds
             setStableParams((prev) => ({
               ...prev,
-              connectedWorldIds: verifiedWorldIds,
+              connectedWorldIds: [],
             }));
-
-            // Update storage if list changed (user lost access to some worlds)
-            if (
-              JSON.stringify(verifiedWorldIds) !== JSON.stringify(worldIds)
-            ) {
-              const verifyBackend = getPrivacyStorageBackend(
-                STORAGE_KEYS.CONNECTED_WORLDS,
-              );
-              await verifyBackend.setJSON(
-                STORAGE_KEYS.CONNECTED_WORLDS,
-                verifiedWorldIds,
-              );
-            }
-          } catch (verificationError) {
-            logger.warn(
+          } else {
+            // Old/missing metadata with empty cache - error state, attempt recovery
+            logger.debug(
               "context",
-              "AppParamsStableProvider: Verification error, using cached list",
-              verificationError,
+              "AppParamsStableProvider: Cache is empty and stale - treating as error state, will attempt verification",
             );
-            // On verification error, use cached list but alert user
-            setStableParams((prev) => ({
-              ...prev,
-              connectedWorldIds: worldIds,
-            }));
+
+            // IMPORTANT: If userId unavailable (transient auth state), don't block UI
+            // Set empty worlds and let screen render - verification will retry when userId arrives
+            if (!userId) {
+              logger.debug(
+                "context",
+                "AppParamsStableProvider: Error state but no userId yet (auth still loading) - showing empty worlds, will verify once auth completes",
+              );
+              setStableParams((prev) => ({
+                ...prev,
+                connectedWorldIds: [],
+              }));
+              // Verification will be triggered again when auth state changes and userId becomes available
+            } else {
+              // userId available - attempt verification in background
+              startBackgroundVerification(userId, [], richCache, true);
+            }
+          }
+        } else {
+          logger.debug(
+            "context",
+            `AppParamsStableProvider: Loaded ${worldIds.length} worlds from persistent cache`,
+          );
+
+          // IMPORTANT: Set UI immediately with cached worlds (no blocking)
+          // This prevents blank screen on startup/restart
+          setStableParams((prev) => ({
+            ...prev,
+            connectedWorldIds: worldIds,
+          }));
+
+          logger.debug(
+            "context",
+            `AppParamsStableProvider: Rich cache metadata - DM: ${richCache?.counts.dm || 0}, Player: ${richCache?.counts.player || 0}, Last verified: ${richCache?.lastVerifiedAt ? new Date(richCache.lastVerifiedAt).toISOString() : "never"}`,
+          );
+
+          // START BACKGROUND VERIFICATION (non-blocking)
+          // Only verify if cache is stale; reduce DB calls for offline capabilities
+          if (shouldVerify) {
+            startBackgroundVerification(userId, worldIds, richCache, false);
+          } else {
+            logger.debug(
+              "context",
+              "AppParamsStableProvider: Cache is fresh, skipping verification (offline-friendly)",
+            );
           }
         }
       } catch (error) {
@@ -150,6 +187,266 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         );
       }
     }
+
+    /**
+     * Check if cache was verified within a specific time threshold
+     * Used for both error detection and staleness checking
+     */
+    function isCacheWithinThreshold(
+      richCache: ConnectedWorldsCache | null | undefined,
+      thresholdMs: number,
+    ): boolean {
+      if (!richCache?.lastVerifiedAt) {
+        return false; // No metadata = not recent
+      }
+
+      const cacheAgeMs = Date.now() - richCache.lastVerifiedAt;
+      return cacheAgeMs <= thresholdMs;
+    }
+
+    /**
+     * Get minutes since last verification for logging
+     */
+    function getTimeSinceVerification(richCache: ConnectedWorldsCache | null | undefined): string {
+      if (!richCache?.lastVerifiedAt) {
+        return "unknown";
+      }
+
+      const cacheAgeMs = Date.now() - richCache.lastVerifiedAt;
+      return (cacheAgeMs / 1000 / 60).toFixed(1);
+    }
+
+    /**
+     * Check if cache is stale (older than 4 hours)
+     * Staleness reduces unnecessary DB calls while supporting offline
+     * Empty cache (null/undefined lastVerifiedAt) is considered always stale
+     */
+    function isVerificationStale(richCache: ConnectedWorldsCache | null | undefined): boolean {
+      if (!richCache?.lastVerifiedAt) {
+        return true; // No metadata = stale
+      }
+
+      const fourHoursMs = 4 * 60 * 60 * 1000;
+      const cacheAgeMs = Date.now() - richCache.lastVerifiedAt;
+      const isStale = cacheAgeMs > fourHoursMs;
+
+      logger.debug(
+        "context",
+        `AppParamsStableProvider: Cache age check - ${(cacheAgeMs / 1000 / 60).toFixed(1)}m old, stale threshold: 240m, isStale: ${isStale}`,
+      );
+
+      return isStale;
+    }
+
+    /**
+     * Staged verification strategy:
+     * 1. If cache is empty → ALWAYS verify (error state)
+     * 2. If cache has data → check staleness (4h threshold)
+     * 3. If cache is fresh → skip verification (offline friendly)
+     * 4. Only update cache if verification returns >= threshold:
+     *    - All DM worlds must be verified (DMs = owner, so none should ever be lost)
+     *    - Player worlds: expect >= 50% (safer for slow RLS sync or transient network issues)
+     * 5. If verification returns 0 while cache > 0: treat as suspicious/transient
+     *    - Don't clear cache; mark as degraded; log warning
+     *    - This prevents data loss if Supabase is temporarily unreachable
+     */
+    async function startBackgroundVerification(
+      userId: string | undefined,
+      cachedWorldIds: string[],
+      richCache: ConnectedWorldsCache | null | undefined,
+      isErrorState: boolean,
+    ) {
+      try {
+        logger.info(
+          "context",
+          `AppParamsStableProvider: Starting background world verification (errorState: ${isErrorState})`,
+        );
+
+        // If empty cache (error state) and no userId, can't verify
+        if (isErrorState && !userId) {
+          logger.warn(
+            "context",
+            "AppParamsStableProvider: Empty cache but no userId - cannot verify, waiting for auth",
+          );
+          return;
+        }
+
+        // Verify all worlds in parallel (faster than serial verification)
+        const verificationResults = await Promise.allSettled(
+          cachedWorldIds.map((worldId) =>
+            AuthStateManager.verifyWorldAccessWithDatabase(worldId),
+          ),
+        );
+
+        const verifiedWorldIds: string[] = [];
+        let hadErrors = false;
+
+        for (let i = 0; i < verificationResults.length; i++) {
+          // eslint-disable-next-line security/detect-object-injection
+          const result = verificationResults[i];
+          // eslint-disable-next-line security/detect-object-injection
+          const worldId = cachedWorldIds[i];
+
+          if (
+            result.status === "fulfilled" &&
+            result.value.hasAccess
+          ) {
+            verifiedWorldIds.push(worldId);
+          } else if (result.status === "rejected") {
+            hadErrors = true;
+            logger.warn(
+              "context",
+              `World ${worldId} verification failed:`,
+              result.reason,
+            );
+          }
+        }
+
+        logger.info(
+          "context",
+          "AppParamsStableProvider: Verification complete",
+          {
+            cached: cachedWorldIds.length,
+            verified: verifiedWorldIds.length,
+            hadErrors,
+            isErrorState,
+          },
+        );
+
+        // ERROR STATE RECOVERY: If cache was empty, populate from verification results
+        if (isErrorState && cachedWorldIds.length === 0) {
+          if (verifiedWorldIds.length > 0) {
+            logger.info(
+              "context",
+              `AppParamsStableProvider: Recovered ${verifiedWorldIds.length} worlds from error state`,
+            );
+            // Set state with verified worlds
+            setStableParams((prev) => ({
+              ...prev,
+              connectedWorldIds: verifiedWorldIds,
+            }));
+
+            // Update persistent cache
+            const verifyBackend = getPrivacyStorageBackend(
+              STORAGE_KEYS.CONNECTED_WORLDS,
+            );
+            await verifyBackend.setJSON(
+              STORAGE_KEYS.CONNECTED_WORLDS,
+              verifiedWorldIds,
+            );
+          } else if (hadErrors) {
+            logger.warn(
+              "context",
+              `AppParamsStableProvider: Error state verification failed. Will retry on next app launch.`,
+            );
+          } else {
+            logger.info(
+              "context",
+              `AppParamsStableProvider: Error state verified - user has 0 worlds`,
+            );
+            setStableParams((prev) => ({
+              ...prev,
+              connectedWorldIds: [],
+            }));
+          }
+          return;
+        }
+
+        // THRESHOLD LOGIC (for non-error states):
+        // If verification returned 0:
+        // - With NO errors → it's a legitimate state (user truly has 0 worlds) → clear cache
+        // - With errors → treat as transient failure → preserve cache
+        if (verifiedWorldIds.length === 0 && cachedWorldIds.length > 0) {
+          if (hadErrors) {
+            logger.warn(
+              "context",
+              `AppParamsStableProvider: Verification returned 0 worlds with errors. Cache preserved.`,
+            );
+            // Transient failure: keep using cached worlds
+            return;
+          } else {
+            logger.info(
+              "context",
+              `AppParamsStableProvider: Verification returned 0 worlds (no errors). User has no worlds. Clearing cache.`,
+            );
+            // Legitimate 0: clear cache and state
+            setStableParams((prev) => ({
+              ...prev,
+              connectedWorldIds: [],
+            }));
+
+            const verifyBackend = getPrivacyStorageBackend(
+              STORAGE_KEYS.CONNECTED_WORLDS,
+            );
+            await verifyBackend.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, []);
+            return;
+          }
+        }
+
+        // Check if verification meets expected thresholds
+        const dmWorlds = richCache?.roleMap.dm || [];
+        const playerWorlds = richCache?.roleMap.player || [];
+
+        // Expect all DM worlds to be verified (DMs = owner/full control)
+        const dmVerified = dmWorlds.filter((id) =>
+          verifiedWorldIds.includes(id),
+        ).length;
+        const dmThreshold = dmWorlds.length; // All DM worlds must be present
+
+        // Expect >= 50% of player worlds (safer for transient RLS issues)
+        const playerVerified = playerWorlds.filter((id) =>
+          verifiedWorldIds.includes(id),
+        ).length;
+        const playerThreshold = Math.ceil(playerWorlds.length * 0.5);
+
+        const dmMetSafe = dmVerified >= dmThreshold || dmThreshold === 0;
+        const playerMetSafe =
+          playerVerified >= playerThreshold || playerWorlds.length === 0;
+
+        logger.debug(
+          "context",
+          `AppParamsStableProvider: Threshold check - DM: ${dmVerified}/${dmThreshold}, Player: ${playerVerified}/${playerThreshold}`,
+        );
+
+        // Only update cache if thresholds are met
+        if (!dmMetSafe || !playerMetSafe) {
+          logger.warn(
+            "context",
+            `AppParamsStableProvider: Verification did not meet safety thresholds. DM met: ${dmMetSafe}, Player met: ${playerMetSafe}. Cache preserved.`,
+          );
+          // Don't update cache - keep using what was there
+          return;
+        }
+
+        // Thresholds met: update state and cache with verified worlds
+        setStableParams((prev) => ({
+          ...prev,
+          connectedWorldIds: verifiedWorldIds,
+        }));
+
+        // Update persistent cache
+        const verifyBackend = getPrivacyStorageBackend(
+          STORAGE_KEYS.CONNECTED_WORLDS,
+        );
+        await verifyBackend.setJSON(
+          STORAGE_KEYS.CONNECTED_WORLDS,
+          verifiedWorldIds,
+        );
+
+        logger.info(
+          "context",
+          "AppParamsStableProvider: Cache updated with verified worlds",
+        );
+      } catch (verificationError) {
+        logger.warn(
+          "context",
+          "AppParamsStableProvider: Verification error, keeping cached worlds",
+          verificationError,
+        );
+        // On verification error, keep cached worlds and surface to user
+      }
+    }
+
     loadFromStorage();
   }, [authStateVersion]);
 

@@ -35,43 +35,43 @@
  */
 
 export {
-  DATA_CLASSIFICATIONS,
-  DataSensitivity,
-  validateClassifications,
-  type DataClassification
+    DATA_CLASSIFICATIONS,
+    DataSensitivity,
+    validateClassifications,
+    type DataClassification
 } from "./data-classification";
 export { FastCache } from "./FastCache";
 export {
-  classifyKey,
-  clearAllUserData,
-  getKeysBySensitivity,
-  getStorageBackend as getPrivacyStorageBackend,
-  getRetentionInfo,
-  getSensitiveKeys,
-  isSensitiveData,
-  redactForLogs,
-  shouldUseSecureStorage
+    classifyKey,
+    clearAllUserData,
+    getKeysBySensitivity,
+    getStorageBackend as getPrivacyStorageBackend,
+    getRetentionInfo,
+    getSensitiveKeys,
+    isSensitiveData,
+    redactForLogs,
+    shouldUseSecureStorage
 } from "./privacy";
 export { SecureStorage } from "./SecureStorage";
 export { STORAGE_BACKEND_CONFIG, type StorageBackend } from "./storage-config";
 export {
-  batchStorageOperation,
-  checkStorageHealth,
-  classifyStorageError,
-  handleStorageErrorGracefully,
-  isStorageError,
-  logStorageError,
-  safeStorageGet,
-  safeStorageGetJSON,
-  safeStorageRemove,
-  safeStorageSet,
-  safeStorageSetJSON,
-  shouldServeFallbackOnStorageError,
-  type BatchStorageResult,
-  type StorageErrorInfo,
-  type StorageGracefulResult,
-  type StorageOperation,
-  type StorageOperationOptions
+    batchStorageOperation,
+    checkStorageHealth,
+    classifyStorageError,
+    handleStorageErrorGracefully,
+    isStorageError,
+    logStorageError,
+    safeStorageGet,
+    safeStorageGetJSON,
+    safeStorageRemove,
+    safeStorageSet,
+    safeStorageSetJSON,
+    shouldServeFallbackOnStorageError,
+    type BatchStorageResult,
+    type StorageErrorInfo,
+    type StorageGracefulResult,
+    type StorageOperation,
+    type StorageOperationOptions
 } from "./storage-error-handling";
 export { updateStorageCache } from "./update-storage-cache";
 
@@ -91,6 +91,7 @@ export const STORAGE_KEYS = {
 
   // App-level data
   CONNECTED_WORLDS: "dnd:app:connected_worlds",
+  CONNECTED_WORLDS_METADATA: "dnd:app:connected_worlds_metadata",
 
   // Auth-related data
   HAS_ACCOUNT: "dnd:auth:has_account",

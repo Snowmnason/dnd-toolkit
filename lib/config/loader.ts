@@ -19,6 +19,7 @@ export interface AppSettings {
   version: number;
   description: string;
   environment: "development" | "production";
+  platformNotes?: string; // Documentation for platform-specific overrides
   features: {
     consoleLogging: boolean;
     devBypass: boolean;
@@ -115,6 +116,12 @@ export interface AppSettings {
       kind?: "free" | "premium" | "beta";
     } & Record<string, any> // Allow additional properties for specific flags
   >;
+  platforms?: {
+    web?: Partial<AppSettings>;
+    ios?: Partial<AppSettings>;
+    android?: Partial<AppSettings>;
+    desktop?: Partial<AppSettings>;
+  };
 }
 
 let cachedConfig: AppSettings | null = null;
@@ -202,7 +209,32 @@ export function getAppConfig(): AppSettings {
     throw new Error(migrationFailMsg);
   }
 
-  // Validate that the migrated config has the expected structure
+  // Apply platform-specific config overrides
+  try {
+    // NOTE: We intentionally use `require()` here instead of `await import()` so that
+    // `getAppConfig()` remains fully synchronous. Making this dynamic import async would
+    // force `getAppConfig()` to become `async`, which is a breaking change for all callers
+    // and for the app's bootstrap flow. This module is small, loaded once at startup, and
+    // has no side effects beyond computing the merged config, so the synchronous require
+    // is an acceptable trade-off here.
+    const { mergeConfigForPlatform } = require("./platform-config");
+    config = mergeConfigForPlatform(config as AppSettings);
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    const configFile =
+      environment === "development"
+        ? "config/appsettings.dev.json"
+        : "config/appsettings.json";
+
+    const platformMergeFailMsg =
+      `[AppConfig] Platform config merge failed. ` +
+      `File: ${configFile}. ` +
+      `Error: ${errorMessage}`;
+
+    console.error(platformMergeFailMsg);
+    throw new Error(platformMergeFailMsg);
+  }
+
   // Validate that the migrated config has the expected structure
   const versionValid =
     typeof config.version === "number" &&
