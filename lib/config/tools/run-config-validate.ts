@@ -4,13 +4,15 @@
  * Loads appsettings.dev.json and appsettings.json, runs schema validation,
  * and reports findings in human-readable format.
  *
- * Usage: node lib/config/tools/run-config-validate.js
- * or: npm run config:validate
+ * Usage:
+ *   npm run config:validate
+ * or (direct):
+ *   node --import tsx lib/config/tools/run-config-validate.ts
  *
  * Options:
  *   --use-migrations  Validate with migrations applied (normalized structure)
  *   --use-loader      Validate with full loader (migrations + platform merges)
- *                     Requires React Native to be available
+ *                     Requires React Native runtime and may not work in plain Node.js
  *
  * Modes (by priority):
  *   1. Raw JSON files (default) - Fast, file-level schema comparison
@@ -91,35 +93,42 @@ function loadConfigWithMigrations(): { devConfig: unknown; prodConfig: unknown }
 }
 
 /**
- * Safe helper to clear require.cache for a module, guarding against errors
+ * Safe helper to clear require.cache for a module and its dependencies
  */
 function clearModuleCache(modulePath: string): void {
-  try {
-    const resolvedPath = require.resolve(modulePath);
-    if (require.cache[resolvedPath]) {
-      delete require.cache[resolvedPath];
+  const modulesToClear = [modulePath, '../migrations', '../platform-config', '../../config/appsettings.dev.json', '../../config/appsettings.json'];
+  for (const mod of modulesToClear) {
+    try {
+      const resolvedPath = require.resolve(mod);
+      if (require.cache[resolvedPath]) {
+        delete require.cache[resolvedPath];
+      }
+    } catch {
+      // Ignore errors if module was never loaded or resolve failed
     }
-  } catch {
-    // Ignore errors if module was never loaded or resolve failed
   }
 }
 
 /**
  * Load config via the loader (applies migrations, platform merges, etc.)
  * Returns the normalized config shape for both dev and prod environments
+ * 
+ * Note: This function resets the loader's cached config before loading each environment
+ * to ensure the environment variable is properly re-read.
  */
 function loadConfigViaLoader(): { devConfig: unknown; prodConfig: unknown } {
   try {
     // Dynamically import loader to avoid loading it unless --use-loader is used
-     
     const loaderModule = require('../loader');
-    const { getAppConfig } = loaderModule;
+    const { getAppConfig, resetCachedConfig } = loaderModule;
 
     // Load dev config
     const prevEnv = process.env.EXPO_PUBLIC_ENVIRONMENT;
     try {
       process.env.EXPO_PUBLIC_ENVIRONMENT = 'development';
-      // Clear the cached config so the loader re-reads with the new environment
+      // Reset the cached config in the loader module before re-reading
+      resetCachedConfig();
+      // Also clear require.cache to ensure clean state
       clearModuleCache('../loader');
        
       const devLoadedModule = require('../loader');
@@ -127,6 +136,9 @@ function loadConfigViaLoader(): { devConfig: unknown; prodConfig: unknown } {
 
       // Load prod config
       process.env.EXPO_PUBLIC_ENVIRONMENT = 'production';
+      // Reset the cached config in the loader module before re-reading
+      resetCachedConfig();
+      // Also clear require.cache to ensure clean state
       clearModuleCache('../loader');
        
       const prodLoadedModule = require('../loader');
@@ -140,7 +152,9 @@ function loadConfigViaLoader(): { devConfig: unknown; prodConfig: unknown } {
       } else {
         delete process.env.EXPO_PUBLIC_ENVIRONMENT;
       }
-      // Clear cache again to avoid pollution
+      // Reset cached config one more time to avoid pollution
+      resetCachedConfig();
+      // Clear cache to ensure clean state
       clearModuleCache('../loader');
     }
   } catch (error) {

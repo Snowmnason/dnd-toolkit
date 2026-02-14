@@ -27,7 +27,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          # Require Node.js 18.19.0+ because the CLI uses the stabilized
+          # `--import` flag (Node >= 18.19.0). Pin the minimum patch to avoid
+          # older 18.x runners that may not support the flag.
+          node-version: '18.19.0'
           cache: 'npm'
 
       - name: Install dependencies
@@ -38,9 +41,5 @@ jobs:
         env:
           STRICT_CONFIG_VALIDATION: '1'
 
-      - name: Report results
-        if: failure()
-        run: |
-          echo "❌ Config schema validation failed"
-          echo "Check the output above for missing/extra fields"
-          exit 1
+      # Reporting is handled by the `Validate config schema` step's output
+      # and GitHub Actions will mark the job as failed when that step exits non-zero.

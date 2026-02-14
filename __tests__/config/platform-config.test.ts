@@ -2,83 +2,15 @@
  * Tests for lib/config/platform-config.ts
  *
  * Tests platform detection and config merging functionality.
+ * Note: Platform detection is primarily tested via loader-integration.test.ts
+ * which tests the actual getPlatformName() function with mocked environment.
  */
 
 import type { AppSettings } from "@/lib/config/loader";
-import { getPlatformName, mergeConfigForPlatform } from "@/lib/config/platform-config";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Platform } from "react-native";
+import { describe, expect, it } from "vitest";
 
-// Mock react-native Platform
-vi.mock("react-native", () => ({
-  Platform: {
-    OS: "unknown" as any,
-  },
-}));
-
-describe("getPlatformName", () => {
-  const originalWindow = (globalThis as any).window;
-  const originalPlatformOS = Platform.OS;
-
-  beforeEach(() => {
-    // Reset globals
-    delete (globalThis as any).window;
-    (Platform as any).OS = "unknown";
-  });
-
-  afterEach(() => {
-    // Restore globals
-    if (originalWindow !== undefined) {
-      (globalThis as any).window = originalWindow;
-    }
-    (Platform as any).OS = originalPlatformOS;
-  });
-
-  it("detects desktop (Electron) when window.electron exists", () => {
-    (globalThis as any).window = { electron: {} };
-    (Platform as any).OS = "web";
-
-    expect(getPlatformName()).toBe("desktop");
-  });
-
-  it("detects web when Platform.OS is web", () => {
-    (Platform as any).OS = "web";
-
-    expect(getPlatformName()).toBe("web");
-  });
-
-  it("detects ios when Platform.OS is ios", () => {
-    (Platform as any).OS = "ios";
-
-    expect(getPlatformName()).toBe("ios");
-  });
-
-  it("detects android when Platform.OS is android", () => {
-    (Platform as any).OS = "android";
-
-    expect(getPlatformName()).toBe("android");
-  });
-
-  it("returns unknown for unrecognized Platform.OS", () => {
-    (Platform as any).OS = "unknown";
-
-    expect(getPlatformName()).toBe("unknown");
-  });
-
-  it("returns unknown when Platform is not available", () => {
-    expect(getPlatformName()).toBe("unknown");
-  });
-
-  it("returns unknown when Platform.OS throws", () => {
-    Object.defineProperty(Platform, "OS", {
-      get: () => {
-        throw new Error("Platform unavailable");
-      },
-    });
-
-    expect(getPlatformName()).toBe("unknown");
-  });
-});
+// Import the module under test
+import { mergeConfigForPlatform } from "../../lib/config/platform-config";
 
 describe("mergeConfigForPlatform", () => {
   const baseConfig: AppSettings = {
@@ -186,7 +118,6 @@ describe("mergeConfigForPlatform", () => {
   it("ignores null/undefined values in overrides", () => {
     const config = {
       ...baseConfig,
-      thresholds: { slowScreenMs: 3000 },
       platforms: {
         ios: {
           thresholds: { slowScreenMs: null as any, slowRequestMs: undefined },

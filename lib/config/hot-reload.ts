@@ -20,7 +20,6 @@
  */
 
 import { logger } from "@/lib/utils/logger";
-import { createHash } from "crypto";
 import { validateAppSettings } from "./config-validator";
 import type { AppSettings } from "./loader";
 import { CURRENT_CONFIG_VERSION, migrateConfig } from "./migrations";
@@ -37,28 +36,71 @@ interface HotReloadOptions {
  * Uses stable JSON serialization to avoid property-order issues.
  */
 function deepEqual(a: any, b: any): boolean {
-  // Stringify with sorted keys for deterministic comparison
-  const stringify = (obj: any): string => {
+  // Deterministic stable stringify that sorts object keys recursively.
+  const stableStringify = (value: any): string => {
     try {
-      return JSON.stringify(obj, Object.keys(obj).sort());
+      if (value === null) return "null";
+      if (value === undefined) return "undefined";
+      const t = typeof value;
+      if (t !== "object") return JSON.stringify(value);
+
+      if (Array.isArray(value)) {
+        const items = value.map((item) => stableStringify(item));
+        return `[${items.join(",")}]`;
+      }
+
+      // Plain object: sort keys and stringify recursively
+      const keys = Object.keys(value).sort();
+      const props = keys.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`);
+      return `{${props.join(",")}}`;
     } catch {
-      return String(obj);
+      return String(value);
     }
   };
-  return stringify(a) === stringify(b);
+
+  return stableStringify(a) === stableStringify(b);
 }
 
 /**
  * Compute SHA256 hash of content string for change detection.
  * Used as fallback when Last-Modified header is unavailable.
  */
-function hashContent(content: string): string {
+/**
+ * Compute SHA256 hash of content string for change detection.
+ * Attempts Node.js `crypto` first, then Web Crypto API, and falls back to
+ * a deterministic length-based fingerprint when neither is available.
+ */
+async function hashContent(content: string): Promise<string> {
   try {
-    return createHash('sha256').update(content).digest('hex');
+    // Try Node.js crypto (dynamic require to avoid bundling in RN)
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const nodeCrypto = typeof require !== 'undefined' ? require('crypto') : null;
+      if (nodeCrypto && typeof nodeCrypto.createHash === 'function') {
+        return nodeCrypto.createHash('sha256').update(content).digest('hex');
+      }
+    } catch {
+      // ignore and try Web Crypto
+    }
+
+    // Try Web Crypto API (browser)
+    if (typeof globalThis !== 'undefined' && (globalThis as any).crypto && (globalThis as any).crypto.subtle) {
+      try {
+        const enc = new TextEncoder();
+        const data = enc.encode(content);
+        const hashBuffer = await (globalThis as any).crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+      } catch {
+        // proceed to fallback
+      }
+    }
   } catch {
-    // Fallback to length-based hash if crypto not available
-    return `len:${content.length}:${content.charCodeAt(0) || 0}`;
+    // fall through to deterministic fallback
   }
+
+  // Fallback to deterministic fingerprint if crypto not available
+  return `len:${content.length}:${content.charCodeAt(0) || 0}`;
 }
 
 /**
@@ -256,7 +298,7 @@ export class ConfigHotReload {
     try {
       const newContent = await this.loadConfigContent();
       if (!newContent) return false;
-      const newHash = hashContent(newContent);
+      const newHash = await hashContent(newContent);
       if (newHash !== this.lastContentHash) {
         this.lastContentHash = newHash;
         return true;

@@ -62,7 +62,7 @@ export const migrateV1ToV2 = (config: any): any => {
  * 2. Increment CURRENT_CONFIG_VERSION to 2
  * 3. Implement the actual migration logic in migrateV1ToV2()
  */
-const MIGRATION_CHAIN: Array<[number, (config: any) => any]> = [
+const MIGRATION_CHAIN: [number, (config: any) => any][] = [
   // [targetVersion, migrationFunction]
   // [2, migrateV1ToV2], // Uncomment when v2 is introduced
   // Add more [targetVersion, migrationFunction] pairs as new versions are introduced
@@ -86,9 +86,20 @@ export function migrateConfig(
   detectedVersion: number,
   targetVersion: number = CURRENT_CONFIG_VERSION,
 ): AppSettings {
-  // Already at target or newer; no migration needed
-  if (detectedVersion >= targetVersion) {
+  // If config version equals target, return as-is
+  if (detectedVersion === targetVersion) {
     return config;
+  }
+
+  // If the config is from a newer version than this code supports,
+  // fail fast and ask the caller to upgrade the tool that is performing
+  // the migration (or provide missing migration functions). Silently
+  // accepting a newer config risks missing required transformations.
+  if (detectedVersion > targetVersion) {
+    throw new Error(
+      `[ConfigMigration] Config version v${detectedVersion} is newer than the supported CURRENT_CONFIG_VERSION v${targetVersion}. ` +
+        'Update the tooling or provide migration(s) to handle this version.'
+    );
   }
 
   let migratedConfig = config;
