@@ -63,8 +63,8 @@ describe("getAppConfig - platform merging integration", () => {
 
     const config = getAppConfig();
 
-    expect(config.thresholds.slowScreenMs).toBe(2000); // Overridden
-    expect(config.thresholds.slowRequestMs).toBe(5000); // Unchanged
+    expect(config.thresholds?.slowScreenMs).toBe(2000); // Overridden
+    expect(config.thresholds?.slowRequestMs).toBe(5000); // Unchanged
     expect(config.description).toBe("Test config"); // Unchanged
   });
 
@@ -73,8 +73,8 @@ describe("getAppConfig - platform merging integration", () => {
 
     const config = getAppConfig();
 
-    expect(config.thresholds.slowScreenMs).toBe(2000); // Overridden
-    expect(config.thresholds.slowRequestMs).toBe(5000); // Unchanged
+    expect(config.thresholds?.slowScreenMs).toBe(2000); // Overridden
+    expect(config.thresholds?.slowRequestMs).toBe(5000); // Unchanged
   });
 
   it("merges Web platform overrides correctly", () => {
@@ -82,8 +82,8 @@ describe("getAppConfig - platform merging integration", () => {
 
     const config = getAppConfig();
 
-    expect(config.thresholds.slowScreenMs).toBe(5000); // Overridden
-    expect(config.thresholds.slowRequestMs).toBe(5000); // Unchanged
+    expect(config.thresholds?.slowScreenMs).toBe(5000); // Overridden
+    expect(config.thresholds?.slowRequestMs).toBe(5000); // Unchanged
   });
 
   it("merges Desktop platform overrides correctly", () => {
@@ -91,8 +91,8 @@ describe("getAppConfig - platform merging integration", () => {
 
     const config = getAppConfig();
 
-    expect(config.thresholds.slowScreenMs).toBe(4000); // Overridden
-    expect(config.thresholds.slowRequestMs).toBe(5000); // Unchanged
+    expect(config.thresholds?.slowScreenMs).toBe(4000); // Overridden
+    expect(config.thresholds?.slowRequestMs).toBe(5000); // Unchanged
   });
 
   it("returns base config when no platform overrides exist", () => {
@@ -107,8 +107,8 @@ describe("getAppConfig - platform merging integration", () => {
 
     const config = getAppConfig();
 
-    expect(config.thresholds.slowScreenMs).toBe(3000); // Base value
-    expect(config.thresholds.slowRequestMs).toBe(5000); // Base value
+    expect(config.thresholds?.slowScreenMs).toBe(3000); // Base value
+    expect(config.thresholds?.slowRequestMs).toBe(5000); // Base value
   });
 
   it("handles deep object merging in platform overrides", () => {
@@ -139,25 +139,31 @@ describe("getAppConfig - platform merging integration", () => {
     expect(config.featureFlags.anotherFlag.enabled).toBe(false); // Unchanged
   });
 
-  it("handles array replacement in platform overrides", () => {
-    const configWithArrayOverrides: AppSettings = {
+  it("handles nested object merging in platform overrides", () => {
+    const configWithNestedOverrides = {
       ...mockConfig,
-      someArray: ["base", "values"],
+      api: {
+        requestTimeoutMs: 5000,
+        retryDelayMs: 1000,
+      },
       platforms: {
         ios: {
-          someArray: ["ios", "override"] as any, // Arrays are replaced, not merged
+          api: {
+            requestTimeoutMs: 3000, // Override only this
+          },
         },
       },
-    };
+    } as AppSettings;
 
-    vi.doMock("@/lib/config/appsettings.json", () => ({ default: configWithArrayOverrides }), { virtual: true });
-    vi.doMock("@/lib/config/appsettings.dev.json", () => ({ default: configWithArrayOverrides }), { virtual: true });
+    vi.doMock("@/lib/config/appsettings.json", () => ({ default: configWithNestedOverrides }), { virtual: true });
+    vi.doMock("@/lib/config/appsettings.dev.json", () => ({ default: configWithNestedOverrides }), { virtual: true });
 
     mockGetPlatformName.mockReturnValue("ios");
 
     const config = getAppConfig();
 
-    expect(config.someArray).toEqual(["ios", "override"]); // Completely replaced
+    expect(config.api?.requestTimeoutMs).toBe(3000); // Overridden
+    expect(config.api?.retryDelayMs).toBe(1000); // Preserved
   });
 
   it("ignores null and undefined values in platform overrides", () => {
@@ -178,7 +184,7 @@ describe("getAppConfig - platform merging integration", () => {
 
     const config = getAppConfig();
 
-    expect(config.thresholds.slowScreenMs).toBe(3000); // Null ignored, base preserved
-    expect(config.thresholds.slowRequestMs).toBe(5000); // Undefined ignored, base preserved
+    expect(config.thresholds?.slowScreenMs).toBe(3000); // Null ignored, base preserved
+    expect(config.thresholds?.slowRequestMs).toBe(5000); // Undefined ignored, base preserved
   });
 });

@@ -9,48 +9,52 @@ import { getPlatformName, mergeConfigForPlatform } from "@/lib/config/platform-c
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("getPlatformName", () => {
-  const originalWindow = global.window;
-  const originalPlatform = global.Platform;
+  const originalWindow = (globalThis as any).window;
+  const originalPlatform = (globalThis as any).Platform;
 
   beforeEach(() => {
     // Reset globals
-    delete (global as any).window;
-    delete (global as any).Platform;
+    delete (globalThis as any).window;
+    delete (globalThis as any).Platform;
   });
 
   afterEach(() => {
     // Restore globals
-    global.window = originalWindow;
-    (global as any).Platform = originalPlatform;
+    if (originalWindow !== undefined) {
+      (globalThis as any).window = originalWindow;
+    }
+    if (originalPlatform !== undefined) {
+      (globalThis as any).Platform = originalPlatform;
+    }
   });
 
   it("detects desktop (Electron) when window.electron exists", () => {
-    (global as any).window = { electron: {} };
-    (global as any).Platform = { OS: "web" };
+    (globalThis as any).window = { electron: {} };
+    (globalThis as any).Platform = { OS: "web" };
 
     expect(getPlatformName()).toBe("desktop");
   });
 
   it("detects web when Platform.OS is web", () => {
-    (global as any).Platform = { OS: "web" };
+    (globalThis as any).Platform = { OS: "web" };
 
     expect(getPlatformName()).toBe("web");
   });
 
   it("detects ios when Platform.OS is ios", () => {
-    (global as any).Platform = { OS: "ios" };
+    (globalThis as any).Platform = { OS: "ios" };
 
     expect(getPlatformName()).toBe("ios");
   });
 
   it("detects android when Platform.OS is android", () => {
-    (global as any).Platform = { OS: "android" };
+    (globalThis as any).Platform = { OS: "android" };
 
     expect(getPlatformName()).toBe("android");
   });
 
   it("returns unknown for unrecognized Platform.OS", () => {
-    (global as any).Platform = { OS: "unknown" };
+    (globalThis as any).Platform = { OS: "unknown" };
 
     expect(getPlatformName()).toBe("unknown");
   });
@@ -60,7 +64,7 @@ describe("getPlatformName", () => {
   });
 
   it("returns unknown when Platform.OS throws", () => {
-    (global as any).Platform = {
+    (globalThis as any).Platform = {
       get OS() {
         throw new Error("Platform unavailable");
       },
@@ -97,7 +101,7 @@ describe("mergeConfigForPlatform", () => {
       platforms: {
         ios: { thresholds: { slowScreenMs: 2000 } },
       },
-    };
+    } as AppSettings;
     const result = mergeConfigForPlatform(config, "unknown");
 
     expect(result.thresholds?.slowScreenMs).toBe(3000); // Base value

@@ -28,6 +28,17 @@ export interface ConfigValidationResult {
 }
 
 /**
+ * Validates app settings structure and values
+ * Made compatible with both internal validation and external test imports
+ */
+export function validateAppSettings(
+  config: AppSettings,
+): ConfigValidationResult {
+  // Delegated to the internal function implementation
+  return validateAppSettingsImpl(config);
+}
+
+/**
  * DND-Toolkit required environment variables
  * These must be present for the app to function properly
  * 
@@ -144,7 +155,9 @@ function validateEnvironmentVariables(
 /**
  * Validate app settings structure for DND-Toolkit
  */
-function validateAppSettings(config: AppSettings): ConfigValidationResult {
+// Note: validateAppSettings function is now defined at the top,
+// this is just the implementation
+function validateAppSettingsImpl(config: AppSettings): ConfigValidationResult {
   const result: ConfigValidationResult = {
     valid: true,
     errors: [],
