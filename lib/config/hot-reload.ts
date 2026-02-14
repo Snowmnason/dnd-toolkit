@@ -20,6 +20,7 @@
  */
 
 import { logger } from "@/lib/utils/logger";
+import { createHash } from "crypto";
 import { validateAppSettings } from "./config-validator";
 import type { AppSettings } from "./loader";
 import { CURRENT_CONFIG_VERSION, migrateConfig } from "./migrations";
@@ -32,6 +33,35 @@ interface HotReloadOptions {
 }
 
 /**
+ * Deterministic deep-equal comparison for config objects.
+ * Uses stable JSON serialization to avoid property-order issues.
+ */
+function deepEqual(a: any, b: any): boolean {
+  // Stringify with sorted keys for deterministic comparison
+  const stringify = (obj: any): string => {
+    try {
+      return JSON.stringify(obj, Object.keys(obj).sort());
+    } catch {
+      return String(obj);
+    }
+  };
+  return stringify(a) === stringify(b);
+}
+
+/**
+ * Compute SHA256 hash of content string for change detection.
+ * Used as fallback when Last-Modified header is unavailable.
+ */
+function hashContent(content: string): string {
+  try {
+    return createHash('sha256').update(content).digest('hex');
+  } catch {
+    // Fallback to length-based hash if crypto not available
+    return `len:${content.length}:${content.charCodeAt(0) || 0}`;
+  }
+}
+
+/**
  * ConfigHotReload: Watches config file for changes and applies without restart.
  * Full pipeline: load → migrate → merge platforms → validate.
  */
@@ -40,6 +70,7 @@ export class ConfigHotReload {
   private currentConfig: AppSettings;
   private listeners: ((config: AppSettings) => void)[] = [];
   private lastFileModified: string | null = null; // Last-Modified header value
+  private lastContentHash: string | null = null; // SHA256 hash of content (fallback change detection)
   private pollTimeout: ReturnType<typeof setTimeout> | null = null;
   private debounceTimeout: ReturnType<typeof setTimeout> | null = null;
   private pendingConfig: AppSettings | null = null;
@@ -125,9 +156,16 @@ export class ConfigHotReload {
 
         const lastModified = response.lastModified;
 
+        // Check if file was modified using Last-Modified header or content hash
+        const fileChanged = lastModified
+          ? lastModified !== this.lastFileModified
+          : await this.checkContentHashChanged();
+
         // Only process if file was actually modified
-        if (lastModified && lastModified !== this.lastFileModified) {
-          this.lastFileModified = lastModified;
+        if (fileChanged) {
+          if (lastModified) {
+            this.lastFileModified = lastModified;
+          }
 
           // Debounce: rapid successive changes are queued and processed once
           if (this.debounceTimeout) {
@@ -143,8 +181,8 @@ export class ConfigHotReload {
               try {
                 const newConfig = this.processConfig(newContent);
 
-                // Only notify if config differs (ignore formatting changes)
-                if (JSON.stringify(this.currentConfig) !== JSON.stringify(newConfig)) {
+                // Only notify if config differs (use deterministic deep-equal)
+                if (!deepEqual(this.currentConfig, newConfig)) {
                   const oldConfig = this.currentConfig;
                   this.currentConfig = newConfig;
 
@@ -190,6 +228,7 @@ export class ConfigHotReload {
   /**
    * Fetch headers (Last-Modified) from appsettings.dev.json to detect changes efficiently.
    * Returns { lastModified } or null on failure.
+   * Note: Last-Modified may not be available on all dev servers; we fall back to content hash.
    */
   private async fetchConfigHeaders(): Promise<{ lastModified: string | null } | null> {
     try {
@@ -206,6 +245,25 @@ export class ConfigHotReload {
       return null;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Check if file content has changed by comparing content hash.
+   * Fallback method when Last-Modified header is unavailable.
+   */
+  private async checkContentHashChanged(): Promise<boolean> {
+    try {
+      const newContent = await this.loadConfigContent();
+      if (!newContent) return false;
+      const newHash = hashContent(newContent);
+      if (newHash !== this.lastContentHash) {
+        this.lastContentHash = newHash;
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
     }
   }
 
@@ -305,6 +363,9 @@ export class ConfigHotReload {
   /**
    * Check if running in development mode.
    * Uses a simple check: avoid circular imports by detecting context.
+   * 
+   * Note: Hot-reload is intentionally a no-op in production.
+   * On native platforms, loadConfigContent() returns null (not yet supported).
    */
   private isDevelopmentMode(): boolean {
     // Check environment variable

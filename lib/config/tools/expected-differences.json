@@ -1,0 +1,18 @@
+{
+  "environment": "Dev uses development mode for detailed logging; production uses production mode for performance",
+  "features.consoleLogging": "Dev enables console logging for debugging; production disables for performance",
+  "features.devBypass": "Dev enables authentication bypass for testing; production MUST be false for security",
+  "features.mockData": "Dev enables mock data for testing features; production MUST be false to serve real data",
+  "overrides.verboseErrorMessages": "Dev enables detailed error messages for debugging; production hides sensitive info for security",
+  "devTools.enableConsoleLogger": "Dev enables verbose console logging; production disables to avoid clutter",
+  "devTools.enableNetworkLogger": "Dev enables network request/response logging; production disables for performance",
+  "devTools.enablePerformanceLogger": "Dev enables performance metrics logging; production disables to reduce overhead",
+  "devTools.enableReduxDevTools": "Dev enables Redux DevTools integration; production disables",
+  "devTools.enableReactDevTools": "Dev enables React DevTools integration; production disables",
+  "featureFlags.loggerCategories.categories": "Dev enables all logger categories for visibility; production filters to essential categories",
+  "featureFlags.debugLogs.enabled": "Dev may enable debug logs; production typically disables",
+  "thresholds.slowScreenMs": "Dev may use different thresholds for testing; production uses final tuned values",
+  "thresholds.slowRequestMs": "Dev may use different thresholds for testing; production uses final tuned values",
+  "network.pingIntervalMs": "Dev may use different intervals for testing; production uses optimal values",
+  "network.retryDelayMs": "Dev may use different delays for faster testing; production uses longer delays for resilience"
+}

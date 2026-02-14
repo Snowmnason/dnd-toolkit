@@ -56,12 +56,17 @@ export const migrateV1ToV2 = (config: any): any => {
 /**
  * Registry of migration functions in order.
  * Migrations are applied in sequence: v1→v2, v2→v3, etc.
+ * 
+ * Currently version 1 is the current version. When a real v2 migration is needed:
+ * 1. Uncomment/add [2, migrateV1ToV2] below
+ * 2. Increment CURRENT_CONFIG_VERSION to 2
+ * 3. Implement the actual migration logic in migrateV1ToV2()
  */
-const MIGRATION_CHAIN = [
+const MIGRATION_CHAIN: Array<[number, (config: any) => any]> = [
   // [targetVersion, migrationFunction]
-  [2, migrateV1ToV2],
+  // [2, migrateV1ToV2], // Uncomment when v2 is introduced
   // Add more [targetVersion, migrationFunction] pairs as new versions are introduced
-] as const;
+];
 
 /**
  * Migrate config from detected version to target version.

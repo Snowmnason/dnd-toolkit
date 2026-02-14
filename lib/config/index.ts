@@ -23,3 +23,9 @@ export {
     createDevTimer, devAssert, isDevBypassEnabled, useDevConsole
 } from "./dev-only";
 
+// Tools: Schema drift detection and config comparison
+export {
+    validateConfigSchema, getConfigDiff, mapExpectedDifferences
+} from "./tools/config-diff";
+export type { SchemaIssue, DiffEntry } from "./tools/config-diff";
+

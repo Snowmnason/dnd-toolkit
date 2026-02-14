@@ -244,6 +244,112 @@ This is **distinct** from `lib/storage/cache-versioning.ts`:
 | **Backward Compat** | Migrations for old configs | Migrations for old storage entries    |
 | **Dependencies**    | None                       | Depends on cache-versioning.ts        |
 
+## Schema Drift Detection (tools)
+
+The `lib/config/tools` submodule provides schema validation to catch drift (missing/extra fields) between `appsettings.dev.json` and `appsettings.json` **before code is committed**.
+
+### Why
+
+Managing two configuration files without tooling leads to **schema drift**:
+- Field added to dev config but forgotten in production config
+- Missing fields cause silent runtime failures instead of clear validation errors
+- Hard to spot differences without manual JSON comparison
+
+### How
+
+#### Manual Validation
+
+Run anytime during development:
+
+```bash
+npm run config:validate
+```
+
+Output shows:
+- Schema validation (fields match or mismatch)
+- Field-level differences (values that differ between dev and prod)
+- Expected vs. unexpected differences (documented intentional changes)
+
+Example:
+
+```
+✅ SCHEMA VALID - Both configs have identical structure
+
+5 Field Differences Found (all expected)
+✅ features.devBypass:      true → false
+✅ environment:        development → production
+```
+
+#### CI Validation and Local Checks
+
+Config validation is enforced in CI via the GitHub Actions workflow (`.github/workflows/config-validate.yml`) which runs on pull requests and protected branches. CI runs `npm run config:validate` in strict mode and will fail the PR check on unexpected differences or schema errors.
+
+For fast, local feedback run:
+
+```bash
+npm run config:validate
+```
+
+The validator supports multiple modes for different validation depths:
+
+- **Raw JSON (default)** — Fast file-level comparison
+- **`--use-migrations`** — Includes config version migrations and normalization
+- **`--use-loader`** — Full runtime shape (requires React Native; for local development)
+
+Example:
+```bash
+npm run config:validate                    # Default: raw files
+npm run config:validate -- --use-migrations # With version migrations
+npm run config:validate -- --use-loader     # Full runtime (local only)
+```
+
+Adding a local pre-commit hook is optional for teams that want immediate blocking behavior on commits; however, CI is the authoritative enforcement point.
+
+#### CI Validation
+
+GitHub Actions workflow (`.github/workflows/config-validate.yml`) runs on PRs:
+- Triggers when config files or tools change
+- Strict mode: blocks merge if any unexpected differences exist
+- Prevents schema drift from being merged
+
+### Expected Differences
+
+Some fields intentionally differ between dev and prod (documented in `lib/config/tools/expected-differences.json`):
+
+| Field | Dev | Prod | Reason |
+|-------|-----|------|--------|
+| `environment` | development | production | Mode-specific logging and features |
+| `features.devBypass` | true | **false** | Auth bypass for testing only |
+| `features.mockData` | true | **false** | Mock data for testing only |
+| `devTools.*` | true | false | Dev tools disabled in production |
+| `overrides.verboseErrorMessages` | true | false | Hide sensitive info in production |
+| `thresholds.slowScreenMs` | varies | varies | Different testing vs. production values |
+
+All documented differences show as ✅ (expected) in validation output.
+
+### Adding New Fields
+
+When adding a field to `appsettings.dev.json`:
+
+1. Add the same field to `appsettings.json` with an appropriate production value
+2. Run `npm run config:validate` to verify
+3. If the difference is intentional, add to `expected-differences.json` with a reason
+
+Example: Adding `network.retryDelayMs`
+
+Dev: `"network": { "retryDelayMs": 1000 }`
+Prod: `"network": { "retryDelayMs": 2000 }`
+
+Run validation — will show as a field difference. If intentional, add to expected-differences:
+
+```json
+{
+  "network.retryDelayMs": "Dev uses short delays for faster iteration; production uses longer delays for stability"
+}
+```
+
+See [Config Diff Tool Usage Guide](../../docs/issues/MileStone%202/Tier%203/192%20-%20Config%20Diff%20Tool/USAGE_GUIDE.md) for detailed examples and troubleshooting.
+
 ## API Reference
 
 ### Loader (`loader.ts`)
@@ -723,7 +829,11 @@ interface AppSettings {
 | `config-validator.ts` | Startup validation of app settings and environment variables | `validateConfig()`, `logValidationResults()`, `ConfigValidationResult`       |
 | `dev-only.ts`         | Safe dev-only utilities with no-op production versions       | `useDevConsole()`, `isDevBypassEnabled()`, `devAssert()`, `createDevTimer()` |
 | `hot-reload.ts`       | Development-only config file hot-reload system               | `initializeHotReload()`, `getHotReload()`, `isHotReloadAvailable()`, `ConfigHotReload` |
-| `index.ts`            | Barrel export for public API                                 | All exports from loader, validator, dev-only, hot-reload                     |
+| `tools/config-diff.ts` | Schema drift detection between dev and prod configs          | `validateConfigSchema()`, `getConfigDiff()`, `mapExpectedDifferences()`       |
+| `tools/expected-differences.json` | Documented intentional differences between env configs | Static JSON mapping of expected field differences with rationale            |
+| `tools/run-config-validate.ts` | CLI tool for config validation                        | Entry point for `npm run config:validate` command                             |
+| `tools/index.ts`      | Barrel export for tools submodule                            | All exports from config-diff                                                 |
+| `index.ts`            | Barrel export for public API                                 | All exports from loader, validator, dev-only, hot-reload, tools             |
 
 ## Testing
 
