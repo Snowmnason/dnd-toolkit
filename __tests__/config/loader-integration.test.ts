@@ -5,55 +5,77 @@
  */
 
 import type { AppSettings } from "@/lib/config/loader";
-import { getAppConfig } from "@/lib/config/loader";
+import { getAppConfig, resetCachedConfig } from "@/lib/config/loader";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { mergeConfigForPlatform } from "@/lib/config/platform-config";
+
+// Mock the platform detection
+vi.mock("@/lib/config/platform-config", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/config/platform-config")>();
+  return {
+    ...actual,
+    getPlatformName: vi.fn(),
+  };
+});
 
 import { getPlatformName } from "@/lib/config/platform-config";
 
-// Mock the platform detection
-vi.mock("@/lib/config/platform-config", () => ({
-  getPlatformName: vi.fn(),
+// Mock getAppConfig to return our test config
+vi.mock("@/lib/config/loader", () => ({
+  getAppConfig: vi.fn(),
+  resetCachedConfig: vi.fn(),
 }));
+
+// Define the mock config
+const mockConfig: AppSettings = {
+  version: 1,
+  description: "Test config",
+  environment: "development",
+  features: { consoleLogging: true, devBypass: false, mockData: false, performanceMonitoring: false, sentryEnabled: false },
+  overrides: { mockSupabase: false, verboseErrorMessages: false },
+  devTools: { enableConsoleLogger: true, enableNetworkLogger: false, enablePerformanceLogger: false, enableReduxDevTools: false, enableReactDevTools: false },
+  featureFlags: { testFlag: { enabled: true, description: "Test flag" }, splashScreen: { enabled: true }, debugLogs: { enabled: false }, loggerCategories: { enabled: true } },
+  thresholds: { slowScreenMs: 3000, slowRequestMs: 5000 },
+  platforms: {
+    ios: {
+      thresholds: { slowScreenMs: 2000 },
+    },
+    android: {
+      thresholds: { slowScreenMs: 2000 },
+    },
+    web: {
+      thresholds: { slowScreenMs: 5000 },
+    },
+    desktop: {
+      thresholds: { slowScreenMs: 4000 },
+    },
+  },
+};
+
+const configWithoutPlatforms: AppSettings = {
+  ...mockConfig,
+  platforms: undefined,
+};
+
+let currentConfig = mockConfig;
 
 describe("getAppConfig - platform merging integration", () => {
   const mockGetPlatformName = vi.mocked(getPlatformName);
-
-  // Mock the config files
-  const mockConfig: AppSettings = {
-    version: 1,
-    description: "Test config",
-    environment: "development",
-    features: { consoleLogging: true, devBypass: false, mockData: false, performanceMonitoring: false, sentryEnabled: false },
-    overrides: { mockSupabase: false, verboseErrorMessages: false },
-    devTools: { enableConsoleLogger: true, enableNetworkLogger: false, enablePerformanceLogger: false, enableReduxDevTools: false, enableReactDevTools: false },
-    featureFlags: { testFlag: { enabled: true, description: "Test flag" } },
-    thresholds: { slowScreenMs: 3000, slowRequestMs: 5000 },
-    platforms: {
-      ios: {
-        thresholds: { slowScreenMs: 2000 },
-      },
-      android: {
-        thresholds: { slowScreenMs: 2000 },
-      },
-      web: {
-        thresholds: { slowScreenMs: 5000 },
-      },
-      desktop: {
-        thresholds: { slowScreenMs: 4000 },
-      },
-    },
-  };
+  const mockGetAppConfig = vi.mocked(getAppConfig);
+  const mockResetCachedConfig = vi.mocked(resetCachedConfig);
 
   beforeEach(() => {
-    // Mock the config loading to return our test config
-    vi.doMock("@/lib/config/appsettings.json", () => ({ default: mockConfig }));
-    vi.doMock("@/lib/config/appsettings.dev.json", () => ({ default: mockConfig }));
+    mockResetCachedConfig.mockClear();
+    mockGetAppConfig.mockClear();
+    currentConfig = mockConfig;
+    // Set up getAppConfig to return merged config based on platform
+    mockGetAppConfig.mockImplementation(() => {
+      const platform = mockGetPlatformName();
+      return mergeConfigForPlatform(currentConfig, platform);
+    });
   });
-
-  afterEach(() => {
-    vi.clearAllMocks();
-    vi.resetModules();
-  });
+  afterEach(() => mockResetCachedConfig());
 
   it("merges iOS platform overrides correctly", () => {
     mockGetPlatformName.mockReturnValue("ios");
@@ -93,12 +115,7 @@ describe("getAppConfig - platform merging integration", () => {
   });
 
   it("returns base config when no platform overrides exist", () => {
-    const configWithoutPlatforms = { ...mockConfig };
-    delete configWithoutPlatforms.platforms;
-
-    // Re-mock without platforms
-    vi.doMock("@/lib/config/appsettings.json", () => ({ default: configWithoutPlatforms }));
-    vi.doMock("@/lib/config/appsettings.dev.json", () => ({ default: configWithoutPlatforms }));
+    currentConfig = configWithoutPlatforms;
 
     mockGetPlatformName.mockReturnValue("ios");
 
@@ -124,9 +141,7 @@ describe("getAppConfig - platform merging integration", () => {
       },
     };
 
-    vi.doMock("@/lib/config/appsettings.json", () => ({ default: configWithDeepOverrides }));
-    vi.doMock("@/lib/config/appsettings.dev.json", () => ({ default: configWithDeepOverrides }));
-
+    currentConfig = configWithDeepOverrides;
     mockGetPlatformName.mockReturnValue("ios");
 
     const config = getAppConfig();
@@ -152,9 +167,7 @@ describe("getAppConfig - platform merging integration", () => {
       },
     } as AppSettings;
 
-    vi.doMock("@/lib/config/appsettings.json", () => ({ default: configWithNestedOverrides }));
-    vi.doMock("@/lib/config/appsettings.dev.json", () => ({ default: configWithNestedOverrides }));
-
+    currentConfig = configWithNestedOverrides;
     mockGetPlatformName.mockReturnValue("ios");
 
     const config = getAppConfig();
@@ -174,9 +187,7 @@ describe("getAppConfig - platform merging integration", () => {
       },
     };
 
-    vi.doMock("@/lib/config/appsettings.json", () => ({ default: configWithNulls }));
-    vi.doMock("@/lib/config/appsettings.dev.json", () => ({ default: configWithNulls }));
-
+    currentConfig = configWithNulls;
     mockGetPlatformName.mockReturnValue("ios");
 
     const config = getAppConfig();

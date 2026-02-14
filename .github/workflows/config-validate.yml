@@ -1,0 +1,45 @@
+name: Config Schema Validation
+
+on:
+  pull_request:
+    paths:
+      - 'config/appsettings.json'
+      - 'config/appsettings.dev.json'
+      - 'lib/config/tools/**'
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'config/appsettings.json'
+      - 'config/appsettings.dev.json'
+      - 'lib/config/tools/**'
+
+jobs:
+  validate-config:
+    runs-on: ubuntu-latest
+    name: Validate Config Schema
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # Require Node.js 18.19.0+ because the CLI uses the stabilized
+          # `--import` flag (Node >= 18.19.0). Pin the minimum patch to avoid
+          # older 18.x runners that may not support the flag.
+          node-version: '18.19.0'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate config schema
+        run: npm run config:validate
+        env:
+          STRICT_CONFIG_VALIDATION: '1'
+
+      # Reporting is handled by the `Validate config schema` step's output
+      # and GitHub Actions will mark the job as failed when that step exits non-zero.

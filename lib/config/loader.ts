@@ -126,6 +126,13 @@ export interface AppSettings {
 
 let cachedConfig: AppSettings | null = null;
 
+// Eagerly import migrations to ensure the migration functions are available
+// in test and runtime environments that may not resolve dynamic require() of .ts files.
+import { CURRENT_CONFIG_VERSION, migrateConfig } from './migrations';
+// Import only platform detection here; apply merging locally so tests can mock
+// platform detection without having to provide a merge helper export.
+import { getPlatformName } from './platform-config';
+
 /**
  * Get the current app settings.
  * Respects EXPO_PUBLIC_ENVIRONMENT; defaults to 'production' for safety.
@@ -191,7 +198,7 @@ export function getAppConfig(): AppSettings {
 
   // Auto-migrate config to current version
   try {
-    const { migrateConfig, CURRENT_CONFIG_VERSION } = require("./migrations");
+    // Use the eagerly-imported migration helpers
     config = migrateConfig(config, detectedVersion, CURRENT_CONFIG_VERSION);
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
@@ -209,16 +216,46 @@ export function getAppConfig(): AppSettings {
     throw new Error(migrationFailMsg);
   }
 
-  // Apply platform-specific config overrides
+  // Apply platform-specific config overrides (merge locally to keep getAppConfig sync)
   try {
-    // NOTE: We intentionally use `require()` here instead of `await import()` so that
-    // `getAppConfig()` remains fully synchronous. Making this dynamic import async would
-    // force `getAppConfig()` to become `async`, which is a breaking change for all callers
-    // and for the app's bootstrap flow. This module is small, loaded once at startup, and
-    // has no side effects beyond computing the merged config, so the synchronous require
-    // is an acceptable trade-off here.
-    const { mergeConfigForPlatform } = require("./platform-config");
-    config = mergeConfigForPlatform(config as AppSettings);
+    const targetPlatform = getPlatformName();
+
+    // If platforms section exists and platform is known, apply deep merge
+    if (config.platforms && targetPlatform !== 'unknown') {
+      const platformOverrides = (config.platforms as Record<string, Partial<AppSettings> | undefined>)[
+        targetPlatform as string
+      ];
+
+      if (platformOverrides) {
+        // Local deep merge implementation (non-mutating)
+        const deepMergeConfigs = <T extends Record<string, any>>(base: T, override: Partial<T> | undefined): T => {
+          if (!override) return { ...base };
+          const result: any = { ...base };
+
+          for (const key in override) {
+            if (!Object.prototype.hasOwnProperty.call(override, key)) continue;
+            const overrideValue = (override as any)[key];
+            if (overrideValue === null || overrideValue === undefined) continue;
+
+            if (
+              typeof overrideValue === 'object' &&
+              !Array.isArray(overrideValue) &&
+              typeof result[key] === 'object' &&
+              !Array.isArray(result[key]) &&
+              result[key] !== null
+            ) {
+              result[key] = deepMergeConfigs(result[key], overrideValue as any);
+            } else {
+              result[key] = overrideValue;
+            }
+          }
+
+          return result as T;
+        };
+
+        config = deepMergeConfigs(config as AppSettings, platformOverrides as Partial<AppSettings>);
+      }
+    }
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     const configFile =
@@ -285,4 +322,14 @@ export function isDevelopment(): boolean {
  */
 export function isProduction(): boolean {
   return (process.env.EXPO_PUBLIC_ENVIRONMENT || "production") === "production";
+}
+
+/**
+ * Reset the cached config (dev-only utility)
+ * Used by config validation tools to reload config for different environments.
+ * Not intended for production use.
+ * @internal
+ */
+export function resetCachedConfig(): void {
+  cachedConfig = null;
 }

@@ -32,6 +32,78 @@ interface HotReloadOptions {
 }
 
 /**
+ * Deterministic deep-equal comparison for config objects.
+ * Uses stable JSON serialization to avoid property-order issues.
+ */
+function deepEqual(a: any, b: any): boolean {
+  // Deterministic stable stringify that sorts object keys recursively.
+  const stableStringify = (value: any): string => {
+    try {
+      if (value === null) return "null";
+      if (value === undefined) return "undefined";
+      const t = typeof value;
+      if (t !== "object") return JSON.stringify(value);
+
+      if (Array.isArray(value)) {
+        const items = value.map((item) => stableStringify(item));
+        return `[${items.join(",")}]`;
+      }
+
+      // Plain object: sort keys and stringify recursively
+      const keys = Object.keys(value).sort();
+      const props = keys.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`);
+      return `{${props.join(",")}}`;
+    } catch {
+      return String(value);
+    }
+  };
+
+  return stableStringify(a) === stableStringify(b);
+}
+
+/**
+ * Compute SHA256 hash of content string for change detection.
+ * Used as fallback when Last-Modified header is unavailable.
+ */
+/**
+ * Compute SHA256 hash of content string for change detection.
+ * Attempts Node.js `crypto` first, then Web Crypto API, and falls back to
+ * a deterministic length-based fingerprint when neither is available.
+ */
+async function hashContent(content: string): Promise<string> {
+  try {
+    // Try Node.js crypto (dynamic require to avoid bundling in RN)
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const nodeCrypto = typeof require !== 'undefined' ? require('crypto') : null;
+      if (nodeCrypto && typeof nodeCrypto.createHash === 'function') {
+        return nodeCrypto.createHash('sha256').update(content).digest('hex');
+      }
+    } catch {
+      // ignore and try Web Crypto
+    }
+
+    // Try Web Crypto API (browser)
+    if (typeof globalThis !== 'undefined' && (globalThis as any).crypto && (globalThis as any).crypto.subtle) {
+      try {
+        const enc = new TextEncoder();
+        const data = enc.encode(content);
+        const hashBuffer = await (globalThis as any).crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+      } catch {
+        // proceed to fallback
+      }
+    }
+  } catch {
+    // fall through to deterministic fallback
+  }
+
+  // Fallback to deterministic fingerprint if crypto not available
+  return `len:${content.length}:${content.charCodeAt(0) || 0}`;
+}
+
+/**
  * ConfigHotReload: Watches config file for changes and applies without restart.
  * Full pipeline: load → migrate → merge platforms → validate.
  */
@@ -40,6 +112,7 @@ export class ConfigHotReload {
   private currentConfig: AppSettings;
   private listeners: ((config: AppSettings) => void)[] = [];
   private lastFileModified: string | null = null; // Last-Modified header value
+  private lastContentHash: string | null = null; // SHA256 hash of content (fallback change detection)
   private pollTimeout: ReturnType<typeof setTimeout> | null = null;
   private debounceTimeout: ReturnType<typeof setTimeout> | null = null;
   private pendingConfig: AppSettings | null = null;
@@ -125,9 +198,16 @@ export class ConfigHotReload {
 
         const lastModified = response.lastModified;
 
+        // Check if file was modified using Last-Modified header or content hash
+        const fileChanged = lastModified
+          ? lastModified !== this.lastFileModified
+          : await this.checkContentHashChanged();
+
         // Only process if file was actually modified
-        if (lastModified && lastModified !== this.lastFileModified) {
-          this.lastFileModified = lastModified;
+        if (fileChanged) {
+          if (lastModified) {
+            this.lastFileModified = lastModified;
+          }
 
           // Debounce: rapid successive changes are queued and processed once
           if (this.debounceTimeout) {
@@ -143,8 +223,8 @@ export class ConfigHotReload {
               try {
                 const newConfig = this.processConfig(newContent);
 
-                // Only notify if config differs (ignore formatting changes)
-                if (JSON.stringify(this.currentConfig) !== JSON.stringify(newConfig)) {
+                // Only notify if config differs (use deterministic deep-equal)
+                if (!deepEqual(this.currentConfig, newConfig)) {
                   const oldConfig = this.currentConfig;
                   this.currentConfig = newConfig;
 
@@ -190,6 +270,7 @@ export class ConfigHotReload {
   /**
    * Fetch headers (Last-Modified) from appsettings.dev.json to detect changes efficiently.
    * Returns { lastModified } or null on failure.
+   * Note: Last-Modified may not be available on all dev servers; we fall back to content hash.
    */
   private async fetchConfigHeaders(): Promise<{ lastModified: string | null } | null> {
     try {
@@ -206,6 +287,25 @@ export class ConfigHotReload {
       return null;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Check if file content has changed by comparing content hash.
+   * Fallback method when Last-Modified header is unavailable.
+   */
+  private async checkContentHashChanged(): Promise<boolean> {
+    try {
+      const newContent = await this.loadConfigContent();
+      if (!newContent) return false;
+      const newHash = await hashContent(newContent);
+      if (newHash !== this.lastContentHash) {
+        this.lastContentHash = newHash;
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
     }
   }
 
@@ -305,6 +405,9 @@ export class ConfigHotReload {
   /**
    * Check if running in development mode.
    * Uses a simple check: avoid circular imports by detecting context.
+   * 
+   * Note: Hot-reload is intentionally a no-op in production.
+   * On native platforms, loadConfigContent() returns null (not yet supported).
    */
   private isDevelopmentMode(): boolean {
     // Check environment variable

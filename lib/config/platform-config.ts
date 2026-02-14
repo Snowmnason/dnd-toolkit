@@ -13,7 +13,6 @@
  * Platforms: "web", "ios", "android", "desktop" (not Expo style)
  */
 
-import { Platform } from "react-native";
 import type { AppSettings } from "./loader";
 
 export type PlatformName = "web" | "ios" | "android" | "desktop";
@@ -38,11 +37,18 @@ export function getPlatformName(): PlatformName | "unknown" {
       return "desktop";
     }
 
-    // Detect via React Native Platform.OS
-    const os = Platform.OS;
-    if (os === "web") return "web";
-    if (os === "ios") return "ios";
-    if (os === "android") return "android";
+    // Try to detect via React Native Platform.OS if available.
+    // Use a dynamic require so bundlers/SSR won't attempt to statically parse react-native.
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const rn = require("react-native");
+      const os = rn?.Platform?.OS;
+      if (os === "web") return "web";
+      if (os === "ios") return "ios";
+      if (os === "android") return "android";
+    } catch {
+      // If react-native isn't resolvable in this environment, fall through to unknown
+    }
 
     return "unknown";
   } catch {

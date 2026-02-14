@@ -49,6 +49,14 @@ vi.mock("@/lib/storage", () => ({
     setJSON: vi.fn(),
     getJSON: vi.fn(),
     removeItem: vi.fn(),
+    getAllKeys: vi.fn().mockResolvedValue([]),
+    setItem: vi.fn(),
+    getItem: vi.fn(),
+  },
+  STORAGE_KEYS: {
+    FEATURE_FLAGS: "dnd:feature_flags:v1",
+    ENTITLEMENTS: "dnd:entitlements:v1",
+    CLOCK_INVALID: "dnd:clock_invalid",
   },
 }));
 

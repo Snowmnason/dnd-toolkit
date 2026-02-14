@@ -43,7 +43,8 @@
     "clean:deps": "node ./scripts/clean.js deps",
     "clean:cache": "node ./scripts/clean.js cache",
     "version:bump": "node ./scripts/bump-version.js",
-    "test": "vitest"
+    "test": "vitest",
+    "config:validate": "node --import tsx lib/config/tools/run-config-validate.ts"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -97,6 +98,7 @@
     "eslint-config-expo": "~10.0.0",
     "eslint-plugin-security": "^3.0.1",
     "gh-pages": "^6.3.0",
+    "tsx": "^4.21.0",
     "typescript": "~5.9.2",
     "vitest": "^4.0.18"
   },
