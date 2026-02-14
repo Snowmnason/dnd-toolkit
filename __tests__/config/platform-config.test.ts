@@ -6,16 +6,24 @@
 
 import type { AppSettings } from "@/lib/config/loader";
 import { getPlatformName, mergeConfigForPlatform } from "@/lib/config/platform-config";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Platform } from "react-native";
+
+// Mock react-native Platform
+vi.mock("react-native", () => ({
+  Platform: {
+    OS: "unknown",
+  },
+}));
 
 describe("getPlatformName", () => {
   const originalWindow = (globalThis as any).window;
-  const originalPlatform = (globalThis as any).Platform;
+  const originalPlatformOS = Platform.OS;
 
   beforeEach(() => {
     // Reset globals
     delete (globalThis as any).window;
-    delete (globalThis as any).Platform;
+    Platform.OS = "unknown";
   });
 
   afterEach(() => {
@@ -23,38 +31,36 @@ describe("getPlatformName", () => {
     if (originalWindow !== undefined) {
       (globalThis as any).window = originalWindow;
     }
-    if (originalPlatform !== undefined) {
-      (globalThis as any).Platform = originalPlatform;
-    }
+    Platform.OS = originalPlatformOS;
   });
 
   it("detects desktop (Electron) when window.electron exists", () => {
     (globalThis as any).window = { electron: {} };
-    (globalThis as any).Platform = { OS: "web" };
+    Platform.OS = "web";
 
     expect(getPlatformName()).toBe("desktop");
   });
 
   it("detects web when Platform.OS is web", () => {
-    (globalThis as any).Platform = { OS: "web" };
+    Platform.OS = "web";
 
     expect(getPlatformName()).toBe("web");
   });
 
   it("detects ios when Platform.OS is ios", () => {
-    (globalThis as any).Platform = { OS: "ios" };
+    Platform.OS = "ios";
 
     expect(getPlatformName()).toBe("ios");
   });
 
   it("detects android when Platform.OS is android", () => {
-    (globalThis as any).Platform = { OS: "android" };
+    Platform.OS = "android";
 
     expect(getPlatformName()).toBe("android");
   });
 
   it("returns unknown for unrecognized Platform.OS", () => {
-    (globalThis as any).Platform = { OS: "unknown" };
+    Platform.OS = "unknown";
 
     expect(getPlatformName()).toBe("unknown");
   });
@@ -64,11 +70,11 @@ describe("getPlatformName", () => {
   });
 
   it("returns unknown when Platform.OS throws", () => {
-    (globalThis as any).Platform = {
-      get OS() {
+    Object.defineProperty(Platform, "OS", {
+      get: () => {
         throw new Error("Platform unavailable");
       },
-    };
+    });
 
     expect(getPlatformName()).toBe("unknown");
   });

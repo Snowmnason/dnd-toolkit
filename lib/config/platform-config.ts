@@ -34,7 +34,7 @@ export type PlatformName = "web" | "ios" | "android" | "desktop";
 export function getPlatformName(): PlatformName | "unknown" {
   try {
     // Detect Electron
-    if (typeof window !== "undefined" && (window as any).electron !== undefined) {
+    if (typeof window !== "undefined" && "electron" in window && window.electron !== undefined) {
       return "desktop";
     }
 
@@ -69,7 +69,7 @@ function deepMergeConfigs<T extends Record<string, any>>(
   base: T,
   override: Partial<T> | undefined,
 ): T {
-  if (!override) return base;
+  if (!override) return { ...base };
 
   const result = { ...base };
 
@@ -128,7 +128,7 @@ export function mergeConfigForPlatform(
 
   // If no platforms section or unknown platform, return config as-is
   if (!config.platforms || targetPlatform === "unknown") {
-    return config;
+    return { ...config };
   }
 
   // Get platform-specific overrides (if any)
@@ -137,7 +137,7 @@ export function mergeConfigForPlatform(
   ];
 
   if (!platformOverrides) {
-    return config;
+    return { ...config };
   }
 
   // Merge base config + platform overrides

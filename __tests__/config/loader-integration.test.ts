@@ -31,19 +31,19 @@ describe("getAppConfig - platform merging integration", () => {
     platforms: {
       ios: {
         thresholds: { slowScreenMs: 2000 },
-        description: "iOS: stricter thresholds for slower devices",
+        platformNotes: "iOS: stricter thresholds for slower devices",
       },
       android: {
         thresholds: { slowScreenMs: 2000 },
-        description: "Android: stricter thresholds for slower devices",
+        platformNotes: "Android: stricter thresholds for slower devices",
       },
       web: {
         thresholds: { slowScreenMs: 5000 },
-        description: "Web: more lenient thresholds for desktop browsers",
+        platformNotes: "Web: more lenient thresholds for desktop browsers",
       },
       desktop: {
         thresholds: { slowScreenMs: 4000 },
-        description: "Desktop: moderate thresholds for native performance",
+        platformNotes: "Desktop: moderate thresholds for native performance",
       },
     },
   };
@@ -56,6 +56,7 @@ describe("getAppConfig - platform merging integration", () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
   });
 
   it("merges iOS platform overrides correctly", () => {
