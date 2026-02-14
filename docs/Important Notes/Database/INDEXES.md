@@ -63,7 +63,14 @@ All indexes documented here match migrations 001–004. Source of truth: `supaba
 | Index | Columns | Type | Notes |
 | --- | --- | --- | --- |
 | `feature_flags_pkey` | `flag_name` | PK (btree) | Primary key (text, not uuid) |
-| `idx_feature_flags_updated_at` | `updated_at DESC` | btree | Recently modified flags |
+| `idx_feature_flags_flag_name` | `flag_name` | btree | Quick flag lookups by name |
+| `idx_feature_flags_enabled` | `enabled` | btree | Filter flagsby enabled state |
+| `idx_feature_flags_kind` | `kind` | btree | Filter by kind (boolean, string, entitlement, etc.) |
+| `idx_feature_flags_updated_at` | `updated_at DESC` | btree | Recently modified flags (admin dashboards) |
+| `idx_feature_flags_created_at` | `created_at DESC` | btree | Chronological flag history |
+| `idx_feature_flags_depends_on` | `depends_on` | GIN | Dependency resolution (text[] array) |
+| `idx_feature_flags_condition_logic_keys` | `condition_logic` | GIN (jsonb_path_ops) | Advanced condition tree lookup (Phase 3) |
+| `idx_feature_flags_metadata_keys` | `metadata` | GIN (jsonb_path_ops) | Nested configuration lookup (categories, options, etc.) |
 
 ### feature_flag.entitlements
 
@@ -71,32 +78,38 @@ All indexes documented here match migrations 001–004. Source of truth: `supaba
 | --- | --- | --- | --- |
 | `entitlements_pkey` | `id` | PK (btree) | Primary key |
 | `entitlements_user_key_unique` | `(user_id, key)` | UNIQUE (btree) | One entitlement per user+key |
-| `one_org_entitlement_per_key` | `key` WHERE `user_id IS NULL` | UNIQUE partial | Org-wide uniqueness |
+| `one_org_entitlement_per_key` | `key` WHERE `user_id IS NULL` | UNIQUE partial | Org-wide uniqueness (one per key) |
 | `idx_entitlements_user_id` | `user_id` | btree | Entitlements by user |
 | `idx_entitlements_key` | `key` | btree | Users with a specific entitlement |
-| `idx_entitlements_expires_at` | `expires_at` | btree | Expiration cleanup |
+| `idx_entitlements_expires_at` | `expires_at` | btree | Expiration cleanup queries |
+| `idx_entitlements_is_active` | `is_active` | btree | Filter by active/inactive |
 | `idx_entitlements_active` | `user_id` WHERE `is_active = true` | btree (partial) | Active entitlements only |
+| `idx_entitlements_user_active` | `(user_id, is_active)` | btree | Composite: user + status (common path) |
+| `idx_entitlements_user_key` | `(user_id, key)` | btree | Composite for unique constraint |
 
 ### feature_flag.feature_flag_overrides
 
 | Index | Columns | Type | Notes |
 | --- | --- | --- | --- |
 | `overrides_pkey` | `id` | PK (btree) | Primary key |
-| `idx_overrides_user_flag` | `(user_id, flag_name)` | UNIQUE (btree) | One override per user+flag |
 | `idx_overrides_user_id` | `user_id` | btree | Overrides by user |
+| `idx_overrides_flag_name` | `flag_name` | btree | Overrides by flag |
 | `idx_overrides_expires_at` | `expires_at` | btree | Expiration cleanup |
-| `idx_overrides_active` | `user_id` WHERE `revoked = false` | btree (partial) | Active overrides only |
+| `idx_overrides_revoked` | `revoked` | btree | Filter revoked status |
+| `idx_overrides_active` | `user_id` WHERE `revoked = false` | btree (partial) | Active (non-revoked) overrides |
+| `idx_overrides_user_flag` | `(user_id, flag_name)` | UNIQUE (btree) | One override per user+flag |
 
 ### feature_flag.entitlements_overrides
 
 | Index | Columns | Type | Notes |
 | --- | --- | --- | --- |
 | `entitlements_overrides_pkey` | `id` | PK (btree) | Primary key |
-| `entitlements_overrides_user_key_unique` | `(user_id, entitlement_key)` | UNIQUE (btree) | One override per user+key |
 | `idx_entitlements_overrides_user_id` | `user_id` | btree | Overrides by user |
+| `idx_entitlements_overrides_key` | `entitlement_key` | btree | Overrides by entitlement key (bulk ops) |
 | `idx_entitlements_overrides_expires_at` | `expires_at` | btree | Expiration cleanup |
-| `idx_entitlements_overrides_key` | `entitlement_key` | btree | Bulk ops by key |
-| `idx_entitlements_overrides_active` | `user_id` WHERE `revoked = false` | btree (partial) | Active overrides only |
+| `idx_entitlements_overrides_revoked` | `revoked` | btree | Filter revoked status |
+| `idx_entitlements_overrides_active` | `user_id` WHERE `revoked = false` | btree (partial) | Active (non-revoked) overrides |
+| `idx_entitlements_overrides_user_key` | `(user_id, entitlement_key)` | UNIQUE (btree) | One override per user+key |
 
 ### feature_flag.feature_flag_rollouts
 
@@ -108,6 +121,8 @@ All indexes documented here match migrations 001–004. Source of truth: `supaba
 | `idx_rollouts_flag_name_active` | `(flag_name, is_active)` | btree | Filter active by flag |
 | `idx_rollouts_is_active` | `is_active` | btree | All active/inactive rollouts |
 | `idx_rollouts_active_time` | `flag_name` WHERE `is_active = true` | btree (partial) | Active rollouts only |
+| `idx_rollouts_created_at` | `created_at DESC` | btree | Rollout history/audit trail |
+| `idx_rollouts_updated_at` | `updated_at DESC` | btree | Cache invalidation support |
 
 ---
 

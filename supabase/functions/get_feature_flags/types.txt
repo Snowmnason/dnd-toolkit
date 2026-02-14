@@ -11,6 +11,12 @@ export type OverrideTargetType = "flag" | "entitlement";
 export interface FeatureFlagRow {
   flag_name: string;
   enabled: boolean;
+  /** Optional list of dependent flag names */
+  depends_on?: string[] | null;
+  /** Advanced condition tree (Phase 3) stored as JSON */
+  condition_logic?: Record<string, any> | null;
+  /** Optional structured metadata for nested configurations (e.g., logger categories) */
+  metadata?: Record<string, any> | null;
   kind: string;
   description?: string;
   created_at: string;

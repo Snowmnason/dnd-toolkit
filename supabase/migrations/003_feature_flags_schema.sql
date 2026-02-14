@@ -51,6 +51,15 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA feature_flags
 CREATE TABLE feature_flags.feature_flags (
   flag_name   text        NOT NULL,
   enabled     boolean     NOT NULL DEFAULT false,
+  -- Optional: list of other flags this flag depends on (array of flag names)
+  depends_on  text[]      NULL,
+  -- Optional: advanced condition logic stored as JSON (Phase 3)
+  -- Stores the same structure as `conditionLogic` in app config (operator, conditions, etc.)
+  condition_logic jsonb   NULL,
+  -- Optional: structured metadata for feature flags with nested configurations
+  -- Stores arbitrary settings like logger categories, feature options, etc.
+  -- Example: { "categories": { "auth": true, "api": false, ... } }
+  metadata    jsonb       NULL,
   kind        text        NOT NULL,   -- 'boolean', 'string', 'percentage', 'entitlement'
   description text        NULL,
   created_at  timestamptz NOT NULL DEFAULT now(),
@@ -173,6 +182,18 @@ CREATE TABLE feature_flags.feature_flag_rollouts (
 -- feature_flags: Recently modified flags (admin dashboard sorting)
 CREATE INDEX idx_feature_flags_updated_at
   ON feature_flags.feature_flags USING btree (updated_at DESC);
+
+-- For quick lookup of dependencies (contains operator on text[])
+CREATE INDEX IF NOT EXISTS idx_feature_flags_depends_on
+  ON feature_flags.feature_flags USING GIN (depends_on);
+
+-- Optional: index to search into condition logic if needed (example: existence of keys)
+CREATE INDEX IF NOT EXISTS idx_feature_flags_condition_logic_keys
+  ON feature_flags.feature_flags USING GIN (condition_logic jsonb_path_ops);
+
+-- Optional: index to search within metadata JSON structure (nested configurations)
+CREATE INDEX IF NOT EXISTS idx_feature_flags_metadata_keys
+  ON feature_flags.feature_flags USING GIN (metadata jsonb_path_ops);
 
 -- entitlements: Find all entitlements for a user
 CREATE INDEX idx_entitlements_user_id
@@ -432,6 +453,9 @@ COMMENT ON COLUMN feature_flags.feature_flag_overrides.revoked IS
 
 COMMENT ON COLUMN feature_flags.feature_flag_overrides.reason IS
   'Admin notes explaining why this override was applied (for audit and future reference).';
+
+COMMENT ON COLUMN feature_flags.feature_flags.metadata IS
+  'Optional structured metadata for nested configurations. Stores arbitrary JSON payloads like feature options, category toggles, etc. Example: { "categories": { "auth": true, "api": false } }';
 
 COMMENT ON COLUMN feature_flags.entitlements_overrides.is_active IS
   'Override state. true = force grant, false = force revoke.';

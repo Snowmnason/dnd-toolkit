@@ -15,6 +15,13 @@
  *   if (config.features.consoleLogging) enableLogging();
  */
 
+// Eagerly import migrations to ensure the migration functions are available
+// in test and runtime environments that may not resolve dynamic require() of .ts files.
+import { CURRENT_CONFIG_VERSION, migrateConfig } from './migrations';
+// Import only platform detection here; apply merging locally so tests can mock
+// platform detection without having to provide a merge helper export.
+import { getPlatformName } from './platform-config';
+
 export interface AppSettings {
   version: number;
   description: string;
@@ -114,6 +121,20 @@ export interface AppSettings {
       enabled: boolean;
       description?: string;
       kind?: "free" | "premium" | "beta";
+      dependsOn?: string[]; // Soft dependencies: array of flag names
+      // Phase 1: Simple conditions (AND logic)
+      conditions?: {
+        platform?: string; // 'web' | 'ios' | 'android' | 'desktop'
+        environment?: string; // 'development' | 'production'
+        userRole?: string; // Role name (e.g., 'admin', 'moderator')
+      };
+      // Phase 3: Advanced condition logic (OR, NOT, nested, custom evaluators)
+      // Supports nested logical expressions with AND/OR/NOT operators
+      conditionLogic?: {
+        operator: "AND" | "OR" | "NOT";
+        conditions?: any[]; // Nested conditions (recursive structure)
+        condition?: any; // For NOT operator (unary)
+      };
     } & Record<string, any> // Allow additional properties for specific flags
   >;
   platforms?: {
@@ -125,13 +146,6 @@ export interface AppSettings {
 }
 
 let cachedConfig: AppSettings | null = null;
-
-// Eagerly import migrations to ensure the migration functions are available
-// in test and runtime environments that may not resolve dynamic require() of .ts files.
-import { CURRENT_CONFIG_VERSION, migrateConfig } from './migrations';
-// Import only platform detection here; apply merging locally so tests can mock
-// platform detection without having to provide a merge helper export.
-import { getPlatformName } from './platform-config';
 
 /**
  * Get the current app settings.
