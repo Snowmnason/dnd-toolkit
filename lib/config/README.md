@@ -470,6 +470,87 @@ interface DevTimer {
 
 **Performance (Production):** O(1) no-op; nil overhead
 
+### Hot-Reload (`hot-reload.ts`)
+
+#### `initializeHotReload(): void`
+
+Initialize the global hot-reload instance for development. Called automatically during app kernel initialization. No-op in production.
+
+```typescript
+import { initializeHotReload } from "@/lib/config";
+
+// Called automatically in app-kernel.ts
+// Manual call only needed for testing or custom initialization
+initializeHotReload();
+```
+
+**Side Effects:** Starts polling `appsettings.dev.json` for changes every 1 second
+
+**Guards:** Only runs in development mode with fetch API available
+
+#### `getHotReload(): ConfigHotReload | null`
+
+Get the active hot-reload instance. Returns null if hot-reload is not available or not initialized.
+
+```typescript
+import { getHotReload } from "@/lib/config";
+
+const hotReload = getHotReload();
+if (hotReload) {
+  // Hot-reload is available and running
+  hotReload.subscribe((newConfig) => {
+    console.log("Config updated:", newConfig);
+  });
+}
+```
+
+**Returns:** `ConfigHotReload` instance or `null`
+
+#### `isHotReloadAvailable(): boolean`
+
+Check if hot-reload can run in the current environment.
+
+```typescript
+import { isHotReloadAvailable } from "@/lib/config";
+
+if (isHotReloadAvailable()) {
+  // Enable hot-reload dependent features
+}
+```
+
+**Returns:** `true` if development mode and fetch API available, `false` otherwise
+
+#### `ConfigHotReload` Class
+
+Main class for managing config hot-reload. Provides methods to control polling and subscribe to changes.
+
+```typescript
+interface ConfigHotReload {
+  start(): void;           // Start polling for changes
+  stop(): void;            // Stop polling and cleanup
+  checkForChanges(): void; // Manually trigger change check
+  subscribe(callback: (config: AppSettings) => void): () => void; // Subscribe to updates
+}
+```
+
+**Methods:**
+
+- `start()`: Begins polling `appsettings.dev.json` for changes
+- `stop()`: Stops polling and unsubscribes all callbacks
+- `checkForChanges()`: Immediately checks for changes (bypasses polling interval)
+- `subscribe(callback)`: Registers callback for config updates; returns unsubscribe function
+
+**Behavior:**
+
+- Polls every 1000ms by default
+- Fetches file modification time first, then full content on changes
+- Applies complete config pipeline: load → migrate → merge → validate
+- Updates global config cache used by `getAppConfig()`
+- Notifies all subscribers with new `AppSettings` object
+- Handles errors gracefully (logs but continues polling)
+
+**Performance:** Minimal overhead; polling checks modification time only, full processing only on changes
+
 ### Type Definitions
 
 #### `AppSettings`
@@ -628,11 +709,11 @@ interface AppSettings {
 
 ## Related Modules
 
-- **lib/utils/logger** - Used for config validation logging (bootstrap category)
+- **lib/utils/logger** - Used for config validation logging (bootstrap category) and hot-reload operations (bootstrap/other categories)
 - **lib/feature-flags.ts** - Higher-level feature flag utility (wraps config.featureFlags)
 - **lib/auth** - Uses config.features.mockSupabase to support mock auth in development
 - **lib/analytics** - Uses config.features.sentryEnabled to conditionally initialize error tracking
-- **lib/kernel** - Calls validateConfig during Phase 0 (critical startup validation)
+- **lib/kernel** - Calls validateConfig during Phase 0 (critical startup validation) and initializeHotReload during bootstrap
 
 ## File Breakdown
 
@@ -641,7 +722,8 @@ interface AppSettings {
 | `loader.ts`           | Environment-aware config loading and caching                 | `getAppConfig()`, `isDevelopment()`, `isProduction()`, `AppSettings`         |
 | `config-validator.ts` | Startup validation of app settings and environment variables | `validateConfig()`, `logValidationResults()`, `ConfigValidationResult`       |
 | `dev-only.ts`         | Safe dev-only utilities with no-op production versions       | `useDevConsole()`, `isDevBypassEnabled()`, `devAssert()`, `createDevTimer()` |
-| `index.ts`            | Barrel export for public API                                 | All exports from loader, validator, dev-only                                 |
+| `hot-reload.ts`       | Development-only config file hot-reload system               | `initializeHotReload()`, `getHotReload()`, `isHotReloadAvailable()`, `ConfigHotReload` |
+| `index.ts`            | Barrel export for public API                                 | All exports from loader, validator, dev-only, hot-reload                     |
 
 ## Testing
 
@@ -685,7 +767,12 @@ Add test cases to a test guide in `docs/A Testing Guide/config-testing-guide.md`
 - Dev utility no-op behavior in production
 - Feature flag schema validation
 - Logger category validation
+- Hot-reload availability checks (development vs production)
+- Config file polling and change detection
+- Subscriber notification on config updates
+- Error handling during config processing
 
 ## Future Enhancements
 
 - **Config Encryption** - Encrypt sensitive fields in config files (though env vars are recommended for secrets)
+- **Hot-Reload Enhancements** - WebSocket-based file watching, selective reloading, config diffing, and multi-file support
