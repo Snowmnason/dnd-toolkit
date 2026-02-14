@@ -2,10 +2,6 @@ name: Config Schema Validation
 
 on:
   pull_request:
-    paths:
-      - 'config/appsettings.json'
-      - 'config/appsettings.dev.json'
-      - 'lib/config/tools/**'
   push:
     branches:
       - main
