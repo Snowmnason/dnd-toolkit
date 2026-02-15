@@ -79,23 +79,53 @@ curl -X POST https://your-project.supabase.co/functions/v1/get_feature_flags \
   "rollouts": {
     "new-feature": { "percentage": 50, "seed": "2026-02-07" }
   },
+  "cohorts": [
+    {
+      "id": "uuid...",
+      "slug": "beta_testers",
+      "name": "Beta Testers",
+      "description": "Early access feature testing group",
+      "percentage": 100,
+      "seed": "beta_v1",
+      "is_active": true,
+      "metadata": {}
+    },
+    {
+      "id": "uuid...",
+      "slug": "enterprise",
+      "name": "Enterprise Customers",
+      "percentage": 100,
+      "seed": null,
+      "is_active": true,
+      "metadata": {"tier": "premium"}
+    }
+  ],
+  "userCohortMemberships": [
+    {
+      "id": "uuid...",
+      "user_id": "uuid...",
+      "cohort_id": "uuid...",
+      "source": "direct",
+      "is_active": true,
+      "expires_at": null
+    }
+  ],
   "fetchedAt": 1707408600000,
   "version": "v1"
 }
 ```
 
-**Server-side Filtering:**
+**Server-side Filtering (Phase 1-4: Cohorts):**
 
-- **Feature Flags:** All returned (no filtering)
-- **Entitlements:** Only `is_active=true` and non-expired (expires_at IS NULL OR expires_at > now())
-- **Overrides:** Only non-revoked and non-expired
-- **Rollouts:** Only `is_active=true`
+- **Cohorts:** Only `is_active=true` cohorts returned; all cohorts returned (edge function doesn't filter by user membership)
+- **User Cohort Memberships:** Only `is_active=true` memberships for current user; includes explicit RLS-enforced memberships
 
-**Client-side Responsibilities:**
+**Client-side Responsibilities (Updated):**
 
-- Cache response via SecureStorage
-- Merge logic: override > entitlement > flag
-- Offline fallback to cached values
+- Cache response via SecureStorage (includes cohorts + memberships)
+- Merge logic: override > entitlement > flag (unchanged)
+- **NEW:** Cohort membership evaluation: in flag's required cohorts? (check explicit memberships OR deterministic bucketing)
+- Offline fallback to cached cohorts + memberships
 - Apply rollout rules (percentage-based bucketing)
 
 **Code Location:** `supabase/functions/get_feature_flags/`

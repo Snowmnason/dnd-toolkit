@@ -32,6 +32,7 @@ import {
 import { FlagEvaluationCache } from "./cache";
 import { evaluateConditions, type FlagContext } from "./conditions";
 import { isInRolloutMemoized } from "./rollout";
+import { isUserInCohort } from "./cohorts";
 
 // ==========================================
 // Types
@@ -99,6 +100,43 @@ export interface CachedRolloutConfig {
 }
 
 /**
+ * Phase 3: Cached cohort row from Edge Function
+ * (mirrors CohortRow from supabase/functions/get_feature_flags/types.ts)
+ */
+export interface CachedCohort {
+  id: string; // UUID
+  slug: string; // Unique identifier for cohorts field in flag config
+  name: string;
+  description?: string;
+  percentage: number; // 0-100; percentage of users in cohort for bucketing
+  seed?: string; // Optional seed for deterministic bucketing
+  is_active: boolean;
+  metadata?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Phase 3: Cached user cohort membership from Edge Function
+ * (mirrors UserCohortMembershipRow from supabase/functions/get_feature_flags/types.ts)
+ */
+export interface CachedUserCohortMembership {
+  id: string; // UUID
+  user_id: string; // UUID
+  cohort_id: string; // UUID
+  cohort_slug?: string; // Denormalized for convenience
+  // Source of membership as provided by the backend/edge function.
+  // Backend may use free-form values (e.g. 'admin', 'system', 'direct'),
+  // so keep this as a plain string to avoid accidental type drift.
+  source: string;
+  is_active?: boolean;
+  reason?: string; // Optional reason for membership
+  expires_at?: string; // Optional expiration date (ISO string)
+  created_at: string;
+  updated_at: string;
+}
+
+/**
  * Typed response from get_feature_flags Edge Function
  * (mirrors GetFeatureFlagsResponse from supabase/functions/get_feature_flags/types.ts)
  */
@@ -107,6 +145,9 @@ export interface GetFeatureFlagsResponse {
   entitlements: CachedEntitlement[];
   overrides: FeatureFlagOverrideRow[];
   rollouts: Record<string, CachedRolloutConfig>; // NEW: rollout config by flag name
+  cohorts?: CachedCohort[]; // Phase 3: Optional list of cohorts
+  cohort_assignments?: any[]; // Phase 3: Optional cohort assignments (for future use)
+  user_cohort_memberships?: CachedUserCohortMembership[]; // Phase 3: User's cohort memberships
   fetchedAt: number;
   version: "v1";
 }
@@ -138,6 +179,8 @@ class FeatureFlagsManagerClass {
   private remoteOverrides: Map<string, FeatureFlagOverrideRow> = new Map(); // Remote server overrides (per-user)
   private cachedEntitlements: Map<string, CachedEntitlement> = new Map(); // Cached from bootstrap + Realtime
   private cachedRollouts: Map<string, CachedRolloutConfig> = new Map(); // NEW: Rollout config for percentage-based rollouts
+  private cachedCohorts: Map<string, CachedCohort> = new Map(); // Phase 3: Cohorts (keyed by slug)
+  private cachedUserCohortMemberships: CachedUserCohortMembership[] = []; // Phase 3: User's cohort memberships
   private evaluationCache: FlagEvaluationCache = new FlagEvaluationCache(); // Phase 2: LRU cache for isEnabledWithContext results
   private subscribers: Set<FlagsSubscriber> = new Set();
   private bootstrapped = false;
@@ -247,6 +290,8 @@ class FeatureFlagsManagerClass {
         overrides: allOverrides,
         entitlements: allEntitlements,
         rollouts: allRollouts, // Extract rollout config from response (no default value)
+        cohorts: allCohorts, // Phase 3: Extract cohorts from response
+        user_cohort_memberships: allUserCohortMemberships, // Phase 3: Extract user's cohort memberships
       } = data;
 
       // Process entitlements (only cache if userId is available)
@@ -363,6 +408,130 @@ class FeatureFlagsManagerClass {
         // Load from cache for backward compatibility and offline support
         await this.loadCachedRollouts();
       }
+
+      // Phase 3: Process cohorts configuration
+      if (allCohorts && allCohorts.length > 0) {
+        try {
+          // Cache cohorts keyed by slug for easy lookup
+          this.cachedCohorts = new Map(
+            allCohorts.map((c) => [c.slug, c]),
+          );
+
+          // Cache cohorts for offline use
+          await SecureStorage.setJSON(
+            `${STORAGE_KEYS.FEATURE_FLAGS}:cohorts`,
+            Object.fromEntries(this.cachedCohorts),
+          );
+
+          logger.debug("feature_flags", "Cached cohorts", {
+            count: this.cachedCohorts.size,
+          });
+        } catch (error) {
+          logger.warn("feature_flags", "Failed to process cohorts", error);
+          await this.loadCachedCohorts();
+        }
+      } else if (allCohorts !== undefined && allCohorts !== null) {
+        // Server explicitly returned empty array (intentional disable of cohorts)
+        this.cachedCohorts = new Map();
+        try {
+          await SecureStorage.removeItem(
+            `${STORAGE_KEYS.FEATURE_FLAGS}:cohorts`,
+          );
+          logger.debug("feature_flags", "Cleared cohorts (server disabled)");
+        } catch (error) {
+          logger.warn(
+            "feature_flags",
+            "Failed to clear cached cohorts",
+            error,
+          );
+          this.cachedCohorts = new Map();
+        }
+      } else {
+        // cohorts field missing from response (old server or no cohorts configured)
+        await this.loadCachedCohorts();
+      }
+
+      // Phase 3: Process user cohort memberships
+      if (this.userId && allUserCohortMemberships && allUserCohortMemberships.length > 0) {
+        try {
+          // Enrich memberships with cohort_slug if missing (for offline/partial responses)
+          // This ensures _resolveCohortSlug() can find the slug from cohort_id lookup
+          this.cachedUserCohortMemberships = allUserCohortMemberships.map((m) => {
+            // If cohort_slug is already present, keep the membership as-is
+            if (m.cohort_slug) {
+              return m;
+            }
+
+            // Otherwise, try to resolve slug from cohort_id
+            if (m.cohort_id) {
+              for (const [slug, cohort] of this.cachedCohorts.entries()) {
+                if (cohort.id === m.cohort_id) {
+                  // Return enriched membership with resolved slug
+                  logger.debug(
+                    "feature_flags",
+                    `Enriched membership with cohort_slug: ${m.cohort_id} → ${slug}`,
+                  );
+                  return {
+                    ...m,
+                    cohort_slug: slug,
+                  };
+                }
+              }
+            }
+
+            // Return membership as-is if slug cannot be resolved (will be handled by _resolveCohortSlug)
+            return m;
+          });
+
+          // Cache memberships for offline use
+          await SecureStorage.setJSON(
+            `${STORAGE_KEYS.FEATURE_FLAGS}:user_cohort_memberships:${this.userId}`,
+            this.cachedUserCohortMemberships,
+          );
+
+          logger.debug(
+            "feature_flags",
+            "Cached user cohort memberships",
+            {
+              count: this.cachedUserCohortMemberships.length,
+            },
+          );
+        } catch (error) {
+          logger.warn(
+            "feature_flags",
+            "Failed to process user cohort memberships",
+            error,
+          );
+          await this.loadCachedUserCohortMemberships();
+        }
+      } else if (
+        this.userId &&
+        allUserCohortMemberships !== undefined &&
+        allUserCohortMemberships !== null
+      ) {
+        // Server explicitly returned empty array (user in no cohorts)
+        this.cachedUserCohortMemberships = [];
+        try {
+          await SecureStorage.removeItem(
+            `${STORAGE_KEYS.FEATURE_FLAGS}:user_cohort_memberships:${this.userId}`,
+          );
+          logger.debug(
+            "feature_flags",
+            "Cleared user cohort memberships (user in no cohorts)",
+          );
+        } catch (error) {
+          logger.warn(
+            "feature_flags",
+            "Failed to clear cached user cohort memberships",
+            error,
+          );
+          this.cachedUserCohortMemberships = [];
+        }
+      } else {
+        // memberships field missing or userId unavailable
+        await this.loadCachedUserCohortMemberships();
+      }
+
       const newFlags: Map<string, FeatureFlagState> = new Map();
 
       if (serverFlags && serverFlags.length > 0) {
@@ -515,6 +684,75 @@ class FeatureFlagsManagerClass {
       }
     } catch (error) {
       logger.warn("feature_flags", "Failed to load cached rollouts", error);
+    }
+  }
+
+  /**
+   * Phase 3: Load cached cohorts from SecureStorage
+   */
+  private async loadCachedCohorts(): Promise<void> {
+    try {
+      const cached = await SecureStorage.getJSON<Record<string, CachedCohort>>(
+        `${STORAGE_KEYS.FEATURE_FLAGS}:cohorts`,
+      );
+      if (cached) {
+        this.cachedCohorts = new Map(Object.entries(cached));
+        logger.debug("feature_flags", "Loaded cached cohorts", {
+          count: this.cachedCohorts.size,
+        });
+      }
+    } catch (error) {
+      logger.warn("feature_flags", "Failed to load cached cohorts", error);
+    }
+  }
+
+  /**
+   * Phase 3: Load cached user cohort memberships from SecureStorage
+   */
+  private async loadCachedUserCohortMemberships(): Promise<void> {
+    try {
+      const cached = await SecureStorage.getJSON<
+        CachedUserCohortMembership[]
+      >(
+        `${STORAGE_KEYS.FEATURE_FLAGS}:user_cohort_memberships:${this.userId}`,
+      );
+      if (cached && Array.isArray(cached)) {
+        // Enrich memberships with cohort_slug if missing
+        // This handles cases where stored memberships lack cohort_slug due to offline caching
+        this.cachedUserCohortMemberships = cached.map((m) => {
+          if (m.cohort_slug) {
+            return m;
+          }
+
+          // Try to resolve slug from cohort_id
+          if (m.cohort_id && this.cachedCohorts.size > 0) {
+            for (const [slug, cohort] of this.cachedCohorts.entries()) {
+              if (cohort.id === m.cohort_id) {
+                return {
+                  ...m,
+                  cohort_slug: slug,
+                };
+              }
+            }
+          }
+
+          return m;
+        });
+
+        logger.debug(
+          "feature_flags",
+          "Loaded cached user cohort memberships",
+          {
+            count: this.cachedUserCohortMemberships.length,
+          },
+        );
+      }
+    } catch (error) {
+      logger.warn(
+        "feature_flags",
+        "Failed to load cached user cohort memberships",
+        error,
+      );
     }
   }
 
@@ -1191,11 +1429,31 @@ class FeatureFlagsManagerClass {
       // Clear rollout cache (persisted and in-memory)
       await SecureStorage.removeItem(`${STORAGE_KEYS.FEATURE_FLAGS}:rollouts`);
 
+      // Clear persisted cohorts cache and any cohort assignment map
+      try {
+        await SecureStorage.removeItem(`${STORAGE_KEYS.FEATURE_FLAGS}:cohorts`);
+        await SecureStorage.removeItem(`${STORAGE_KEYS.FEATURE_FLAGS}:cohort_assignments`);
+      } catch (error) {
+        logger.warn(
+          "feature_flags",
+          "Failed to clear persisted cohorts or cohort assignments",
+          error,
+        );
+      }
+
       // Clear entitlements cache
       if (this.userId) {
         await SecureStorage.removeItem(
           `${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`,
         );
+      }
+
+      // Clear user cohort memberships cache (user-scoped)
+      if (this.userId) {
+        await SecureStorage.removeItem(
+          `${STORAGE_KEYS.FEATURE_FLAGS}:user_cohort_memberships:${this.userId}`,
+        );
+        this.cachedUserCohortMemberships = [];
       }
 
       // Clear all override cache entries by pattern
@@ -1222,10 +1480,12 @@ class FeatureFlagsManagerClass {
 
       logger.info(
         "feature_flags",
-        "Cleared all cached flags, entitlements, and overrides",
+        "Cleared all cached flags, entitlements, overrides, cohorts, and cohort assignments",
       );
 
       this.currentFlags = new Map();
+      // Clear in-memory cohorts cache
+      this.cachedCohorts = new Map();
       this.userOverrides.clear();
       this.remoteOverrides.clear();
       this.cachedEntitlements.clear();
@@ -1483,6 +1743,12 @@ class FeatureFlagsManagerClass {
       return false;
     }
 
+    // Step 1.5: Phase 3 - Check cohort membership (allow-list, OR logic: user must be in at least ONE of the listed cohorts)
+    if (!this._checkCohorts(flagName)) {
+      memo.set(cacheKey, false);
+      return false;
+    }
+
     // Step 2: Get flag config from server-backed state, or fall back to AppSettings for schema
     const appConfig = getAppConfig();
     // eslint-disable-next-line security/detect-object-injection
@@ -1585,6 +1851,134 @@ class FeatureFlagsManagerClass {
   }
 
   /**
+   * Phase 3: Resolve cohort slug from membership
+   *
+   * Attempts to get the cohort slug in priority order:
+   * 1. From membership.cohort_slug (if denormalized in response)
+   * 2. By searching cachedCohorts for matching cohort_id
+   *
+   * This ensures explicit membership checks work even if the Edge Function
+   * response doesn't include the denormalized cohort_slug field.
+   *
+   * @param membership - User cohort membership record
+   * @returns Cohort slug if found, undefined otherwise
+   * @private
+   *
+   * @example
+   * ```ts
+   * // If membership has cohort_slug, use it directly
+   * const membership = { cohort_id: "abc-123", cohort_slug: "beta_testers", ... };
+   * _resolveCohortSlug(membership) // "beta_testers"
+   *
+   * // If membership only has cohort_id, search cachedCohorts
+   * const membership = { cohort_id: "abc-123", ... }; // No cohort_slug
+   * _resolveCohortSlug(membership) // searches cachedCohorts and returns slug if found
+   * ```
+   */
+  private _resolveCohortSlug(membership: CachedUserCohortMembership): string | undefined {
+    // Priority 1: Use denormalized cohort_slug if available
+    if (membership.cohort_slug) {
+      return membership.cohort_slug;
+    }
+
+    // Priority 2: Search cachedCohorts for matching cohort_id
+    if (membership.cohort_id) {
+      // cachedCohorts is keyed by slug, so we need to search for the matching ID
+      for (const [slug, cohort] of this.cachedCohorts.entries()) {
+        if (cohort.id === membership.cohort_id) {
+          logger.debug(
+            "feature_flags",
+            `Resolved cohort slug from ID: ${membership.cohort_id} → ${slug}`,
+          );
+          return slug;
+        }
+      }
+      // Cohort not found in cache (may be loading or invalid ID)
+      logger.warn(
+        "feature_flags",
+        `Failed to resolve cohort slug from ID: ${membership.cohort_id}`,
+      );
+    }
+
+    // No way to resolve slug
+    return undefined;
+  }
+
+  /**
+   * Phase 3: Check if user is in required cohorts
+   * Evaluates both explicit membership and deterministic bucketing
+   * Returns true if user is in ANY of the flag's assigned cohorts (OR logic)
+   *
+   * Priority:
+
+   * 1. Explicit membership (direct or invited) from cachedUserCohortMemberships
+   * 2. Deterministic bucketing via isUserInCohort(userId, cohortSlug)
+   *
+   * @returns true if user is in at least one cohort, false if no cohorts required or user not in any
+   */
+  private _checkCohorts(flagName: string): boolean {
+    // Get flag config to see which cohorts are required
+    const appConfig = getAppConfig();
+    // eslint-disable-next-line security/detect-object-injection
+    const flagConfig = appConfig.featureFlags?.[flagName];
+
+    if (!flagConfig || !flagConfig.cohorts || flagConfig.cohorts.length === 0) {
+      // No cohorts required for this flag
+      return true;
+    }
+
+    // User must be in at least one of the required cohorts
+    const requiredCohorts = flagConfig.cohorts;
+
+    // Check explicit membership first (highest priority)
+    for (const membership of this.cachedUserCohortMemberships) {
+      // Resolve cohort slug from membership (with fallback to cohort_id lookup)
+      const cohortSlug = this._resolveCohortSlug(membership);
+
+      if (
+        cohortSlug &&
+        requiredCohorts.includes(cohortSlug) &&
+        membership.is_active !== false &&
+        (!membership.expires_at || new Date(membership.expires_at) > new Date())
+      ) {
+        // User has active membership in a required cohort
+        logger.debug(
+          "feature_flags",
+          `User explicitly in cohort ${cohortSlug} for flag ${flagName}`,
+        );
+        return true;
+      }
+    }
+
+    // Check deterministic bucketing for each required cohort
+    // (Only if userId is available)
+    if (!this.userId) {
+      return false;
+    }
+
+    for (const cohortSlug of requiredCohorts) {
+      const cohort = this.cachedCohorts.get(cohortSlug);
+      if (!cohort || !cohort.is_active) {
+        // Cohort not found or inactive, skip
+        continue;
+      }
+
+      // Use isUserInCohort from lib/feature-flags/cohorts.ts
+      // This implements deterministic bucketing based on user ID and cohort seed
+      if (isUserInCohort(this.userId, cohort)) {
+        logger.debug(
+          "feature_flags",
+          `User bucketed into cohort ${cohortSlug} for flag ${flagName}`,
+        );
+        return true;
+      }
+    }
+
+    // User is not in any required cohort
+    return false;
+  }
+
+  /**
    * Validate feature flag dependencies and conditions at bootstrap
    * Checks for missing dependencies and circular references
    * Logs warnings (soft checks, doesn't block startup)
@@ -1617,6 +2011,18 @@ class FeatureFlagsManagerClass {
             "feature_flags",
             `Invalid conditionLogic for flag "${flagName}": ${validationErrors.join("; ")}`,
           );
+        }
+      }
+
+      // Phase 3: Validate cohort references
+      if (flagConfig.cohorts && Array.isArray(flagConfig.cohorts)) {
+        for (const cohortSlug of flagConfig.cohorts) {
+          if (!this.cachedCohorts.has(cohortSlug)) {
+            logger.warn(
+              "feature_flags",
+              `Flag "${flagName}" references unknown cohort "${cohortSlug}"`,
+            );
+          }
         }
       }
 

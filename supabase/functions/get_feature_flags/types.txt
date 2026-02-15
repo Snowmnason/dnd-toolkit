@@ -39,6 +39,52 @@ export interface EntitlementRow {
 }
 
 /**
+ * Cohort definition
+ */
+export interface CohortRow {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string | null;
+  percentage: number;
+  seed?: string | null;
+  is_active: boolean;
+  metadata?: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Cohort <-> Flag assignment row
+ */
+export interface CohortFlagAssignmentRow {
+  id: string;
+  flag_name: string;
+  cohort_id: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+  cohort_slug?: string | null; // populated by edge function for client convenience
+}
+
+/**
+ * Explicit user cohort membership
+ */
+export interface UserCohortMembershipRow {
+  id: string;
+  user_id: string;
+  cohort_id: string;
+  source: string; // e.g., 'admin' | 'system'
+  created_by?: string | null;
+  reason?: string | null;
+  expires_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  is_active?: boolean;
+  cohort_slug?: string | null; // populated by edge function for client convenience
+}
+
+/**
  * Feature flag override row from database (003 simplified schema, no target_type in DB)
  * target_type added synthetically by Edge Function for client compatibility
  */
@@ -93,6 +139,9 @@ export interface GetFeatureFlagsResponse {
   entitlements: EntitlementRow[];
   overrides: (FeatureFlagOverrideRow | EntitlementOverrideRow)[]; // Both flag and entitlement overrides (non-revoked, non-expired)
   rollouts: Record<string, RolloutConfigRow>; // Rollout config by flag name
+  cohorts?: CohortRow[]; // Active cohort definitions
+  cohort_assignments?: CohortFlagAssignmentRow[]; // Mapping of cohorts -> flags
+  user_cohort_memberships?: UserCohortMembershipRow[]; // Explicit memberships for requesting user
   fetchedAt: number;
   version: "v1";
 }

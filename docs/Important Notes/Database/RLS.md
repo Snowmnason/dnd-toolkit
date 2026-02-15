@@ -124,6 +124,32 @@ No INSERT policy — overrides created server-side only.
 
 No INSERT policy — rollouts created server-side only.
 
+### feature_flag.cohorts
+
+| Policy | Command | Role | Condition |
+| --- | --- | --- | --- |
+| `cohorts_authenticated_read` | SELECT | authenticated | `is_active = true` (only active cohorts visible) |
+| `cohorts_admin_all_access` | ALL | authenticated | `public.is_admin()` (admins see all, regardless of is_active) |
+
+Public read disabled — cohort definitions are admin-controlled. Client receives cohorts via edge function; filtering happens server-side.
+
+### feature_flag.user_cohort_memberships
+
+| Policy | Command | Role | Condition |
+| --- | --- | --- | --- |
+| `memberships_user_read_own` | SELECT | authenticated | `user_id = get_current_user_id() AND is_active = true` |
+| `memberships_admin_full_access` | ALL | authenticated | `public.is_admin()` |
+
+Users see only their active memberships. Admins manage all (including inactive). Membership changes trigger cache invalidation on app.
+
+### feature_flag.cohort_flag_assignments
+
+| Policy | Command | Role | Condition |
+| --- | --- | --- | --- |
+| `assignments_admin_only` | ALL | authenticated | `public.is_admin()` |
+
+No SELECT for authenticated/public — data is read by edge function (SECURITY DEFINER context) only. Assignments link flags to cohorts for edge lookups.
+
 ---
 
 ## AUDIT Schema (004)
