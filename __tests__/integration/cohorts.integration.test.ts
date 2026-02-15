@@ -3,6 +3,11 @@
  *
  * Tests database operations, RLS policies, and edge function integration.
  * These tests require a test database with cohort schema.
+ *
+ * NOTE: These tests are automatically skipped unless real Supabase test credentials
+ * are provided via TEST_SUPABASE_URL, TEST_SUPABASE_ANON_KEY, and TEST_SUPABASE_SERVICE_KEY
+ * environment variables. The fallback values will cause the tests to be skipped to prevent
+ * network calls and failures in CI/dev environments without a running local Supabase stack.
  */
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
@@ -14,29 +19,67 @@ const TEST_SUPABASE_URL = process.env.TEST_SUPABASE_URL || "http://localhost:543
 const TEST_SUPABASE_ANON_KEY = process.env.TEST_SUPABASE_ANON_KEY || "test-anon-key";
 const TEST_SUPABASE_SERVICE_KEY = process.env.TEST_SUPABASE_SERVICE_KEY || "test-service-key";
 
-// Test data
-const TEST_USER_ID = "test-user-integration";
-const TEST_ADMIN_ID = "test-admin-integration";
-const TEST_COHORT_ID = "test-cohort-integration";
+// Test data - using UUIDs as required by schema
+const TEST_USER_ID = "550e8400-e29b-41d4-a716-446655440000"; // UUID format
+const TEST_ADMIN_ID = "550e8400-e29b-41d4-a716-446655440001"; // UUID format
+const TEST_COHORT_ID = "550e8400-e29b-41d4-a716-446655440002"; // UUID format
 
-describe("Phase 7: Cohorts Integration Tests", () => {
+// Check if we have real test credentials (not fallbacks)
+const hasRealTestCredentials = () => {
+  return (
+    TEST_SUPABASE_URL !== "http://localhost:54321" &&
+    TEST_SUPABASE_ANON_KEY !== "test-anon-key" &&
+    TEST_SUPABASE_SERVICE_KEY !== "test-service-key"
+  );
+};
+
+// Skip all tests if real test credentials are not available
+const testSuite = hasRealTestCredentials()
+  ? describe
+  : describe.skip;
+
+// Warn if tests are being skipped due to missing credentials
+if (!hasRealTestCredentials()) {
+  console.warn(
+    "⚠️  Cohorts integration tests skipped: Missing real Supabase test credentials.\n" +
+    "   Set TEST_SUPABASE_URL, TEST_SUPABASE_ANON_KEY, and TEST_SUPABASE_SERVICE_KEY\n" +
+    "   environment variables to run these tests."
+  );
+}
+
+testSuite("Phase 7: Cohorts Integration Tests", () => {
   let anonClient: SupabaseClient;
   let adminClient: SupabaseClient;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     anonClient = createClient(TEST_SUPABASE_URL, TEST_SUPABASE_ANON_KEY);
     adminClient = createClient(TEST_SUPABASE_URL, TEST_SUPABASE_SERVICE_KEY);
+
+    // Create test user in public.users (required for FK constraints)
+    await adminClient
+      .from("users")
+      .upsert({
+        id: TEST_USER_ID,
+        email: "test-integration@example.com",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
   });
 
   afterAll(async () => {
     // Clean up test data
-    await adminClient.from("user_cohort_memberships").delete().eq("user_id", TEST_USER_ID);
-    await adminClient.from("cohorts").delete().eq("id", TEST_COHORT_ID);
+    await adminClient.schema("feature_flags").from("user_cohort_memberships").delete().eq("user_id", TEST_USER_ID);
+    await adminClient.schema("feature_flags").from("cohorts").delete().eq("id", TEST_COHORT_ID);
+    await adminClient.schema("feature_flags").from("cohort_flag_assignments").delete().eq("cohort_id", TEST_COHORT_ID);
+
+    // Clean up test user
+    await adminClient.from("users").delete().eq("id", TEST_USER_ID);
   });
 
   describe("Database Schema & RLS Policies", () => {
     it("should create cohort as admin", async () => {
       const { data, error } = await adminClient
+        .schema("feature_flags")
         .from("cohorts")
         .insert({
           id: TEST_COHORT_ID,
@@ -61,6 +104,7 @@ describe("Phase 7: Cohorts Integration Tests", () => {
 
     it("should reject cohort creation from anonymous user", async () => {
       const { error } = await anonClient
+        .schema("feature_flags")
         .from("cohorts")
         .insert({
           slug: "should_fail_cohort",
@@ -74,6 +118,7 @@ describe("Phase 7: Cohorts Integration Tests", () => {
 
     it("should assign user to cohort as admin", async () => {
       const { data, error } = await adminClient
+        .schema("feature_flags")
         .from("user_cohort_memberships")
         .insert({
           user_id: TEST_USER_ID,
@@ -94,9 +139,10 @@ describe("Phase 7: Cohorts Integration Tests", () => {
 
     it("should reject user assignment from anonymous user", async () => {
       const { error } = await anonClient
+        .schema("feature_flags")
         .from("user_cohort_memberships")
         .insert({
-          user_id: "some-user",
+          user_id: "550e8400-e29b-41d4-a716-446655440003", // Different UUID
           cohort_id: TEST_COHORT_ID,
           source: "direct",
         });
@@ -109,6 +155,7 @@ describe("Phase 7: Cohorts Integration Tests", () => {
       // This would require setting up auth context for TEST_USER_ID
       // For now, we'll test that admin can read all memberships
       const { data, error } = await adminClient
+        .schema("feature_flags")
         .from("user_cohort_memberships")
         .select("*")
         .eq("user_id", TEST_USER_ID);
@@ -120,6 +167,7 @@ describe("Phase 7: Cohorts Integration Tests", () => {
 
     it("should read active cohorts for anonymous users", async () => {
       const { data, error } = await anonClient
+        .schema("feature_flags")
         .from("cohorts")
         .select("*")
         .eq("is_active", true);
@@ -135,11 +183,13 @@ describe("Phase 7: Cohorts Integration Tests", () => {
     it("should not read inactive cohorts for anonymous users", async () => {
       // First mark our test cohort inactive temporarily
       await adminClient
+        .schema("feature_flags")
         .from("cohorts")
         .update({ is_active: false })
         .eq("id", TEST_COHORT_ID);
 
       const { data } = await anonClient
+        .schema("feature_flags")
         .from("cohorts")
         .select("*")
         .eq("is_active", true);
@@ -150,6 +200,7 @@ describe("Phase 7: Cohorts Integration Tests", () => {
 
       // Restore active status
       await adminClient
+        .schema("feature_flags")
         .from("cohorts")
         .update({ is_active: true })
         .eq("id", TEST_COHORT_ID);
@@ -168,9 +219,11 @@ describe("Phase 7: Cohorts Integration Tests", () => {
       }
 
       expect(data).toHaveProperty("cohorts");
-      expect(data).toHaveProperty("userCohortMemberships");
+      expect(data).toHaveProperty("cohort_assignments");
+      expect(data).toHaveProperty("user_cohort_memberships");
       expect(Array.isArray(data.cohorts)).toBe(true);
-      expect(Array.isArray(data.userCohortMemberships)).toBe(true);
+      expect(Array.isArray(data.cohort_assignments)).toBe(true);
+      expect(Array.isArray(data.user_cohort_memberships)).toBe(true);
     });
 
     it("should filter user memberships by authenticated user", async () => {
@@ -185,7 +238,7 @@ describe("Phase 7: Cohorts Integration Tests", () => {
 
       // All returned memberships should be for the authenticated user
       // (This is enforced by RLS in the edge function)
-      data.userCohortMemberships.forEach((membership: any) => {
+      data.user_cohort_memberships.forEach((membership: any) => {
         expect(membership.user_id).toBeDefined();
         // In a real test, we'd verify it matches the JWT user_id
       });
@@ -195,6 +248,7 @@ describe("Phase 7: Cohorts Integration Tests", () => {
   describe("Cohort Flag Assignments", () => {
     it("should create cohort-flag assignment as admin", async () => {
       const { data, error } = await adminClient
+        .schema("feature_flags")
         .from("cohort_flag_assignments")
         .insert({
           flag_name: "integration_test_flag",
@@ -210,6 +264,7 @@ describe("Phase 7: Cohorts Integration Tests", () => {
 
     it("should reject cohort-flag assignment from anonymous user", async () => {
       const { error } = await anonClient
+        .schema("feature_flags")
         .from("cohort_flag_assignments")
         .insert({
           flag_name: "should_fail_flag",
@@ -236,6 +291,7 @@ describe("Phase 7: Cohorts Integration Tests", () => {
   describe("Data Integrity & Constraints", () => {
     it("should enforce unique cohort slug", async () => {
       const { error } = await adminClient
+        .schema("feature_flags")
         .from("cohorts")
         .insert({
           slug: "integration_test_cohort", // Same slug as existing
@@ -249,6 +305,7 @@ describe("Phase 7: Cohorts Integration Tests", () => {
 
     it("should enforce unique user-cohort membership", async () => {
       const { error } = await adminClient
+        .schema("feature_flags")
         .from("user_cohort_memberships")
         .insert({
           user_id: TEST_USER_ID,
@@ -262,6 +319,7 @@ describe("Phase 7: Cohorts Integration Tests", () => {
 
     it("should enforce percentage bounds (0-100)", async () => {
       const { error: errorNegative } = await adminClient
+        .schema("feature_flags")
         .from("cohorts")
         .insert({
           slug: "negative_percentage",
@@ -270,6 +328,7 @@ describe("Phase 7: Cohorts Integration Tests", () => {
         });
 
       const { error: errorOver } = await adminClient
+        .schema("feature_flags")
         .from("cohorts")
         .insert({
           slug: "over_percentage",
@@ -297,7 +356,8 @@ describe("Phase 7: Cohorts Integration Tests", () => {
 
       // Check audit table (requires admin access)
       const { data } = await adminClient
-        .from("audit.audit_events")
+        .schema("audit")
+        .from("audit_events")
         .select("*")
         .eq("table_name", "cohorts")
         .eq("event_type", "insert")
@@ -309,7 +369,7 @@ describe("Phase 7: Cohorts Integration Tests", () => {
       expect(data?.[0].event_type).toBe("insert");
 
       // Clean up
-      await adminClient.from("cohorts").delete().eq("slug", testSlug);
+      await adminClient.schema("feature_flags").from("cohorts").delete().eq("slug", testSlug);
     });
   });
 });

@@ -805,13 +805,19 @@ const desktopFirst = RECOMMENDED_COHORTS.desktop_first;   // 100% (use with plat
 
 ```typescript
 interface CohortDef {
-  id: string;           // Unique cohort ID (e.g., "beta_testers")
+  slug: string;         // Public cohort identifier (e.g., "beta_testers")
   name: string;         // Display name (e.g., "Beta Testers")
   description?: string; // Human-readable description
   percentage?: number;  // 0-100; ~X% of users in cohort (undefined = 100%)
   seed?: string;        // Optional seed for rebalancing (null/undefined = default)
   metadata?: object;    // Arbitrary metadata (Phase 2+)
 }
+
+> Note: `CohortDef.slug` is the client-facing identifier used by the SDK and
+> deterministic bucketing (hashing). The database also stores an internal
+> UUID `id` for relations (`cohorts.id`). Client APIs and examples below use
+> the `slug` string (stable and human-readable). Server-side code and DB
+> relations use the UUID `id` where appropriate.
 ```
 
 ### Phase 1: Using Cohorts with Deterministic Bucketing
@@ -926,7 +932,7 @@ import { isUserInCohort } from '@/lib/feature-flags';
 const inCohort = isUserInCohort(
   "user-123",
   "beta_testers",
-  { id: "beta_testers", percentage: 20 }
+  { slug: "beta_testers", percentage: 20 }
 );
 
 if (inCohort) {
@@ -985,7 +991,7 @@ import { isUserInCohort } from '@/lib/feature-flags';
 
 describe('Cohorts', () => {
   it('should bucket users deterministically', () => {
-    const cohort = { id: "test", percentage: 50 };
+    const cohort = { slug: "test", percentage: 50 };
     const userId = "user-123";
 
     const result1 = isUserInCohort(userId, "test", cohort);
@@ -998,8 +1004,8 @@ describe('Cohorts', () => {
     const userId = "user-123";
     const seed = "v1";
 
-    const cohort10 = { id: "test", percentage: 10, seed };
-    const cohort50 = { id: "test", percentage: 50, seed };
+    const cohort10 = { slug: "test", percentage: 10, seed };
+    const cohort50 = { slug: "test", percentage: 50, seed };
 
     const inSmall = isUserInCohort(userId, "test", cohort10);
     if (inSmall) {
@@ -1009,7 +1015,7 @@ describe('Cohorts', () => {
   });
 
   it('should allow admin overrides', () => {
-    const cohort = { id: "test", percentage: 0 }; // 0% via bucketing
+    const cohort = { slug: "test", percentage: 0 }; // 0% via bucketing
     const explicitMemberships = ["test"];
 
     const result = isUserInCohort(
@@ -1030,13 +1036,13 @@ describe('Cohorts', () => {
 
 ```typescript
 // Day 1
-const canary: CohortDef = { id: "feature", percentage: 1, seed: "release" };
+const canary: CohortDef = { slug: "feature", percentage: 1, seed: "release" };
 
 // Day 2
-const earlyAdopt: CohortDef = { id: "feature", percentage: 10, seed: "release" };
+const earlyAdopt: CohortDef = { slug: "feature", percentage: 10, seed: "release" };
 
 // Day 3
-const fullRelease: CohortDef = { id: "feature", percentage: 100, seed: "release" };
+const fullRelease: CohortDef = { slug: "feature", percentage: 100, seed: "release" };
 
 // Same seed ensures no user churn
 ```
@@ -1044,8 +1050,8 @@ const fullRelease: CohortDef = { id: "feature", percentage: 100, seed: "release"
 **Pattern 2: A/B Testing (50/50 Split)**
 
 ```typescript
-const variantA: CohortDef = { id: "ui_variant_a", percentage: 50, seed: "experiment_1" };
-const variantB: CohortDef = { id: "ui_variant_b", percentage: 50, seed: "experiment_1" };
+const variantA: CohortDef = { slug: "ui_variant_a", percentage: 50, seed: "experiment_1" };
+const variantB: CohortDef = { slug: "ui_variant_b", percentage: 50, seed: "experiment_1" };
 
 const isVariantA = isUserInCohort(userId, "ui_variant_a", variantA);
 const isVariantB = isUserInCohort(userId, "ui_variant_b", variantB);
@@ -1056,8 +1062,8 @@ const isVariantB = isUserInCohort(userId, "ui_variant_b", variantB);
 **Pattern 3: Platform-Specific Features**
 
 ```typescript
-const mobileFeature: CohortDef = { id: "mobile_feature", percentage: 100 };
-const desktopFeature: CohortDef = { id: "desktop_feature", percentage: 100 };
+const mobileFeature: CohortDef = { slug: "mobile_feature", percentage: 100 };
+const desktopFeature: CohortDef = { slug: "desktop_feature", percentage: 100 };
 
 // Combined with condition (Phase 3):
 // isEnabled IF (cohort=mobile_feature AND platform=ios/android)

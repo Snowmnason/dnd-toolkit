@@ -451,11 +451,38 @@ class FeatureFlagsManagerClass {
       // Phase 3: Process user cohort memberships
       if (this.userId && allUserCohortMemberships && allUserCohortMemberships.length > 0) {
         try {
-          this.cachedUserCohortMemberships = allUserCohortMemberships;
+          // Enrich memberships with cohort_slug if missing (for offline/partial responses)
+          // This ensures _resolveCohortSlug() can find the slug from cohort_id lookup
+          this.cachedUserCohortMemberships = allUserCohortMemberships.map((m) => {
+            // If cohort_slug is already present, keep the membership as-is
+            if (m.cohort_slug) {
+              return m;
+            }
+
+            // Otherwise, try to resolve slug from cohort_id
+            if (m.cohort_id) {
+              for (const [slug, cohort] of this.cachedCohorts.entries()) {
+                if (cohort.id === m.cohort_id) {
+                  // Return enriched membership with resolved slug
+                  logger.debug(
+                    "feature_flags",
+                    `Enriched membership with cohort_slug: ${m.cohort_id} → ${slug}`,
+                  );
+                  return {
+                    ...m,
+                    cohort_slug: slug,
+                  };
+                }
+              }
+            }
+
+            // Return membership as-is if slug cannot be resolved (will be handled by _resolveCohortSlug)
+            return m;
+          });
 
           // Cache memberships for offline use
           await SecureStorage.setJSON(
-            `${STORAGE_KEYS.FEATURE_FLAGS}:user_cohort_memberships`,
+            `${STORAGE_KEYS.FEATURE_FLAGS}:user_cohort_memberships:${this.userId}`,
             this.cachedUserCohortMemberships,
           );
 
@@ -483,7 +510,7 @@ class FeatureFlagsManagerClass {
         this.cachedUserCohortMemberships = [];
         try {
           await SecureStorage.removeItem(
-            `${STORAGE_KEYS.FEATURE_FLAGS}:user_cohort_memberships`,
+            `${STORAGE_KEYS.FEATURE_FLAGS}:user_cohort_memberships:${this.userId}`,
           );
           logger.debug(
             "feature_flags",
@@ -684,10 +711,31 @@ class FeatureFlagsManagerClass {
       const cached = await SecureStorage.getJSON<
         CachedUserCohortMembership[]
       >(
-        `${STORAGE_KEYS.FEATURE_FLAGS}:user_cohort_memberships`,
+        `${STORAGE_KEYS.FEATURE_FLAGS}:user_cohort_memberships:${this.userId}`,
       );
       if (cached && Array.isArray(cached)) {
-        this.cachedUserCohortMemberships = cached;
+        // Enrich memberships with cohort_slug if missing
+        // This handles cases where stored memberships lack cohort_slug due to offline caching
+        this.cachedUserCohortMemberships = cached.map((m) => {
+          if (m.cohort_slug) {
+            return m;
+          }
+
+          // Try to resolve slug from cohort_id
+          if (m.cohort_id && this.cachedCohorts.size > 0) {
+            for (const [slug, cohort] of this.cachedCohorts.entries()) {
+              if (cohort.id === m.cohort_id) {
+                return {
+                  ...m,
+                  cohort_slug: slug,
+                };
+              }
+            }
+          }
+
+          return m;
+        });
+
         logger.debug(
           "feature_flags",
           "Loaded cached user cohort memberships",
@@ -1378,11 +1426,31 @@ class FeatureFlagsManagerClass {
       // Clear rollout cache (persisted and in-memory)
       await SecureStorage.removeItem(`${STORAGE_KEYS.FEATURE_FLAGS}:rollouts`);
 
+      // Clear persisted cohorts cache and any cohort assignment map
+      try {
+        await SecureStorage.removeItem(`${STORAGE_KEYS.FEATURE_FLAGS}:cohorts`);
+        await SecureStorage.removeItem(`${STORAGE_KEYS.FEATURE_FLAGS}:cohort_assignments`);
+      } catch (error) {
+        logger.warn(
+          "feature_flags",
+          "Failed to clear persisted cohorts or cohort assignments",
+          error,
+        );
+      }
+
       // Clear entitlements cache
       if (this.userId) {
         await SecureStorage.removeItem(
           `${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`,
         );
+      }
+
+      // Clear user cohort memberships cache (user-scoped)
+      if (this.userId) {
+        await SecureStorage.removeItem(
+          `${STORAGE_KEYS.FEATURE_FLAGS}:user_cohort_memberships:${this.userId}`,
+        );
+        this.cachedUserCohortMemberships = [];
       }
 
       // Clear all override cache entries by pattern
@@ -1409,10 +1477,12 @@ class FeatureFlagsManagerClass {
 
       logger.info(
         "feature_flags",
-        "Cleared all cached flags, entitlements, and overrides",
+        "Cleared all cached flags, entitlements, overrides, cohorts, and cohort assignments",
       );
 
       this.currentFlags = new Map();
+      // Clear in-memory cohorts cache
+      this.cachedCohorts = new Map();
       this.userOverrides.clear();
       this.remoteOverrides.clear();
       this.cachedEntitlements.clear();
@@ -1670,7 +1740,7 @@ class FeatureFlagsManagerClass {
       return false;
     }
 
-    // Step 1.5: Phase 3 - Check cohort membership (AND logic: user must be in required cohorts)
+    // Step 1.5: Phase 3 - Check cohort membership (allow-list, OR logic: user must be in at least ONE of the listed cohorts)
     if (!this._checkCohorts(flagName)) {
       memo.set(cacheKey, false);
       return false;
@@ -1778,11 +1848,66 @@ class FeatureFlagsManagerClass {
   }
 
   /**
+   * Phase 3: Resolve cohort slug from membership
+   *
+   * Attempts to get the cohort slug in priority order:
+   * 1. From membership.cohort_slug (if denormalized in response)
+   * 2. By searching cachedCohorts for matching cohort_id
+   *
+   * This ensures explicit membership checks work even if the Edge Function
+   * response doesn't include the denormalized cohort_slug field.
+   *
+   * @param membership - User cohort membership record
+   * @returns Cohort slug if found, undefined otherwise
+   * @private
+   *
+   * @example
+   * ```ts
+   * // If membership has cohort_slug, use it directly
+   * const membership = { cohort_id: "abc-123", cohort_slug: "beta_testers", ... };
+   * _resolveCohortSlug(membership) // "beta_testers"
+   *
+   * // If membership only has cohort_id, search cachedCohorts
+   * const membership = { cohort_id: "abc-123", ... }; // No cohort_slug
+   * _resolveCohortSlug(membership) // searches cachedCohorts and returns slug if found
+   * ```
+   */
+  private _resolveCohortSlug(membership: CachedUserCohortMembership): string | undefined {
+    // Priority 1: Use denormalized cohort_slug if available
+    if (membership.cohort_slug) {
+      return membership.cohort_slug;
+    }
+
+    // Priority 2: Search cachedCohorts for matching cohort_id
+    if (membership.cohort_id) {
+      // cachedCohorts is keyed by slug, so we need to search for the matching ID
+      for (const [slug, cohort] of this.cachedCohorts.entries()) {
+        if (cohort.id === membership.cohort_id) {
+          logger.debug(
+            "feature_flags",
+            `Resolved cohort slug from ID: ${membership.cohort_id} → ${slug}`,
+          );
+          return slug;
+        }
+      }
+      // Cohort not found in cache (may be loading or invalid ID)
+      logger.warn(
+        "feature_flags",
+        `Failed to resolve cohort slug from ID: ${membership.cohort_id}`,
+      );
+    }
+
+    // No way to resolve slug
+    return undefined;
+  }
+
+  /**
    * Phase 3: Check if user is in required cohorts
    * Evaluates both explicit membership and deterministic bucketing
    * Returns true if user is in ANY of the flag's assigned cohorts (OR logic)
    *
    * Priority:
+
    * 1. Explicit membership (direct or invited) from cachedUserCohortMemberships
    * 2. Deterministic bucketing via isUserInCohort(userId, cohortSlug)
    *
@@ -1804,16 +1929,19 @@ class FeatureFlagsManagerClass {
 
     // Check explicit membership first (highest priority)
     for (const membership of this.cachedUserCohortMemberships) {
+      // Resolve cohort slug from membership (with fallback to cohort_id lookup)
+      const cohortSlug = this._resolveCohortSlug(membership);
+
       if (
-        membership.cohort_slug &&
-        requiredCohorts.includes(membership.cohort_slug) &&
+        cohortSlug &&
+        requiredCohorts.includes(cohortSlug) &&
         membership.is_active !== false &&
         (!membership.expires_at || new Date(membership.expires_at) > new Date())
       ) {
         // User has active membership in a required cohort
         logger.debug(
           "feature_flags",
-          `User explicitly in cohort ${membership.cohort_slug} for flag ${flagName}`,
+          `User explicitly in cohort ${cohortSlug} for flag ${flagName}`,
         );
         return true;
       }
@@ -1834,13 +1962,7 @@ class FeatureFlagsManagerClass {
 
       // Use isUserInCohort from lib/feature-flags/cohorts.ts
       // This implements deterministic bucketing based on user ID and cohort seed
-      if (
-        isUserInCohort(
-          this.userId,
-          cohortSlug,
-          cohort,
-        )
-      ) {
+      if (isUserInCohort(this.userId, cohort)) {
         logger.debug(
           "feature_flags",
           `User bucketed into cohort ${cohortSlug} for flag ${flagName}`,

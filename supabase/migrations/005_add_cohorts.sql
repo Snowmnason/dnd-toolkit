@@ -160,7 +160,14 @@ CREATE POLICY cohort_flag_assignments_select_public ON feature_flags.cohort_flag
 
 -- Users: can read their own explicit memberships
 DROP POLICY IF EXISTS user_cohort_memberships_select_self ON feature_flags.user_cohort_memberships;
-CREATE POLICY user_cohort_memberships_select_self ON feature_flags.user_cohort_memberships FOR SELECT TO authenticated USING (user_id = (SELECT public.get_current_user_id()));
+-- Policy: users can read their own explicit, non-expired memberships.
+-- NOTE: `is_active` is maintained on INSERT/UPDATE only and may become stale
+-- as `expires_at` passes. We therefore enforce non-expired rows in the
+-- policy using the `expires_at` column directly (expires_at IS NULL OR expires_at > now()).
+CREATE POLICY user_cohort_memberships_select_self ON feature_flags.user_cohort_memberships FOR SELECT TO authenticated USING (
+  user_id = (SELECT public.get_current_user_id())
+  AND (expires_at IS NULL OR expires_at > now())
+);
 
 -- Admins: full access to manage cohorts and assignments
 DROP POLICY IF EXISTS cohorts_admin_all ON feature_flags.cohorts;
@@ -190,3 +197,36 @@ ON CONFLICT (slug) DO UPDATE
       updated_at = now();
 
 COMMIT;
+
+-- ------------------------------------------------------------------
+-- Utility: refresh `is_active` based on `expires_at`
+-- This function can be scheduled to keep the `is_active` column accurate
+-- without requiring updates to each row. Scheduling can be done via
+-- `pg_cron` or an external scheduler that calls this function periodically.
+-- ------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION feature_flags.refresh_user_cohort_memberships_is_active()
+RETURNS void AS $$
+BEGIN
+  UPDATE feature_flags.user_cohort_memberships
+  SET is_active = (expires_at IS NULL OR expires_at > now()),
+      updated_at = now()
+  WHERE is_active IS DISTINCT FROM (expires_at IS NULL OR expires_at > now());
+END;
+$$ LANGUAGE plpgsql;
+
+DO $$
+BEGIN
+  -- If pg_cron is available, register a job to run the refresh every minute.
+  -- If not available, the NOTICE reminds operators to schedule the function.
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+    BEGIN
+      PERFORM cron.schedule('refresh_ucm_is_active', '*/1 * * * *', $q$SELECT feature_flags.refresh_user_cohort_memberships_is_active();$q$);
+    EXCEPTION WHEN others THEN
+      -- If scheduling fails (e.g., job already exists), do not raise migration error.
+      RAISE NOTICE 'pg_cron scheduling failed or job already exists: %', SQLERRM;
+    END;
+  ELSE
+    RAISE NOTICE 'pg_cron not installed: please schedule feature_flags.refresh_user_cohort_memberships_is_active() periodically (e.g. via pg_cron or external scheduler) to keep is_active accurate.';
+  END IF;
+END;
+$$ LANGUAGE plpgsql;

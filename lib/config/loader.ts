@@ -122,8 +122,8 @@ export interface AppSettings {
       description?: string;
       kind?: "free" | "premium" | "beta";
       dependsOn?: string[]; // Soft dependencies: array of flag names
-      // Phase 3: Cohort membership (user must be in cohort)
-      cohorts?: string[]; // E.g., ["beta_testers", "enterprise"] — requires userId context
+      // Phase 3: Cohort membership (allow-list, OR logic: user must be in at least ONE of the listed cohorts)
+      cohorts?: string[]; // E.g., ["beta_testers", "enterprise"] — flag enabled if user in ANY listed cohort; requires userId context
       // Phase 1: Simple conditions (AND logic)
       conditions?: {
         platform?: string; // 'web' | 'ios' | 'android' | 'desktop'

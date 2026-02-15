@@ -196,18 +196,17 @@ export interface UserCohortMembershipRow {
  *   slug: "beta_testers",
  *   percentage: 20,
  * };
- * if (isUserInCohort(userId, "beta_testers", betaTesters)) {
+ * if (isUserInCohort(userId, betaTesters)) {
  *   // ~20% of users reach here
  * }
  *
  * // Phase 2: With explicit membership override
  * const explicitMemberships = ["qa_testers"]; // Admin assigned this user
- * if (isUserInCohort(userId, "qa_testers", qaTesters, explicitMemberships)) {
+ * if (isUserInCohort(userId, qaTesters, explicitMemberships)) {
  *   // User is explicitly in qa_testers (has highest priority)
  * }
  *
  * // Rebalancing pattern
-/**
  * Check if a user is in a cohort (PHASE 1-3: Main evaluation function)
  *
  * Evaluates cohort membership using two mechanisms:
@@ -218,7 +217,7 @@ export interface UserCohortMembershipRow {
  *
  * Uses FNV-hash to ensure same user always gets same bucket:
  * ```
- * bucket = FNV_HASH(userId + cohortId + seed) % 100
+ * bucket = FNV_HASH(userId + cohortSlug + seed) % 100
  * isInCohort = bucket < percentage
  * ```
  *
@@ -229,7 +228,7 @@ export interface UserCohortMembershipRow {
  *
  * ## Seed Parameter (Phase 4: Rebalancing)
  *
- * **Default seed:** cohortId (e.g., "beta_testers")
+ * **Default seed:** cohortDef.slug (e.g., "beta_testers")
  * **Custom seed:** Specified in CohortDef for rebalancing
  *
  * ### Safe Gradual Rollout with Seed
@@ -239,17 +238,17 @@ export interface UserCohortMembershipRow {
  * ```ts
  * // Day 1: 10% rollout (seed: "v1")
  * const day1 = { slug: "feature", percentage: 10, seed: "v1" };
- * isUserInCohort(userId, "feature", day1) // → hash(userId + "feature" + "v1") % 100 < 10
+ * isUserInCohort(userId, day1) // → hash(userId + "feature" + "v1") % 100 < 10
  *
  * // Day 2: 50% rollout (same seed keeps existing users)
  * const day2 = { slug: "feature", percentage: 50, seed: "v1" };
- * isUserInCohort(userId, "feature", day2) // → Same hash, new range < 50
+ * isUserInCohort(userId, day2) // → Same hash, new range < 50
  * // If user was in 10%, still in 50% (hash in [0-9], so < 50)
  * // New users [10-49] are added to cohort
  *
  * // Day 3: 100% rollout (everyone)
  * const day3 = { slug: "feature", percentage: 100, seed: "v1" };
- * isUserInCohort(userId, "feature", day3) // → Always true (hash in [0-99])
+ * isUserInCohort(userId, day3) // → Always true (hash in [0-99])
  * ```
  *
  * **Changing the seed re-buckets everyone** (use sparingly):
@@ -262,14 +261,18 @@ export interface UserCohortMembershipRow {
  * ## Priority
  *
  * 1. **Explicit membership** (if provided in Phase 2)
- *    - Always true if user is explicitly assigned
+ *    - Always true if user is explicitly assigned to this cohort
  * 2. **Deterministic bucketing** (Phase 1-4)
  *    - Based on percentage and seed
  *
+ * ## API Simplification
+ *
+ * Uses `cohortDef.slug` as the single source of truth for cohort identity.
+ * This eliminates potential mismatches between separate cohortId and cohortDef.slug parameters.
+ *
  * @param userId - User identifier (UUID or stable ID from auth)
- * @param cohortId - Cohort identifier (matches flag's `cohorts: []` array)
- * @param cohortDef - Cohort definition with percentage and optional seed
- * @param explicitMemberships - Optional list of explicitly assigned cohort IDs (Phase 2)
+ * @param cohortDef - Cohort definition (slug is used for bucketing and membership checks)
+ * @param explicitMemberships - Optional list of explicitly assigned cohort slugs (Phase 2)
  *
  * @returns `true` if user is in cohort, `false` otherwise
  *
@@ -277,14 +280,14 @@ export interface UserCohortMembershipRow {
  * ```ts
  * // Basic check (deterministic bucketing)
  * const cohort = { slug: "beta_testers", percentage: 20 };
- * if (isUserInCohort(userId, "beta_testers", cohort)) {
+ * if (isUserInCohort(userId, cohort)) {
  *   // User is in ~20% beta group (same result every time)
  * }
  *
  * // With explicit membership override (Phase 2)
  * const memberships = ["qa_special", "beta_testers"]; // From database
- * if (isUserInCohort(userId, "qa_special", cohort, memberships)) {
- *   // Always true (explicit membership takes priority)
+ * if (isUserInCohort(userId, cohort, memberships)) {
+ *   // True if user is explicitly in beta_testers or bucketed into it
  * }
  *
  * // Gradual rollout scenario
@@ -299,21 +302,20 @@ export interface UserCohortMembershipRow {
  */
 export function isUserInCohort(
   userId: string,
-  cohortId: string,
   cohortDef: CohortDef,
   explicitMemberships?: string[],
 ): boolean {
   // Phase 2: Check explicit membership first (highest priority)
-  if (explicitMemberships?.includes(cohortId)) {
+  if (explicitMemberships?.includes(cohortDef.slug)) {
     return true; // Admin override
   }
 
   // Phase 1: Deterministic bucketing
   const percentage = cohortDef.percentage ?? 100;
-  const seed = cohortDef.seed ?? cohortId;
+  const seed = cohortDef.seed ?? cohortDef.slug;
 
-  // Use flag name = cohort ID for consistent bucketing
-  return isInRollout(userId, cohortId, percentage, seed ?? undefined);
+  // Use cohort slug for consistent bucketing
+  return isInRollout(userId, cohortDef.slug, percentage, seed ?? undefined);
 }
 
 /**

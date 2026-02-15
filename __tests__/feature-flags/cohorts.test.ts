@@ -588,9 +588,8 @@ describe("Phase 3: Cohorts Integration", () => {
 
       const result = isUserInCohort(
         "user-123",
-        "cohort-1",
         cohort,
-        ["cohort-1"], // Explicit membership
+        ["test-cohort"], // Explicit membership matching cohort.slug
       );
 
       expect(result).toBe(true);
@@ -607,7 +606,6 @@ describe("Phase 3: Cohorts Integration", () => {
       // With 100% percentage, should always be true
       const result = isUserInCohort(
         "user-123",
-        "cohort-1",
         cohort,
         [], // No explicit membership
       );
@@ -624,8 +622,8 @@ describe("Phase 3: Cohorts Integration", () => {
       };
 
       // Same user with same seed should give same result
-      const result1 = isUserInCohort("user-123", "cohort-1", cohort);
-      const result2 = isUserInCohort("user-123", "cohort-1", cohort);
+      const result1 = isUserInCohort("user-123", cohort);
+      const result2 = isUserInCohort("user-123", cohort);
 
       expect(result1).toBe(result2); // Should be deterministic
     });
@@ -644,7 +642,7 @@ describe("Phase 3: Cohorts Integration", () => {
         seed,
       };
 
-      const inDay1 = isUserInCohort(userId, "gradual_feature", day1Cohort);
+      const inDay1 = isUserInCohort(userId, day1Cohort);
 
       // Day 2: 50% rollout (same seed)
       const day2Cohort = {
@@ -654,7 +652,7 @@ describe("Phase 3: Cohorts Integration", () => {
         seed,
       };
 
-      const inDay2 = isUserInCohort(userId, "gradual_feature", day2Cohort);
+      const inDay2 = isUserInCohort(userId, day2Cohort);
 
       // Day 3: 100% rollout (same seed)
       const day3Cohort = {
@@ -664,7 +662,7 @@ describe("Phase 3: Cohorts Integration", () => {
         seed,
       };
 
-      const inDay3 = isUserInCohort(userId, "gradual_feature", day3Cohort);
+      const inDay3 = isUserInCohort(userId, day3Cohort);
 
       // If user was in day 1 (10%), they should still be in day 2 (50%) and day 3 (100%)
       if (inDay1) {
@@ -686,7 +684,7 @@ describe("Phase 3: Cohorts Integration", () => {
         seed: "seed_v1",
       };
 
-      const resultWithV1 = isUserInCohort(userId, "feature", originalCohort);
+      const resultWithV1 = isUserInCohort(userId, originalCohort);
 
       // New seed (rebalancing)
       const rebalancedCohort = {
@@ -696,7 +694,7 @@ describe("Phase 3: Cohorts Integration", () => {
         seed: "seed_v2",
       };
 
-      const resultWithV2 = isUserInCohort(userId, "feature", rebalancedCohort);
+      const resultWithV2 = isUserInCohort(userId, rebalancedCohort);
 
       // Results may or may not be the same, but we're testing that
       // changing the seed affects the bucketing
@@ -720,7 +718,7 @@ describe("Phase 3: Cohorts Integration", () => {
       };
 
       const usersIn = userIds.filter((userId) =>
-        isUserInCohort(userId, "test", cohort),
+        isUserInCohort(userId, cohort),
       );
 
       // With 100 users and 50% percentage, expect ~50 users
@@ -740,7 +738,7 @@ describe("Phase 3: Cohorts Integration", () => {
         seed: undefined,
       };
 
-      const result1 = isUserInCohort(userId, "feature", cohortNoSeed);
+      const result1 = isUserInCohort(userId, cohortNoSeed);
 
       // Call again with explicitly null seed
       const cohortNullSeed = {
@@ -750,7 +748,7 @@ describe("Phase 3: Cohorts Integration", () => {
         seed: null,
       };
 
-      const result2 = isUserInCohort(userId, "feature", cohortNullSeed);
+      const result2 = isUserInCohort(userId, cohortNullSeed);
 
       // Both should use default seed (cohortId) and be identical
       expect(result1).toBe(result2);
@@ -772,7 +770,7 @@ describe("Phase 3: Cohorts Integration", () => {
       };
 
       const phase1Users = userIds.filter((uid) =>
-        isUserInCohort(uid, "gradual", phase1Cohort),
+        isUserInCohort(uid, phase1Cohort),
       );
 
       // Phase 2: 50% rollout (same seed)
@@ -784,7 +782,7 @@ describe("Phase 3: Cohorts Integration", () => {
       };
 
       const phase2Users = userIds.filter((uid) =>
-        isUserInCohort(uid, "gradual", phase2Cohort),
+        isUserInCohort(uid, phase2Cohort),
       );
 
       // Phase 1 users should still be in Phase 2
@@ -805,7 +803,7 @@ describe("Phase 3: Cohorts Integration", () => {
       };
 
       const phase3Users = userIds.filter((uid) =>
-        isUserInCohort(uid, "gradual", phase3Cohort),
+        isUserInCohort(uid, phase3Cohort),
       );
 
       // All users should be in Phase 3
@@ -828,7 +826,7 @@ describe("Phase 3: Cohorts Integration", () => {
           percentage: 0,
         };
 
-        const result = isUserInCohort("any-user", "zero_percent", cohortDef);
+        const result = isUserInCohort("any-user", cohortDef);
         expect(result).toBe(false);
       });
 
@@ -839,7 +837,7 @@ describe("Phase 3: Cohorts Integration", () => {
           percentage: 100,
         };
 
-        const result = isUserInCohort("any-user", "hundred_percent", cohortDef);
+        const result = isUserInCohort("any-user", cohortDef);
         expect(result).toBe(true);
       });
 
@@ -850,7 +848,7 @@ describe("Phase 3: Cohorts Integration", () => {
           percentage: null as any,
         };
 
-        const result = isUserInCohort("any-user", "null_percent", cohortDef);
+        const result = isUserInCohort("any-user", cohortDef);
         expect(result).toBe(true);
       });
 
@@ -861,7 +859,7 @@ describe("Phase 3: Cohorts Integration", () => {
           percentage: undefined,
         };
 
-        const result = isUserInCohort("any-user", "undefined_percent", cohortDef);
+        const result = isUserInCohort("any-user", cohortDef);
         expect(result).toBe(true);
       });
 
@@ -883,9 +881,9 @@ describe("Phase 3: Cohorts Integration", () => {
 
         // Each user should consistently get the same result
         userIds.forEach((userId) => {
-          const result1 = isUserInCohort(userId, "test_determinism", cohortDef);
-          const result2 = isUserInCohort(userId, "test_determinism", cohortDef);
-          const result3 = isUserInCohort(userId, "test_determinism", cohortDef);
+          const result1 = isUserInCohort(userId, cohortDef);
+          const result2 = isUserInCohort(userId, cohortDef);
+          const result3 = isUserInCohort(userId, cohortDef);
 
           expect(result1).toBe(result2);
           expect(result2).toBe(result3);
@@ -903,15 +901,15 @@ describe("Phase 3: Cohorts Integration", () => {
 
         // Null seed (should use cohortId)
         const nullSeed = { ...baseCohort, seed: null };
-        const resultNull = isUserInCohort(userId, "seed_test", nullSeed);
+        const resultNull = isUserInCohort(userId, nullSeed);
 
         // Undefined seed (should use cohortId)
         const undefinedSeed = { ...baseCohort, seed: undefined };
-        const resultUndefined = isUserInCohort(userId, "seed_test", undefinedSeed);
+        const resultUndefined = isUserInCohort(userId, undefinedSeed);
 
         // Empty string seed
         const emptySeed = { ...baseCohort, seed: "" };
-        const resultEmpty = isUserInCohort(userId, "seed_test", emptySeed);
+        const resultEmpty = isUserInCohort(userId, emptySeed);
 
         // Null and undefined should be equivalent (both use cohortId)
         expect(resultNull).toBe(resultUndefined);
@@ -928,7 +926,7 @@ describe("Phase 3: Cohorts Integration", () => {
         };
 
         // FNV hash is always 0-99, so 150% means all users
-        const result = isUserInCohort("any-user", "over_percent", cohortDef);
+        const result = isUserInCohort("any-user", cohortDef);
         expect(result).toBe(true);
       });
 
@@ -940,7 +938,7 @@ describe("Phase 3: Cohorts Integration", () => {
         };
 
         // Negative percentage should result in no users
-        const result = isUserInCohort("any-user", "negative_percent", cohortDef);
+        const result = isUserInCohort("any-user", cohortDef);
         expect(result).toBe(false);
       });
     });
@@ -955,7 +953,7 @@ describe("Phase 3: Cohorts Integration", () => {
 
         const userIds = Array.from({ length: 1000 }, (_, i) => `user-${i}`);
         const includedUsers = userIds.filter(uid =>
-          isUserInCohort(uid, "distribution_test", cohortDef)
+          isUserInCohort(uid, cohortDef)
         );
 
         const actualPercentage = (includedUsers.length / userIds.length) * 100;
@@ -976,7 +974,7 @@ describe("Phase 3: Cohorts Integration", () => {
 
         // Run multiple times
         const results = Array.from({ length: 100 }, () =>
-          isUserInCohort(userId, "consistency_test", cohortDef)
+          isUserInCohort(userId, cohortDef)
         );
 
         // All results should be identical (deterministic)
@@ -997,7 +995,7 @@ describe("Phase 3: Cohorts Integration", () => {
 
         // Should not crash, but behavior is undefined
         expect(() => {
-          isUserInCohort("user", "incomplete", incompleteCohort);
+          isUserInCohort("user", incompleteCohort);
         }).not.toThrow();
       });
 
@@ -1017,7 +1015,7 @@ describe("Phase 3: Cohorts Integration", () => {
 
         extremeUserIds.forEach(userId => {
           expect(() => {
-            isUserInCohort(userId, "extreme_test", cohortDef);
+            isUserInCohort(userId, cohortDef);
           }).not.toThrow();
         });
       });
@@ -1035,7 +1033,7 @@ describe("Phase 3: Cohorts Integration", () => {
 
         // Evaluate 1000 times
         for (let i = 0; i < 1000; i++) {
-          isUserInCohort(`user-${i}`, "perf_test", cohortDef);
+          isUserInCohort(`user-${i}`, cohortDef);
         }
 
         const end = performance.now();
@@ -1053,7 +1051,7 @@ describe("Phase 3: Cohorts Integration", () => {
         };
 
         const evaluations = Array.from({ length: 100 }, (_, i) =>
-          Promise.resolve(isUserInCohort(`user-${i}`, "concurrent_test", cohortDef))
+          Promise.resolve(isUserInCohort(`user-${i}`, cohortDef))
         );
 
         const results = await Promise.all(evaluations);
