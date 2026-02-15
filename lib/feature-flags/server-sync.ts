@@ -125,7 +125,10 @@ export interface CachedUserCohortMembership {
   user_id: string; // UUID
   cohort_id: string; // UUID
   cohort_slug?: string; // Denormalized for convenience
-  source: "direct" | "computed" | "invited"; // How user was added
+  // Source of membership as provided by the backend/edge function.
+  // Backend may use free-form values (e.g. 'admin', 'system', 'direct'),
+  // so keep this as a plain string to avoid accidental type drift.
+  source: string;
   is_active?: boolean;
   reason?: string; // Optional reason for membership
   expires_at?: string; // Optional expiration date (ISO string)
