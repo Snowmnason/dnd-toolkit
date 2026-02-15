@@ -156,279 +156,341 @@ CREATE TABLE feature_flags.user_cohort_memberships (
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now(),
   
-  CONSTRAINT ucm_pkey PRIMARY KEY (id),
-  CONSTRAINT ucm_user_fkey FOREIGN KEY (user_id)
-    REFERENCES public.users(id) ON DELETE CASCADE,
-  CONSTRAINT ucm_cohort_fkey FOREIGN KEY (cohort_id)
-    REFERENCES feature_flags.cohorts(id) ON UPDATE CASCADE ON DELETE CASCADE,
-  CONSTRAINT ucm_created_by_fkey FOREIGN KEY (created_by)
-    REFERENCES public.users(id) ON DELETE SET NULL,
-  -- Prevent duplicate memberships
-  CONSTRAINT ucm_user_cohort_unique UNIQUE (user_id, cohort_id)
-);
-
--- Helper indexes for performance
-CREATE INDEX idx_cohort_flag_assignments_flag
-  ON feature_flags.cohort_flag_assignments(flag_name);
-
-CREATE INDEX idx_user_cohort_memberships_user
-  ON feature_flags.user_cohort_memberships(user_id);
-
-CREATE INDEX idx_user_cohort_memberships_cohort
-  ON feature_flags.user_cohort_memberships(cohort_id);
-
--- Partial index for non-expired explicit memberships
-CREATE INDEX idx_user_cohort_memberships_active
-  ON feature_flags.user_cohort_memberships(user_id, cohort_id)
-  WHERE expires_at IS NULL OR expires_at > now();
-
--- Triggers for updated_at
-CREATE TRIGGER trg_cohorts_updated_at
-  BEFORE UPDATE ON feature_flags.cohorts
-  FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
-
-CREATE TRIGGER trg_cohort_flag_assignments_updated_at
-  BEFORE UPDATE ON feature_flags.cohort_flag_assignments
-  FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
-
-CREATE TRIGGER trg_user_cohort_memberships_updated_at
-  BEFORE UPDATE ON feature_flags.user_cohort_memberships
-  FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
-```
-
-### Data Insertion (Bootstrap Cohorts)
-
-```sql
--- Insert default cohorts on migration
-INSERT INTO feature_flags.cohorts (id, name, description, percentage) VALUES
-  ('beta_testers', 'Beta Testers', 'Early adopters testing features before release', 20),
-  ('enterprise', 'Enterprise', 'Enterprise customers', 100),
-  ('internal', 'Internal Team', 'Internal team members (dogfooding)', 100),
-  ('mobile_first', 'Mobile-First Users', 'Mobile platform optimizations', 100),
-  ('desktop_first', 'Desktop-First Users', 'Desktop/web platform optimizations', 100)
-ON CONFLICT DO NOTHING;
-```
-
----
-
-## 3. Migration Strategy: Schema Definition Files + Patch Files
-
-### Philosophy: Schema Files as Source of Truth
-
-**001-004 are schema definition files**, not immutable history:
-- They represent the **current desired schema state**
-- When you add a table to the schema, you **edit the relevant migration file**
-- If database needs reset, running 001-004 creates the final, complete schema
-- Keeps migration files minimal and maintainable (less file bloat)
-
-**Patch files** (small, temporary .sql) are created **only when altering a live database**:
-- Used to migrate live data between schema versions
-- Can be discarded after applied (not part of permanent history)
-- Keeps the workflow simple: schema files + minimal patches
-
-### Implementation: Single `005_add_cohorts.sql`
-
-**Naming Convention:** `005_add_cohorts.sql` (combines Phase 1 + Phase 2)
-
-```
-supabase/migrations/
-├── 001_public_schema.sql          (EVOLVING - users/settings, add new tables here)
-├── 002_worlds_schema.sql          (EVOLVING - worlds/members/invites, add new tables here)
-├── 003_feature_flags_schema.sql   (EVOLVING - flags/entitlements/overrides, will add cohorts here in Phase 1)
-├── 004_audit_schema.sql           (EVOLVING - audit logs)
-└── 005_add_cohorts.sql            (NEW - cohorts + flag_assignments + memberships + seed data)
-```
-
-### Phase 1 + Phase 2 Combined in Single File
-
-**Create `005_add_cohorts.sql`** with:
-- ✅ `cohorts` table (definitions: beta_testers, enterprise, internal, mobile_first, desktop_first)
-- ✅ `cohort_flag_assignments` table (flag ↔ cohort mapping)
-- ✅ `user_cohort_memberships` table (explicit admin assignments, used in Phase 2+)
-- ✅ RLS policies (public read, admin write)
-- ✅ Indexes for performance
-- ✅ Triggers for updated_at
-- ✅ Seed data (5 default cohorts)
-
-**Benefits of this approach:**
-✅ Single migration file (simpler, less file bloat)  
-✅ Phase 1 + Phase 2 in one place (cohorts are self-contained)  
-✅ Can implement Phase 2 without new migrations  
-✅ If database resets, 005 creates full cohort schema  
-✅ Fewer files to maintain  
-✅ Easier to understand (all cohort-related schema in one place)
+  # Issue #196 — Phase 2: Database Schema & Cohort Design (revised)
+
+  Document purpose: produce an implementable, ordered migration and design plan for cohorts, matching the repo's existing migration conventions (see 001–004). This document is reorganized for clarity and execution.
+
+  Contents
+  - Prerequisites & safety checks
+  - TypeScript interfaces & public API changes (Phase 1)
+  - Migration file: `005_add_cohorts.sql` (DDL, indexes, triggers, seeds)
+  - RLS policies (placed immediately after DDL)
+  - Edge function / API changes
+  - Client caching, bootstrap, and evaluation flow
+  - Audit, telemetry, privacy, and retention
+  - Tests, validation and rollout checklist
+  - Implementation checklist & migration recipe
+
+  ---
+
+  ## Prerequisites & Safety Checks
+
+  Before creating or applying `005_add_cohorts.sql`, verify the environment matches expectations:
+
+  - Required Postgres extensions (add to migration header):
+    - `pgcrypto` (for `gen_random_uuid()`)
+    - `uuid-ossp` (if used) — include `CREATE EXTENSION IF NOT EXISTS` statements in migration
+
+  - Required helper functions (present in `001_public_schema.sql`):
+    - `public.update_timestamp()` — used by triggers
+    - `public.get_current_user_id()` — used by RLS
+    - `public.is_admin()` — used by RLS
+
+  If any helper is missing in an environment, the migration should either create a safe stub (for development) or fail early with a clear message and link to `001_public_schema.sql`.
+
+  Security note: seed data and cohort definitions returned by public endpoints must not contain admin-only fields (e.g., `metadata.owner_id`) unless the caller is authorized.
+
+  ---
+
+  ## Phase 1 (Config + Types) — Minimal client changes (safe, no DB required)
+
+  Goal: Add TypeScript types and small API changes so the client can support cohorts defined in config before DB rollout.
+
+  Files to add/modify:
+  - `lib/feature-flags/cohorts.ts` — new module with deterministic bucketing helpers.
+  - `lib/feature-flags/README.md` — docs for usage and seeds.
+
+  Types (copy-paste ready)
+  ```ts
+  export interface CohortDef {
+    id: string;            // e.g. 'beta_testers'
+    name: string;
+    description?: string;
+    percentage?: number;   // 0-100; undefined => 100
+    seed?: string | null;  // optional seed for rebalancing
+    metadata?: Record<string, any> | null;
+  }
+
+  export interface CohortRow extends CohortDef {
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+  }
+
+  export interface CohortFlagAssignmentRow {
+    id: string;
+    flag_name: string;
+    cohort_id: string;
+    enabled: boolean;
+  }
+
+  export interface UserCohortMembershipRow {
+    id: string;
+    user_id: string;
+    cohort_id: string;
+    source: string; // 'admin'|'property-based'|'auto-assigned'
+    expires_at?: string | null;
+  }
+  ```
+
+  Public API change (recommended, additive):
+
+  ```ts
+  // Backward-compatible overload
+  isEnabled(flagName: string): boolean
+  isEnabled(flagName: string, userId?: string, context?: FlagContext): boolean
+  ```
+
+  Helper functions to implement in `lib/feature-flags/cohorts.ts`:
+
+  ```ts
+  function isUserInCohort(
+    userId: string,
+    cohortId: string,
+    cohortDef: CohortDef,
+    explicitMemberships?: string[]
+  ): boolean {
+    if (explicitMemberships?.includes(cohortId)) return true;
+    const percentage = cohortDef.percentage ?? 100;
+    const seed = cohortDef.seed ?? cohortId;
+    return isInRollout(userId, cohortId, percentage, seed);
+  }
+  ```
+
+  ---
+
+  ## Migration: `005_add_cohorts.sql` (Phase 2)
+
+  Purpose: create `feature_flags.cohorts`, `feature_flags.cohort_flag_assignments`, `feature_flags.user_cohort_memberships`, with indexes, triggers, RLS, seed data, and audit triggers. Follow patterns from `003_feature_flags_schema.sql` (schema creation, grants, indexes) and `001_public_schema.sql` (helper functions, triggers).
+
+  Migration header (pattern consistent with existing files):
+
+  ```sql
+  -- ============================================================
+  -- 005: COHORTS (feature_flags schema)
+  -- Tables: cohorts, cohort_flag_assignments, user_cohort_memberships
+  -- EXECUTION ORDER: Run AFTER 003_feature_flags_schema.sql and 001_public_schema.sql
+  -- PREREQUISITES: public.update_timestamp(), public.get_current_user_id(), public.is_admin(), extensions
+  -- ============================================================
+
+  BEGIN;
+
+  -- Ensure extensions
+  CREATE EXTENSION IF NOT EXISTS pgcrypto;
+  CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+  CREATE SCHEMA IF NOT EXISTS feature_flags;
+  GRANT USAGE ON SCHEMA feature_flags TO anon, authenticated, service_role;
+  -- (match grants used in 003)
+  ```
+
+  DDL (core tables) — follow existing style and constraints:
+
+  ```sql
+  CREATE TABLE IF NOT EXISTS feature_flags.cohorts (
+    id text NOT NULL,
+    name text NOT NULL,
+    description text NULL,
+    percentage integer NOT NULL DEFAULT 100,
+    seed text NULL,
+    is_active boolean NOT NULL DEFAULT true,
+    metadata jsonb NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT cohorts_pkey PRIMARY KEY (id),
+    CONSTRAINT ck_percentage_range CHECK (percentage >= 0 AND percentage <= 100),
+    CONSTRAINT ck_seed_length CHECK (seed IS NULL OR length(seed) > 0)
+  );
+
+  CREATE TABLE IF NOT EXISTS feature_flags.cohort_flag_assignments (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    flag_name text NOT NULL,
+    cohort_id text NOT NULL,
+    enabled boolean NOT NULL DEFAULT true,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT cfa_pkey PRIMARY KEY (id),
+    CONSTRAINT cfa_flag_fkey FOREIGN KEY (flag_name)
+      REFERENCES feature_flags.feature_flags(flag_name) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT cfa_cohort_fkey FOREIGN KEY (cohort_id)
+      REFERENCES feature_flags.cohorts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT cfa_flag_cohort_unique UNIQUE (flag_name, cohort_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS feature_flags.user_cohort_memberships (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL,
+    cohort_id text NOT NULL,
+    source text NOT NULL,
+    created_by uuid NULL,
+    reason text NULL,
+    expires_at timestamptz NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT ucm_pkey PRIMARY KEY (id),
+    CONSTRAINT ucm_user_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE,
+    CONSTRAINT ucm_cohort_fkey FOREIGN KEY (cohort_id) REFERENCES feature_flags.cohorts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT ucm_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE SET NULL,
+    CONSTRAINT ucm_user_cohort_unique UNIQUE (user_id, cohort_id)
+  );
+  ```
+
+  Indexes and triggers (attach `public.update_timestamp()`):
+
+  ```sql
+  CREATE INDEX IF NOT EXISTS idx_cohort_flag_assignments_flag ON feature_flags.cohort_flag_assignments(flag_name);
+  CREATE INDEX IF NOT EXISTS idx_cohorts_active ON feature_flags.cohorts(is_active) WHERE is_active = true;
+  CREATE INDEX IF NOT EXISTS idx_user_cohort_memberships_user ON feature_flags.user_cohort_memberships(user_id);
+  CREATE INDEX IF NOT EXISTS idx_user_cohort_memberships_cohort ON feature_flags.user_cohort_memberships(cohort_id);
+  CREATE INDEX IF NOT EXISTS idx_user_cohort_memberships_active ON feature_flags.user_cohort_memberships(user_id, cohort_id) WHERE expires_at IS NULL OR expires_at > now();
+
+  CREATE TRIGGER IF NOT EXISTS trg_cohorts_updated_at BEFORE UPDATE ON feature_flags.cohorts FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
+  CREATE TRIGGER IF NOT EXISTS trg_cfa_updated_at BEFORE UPDATE ON feature_flags.cohort_flag_assignments FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
+  CREATE TRIGGER IF NOT EXISTS trg_ucm_updated_at BEFORE UPDATE ON feature_flags.user_cohort_memberships FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
+  ```
+
+  Seed data (idempotent):
+
+  ```sql
+  INSERT INTO feature_flags.cohorts (id, name, description, percentage) VALUES
+    ('beta_testers', 'Beta Testers', 'Early adopters testing features before release', 20),
+    ('enterprise', 'Enterprise', 'Enterprise customers', 100),
+    ('internal', 'Internal Team', 'Internal team members (dogfooding)', 100),
+    ('mobile_first', 'Mobile-First Users', 'Mobile platform optimizations', 100),
+    ('desktop_first', 'Desktop-First Users', 'Desktop/web platform optimizations', 100)
+  ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description, percentage = EXCLUDED.percentage WHERE feature_flags.cohorts.is_active = true;
+  ```
+
+  Commit at end of file:
+
+  ```sql
+  COMMIT;
+  ```
+
+  ---
+
+  ## RLS Policies (add immediately after DDL in migration)
+
+  Policies follow the project's pattern — examples below must be reviewed against `001_public_schema.sql` helpers.
+
+  ```sql
+  -- Public: allow reading active cohorts
+  CREATE POLICY IF NOT EXISTS cohorts_select_public ON feature_flags.cohorts FOR SELECT USING (is_active = true);
+
+  -- Public: allow reading enabled assignments
+  CREATE POLICY IF NOT EXISTS cohort_flag_assignments_select_public ON feature_flags.cohort_flag_assignments FOR SELECT USING (enabled = true);
+
+  -- Users may read their own explicit memberships
+  CREATE POLICY IF NOT EXISTS user_cohort_memberships_select_self ON feature_flags.user_cohort_memberships FOR SELECT USING (user_id = public.get_current_user_id());
+
+  -- Admins manage cohorts/assignments/memberships
+  CREATE POLICY IF NOT EXISTS cohorts_admin_all ON feature_flags.cohorts FOR ALL USING (public.is_admin());
+  CREATE POLICY IF NOT EXISTS cfa_admin_all ON feature_flags.cohort_flag_assignments FOR ALL USING (public.is_admin());
+  CREATE POLICY IF NOT EXISTS ucm_admin_all ON feature_flags.user_cohort_memberships FOR ALL USING (public.is_admin());
+  ```
+
+  Notes:
+  - Ensure `public.get_current_user_id()` and `public.is_admin()` exist; otherwise migration must fail with a clear precheck message.
+
+  ---
+
+  ## Edge functions & API
+
+  Phase 1: client-side only. No edge function change required if cohorts are config-only.
+
+  Phase 2 (recommended): update `get_feature_flags` to include `cohorts` and `cohort_flag_assignments` and (optionally) `user_cohort_memberships` for the requesting user (RLS will limit rows).
+
+  Suggested response types (TypeScript):
+
+  ```ts
+  interface GetFeatureFlagsResponse {
+    flags: FeatureFlagRow[];
+    entitlements: EntitlementRow[];
+    overrides: OverrideRow[];
+    cohorts: CohortRow[]; // public: active cohorts
+    cohort_flag_assignments: CohortFlagAssignmentRow[]; // public: enabled assignments
+    user_cohort_memberships?: UserCohortMembershipRow[]; // RLS filtered to this user
+  }
+  ```
+
+  If `user_cohort_memberships` is returned, it must be filtered by RLS and should not include admin-only metadata unless caller is admin.
+
+  ---
+
+  ## Client bootstrap, caching & evaluation flow
+
+  Recommended flow (safe, backwards-compatible):
+
+  1. `FeatureFlagsManager.bootstrapFlags()` — fetch feature flags (existing behavior)
+  2. Fetch cohorts & assignments (edge function) — cache locally
+  3. For each `isEnabled(flag, userId?, context?)` call:
+     - Check overrides/entitlements/flag.enabled (existing resolution order)
+     - If flag has cohorts and userId provided, evaluate cohort membership:
+         a. Query explicit memberships (from cached `user_cohort_memberships` or edge function)
+         b. If explicit membership exists, use it (highest priority)
+         c. Else run deterministic bucketing via `isInRollout(userId, cohortId, percentage, seed)`
+     - Evaluate conditions (Phase 3) and dependencies
+
+  Caching recommendations:
+  - Cohort definitions: TTL = 1h
+  - Cohort assignments: TTL = 30m
+  - User explicit memberships: TTL = 15m
+
+  Provide a manual invalidation path (admin action triggers websocket/event to invalidate caches), and fallbacks to last cached state if fetch fails.
+
+  ---
+
+  ## Audit, telemetry and privacy
+
+  - Attach `audit.log_change()` triggers to cohort tables (consistent with `004_audit_schema.sql`).
+  - Telemetry events:
+    - `cohort_assigned` (hashed user id, cohort id, source)
+    - `flag_evaluated` (flag, enabled, reason)
+    - `admin_action` (create/assign/remove)
+
+  Privacy & retention:
+  - `user_cohort_memberships` contains PII: limit access via RLS, log only hashed user identifiers in telemetry.
+  - Add retention policy: delete expired explicit memberships after 90 days (or configurable interval).
+
+  ---
+
+  ## Tests & validation
+
+  Unit tests:
+  - `isUserInCohort()` determinism (same user+seed yields same result)
+  - seed rebalancing tests
+  - explicit override precedence
+
+  Integration tests:
+  - RLS: non-admin read vs admin write
+  - get_feature_flags includes cohorts and assignments
+
+  Performance: measure fetch times with 100+ cohorts and 10k assignments; ensure indexes support queries used by edge functions.
+
+  ---
+
+  ## Migration recipe (step-by-step)
+
+  1. Prepare migration `005_add_cohorts.sql` and review in staging.
+  2. Run migration in staging; ensure no helper function errors.
+  3. Upsert config-defined cohorts into DB (idempotent upsert script).
+  4. Update edge function `get_feature_flags` to include cohorts and assignments; deploy to staging.
+  5. Update client to fetch cohorts (feature-gated). Ship only once staged successfully.
+  6. Monitor telemetry for cohort distribution and errors.
+  7. Rollout to production in maintenance window; if issues, rollback client gate and remove DB changes if necessary.
+
+  ---
+
+  ## Implementation checklist
+
+  - [ ] Add `lib/feature-flags/cohorts.ts` with helper functions and types
+  - [ ] Create `supabase/migrations/005_add_cohorts.sql` (DDL + RLS + indexes + triggers + seeds)
+  - [ ] Update `get_feature_flags` to return cohort data
+  - [ ] Add unit & integration tests
+  - [ ] Add docs to `lib/feature-flags/README.md` and `docs/issues/.../SERVER_SIDE.md`
+  - [ ] Create small upsert script to import config cohorts into DB
+
+  ---
+
+  If you'd like, I can now generate a draft `005_add_cohorts.sql` (idempotent), the `cohorts.ts` helper module skeleton, and a unit test scaffold. Which should I create first?
 
----
-
-## 4. Edge Functions: What Needs Updating
-
-### Current: `get_feature_flags` (POST)
-
-**Current Behavior:**
-- Authenticates via JWT
-- Returns: feature_flags + entitlements + overrides (all users' data needed)
-- Used by: FeatureFlagsManager.bootstrapFlags()
-
-**Changes Needed for Cohorts:**
-
-```typescript
-// PHASE 1: No edge function changes (client-side bucketing only)
-// Cohort membership is computed client-side via isUserInCohort()
-// Edge function doesn't need to know about cohorts yet
-
-// PHASE 2: Add cohort data to response
-interface GetFeatureFlagsResponse {
-  flags: FeatureFlagRow[];
-  entitlements: EntitlementRow[];
-  overrides: OverrideRow[];
-  cohorts: CohortRow[];                  // NEW: cohort definitions
-  cohort_flag_assignments: CohortFlagAssignmentRow[];  // NEW: flag ↔ cohort map
-  user_cohort_memberships?: UserCohortMembershipRow[];  // NEW: explicit memberships (optional)
-}
-
-// New queries in edge function:
-const cohorts = await fetchCohorts(supabase);  // All cohorts
-const assignments = await fetchCohortFlagAssignments(supabase);  // All assignments
-const memberships = await fetchUserCohortMemberships(supabase, userId);  // This user only
-```
-
-### Proposed New Edge Function: `get_user_cohorts` (POST, Phase 2)
-
-Only needed if Phase 2 adds server-side explicit memberships.
-
-```typescript
-// PHASE 2 (Optional): New edge function to check cohort membership
-// Used by: FeatureFlagsManager to verify if user is in specific cohort
-// (For explicit memberships; deterministic bucketing doesn't need this)
-
-interface GetUserCohortsRequest {
-  user_id: uuid;
-}
-
-interface GetUserCohortsResponse {
-  cohort_ids: string[];  // ["beta_testers", "qa_testers"]
-}
-
-// Returns explicit cohort memberships + deterministic bucketing result
-// This is a convenience function; Phase 1 doesn't need it
-```
-
-### Edge Function Update Priority
-
-| Function | Phase | Change | Priority |
-|----------|-------|--------|----------|
-| **get_feature_flags** | 1 | ✅ Add `cohorts` + `cohort_flag_assignments` to response | HIGH (Phase 1) |
-| **get_user_cohorts** | 2 | ➕ NEW: Return user's explicit memberships | MEDIUM (Phase 2+) |
-
----
-
-## 5. RLS Policies for Cohorts
-
-### Public Access (Users can view, not modify)
-
-```sql
--- Cohorts: Users can view all cohorts (needed for client-side bucketing)
-CREATE POLICY "cohorts_select_public"
-  ON feature_flags.cohorts FOR SELECT
-  USING (is_active = true);
-
--- Cohort assignments: Users can view all assignments
-CREATE POLICY "cohort_flag_assignments_select_public"
-  ON feature_flags.cohort_flag_assignments FOR SELECT
-  USING (enabled = true);
-
--- User memberships: Users can view only their own memberships
-CREATE POLICY "user_cohort_memberships_select_self"
-  ON feature_flags.user_cohort_memberships FOR SELECT
-  USING (user_id = public.get_current_user_id());
-```
-
-### Admin Write Access (Phase 2+)
-
-```sql
--- Admins can manage cohorts (CRUD)
-CREATE POLICY "cohorts_admin_write"
-  ON feature_flags.cohorts FOR ALL
-  USING (public.is_admin());
-
--- Admins can manage assignments (CRUD)
-CREATE POLICY "cohort_flag_assignments_admin_write"
-  ON feature_flags.cohort_flag_assignments FOR ALL
-  USING (public.is_admin());
-
--- Admins can manage explicit memberships (CRUD)
-CREATE POLICY "user_cohort_memberships_admin_write"
-  ON feature_flags.user_cohort_memberships FOR ALL
-  USING (public.is_admin());
-```
-
----
-
-## 6. Implementation Checklist (Phase 1 + 2 Combined)
-
-### Database Preparation (Single Migration File)
-
-- [ ] Create `supabase/migrations/005_add_cohorts.sql` with:
-  - [ ] `cohorts` table (id, name, description, percentage, is_active, metadata, timestamps)
-  - [ ] `cohort_flag_assignments` table (flag ↔ cohort mapping)
-  - [ ] `user_cohort_memberships` table (explicit admin assignments)
-  - [ ] RLS policies (public read, admin write)
-  - [ ] Indexes for performance (flag, cohort, user lookups)
-  - [ ] Triggers for updated_at
-  - [ ] Insert 5 seed cohorts (beta_testers, enterprise, internal, mobile_first, desktop_first)
-
-### Edge Function Updates
-
-- [ ] Update `get_feature_flags` function:
-  - [ ] Add `fetchCohorts(supabase)` query
-  - [ ] Add `fetchCohortFlagAssignments(supabase)` query
-  - [ ] Add `fetchUserCohortMemberships(supabase, userId)` query (Phase 2)
-  - [ ] Add cohort data to response
-  - [ ] Export new types in `types.ts`
-
-### Live Database Patches (Only if Needed)
-
-- [ ] If live database needs schema adjustment before Phase 1 complete:
-  - [ ] Create small `patch_YYYY-MM-DD_cohorts_alter.sql` file
-  - [ ] Apply patch to live database
-  - [ ] Document patch in PR (temporary file, can be discarded after applied)
-
----
-
-## 7. Decision Summary
-
-### Cohort Enum Answer
-
-✅ **Use:** `beta_testers`, `enterprise`, `internal`, `mobile_first`, `desktop_first`  
-✅ **Add more later** if needed (new product features, new user types)  
-✅ **Not hardcoded** - stored in database, can be added dynamically (Phase 2+)
-
-### Schema Location Answer
-
-✅ **Place in: `feature_flags` schema** (not `public` with users)  
-✅ **Reason:** Cohorts are feature control constructs, not user identity  
-✅ **Three tables:** `cohorts` (definitions), `cohort_flag_assignments` (config), `user_cohort_memberships` (explicit, Phase 2+)
-
-### Migration Strategy Answer
-
-✅ **Use single migration file:** `005_add_cohorts.sql` (Phase 1 + 2 combined)  
-✅ **Philosophy:** 001-004 are evolving schema definition files (not immutable)  
-✅ **When updating 001-004:** Edit migration file directly to keep schema current  
-✅ **Live database patches:** Create temporary patch files only when needed  
-✅ **Benefits:** Fewer files, simpler setup, cleaner schema ownership
-
-### Edge Functions Answer
-
-✅ **Phase 1:** Update `get_feature_flags` to include cohort definitions + assignments  
-✅ **Phase 2:** (Optional) New `get_user_cohorts` for explicit membership verification  
-✅ **No breaking changes** - cohort data is additive to existing response
-
----
-
-## Next Steps
-
-1. **Approve cohort enum** (beta_testers, enterprise, internal, mobile_first, desktop_first - or modify?)
-2. **Approve schema location** (feature_flags schema confirmed?)
-3. **Create Phase 1 migration file** (`005_add_cohorts.sql`)
-4. **Update Phase 1 issue scope** with migration file details
-5. **Proceed with implementation** (Phase 1 client-side bucketing)

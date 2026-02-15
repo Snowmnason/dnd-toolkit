@@ -777,6 +777,305 @@ export async function checkPremiumFeature(featureKey: string) {
 
 6. **Rollout Targeting**: ✅ **Implemented** - Use `evaluateRollout()` for percentage-based user bucketing. Deterministic hashing ensures same user always sees same variant.
 
+## Cohorts (Phase 1) — 🆕 **NEW**
+
+Cohorts are named user groups for feature targeting and gradual rollouts. They enable safe, staged feature deployment without redeployment.
+
+### What are Cohorts?
+
+A cohort is a logical grouping of users defined by:
+- **Deterministic bucketing** (Phase 1): Users are automatically assigned to cohorts using FNV-hash bucketing based on their user ID
+- **Explicit membership** (Phase 2): Admins can manually assign users to cohorts via database entries
+- **Safe rebalancing** (seed parameter): Change rollout percentage without re-bucketing existing users
+
+### Recommended Cohorts
+
+```typescript
+import { RECOMMENDED_COHORTS, type CohortDef } from '@/lib/feature-flags';
+
+// Pre-configured cohorts suitable for most rollout scenarios
+const betaTesters = RECOMMENDED_COHORTS.beta_testers;    // 20% deterministic
+const enterprise = RECOMMENDED_COHORTS.enterprise;        // 100% of users
+const internal = RECOMMENDED_COHORTS.internal;            // 100% dogfooding
+const mobileFirst = RECOMMENDED_COHORTS.mobile_first;     // 100% (use with platform condition)
+const desktopFirst = RECOMMENDED_COHORTS.desktop_first;   // 100% (use with platform condition)
+```
+
+### Cohort Definition
+
+```typescript
+interface CohortDef {
+  id: string;           // Unique cohort ID (e.g., "beta_testers")
+  name: string;         // Display name (e.g., "Beta Testers")
+  description?: string; // Human-readable description
+  percentage?: number;  // 0-100; ~X% of users in cohort (undefined = 100%)
+  seed?: string;        // Optional seed for rebalancing (null/undefined = default)
+  metadata?: object;    // Arbitrary metadata (Phase 2+)
+}
+```
+
+### Phase 1: Using Cohorts with Deterministic Bucketing
+
+In Phase 1, cohorts are **local-only** (no database required). Users are bucketed deterministically based on their user ID:
+
+```typescript
+import { isUserInCohort, RECOMMENDED_COHORTS } from '@/lib/feature-flags';
+
+export function MyComponent() {
+  const userId = useUserId();
+  
+  // Check if user is in beta_testers cohort (~20% of users)
+  const isBetaTester = isUserInCohort(
+    userId,
+    "beta_testers",
+    RECOMMENDED_COHORTS.beta_testers
+  );
+
+  return isBetaTester ? <BetaFeature /> : <StableFeature />;
+}
+```
+
+**Important:** Same user always gets same result. Deterministic bucketing uses FNV-hash(userId + cohortId + seed) % 100 < percentage.
+
+### Phase 1 Example: Gradual Rollout with Rebalancing
+
+Safe rollout pattern using seed field (percentage increases without losing existing users):
+
+```typescript
+// Day 1: Roll out to 10% of users
+const day1Cohort: CohortDef = {
+  id: "advanced_maps",
+  percentage: 10,
+  seed: "v1"  // Seed for rebalancing
+};
+
+// Existing users in 10% cohort still in cohort (same seed)
+const user1InCohort = isUserInCohort(userId1, "advanced_maps", day1Cohort); // ✅ Still true
+
+// Day 2: Expand to 50% (same seed keeps existing users)
+const day2Cohort: CohortDef = {
+  id: "advanced_maps",
+  percentage: 50,
+  seed: "v1"  // Same seed = existing users keep same status
+};
+
+// Existing users not re-bucketed
+const user1StillInCohort = isUserInCohort(userId1, "advanced_maps", day2Cohort); // ✅ Still true
+
+// Day 3: Full rollout
+const day3Cohort: CohortDef = {
+  id: "advanced_maps",
+  percentage: 100,
+  seed: "v1"
+};
+
+const user1FullyRolled = isUserInCohort(userId1, "advanced_maps", day3Cohort); // ✅ True
+```
+
+### Phase 2: Explicit Admin Overrides
+
+In Phase 2 (when database migration is applied), you can override deterministic bucketing:
+
+```typescript
+// Phase 2: Future API
+const explicitMemberships = ["qa_special", "beta_testers"]; // From user_cohort_memberships table
+const adminOverride = isUserInCohort(
+  userId,
+  "qa_special",
+  cohortDef,
+  explicitMemberships  // Explicit memberships have highest priority
+);
+
+// Admin assigned this user to qa_special cohort → always true (overrides deterministic)
+```
+
+### Combining Cohorts with Conditions (Phase 3)
+
+In Phase 3, you can combine cohort membership with advanced conditions:
+
+```json
+{
+  "featureFlags": {
+    "advancedMaps": {
+      "enabled": true,
+      "conditionLogic": {
+        "operator": "AND",
+        "conditions": [
+          { "type": "cohort", "value": "beta_testers" },
+          { "type": "platform", "value": "web" }
+        ]
+      }
+    }
+  }
+}
+```
+
+This flag is enabled only if BOTH:
+- User is in "beta_testers" cohort (20% of users via bucketing), AND
+- Platform is "web"
+
+### API Reference: Cohorts
+
+**`isUserInCohort(userId, cohortId, cohortDef, explicitMemberships?): boolean`**
+
+Evaluate if a user is in a cohort.
+
+```typescript
+import { isUserInCohort } from '@/lib/feature-flags';
+
+const inCohort = isUserInCohort(
+  "user-123",
+  "beta_testers",
+  { id: "beta_testers", percentage: 20 }
+);
+
+if (inCohort) {
+  // User is in beta_testers cohort
+}
+```
+
+**`RECOMMENDED_COHORTS`**
+
+Pre-configured cohort definitions:
+
+```typescript
+import { RECOMMENDED_COHORTS } from '@/lib/feature-flags';
+
+const cohorts = [
+  RECOMMENDED_COHORTS.beta_testers,   // 20%
+  RECOMMENDED_COHORTS.enterprise,     // 100%
+  RECOMMENDED_COHORTS.internal,       // 100%
+  RECOMMENDED_COHORTS.mobile_first,   // 100%
+  RECOMMENDED_COHORTS.desktop_first   // 100%
+];
+```
+
+### Seed Rebalancing Pattern
+
+✨ **Key Feature:** Safe percentage increases without user churn
+
+**How It Works:**
+
+```
+Bucket range: 0-99
+
+Day 1 (10% cohort, seed="v1"):
+hash(userId + "advanced_maps" + "v1") % 100 → [0-9] ✅ In cohort
+
+Day 2 (50% cohort, same seed="v1"):
+hash(userId + "advanced_maps" + "v1") % 100 → [0-49] ✅ Still in cohort
+New users [10-49] are added to cohort
+
+Day 3 (100% cohort):
+hash(...) → [0-99] ✅ All users in cohort
+
+If seed changes (e.g., "v1" → "v2"):
+hash(userId + "advanced_maps" + "v2") % 100 → Different bucket
+Users may move to different cohort → ⚠️ Be careful!
+```
+
+**Best Practice:** Change seed only when you want to re-bucket users (e.g., rebalance test group).
+
+### Testing Cohorts
+
+**Unit Test Example:**
+
+```typescript
+import { isUserInCohort } from '@/lib/feature-flags';
+
+describe('Cohorts', () => {
+  it('should bucket users deterministically', () => {
+    const cohort = { id: "test", percentage: 50 };
+    const userId = "user-123";
+
+    const result1 = isUserInCohort(userId, "test", cohort);
+    const result2 = isUserInCohort(userId, "test", cohort);
+
+    expect(result1).toBe(result2); // Same result every time
+  });
+
+  it('should keep users in cohort when percentage increases', () => {
+    const userId = "user-123";
+    const seed = "v1";
+
+    const cohort10 = { id: "test", percentage: 10, seed };
+    const cohort50 = { id: "test", percentage: 50, seed };
+
+    const inSmall = isUserInCohort(userId, "test", cohort10);
+    if (inSmall) {
+      const inLarge = isUserInCohort(userId, "test", cohort50);
+      expect(inLarge).toBe(true); // Still in larger cohort
+    }
+  });
+
+  it('should allow admin overrides', () => {
+    const cohort = { id: "test", percentage: 0 }; // 0% via bucketing
+    const explicitMemberships = ["test"];
+
+    const result = isUserInCohort(
+      "user-123",
+      "test",
+      cohort,
+      explicitMemberships
+    );
+
+    expect(result).toBe(true); // Override forces membership
+  });
+});
+```
+
+### Common Patterns
+
+**Pattern 1: Canary Release (1% → 10% → 100%)**
+
+```typescript
+// Day 1
+const canary: CohortDef = { id: "feature", percentage: 1, seed: "release" };
+
+// Day 2
+const earlyAdopt: CohortDef = { id: "feature", percentage: 10, seed: "release" };
+
+// Day 3
+const fullRelease: CohortDef = { id: "feature", percentage: 100, seed: "release" };
+
+// Same seed ensures no user churn
+```
+
+**Pattern 2: A/B Testing (50/50 Split)**
+
+```typescript
+const variantA: CohortDef = { id: "ui_variant_a", percentage: 50, seed: "experiment_1" };
+const variantB: CohortDef = { id: "ui_variant_b", percentage: 50, seed: "experiment_1" };
+
+const isVariantA = isUserInCohort(userId, "ui_variant_a", variantA);
+const isVariantB = isUserInCohort(userId, "ui_variant_b", variantB);
+
+// ~50% users in each variant (deterministic split)
+```
+
+**Pattern 3: Platform-Specific Features**
+
+```typescript
+const mobileFeature: CohortDef = { id: "mobile_feature", percentage: 100 };
+const desktopFeature: CohortDef = { id: "desktop_feature", percentage: 100 };
+
+// Combined with condition (Phase 3):
+// isEnabled IF (cohort=mobile_feature AND platform=ios/android)
+```
+
+### Security Considerations
+
+- **No Secrets**: Cohort IDs are shared with client. Never use cohort IDs to distribute secrets.
+- **Deterministic**: Same user always gets same bucketing (not random). Use for gradual rollouts, not security gates.
+- **Admin Overrides Only**: Explicit membership can only be set by admins (via database RLS in Phase 2).
+- **Server-Side Validation**: Always validate cohort membership on backend if used for premium features.
+
+### Performance Notes
+
+- **Bucketing**: O(1) — FNV hash computation is fast, memoized by default
+- **Cohort Checks**: ~0.1ms per check (after memoization)
+- **Memory**: Negligible (cohort definitions are small objects)
+
 ### Security Considerations
 
 - **No Secrets**: Feature flags are config-driven and visible in client code. Never store secrets in flag definitions.
@@ -1183,18 +1482,20 @@ All validation is logged via the `feature_flags` logger category.
 | feature-flags.ts          | Legacy `FeatureFlags` class, config toggles     | ✅ | ~130  |
 | server-sync.ts            | `FeatureFlagsManager`, entitlements, overrides  | ✅ | ~1700 |
 | rollout.ts                | Percentage-based rollouts                       | ✅ | ~100  |
+| cohorts.ts                | Cohort types & deterministic bucketing (Phase 1)| ✅ | ~300  |
 | conditions.ts             | Phase 1: Simple condition evaluators (internal) | ❌ | ~144  |
 | advanced-conditions.ts    | Phase 3: Logic operators, plugins (internal)   | ❌ | ~360  |
 | cache.ts                  | Phase 2: LRU evaluation cache (internal)        | ❌ | ~280  |
 | admin-tooling.ts          | Phase 3: Validation, graphs, simulation         | ❌ | ~380  |
 | telemetry.ts              | Phase 3: Monitoring, health checks, metrics     | ❌ | ~370  |
 | index.ts                  | Public API barrel export                        | — | 20    |
-| README.md                 | This file                                        | — | ~950  |
+| README.md                 | This file                                        | — | ~1600 |
 
 **Public Exports from index.ts:**
 - `FeatureFlags`, `FeatureFlag`, `FeatureFlagKind`, `FeatureFlagName`
 - `FeatureFlagsManager`, `EntitlementState`, `FeatureFlagState`, `FlagsSubscriber`
 - `bucketPercent`, `clearBucketCache`, `getBucketMemoized`, `isInRollout`, `isInRolloutMemoized`, `RolloutConfig`
+- `isUserInCohort`, `RECOMMENDED_COHORTS`, `CohortDef`, `CohortRow`, `CohortFlagAssignmentRow`, `UserCohortMembershipRow`
 
 **Internal Modules** (not exported; used internally by manager and hooks):
 - `conditions.ts` – Used by `FeatureFlagsManager._resolveFlag()`
