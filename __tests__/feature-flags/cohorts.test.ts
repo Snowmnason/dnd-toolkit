@@ -817,5 +817,252 @@ describe("Phase 3: Cohorts Integration", () => {
       });
     });
   });
+
+  // Phase 7: Additional Unit Tests for Edge Cases & Coverage
+  describe("Phase 7: Comprehensive Edge Cases", () => {
+    describe("isUserInCohort Edge Cases", () => {
+      it("should handle 0% percentage (no users)", () => {
+        const cohortDef = {
+          slug: "zero_percent",
+          name: "Zero Percent",
+          percentage: 0,
+        };
+
+        const result = isUserInCohort("any-user", "zero_percent", cohortDef);
+        expect(result).toBe(false);
+      });
+
+      it("should handle 100% percentage (all users)", () => {
+        const cohortDef = {
+          slug: "hundred_percent",
+          name: "Hundred Percent",
+          percentage: 100,
+        };
+
+        const result = isUserInCohort("any-user", "hundred_percent", cohortDef);
+        expect(result).toBe(true);
+      });
+
+      it("should handle null percentage (defaults to 100%)", () => {
+        const cohortDef = {
+          slug: "null_percent",
+          name: "Null Percent",
+          percentage: null as any,
+        };
+
+        const result = isUserInCohort("any-user", "null_percent", cohortDef);
+        expect(result).toBe(true);
+      });
+
+      it("should handle undefined percentage (defaults to 100%)", () => {
+        const cohortDef = {
+          slug: "undefined_percent",
+          name: "Undefined Percent",
+          percentage: undefined,
+        };
+
+        const result = isUserInCohort("any-user", "undefined_percent", cohortDef);
+        expect(result).toBe(true);
+      });
+
+      it("should be deterministic with various user ID formats", () => {
+        const cohortDef = {
+          slug: "test_determinism",
+          name: "Test Determinism",
+          percentage: 50,
+        };
+
+        const userIds = [
+          "user-123",
+          "user@example.com",
+          "uuid-12345678-1234-1234-1234-123456789012",
+          "very-long-user-id-that-might-cause-issues-with-hashing-algorithms",
+          "123", // numeric string
+          "", // empty string
+        ];
+
+        // Each user should consistently get the same result
+        userIds.forEach((userId) => {
+          const result1 = isUserInCohort(userId, "test_determinism", cohortDef);
+          const result2 = isUserInCohort(userId, "test_determinism", cohortDef);
+          const result3 = isUserInCohort(userId, "test_determinism", cohortDef);
+
+          expect(result1).toBe(result2);
+          expect(result2).toBe(result3);
+        });
+      });
+
+      it("should handle seed edge cases", () => {
+        const baseCohort = {
+          slug: "seed_test",
+          name: "Seed Test",
+          percentage: 50,
+        };
+
+        const userId = "different-test-user";
+
+        // Null seed (should use cohortId)
+        const nullSeed = { ...baseCohort, seed: null };
+        const resultNull = isUserInCohort(userId, "seed_test", nullSeed);
+
+        // Undefined seed (should use cohortId)
+        const undefinedSeed = { ...baseCohort, seed: undefined };
+        const resultUndefined = isUserInCohort(userId, "seed_test", undefinedSeed);
+
+        // Empty string seed
+        const emptySeed = { ...baseCohort, seed: "" };
+        const resultEmpty = isUserInCohort(userId, "seed_test", emptySeed);
+
+        // Null and undefined should be equivalent (both use cohortId)
+        expect(resultNull).toBe(resultUndefined);
+
+        // Empty string should be different
+        expect(resultEmpty).not.toBe(resultNull);
+      });
+
+      it("should handle very large percentages (over 100%)", () => {
+        const cohortDef = {
+          slug: "over_percent",
+          name: "Over Percent",
+          percentage: 150, // Over 100%
+        };
+
+        // FNV hash is always 0-99, so 150% means all users
+        const result = isUserInCohort("any-user", "over_percent", cohortDef);
+        expect(result).toBe(true);
+      });
+
+      it("should handle negative percentages", () => {
+        const cohortDef = {
+          slug: "negative_percent",
+          name: "Negative Percent",
+          percentage: -10,
+        };
+
+        // Negative percentage should result in no users
+        const result = isUserInCohort("any-user", "negative_percent", cohortDef);
+        expect(result).toBe(false);
+      });
+    });
+
+    describe("Cohort Distribution Statistics", () => {
+      it("should achieve expected distribution with large user set", () => {
+        const cohortDef = {
+          slug: "distribution_test",
+          name: "Distribution Test",
+          percentage: 25, // 25% of users
+        };
+
+        const userIds = Array.from({ length: 1000 }, (_, i) => `user-${i}`);
+        const includedUsers = userIds.filter(uid =>
+          isUserInCohort(uid, "distribution_test", cohortDef)
+        );
+
+        const actualPercentage = (includedUsers.length / userIds.length) * 100;
+
+        // Should be close to 25% (within 5% margin for statistical variation)
+        expect(actualPercentage).toBeGreaterThan(20);
+        expect(actualPercentage).toBeLessThan(30);
+      });
+
+      it("should maintain distribution consistency across multiple evaluations", () => {
+        const cohortDef = {
+          slug: "consistency_test",
+          name: "Consistency Test",
+          percentage: 33,
+        };
+
+        const userId = "consistency-user";
+
+        // Run multiple times
+        const results = Array.from({ length: 100 }, () =>
+          isUserInCohort(userId, "consistency_test", cohortDef)
+        );
+
+        // All results should be identical (deterministic)
+        const firstResult = results[0];
+        results.forEach(result => {
+          expect(result).toBe(firstResult);
+        });
+      });
+    });
+
+    describe("Error Handling & Validation", () => {
+      it("should handle malformed cohort definitions gracefully", () => {
+        // Missing required fields
+        const incompleteCohort = {
+          slug: "incomplete",
+          // missing name and percentage
+        } as any;
+
+        // Should not crash, but behavior is undefined
+        expect(() => {
+          isUserInCohort("user", "incomplete", incompleteCohort);
+        }).not.toThrow();
+      });
+
+      it("should handle extreme user ID lengths", () => {
+        const cohortDef = {
+          slug: "extreme_test",
+          name: "Extreme Test",
+          percentage: 50,
+        };
+
+        const extremeUserIds = [
+          "a".repeat(1000), // Very long user ID
+          "🚀".repeat(100), // Unicode characters
+          "user\nwith\nnewlines", // Special characters
+          "user\twith\ttabs",
+        ];
+
+        extremeUserIds.forEach(userId => {
+          expect(() => {
+            isUserInCohort(userId, "extreme_test", cohortDef);
+          }).not.toThrow();
+        });
+      });
+    });
+
+    describe("Performance Benchmarks", () => {
+      it("should evaluate quickly for single user", () => {
+        const cohortDef = {
+          slug: "perf_test",
+          name: "Performance Test",
+          percentage: 50,
+        };
+
+        const start = performance.now();
+
+        // Evaluate 1000 times
+        for (let i = 0; i < 1000; i++) {
+          isUserInCohort(`user-${i}`, "perf_test", cohortDef);
+        }
+
+        const end = performance.now();
+        const avgMs = (end - start) / 1000;
+
+        // Should be very fast (< 1ms per evaluation)
+        expect(avgMs).toBeLessThan(1);
+      });
+
+      it("should handle concurrent evaluations", async () => {
+        const cohortDef = {
+          slug: "concurrent_test",
+          name: "Concurrent Test",
+          percentage: 50,
+        };
+
+        const evaluations = Array.from({ length: 100 }, (_, i) =>
+          Promise.resolve(isUserInCohort(`user-${i}`, "concurrent_test", cohortDef))
+        );
+
+        const results = await Promise.all(evaluations);
+
+        // All evaluations should complete
+        expect(results).toHaveLength(100);
+        expect(results.every(r => typeof r === "boolean")).toBe(true);
+      });
+    });
+  });
 });
 
