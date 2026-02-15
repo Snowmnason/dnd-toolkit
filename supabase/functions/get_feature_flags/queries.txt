@@ -25,7 +25,9 @@ export async function fetchFeatureFlags(
   const { data, error } = await supabase
     .schema('feature_flags')
     .from('feature_flags')
-    .select("flag_name, enabled, kind, description, created_at, updated_at");
+    .select(
+      "flag_name, enabled, kind, description, created_at, updated_at, depends_on, condition_logic, metadata",
+    );
 
   if (error) {
     console.error("Error fetching feature flags:", error?.message ?? error);

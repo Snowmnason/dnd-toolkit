@@ -296,6 +296,7 @@ function validateAppSettingsImpl(config: AppSettings): ConfigValidationResult {
             "security",
             "bootstrap",
             "error",
+            "feature_flags",
             "other",
           ];
           for (const cat of requiredCategories) {

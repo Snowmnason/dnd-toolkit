@@ -69,6 +69,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     connectedWorldIds: [],
   });
   const [authStateVersion, setAuthStateVersion] = useState(0);
+  const previousUserIdRef = React.useRef<string | undefined>(undefined);
 
   // Load from storage on mount AND when auth state changes
   useEffect(() => {
@@ -505,6 +506,26 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
       }
     };
   }, []);
+
+  // Force re-verification when userId transitions from undefined→defined (auth just completed)
+  // This catches the race condition where verification ran before auth was ready
+  useEffect(() => {
+    const hadNoUserId = previousUserIdRef.current === undefined;
+    const nowHasUserId = stableParams.userId !== undefined;
+
+    if (hadNoUserId && nowHasUserId && stableParams.connectedWorldIds.length === 0) {
+      logger.info(
+        "context",
+        "AppParamsStableProvider: UserId just became available with empty worlds - forcing re-verification to catch auth race condition",
+      );
+      // Bump authStateVersion to trigger loadFromStorage again
+      // This time userId is available so verification will run properly
+      setAuthStateVersion((v) => v + 1);
+    }
+
+    // Update the ref for next comparison
+    previousUserIdRef.current = stableParams.userId;
+  }, [stableParams.userId]);
 
   const setUserId = useCallback((userId: string | undefined) => {
     setStableParams((prev) => ({ ...prev, userId }));

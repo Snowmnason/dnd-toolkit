@@ -20,10 +20,17 @@
 
 import { trackVariantAssignment } from "@/lib/analytics/variant-tracking";
 import { getAppConfig, isDevelopment } from "@/lib/config/loader";
+import { getPlatformName } from "@/lib/config/platform-config";
 import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
 import { FeatureFlagOverrideRow } from "@/lib/database/feature-flag-overrides";
 import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
+import {
+    evaluateAdvancedCondition,
+    validateAdvancedCondition,
+} from "./advanced-conditions";
+import { FlagEvaluationCache } from "./cache";
+import { evaluateConditions, type FlagContext } from "./conditions";
 import { isInRolloutMemoized } from "./rollout";
 
 // ==========================================
@@ -34,6 +41,12 @@ export interface FeatureFlagState {
   enabled: boolean;
   kind?: string;
   description?: string;
+  /** Optional list of dependent flag names from server */
+  depends_on?: string[] | null;
+  /** Optional advanced condition tree from server (Phase 3) */
+  condition_logic?: Record<string, any> | null;
+  /** Optional structured metadata for nested configurations (e.g., logger categories) */
+  metadata?: Record<string, any> | null;
   source: "server" | "hardcoded" | "override";
 }
 
@@ -64,6 +77,12 @@ export interface CachedEntitlement {
 export interface CachedFeatureFlag {
   flag_name: string;
   enabled: boolean;
+  /** Optional list of dependent flag names from DB */
+  depends_on?: string[] | null;
+  /** Optional advanced condition tree from DB */
+  condition_logic?: Record<string, any> | null;
+  /** Optional structured metadata for nested configurations from DB */
+  metadata?: Record<string, any> | null;
   kind: string;
   description?: string;
   created_at: string;
@@ -119,6 +138,7 @@ class FeatureFlagsManagerClass {
   private remoteOverrides: Map<string, FeatureFlagOverrideRow> = new Map(); // Remote server overrides (per-user)
   private cachedEntitlements: Map<string, CachedEntitlement> = new Map(); // Cached from bootstrap + Realtime
   private cachedRollouts: Map<string, CachedRolloutConfig> = new Map(); // NEW: Rollout config for percentage-based rollouts
+  private evaluationCache: FlagEvaluationCache = new FlagEvaluationCache(); // Phase 2: LRU cache for isEnabledWithContext results
   private subscribers: Set<FlagsSubscriber> = new Set();
   private bootstrapped = false;
   private userId: string | null = null;
@@ -352,6 +372,9 @@ class FeatureFlagsManagerClass {
             enabled: flag.enabled,
             kind: flag.kind,
             description: flag.description,
+            depends_on: flag.depends_on || null,
+            condition_logic: flag.condition_logic || null,
+            metadata: flag.metadata || null,
             source: "server",
           });
         }
@@ -425,6 +448,9 @@ class FeatureFlagsManagerClass {
     if (!isDev) {
       await this.subscribeToRealtimeUpdates();
     }
+
+    // Validate flag dependencies and conditions (soft checks, doesn't block startup)
+    this.validateFlagDependencies();
   }
 
   /**
@@ -604,6 +630,8 @@ class FeatureFlagsManagerClass {
         if (flag?.flag_name) {
           this.currentFlags.delete(flag.flag_name);
           logger.debug("feature_flags", `Flag deleted:`, flag.flag_name);
+          // Invalidate evaluation cache for this flag
+          this.invalidateFlagCache(flag.flag_name);
         }
       } else if (eventType === "INSERT" || eventType === "UPDATE") {
         // Flag was inserted or updated
@@ -615,6 +643,8 @@ class FeatureFlagsManagerClass {
             source: "server",
           });
           logger.debug("feature_flags", `Flag ${eventType}:`, flag.flag_name);
+          // Invalidate evaluation cache for this flag
+          this.invalidateFlagCache(flag.flag_name);
         }
       }
 
@@ -649,6 +679,8 @@ class FeatureFlagsManagerClass {
         // Entitlement was revoked/deleted
         this.cachedEntitlements.delete(entitlementKey);
         logger.debug("feature_flags", `Entitlement revoked: ${entitlementKey}`);
+        // Clear evaluation cache since user's role/entitlements changed
+        this.clearEvaluationCache();
       } else if (eventType === "INSERT" || eventType === "UPDATE") {
         // Entitlement was granted or updated
         if (entitlementData) {
@@ -661,6 +693,8 @@ class FeatureFlagsManagerClass {
             `Entitlement ${eventType}:`,
             entitlementKey,
           );
+          // Clear evaluation cache since user's role/entitlements changed
+          this.clearEvaluationCache();
         }
       }
 
@@ -690,6 +724,8 @@ class FeatureFlagsManagerClass {
         // Override was revoked, remove from map
         this.remoteOverrides.delete(targetName);
         logger.debug("feature_flags", `Override revoked: ${targetName}`);
+        // Invalidate evaluation cache for this flag
+        this.invalidateFlagCache(targetName);
       } else if (overrideData?.target_type === "flag") {
         // Only track flag-type overrides
         this.remoteOverrides.set(
@@ -697,6 +733,8 @@ class FeatureFlagsManagerClass {
           overrideData as FeatureFlagOverrideRow,
         );
         logger.debug("feature_flags", `Override ${eventType}: ${targetName}`);
+        // Invalidate evaluation cache for this flag
+        this.invalidateFlagCache(targetName);
       }
 
       // Cache updated overrides
@@ -726,6 +764,9 @@ class FeatureFlagsManagerClass {
           enabled: !!value.enabled,
           kind: value.kind,
           description: value.description,
+          depends_on: (value as any).dependsOn || null,
+          condition_logic: (value as any).conditionLogic || null,
+          metadata: (value as any).metadata || null,
           source: "hardcoded",
         });
       }
@@ -1296,7 +1337,511 @@ class FeatureFlagsManagerClass {
   }
 
   /**
-   * Get all cached rollouts (for debugging/logging)
+   * Evaluate if a flag is enabled considering conditions and dependencies
+   *
+   * **Resolution order (in priority):**
+   * 1. Check if flag exists in current flags
+   * 2. Check conditions (platform, environment, userRole) — AND logic
+   * 3. Resolve dependencies recursively (all must be enabled)
+   * 4. Return final boolean result
+   *
+   * **Context Defaults & Auto-Detection:**
+   * - `platform`: Falls back to current platform if not provided
+   * - `environment`: Falls back to app config environment if not provided
+   * - `userRole`: **Phase 3:** Auto-detected from cached entitlements if not provided (via `getCachedUserRole()`)
+   *
+   * **Phase 2: Caching** — Results are cached per (flag, context) signature using LRU cache.
+   * Default TTL is 1 hour; evictions are LRU-based at 256 entries max.
+   * Cache can be cleared via `evaluationCache.clear()` or per-flag via `invalidateFlagCache(flagName)`.
+   *
+   * **Per-Call Memoization:** Within a single evaluation, per-call memoization avoids
+   * redundant work for dependencies checked multiple times.
+   *
+   * **Usage Examples:**
+   * ```ts
+   * import { FeatureFlagsManager } from "@/lib/feature-flags";
+   *
+   * // Explicit role
+   * const enabled = FeatureFlagsManager.isEnabledWithContext('advancedMaps', {
+   *   platform: 'web',
+   *   environment: 'production',
+   *   userRole: 'admin'
+   * });
+   *
+   * // Auto-detect role from entitlements
+   * const autoDetected = FeatureFlagsManager.isEnabledWithContext('advancedMaps', {
+   *   platform: 'web'
+   *   // userRole will be auto-detected from cached entitlements
+   * });
+   *
+   * // Use defaults for all context fields
+   * const withDefaults = FeatureFlagsManager.isEnabledWithContext('simpleFeature');
+   * ```
+   *
+   * @param flagName - Name of the flag to evaluate
+   * @param context - Optional runtime context (platform, environment, userRole, etc.)
+   *                  Omitted fields use defaults: platform from current platform,
+   *                  environment from app config, userRole from cached entitlements
+   * @returns true if flag is enabled considering conditions and dependencies
+   */
+  isEnabledWithContext(
+    flagName: string,
+    context: FlagContext = {},
+  ): boolean {
+    // Phase 2: Check LRU cache first (TTL: 1 hour, max 256 entries)
+    const platform = context.platform || getPlatformName();
+    const environment = context.environment || getAppConfig().environment;
+    // Phase 3: Auto-detect userRole from cached entitlements if not provided
+    const userRole = context.userRole || this.getCachedUserRole();
+
+    const cachedResult = this.evaluationCache.getResult(
+      flagName,
+      platform,
+      environment,
+      userRole,
+    );
+
+    if (cachedResult !== undefined) {
+      logger.debug("feature_flags", `Flag evaluation cache hit: ${flagName}`);
+      return cachedResult;
+    }
+
+    // Create a resolved context with defaults to ensure evaluators receive concrete values
+    // This prevents undefined comparisons in condition evaluation
+    const resolvedContext: FlagContext = {
+      platform: context.platform || platform,
+      environment: context.environment || environment,
+      userRole: userRole,
+    };
+
+    // Cache miss: evaluate the flag
+    const callMemo = new Map<string, boolean>();
+    const resolving = new Set<string>(); // Track in-progress resolutions for cycle detection
+    const result = this._resolveFlag(flagName, resolvedContext, callMemo, resolving);
+
+    // Cache the result for future lookups
+    this.evaluationCache.setResult(
+      flagName,
+      platform,
+      environment,
+      userRole,
+      result,
+    );
+
+    return result;
+  }
+
+  /**
+   * Internal recursive flag resolver with per-call memoization and cycle detection
+   * @private
+   * @param flagName - Flag to resolve
+   * @param context - Evaluation context
+   * @param memo - Map of completed evaluations (cacheKey → result)
+   * @param resolving - Set of flags currently being resolved (cycle detection)
+   */
+  private _resolveFlag(
+    flagName: string,
+    context: FlagContext,
+    memo: Map<string, boolean>,
+    resolving: Set<string>,
+  ): boolean {
+    // Create a cache key from flag name and context signature
+    const cacheKey = this._makeContextKey(flagName, context);
+
+    // Return cached result if already evaluated in this call
+    if (memo.has(cacheKey)) {
+      return memo.get(cacheKey)!;
+    }
+
+    // Detect circular dependency: if flag is already being resolved, fail closed
+    if (resolving.has(cacheKey)) {
+      logger.warn(
+        "feature_flags",
+        `Circular dependency detected for flag ${flagName}. Returning false to prevent infinite recursion.`,
+      );
+      memo.set(cacheKey, false);
+      return false;
+    }
+
+    // Mark this flag as currently resolving
+    resolving.add(cacheKey);
+
+    // Get the flag definition from current flags
+    const flagState = this.currentFlags.get(flagName);
+    if (!flagState) {
+      logger.warn(
+        "feature_flags",
+        `Flag not found: ${flagName}, treating as disabled`,
+      );
+      memo.set(cacheKey, false);
+      return false;
+    }
+
+    // Step 1: Check if base flag is enabled
+    if (!flagState.enabled) {
+      memo.set(cacheKey, false);
+      return false;
+    }
+
+    // Step 2: Get flag config from server-backed state, or fall back to AppSettings for schema
+    const appConfig = getAppConfig();
+    // eslint-disable-next-line security/detect-object-injection
+    const hardcodedFlagConfig = appConfig.featureFlags?.[flagName];
+
+    // Build effective flag config by merging server data + hardcoded schema
+    // Dependencies are merged independently to ensure hardcoded dependsOn isn't lost
+    const flagConfig = {
+      depends_on: flagState.depends_on || hardcodedFlagConfig?.dependsOn,
+      condition_logic: flagState.condition_logic,
+      conditions: hardcodedFlagConfig?.conditions,
+      dependsOn: flagState.depends_on || hardcodedFlagConfig?.dependsOn, // Also support camelCase for compatibility
+      conditionLogic: flagState.condition_logic || hardcodedFlagConfig?.conditionLogic,
+    };
+
+    // If server didn't provide conditions, use hardcoded config
+    // (dependencies are already merged independently above, so we don't repeat that here)
+    if (!flagConfig.conditionLogic && !flagConfig.conditions && hardcodedFlagConfig) {
+      Object.assign(flagConfig, {
+        conditionLogic: hardcodedFlagConfig.conditionLogic,
+        conditions: hardcodedFlagConfig.conditions,
+      });
+    }
+
+    // Step 2: Evaluate conditions
+    // Phase 3: Check advanced condition logic first (OR, NOT, nested)
+    if (flagConfig.conditionLogic) {
+      try {
+        const validationErrors = validateAdvancedCondition(
+          flagConfig.conditionLogic as any,
+        );
+        if (validationErrors.length > 0) {
+          logger.error(
+            "feature_flags",
+            `Invalid conditionLogic for flag ${flagName}: ${validationErrors.join("; ")}`,
+          );
+          memo.set(cacheKey, false);
+          return false;
+        }
+
+        const conditionsPass = evaluateAdvancedCondition(
+          flagConfig.conditionLogic as any,
+          context,
+        );
+        if (!conditionsPass) {
+          memo.set(cacheKey, false);
+          return false;
+        }
+      } catch (error) {
+        logger.error(
+          "feature_flags",
+          `Error evaluating advanced conditions for ${flagName}: ${error}`,
+        );
+        memo.set(cacheKey, false);
+        return false;
+      }
+    }
+    // Phase 1: Fall back to simple conditions (AND logic)
+    else if (flagConfig.conditions) {
+      const conditionsPass = evaluateConditions(flagConfig.conditions, context);
+      if (!conditionsPass) {
+        memo.set(cacheKey, false);
+        return false;
+      }
+    }
+
+    // Step 3: Resolve dependencies (all dependencies must be enabled)
+    if (flagConfig.dependsOn && flagConfig.dependsOn.length > 0) {
+      for (const depName of flagConfig.dependsOn) {
+        // Recursively check each dependency with the same context and resolving set
+        const depEnabled = this._resolveFlag(depName, context, memo, resolving);
+        if (!depEnabled) {
+          logger.debug(
+            "feature_flags",
+            `Flag ${flagName} disabled: dependency ${depName} is disabled`,
+          );
+          memo.set(cacheKey, false);
+          return false;
+        }
+      }
+    }
+
+    // All checks passed
+    memo.set(cacheKey, true);
+    return true;
+  }
+
+  /**
+   * Create a cache key for (flag, context) signature
+   * @private
+   */
+  private _makeContextKey(
+    flagName: string,
+    context: FlagContext,
+  ): string {
+    const platform = context.platform || getPlatformName();
+    const environment = context.environment || getAppConfig().environment;
+    const role = context.userRole || "unknown";
+    return `${flagName}::${platform}::${environment}::${role}`;
+  }
+
+  /**
+   * Validate feature flag dependencies and conditions at bootstrap
+   * Checks for missing dependencies and circular references
+   * Logs warnings (soft checks, doesn't block startup)
+   * @private
+   */
+  private validateFlagDependencies(): void {
+    const config = getAppConfig();
+    const flags = config.featureFlags || {};
+
+    if (Object.keys(flags).length === 0) {
+      return; // No flags to validate
+    }
+
+    // Collect all flag names for existence checks
+    const allFlagNames = new Set(Object.keys(flags));
+
+    // Check each flag for issues
+    for (const [flagName, flagConfig] of Object.entries(flags)) {
+      if (!flagConfig || typeof flagConfig !== "object") {
+        continue;
+      }
+
+      // Phase 3: Validate advanced condition logic
+      if (flagConfig.conditionLogic) {
+        const validationErrors = validateAdvancedCondition(
+          flagConfig.conditionLogic as any,
+        );
+        if (validationErrors.length > 0) {
+          logger.warn(
+            "feature_flags",
+            `Invalid conditionLogic for flag "${flagName}": ${validationErrors.join("; ")}`,
+          );
+        }
+      }
+
+      // Check for missing dependencies
+      if (flagConfig.dependsOn && Array.isArray(flagConfig.dependsOn)) {
+        for (const depName of flagConfig.dependsOn) {
+          if (!allFlagNames.has(depName)) {
+            logger.warn(
+              "feature_flags",
+              `Flag "${flagName}" depends on missing flag "${depName}"`,
+            );
+          }
+        }
+      }
+    }
+
+    // Check for circular dependencies using DFS
+    for (const flagName of allFlagNames) {
+      const cycle = this._detectCycle(flagName, flags, new Set(), new Set());
+      if (cycle) {
+        logger.warn(
+          "feature_flags",
+          `Circular dependency detected: ${cycle.join(" → ")}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Detect circular dependencies using depth-first search
+   * @private
+   */
+  private _detectCycle(
+    flagName: string,
+    flags: Record<string, any>,
+    visited: Set<string>,
+    stackSet: Set<string>,
+  ): string[] | null {
+    visited.add(flagName);
+    stackSet.add(flagName);
+
+    // eslint-disable-next-line security/detect-object-injection
+    const flagConfig = flags[flagName] as any;
+    if (!flagConfig || !flagConfig.dependsOn || !Array.isArray(flagConfig.dependsOn)) {
+      stackSet.delete(flagName);
+      return null;
+    }
+
+    for (const depName of flagConfig.dependsOn) {
+      if (!visited.has(depName)) {
+        const cycle = this._detectCycle(
+          depName,
+          flags,
+          visited,
+          stackSet,
+        );
+        if (cycle) {
+          return [flagName, ...cycle];
+        }
+      } else if (stackSet.has(depName)) {
+        // Found a back edge (cycle)
+        return [flagName, depName];
+      }
+    }
+
+    stackSet.delete(flagName);
+    return null;
+  }
+
+  /**
+   * Invalidate evaluation cache for a specific flag
+   *
+   * Call this when a flag's config changes, conditions change, or dependencies change.
+   * This ensures subsequent evaluations will re-evaluate conditions and dependencies.
+   *
+   * **Phase 2:** Part of cache invalidation strategy. Use alongside invalidateRoleCache()
+   * when user roles change or when fetching fresh entitlements.
+   *
+   * @param flagName - Name of the flag whose cache entries should be invalidated
+   *
+   * @example
+   * ```ts
+   * // When a flag config is updated from server
+   * FeatureFlagsManager.invalidateFlagCache('advancedMaps');
+   *
+   * // Subsequent evaluations will re-evaluate conditions
+   * const enabled = FeatureFlagsManager.isEnabledWithContext('advancedMaps', context);
+   * ```
+   */
+  invalidateFlagCache(flagName: string): void {
+    this.evaluationCache.invalidateFlag(flagName);
+    logger.debug(
+      "feature_flags",
+      `Invalidated evaluation cache for flag: ${flagName}`,
+    );
+  }
+
+  /**
+   * Invalidate evaluation cache for a specific user role
+   *
+   * Call this when user role changes or when fresh entitlements are fetched.
+   * This ensures subsequent role-based evaluations are re-computed.
+   *
+   * **Phase 2:** Part of cache invalidation strategy. Use after updating cachedEntitlements
+   * or when user role changes to ensure role-based conditions are re-evaluated.
+   *
+   * @param userRole - User role string (e.g., 'admin', 'player', 'unknown')
+   *
+   * @example
+   * ```ts
+   * // When user role changes (e.g., premium subscription activated)
+   * FeatureFlagsManager.invalidateRoleCache('premium-user');
+   *
+   * // Subsequent evaluations with role-based conditions will be re-computed
+   * const enabled = FeatureFlagsManager.isEnabledWithContext('advancedMaps', {
+   *   userRole: 'premium-user'
+   * });
+   * ```
+   */
+  invalidateRoleCache(userRole: string): void {
+    this.evaluationCache.invalidateRole(userRole);
+    logger.debug(
+      "feature_flags",
+      `Invalidated evaluation cache for role: ${userRole}`,
+    );
+  }
+
+  /**
+   * Clear all cached evaluations
+   *
+   * Use sparingly — primarily for testing or when performing a full reset.
+   * Use invalidateFlagCache() or invalidateRoleCache() for targeted invalidation instead.
+   *
+   * @example
+   * ```ts
+   * // Full cache reset (e.g., after logout or major config change)
+   * FeatureFlagsManager.clearEvaluationCache();
+   * ```
+   */
+  clearEvaluationCache(): void {
+    this.evaluationCache.clear();
+    logger.info("feature_flags", "Cleared all evaluation cache entries");
+  }
+
+  /**
+   * Get cached user role from entitlements
+   *
+   * **Phase 2:** Queries cached entitlements to determine the user's role.
+   * Checks for known role entitlements (admin, moderator, premium_user, etc.)
+   * and returns the first matching role found.
+   *
+   * Falls back gracefully:
+   * - If no role entitlements found, returns "unknown"
+   * - If entitlements not loaded yet, returns undefined (caller should provide role in context)
+   *
+   * **How it works:**
+   * 1. Iterates through cached entitlements
+   * 2. Looks for known role keys (e.g., 'admin', 'moderator')
+   * 3. Checks expiry (excludes expired entitlements)
+   * 4. Returns first matching role or "unknown"
+   *
+   * **Performance:** O(n) scan of cached entitlements; use getCachedUserRole() judiciously.
+   *
+   * @returns User's role string (e.g., 'admin', 'moderator', 'premium_user') or "unknown"
+   *
+   * @example
+   * ```ts
+   * // After entitlements are loaded from server
+   * const role = FeatureFlagsManager.getCachedUserRole();
+   * console.log(`User role: ${role}`); // "admin" or "premium_user" or "unknown"
+   *
+   * // Use in feature flag evaluation
+   * const hasAccess = FeatureFlagsManager.isEnabledWithContext('advancedMaps', {
+   *   userRole: role
+   * });
+   * ```
+   */
+  getCachedUserRole(): string {
+    // List of known role entitlements to check for
+    const knownRoles = ["admin", "moderator", "premium_user", "vip"];
+
+    // Iterate through cached entitlements and check for known roles
+    for (const entitlement of this.cachedEntitlements.values()) {
+      // Check if this entitlement's key matches a known role
+      if (knownRoles.includes(entitlement.key)) {
+        // Check if entitlement has not expired
+        if (entitlement.expires_at) {
+          const expiryTime = new Date(entitlement.expires_at).getTime();
+          if (expiryTime < Date.now()) {
+            // Entitlement has expired, skip it
+            continue;
+          }
+        }
+
+        logger.debug(
+          "feature_flags",
+          `Found cached user role: ${entitlement.key}`,
+        );
+        return entitlement.key;
+      }
+    }
+
+    // No role entitlements found
+    logger.debug("feature_flags", "No cached user role found, using 'unknown'");
+    return "unknown";
+  }
+
+  /**
+   * Get cache statistics (for debugging/monitoring)
+   *
+   * Returns hit/miss rates and current cache size information.
+   *
+   * @example
+   * ```ts
+   * const stats = FeatureFlagsManager.getEvaluationCacheStats();
+   * console.log(`Cache hit rate: ${(stats.hitRate * 100).toFixed(1)}%`);
+   * console.log(`Current entries: ${stats.size}`);
+   * ```
+   */
+  getEvaluationCacheStats() {
+    return this.evaluationCache.getStats();
+  }
+
+  /**
+   * Get all cached evaluations (for debugging/logging)
    */
   getRollouts(): Record<string, CachedRolloutConfig> {
     return Object.fromEntries(this.cachedRollouts);

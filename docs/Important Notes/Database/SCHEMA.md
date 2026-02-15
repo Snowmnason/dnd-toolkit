@@ -138,6 +138,9 @@ Master list of feature flags. Resolution order: overrides > entitlements > rollo
 | ------------- | ----------- | -------- | ------- | --------------------------------------- |
 | `flag_name`   | text        | No       | —       | PK — unique flag identifier             |
 | `enabled`     | boolean     | No       | `false` | Global default; overridable per-user    |
+| `depends_on`  | text[]      | Yes      | `NULL`  | Optional list of other flags this flag depends on (array of flag names). Useful for server-side dependency resolution and graph analysis.
+| `condition_logic` | jsonb  | Yes      | `NULL`  | Optional advanced condition tree (Phase 3). Stores the `conditionLogic` object used by the app (operators, nested conditions, custom evaluators).
+| `metadata`    | jsonb       | Yes      | `NULL`  | Optional structured payload for nested configurations. Example: `{ "categories": { "auth": true, "api": false, ... } }` for flags with sub-toggles (logger categories, feature options, etc.).
 | `kind`        | text        | No       | —       | Type: `'boolean'`, `'string'`, `'percentage'`, `'entitlement'` |
 | `description` | text        | Yes      | `NULL`  | Human-readable purpose                  |
 | `created_at`  | timestamptz | No       | `now()` | —                                       |

@@ -29,7 +29,8 @@ type LogCategory =
   | "bootstrap" // App initialization and bootstrap
   | "jobs" // Background job queue and task processing
   | "error" // Error handling and reporting
-  | "other"; // Catch-all for miscellaneous logs
+  | "other" // Catch-all for miscellaneous logs
+  | "feature_flags"; // Feature flag related logs
 
 interface LoggerConfig {
   enabledLevels: LogLevel[];
@@ -148,6 +149,7 @@ class Logger {
         "navigation",
         "api",
         "network",
+        "feature_flags",
         "performance",
         "storage",
         "ui",
@@ -166,6 +168,7 @@ class Logger {
     if (categories.navigation !== false) enabled.push("navigation");
     if (categories.api !== false) enabled.push("api");
     if (categories.network !== false) enabled.push("network");
+    if (categories.feature_flags !== false) enabled.push("feature_flags");
     if (categories.performance !== false) enabled.push("performance");
     if (categories.storage !== false) enabled.push("storage");
     if (categories.ui !== false) enabled.push("ui");
@@ -197,6 +200,7 @@ class Logger {
       "navigation",
       "api",
       "network",
+      "feature_flags",
       "performance",
       "storage",
       "ui",
