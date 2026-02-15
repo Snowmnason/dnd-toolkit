@@ -27,6 +27,7 @@
   "featureFlags.loggerCategories.categories.analytics": "Dev enables analytics logging for visibility during development; production restricts to essential categories",
   "featureFlags.loggerCategories.categories.bootstrap": "Dev enables bootstrap logging; production restricts to essential categories",
   "featureFlags.loggerCategories.categories.other": "Dev enables miscellaneous logging; production restricts to essential categories",
+  "featureFlags.loggerCategories.categories.feature_flags": "Dev enables feature flags logging for debugging; production restricts to essential categories",
   "backgroundJobs.reconnectDebounceMs": "Dev uses faster reconnect debounce for rapid testing; production uses conservative timing",
   "backgroundJobs.pollIntervalMs": "Dev polls faster for quicker feedback; production polls less frequently for stability",
   "backgroundJobs.description": "Background job configuration differs between dev and prod to reflect test vs production behavior",

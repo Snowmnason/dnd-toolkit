@@ -26,8 +26,8 @@ import { FeatureFlagOverrideRow } from "@/lib/database/feature-flag-overrides";
 import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import {
-  evaluateAdvancedCondition,
-  validateAdvancedCondition,
+    evaluateAdvancedCondition,
+    validateAdvancedCondition,
 } from "./advanced-conditions";
 import { FlagEvaluationCache } from "./cache";
 import { evaluateConditions, type FlagContext } from "./conditions";
@@ -630,6 +630,8 @@ class FeatureFlagsManagerClass {
         if (flag?.flag_name) {
           this.currentFlags.delete(flag.flag_name);
           logger.debug("feature_flags", `Flag deleted:`, flag.flag_name);
+          // Invalidate evaluation cache for this flag
+          this.invalidateFlagCache(flag.flag_name);
         }
       } else if (eventType === "INSERT" || eventType === "UPDATE") {
         // Flag was inserted or updated
@@ -641,6 +643,8 @@ class FeatureFlagsManagerClass {
             source: "server",
           });
           logger.debug("feature_flags", `Flag ${eventType}:`, flag.flag_name);
+          // Invalidate evaluation cache for this flag
+          this.invalidateFlagCache(flag.flag_name);
         }
       }
 
@@ -675,6 +679,8 @@ class FeatureFlagsManagerClass {
         // Entitlement was revoked/deleted
         this.cachedEntitlements.delete(entitlementKey);
         logger.debug("feature_flags", `Entitlement revoked: ${entitlementKey}`);
+        // Clear evaluation cache since user's role/entitlements changed
+        this.clearEvaluationCache();
       } else if (eventType === "INSERT" || eventType === "UPDATE") {
         // Entitlement was granted or updated
         if (entitlementData) {
@@ -687,6 +693,8 @@ class FeatureFlagsManagerClass {
             `Entitlement ${eventType}:`,
             entitlementKey,
           );
+          // Clear evaluation cache since user's role/entitlements changed
+          this.clearEvaluationCache();
         }
       }
 
@@ -716,6 +724,8 @@ class FeatureFlagsManagerClass {
         // Override was revoked, remove from map
         this.remoteOverrides.delete(targetName);
         logger.debug("feature_flags", `Override revoked: ${targetName}`);
+        // Invalidate evaluation cache for this flag
+        this.invalidateFlagCache(targetName);
       } else if (overrideData?.target_type === "flag") {
         // Only track flag-type overrides
         this.remoteOverrides.set(
@@ -723,6 +733,8 @@ class FeatureFlagsManagerClass {
           overrideData as FeatureFlagOverrideRow,
         );
         logger.debug("feature_flags", `Override ${eventType}: ${targetName}`);
+        // Invalidate evaluation cache for this flag
+        this.invalidateFlagCache(targetName);
       }
 
       // Cache updated overrides
@@ -1333,6 +1345,11 @@ class FeatureFlagsManagerClass {
    * 3. Resolve dependencies recursively (all must be enabled)
    * 4. Return final boolean result
    *
+   * **Context Defaults & Auto-Detection:**
+   * - `platform`: Falls back to current platform if not provided
+   * - `environment`: Falls back to app config environment if not provided
+   * - `userRole`: **Phase 3:** Auto-detected from cached entitlements if not provided (via `getCachedUserRole()`)
+   *
    * **Phase 2: Caching** — Results are cached per (flag, context) signature using LRU cache.
    * Default TTL is 1 hour; evictions are LRU-based at 256 entries max.
    * Cache can be cleared via `evaluationCache.clear()` or per-flag via `invalidateFlagCache(flagName)`.
@@ -1340,23 +1357,31 @@ class FeatureFlagsManagerClass {
    * **Per-Call Memoization:** Within a single evaluation, per-call memoization avoids
    * redundant work for dependencies checked multiple times.
    *
-   * **Usage:**
+   * **Usage Examples:**
    * ```ts
    * import { FeatureFlagsManager } from "@/lib/feature-flags";
    *
+   * // Explicit role
    * const enabled = FeatureFlagsManager.isEnabledWithContext('advancedMaps', {
    *   platform: 'web',
    *   environment: 'production',
    *   userRole: 'admin'
    * });
    *
-   * if (enabled) {
-   *   // Show advanced features
-   * }
+   * // Auto-detect role from entitlements
+   * const autoDetected = FeatureFlagsManager.isEnabledWithContext('advancedMaps', {
+   *   platform: 'web'
+   *   // userRole will be auto-detected from cached entitlements
+   * });
+   *
+   * // Use defaults for all context fields
+   * const withDefaults = FeatureFlagsManager.isEnabledWithContext('simpleFeature');
    * ```
    *
    * @param flagName - Name of the flag to evaluate
-   * @param context - Runtime context (platform, environment, userRole, etc.)
+   * @param context - Optional runtime context (platform, environment, userRole, etc.)
+   *                  Omitted fields use defaults: platform from current platform,
+   *                  environment from app config, userRole from cached entitlements
    * @returns true if flag is enabled considering conditions and dependencies
    */
   isEnabledWithContext(
@@ -1366,7 +1391,8 @@ class FeatureFlagsManagerClass {
     // Phase 2: Check LRU cache first (TTL: 1 hour, max 256 entries)
     const platform = context.platform || getPlatformName();
     const environment = context.environment || getAppConfig().environment;
-    const userRole = context.userRole;
+    // Phase 3: Auto-detect userRole from cached entitlements if not provided
+    const userRole = context.userRole || this.getCachedUserRole();
 
     const cachedResult = this.evaluationCache.getResult(
       flagName,
@@ -1380,9 +1406,18 @@ class FeatureFlagsManagerClass {
       return cachedResult;
     }
 
+    // Create a resolved context with defaults to ensure evaluators receive concrete values
+    // This prevents undefined comparisons in condition evaluation
+    const resolvedContext: FlagContext = {
+      platform: context.platform || platform,
+      environment: context.environment || environment,
+      userRole: userRole,
+    };
+
     // Cache miss: evaluate the flag
     const callMemo = new Map<string, boolean>();
-    const result = this._resolveFlag(flagName, context, callMemo);
+    const resolving = new Set<string>(); // Track in-progress resolutions for cycle detection
+    const result = this._resolveFlag(flagName, resolvedContext, callMemo, resolving);
 
     // Cache the result for future lookups
     this.evaluationCache.setResult(
@@ -1397,13 +1432,18 @@ class FeatureFlagsManagerClass {
   }
 
   /**
-   * Internal recursive flag resolver with per-call memoization
+   * Internal recursive flag resolver with per-call memoization and cycle detection
    * @private
+   * @param flagName - Flag to resolve
+   * @param context - Evaluation context
+   * @param memo - Map of completed evaluations (cacheKey → result)
+   * @param resolving - Set of flags currently being resolved (cycle detection)
    */
   private _resolveFlag(
     flagName: string,
     context: FlagContext,
     memo: Map<string, boolean>,
+    resolving: Set<string>,
   ): boolean {
     // Create a cache key from flag name and context signature
     const cacheKey = this._makeContextKey(flagName, context);
@@ -1412,6 +1452,19 @@ class FeatureFlagsManagerClass {
     if (memo.has(cacheKey)) {
       return memo.get(cacheKey)!;
     }
+
+    // Detect circular dependency: if flag is already being resolved, fail closed
+    if (resolving.has(cacheKey)) {
+      logger.warn(
+        "feature_flags",
+        `Circular dependency detected for flag ${flagName}. Returning false to prevent infinite recursion.`,
+      );
+      memo.set(cacheKey, false);
+      return false;
+    }
+
+    // Mark this flag as currently resolving
+    resolving.add(cacheKey);
 
     // Get the flag definition from current flags
     const flagState = this.currentFlags.get(flagName);
@@ -1436,20 +1489,21 @@ class FeatureFlagsManagerClass {
     const hardcodedFlagConfig = appConfig.featureFlags?.[flagName];
 
     // Build effective flag config by merging server data + hardcoded schema
+    // Dependencies are merged independently to ensure hardcoded dependsOn isn't lost
     const flagConfig = {
-      depends_on: flagState.depends_on,
+      depends_on: flagState.depends_on || hardcodedFlagConfig?.dependsOn,
       condition_logic: flagState.condition_logic,
       conditions: hardcodedFlagConfig?.conditions,
-      dependsOn: flagState.depends_on, // Also support camelCase for compatibility
-      conditionLogic: flagState.condition_logic,
+      dependsOn: flagState.depends_on || hardcodedFlagConfig?.dependsOn, // Also support camelCase for compatibility
+      conditionLogic: flagState.condition_logic || hardcodedFlagConfig?.conditionLogic,
     };
 
-    // If server didn't provide conditions/dependencies, use hardcoded config
-    if (!flagConfig.condition_logic && !flagConfig.conditions && hardcodedFlagConfig) {
+    // If server didn't provide conditions, use hardcoded config
+    // (dependencies are already merged independently above, so we don't repeat that here)
+    if (!flagConfig.conditionLogic && !flagConfig.conditions && hardcodedFlagConfig) {
       Object.assign(flagConfig, {
         conditionLogic: hardcodedFlagConfig.conditionLogic,
         conditions: hardcodedFlagConfig.conditions,
-        dependsOn: hardcodedFlagConfig.dependsOn,
       });
     }
 
@@ -1498,8 +1552,8 @@ class FeatureFlagsManagerClass {
     // Step 3: Resolve dependencies (all dependencies must be enabled)
     if (flagConfig.dependsOn && flagConfig.dependsOn.length > 0) {
       for (const depName of flagConfig.dependsOn) {
-        // Recursively check each dependency with the same context
-        const depEnabled = this._resolveFlag(depName, context, memo);
+        // Recursively check each dependency with the same context and resolving set
+        const depEnabled = this._resolveFlag(depName, context, memo, resolving);
         if (!depEnabled) {
           logger.debug(
             "feature_flags",
@@ -1560,7 +1614,7 @@ class FeatureFlagsManagerClass {
         );
         if (validationErrors.length > 0) {
           logger.warn(
-            "featureFlags",
+            "feature_flags",
             `Invalid conditionLogic for flag "${flagName}": ${validationErrors.join("; ")}`,
           );
         }
@@ -1571,7 +1625,7 @@ class FeatureFlagsManagerClass {
         for (const depName of flagConfig.dependsOn) {
           if (!allFlagNames.has(depName)) {
             logger.warn(
-              "featureFlags",
+              "feature_flags",
               `Flag "${flagName}" depends on missing flag "${depName}"`,
             );
           }
@@ -1584,7 +1638,7 @@ class FeatureFlagsManagerClass {
       const cycle = this._detectCycle(flagName, flags, new Set(), new Set());
       if (cycle) {
         logger.warn(
-          "featureFlags",
+          "feature_flags",
           `Circular dependency detected: ${cycle.join(" → ")}`,
         );
       }

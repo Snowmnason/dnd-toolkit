@@ -374,7 +374,7 @@ export function describeEvaluation(
 export interface FlagImpactAnalysis {
   flag: string;
   affectedFlags: string[]; // Flags that depend on this one
-  dependencyChain: string[]; // Chain to root  enabledByDefault: boolean;
+  dependencyChain: string[]; // Chain of dependencies to root (flags with no further dependencies)
   complexity: "simple" | "moderate" | "complex";
   riskOfDisabling: string;
 }

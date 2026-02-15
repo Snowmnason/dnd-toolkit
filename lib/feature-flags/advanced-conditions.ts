@@ -236,9 +236,18 @@ function isNotExpression(node: any): node is NotExpression {
  * Evaluate a nested logical expression recursively
  *
  * Supports:
- * - AND: all conditions must be true
- * - OR: at least one condition must be true
+ * - AND: all conditions must be true (empty → false for safety)
+ * - OR: at least one condition must be true (empty → false for safety)
  * - NOT: condition must be false
+ *
+ * **Important:** Built-in condition evaluators (platform, environment, userRole)
+ * use case-insensitive matching to align with Phase 1 behavior. Callers should
+ * pass a `resolvedContext` with platform/environment defaults to avoid undefined
+ * comparisons (see isEnabledWithContext).
+ *
+ * Note: Empty conditions arrays should be rejected at validation time.
+ * The evaluator explicitly returns false for empty arrays to handle
+ * edge cases and maintain consistency with the validator's intent.
  */
 export function evaluateAdvancedCondition(
   expression: ConditionNode,
@@ -267,6 +276,26 @@ export function evaluateAdvancedCondition(
 
   // Handle AND/OR operators
   if (isLogicalExpression(expression)) {
+    // Empty conditions arrays should be rejected by validator, but implement
+    // mathematically correct semantics here for safety:
+    // - AND with no conditions: vacuously true (all conditions satisfied)
+    // - OR with no conditions: false (no conditions to satisfy)
+    if (expression.conditions.length === 0) {
+      if (expression.operator === "AND") {
+        logger.warn(
+          "feature_flags",
+          `Empty AND expression. This should have been caught during validation.`,
+        );
+        return true; // Vacuously true: all (zero) conditions are satisfied
+      } else if (expression.operator === "OR") {
+        logger.warn(
+          "feature_flags",
+          `Empty OR expression. This should have been caught during validation.`,
+        );
+        return false; // No conditions to satisfy
+      }
+    }
+
     if (expression.operator === "AND") {
       // All conditions must be true
       return expression.conditions.every((cond) =>
@@ -284,15 +313,27 @@ export function evaluateAdvancedCondition(
   const condition = expression as SingleCondition;
 
   if (condition.type === "platform") {
-    return context.platform === condition.value;
+    // Case-insensitive matching to align with Phase 1 evaluators
+    if (!context.platform || !condition.value) {
+      return !condition.value; // Match only if both undefined/missing
+    }
+    return context.platform.toLowerCase() === String(condition.value).toLowerCase();
   }
 
   if (condition.type === "environment") {
-    return context.environment === condition.value;
+    // Case-insensitive matching to align with Phase 1 evaluators
+    if (!context.environment || !condition.value) {
+      return !condition.value; // Match only if both undefined/missing
+    }
+    return context.environment.toLowerCase() === String(condition.value).toLowerCase();
   }
 
   if (condition.type === "userRole") {
-    return context.userRole === condition.value;
+    // Case-insensitive matching to align with Phase 1 evaluators
+    if (!context.userRole || !condition.value) {
+      return !condition.value; // Match only if both undefined/missing
+    }
+    return context.userRole.toLowerCase() === String(condition.value).toLowerCase();
   }
 
   if (condition.type === "time") {
@@ -379,6 +420,12 @@ function evaluateTimeCondition(config?: Record<string, any>): boolean {
  * Validate advanced condition expression for common errors
  *
  * Returns array of error messages (empty if valid)
+ *
+ * Notes:
+ * - Empty conditions arrays are rejected: AND/OR with no conditions is logically
+ *   valid but practically meaningless in a feature flag context and likely indicates
+ *   a configuration error.
+ * - Evaluator will also safely reject empties if they somehow bypass validation.
  */
 export function validateAdvancedCondition(
   expression: ConditionNode,

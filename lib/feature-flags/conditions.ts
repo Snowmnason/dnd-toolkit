@@ -8,7 +8,6 @@
 
 import { getAppConfig } from "../config/loader";
 import { getPlatformName } from "../config/platform-config";
-import { FeatureFlagsManager } from "./server-sync";
 
 // ==========================================
 // Types
@@ -113,23 +112,4 @@ export function evaluateConditions(
   }
 
   return true;
-}
-
-/**
- * Get a user's role from cached entitlements or session
- * Phase 2: Reads from cached entitlements populated at bootstrap
- * Fallback: Returns "unknown" if role data unavailable
- *
- * **How it works:**
- * - Phase 1: Returns undefined (caller provides role in context)
- * - Phase 2: Queries FeatureFlagsManager for cached role data (if available)
- * - Fallback: Returns "unknown" (safe for permission checks)
- *
- * See: FeatureFlagsManager.getCachedUserRole() for actual implementation
- *
- * @returns User's role (e.g., 'admin') or "unknown" if unavailable
- */
-export function getCachedUserRole(): string {
-  // Phase 2: Query FeatureFlagsManager for cached role from entitlements
-  return FeatureFlagsManager.getCachedUserRole();
 }

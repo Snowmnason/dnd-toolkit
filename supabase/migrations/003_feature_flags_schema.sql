@@ -187,11 +187,13 @@ CREATE INDEX idx_feature_flags_updated_at
 CREATE INDEX IF NOT EXISTS idx_feature_flags_depends_on
   ON feature_flags.feature_flags USING GIN (depends_on);
 
--- Optional: index to search into condition logic if needed (example: existence of keys)
+-- Index to search condition logic using @> containment queries (e.g., find flags where condition_logic contains certain operators or conditions)
+-- jsonb_path_ops is optimal for nested path searches on complex JSON structures
 CREATE INDEX IF NOT EXISTS idx_feature_flags_condition_logic_keys
   ON feature_flags.feature_flags USING GIN (condition_logic jsonb_path_ops);
 
--- Optional: index to search within metadata JSON structure (nested configurations)
+-- Index to search within metadata JSON structure for nested configurations using @> containment
+-- jsonb_path_ops is optimal for efficient lookups within nested JSON structures
 CREATE INDEX IF NOT EXISTS idx_feature_flags_metadata_keys
   ON feature_flags.feature_flags USING GIN (metadata jsonb_path_ops);
 

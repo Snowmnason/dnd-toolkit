@@ -401,9 +401,6 @@ const defaultContextResult = FeatureFlagsManager.isEnabledWithContext('simpleFea
 - Synchronous, fast (memoized within single call to avoid redundant work)
 - Depends are cached at startup
 - Recommended: use in selectors/computed values, not per-render (like any flag check)
-
-**
-
 **`async getEntitlement(name: string, userId: string): Promise<{ granted: boolean; source: string }>`**
 
 Fetches entitlement **fresh** on each call (real-time verification). Checks expiry automatically.
@@ -1181,18 +1178,30 @@ All validation is logged via the `feature_flags` logger category.
 
 ## File Breakdown
 
-| File                      | Purpose                                          | Lines |
-| ------------------------- | ------------------------------------------------ | ----- |
-| feature-flags.ts          | Legacy `FeatureFlags` class, config toggles     | ~130  |
-| server-sync.ts            | `FeatureFlagsManager`, entitlements, overrides  | ~1700 |
-| conditions.ts             | Phase 1: Simple condition evaluators            | ~144  |
-| **advanced-conditions.ts** | **Phase 3: Logic operators, plugins, validation** | ~360  |
-| **admin-tooling.ts**       | **Phase 3: Validation, graphs, simulation**     | ~380  |
-| **telemetry.ts**           | **Phase 3: Monitoring, health checks, metrics** | ~370  |
-| cache.ts                  | Phase 2: LRU cache for evaluation results       | ~280  |
-| rollout.ts                | Percentage-based rollouts                       | ~100  |
-| index.ts                  | Barrel export (all modules)                     | 10    |
-| README.md                 | This file                                        | ~950  |
+| File                      | Purpose                                          | Exported | Lines |
+| ------------------------- | ------------------------------------------------ | -------- | ----- |
+| feature-flags.ts          | Legacy `FeatureFlags` class, config toggles     | ✅ | ~130  |
+| server-sync.ts            | `FeatureFlagsManager`, entitlements, overrides  | ✅ | ~1700 |
+| rollout.ts                | Percentage-based rollouts                       | ✅ | ~100  |
+| conditions.ts             | Phase 1: Simple condition evaluators (internal) | ❌ | ~144  |
+| advanced-conditions.ts    | Phase 3: Logic operators, plugins (internal)   | ❌ | ~360  |
+| cache.ts                  | Phase 2: LRU evaluation cache (internal)        | ❌ | ~280  |
+| admin-tooling.ts          | Phase 3: Validation, graphs, simulation         | ❌ | ~380  |
+| telemetry.ts              | Phase 3: Monitoring, health checks, metrics     | ❌ | ~370  |
+| index.ts                  | Public API barrel export                        | — | 20    |
+| README.md                 | This file                                        | — | ~950  |
+
+**Public Exports from index.ts:**
+- `FeatureFlags`, `FeatureFlag`, `FeatureFlagKind`, `FeatureFlagName`
+- `FeatureFlagsManager`, `EntitlementState`, `FeatureFlagState`, `FlagsSubscriber`
+- `bucketPercent`, `clearBucketCache`, `getBucketMemoized`, `isInRollout`, `isInRolloutMemoized`, `RolloutConfig`
+
+**Internal Modules** (not exported; used internally by manager and hooks):
+- `conditions.ts` – Used by `FeatureFlagsManager._resolveFlag()`
+- `advanced-conditions.ts` – Used by condition evaluation pipeline
+- `cache.ts` – Used by `FeatureFlagsManager` for LRU evaluation caching
+- `admin-tooling.ts` – Used by admin debug tools and simulation utilities
+- `telemetry.ts` – Used by `FeatureFlagsManager` for monitoring
 
 ## Testing
 
