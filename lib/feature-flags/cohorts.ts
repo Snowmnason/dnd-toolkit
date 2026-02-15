@@ -207,15 +207,95 @@ export interface UserCohortMembershipRow {
  * }
  *
  * // Rebalancing pattern
- * const cohortV1 = { slug: "feature", percentage: 10, seed: "v1" };
- * const cohortV2 = { slug: "feature", percentage: 50, seed: "v1" }; // Same seed
- * // If user was in 10% with v1, they're still in 10% with v2
- * // Remaining users are distributed into 40% bucket
+/**
+ * Check if a user is in a cohort (PHASE 1-3: Main evaluation function)
  *
- * // Changing seed re-buckets everyone
- * const cohortV2New = { slug: "feature", percentage: 50, seed: "v2" };
- * // User may be in different 50% now
+ * Evaluates cohort membership using two mechanisms:
+ * 1. **Explicit membership** (Phase 2+, highest priority): Direct assignment from database
+ * 2. **Deterministic bucketing** (Phase 1): Hash-based percentage grouping
+ *
+ * ## Deterministic Bucketing Algorithm
+ *
+ * Uses FNV-hash to ensure same user always gets same bucket:
  * ```
+ * bucket = FNV_HASH(userId + cohortId + seed) % 100
+ * isInCohort = bucket < percentage
+ * ```
+ *
+ * This guarantees:
+ * - Same user always gets same result (deterministic)
+ * - Uniform distribution across users (fair bucketing)
+ * - Consistent when percentage increases with same seed (safe gradual rollout)
+ *
+ * ## Seed Parameter (Phase 4: Rebalancing)
+ *
+ * **Default seed:** cohortId (e.g., "beta_testers")
+ * **Custom seed:** Specified in CohortDef for rebalancing
+ *
+ * ### Safe Gradual Rollout with Seed
+ *
+ * To expand a rollout without losing existing users, use the same seed:
+ *
+ * ```ts
+ * // Day 1: 10% rollout (seed: "v1")
+ * const day1 = { slug: "feature", percentage: 10, seed: "v1" };
+ * isUserInCohort(userId, "feature", day1) // → hash(userId + "feature" + "v1") % 100 < 10
+ *
+ * // Day 2: 50% rollout (same seed keeps existing users)
+ * const day2 = { slug: "feature", percentage: 50, seed: "v1" };
+ * isUserInCohort(userId, "feature", day2) // → Same hash, new range < 50
+ * // If user was in 10%, still in 50% (hash in [0-9], so < 50)
+ * // New users [10-49] are added to cohort
+ *
+ * // Day 3: 100% rollout (everyone)
+ * const day3 = { slug: "feature", percentage: 100, seed: "v1" };
+ * isUserInCohort(userId, "feature", day3) // → Always true (hash in [0-99])
+ * ```
+ *
+ * **Changing the seed re-buckets everyone** (use sparingly):
+ * ```ts
+ * const rebalanced = { slug: "feature", percentage: 50, seed: "v2" };
+ * // User gets new hash(userId + "feature" + "v2")
+ * // May move to different 50% bucket
+ * ```
+ *
+ * ## Priority
+ *
+ * 1. **Explicit membership** (if provided in Phase 2)
+ *    - Always true if user is explicitly assigned
+ * 2. **Deterministic bucketing** (Phase 1-4)
+ *    - Based on percentage and seed
+ *
+ * @param userId - User identifier (UUID or stable ID from auth)
+ * @param cohortId - Cohort identifier (matches flag's `cohorts: []` array)
+ * @param cohortDef - Cohort definition with percentage and optional seed
+ * @param explicitMemberships - Optional list of explicitly assigned cohort IDs (Phase 2)
+ *
+ * @returns `true` if user is in cohort, `false` otherwise
+ *
+ * @example
+ * ```ts
+ * // Basic check (deterministic bucketing)
+ * const cohort = { slug: "beta_testers", percentage: 20 };
+ * if (isUserInCohort(userId, "beta_testers", cohort)) {
+ *   // User is in ~20% beta group (same result every time)
+ * }
+ *
+ * // With explicit membership override (Phase 2)
+ * const memberships = ["qa_special", "beta_testers"]; // From database
+ * if (isUserInCohort(userId, "qa_special", cohort, memberships)) {
+ *   // Always true (explicit membership takes priority)
+ * }
+ *
+ * // Gradual rollout scenario
+ * const day1 = { slug: "feature", percentage: 10, seed: "rollout_v1" };
+ * const day2 = { slug: "feature", percentage: 50, seed: "rollout_v1" };
+ * // If user was in day 1 (10%), guaranteed to be in day 2 (50%)
+ * // Seed ensures consistent bucketing across percentage changes
+ * ```
+ *
+ * @see {@link https://github.com/Snowmnason/dnd-toolkit/blob/main/lib/feature-flags/rollout.ts} for FNV hash implementation
+ * @see {@link lib/feature-flags/README.md} for decision guide on "Cohorts vs. Conditions vs. Rollouts"
  */
 export function isUserInCohort(
   userId: string,

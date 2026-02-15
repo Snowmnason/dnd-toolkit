@@ -225,6 +225,68 @@ Percentage-based A/B rollout. Users bucketed by FNV-1a hash of (user_id + seed).
 
 ---
 
+## COHORT Schema (Phase 1-4: Feature Flags Cohorts)
+
+### feature_flag.cohorts
+
+Named user groups for feature targeting. Supports deterministic bucketing (percentage-based) and explicit membership.
+
+| Column        | Type        | Nullable | Default             | Notes                                                    |
+| ------------- | ----------- | -------- | ------------------- | -------------------------------------------------------- |
+| `id`          | uuid        | No       | `gen_random_uuid()` | PK — stable internal cohort ID                           |
+| `slug`        | text        | No       | —                   | UNIQUE; machine-readable identifier (e.g., `'beta_testers'`) |
+| `name`        | text        | No       | —                   | Human-readable display name                              |
+| `description` | text        | Yes      | `NULL`              | Purpose and usage guidelines                             |
+| `percentage`  | smallint    | Yes      | `NULL`              | 0–100; percentage of users included deterministically (NULL = explicit membership only) |
+| `seed`        | text        | Yes      | `NULL`              | Optional hash seed for rebalancing (Phase 4). Same seed + increased percentage = stable membership. |
+| `is_active`   | boolean     | No       | `true`              | Enable/disable without deleting; RLS filters inactive cohorts |
+| `metadata`    | jsonb       | Yes      | `'{}'`              | Custom attributes (e.g., `{"owner": "product-team", "rollout_phase": "beta"}`) |
+| `created_at`  | timestamptz | No       | `now()`             | —                                                        |
+| `updated_at`  | timestamptz | No       | `now()`             | Auto-updated by trigger                                  |
+
+**Unique**: `slug` — prevents ambiguous cohort references.
+
+**Indexes**: `(slug)` for fast lookups during flag evaluation, `(is_active)` for RLS filtering.
+
+### feature_flag.user_cohort_memberships
+
+Explicit user assignments to cohorts. Overrides deterministic bucketing.
+
+| Column      | Type                         | Nullable | Default             | Notes                                                        |
+| ----------- | ---------------------------- | -------- | ------------------- | ------------------------------------------------------------ |
+| `id`        | uuid                         | No       | `gen_random_uuid()` | PK                                                           |
+| `user_id`   | uuid                         | No       | —                   | FK → `public.users(id)` ON DELETE CASCADE                    |
+| `cohort_id` | uuid                         | No       | —                   | FK → `cohorts(id)` ON DELETE CASCADE                         |
+| `source`    | enum('direct'\|'group'\|'auto') | No     | `'direct'`          | `'direct'` = manual admin, `'group'` = group membership, `'auto'` = system |
+| `is_active` | boolean                      | No       | `true`              | Soft-deactivate without deleting; RLS filters inactive       |
+| `expires_at`| timestamptz                  | Yes      | `NULL`              | NULL = permanent; automatic deactivation on cron job        |
+| `created_at`| timestamptz                  | No       | `now()`             | —                                                            |
+| `updated_at`| timestamptz                  | No       | `now()`             | Auto-updated by trigger                                     |
+
+**Unique**: `(user_id, cohort_id)` — one membership per user per cohort.
+
+**Indexes**: `(user_id)` for quick user membership lookup, `(cohort_id)` for cohort member enumeration, `(is_active)` for RLS.
+
+**RLS Protection**: Users can view/modify their own memberships; admins manage all.
+
+### feature_flag.cohort_flag_assignments
+
+Join table mapping flags to required cohorts. Used by edge function to return cohort data.
+
+| Column     | Type | Nullable | Default | Notes                                                |
+| ---------- | ---- | -------- | ------- | ---------------------------------------------------- |
+| `flag_name` | text | No       | —       | FK → `feature_flags(flag_name)` ON UPDATE/DELETE CASCADE |
+| `cohort_id` | uuid | No       | —       | FK → `cohorts(id)` ON DELETE CASCADE                |
+| `created_at` | timestamptz | No | `now()` | —                                                    |
+
+**Composite PK**: `(flag_name, cohort_id)` — prevents duplicate assignments.
+
+**Indexes**: `(flag_name)` for edge function lookups, `(cohort_id)` for cascade analysis.
+
+**Note**: Populated automatically when flag config includes cohorts. Used by `get_feature_flags()` edge function to return cohort data (see EDGE_FUNCTIONS.md).
+
+---
+
 ## AUDIT Schema (004_audit_schema.sql)
 
 ### audit.audit_events
@@ -245,9 +307,9 @@ Unified immutable audit log. No foreign keys intentionally — records persist a
 
 ### audit.log_change() (Trigger Function)
 
-Generic SECURITY DEFINER trigger function. Auto-detects schema, table, and PK (tries `id`, `world_id`, `user_id`, `flag_name`, `key`). Attached to all tracked tables via `AFTER INSERT OR UPDATE OR DELETE` triggers.
+Generic SECURITY DEFINER trigger function. Auto-detects schema, table, and PK (tries `id`, `world_id`, `user_id`, `flag_name`, `key`, `cohort_id`). Attached to all tracked tables via `AFTER INSERT OR UPDATE OR DELETE` triggers.
 
-**Tracked tables**: `public.users`, `public.user_settings`, `worlds.worlds`, `worlds.world_access`, `worlds.invite_links`, `feature_flags.feature_flags`, `feature_flags.entitlements`, `feature_flags.entitlements_overrides`, `feature_flags.feature_flag_overrides`, `feature_flags.feature_flag_rollouts`
+**Tracked tables**: `public.users`, `public.user_settings`, `worlds.worlds`, `worlds.world_access`, `worlds.invite_links`, `feature_flags.feature_flags`, `feature_flags.entitlements`, `feature_flags.entitlements_overrides`, `feature_flags.feature_flag_overrides`, `feature_flags.feature_flag_rollouts`, `feature_flags.cohorts`, `feature_flags.user_cohort_memberships`, `feature_flags.cohort_flag_assignments`
 
 ---
 

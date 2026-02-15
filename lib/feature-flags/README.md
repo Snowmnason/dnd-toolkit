@@ -1564,6 +1564,196 @@ console.log(FeatureFlags.getByKind("beta")); // All beta flags enabled
 - ✅ Health checks and performance monitoring
 - ✅ Safe evaluation (recursion depth limits, validation at bootstrap)
 
+## Cohorts vs. Conditions vs. Rollouts — Decision Guide
+
+### Quick Comparison Table
+
+| Feature | **Conditions** | **Cohorts** | **Rollouts** |
+|---------|---|---|---|
+| **What it does** | Matches context (platform, environment, role) | Targets user groups by membership or percentage | Percentage-based gradual deployment |
+| **Use case** | "Only on web" / "Only for admins" | "Only beta testers" / "Enterprise only" | "Roll out to 10%, 50%, then 100%" |
+| **Requires userId** | ❌ No | ✅ Yes | ✅ Yes |
+| **Deterministic** | ✅ Yes (same context = same result) | ✅ Yes (same user = same result) | ✅ Yes (same user = same result) |
+| **Admin override** | ❌ No | ✅ Yes (explicit membership) | ❌ No (percentage-based) |
+| **Multiple values** | ❌ No (AND logic) | ✅ Yes (OR logic, user in ANY) | ❌ No (single percentage) |
+| **Config** | `conditions: { platform, environment, userRole }` | `cohorts: ["beta_testers", "enterprise"]` | % via cohort or rollout |
+| **Scalability** | High (fast context match) | High (cached, RLS-filtered) | High (deterministic hash) |
+
+### Decision Tree: Which Should I Use?
+
+```
+┌─ Does the flag depend on REQUEST CONTEXT?
+│  (platform, environment, role, feature flags, entitlements)
+│  
+│  YES → Use CONDITIONS
+│  ├─ Example: "advancedMaps only on web, for premium users"
+│  │ conditions: { platform: "web", userRole: "premium" }
+│  │
+│  └─ Combine with cohorts for targeting:
+│     "advancedMaps for web + premium users in beta cohort"
+│     conditions: { platform: "web", userRole: "premium" }
+│     cohorts: ["beta_testers"]
+│  
+│  NO → Continue...
+│
+└─ Does the flag target specific NAMED USER GROUPS?
+   (beta testers, enterprise tier, internal staff, regions)
+   
+   YES → Use COHORTS
+   ├─ Example: "betaFeature only for beta testers"
+   │ cohorts: ["beta_testers"]
+   │
+   ├─ Multiple cohorts (user in ANY):
+   │ "advancedMaps for beta OR enterprise customers"
+   │ cohorts: ["beta_testers", "enterprise"]
+   │
+   └─ With gradual rollout + seed:
+      "Roll out to 10% of beta testers, then 50%, then 100%"
+      cohorts: ["gradual_rollout"] with percentage + seed
+   
+   NO → Continue...
+
+└─ Are you doing a GRADUAL ROLLOUT by percentage?
+   (Start with 10%, expand to 50%, then 100%)
+   
+   YES → Use COHORTS with SEED parameter
+   ├─ Day 1: { slug: "feature", percentage: 10, seed: "v1" }
+   ├─ Day 2: { slug: "feature", percentage: 50, seed: "v1" }
+   └─ Day 3: { slug: "feature", percentage: 100, seed: "v1" }
+   
+   NO → Feature is GLOBALLY ENABLED
+   └─ Don't add cohorts or conditions
+       enabled: true
+```
+
+### Detailed Guidance
+
+#### When to Use CONDITIONS
+
+**✅ Use conditions when:**
+- Feature depends on context (current platform, environment, user role, entitlements)
+- You need to gate features by permission/tier
+- You want fast, context-based toggles without user data
+
+**Example: Role-Based Feature**
+```json
+{
+  "featureFlags": {
+    "advancedSettings": {
+      "enabled": true,
+      "conditions": {
+        "platform": "web",
+        "userRole": "admin"
+      }
+    }
+  }
+}
+```
+
+**Example: Premium + Regional**
+```typescript
+const enabled = FeatureFlagsManager.isEnabledWithContext("premiumFeature", {
+  platform: "web",
+  environment: "production",
+  userRole: "premium_subscriber"
+});
+```
+
+#### When to Use COHORTS
+
+**✅ Use cohorts when:**
+- You want to gate features by named user groups (beta testers, enterprise, internal)
+- You need admin-controlled explicit membership overrides
+- You want deterministic bucketing without permissions/roles
+- You're doing gradual rollouts to subsets of users
+
+**Example: Beta Testers Only**
+```json
+{
+  "featureFlags": {
+    "betaFeature": {
+      "enabled": true,
+      "cohorts": ["beta_testers"]
+    }
+  }
+}
+```
+
+**Example: Multiple Cohorts (OR logic)**
+```json
+{
+  "featureFlags": {
+    "advancedMaps": {
+      "enabled": true,
+      "cohorts": ["beta_testers", "enterprise"]
+    }
+  }
+}
+```
+User qualifies if in beta_testers OR enterprise.
+
+**Example: Gradual Rollout**
+```typescript
+// Day 1: 10% of internal staff
+const cohort = {
+  slug: "internal_staff",
+  percentage: 10,
+  seed: "rollout_v1"
+};
+
+// Day 2: Expand to 50% (same users stay in)
+const cohort = {
+  slug: "internal_staff",
+  percentage: 50,
+  seed: "rollout_v1"  // Same seed = consistent
+};
+```
+
+#### When to Use BOTH (Conditions + Cohorts)
+
+**✅ Use both when:**
+- Feature needs context matching AND user group targeting
+- Example: "Advanced maps for web users in beta cohort"
+- Example: "Enterprise-only feature on iOS and Android"
+
+**Example: Web + Beta Testers**
+```json
+{
+  "featureFlags": {
+    "advancedMaps": {
+      "enabled": true,
+      "conditions": {
+        "platform": "web"
+      },
+      "cohorts": ["beta_testers"]
+    }
+  }
+}
+```
+
+**Example: Mobile + Enterprise**
+```json
+{
+  "featureFlags": {
+    "mobilePay": {
+      "enabled": true,
+      "conditions": {
+        "platform": "ios|android"
+      },
+      "cohorts": ["enterprise"]
+    }
+  }
+}
+```
+
+**Resolution (AND logic):**
+User must match:
+- ✅ Enabled flag
+- ✅ Platform condition (web)
+- ✅ Cohort membership (in beta_testers)
+
+All three must be true for flag to enabled.
+
 **Future Opportunities:**
 
 - **Recurring Sync** – Background job to refresh flags/entitlements at configurable intervals (24h default)
@@ -1573,3 +1763,4 @@ console.log(FeatureFlags.getByKind("beta")); // All beta flags enabled
 - **A/B Testing Integration** – Link flag variants to user cohorts
 - **Remote Condition Plugins** – Load custom evaluators from server (for non-dev platforms)
 - **Condition Performance Profiling** – Identify slow conditions/plugins in production
+

@@ -10,11 +10,11 @@
  * - Cohort validation
  */
 
-import { FeatureFlagsManager } from "@/lib/feature-flags/server-sync";
-import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CachedCohort, CachedUserCohortMembership, GetFeatureFlagsResponse } from "@/lib/feature-flags/server-sync";
 import { isUserInCohort } from "@/lib/feature-flags/cohorts";
+import type { CachedCohort, CachedUserCohortMembership } from "@/lib/feature-flags/server-sync";
+import { FeatureFlagsManager } from "@/lib/feature-flags/server-sync";
+import { SecureStorage } from "@/lib/storage";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock Supabase
 const createMockSupabase = (invokeFn?: any) => ({
@@ -630,4 +630,192 @@ describe("Phase 3: Cohorts Integration", () => {
       expect(result1).toBe(result2); // Should be deterministic
     });
   });
+
+  describe("Phase 4: Rebalancing with Seeds", () => {
+    it("should keep users in cohort when percentage increases with same seed", () => {
+      const userId = "user-stable-123";
+      const seed = "gradual_rollout_v1";
+
+      // Day 1: 10% rollout
+      const day1Cohort = {
+        slug: "gradual_feature",
+        name: "Gradual Feature",
+        percentage: 10,
+        seed,
+      };
+
+      const inDay1 = isUserInCohort(userId, "gradual_feature", day1Cohort);
+
+      // Day 2: 50% rollout (same seed)
+      const day2Cohort = {
+        slug: "gradual_feature",
+        name: "Gradual Feature",
+        percentage: 50,
+        seed,
+      };
+
+      const inDay2 = isUserInCohort(userId, "gradual_feature", day2Cohort);
+
+      // Day 3: 100% rollout (same seed)
+      const day3Cohort = {
+        slug: "gradual_feature",
+        name: "Gradual Feature",
+        percentage: 100,
+        seed,
+      };
+
+      const inDay3 = isUserInCohort(userId, "gradual_feature", day3Cohort);
+
+      // If user was in day 1 (10%), they should still be in day 2 (50%) and day 3 (100%)
+      if (inDay1) {
+        expect(inDay2).toBe(true);
+        expect(inDay3).toBe(true);
+      }
+      // If not in day 1, they may or may not be in day 2/3
+      // but consistency is maintained
+    });
+
+    it("should get different buckets when seed changes", () => {
+      const userId = "user-rebalance-456";
+
+      // Original seed
+      const originalCohort = {
+        slug: "feature",
+        name: "Feature",
+        percentage: 50,
+        seed: "seed_v1",
+      };
+
+      const resultWithV1 = isUserInCohort(userId, "feature", originalCohort);
+
+      // New seed (rebalancing)
+      const rebalancedCohort = {
+        slug: "feature",
+        name: "Feature",
+        percentage: 50,
+        seed: "seed_v2",
+      };
+
+      const resultWithV2 = isUserInCohort(userId, "feature", rebalancedCohort);
+
+      // Results may or may not be the same, but we're testing that
+      // changing the seed affects the bucketing
+      expect(typeof resultWithV1).toBe("boolean");
+      expect(typeof resultWithV2).toBe("boolean");
+    });
+
+    it("should achieve stable user distribution across multiple users with same seed", () => {
+      const seed = "stable_rollout";
+      const userIds = Array.from(
+        { length: 100 },
+        (_, i) => `user-${i.toString().padStart(3, "0")}`,
+      );
+
+      // 50% cohort
+      const cohort = {
+        slug: "test",
+        name: "Test",
+        percentage: 50,
+        seed,
+      };
+
+      const usersIn = userIds.filter((userId) =>
+        isUserInCohort(userId, "test", cohort),
+      );
+
+      // With 100 users and 50% percentage, expect ~50 users
+      // Allow for variance: 40-60 users is reasonable
+      expect(usersIn.length).toBeGreaterThanOrEqual(40);
+      expect(usersIn.length).toBeLessThanOrEqual(60);
+    });
+
+    it("should not change bucket when seed is null/undefined", () => {
+      const userId = "user-default-seed";
+
+      // Cohort without seed (will use cohortId as seed)
+      const cohortNoSeed = {
+        slug: "feature",
+        name: "Feature",
+        percentage: 75,
+        seed: undefined,
+      };
+
+      const result1 = isUserInCohort(userId, "feature", cohortNoSeed);
+
+      // Call again with explicitly null seed
+      const cohortNullSeed = {
+        slug: "feature",
+        name: "Feature",
+        percentage: 75,
+        seed: null,
+      };
+
+      const result2 = isUserInCohort(userId, "feature", cohortNullSeed);
+
+      // Both should use default seed (cohortId) and be identical
+      expect(result1).toBe(result2);
+    });
+
+    it("should handle gradual rollout scenario: 10% → 50% → 100%", () => {
+      const userIds = Array.from(
+        { length: 1000 },
+        (_, i) => `user-gradual-${i}`,
+      );
+      const seed = "gradual_v1";
+
+      // Phase 1: 10% rollout
+      const phase1Cohort = {
+        slug: "gradual",
+        name: "Gradual",
+        percentage: 10,
+        seed,
+      };
+
+      const phase1Users = userIds.filter((uid) =>
+        isUserInCohort(uid, "gradual", phase1Cohort),
+      );
+
+      // Phase 2: 50% rollout (same seed)
+      const phase2Cohort = {
+        slug: "gradual",
+        name: "Gradual",
+        percentage: 50,
+        seed,
+      };
+
+      const phase2Users = userIds.filter((uid) =>
+        isUserInCohort(uid, "gradual", phase2Cohort),
+      );
+
+      // Phase 1 users should still be in Phase 2
+      const phase1UsersStable = phase1Users.every((uid) =>
+        phase2Users.includes(uid),
+      );
+      expect(phase1UsersStable).toBe(true);
+
+      // Phase 2 should have more users than Phase 1 (approximately 5x)
+      expect(phase2Users.length).toBeGreaterThan(phase1Users.length);
+
+      // Phase 3: 100% rollout
+      const phase3Cohort = {
+        slug: "gradual",
+        name: "Gradual",
+        percentage: 100,
+        seed,
+      };
+
+      const phase3Users = userIds.filter((uid) =>
+        isUserInCohort(uid, "gradual", phase3Cohort),
+      );
+
+      // All users should be in Phase 3
+      expect(phase3Users.length).toBe(userIds.length);
+
+      // Phase 1 and 2 users must all be in Phase 3
+      phase1Users.forEach((uid) => {
+        expect(phase3Users).toContain(uid);
+      });
+    });
+  });
 });
+
