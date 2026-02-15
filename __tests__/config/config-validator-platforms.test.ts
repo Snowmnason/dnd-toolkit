@@ -17,6 +17,8 @@ describe("validateAppSettings - platforms section", () => {
     overrides: { mockSupabase: false, verboseErrorMessages: false },
     devTools: { enableConsoleLogger: true, enableNetworkLogger: false, enablePerformanceLogger: false, enableReduxDevTools: false, enableReactDevTools: false },
     featureFlags: { testFlag: { enabled: true, description: "Test flag" }, splashScreen: { enabled: true }, debugLogs: { enabled: false }, loggerCategories: { enabled: true, categories: { auth: true, navigation: true, api: true, performance: true, storage: true, ui: true, analytics: true, security: true, bootstrap: true, error: true, other: true } } },
+    // Add `feature_flags` category to match validator's required categories
+    featureFlags: { testFlag: { enabled: true, description: "Test flag" }, splashScreen: { enabled: true }, debugLogs: { enabled: false }, loggerCategories: { enabled: true, categories: { auth: true, navigation: true, api: true, performance: true, storage: true, ui: true, analytics: true, security: true, bootstrap: true, error: true, feature_flags: true, other: true } } },
     thresholds: { slowScreenMs: 3000, slowRequestMs: 5000 },
   };
 
