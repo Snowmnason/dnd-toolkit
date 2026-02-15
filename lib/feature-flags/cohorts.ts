@@ -22,17 +22,17 @@ import { isInRollout } from "./rollout";
  * @example
  * ```ts
  * const betaTesters: CohortDef = {
- *   id: "beta_testers",
+ *   slug: "beta_testers",
  *   name: "Beta Testers",
  *   description: "Early adopters testing pre-release features",
  *   percentage: 20,  // ~20% of users in this cohort (deterministic bucketing)
- *   seed: undefined, // No seed means bucket by cohort ID
+ *   seed: undefined, // No seed means bucket by cohort slug
  * };
  * ```
  */
 export interface CohortDef {
-  /** Unique cohort identifier (e.g., "beta_testers", "mobile_first") */
-  id: string;
+  /** Human-readable stable identifier (slug), used for deterministic bucketing (e.g., "beta_testers") */
+  slug: string;
 
   /** Display name (e.g., "Beta Testers") */
   name: string;
@@ -75,6 +75,12 @@ export interface CohortRow extends CohortDef {
   /** Whether cohort is active (admins can deactivate) */
   is_active: boolean;
 
+  /** Database primary key (UUID) for internal relations */
+  id: string;
+
+  /** Mandatory slug when returned from server */
+  slug: string;
+
   /** ISO 8601 timestamp */
   created_at: string;
 
@@ -95,8 +101,11 @@ export interface CohortFlagAssignmentRow {
   /** Feature flag name (references feature_flags.feature_flags.flag_name) */
   flag_name: string;
 
-  /** Cohort ID (references feature_flags.cohorts.id) */
+  /** Cohort ID (UUID, references feature_flags.cohorts.id) */
   cohort_id: string;
+
+  /** Cohort slug for client convenience (may be null if not available) */
+  cohort_slug?: string | null;
 
   /** Whether flag is enabled for this cohort (false = explicitly disabled) */
   enabled: boolean;
@@ -135,8 +144,14 @@ export interface UserCohortMembershipRow {
   /** User ID being assigned to cohort */
   user_id: string;
 
-  /** Cohort ID (references feature_flags.cohorts.id) */
+  /** Cohort ID (UUID, references feature_flags.cohorts.id) */
   cohort_id: string;
+
+  /** Whether membership is active (computed or set server-side) */
+  is_active?: boolean;
+
+  /** Cohort slug for client convenience (may be null if not available) */
+  cohort_slug?: string | null;
 
   /** How membership was assigned: "admin" | "property-based" | "auto-assigned" */
   source: string;
@@ -178,7 +193,7 @@ export interface UserCohortMembershipRow {
  * ```ts
  * // Phase 1: Deterministic bucketing
  * const betaTesters: CohortDef = {
- *   id: "beta_testers",
+ *   slug: "beta_testers",
  *   percentage: 20,
  * };
  * if (isUserInCohort(userId, "beta_testers", betaTesters)) {
@@ -192,13 +207,13 @@ export interface UserCohortMembershipRow {
  * }
  *
  * // Rebalancing pattern
- * const cohortV1 = { id: "feature", percentage: 10, seed: "v1" };
- * const cohortV2 = { id: "feature", percentage: 50, seed: "v1" }; // Same seed
+ * const cohortV1 = { slug: "feature", percentage: 10, seed: "v1" };
+ * const cohortV2 = { slug: "feature", percentage: 50, seed: "v1" }; // Same seed
  * // If user was in 10% with v1, they're still in 10% with v2
  * // Remaining users are distributed into 40% bucket
  *
  * // Changing seed re-buckets everyone
- * const cohortV2New = { id: "feature", percentage: 50, seed: "v2" };
+ * const cohortV2New = { slug: "feature", percentage: 50, seed: "v2" };
  * // User may be in different 50% now
  * ```
  */
@@ -229,31 +244,31 @@ export function isUserInCohort(
  */
 export const RECOMMENDED_COHORTS: Record<string, CohortDef> = {
   beta_testers: {
-    id: "beta_testers",
+    slug: "beta_testers",
     name: "Beta Testers",
     description: "Early adopters testing features before release",
     percentage: 20,
   },
   enterprise: {
-    id: "enterprise",
+    slug: "enterprise",
     name: "Enterprise",
     description: "Enterprise customers",
     percentage: 100,
   },
   internal: {
-    id: "internal",
+    slug: "internal",
     name: "Internal Team",
     description: "Internal team members (dogfooding)",
     percentage: 100,
   },
   mobile_first: {
-    id: "mobile_first",
+    slug: "mobile_first",
     name: "Mobile-First Users",
     description: "Mobile platform optimizations",
     percentage: 100,
   },
   desktop_first: {
-    id: "desktop_first",
+    slug: "desktop_first",
     name: "Desktop-First Users",
     description: "Desktop/web platform optimizations",
     percentage: 100,

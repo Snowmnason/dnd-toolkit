@@ -36,6 +36,11 @@ import {
   fetchOverridesByUserId,
   fetchRolloutConfigs,
 } from "./queries.ts";
+import {
+  fetchCohorts,
+  fetchCohortFlagAssignments,
+  fetchUserCohortMemberships,
+} from "./queries.ts";
 import type { GetFeatureFlagsResponse } from "./types.ts";
 
 /**
@@ -116,18 +121,29 @@ Deno.serve(async (req: Request) => {
     const userId = user.id;
     console.info(`Authenticated user: ${userId}`);
 
-    // 3. Fetch all three data sources in parallel
-    let flags, entitlements, flagOverrides, entitlementOverrides, rollouts;
+    // 3. Fetch all required data sources in parallel (including cohorts)
+    let flags, entitlements, flagOverrides, entitlementOverrides, rollouts, cohorts, cohortAssignments, userCohortMemberships;
 
     try {
-      [flags, entitlements, flagOverrides, entitlementOverrides, rollouts] =
-        await Promise.all([
-          fetchFeatureFlags(supabase),
-          fetchEntitlementsByUserId(supabase, userId),
-          fetchOverridesByUserId(supabase, userId),
-          fetchEntitlementOverridesByUserId(supabase, userId),
-          fetchRolloutConfigs(supabase),
-        ]);
+      [
+        flags,
+        entitlements,
+        flagOverrides,
+        entitlementOverrides,
+        rollouts,
+        cohorts,
+        cohortAssignments,
+        userCohortMemberships,
+      ] = await Promise.all([
+        fetchFeatureFlags(supabase),
+        fetchEntitlementsByUserId(supabase, userId),
+        fetchOverridesByUserId(supabase, userId),
+        fetchEntitlementOverridesByUserId(supabase, userId),
+        fetchRolloutConfigs(supabase),
+        fetchCohorts(supabase),
+        fetchCohortFlagAssignments(supabase),
+        fetchUserCohortMemberships(supabase, userId),
+      ]);
     } catch (fetchError) {
       console.error(
         "Failed to fetch data sources:",
@@ -149,6 +165,9 @@ Deno.serve(async (req: Request) => {
         ? entitlementOverrides.length
         : 0,
       rollouts: Object.keys(rollouts || {}).length,
+      cohorts: Array.isArray(cohorts) ? cohorts.length : 0,
+      cohortAssignments: Array.isArray(cohortAssignments) ? cohortAssignments.length : 0,
+      userCohortMemberships: Array.isArray(userCohortMemberships) ? userCohortMemberships.length : 0,
     });
 
     // Merge both override types into single array for response
@@ -157,12 +176,33 @@ Deno.serve(async (req: Request) => {
       ...(entitlementOverrides || []),
     ];
 
+    // Attach cohort_slug to assignments and memberships for client convenience
+    const cohortMap = new Map<string, any>();
+    if (Array.isArray(cohorts)) {
+      for (const c of cohorts) {
+        if (c && c.id) cohortMap.set(String(c.id), c);
+      }
+    }
+
+    const enrichedCohortAssignments = (cohortAssignments || []).map((a: any) => ({
+      ...a,
+      cohort_slug: cohortMap.get(String(a.cohort_id))?.slug ?? null,
+    }));
+
+    const enrichedUserCohortMemberships = (userCohortMemberships || []).map((m: any) => ({
+      ...m,
+      cohort_slug: cohortMap.get(String(m.cohort_id))?.slug ?? null,
+    }));
+
     // 4. Build response
     const response: GetFeatureFlagsResponse = {
       flags,
       entitlements,
       overrides: allOverrides, // Both flag and entitlement overrides with synthetic target_type
       rollouts: rollouts || {}, // Rollout config from database
+      cohorts: cohorts || [],
+      cohort_assignments: enrichedCohortAssignments || [],
+      user_cohort_memberships: enrichedUserCohortMemberships || [],
       fetchedAt: Date.now(),
       version: "v1",
     };
