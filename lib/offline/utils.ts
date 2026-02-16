@@ -4,6 +4,7 @@
  * Helper functions for offline mutation handling
  */
 
+import { QueryCache } from "@/lib/cache/query-cache";
 import { NetworkDetection } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
 import { OfflineMutationQueue } from "./mutation-queue";
@@ -191,3 +192,61 @@ export function createOptimisticUpdate(
       return undefined;
   }
 }
+
+/**
+ * Rollback an optimistic update by removing it from cache
+ * 
+ * Call this when a mutation fails permanently (4xx error or dead-letter).
+ * Restores the original cached data by clearing cache entries that were
+ * affected by the failed mutation.
+ *
+ * Usage with offline mutations:
+ * ```ts
+ * try {
+ *   await enqueueIfOffline(
+ *     async () => supabase.from('worlds').update(data).eq('id', worldId),
+ *     {
+ *       operation: 'update',
+ *       table: 'worlds',
+ *       payload: data,
+ *       invalidateTags: ['worlds', `world:${worldId}`]
+ *     }
+ *   );
+ * } catch (error) {
+ *   // Mutation failed permanently - rollback optimistic update
+ *   rollbackOptimisticUpdate('worlds', `world:${worldId}`);
+ *   showErrorToast('Failed to update world');
+ * }
+ * ```
+ *
+ * @param optimisticId Unique ID of the optimistic update (usually the resource ID)
+ * @param cacheKeyPattern Cache key pattern to invalidate (e.g., 'worlds' or 'world:123')
+ *                        This clears the cache so fresh data will be fetched on next query
+ */
+export async function rollbackOptimisticUpdate(
+  optimisticId: string,
+  cacheKeyPattern: string,
+): Promise<void> {
+  try {
+    logger
+      .category("storage")
+      .debug(`Rolling back optimistic update: ${optimisticId}`, {
+        cacheKeyPattern,
+      });
+
+    // Invalidate the cache to force refetch of fresh data from server
+    // This clears any cached data affected by the failed mutation
+    await QueryCache.invalidateByTags([cacheKeyPattern]);
+
+    logger
+      .category("storage")
+      .info(`Optimistic update rolled back: ${optimisticId}`, {
+        cacheKeyPattern,
+      });
+  } catch (error) {
+    logger
+      .category("error")
+      .warn(`Failed to rollback optimistic update: ${optimisticId}`, error);
+  }
+}
+

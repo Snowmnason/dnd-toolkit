@@ -25,6 +25,7 @@ export * from './Resuables/gradients';
 export * from './Resuables/shadows';
 export * from './Snackbar';
 export * from './Switch';
+export * from './SyncStatus';
 export * from './Tabs';
 export * from './TextInputs';
 // Form wrappers

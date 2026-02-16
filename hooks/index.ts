@@ -37,4 +37,7 @@ export type { UseEntitlementExpiredModalReturn } from './entitlements/useEntitle
 // Background Jobs
 export * from "./jobs";
 
+// Offline & Sync
+export * from "./offline/use-offline-queue";
+
 // Utilities
