@@ -88,6 +88,32 @@ export const updateStorageCache = {
     // Create the refresh promise and store it
     inFlightRefresh = (async () => {
       try {
+        // CRITICAL: Check if Supabase session is ready before attempting world query
+        // Without a valid session, RLS policies will block access and return 0 worlds
+        const { getSupabaseClient, isSupabaseConfigured } = await import(
+          "../database/supabase"
+        );
+        if (isSupabaseConfigured()) {
+          try {
+            const client = getSupabaseClient();
+            const { data: sessionData } = await client.auth.getSession();
+            if (!sessionData?.session) {
+              logger.info(
+                "storage",
+                "Session not ready yet, deferring world cache refresh",
+              );
+              return null; // Return null to signal "not ready, try again later"
+            }
+          } catch (sessionCheckErr) {
+            logger.warn(
+              "storage",
+              "Failed to check session state, deferring world cache refresh",
+              sessionCheckErr,
+            );
+            return null;
+          }
+        }
+
         // Get userId from SecureStorage (never stale)
         const backend = getStorageBackend(STORAGE_KEYS.USER_DATA);
         const userData = await backend.getJSON<{ id: string }>(

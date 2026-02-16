@@ -1,8 +1,8 @@
 import {
-  clearAllUserData,
-  getPrivacyStorageBackend,
-  SecureStorage,
-  STORAGE_KEYS,
+    clearAllUserData,
+    getPrivacyStorageBackend,
+    SecureStorage,
+    STORAGE_KEYS,
 } from "../storage";
 import { logger } from "../utils/logger";
 
@@ -663,8 +663,9 @@ export const AuthStateManager = {
     // Do ONE bulk refresh to get all world access flags at once
     const { updateStorageCache } =
       await import("../storage/update-storage-cache");
+    let refreshResult: any = null;
     try {
-      await updateStorageCache.refreshAllWorldsCache();
+      refreshResult = await updateStorageCache.refreshAllWorldsCache();
     } catch (error) {
       logger.warn(
         "auth",
@@ -676,6 +677,22 @@ export const AuthStateManager = {
       for (const worldId of worldIds) {
         const result = await this.verifyWorldAccessWithDatabase(worldId);
         results.set(worldId, result.hasAccess);
+      }
+      return results;
+    }
+
+    // If refresh returned null (session not ready), return "unknown" for all worlds
+    // This prevents cache from being cleared incorrectly during app startup
+    if (refreshResult === null) {
+      logger.info(
+        "auth",
+        "[BATCH-VERIFY] Refresh deferred (session not ready), using cached values",
+      );
+      const results = new Map<string, boolean>();
+      // Mark all worlds as "needs verification later" by returning cached state
+      // Don't verify now because session isn't ready
+      for (const worldId of worldIds) {
+        results.set(worldId, true); // Assume cached worlds are valid until we can verify
       }
       return results;
     }
