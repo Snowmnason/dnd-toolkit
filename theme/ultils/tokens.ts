@@ -34,7 +34,6 @@ export function $(
   // Check if this is a sizing/spacing token (not a color)
   const sizingTokens = { ...S.font, ...S.space, ...S.radius, ...S.border };
   if (key in sizingTokens) {
-     
     return sizingTokens[key as keyof typeof sizingTokens];
   }
 
@@ -56,7 +55,7 @@ export function resolveStyleTokens<T extends Record<string, any>>(
     /* eslint-disable-next-line security/detect-object-injection */
     const value = style[key];
 
-      if (typeof value === "string" && value.startsWith("$")) {
+    if (typeof value === "string" && value.startsWith("$")) {
       const tokenName = value.slice(1);
       /* eslint-disable-next-line security/detect-object-injection -- safe: tokenName originates from style token string in code */
       resolved[key] = tokens[tokenName as keyof typeof tokens];

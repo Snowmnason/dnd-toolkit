@@ -499,7 +499,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
 
     // Update the ref for next comparison
     previousUserIdRef.current = stableParams.userId;
-  }, [stableParams.userId, stableParams.connectedWorldIds.length]);
+  }, [stableParams.userId, stableParams.connectedWorldIds]);
 
   const setUserId = useCallback((userId: string | undefined) => {
     setStableParams((prev) => ({ ...prev, userId }));

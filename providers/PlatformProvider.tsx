@@ -1,11 +1,11 @@
 import { logger } from "@/lib/utils/logger";
 import React, {
-  createContext,
-  ReactNode,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
+    createContext,
+    ReactNode,
+    useContext,
+    useEffect,
+    useRef,
+    useState,
 } from "react";
 import { Platform, useWindowDimensions } from "react-native";
 
@@ -76,7 +76,7 @@ export function PlatformProvider({ children }: PlatformProviderProps) {
         lastWidthRef.current = width;
       }
     }
-  }, [width, rawIsMobile, isMobileState, height]);
+  }, [width, rawIsMobile, isMobileState]);
 
   const isMobile = isMobileState !== null ? isMobileState : rawIsMobile;
   const isDesktop = !isMobile && width >= DESKTOP_BREAKPOINT;

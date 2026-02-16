@@ -142,16 +142,7 @@ export const usersDB = {
           `${STORAGE_KEYS.USER_DATA}_meta`,
         );
 
-        // Backwards-compat: older installs may have cached user data but no meta.
-        // In that case, prefer using the cached profile rather than forcing a DB call.
-        if (cachedUser && !cacheMeta) {
-          logger.debug(
-            "storage",
-            "User profile cache meta missing; using cached profile as fallback",
-          );
-          return cachedUser;
-        }
-
+        // Cache is valid only if both user data and metadata exist, and metadata is fresh
         if (cachedUser && cacheMeta) {
           const cacheAge = Date.now() - cacheMeta.timestamp;
           const isCacheFresh = cacheAge < maxAgeMs;
@@ -169,6 +160,7 @@ export const usersDB = {
             `User profile cache stale (age: ${cacheAge}ms), refreshing from database`,
           );
         }
+        // If meta is missing or cache is missing, treat as cache miss and fetch from DB
       } catch (storageError) {
         logger.warn(
           "storage",

@@ -94,7 +94,7 @@ function cleanCache() {
         execSync(`rm -f ${pattern}`, { stdio: 'ignore' });
         log(`✓ Removed TypeScript cache (${pattern})`, 'green');
       } catch (error) {
-        log(`✗ Failed to remove TypeScript cache (${pattern}): ${error instanceof Error ? error.message : String(error)}`, 'red');
+        log(`✗ Failed to remove TypeScript cache (${pattern}): ${error instanceof Error ? error.message : String(error)}`, 'yellow');
       }
     }
   });

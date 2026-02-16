@@ -50,7 +50,13 @@ export interface ConnectedWorldsCache {
 // Module-level lock to deduplicate in-flight refreshAllWorldsCache() calls
 // Prevents thundering herd: if 5 parallel verifications all detect stale cache,
 // they all share one DB call instead of making 5 redundant refreshes
-let inFlightRefresh: Promise<ConnectedWorldsCache | null> | null = null;
+// Stores { promise, timestamp } so we can detect stale locks and clean them up
+let inFlightRefresh: {
+  promise: Promise<ConnectedWorldsCache | null>;
+  timestamp: number;
+} | null = null;
+
+const INBOUND_REFRESH_TIMEOUT_MS = 30 * 1000; // 30 seconds - max time to wait for in-flight refresh before treating as stale
 
 export const updateStorageCache = {
   /**
@@ -76,17 +82,27 @@ export const updateStorageCache = {
    * - Settings "Refresh App Data" button
    */
   async refreshAllWorldsCache(): Promise<ConnectedWorldsCache | null> {
-    // Deduplicate in-flight calls: if a refresh is already in progress, return that promise
+    // Deduplicate in-flight calls: if a fresh refresh is already in progress, return that promise
+    // But check if the lock is stale (> 30s old) - if so, clear it and start a new request
     if (inFlightRefresh) {
-      logger.debug(
-        "storage",
-        "World cache refresh already in flight, sharing in-flight request",
-      );
-      return inFlightRefresh;
+      const lockAgeMsec = Date.now() - inFlightRefresh.timestamp;
+      if (lockAgeMsec < INBOUND_REFRESH_TIMEOUT_MS) {
+        logger.debug(
+          "storage",
+          `World cache refresh already in flight (${lockAgeMsec}ms old), sharing in-flight request`,
+        );
+        return inFlightRefresh.promise;
+      } else {
+        logger.warn(
+          "storage",
+          `Stale in-flight refresh lock detected (${lockAgeMsec}ms old), clearing and starting fresh`,
+        );
+        inFlightRefresh = null;
+      }
     }
 
-    // Create the refresh promise and store it
-    inFlightRefresh = (async () => {
+    // Create the refresh promise and store it with timestamp
+    const refreshPromise = (async () => {
       try {
         // CRITICAL: Check if Supabase session is ready before attempting world query
         // Without a valid session, RLS policies will block access and return 0 worlds
@@ -217,7 +233,9 @@ export const updateStorageCache = {
       }
     })();
 
-    return inFlightRefresh;
+    // Store promise with timestamp for staleness detection
+    inFlightRefresh = { promise: refreshPromise, timestamp: Date.now() };
+    return refreshPromise;
   },
 
   /**

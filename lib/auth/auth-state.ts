@@ -681,18 +681,18 @@ export const AuthStateManager = {
       return results;
     }
 
-    // If refresh returned null (session not ready), return "unknown" for all worlds
-    // This prevents cache from being cleared incorrectly during app startup
+    // If refresh returned null (session not ready), return false for all worlds
+    // This prevents granting access to unauthenticated users during app startup.
+    // Screens should listen to auth state changes and re-verify once session is ready.
     if (refreshResult === null) {
       logger.info(
         "auth",
-        "[BATCH-VERIFY] Refresh deferred (session not ready), using cached values",
+        "[BATCH-VERIFY] Refresh deferred (session not ready), denying access until verified",
       );
       const results = new Map<string, boolean>();
-      // Mark all worlds as "needs verification later" by returning cached state
-      // Don't verify now because session isn't ready
+      // Deny access for all worlds until session is ready and we can verify
       for (const worldId of worldIds) {
-        results.set(worldId, true); // Assume cached worlds are valid until we can verify
+        results.set(worldId, false); // Deny access until session is ready
       }
       return results;
     }

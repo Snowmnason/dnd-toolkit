@@ -18,6 +18,7 @@
  * - Offline: Use last known values
  */
 
+// App-level imports (absolute)
 import { trackVariantAssignment } from "@/lib/analytics/variant-tracking";
 import { getAppConfig, isDevelopment } from "@/lib/config/loader";
 import { getPlatformName } from "@/lib/config/platform-config";
@@ -25,6 +26,8 @@ import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
 import { FeatureFlagOverrideRow } from "@/lib/database/feature-flag-overrides";
 import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
+
+// Relative module imports (local)
 import {
   evaluateAdvancedCondition,
   validateAdvancedCondition,

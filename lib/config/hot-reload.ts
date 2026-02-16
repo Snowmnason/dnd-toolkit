@@ -74,7 +74,7 @@ function deepEqual(a: any, b: any): boolean {
 async function hashContent(content: string): Promise<string> {
   try {
     // Try Node.js crypto (dynamic require to avoid bundling in RN)
-      try {
+    try {
       const nodeCrypto = typeof require !== 'undefined' ? require('crypto') : null;
       if (nodeCrypto && typeof nodeCrypto.createHash === 'function') {
         return nodeCrypto.createHash('sha256').update(content).digest('hex');
