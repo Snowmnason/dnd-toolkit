@@ -19,6 +19,7 @@ export const getEmailProvider = (domain: string) => {
     'aol.com': { name: 'AOL Mail', url: 'https://mail.aol.com' },
   };
   
+  /* eslint-disable-next-line security/detect-object-injection */
   return providers[domain] || { name: 'Email', url: `https://${domain}` };
 };
 

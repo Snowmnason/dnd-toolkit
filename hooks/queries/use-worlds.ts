@@ -2,8 +2,7 @@ import { useCallback, useState } from "react";
 import { CACHE_CONFIG, CACHE_KEYS, CACHE_TAGS } from "../../lib/cache/keys";
 import { useQuery } from "../../lib/cache/use-query";
 import { worldsDB, WorldWithAccess } from "../../lib/database/worlds";
-import { useAppKernel } from "../../lib/kernel/use-app-kernel";
-import { SecureStorage } from "../../lib/storage";
+import { worldAccessCache } from "../../lib/storage/world-access-cache";
 import { logger } from "../../lib/utils/logger";
 
 /**
@@ -22,7 +21,6 @@ export function useWorlds(
   userId?: string,
   onWorldsLoaded?: (worldIds: string[]) => void,
 ) {
-  const kernel = useAppKernel();
   const [selectedWorld, setSelectedWorld] = useState<WorldWithAccess | null>(
     null,
   );
@@ -41,15 +39,11 @@ export function useWorlds(
       // Update world access cache for all loaded worlds
       // These worlds are confirmed accessible since they came from the server's getMyWorlds()
       if (userWorlds && userWorlds.length > 0) {
-        for (const world of userWorlds) {
-          const cacheKey = `world_access_${world.world_id}`;
-          const metaKey = `world_access_meta_${world.world_id}`;
-          await SecureStorage.setJSON(cacheKey, true); // User has access
-          await SecureStorage.setJSON(metaKey, {
-            timestamp: Date.now(),
-            source: "server_verified",
-          });
-        }
+        await Promise.all(
+          userWorlds.map((world) =>
+            worldAccessCache.updateAccessFlag(world.world_id, true, "add"),
+          ),
+        );
       }
 
       // Notify parent if callback provided

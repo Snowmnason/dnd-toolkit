@@ -249,7 +249,6 @@ const MIGRATION_CHAIN = [
 
 ## Related Documentation
 
-- [Config Versioning Implementation Guide](./CONFIG_VERSIONING_IMPLEMENTATION.md) - Technical details
-- [lib/config/README.md](../../lib/config/README.md) - Complete config system docs
-- [AppSettings Interface](../../lib/config/loader.ts) - Type definitions</content>
-<parameter name="filePath">p:\CodingProjects\dnd-toolkit\docs\issues\MileStone 2\Tier 3\CONFIG_VERSIONING_USAGE_GUIDE.md
+- [Config Versioning Implementation Guide](./IMPLEMENTATION.md) - Technical details
+- [lib/config/README.md](../../../../../lib/config/README.md) - Complete config system docs
+- [AppSettings Interface](../../../../../lib/config/loader.ts) - Type definitions

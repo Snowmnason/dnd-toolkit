@@ -178,6 +178,7 @@ export const RedactionManager: {
         if (value !== null && typeof value === "object") {
           if (Array.isArray(value)) {
             // Redact array items if they're objects
+            /* eslint-disable-next-line security/detect-object-injection */
             redacted[key] = value.map((item) =>
               typeof item === "object" && item !== null
                 ? this._redactObjectImpl(item, rules, currentPath, visited)
@@ -191,15 +192,18 @@ export const RedactionManager: {
               currentPath,
               visited,
             );
+            /* eslint-disable-next-line security/detect-object-injection */
             redacted[key] =
               redactedNested !== undefined ? redactedNested : undefined;
           }
         } else if (this.shouldRedact(currentPath, rules)) {
           // Find the matching rule to get replacement value
           const rule = this.findMatchingRule(currentPath, rules);
+          /* eslint-disable-next-line security/detect-object-injection */
           redacted[key] =
             rule?.replacement !== undefined ? rule.replacement : undefined;
         } else {
+          /* eslint-disable-next-line security/detect-object-injection */
           redacted[key] = value;
         }
       }
@@ -615,6 +619,7 @@ export const OfflineQueueStatsCollector = {
         // Count by error type only for mutations that have actually failed
         const errorType: keyof typeof stats.failuresByType =
           mutation.lastErrorType || "unknown";
+        /* eslint-disable-next-line security/detect-object-injection -- safe: errorType is from internal enum or 'unknown' */
         stats.failuresByType[errorType]++;
       } else {
         // Track mutations awaiting their first sync attempt
@@ -829,6 +834,7 @@ export const FetcherRegistryFallback = {
       let headerObject: Record<string, string> = {};
       if (options?.headers instanceof Headers) {
         options.headers.forEach((value, key) => {
+          /* eslint-disable-next-line security/detect-object-injection -- safe: copying header entries into local object */
           headerObject[key] = value;
         });
       } else if (options?.headers) {

@@ -32,6 +32,7 @@
  * ```
  */
 
+import { logger } from '../utils/logger';
 import type { QueuedMutation } from "./types";
 
 /**
@@ -86,8 +87,8 @@ const handlerRegistry = new Map<string, SyncHandler>();
  */
 export function registerSyncHandler(table: string, handler: SyncHandler): void {
   if (handlerRegistry.has(table)) {
-    console.warn(
-      `[SyncHandlers] Handler for table '${table}' already registered, overwriting`,
+    logger.category('offline').warn(
+      `Handler for table '${table}' already registered, overwriting`,
     );
   }
   handlerRegistry.set(table, handler);

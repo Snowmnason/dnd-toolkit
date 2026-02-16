@@ -266,5 +266,4 @@ psql -h host -U user -d dbname -f feature_flags.sql
 - Schema existence checks
 - Permission verification
 - Basic CRUD operations per schema
-- RLS policy validation</content>
-<parameter name="filePath">p:\CodingProjects\dnd-toolkit\docs\issues\MileStone 2\Tier 3\197 - Config Versioning\SCHEMA_OPERATIONS_GUIDE.md
+- RLS policy validation

@@ -1,7 +1,4 @@
-import {
-    FeatureFlagsManager,
-    type FeatureFlagState,
-} from "@/lib/feature-flags";
+import { FeatureFlagsManager } from "@/lib/feature-flags";
 import { logger } from "@/lib/utils/logger";
 import { useEffect, useState } from "react";
 
@@ -48,6 +45,7 @@ export function useFeatureFlags(
     try {
       const enabled = FeatureFlagsManager.getFlag(flagName, fallback);
       const allFlags = FeatureFlagsManager.getAllFlags();
+      /* eslint-disable-next-line security/detect-object-injection */
       const source = allFlags[flagName]?.source || "fallback";
 
       setState({ enabled, loading: false, error: null, source });
@@ -64,6 +62,7 @@ export function useFeatureFlags(
     const unsubscribe = FeatureFlagsManager.subscribe((updatedFlags) => {
       try {
         const enabled = FeatureFlagsManager.getFlag(flagName, fallback);
+        /* eslint-disable-next-line security/detect-object-injection */
         const source = updatedFlags[flagName]?.source || "fallback";
         setState({ enabled, loading: false, error: null, source });
         logger.debug("ui", `useFeatureFlags(${flagName}): updated`, {

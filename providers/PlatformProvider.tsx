@@ -1,11 +1,11 @@
 import { logger } from "@/lib/utils/logger";
 import React, {
-  createContext,
-  ReactNode,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
+    createContext,
+    ReactNode,
+    useContext,
+    useEffect,
+    useRef,
+    useState,
 } from "react";
 import { Platform, useWindowDimensions } from "react-native";
 

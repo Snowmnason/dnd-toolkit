@@ -125,36 +125,54 @@ export const usersDB = {
   },
 
   // Get current user's profile
-  async getCurrentUser(): Promise<User | null> {
-    logger.debug("storage", "Starting getCurrentUser");
+  async getCurrentUser(options?: { maxAgeMs?: number; forceRefresh?: boolean }): Promise<User | null> {
+    logger.debug("storage", "Starting getCurrentUser", options);
 
-    // First, try to get from local storage to avoid DB call
-    try {
-      const { AuthStateManager } = await import("../auth/auth-state");
-      const cachedUser = await AuthStateManager.getUserData();
+    const maxAgeMs = options?.maxAgeMs ?? (4 * 60 * 60 * 1000); // Default 4 hours
+    const forceRefresh = options?.forceRefresh ?? false;
 
-      if (cachedUser) {
-        logger.debug(
-          "storage",
-          "User profile loaded from storage (avoiding DB call):",
-          {
-            id: cachedUser.id,
-            username: cachedUser.username,
-            is_admin: cachedUser.is_admin,
-          },
+    // First, try to get from local storage (unless forced refresh)
+    if (!forceRefresh) {
+      try {
+        const { AuthStateManager } = await import("../auth/auth-state");
+        const { SecureStorage, STORAGE_KEYS } = await import("../storage");
+
+        const cachedUser = await AuthStateManager.getUserData();
+        const cacheMeta = await SecureStorage.getJSON<{ timestamp: number }>(
+          `${STORAGE_KEYS.USER_DATA}_meta`,
         );
-        return cachedUser;
+
+        // Cache is valid only if both user data and metadata exist, and metadata is fresh
+        if (cachedUser && cacheMeta) {
+          const cacheAge = Date.now() - cacheMeta.timestamp;
+          const isCacheFresh = cacheAge < maxAgeMs;
+
+          if (isCacheFresh) {
+            logger.debug(
+              "storage",
+              `User profile loaded from cache (age: ${cacheAge}ms)`,
+            );
+            return cachedUser;
+          }
+          // Cache is stale - fall through to fetch from DB
+          logger.debug(
+            "storage",
+            `User profile cache stale (age: ${cacheAge}ms), refreshing from database`,
+          );
+        }
+        // If meta is missing or cache is missing, treat as cache miss and fetch from DB
+      } catch (storageError) {
+        logger.warn(
+          "storage",
+          "Could not load from storage, fetching from DB:",
+          storageError,
+        );
       }
-    } catch (storageError) {
-      logger.warn(
-        "storage",
-        "Could not load from storage, fetching from DB:",
-        storageError,
-      );
+    } else {
+      logger.debug("storage", "Force refresh requested, skipping cache");
     }
 
-    // If not in storage, fetch from database
-    // Use cached session instead of making network call (getUser)
+    // Fetch from database
     const {
       data: { session },
       error: authError,
@@ -185,8 +203,7 @@ export const usersDB = {
       authId,
     );
 
-    // Use RequestManager to wrap database fetch
-    // (storage-to-DB fallback is not deduplicated, only the DB call)
+    // Use RequestManager to wrap database fetch with deduplication, retries, timeout
     const data = await RequestManager.fetch(
       `user:profile:${authId}`,
       async () => {
@@ -253,10 +270,16 @@ export const usersDB = {
       created_at: data.created_at,
     });
 
-    // Save user data to local storage to avoid future database calls
+    // Save user data to local storage + metadata with fresh timestamp
     try {
       const { AuthStateManager } = await import("../auth/auth-state");
+      const { SecureStorage, STORAGE_KEYS } = await import("../storage");
+
       await AuthStateManager.saveUserData(data);
+      await SecureStorage.setJSON(`${STORAGE_KEYS.USER_DATA}_meta`, {
+        timestamp: Date.now(),
+        source: "supabase",
+      });
     } catch (storageError) {
       logger.warn(
         "storage",

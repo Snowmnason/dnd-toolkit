@@ -42,6 +42,7 @@ function computeCspHash(content) {
 }
 
 function computeIntegrity(filePath) {
+  /* eslint-disable-next-line security/detect-non-literal-fs-filename -- safe: filePath is from internal file traversal of dist directory */
   const content = fs.readFileSync(filePath);
   const hash = crypto.createHash("sha384").update(content).digest("base64");
   return `sha384-${hash}`;
@@ -84,6 +85,7 @@ function addSriAttributes(html) {
     const normalizedSrc = src.replace(/^\//, "");
     const assetPath = path.join(DIST_DIR, normalizedSrc);
 
+    /* eslint-disable-next-line security/detect-non-literal-fs-filename -- safe: assetPath is computed from internal asset structure within dist directory */
     if (!fs.existsSync(assetPath)) {
       console.warn("[harden-web] unable to find asset for SRI:", src);
       return full;

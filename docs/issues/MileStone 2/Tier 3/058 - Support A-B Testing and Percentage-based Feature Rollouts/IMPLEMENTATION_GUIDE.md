@@ -318,5 +318,4 @@ VALUES ('feature_a', 10, true), ('feature_b', 50, true);
 - **Audit Trail**: Track rollout changes and creators
 - **A/B Testing**: Multiple variants per feature
 - **Gradual Rollouts**: Safe feature deployment
-- **Offline Support**: Cached configurations work offline</content>
-<parameter name="filePath">p:\CodingProjects\dnd-toolkit\docs\issues\MileStone 1\058 - Support A-B Testing and Percentage-based Feature Rollouts\IMPLEMENTATION_GUIDE.md
+- **Offline Support**: Cached configurations work offline

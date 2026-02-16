@@ -99,6 +99,7 @@ export function getStorageDefaults(): Record<string, StorageDefaultValue> {
  * @returns The default value, or null if key is optional
  */
 export function getStorageDefault(key: string): StorageDefaultValue {
+  /* eslint-disable-next-line security/detect-object-injection */
   return STORAGE_DEFAULTS_CACHE[key] ?? null;
 }
 
@@ -108,6 +109,7 @@ export function getStorageDefault(key: string): StorageDefaultValue {
  * @returns true if the key should be initialized, false if it's optional
  */
 export function shouldInitializeStorageKey(key: string): boolean {
+  /* eslint-disable-next-line security/detect-object-injection */
   return STORAGE_DEFAULTS_CACHE[key] !== null;
 }
 

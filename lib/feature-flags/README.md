@@ -47,6 +47,14 @@ Component/Service Decision Logic
 
 ### New Server-Driven Path (FeatureFlagsManager, Phase 1 ✅ Complete)
 
+**⚡ Sync Strategy: Bootstrap + Realtime (Not Polling)**
+
+This system uses **event-driven updates** (Realtime subscriptions) instead of periodic polling:
+- ✅ **One-time bootstrap** at app startup (efficient, minimal latency)
+- ✅ **Server-push via Supabase Realtime** when flags/entitlements/overrides change (live updates)
+- ✅ **Graceful degradation**: offline uses `SecureStorage` cache; reconnection auto-syncs
+- **Why not polling?** Polling adds server load, increases latency, and wastes bandwidth for infrequent changes. Realtime is the modern pattern for feature flag delivery.
+
 **Development Mode:**
 
 - Uses `appsettings.dev.json` as source of truth (no remote fetch)
@@ -61,6 +69,7 @@ Component/Service Decision Logic
 - Used throughout app lifecycle without re-fetching
 - **Storage Strategy**: Persisted to `SecureStorage` for offline access. One-time bootstrap simplifies logic and reduces points of failure.
 - Offline: Uses last startup values from `SecureStorage` (including cached overrides)
+- **Realtime updates** push flag/entitlement/override changes to client immediately (subscriptions to `feature_flags`, `entitlements`, `feature_flag_overrides`, `rollouts`, `cohorts`, `user_cohort_memberships`)
 
 **Entitlements:**
 

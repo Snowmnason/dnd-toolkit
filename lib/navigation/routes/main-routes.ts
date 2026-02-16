@@ -1,4 +1,5 @@
 import type { NavigationContext, RouteConfig } from '../navigation-config'
+import { logger } from '../../utils/logger'
 
 // Main app routes (world-dependent)
 export const MAIN_ROUTES: RouteConfig[] = [
@@ -18,7 +19,7 @@ export const MAIN_ROUTES: RouteConfig[] = [
       return undefined
     },
     onError: (error: Error, context: NavigationContext) => {
-      console.error('[Route Error] main-landing:', error.message)
+      logger.category('navigation').error('[Route Error] main-landing:', error.message)
       context.router.replace('/select/world-selection')
     },
   },

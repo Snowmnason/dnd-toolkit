@@ -51,6 +51,7 @@ function deepEqual(a: any, b: any): boolean {
 
       // Plain object: sort keys and stringify recursively
       const keys = Object.keys(value).sort();
+      /* eslint-disable-next-line security/detect-object-injection -- safe: keys derived from Object.keys(value) */
       const props = keys.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`);
       return `{${props.join(",")}}`;
     } catch {
@@ -74,7 +75,6 @@ async function hashContent(content: string): Promise<string> {
   try {
     // Try Node.js crypto (dynamic require to avoid bundling in RN)
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const nodeCrypto = typeof require !== 'undefined' ? require('crypto') : null;
       if (nodeCrypto && typeof nodeCrypto.createHash === 'function') {
         return nodeCrypto.createHash('sha256').update(content).digest('hex');

@@ -19,10 +19,12 @@ function findFilesByExtension(dir, extension) {
   const matches = [];
 
   try {
+    /* eslint-disable-next-line security/detect-non-literal-fs-filename -- safe: dir is project root + internal subdirectories */
     const files = readdirSync(dir);
 
     files.forEach((file) => {
       const filePath = path.join(dir, file);
+      /* eslint-disable-next-line security/detect-non-literal-fs-filename -- safe: filePath is computed from internal file traversal */
       const stat = statSync(filePath);
 
       if (stat.isDirectory()) {
@@ -111,6 +113,7 @@ try {
 // Fix HTML files
 htmlFiles.forEach((filePath) => {
   try {
+    /* eslint-disable-next-line security/detect-non-literal-fs-filename -- safe: filePath is from internal file traversal */
     let content = readFileSync(filePath, "utf8");
     const originalContent = content;
 
@@ -133,6 +136,7 @@ htmlFiles.forEach((filePath) => {
     content = content.replace(/\s+crossorigin="anonymous"/g, "");
 
     if (content !== originalContent) {
+      /* eslint-disable-next-line security/detect-non-literal-fs-filename -- safe: filePath is from internal file traversal */
       writeFileSync(filePath, content, "utf8");
       console.log(`✓ Fixed: ${path.relative(distDir, filePath)}`);
     }
@@ -144,6 +148,7 @@ htmlFiles.forEach((filePath) => {
 // Fix JS bundles - replace absolute paths in JavaScript code
 jsFiles.forEach((filePath) => {
   try {
+    /* eslint-disable-next-line security/detect-non-literal-fs-filename -- safe: filePath is from internal file traversal */
     let content = readFileSync(filePath, "utf8");
     const originalContent = content;
 
@@ -159,6 +164,7 @@ jsFiles.forEach((filePath) => {
     content = content.replace(/`\/assets\//g, "`app://assets/");
 
     if (content !== originalContent) {
+      /* eslint-disable-next-line security/detect-non-literal-fs-filename -- safe: filePath is from internal file traversal */
       writeFileSync(filePath, content, "utf8");
       console.log(`✓ Fixed JS: ${path.relative(distDir, filePath)}`);
     }
@@ -170,6 +176,7 @@ jsFiles.forEach((filePath) => {
 // Fix CSS files - replace absolute paths in url() declarations (for fonts)
 cssFiles.forEach((filePath) => {
   try {
+    /* eslint-disable-next-line security/detect-non-literal-fs-filename -- safe: filePath is from internal file traversal */
     let content = readFileSync(filePath, "utf8");
     const originalContent = content;
 
@@ -183,6 +190,7 @@ cssFiles.forEach((filePath) => {
     );
 
     if (content !== originalContent) {
+      /* eslint-disable-next-line security/detect-non-literal-fs-filename -- safe: filePath is from internal file traversal */
       writeFileSync(filePath, content, "utf8");
       console.log(`✓ Fixed CSS: ${path.relative(distDir, filePath)}`);
     }

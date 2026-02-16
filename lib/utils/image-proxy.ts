@@ -12,7 +12,7 @@
  * - Using a dedicated CORS proxy service
  * - Requesting CORS headers from original source
  */
-const CORS_PROXY = 'https://cors-anywhere.herokuapp.com/';
+// CORS proxy removed (unused). If needed, reintroduce via config.
 
 /**
  * Check if URL is from an external domain (not our own server)

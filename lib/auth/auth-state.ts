@@ -1,8 +1,8 @@
 import {
-  clearAllUserData,
-  getPrivacyStorageBackend,
-  SecureStorage,
-  STORAGE_KEYS,
+    clearAllUserData,
+    getPrivacyStorageBackend,
+    SecureStorage,
+    STORAGE_KEYS,
 } from "../storage";
 import { logger } from "../utils/logger";
 
@@ -641,6 +641,90 @@ export const AuthStateManager = {
       }
     }
   },
+
+  /**
+   * Batch verify world access for multiple worlds efficiently
+   * 
+   * Instead of verifying each world individually (which can spawn N parallel refreshes),
+   * do ONE bulk refresh upfront, then verify all worlds from the refreshed cache.
+   * This prevents the thundering herd problem.
+   * 
+   * @param worldIds - World IDs to verify
+   * @returns Map of worldId => hasAccess
+   */
+  async batchVerifyWorldAccess(
+    worldIds: string[],
+  ): Promise<Map<string, boolean>> {
+    logger.info(
+      "auth",
+      `[BATCH-VERIFY] Starting batch verification for ${worldIds.length} worlds`,
+    );
+
+    // Do ONE bulk refresh to get all world access flags at once
+    const { updateStorageCache } =
+      await import("../storage/update-storage-cache");
+    let refreshResult: any = null;
+    try {
+      refreshResult = await updateStorageCache.refreshAllWorldsCache();
+    } catch (error) {
+      logger.warn(
+        "auth",
+        "[BATCH-VERIFY] Bulk refresh failed, falling back to per-world verification",
+        error,
+      );
+      // Fall back to per-world verification if bulk fails
+      const results = new Map<string, boolean>();
+      for (const worldId of worldIds) {
+        const result = await this.verifyWorldAccessWithDatabase(worldId);
+        results.set(worldId, result.hasAccess);
+      }
+      return results;
+    }
+
+    // If refresh returned null (session not ready), return false for all worlds
+    // This prevents granting access to unauthenticated users during app startup.
+    // Screens should listen to auth state changes and re-verify once session is ready.
+    if (refreshResult === null) {
+      logger.info(
+        "auth",
+        "[BATCH-VERIFY] Refresh deferred (session not ready), denying access until verified",
+      );
+      const results = new Map<string, boolean>();
+      // Deny access for all worlds until session is ready and we can verify
+      for (const worldId of worldIds) {
+        results.set(worldId, false); // Deny access until session is ready
+      }
+      return results;
+    }
+
+    // Now check cache for each world locally (no DB calls needed)
+    const results = new Map<string, boolean>();
+    const backend = getPrivacyStorageBackend("world_access_temp");
+
+    for (const worldId of worldIds) {
+      const cacheKey = `world_access_${worldId}`;
+      try {
+        const cached = await backend.getJSON<boolean>(cacheKey);
+        results.set(worldId, cached === true);
+        logger.debug("auth", `[BATCH-VERIFY] ${worldId}=${cached === true}`);
+      } catch (error) {
+        logger.error(
+          "auth",
+          `[BATCH-VERIFY] Failed to check cache for ${worldId}`,
+          error,
+        );
+        // If we can't read cache, deny access for security
+        results.set(worldId, false);
+      }
+    }
+
+    logger.info(
+      "auth",
+      `[BATCH-VERIFY] Complete: ${results.size} worlds verified`,
+    );
+    return results;
+  },
+
   /**
    * Check world access in Supabase database
    * This is the "slow" source of truth
@@ -663,7 +747,6 @@ export const AuthStateManager = {
         return { hasAccess: true };
       }
 
-      const supabase = supabaseCache;
       const userId = await this.getUserId();
 
       if (!userId) {

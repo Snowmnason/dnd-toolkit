@@ -345,19 +345,21 @@ export const SAFE_MODE_MESSAGES: Record<SafeModeReason, string> = {
 export function getSafeModeDefinition(
   reason: SafeModeReason,
 ): (typeof SAFE_MODE_DEFINITIONS)[SafeModeReason] {
-  return (
-    SAFE_MODE_DEFINITIONS[reason] ||
-    SAFE_MODE_DEFINITIONS[SafeModeReason.UNKNOWN]
-  );
+  /* eslint-disable-next-line security/detect-object-injection -- safe: `reason` is an enum value controlled by the application */
+  if (SAFE_MODE_DEFINITIONS[reason]) {
+    /* eslint-disable-next-line security/detect-object-injection -- safe: `reason` is an enum value controlled by the application */
+    return SAFE_MODE_DEFINITIONS[reason];
+  }
+  return SAFE_MODE_DEFINITIONS[SafeModeReason.UNKNOWN];
 }
 
 /**
  * Helper to get human-readable message for a safe mode reason
  */
 export function getSafeModeMessage(reason: SafeModeReason): string {
-  return (
-    SAFE_MODE_MESSAGES[reason] || SAFE_MODE_MESSAGES[SafeModeReason.UNKNOWN]
-  );
+  /* eslint-disable-next-line security/detect-object-injection -- safe: `reason` is an enum value controlled by the application */
+  if (SAFE_MODE_MESSAGES[reason]) return SAFE_MODE_MESSAGES[reason];
+  return SAFE_MODE_MESSAGES[SafeModeReason.UNKNOWN];
 }
 
 /**

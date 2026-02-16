@@ -3,6 +3,8 @@
  * Loads fonts.css on web to make custom fonts available
  */
 
+import { logger } from './logger';
+
 export async function injectWebFonts(): Promise<void> {
   if (typeof document === "undefined") {
     return; // Not running on web
@@ -35,8 +37,8 @@ export async function injectWebFonts(): Promise<void> {
       document.documentElement;
     head.appendChild(link);
 
-    console.log(`✅ Web fonts stylesheet injected (${fontsHref})`);
+    logger.category('ui').debug(`Web fonts stylesheet injected from ${fontsHref}`);
   } catch (error) {
-    console.error("❌ Failed to inject web fonts:", error);
+    logger.category('ui').error("Failed to inject web fonts:", error);
   }
 }

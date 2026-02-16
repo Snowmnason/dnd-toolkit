@@ -9,8 +9,11 @@ import type { User } from "./users";
 
 /**
  * Get current user's profile using cache-first strategy with freshness threshold
+ * 
+ * This is a thin wrapper around usersDB.getCurrentUser() to maintain backwards compatibility.
+ * For all new code, prefer calling usersDB.getCurrentUser() directly from lib/database/users.ts
  *
- * @param forceRefresh - If true, bypass cache and fetch fresh from Supabase
+ * @param forceRefresh - If true, bypass cache and fetch fresh from database
  * @returns User profile or null if not authenticated
  * @throws Error if auth succeeds but profile not found (data inconsistency)
  *
@@ -22,160 +25,11 @@ import type { User } from "./users";
 export async function getCurrentUserProfile(
   forceRefresh = false,
 ): Promise<User | null> {
-  const { AuthStateManager } = await import("../auth/auth-state");
-  const { updateStorageCache } =
-    await import("../storage/update-storage-cache");
-  const { SecureStorage, STORAGE_KEYS } = await import("../storage");
-
-  // Cache freshness window: 4 hours
-  const CACHE_FRESH_THRESHOLD = 4 * 60 * 60 * 1000;
-
-  const isSchemaCacheUnavailableError = (err: any): boolean => {
-    const code = err?.code;
-    const message = err?.message;
-    const status = err?.status;
-    return (
-      code === "PGRST002" ||
-      status === 503 ||
-      (typeof message === "string" &&
-        message.toLowerCase().includes("schema cache"))
-    );
-  };
-
-  // Step 1: Try cache first (unless force refresh)
-  if (!forceRefresh) {
-    try {
-      const cachedUser = await AuthStateManager.getUserData();
-      const cacheMeta = await SecureStorage.getJSON<{ timestamp: number }>(
-        `${STORAGE_KEYS.USER_DATA}_meta`,
-      );
-
-      // Backwards-compat: older installs may have cached user data but no meta.
-      // In that case, prefer using the cached profile rather than forcing a DB call.
-      if (cachedUser && !cacheMeta) {
-        logger.debug(
-          "storage",
-          "User profile cache meta missing; using cached profile as fallback",
-        );
-        // Best-effort background refresh so meta + data get updated when servers are reachable.
-        updateStorageCache
-          .refreshUserProfile()
-          .catch((error) =>
-            logger.warn(
-              "storage",
-              "Background user profile refresh failed (non-critical):",
-              error,
-            ),
-          );
-        return cachedUser;
-      }
-
-      if (cachedUser && cacheMeta) {
-        const cacheAge = Date.now() - cacheMeta.timestamp;
-        const isCacheFresh = cacheAge < CACHE_FRESH_THRESHOLD;
-
-        if (isCacheFresh) {
-          logger.debug(
-            "storage",
-            `User profile loaded from cache (age: ${cacheAge}ms)`,
-          );
-          return cachedUser;
-        }
-
-        // Cache is stale - refresh from database
-        logger.debug(
-          "storage",
-          `User profile cache stale (age: ${cacheAge}ms), refreshing from database`,
-        );
-        try {
-          await updateStorageCache.refreshUserProfile();
-          // Now read the refreshed cache
-          const refreshedUser = await AuthStateManager.getUserData();
-          return refreshedUser;
-        } catch (refreshError) {
-          logger.warn(
-            "storage",
-            "Failed to refresh user profile, using stale cache as fallback :",
-            refreshError,
-          );
-          return cachedUser;
-        }
-      }
-    } catch {
-      logger.debug("storage", "Cache access failed, fetching from session");
-    }
-  } else {
-    logger.debug("storage", "Force refresh requested, skipping cache");
-  }
-
-  // Step 2: Check cached session (no network call, but may be stale)
-  const {
-    data: { session },
-    error: sessionError,
-  } = await supabase.auth.getSession();
-
-  if (sessionError) {
-    logger.error("storage", "Session error:", sessionError);
-    return null;
-  }
-
-  if (!session || !session.user) {
-    logger.debug("storage", "No active session");
-    return null;
-  }
-
-  // Step 3: We have a session, fetch user profile from DB
-  const authUserId = session.user.id;
-
-  const { data: userProfile, error: dbError } = await supabase
-    .schema('public')
-    .from('users')
-    .select("*")
-    .eq("auth_id", authUserId)
-    .single();
-
-  if (dbError) {
-    logger.error("storage", "Error fetching user profile:", dbError);
-
-    // Transient Supabase/PostgREST failure (commonly during project wakeup/DB restart).
-    // If we have cached user data, return it so the app can continue in a degraded mode.
-    if (!forceRefresh && isSchemaCacheUnavailableError(dbError)) {
-      try {
-        const cachedUser = await AuthStateManager.getUserData();
-        if (cachedUser) {
-          logger.warn(
-            "storage",
-            "Supabase temporarily unavailable; using cached user profile",
-            dbError,
-          );
-          return cachedUser;
-        }
-      } catch {
-        // ignore cache read failures; fall through to throwing
-      }
-    }
-
-    throw new Error(dbError.message || "Failed to fetch user profile");
-  }
-
-  if (!userProfile) {
-    logger.error("storage", "User profile not found for auth_id:", authUserId);
-    throw new Error("User profile not found");
-  }
-
-  // Step 4: Update cache for next time
-  try {
-    await AuthStateManager.saveUserData(userProfile);
-    // Save metadata with fresh timestamp
-    await SecureStorage.setJSON(`${STORAGE_KEYS.USER_DATA}_meta`, {
-      timestamp: Date.now(),
-      source: "supabase",
-    });
-  } catch (error) {
-    logger.warn("storage", "Failed to update cache (non-critical):", error);
-  }
-
-  return userProfile;
+  const { usersDB } = await import("./users");
+  return usersDB.getCurrentUser({
+    forceRefresh,
+    maxAgeMs: 4 * 60 * 60 * 1000, // 4 hours
+  });
 }
 
 /**

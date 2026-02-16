@@ -374,6 +374,7 @@ class QueryCacheClass {
       if (typeof pattern === "string") {
         // Escape special regex characters to prevent ReDoS attacks
         const escapedPattern = escapeRegexChars(pattern);
+        /* eslint-disable-next-line security/detect-non-literal-regexp */
         regex = new RegExp(`^${escapedPattern}`);
       } else {
         regex = pattern;
@@ -513,6 +514,7 @@ class QueryCacheClass {
 
     const toRemove = Math.ceil(entries.length * 0.1); // Remove 10% oldest
     for (let i = 0; i < toRemove; i++) {
+      // eslint-disable-next-line security/detect-object-injection
       const keyToRemove = entries[i][0];
       await this.remove(keyToRemove);
     }

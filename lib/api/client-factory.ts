@@ -958,6 +958,7 @@ export abstract class APIClient {
       const obj: Record<string, any> = {};
       const keys = Object.keys(val).sort();
       for (const key of keys) {
+        /* eslint-disable-next-line security/detect-object-injection -- safe: keys are derived from Object.keys(val) */
         obj[key] = normalize((val as any)[key]);
       }
       return obj;

@@ -56,9 +56,11 @@ const moveDirectories = async (userInput) => {
     // Move old directories to new app-example directory or delete them
     for (const dir of oldDirs) {
       const oldDirPath = path.join(root, dir);
+      /* eslint-disable-next-line security/detect-non-literal-fs-filename -- safe: oldDirPath is constructed from internal project directory structure */
       if (fs.existsSync(oldDirPath)) {
         if (userInput === "y") {
           const newDirPath = path.join(root, exampleDir, dir);
+          /* eslint-disable-next-line security/detect-non-literal-fs-filename -- safe: paths are constructed from internal project directory structure */
           await fs.promises.rename(oldDirPath, newDirPath);
           console.log(`➡️ /${dir} moved to /${exampleDir}/${dir}.`);
         } else {

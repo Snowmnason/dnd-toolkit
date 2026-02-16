@@ -59,6 +59,7 @@ export function $(token: TokenName, theme?: ThemeTokens): string {
   // If theme is explicitly passed, always return resolved value
   // (this indicates the caller needs the actual color for computations like tone())
   if (theme) {
+    /* eslint-disable-next-line security/detect-object-injection */
     return theme[token];
   }
 
@@ -72,6 +73,7 @@ export function $(token: TokenName, theme?: ThemeTokens): string {
   try {
     const ctx = UseTheme();
     if (ctx && ctx.theme) {
+      /* eslint-disable-next-line security/detect-object-injection */
       return ctx.theme[token];
     }
   } catch {

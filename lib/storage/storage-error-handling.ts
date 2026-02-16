@@ -139,6 +139,7 @@ export function isStorageError(error: unknown): boolean {
 export function logStorageError(errorInfo: StorageErrorInfo, context?: Record<string, any>): void {
   const level = errorInfo.isCritical ? 'error' : 'warn';
   
+  /* eslint-disable-next-line security/detect-object-injection */
   logger[level](
     'storage',
     `${errorInfo.operation} failed for key: ${errorInfo.key || 'unknown'}`,

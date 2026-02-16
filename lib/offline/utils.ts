@@ -138,6 +138,7 @@ export function createOptimisticUpdate(
       return (prev: any[]) => [...prev, payload];
 
     case "update": {
+      /* eslint-disable-next-line security/detect-object-injection */
       const updateId = payload[idField];
       if (!updateId) {
         logger
@@ -153,6 +154,7 @@ export function createOptimisticUpdate(
       return (prev: any) => {
         if (Array.isArray(prev)) {
           return prev.map((item) =>
+            /* eslint-disable-next-line security/detect-object-injection */
             item[idField] === updateId ? { ...item, ...payload } : item,
           );
         }
@@ -161,6 +163,7 @@ export function createOptimisticUpdate(
     }
 
     case "delete": {
+      /* eslint-disable-next-line security/detect-object-injection */
       const deleteId = payload[idField];
       if (!deleteId) {
         logger
@@ -175,7 +178,10 @@ export function createOptimisticUpdate(
 
       return (prev: any) => {
         if (Array.isArray(prev)) {
-          return prev.filter((item) => item[idField] !== deleteId);
+          return prev.filter(
+            /* eslint-disable-next-line security/detect-object-injection */
+            (item) => item[idField] !== deleteId,
+          );
         }
         return null;
       };

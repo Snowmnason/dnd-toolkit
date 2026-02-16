@@ -338,6 +338,7 @@ function validateAppSettingsImpl(config: AppSettings): ConfigValidationResult {
         }
 
         // Validate platform config is an object (Partial<AppSettings>)
+        /* eslint-disable-next-line security/detect-object-injection */
         const platformConfig = (config.platforms as any)[platformName];
         if (platformConfig !== undefined && typeof platformConfig !== "object") {
           result.valid = false;

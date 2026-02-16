@@ -272,33 +272,23 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Verify all worlds in parallel (faster than serial verification)
-        const verificationResults = await Promise.allSettled(
-          cachedWorldIds.map((worldId) =>
-            AuthStateManager.verifyWorldAccessWithDatabase(worldId),
-          ),
+        // Batch verify all worlds efficiently (prevents per-world refresh spam)
+        // Instead of N parallel calls to verifyWorldAccessWithDatabase (which could each call
+        // refreshAllWorldsCache), do ONE bulk refresh then verify all from cache
+        const accessMap = await AuthStateManager.batchVerifyWorldAccess(
+          cachedWorldIds,
         );
 
         const verifiedWorldIds: string[] = [];
-        let hadErrors = false;
+        const results = Array.from(accessMap.entries());
 
-        for (let i = 0; i < verificationResults.length; i++) {
-          // eslint-disable-next-line security/detect-object-injection
-          const result = verificationResults[i];
-          // eslint-disable-next-line security/detect-object-injection
-          const worldId = cachedWorldIds[i];
-
-          if (
-            result.status === "fulfilled" &&
-            result.value.hasAccess
-          ) {
+        for (const [worldId, hasAccess] of results) {
+          if (hasAccess) {
             verifiedWorldIds.push(worldId);
-          } else if (result.status === "rejected") {
-            hadErrors = true;
-            logger.warn(
+          } else {
+            logger.info(
               "context",
-              `World ${worldId} verification failed:`,
-              result.reason,
+              `World ${worldId} access denied or stale`,
             );
           }
         }
@@ -309,7 +299,6 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
           {
             cached: cachedWorldIds.length,
             verified: verifiedWorldIds.length,
-            hadErrors,
             isErrorState,
           },
         );
@@ -335,11 +324,6 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
               STORAGE_KEYS.CONNECTED_WORLDS,
               verifiedWorldIds,
             );
-          } else if (hadErrors) {
-            logger.warn(
-              "context",
-              `AppParamsStableProvider: Error state verification failed. Will retry on next app launch.`,
-            );
           } else {
             logger.info(
               "context",
@@ -355,33 +339,23 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
 
         // THRESHOLD LOGIC (for non-error states):
         // If verification returned 0:
-        // - With NO errors → it's a legitimate state (user truly has 0 worlds) → clear cache
-        // - With errors → treat as transient failure → preserve cache
+        // - It's a legitimate state (user truly has 0 worlds) → clear cache
         if (verifiedWorldIds.length === 0 && cachedWorldIds.length > 0) {
-          if (hadErrors) {
-            logger.warn(
-              "context",
-              `AppParamsStableProvider: Verification returned 0 worlds with errors. Cache preserved.`,
-            );
-            // Transient failure: keep using cached worlds
-            return;
-          } else {
-            logger.info(
-              "context",
-              `AppParamsStableProvider: Verification returned 0 worlds (no errors). User has no worlds. Clearing cache.`,
-            );
-            // Legitimate 0: clear cache and state
-            setStableParams((prev) => ({
-              ...prev,
-              connectedWorldIds: [],
-            }));
+          logger.info(
+            "context",
+            `AppParamsStableProvider: Verification returned 0 worlds. User has no worlds. Clearing cache.`,
+          );
+          // Legitimate 0: clear cache and state
+          setStableParams((prev) => ({
+            ...prev,
+            connectedWorldIds: [],
+          }));
 
-            const verifyBackend = getPrivacyStorageBackend(
-              STORAGE_KEYS.CONNECTED_WORLDS,
-            );
-            await verifyBackend.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, []);
-            return;
-          }
+          const verifyBackend = getPrivacyStorageBackend(
+            STORAGE_KEYS.CONNECTED_WORLDS,
+          );
+          await verifyBackend.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, []);
+          return;
         }
 
         // Check if verification meets expected thresholds
@@ -525,7 +499,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
 
     // Update the ref for next comparison
     previousUserIdRef.current = stableParams.userId;
-  }, [stableParams.userId]);
+  }, [stableParams.userId, stableParams.connectedWorldIds]);
 
   const setUserId = useCallback((userId: string | undefined) => {
     setStableParams((prev) => ({ ...prev, userId }));

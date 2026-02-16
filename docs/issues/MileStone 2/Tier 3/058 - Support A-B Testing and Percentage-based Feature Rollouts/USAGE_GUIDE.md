@@ -211,5 +211,4 @@ SET seed = '2026-02-08'
 WHERE flag_name = 'feature_name';
 ```
 
-This moves users between rollout groups while maintaining percentages.</content>
-<parameter name="filePath">p:\CodingProjects\dnd-toolkit\docs\issues\MileStone 1\058 - Support A-B Testing and Percentage-based Feature Rollouts\USAGE_GUIDE.md
+This moves users between rollout groups while maintaining percentages.

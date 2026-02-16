@@ -608,10 +608,6 @@ class AppKernelClass {
           );
           logger.reconfigure(debugLogsEnabled);
         } catch (bridgeError) {
-          console.error(
-            "[BRIDGE] Bridge failed:",
-            (bridgeError as Error).message,
-          );
           logger
             .category("bootstrap")
             .warn(

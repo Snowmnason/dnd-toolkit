@@ -210,5 +210,4 @@ supabase db push
 **Migration order problems**
 - Check migration file numbering
 - Verify prerequisites are met
-- Test migrations individually</content>
-<parameter name="filePath">p:\CodingProjects\dnd-toolkit\docs\issues\MileStone 2\Tier 3\197 - Config Versioning\DATABASE_SCHEMA_APPROACH.md
+- Test migrations individually

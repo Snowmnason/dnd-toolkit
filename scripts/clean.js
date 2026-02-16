@@ -38,17 +38,19 @@ const colors = {
 };
 
 function log(message, color = 'reset') {
+  /* eslint-disable-next-line security/detect-object-injection */
   console.log(`${colors[color]}${message}${colors.reset}`);
 }
 
 function deleteDir(dirPath, name) {
+  /* eslint-disable-next-line security/detect-non-literal-fs-filename -- safe: dirPath computed from internal project paths */
   if (fs.existsSync(dirPath)) {
     try {
       execSync(`rm -rf "${dirPath}"`, { stdio: 'ignore' });
       log(`✓ Removed ${name}`, 'green');
       return true;
     } catch (error) {
-      log(`✗ Failed to remove ${name}`, 'red');
+      log(`✗ Failed to remove ${name}: ${error instanceof Error ? error.message : String(error)}`, 'red');
       return false;
     }
   } else {
@@ -86,12 +88,13 @@ function cleanCache() {
   ];
   
   tsFiles.forEach(pattern => {
+    /* eslint-disable-next-line security/detect-non-literal-fs-filename -- safe: pattern is constructed from internal project directory structure */
     if (fs.existsSync(pattern)) {
       try {
         execSync(`rm -f ${pattern}`, { stdio: 'ignore' });
         log(`✓ Removed TypeScript cache (${pattern})`, 'green');
       } catch (error) {
-        // Ignore
+        log(`✗ Failed to remove TypeScript cache (${pattern}): ${error instanceof Error ? error.message : String(error)}`, 'yellow');
       }
     }
   });
