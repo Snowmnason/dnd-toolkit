@@ -430,11 +430,34 @@ Create `__tests__/lib/network/error-handling.test.ts`:
 - Connection type unavailable on older web browsers (fallback: "unknown")
 - Latency detection via ping only on web (native relies on OS detection)
 
+## Integration with Offline Mutation Queue
+
+The **[lib/offline module](../offline/README.md)** uses `NetworkDetection` to automatically sync queued mutations when connection is restored:
+
+```ts
+// In OnlineSyncManager
+NetworkDetection.subscribe((status) => {
+  if (status.isOnline && status.connectionQuality === "GOOD") {
+    // Trigger sync of queued mutations
+    await syncQueuedMutations();
+  }
+});
+```
+
+**Key Integration Points:**
+
+- **Online Detection**: When `NetworkDetection.isOnline` transitions from `false` → `true`, `OnlineSyncManager` begins syncing queued mutations
+- **Connection Quality**: Sync only starts when quality is stable (GOOD); BAD/NO_WIFI connections continue queueing
+- **Debouncing**: Rapid online/offline flapping is debounced (5000ms default) to avoid redundant sync attempts
+- **Error Handling**: If sync fails, mutations remain queued and retry with exponential backoff
+
+See [lib/offline/README.md](../offline/README.md#architecture--data-flow) for complete offline queue architecture.
+
 ## Future Enhancements
 
 See `docs/suggestions/` for planned improvements:
 
-1. **Offline queue system** – Queue mutations when offline, sync when online
+1. ✅ **Offline queue system** – IMPLEMENTED (see [lib/offline](../offline/README.md))
 2. **Network quality prediction** – ML-based prediction of connection quality
 3. **Adaptive payload sizing** – Automatically reduce payloads based on connection
 4. **Telemetry & metrics** – Track network quality distribution, impact on UX

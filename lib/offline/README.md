@@ -685,7 +685,7 @@ OnlineSyncManager.subscribe((status) => {
 **Prevention:**
 
 ```ts
-// Use STORAGE_KEYS.OFFLINE_QUEUE (hashed and encrypted)
+// Use STORAGE_KEYS.OFFLINE_MUTATION_QUEUE (centrally defined in lib/storage, encrypted on all platforms)
 // Never access queue directly; always use OfflineMutationQueue API
 ```
 
