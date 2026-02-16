@@ -247,7 +247,7 @@ export function getAppConfig(): AppSettings {
         const deepMergeConfigs = <T extends Record<string, any>>(base: T, override: Partial<T> | undefined): T => {
           if (!override) return { ...base };
           const result: any = { ...base };
-
+          /* eslint-disable security/detect-object-injection -- safe: merging config keys from trusted config files */
           for (const key in override) {
             if (!Object.prototype.hasOwnProperty.call(override, key)) continue;
             const overrideValue = (override as any)[key];
@@ -260,8 +260,10 @@ export function getAppConfig(): AppSettings {
               !Array.isArray(result[key]) &&
               result[key] !== null
             ) {
+               
               result[key] = deepMergeConfigs(result[key], overrideValue as any);
             } else {
+               
               result[key] = overrideValue;
             }
           }

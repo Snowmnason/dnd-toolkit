@@ -26,13 +26,13 @@ import { FeatureFlagOverrideRow } from "@/lib/database/feature-flag-overrides";
 import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import {
-    evaluateAdvancedCondition,
-    validateAdvancedCondition,
+  evaluateAdvancedCondition,
+  validateAdvancedCondition,
 } from "./advanced-conditions";
 import { FlagEvaluationCache } from "./cache";
+import { isUserInCohort } from "./cohorts";
 import { evaluateConditions, type FlagContext } from "./conditions";
 import { isInRolloutMemoized } from "./rollout";
-import { isUserInCohort } from "./cohorts";
 
 // ==========================================
 // Types
@@ -137,19 +137,52 @@ export interface CachedUserCohortMembership {
 }
 
 /**
+ * Phase 3: Cohort-to-flag assignment row from Edge Function
+ * Maps which cohorts are required for a feature flag (server-provided, source of truth)
+ */
+export interface CachedCohortFlagAssignment {
+  id: string; // UUID
+  flag_name: string; // Feature flag name
+  cohort_id: string; // UUID of required cohort
+  cohort_slug?: string; // Cohort slug for convenience (populated by Edge Function)
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
  * Typed response from get_feature_flags Edge Function
  * (mirrors GetFeatureFlagsResponse from supabase/functions/get_feature_flags/types.ts)
  */
 export interface GetFeatureFlagsResponse {
   flags: CachedFeatureFlag[];
   entitlements: CachedEntitlement[];
-  overrides: FeatureFlagOverrideRow[];
+  overrides: (FeatureFlagOverrideRow | EdgeEntitlementOverrideRow)[];
   rollouts: Record<string, CachedRolloutConfig>; // NEW: rollout config by flag name
   cohorts?: CachedCohort[]; // Phase 3: Optional list of cohorts
-  cohort_assignments?: any[]; // Phase 3: Optional cohort assignments (for future use)
+  cohort_assignments?: CachedCohortFlagAssignment[]; // Phase 3: Server-provided flag → cohort requirements
   user_cohort_memberships?: CachedUserCohortMembership[]; // Phase 3: User's cohort memberships
   fetchedAt: number;
   version: "v1";
+}
+
+/**
+ * Entitlement override row as returned by the Edge Function.
+ * (Synthetic shape; differs from the DB row which uses entitlement_key/is_active.)
+ */
+export interface EdgeEntitlementOverrideRow {
+  id: string;
+  user_id: string;
+  target_type: "entitlement";
+  target_name: string; // entitlement key
+  action: "grant" | "revoke";
+  enabled: boolean; // mirrors action state for client compatibility
+  expires_at: string | null;
+  revoked: boolean;
+  reason?: string;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export type FlagsSubscriber = (flags: Record<string, FeatureFlagState>) => void;
@@ -159,6 +192,7 @@ export type FlagsSubscriber = (flags: Record<string, FeatureFlagState>) => void;
 // ==========================================
 
 const OVERRIDE_CACHE_KEY_PREFIX = "feature_flag_override:";
+const ENTITLEMENT_OVERRIDE_CACHE_KEY_PREFIX = "entitlement_override:";
 
 /**
  * Get clock skew tolerance from config (default: 60 seconds)
@@ -177,15 +211,98 @@ class FeatureFlagsManagerClass {
   private currentFlags: Map<string, FeatureFlagState> = new Map(); // Use Map for safe access
   private userOverrides: Map<string, boolean> = new Map(); // Admin testing overrides (local)
   private remoteOverrides: Map<string, FeatureFlagOverrideRow> = new Map(); // Remote server overrides (per-user)
+  private remoteEntitlementOverrides: Map<string, EdgeEntitlementOverrideRow> = new Map(); // Remote server entitlement overrides (per-user)
   private cachedEntitlements: Map<string, CachedEntitlement> = new Map(); // Cached from bootstrap + Realtime
   private cachedRollouts: Map<string, CachedRolloutConfig> = new Map(); // NEW: Rollout config for percentage-based rollouts
   private cachedCohorts: Map<string, CachedCohort> = new Map(); // Phase 3: Cohorts (keyed by slug)
   private cachedUserCohortMemberships: CachedUserCohortMembership[] = []; // Phase 3: User's cohort memberships
+  private cachedCohortAssignments: Map<string, Set<string>> = new Map(); // Phase 3: Flag → Set<cohortSlug> from server (source of truth)
   private evaluationCache: FlagEvaluationCache = new FlagEvaluationCache(); // Phase 2: LRU cache for isEnabledWithContext results
   private subscribers: Set<FlagsSubscriber> = new Set();
   private bootstrapped = false;
   private userId: string | null = null;
   private realtimeSubscriptions: Map<string, any> = new Map(); // Track Realtime channel subscriptions
+
+  private _isOverrideActive(
+    expiresAt: string | null | undefined,
+    revoked: boolean | undefined,
+  ): boolean {
+    if (revoked) return false;
+    if (!expiresAt) return true;
+    return new Date(expiresAt).getTime() > Date.now();
+  }
+
+  private _getRemoteFlagOverrideValue(flagName: string): boolean | undefined {
+    const remoteOverride = this.remoteOverrides.get(flagName);
+    if (!remoteOverride) return undefined;
+    if (!this._isOverrideActive(remoteOverride.expires_at, remoteOverride.revoked)) {
+      return undefined;
+    }
+    return remoteOverride.enabled;
+  }
+
+  private _getLocalFlagOverrideValue(flagName: string): boolean | undefined {
+    if (!this.userOverrides.has(flagName)) return undefined;
+    return this.userOverrides.get(flagName);
+  }
+
+  private _normalizeFlagOverrideRow(row: any): FeatureFlagOverrideRow | null {
+    if (!row) return null;
+
+    // Edge Function synthetic shape
+    if (row.target_type === "flag" && typeof row.target_name === "string") {
+      return row as FeatureFlagOverrideRow;
+    }
+
+    // DB realtime shape: feature_flags.feature_flag_overrides
+    if (typeof row.flag_name === "string") {
+      return {
+        id: String(row.id),
+        user_id: String(row.user_id),
+        target_type: "flag",
+        target_name: String(row.flag_name),
+        enabled: !!row.enabled,
+        expires_at: row.expires_at ?? null,
+        revoked: !!row.revoked,
+        reason: row.reason ?? undefined,
+        created_by: row.created_by ?? null,
+        created_at: String(row.created_at),
+        updated_at: String(row.updated_at),
+      };
+    }
+
+    return null;
+  }
+
+  private _normalizeEntitlementOverrideRow(row: any): EdgeEntitlementOverrideRow | null {
+    if (!row) return null;
+
+    // Edge Function synthetic shape
+    if (row.target_type === "entitlement" && typeof row.target_name === "string") {
+      return row as EdgeEntitlementOverrideRow;
+    }
+
+    // DB realtime shape: feature_flags.entitlements_overrides
+    if (typeof row.entitlement_key === "string") {
+      const isActive = !!row.is_active;
+      return {
+        id: String(row.id),
+        user_id: String(row.user_id),
+        target_type: "entitlement",
+        target_name: String(row.entitlement_key),
+        action: isActive ? "grant" : "revoke",
+        enabled: isActive,
+        expires_at: row.expires_at ?? null,
+        revoked: !!row.revoked,
+        reason: row.reason ?? undefined,
+        created_by: row.created_by ?? null,
+        created_at: String(row.created_at),
+        updated_at: String(row.updated_at),
+      };
+    }
+
+    return null;
+  }
 
   /**
    * Initialize with Supabase client and user ID
@@ -291,6 +408,7 @@ class FeatureFlagsManagerClass {
         entitlements: allEntitlements,
         rollouts: allRollouts, // Extract rollout config from response (no default value)
         cohorts: allCohorts, // Phase 3: Extract cohorts from response
+        cohort_assignments: allCohortAssignments, // Phase 3: Extract cohort flag assignments
         user_cohort_memberships: allUserCohortMemberships, // Phase 3: Extract user's cohort memberships
       } = data;
 
@@ -339,15 +457,37 @@ class FeatureFlagsManagerClass {
             flagOverrides.map((o) => [o.target_name, o]),
           );
 
+          // Filter to only include entitlement-type overrides
+          const entitlementOverrides = allOverrides.filter(
+            (o) => o.target_type === "entitlement",
+          ) as EdgeEntitlementOverrideRow[];
+          this.remoteEntitlementOverrides = new Map(
+            entitlementOverrides.map((o) => [o.target_name, o]),
+          );
+
           // Cache flag overrides for offline use
           await SecureStorage.setJSON(
             `${STORAGE_KEYS.FEATURE_FLAGS}:${OVERRIDE_CACHE_KEY_PREFIX}${this.userId}`,
             Object.fromEntries(this.remoteOverrides),
           );
 
+          // Cache entitlement overrides for offline use (user-scoped)
+          await SecureStorage.setJSON(
+            `${STORAGE_KEYS.ENTITLEMENTS}:${ENTITLEMENT_OVERRIDE_CACHE_KEY_PREFIX}${this.userId}`,
+            Object.fromEntries(this.remoteEntitlementOverrides),
+          );
+
           logger.debug("feature_flags", "Processed remote flag overrides", {
             count: this.remoteOverrides.size,
           });
+
+          logger.debug(
+            "feature_flags",
+            "Processed remote entitlement overrides",
+            {
+              count: this.remoteEntitlementOverrides.size,
+            },
+          );
         } catch (error) {
           logger.warn(
             "feature_flags",
@@ -355,6 +495,7 @@ class FeatureFlagsManagerClass {
             error,
           );
           await this.loadCachedRemoteOverrides();
+          await this.loadCachedRemoteEntitlementOverrides();
         }
       }
 
@@ -532,6 +673,91 @@ class FeatureFlagsManagerClass {
         await this.loadCachedUserCohortMemberships();
       }
 
+      // Phase 3: Process cohort flag assignments (server-provided, source of truth)
+      if (allCohortAssignments && allCohortAssignments.length > 0) {
+        try {
+          // Build flag → Set<cohortSlug> map
+          const assignmentMap = new Map<string, Set<string>>();
+
+          for (const assignment of allCohortAssignments) {
+            // Resolve cohort slug from assignment or by looking up cohort_id in cached cohorts
+            let cohortSlug = assignment.cohort_slug;
+
+            if (!cohortSlug && assignment.cohort_id) {
+              // Try to resolve from cached cohorts
+              for (const [slug, cohort] of this.cachedCohorts.entries()) {
+                if (cohort.id === assignment.cohort_id) {
+                  cohortSlug = slug;
+                  break;
+                }
+              }
+            }
+
+            if (!cohortSlug) {
+              logger.warn(
+                "feature_flags",
+                `Unable to resolve cohort slug for assignment ${assignment.flag_name} → ${assignment.cohort_id}`,
+              );
+              continue;
+            }
+
+            // Add to map: flag_name → Set of cohort slugs
+            if (!assignmentMap.has(assignment.flag_name)) {
+              assignmentMap.set(assignment.flag_name, new Set());
+            }
+            assignmentMap.get(assignment.flag_name)!.add(cohortSlug);
+          }
+
+          this.cachedCohortAssignments = assignmentMap;
+
+          // Persist to SecureStorage for offline use
+          const persistedAssignments: Record<string, string[]> = {};
+          for (const [flagName, cohortSlugs] of assignmentMap.entries()) {
+            /* eslint-disable-next-line security/detect-object-injection -- safe: flagName is produced internally from assignmentMap */
+            persistedAssignments[flagName] = Array.from(cohortSlugs);
+          }
+
+          await SecureStorage.setJSON(
+            `${STORAGE_KEYS.FEATURE_FLAGS}:cohort_assignments`,
+            persistedAssignments,
+          );
+
+          logger.debug("feature_flags", "Cached cohort flag assignments", {
+            flagsWithAssignments: assignmentMap.size,
+            totalAssignments: allCohortAssignments.length,
+          });
+        } catch (error) {
+          logger.warn(
+            "feature_flags",
+            "Failed to process cohort assignments",
+            error,
+          );
+          await this.loadCachedCohortAssignments();
+        }
+      } else if (
+        allCohortAssignments !== undefined &&
+        allCohortAssignments !== null
+      ) {
+        // Server explicitly returned empty array (no flags require cohorts)
+        this.cachedCohortAssignments = new Map();
+        try {
+          await SecureStorage.removeItem(
+            `${STORAGE_KEYS.FEATURE_FLAGS}:cohort_assignments`,
+          );
+          logger.debug("feature_flags", "Cleared cohort assignments (disabled)");
+        } catch (error) {
+          logger.warn(
+            "feature_flags",
+            "Failed to clear cached cohort assignments",
+            error,
+          );
+          this.cachedCohortAssignments = new Map();
+        }
+      } else {
+        // assignments field missing from response
+        await this.loadCachedCohortAssignments();
+      }
+
       const newFlags: Map<string, FeatureFlagState> = new Map();
 
       if (serverFlags && serverFlags.length > 0) {
@@ -591,6 +817,7 @@ class FeatureFlagsManagerClass {
           this.bootstrapped = true;
           // Also try to load cached overrides and rollouts
           await this.loadCachedRemoteOverrides();
+          await this.loadCachedRemoteEntitlementOverrides();
           await this.loadCachedRollouts(); // NEW: Load cached rollouts
           logger.info("feature_flags", "Loaded from last known state", {
             flagCount: this.currentFlags.size,
@@ -643,6 +870,36 @@ class FeatureFlagsManagerClass {
       logger.warn(
         "feature_flags",
         "Failed to load cached remote overrides",
+        error,
+      );
+    }
+  }
+
+  /**
+   * Load cached remote entitlement overrides from storage
+   */
+  private async loadCachedRemoteEntitlementOverrides(): Promise<void> {
+    if (!this.userId) return;
+    try {
+      const cached = await SecureStorage.getJSON<
+        Record<string, EdgeEntitlementOverrideRow>
+      >(
+        `${STORAGE_KEYS.ENTITLEMENTS}:${ENTITLEMENT_OVERRIDE_CACHE_KEY_PREFIX}${this.userId}`,
+      );
+      if (cached) {
+        this.remoteEntitlementOverrides = new Map(Object.entries(cached));
+        logger.debug(
+          "feature_flags",
+          "Loaded cached remote entitlement overrides",
+          {
+            count: this.remoteEntitlementOverrides.size,
+          },
+        );
+      }
+    } catch (error) {
+      logger.warn(
+        "feature_flags",
+        "Failed to load cached remote entitlement overrides",
         error,
       );
     }
@@ -757,6 +1014,36 @@ class FeatureFlagsManagerClass {
   }
 
   /**
+   * Phase 3: Load cached cohort flag assignments from SecureStorage
+   * These assignments represent which cohorts are required for each flag (server-provided)
+   */
+  private async loadCachedCohortAssignments(): Promise<void> {
+    try {
+      const cached = await SecureStorage.getJSON<Record<string, string[]>>(
+        `${STORAGE_KEYS.FEATURE_FLAGS}:cohort_assignments`,
+      );
+      if (cached) {
+        // Convert flat storage format back to Map<flagName, Set<cohortSlug>>
+        this.cachedCohortAssignments = new Map(
+          Object.entries(cached).map(([flagName, slugs]) => [
+            flagName,
+            new Set(slugs),
+          ]),
+        );
+        logger.debug("feature_flags", "Loaded cached cohort assignments", {
+          flags: this.cachedCohortAssignments.size,
+        });
+      }
+    } catch (error) {
+      logger.warn(
+        "feature_flags",
+        "Failed to load cached cohort assignments",
+        error,
+      );
+    }
+  }
+
+  /**
    * Subscribe to Realtime updates for feature flags, entitlements, and overrides
    * Allows server-side changes to be pushed to the client immediately
    * Reduces polling and moves control to the server
@@ -770,12 +1057,12 @@ class FeatureFlagsManagerClass {
     try {
       // Subscribe to feature flags table (all users, all changes)
       const flagsChannel = this.supabaseClient
-        .channel("public:feature_flags")
+        .channel("feature_flags:feature_flags")
         .on(
           "postgres_changes",
           {
             event: "*",
-            schema: "public",
+            schema: "feature_flags",
             table: "feature_flags",
           },
           (payload: any) => {
@@ -792,12 +1079,12 @@ class FeatureFlagsManagerClass {
 
       // Subscribe to entitlements for this user
       const entitlementsChannel = this.supabaseClient
-        .channel(`public:entitlements:user.eq.${this.userId}`)
+        .channel(`feature_flags:entitlements:user.eq.${this.userId}`)
         .on(
           "postgres_changes",
           {
             event: "*",
-            schema: "public",
+            schema: "feature_flags",
             table: "entitlements",
             filter: `user_id=eq.${this.userId}`,
           },
@@ -818,12 +1105,12 @@ class FeatureFlagsManagerClass {
 
       // Subscribe to feature flag overrides for this user
       const overridesChannel = this.supabaseClient
-        .channel(`public:feature_flag_overrides:user.eq.${this.userId}`)
+        .channel(`feature_flags:feature_flag_overrides:user.eq.${this.userId}`)
         .on(
           "postgres_changes",
           {
             event: "*",
-            schema: "public",
+            schema: "feature_flags",
             table: "feature_flag_overrides",
             filter: `user_id=eq.${this.userId}`,
           },
@@ -841,6 +1128,93 @@ class FeatureFlagsManagerClass {
         });
 
       this.realtimeSubscriptions.set("overrides", overridesChannel);
+
+      // Subscribe to entitlement overrides for this user
+      const entitlementOverridesChannel = this.supabaseClient
+        .channel(`feature_flags:entitlements_overrides:user.eq.${this.userId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "feature_flags",
+            table: "entitlements_overrides",
+            filter: `user_id=eq.${this.userId}`,
+          },
+          (payload: any) => {
+            this.handleEntitlementOverrideChange(payload);
+          },
+        )
+        .subscribe((status: string) => {
+          if (status === "SUBSCRIBED") {
+            logger.debug(
+              "feature_flags",
+              "Subscribed to entitlements_overrides for user",
+            );
+          }
+        });
+
+      this.realtimeSubscriptions.set(
+        "entitlements_overrides",
+        entitlementOverridesChannel,
+      );
+
+      // Subscribe to rollouts (global)
+      const rolloutsChannel = this.supabaseClient
+        .channel("feature_flags:feature_flag_rollouts")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "feature_flags",
+            table: "feature_flag_rollouts",
+          },
+          (payload: any) => {
+            this.handleRolloutChange(payload);
+          },
+        )
+        .subscribe();
+
+      this.realtimeSubscriptions.set("rollouts", rolloutsChannel);
+
+      // Subscribe to cohorts (global)
+      const cohortsChannel = this.supabaseClient
+        .channel("feature_flags:cohorts")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "feature_flags",
+            table: "cohorts",
+          },
+          (payload: any) => {
+            this.handleCohortChange(payload);
+          },
+        )
+        .subscribe();
+
+      this.realtimeSubscriptions.set("cohorts", cohortsChannel);
+
+      // Subscribe to user cohort memberships (user-scoped)
+      const membershipsChannel = this.supabaseClient
+        .channel(`feature_flags:user_cohort_memberships:user.eq.${this.userId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "feature_flags",
+            table: "user_cohort_memberships",
+            filter: `user_id=eq.${this.userId}`,
+          },
+          (payload: any) => {
+            this.handleUserCohortMembershipChange(payload);
+          },
+        )
+        .subscribe();
+
+      this.realtimeSubscriptions.set(
+        "user_cohort_memberships",
+        membershipsChannel,
+      );
 
       logger.info("feature_flags", "Realtime subscriptions established");
     } catch (error) {
@@ -876,6 +1250,9 @@ class FeatureFlagsManagerClass {
         if (flag?.flag_name) {
           this.currentFlags.set(flag.flag_name, {
             enabled: flag.enabled,
+            depends_on: flag.depends_on ?? null,
+            condition_logic: flag.condition_logic ?? null,
+            metadata: flag.metadata ?? null,
             kind: flag.kind,
             description: flag.description,
             source: "server",
@@ -955,8 +1332,12 @@ class FeatureFlagsManagerClass {
 
       if (!this.userId) return;
 
-      const targetName =
-        overrideData?.target_name || oldOverrideData?.target_name;
+      const normalized = this._normalizeFlagOverrideRow(
+        overrideData || oldOverrideData,
+      );
+      const targetName = normalized?.target_name;
+
+      if (!targetName) return;
 
       if (eventType === "DELETE") {
         // Override was revoked, remove from map
@@ -964,12 +1345,9 @@ class FeatureFlagsManagerClass {
         logger.debug("feature_flags", `Override revoked: ${targetName}`);
         // Invalidate evaluation cache for this flag
         this.invalidateFlagCache(targetName);
-      } else if (overrideData?.target_type === "flag") {
-        // Only track flag-type overrides
-        this.remoteOverrides.set(
-          targetName,
-          overrideData as FeatureFlagOverrideRow,
-        );
+      } else {
+        // Track normalized flag override (DB realtime row or Edge synthetic row)
+        this.remoteOverrides.set(targetName, normalized);
         logger.debug("feature_flags", `Override ${eventType}: ${targetName}`);
         // Invalidate evaluation cache for this flag
         this.invalidateFlagCache(targetName);
@@ -985,6 +1363,169 @@ class FeatureFlagsManagerClass {
       this.notifySubscribers(this.currentFlags);
     } catch (error) {
       logger.warn("feature_flags", "Error handling override change", error);
+    }
+  }
+
+  /**
+   * Handle entitlement override changes from Realtime
+   */
+  private async handleEntitlementOverrideChange(payload: any): Promise<void> {
+    try {
+      const { new: overrideData, old: oldOverrideData, eventType } = payload;
+
+      if (!this.userId) return;
+
+      const normalized = this._normalizeEntitlementOverrideRow(
+        overrideData || oldOverrideData,
+      );
+
+      const entitlementKey = normalized?.target_name;
+      if (!entitlementKey) return;
+
+      if (eventType === "DELETE") {
+        this.remoteEntitlementOverrides.delete(entitlementKey);
+        logger.debug(
+          "feature_flags",
+          `Entitlement override deleted: ${entitlementKey}`,
+        );
+      } else {
+        this.remoteEntitlementOverrides.set(entitlementKey, normalized);
+        logger.debug(
+          "feature_flags",
+          `Entitlement override ${eventType}: ${entitlementKey}`,
+        );
+      }
+
+      await SecureStorage.setJSON(
+        `${STORAGE_KEYS.ENTITLEMENTS}:${ENTITLEMENT_OVERRIDE_CACHE_KEY_PREFIX}${this.userId}`,
+        Object.fromEntries(this.remoteEntitlementOverrides),
+      );
+
+      this.clearEvaluationCache();
+      this.notifySubscribers(this.currentFlags);
+    } catch (error) {
+      logger.warn(
+        "feature_flags",
+        "Error handling entitlement override change",
+        error,
+      );
+    }
+  }
+
+  /**
+   * Handle rollout config changes from Realtime
+   */
+  private async handleRolloutChange(payload: any): Promise<void> {
+    try {
+      const { new: rolloutData, old: oldRolloutData, eventType } = payload;
+      const rollout = rolloutData || oldRolloutData;
+      const flagName = rollout?.flag_name;
+      if (!flagName) return;
+
+      if (eventType === "DELETE") {
+        this.cachedRollouts.delete(flagName);
+        logger.debug("feature_flags", `Rollout deleted: ${flagName}`);
+      } else {
+        this.cachedRollouts.set(flagName, {
+          percentage: Number(rollout.percentage),
+          seed: rollout.seed ?? undefined,
+        });
+        logger.debug("feature_flags", `Rollout ${eventType}: ${flagName}`);
+      }
+
+      await SecureStorage.setJSON(
+        `${STORAGE_KEYS.FEATURE_FLAGS}:rollouts`,
+        Object.fromEntries(this.cachedRollouts),
+      );
+    } catch (error) {
+      logger.warn("feature_flags", "Error handling rollout change", error);
+    }
+  }
+
+  /**
+   * Handle cohort changes from Realtime
+   */
+  private async handleCohortChange(payload: any): Promise<void> {
+    try {
+      const { new: cohortData, old: oldCohortData, eventType } = payload;
+      const cohort = cohortData || oldCohortData;
+      const slug = cohort?.slug;
+      if (!slug) return;
+
+      if (eventType === "DELETE") {
+        this.cachedCohorts.delete(slug);
+        logger.debug("feature_flags", `Cohort deleted: ${slug}`);
+      } else {
+        this.cachedCohorts.set(slug, cohort as CachedCohort);
+        logger.debug("feature_flags", `Cohort ${eventType}: ${slug}`);
+      }
+
+      await SecureStorage.setJSON(
+        `${STORAGE_KEYS.FEATURE_FLAGS}:cohorts`,
+        Object.fromEntries(this.cachedCohorts),
+      );
+
+      this.clearEvaluationCache();
+      this.notifySubscribers(this.currentFlags);
+    } catch (error) {
+      logger.warn("feature_flags", "Error handling cohort change", error);
+    }
+  }
+
+  /**
+   * Handle user cohort membership changes from Realtime
+   */
+  private async handleUserCohortMembershipChange(payload: any): Promise<void> {
+    try {
+      const { new: membershipData, old: oldMembershipData, eventType } = payload;
+
+      if (!this.userId) return;
+
+      const membership = (membershipData || oldMembershipData) as
+        | CachedUserCohortMembership
+        | undefined;
+      if (!membership?.id) return;
+
+      if (eventType === "DELETE") {
+        this.cachedUserCohortMemberships = this.cachedUserCohortMemberships.filter(
+          (m) => m.id !== membership.id,
+        );
+        logger.debug(
+          "feature_flags",
+          `User cohort membership deleted: ${membership.id}`,
+        );
+      } else {
+        const enriched: CachedUserCohortMembership = {
+          ...membership,
+          cohort_slug:
+            membership.cohort_slug || this._resolveCohortSlug(membership),
+        };
+
+        // Rebuild array without index assignment (security lint)
+        this.cachedUserCohortMemberships = [
+          ...this.cachedUserCohortMemberships.filter((m) => m.id !== enriched.id),
+          enriched,
+        ];
+
+        logger.debug(
+          "feature_flags",
+          `User cohort membership ${eventType}: ${enriched.id}`,
+        );
+      }
+
+      await SecureStorage.setJSON(
+        `${STORAGE_KEYS.FEATURE_FLAGS}:user_cohort_memberships:${this.userId}`,
+        this.cachedUserCohortMemberships,
+      );
+
+      this.clearEvaluationCache();
+      this.notifySubscribers(this.currentFlags);
+    } catch (error) {
+      logger.warn(
+        "feature_flags",
+        "Error handling user cohort membership change",
+        error,
+      );
     }
   }
 
@@ -1129,6 +1670,27 @@ class FeatureFlagsManagerClass {
         { name },
       );
       return { granted: false, source: "clock_invalid", expiresAt: undefined };
+    }
+
+    // Priority 1.5: Remote entitlement override (admin-controlled, per-user)
+    const remoteEntitlementOverride = this.remoteEntitlementOverrides.get(name);
+    if (
+      remoteEntitlementOverride &&
+      this._isOverrideActive(
+        remoteEntitlementOverride.expires_at,
+        remoteEntitlementOverride.revoked,
+      )
+    ) {
+      const granted = remoteEntitlementOverride.action === "grant";
+      logger.debug(
+        "feature_flags",
+        `Entitlement ${name} from remote override: ${granted}`,
+      );
+      return {
+        granted,
+        source: "remote_override",
+        expiresAt: remoteEntitlementOverride.expires_at,
+      };
     }
 
     // Priority 2: Check cache first (event-driven design)
@@ -1343,6 +1905,7 @@ class FeatureFlagsManagerClass {
 
     // If it's a flag override, notify subscribers
     if (!key.includes(":")) {
+      this.invalidateFlagCache(key);
       this.notifySubscribers(this.currentFlags);
     }
   }
@@ -1356,6 +1919,7 @@ class FeatureFlagsManagerClass {
 
     // If it's a flag override, notify subscribers
     if (!key.includes(":")) {
+      this.invalidateFlagCache(key);
       this.notifySubscribers(this.currentFlags);
     }
   }
@@ -1366,6 +1930,7 @@ class FeatureFlagsManagerClass {
   clearAllOverrides(): void {
     this.userOverrides.clear();
     logger.info("feature_flags", "All overrides cleared");
+    this.clearEvaluationCache();
     this.notifySubscribers(this.currentFlags);
   }
 
@@ -1448,6 +2013,13 @@ class FeatureFlagsManagerClass {
         );
       }
 
+      // Clear entitlement override cache (user-scoped)
+      if (this.userId) {
+        await SecureStorage.removeItem(
+          `${STORAGE_KEYS.ENTITLEMENTS}:${ENTITLEMENT_OVERRIDE_CACHE_KEY_PREFIX}${this.userId}`,
+        );
+      }
+
       // Clear user cohort memberships cache (user-scoped)
       if (this.userId) {
         await SecureStorage.removeItem(
@@ -1488,6 +2060,7 @@ class FeatureFlagsManagerClass {
       this.cachedCohorts = new Map();
       this.userOverrides.clear();
       this.remoteOverrides.clear();
+      this.remoteEntitlementOverrides.clear();
       this.cachedEntitlements.clear();
       this.cachedRollouts.clear(); // NEW: Clear rollouts cache too
       this.bootstrapped = false;
@@ -1648,6 +2221,18 @@ class FeatureFlagsManagerClass {
     flagName: string,
     context: FlagContext = {},
   ): boolean {
+    // Overrides are highest priority and should bypass caching.
+    // This avoids stale results if an override expires without a Realtime event.
+    const remoteOverrideValue = this._getRemoteFlagOverrideValue(flagName);
+    if (remoteOverrideValue !== undefined) {
+      return remoteOverrideValue;
+    }
+
+    const localOverrideValue = this._getLocalFlagOverrideValue(flagName);
+    if (localOverrideValue !== undefined) {
+      return localOverrideValue;
+    }
+
     // Phase 2: Check LRU cache first (TTL: 1 hour, max 256 entries)
     const platform = context.platform || getPlatformName();
     const environment = context.environment || getAppConfig().environment;
@@ -1725,6 +2310,19 @@ class FeatureFlagsManagerClass {
 
     // Mark this flag as currently resolving
     resolving.add(cacheKey);
+
+    // Overrides should apply even when this flag is being evaluated as a dependency.
+    const remoteOverrideValue = this._getRemoteFlagOverrideValue(flagName);
+    if (remoteOverrideValue !== undefined) {
+      memo.set(cacheKey, remoteOverrideValue);
+      return remoteOverrideValue;
+    }
+
+    const localOverrideValue = this._getLocalFlagOverrideValue(flagName);
+    if (localOverrideValue !== undefined) {
+      memo.set(cacheKey, localOverrideValue);
+      return localOverrideValue;
+    }
 
     // Get the flag definition from current flags
     const flagState = this.currentFlags.get(flagName);
@@ -1910,26 +2508,48 @@ class FeatureFlagsManagerClass {
    * Returns true if user is in ANY of the flag's assigned cohorts (OR logic)
    *
    * Priority:
-
-   * 1. Explicit membership (direct or invited) from cachedUserCohortMemberships
-   * 2. Deterministic bucketing via isUserInCohort(userId, cohortSlug)
+   * 1. Server-provided cohort assignments (source of truth from feature_flags.cohort_flag_assignments)
+   * 2. App config cohorts (fallback for offline/bootstrap)
+   * 3. Explicit membership (direct or invited) from cachedUserCohortMemberships
+   * 4. Deterministic bucketing via isUserInCohort(userId, cohortSlug)
    *
    * @returns true if user is in at least one cohort, false if no cohorts required or user not in any
    */
   private _checkCohorts(flagName: string): boolean {
-    // Get flag config to see which cohorts are required
-    const appConfig = getAppConfig();
-    // eslint-disable-next-line security/detect-object-injection
-    const flagConfig = appConfig.featureFlags?.[flagName];
+    // Get flag's required cohorts from server assignments (preferred/source of truth)
+    let requiredCohorts: string[] | undefined;
 
-    if (!flagConfig || !flagConfig.cohorts || flagConfig.cohorts.length === 0) {
-      // No cohorts required for this flag
+    const serverAssignments = this.cachedCohortAssignments.get(flagName);
+    if (serverAssignments && serverAssignments.size > 0) {
+      // Use server-provided assignments as source of truth
+      requiredCohorts = Array.from(serverAssignments);
+      logger.debug(
+        "feature_flags",
+        `Using server assignments for flag ${flagName}: ${requiredCohorts.join(", ")}`,
+      );
+    } else {
+      // Fall back to app config (for offline bootstrap or flags without server assignments)
+      const appConfig = getAppConfig();
+      // eslint-disable-next-line security/detect-object-injection
+      const flagConfig = appConfig.featureFlags?.[flagName];
+
+      if (!flagConfig || !flagConfig.cohorts || flagConfig.cohorts.length === 0) {
+        // No cohorts required for this flag (neither from server nor app config)
+        return true;
+      }
+
+      requiredCohorts = flagConfig.cohorts;
+      logger.debug(
+        "feature_flags",
+        `Using app config cohorts for flag ${flagName}: ${requiredCohorts.join(", ")}`,
+      );
+    }
+
+    if (!requiredCohorts || requiredCohorts.length === 0) {
       return true;
     }
 
     // User must be in at least one of the required cohorts
-    const requiredCohorts = flagConfig.cohorts;
-
     // Check explicit membership first (highest priority)
     for (const membership of this.cachedUserCohortMemberships) {
       // Resolve cohort slug from membership (with fallback to cohort_id lookup)

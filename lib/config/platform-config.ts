@@ -40,7 +40,7 @@ export function getPlatformName(): PlatformName | "unknown" {
     // Try to detect via React Native Platform.OS if available.
     // Use a dynamic require so bundlers/SSR won't attempt to statically parse react-native.
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+       
       const rn = require("react-native");
       const os = rn?.Platform?.OS;
       if (os === "web") return "web";
@@ -79,6 +79,7 @@ function deepMergeConfigs<T extends Record<string, any>>(
 
   const result = { ...base };
 
+  /* eslint-disable security/detect-object-injection -- safe: merging platform override keys from config */
   for (const key in override) {
     if (!Object.prototype.hasOwnProperty.call(override, key)) continue;
 
@@ -95,14 +96,11 @@ function deepMergeConfigs<T extends Record<string, any>>(
       !Array.isArray(result[key]) &&
       result[key] !== null
     ) {
-      // eslint-disable-next-line security/detect-object-injection
       result[key] = deepMergeConfigs(result[key] as any, overrideValue as any);
     } else {
-      // eslint-disable-next-line security/detect-object-injection
       result[key] = overrideValue as any;
     }
   }
-
   return result;
 }
 

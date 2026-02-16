@@ -51,6 +51,7 @@ const colors = {
  */
 function loadConfig(filePath: string): unknown {
   try {
+    /* eslint-disable-next-line security/detect-non-literal-fs-filename -- safe: filePath is constructed from resolved workspace root */
     const content = fs.readFileSync(filePath, 'utf-8');
     return JSON.parse(content);
   } catch (error) {
@@ -100,7 +101,9 @@ function clearModuleCache(modulePath: string): void {
   for (const mod of modulesToClear) {
     try {
       const resolvedPath = require.resolve(mod);
+      /* eslint-disable-next-line security/detect-object-injection -- safe: clearing Node require cache for internal module paths */
       if (require.cache[resolvedPath]) {
+        /* eslint-disable-next-line security/detect-object-injection -- safe: clearing Node require cache for internal module paths */
         delete require.cache[resolvedPath];
       }
     } catch {
@@ -120,7 +123,7 @@ function loadConfigViaLoader(): { devConfig: unknown; prodConfig: unknown } {
   try {
     // Dynamically import loader to avoid loading it unless --use-loader is used
     const loaderModule = require('../loader');
-    const { getAppConfig, resetCachedConfig } = loaderModule;
+    const { resetCachedConfig } = loaderModule;
 
     // Load dev config
     const prevEnv = process.env.EXPO_PUBLIC_ENVIRONMENT;
@@ -169,6 +172,7 @@ function loadConfigViaLoader(): { devConfig: unknown; prodConfig: unknown } {
  */
 function log(message: string, color?: keyof typeof colors): void {
   if (color) {
+    // eslint-disable-next-line security/detect-object-injection
     console.log(`${colors[color]}${message}${colors.reset}`);
   } else {
     console.log(message);

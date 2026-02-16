@@ -37,5 +37,9 @@ jobs:
         env:
           STRICT_CONFIG_VALIDATION: '1'
 
+      - name: Check Config Diffs (dev vs prod)
+        run: node -r ts-node/register lib/config/tools/config-diff.ts
+        continue-on-error: false
+
       # Reporting is handled by the `Validate config schema` step's output
       # and GitHub Actions will mark the job as failed when that step exits non-zero.

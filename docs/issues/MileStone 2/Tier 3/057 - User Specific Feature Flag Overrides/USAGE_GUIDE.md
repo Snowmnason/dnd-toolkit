@@ -145,5 +145,4 @@ const value = FeatureFlagsManager.getFlag('testFlag', false); // returns true
 // Force refresh (development only)
 await FeatureFlagsManager.initialize(supabaseClient, userId);
 await FeatureFlagsManager.bootstrapFlags();
-```</content>
-<parameter name="filePath">p:\CodingProjects\dnd-toolkit\docs\issues\MileStone 1\057 - User Specific Feature Flag Overrides\USAGE_GUIDE.md
+```

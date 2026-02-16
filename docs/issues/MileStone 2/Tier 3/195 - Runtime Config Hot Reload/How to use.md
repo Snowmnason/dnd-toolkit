@@ -172,5 +172,4 @@ if (hotReload) {
 3. **Documentation**: Document feature flags and their effects
 4. **Validation**: Use strict validation to catch config errors early
 5. **Performance**: Be mindful of subscribers; unsubscribe when not needed
-6. **Error Handling**: Handle config update failures gracefully in subscribers</content>
-<parameter name="filePath">p:\CodingProjects\dnd-toolkit\docs\issues\MileStone 3\195 - Runtime Config Hot Reload\How to use.md
+6. **Error Handling**: Handle config update failures gracefully in subscribers

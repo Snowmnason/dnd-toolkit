@@ -18,6 +18,7 @@ const targets = [
 
 for (const target of targets) {
   try {
+    /* eslint-disable-next-line security/detect-non-literal-fs-filename -- safe: target is constructed from internal project directory structure */
     if (fs.existsSync(target)) {
       fs.rmSync(target, { force: true });
       console.log(`[strip-dev-appsettings] Removed ${target}`);

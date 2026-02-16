@@ -56,6 +56,7 @@ function extractFields(obj: unknown, prefix = ''): FieldMap {
 
   if (obj === null || typeof obj !== 'object') {
     if (prefix) {
+      // eslint-disable-next-line security/detect-object-injection
       fields[prefix] = obj;
     }
     return fields;
@@ -64,6 +65,7 @@ function extractFields(obj: unknown, prefix = ''): FieldMap {
   if (Array.isArray(obj)) {
     // Arrays are leaf values; don't traverse contents
     if (prefix) {
+      // eslint-disable-next-line security/detect-object-injection
       fields[prefix] = obj;
     }
     return fields;
@@ -72,13 +74,16 @@ function extractFields(obj: unknown, prefix = ''): FieldMap {
   const record = obj as Record<string, unknown>;
   for (const key of Object.keys(record)) {
     const newPath = prefix ? `${prefix}.${key}` : key;
+    /* eslint-disable-next-line security/detect-object-injection -- safe: keys derived from Object.keys(record) */
     const value = record[key];
 
     if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
       // Recurse into nested objects
+
       Object.assign(fields, extractFields(value, newPath));
     } else {
       // Leaf value (primitive, array, or null)
+      /* eslint-disable-next-line security/detect-object-injection -- safe: using internal field path as key */
       fields[newPath] = value;
     }
   }
@@ -126,6 +131,7 @@ export function validateConfigSchema(
       issues.push({
         type: 'missing-in-prod',
         path,
+        /* eslint-disable-next-line security/detect-object-injection -- safe: path is derived from internal field extraction */
         devValue: devFields[path],
       });
     }
@@ -137,6 +143,7 @@ export function validateConfigSchema(
       issues.push({
         type: 'missing-in-dev',
         path,
+        /* eslint-disable-next-line security/detect-object-injection -- safe: path is derived from internal field extraction */
         prodValue: prodFields[path],
       });
     }
@@ -181,7 +188,9 @@ export function getConfigDiff(devConfig: unknown, prodConfig: unknown): DiffEntr
   const allPaths = new Set([...Object.keys(devFields), ...Object.keys(prodFields)]);
 
   for (const path of allPaths) {
+    /* eslint-disable-next-line security/detect-object-injection -- safe: path is derived from extractFields and represents internal field paths */
     const devValue = devFields[path];
+    /* eslint-disable-next-line security/detect-object-injection -- safe: path is derived from extractFields and represents internal field paths */
     const prodValue = prodFields[path];
 
     // Skip if both undefined (shouldn't happen with extractFields, but defensive)
@@ -192,12 +201,14 @@ export function getConfigDiff(devConfig: unknown, prodConfig: unknown): DiffEntr
     // Check if values differ
     if (JSON.stringify(devValue) !== JSON.stringify(prodValue)) {
       const isExpected = path in expectedDiffs;
+      /* eslint-disable-next-line security/detect-object-injection -- safe: path is derived from config field paths */
+      const reason = expectedDiffs[path];
       diffs.push({
         path,
         devValue,
         prodValue,
         isExpected,
-        reason: expectedDiffs[path],
+        reason,
       });
     }
   }

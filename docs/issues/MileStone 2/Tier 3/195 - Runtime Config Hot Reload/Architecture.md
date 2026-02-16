@@ -224,5 +224,4 @@ logger.category("other").error("Config validation failed:", error);
 - **Config Diffing**: Provide detailed change information to subscribers
 - **Hot-Reload UI**: Visual indicator when config changes are applied
 - **Config History**: Allow reverting to previous config versions
-- **Multi-File Support**: Watch additional config files beyond appsettings.dev.json</content>
-<parameter name="filePath">p:\CodingProjects\dnd-toolkit\docs\issues\MileStone 3\195 - Runtime Config Hot Reload\Architecture.md
+- **Multi-File Support**: Watch additional config files beyond appsettings.dev.json

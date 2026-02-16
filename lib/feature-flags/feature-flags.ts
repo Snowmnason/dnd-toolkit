@@ -50,8 +50,8 @@ class FeatureFlagsManager {
         ([, flag]) => flag.kind === "beta" && flag.enabled,
       );
       if (betaEnabled.length > 0) {
-        console.warn(
-          "[FeatureFlags] Beta flags enabled in production:",
+        logger.category('feature_flags').warn(
+          "Beta flags enabled in production:",
           betaEnabled.map(([name]) => name).join(", "),
         );
       }
@@ -126,7 +126,7 @@ class FeatureFlagsManager {
         flag.enabled = enabled;
       }
     });
-    console.log(`[FeatureFlags] Set all '${kind}' flags to ${enabled}`);
+    logger.category('feature_flags').debug(`Set all '${kind}' flags to ${enabled}`);
     this.notifyListeners(null, kind);
   }
 
@@ -139,7 +139,7 @@ class FeatureFlagsManager {
     const flag = this.flags.get(flagName);
     if (flag) {
       flag.enabled = enabled;
-      console.log(`[FeatureFlags] ${flagName} = ${enabled}`);
+      logger.category('feature_flags').debug(`${flagName} = ${enabled}`);
       this.notifyListeners(flagName);
     }
   }

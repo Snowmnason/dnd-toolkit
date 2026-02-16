@@ -108,13 +108,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // Resolve active theme tokens from family + mode
   const theme: ThemeTokens = useMemo(() => {
+    /* eslint-disable-next-line security/detect-object-injection */
     const selectedFamily = allThemes[family];
+    /* eslint-disable-next-line security/detect-object-injection */
     return selectedFamily?.[mode] ?? allThemes.classic.dark;
   }, [family, mode]);
 
   /** Update family and persist */
   const setFamily = useCallback(
     (f: ThemeFamily) => {
+      /* eslint-disable-next-line security/detect-object-injection */
       if (!allThemes[f]) {
         logger.category("ui").warn("ThemeProvider: unknown theme", {
           requested: f,
@@ -164,6 +167,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   /** Update both family + mode and persist */
   const setTheme = useCallback(
     (f: ThemeFamily, m: ThemeMode) => {
+      /* eslint-disable-next-line security/detect-object-injection */
       if (!allThemes[f]) {
         logger.category("ui").warn("ThemeProvider: unknown theme", {
           requested: f,

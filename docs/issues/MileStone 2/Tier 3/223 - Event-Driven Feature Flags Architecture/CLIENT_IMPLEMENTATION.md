@@ -11,6 +11,16 @@ The `FeatureFlagsManager` provides runtime access to feature flags and premium e
 3. **Cache fallback** → Works offline using SecureStorage
 4. **Priority merging** → Applies overrides > server values > hardcoded config
 
+## Cohorts (Tier 3)
+
+Tier 3 supports **cohort-gated flags** (e.g., “enable this flag only for users in cohort X”).
+
+- **Authoring:** Flags can declare `cohorts: ["beta_testers", ...]` as part of the flag definition schema.
+- **Data sources:** Cohort *definitions* and per-user *memberships* are provided by the backend and can be cached for offline use.
+- **Evaluation:** Flag evaluation checks cohort membership using the cached membership list for the current user.
+
+Note: If the backend returns separate **cohort assignment** data (flag-to-cohort mappings) as part of the consolidated bootstrap payload, ensure the client applies it. If you observe “cohort assignments returned but not applied”, track it via the existing suggestion doc: `docs/suggestions/CRITICAL - Tier 3 Cohort Assignments Not Applied.md`.
+
 ## Architecture
 
 ```

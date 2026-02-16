@@ -150,7 +150,7 @@ export function supportsWebP(): Promise<boolean> {
       };
       webp.src =
         "data:image/webp;base64,UklGRjoAAABXRUJQVlA4IC4AAAB8AQCdASoBAAEAAQAcJaACdLoBmAAP/gAA";
-    } catch (error) {
+    } catch {
       // If Image constructor fails, WebP is not supported
       resolve(false);
     }

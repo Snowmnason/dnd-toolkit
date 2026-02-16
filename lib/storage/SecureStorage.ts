@@ -21,7 +21,7 @@ let AsyncStorage: any;
 if (typeof window === "undefined" || Platform.OS !== "web") {
   try {
     AsyncStorage = require("@react-native-async-storage/async-storage").default;
-  } catch (err) {
+  } catch {
     // AsyncStorage not available in non-RN environments
   }
 }
@@ -29,12 +29,8 @@ if (typeof window === "undefined" || Platform.OS !== "web") {
 /**
  * Get localStorage safely
  */
-const getLocalStorage = (): Storage | null => {
-  if (typeof window !== "undefined" && window.localStorage) {
-    return window.localStorage;
-  }
-  return null;
-};
+// `getLocalStorage` removed — not used in codebase; session/local access goes through
+// `getSessionStorage` or the encrypted backend loader above.
 
 /**
  * Get sessionStorage safely

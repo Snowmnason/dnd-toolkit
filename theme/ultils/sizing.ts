@@ -122,8 +122,10 @@ export const radius = {
 export function buildSizing(scaleValue: number) {
   // Helper that applies a non-linear curve and optional nudge per token
   const sized = (base: number, key: keyof typeof fontBase) => {
+    /* eslint-disable-next-line security/detect-object-injection */
     const curve = fontCurves[key] ?? 1;
     const effectiveScale = 1 + (scaleValue - 1) * curve;
+    /* eslint-disable-next-line security/detect-object-injection */
     const nudge = fontNudges[key] ?? 0;
     return Math.round(base * effectiveScale + nudge);
   };

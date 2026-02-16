@@ -115,6 +115,7 @@ export async function executeHooksSerially<T>(
 ): Promise<void> {
   let index = 0;
   for (const hook of hooks) {
+    /* eslint-disable-next-line security/detect-object-injection */
     const interceptor = interceptors?.[index];
 
     try {

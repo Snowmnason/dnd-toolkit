@@ -46,6 +46,12 @@ export interface ConnectedWorldsCache {
  *
  * DOES NOT verify access - just updates cache with fresh database data.
  */
+
+// Module-level lock to deduplicate in-flight refreshAllWorldsCache() calls
+// Prevents thundering herd: if 5 parallel verifications all detect stale cache,
+// they all share one DB call instead of making 5 redundant refreshes
+let inFlightRefresh: Promise<ConnectedWorldsCache | null> | null = null;
+
 export const updateStorageCache = {
   /**
    * Refresh all world access cache with role-based structure
@@ -70,105 +76,122 @@ export const updateStorageCache = {
    * - Settings "Refresh App Data" button
    */
   async refreshAllWorldsCache(): Promise<ConnectedWorldsCache | null> {
-    try {
-      // Get userId from SecureStorage (never stale)
-      const backend = getStorageBackend(STORAGE_KEYS.USER_DATA);
-      const userData = await backend.getJSON<{ id: string }>(
-        STORAGE_KEYS.USER_DATA,
-      );
-      const userId = userData?.id;
-
-      if (!userId) {
-        logger.warn(
-          "storage",
-          "No userId in SecureStorage, skipping cache refresh",
-        );
-        return null;
-      }
-
-      logger.info("storage", `Refreshing all worlds cache for user ${userId}`);
-
-      // Call existing database function (no new Supabase query)
-      const { worldsDB } = await import("../database/worlds");
-      const userWorlds = await worldsDB.getMyWorlds(userId);
-
-      logger.info(
+    // Deduplicate in-flight calls: if a refresh is already in progress, return that promise
+    if (inFlightRefresh) {
+      logger.debug(
         "storage",
-        `Fetched ${userWorlds.length} worlds from database`,
+        "World cache refresh already in flight, sharing in-flight request",
       );
-
-      // Build rich cache structure with role breakdown
-      const timestamp = Date.now();
-      const roleMap = {
-        dm: [] as string[],
-        player: [] as string[],
-        gm: [] as string[],
-        spectator: [] as string[],
-        observer: [] as string[],
-      };
-      const worldList: string[] = [];
-
-      for (const world of userWorlds) {
-        worldList.push(world.world_id);
-        const role = world.user_role || "player";
-        if (role in roleMap) {
-          roleMap[role as keyof typeof roleMap].push(world.world_id);
-        }
-      }
-
-      // Create rich cache with counts
-      const richCache: ConnectedWorldsCache = {
-        list: worldList,
-        roleMap,
-        counts: {
-          dm: roleMap.dm.length,
-          player: roleMap.player.length,
-          gm: roleMap.gm.length,
-          spectator: roleMap.spectator.length,
-          observer: roleMap.observer.length,
-          total: worldList.length,
-        },
-        lastVerifiedAt: timestamp,
-      };
-
-      // Write rich cache to storage
-      const cacheBackend = getStorageBackend(
-        STORAGE_KEYS.CONNECTED_WORLDS_METADATA,
-      );
-      await cacheBackend.setJSON(
-        STORAGE_KEYS.CONNECTED_WORLDS_METADATA,
-        richCache,
-      );
-
-      // Also write flattened list to CONNECTED_WORLDS for backward compatibility
-      const listBackend = getStorageBackend(STORAGE_KEYS.CONNECTED_WORLDS);
-      await listBackend.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, worldList);
-
-      // Update per-world session cache entries
-      await Promise.all(
-        userWorlds.map(async (world) => {
-          const cacheKey = `world_access_${world.world_id}`;
-          const metaKey = `world_access_meta_${world.world_id}`;
-
-          const worldBackend = getStorageBackend(cacheKey);
-          await worldBackend.setJSON(cacheKey, true);
-          await worldBackend.setJSON(metaKey, {
-            timestamp,
-            source: "supabase",
-          });
-        }),
-      );
-
-      logger.info(
-        "storage",
-        `Updated cache for ${worldList.length} worlds (DM: ${roleMap.dm.length}, Player: ${roleMap.player.length})`,
-      );
-
-      return richCache;
-    } catch (error) {
-      logger.error("storage", "Error refreshing all worlds cache:", error);
-      throw error;
+      return inFlightRefresh;
     }
+
+    // Create the refresh promise and store it
+    inFlightRefresh = (async () => {
+      try {
+        // Get userId from SecureStorage (never stale)
+        const backend = getStorageBackend(STORAGE_KEYS.USER_DATA);
+        const userData = await backend.getJSON<{ id: string }>(
+          STORAGE_KEYS.USER_DATA,
+        );
+        const userId = userData?.id;
+
+        if (!userId) {
+          logger.warn(
+            "storage",
+            "No userId in SecureStorage, skipping cache refresh",
+          );
+          return null;
+        }
+
+        logger.info("storage", `Refreshing all worlds cache for user ${userId}`);
+
+        // Call existing database function (no new Supabase query)
+        const { worldsDB } = await import("../database/worlds");
+        const userWorlds = await worldsDB.getMyWorlds(userId);
+
+        logger.info(
+          "storage",
+          `Fetched ${userWorlds.length} worlds from database`,
+        );
+
+        // Build rich cache structure with role breakdown
+        const timestamp = Date.now();
+        const roleMap = {
+          dm: [] as string[],
+          player: [] as string[],
+          gm: [] as string[],
+          spectator: [] as string[],
+          observer: [] as string[],
+        };
+        const worldList: string[] = [];
+
+        for (const world of userWorlds) {
+          worldList.push(world.world_id);
+          const role = world.user_role || "player";
+          if (role in roleMap) {
+            roleMap[role as keyof typeof roleMap].push(world.world_id);
+          }
+        }
+
+        // Create rich cache with counts
+        const richCache: ConnectedWorldsCache = {
+          list: worldList,
+          roleMap,
+          counts: {
+            dm: roleMap.dm.length,
+            player: roleMap.player.length,
+            gm: roleMap.gm.length,
+            spectator: roleMap.spectator.length,
+            observer: roleMap.observer.length,
+            total: worldList.length,
+          },
+          lastVerifiedAt: timestamp,
+        };
+
+        // Write rich cache to storage
+        const cacheBackend = getStorageBackend(
+          STORAGE_KEYS.CONNECTED_WORLDS_METADATA,
+        );
+        await cacheBackend.setJSON(
+          STORAGE_KEYS.CONNECTED_WORLDS_METADATA,
+          richCache,
+        );
+
+        // Also write flattened list to CONNECTED_WORLDS for backward compatibility
+        const listBackend = getStorageBackend(STORAGE_KEYS.CONNECTED_WORLDS);
+        await listBackend.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, worldList);
+
+        // Update per-world session cache entries
+        await Promise.all(
+          userWorlds.map(async (world) => {
+            const cacheKey = `world_access_${world.world_id}`;
+            const metaKey = `world_access_meta_${world.world_id}`;
+
+            const worldBackend = getStorageBackend(cacheKey);
+            await worldBackend.setJSON(cacheKey, true);
+            await worldBackend.setJSON(metaKey, {
+              timestamp,
+              source: "supabase",
+            });
+          }),
+        );
+
+        logger.info(
+          "storage",
+          `Updated cache for ${worldList.length} worlds (DM: ${roleMap.dm.length}, Player: ${roleMap.player.length})`,
+        );
+
+        return richCache;
+      } catch (error) {
+        logger.error("storage", "Error refreshing all worlds cache:", error);
+        throw error;
+      } finally {
+        // Always clear the in-flight lock, whether success or failure
+        inFlightRefresh = null;
+      }
+    })();
+
+    return inFlightRefresh;
   },
 
   /**
@@ -187,52 +210,15 @@ export const updateStorageCache = {
     try {
       logger.info("storage", "Refreshing user profile cache");
 
-      // Import Supabase directly for this critical operation
-      const { supabase, isSupabaseConfigured } =
-        await import("../database/supabase");
+      // Use centralized DB layer instead of direct Supabase query
+      // This ensures consistent error handling, retries, and deduplication
+      const { usersDB } = await import("../database/users");
 
-      if (!isSupabaseConfigured()) {
-        logger.warn(
-          "storage",
-          "Supabase not configured, skipping user profile refresh",
-        );
-        return;
-      }
-
-      // Get current session to get auth_id
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-
-      if (sessionError) {
-        logger.error("storage", "Error getting session:", sessionError);
-        throw sessionError;
-      }
-
-      if (!session?.user?.id) {
-        logger.warn(
-          "storage",
-          "No active session, skipping user profile refresh",
-        );
-        return;
-      }
-
-      // Fetch fresh user profile from Supabase
-      const { data: userProfile, error: profileError } = await supabase
-        .schema('public')
-        .from('users')
-        .select("*")
-        .eq("auth_id", session.user.id)
-        .single();
-
-      if (profileError) {
-        logger.error("storage", "Error fetching user profile:", profileError);
-        throw profileError;
-      }
+      // Fetch fresh user profile via DB layer
+      const userProfile = await usersDB.getCurrentUser();
 
       if (!userProfile) {
-        logger.warn("storage", "User profile not found for auth_id");
+        logger.warn("storage", "User profile not found");
         return;
       }
 
@@ -245,7 +231,7 @@ export const updateStorageCache = {
       const metaBackend = getStorageBackend(userDataMetaKey);
       await metaBackend.setJSON(userDataMetaKey, {
         timestamp: Date.now(),
-        source: "supabase",
+        source: "db_refresh",
       });
 
       logger.info(

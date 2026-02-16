@@ -76,7 +76,7 @@ export function PlatformProvider({ children }: PlatformProviderProps) {
         lastWidthRef.current = width;
       }
     }
-  }, [width, rawIsMobile, isMobileState]);
+  }, [width, rawIsMobile, isMobileState, height]);
 
   const isMobile = isMobileState !== null ? isMobileState : rawIsMobile;
   const isDesktop = !isMobile && width >= DESKTOP_BREAKPOINT;

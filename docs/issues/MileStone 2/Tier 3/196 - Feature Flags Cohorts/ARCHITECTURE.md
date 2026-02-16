@@ -212,7 +212,7 @@ interface GetFeatureFlagsResponse {
   
   // Phase 3 (Cohorts)
   cohorts?: CachedCohort[];                       // All active cohorts
-  cohort_assignments?: any[];                     // Future: flag-to-cohort mappings
+  cohort_assignments?: any[];                     // Flag-to-cohort mappings (ensure client applies these if returned)
   user_cohort_memberships?: CachedUserCohortMembership[];  // User's memberships
   
   fetchedAt: number;                              // When this was fetched
