@@ -1,6 +1,6 @@
 import { EntitlementExpiredModal } from "@/components/modals";
 import { OfflineSyncNotificationLayer } from "@/components/offline";
-import { NotificationContainer, TopBar } from "@/components/ui";
+import { AppToastLayer, NotificationContainer, TopBar } from "@/components/ui";
 import { useEntitlementExpiredModal } from "@/hooks";
 import { useAnalyticsNavigation } from "@/hooks/navigation";
 import { useSplashScreen } from "@/hooks/ui";
@@ -24,6 +24,7 @@ import {
 } from "@/lib";
 import type { AccessRole } from "@/lib/database/worlds";
 import { SafeModeReason } from "@/lib/error/safe-mode";
+import { AppToastProvider } from "@/lib/toast/app-toast-context";
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ThemeProvider, UseTheme } from "@/providers/ThemeProvider";
@@ -447,6 +448,9 @@ function RootLayoutContent() {
         {/* Notification Container - renders all queued notifications */}
         <NotificationContainer />
 
+        {/* App Toast Layer - renders global app-level toasts */}
+        <AppToastLayer />
+
         {/* Offline sync status and notifications */}
         <OfflineSyncNotificationLayer />
 
@@ -475,13 +479,15 @@ export default function RootLayout() {
               <AppParamsStableProvider>
                 <AppParamsVolatileProvider>
                   <NotificationProvider>
-                    <AppErrorBoundary
-                      renderFallback={(error, onRetry) => (
-                        <CrashFallBack error={error} onRetry={onRetry} />
-                      )}
-                    >
-                      <RootLayoutContent />
-                    </AppErrorBoundary>
+                    <AppToastProvider>
+                      <AppErrorBoundary
+                        renderFallback={(error, onRetry) => (
+                          <CrashFallBack error={error} onRetry={onRetry} />
+                        )}
+                      >
+                        <RootLayoutContent />
+                      </AppErrorBoundary>
+                    </AppToastProvider>
                   </NotificationProvider>
                 </AppParamsVolatileProvider>
               </AppParamsStableProvider>

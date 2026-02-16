@@ -7,6 +7,7 @@ export * from './Accordion';
 export * from './AppModal';
 export * from './AppText';
 export * from './AppToast';
+export * from './AppToastLayer';
 export * from './AppToolTip';
 export * from './AppView';
 export * from './base/ViewCust';

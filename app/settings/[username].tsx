@@ -1,10 +1,10 @@
 import {
-    deleteUserAccount,
-    isSupabaseConfigured,
-    logger,
-    signOutUser,
-    supabase,
-    usersDB,
+  deleteUserAccount,
+  isSupabaseConfigured,
+  logger,
+  signOutUser,
+  supabase,
+  usersDB,
 } from "@/lib";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
@@ -15,12 +15,11 @@ import { Alert, View } from "react-native";
 // 🧱 New UI Components
 import { CredentialConfirmModal } from "@/components/modals";
 import {
-    AppLoading,
-    AppPage,
-    AppToast,
-    Button,
-    Heading,
-    Surface
+  AppLoading,
+  AppPage,
+  Button,
+  Heading,
+  Surface
 } from "@/components/ui";
 import UserProfile from "../../Screens/settings/user-profile";
 import VersionDisplay from "../../components/VersionDisplay";
@@ -46,12 +45,6 @@ export default function SettingsPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
-
-  // App Settings toasts (force refresh)
-  const [syncingToast, setSyncingToast] = useState(false);
-  const [successToast, setSuccessToast] = useState(false);
-  const [errorToast, setErrorToast] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     // Double-check: require confirmed Supabase session before proceeding
@@ -210,12 +203,7 @@ export default function SettingsPage() {
         App Settings
       </Heading>
       <Surface bordered padded radius="md">
-        <AppSettings
-          setSyncingToast={setSyncingToast}
-          setSuccessToast={setSuccessToast}
-          setErrorToast={setErrorToast}
-          setErrorMessage={setErrorMessage}
-        />
+        <AppSettings />
       </Surface>
 
       {/* Account Actions */}
@@ -265,31 +253,6 @@ export default function SettingsPage() {
         errorText={deleteError}
         onCancel={handleCloseDeleteModal}
         onConfirm={handleDeleteAccount}
-      />
-
-      {/* App Settings Toasts */}
-      <AppToast
-        message="Syncing latest data..."
-        type="warning"
-        visible={syncingToast}
-        duration={5000}
-        onHide={() => setSyncingToast(false)}
-      />
-
-      <AppToast
-        message="App Data Synced"
-        type="success"
-        visible={successToast}
-        duration={4000}
-        onHide={() => setSuccessToast(false)}
-      />
-
-      <AppToast
-        message={errorMessage}
-        type="error"
-        visible={errorToast}
-        duration={4000}
-        onHide={() => setErrorToast(false)}
       />
     </AppPage>
   );

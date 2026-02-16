@@ -1,82 +1,25 @@
 import { Button, SubTitle } from '@/components/ui'
-import { logger } from '@/lib'
-import { updateStorageCache } from '@/lib/storage'
+import { useForceResync } from '@/hooks/offline/useForceResync'
+import { useRefreshStorageCache } from '@/hooks/storage/useRefreshStorageCache'
 import { useScale } from '@/theme'
-import { useEffect, useRef, useState } from 'react'
 import { View } from 'react-native'
-
-interface AppSettingsProps {
-  setSyncingToast: (visible: boolean) => void
-  setSuccessToast: (visible: boolean) => void
-  setErrorToast: (visible: boolean) => void
-  setErrorMessage: (message: string) => void
-}
 
 /**
  * ⚙️ AppSettings
  * Displays app settings with button groups for future features.
  * 
  * Force Refresh: Fetches latest user data from server, bypassing the 4-hour cache
+ * Toasts are displayed globally via AppToastLayer at app root.
  */
-export function AppSettings({
-  setSyncingToast,
-  setSuccessToast,
-  setErrorToast,
-  setErrorMessage,
-}: AppSettingsProps) {
+export function AppSettings() {
   const S = useScale()
-  const [refreshDisabled, setRefreshDisabled] = useState(false)
-  
-  // Track component mount status to prevent state updates on unmounted component
-  const isMountedRef = useRef(true)
   
   // TODO: Replace with actual offline check when offline functionality is implemented
   const isOffline = false
 
-  useEffect(() => {
-    return () => {
-      isMountedRef.current = false
-    }
-  }, [])
+  const { isResyncing, handleForceResync } = useForceResync({ isOffline })
 
-  const handleForceRefresh = async () => {
-    if (refreshDisabled || isOffline) return
-
-    setRefreshDisabled(true)
-    setSyncingToast(true)
-    const startTime = Date.now()
-
-    try {
-      // Refresh everything: user profile + all world access cache
-      await updateStorageCache.refreshEverything()
-      
-      logger.info('other', 'Force refresh completed successfully')
-      
-      // Keep syncing toast visible for at least 2 seconds before showing success
-      const elapsedTime = Date.now() - startTime
-      const minDisplayTime = 2000
-      const remainingTime = Math.max(0, minDisplayTime - elapsedTime)
-      
-      setTimeout(() => {
-        if (isMountedRef.current) {
-          setSyncingToast(false)
-          setSuccessToast(true)
-        }
-      }, remainingTime)
-    } catch (error: any) {
-      logger.error('other', 'Force refresh failed:', error)
-      setErrorMessage('Failed to sync data. Please try again.')
-      setSyncingToast(false)
-      setErrorToast(true)
-    } finally {
-      // Prevent accidental excessive refreshes
-      setTimeout(() => {
-        if (isMountedRef.current) {
-          setRefreshDisabled(false)
-        }
-      }, 1500)
-    }
-  }
+  const { isRefreshing, handleRefreshStorageCache } = useRefreshStorageCache({ isOffline })
 
   return (
     <View style={{ gap: S.space.md }}>
@@ -84,22 +27,28 @@ export function AppSettings({
       <View style={{ flexDirection: 'row', gap: S.space.sm }}>
         <View style={{ flex: 1, flexDirection: 'column' }}>
           <Button
-            text="Refresh App Data"
+            text={isRefreshing ? 'Refreshing...' : 'Refresh App Data'}
             variant="secondary"
-            onPress={handleForceRefresh}
-            disabled={refreshDisabled || isOffline}
+            onPress={handleRefreshStorageCache}
+            disabled={isRefreshing || isOffline}
             style={{ flex: 1 }}
           />
           <SubTitle textType='primary' style={{ marginTop: S.space.xs, marginLeft: S.space.md }}>
             Syncs your latest changes from the server
           </SubTitle>
         </View>
-        <Button
-          text="Setting 2"
-          variant="secondary"
-          onPress={() => {}}
-          style={{ flex: 1 }}
-        />
+        <View style={{ flex: 1, flexDirection: 'column' }}>
+          <Button
+            text={isResyncing ? 'Resyncing...' : 'Force Resync'}
+            variant="secondary"
+            onPress={handleForceResync}
+            disabled={isResyncing || isOffline}
+            style={{ flex: 1 }}
+          />
+          <SubTitle textType='primary' style={{ marginTop: S.space.xs, marginLeft: S.space.md }}>
+            Force a background sync of pending offline changes
+          </SubTitle>
+        </View>
       </View>
 
       {/* Row 2: Placeholder buttons */}
