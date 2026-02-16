@@ -82,12 +82,116 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 - Fonts on web: non-critical fonts are loaded in bootstrap; Eurostile/Cyberpunk is on-demand to avoid decode warnings.
 - Notifications flicker: do not mount the old notification provider/container; use `AppToast`/`Snackbar` until the system is redesigned.
 
+## Database & Schema Conventions
+
+**Data Migrations Philosophy:**
+- Migration files **001-004** are **evolving schema definition files**, NOT immutable history
+- They represent the **current desired schema state**; when adding a table, edit the relevant migration file directly
+- **Patch files** (e.g., `patch_YYYY-MM-DD_cohorts.sql`) are created **only when altering a live database** before schema changes are finalized
+- Patch files can be discarded after applied; they don't become part of permanent history
+- If database needs reset, running 001-004 creates the final, complete schema
+
+**Database Organization:**
+- Schemas: `public` (users), `worlds` (worlds/members), `feature_flags` (all flag-related), `audit` (audit logs)
+- **All database calls must be centralized in `lib/database/`** — never scatter queries in components, hooks, or other lib folders
+- Database files follow pattern: `lib/database/[entity].ts` (e.g., `users.ts`, `feature-flags.ts`, `worlds.ts`)
+- Each database module exports: typed queries, types for rows, helper functions, error handling
+
+**Audit System (004_audit_schema.sql):**
+- All tables automatically capture changes via `audit.log_change()` trigger function
+- Tracks: `old_data`, `new_data` (JSONB snapshots), `initiated_by` (user), `created_at` (timestamp)
+- RLS policies allow admins to see all audit events; users see only their own changes
+- No need to manually log database changes—triggers handle it automatically
+
+## Feature Flags System (Tier 3)
+
+**System Architecture:**
+- Config-based flags: `config/appsettings.*.json` (flags, cohorts, conditions, overrides)
+- Database-backed: `supabase/migrations/003_feature_flags_schema.sql` (feature_flags, entitlements, overrides)
+- Cohorts (named user groups): `supabase/migrations/005_add_cohorts.sql` (cohorts, cohort_flag_assignments, user_cohort_memberships)
+- Remote sync: `lib/feature-flags/` provides `FeatureFlagsManager` that syncs with edge function
+- Edge function: `supabase/functions/get_feature_flags/` returns all flags, cohorts, conditions, and user-specific data
+
+**How Features Integrate (AND logic):**
+- **A/B Testing (#058)**: Percentage-based rollout (10%, 50%, 100%) using deterministic hashing via `isInRollout(userId, flagName, percentage)`
+- **Conditions (#198)**: Rules that must match (platform=web, environment=production, etc.)
+- **Cohorts (#196)**: Named user groups (beta_testers, enterprise, internal, mobile_first, desktop_first)
+- **Overrides (#057)**: Per-user flag values override global settings
+- **Combined evaluation**: `enabled AND (condition checks) AND (cohort check) AND NOT overridden`
+  - Example: Enable "advancedMaps" for 20% of beta_testers on web platform only
+  - Config: `{ enabled: true, cohorts: ['beta_testers'], percentage: 20, conditions: { platform: 'web' } }`
+
+**Cohort Semantics (use when you need semantic user groups):**
+- `beta_testers` (20%): Early adopters, semi-controlled pre-release rollout
+- `enterprise` (100%): Enterprise tier features
+- `internal` (100%): Internal team dogfooding, internal-only tools
+- `mobile_first` (100%): Mobile platform-optimized features
+- `desktop_first` (100%): Desktop/web platform-optimized features
+- **When to use cohorts**: Named, intentional user groups; when you need to know which users are in a cohort
+- **When to use percentage rollouts**: Unnamed, mathematical distributions; canary releases (1% → 10% → 50% → 100%)
+- **When to use conditions**: Rules based on context (platform, environment, subscription level)
+
+**Client-Side vs Server-Side:**
+- **Phase 1 (client-side)**: Config-based cohorts, deterministic bucketing via `isUserInCohort()`, no database needed for membership
+- **Phase 2 (server-side)**: Database-backed cohorts, explicit admin assignments via `user_cohort_memberships` table
+- App can use THREE sources of membership (in priority order):
+  1. Explicit membership from `user_cohort_memberships` (admin override)
+  2. Deterministic bucketing (hash-based, no DB needed)
+  3. No membership (fallback)
+
+**Usage Patterns:**
+```typescript
+// Simple percentage rollout (A/B testing)
+const { isEnabled } = useFeatureFlags();
+if (isEnabled('advancedMaps')) { /* show feature */ }
+
+// With user ID (checks cohorts)
+const { isEnabledForUser } = useFeatureFlags();
+if (isEnabledForUser('advancedMaps', userId)) { /* show feature */ }
+
+// With conditions (platform, environment, etc.)
+const { isEnabledWithContext } = useFeatureFlags();
+if (isEnabledWithContext('advancedMaps', { platform: 'web' })) { /* show feature */ }
+
+// All together: cohorts + conditions + percentage
+// Config: { enabled: true, cohorts: ['beta_testers'], percentage: 20, conditions: { platform: 'web' } }
+if (isEnabledWithContext('advancedMaps', userId, { platform: 'web' })) { /* beta testers on web only */ }
+```
+
+## Pre-Release Development Guideline
+
+⚠️ **DO NOT BUILD FOR BACKWARDS COMPATIBILITY**
+
+We are nowhere near release. Building backwards compatibility now adds:
+- Unnecessary code complexity (migrations, version checks, data transformations)
+- Technical debt (we'll change designs multiple times before release)
+- Longer iteration cycles (more careful about breaking changes)
+- Wasted effort (pre-release designs often change entirely)
+
+**Default approach:**
+- ✅ Make breaking changes freely (schema changes, API renames, file restructuring)
+- ✅ Delete old code and patterns; don't keep "for backwards compat"
+- ✅ Refactor aggressively; don't worry about existing deployments
+- ❌ Do NOT create migration systems or version checks unless absolutely required
+- ❌ Do NOT keep deprecated functions "for compatibility"
+- ❌ Do NOT design for forwards/backwards compatibility
+
+**When breaking changes are needed:**
+1. Update all code that uses the old pattern (don't leave stubs)
+2. Delete the old code entirely
+3. Only upgrade tests and docs
+4. No migration logic needed
+
+**Exception: Schema migrations**
+- Once data goes to live Supabase (if using it), follow schema evolution patterns (001-004 edit philosophy)
+- This is about data safety, not backwards API compatibility
+
 ## Where to look
 
 - Layout/routing: `app/_layout.tsx`
 - **Kernel/Bootstrap**: `lib/kernel/app-kernel.ts` (AppKernel singleton), `lib/kernel/use-app-kernel.tsx` (AppKernelProvider + hooks). See **`lib/kernel/README.md`** for full documentation.
 - Splash screen: `hooks/use-splash-screen.tsx`
-- Feature flags: `config/appsettings.*.json` (`featureFlags`), `lib/feature-flags.ts` (kind helper + beta warning in prod)
+- **Feature Flags System (Tier 3)**: `lib/feature-flags/` (core system), `supabase/migrations/003_feature_flags_schema.sql` (schema), `supabase/functions/get_feature_flags/` (edge funtion). See **`lib/feature-flags/README.md`** for full architecture and integration guide.
 - **Auth system**: `lib/auth/auth-state.ts` (AuthStateManager), `lib/auth/useAuthGuard.ts` (route guards), `lib/auth/useWorldRole.ts` (FUTURE: role checking)
 - **Storage**: `lib/storage/SecureStorage.ts` (implementation), `lib/storage/index.ts` (exports + keys)
 - **Image optimization**: `components/ui/LazyImage.tsx`, `hooks/use-viewport-tracking.tsx`, `hooks/use-image-cache.tsx`, `lib/utils/image-optimization.ts`. See `docs/issues/MileStone 1/030 - Optimize Image Loading/` for full guide.
@@ -144,4 +248,9 @@ This file exists to make the testing guidance discoverable until `.github/copilo
 
 ## Milestone Overview
 
-For a comprehensive overview of all Milestone 1 implementations, see `docs/issues/MileStone 1/MILESTONE_1_OVERVIEW.md`. This document summarizes all features, architectural changes, and provides quick links to detailed documentation.
+For comprehensive overviews of implementation tiers, see:
+- `docs/issues/MileStone 2/Tier 1/` — Core Foundation (job queues, safe mode, privacy policies)
+- `docs/issues/MileStone 2/Tier 2/` — API & Network Layer (auth, interceptors, circuit breakers, offline queues)
+- `docs/issues/MileStone 2/Tier 3/TIER_3_OVERVIEW.md` — Feature Control & Configuration (feature flags, conditions, cohorts, A/B testing, config management)
+
+Each tier's README files document architecture, integration points, and key design decisions.
