@@ -12,9 +12,7 @@
 
 export {
   ConnectionQuality,
-  NetworkDetection,
-  useNetworkStatus,
-  qualityToNetworkState
+  NetworkDetection, qualityToNetworkState, useNetworkStatus
 } from "./network-detection";
 export type { NetworkStatus, NetworkStatusCallback } from "./network-detection";
 
@@ -60,7 +58,13 @@ export {
 } from "./adaptive-payload-request";
 
 export {
-  deriveConnectionType,
-  composeNetworkContext
+  composeNetworkContext, deriveConnectionType
 } from "./helpers";
 export type { ConnectionType, NetworkContext } from "./helpers";
+
+export {
+  cleanupTelemetry, ConnectionQualityTier, emitHealthCheckEvent, emitQualityChangeEvent, initializeTelemetry, mapQualityTier, startHealthCheckInterval,
+  stopHealthCheckInterval
+} from "./network-telemetry";
+export type { NetworkHealthEvent } from "./network-telemetry";
+
