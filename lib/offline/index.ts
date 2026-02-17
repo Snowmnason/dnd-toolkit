@@ -40,7 +40,8 @@ export {
     enqueueIfOffline,
     isQueuedMutation,
     getCacheKeyPatternForMutation,
-    createOptimisticUpdate
+    createOptimisticUpdate,
+    rollbackOptimisticUpdate
 } from "./utils";
 
 export type {

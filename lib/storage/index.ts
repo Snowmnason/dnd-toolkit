@@ -35,43 +35,43 @@
  */
 
 export {
-    DATA_CLASSIFICATIONS,
-    DataSensitivity,
-    validateClassifications,
-    type DataClassification
+  DATA_CLASSIFICATIONS,
+  DataSensitivity,
+  validateClassifications,
+  type DataClassification
 } from "./data-classification";
 export { FastCache } from "./FastCache";
 export {
-    classifyKey,
-    clearAllUserData,
-    getKeysBySensitivity,
-    getStorageBackend as getPrivacyStorageBackend,
-    getRetentionInfo,
-    getSensitiveKeys,
-    isSensitiveData,
-    redactForLogs,
-    shouldUseSecureStorage
+  classifyKey,
+  clearAllUserData,
+  getKeysBySensitivity,
+  getStorageBackend as getPrivacyStorageBackend,
+  getRetentionInfo,
+  getSensitiveKeys,
+  isSensitiveData,
+  redactForLogs,
+  shouldUseSecureStorage
 } from "./privacy";
 export { SecureStorage } from "./SecureStorage";
 export { STORAGE_BACKEND_CONFIG, type StorageBackend } from "./storage-config";
 export {
-    batchStorageOperation,
-    checkStorageHealth,
-    classifyStorageError,
-    handleStorageErrorGracefully,
-    isStorageError,
-    logStorageError,
-    safeStorageGet,
-    safeStorageGetJSON,
-    safeStorageRemove,
-    safeStorageSet,
-    safeStorageSetJSON,
-    shouldServeFallbackOnStorageError,
-    type BatchStorageResult,
-    type StorageErrorInfo,
-    type StorageGracefulResult,
-    type StorageOperation,
-    type StorageOperationOptions
+  batchStorageOperation,
+  checkStorageHealth,
+  classifyStorageError,
+  handleStorageErrorGracefully,
+  isStorageError,
+  logStorageError,
+  safeStorageGet,
+  safeStorageGetJSON,
+  safeStorageRemove,
+  safeStorageSet,
+  safeStorageSetJSON,
+  shouldServeFallbackOnStorageError,
+  type BatchStorageResult,
+  type StorageErrorInfo,
+  type StorageGracefulResult,
+  type StorageOperation,
+  type StorageOperationOptions
 } from "./storage-error-handling";
 export { updateStorageCache } from "./update-storage-cache";
 
@@ -131,6 +131,12 @@ export const STORAGE_KEYS = {
 
   // Offline request queue (persistent, survives app restart)
   OFFLINE_QUEUE: "dnd:api:offline_queue",
+
+  // Offline mutation queue (persistent, survives app restart)
+  OFFLINE_MUTATION_QUEUE: "dnd:offline:mutation_queue",
+
+  // Offline mutation dead-letter queue (permanent failures)
+  OFFLINE_DEAD_LETTER: "dnd:offline:dead_letter",
 
   // Network recovery state (retry count, backoff timing)
   NETWORK_RECOVERY_STATE: "dnd:network:recovery_state",

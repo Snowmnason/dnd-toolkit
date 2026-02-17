@@ -12,7 +12,7 @@
  * - Cache invalidation tags
  */
 
-import { SecureStorage } from "@/lib/storage";
+import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import {
   BackoffScheduler,
@@ -36,10 +36,7 @@ function generateUUID(): string {
   });
 }
 
-/**
- * Storage key for the offline mutation queue
- */
-const STORAGE_KEY_OFFLINE_QUEUE = "dnd:offline:mutation_queue";
+
 
 /**
  * Default configuration for offline sync
@@ -66,7 +63,7 @@ class OfflineMutationQueueService {
 
     try {
       const stored = await SecureStorage.getJSON<QueuedMutation[]>(
-        STORAGE_KEY_OFFLINE_QUEUE,
+        STORAGE_KEYS.OFFLINE_MUTATION_QUEUE,
       );
 
       if (Array.isArray(stored)) {
@@ -214,7 +211,7 @@ class OfflineMutationQueueService {
    */
   async clear(): Promise<void> {
     this.queue = [];
-    await SecureStorage.removeItem(STORAGE_KEY_OFFLINE_QUEUE);
+    await SecureStorage.removeItem(STORAGE_KEYS.OFFLINE_MUTATION_QUEUE);
     logger.category("storage").warn("Cleared offline mutation queue");
   }
 
@@ -223,7 +220,7 @@ class OfflineMutationQueueService {
    */
   private async persist(): Promise<void> {
     try {
-      await SecureStorage.setJSON(STORAGE_KEY_OFFLINE_QUEUE, this.queue);
+      await SecureStorage.setJSON(STORAGE_KEYS.OFFLINE_MUTATION_QUEUE, this.queue);
     } catch (error) {
       logger
         .category("error")
@@ -290,6 +287,17 @@ class OfflineMutationQueueService {
    */
   async getMutationsByErrorType(errorType: string): Promise<QueuedMutation[]> {
     return this.queue.filter((m) => m.lastErrorType === errorType);
+  }
+
+  /**
+   * Get count of dead-letter mutations (permanently failed)
+   *
+   * A mutation is dead-lettered when retryCount >= maxRetries.
+   * This method efficiently returns the count without loading the entire queue.
+   */
+  getDeadLetterCount(): number {
+    return this.queue.filter((m) => m.retryCount >= DEFAULT_CONFIG.maxRetries)
+      .length;
   }
 }
 

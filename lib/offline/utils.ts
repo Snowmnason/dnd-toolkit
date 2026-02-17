@@ -4,6 +4,7 @@
  * Helper functions for offline mutation handling
  */
 
+import { QueryCache } from "@/lib/cache/query-cache";
 import { NetworkDetection } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
 import { OfflineMutationQueue } from "./mutation-queue";
@@ -191,3 +192,62 @@ export function createOptimisticUpdate(
       return undefined;
   }
 }
+
+/**
+ * Rollback an optimistic update by invalidating cache tags
+ * 
+ * Call this when a mutation fails permanently (4xx error or dead-letter).
+ * Invalidates cache tags so fresh data will be refetched from server,
+ * effectively rolling back any optimistic UI updates.
+ *
+ * Usage with offline mutations:
+ * ```ts
+ * try {
+ *   await enqueueIfOffline(
+ *     async () => supabase.from('worlds').update(data).eq('id', worldId),
+ *     {
+ *       operation: 'update',
+ *       table: 'worlds',
+ *       payload: data,
+ *       invalidateTags: ['worlds', `world:${worldId}`]
+ *     }
+ *   );
+ * } catch (error) {
+ *   // Mutation failed permanently - rollback by invalidating tags
+ *   rollbackOptimisticUpdate(worldId, ['worlds', `world:${worldId}`]);
+ *   showErrorToast('Failed to update world');
+ * }
+ * ```
+ *
+ * @param optimisticId Unique ID of the optimistic update (usually the resource ID)
+ * @param invalidateTags Cache tags to invalidate (same tags used in enqueueIfOffline.invalidateTags)
+ *                       Each tag should match how the query was done (e.g., 'worlds', 'world:id', etc.).
+ *                       Invalidating these tags forces a refetch of fresh server data.
+ */
+export async function rollbackOptimisticUpdate(
+  optimisticId: string,
+  invalidateTags: string[],
+): Promise<void> {
+  try {
+    logger
+      .category("storage")
+      .debug(`Rolling back optimistic update: ${optimisticId}`, {
+        invalidateTags,
+      });
+
+    // Invalidate the cache tags to force refetch of fresh data from server
+    // This clears any cached data affected by the failed mutation
+    await QueryCache.invalidateByTags(invalidateTags);
+
+    logger
+      .category("storage")
+      .info(`Optimistic update rolled back: ${optimisticId}`, {
+        invalidateTags,
+      });
+  } catch (error) {
+    logger
+      .category("error")
+      .warn(`Failed to rollback optimistic update: ${optimisticId}`, error);
+  }
+}
+

@@ -229,8 +229,6 @@ if (isQueuedMutation(result)) {
 }
 ```
 
----
-
 ### Sync Handlers
 
 #### `registerSyncHandler(table, handler): void`
@@ -240,8 +238,6 @@ Register a sync handler for a table.
 **Parameters:**
 
 - `table`: string — Table name (e.g., 'notes', 'worlds', 'characters')
-- `handler`: SyncHandler — Async function that applies mutation to backend
-  - Receives: (payload, operation, supabaseClient) => Promise<SyncHandlerResult>
   - Should return: { success, data?, error?, conflict? }
 
 **Example:**
@@ -277,12 +273,7 @@ registerSyncHandler("notes", async (payload, operation, supabase) => {
         success: !error,
         data,
         error: error?.message,
-        conflict: error?.code === "PGRST116", // Conflict code
-      };
-    }
-
     if (operation === "delete") {
-      const { error } = await supabase
         .from("notes")
         .delete()
         .eq("id", payload.id);
@@ -299,16 +290,11 @@ registerSyncHandler("notes", async (payload, operation, supabase) => {
       success: false,
       error: err instanceof Error ? err.message : "Unknown error",
     };
-  }
-});
 ```
 
 #### `executeSyncHandler(mutation, supabase): Promise<SyncResult>`
 
 Execute a registered sync handler for a mutation (internal use).
-
-**Parameters:**
-
 - `mutation`: QueuedMutation — Queued mutation to sync
 - `supabase`: SupabaseClient — Supabase client
 
@@ -340,13 +326,10 @@ Initialize the sync manager (call once during app bootstrap).
   - `debounceMs?`: number (default: 5000)
   - `maxRetries?`: number (default: 5)
   - `retryBaseMs?`: number (default: 2000)
-  - `conflictStrategy?`: 'client_wins' | 'server_wins' | 'user_choose' (default: 'client_wins')
-
 **Example:**
 
 ```ts
 import { OnlineSyncManager } from "@/lib/offline";
-
 await OnlineSyncManager.initialize({
   batchSize: 10,
   debounceMs: 3000,
@@ -685,7 +668,7 @@ OnlineSyncManager.subscribe((status) => {
 **Prevention:**
 
 ```ts
-// Use STORAGE_KEYS.OFFLINE_QUEUE (hashed and encrypted)
+// Use STORAGE_KEYS.OFFLINE_MUTATION_QUEUE (centrally defined in lib/storage, encrypted on all platforms)
 // Never access queue directly; always use OfflineMutationQueue API
 ```
 
