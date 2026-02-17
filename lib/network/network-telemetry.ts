@@ -135,6 +135,62 @@ function getLatencyFromAPI(): number | undefined {
 }
 
 /**
+ * Sampling configuration (from appsettings or defaults)
+ */
+interface SamplingConfig {
+  healthCheckSampleRate: number; // 0-1 (10% = 0.1)
+  errorCorrelationSampleRate: number; // 0-1 (50% = 0.5)
+  enabled: boolean;
+}
+
+/**
+ * Get sampling configuration from app settings
+ * Defaults: health check 10%, error correlation 50%
+ */
+function getSamplingConfig(): SamplingConfig {
+  try {
+    const { getAppConfig } = require("@/lib/config");
+    const config = getAppConfig();
+    const telemetryConfig = config?.network?.telemetry;
+    return {
+      healthCheckSampleRate: telemetryConfig?.healthCheckSampleRate ?? 0.1,
+      errorCorrelationSampleRate: telemetryConfig?.errorCorrelationSampleRate ?? 0.5,
+      enabled: telemetryConfig?.enabled ?? true,
+    };
+  } catch {
+    // Fallback to defaults
+    return {
+      healthCheckSampleRate: 0.1,
+      errorCorrelationSampleRate: 0.5,
+      enabled: true,
+    };
+  }
+}
+
+/**
+ * Check if an event should be sampled (random probability)
+ * @param sampleRate - Sample rate (0-1). 0.1 = 10% of events logged
+ * @returns true if event should be emitted, false if filtered by sampling
+ */
+function shouldSample(sampleRate: number): boolean {
+  if (sampleRate >= 1) return true;
+  if (sampleRate <= 0) return false;
+  return Math.random() < sampleRate;
+}
+
+/**
+ * Check if analytics consent is granted (works with #181)
+ * Phase 1c: client-side consent; Phase 2+ will handle backend privacy
+ * @returns true if telemetry is enabled and has consent
+ */
+async function hasPrivacyConsent(): Promise<boolean> {
+  // For now, telemetry is enabled by default (Phase 1c)
+  // Phase 2 will integrate with #181 consent system
+  // Placeholder for future: check analytics consent flag
+  return true;
+}
+
+/**
  * Compose a network health event from current status
  */
 function composeHealthEvent(
@@ -171,6 +227,7 @@ interface TelemetryState {
   qualityChangeTimestamps: number[]; // Track last 10 quality changes for flapping detection
   subscriptionUnsubscribe: (() => void) | null;
   errorQueue: ErrorCorrelationEvent[]; // Collect error events for Phase 1c sampling & emission
+  firstHealthCheckEmitted: boolean; // Track if initial health check sent (always unsampled)
 }
 
 const telemetryState: TelemetryState = {
@@ -179,6 +236,7 @@ const telemetryState: TelemetryState = {
   qualityChangeTimestamps: [],
   subscriptionUnsubscribe: null,
   errorQueue: [],
+  firstHealthCheckEmitted: false,
 };
 
 /**
@@ -220,7 +278,7 @@ export function emitQualityChangeEvent(
  * Call this on every health check interval.
  *
  * Logs via logger.category('network').info('health_check', eventData)
- * Note: Sampling (which health checks are actually logged) happens in Phase 1c
+ * Sampling: First check always logged (unsampled); rest sampled at healthCheckSampleRate
  */
 export function emitHealthCheckEvent(status: NetworkStatus): void {
   const ctx: NetworkContext = composeNetworkContext(status);
@@ -230,7 +288,21 @@ export function emitHealthCheckEvent(status: NetworkStatus): void {
   // Update lastQuality so it's ready for the next quality change event or health check
   telemetryState.lastQuality = currentQuality;
 
-  logger.category("network").info("health_check", event);
+  // Apply sampling: first health check is always logged (unsampled)
+  const samplingConfig = getSamplingConfig();
+  if (!samplingConfig.enabled) {
+    return; // Telemetry disabled
+  }
+
+  const isFirstCheck = !telemetryState.firstHealthCheckEmitted;
+  const shouldEmit = isFirstCheck || shouldSample(samplingConfig.healthCheckSampleRate);
+
+  if (shouldEmit) {
+    logger.category("network").info("health_check", event);
+    if (isFirstCheck) {
+      telemetryState.firstHealthCheckEmitted = true;
+    }
+  }
 }
 
 /**
@@ -287,6 +359,26 @@ export function getAndClearErrorQueue(clearQueue: boolean = true): ErrorCorrelat
     telemetryState.errorQueue = [];
   }
   return events;
+}
+
+/**
+ * Emit sampled error correlation events
+ * Logs errorsevents at errorCorrelationSampleRate
+ * Usually called periodically (e.g., every 5 minutes) to drain the error queue
+ *
+ * @param events - Error events to emit (typically from getAndClearErrorQueue)
+ */
+export function emitSampledErrorEvents(events: ErrorCorrelationEvent[]): void {
+  const samplingConfig = getSamplingConfig();
+  if (!samplingConfig.enabled) {
+    return; // Telemetry disabled
+  }
+
+  for (const event of events) {
+    if (shouldSample(samplingConfig.errorCorrelationSampleRate)) {
+      logger.category("network").info("error_correlation", event);
+    }
+  }
 }
 
 /**
@@ -385,5 +477,6 @@ export function cleanupTelemetry(): void {
   }
   stopHealthCheckInterval();
   telemetryState.errorQueue = [];
+  telemetryState.firstHealthCheckEmitted = false;
   logger.category("network").debug("Network telemetry cleaned up");
 }
