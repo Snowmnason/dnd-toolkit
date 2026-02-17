@@ -34,7 +34,7 @@ Platform-specific detection:
 Normalize to ConnectionQuality:
   - GOOD: Excellent connection, all operations safe
   - BAD: Latency >500ms, packet loss detected, use smaller payloads
-  - NO_WIFI: On cellular/hotspot, possibly metered
+  - CELLULAR: On cellular/hotspot, possibly metered
   - OFFLINE: No network at all
         ↓
 Notify subscribers (real-time updates)
@@ -242,12 +242,12 @@ Six states define the network lifecycle:
 
 | State          | Meaning                                 | Transitions To                     |
 | -------------- | --------------------------------------- | ---------------------------------- |
-| `INITIALIZING` | App starting, no status yet             | GOOD, BAD, NO_WIFI, OFFLINE        |
-| `GOOD`         | Network available, responsive           | BAD, NO_WIFI, OFFLINE, RECOVERING  |
-| `BAD`          | Network present but slow/high-latency   | GOOD, NO_WIFI, OFFLINE, RECOVERING |
-| `NO_WIFI`      | Cellular/offline detected (iOS/Android) | GOOD, BAD, OFFLINE, RECOVERING     |
+| `INITIALIZING` | App starting, no status yet             | GOOD, BAD, CELLULAR, OFFLINE        |
+| `GOOD`         | Network available, responsive           | BAD, CELLULAR, OFFLINE, RECOVERING  |
+| `BAD`          | Network present but slow/high-latency   | GOOD, CELLULAR, OFFLINE, RECOVERING |
+| `CELLULAR`      | Cellular/offline detected (iOS/Android) | GOOD, BAD, OFFLINE, RECOVERING     |
 | `OFFLINE`      | No connectivity at all                  | INITIALIZING, RECOVERING           |
-| `RECOVERING`   | Attempting reconnection with backoff    | GOOD, BAD, NO_WIFI, OFFLINE        |
+| `RECOVERING`   | Attempting reconnection with backoff    | GOOD, BAD, CELLULAR, OFFLINE        |
 
 ### Valid Transitions
 
@@ -255,7 +255,7 @@ The `VALID_TRANSITIONS` map enforces a strict directed graph. Key rules:
 
 - **Recovery path**: `OFFLINE` can only reach `GOOD` via `RECOVERING` (ensures recovery side effects execute)
 - **Initialization**: `INITIALIZING` only reachable at startup
-- **WiFi switch**: `NO_WIFI` ↔ `GOOD` allowed (iOS/Android WiFi toggles)
+- **WiFi switch**: `CELLULAR` ↔ `GOOD` allowed (iOS/Android WiFi toggles)
 
 Invalid transitions are rejected with an error.
 
@@ -595,7 +595,7 @@ Implement server-side support via Issue #XXX - Server-Side Image Variants.
 **Key Integration Points:**
 
 - **Online Detection**: When `NetworkDetection.isOnline` transitions from `false` → `true`, `OnlineSyncManager` begins syncing queued mutations
-- **Connection Quality**: Sync only starts when quality is stable (GOOD); BAD/NO_WIFI connections continue queueing
+- **Connection Quality**: Sync only starts when quality is stable (GOOD); BAD/CELLULAR connections continue queueing
 - **Debouncing**: Rapid online/offline flapping is debounced (5000ms default) to avoid redundant sync attempts
 - **Error Handling**: If sync fails, mutations remain queued and retry with exponential backoff
 

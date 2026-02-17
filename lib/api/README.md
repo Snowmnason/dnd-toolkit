@@ -325,7 +325,7 @@ Automatically queues requests for replay when the network is offline or the circ
 
 **Features:**
 
-- Automatic queueing when offline (OFFLINE/NO_WIFI) or circuit is Open
+- Automatic queueing when offline (OFFLINE/CELLULAR) or circuit is Open
 - Persistent storage via SecureStorage with schema versioning
 - Automatic replay on reconnect via NetworkDetection
 - FIFO replay with per-key deduplication (keeps latest request)

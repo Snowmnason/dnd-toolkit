@@ -16,7 +16,7 @@ Track four distinct network states for implementing degraded/safe modes:
 
 - **GOOD** - Excellent connection (WiFi, normal latency)
 - **BAD** - Poor connection (WiFi with high latency > 500ms)
-- **NO_WIFI** - Cellular/metered connection
+- **CELLULAR** - Cellular/metered connection
 - **OFFLINE** - No network service
 
 ### Battery-Aware Networking

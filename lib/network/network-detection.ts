@@ -75,6 +75,23 @@ interface BatteryStatus {
 export type NetworkStatusCallback = (status: NetworkStatus) => void;
 
 /**
+ * Convert ConnectionQuality to NetworkState
+ * Standalone function for use in state machine and telemetry
+ */
+export function qualityToNetworkState(quality: ConnectionQuality): NetworkState {
+  switch (quality) {
+    case ConnectionQuality.GOOD:
+      return "GOOD";
+    case ConnectionQuality.BAD:
+      return "BAD";
+    case ConnectionQuality.CELLULAR:
+      return "CELLULAR";
+    case ConnectionQuality.OFFLINE:
+      return "OFFLINE";
+  }
+}
+
+/**
  * Network detection service (cross-platform)
  *
  * Handles:
@@ -161,7 +178,7 @@ class NetworkDetectionClass {
       this.isInitialized = true;
 
       // Initialize state machine to detected state
-      const initialNetworkState = this.qualityToNetworkState(
+      const initialNetworkState = qualityToNetworkState(
         this.currentStatus.connectionQuality,
       );
       try {
@@ -659,22 +676,6 @@ class NetworkDetectionClass {
   }
 
   /**
-   * Convert ConnectionQuality to NetworkState
-   */
-  private qualityToNetworkState(quality: ConnectionQuality): NetworkState {
-    switch (quality) {
-      case ConnectionQuality.GOOD:
-        return "GOOD";
-      case ConnectionQuality.BAD:
-        return "BAD";
-      case ConnectionQuality.CELLULAR:
-        return "CELLULAR";
-      case ConnectionQuality.OFFLINE:
-        return "OFFLINE";
-    }
-  }
-
-  /**
    * Convert connection quality to effective network type for adaptive payloads
    *
    * Maps:
@@ -730,8 +731,8 @@ class NetworkDetectionClass {
 
     // Trigger state transition if connection quality changed
     if (oldStatus.connectionQuality !== this.currentStatus.connectionQuality) {
-      const oldState = this.qualityToNetworkState(oldStatus.connectionQuality);
-      const newState = this.qualityToNetworkState(
+      const oldState = qualityToNetworkState(oldStatus.connectionQuality);
+      const newState = qualityToNetworkState(
         this.currentStatus.connectionQuality,
       );
       this.triggerStateTransition(oldState, newState).catch((error) => {

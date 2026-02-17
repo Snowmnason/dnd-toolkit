@@ -11,6 +11,7 @@
  */
 
 import { logger } from "@/lib/utils/logger";
+import { deriveConnectionType } from "./helpers";
 import { NetworkStatus } from "./network-detection";
 
 /**
@@ -56,9 +57,11 @@ export interface AdaptivePayloadOptions {
 /**
  * Map network connection quality to adaptive payload options
  *
- * Quality tier mapping:
- * - 4g: HD images, full details, maps included, 5MB limit
- * - 3g: SD images, full details, no maps, 2MB limit
+ * Quality tier mapping (connection-aware):
+ * - WIFI+4g: HD images, full details, maps included, 5MB limit (unmetered, can be aggressive)
+ * - WIFI+3g: SD images, full details, no maps, 2MB limit
+ * - CELLULAR+4g: SD images, full details, no maps, 2MB limit (metered, be conservative)
+ * - CELLULAR+3g: Thumbnails, summaries, no maps, 1MB limit (metered + slower)
  * - 2g/slow-2g: Thumbnails only, summaries, no maps, 500KB limit
  * - offline: No images, text only, 0 limit (works with #206 offline queue)
  * - unknown: Safe default (SD, 2MB, summaries optional)
@@ -82,20 +85,46 @@ export function getAdaptivePayloadOptions(
   }
 
   const effectiveType = status.effectiveType ?? "unknown";
+  const connectionType = deriveConnectionType(status);
+  const isCellular = connectionType === "CELLULAR";
 
   switch (effectiveType) {
     case "4g": {
+      // On WIFI+4g: aggressive (HD, maps, 5MB)
+      // On CELLULAR+4g: conservative (SD, no maps, 2MB) - avoid data charges
+      if (isCellular) {
+        return {
+          includeImages: true,
+          imageQuality: "sd",
+          includeDetails: true,
+          includeMaps: false,
+          maxPayloadSize: 2 * 1024 * 1024, // 2MB (metered, be careful)
+          compressionEnabled: true,
+        };
+      }
       return {
         includeImages: true,
         imageQuality: "hd",
         includeDetails: true,
         includeMaps: true,
-        maxPayloadSize: 5 * 1024 * 1024, // 5MB
+        maxPayloadSize: 5 * 1024 * 1024, // 5MB (unmetered, can be generous)
         compressionEnabled: true,
       };
     }
 
     case "3g": {
+      // On WIFI+3g: moderate (SD, no maps, 2MB)
+      // On CELLULAR+3g: conservative (thumbnails, summaries, no maps, 1MB)
+      if (isCellular) {
+        return {
+          includeImages: true,
+          imageQuality: "thumb",
+          includeDetails: false, // Summaries only
+          includeMaps: false,
+          maxPayloadSize: 1 * 1024 * 1024, // 1MB (metered + slower)
+          compressionEnabled: true,
+        };
+      }
       return {
         includeImages: true,
         imageQuality: "sd",

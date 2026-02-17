@@ -101,14 +101,14 @@ The system tracks four distinct connection states for implementing progressive d
   }
   ```
 
-### NO_WIFI
+### CELLULAR
 
 - **When**: Connected via cellular/mobile hotspot
 - **Indicators**: `type === 'cellular'`
 - **Use Case**: Warn user, restrict data-heavy operations
 - **Example**:
   ```typescript
-  if (status.connectionQuality === ConnectionQuality.NO_WIFI) {
+  if (status.connectionQuality === ConnectionQuality.CELLULAR) {
     // Show "Cellular connection" indicator
     // Warn before downloading large files
     // Defer auto-sync of large worlds
@@ -209,7 +209,7 @@ function selectImageSize(
       return "thumb"; // Cached only
     case ConnectionQuality.BAD:
       return "thumb"; // Smallest size
-    case ConnectionQuality.NO_WIFI:
+    case ConnectionQuality.CELLULAR:
       return "normal"; // Balanced
     case ConnectionQuality.GOOD:
       return "high"; // Full resolution
@@ -226,7 +226,7 @@ function getBatchInterval(quality: ConnectionQuality): number {
       return 1000; // 1 second
     case ConnectionQuality.BAD:
       return 5000; // 5 seconds
-    case ConnectionQuality.NO_WIFI:
+    case ConnectionQuality.CELLULAR:
       return 10000; // 10 seconds
     case ConnectionQuality.OFFLINE:
       return Infinity; // Don't batch, queue only
@@ -371,7 +371,7 @@ function getApiConfig(quality: ConnectionQuality) {
   return {
     timeout: quality === ConnectionQuality.BAD ? 30000 : 10000,
     retries: quality === ConnectionQuality.BAD ? 3 : 1,
-    compress: quality === ConnectionQuality.NO_WIFI,
+    compress: quality === ConnectionQuality.CELLULAR,
     batchSize: quality === ConnectionQuality.GOOD ? 50 : 10,
   };
 }
@@ -442,7 +442,7 @@ function getConnectionQuality(): ConnectionQuality;
 export enum ConnectionQuality {
   GOOD = "good",
   BAD = "bad",
-  NO_WIFI = "no-wifi",
+  CELLULAR = "no-wifi",
   OFFLINE = "offline",
 }
 

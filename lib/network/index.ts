@@ -13,7 +13,8 @@
 export {
   ConnectionQuality,
   NetworkDetection,
-  useNetworkStatus
+  useNetworkStatus,
+  qualityToNetworkState
 } from "./network-detection";
 export type { NetworkStatus, NetworkStatusCallback } from "./network-detection";
 
@@ -58,3 +59,8 @@ export {
   shouldDowngradeResource
 } from "./adaptive-payload-request";
 
+export {
+  deriveConnectionType,
+  composeNetworkContext
+} from "./helpers";
+export type { ConnectionType, NetworkContext } from "./helpers";
