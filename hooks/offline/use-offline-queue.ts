@@ -51,14 +51,8 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
     setQueueSize(initialStatus.totalQueued);
     setIsSyncing(initialStatus.isSyncing);
 
-    // Initialize dead-letter count and last synced time from state
-    // Dead-letter count comes from OfflineMutationQueue internal state
-    OfflineMutationQueue.getAll().then((mutations) => {
-      const deadLetterMutations = mutations.filter(
-        (m) => m.retryCount >= 5
-      );
-      setDeadLetterCount(deadLetterMutations.length);
-    });
+    // Initialize dead-letter count from OfflineMutationQueue
+    setDeadLetterCount(OfflineMutationQueue.getDeadLetterCount());
 
     // Track last sync success via status.lastSyncAttempt
     // Note: This could be enhanced to track actual success timestamp separately
@@ -71,11 +65,8 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
       setQueueSize(status.totalQueued);
       setIsSyncing(status.isSyncing);
 
-      // Update dead-letter count based on queue state
-      OfflineMutationQueue.getAll().then((mutations) => {
-        const deadLetterMutations = mutations.filter((m) => m.retryCount >= 5);
-        setDeadLetterCount(deadLetterMutations.length);
-      });
+      // Update dead-letter count efficiently (synchronous, no storage read)
+      setDeadLetterCount(OfflineMutationQueue.getDeadLetterCount());
 
       // Track last sync time - update when sync completes successfully
       // Only update if this sync had successful completions

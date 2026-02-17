@@ -194,11 +194,11 @@ export function createOptimisticUpdate(
 }
 
 /**
- * Rollback an optimistic update by removing it from cache
+ * Rollback an optimistic update by invalidating cache tags
  * 
  * Call this when a mutation fails permanently (4xx error or dead-letter).
- * Restores the original cached data by clearing cache entries that were
- * affected by the failed mutation.
+ * Invalidates cache tags so fresh data will be refetched from server,
+ * effectively rolling back any optimistic UI updates.
  *
  * Usage with offline mutations:
  * ```ts
@@ -213,35 +213,36 @@ export function createOptimisticUpdate(
  *     }
  *   );
  * } catch (error) {
- *   // Mutation failed permanently - rollback optimistic update
- *   rollbackOptimisticUpdate('worlds', `world:${worldId}`);
+ *   // Mutation failed permanently - rollback by invalidating tags
+ *   rollbackOptimisticUpdate(worldId, ['worlds', `world:${worldId}`]);
  *   showErrorToast('Failed to update world');
  * }
  * ```
  *
  * @param optimisticId Unique ID of the optimistic update (usually the resource ID)
- * @param cacheKeyPattern Cache key pattern to invalidate (e.g., 'worlds' or 'world:123')
- *                        This clears the cache so fresh data will be fetched on next query
+ * @param invalidateTags Cache tags to invalidate (same tags used in enqueueIfOffline.invalidateTags)
+ *                       Each tag should match how the query was done (e.g., 'worlds', 'world:id', etc.).
+ *                       Invalidating these tags forces a refetch of fresh server data.
  */
 export async function rollbackOptimisticUpdate(
   optimisticId: string,
-  cacheKeyPattern: string,
+  invalidateTags: string[],
 ): Promise<void> {
   try {
     logger
       .category("storage")
       .debug(`Rolling back optimistic update: ${optimisticId}`, {
-        cacheKeyPattern,
+        invalidateTags,
       });
 
-    // Invalidate the cache to force refetch of fresh data from server
+    // Invalidate the cache tags to force refetch of fresh data from server
     // This clears any cached data affected by the failed mutation
-    await QueryCache.invalidateByTags([cacheKeyPattern]);
+    await QueryCache.invalidateByTags(invalidateTags);
 
     logger
       .category("storage")
       .info(`Optimistic update rolled back: ${optimisticId}`, {
-        cacheKeyPattern,
+        invalidateTags,
       });
   } catch (error) {
     logger

@@ -1,7 +1,7 @@
 import { updateStorageCache } from '@/lib/storage';
 import { useAppToast } from '@/lib/toast/app-toast-context';
 import { logger } from '@/lib/utils/logger';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface UseRefreshStorageCacheReturn {
   isRefreshing: boolean;
@@ -19,6 +19,19 @@ export function useRefreshStorageCache({
 }): UseRefreshStorageCacheReturn {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { show: showToast } = useAppToast();
+  const isMountedRef = useRef(true);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const handleRefreshStorageCache = useCallback(async () => {
     if (isRefreshing || isOffline) return;
@@ -36,14 +49,20 @@ export function useRefreshStorageCache({
       const minDisplayTime = 2000;
       const remainingTime = Math.max(0, minDisplayTime - elapsedTime);
 
-      setTimeout(() => {
-        showToast('App Data Synced', 'success', 4000);
+      timeoutRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          showToast('App Data Synced', 'success', 4000);
+        }
       }, remainingTime);
     } catch (error: any) {
       logger.error('other', 'Force refresh failed:', error);
-      showToast('Failed to sync data. Please try again.', 'error', 4000);
+      if (isMountedRef.current) {
+        showToast('Failed to sync data. Please try again.', 'error', 4000);
+      }
     } finally {
-      setIsRefreshing(false);
+      if (isMountedRef.current) {
+        setIsRefreshing(false);
+      }
     }
   }, [isRefreshing, isOffline, showToast]);
 

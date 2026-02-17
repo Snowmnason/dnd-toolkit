@@ -82,6 +82,8 @@ describe("OnlineSyncManager (unit)", () => {
 
     (OnlineSyncManager as any).isOnline = true;
 
+    await OnlineSyncManager.syncAll();
+
     expect(OfflineMutationQueue.discard).toHaveBeenCalled();
   });
 });

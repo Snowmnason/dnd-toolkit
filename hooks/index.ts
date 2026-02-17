@@ -29,15 +29,19 @@ export * from "./ui";
 export * from "./assets";
 
 // Feature Flags & Entitlements
-export * from "./feature/use-feature-flags";
-export * from "./feature/use-entitlements";
 export { useEntitlementExpiredModal } from './entitlements/useEntitlementExpiredModal';
 export type { UseEntitlementExpiredModalReturn } from './entitlements/useEntitlementExpiredModal';
+export * from "./feature/use-entitlements";
+export * from "./feature/use-feature-flags";
 
 // Background Jobs
 export * from "./jobs";
 
 // Offline & Sync
 export * from "./offline/use-offline-queue";
+export * from "./offline/useForceResync";
+
+// Storage
+export * from "./storage/useRefreshStorageCache";
 
 // Utilities

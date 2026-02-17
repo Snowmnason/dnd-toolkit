@@ -1,6 +1,6 @@
 import { Button, SubTitle } from '@/components/ui'
-import { useForceResync } from '@/hooks/offline/useForceResync'
-import { useRefreshStorageCache } from '@/hooks/storage/useRefreshStorageCache'
+import { useForceResync, useRefreshStorageCache } from '@/hooks'
+import { useNetworkStatus } from '@/lib/network'
 import { useScale } from '@/theme'
 import { View } from 'react-native'
 
@@ -9,13 +9,13 @@ import { View } from 'react-native'
  * Displays app settings with button groups for future features.
  * 
  * Force Refresh: Fetches latest user data from server, bypassing the 4-hour cache
+ * Force Resync: Triggers offline queue sync if mutations are pending
  * Toasts are displayed globally via AppToastLayer at app root.
  */
 export function AppSettings() {
   const S = useScale()
-  
-  // TODO: Replace with actual offline check when offline functionality is implemented
-  const isOffline = false
+  const { isOnline } = useNetworkStatus()
+  const isOffline = !isOnline
 
   const { isResyncing, handleForceResync } = useForceResync({ isOffline })
 

@@ -65,7 +65,7 @@ function formatTimeAgo(timestamp: number | null): string {
  * Displays offline sync status for user awareness.
  * Returns null if no pending mutations to avoid clutter.
  */
-export function SyncStatus(): React.ReactNode {
+export function SyncStatus(): React.ReactElement | null {
   const { queueSize, isSyncing, lastSyncedAt } = useOfflineQueue();
 
   const timeAgoText = useMemo(() => {

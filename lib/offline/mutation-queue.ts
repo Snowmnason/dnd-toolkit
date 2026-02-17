@@ -288,6 +288,17 @@ class OfflineMutationQueueService {
   async getMutationsByErrorType(errorType: string): Promise<QueuedMutation[]> {
     return this.queue.filter((m) => m.lastErrorType === errorType);
   }
+
+  /**
+   * Get count of dead-letter mutations (permanently failed)
+   *
+   * A mutation is dead-lettered when retryCount >= maxRetries.
+   * This method efficiently returns the count without loading the entire queue.
+   */
+  getDeadLetterCount(): number {
+    return this.queue.filter((m) => m.retryCount >= DEFAULT_CONFIG.maxRetries)
+      .length;
+  }
 }
 
 // Singleton instance
