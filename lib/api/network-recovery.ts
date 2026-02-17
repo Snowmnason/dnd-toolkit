@@ -280,7 +280,7 @@ export async function registerNetworkRecoveryHooks(
     },
   );
 
-  // Also handle other quality transitions to OFFLINE (BAD, NO_WIFI)
+  // Also handle other quality transitions to OFFLINE (BAD, CELLULAR)
   networkStateMachine.onSpecificTransition(
     "BAD" as NetworkState,
     "OFFLINE" as NetworkState,
@@ -295,11 +295,11 @@ export async function registerNetworkRecoveryHooks(
   );
 
   networkStateMachine.onSpecificTransition(
-    "NO_WIFI" as NetworkState,
+    "CELLULAR" as NetworkState,
     "OFFLINE" as NetworkState,
     async () => {
-      logger.info("network", "Executing NO_WIFI → OFFLINE notification");
-      await executeRecoveryStep("no-wifi-offline-notification", async () => {
+      logger.info("network", "Executing CELLULAR → OFFLINE notification");
+      await executeRecoveryStep("cellular-offline-notification", async () => {
         NetworkRecoveryManager._notify(
           "No connection - changes will sync when online",
         );

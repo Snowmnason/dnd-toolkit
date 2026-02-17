@@ -11,7 +11,7 @@ import type { RequestOptions } from "./request-manager";
 /**
  * Offline Queue System
  *
- * Queues requests that fail when offline (NetworkDetection = OFFLINE/NO_WIFI)
+ * Queues requests that fail when offline (NetworkDetection = OFFLINE/CELLULAR)
  * or when circuit breaker is Open. Replays queued requests automatically
  * when connectivity is restored or manually via flushOfflineQueue().
  *

@@ -1841,11 +1841,11 @@ class RequestManagerClass {
     error: unknown,
     cbKey?: string,
   ): Promise<boolean> {
-    // Check if network is offline (OFFLINE or NO_WIFI)
+    // Check if network is offline (OFFLINE or CELLULAR)
     const networkStatus = await NetworkDetection.getStatus();
     const isOffline =
       networkStatus.connectionQuality === "offline" ||
-      networkStatus.connectionQuality === "no-wifi";
+      networkStatus.connectionQuality === "cellular";
 
     if (isOffline) {
       logger.debug("api", "Should queue: network offline", {

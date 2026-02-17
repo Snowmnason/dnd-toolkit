@@ -8,7 +8,7 @@
  * - INITIALIZING: App startup, detecting initial network status
  * - GOOD: Excellent connection, all operations safe
  * - BAD: Poor connection (high latency/packet loss), degrade gracefully
- * - NO_WIFI: On cellular/hotspot, may be metered
+ * - CELLULAR: On cellular/hotspot, may be metered
  * - OFFLINE: No network connection at all
  * - RECOVERING: Attempting to reconnect from offline state
  */
@@ -22,7 +22,7 @@ export type NetworkState =
   | "INITIALIZING" // Starting up, detecting initial network
   | "GOOD" // Excellent connection
   | "BAD" // Poor connection, high latency
-  | "NO_WIFI" // On cellular/hotspot
+  | "CELLULAR" // On cellular/hotspot
   | "OFFLINE" // No connection
   | "RECOVERING"; // Attempting to reconnect
 
@@ -31,12 +31,12 @@ export type NetworkState =
  * Defines which states can transition to which other states
  */
 export const VALID_TRANSITIONS: Record<NetworkState, NetworkState[]> = {
-  INITIALIZING: ["GOOD", "BAD", "NO_WIFI", "OFFLINE"],
-  GOOD: ["BAD", "NO_WIFI", "OFFLINE", "RECOVERING"],
-  BAD: ["GOOD", "NO_WIFI", "OFFLINE", "RECOVERING"],
-  NO_WIFI: ["GOOD", "BAD", "OFFLINE", "RECOVERING"],
+  INITIALIZING: ["GOOD", "BAD", "CELLULAR", "OFFLINE"],
+  GOOD: ["BAD", "CELLULAR", "OFFLINE", "RECOVERING"],
+  BAD: ["GOOD", "CELLULAR", "OFFLINE", "RECOVERING"],
+  CELLULAR: ["GOOD", "BAD", "OFFLINE", "RECOVERING"],
   OFFLINE: ["INITIALIZING", "RECOVERING"],
-  RECOVERING: ["GOOD", "BAD", "NO_WIFI", "OFFLINE"],
+  RECOVERING: ["GOOD", "BAD", "CELLULAR", "OFFLINE"],
 };
 
 /**
@@ -157,7 +157,7 @@ class NetworkStateMachine {
     this.currentState = toState;
 
     // Reset recovery retries on successful transitions
-    if (toState === "GOOD" || toState === "BAD" || toState === "NO_WIFI") {
+    if (toState === "GOOD" || toState === "BAD" || toState === "CELLULAR") {
       this.recoveryRetries = 0;
       this.recoveryBackoffMs = 1000; // Reset backoff
     }
@@ -249,11 +249,11 @@ class NetworkStateMachine {
   }
 
   /**
-   * Check if network is healthy (GOOD or NO_WIFI)
+   * Check if network is healthy (GOOD or CELLULAR)
    * Use for operations that don't require excellent connection
    */
   isHealthy(): boolean {
-    return this.currentState === "GOOD" || this.currentState === "NO_WIFI";
+    return this.currentState === "GOOD" || this.currentState === "CELLULAR";
   }
 
   /**

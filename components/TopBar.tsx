@@ -96,7 +96,7 @@ function TopBar({
     if (!networkStatus.isOnline) {
       return "#EF4444"; // Red - no connection
     }
-    if (networkStatus.connectionQuality === ConnectionQuality.NO_WIFI) {
+    if (networkStatus.connectionQuality === ConnectionQuality.CELLULAR) {
       return "#FBBF24"; // Yellow - no wifi (cellular)
     }
     if (networkStatus.connectionQuality === ConnectionQuality.BAD) {

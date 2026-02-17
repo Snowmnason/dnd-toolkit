@@ -51,7 +51,7 @@ vi.mock("@/lib/network/network-detection", () => ({
   ConnectionQuality: {
     GOOD: "good",
     BAD: "bad",
-    NO_WIFI: "no-wifi",
+    CELLULAR: "cellular",
     OFFLINE: "offline",
   },
 }));

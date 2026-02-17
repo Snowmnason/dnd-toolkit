@@ -83,7 +83,7 @@ export const NetworkRecoveryRetryJobManager = {
     });
 
     networkStateMachine.onSpecificTransition(
-      "NO_WIFI",
+      "CELLULAR",
       "RECOVERING",
       async () => {
         logger.info(
@@ -111,11 +111,11 @@ export const NetworkRecoveryRetryJobManager = {
 
     networkStateMachine.onSpecificTransition(
       "RECOVERING",
-      "NO_WIFI",
+      "CELLULAR",
       async () => {
         logger.info(
           "network",
-          "Transitioned RECOVERING → NO_WIFI: stopping auto-retry",
+          "Transitioned RECOVERING → CELLULAR: stopping auto-retry",
         );
         await this._stopRetryJob();
       },

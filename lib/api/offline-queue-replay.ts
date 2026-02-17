@@ -64,7 +64,7 @@ async function handleNetworkStatusChange(status: NetworkStatus): Promise<void> {
     }
   } else if (
     status.connectionQuality === "offline" ||
-    status.connectionQuality === "no-wifi"
+    status.connectionQuality === "cellular"
   ) {
     logger.debug("api", "Network offline or poor, pausing queue replay", {
       connectionQuality: status.connectionQuality,

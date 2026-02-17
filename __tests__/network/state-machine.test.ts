@@ -53,8 +53,8 @@ describe("NetworkStateManager", () => {
       expect(NetworkStateManager.getState()).toBe("GOOD");
     });
 
-    it("should allow NO_WIFI → OFFLINE", async () => {
-      await NetworkStateManager.transitionTo("NO_WIFI");
+    it("should allow CELLULAR → OFFLINE", async () => {
+      await NetworkStateManager.transitionTo("CELLULAR");
       await NetworkStateManager.transitionTo("OFFLINE");
       expect(NetworkStateManager.getState()).toBe("OFFLINE");
     });
@@ -80,8 +80,8 @@ describe("NetworkStateManager", () => {
       ).rejects.toThrow();
     });
 
-    it("should allow NO_WIFI → GOOD (switching from cellular to WiFi)", async () => {
-      await NetworkStateManager.transitionTo("NO_WIFI");
+    it("should allow CELLULAR → GOOD (switching from cellular to WiFi)", async () => {
+      await NetworkStateManager.transitionTo("CELLULAR");
       await NetworkStateManager.transitionTo("GOOD");
       expect(NetworkStateManager.getState()).toBe("GOOD");
     });
@@ -102,7 +102,7 @@ describe("NetworkStateManager", () => {
       await NetworkStateManager.transitionTo("GOOD");
       NetworkStateManager.onSpecificTransition("GOOD", "BAD", hookFn);
 
-      await NetworkStateManager.transitionTo("NO_WIFI");
+      await NetworkStateManager.transitionTo("CELLULAR");
       expect(hookFn).not.toHaveBeenCalled();
     });
 
@@ -216,13 +216,13 @@ describe("NetworkStateManager", () => {
       expect(NetworkStateManager.getState()).toBe("OFFLINE");
     });
 
-    it("should report healthy state (GOOD or NO_WIFI)", async () => {
+    it("should report healthy state (GOOD or CELLULAR)", async () => {
       expect(NetworkStateManager.isHealthy()).toBe(false); // INITIALIZING
 
       await NetworkStateManager.transitionTo("GOOD");
       expect(NetworkStateManager.isHealthy()).toBe(true);
 
-      await NetworkStateManager.transitionTo("NO_WIFI");
+      await NetworkStateManager.transitionTo("CELLULAR");
       expect(NetworkStateManager.isHealthy()).toBe(true);
 
       await NetworkStateManager.transitionTo("BAD");
@@ -241,7 +241,7 @@ describe("NetworkStateManager", () => {
       await NetworkStateManager.transitionTo("BAD");
       expect(NetworkStateManager.isConnected()).toBe(true);
 
-      await NetworkStateManager.transitionTo("NO_WIFI");
+      await NetworkStateManager.transitionTo("CELLULAR");
       expect(NetworkStateManager.isConnected()).toBe(true);
 
       await NetworkStateManager.transitionTo("OFFLINE");
@@ -257,7 +257,7 @@ describe("NetworkStateManager", () => {
       await NetworkStateManager.transitionTo("GOOD");
       expect(NetworkStateManager.canPerformHeavyOps()).toBe(true);
 
-      await NetworkStateManager.transitionTo("NO_WIFI");
+      await NetworkStateManager.transitionTo("CELLULAR");
       expect(NetworkStateManager.canPerformHeavyOps()).toBe(false);
 
       await NetworkStateManager.transitionTo("BAD");
