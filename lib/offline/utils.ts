@@ -8,7 +8,85 @@ import { QueryCache } from "@/lib/cache/query-cache";
 import { NetworkDetection } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
 import { OfflineMutationQueue } from "./mutation-queue";
-import type { MutationOperation, QueuedMutation } from "./types";
+import type { MutationOperation, MutationPersistence, QueuedMutation } from "./types";
+
+/**
+ * Reduce payload based on persistence strategy (Phase 1b: Adaptive Payloads)
+ * 
+ * Strategies:
+ * - `full`: Keep all fields (no reduction)
+ * - `reduced`: Strip attachments, maps, GeoJSON, large arrays (recommended for 2G)
+ * - `ephemeral`: Keep only core fields (IDs, timestamps, relationships)
+ * 
+ * @param payload Original mutation payload
+ * @param persistence Persistence strategy to apply
+ * @returns Reduced payload
+ */
+export function reducePayloadByPersistence(
+  payload: Record<string, any>,
+  persistence: MutationPersistence = "reduced",
+): Record<string, any> {
+  if (persistence === "full") {
+    return payload; // No reduction
+  }
+
+  const fieldsToStrip = [
+    "map_image_url",
+    "map_data",
+    "geoJson",
+    "geojson",
+    "geometry",
+    "coordinates",
+    "attachments",
+    "files",
+    "images",
+    "thumbnails",
+    "description",
+    "notes",
+    "details",
+    "metadata",
+    "extra",
+  ];
+
+  const reduced = { ...payload };
+
+  if (persistence === "reduced") {
+    // Strip large fields but keep core identifiers and timestamps
+    fieldsToStrip.forEach((field) => {
+      if (field in reduced) {
+        // eslint-disable-next-line security/detect-object-injection
+        delete reduced[field];
+      }
+    });
+    // Add marker that attachments are pending
+    if (payload.attachments) {
+      reduced.attachmentsPending = true;
+    }
+  } else if (persistence === "ephemeral") {
+    // Keep only IDs, timestamps, and basic relationships
+    const coreFields = [
+      "id",
+      "world_id",
+      "user_id",
+      "owner_id",
+      "parent_id",
+      "created_at",
+      "updated_at",
+      "name",
+      "status",
+    ];
+    const ephemeral: Record<string, any> = {};
+    coreFields.forEach((field) => {
+      if (field in reduced) {
+        // eslint-disable-next-line security/detect-object-injection
+        ephemeral[field] = reduced[field];
+      }
+    });
+    return ephemeral;
+  }
+
+  return reduced;
+}
 
 /**
  * Wrapper to enqueue a mutation if offline, or execute immediately if online
@@ -33,9 +111,25 @@ import type { MutationOperation, QueuedMutation } from "./types";
  *   );
  * }
  * ```
+ * 
+ * With adaptive payload sizing (Phase 1b):
+ * ```ts
+ * // Request reduced payload on poor connections
+ * return enqueueIfOffline(
+ *   async () => supabase.from('worlds').update(data).eq('id', worldId),
+ *   {
+ *     operation: 'update',
+ *     table: 'worlds',
+ *     payload: data,
+ *     persistence: 'reduced', // Strip maps, attachments on poor connections
+ *     invalidateTags: ['worlds', `world:${worldId}`]
+ *   }
+ * );
+ * ```
  *
  * @param onlineFn Function to execute when online
  * @param mutation Mutation metadata for offline queueing
+ * @param mutation.persistence Payload reduction strategy: 'full'|'reduced'|'ephemeral' (default: 'reduced')
  * @returns Promise with result from onlineFn or queued status
  */
 export async function enqueueIfOffline<T>(
@@ -80,12 +174,29 @@ export async function enqueueIfOffline<T>(
 
 /**
  * Internal: Queue a mutation for later sync
+ * Applies payload reduction based on persistence strategy
  */
 async function queueMutation(
   mutation: Omit<QueuedMutation, "id" | "timestamp" | "retryCount">,
 ): Promise<{ queued: true; mutationId: string }> {
-  const queued = await OfflineMutationQueue.enqueue(mutation);
-  logger.category("storage").info(`Mutation queued: ${queued.id}`);
+  // Apply payload reduction if persistence strategy specified
+  const persistenceStrategy = mutation.persistence || "reduced";
+  const reducedPayload = reducePayloadByPersistence(
+    mutation.payload,
+    persistenceStrategy,
+  );
+
+  const mutationToQueue = {
+    ...mutation,
+    payload: reducedPayload,
+  };
+
+  const queued = await OfflineMutationQueue.enqueue(mutationToQueue);
+  logger.category("storage").info(`Mutation queued: ${queued.id}`, {
+    persistence: persistenceStrategy,
+    originalSize: JSON.stringify(mutation.payload).length,
+    reducedSize: JSON.stringify(reducedPayload).length,
+  });
   return { queued: true, mutationId: queued.id };
 }
 

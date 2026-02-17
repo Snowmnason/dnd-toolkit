@@ -11,6 +11,17 @@
 export type MutationOperation = "create" | "update" | "delete";
 
 /**
+ * Persistence strategy for offline mutations (Phase 1b: Adaptive Payload Sizing)
+ * 
+ * - `full`: Store complete payload (all fields, attachments, maps, details)
+ * - `reduced`: Strip large fields (attachments, maps, GeoJSON), keep core data
+ * - `ephemeral`: Minimal payload (only IDs and timestamps, for quick operations)
+ * 
+ * Default: `reduced` to respect network conditions and save storage
+ */
+export type MutationPersistence = "full" | "reduced" | "ephemeral";
+
+/**
  * A mutation queued while offline, waiting to sync when online
  *
  * Stored in SecureStorage with key: dnd:offline:mutation_queue
@@ -20,6 +31,12 @@ export type MutationOperation = "create" | "update" | "delete";
  * - payload: Redacted (stripped of tokens/PII before storage)
  * - nextAttemptAt: Scheduled retry with backoff + jitter (survives restarts)
  * - lastFailureReason: Per-entry failure tracking for observability
+ * 
+ * Phase 1b (Adaptive Payloads):
+ * - persistence: Strategy for payload reduction based on network quality
+ *   - `full`: Complete payload (no reduction)
+ *   - `reduced`: Strip attachments, maps, details (default for offline mutations)
+ *   - `ephemeral`: Only core fields (IDs, timestamps)
  */
 export interface QueuedMutation {
   /** Unique identifier for this queued mutation (UUID) */
@@ -80,6 +97,9 @@ export interface QueuedMutation {
     | "rate_limit"
     | "server"
     | "unknown";
+
+  /** Persistence strategy for payload reduction (Phase 1b: Adaptive Payloads) */
+  persistence?: MutationPersistence;
 }
 
 /**

@@ -37,6 +37,11 @@ export * from "./feature/use-feature-flags";
 // Background Jobs
 export * from "./jobs";
 
+// Network & Adaptive Payloads
+export { useAdaptivePayload } from "./network/use-adaptive-payload";
+export { useAdaptivePayloadCacheInvalidation, invalidateAdaptivePayloadCache } from "./network/useAdaptivePayloadCacheInvalidation";
+export type { UseAdaptivePayloadResult } from "./network/use-adaptive-payload";
+
 // Offline & Sync
 export * from "./offline/use-offline-queue";
 export * from "./offline/useForceResync";

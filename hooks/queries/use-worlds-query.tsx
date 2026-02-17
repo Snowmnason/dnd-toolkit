@@ -1,9 +1,14 @@
+import { useAdaptivePayloadCacheInvalidation } from '@/hooks/network/useAdaptivePayloadCacheInvalidation';
 import { useQuery } from '@/lib/cache';
 import { worldsDB } from '@/lib/database/worlds';
+import { getAdaptiveQueryParams, getQualityAwareCacheKey } from '@/lib/network/adaptive-payload-integration';
 
 /**
  * Hook for fetching worlds with SWR pattern
  * Returns both owned and member worlds for current user
+ * 
+ * Supports adaptive payload sizing based on network quality.
+ * Cache keys include quality tier (4g/3g/2g/offline) to store variants separately.
  *
  * @example
  * ```tsx
@@ -28,7 +33,25 @@ export function useWorldsQuery(options: { page?: number; limit?: number } = {}) 
   const { page, limit } = options;
   const isPaginated = page !== undefined && limit !== undefined;
 
-  const queryKey = isPaginated ? `worlds:list:${page}:${limit}` : 'worlds:list';
+  // Set up cache invalidation on network quality changes
+  // This hook watches NetworkDetection and refetches when quality changes
+  useAdaptivePayloadCacheInvalidation({
+    tagsToInvalidate: ['worlds'],
+    skipInitialCheck: true,
+  });
+
+  // Build quality-aware cache key
+  // Same worlds:list but quality tier appended (e.g., 'worlds:list:4g' vs 'worlds:list:2g')
+  const baseCacheKey = isPaginated ? `worlds:list:${page}:${limit}` : 'worlds:list';
+  const queryKey = getQualityAwareCacheKey({
+    baseCacheKey,
+    cacheTagsToInvalidate: ['worlds'],
+  });
+
+  // Get adaptive params for this quality level
+  // Note: Currently worldsDB methods don't use params, but this prepares for future API integration
+  const adaptiveParams = getAdaptiveQueryParams();
+
   const queryFn = isPaginated
     ? () => worldsDB.getMyWorldsPaginated(undefined, { page, limit })
     : async () => {

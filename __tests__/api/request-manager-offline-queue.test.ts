@@ -5,13 +5,13 @@ import { RequestManager } from "@/lib/api/request-manager";
 import { ConnectionQuality, NetworkDetection } from "@/lib/network";
 import { SecureStorage } from "@/lib/storage";
 import {
-    afterEach,
-    beforeEach,
-    describe,
-    expect,
-    it,
-    vi,
-    type MockedFunction,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockedFunction,
 } from "vitest";
 
 vi.mock("react-native", () => ({
@@ -90,6 +90,7 @@ vi.mock("@/lib/utils/logger", () => ({
 vi.mock("@/lib/network", () => ({
   NetworkDetection: {
     getStatus: vi.fn(),
+    subscribe: vi.fn(),
   },
   ConnectionQuality: {
     GOOD: "good",

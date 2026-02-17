@@ -57,6 +57,8 @@ export interface NetworkStatus {
   connectionQuality: ConnectionQuality;
   /** More accurate than isOnline (requires native package) */
   isInternetReachable?: boolean;
+  /** Effective connection type for adaptive payloads: '4g' | '3g' | '2g' | 'slow-2g' | 'offline' */
+  effectiveType?: "4g" | "3g" | "2g" | "slow-2g" | "offline";
 }
 
 /**
@@ -86,6 +88,7 @@ class NetworkDetectionClass {
     type: "unknown",
     isExpensive: false,
     connectionQuality: ConnectionQuality.GOOD,
+    effectiveType: "4g", // Default to 4g; will be updated by deriveEffectiveType() on first status change
   };
 
   private currentBattery: BatteryStatus = {
@@ -672,11 +675,58 @@ class NetworkDetectionClass {
   }
 
   /**
+   * Convert connection quality to effective network type for adaptive payloads
+   *
+   * Maps:
+   * - OFFLINE → "offline"
+   * - NO_WIFI (cellular) → "3g"
+   * - BAD (high latency) → "2g" or "slow-2g" based on severity
+   * - GOOD + wifi → "4g"
+   * - GOOD + cellular → "3g" (cellular is metered, treat as 3G)
+   */
+  private deriveEffectiveType(status: NetworkStatus): NetworkStatus["effectiveType"] {
+    if (status.connectionQuality === ConnectionQuality.OFFLINE) {
+      return "offline";
+    }
+
+    if (status.connectionQuality === ConnectionQuality.NO_WIFI) {
+      // Cellular networks are typically 3G speed; use 2g if also expensive/low battery
+      return status.isExpensive ? "2g" : "3g";
+    }
+
+    if (status.connectionQuality === ConnectionQuality.BAD) {
+      // High latency detected; use slow-2g for very poor connections, 2g for moderate
+      // Average latency from pingLatencies indicates severity
+      const avgLatency =
+        this.pingLatencies.length > 0
+          ? this.pingLatencies.reduce((a, b) => a + b, 0) /
+            this.pingLatencies.length
+          : 0;
+
+      // If latency is extreme (>1000ms), treat as slow-2g; otherwise 2g
+      const isSevere = avgLatency > 1000;
+      return isSevere ? "slow-2g" : "2g";
+    }
+
+    // GOOD connection
+    if (status.type === "cellular") {
+      // Cellular on good signal is 3G capability
+      return "3g";
+    }
+
+    // WiFi on good signal is 4G capability
+    return "4g";
+  }
+
+  /**
    * Update status and notify listeners
    */
   private updateStatus(partial: Partial<NetworkStatus>): void {
     const oldStatus = { ...this.currentStatus };
     this.currentStatus = { ...this.currentStatus, ...partial };
+
+    // Derive and include effectiveType in the updated status
+    this.currentStatus.effectiveType = this.deriveEffectiveType(this.currentStatus);
 
     // Trigger state transition if connection quality changed
     if (oldStatus.connectionQuality !== this.currentStatus.connectionQuality) {
@@ -718,6 +768,14 @@ class NetworkDetectionClass {
         from: oldStatus.isExpensive,
         to: this.currentStatus.isExpensive,
       });
+    }
+
+    if (oldStatus.effectiveType !== this.currentStatus.effectiveType) {
+      logger
+        .category("network")
+        .debug(
+          `Effective type changed (adaptive payload quality): ${oldStatus.effectiveType} -> ${this.currentStatus.effectiveType}`,
+        );
     }
 
     this.notifyListeners();

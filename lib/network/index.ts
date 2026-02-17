@@ -19,7 +19,9 @@ export type { NetworkStatus, NetworkStatusCallback } from "./network-detection";
 
 export { NetworkStateManager, VALID_TRANSITIONS } from "./state-machine";
 export type {
-  NetworkState, SpecificTransitionHook, TransitionHook
+  NetworkState,
+  SpecificTransitionHook,
+  TransitionHook
 } from "./state-machine";
 
 export {
@@ -38,4 +40,21 @@ export {
   LOW_BATTERY_THRESHOLD,
   SUPABASE_HEALTH_ENDPOINT
 } from "./network-config";
+
+export {
+  buildAdaptiveQueryParams,
+  getAdaptivePayloadOptions,
+  getCacheKeyQualityComponent
+} from "./adaptive-payload";
+
+export type {
+  AdaptivePayloadOptions,
+  PayloadQuality
+} from "./adaptive-payload";
+
+export {
+  appendAdaptiveParams,
+  getAdaptiveQueryString,
+  shouldDowngradeResource
+} from "./adaptive-payload-request";
 

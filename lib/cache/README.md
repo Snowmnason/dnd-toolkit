@@ -261,6 +261,44 @@ return (
 - `tags` (string[]) – Tags for invalidation
 - `onSuccess` ((data: T) => void) – Called on successful fetch
 - `onError` ((error: Error) => void) – Called on fetch error
+- `cachePriority` (string) – Cache priority strategy (default: 'balanced'):
+  - `'balanced'`: Use cache if available; revalidate in background if stale (SWR pattern)
+  - `'cacheFirst'`: Strongly prefer cache; only revalidate on explicit `refetch()` call
+  - `'networkFirst'`: Always try to fetch; use cache as fallback on network error
+  - `'offlineFirst'`: When offline, use cache even if very stale; don't force revalidation
+
+**Cache Priority Behavior:**
+
+```ts
+// Default: 'balanced' (SWR)
+const { data } = useQuery('worlds:list', fetcher);
+// Returns cached data immediately if exists
+// Revalidates in background if older than staleTime
+
+// cacheFirst: Minimal data refresh
+const { data } = useQuery('worlds:list', fetcher, {
+  cachePriority: 'cacheFirst',
+});
+// Returns cached data immediately
+// Never revalidates automatically (call refetch() manually)
+// Useful for stable, rarely-changing data
+
+// offlineFirst: Offline-aware
+const { data } = useQuery('worlds:list', fetcher, {
+  cachePriority: 'offlineFirst',
+});
+// When offline: returns cache even if stale, doesn't try network
+// When online: standard SWR behavior
+// Useful for critical features that should work offline
+
+// networkFirst: Always fresh if possible
+const { data } = useQuery('worlds:list', fetcher, {
+  cachePriority: 'networkFirst',
+});
+// Always attempts to fetch fresh data
+// Falls back to cache if network fails
+// Useful for frequently-changing data that must be current
+```
 
 ---
 

@@ -47,6 +47,13 @@ vi.mock("@/lib/network/network-detection", () => ({
     getStatus: vi.fn(() => ({ isOnline: true })),
     subscribe: vi.fn(() => () => {}), // Return unsubscribe function
   },
+  // Provide ConnectionQuality constants used by tests
+  ConnectionQuality: {
+    GOOD: "good",
+    BAD: "bad",
+    NO_WIFI: "no-wifi",
+    OFFLINE: "offline",
+  },
 }));
 
 // Mock logger
