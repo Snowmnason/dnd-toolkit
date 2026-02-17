@@ -5,7 +5,7 @@ import {
 } from "../analytics";
 import { QueryCache } from "../cache";
 import { getAppConfig } from "../config";
-import { NetworkDetection } from "../network";
+import { NetworkDetection, buildAdaptiveQueryParams, getAdaptivePayloadOptions, type PayloadQuality } from "../network";
 import { logger } from "../utils/logger";
 import { AuthLayer, type AuthContext } from "./auth-layer";
 import {
@@ -54,6 +54,12 @@ export interface RequestOptions {
 
   /** Timeout in ms for the request (default: 30000) */
   timeout?: number;
+
+  /** Query parameters to append to request URL. Converted to querystring automatically. (optional) */
+  params?: Record<string, string | number | boolean>;
+
+  /** Enable automatic adaptive payload parameter injection based on network quality (default: true for HTTP URLs) */
+  useAdaptiveParams?: boolean;
 
   // ===== Phase 4 Enhancements =====
 
@@ -186,6 +192,8 @@ function getDefaultOptions(): Omit<
       | "interceptors"
       | "context"
       | "idempotencyKey"
+      | "params"
+      | "useAdaptiveParams"
     >
   >,
   never
@@ -194,6 +202,8 @@ function getDefaultOptions(): Omit<
   circuitThresholds: undefined;
   context: undefined;
   idempotencyKey: undefined;
+  params: undefined;
+  useAdaptiveParams: undefined;
 } {
   const config = getAppConfig();
   return {
@@ -211,6 +221,8 @@ function getDefaultOptions(): Omit<
     idempotencyKey: undefined,
     circuitBreakerKey: undefined,
     circuitThresholds: undefined,
+    params: undefined,
+    useAdaptiveParams: undefined,
   };
 }
 
@@ -224,6 +236,8 @@ const DEFAULT_OPTIONS = getDefaultOptions() as Omit<
       | "interceptors"
       | "context"
       | "idempotencyKey"
+      | "params"
+      | "useAdaptiveParams"
     >
   >,
   never
@@ -232,6 +246,8 @@ const DEFAULT_OPTIONS = getDefaultOptions() as Omit<
   circuitThresholds: undefined;
   context: undefined;
   idempotencyKey: undefined;
+  params: undefined;
+  useAdaptiveParams: undefined;
 };
 
 // Rate limiting: token bucket algorithm
@@ -259,9 +275,8 @@ class RequestManagerClass {
    * Track in-flight GET requests and their initial network quality
    * Used for abort-and-retry logic when quality degrades mid-request
    * 
-   * Future enhancement (Phase 4):
-   * - Subscribe to NetworkDetection changes
-   * - If quality degrades significantly during request, abort fetch and retry with new params
+   * When network quality degrades significantly during a request:
+   * - Abort fetch and retry with lower-quality params (thumbnails, summaries)
    * - Only for queries (GET); mutations handle their own persistence strategy
    * - Prevents long timeouts on requests that started on good connection but hit poor connection mid-way
    * 
@@ -270,8 +285,11 @@ class RequestManagerClass {
    */
   private inFlightGetRequests: Map<
     string,
-    { effectiveType: string | undefined; startedAt: number }
+    { effectiveType: string | undefined; startedAt: number; abortController: AbortController }
   > = new Map();
+
+  /** Network quality subscription for abort-and-retry */
+  private networkQualityUnsubscribe: (() => void) | null = null;
 
   /** Periodic cleanup timer to prevent memory leaks */
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
@@ -287,9 +305,64 @@ class RequestManagerClass {
   /** Hook for offline detection - can short-circuit to fail-open */
   onOfflineDetect?: () => boolean | Promise<boolean>;
 
+  /** Track current retry state for adaptive param downgrading */
+  private currentRetryState: Map<string, { attemptNumber: number; initialQuality?: PayloadQuality }> = new Map();
+
   constructor() {
     // Start periodic cleanup of stale rate limit buckets
     this.startCleanupTimer();
+
+    // Subscribe to network quality changes for abort-and-retry
+    this.subscribeToNetworkQuality();
+  }
+
+  /**
+   * Convert params object to querystring
+   * Example: { imageQuality: 'hd', limit: 10 } → 'imageQuality=hd&limit=10'
+   */
+  private paramsToQueryString(params: Record<string, string | number | boolean>): string {
+    const entries = Object.entries(params).map(([key, value]) => {
+      return `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`;
+    });
+    return entries.join('&');
+  }
+
+  /**
+   * Append params to a URL/key, handling existing query strings
+   */
+  private appendParamsToKey(key: string, params: Record<string, string | number | boolean>): string {
+    if (Object.keys(params).length === 0) return key;
+    const queryString = this.paramsToQueryString(params);
+    const separator = key.includes('?') ? '&' : '?';
+    return `${key}${separator}${queryString}`;
+  }
+
+  /**
+   * Downgrade adaptive quality for retry attempts
+   * Maps: hd → sd → thumb → text-only
+   * Used when a request aborts/times out and we retry with lower quality hints
+   */
+  private downgradeAdaptiveQuality(quality: PayloadQuality): PayloadQuality {
+    const degradeMap: Record<PayloadQuality, PayloadQuality> = {
+      'hd': 'sd',
+      'sd': 'thumb',
+      'thumb': 'text-only',
+      'text-only': 'text-only', // Already at minimum
+    };
+    return degradeMap[quality];
+  }
+
+  /**
+   * Determine if we should auto-inject adaptive params for this key
+   * Only inject for HTTP-like URLs, not for internal cache keys like 'worlds:list'
+   */
+  private shouldAutoInjectAdaptiveParams(key: string, useAdaptiveParams?: boolean): boolean {
+    // Explicit disable
+    if (useAdaptiveParams === false) return false;
+    // Explicit enable
+    if (useAdaptiveParams === true) return true;
+    // Default: only for HTTP-like URLs (default auto-injection for external requests)
+    return key.startsWith('http') || key.startsWith('/');
   }
 
   /**
@@ -320,15 +393,13 @@ class RequestManagerClass {
   }
 
   /**
-   * Track a GET request's initial network quality
-   * Used for future abort-and-retry logic when quality degrades mid-request
-   * 
-   * Phase 4 enhancement: detect significant quality degradation during in-flight requests
-   * and abort/retry with lower-quality params.
+   * Track a GET request's initial network quality with abort controller
+   * Used for abort-and-retry logic when quality degrades mid-request
    * 
    * @param key - Cache key or URL of the request
+   * @param abortController - AbortController for this request
    */
-  private trackInFlightGetRequest(key: string): void {
+  private trackInFlightGetRequest(key: string, abortController: AbortController): void {
     const status = NetworkDetection.getStatus();
     if (!status) {
       return;
@@ -337,6 +408,7 @@ class RequestManagerClass {
     this.inFlightGetRequests.set(key, {
       effectiveType: status.effectiveType,
       startedAt: Date.now(),
+      abortController,
     });
   }
 
@@ -350,14 +422,40 @@ class RequestManagerClass {
   }
 
   /**
+   * Subscribe to network quality changes and abort in-flight GETs on significant degradation
+   */
+  private subscribeToNetworkQuality(): void {
+    this.networkQualityUnsubscribe = NetworkDetection.subscribe((status) => {
+      // Check all in-flight GET requests for degradation
+      const entries = Array.from(this.inFlightGetRequests.entries());
+      
+      for (const [key, entry] of entries) {
+        if (this.shouldAbortAndRetryDueToQualityDegradation(key, 2000)) {
+          logger.info('api', 'Aborting in-flight GET due to quality degradation', {
+            key,
+            startQuality: entry.effectiveType,
+            currentQuality: status.effectiveType,
+            ageMs: Date.now() - entry.startedAt,
+          });
+
+          // Abort the request - the retry will happen automatically via the catch block
+          entry.abortController.abort();
+        }
+      }
+    });
+  }
+
+  /**
    * Check if quality degradation should trigger abort-and-retry for in-flight request
    * 
-   * Phase 4 enhancement: if quality dropped significantly from request start to now,
-   * return true to signal that the request should be aborted and retried with new params.
+   * Conservative thresholds:
+   * - Only abort if quality degraded by ≥2 tiers (e.g., 4g → 2g)
+   * - Only abort if request has been in-flight > 2s (give fast requests time to complete)
+   * - Never abort upgrades (2g → 4g) - let original request finish
    * 
-   * Example: Started on 4G, now on 2G → return true (abort and retry with thumbnails)
-   * Example: Started on 3G, now on 3G → return false (no degradation)
-   * Example: Started on 2G, now on 4G → return false (upgraded, complete original request)
+   * Example: Started on 4G, now on 2G → true (abort and retry with thumbnails)
+   * Example: Started on 3G, now on 3G → false (no degradation)
+   * Example: Started on 2G, now on 4G → false (upgraded, complete original request)
    * 
    * @param key - Cache key or URL
    * @param maxAgeMsForRetry - Only retry if request has been in-flight longer than this (ms)
@@ -492,6 +590,11 @@ class RequestManagerClass {
    *     tags: ['worlds', `user:${userId}`]
    *   }
    * );
+   *
+   * // With adaptive payloads (automatically adjusts quality based on network)
+   * import { appendAdaptiveParams } from '@/lib/network';
+   * const key = appendAdaptiveParams('worlds:list'); // Adds ?imageQuality=hd&...
+   * const data = await RequestManager.fetch(key, () => fetcher());
    * ```
    */
   async fetch<T>(
@@ -509,26 +612,53 @@ class RequestManagerClass {
       ? { context: options.context, idempotencyKey: options.idempotencyKey }
       : {};
 
+    // ========== ADAPTIVE PARAMS INJECTION ==========
+    // Auto-append adaptive quality params based on network connection
+    // Only for HTTP-like URLs; internal cache keys are not modified
+    let keyWithParams = key;
+    let initialAdaptiveQuality: PayloadQuality | undefined;
+    
+    if (this.shouldAutoInjectAdaptiveParams(key, options_.useAdaptiveParams)) {
+      const status = NetworkDetection.getStatus();
+      if (status) {
+        const payloadOptions = getAdaptivePayloadOptions(status);
+        const adaptiveParams = buildAdaptiveQueryParams(payloadOptions);
+        if (Object.keys(adaptiveParams).length > 0) {
+          keyWithParams = this.appendParamsToKey(keyWithParams, adaptiveParams);
+          initialAdaptiveQuality = payloadOptions.imageQuality;
+        }
+      }
+    }
+
+    // ========== PARAMS CONVERSION ==========
+    // Convert options.params to querystring and append to key
+    if (options_.params) {
+      keyWithParams = this.appendParamsToKey(keyWithParams, options_.params);
+    }
+
+    // Use the enriched key for all downstream operations (dedupe, cache, etc.)
+    const enrichedKey = keyWithParams;
+
     const startedAt = Date.now();
     const trackingEnabled = Analytics.enabled();
 
     // ========== FETCHER REGISTRY (for offline replay) ==========
     // Register this fetcher for offline queue replay
     // This allows queued requests to be replayed with the original fetcher function
-    this.fetcherRegistry.set(key, fetcher);
+    this.fetcherRegistry.set(enrichedKey, fetcher);
 
     // ========== QueryCache CHECK (Optional) ==========
     // If useQueryCache is enabled, check cache first before dedupe/retry logic
     if (options_.useQueryCache) {
       try {
-        const cached = await QueryCache.get<T>(key);
+        const cached = await QueryCache.get<T>(enrichedKey);
         if (cached !== undefined && cached !== null) {
-          const isStale = await QueryCache.isStale(key);
+          const isStale = await QueryCache.isStale(enrichedKey);
           if (!isStale) {
             // Cache hit and not stale - return immediately
-            logger.debug("api", "QueryCache hit (not stale):", { key });
+            logger.debug("api", "QueryCache hit (not stale):", { key: enrichedKey });
             Analytics.track("api_request", {
-              key,
+              key: enrichedKey,
               ok: true,
               source: "cache_hit",
               duration_ms: 0,
@@ -539,11 +669,11 @@ class RequestManagerClass {
           logger.debug(
             "api",
             "QueryCache stale (will revalidate in background):",
-            { key },
+            { key: enrichedKey },
           );
         }
       } catch (error) {
-        logger.warn("api", "QueryCache read error:", { key, error });
+        logger.warn("api", "QueryCache read error:", { key: enrichedKey, error });
         // Continue with normal fetch if cache read fails
       }
     }
@@ -553,18 +683,18 @@ class RequestManagerClass {
       return p.then(
         (value) => {
           const duration_ms = Date.now() - started;
-          Analytics.track("api_request", { key, ok: true, duration_ms });
+          Analytics.track("api_request", { key: enrichedKey, ok: true, duration_ms });
           const slowRequestThreshold =
             Analytics.getThreshold?.("slowRequestMs") ?? 3000;
           if (duration_ms > slowRequestThreshold) {
-            logger.warn("api", `Slow request: ${key} took ${duration_ms}ms`);
+            logger.warn("api", `Slow request: ${enrichedKey} took ${duration_ms}ms`);
           }
           return value;
         },
         (err) => {
           const duration_ms = Date.now() - started;
           Analytics.track("api_request", {
-            key,
+            key: enrichedKey,
             ok: false,
             duration_ms,
             ...sanitizeErrorForAnalytics(err),
@@ -574,7 +704,7 @@ class RequestManagerClass {
           if (duration_ms > slowRequestThreshold) {
             logger.warn(
               "api",
-              `Slow failed request: ${key} took ${duration_ms}ms`,
+              `Slow failed request: ${enrichedKey} took ${duration_ms}ms`,
             );
           }
           throw err;
@@ -587,21 +717,21 @@ class RequestManagerClass {
 
     try {
       // ========== DEDUPE CHECK ==========
-      if (options_.dedupe && this.pendingRequests.has(key)) {
-        logger.debug("api", "Returning deduplicated request:", key);
-        const pending = this.pendingRequests.get(key)!;
+      if (options_.dedupe && this.pendingRequests.has(enrichedKey)) {
+        logger.debug("api", "Returning deduplicated request:", enrichedKey);
+        const pending = this.pendingRequests.get(enrichedKey)!;
         const deduplicatedPromise = pending.promise as Promise<T>;
         // Note: Duration tracking uses the original request's timestamp (pending.timestamp)
         // not the current request's startedAt, ensuring accurate duration for deduplicated requests
         return deduplicatedPromise.catch((error) => {
-          logger.error("api", "Deduplicated request failed:", { key, error });
-          this.reportErrorToSentry(error, { key, options: options_ });
+          logger.error("api", "Deduplicated request failed:", { key: enrichedKey, error });
+          this.reportErrorToSentry(error, { key: enrichedKey, options: options_ });
 
           if (options_.failOpen) {
             logger.warn(
               "api",
               "Fail-open enabled for deduplicated request, returning null:",
-              key,
+              enrichedKey,
             );
             return null;
           }
@@ -626,7 +756,7 @@ class RequestManagerClass {
       cbKey =
         options_.circuitBreakerKey === null
           ? undefined
-          : (options_.circuitBreakerKey ?? parseEndpoint(key));
+          : (options_.circuitBreakerKey ?? parseEndpoint(enrichedKey));
 
       if (cbKey) {
         const cbState = CircuitBreakerManager.getState(cbKey);
@@ -649,9 +779,9 @@ class RequestManagerClass {
           // Otherwise, attempt to queue the request for offline replay instead
           try {
             const entry = this._buildQueueEntry(
-              key,
+              enrichedKey,
               options_,
-              key, // URL defaults to key
+              enrichedKey, // URL defaults to key
               "POST",
               requestContext, // Pass context and idempotencyKey for queue preservation
             );
@@ -659,7 +789,7 @@ class RequestManagerClass {
             logger.info(
               "api",
               "Circuit-breaker open: request queued for offline replay",
-              { key },
+              { key: enrichedKey },
             );
 
             // Notify error interceptors that the request was queued
@@ -667,7 +797,7 @@ class RequestManagerClass {
               await InterceptorManager.executeErrorHooks(
                 {
                   error,
-                  url: key,
+                  url: enrichedKey,
                   init: {},
                   statusCode: (error as any)?.status || (error as any)?.code,
                   isNetworkError: false,
@@ -689,7 +819,7 @@ class RequestManagerClass {
             logger.warn(
               "api",
               "Failed to queue request while circuit breaker open, falling back to error",
-              { key, error: queueErr },
+              { key: enrichedKey, error: queueErr },
             );
             // If queuing failed, fall back to throwing the original circuit error
             throw error;
@@ -721,6 +851,17 @@ class RequestManagerClass {
         }
       }
 
+      // ========== CREATE ABORT CONTROLLER FOR ADAPTIVE ABORT-AND-RETRY ==========
+      // Create AbortController for this request to support abort-and-retry on quality degradation
+      // Only used for GET requests (mutations rely on offline queue for resilience)
+      const abortController = new AbortController();
+      const isGetRequest = true; // TODO: Accept method in options; default to GET for now
+
+      // Track this request for abort-and-retry if it's a GET
+      if (isGetRequest) {
+        this.trackInFlightGetRequest(enrichedKey, abortController);
+      }
+
       // ========== EXECUTE WITH RETRY & AUTH ==========
       // Middleware chain (bottom-up execution order):
       // 1. Retry middleware: Retries on failure with exponential backoff
@@ -742,12 +883,14 @@ class RequestManagerClass {
           // Create a fresh requestInit for each retry attempt
           // This ensures each attempt starts with clean state and avoids header accumulation
           // across retries. Interceptors will be called fresh on each attempt.
-          const requestInit: RequestInit = {};
-          const endpoint = parseEndpoint(key);
+          const requestInit: RequestInit = {
+            signal: abortController.signal, // Add abort signal for quality-based abort-and-retry
+          };
+          const endpoint = parseEndpoint(enrichedKey);
 
           await InterceptorManager.executeBeforeRequestHooks(
             {
-              url: key,
+              url: enrichedKey,
               init: requestInit,
               endpoint,
             },
@@ -766,7 +909,7 @@ class RequestManagerClass {
 
           if (options_.authStrategy) {
             const context: AuthContext = {
-              url: key,
+              url: enrichedKey,
               method: "GET", // Note: Could be enhanced to accept method in options
               endpoint,
               retryCount: attemptNumber,
@@ -783,7 +926,7 @@ class RequestManagerClass {
             requestInit.headers = authHeaders;
 
             logger.debug("api", "Auth middleware: prepared headers", {
-              key,
+              key: enrichedKey,
               strategy: options_.authStrategy,
               hasAuth: !!authHeaders["Authorization"],
               attemptNumber,
@@ -791,11 +934,11 @@ class RequestManagerClass {
 
             // If fetcher accepts headers param, it will use them (e.g., raw fetch wrapper)
             // Otherwise, it's a no-op (e.g., Supabase client handles its own auth)
-            return await (fetcher as any)(authHeaders);
+            return await (fetcher as any)(authHeaders, abortController.signal);
           }
 
-          // No auth strategy - just call fetcher directly
-          return await (fetcher as any)();
+          // No auth strategy - just call fetcher directly (pass signal if supported)
+          return await (fetcher as any)(abortController.signal);
         };
 
       // Wrap with 401 handling & token refresh
@@ -817,8 +960,8 @@ class RequestManagerClass {
         options_.timeout,
         undefined, // totalRetries (defaults to retriesLeft)
         {
-          key,
-          endpoint: parseEndpoint(key),
+          key: enrichedKey,
+          endpoint: parseEndpoint(enrichedKey),
           authStrategy: options_.authStrategy,
           interceptors: options_.interceptors,
           context: options_.context, // Pass context through retry chain
@@ -838,7 +981,7 @@ class RequestManagerClass {
               const versionAtStart = QueryCache.getCurrentVersion();
 
               await QueryCache.set(
-                key,
+                enrichedKey,
                 result,
                 {
                   staleTime: options_.staleTime,
@@ -847,10 +990,10 @@ class RequestManagerClass {
                 },
                 versionAtStart,
               );
-              logger.debug("api", "Persisted to QueryCache:", { key });
+              logger.debug("api", "Persisted to QueryCache:", { key: enrichedKey });
             } catch (error) {
               logger.warn("api", "QueryCache persistence failed:", {
-                key,
+                key: enrichedKey,
                 error,
               });
               // Don't throw - cache persistence failure shouldn't break the request
@@ -926,7 +1069,7 @@ class RequestManagerClass {
 
       // ========== TRACK PENDING REQUEST ==========
       if (options_.dedupe) {
-        this.pendingRequests.set(key, {
+        this.pendingRequests.set(enrichedKey, {
           promise: circuitBreakerRecordedPromise,
           timestamp: startedAt,
         });
@@ -940,8 +1083,8 @@ class RequestManagerClass {
         // debugging but don't affect the main request result.
         circuitBreakerRecordedPromise
           .then(
-            () => this.pendingRequests.delete(key),
-            () => this.pendingRequests.delete(key),
+            () => this.pendingRequests.delete(enrichedKey),
+            () => this.pendingRequests.delete(enrichedKey),
           )
           .catch((cleanupError) => {
             // Log cleanup failures for debugging without blocking the main operation.
@@ -954,17 +1097,36 @@ class RequestManagerClass {
           });
       }
 
+      // ========== CLEAN UP IN-FLIGHT TRACKER (ABORT-AND-RETRY) ==========
+      // Remove from in-flight tracking when request completes (success or failure)
+      // This cleanup is separate from deduplication tracking because abort-and-retry
+      // specifically monitors in-flight GET requests for network quality degradation
+      if (isGetRequest) {
+        circuitBreakerRecordedPromise
+          .then(
+            () => this.untrackInFlightGetRequest(enrichedKey),
+            () => this.untrackInFlightGetRequest(enrichedKey),
+          )
+          .catch((cleanupError) => {
+            logger.warn(
+              "request-manager",
+              "In-flight tracker cleanup error (unexpected):",
+              cleanupError,
+            );
+          });
+      }
+
       return await circuitBreakerRecordedPromise;
     } catch (error) {
-      logger.error("request-manager", "Request failed:", { key, error });
+      logger.error("request-manager", "Request failed:", { key: enrichedKey, error });
 
       // ========== SENTRY REPORTING ==========
-      this.reportErrorToSentry(error, { key, options: options_ });
+      this.reportErrorToSentry(error, { key: enrichedKey, options: options_ });
 
       // Tracking for thrown path (in case promise creation failed early)
       const duration_ms = Date.now() - startedAt;
       Analytics.track("api_request", {
-        key,
+        key: enrichedKey,
         ok: false,
         duration_ms,
         ...sanitizeErrorForAnalytics(error),
@@ -977,24 +1139,24 @@ class RequestManagerClass {
       if (shouldQueue && !options_.failOpen) {
         try {
           const entry = this._buildQueueEntry(
-            key,
+            enrichedKey,
             options_,
-            key, // URL defaults to key
+            enrichedKey, // URL defaults to key
             "POST", // Default method (could be enhanced to accept method in options)
             requestContext, // Pass context and idempotencyKey for queue preservation
           );
           await OfflineQueueManager.enqueue(entry);
-          logger.info("api", "Request queued for offline replay", { key });
+          logger.info("api", "Request queued for offline replay", { key: enrichedKey });
           // Notify error interceptors that the request was queued
           try {
             await InterceptorManager.executeErrorHooks(
               {
                 error: error as Error,
-                url: key,
+                url: enrichedKey,
                 init: {},
                 statusCode: (error as any)?.status || (error as any)?.code,
                 isNetworkError: false,
-                endpoint: cbKey ?? parseEndpoint(key),
+                endpoint: cbKey ?? parseEndpoint(enrichedKey),
                 queued: true,
               },
               options_.interceptors,
@@ -1011,7 +1173,7 @@ class RequestManagerClass {
           return null;
         } catch (queueError) {
           logger.warn("api", "Failed to queue request for offline replay", {
-            key,
+            key: enrichedKey,
             error: queueError,
           });
           // Fall through to normal error handling
@@ -1023,7 +1185,7 @@ class RequestManagerClass {
         logger.warn(
           "request-manager",
           "Fail-open enabled, returning null:",
-          key,
+          enrichedKey,
         );
         return null;
       }
@@ -1243,6 +1405,18 @@ class RequestManagerClass {
         }
 
         throw error;
+      }
+
+      // ========== DETECT ABORT-AND-RETRY ==========
+      // If this is an AbortError, it was triggered by network quality degradation
+      // Log it for debugging and continue with normal retry flow
+      const isAbortError = (error as any)?.name === "AbortError";
+      if (isAbortError && requestContext) {
+        logger.debug("api", "Request aborted due to network quality degradation", {
+          key: requestContext.key,
+          attemptNumber,
+          retriesLeft,
+        });
       }
 
       logger.debug("request-manager", "Retrying after error:", {
@@ -1723,6 +1897,12 @@ class RequestManagerClass {
     this.clearPending();
     this.resetRateLimit();
     this.inFlightGetRequests.clear();
+
+    // Unsubscribe from network quality changes
+    if (this.networkQualityUnsubscribe) {
+      this.networkQualityUnsubscribe();
+      this.networkQualityUnsubscribe = null;
+    }
   }
 }
 

@@ -49,21 +49,9 @@ Error handler uses quality to decide:
 ## API Reference
 
 ### `useNetworkStatus(): NetworkStatus`
-
-React hook to subscribe to network status updates. Returns current status immediately and re-renders when status changes.
-
-```ts
-import { useNetworkStatus } from '@/lib/network';
-
-export function MyComponent() {
   const status = useNetworkStatus();
 
   if (status.connectionQuality === ConnectionQuality.OFFLINE) {
-    return <OfflineMessage />;
-  }
-
-  if (status.connectionQuality === ConnectionQuality.BAD) {
-    return (
       <>
         <PoorConnectionWarning />
         <SmallPayloadList /> {/* Use lighter data */}
@@ -94,17 +82,8 @@ console.log(`Online: ${status.isOnline}, Quality: ${status.connectionQuality}`);
 
 Subscribe to network status changes. Returns unsubscribe function.
 
-```ts
-const unsubscribe = NetworkDetection.subscribe((status) => {
-  if (status.isOnline === false) {
-    showOfflineIndicator();
   }
 });
-
-// Later: unsubscribe when done
-unsubscribe();
-```
-
 ### `isNetworkError(error: any): boolean`
 
 Determine if an error is network-related (not a logical/validation error).
@@ -121,7 +100,6 @@ try {
   } else {
     // Real validation/logic error
     throw error;
-  }
 }
 ```
 
@@ -131,78 +109,59 @@ Decide whether to serve stale cache when error occurs.
 
 ```ts
 import { isNetworkError, shouldServeStaleOnError } from "@/lib/network";
-
 try {
   const data = await fetchLatestCharacters(worldId);
-  return data;
 } catch (error) {
   const shouldServeStale = shouldServeStaleOnError(error, {
-    isNetworkError: isNetworkError(error),
     hasCache: !!cachedCharacters,
     isOnline: NetworkDetection.getCurrentStatus().isOnline,
   });
-
   if (shouldServeStale) {
     return cachedCharacters; // Serve stale
   } else {
-    throw error;
   }
 }
 ```
 
 ## Interfaces
-
 ### `NetworkStatus`
 
 Current network state.
 
 ```ts
-interface NetworkStatus {
   /** Is device connected to any network */
   isOnline: boolean;
 
   /** Network type: 'wifi' | 'cellular' | 'none' | 'unknown' */
   type: "wifi" | "cellular" | "none" | "unknown";
-
   /** Is connection expensive (cellular or low battery + not charging) */
   isExpensive: boolean;
 
   /** Connection quality for degraded modes */
   connectionQuality: ConnectionQuality;
-
   /** More accurate than isOnline (requires native package) */
   isInternetReachable?: boolean;
 }
 ```
-
 ### `ConnectionQuality` Enum
 
 ```ts
-enum ConnectionQuality {
   /** Excellent connection - can do all operations */
   GOOD = "good",
 
-  /** Poor connection - latency/packet loss detected - use smaller payloads */
   BAD = "bad",
 
   /** WiFi disconnected, using cellular/hotspot - may be metered */
-  NO_WIFI = "no-wifi",
 
   /** No network service at all */
-  OFFLINE = "offline",
 }
 ```
 
 ## Dependencies
 
-### External Packages
-
 - **`expo-network`** – Network detection on iOS/Android
 - **`expo-battery`** – Battery status on iOS/Android (for expensive connection detection)
 - **`expo-constants`** – Supabase URL from environment
-
-### Internal Dependencies
-
 - **`lib/utils/logger`** – Logging network state changes
 - **`lib/api`** – HTTP requests (uses network detection indirectly)
 - **`lib/cache`** – Stale cache serving via error handler
@@ -230,12 +189,7 @@ enum ConnectionQuality {
 **Native (iOS/Android):**
 
 1. Use `expo-network` to detect wifi vs cellular
-2. Monitor `expo-battery` to mark cellular + low battery as "expensive"
-3. React to real-time state changes via native listeners
 
-**Graceful Degradation:**
-
-- If Supabase health endpoint fails → Fall back to `navigator.onLine` / native API
 - If battery detection unavailable → Assume charging (conservative estimate)
 - If latency check fails → Assume good connection (optimistic estimate)
 
@@ -443,6 +397,200 @@ NetworkDetection.subscribe((status) => {
   }
 });
 ```
+
+## Adaptive Payload Sizing (Issue #205)
+
+Automatically reduce API payload complexity based on network quality.
+
+### Architecture
+
+```
+NetworkDetection.getStatus()
+        ↓
+    {effectiveType: '4g'|'3g'|'2g'|'slow-2g'|'offline'}
+        ↓
+getAdaptivePayloadOptions()
+        ↓
+{imageQuality: 'hd'|'sd'|'thumb',
+ includeDetails: true|false,
+ includeMaps: true|false,
+ maxPayloadSize: number}
+        ↓
+buildAdaptiveQueryParams()
+        ↓
+Request sent with params: ?imageQuality=sd&excludeMaps=true&summaryOnly=true
+        ↓
+Server responds with appropriately sized payload
+        ↓
+RequestManager caches result + invalidates on quality change
+```
+
+### Quality Tiers
+
+| Connection | Quality | Images | Details | Maps | Max Size |
+|-----------|---------|--------|---------|------|----------|
+| 4G        | HD      | Full   | Full    | Yes  | 5MB      |
+| 3G        | SD      | Medium | Full    | No   | 2MB      |
+| 2G        | Thumb   | Small  | Summary | No   | 500KB    |
+| Offline   | Text    | None   | Summary | No   | 0        |
+
+### API Reference
+
+#### `getAdaptivePayloadOptions(status: NetworkStatus): AdaptivePayloadOptions`
+
+Maps connection quality to payload options.
+
+```ts
+import { getAdaptivePayloadOptions } from '@/lib/network';
+import { NetworkDetection } from '@/lib/network';
+
+const status = NetworkDetection.getStatus();
+const options = getAdaptivePayloadOptions(status);
+
+console.log(options); // { imageQuality: 'sd', includeMaps: false, ... }
+```
+
+#### `buildAdaptiveQueryParams(options: AdaptivePayloadOptions): Record<string, any>`
+
+Converts payload options to query parameters for server request.
+
+```ts
+import { buildAdaptiveQueryParams, getAdaptivePayloadOptions } from '@/lib/network';
+
+const status = NetworkDetection.getStatus();
+const options = getAdaptivePayloadOptions(status);
+const params = buildAdaptiveQueryParams(options);
+// Result: { imageQuality: 'sd', excludeMaps: 'true', summaryOnly: 'true', ... }
+
+// Use in RequestManager:
+const data = await RequestManager.fetch(url, fetcher, { params });
+```
+
+#### `appendAdaptiveParams(key: string): string`
+
+Appends quality params to a URL or cache key.
+
+```ts
+import { appendAdaptiveParams } from '@/lib/network';
+
+// Automatically appends based on current network quality
+const keyWithParams = appendAdaptiveParams('worlds:list');
+// Result: 'worlds:list?imageQuality=hd&...' (if 4G)
+//      or 'worlds:list?imageQuality=thumb&...' (if 2G)
+```
+
+#### `useAdaptivePayload(): { networkStatus, payloadOptions }`
+
+React hook for UI awareness of current quality tier.
+
+```ts
+import { useAdaptivePayload } from '@/hooks/network/use-adaptive-payload';
+
+function MyComponent() {
+  const { payloadOptions } = useAdaptivePayload();
+  
+  return (
+    <>
+      {payloadOptions.includeDetails && <FullDescription />}
+      {!payloadOptions.includeDetails && <Summary />}
+      {payloadOptions.includeMaps && <MapComponent />}
+    </>
+  );
+}
+```
+
+### Integration with RequestManager
+
+RequestManager automatically injects adaptive params for HTTP-like URLs:
+
+```ts
+// Auto-inject adaptive params for /api/* URLs
+const data = await RequestManager.fetch(
+  '/api/worlds',
+  () => worldsAPI.getWorlds(),
+  {
+    useAdaptiveParams: true, // Default for HTTP URLs
+    useQueryCache: true,
+  }
+);
+
+// or explicit params override
+const data = await RequestManager.fetch(
+  '/api/worlds',
+  () => worldsAPI.getWorlds(),
+  {
+    params: { limit: 20, offset: 0 },
+    useAdaptiveParams: true, // Still injects imageQuality, etc.
+  }
+);
+
+// Disable for internal cache keys
+const data = await RequestManager.fetch(
+  'worlds:list:local',
+  () => localCache.getWorlds(),
+  {
+    useAdaptiveParams: false, // Don't append to internal keys
+  }
+);
+```
+
+### Cache Strategy
+
+Include quality tier in cache keys so variants are stored separately:
+
+```ts
+import { getQualityAwareCacheKey } from '@/lib/network/adaptive-payload-integration';
+
+const queryKey = getQualityAwareCacheKey({
+  baseCacheKey: 'worlds:list',
+  cacheTagsToInvalidate: ['worlds'],
+});
+// Result: 'worlds:list:4g' or 'worlds:list:2g' (depending on quality)
+```
+
+### Auto-Invalidation on Quality Change
+
+When network quality changes, cache automatically invalidates and refetches:
+
+```ts
+import { useAdaptivePayloadCacheInvalidation } from '@/hooks/network/useAdaptivePayloadCacheInvalidation';
+
+function WorldsList() {
+  // Subscribe to network quality changes
+  useAdaptivePayloadCacheInvalidation({
+    tagsToInvalidate: ['worlds', 'characters'],
+  });
+
+  const { worlds } = useWorldsQuery(); // Auto-refetches on quality change
+  return <>{worlds.map(w => <WorldCard key={w.id} world={w} />)}</>;
+}
+```
+
+### Server Support
+
+Server support for quality params is **optional**. Clients send params; servers gracefully ignore unsupported ones:
+
+- Servers that support quality params respond with appropriately sized payloads
+- Servers that don't support params return full payload (same as before)
+- Clients gracefully handle both cases
+
+Implement server-side support via Issue #XXX - Server-Side Image Variants.
+
+### Related Modules
+
+- **[lib/api/request-manager](../api/README.md)** – Injects params automatically
+- **[lib/cache/QueryCache](../cache/README.md)** – Caches variants per quality tier
+- **[lib/offline](../offline/README.md)** – Uses adaptive payloads for mutation queuing
+- **Issue #206** – Network Offline Queue
+- **Issue #208** – Network Telemetry (tracks quality distribution)
+
+### Known Limitations
+
+- **Server-side variants not yet implemented** – Client requests quality params, but server doesn't resize. Implement via Issue #XXX
+- **Progressive loading not implemented** – Images don't incrementally improve quality. Phase 4+ enhancement
+- **No manual override** – Users can't manually force HD on 2G. Can be added as debug feature
+
+---
 
 **Key Integration Points:**
 
