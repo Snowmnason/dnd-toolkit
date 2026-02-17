@@ -41,11 +41,13 @@ export {
     isQueuedMutation,
     getCacheKeyPatternForMutation,
     createOptimisticUpdate,
-    rollbackOptimisticUpdate
+    rollbackOptimisticUpdate,
+    reducePayloadByPersistence
 } from "./utils";
 
 export type {
     MutationOperation,
+    MutationPersistence,
     OfflineSyncConfig,
     OfflineSyncStatus,
     QueuedMutation,

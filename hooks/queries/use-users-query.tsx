@@ -1,8 +1,13 @@
+import { useAdaptivePayloadCacheInvalidation } from '@/hooks/network/useAdaptivePayloadCacheInvalidation';
 import { useQuery } from '@/lib/cache';
 import { usersDB } from '@/lib/database/users';
+import { getQualityAwareCacheKey } from '@/lib/network/adaptive-payload-integration';
 
 /**
  * Hook for fetching current user profile with SWR pattern
+ * 
+ * Supports adaptive payload sizing based on network quality.
+ * Cache keys include quality tier (4g/3g/2g/offline) to store variants separately.
  *
  * @example
  * ```tsx
@@ -15,8 +20,19 @@ import { usersDB } from '@/lib/database/users';
  * ```
  */
 export function useCurrentUserQuery() {
+  // Set up cache invalidation on network quality changes
+  useAdaptivePayloadCacheInvalidation({
+    tagsToInvalidate: ['users'],
+    skipInitialCheck: true,
+  });
+
+  const queryKey = getQualityAwareCacheKey({
+    baseCacheKey: 'users:current',
+    cacheTagsToInvalidate: ['users'],
+  });
+
   const { data, error, isLoading, isValidating, refetch, invalidate } = useQuery(
-    'users:current',
+    queryKey,
     () => usersDB.getCurrentUser().then(user => {
       if (!user) throw new Error('Not authenticated');
       return user;
@@ -40,6 +56,8 @@ export function useCurrentUserQuery() {
 
 /**
  * Hook for fetching a specific user by ID with SWR pattern
+ * 
+ * Supports adaptive payload sizing based on network quality.
  *
  * @param userId - The user ID to fetch (null to disable query)
  * @example
@@ -48,8 +66,19 @@ export function useCurrentUserQuery() {
  * ```
  */
 export function useUserQuery(userId: string | null) {
+  // Set up cache invalidation on network quality changes
+  useAdaptivePayloadCacheInvalidation({
+    tagsToInvalidate: ['users'],
+    skipInitialCheck: true,
+  });
+
+  const queryKey = getQualityAwareCacheKey({
+    baseCacheKey: `user:${userId}`,
+    cacheTagsToInvalidate: ['users'],
+  });
+
   const { data, error, isLoading, isValidating, refetch, invalidate } = useQuery(
-    `user:${userId}`,
+    queryKey,
     userId ? () => usersDB.getCurrentUser().then(user => {
       if (!user) throw new Error('User not found');
       return user;

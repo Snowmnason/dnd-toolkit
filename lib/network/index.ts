@@ -39,3 +39,14 @@ export {
   SUPABASE_HEALTH_ENDPOINT
 } from "./network-config";
 
+export {
+  buildAdaptiveQueryParams, getAdaptivePayloadOptions, getCacheKeyQualityComponent, type AdaptivePayloadOptions,
+  type PayloadQuality
+} from "./adaptive-payload";
+
+export {
+  appendAdaptiveParams,
+  getAdaptiveQueryString,
+  shouldDowngradeResource
+} from "./adaptive-payload-request";
+

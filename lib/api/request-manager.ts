@@ -1,7 +1,7 @@
 import * as Sentry from "@sentry/react-native";
 import {
-    Analytics,
-    sanitizeError as sanitizeErrorForAnalytics,
+  Analytics,
+  sanitizeError as sanitizeErrorForAnalytics,
 } from "../analytics";
 import { QueryCache } from "../cache";
 import { getAppConfig } from "../config";
@@ -9,15 +9,15 @@ import { NetworkDetection } from "../network";
 import { logger } from "../utils/logger";
 import { AuthLayer, type AuthContext } from "./auth-layer";
 import {
-    CircuitBreakerManager,
-    CircuitBreakerOpenError,
-    DEFAULT_THRESHOLDS,
-    type CircuitThresholds,
+  CircuitBreakerManager,
+  CircuitBreakerOpenError,
+  DEFAULT_THRESHOLDS,
+  type CircuitThresholds,
 } from "./circuit-breaker";
 import {
-    InterceptorManager,
-    parseEndpoint,
-    type RequestInterceptor,
+  InterceptorManager,
+  parseEndpoint,
+  type RequestInterceptor,
 } from "./interceptor";
 import { OfflineQueueManager, type QueuedRequestEntry } from "./offline-queue";
 
@@ -255,6 +255,24 @@ class RequestManagerClass {
   /** Registry of fetcher functions for offline queue replay */
   private fetcherRegistry: Map<string, () => Promise<any>> = new Map();
 
+  /**
+   * Track in-flight GET requests and their initial network quality
+   * Used for abort-and-retry logic when quality degrades mid-request
+   * 
+   * Future enhancement (Phase 4):
+   * - Subscribe to NetworkDetection changes
+   * - If quality degrades significantly during request, abort fetch and retry with new params
+   * - Only for queries (GET); mutations handle their own persistence strategy
+   * - Prevents long timeouts on requests that started on good connection but hit poor connection mid-way
+   * 
+   * Example: User starts loading world maps on 4G, drops to 2G mid-request
+   * → Abort current fetch → Retry with thumbnail+summaries quality
+   */
+  private inFlightGetRequests: Map<
+    string,
+    { effectiveType: string | undefined; startedAt: number }
+  > = new Map();
+
   /** Periodic cleanup timer to prevent memory leaks */
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -302,6 +320,94 @@ class RequestManagerClass {
   }
 
   /**
+   * Track a GET request's initial network quality
+   * Used for future abort-and-retry logic when quality degrades mid-request
+   * 
+   * Phase 4 enhancement: detect significant quality degradation during in-flight requests
+   * and abort/retry with lower-quality params.
+   * 
+   * @param key - Cache key or URL of the request
+   */
+  private trackInFlightGetRequest(key: string): void {
+    const status = NetworkDetection.getStatus();
+    if (!status) {
+      return;
+    }
+
+    this.inFlightGetRequests.set(key, {
+      effectiveType: status.effectiveType,
+      startedAt: Date.now(),
+    });
+  }
+
+  /**
+   * Untrack a GET request after it completes
+   * 
+   * @param key - Cache key or URL of the request
+   */
+  private untrackInFlightGetRequest(key: string): void {
+    this.inFlightGetRequests.delete(key);
+  }
+
+  /**
+   * Check if quality degradation should trigger abort-and-retry for in-flight request
+   * 
+   * Phase 4 enhancement: if quality dropped significantly from request start to now,
+   * return true to signal that the request should be aborted and retried with new params.
+   * 
+   * Example: Started on 4G, now on 2G → return true (abort and retry with thumbnails)
+   * Example: Started on 3G, now on 3G → return false (no degradation)
+   * Example: Started on 2G, now on 4G → return false (upgraded, complete original request)
+   * 
+   * @param key - Cache key or URL
+   * @param maxAgeMsForRetry - Only retry if request has been in-flight longer than this (ms)
+   * @returns true if quality degraded enough to warrant abort-retry, false otherwise
+   */
+  private shouldAbortAndRetryDueToQualityDegradation(
+    key: string,
+    maxAgeMsForRetry: number = 2000, // Only retry if in-flight > 2s
+  ): boolean {
+    const inFlightRequest = this.inFlightGetRequests.get(key);
+    if (!inFlightRequest) {
+      return false;
+    }
+
+    // If request is very young, don't abort yet - give it a chance to complete
+    const age = Date.now() - inFlightRequest.startedAt;
+    if (age < maxAgeMsForRetry) {
+      return false;
+    }
+
+    const currentStatus = NetworkDetection.getStatus();
+    if (!currentStatus) {
+      return false;
+    }
+
+    // Quality rank: 4g > 3g > 2g > slow-2g > offline
+    const qualityRank: Record<string, number> = {
+      '4g': 5,
+      '3g': 4,
+      '2g': 3,
+      'slow-2g': 2,
+      'offline': 1,
+      'unknown': 3, // Treat unknown as 2g-equivalent
+    };
+
+    const startQuality = inFlightRequest.effectiveType || 'unknown';
+    const currentQuality = currentStatus.effectiveType || 'unknown';
+
+    const startRank = qualityRank[startQuality] ?? 3;
+    const currentRank = qualityRank[currentQuality] ?? 3;
+
+    // Only abort if quality degraded by at least 2 tiers (e.g., 4g → 2g)
+    // Minor degradation (4g → 3g) not worth aborting
+    const DEGRADATION_THRESHOLD = 2;
+    const degradation = startRank - currentRank;
+
+    return degradation >= DEGRADATION_THRESHOLD;
+  }
+
+  /**
    * Remove stale rate limit bucket entries that haven't been accessed
    * This prevents unbounded memory growth in long-running applications
    */
@@ -309,6 +415,7 @@ class RequestManagerClass {
     const now = Date.now();
     let removedBuckets = 0;
     let removedRequests = 0;
+    let removedInFlightRequests = 0;
 
     // Clean up stale rate limit buckets
     const bucketEntries = Array.from(this.rateLimitBuckets.entries());
@@ -333,12 +440,25 @@ class RequestManagerClass {
       }
     }
 
-    if (removedBuckets > 0 || removedRequests > 0) {
+    // Clean up stale in-flight GET request tracking (older than 30 minutes)
+    // These should normally be removed by untrackInFlightGetRequest, but cleanup handles edge cases
+    const inFlightEntries = Array.from(this.inFlightGetRequests.entries());
+    for (const [key, entry] of inFlightEntries) {
+      if (now - entry.startedAt > 30 * 60 * 1000) {
+        // 30 minutes
+        this.inFlightGetRequests.delete(key);
+        removedInFlightRequests++;
+      }
+    }
+
+    if (removedBuckets > 0 || removedRequests > 0 || removedInFlightRequests > 0) {
       logger.category("api").debug("Cleanup cycle completed", {
         buckets: removedBuckets,
         requests: removedRequests,
+        inFlightGetRequests: removedInFlightRequests,
         totalPendingNow: this.pendingRequests.size,
         totalBucketsNow: this.rateLimitBuckets.size,
+        totalInFlightNow: this.inFlightGetRequests.size,
       });
     }
   }
@@ -1602,6 +1722,7 @@ class RequestManagerClass {
     this.stopCleanupTimer();
     this.clearPending();
     this.resetRateLimit();
+    this.inFlightGetRequests.clear();
   }
 }
 
