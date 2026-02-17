@@ -63,8 +63,18 @@ export {
 export type { ConnectionType, NetworkContext } from "./helpers";
 
 export {
-  cleanupTelemetry, ConnectionQualityTier, emitHealthCheckEvent, emitQualityChangeEvent, initializeTelemetry, mapQualityTier, startHealthCheckInterval,
-  stopHealthCheckInterval
+  cleanupTelemetry,
+  ConnectionQualityTier,
+  emitHealthCheckEvent,
+  emitQualityChangeEvent,
+  initializeTelemetry,
+  mapQualityTier,
+  startHealthCheckInterval,
+  stopHealthCheckInterval,
+  ErrorType,
+  captureErrorCorrelation,
+  getAndClearErrorQueue,
+  getErrorQueue
 } from "./network-telemetry";
-export type { NetworkHealthEvent } from "./network-telemetry";
+export type { NetworkHealthEvent, ErrorCorrelationEvent } from "./network-telemetry";
 

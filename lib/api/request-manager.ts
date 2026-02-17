@@ -5,7 +5,14 @@ import {
 } from "../analytics";
 import { QueryCache } from "../cache";
 import { getAppConfig } from "../config";
-import { NetworkDetection, buildAdaptiveQueryParams, getAdaptivePayloadOptions, type PayloadQuality } from "../network";
+import {
+  buildAdaptiveQueryParams,
+  captureErrorCorrelation,
+  ErrorType,
+  getAdaptivePayloadOptions,
+  NetworkDetection,
+  type PayloadQuality,
+} from "../network";
 import { logger } from "../utils/logger";
 import { AuthLayer, type AuthContext } from "./auth-layer";
 import {
@@ -559,7 +566,9 @@ class RequestManagerClass {
     const startQuality = inFlightRequest.effectiveType || 'unknown';
     const currentQuality = currentStatus.effectiveType || 'unknown';
 
+    // eslint-disable-next-line security/detect-object-injection
     const startRank = qualityRank[startQuality] ?? 3;
+    // eslint-disable-next-line security/detect-object-injection
     const currentRank = qualityRank[currentQuality] ?? 3;
 
     // Only abort if quality degraded by at least 2 tiers (e.g., 4g → 2g)
@@ -1521,6 +1530,23 @@ class RequestManagerClass {
             requestContext.interceptors,
           );
         }
+
+        // ========== TELEMETRY: Capture error correlation ==========
+        // Capture error + network quality snapshot for Phase 1c analysis
+        const errorMsg = (error as Error)?.message || String(error);
+        let mappedErrorType = ErrorType.OTHER;
+        if (errorMsg.includes("timeout") || errorMsg.includes("AbortError")) {
+          mappedErrorType = ErrorType.TIMEOUT;
+        } else if (errorMsg.includes("DNS") || errorMsg.includes("dns")) {
+          mappedErrorType = ErrorType.DNS_FAIL;
+        } else if (errorMsg.includes("connection reset") || errorMsg.includes("ECONNRESET")) {
+          mappedErrorType = ErrorType.CONNECTION_RESET;
+        } else if (statusCode && statusCode >= 500) {
+          mappedErrorType = ErrorType.HTTP_5XX;
+        } else if (statusCode && statusCode >= 400 && statusCode < 500) {
+          mappedErrorType = ErrorType.HTTP_4XX;
+        }
+        captureErrorCorrelation(mappedErrorType, errorMsg, statusCode);
 
         throw error;
       }

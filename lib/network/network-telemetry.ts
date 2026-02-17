@@ -31,6 +31,35 @@ export enum ConnectionQualityTier {
 }
 
 /**
+ * Error type classification for telemetry correlation
+ */
+export enum ErrorType {
+  TIMEOUT = "timeout",
+  DNS_FAIL = "dns_fail",
+  CONNECTION_RESET = "connection_reset",
+  HTTP_5XX = "5xx",
+  HTTP_4XX = "4xx",
+  OTHER = "other",
+}
+
+/**
+ * Error correlation event: error + network quality snapshot
+ * Created on request/sync failure; emitted in Phase 1c with sampling
+ */
+export interface ErrorCorrelationEvent {
+  eventType: "error_correlation";
+  errorType: ErrorType | string;
+  errorCode?: number;
+  errorMessage: string;
+  currentQuality: ConnectionQualityTier;
+  isOnline: boolean;
+  connectionType?: ConnectionType;
+  latency?: number;
+  timestamp: number;
+  platform: "web" | "ios" | "android" | "desktop";
+}
+
+/**
  * Network health event emitted on quality change or periodic health check
  */
 export interface NetworkHealthEvent {
@@ -141,6 +170,7 @@ interface TelemetryState {
   healthCheckInterval: ReturnType<typeof setInterval> | null;
   qualityChangeTimestamps: number[]; // Track last 10 quality changes for flapping detection
   subscriptionUnsubscribe: (() => void) | null;
+  errorQueue: ErrorCorrelationEvent[]; // Collect error events for Phase 1c sampling & emission
 }
 
 const telemetryState: TelemetryState = {
@@ -148,6 +178,7 @@ const telemetryState: TelemetryState = {
   healthCheckInterval: null,
   qualityChangeTimestamps: [],
   subscriptionUnsubscribe: null,
+  errorQueue: [],
 };
 
 /**
@@ -200,6 +231,70 @@ export function emitHealthCheckEvent(status: NetworkStatus): void {
   telemetryState.lastQuality = currentQuality;
 
   logger.category("network").info("health_check", event);
+}
+
+/**
+ * Capture error + quality snapshot for correlation
+ * Call this when a network error occurs (timeout, DNS fail, etc.)
+ * Error is queued; Phase 1c will sample & emit based on sampling rate
+ *
+ * @param errorType - Type of error (timeout, dns_fail, connection_reset, 5xx, 4xx, other)
+ * @param errorMessage - Human-readable error message
+ * @param errorCode - Optional HTTP status code or error code
+ */
+export function captureErrorCorrelation(
+  errorType: ErrorType | string,
+  errorMessage: string,
+  errorCode?: number,
+): void {
+  const status = NetworkDetection.getStatus();
+  const ctx = composeNetworkContext(status);
+  const latency = getLatencyFromAPI();
+  const currentQuality = mapQualityTier(ctx.effectiveType, latency);
+
+  const event: ErrorCorrelationEvent = {
+    eventType: "error_correlation",
+    errorType,
+    errorCode,
+    errorMessage,
+    currentQuality,
+    isOnline: status.isOnline,
+    connectionType: ctx.connectionType,
+    latency,
+    timestamp: Date.now(),
+    platform: getPlatform(),
+  };
+
+  // Queue for Phase 1c sampling & emission
+  telemetryState.errorQueue.push(event);
+
+  logger.category("network").debug(
+    "error_correlation_captured",
+    `Error captured: ${errorType}. Queue length: ${telemetryState.errorQueue.length}`,
+  );
+}
+
+/**
+ * Get all captured error events and optionally clear the queue
+ * Used by Phase 1c to retrieve and sample error events
+ *
+ * @param clearQueue - If true, clears the error queue after retrieving
+ * @returns Array of captured error correlation events
+ */
+export function getAndClearErrorQueue(clearQueue: boolean = true): ErrorCorrelationEvent[] {
+  const events = [...telemetryState.errorQueue];
+  if (clearQueue) {
+    telemetryState.errorQueue = [];
+  }
+  return events;
+}
+
+/**
+ * Get current error queue without clearing
+ * @returns Current error queue
+ */
+export function getErrorQueue(): ErrorCorrelationEvent[] {
+  return [...telemetryState.errorQueue];
 }
 
 /**
@@ -289,5 +384,6 @@ export function cleanupTelemetry(): void {
     telemetryState.subscriptionUnsubscribe = null;
   }
   stopHealthCheckInterval();
+  telemetryState.errorQueue = [];
   logger.category("network").debug("Network telemetry cleaned up");
 }
