@@ -10,6 +10,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./"),
+      // Alias react-native to a local stub to avoid parsing native package in tests
+      "react-native": path.resolve(__dirname, "./__mocks__/react-native.ts"),
     },
   },
 });

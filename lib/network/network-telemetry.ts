@@ -10,6 +10,41 @@
  * - Detect and warn on rapid quality changes (flapping)
  * - Include platform, latency, and connection type in events
  * - Integrate with NetworkDetection subscription
+ * - Enforce privacy consent before capturing or emitting any telemetry
+ *
+ * ===== PRIVACY & PII AUDIT =====
+ * Data COLLECTED in telemetry events (intentional):
+ * - eventType: 'quality_change' | 'health_check' | 'error_correlation'
+ * - timestamp: UTC milliseconds (Date.now())
+ * - platform: 'web' | 'ios' | 'android' | 'desktop'
+ * - currentQuality: EXCELLENT | GOOD | POOR | OFFLINE
+ * - previousQuality: (quality_change only) for transition tracking
+ * - isOnline: boolean
+ * - connectionType: 'wifi' | 'cellular' | 'ethernet' | 'unknown'
+ * - isExpensive: boolean (cellular = expensive)
+ * - latency: RTT in ms (from Network Information API, omitted if unavailable)
+ * - downlink: Mbps (from Network Information API, omitted if unavailable)
+ * - rtt: RTT in ms (from Network Information API, omitted if unavailable)
+ * - userAgent: browser/app UA string (web only, optional)
+ * - errorType: (error_correlation only) timeout | dns_fail | connection_reset | 5xx | 4xx | other
+ * - errorCode: (error_correlation only) HTTP status or error code
+ * - errorMessage: (error_correlation only) human-readable error text
+ *
+ * Data NEVER collected (privacy-safe):
+ * ✗ userId / user identity
+ * ✗ email / phone / personally identifiable info (PII)
+ * ✗ geolocation / GPS coordinates
+ * ✗ app version / build number (could be identifying)
+ * ✗ device IMEI / UDID / hardware serial
+ * ✗ IP address (implicit in network, not explicit)
+ * ✗ request/response body or headers (except error classification)
+ * ✗ app-specific data or customer data
+ *
+ * Privacy Controls:
+ * - Consent gating: telemetry respects config.network.telemetry.enabled and hasPrivacyConsent()
+ * - If consent is not granted or config disabled, NO data is captured or emitted
+ * - Error queue is bounded to prevent memory exhaustion; oldest events dropped on overflow
+ * - No backend ingestion yet; Phase 1 is local logging only (Phase 2+ will add server integration)
  *
  * Sampling and privacy controls are handled in Phase 1c.
  */
@@ -135,19 +170,21 @@ function getLatencyFromAPI(): number | undefined {
 }
 
 /**
- * Sampling configuration (from appsettings or defaults)
+ * Sampling and queue configuration (from appsettings or defaults)
  */
-interface SamplingConfig {
+interface TelemetryConfig {
   healthCheckSampleRate: number; // 0-1 (10% = 0.1)
   errorCorrelationSampleRate: number; // 0-1 (50% = 0.5)
   enabled: boolean;
+  maxErrorQueueSize: number; // Max in-memory errors before dropping oldest
 }
 
 /**
- * Get sampling configuration from app settings
- * Defaults: health check 10%, error correlation 50%
+ * Get telemetry configuration from app settings
+ * Defaults: health check 10%, error correlation 50%, queue 1000 events
+ * Safe fallback ensures basic functionality even if config loading fails
  */
-function getSamplingConfig(): SamplingConfig {
+function getTelemetryConfig(): TelemetryConfig {
   try {
     const { getAppConfig } = require("@/lib/config");
     const config = getAppConfig();
@@ -156,13 +193,15 @@ function getSamplingConfig(): SamplingConfig {
       healthCheckSampleRate: telemetryConfig?.healthCheckSampleRate ?? 0.1,
       errorCorrelationSampleRate: telemetryConfig?.errorCorrelationSampleRate ?? 0.5,
       enabled: telemetryConfig?.enabled ?? true,
+      maxErrorQueueSize: telemetryConfig?.maxErrorQueueSize ?? 1000,
     };
   } catch {
-    // Fallback to defaults
+    // Safe fallback: basic telemetry enabled with conservative defaults
     return {
       healthCheckSampleRate: 0.1,
       errorCorrelationSampleRate: 0.5,
       enabled: true,
+      maxErrorQueueSize: 1000,
     };
   }
 }
@@ -183,10 +222,46 @@ function shouldSample(sampleRate: number): boolean {
  * Phase 1c: client-side consent; Phase 2+ will handle backend privacy
  * @returns true if telemetry is enabled and has consent
  */
-async function hasPrivacyConsent(): Promise<boolean> {
-  // For now, telemetry is enabled by default (Phase 1c)
-  // Phase 2 will integrate with #181 consent system
-  // Placeholder for future: check analytics consent flag
+/**
+ * Check if analytics consent is granted.
+ * Behavior:
+ * - If config.network.telemetry.enabled === false => false
+ * - If an app-provided sync consent API is exposed on `global.__CONSENT__` and
+ *   implements `hasAnalyticsConsent()` (sync) it will be used.
+ * - Otherwise returns true (legacy behavior: telemetry enabled by default).
+ *
+ * NOTE: This is intentionally synchronous to avoid changing public API of
+ * emit/capture functions. Integrate with #181 consent manager when available.
+ */
+function hasPrivacyConsent(): boolean {
+  try {
+    // Prefer explicit config toggle first
+    const { getAppConfig } = require("@/lib/config");
+    const cfg = getAppConfig?.();
+    if (cfg && cfg.network && cfg.network.telemetry === false) return false;
+    if (cfg && cfg.network && typeof cfg.network.telemetry === "object") {
+      // If telemetry.enabled is explicitly set to false, block
+      // (appsettings.json controls default behavior)
+      const enabled = (cfg.network.telemetry as any)?.enabled;
+      if (enabled === false) return false;
+    }
+
+    // Optional: allow app to provide a global consent helper
+    // Example integration: global.__CONSENT__ = { hasAnalyticsConsent: () => true }
+    // If present and implements hasAnalyticsConsent(), use it (sync)
+    const maybeConsent: any = (global as any).__CONSENT__;
+    if (maybeConsent && typeof maybeConsent.hasAnalyticsConsent === "function") {
+      try {
+        return !!maybeConsent.hasAnalyticsConsent();
+      } catch {
+        // Fall through to default
+      }
+    }
+  } catch {
+    // ignore and fall back to default
+  }
+
+  // Legacy default: telemetry enabled
   return true;
 }
 
@@ -250,6 +325,8 @@ export function emitQualityChangeEvent(
   current: ConnectionQualityTier,
   status: NetworkStatus,
 ): void {
+  // Respect privacy/consent at emission time
+  if (!hasPrivacyConsent()) return;
   const event = composeHealthEvent(status, "quality_change", previous);
 
   // Detect rapid changes (flapping): 3+ changes in 10 seconds
@@ -289,18 +366,31 @@ export function emitHealthCheckEvent(status: NetworkStatus): void {
   telemetryState.lastQuality = currentQuality;
 
   // Apply sampling: first health check is always logged (unsampled)
-  const samplingConfig = getSamplingConfig();
-  if (!samplingConfig.enabled) {
+  const telemetryConfig = getTelemetryConfig();
+  if (!telemetryConfig.enabled) {
     return; // Telemetry disabled
   }
 
+  // Respect privacy/consent at emission time
+  if (!hasPrivacyConsent()) return;
+
   const isFirstCheck = !telemetryState.firstHealthCheckEmitted;
-  const shouldEmit = isFirstCheck || shouldSample(samplingConfig.healthCheckSampleRate);
+  const shouldEmit = isFirstCheck || shouldSample(telemetryConfig.healthCheckSampleRate);
 
   if (shouldEmit) {
     logger.category("network").info("health_check", event);
     if (isFirstCheck) {
       telemetryState.firstHealthCheckEmitted = true;
+    }
+    // Drain any captured error events during health checks so we don't retain
+    // an unbounded in-memory queue. Emit sampled error events as part of health check.
+    try {
+      const events = getAndClearErrorQueue(true);
+      if (events.length > 0) {
+        emitSampledErrorEvents(events);
+      }
+    } catch (err) {
+      logger.category("network").debug("error_drain_failed", String(err));
     }
   }
 }
@@ -319,6 +409,9 @@ export function captureErrorCorrelation(
   errorMessage: string,
   errorCode?: number,
 ): void {
+  // Respect privacy/consent: do not capture if user has not consented
+  if (!hasPrivacyConsent()) return;
+
   const status = NetworkDetection.getStatus();
   const ctx = composeNetworkContext(status);
   const latency = getLatencyFromAPI();
@@ -338,7 +431,15 @@ export function captureErrorCorrelation(
   };
 
   // Queue for Phase 1c sampling & emission
-  telemetryState.errorQueue.push(event);
+  // Enforce max queue size (from config) to avoid unbounded memory growth
+  const telemetryConfig = getTelemetryConfig();
+  if (telemetryState.errorQueue.length >= telemetryConfig.maxErrorQueueSize) {
+    // Drop the oldest event to make room for new events
+    telemetryState.errorQueue.shift();
+    telemetryState.errorQueue.push(event);
+  } else {
+    telemetryState.errorQueue.push(event);
+  }
 
   logger.category("network").debug(
     "error_correlation_captured",
@@ -369,13 +470,13 @@ export function getAndClearErrorQueue(clearQueue: boolean = true): ErrorCorrelat
  * @param events - Error events to emit (typically from getAndClearErrorQueue)
  */
 export function emitSampledErrorEvents(events: ErrorCorrelationEvent[]): void {
-  const samplingConfig = getSamplingConfig();
-  if (!samplingConfig.enabled) {
+  const telemetryConfig = getTelemetryConfig();
+  if (!telemetryConfig.enabled) {
     return; // Telemetry disabled
   }
 
   for (const event of events) {
-    if (shouldSample(samplingConfig.errorCorrelationSampleRate)) {
+    if (shouldSample(telemetryConfig.errorCorrelationSampleRate)) {
       logger.category("network").info("error_correlation", event);
     }
   }
