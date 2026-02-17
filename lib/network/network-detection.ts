@@ -15,15 +15,15 @@
  */
 
 import {
-  LATENCY_THRESHOLD,
-  LOW_BATTERY_THRESHOLD,
-  getSupabaseHealthEndpoint,
-  getWebPingInterval,
-  getWebPingTimeout,
+    LATENCY_THRESHOLD,
+    LOW_BATTERY_THRESHOLD,
+    getSupabaseHealthEndpoint,
+    getWebPingInterval,
+    getWebPingTimeout,
 } from "@/lib/network/network-config";
 import {
-  NetworkStateManager,
-  type NetworkState,
+    NetworkStateManager,
+    type NetworkState,
 } from "@/lib/network/state-machine";
 import { logger } from "@/lib/utils/logger";
 import * as React from "react";
@@ -57,6 +57,8 @@ export interface NetworkStatus {
   connectionQuality: ConnectionQuality;
   /** More accurate than isOnline (requires native package) */
   isInternetReachable?: boolean;
+  /** Effective connection type for adaptive payloads: '4g' | '3g' | '2g' | 'slow-2g' | 'offline' */
+  effectiveType?: "4g" | "3g" | "2g" | "slow-2g" | "offline";
 }
 
 /**
