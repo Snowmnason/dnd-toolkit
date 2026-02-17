@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { NetworkDetection } from '../network';
 import { logger } from '../utils/logger';
 import { QueryCache } from './query-cache';
 
@@ -190,29 +191,39 @@ export function useQuery<T>(
           // Determine if we should revalidate based on staleness and cachePriority
           const isStale = await QueryCache.isStale(key);
 
-          if (isStale) {
-            switch (cachePriority) {
-              case 'cacheFirst':
-                // cacheFirst: Only revalidate on explicit refetch, not automatically
+          switch (cachePriority) {
+            case 'networkFirst':
+              // networkFirst: Always attempt to fetch fresh data, use cached as fallback
+              setIsValidating(true);
+              setIsLoading(false);
+              await revalidate();
+              break;
+
+            case 'cacheFirst':
+              // cacheFirst: Only revalidate on explicit refetch, not automatically
+              setIsValidating(false);
+              setIsLoading(false);
+              break;
+
+            case 'offlineFirst':
+              // offlineFirst: If offline, don't force revalidation even if stale
+              if (isOfflineRef.current) {
                 setIsValidating(false);
                 setIsLoading(false);
-                break;
+              } else if (isStale && revalidateOnFocus) {
+                // Online: revalidate if stale (SWR)
+                setIsValidating(true);
+                await revalidate();
+              } else {
+                setIsValidating(false);
+                setIsLoading(false);
+              }
+              break;
 
-              case 'offlineFirst':
-                // offlineFirst: If offline, don't force revalidation even if stale
-                if (isOfflineRef.current) {
-                  setIsValidating(false);
-                  setIsLoading(false);
-                } else if (revalidateOnFocus) {
-                  // Online: revalidate if stale (SWR)
-                  setIsValidating(true);
-                  await revalidate();
-                }
-                break;
-
-              case 'balanced':
-              default:
-                // balanced (default): Revalidate if stale (SWR)
+            case 'balanced':
+            default:
+              // balanced (default): Revalidate if stale (SWR)
+              if (isStale) {
                 if (revalidateOnFocus) {
                   setIsValidating(true);
                   await revalidate();
@@ -220,12 +231,12 @@ export function useQuery<T>(
                   setIsValidating(false);
                   setIsLoading(false);
                 }
-                break;
-            }
-          } else {
-            // Not stale - use cache as-is
-            setIsValidating(false);
-            setIsLoading(false);
+              } else {
+                // Not stale - use cache as-is
+                setIsValidating(false);
+                setIsLoading(false);
+              }
+              break;
           }
         } else {
           // No cached data
@@ -290,26 +301,29 @@ export function useQuery<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, disabled, revalidateOnFocus]);
 
-  // Track online/offline status for offlineFirst priority
+  // Track online/offline status for offlineFirst priority using cross-platform NetworkDetection
+  // instead of browser-only window.addEventListener (which fails on React Native)
   useEffect(() => {
-    const handleOnline = () => {
-      isOfflineRef.current = false;
-      logger.debug('cache', `Online detected for key: ${key}; may need revalidation`);
-      // Note: Automatic revalidation on come-back-online is deferred to next query focus
-      // To force revalidation on coming online, call refetch() explicitly
-    };
+    // Subscribe to network status changes (handles web, iOS, Android)
+    // NetworkDetection provides isOnline and other status properties
+    const unsubscribe = NetworkDetection.subscribe((status) => {
+      const wasOffline = isOfflineRef.current;
+      isOfflineRef.current = !status.isOnline;
 
-    const handleOffline = () => {
-      isOfflineRef.current = true;
-      logger.debug('cache', `Offline detected for key: ${key}; using cache-only mode`);
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+      // Log transitions
+      if (wasOffline !== isOfflineRef.current) {
+        if (isOfflineRef.current) {
+          logger.debug('cache', `Offline detected for key: ${key}; using cache-only mode`);
+        } else {
+          logger.debug('cache', `Online detected for key: ${key}; may need revalidation`);
+          // Note: Automatic revalidation on come-back-online is deferred to next query focus
+          // To force revalidation on coming online, call refetch() explicitly
+        }
+      }
+    });
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      unsubscribe();
     };
   }, [key]);
 

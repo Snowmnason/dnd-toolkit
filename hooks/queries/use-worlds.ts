@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { CACHE_CONFIG, CACHE_KEYS, CACHE_TAGS } from "../../lib/cache/keys";
 import { useQuery } from "../../lib/cache/use-query";
 import { worldsDB, WorldWithAccess } from "../../lib/database/worlds";
@@ -35,10 +35,16 @@ export function useWorlds(
   );
 
   // Build quality-aware cache key
-  const cacheKey = getQualityAwareCacheKey({
-    baseCacheKey: CACHE_KEYS.worlds.list(userId || "current"),
-    cacheTagsToInvalidate: ['worlds'],
-  });
+  // Memoized to prevent unnecessary useQuery re-runs on every render
+  // Cache invalidation on quality changes is handled by useAdaptivePayloadCacheInvalidation above
+  const cacheKey = useMemo(
+    () =>
+      getQualityAwareCacheKey({
+        baseCacheKey: CACHE_KEYS.worlds.list(userId || "current"),
+        cacheTagsToInvalidate: ['worlds'],
+      }),
+    [userId],
+  );
 
   // Use QueryCache with SWR pattern for worlds fetching
   const {

@@ -133,7 +133,7 @@ export function getAdaptivePayloadOptions(
       // Unknown connection type - use safe default
       logger
         .category("network")
-        .warn("Unknown effeciveType, using safe default", { effectiveType });
+        .warn("Unknown effectiveType, using safe default", { effectiveType });
       return {
         includeImages: true,
         imageQuality: "sd",

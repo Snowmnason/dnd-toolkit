@@ -130,6 +130,54 @@ interface RateLimitBucket {
   lastAccess: number; // Track last access time for cleanup
 }
 
+/**
+ * Fetcher function types
+ *
+ * Fetchers are user-provided async functions that perform the actual request.
+ * RequestManager supports multiple fetcher signatures for flexibility:
+ *
+ * 1. **Basic fetcher (no parameters):** `() => Promise<T>`
+ *    - Use when you don't need AbortSignal or auth headers
+ *    - Example: Supabase client methods, database queries
+ *    - ```typescript
+ *    const data = await RequestManager.fetch('key', () => supabase.from('table').select());
+ *    ```
+ *
+ * 2. **Fetcher with signal:** `(signal?: AbortSignal) => Promise<T>`
+ *    - Use when you need to support cancellation via AbortController
+ *    - Example: Raw fetch calls, HTTP clients with cancel support
+ *    - ```typescript
+ *    const data = await RequestManager.fetch(
+ *      'key',
+ *      (signal) => fetch(url, { signal })
+ *    );
+ *    ```
+ *
+ * 3. **Fetcher with signal and headers:** `(headers?: Record<string,string>, signal?: AbortSignal) => Promise<T>`
+ *    - Use for custom HTTP clients that need both auth headers and cancellation
+ *    - Example: Custom API wrapper handling auth and requests
+ *    - ```typescript
+ *    const data = await RequestManager.fetch(
+ *      'key',
+ *      (headers, signal) => customHttpClient(url, { headers, signal })
+ *    );
+ *    ```
+ *
+ * **How it works:**
+ * - If your fetcher accepts a signal parameter, RequestManager will pass the AbortController.signal
+ * - If your fetcher accepts headers, RequestManager will pass auth headers (if authStrategy is set)
+ * - If your fetcher doesn't accept these parameters, they're simply not passed (no error)
+ * - The exact parameters passed depend on your context (auth strategy, etc.)
+ *
+ * **Note on AbortSignal:**
+ * RequestManager supports quality downgrade on repeated AbortErrors (from network degradation).
+ * For this feature to work, your fetcher must support the signal parameter.
+ */
+type FetcherSignature<T> = 
+  | (() => Promise<T>)
+  | ((signal?: AbortSignal) => Promise<T>)
+  | ((headers?: Record<string, string>, signal?: AbortSignal) => Promise<T>)
+
 // ==========================================
 // Utility Functions
 // ==========================================
@@ -285,7 +333,7 @@ class RequestManagerClass {
    */
   private inFlightGetRequests: Map<
     string,
-    { effectiveType: string | undefined; startedAt: number; abortController: AbortController }
+    { effectiveType: string | undefined; startedAt: number; abortController: AbortController; aborted?: boolean }
   > = new Map();
 
   /** Network quality subscription for abort-and-retry */
@@ -430,6 +478,12 @@ class RequestManagerClass {
       const entries = Array.from(this.inFlightGetRequests.entries());
       
       for (const [key, entry] of entries) {
+        // Skip entries that have already been aborted to prevent redundant abort calls
+        // when network quality changes multiple times before the request cleanup completes
+        if (entry.aborted) {
+          continue;
+        }
+
         if (this.shouldAbortAndRetryDueToQualityDegradation(key, 2000)) {
           logger.info('api', 'Aborting in-flight GET due to quality degradation', {
             key,
@@ -437,6 +491,10 @@ class RequestManagerClass {
             currentQuality: status.effectiveType,
             ageMs: Date.now() - entry.startedAt,
           });
+
+          // Mark as aborted to prevent redundant abort calls if quality changes again
+          // before the promise cleanup removes this entry from tracking
+          entry.aborted = true;
 
           // Abort the request - the retry will happen automatically via the catch block
           entry.abortController.abort();
@@ -452,6 +510,7 @@ class RequestManagerClass {
    * - Only abort if quality degraded by ≥2 tiers (e.g., 4g → 2g)
    * - Only abort if request has been in-flight > 2s (give fast requests time to complete)
    * - Never abort upgrades (2g → 4g) - let original request finish
+   * - Skip entries already marked as aborted (prevents race condition on repeated quality changes)
    * 
    * Example: Started on 4G, now on 2G → true (abort and retry with thumbnails)
    * Example: Started on 3G, now on 3G → false (no degradation)
@@ -467,6 +526,12 @@ class RequestManagerClass {
   ): boolean {
     const inFlightRequest = this.inFlightGetRequests.get(key);
     if (!inFlightRequest) {
+      return false;
+    }
+
+    // Skip requests already marked as aborted to prevent redundant abort calls
+    // when network quality changes multiple times before cleanup completes
+    if (inFlightRequest.aborted) {
       return false;
     }
 
@@ -566,6 +631,11 @@ class RequestManagerClass {
    *
    * @param key - Unique key for deduplication (should be deterministic)
    * @param fetcher - Async function that performs the actual request
+   *   Supports multiple signatures:
+   *   - `() => Promise<T>` – basic fetcher (no signal/headers)
+   *   - `(signal?: AbortSignal) => Promise<T>` – accepts cancellation signal
+   *   - `(headers?: Record<string,string>, signal?: AbortSignal) => Promise<T>` – accepts both
+   *   See FetcherSignature type docs for details and examples.
    * @param options - Request options (dedupe, retries, failOpen, useQueryCache, authStrategy, etc.) (optional, defaults to {})
    * @returns The result of the fetcher function
    *
@@ -595,11 +665,17 @@ class RequestManagerClass {
    * import { appendAdaptiveParams } from '@/lib/network';
    * const key = appendAdaptiveParams('worlds:list'); // Adds ?imageQuality=hd&...
    * const data = await RequestManager.fetch(key, () => fetcher());
+   *
+   * // With AbortSignal support for cancellation on network degradation
+   * const data = await RequestManager.fetch(
+   *   url,
+   *   (signal) => fetch(url, { signal })
+   * );
    * ```
    */
   async fetch<T>(
     key: string,
-    fetcher: () => Promise<T>,
+    fetcher: FetcherSignature<T>,
     options?: RequestOptions,
   ): Promise<T | null> {
     // Create options with all defaults applied
@@ -638,6 +714,22 @@ class RequestManagerClass {
 
     // Use the enriched key for all downstream operations (dedupe, cache, etc.)
     const enrichedKey = keyWithParams;
+
+    // ========== RETRY STATE TRACKING (for quality downgrade on abort) ==========
+    // Track current quality for this base key so we can downgrade on AbortError
+    // This enables progressive quality degradation on network failures
+    if (initialAdaptiveQuality) {
+      const existingState = this.currentRetryState.get(key);
+      if (!existingState) {
+        // First attempt: initialize with current quality
+        this.currentRetryState.set(key, {
+          attemptNumber: 0,
+          initialQuality: initialAdaptiveQuality,
+        });
+      }
+      // On subsequent retries with the same key, the state persists
+      // and will be updated if quality is downgraded
+    }
 
     const startedAt = Date.now();
     const trackingEnabled = Analytics.enabled();
@@ -932,12 +1024,18 @@ class RequestManagerClass {
               attemptNumber,
             });
 
-            // If fetcher accepts headers param, it will use them (e.g., raw fetch wrapper)
-            // Otherwise, it's a no-op (e.g., Supabase client handles its own auth)
+            // Call fetcher with auth headers and abort signal (if it accepts them)
+            // Fetchers can have different signatures:
+            // - () => Promise<T> – ignores both parameters
+            // - (signal) => Promise<T> – uses signal, ignores headers
+            // - (headers, signal) => Promise<T> – uses both
+            // We use 'as any' to avoid type errors when passing optional parameters
+            // the fetcher may or may not accept. JavaScript allows this gracefully.
             return await (fetcher as any)(authHeaders, abortController.signal);
           }
 
-          // No auth strategy - just call fetcher directly (pass signal if supported)
+          // No auth strategy - just call fetcher directly with signal (if it accepts it)
+          // Fetchers that don't accept parameters simply ignore them.
           return await (fetcher as any)(abortController.signal);
         };
 
@@ -1115,6 +1213,26 @@ class RequestManagerClass {
             );
           });
       }
+
+      // ========== CLEAN UP RETRY STATE (on final success) ==========
+      // Clear retry state when request succeeds to allow next fresh request
+      // to start with full quality again (don't persist downgrades across cycles)
+      circuitBreakerRecordedPromise
+        .then(
+          () => {
+            // Request succeeded: clear the retry state so next fetch() starts fresh
+            if (initialAdaptiveQuality) {
+              this.currentRetryState.delete(key);
+            }
+          },
+          () => {
+            // Request failed: keep retry state so quality downgrade persists
+            // for future retry attempts by interested callers (hooks/UI)
+          },
+        )
+        .catch(() => {
+          // Cleanup errors are OK; they don't affect the main request result
+        });
 
       return await circuitBreakerRecordedPromise;
     } catch (error) {
@@ -1409,14 +1527,32 @@ class RequestManagerClass {
 
       // ========== DETECT ABORT-AND-RETRY ==========
       // If this is an AbortError, it was triggered by network quality degradation
-      // Log it for debugging and continue with normal retry flow
+      // Downgrade the requested quality and log it for monitoring
       const isAbortError = (error as any)?.name === "AbortError";
       if (isAbortError && requestContext) {
-        logger.debug("api", "Request aborted due to network quality degradation", {
-          key: requestContext.key,
-          attemptNumber,
-          retriesLeft,
-        });
+        // Downgrade quality for next retry attempt
+        // Note: The downgraded quality will be used the next time fetch() is called
+        // for this key, since enrichedKey is computed at the start of fetch()
+        const retryState = this.currentRetryState.get((requestContext as any).baseKey || requestContext.key);
+        if (retryState && retryState.initialQuality && retryState.initialQuality !== 'text-only') {
+          const currentQuality = retryState.initialQuality;
+          const downgradedQuality = this.downgradeAdaptiveQuality(currentQuality);
+          retryState.initialQuality = downgradedQuality;
+          logger.info("api", "Downgrading image quality on abort", {
+            key: requestContext.key,
+            from: currentQuality,
+            to: downgradedQuality,
+            attemptNumber,
+            retriesLeft,
+          });
+        } else {
+          logger.debug("api", "Request aborted due to network quality degradation", {
+            key: requestContext.key,
+            attemptNumber,
+            retriesLeft,
+            quality: retryState?.initialQuality || 'unknown',
+          });
+        }
       }
 
       logger.debug("request-manager", "Retrying after error:", {

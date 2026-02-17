@@ -19,7 +19,9 @@ export type { NetworkStatus, NetworkStatusCallback } from "./network-detection";
 
 export { NetworkStateManager, VALID_TRANSITIONS } from "./state-machine";
 export type {
-  NetworkState, SpecificTransitionHook, TransitionHook
+  NetworkState,
+  SpecificTransitionHook,
+  TransitionHook
 } from "./state-machine";
 
 export {
@@ -40,8 +42,14 @@ export {
 } from "./network-config";
 
 export {
-  buildAdaptiveQueryParams, getAdaptivePayloadOptions, getCacheKeyQualityComponent, type AdaptivePayloadOptions,
-  type PayloadQuality
+  buildAdaptiveQueryParams,
+  getAdaptivePayloadOptions,
+  getCacheKeyQualityComponent
+} from "./adaptive-payload";
+
+export type {
+  AdaptivePayloadOptions,
+  PayloadQuality
 } from "./adaptive-payload";
 
 export {
