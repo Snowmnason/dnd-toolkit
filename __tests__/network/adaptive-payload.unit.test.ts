@@ -1,11 +1,12 @@
 import {
-    buildAdaptiveQueryParams,
-    getAdaptivePayloadOptions,
-    getCacheKeyQualityComponent,
-    type AdaptivePayloadOptions,
-    type PayloadQuality,
+  buildAdaptiveQueryParams,
+  getAdaptivePayloadOptions,
+  getCacheKeyQualityComponent,
+  type AdaptivePayloadOptions,
+  type PayloadQuality,
 } from "@/lib/network/adaptive-payload";
 import type { NetworkStatus } from "@/lib/network/network-detection";
+import { ConnectionQuality } from "@/lib/network/network-detection";
 import { describe, expect, it } from "vitest";
 
 describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
@@ -13,6 +14,9 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
     it("returns 4G options for 4g connection", () => {
       const status: NetworkStatus = {
         isOnline: true,
+        type: "cellular",
+        isExpensive: false,
+        connectionQuality: ConnectionQuality.GOOD,
         isInternetReachable: true,
         effectiveType: "4g",
       };
@@ -30,6 +34,9 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
     it("returns 3G options for 3g connection", () => {
       const status: NetworkStatus = {
         isOnline: true,
+        type: "cellular",
+        isExpensive: true,
+        connectionQuality: ConnectionQuality.GOOD,
         isInternetReachable: true,
         effectiveType: "3g",
       };
@@ -47,6 +54,9 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
     it("returns 2G options for 2g connection", () => {
       const status: NetworkStatus = {
         isOnline: true,
+        type: "cellular",
+        isExpensive: true,
+        connectionQuality: ConnectionQuality.BAD,
         isInternetReachable: true,
         effectiveType: "2g",
       };
@@ -64,6 +74,9 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
     it("returns 2G options for slow-2g connection", () => {
       const status: NetworkStatus = {
         isOnline: true,
+        type: "cellular",
+        isExpensive: true,
+        connectionQuality: ConnectionQuality.BAD,
         isInternetReachable: true,
         effectiveType: "slow-2g",
       };
@@ -80,6 +93,9 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
     it("returns offline options for offline state", () => {
       const status: NetworkStatus = {
         isOnline: false,
+        type: "none",
+        isExpensive: false,
+        connectionQuality: ConnectionQuality.OFFLINE,
         isInternetReachable: false,
         effectiveType: "offline",
       };
@@ -97,6 +113,9 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
     it("returns safe default for unknown effectiveType", () => {
       const status: NetworkStatus = {
         isOnline: true,
+        type: "cellular",
+        isExpensive: true,
+        connectionQuality: ConnectionQuality.BAD,
         isInternetReachable: true,
         effectiveType: "unknown" as any,
       };
@@ -133,11 +152,17 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
     it("verifies payload reduction: 4G vs 2G is at least 50%", () => {
       const status4G: NetworkStatus = {
         isOnline: true,
+        type: "cellular",
+        isExpensive: false,
+        connectionQuality: ConnectionQuality.GOOD,
         isInternetReachable: true,
         effectiveType: "4g",
       };
       const status2G: NetworkStatus = {
         isOnline: true,
+        type: "cellular",
+        isExpensive: true,
+        connectionQuality: ConnectionQuality.BAD,
         isInternetReachable: true,
         effectiveType: "2g",
       };
@@ -271,13 +296,17 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
 
       const params = buildAdaptiveQueryParams(options);
 
-      // Should only have flags that are true/necessary
-      expect(Object.keys(params)).toEqual(
-        expect.arrayContaining(["noImages", "summaryOnly", "excludeMaps", "compress"]),
-      );
-      expect(Object.keys(params)).not.toEqual(
-        expect.arrayContaining(["imageQuality", "maxPayloadBytes"]),
-      );
+      // Should only contain explicit boolean flags for the "text-only" case
+      expect(params).toMatchObject({
+        noImages: true,
+        summaryOnly: true,
+        excludeMaps: true,
+        compress: true,
+      });
+
+      // Should NOT include properties that represent non-default values
+      expect(params).not.toHaveProperty("imageQuality");
+      expect(params).not.toHaveProperty("maxPayloadBytes");
     });
   });
 
@@ -285,6 +314,9 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
     it("returns effectiveType for 4G", () => {
       const status: NetworkStatus = {
         isOnline: true,
+        type: "cellular",
+        isExpensive: false,
+        connectionQuality: ConnectionQuality.GOOD,
         isInternetReachable: true,
         effectiveType: "4g",
       };
@@ -297,6 +329,9 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
     it("returns effectiveType for 2G", () => {
       const status: NetworkStatus = {
         isOnline: true,
+        type: "cellular",
+        isExpensive: true,
+        connectionQuality: ConnectionQuality.BAD,
         isInternetReachable: true,
         effectiveType: "2g",
       };
@@ -321,6 +356,9 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
     it("returns 'unknown' when effectiveType is null", () => {
       const status: NetworkStatus = {
         isOnline: true,
+        type: "cellular",
+        isExpensive: false,
+        connectionQuality: ConnectionQuality.GOOD,
         isInternetReachable: true,
         effectiveType: null as any,
       };
@@ -333,11 +371,17 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
     it("enables cache key differentiation: 4G vs 2G separate", () => {
       const status4G: NetworkStatus = {
         isOnline: true,
+        type: "cellular",
+        isExpensive: false,
+        connectionQuality: ConnectionQuality.GOOD,
         isInternetReachable: true,
         effectiveType: "4g",
       };
       const status2G: NetworkStatus = {
         isOnline: true,
+        type: "cellular",
+        isExpensive: true,
+        connectionQuality: ConnectionQuality.BAD,
         isInternetReachable: true,
         effectiveType: "2g",
       };
@@ -361,27 +405,62 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
         tierName: string;
       }[] = [
         {
-          status: { isOnline: true, isInternetReachable: true, effectiveType: "4g" },
+          status: {
+            isOnline: true,
+            type: "cellular",
+            isExpensive: false,
+            connectionQuality: ConnectionQuality.GOOD,
+            isInternetReachable: true,
+            effectiveType: "4g",
+          },
           expectedQuality: "hd",
           tierName: "4G",
         },
         {
-          status: { isOnline: true, isInternetReachable: true, effectiveType: "3g" },
+          status: {
+            isOnline: true,
+            type: "cellular",
+            isExpensive: true,
+            connectionQuality: ConnectionQuality.GOOD,
+            isInternetReachable: true,
+            effectiveType: "3g",
+          },
           expectedQuality: "sd",
           tierName: "3G",
         },
         {
-          status: { isOnline: true, isInternetReachable: true, effectiveType: "2g" },
+          status: {
+            isOnline: true,
+            type: "cellular",
+            isExpensive: true,
+            connectionQuality: ConnectionQuality.BAD,
+            isInternetReachable: true,
+            effectiveType: "2g",
+          },
           expectedQuality: "thumb",
           tierName: "2G",
         },
         {
-          status: { isOnline: true, isInternetReachable: true, effectiveType: "slow-2g" },
+          status: {
+            isOnline: true,
+            type: "cellular",
+            isExpensive: true,
+            connectionQuality: ConnectionQuality.BAD,
+            isInternetReachable: true,
+            effectiveType: "slow-2g",
+          },
           expectedQuality: "thumb",
           tierName: "slow-2g",
         },
         {
-          status: { isOnline: false, isInternetReachable: false, effectiveType: "offline" },
+          status: {
+            isOnline: false,
+            type: "none",
+            isExpensive: false,
+            connectionQuality: ConnectionQuality.OFFLINE,
+            isInternetReachable: false,
+            effectiveType: "offline",
+          },
           expectedQuality: "text-only",
           tierName: "offline",
         },
@@ -398,16 +477,25 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
     it("payload sizes decrease monotonically: 4G > 3G > 2G", () => {
       const options4G = getAdaptivePayloadOptions({
         isOnline: true,
+        type: "cellular",
+        isExpensive: false,
+        connectionQuality: ConnectionQuality.GOOD,
         isInternetReachable: true,
         effectiveType: "4g",
       });
       const options3G = getAdaptivePayloadOptions({
         isOnline: true,
+        type: "cellular",
+        isExpensive: true,
+        connectionQuality: ConnectionQuality.GOOD,
         isInternetReachable: true,
         effectiveType: "3g",
       });
       const options2G = getAdaptivePayloadOptions({
         isOnline: true,
+        type: "cellular",
+        isExpensive: true,
+        connectionQuality: ConnectionQuality.BAD,
         isInternetReachable: true,
         effectiveType: "2g",
       });
@@ -420,11 +508,15 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
       const tiers = ["4g", "3g", "2g", "slow-2g"];
 
       tiers.forEach((tier) => {
-        const options = getAdaptivePayloadOptions({
+        const status: NetworkStatus = {
           isOnline: true,
+          type: "cellular",
+          isExpensive: tier !== "4g",
+          connectionQuality: tier === "4g" ? ConnectionQuality.GOOD : ConnectionQuality.BAD,
           isInternetReachable: true,
           effectiveType: tier as any,
-        });
+        };
+        const options = getAdaptivePayloadOptions(status);
 
         if (tier === "4g") {
           expect(options.includeMaps).toBe(true);
@@ -444,16 +536,19 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
       ];
 
       tiers.forEach(({ tier, expected }) => {
-        const options = getAdaptivePayloadOptions({
+        const status: NetworkStatus = {
           isOnline: tier !== "offline",
+          type: tier === "offline" ? "none" : "cellular",
+          isExpensive: tier !== "4g" && tier !== "offline",
+          connectionQuality:
+            tier === "offline" ? ConnectionQuality.OFFLINE : ConnectionQuality.GOOD,
           isInternetReachable: tier !== "offline",
           effectiveType: tier as any,
-        });
+        };
 
-        expect(options.includeDetails).toBe(
-          expected,
-          `Expected includeDetails=${expected} for ${tier}`,
-        );
+        const options = getAdaptivePayloadOptions(status);
+
+        expect(options.includeDetails).toBe(expected);
       });
     });
   });
