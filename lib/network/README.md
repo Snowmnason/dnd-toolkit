@@ -166,6 +166,54 @@ Current network state.
 - **`lib/api`** – HTTP requests (uses network detection indirectly)
 - **`lib/cache`** – Stale cache serving via error handler
 
+## Telemetry (Observability)
+
+This module emits local telemetry events for network observability. In Phase 1 the module logs events locally via `logger.category('network')`. Phase 2 documents the event schema and integration points; Phase 3+ covers backend ingestion and retention policies.
+
+Event types:
+- `quality_change` — emitted when the effective connection quality tier changes (unsampled).
+- `health_check` — periodic heartbeat with a snapshot of current quality (sampled; first check always emitted).
+- `error_correlation` — emitted (sampled) when a network-related request or sync fails, including a quality snapshot.
+
+Why local logging first:
+- Keeps rollout safe and privacy-friendly (no backend transmission until Phase 2 consent/wiring).
+- Allows iteration on schema without affecting backend contracts.
+
+Integration points (where events are emitted):
+- `NetworkDetection.subscribe()` — emits `quality_change` on effective type/quality transitions.
+- App bootstrap (AppKernel) — starts periodic `health_check` interval (default 5 minutes).
+- `lib/api/RequestManager` and `lib/offline` sync — capture and queue `error_correlation` events when requests fail.
+
+Sampling and configuration:
+- Sampling rates are configurable in `config/appsettings.json` under `network.telemetry`.
+- Defaults (Phase 1/1c): `healthCheckSampleRate = 0.1` (10%), `errorCorrelationSampleRate = 0.5` (50%), `enabled = true`.
+- First health check after app start is always emitted regardless of sample rate.
+
+Privacy and consent:
+- Telemetry emission respects the application's consent system (#181). A consent check runs before any emit; if consent is withdrawn the health check interval is stopped and queued error events are discarded.
+- Events avoid PII by default. Do not add user-identifying fields unless explicit consent is recorded.
+
+Event fields (summary):
+- `eventType` — one of `quality_change` | `health_check` | `error_correlation`.
+- `currentQuality` — `EXCELLENT|GOOD|POOR|OFFLINE`.
+- `previousQuality?` — present for `quality_change`.
+- `isOnline` — boolean.
+- `connectionType?` — `wifi|cellular|ethernet|unknown`.
+- `isExpensive?` — boolean (true for cellular by default).
+- `latency?` — RTT in ms (when available via Network Information API or ping measurement).
+- `downlink?` — Mbps (when available).
+- `error?` — present for `error_correlation` (e.g., `timeout|dns_fail|connection_reset|5xx|4xx|other`).
+- `timestamp` — epoch ms.
+- `platform` — `web|ios|android|desktop`.
+
+Where to find the full schema and examples:
+- `lib/network/TELEMETRY_SCHEMA.md` — JSON schemas and example events.
+
+Operational notes:
+- Keep the sampling rates conservative for mobile (cellular) users to avoid data charges.
+- Consider server-side validation of event schema and an ingestion version field once backend integration begins.
+
+
 ## File Breakdown
 
 | File                   | Purpose                                                                  | Exports                                                                                             |
