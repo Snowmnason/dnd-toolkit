@@ -73,5 +73,6 @@
   "platforms.desktop.thresholds.slowScreenMs": "Desktop thresholds differ between dev and production",
   "platforms.desktop.platformNotes": "Desktop platform notes differ to document dev vs production behavior"
   ,"analytics.buffer.description": "Analytics buffer description may differ between dev and production (dev: explanatory note; prod: concise operational description)"
+  ,"analytics.breadcrumbs.description": "Sentry breadcrumb queue configuration (offline persistence). enabled: queue breadcrumbs when offline. provider: Sentry adapter name. maxBreadcrumbs: max breadcrumbs in queue (FIFO overflow). batchSize: breadcrumbs per flush request. maxRetries: max retry attempts per breadcrumb (then discard). retryBaseMs: base exponential backoff (1s→2s→4s→8s→16s). debounceMs: debounce flush on network flaps (once per 5s). breadcrumbRetentionDays: discard breadcrumbs older than N days (don't waste quota)."
   ,"analytics.description": "Analytics settings description differs between dev and production (dev: testing-oriented note; prod: operational defaults)"
 }

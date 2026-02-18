@@ -64,7 +64,12 @@ Start every issue with a header block:
 **Status:** Tier 4 (Category)  
 **Impact:** LARGE / MEDIUM / SMALL — [1-2 sentence impact summary]  
 **Depends on:** #ABC (Feature X), #DEF (Feature Y)  
-**Integrates with:** `lib/module`, `lib/other-module`, Component/Hook name, Feature flags
+**Integrates with:** `lib/module`, `lib/other-module`, Component/Hook name, Feature flags  
+**Impacts (check if applicable):**
+  - [ ] Config (add to appsettings.json AND appsettings.dev.json)
+  - [ ] Storage/Migration (SecureStorage key, schema changes, migration logic)
+  - [ ] PII/Privacy (user data handling, consent checks)
+  - [ ] Encryption (data at rest via SecureStorage)
 
 ## Problem
 ...
@@ -179,35 +184,14 @@ Result: Consent is not reliably persisted, creating compliance risk and UX frict
 
 **Goal:** Show how to fix the problem, broken into phases.
 
-### Format
-
-```markdown
 ## Solution
 
 [1-2 sentence summary: what will be built]
 
-1. **Phase 0** — Understand scope and draft PR body
-2. **Phase 1a** — [Specific sub-feature]
-3. **Phase 1b** — [Next sub-feature, builds on 1a]
-4. **Phase 1c** — [Final sub-feature, completes core]
-5. **Phase 2** — Documentation
-6. **Phase 3** — Usage guides
-7. **Phase 4** — Testing
+## Out of Scope
 
----
-
-## Phase 0: Understand scope and draft PR body
-
-[See Phase 0 section below]
-
----
-
-## Phase 1a: [Specific title]
-
-[See Phase 1a section below]
-
-... (1b, 1c follow)
-```
+- [What is explicitly NOT being addressed in this phase]
+- [Examples: "UI redesign", "Mobile-only feature", "Multi-provider support"]
 
 ### Solution Tips
 
@@ -242,6 +226,7 @@ Result: Consent is not reliably persisted, creating compliance risk and UX frict
   - [Error handling scenario]
 - [ ] Confirm acceptance criteria are clear
 - [ ] Draft PR body (copy into `docs/issues.md` for reference):
+- **Follow the style guide:** See `.github\PR_BODY_TEMPLATE.md` for detailed formatting requirements for all issue docs
 
 \`\`\`markdown
 ## [Feature Name] #XXX
