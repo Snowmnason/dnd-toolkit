@@ -7,6 +7,7 @@
  * No Sentry imports here — all provider-specific logic is in adapters.
  */
 
+import { getAppConfig } from '@/lib/config';
 import { BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '@/lib/services/provider-adapter';
 import { STORAGE_KEYS, SecureStorage } from '@/lib/storage';
 import { logger } from '@/lib/utils/logger';
@@ -32,14 +33,33 @@ class BreadcrumbQueueService {
   private provider: BreadcrumbProvider | null = null;
   private overflowCount = 0; // Session-only
   private lastFlushTime: number | undefined = undefined;
+  private lastFlushAttemptTime = 0; // Track when we last tried to flush
+  private nextFlushAfterMs = 0; // Time when next flush is allowed (rate limit backoff)
   private isFlushing = false;
+  private currentBatchIds = new Set<string>(); // Track current batch to prevent double-retry
   private deduplicationCache = new Map<string, number>(); // fingerprint -> lastSentAt (ms)
-  private readonly maxBreadcrumbs = 500;
-  private readonly retentionDays = 14;
-  private readonly deduplicationTTL = 24 * 60 * 60 * 1000; // 24h in ms
+  
+  // Config values with fallbacks (from appsettings or hardcoded defaults)
+  private readonly maxBreadcrumbs: number;
+  private readonly retentionDays: number;
+  private readonly deduplicationTTL: number;
+  private readonly batchSpacingMs: number;
+  private readonly debounceMs: number;
+
+  constructor() {
+    // Load config values from appsettings with fallbacks
+    const config = getAppConfig();
+    const breadcrumbsConfig = config.analytics?.breadcrumbs;
+
+    this.maxBreadcrumbs = breadcrumbsConfig?.maxBreadcrumbs ?? 500;
+    this.retentionDays = breadcrumbsConfig?.breadcrumbRetentionDays ?? 14;
+    this.deduplicationTTL = 24 * 60 * 60 * 1000; // 24h in ms (hardcoded, not configurable)
+    this.batchSpacingMs = 1500; // Space batches by 1.5s if 100+ pending (hardcoded, not configurable)
+    this.debounceMs = breadcrumbsConfig?.debounceMs ?? 5000; // Debounce flush: once per 5s
+  }
+
   private networkUnsubscribe: (() => void) | null = null;
   private lastNetworkOnTime = 0;
-  private readonly debounceMs = 5000; // Debounce flush: once per 5s
 
   /**
    * Initialize queue from SecureStorage and set active provider
@@ -236,16 +256,59 @@ class BreadcrumbQueueService {
 
   /**
    * Flush pending breadcrumbs via provider
+   * Implements Phase 1c: batch spacing, rate limit backoff, dedup-on-flush
    */
   async flush(): Promise<void> {
     if (this.isFlushing || !this.provider || this.queue.length === 0) {
       return;
     }
 
+    const now = Date.now();
+
+    // Phase 1c: Rate limit backoff — don't flush if we're rate-limited
+    if (now < this.nextFlushAfterMs) {
+      logger.category('analytics').debug(
+        'BreadcrumbQueue',
+        `Rate-limited: next flush in ${this.nextFlushAfterMs - now}ms`
+      );
+      return;
+    }
+
     this.isFlushing = true;
+    this.lastFlushAttemptTime = now;
 
     try {
-      const batch = this.peek(10); // Provider typically recommends 10 per request
+      // Phase 1c: Batch spacing — if 100+ pending, space batches apart to avoid rate limit
+      const hasLargeQueue = this.queue.length >= 100;
+      if (hasLargeQueue && this.lastFlushTime && now - this.lastFlushTime < this.batchSpacingMs) {
+        logger.category('analytics').debug('BreadcrumbQueue', `Batch spacing: deferring flush (${this.queue.length} pending)`);
+        this.isFlushing = false;
+        return;
+      }
+
+      // Phase 1c: Dedup-on-flush — skip breadcrumbs with recently-sent fingerprints
+      let batch = this.peek(10); // Provider typically recommends 10 per request
+
+      batch = batch.filter((b) => {
+        const lastSent = this.deduplicationCache.get(b.fingerprint);
+        if (lastSent && now - lastSent < this.deduplicationTTL) {
+          logger.category('analytics').debug(
+            'BreadcrumbQueue',
+            `Skipping duplicate on flush (fingerprint: ${b.fingerprint})`
+          );
+          return false; // Skip this breadcrumb
+        }
+        return true;
+      });
+
+      if (batch.length === 0) {
+        logger.category('analytics').debug('BreadcrumbQueue', 'No new breadcrumbs to flush (all deduplicated)');
+        this.isFlushing = false;
+        return;
+      }
+
+      // Track current batch IDs (Phase 1c: prevent double-retry)
+      this.currentBatchIds = new Set(batch.map((b) => b.id));
 
       logger.category('analytics').info(
         'BreadcrumbQueue',
@@ -270,21 +333,39 @@ class BreadcrumbQueueService {
 
       // Process retries (5xx, network errors, rate-limited)
       for (const id of result.retry) {
-        await this.markFailed(id, 'provider retry');
+        // Only retry if this ID is from current batch (Phase 1c: prevent double-retry)
+        if (this.currentBatchIds.has(id)) {
+          await this.markFailed(id, 'provider retry');
+        }
       }
 
       // Process discards (4xx, validation errors)
       for (const id of result.discard) {
-        await this.discard(id, 'provider rejected');
+        // Only discard if this ID is from current batch
+        if (this.currentBatchIds.has(id)) {
+          await this.discard(id, 'provider rejected');
+        }
       }
 
-      this.lastFlushTime = Date.now();
+      // Phase 1c: Handle rate-limited response (429) with Retry-After backoff
+      if (result.retryAfterMs && result.retryAfterMs > 0) {
+        this.nextFlushAfterMs = now + result.retryAfterMs;
+        logger.category('analytics').warn(
+          'BreadcrumbQueue',
+          `Rate-limited: next flush in ${result.retryAfterMs}ms`
+        );
+      }
+
+      this.lastFlushTime = now;
+      this.currentBatchIds.clear();
+
       logger.category('analytics').info(
         'BreadcrumbQueue',
         `Flush complete: sent ${result.sent.length}, retry ${result.retry.length}, discard ${result.discard.length}`
       );
     } catch (error) {
       logger.category('analytics').error('BreadcrumbQueue', `Flush failed: ${error}`);
+      this.currentBatchIds.clear();
     } finally {
       this.isFlushing = false;
     }
