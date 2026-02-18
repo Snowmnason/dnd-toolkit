@@ -10,7 +10,7 @@ try {
 }
 
 try {
-  AnalyticsBufferService = require('@/lib/analytics/analytics-buffer').AnalyticsBufferService;
+  AnalyticsBufferService = require('@/lib/analytics/analytics-buffer').analyticsBufferService;
 } catch (e) {
   AnalyticsBufferService = null;
 }
@@ -28,12 +28,12 @@ if (!AnalyticsBufferService) {
 
       const push = [] as Promise<void>[];
       for (let i = 0; i < 200; i++) {
-        push.push(AnalyticsBufferService.enqueue({ id: `s${i}`, eventType: 'x', payload: {}, retryCount: 0, maxRetries: 3, timestamp: Date.now() + i } as any));
+        push.push(AnalyticsBufferService.enqueue({ eventType: 'x', payload: { seq: i }, maxRetries: 3 } as any));
       }
 
       await Promise.all(push);
       const stats = AnalyticsBufferService.getStats();
-      expect(stats.size).toBeLessThanOrEqual(100);
+      expect(stats.queueSize).toBeLessThanOrEqual(100);
     }, 20000);
   });
 }

@@ -18,7 +18,7 @@ New module: `lib/analytics/analytics-buffer.ts`
 ### AnalyticsBufferService (public API)
 - `initialize(config?: Partial<AnalyticsBufferConfig>): Promise<void>` — load persisted queue, validate, apply runtime overrides.
 - `enqueue(event): Promise<QueuedAnalyticsEvent | null>` — add event (FIFO), persist, drop oldest on overflow.
-- `peek(batchSize): Promise<QueuedAnalyticsEvent[]>` — get next batch (FIFO).
+- `peek(batchSize): QueuedAnalyticsEvent[]` — get next batch (FIFO, synchronous).
 - `remove(ids): Promise<void>` — remove successfully sent events.
 - `markFailed(id, reason): Promise<void>` — increment retryCount, set `nextAttemptAt` (exponential backoff), discard if max retries exceeded.
 - `discard(id, reason): Promise<void>` — permanently drop a specific event.
@@ -62,7 +62,7 @@ New module: `lib/analytics/analytics-buffer.ts`
 - `lib/analytics/analytics-buffer.ts` (new features & API)
 - `lib/analytics/analytics-network-integration.ts` (network integration + retry scheduler)
 - `lib/analytics/index.ts` (exports updated)
-- `hooks/use-analytics-buffer-status.ts` (diagnostic hook)
+- `hooks/analytics/use-analytics-buffer-status.ts` (diagnostic hook)
 - `lib/analytics/README.md` (buffer section added)
 
 ## Integration checklist for engineers

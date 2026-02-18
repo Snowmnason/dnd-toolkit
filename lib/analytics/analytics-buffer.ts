@@ -10,8 +10,13 @@
  * - Retry counting and tracking
  * - Configurable queue size limit (default 100 events)
  * - Automatic validation on load (removes corrupted/stale events)
- * - Overflow handling (FIFO drop: discard oldest if exceeds max size)
+ * - Overflow handling (FIFO drop: discard oldest if exceeds max size, tracked in current session)
  * - Respects analytics consent (discard pending on consent withdraw)
+ *
+ * **Overflow Tracking:**
+ * overflowCount is a session-only metric that resets on app restart.
+ * It tracks dropped events during the current session to help identify capacity issues.
+ * Use getAndResetOverflowCount() to inspect and optionally reset the counter during a session.
  */
 
 import { getAppConfig } from "@/lib/config/loader";
@@ -46,6 +51,8 @@ export interface AnalyticsBufferConfig {
   batchSize: number; // Events per flush request (default 25)
   retryBaseMs: number; // Base backoff delay (default 1000ms)
   debounceMs: number; // Debounce flush on network flaps (default 5000ms)
+  batchDelayMs: number; // Delay between batch sends to avoid overwhelming backend (default 1000ms)
+  endpoint?: string | null; // Analytics endpoint URL (optional override; fallback to env var / Sentry DSN)
 }
 
 /**
@@ -58,6 +65,7 @@ const SAFE_DEFAULTS: AnalyticsBufferConfig = {
   batchSize: 25,
   retryBaseMs: 1000,
   debounceMs: 5000,
+  batchDelayMs: 1000,
 };
 
 /**
@@ -122,6 +130,11 @@ export interface AnalyticsBufferStats {
 }
 
 /**
+ * Callback type for state change subscribers
+ */
+export type AnalyticsBufferSubscriber = () => void;
+
+/**
  * Analytics Buffer Service
  *
  * Singleton service for managing offline analytics event queue.
@@ -131,7 +144,10 @@ class AnalyticsBufferService {
   private queue: QueuedAnalyticsEvent[] = [];
   private initialized = false;
   private config: AnalyticsBufferConfig = ANALYTICS_CONFIG;
-  private overflowCount = 0; // Track events dropped due to overflow
+  // Session-only metric: resets on app initialization. Counts events dropped due to queue overflow.
+  // Use getAndResetOverflowCount() to inspect and reset during a session.
+  private overflowCount = 0;
+  private subscribers = new Set<AnalyticsBufferSubscriber>(); // Observer pattern for state changes
 
   /**
    * Initialize the queue from storage
@@ -145,8 +161,53 @@ class AnalyticsBufferService {
       return;
     }
 
-    // Apply user-provided runtime overrides if supplied
+    // Reset session-only metrics on initialization (app startup)
+    this.overflowCount = 0;
+
+    // Validate and apply user-provided runtime overrides if supplied
     if (config) {
+      // Validate override values before applying
+      if (config.maxSize !== undefined && config.maxSize < 1) {
+        throw new Error(
+          `analytics.buffer.maxSize must be at least 1, got ${config.maxSize}`,
+        );
+      }
+      if (config.maxRetries !== undefined && config.maxRetries < 0) {
+        throw new Error(
+          `analytics.buffer.maxRetries must be non-negative, got ${config.maxRetries}`,
+        );
+      }
+      if (config.batchSize !== undefined && config.batchSize < 1) {
+        throw new Error(
+          `analytics.buffer.batchSize must be at least 1, got ${config.batchSize}`,
+        );
+      }
+      if (config.retryBaseMs !== undefined && config.retryBaseMs <= 0) {
+        throw new Error(
+          `analytics.buffer.retryBaseMs must be positive (> 0), got ${config.retryBaseMs}`,
+        );
+      }
+      if (config.debounceMs !== undefined && config.debounceMs < 0) {
+        throw new Error(
+          `analytics.buffer.debounceMs must be non-negative, got ${config.debounceMs}`,
+        );
+      }
+      if (config.batchDelayMs !== undefined && config.batchDelayMs < 0) {
+        throw new Error(
+          `analytics.buffer.batchDelayMs must be non-negative, got ${config.batchDelayMs}`,
+        );
+      }
+      if (
+        config.endpoint !== undefined &&
+        config.endpoint !== null &&
+        typeof config.endpoint === "string" &&
+        config.endpoint.trim().length === 0
+      ) {
+        throw new Error(
+          `analytics.buffer.endpoint must not be an empty string; use null to disable`,
+        );
+      }
+
       this.config = { ...this.config, ...config };
       logger
         .category("analytics")
@@ -227,7 +288,7 @@ class AnalyticsBufferService {
           }
         })();
       }
-    } catch (error) {
+    } catch {
       logger
         .category("analytics")
         .debug("Could not check for ready events on initialize (network not available yet)");
@@ -304,6 +365,13 @@ class AnalyticsBufferService {
       return null;
     }
 
+    if (!this.config.enabled) {
+      logger
+        .category("analytics")
+        .debug("Analytics buffer disabled; skipping enqueue");
+      return null;
+    }
+
     try {
       const queued: QueuedAnalyticsEvent = {
         ...event,
@@ -326,6 +394,7 @@ class AnalyticsBufferService {
 
       this.queue.push(queued);
       await this.persist();
+      this.notifySubscribers();
 
       logger
         .category("analytics")
@@ -347,7 +416,7 @@ class AnalyticsBufferService {
    *
    * Returns events in FIFO order (oldest first), up to batchSize
    */
-  async peek(batchSize: number = this.config.batchSize): Promise<QueuedAnalyticsEvent[]> {
+  peek(batchSize: number = this.config.batchSize): QueuedAnalyticsEvent[] {
     return this.queue
       .slice(0, batchSize)
       .sort((a, b) => a.timestamp - b.timestamp);
@@ -363,6 +432,7 @@ class AnalyticsBufferService {
 
     if (removedCount > 0) {
       await this.persist();
+      this.notifySubscribers();
       logger
         .category("analytics")
         .debug(
@@ -394,6 +464,7 @@ class AnalyticsBufferService {
       // Discard permanently
       this.queue = this.queue.filter((e) => e.id !== id);
       await this.persist();
+      this.notifySubscribers();
       logger
         .category("analytics")
         .warn(
@@ -410,6 +481,7 @@ class AnalyticsBufferService {
     event.nextAttemptAt = Date.now() + backoffMs;
 
     await this.persist();
+    this.notifySubscribers();
 
     logger
       .category("analytics")
@@ -427,6 +499,7 @@ class AnalyticsBufferService {
 
     if (this.queue.length < beforeCount) {
       await this.persist();
+      this.notifySubscribers();
       logger
         .category("analytics")
         .info(`Discarded analytics event ${id}: ${reason}`);
@@ -449,7 +522,27 @@ class AnalyticsBufferService {
     this.queue = [];
     this.overflowCount = 0;
     await SecureStorage.removeItem(STORAGE_KEYS.ANALYTICS_OFFLINE_QUEUE);
+    this.notifySubscribers();
     logger.category("analytics").warn("Cleared analytics buffer queue");
+  }
+
+  /**
+   * Get and reset the overflow count for this session
+   *
+   * Use this to inspect how many events were dropped due to queue overflow,
+   * then reset the counter for the next monitoring period.
+   *
+   * @returns Current overflow count (events dropped since last reset or app start)
+   */
+  getAndResetOverflowCount(): number {
+    const count = this.overflowCount;
+    this.overflowCount = 0;
+    logger
+      .category("analytics")
+      .debug(
+        `Overflow count reset: was ${count}, now 0 (session-only metric)`,
+      );
+    return count;
   }
 
   /**
@@ -489,7 +582,7 @@ class AnalyticsBufferService {
   /**
    * Get all queued events (for debugging)
    */
-  async getAll(): Promise<QueuedAnalyticsEvent[]> {
+  getAll(): QueuedAnalyticsEvent[] {
     return [...this.queue];
   }
 
@@ -571,9 +664,46 @@ class AnalyticsBufferService {
         .debug("Analytics consent withdrawn; no pending events to discard");
     }
   }
+
+  /**
+   * Subscribe to buffer state changes (observer pattern)
+   * Subscriber callback is called whenever queue or flushing state changes
+   * Returns unsubscribe function
+   */
+  subscribe(callback: AnalyticsBufferSubscriber): () => void {
+    this.subscribers.add(callback);
+    // Return unsubscribe function
+    return () => {
+      this.subscribers.delete(callback);
+    };
+  }
+
+  /**
+   * Notify all subscribers of state change
+   * @internal
+   */
+  private notifySubscribers(): void {
+    this.subscribers.forEach((callback) => {
+      try {
+        callback();
+      } catch (error) {
+        logger
+          .category("error")
+          .error("Analytics buffer subscriber error:", error);
+      }
+    });
+  }
 }
 
 /**
  * Singleton instance
  */
 export const analyticsBufferService = new AnalyticsBufferService();
+/**
+ * Notify buffer subscribers when flushing state changes
+ * Called from analytics-network-integration.ts via _setAnalyticsBufferFlushing
+ * @internal
+ */
+export function notifyBufferStateChange(): void {
+  (analyticsBufferService as any).notifySubscribers?.();
+}

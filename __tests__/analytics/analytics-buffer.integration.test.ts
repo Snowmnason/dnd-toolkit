@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 let AnalyticsBufferService: any;
 let NetworkDetection: any;
@@ -10,7 +10,7 @@ try {
 }
 
 try {
-  AnalyticsBufferService = require('@/lib/analytics/analytics-buffer').AnalyticsBufferService;
+  AnalyticsBufferService = require('@/lib/analytics/analytics-buffer').analyticsBufferService;
 } catch (e) {
   AnalyticsBufferService = null;
 }
@@ -31,14 +31,12 @@ if (!AnalyticsBufferService || !NetworkDetection) {
     let cb: any = null;
     (NetworkDetection as any).subscribe = (fn: any) => { cb = fn; return () => {}; };
 
-    // mock a send function on the service (provider adapter)
-    const sendMock = vi.fn().mockResolvedValue({ status: 200 });
-    if ((AnalyticsBufferService as any)._setSender) {
-      (AnalyticsBufferService as any)._setSender(sendMock);
-    }
+    // mock network call used by sendAnalyticsEventsBatch via global fetch
+    const fetchMock = vi.fn().mockResolvedValue({ status: 200 });
+    vi.stubGlobal('fetch', fetchMock as any);
 
     await AnalyticsBufferService.initialize({ batchSize: 25 } as any);
-    await AnalyticsBufferService.enqueue({ id: 'i1', eventType: 'p', payload: {}, retryCount: 0, maxRetries: 3, timestamp: Date.now() } as any);
+    await AnalyticsBufferService.enqueue({ eventType: 'p', payload: { note: 'i1' }, maxRetries: 3 } as any);
 
     // simulate online transition
     cb && cb({ isOnline: true });
@@ -46,31 +44,34 @@ if (!AnalyticsBufferService || !NetworkDetection) {
     // give microtasks time
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(sendMock).toHaveBeenCalled();
+    expect((global as any).fetch).toHaveBeenCalled();
   });
 
   it('keeps events in queue on 5xx and retries later', async () => {
     let cb: any = null;
     (NetworkDetection as any).subscribe = (fn: any) => { cb = fn; return () => {}; };
 
-    const sendMock = vi.fn()
+    const fetchMock = vi.fn()
       .mockResolvedValueOnce({ status: 500 })
       .mockResolvedValueOnce({ status: 200 });
-
-    if ((AnalyticsBufferService as any)._setSender) {
-      (AnalyticsBufferService as any)._setSender(sendMock);
-    }
+    vi.stubGlobal('fetch', fetchMock as any);
 
     await AnalyticsBufferService.initialize({ batchSize: 25, retryBaseMs: 1 } as any);
-    await AnalyticsBufferService.enqueue({ id: 'r1', eventType: 'e', payload: {}, retryCount: 0, maxRetries: 2, timestamp: Date.now() } as any);
+    await AnalyticsBufferService.enqueue({ eventType: 'e', payload: { note: 'r1' }, maxRetries: 2 } as any);
 
     cb && cb({ isOnline: true });
     await new Promise((r) => setTimeout(r, 20));
 
     // first attempt failed, should have retried
-    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect((global as any).fetch).toHaveBeenCalledTimes(2);
     const stats = AnalyticsBufferService.getStats();
-    expect(stats.size).toBe(0);
+    expect(stats.queueSize).toBe(0);
+  });
+
+  afterEach(() => {
+    try {
+      vi.unstubAllGlobals();
+    } catch {}
   });
 });
 

@@ -96,6 +96,8 @@ export interface AppSettings {
       batchSize?: number;
       retryBaseMs?: number;
       debounceMs?: number;
+      batchDelayMs?: number;
+      endpoint?: string | null;
       description?: string;
     };
     description?: string;

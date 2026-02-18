@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 let HookModule: any;
 try {
-  HookModule = require('@/lib/analytics/hooks/useAnalyticsBufferStatus');
+  HookModule = require('@/hooks/analytics/use-analytics-buffer-status');
 } catch (e) {
   HookModule = null;
 }

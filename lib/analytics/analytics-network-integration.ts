@@ -11,11 +11,19 @@
  * - Consent-aware flushing (no flush if consent withdrawn)
  */
 
+import { _setAnalyticsBufferFlushing } from "@/hooks/analytics/use-analytics-buffer-status";
 import { getAppConfig } from "@/lib/config/loader";
 import { NetworkDetection, type NetworkStatus } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
 import { analyticsBufferService } from "./analytics-buffer";
 import { AnalyticsConsent } from "./consent";
+
+/**
+ * Prevent concurrent flushes
+ * If a flush is already in progress, subsequent calls return early
+ * to avoid duplicate sends and race conditions
+ */
+let isFlushing = false;
 
 /**
  * Flush analytics events to backend
@@ -24,6 +32,16 @@ import { AnalyticsConsent } from "./consent";
  * Respects nextAttemptAt scheduling (only flushes events ready for retry)
  */
 export async function flushAnalyticsQueue(): Promise<void> {
+  // Prevent concurrent flushes (race condition guard)
+  if (isFlushing) {
+    logger
+      .category("analytics")
+      .debug("Flush already in progress, skipping concurrent request");
+    return;
+  }
+
+  isFlushing = true;
+
   try {
     // Check consent before flushing
     // Note: "usage" consent is for user behavior analytics like screen_view
@@ -35,6 +53,9 @@ export async function flushAnalyticsQueue(): Promise<void> {
         .debug("Analytics consent not given, skipping flush");
       return;
     }
+
+    // Signal that flush is starting
+    _setAnalyticsBufferFlushing(true);
 
     // Get config
     const config = getAppConfig();
@@ -53,7 +74,7 @@ export async function flushAnalyticsQueue(): Promise<void> {
     ) {
       batchCount++;
 
-      const batch = await analyticsBufferService.peek(batchSize);
+      const batch = analyticsBufferService.peek(batchSize);
       if (!batch || batch.length === 0) {
         break;
       }
@@ -122,9 +143,11 @@ export async function flushAnalyticsQueue(): Promise<void> {
         break;
       }
 
-      // Space out batches to avoid overwhelming backend
+      // Space out batches to avoid overwhelming backend (configurable delay)
       if (analyticsBufferService.size() > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const config = getAppConfig();
+        const delayMs = config.analytics?.buffer?.batchDelayMs ?? 1000;
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
 
@@ -143,6 +166,11 @@ export async function flushAnalyticsQueue(): Promise<void> {
       .error("Analytics flush error:", {
         error: String(error),
       });
+  } finally {
+    // Signal that flush is complete
+    _setAnalyticsBufferFlushing(false, Date.now());
+    // Release flush lock
+    isFlushing = false;
   }
 }
 
@@ -233,27 +261,63 @@ async function sendAnalyticsEventsBatch(
 
 /**
  * Get the analytics backend endpoint
- * Determines based on environment and Sentry config
+ * 
+ * Tries in order:
+ * 1. Config value from appsettings (analytics.buffer.endpoint)
+ * 2. Environment variable EXPO_PUBLIC_ANALYTICS_ENDPOINT
+ * 3. Sentry DSN parsing (if EXPO_PUBLIC_SENTRY_DSN is set)
+ * 
+ * IMPORTANT: This function must be configured with a valid endpoint before production use.
+ * The fallback behavior (Sentry DSN parsing) is incomplete and may fail silently.
+ * 
+ * @throws Error if no valid endpoint is available
  */
 function getAnalyticsEndpoint(): string {
-  // In a real implementation, this would determine the correct endpoint
-  // based on the analytics provider (Sentry, Mixpanel, Segment, etc.)
-  // For now, return a placeholder
+  const config = getAppConfig();
+  
+  // Try config first
+  const configEndpoint = config.analytics?.buffer?.endpoint;
+  if (configEndpoint) {
+    return configEndpoint;
+  }
+  
+  // Try environment variable
+  const envEndpoint = process.env.EXPO_PUBLIC_ANALYTICS_ENDPOINT;
+  if (envEndpoint) {
+    return envEndpoint;
+  }
+  
+  // Try Sentry DSN parsing as fallback (Sentry-specific)
   const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
-
   if (sentryDsn) {
-    // Parse Sentry DSN to get the endpoint
     try {
       const url = new URL(sentryDsn);
       const projectId = url.pathname.split("/").pop();
-      return `${url.protocol}//${url.host}/api/${projectId}/store/`;
-    } catch {
-      // Fallback
+      const endpoint = `${url.protocol}//${url.host}/api/${projectId}/store/`;
+      logger
+        .category("analytics")
+        .warn(
+          "Using Sentry DSN for analytics endpoint (fallback). Configure analytics.buffer.endpoint or EXPO_PUBLIC_ANALYTICS_ENDPOINT for explicit control.",
+          { endpoint },
+        );
+      return endpoint;
+    } catch (error) {
+      logger
+        .category("analytics")
+        .warn(
+          "Failed to parse Sentry DSN for analytics endpoint. Configure analytics.buffer.endpoint or EXPO_PUBLIC_ANALYTICS_ENDPOINT.",
+          { error: String(error) },
+        );
     }
   }
-
-  // Fallback endpoint (would be configured per provider)
-  return "https://analytics.example.com/batch";
+  
+  // No valid endpoint available
+  const errorMsg =
+    "Analytics endpoint not configured. Set analytics.buffer.endpoint in appsettings.json, " +
+    "EXPO_PUBLIC_ANALYTICS_ENDPOINT env var, or EXPO_PUBLIC_SENTRY_DSN. " +
+    "Analytics events will not be sent until this is resolved.";
+  logger.category("error").error(errorMsg);
+  throw new Error(errorMsg);
 }
 
 /**
@@ -266,8 +330,9 @@ function getAnalyticsEndpoint(): string {
  */
 let isInitialized = false;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
-let retrySchedulerTimer: ReturnType<typeof setInterval> | null = null;
+let retrySchedulerTimer: ReturnType<typeof setTimeout> | null = null;
 let unsubscribeFromNetwork: (() => void) | null = null;
+let unsubscribeFromBuffer: (() => void) | null = null;
 
 export function initializeAnalyticsNetworkIntegration(): void {
   if (isInitialized) {
@@ -280,7 +345,6 @@ export function initializeAnalyticsNetworkIntegration(): void {
   try {
     const config = getAppConfig();
     const debounceMs = config.analytics?.buffer?.debounceMs ?? 5000;
-    const retryCheckIntervalMs = 30000; // Check for scheduled retries every 30s
 
     // Subscribe to network status changes
     unsubscribeFromNetwork = NetworkDetection.subscribe(
@@ -289,19 +353,22 @@ export function initializeAnalyticsNetworkIntegration(): void {
       },
     );
 
-    // Start retry scheduler: periodically check for events ready to retry
-    retrySchedulerTimer = setInterval(() => {
-      scheduleReadyRetries().catch((error) => {
-        logger
-          .category("analytics")
-          .error("Retry scheduler error:", { error: String(error) });
-      });
-    }, retryCheckIntervalMs);
+    // Subscribe to buffer state changes to reschedule retries dynamically
+    // When events are marked as failed or flushed, recalculate the next retry time
+    unsubscribeFromBuffer = analyticsBufferService.subscribe(() => {
+      // Reschedule retry timeout based on updated buffer state
+      void rescheduleRetryTimeout();
+    });
+
+    // Schedule initial retry timeout
+    void rescheduleRetryTimeout();
 
     isInitialized = true;
     logger
       .category("analytics")
-      .debug("Analytics network integration initialized with retry scheduler");
+      .debug(
+        "Analytics network integration initialized with dynamic retry scheduling",
+      );
   } catch (error) {
     logger
       .category("analytics")
@@ -309,6 +376,69 @@ export function initializeAnalyticsNetworkIntegration(): void {
         error: String(error),
       });
   }
+}
+
+/**
+ * Calculate the next retry time from scheduled events
+ * Returns milliseconds from now, or null if no scheduled events or all events ready
+ * @internal
+ */
+async function calculateNextRetryDelay(): Promise<number | null> {
+  const allEvents = analyticsBufferService.getAll();
+  const now = Date.now();
+
+  // Find all events with scheduled retry times in the future
+  const scheduledEvents = allEvents.filter(
+    (e) => e.nextAttemptAt && e.nextAttemptAt > now,
+  );
+
+  if (scheduledEvents.length === 0) {
+    return null; // No scheduled events
+  }
+
+  // Calculate delay to the nearest scheduled event
+  const nextRetryTime = Math.min(...scheduledEvents.map((e) => e.nextAttemptAt!));
+  return Math.max(0, nextRetryTime - now); // Ensure non-negative
+}
+
+/**
+ * Reschedule retry timeout based on the next event retry time
+ * This replaces fixed polling with dynamic scheduling:
+ * - If no scheduled events: no timeout is set
+ * - If events are scheduled: timeout is set for exactly that time
+ * - When buffer state changes: timeout is recalculated
+ * @internal
+ */
+async function rescheduleRetryTimeout(): Promise<void> {
+  // Clear existing retry timeout if any
+  if (retrySchedulerTimer) {
+    clearTimeout(retrySchedulerTimer);
+    retrySchedulerTimer = null;
+  }
+
+  // Don't schedule if offline
+  if (!NetworkDetection.isOnline()) {
+    return;
+  }
+
+  // Calculate next retry time
+  const delayMs = await calculateNextRetryDelay();
+  if (delayMs === null) {
+    logger
+      .category("analytics")
+      .debug("Retry scheduler: No scheduled events, timeout cleared");
+    return;
+  }
+
+  // Schedule timeout for the exact next retry time
+  logger
+    .category("analytics")
+    .debug(`Retry scheduler: Next retry in ${delayMs}ms`);
+
+  retrySchedulerTimer = setTimeout(() => {
+    retrySchedulerTimer = null;
+    void scheduleReadyRetries();
+  }, delayMs);
 }
 
 /**
@@ -322,25 +452,15 @@ async function scheduleReadyRetries(): Promise<void> {
     }
 
     // Check if any events are ready to retry
-    const allEvents = await analyticsBufferService.getAll();
+    const allEvents = analyticsBufferService.getAll();
     const now = Date.now();
     const readyEvents = allEvents.filter(
       (e) => !e.nextAttemptAt || e.nextAttemptAt <= now,
     );
 
     if (readyEvents.length === 0) {
-      // No events ready to retry
-      const scheduledEvents = allEvents.filter(
-        (e) => e.nextAttemptAt && e.nextAttemptAt > now,
-      );
-      if (scheduledEvents.length > 0) {
-        const nextRetryMs = Math.min(...scheduledEvents.map((e) => e.nextAttemptAt!));
-        logger
-          .category("analytics")
-          .debug(
-            `Retry scheduler: ${scheduledEvents.length} events scheduled, next in ${nextRetryMs - now}ms`,
-          );
-      }
+      // No events ready to retry; reschedule for the next retry time
+      void rescheduleRetryTimeout();
       return;
     }
 
@@ -351,17 +471,16 @@ async function scheduleReadyRetries(): Promise<void> {
       );
 
     // Trigger a non-blocking flush
-    flushAnalyticsQueue().catch((error) => {
-      logger
-        .category("analytics")
-        .error("Retry flush failed:", { error: String(error) });
-    });
+    await flushAnalyticsQueue();
+
+    // After flush, reschedule based on updated buffer state
+    void rescheduleRetryTimeout();
   } catch (error) {
     logger
       .category("analytics")
-      .error("Error checking for ready retries:", {
-        error: String(error),
-      });
+      .error("Retry scheduler error:", { error: String(error) });
+    // Attempt to reschedule even on error
+    void rescheduleRetryTimeout();
   }
 }
 
@@ -407,13 +526,18 @@ export function cleanupAnalyticsNetworkIntegration(): void {
   }
 
   if (retrySchedulerTimer) {
-    clearInterval(retrySchedulerTimer);
+    clearTimeout(retrySchedulerTimer);
     retrySchedulerTimer = null;
   }
 
   if (unsubscribeFromNetwork) {
     unsubscribeFromNetwork();
     unsubscribeFromNetwork = null;
+  }
+
+  if (unsubscribeFromBuffer) {
+    unsubscribeFromBuffer();
+    unsubscribeFromBuffer = null;
   }
 
   isInitialized = false;

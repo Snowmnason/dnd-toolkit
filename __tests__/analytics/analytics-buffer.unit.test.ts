@@ -10,7 +10,7 @@ try {
 }
 
 try {
-  AnalyticsBufferService = require('@/lib/analytics/analytics-buffer').AnalyticsBufferService;
+  AnalyticsBufferService = require('@/lib/analytics/analytics-buffer').analyticsBufferService;
 } catch (e) {
   AnalyticsBufferService = null;
 }
@@ -31,45 +31,44 @@ if (!AnalyticsBufferService) {
 
     await AnalyticsBufferService.initialize();
 
+    // Do not provide id/timestamp/retryCount - service should generate them
     await AnalyticsBufferService.enqueue({
-      id: 'evt-1',
       eventType: 'pageview',
       payload: { path: '/home' },
-      retryCount: 0,
       maxRetries: 5,
-      timestamp: Date.now(),
     } as any);
 
     expect(saveMock).toHaveBeenCalled();
     const stats = AnalyticsBufferService.getStats();
-    expect(stats.size).toBeGreaterThanOrEqual(1);
+    expect(stats.queueSize).toBeGreaterThanOrEqual(1);
   });
 
   it('peek returns FIFO order and respects batch size', async () => {
     vi.spyOn(SecureStorage, 'setJSON').mockResolvedValue(undefined as any);
     await AnalyticsBufferService.initialize();
 
-    const makeEvent = (i: number) => ({ id: `e${i}`, eventType: 'ev', payload: {}, retryCount: 0, maxRetries: 5, timestamp: Date.now() + i });
+    // Use payload sequence markers to assert ordering since ids/timestamps are auto-generated
+    const makeEvent = (i: number) => ({ eventType: 'ev', payload: { seq: i }, maxRetries: 5 } as any);
 
-    await AnalyticsBufferService.enqueue(makeEvent(1) as any);
-    await AnalyticsBufferService.enqueue(makeEvent(2) as any);
-    await AnalyticsBufferService.enqueue(makeEvent(3) as any);
+    await AnalyticsBufferService.enqueue(makeEvent(1));
+    await AnalyticsBufferService.enqueue(makeEvent(2));
+    await AnalyticsBufferService.enqueue(makeEvent(3));
 
     const batch = AnalyticsBufferService.peek(2);
-    expect(batch.map((b: any) => b.id)).toEqual(['e1','e2']);
+    expect(batch.map((b: any) => b.payload?.seq)).toEqual([1, 2]);
   });
 
   it('trims oldest events when maxSize exceeded', async () => {
     vi.spyOn(SecureStorage, 'setJSON').mockResolvedValue(undefined as any);
     await AnalyticsBufferService.initialize({ maxSize: 3 } as any);
 
-    await AnalyticsBufferService.enqueue({ id: 'a', eventType: 'x', payload: {}, retryCount: 0, maxRetries: 5, timestamp: Date.now() } as any);
-    await AnalyticsBufferService.enqueue({ id: 'b', eventType: 'x', payload: {}, retryCount: 0, maxRetries: 5, timestamp: Date.now() } as any);
-    await AnalyticsBufferService.enqueue({ id: 'c', eventType: 'x', payload: {}, retryCount: 0, maxRetries: 5, timestamp: Date.now() } as any);
-    await AnalyticsBufferService.enqueue({ id: 'd', eventType: 'x', payload: {}, retryCount: 0, maxRetries: 5, timestamp: Date.now() } as any);
+    await AnalyticsBufferService.enqueue({ eventType: 'x', payload: { seq: 'a' }, maxRetries: 5 } as any);
+    await AnalyticsBufferService.enqueue({ eventType: 'x', payload: { seq: 'b' }, maxRetries: 5 } as any);
+    await AnalyticsBufferService.enqueue({ eventType: 'x', payload: { seq: 'c' }, maxRetries: 5 } as any);
+    await AnalyticsBufferService.enqueue({ eventType: 'x', payload: { seq: 'd' }, maxRetries: 5 } as any);
 
     const stats = AnalyticsBufferService.getStats();
-    expect(stats.size).toBeLessThanOrEqual(3);
+    expect(stats.queueSize).toBeLessThanOrEqual(3);
   });
 });
 

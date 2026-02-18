@@ -1,10 +1,11 @@
 /**
  * Hook for debugging analytics buffer status
  *
- * Use this in development or admin panels to inspect the analytics queue
+ * Use this in development or admin panels to inspect the analytics queue.
+ * Uses subscription-based updates (not polling) to avoid redundant work.
  */
 
-import { analyticsBufferService } from "@/lib/analytics/analytics-buffer";
+import { analyticsBufferService, notifyBufferStateChange } from "@/lib/analytics/analytics-buffer";
 import { useEffect, useState } from "react";
 
 export interface AnalyticsBufferStatus {
@@ -22,7 +23,7 @@ let lastFlushTime: number | null = null;
 
 /**
  * Hook to get analytics buffer status
- * Updates whenever the buffer changes
+ * Subscribes to buffer state changes instead of polling for efficiency
  */
 export function useAnalyticsBufferStatus(): AnalyticsBufferStatus {
   const [status, setStatus] = useState<AnalyticsBufferStatus>(() => {
@@ -39,8 +40,10 @@ export function useAnalyticsBufferStatus(): AnalyticsBufferStatus {
   });
 
   useEffect(() => {
-    // Poll buffer status every 500ms (light polling during flushes)
-    const interval = setInterval(async () => {
+    /**
+     * Update state with current buffer and flushing state
+     */
+    const updateStatus = async () => {
       const stats = analyticsBufferService.getStats();
       const allEvents = await analyticsBufferService.getAll();
       const eventTypes = Array.from(
@@ -55,9 +58,20 @@ export function useAnalyticsBufferStatus(): AnalyticsBufferStatus {
         maxSize: stats.maxSize,
         oldestEventAge: stats.oldestEventAge,
       });
-    }, 500);
+    };
 
-    return () => clearInterval(interval);
+    // Subscribe to buffer state changes
+    // Callback fires whenever queue or flushing state changes
+    const unsubscribe = analyticsBufferService.subscribe(updateStatus);
+
+    // Initial update (state may have changed since hook was mounted)
+    updateStatus().catch((error) => {
+      console.error("Error updating analytics buffer status:", error);
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   return status;
@@ -65,6 +79,7 @@ export function useAnalyticsBufferStatus(): AnalyticsBufferStatus {
 
 /**
  * Internal: Update flushing state (called from network integration)
+ * Notifies all buffer subscribers when flushing state changes
  * @internal
  */
 export function _setAnalyticsBufferFlushing(
@@ -75,4 +90,7 @@ export function _setAnalyticsBufferFlushing(
   if (value === false && timestamp) {
     lastFlushTime = timestamp;
   }
+  // Notify subscribed components of state change
+  notifyBufferStateChange();
 }
+
