@@ -554,22 +554,27 @@ class RequestManagerClass {
     }
 
     // Quality rank: 4g > 3g > 2g > slow-2g > offline
-    const qualityRank: Record<string, number> = {
+    const qualityRank = {
       '4g': 5,
       '3g': 4,
       '2g': 3,
       'slow-2g': 2,
       'offline': 1,
       'unknown': 3, // Treat unknown as 2g-equivalent
+    } as const;
+
+    // Type-safe helper to get quality rank (eliminates object injection warnings)
+    const getRank = (quality: string | undefined): number => {
+      if (!quality) return qualityRank.unknown;
+      const rank = qualityRank[quality as keyof typeof qualityRank];
+      return rank ?? qualityRank.unknown;
     };
 
-    const startQuality = inFlightRequest.effectiveType || 'unknown';
-    const currentQuality = currentStatus.effectiveType || 'unknown';
+    const startQuality = inFlightRequest.effectiveType;
+    const currentQuality = currentStatus.effectiveType;
 
-    // eslint-disable-next-line security/detect-object-injection
-    const startRank = qualityRank[startQuality] ?? 3;
-    // eslint-disable-next-line security/detect-object-injection
-    const currentRank = qualityRank[currentQuality] ?? 3;
+    const startRank = getRank(startQuality);
+    const currentRank = getRank(currentQuality);
 
     // Only abort if quality degraded by at least 2 tiers (e.g., 4g → 2g)
     // Minor degradation (4g → 3g) not worth aborting
@@ -1867,11 +1872,10 @@ class RequestManagerClass {
     error: unknown,
     cbKey?: string,
   ): Promise<boolean> {
-    // Check if network is offline (OFFLINE or CELLULAR)
+    // Check if network is offline. CELLULAR is a valid connected state (per state machine)
+    // and should NOT trigger offline queueing. Only true OFFLINE should queue requests.
     const networkStatus = await NetworkDetection.getStatus();
-    const isOffline =
-      networkStatus.connectionQuality === "offline" ||
-      networkStatus.connectionQuality === "cellular";
+    const isOffline = networkStatus.connectionQuality === "offline";
 
     if (isOffline) {
       logger.debug("api", "Should queue: network offline", {

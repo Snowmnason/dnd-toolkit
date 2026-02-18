@@ -419,7 +419,8 @@ class AppKernelClass {
               "@/lib/network"
             );
             initializeTelemetry();
-            startHealthCheckInterval(300000); // 5 minutes default
+            // Skip initial check since initializeTelemetry() already captured initial state
+            startHealthCheckInterval(300000, true); // 5 minutes default, skip initial
             logger.category("bootstrap").debug("Network telemetry initialized");
           } catch (error) {
             logger

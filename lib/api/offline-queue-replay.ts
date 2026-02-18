@@ -62,11 +62,8 @@ async function handleNetworkStatusChange(status: NetworkStatus): Promise<void> {
     } catch (error) {
       logger.error("api", "Error flushing offline queue on reconnect", error);
     }
-  } else if (
-    status.connectionQuality === "offline" ||
-    status.connectionQuality === "cellular"
-  ) {
-    logger.debug("api", "Network offline or poor, pausing queue replay", {
+  } else if (status.connectionQuality === "offline") {
+    logger.debug("api", "Network offline, pausing queue replay", {
       connectionQuality: status.connectionQuality,
     });
   }

@@ -20,6 +20,11 @@
  * - Detector auto-resets when app exits safe mode
  */
 
+// NOTE: previously had a diagnostic call to `process.memoryUsage()` here which
+// caused runtime failures under Metro (process.memoryUsage not available).
+// Keep this file import-safe in all environments.
+
+
 import { QueryCache } from "@/lib/cache/query-cache";
 import { getAppConfig } from "@/lib/config";
 import {

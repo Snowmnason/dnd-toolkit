@@ -41,7 +41,8 @@
  * ✗ app-specific data or customer data
  *
  * Privacy Controls:
- * - Consent gating: telemetry respects config.network.telemetry.enabled and hasPrivacyConsent()
+ * - Consent gating: respects config.network.telemetry.enabled and AnalyticsConsent.isAllowed('performance')
+ * - Integrates with lib/analytics/consent.ts for centralized consent management
  * - If consent is not granted or config disabled, NO data is captured or emitted
  * - Error queue is bounded to prevent memory exhaustion; oldest events dropped on overflow
  * - No backend ingestion yet; Phase 1 is local logging only (Phase 2+ will add server integration)
@@ -49,10 +50,11 @@
  * Sampling and privacy controls are handled in Phase 1c.
  */
 
+import { AnalyticsConsent } from "@/lib/analytics";
+import { getPlatformName } from "@/lib/config/platform-config";
 import { composeNetworkContext, type ConnectionType, type NetworkContext } from "@/lib/network/helpers";
 import { NetworkDetection, type NetworkStatus } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
-import { Platform } from "react-native";
 
 /**
  * Quality tier for telemetry events
@@ -144,15 +146,12 @@ export function mapQualityTier(
 
 /**
  * Get platform identifier
+ * Uses centralized platform detection from lib/config/platform-config
  */
 function getPlatform(): "web" | "ios" | "android" | "desktop" {
-  if (typeof window !== "undefined" && typeof navigator !== "undefined") {
-    return "web";
-  }
-  if (Platform.OS === "ios") return "ios";
-  if (Platform.OS === "android") return "android";
-  if (Platform.OS === "windows" || Platform.OS === "macos") return "desktop";
-  return "web"; // fallback
+  const platformName = getPlatformName();
+  // Default to "web" if platform detection returns "unknown"
+  return platformName === "unknown" ? "web" : platformName;
 }
 
 /**
@@ -218,51 +217,39 @@ function shouldSample(sampleRate: number): boolean {
 }
 
 /**
- * Check if analytics consent is granted (works with #181)
- * Phase 1c: client-side consent; Phase 2+ will handle backend privacy
- * @returns true if telemetry is enabled and has consent
- */
-/**
- * Check if analytics consent is granted.
+ * Check if analytics consent is granted for network telemetry.
+ * 
+ * Network telemetry is categorized as 'performance' data (Network Information API,
+ * latency measurements, connection quality metrics). This respects the centralized
+ * AnalyticsConsent manager in lib/analytics for consistency with other analytics systems.
+ * 
  * Behavior:
- * - If config.network.telemetry.enabled === false => false
- * - If an app-provided sync consent API is exposed on `global.__CONSENT__` and
- *   implements `hasAnalyticsConsent()` (sync) it will be used.
- * - Otherwise returns true (legacy behavior: telemetry enabled by default).
- *
- * NOTE: This is intentionally synchronous to avoid changing public API of
- * emit/capture functions. Integrate with #181 consent manager when available.
+ * - If config.network.telemetry.enabled === false => false (config takes priority)
+ * - Otherwise, check AnalyticsConsent.isAllowed('performance')
+ * 
+ * @returns true if telemetry is enabled and user has consented to performance tracking
  */
 function hasPrivacyConsent(): boolean {
   try {
-    // Prefer explicit config toggle first
+    // Config toggle takes priority (allows server-side or environment-based disable)
     const { getAppConfig } = require("@/lib/config");
     const cfg = getAppConfig?.();
     if (cfg && cfg.network && cfg.network.telemetry === false) return false;
     if (cfg && cfg.network && typeof cfg.network.telemetry === "object") {
-      // If telemetry.enabled is explicitly set to false, block
-      // (appsettings.json controls default behavior)
       const enabled = (cfg.network.telemetry as any)?.enabled;
       if (enabled === false) return false;
     }
 
-    // Optional: allow app to provide a global consent helper
-    // Example integration: global.__CONSENT__ = { hasAnalyticsConsent: () => true }
-    // If present and implements hasAnalyticsConsent(), use it (sync)
-    const maybeConsent: any = (global as any).__CONSENT__;
-    if (maybeConsent && typeof maybeConsent.hasAnalyticsConsent === "function") {
-      try {
-        return !!maybeConsent.hasAnalyticsConsent();
-      } catch {
-        // Fall through to default
-      }
-    }
+    // Check centralized analytics consent system
+    // Network telemetry is considered 'performance' data
+    return AnalyticsConsent.isAllowed("performance");
   } catch {
-    // ignore and fall back to default
+    // Legacy default: if consent system or config loading errors occur, fall
+    // back to legacy behavior (telemetry enabled). This keeps development and
+    // unit tests working while production integrations should provide proper
+    // consent configuration. Adjust if you want stricter failure behavior.
+    return true;
   }
-
-  // Legacy default: telemetry enabled
-  return true;
 }
 
 /**
@@ -382,16 +369,18 @@ export function emitHealthCheckEvent(status: NetworkStatus): void {
     if (isFirstCheck) {
       telemetryState.firstHealthCheckEmitted = true;
     }
-    // Drain any captured error events during health checks so we don't retain
-    // an unbounded in-memory queue. Emit sampled error events as part of health check.
-    try {
-      const events = getAndClearErrorQueue(true);
-      if (events.length > 0) {
-        emitSampledErrorEvents(events);
-      }
-    } catch (err) {
-      logger.category("network").debug("error_drain_failed", String(err));
+  }
+
+  // Always drain error queue on every health check interval, regardless of health check
+  // sampling. This prevents error events from accumulating indefinitely in memory.
+  // Error drainage is independent of health check sampling to ensure bounded queue growth.
+  try {
+    const events = getAndClearErrorQueue(true);
+    if (events.length > 0) {
+      emitSampledErrorEvents(events);
     }
+  } catch (err) {
+    logger.category("network").debug("error_drain_failed", String(err));
   }
 }
 
@@ -464,7 +453,7 @@ export function getAndClearErrorQueue(clearQueue: boolean = true): ErrorCorrelat
 
 /**
  * Emit sampled error correlation events
- * Logs errorsevents at errorCorrelationSampleRate
+ * Logs error events at errorCorrelationSampleRate
  * Usually called periodically (e.g., every 5 minutes) to drain the error queue
  *
  * @param events - Error events to emit (typically from getAndClearErrorQueue)
@@ -496,17 +485,28 @@ export function getErrorQueue(): ErrorCorrelationEvent[] {
  *
  * Should be called during app initialization (AppKernel networkReady phase)
  * Cleans up existing interval if already running to prevent duplicates
+ * 
+ * @param intervalMs - Interval in milliseconds (default: 300000 = 5 minutes)
+ * @param skipInitialCheck - If true, skips the immediate initial health check
+ *                           Set to true if initializeTelemetry() was called first
+ *                           (avoids redundant duplicate health check emission)
  */
-export function startHealthCheckInterval(intervalMs: number = 300000): void {
+export function startHealthCheckInterval(
+  intervalMs: number = 300000,
+  skipInitialCheck: boolean = false,
+): void {
   // Clean up existing interval
   if (telemetryState.healthCheckInterval) {
     clearInterval(telemetryState.healthCheckInterval);
     telemetryState.healthCheckInterval = null;
   }
 
-  // First health check immediately on start (always logged, unsampled)
-  const initialStatus = NetworkDetection.getStatus();
-  emitHealthCheckEvent(initialStatus);
+  // First health check immediately on start (unless skipped)
+  // Skip this if initializeTelemetry() already initialized lastQuality
+  if (!skipInitialCheck) {
+    const initialStatus = NetworkDetection.getStatus();
+    emitHealthCheckEvent(initialStatus);
+  }
 
   // Then periodic checks
   telemetryState.healthCheckInterval = setInterval(() => {
@@ -535,6 +535,16 @@ export function stopHealthCheckInterval(): void {
  * Initialize telemetry integration with NetworkDetection
  *
  * Subscribes to network status changes and emits quality_change events.
+ * Initializes lastQuality to the current network state.
+ * 
+ * **IMPORTANT:** Call this before startHealthCheckInterval() to avoid redundant
+ * health check emissions. If both are called (typical in app initialization),
+ * pass skipInitialCheck: true to startHealthCheckInterval().
+ * 
+ * Example:
+ *   initializeTelemetry();
+ *   startHealthCheckInterval(300000, true); // skip initial check
+ * 
  * Called once during app initialization.
  */
 export function initializeTelemetry(): void {

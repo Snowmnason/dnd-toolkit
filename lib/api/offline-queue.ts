@@ -11,9 +11,10 @@ import type { RequestOptions } from "./request-manager";
 /**
  * Offline Queue System
  *
- * Queues requests that fail when offline (NetworkDetection = OFFLINE/CELLULAR)
- * or when circuit breaker is Open. Replays queued requests automatically
- * when connectivity is restored or manually via flushOfflineQueue().
+ * Queues requests that fail when offline (NetworkDetection = OFFLINE only).
+ * CELLULAR is a valid connected state and should NOT trigger offline queueing.
+ * Replays queued requests automatically when connectivity is restored or manually
+ * via flushOfflineQueue().
  *
  * Features:
  * - FIFO replay with per-key deduplication (keeps latest, resets attempt count)

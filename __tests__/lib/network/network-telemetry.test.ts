@@ -5,6 +5,8 @@ beforeEach(() => {
   vi.resetModules();
   // Mock react-native Platform to avoid importing the real react-native package during tests
   vi.mock("react-native", () => ({ Platform: { OS: "web" } }));
+  // Ensure analytics consent allows performance data in unit tests
+  vi.mock("@/lib/analytics", () => ({ AnalyticsConsent: { isAllowed: (_: string) => true } }));
 });
 
 afterEach(() => {

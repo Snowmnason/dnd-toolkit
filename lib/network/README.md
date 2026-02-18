@@ -643,7 +643,7 @@ Implement server-side support via Issue #XXX - Server-Side Image Variants.
 **Key Integration Points:**
 
 - **Online Detection**: When `NetworkDetection.isOnline` transitions from `false` → `true`, `OnlineSyncManager` begins syncing queued mutations
-- **Connection Quality**: Sync only starts when quality is stable (GOOD); BAD/CELLULAR connections continue queueing
+- **Connection Quality**: Sync only starts when the network is healthy (GOOD or CELLULAR). BAD/OFFLINE connections continue queueing. See `isHealthy()` in `lib/network/state-machine.ts` for semantics.
 - **Debouncing**: Rapid online/offline flapping is debounced (5000ms default) to avoid redundant sync attempts
 - **Error Handling**: If sync fails, mutations remain queued and retry with exponential backoff
 
