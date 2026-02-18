@@ -37,6 +37,9 @@ class BreadcrumbQueueService {
   private readonly maxBreadcrumbs = 500;
   private readonly retentionDays = 14;
   private readonly deduplicationTTL = 24 * 60 * 60 * 1000; // 24h in ms
+  private networkUnsubscribe: (() => void) | null = null;
+  private lastNetworkOnTime = 0;
+  private readonly debounceMs = 5000; // Debounce flush: once per 5s
 
   /**
    * Initialize queue from SecureStorage and set active provider
@@ -297,6 +300,50 @@ class BreadcrumbQueueService {
     await SecureStorage.removeItem(STORAGE_KEYS.BREADCRUMB_QUEUE);
     await SecureStorage.removeItem(STORAGE_KEYS.BREADCRUMB_DEDUP_CACHE);
     logger.category('analytics').info('BreadcrumbQueue', 'Queue cleared');
+  }
+
+  /**
+   * Hook into NetworkDetection for auto-flush on online transition
+   * Returns unsubscribe function for cleanup
+   */
+  hookNetworkDetection(networkDetection: { subscribe: (cb: (status: { isOnline: boolean }) => void) => () => void }): void {
+    if (this.networkUnsubscribe) {
+      logger.category('analytics').warn('BreadcrumbQueue', 'NetworkDetection already hooked');
+      return;
+    }
+
+    let wasOnline = true; // Assume online on initial hook
+
+    this.networkUnsubscribe = networkDetection.subscribe(async (status) => {
+      const now = Date.now();
+      const isOnline = status.isOnline;
+
+      // Online transition (false -> true) with debounce (once per 5s)
+      if (isOnline && !wasOnline && now - this.lastNetworkOnTime >= this.debounceMs) {
+        this.lastNetworkOnTime = now;
+        logger.category('analytics').info('BreadcrumbQueue', 'Online transition detected, triggering auto-flush');
+
+        // Flush in background (non-blocking)
+        this.flush().catch((err) => {
+          logger.category('analytics').warn('BreadcrumbQueue', `Auto-flush failed: ${err}`);
+        });
+      }
+
+      wasOnline = isOnline;
+    });
+
+    logger.category('analytics').info('BreadcrumbQueue', 'NetworkDetection hook installed');
+  }
+
+  /**
+   * Unhook from NetworkDetection
+   */
+  unhookNetworkDetection(): void {
+    if (this.networkUnsubscribe) {
+      this.networkUnsubscribe();
+      this.networkUnsubscribe = null;
+      logger.category('analytics').info('BreadcrumbQueue', 'NetworkDetection hook removed');
+    }
   }
 
   /**
