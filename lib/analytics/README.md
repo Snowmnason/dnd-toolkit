@@ -222,6 +222,62 @@ Returns the delay in ms for a given retry attempt. Base defaults to 1000ms; caps
 
 ---
 
+### Breadcrumb Queue (Offline Queue)
+
+Queues Sentry breadcrumbs when offline and flushes them automatically on reconnect. Provider-agnostic design allows swapping analytics backends.
+
+#### `BreadcrumbQueue.initialize(provider)` — Initialize with provider adapter
+
+Sets up the queue with a provider adapter (e.g., SentryAdapter). Loads persisted breadcrumbs from SecureStorage.
+
+#### `enqueue(breadcrumb)` — Queue a breadcrumb (with dedup via fingerprint)
+
+Adds a breadcrumb to the queue. Deduplicates based on fingerprint hash to prevent duplicates.
+
+#### `stats()` — Get queue statistics (count, pending, lastFlush, etc.)
+
+Returns queue metrics like size, oldest breadcrumb age, provider name.
+
+#### `flush()` — Manual flush (async)
+
+Triggers a manual flush of queued breadcrumbs via the provider.
+
+#### `BreadcrumbProvider` interface — contract for implementing adapters
+
+Interface for provider adapters: `sendBatch(breadcrumbs)`, `parseHttpResponse(response)`.
+
+#### `useBreadcrumbQueueStatus()` — Debug hook
+
+Returns `{ queueSize, isFlushing, lastFlushTime, oldestBreadcrumbTime, providerName }`.
+
+**Queue config** (in `config/appsettings.json`):
+
+```json
+{
+  "analytics": {
+    "breadcrumbQueue": {
+      "enabled": true,
+      "maxBreadcrumbs": 500,
+      "batchSize": 10,
+      "maxRetries": 5,
+      "retryBaseMs": 1000,
+      "debounceMs": 5000
+    }
+  }
+}
+```
+
+| Setting | Default | Description |
+| ------- | ------- | ----------- |
+| `enabled` | `true` | Turns the breadcrumb queue on/off |
+| `maxBreadcrumbs` | `500` | Max queued breadcrumbs; oldest dropped when exceeded (FIFO) |
+| `batchSize` | `10` | Breadcrumbs per flush request |
+| `maxRetries` | `5` | Attempts before a breadcrumb is discarded |
+| `retryBaseMs` | `1000` | Base for exponential backoff |
+| `debounceMs` | `5000` | Debounce delay on network-online transitions |
+
+---
+
 ### Utility Functions
 
 #### `categorizeError(error): ErrorCategory`
@@ -352,6 +408,10 @@ O(n) scan over active marks (typically fewer than 10). Runs automatically after 
 | `session.ts` | `sessionManager`. Tracks session lifetime, screen views, and error count. Sends `session_started` and `session_ended` events. |
 | `analytics-buffer.ts` | Offline event queue. FIFO persistent storage via lib/storage, retry scheduling, overflow tracking, and batch flush logic. |
 | `analytics-network-integration.ts` | Connects the buffer to lib/network. Flushes queued events on online transitions with debouncing and consent checks. |
+| `breadcrumb-queue.ts` | Generic breadcrumb queue for offline queuing. Provider-agnostic, handles dedup, retry, and persistence. |
+| `provider-adapter.ts` | Interface and factory for provider adapters (e.g., Sentry). Enables swapping analytics backends. |
+| `sentry/` | Isolated Sentry implementation. |
+| `sentry/sentry-adapter.ts` | Sentry-specific adapter implementing BreadcrumbProvider. Handles envelope format and rate limits. |
 | `error-categorization.ts` | `categorizeError()`. Classifies errors into `network`, `auth`, `validation`, `timeout`, or `unknown` by inspecting message, name, and code. |
 | `utils.ts` | Shared helpers: `sanitizeError()` (strips sensitive fields), `getThreshold()` (reads from config). |
 | `variant-tracking.ts` | A/B test helpers: `trackVariantAssignment()`, `trackVariantEngagement()`, `trackVariantPerformance()`. |
