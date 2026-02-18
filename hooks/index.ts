@@ -39,8 +39,8 @@ export * from "./jobs";
 
 // Network & Adaptive Payloads
 export { useAdaptivePayload } from "./network/use-adaptive-payload";
-export { useAdaptivePayloadCacheInvalidation, invalidateAdaptivePayloadCache } from "./network/useAdaptivePayloadCacheInvalidation";
 export type { UseAdaptivePayloadResult } from "./network/use-adaptive-payload";
+export { invalidateAdaptivePayloadCache, useAdaptivePayloadCacheInvalidation } from "./network/useAdaptivePayloadCacheInvalidation";
 
 // Offline & Sync
 export * from "./offline/use-offline-queue";
@@ -48,5 +48,9 @@ export * from "./offline/useForceResync";
 
 // Storage
 export * from "./storage/useRefreshStorageCache";
+
+// Analytics
+export { useAnalyticsBufferStatus } from "./analytics/use-analytics-buffer-status";
+export type { AnalyticsBufferStatus } from "./analytics/use-analytics-buffer-status";
 
 // Utilities

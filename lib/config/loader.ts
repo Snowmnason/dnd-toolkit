@@ -88,6 +88,20 @@ export interface AppSettings {
     syncToastDurationMs?: number;
     description?: string;
   };
+  analytics?: {
+    buffer?: {
+      enabled?: boolean;
+      maxSize?: number;
+      maxRetries?: number;
+      batchSize?: number;
+      retryBaseMs?: number;
+      debounceMs?: number;
+      batchDelayMs?: number;
+      endpoint?: string | null;
+      description?: string;
+    };
+    description?: string;
+  };
   thresholds?: {
     slowScreenMs?: number;
     slowRequestMs?: number;

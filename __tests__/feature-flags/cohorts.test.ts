@@ -219,6 +219,47 @@ describe("Phase 3: Cohorts Integration", () => {
         mockMemberships,
       );
     });
+
+    it("should handle Edge Function response with no cohort data gracefully", async () => {
+      const mockSupabase = createMockSupabase(
+        vi.fn().mockResolvedValue({
+          data: {
+            flags: [
+              {
+                flag_name: "regular_feature",
+                enabled: true,
+                kind: "free",
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              },
+            ],
+            entitlements: [],
+            overrides: [],
+            rollouts: {},
+            cohorts: [],
+            cohort_assignments: [],
+            user_cohort_memberships: [],
+            fetchedAt: Date.now(),
+            version: "v1",
+          },
+          error: null,
+        }),
+      );
+
+      await FeatureFlagsManager.initialize(mockSupabase, "user-123");
+      await FeatureFlagsManager.bootstrapFlags();
+
+      // Cohorts setJSON call should either not happen or use an empty object
+      const cohortStoreCalls = (SecureStorage.setJSON as any).mock.calls.filter(
+        (call: any[]) => typeof call[0] === "string" && call[0].includes(":cohorts"),
+      );
+      if (cohortStoreCalls.length > 0) {
+        expect(Object.keys(cohortStoreCalls[0][1])).toHaveLength(0);
+      }
+
+      // Regular flag that has no cohort requirement should still resolve
+      expect(FeatureFlagsManager.getFlag("regular_feature", false)).toBe(true);
+    });
   });
 
   describe("Flag Resolution with Cohorts", () => {
