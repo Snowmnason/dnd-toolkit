@@ -1,888 +1,302 @@
-# lib/config
+# Config Module
+
+Environment-aware configuration management with compile-time development/production separation. Loads `appsettings.json` (production) or `appsettings.dev.json` (development) based on `EXPO_PUBLIC_ENVIRONMENT`, validates settings at app startup, supports config versioning with auto-migrations, and provides dev-only utilities with zero-overhead production no-ops.
 
 ## When to Use This Module
 
-This module provides **environment-aware configuration management** for applications that require different settings across development and production builds. Use `lib/config` when you need to:
+**Use this module if you need to:**
 
 - Load environment-specific settings (development vs. production)
-- Gate dev-only features (console logging, bypass modes, mock data) with compile-time separation
-- Validate critical configuration at app startup (environment variables, required fields, feature flags)
-- Gate feature flags with optional metadata (description, tier: free/premium/beta)
-- Prevent dev features from leaking into production builds
-- Provide safe no-op versions of dev utilities in production (minimal overhead)
+- Gate dev-only features (console logging, bypass modes) with compile-time separation
+- Validate critical configuration at app startup (environment variables, required fields)
+- Provide dev utilities with zero overhead in production (no-ops)
+- Support config evolution with versioning and automatic migrations
+- Detect schema drift between dev and prod configs
 
 **Do NOT use this module for:**
 
 - Runtime user preferences (use `lib/storage` instead)
-- Feature flags that change frequently at runtime (consider a remote config service)
-- Sensitive secrets that should never be committed (use environment variables or CI/CD injection)
-- Non-development-specific conditional logic (use feature flags in `appsettings.json`)
+- Secrets (use environment variables or CI/CD injection instead)
 
 ## Architecture & Data Flow
 
 ```
-Development Build:
-  EXPO_PUBLIC_ENVIRONMENT=development
-  ↓
-  getAppConfig() → loads appsettings.dev.json
-  ↓
-  Config cached (after first call)
-  ↓
-  isDevelopment() → true, dev utilities return real implementations
-  ↓
-  App runs with full logging, dev tools, mock data if enabled
+APP STARTUP
+        ↓
+getAppConfig()
+        ├─ Check EXPO_PUBLIC_ENVIRONMENT
+        │  ├─ 'development' → load appsettings.dev.json
+        │  └─ unset/production → load appsettings.json
+        ↓
+Migrate Config (version compatibility)
+        ↓
+Validate Config (required fields, env vars, security checks)
+        ↓
+Cache globally
+        ↓
+Return AppSettings
 
-Production Build:
-  EXPO_PUBLIC_ENVIRONMENT not set (defaults to production)
-  ↓
-  getAppConfig() → loads appsettings.json
-  ↓
-  Config cached (after first call)
-  ↓
-  isDevelopment() → false, dev utilities return no-ops
-  ↓
-  App runs optimized: no console logging overhead, dev tools disabled
+DEV UTILITIES
+  isDevelopment() → true/false (static per build)
+  useDevConsole(), createDevTimer(), isDevBypassEnabled()
+        → Real implementations in dev
+        → No-ops in production (O(1), nil overhead)
 ```
 
-### Configuration Structure
+## Configuration Structure
 
-All configuration is centralized in two JSON files (`appsettings.json` and `appsettings.dev.json`) loaded based on `EXPO_PUBLIC_ENVIRONMENT`:
+Two JSON files, both following `AppSettings` schema:
 
-- **environment**: `"production" | "development"` - Must match env var
-- **features**: Compile-time toggles (consoleLogging, devBypass, mockData, performanceMonitoring, sentryEnabled)
-- **overrides**: Runtime overrides (mockSupabase, verboseErrorMessages)
-- **devTools**: Development utilities (enableConsoleLogger, enableNetworkLogger, enablePerformanceLogger, enableReduxDevTools, enableReactDevTools)
-- **featureFlags**: Dynamic flags with metadata (enabled, description, kind, optional categories for logger)
-- **thresholds**: Performance thresholds (slowScreenMs, slowRequestMs)
+- **appsettings.json** - Production defaults (committed to repo)
+- **appsettings.dev.json** - Development overrides (committed, not stripped)
 
-## Platform-Specific Overrides
+**Top-level fields:**
 
-This project supports per-platform partial overrides for infrastructure settings via the new `platforms` section in the appsettings files and the helper in `lib/config/platform-config.ts`.
+| Field | Purpose |
+| --- | --- |
+| `version` | Schema version for migrations |
+| `environment` | `"production"` or `"development"` |
+| `features` | Boolean toggles: consoleLogging, devBypass, mockData, performanceMonitoring, sentryEnabled |
+| `overrides` | Runtime flags: mockSupabase, verboseErrorMessages |
+| `devTools` | Dev-only: enableConsoleLogger, enableNetworkLogger, etc. |
+| `featureFlags` | Flags with `{ enabled, description, kind }` |
+| `thresholds` | Performance thresholds: slowScreenMs, slowRequestMs |
 
-- Purpose: allow small, focused differences per platform (web, ios, android, desktop) without duplicating the whole config file.
-- Location: add a `platforms` object in `config/appsettings.json` or `config/appsettings.dev.json`. Each key is a platform name and its value is a `Partial<AppSettings>` containing only the fields you want to override.
-- Detection: `getPlatformName()` (in `lib/config/platform-config.ts`) returns `"web" | "ios" | "android" | "desktop"`.
-- Merge: `mergeConfigForPlatform(config)` applies the platform partial on top of shared defaults using a deep-merge (objects merged, arrays replaced). The merged config is applied in `getAppConfig()` at startup and then cached.
-- Validation: `lib/config/config-validator.ts` now validates the optional `platforms` section and rejects unknown platform keys.
+## Versioning & Migrations
 
-See `docs/issues/MileStone 2/Tier 3/194 - Platform Specific Config/USAGE_GUIDE.md` for examples, rationale, and troubleshooting. For a concise developer-oriented list of added files and integration points, see `docs/issues/MileStone 2/Tier 3/194 - Platform Specific Config/IMPLEMENTATION.md`.
+Config schema uses simple integer versioning for safe evolution:
 
-### Validation Flow
+- **Current version**: 1
+- **Strategy**: When breaking changes needed (add required field, remove/rename field, change type), increment version and create migration function
+- **Auto-migration**: `getAppConfig()` automatically applies migrations on load
+- **Rollback**: Keep all old migrations indefinitely (supports rollback)
 
-At app startup (kernel Phase 0), validation runs in two stages:
+See [lib/config/migrations.ts](migrations.ts) for migration chain. When adding a version:
 
-1. **Environment Variables**: Required env vars (EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY in production)
-2. **App Settings**: Structure, required fields, feature flags, environment mismatch detection
+1. Update `AppSettings` interface in `loader.ts`
+2. Create migration function (e.g., `migrateV1ToV2`)
+3. Register in migration chain + increment `CURRENT_CONFIG_VERSION`
+4. Update both `appsettings.json` and `appsettings.dev.json`
 
-Validation blocks app startup on error; warnings are logged but allow continuation. Production dev features (devBypass, mockData) are fatal errors.
+## Validation
 
-## Configuration Versioning
+At app startup (kernel Phase 0):
 
-AppSettings uses simple integer versioning to safely evolve schema over time without breaking deployments.
+1. Load config file (appsettings.json or appsettings.dev.json)
+2. Migrate version if needed
+3. Validate structure:
+   - Required environment variables (Supabase URL/key in production)
+   - Required config fields (features, overrides, devTools, featureFlags)
+   - Environment mismatch detection
+   - **Production safety**: devBypass and mockData MUST be false (fatal error if true)
 
-### Version Flow
-
-```
-appsettings.json { version: 1 }
-                ↓
-getAppConfig() → Detect version (throws if missing or invalid)
-                ↓
-migrateConfig(config, detectedVersion) → Apply migration chain v1→v2→v3...
-                ↓
-Validate structure (required fields)
-                ↓
-Cache & return
-```
-
-### Version Strategy
-
-- **Current Version**: 1 (first versioned release)
-- **Numbering**: Simple integers (1, 2, 3, ...); no semantic versioning
-- **Backward Compatibility**: Missing or invalid `version` now causes the loader to throw; do not rely on an implicit default
-- **Forward Compatibility**: Config at v2+ works with app expecting v1 (no migration if already at/above target)
-- **Rollback**: Keep all old migrations indefinitely (don't delete; supports rollback scenarios)
-
-### When to Bump Version
-
-**Bump version (breaking change):**
-
-- Add new **required** field
-- Remove existing field
-- Change field type
-- Rename field
-- Change behavior of existing field
-
-**Don't bump (non-breaking):**
-
-- Add optional field with default value
-- Add new feature flag
-- Performance tuning
-- Description/comment changes
-
-### Adding a New Version
-
-1. **Update AppSettings interface** (`lib/config/loader.ts`)
-
-   ```typescript
-   export interface AppSettings {
-     version: number;
-     // Add new required field
-     newFeature?: { ... };
-   }
-   ```
-
-2. **Create migration function** (`lib/config/migrations.ts`)
-
-   ```typescript
-   export const migrateV2ToV3 = (config: any): any => ({
-     ...config,
-     newFeature:
-       config.newFeature ??
-       {
-         /* defaults */
-       },
-   });
-   ```
-
-3. **Register migration** (`lib/config/migrations.ts`)
-
-   ```typescript
-   export const CURRENT_CONFIG_VERSION = 3;
-
-   const MIGRATION_CHAIN = [
-     [2, migrateV1ToV2],
-     [3, migrateV2ToV3], // Add new entry
-   ] as const;
-   ```
-
-4. **Update config files** (both `appsettings.json` and `appsettings.dev.json`)
-
-   ```json
-   {
-     "version": 3,
-     "newFeature": { ... }
-   }
-   ```
-
-5. **Document change** in migration function comments with rationale
-
-### Example: Adding a New Field
-
-**Change:** AppSettings v1 → v2 adds required field `analytics.enabled`
-
-**Step 1: Update interface** (`loader.ts`)
-
-```typescript
-export interface AppSettings {
-  version: number;
-  // ... existing fields ...
-  analytics: {
-    enabled: boolean;
-    sampleRate?: number;
-  };
-}
-```
-
-**Step 2: Create migration** (`migrations.ts`)
-
-```typescript
-export const migrateV1ToV2 = (config: any): any => ({
-  ...config,
-  analytics: {
-    enabled: config.analytics?.enabled ?? false, // Default: disabled
-    sampleRate: config.analytics?.sampleRate ?? 1.0,
-  },
-});
-```
-
-**Step 3: Register migration** (`migrations.ts`)
-
-```typescript
-export const CURRENT_CONFIG_VERSION = 2;
-
-const MIGRATION_CHAIN = [[2, migrateV1ToV2]] as const;
-```
-
-**Step 4: Update config files**
-
-```json
-{
-  "version": 2,
-  "analytics": {
-    "enabled": true,
-    "sampleRate": 1.0
-  }
-}
-```
-
-### Migration Errors
-
-If migration fails, `getAppConfig()` throws with details:
-
-```
-[AppConfig] Configuration migration failed (v1).
-File: config/appsettings.json.
-Error: [ConfigMigration] Failed to migrate from v1 to v2: ...
-```
-
-**Resolution:**
-
-- Check config file JSON syntax
-- Verify all required fields for target version are present
-- If downgrading, ensure old migration still works (don't delete migrations)
-- Run `npm run typecheck` to catch type errors
-
-### Relationship to Cache Versioning
-
-This is **distinct** from `lib/storage/cache-versioning.ts`:
-
-| Aspect              | Config Versioning          | Cache Versioning                      |
-| ------------------- | -------------------------- | ------------------------------------- |
-| **What**            | AppSettings JSON schema    | SecureStorage data schemas            |
-| **When**            | App startup (every boot)   | On first access to cached data        |
-| **Example**         | Adding new config field    | Changing stored user preference shape |
-| **Backward Compat** | Migrations for old configs | Migrations for old storage entries    |
-| **Dependencies**    | None                       | Depends on cache-versioning.ts        |
-
-## Schema Drift Detection (tools)
-
-The `lib/config/tools` submodule provides schema validation to catch drift (missing/extra fields) between `appsettings.dev.json` and `appsettings.json` **before code is committed**.
-
-### Why
-
-Managing two configuration files without tooling leads to **schema drift**:
-- Field added to dev config but forgotten in production config
-- Missing fields cause silent runtime failures instead of clear validation errors
-- Hard to spot differences without manual JSON comparison
-
-### How
-
-#### Manual Validation
-
-Run anytime during development:
-
-```bash
-npm run config:validate
-```
-
-Output shows:
-- Schema validation (fields match or mismatch)
-- Field-level differences (values that differ between dev and prod)
-- Expected vs. unexpected differences (documented intentional changes)
-
-Example:
-
-```
-✅ SCHEMA VALID - Both configs have identical structure
-
-5 Field Differences Found (all expected)
-✅ features.devBypass:      true → false
-✅ environment:        development → production
-```
-
-#### CI Validation and Local Checks
-
-Config validation is enforced in CI via the GitHub Actions workflow (`.github/workflows/config-validate.yml`) which runs on pull requests and protected branches. CI runs `npm run config:validate` in strict mode and will fail the PR check on unexpected differences or schema errors.
-
-For fast, local feedback run:
-
-```bash
-npm run config:validate
-```
-
-The validator supports multiple modes for different validation depths:
-
-- **Raw JSON (default)** — Fast file-level comparison
-- **`--use-migrations`** — Includes config version migrations and normalization
-- **`--use-loader`** — Full runtime shape (requires React Native; for local development)
-
-Example:
-```bash
-npm run config:validate                    # Default: raw files
-npm run config:validate -- --use-migrations # With version migrations
-npm run config:validate -- --use-loader     # Full runtime (local only)
-```
-
-Adding a local pre-commit hook is optional for teams that want immediate blocking behavior on commits; however, CI is the authoritative enforcement point.
-
-#### CI Validation
-
-GitHub Actions workflow (`.github/workflows/config-validate.yml`) runs on PRs:
-- Triggers when config files or tools change
-- Strict mode: blocks merge if any unexpected differences exist
-- Prevents schema drift from being merged
-
-### Expected Differences
-
-Some fields intentionally differ between dev and prod (documented in `lib/config/tools/expected-differences.json`):
-
-| Field | Dev | Prod | Reason |
-|-------|-----|------|--------|
-| `environment` | development | production | Mode-specific logging and features |
-| `features.devBypass` | true | **false** | Auth bypass for testing only |
-| `features.mockData` | true | **false** | Mock data for testing only |
-| `devTools.*` | true | false | Dev tools disabled in production |
-| `overrides.verboseErrorMessages` | true | false | Hide sensitive info in production |
-| `thresholds.slowScreenMs` | varies | varies | Different testing vs. production values |
-
-All documented differences show as ✅ (expected) in validation output.
-
-### Adding New Fields
-
-When adding a field to `appsettings.dev.json`:
-
-1. Add the same field to `appsettings.json` with an appropriate production value
-2. Run `npm run config:validate` to verify
-3. If the difference is intentional, add to `expected-differences.json` with a reason
-
-Example: Adding `network.retryDelayMs`
-
-Dev: `"network": { "retryDelayMs": 1000 }`
-Prod: `"network": { "retryDelayMs": 2000 }`
-
-Run validation — will show as a field difference. If intentional, add to expected-differences:
-
-```json
-{
-  "network.retryDelayMs": "Dev uses short delays for faster iteration; production uses longer delays for stability"
-}
-```
-
-See [Config Diff Tool Usage Guide](../../docs/issues/MileStone%202/Tier%203/192%20-%20Config%20Diff%20Tool/USAGE_GUIDE.md) for detailed examples and troubleshooting.
+Validation errors block startup; warnings logged but allow continuation.
 
 ## API Reference
 
-### Loader (`loader.ts`)
+### Loader
 
 #### `getAppConfig(): AppSettings`
 
 Load and cache application settings. Respects `EXPO_PUBLIC_ENVIRONMENT`; defaults to production for safety.
 
 ```typescript
-import { getAppConfig } from "@/lib/config";
-
 const config = getAppConfig();
 console.log(config.environment); // 'development' or 'production'
-console.log(config.features.consoleLogging); // boolean
-console.log(config.featureFlags.splashScreen.enabled); // boolean
+console.log(config.features.devBypass); // boolean
 ```
 
-**Returns:** `AppSettings` object (cached after first call)
+**Performance:** O(1) after first call (cached); first call ~5-10ms (JSON parsing)
 
-**Throws:** If required `appsettings.json` or `appsettings.dev.json` is missing, malformed, or missing required fields
-
-**Performance:** O(1) after first call (cached); first call is O(n) where n = JSON parsing
-
-### Migrations (`migrations.ts`)
-
-#### `migrateConfig(config: unknown, detectedVersion: number, targetVersion?: number): AppSettings`
-
-Migrate configuration from detected version to target version. Called automatically by `getAppConfig()`.
-
-```typescript
-import { migrateConfig, CURRENT_CONFIG_VERSION } from "@/lib/config";
-
-const config = require("./appsettings.json");
-// The loader and migration chain expect a valid numeric `version` field.
-// WARNING: If `config.version` is missing or invalid the loader will throw.
-// Explicitly validate before calling `migrateConfig` when working with
-// externally-provided or hand-edited files:
-const detectedVersion = (() => {
-  if (typeof config.version !== "number" || config.version < 1) {
-    throw new Error("Missing or invalid config.version; cannot migrate");
-  }
-  return config.version;
-})();
-
-const migratedConfig = migrateConfig(
-  config,
-  detectedVersion,
-  CURRENT_CONFIG_VERSION,
-);
-```
-
-**Parameters:**
-
-- `config` - Loaded config object (any shape; defensive handling)
-- `detectedVersion` - Version field from `config`. The loader expects a valid numeric `version` and will throw if it is missing or invalid; callers should validate `config.version` before calling when the source may be unreliable.
-- `targetVersion` - Target version (default: `CURRENT_CONFIG_VERSION`)
-
-**Returns:** `AppSettings` - Migrated config with `version` field set to `targetVersion`
-
-**Throws:** If version unsupported (<1) or migration fails
-
-**Migration Chain:** Applies v1→v2, v2→v3, etc. in sequence until `targetVersion` reached
-
-#### `CURRENT_CONFIG_VERSION: number`
-
-Current schema version (exported constant). Increment when making breaking changes.
-
-```typescript
-import { CURRENT_CONFIG_VERSION } from "@/lib/config";
-
-console.log(CURRENT_CONFIG_VERSION); // 1
-```
-
-**Performance:** O(1) after first call (cached); first call is O(n) where n = JSON parsing
+**Throws:** If config file missing, malformed, or validation fails
 
 #### `isDevelopment(): boolean`
 
-Check if running in development mode. Use this for compile-time guards.
-
-```typescript
-import { isDevelopment } from "@/lib/config";
-
-if (isDevelopment()) {
-  enableDebugLogging();
-}
-```
+Returns true if `EXPO_PUBLIC_ENVIRONMENT=development`.
 
 #### `isProduction(): boolean`
 
-Check if running in production mode. Use this to gate production-safe code paths.
+Returns true if `EXPO_PUBLIC_ENVIRONMENT` unset or "production".
 
-```typescript
-import { isProduction } from "@/lib/config";
+#### `CURRENT_CONFIG_VERSION: number`
 
-if (isProduction()) {
-  initializeSentryErrorTracking();
-}
-```
+Current schema version. Increment on breaking changes; migrations applied automatically by `getAppConfig()`.
 
-### Validator (`config-validator.ts`)
+### Migrations
+
+#### `migrateConfig(config: unknown, detectedVersion: number, targetVersion?: number): AppSettings`
+
+Migrate config from one version to another. Called automatically by `getAppConfig()`.
+
+**Returns:** Migrated `AppSettings` object
+
+**Throws:** If version unsupported (<1) or migration fails
+
+### Validator
 
 #### `validateConfig(config: AppSettings): ConfigValidationResult`
 
-Validate complete app configuration. Called during kernel initialization.
+Validate config structure, required fields, and environment variables. Called at app startup.
 
 ```typescript
-import { validateConfig, logValidationResults } from "@/lib/config";
-
-const config = getAppConfig();
 const result = validateConfig(config);
-
 if (!result.valid) {
-  console.error("Config validation failed:", result.errors);
-  // App startup is blocked by kernel
+  console.error(result.errors); // Blocks startup
 }
 ```
 
-**Parameters:**
+**Returns:** `{valid: boolean, errors: string[], warnings: string[]}`
 
-- `config`: `AppSettings` object to validate
+**Checks:**
+- Required environment variables (Supabase in production)
+- Config file environment matches `EXPO_PUBLIC_ENVIRONMENT`
+- Required config fields present
+- Production safety: devBypass and mockData must be false
 
-**Returns:** `ConfigValidationResult`
-
-```typescript
-interface ConfigValidationResult {
-  valid: boolean;
-  errors: string[]; // Blocks startup
-  warnings: string[]; // Logged only
-}
-```
-
-**Validation Rules:**
-
-- All required environment variables present (Supabase in production)
-- Config file environment matches `EXPO_PUBLIC_ENVIRONMENT` (if set)
-- All required fields in features, overrides, devTools objects
-- All required feature flags present with `enabled` field
-- Logger categories contain required 11 categories (auth, navigation, api, performance, storage, ui, analytics, security, bootstrap, error, other)
-- Production safety: devBypass and mockData must be false (fatal error if true)
-- Structure: All sections must be objects (not null), never undefined
-
-#### `logValidationResults(result: ConfigValidationResult): void`
-
-Log validation results using the logger system with appropriate severity.
-
-```typescript
-import { logValidationResults } from "@/lib/config";
-
-logValidationResults(result);
-// Logs errors with ❌ prefix, warnings with ⚠️ prefix, or ✅ if valid
-```
-
-### Dev-Only Utilities (`dev-only.ts`)
+### Dev-Only Utilities
 
 #### `useDevConsole(scope: string): DevLogger`
 
-Scoped console logger that returns no-op methods in production. Respects `devTools.enableConsoleLogger` setting.
+Scoped logger. No-op in production.
 
 ```typescript
-import { useDevConsole } from "@/lib/config";
-
-const devLogger = useDevConsole("MyModule");
-devLogger.log("Debug info"); // Only logs in dev + enableConsoleLogger true
-devLogger.warn("Warning"); // No-op in production
-devLogger.error("Error"); // No-op in production
+const logger = useDevConsole("MyModule");
+logger.log("Debug"); // Only in dev + enableConsoleLogger true
 ```
-
-**Returns:**
-
-```typescript
-interface DevLogger {
-  log(...args: any[]): void;
-  warn(...args: any[]): void;
-  error(...args: any[]): void;
-}
-```
-
-**Performance (Production):** O(1) no-op; nil overhead
 
 #### `isDevBypassEnabled(): boolean`
 
-Check if dev bypass mode is active (allows skipping auth, gates, etc. during testing). Always false in production.
-
-```typescript
-import { isDevBypassEnabled } from "@/lib/config";
-
-if (isDevBypassEnabled()) {
-  // Skip authentication for testing
-  skipAuthFlow();
-}
-```
-
-#### `devAssert(condition: boolean, message: string): void`
-
-Assert condition in development; throw with verbose message if false. No-op in production.
-
-```typescript
-import { devAssert } from "@/lib/config";
-
-devAssert(userId !== null, "userId should never be null here");
-```
-
-**Throws (Dev Only):** `Error` if `condition` is false and `overrides.verboseErrorMessages` is true
+Returns true if dev bypass mode active (always false in production).
 
 #### `createDevTimer(label: string): DevTimer`
 
-Create a performance timer that logs elapsed time. Returns no-op timer in production.
+Performance timer. No-op in production.
 
 ```typescript
-import { createDevTimer } from "@/lib/config";
-
 const timer = createDevTimer("DataFetch");
 await fetchData();
-timer.end(); // Logs "[PERF] DataFetch: 245ms" in dev (if enablePerformanceLogger true)
+timer.end(); // Logs "[PERF] DataFetch: 245ms" in dev
 ```
 
-**Returns:**
-
-```typescript
-interface DevTimer {
-  end(): void;
-}
-```
-
-**Performance (Production):** O(1) no-op; nil overhead
-
-### Hot-Reload (`hot-reload.ts`)
+### Hot-Reload
 
 #### `initializeHotReload(): void`
 
-Initialize the global hot-reload instance for development. Called automatically during app kernel initialization. No-op in production.
-
-```typescript
-import { initializeHotReload } from "@/lib/config";
-
-// Called automatically in app-kernel.ts
-// Manual call only needed for testing or custom initialization
-initializeHotReload();
-```
-
-**Side Effects:** Starts polling `appsettings.dev.json` for changes every 1 second
-
-**Guards:** Only runs in development mode with fetch API available
+Start config hot-reload for development. Called automatically at app startup. No-op in production.
 
 #### `getHotReload(): ConfigHotReload | null`
 
-Get the active hot-reload instance. Returns null if hot-reload is not available or not initialized.
-
-```typescript
-import { getHotReload } from "@/lib/config";
-
-const hotReload = getHotReload();
-if (hotReload) {
-  // Hot-reload is available and running
-  hotReload.subscribe((newConfig) => {
-    console.log("Config updated:", newConfig);
-  });
-}
-```
-
-**Returns:** `ConfigHotReload` instance or `null`
+Get active hot-reload instance (or null if not available).
 
 #### `isHotReloadAvailable(): boolean`
 
-Check if hot-reload can run in the current environment.
-
-```typescript
-import { isHotReloadAvailable } from "@/lib/config";
-
-if (isHotReloadAvailable()) {
-  // Enable hot-reload dependent features
-}
-```
-
-**Returns:** `true` if development mode and fetch API available, `false` otherwise
+Check if hot-reload can run (development mode + fetch API available).
 
 #### `ConfigHotReload` Class
 
-Main class for managing config hot-reload. Provides methods to control polling and subscribe to changes.
-
 ```typescript
 interface ConfigHotReload {
-  start(): void;           // Start polling for changes
+  start(): void;           // Start polling appsettings.dev.json
   stop(): void;            // Stop polling and cleanup
   checkForChanges(): void; // Manually trigger change check
-  subscribe(callback: (config: AppSettings) => void): () => void; // Subscribe to updates
+  subscribe(callback: (config: AppSettings) => void): () => void;
 }
 ```
 
-**Methods:**
-
-- `start()`: Begins polling `appsettings.dev.json` for changes
-- `stop()`: Stops polling and unsubscribes all callbacks
-- `checkForChanges()`: Immediately checks for changes (bypasses polling interval)
-- `subscribe(callback)`: Registers callback for config updates; returns unsubscribe function
-
-**Behavior:**
-
-- Polls every 1000ms by default
-- Fetches file modification time first, then full content on changes
-- Applies complete config pipeline: load → migrate → merge → validate
-- Updates global config cache used by `getAppConfig()`
-- Notifies all subscribers with new `AppSettings` object
-- Handles errors gracefully (logs but continues polling)
-
-**Performance:** Minimal overhead; polling checks modification time only, full processing only on changes
-
-### Type Definitions
-
-#### `AppSettings`
-
-Complete configuration schema. Loaded from `appsettings.json` or `appsettings.dev.json`.
-
-```typescript
-interface AppSettings {
-  version: number; // Schema version (currently 1); auto-migrated on load
-  description: string;
-  environment: "development" | "production";
-
-  features: {
-    consoleLogging: boolean;
-    devBypass: boolean;
-    mockData: boolean;
-    performanceMonitoring: boolean;
-    sentryEnabled: boolean;
-  };
-
-  overrides: {
-    mockSupabase: boolean;
-    verboseErrorMessages: boolean;
-  };
-
-  devTools: {
-    enableConsoleLogger: boolean;
-    enableNetworkLogger: boolean;
-    enablePerformanceLogger: boolean;
-    enableReduxDevTools: boolean;
-    enableReactDevTools: boolean;
-  };
-
-  thresholds?: {
-    slowScreenMs?: number;
-    slowRequestMs?: number;
-  };
-
-  featureFlags: Record<
-    string,
-    {
-      enabled: boolean;
-      description?: string;
-      kind?: "free" | "premium" | "beta";
-      categories?: Record<string, boolean>; // For loggerCategories flag
-    }
-  >;
-}
-```
+Polls every 1000ms, applies full pipeline (load → migrate → validate), updates global cache, notifies subscribers.
 
 ## Dependencies
 
 ### External Packages
 
-- `expo-constants` - Access embedded secrets from `app.json` (Supabase credentials in export builds)
+- **`expo-constants`** – Reads Supabase credentials from `app.json` extra fields (Expo export builds)
 
-### Internal lib/ Dependencies
+### Internal Dependencies
 
-- `lib/utils/logger` (config-validator.ts) - Bootstrap-category logging for validation results
+- **`lib/utils/logger`** – Validation result logging (bootstrap category)
 
-### Platform Dependencies
+### Environment Variables
 
-- Environment variables (EXPO*PUBLIC_ENVIRONMENT, EXPO_PUBLIC_SENTRY_DSN, EXPO_PUBLIC_SUPABASE*\*)
-- `app.json` extra fields (for Supabase credentials in Expo export builds)
+- **`EXPO_PUBLIC_ENVIRONMENT`** – Set to `"development"` for dev builds; unset or `"production"` for production
+- **`EXPO_PUBLIC_SUPABASE_URL`**, **`EXPO_PUBLIC_SUPABASE_ANON_KEY`** – Required in production
 
 ## Error Handling & Edge Cases
 
 ### Missing Configuration Files
 
-**Problem:** `appsettings.dev.json` or `appsettings.json` not found at build time
+**Problem:** `appsettings.dev.json` or `appsettings.json` not found
 
 **Resolution:**
-
-- Check that both files exist in `config/` directory
-- If building development: ensure `appsettings.dev.json` exists
-- If building production: ensure `appsettings.json` exists
-- Error message indicates which file is missing and common causes (syntax error, incorrect strip-dev-appsettings cleanup)
+- Check both files exist in `config/` directory
+- Ensure file names match exactly (case-sensitive on some systems)
+- Error message indicates which file is missing
 
 ### Environment Variable Mismatch
 
 **Problem:** `EXPO_PUBLIC_ENVIRONMENT=development` but `appsettings.json` has `environment: "production"`
 
 **Resolution:**
-
 - Ensure loaded config file matches environment variable
 - If not explicitly set, defaults to production for safety
-- Error indicates which mismatch occurred
 
-### Invalid JSON Structure
+### Invalid JSON or Missing Fields
 
 **Problem:** Config file is missing required fields (features, overrides, devTools, featureFlags)
 
 **Resolution:**
-
-- Validator logs each missing field
-- Error lists all missing fields; add them to match `AppSettings` interface
-- Dev features (devBypass, mockData) enabled in production produce fatal errors
+- Validator logs each missing field with description
+- Add missing fields to match `AppSettings` interface
+- Dev features (devBypass, mockData) enabled in production = fatal error
 
 ### Production Dev Features Enabled
 
-**Problem:** `features.devBypass: true` or `features.mockData: true` in production build
+**Problem:** `features.devBypass: true` or `features.mockData: true` in production
 
 **Resolution:**
-
-- ALWAYS false in `appsettings.json`
-- These are fatal validation errors (block startup)
-- Security risk: devBypass allows unauthenticated access; mockData serves incorrect game data
+- ALWAYS false in `appsettings.json` (security risk)
+- Block startup immediately (fatal validation error)
 - If accidentally deployed: rollback immediately
-
-### Missing Environment Variables
-
-**Problem:** Required env vars (EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY) not set in production built with git pages
-
-**Resolution:**
-
-- Set in CI/CD environment during build
-- Or embed in `app.json` extra fields (for `expo export` builds)
-- Validator checks both `process.env` AND `Constants.expoConfig.extra`
-- Dev mode has no required env vars (optional for graceful degradation)
-
-### Feature Flag Validation
-
-**Problem:** Missing required feature flag or missing `enabled` field
-
-**Resolution:**
-
-- Add all required flags: splashScreen, debugLogs, loggerCategories
-- Ensure each flag has `{ enabled: boolean, ... }`
-- For loggerCategories: must contain all 11 required categories
 
 ## Performance Notes
 
 ### Caching
 
-- Config is loaded once and cached globally; subsequent `getAppConfig()` calls return cached object (O(1))
-- First call incurs JSON parsing cost (typically <10ms for config files)
-- Safe to call `getAppConfig()` anywhere in the app without performance penalty
+- Config cached after first call; subsequent `getAppConfig()` calls are O(1)
+- First call parses JSON: ~5-10ms for typical config
+- Safe to call `getAppConfig()` anywhere
 
-### Dev-Only No-Ops
+### Dev Utilities
 
-- In production, all dev utilities (`useDevConsole`, `createDevTimer`, `isDevBypassEnabled`) are no-op functions with negligible overhead
-- Dev utilities are safe to call anywhere; they provide no-op returns in production rather than adding compilation burden
-- No tree-shaking needed; production bundle includes dev utilities but they're effectively inlined as empty functions
+- In production: `useDevConsole()`, `createDevTimer()`, `isDevBypassEnabled()` are no-op functions with O(1), nil overhead
+- Safe to call anywhere; return early in production
 
-### Validation Cost
+### Validation
 
-- Validation runs once at app startup (kernel Phase 0, before UI rendering)
-- Validator iterates through config structure once: O(n) where n = total config fields (~30 fields typical)
-- Validation cost <5ms; blocking startup is acceptable for critical config verification
+- Runs once at app startup (kernel Phase 0, before UI)
+- O(n) where n = config fields (~30 typical); <5ms total
+- Blocks startup on errors (acceptable for critical validation)
 
 ### Environment Variable Access
 
-- `EXPO_PUBLIC_*` variables are bundled at compile time (Expo CLI replaces with values during build)
-- `process.env` access at runtime has no performance penalty
-- `Constants.expoConfig.extra` access is cached by Expo (no cost)
+- `EXPO_PUBLIC_*` variables bundled at compile-time by Expo CLI
+- No runtime access cost
 
 ## Related Modules
 
-- **lib/utils/logger** - Used for config validation logging (bootstrap category) and hot-reload operations (bootstrap/other categories)
-- **lib/feature-flags.ts** - Higher-level feature flag utility (wraps config.featureFlags)
-- **lib/auth** - Uses config.features.mockSupabase to support mock auth in development
-- **lib/analytics** - Uses config.features.sentryEnabled to conditionally initialize error tracking
-- **lib/kernel** - Calls validateConfig during Phase 0 (critical startup validation) and initializeHotReload during bootstrap
+- **`lib/utils/logger`** – Validation logging (bootstrap category)
+- **`lib/kernel`** – Calls `validateConfig()` during Phase 0, `initializeHotReload()` during bootstrap
+- **`lib/auth`** – Uses `config.features.mockSupabase` for mock auth in dev
+- **`lib/analytics`** – Uses `config.features.sentryEnabled` to gate Sentry initialization
 
 ## File Breakdown
 
-| File                  | Purpose                                                      | Exports                                                                      |
-| --------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- |
-| `loader.ts`           | Environment-aware config loading and caching                 | `getAppConfig()`, `isDevelopment()`, `isProduction()`, `AppSettings`         |
-| `config-validator.ts` | Startup validation of app settings and environment variables | `validateConfig()`, `logValidationResults()`, `ConfigValidationResult`       |
-| `dev-only.ts`         | Safe dev-only utilities with no-op production versions       | `useDevConsole()`, `isDevBypassEnabled()`, `devAssert()`, `createDevTimer()` |
-| `hot-reload.ts`       | Development-only config file hot-reload system               | `initializeHotReload()`, `getHotReload()`, `isHotReloadAvailable()`, `ConfigHotReload` |
-| `tools/config-diff.ts` | Schema drift detection between dev and prod configs          | `validateConfigSchema()`, `getConfigDiff()`, `mapExpectedDifferences()`       |
-| `tools/expected-differences.json` | Documented intentional differences between env configs | Static JSON mapping of expected field differences with rationale            |
-| `tools/run-config-validate.ts` | CLI tool for config validation                        | Entry point for `npm run config:validate` command                             |
-| `tools/index.ts`      | Barrel export for tools submodule                            | All exports from config-diff                                                 |
-| `index.ts`            | Barrel export for public API                                 | All exports from loader, validator, dev-only, hot-reload, tools             |
-
-## Testing
-
-### Manual Testing
-
-#### Development Mode
-
-1. Set `EXPO_PUBLIC_ENVIRONMENT=development`
-2. Run app: `npm run start`
-3. Verify console logging works (if enableConsoleLogger true in appsettings.dev.json)
-4. Call `useDevConsole('Test')` and verify logs appear
-5. Call `createDevTimer('TestTimer')` and verify "[PERF]" logs appear
-
-#### Production Mode
-
-1. Unset `EXPO_PUBLIC_ENVIRONMENT` (defaults to production)
-2. Build: `npm run predeploy` (Expo export)
-3. Verify no console logging appears (even if dev code calls useDevConsole)
-4. Verify no performance timers log
-5. Verify config validation passes (✅ in console)
-
-#### Config Validation
-
-1. Intentionally break appsettings.json (remove a required field)
-2. Start app and verify validation error blocks startup
-3. Restore file and verify app boots normally
-
-#### Environment Variable Validation
-
-1. Unset EXPO_PUBLIC_SUPABASE_URL in production build
-2. Verify validation error about missing Supabase URL
-3. Set variable and verify validation passes
-
-### Automated Tests
-
-Add test cases to a test guide in `docs/A Testing Guide/config-testing-guide.md`:
-
-- Config loading with different EXPO_PUBLIC_ENVIRONMENT values
-- Caching behavior (multiple getAppConfig calls return same object)
-- Validation of all required fields
-- Dev utility no-op behavior in production
-- Feature flag schema validation
-- Logger category validation
-- Hot-reload availability checks (development vs production)
-- Config file polling and change detection
-- Subscriber notification on config updates
-- Error handling during config processing
-
-## Future Enhancements
-
-- **Config Encryption** - Encrypt sensitive fields in config files (though env vars are recommended for secrets)
-- **Hot-Reload Enhancements** - WebSocket-based file watching, selective reloading, config diffing, and multi-file support
+| File | Purpose |
+| --- | --- |
+| `loader.ts` (368 lines) | Load config based on `EXPO_PUBLIC_ENVIRONMENT`, cache, auto-migrate |
+| `config-validator.ts` (446 lines) | Validate config structure, required fields, env vars at startup |
+| `dev-only.ts` (99 lines) | Dev utilities (console logger, timer, bypass) with no-op production versions |
+| `hot-reload.ts` | Dev-only hot-reload of `appsettings.dev.json`; subscribe to changes |
+| `migrations.ts` | Version migration chain (v1→v2, etc.) |
+| `platform-config.ts` | Platform detection (`web`, `ios`, `android`, `desktop`) and config merging |
+| `tools/` (submodule) | Schema drift detection (config-diff.ts, expected-differences.json); run via `npm run config:validate` |
+| `index.ts` | Barrel export of public API |

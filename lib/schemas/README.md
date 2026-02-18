@@ -9,7 +9,7 @@ Centralized form validation schemas using **Zod**. Provides type-safe runtime va
 - Validate form inputs before submission with runtime type safety
 - Get TypeScript types inferred from schemas (single source of truth)
 - Ensure consistent validation across app (auth forms, world creation, settings)
-- Protect against SQL injection and malicious input in user input
+- Protect against SQL injection and malicious input
 - Validate API responses and [lib/database](../database/README.md) data at runtime
 - Coordinate with [lib/auth's auth flows](../auth/README.md) for credential validation
 
@@ -17,18 +17,18 @@ Centralized form validation schemas using **Zod**. Provides type-safe runtime va
 
 - Server-side validation (implement corresponding checks on backend)
 - Business logic rules beyond form validation (use separate domain functions)
-- Complex conditional validation requiring context (extend schemas or use separate validators)
+- Complex conditional validation requiring context (extend schemas directly)
 - Real-time form feedback (use React validation hooks instead)
 - API response transformation (use separate data transformation layer)
 
-## What is Zod?
+## Zod Overview
 
-**Zod** is a TypeScript-first schema validation library:
+**Zod** is a TypeScript-first schema validation library. Define once, validate everywhere:
 
 ```ts
 import { z } from "zod";
 
-// Define a schema
+// Define schema
 const userSchema = z.object({
   email: z.string().email(),
   age: z.number().min(18),
@@ -37,17 +37,11 @@ const userSchema = z.object({
 // Validate data
 const result = userSchema.parse({ email: "user@example.com", age: 25 });
 
-// Get TypeScript type automatically
+// Type inference (automatic)
 type User = z.infer<typeof userSchema>;
 ```
 
-**Benefits:**
-
-- Type-safe: inferred types match validation rules
-- Chainable: `.string().email().min(5)` reads naturally
-- Composable: extend and combine schemas
-- Runtime validation: catches data issues at runtime
-- Good errors: detailed error messages
+**Key benefits:** Type-safe, chainable, composable, runtime validation, detailed error messages.
 
 ## API Reference
 
@@ -55,56 +49,50 @@ type User = z.infer<typeof userSchema>;
 
 #### `emailSchema`
 
-Validates email format with SQL injection protection.
+Email format with SQL injection protection.
 
 ```ts
 import { emailSchema } from "@/lib/schemas";
 
-const result = emailSchema.parse("user@example.com"); // ✅
-const result = emailSchema.parse("user'; DROP TABLE--"); // ❌ SQL injection blocked
+emailSchema.parse("user@example.com"); // ✅
+emailSchema.parse("admin'; DROP TABLE--"); // ❌ Blocked
 ```
 
 #### `passwordSchema`
 
-Validates password strength: 6+ chars, uppercase, lowercase, number, special char.
+Password strength: 6+ chars, uppercase, lowercase, number, special char.
 
 ```ts
 import { passwordSchema } from "@/lib/schemas";
 
-const result = passwordSchema.parse("MyPassword123!"); // ✅
-const result = passwordSchema.parse("weak"); // ❌ Too short
-
-type PasswordInput = z.infer<typeof passwordSchema>; // string
+passwordSchema.parse("MyPassword123!"); // ✅
+passwordSchema.parse("weak"); // ❌
 ```
 
 #### `usernameSchema`
 
-Validates username: 3-20 chars, starts with letter, alphanumeric + underscores.
+Username: 3-20 chars, starts with letter, alphanumeric + underscores.
 
 ```ts
 import { usernameSchema } from "@/lib/schemas";
 
-const result = usernameSchema.parse("alice_123"); // ✅
-const result = usernameSchema.parse("2invalid"); // ❌ Doesn't start with letter
+usernameSchema.parse("alice_123"); // ✅
+usernameSchema.parse("2invalid"); // ❌
 ```
 
 #### `signInSchema`
 
-Validates sign-in form (email + password).
+Sign-in form (email + password).
 
 ```ts
 import { signInSchema, type SignInFormData } from "@/lib/schemas";
 
-const form = { email: "user@example.com", password: "pass" };
-const result = signInSchema.parse(form); // ✅
-
-// Get type
 type FormData = z.infer<typeof signInSchema>;
 ```
 
 #### `signUpSchema`
 
-Validates sign-up form with password confirmation.
+Sign-up form with password confirmation. Throws `ZodError` if passwords don't match.
 
 ```ts
 import { signUpSchema } from "@/lib/schemas";
@@ -114,33 +102,18 @@ const form = {
   password: "MyPassword123!",
   confirmPassword: "MyPassword123!",
 };
-const result = signUpSchema.parse(form); // ✅
+signUpSchema.parse(form); // ✅
 ```
 
-Throws if passwords don't match:
+#### `forgotPasswordSchema`, `resetPasswordSchema`
 
-```ts
-const form = {
-  email: "user@example.com",
-  password: "MyPassword123!",
-  confirmPassword: "Different123!",
-};
-signUpSchema.parse(form); // ❌ ZodError: "Passwords do not match"
-```
-
-#### `forgotPasswordSchema`
-
-Validates forgot password form (email only).
-
-#### `resetPasswordSchema`
-
-Validates password reset with confirmation.
+Forgot password (email only) and reset password (with confirmation).
 
 ### World Schemas
 
 #### `worldSchema`
 
-Validates world creation (name, description, system).
+World creation (name, description, system).
 
 ```ts
 import { worldSchema, type WorldFormData } from "@/lib/schemas";
@@ -150,48 +123,25 @@ const world = {
   description: "An epic adventure",
   system: "D&D 5e",
 };
-const result = worldSchema.parse(world); // ✅
+worldSchema.parse(world); // ✅
 
 type World = z.infer<typeof worldSchema>;
 ```
 
 **Fields:**
-
-- `name`: 2-20 chars, no SQL injection, alphanumeric + basic punctuation
-- `description`: optional, max 500 chars, no SQL injection
+- `name`: 2-20 chars, alphanumeric + basic punctuation, SQL injection protected
+- `description`: optional, max 500 chars, SQL injection protected
 - `system`: enum of 'D&D 5e' | 'Pathfinder' | 'Call of Cthulhu' | 'Custom'
 
 #### `editWorldSchema`
 
-Validates world edit with name uniqueness check.
-
-```ts
-import { editWorldSchema } from "@/lib/schemas";
-
-const form = {
-  name: "New Name",
-  description: "Updated description",
-  system: "D&D 5e",
-  originalName: "Old Name", // For uniqueness check
-};
-const result = editWorldSchema.parse(form); // ✅ if name changed
-```
+World edit with name uniqueness check (requires `originalName` for comparison).
 
 #### `editWorldNameSchema`
 
 Simplified schema for name-only edits (in modals).
 
-```ts
-import { editWorldNameSchema } from "@/lib/schemas";
-
-const form = {
-  name: "New Name",
-  originalName: "Old Name",
-};
-const result = editWorldNameSchema.parse(form); // ✅
-```
-
-## How to Use Zod
+## Using Zod in Your Code
 
 ### Basic Validation
 
@@ -200,18 +150,11 @@ import { z } from "zod";
 
 const schema = z.string().email();
 
-try {
-  const result = schema.parse("invalid"); // Throws ZodError
-} catch (error) {
-  console.error(error.errors); // [ { code: 'invalid_string', ... } ]
-}
-```
+// With throw
+const result = schema.parse("invalid"); // Throws ZodError
 
-### Safe Parsing (No Throw)
-
-```ts
+// Without throw (safe)
 const result = schema.safeParse("invalid");
-
 if (!result.success) {
   console.error(result.error); // ZodError with details
 } else {
@@ -219,7 +162,7 @@ if (!result.success) {
 }
 ```
 
-### Inferring Types
+### Type Inference
 
 ```ts
 const userSchema = z.object({
@@ -227,36 +170,8 @@ const userSchema = z.object({
   age: z.number().min(18),
 });
 
-// Automatically gets correct type
 type User = z.infer<typeof userSchema>;
 // = { email: string; age: number; }
-```
-
-### Common Zod Methods
-
-```ts
-// Strings
-z.string().min(1).max(10).email().transform(val => val.toLowerCase());
-
-// Numbers
-z.number().min(0).max(100).int().positive();
-
-// Enums
-z.enum(['red', 'green', 'blue']);
-
-// Objects
-z.object({ name: z.string(), age: z.number() });
-
-// Arrays
-z.array(z.string()).min(1).max(10);
-
-// Optional/Nullable
-z.string().optional(); // string | undefined
-z.string().nullable(); // string | null
-z.string().or(z.literal('')); // string | ''
-
-// Conditionals
-z.object({ ... }).refine(data => data.password === data.confirm, { path: ['confirm'] });
 ```
 
 ### Extending Schemas
@@ -265,12 +180,23 @@ z.object({ ... }).refine(data => data.password === data.confirm, { path: ['confi
 const baseSchema = z.object({ email: z.string().email() });
 
 // Extend with new fields
-const extendedSchema = baseSchema.extend({
+const extended = baseSchema.extend({
   age: z.number().min(18),
 });
 
 // Merge two schemas
 const merged = baseSchema.merge(addressSchema);
+```
+
+### Common Zod Methods
+
+```ts
+z.string().min(5).max(20).email().toLowerCase();
+z.number().min(0).max(100).int();
+z.enum(['red', 'green', 'blue']);
+z.array(z.string()).min(1).max(10);
+z.string().optional(); // string | undefined
+z.object({...}).refine(data => data.password === data.confirm);
 ```
 
 ## Security
@@ -283,36 +209,18 @@ emailSchema.parse("admin'; DROP TABLE users--");
 // Error: "Email contains invalid characters"
 
 // ❌ Blocked: Dangerous characters
-worldSchema.parse({ name: "World'; DELETE FROM worlds--", ... });
+worldSchema.parse({ name: "World'; DELETE--", ... });
 // Error: "World name contains invalid characters"
 
 // ✅ Safe: Normal input
 emailSchema.parse("user@example.com");
 ```
 
-**Validation order:** Injection checks run BEFORE transforms to prevent sneaky bypasses.
+Injection checks run BEFORE transforms to prevent sneaky bypasses.
 
-## Dependencies
+## React Form Integration
 
-### External Packages
-
-- **`zod`** – Schema validation library
-
-### Internal Dependencies
-
-- None (schemas are pure, no app dependencies)
-
-## File Breakdown
-
-| File              | Purpose                                               | Exports                        |
-| ----------------- | ----------------------------------------------------- | ------------------------------ |
-| `auth.schema.ts`  | Auth form schemas (sign-up, sign-in, password reset). | Auth schemas + inferred types  |
-| `world.schema.ts` | World creation/editing schemas with system selection. | World schemas + inferred types |
-| `index.ts`        | Barrel export for public API.                         | All public schemas and types   |
-
-## Usage in React Forms
-
-### React Hook Form Integration
+### With React Hook Form
 
 ```tsx
 import { useForm } from "react-hook-form";
@@ -329,7 +237,6 @@ export function SignUpForm() {
   });
 
   const onSubmit = (data: SignUpFormData) => {
-    // data is type-safe and validated
     await api.signUp(data);
   };
 
@@ -354,55 +261,32 @@ const form = { email: "user@example.com", password: "MyPassword123!" };
 const result = signInSchema.safeParse(form);
 
 if (!result.success) {
-  // Show validation errors
-  console.error(result.error.flatten());
+  console.error(result.error.flatten()); // Show errors
 } else {
-  // Submit form
-  await api.signIn(result.data);
+  await api.signIn(result.data); // Submit
 }
 ```
 
-## Testing Schemas
+## Dependencies
 
-```ts
-import { signUpSchema } from "@/lib/schemas";
+### External Packages
 
-describe("signUpSchema", () => {
-  it("accepts valid input", () => {
-    expect(
-      signUpSchema.safeParse({
-        email: "user@example.com",
-        password: "MyPassword123!",
-        confirmPassword: "MyPassword123!",
-      }).success,
-    ).toBe(true);
-  });
+- **`zod`** – Schema validation library
+- **`@hookform/resolvers`** – React Hook Form integration (optional, for forms)
 
-  it("rejects mismatched passwords", () => {
-    expect(
-      signUpSchema.safeParse({
-        email: "user@example.com",
-        password: "MyPassword123!",
-        confirmPassword: "Different123!",
-      }).success,
-    ).toBe(false);
-  });
+### Internal Dependencies
 
-  it("blocks SQL injection", () => {
-    expect(
-      signUpSchema.safeParse({
-        email: "admin'; DROP TABLE--@example.com",
-        password: "MyPassword123!",
-        confirmPassword: "MyPassword123!",
-      }).success,
-    ).toBe(false);
-  });
-});
-```
+- None (schemas are pure, no app dependencies)
 
-## Notes
+## File Breakdown
 
-- All schemas include SQL injection protection via `refine()` checks
-- Error messages are user-friendly and displayed directly in forms
-- Types are automatically inferred; no manual type definitions needed
-- Schemas are immutable (safe to reuse and extend)
+| File              | Purpose                                               | Lines |
+| ----------------- | ----------------------------------------------------- | ----- |
+| `auth.schema.ts`  | Auth form schemas (sign-up, sign-in, password reset) | ~80   |
+| `world.schema.ts` | World creation/editing schemas with system selection | ~60   |
+| `index.ts`        | Barrel export for public API                          | 2     |
+
+## Related Modules
+
+- **lib/auth** – Authentication flows, credential handling
+- **lib/database** – Data persistence, runtime validation of responses

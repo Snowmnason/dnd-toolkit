@@ -1,27 +1,25 @@
 # Auth Module
 
-Comprehensive authentication system providing email/password auth with secure session management, rate limiting, brute-force protection, input validation, and integration with optional auth providers (e.g., Supabase). Designed as a portable foundation for building auth-protected applications.
+Email/password authentication system with brute-force protection, secure session persistence, input validation, Supabase integration, route guards, and background health monitoring. Session state survives app restarts via encrypted storage; auth attempts are rate-limited (5 attempts per 10 minutes) with automatic 15-minute lockout on failure.
 
 ## When to Use This Module
 
 **Use this module if you need to:**
 
-- Implement email/password authentication with brute-force protection
-- Protect routes based on authentication state (account-only, world-required)
-- Handle user signup, signin, password reset, and logout flows with input validation
-- Prevent brute-force attacks with rate limiting and account lockout
-- Store auth state securely across app restarts via [lib/storage's SecureStorage](../storage/README.md)
-- Manage user sessions with automatic recovery and Supabase integration
-- Support optional third-party auth providers (Supabase, future: OAuth2)
-- Validate input forms using [lib/schemas](../schemas/README.md) Zod schemas
+- Implement email/password signup and signin with form validation
+- Protect routes based on authentication state (logged in vs. logged out)
+- Handle brute-force attacks with automatic rate limiting and lockout (5 attempts / 10 min)
+- Persist user sessions across app restarts via encrypted storage
+- Support optional Supabase for auth provider backend
+- Validate email, password, and username inputs with ReDoS-safe regex
+- Integrate auth state with route navigation (redirects, login screens)
 
 **Do NOT use this module for:**
 
-- OAuth2/OIDC social login (not yet supported; future enhancement)
-- Multi-factor authentication (MFA) out-of-the-box (future enhancement)
-- JWT token management beyond session recovery (consider token layer)
-- Role-based access control at the auth level (implement using [lib/premium's SubscriptionManager](../premium/README.md) or domain-specific checks instead)
-- Route protection/authentication guards (use [lib/routing's AUTH_CONFIG](../routing/README.md) + `useAuthGuard` hook instead)
+- OAuth2/OIDC social login (not yet supported)
+- Multi-factor authentication (MFA) (not yet supported)
+- Role-based access control or permission checking (use per-route checks or [lib/premium](../premium/README.md) instead)
+- Raw email validation without signup context (use `validateEmail()` directly instead)
 
 ## Architecture & Data Flow
 
@@ -29,29 +27,38 @@ Comprehensive authentication system providing email/password auth with secure se
 User Action (SignUp / SignIn / PasswordReset)
         ↓
 Validate Input (email, password, username)
+        ├─ ReDoS-safe regex, sanitization, length checks
         ↓
 Check Auth Attempt Guard (brute-force protection)
+        ├─ 5 attempts / 10 min window per email+scope
+        ├─ 15 min lockout after exceeding threshold
+        ├─ Tracked in encrypted storage
         ↓
-Call Auth Provider (Supabase, custom API, etc.)
+Call Auth Provider (Supabase, optional)
+        ├─ Lazy-loaded, guarded by isSupabaseConfigured()
+        ├─ Made via lib/api RequestManager (retry, dedup)
         ↓
 Persist Session to SecureStorage
+        ├─ Saves access_token, refresh_token, user metadata
+        ├─ Encrypted; survives app restarts
         ↓
 Update Auth State (hasAccount: true)
+        ├─ Stored in SecureStorage
         ↓
-Return Result (success/error)
+Return Result (success/error/redirectTo)
         ↓
-UI Triggers Redirect (based on result)
+UI Triggers Redirect (route guards, navigation)
 ```
 
 **Key Principles:**
 
-- **Secure-by-default**: All credentials encrypted via SecureStorage; no plaintext storage
-- **Brute-force protected**: Rate limiting per email via auth-attempt-guard (5 attempts / 10 min)
-- **Validated inputs**: Email/password/username validated before reaching auth provider
-- **Session recovery**: Auth state persists; app recovers session on restart
-- **Provider-agnostic**: Core logic independent of auth provider (Supabase, Firebase, custom API)
+- **Secure by default**: All credentials and session data encrypted via encrypted storage (works with lib/storage)
+- **Brute-force protected**: Rate limiting per email per operation type (signin, signup, reset)
+- **Validated inputs**: Email/password/username validated (ReDoS-safe) before reaching auth provider
+- **Session recovery**: Auth state persists; app recovers session on restart via SecureStorage
+- **Provider-agnostic**: Core logic independent of auth provider (Supabase or custom)
 - **Graceful degradation**: Offline support via SecureStorage; no external call required for auth checks
-- **Observable**: All auth events logged and tracked to analytics
+- **Observable**: All state changes logged; integrates with analytics (works with lib/analytics)
 
 ## API Reference
 
@@ -438,31 +445,3 @@ On app launch, a single `checkUserSession()` call. If session valid and profile 
 | `redirectSafety.ts`                                                                         | Redirect safety utilities (not detailed here; likely prevents open redirects).                                                                                               |
 | `encrypted-storage.ts`                                                                      | Legacy file (likely deprecated in favor of `lib/storage/SecureStorage`).                                                                                                     |
 | `useSignInForm.ts`, `useSignUpForm.ts`, `useResetPasswordConfirm.ts`, `useWelcomeScreen.ts` | React hooks for form state management and auth flows. UI-specific (app-layer), not core auth logic.                                                                          |
-
----
-
-## Testing
-
-Currently, no dedicated test guide exists for this module. When adding tests, create a guide at `docs/A Testing Guide/auth.md` following the repository's testing guide template.
-
-**Manual testing tips:**
-
-- **Signup**: Valid email + strong password → should succeed; weak password → should fail with validation error
-- **Brute-force**: Attempt signup 6 times with same email → 6th attempt should fail with lockout message
-- **Session recovery**: Signup → close app → reopen → `AuthStateManager.getAuthState()` should return `hasAccount: true`
-- **Logout**: Sign in → call `clearAuthState()` → verify all storage keys cleared; `getAuthState()` returns `hasAccount: false`
-- **Route guard**: Protect a route with `useAuthGuard('account-only')` → unauthenticated user should be redirected
-- **Email validation**: Test various email formats; verify ReDoS-safe regex doesn't hang on pathological inputs
-- **Offline**: Disable network → attempt signup → should fail gracefully (not hang)
-
----
-
-## Future Enhancements
-
-- **Account Recovery**: Account deletion, data export, identity verification
-
-_Deferred (cost/complexity) - see `docs/suggestions/auth/` for discussion:_
-
-- Social Login (OAuth2 providers - deferred, cost)
-- Passwordless Auth (Magic link, WebAuthn, biometric - deferred, complicated)
-- Security Events (Audit log, IP tracking, device fingerprinting - deferred, complicated)

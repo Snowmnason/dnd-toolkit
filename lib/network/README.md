@@ -1,114 +1,121 @@
 # lib/network
 
-Cross-platform network status detection and error handling. Detects online/offline state, connection quality (good/bad/cellular/offline), and battery status. Enables graceful degradation (serving stale cache when network is unavailable or unreliable).
+Cross-platform network status detection with connection quality estimation, error handling, and graceful degradation. Detects online/offline state, connection quality (good/bad/cellular/offline), manages recovery backoff via state machine, handles adaptive payload sizing, and provides stale cache fallback strategies for network failures.
 
 ## When to Use This Module
 
-**Use this module to:**
+- Check if device is online before making requests
+- Detect connection quality (GOOD/BAD/CELLULAR/OFFLINE) for graceful degradation
+- Serve lighter payloads on poor connections (adaptive payload sizing)
+- Handle network errors with appropriate fallbacks (serve stale cache vs. fail)
+- Subscribe to real-time network status changes
+- Monitor recovery backoff when network is unavailable
+- Implement offline-first patterns with lib/offline
+- Track network quality for observability via Telemetry
 
-- Check if device is online before making requests or rendering UI
-- Detect connection quality (good/bad/cellular/offline) for graceful degradation
-- Determine if connection is expensive (cellular + low battery = avoid heavy downloads)
-- Handle network errors gracefully with appropriate fallback strategies
-- Monitor network health and subscribe to connection status changes
-- Implement offline-first patterns with [lib/offline](../offline/README.md)
-- Log network events for [lib/analytics](../analytics/README.md) and [lib/utils's Logger](../utils/README.md)
-
-**Do NOT use this module for:**
-
-- HTTP request retries (use [lib/api's RequestManager](../api/README.md) instead)
-- Offline data queuing (use [lib/offline](../offline/README.md) mutation queue or [lib/storage's SecureStorage](../storage/README.md) instead)
-- Authentication state detection (use [lib/auth's AuthStateManager](../auth/README.md) instead)
-- Cache invalidation (use [lib/cache's QueryCache](../cache/README.md) tag-based invalidation instead)
-- Connection simulation/mocking (use feature flags or [lib/config](../config/README.md) dev utilities instead)
+Do NOT use for: HTTP retries (use lib/api RequestManager), offline queuing (use lib/offline), auth state (use lib/auth), cache invalidation (use lib/cache), or connection mocking (use feature flags).
 
 ## Architecture & Data Flow
 
 ```
-Network Events
-        ↓
-Platform-specific detection:
-  - Web: navigator.onLine, online/offline events, periodic ping
-  - Native: react-native-netinfo, battery monitoring
-        ↓
-Normalize to ConnectionQuality:
-  - GOOD: Excellent connection, all operations safe
-  - BAD: Latency >500ms, packet loss detected, use smaller payloads
-  - CELLULAR: On cellular/hotspot, possibly metered
-  - OFFLINE: No network at all
-        ↓
-Notify subscribers (real-time updates)
-        ↓
-Error handler uses quality to decide:
-  - Network error + offline → Serve stale cache
-  - Network error + bad connection → Serve stale cache
-  - Server error (5xx) → Serve stale cache
-  - Client error (4xx) → Fail (real error)
+Network Events (platform-specific)
+  ├─ Web: navigator.onLine, online/offline events, periodic health ping
+  ├─ Native: react-native-netinfo, expo-battery status
+  └─ Latency measurement: ICMP ping to Supabase health endpoint
+       ↓
+Normalize to ConnectionQuality: GOOD | BAD | CELLULAR | OFFLINE
+       ↓
+State Machine manages transitions with recovery backoff
+  └─ INITIALIZING → GOOD/BAD/CELLULAR/OFFLINE ↔ RECOVERING (exponential backoff)
+       ↓
+Subscribers notified of state changes → trigger side effects
+  ├─ sync offline queue (lib/offline)
+  ├─ invalidate adaptive cache keys
+  └─ emit telemetry events
+       ↓
+Error Handler decides: serve stale cache OR fail
+  └─ Network errors + offline/bad connection → stale cache
+  └─ Server errors (5xx) + has cache → stale cache
+  └─ Client errors (4xx) → fail immediately
 ```
 
 ## API Reference
 
-### `useNetworkStatus(): NetworkStatus`
+### Core Status Checking
+
+`useNetworkStatus(): NetworkStatus` — React hook for real-time network state. Re-renders on status changes.
+
+**Returns:** `{ isOnline, type, isExpensive, connectionQuality, isInternetReachable? }`
+
+**Example:**
+```ts
+function MyComponent() {
   const status = useNetworkStatus();
-
-  if (status.connectionQuality === ConnectionQuality.OFFLINE) {
-      <>
-        <PoorConnectionWarning />
-        <SmallPayloadList /> {/* Use lighter data */}
-      </>
-    );
+  
+  if (status.connectionQuality === 'OFFLINE') {
+    return <OfflineUI />;
   }
-
+  
   if (status.isExpensive) {
-    return <CellularWarning />;
+    return <CellularWarning>Data may be metered</CellularWarning>;
   }
-
+  
   return <NormalScreen />;
 }
 ```
 
-### `NetworkDetection.getCurrentStatus(): NetworkStatus`
+`NetworkDetection.getCurrentStatus(): NetworkStatus` — Synchronous status check (no subscription, no async).
 
-Get current network status synchronously (no subscription).
+**Returns:** Latest status from cache. Always available immediately after initialization.
 
+**Example:**
 ```ts
-import { NetworkDetection } from "@/lib/network";
-
-const status = NetworkDetection.getCurrentStatus();
-console.log(`Online: ${status.isOnline}, Quality: ${status.connectionQuality}`);
-```
-
-### `NetworkDetection.subscribe(callback: NetworkStatusCallback): () => void`
-
-Subscribe to network status changes. Returns unsubscribe function.
-
-  }
-});
-### `isNetworkError(error: any): boolean`
-
-Determine if an error is network-related (not a logical/validation error).
-
-```ts
-import { isNetworkError } from "@/lib/network";
-
-try {
-  await fetchData();
-} catch (error) {
-  if (isNetworkError(error)) {
-    // Try stale cache or retry
-    return useFallback();
-  } else {
-    // Real validation/logic error
-    throw error;
+// Quick check without subscribing
+const isOnline = NetworkDetection.getCurrentStatus().isOnline;
+if (isOnline) {
+  await syncData();
 }
 ```
 
-### `shouldServeStaleOnError(error: any, options: { isNetworkError: boolean; hasCache: boolean; isOnline: boolean }): boolean`
+`NetworkDetection.subscribe(callback: (status: NetworkStatus) => void): () => void` — Subscribe to status changes. Returns unsubscribe function.
 
-Decide whether to serve stale cache when error occurs.
-
+**Example:**
 ```ts
-import { isNetworkError, shouldServeStaleOnError } from "@/lib/network";
+const unsubscribe = NetworkDetection.subscribe((status) => {
+  console.log(`Network: ${status.connectionQuality}`);
+});
+
+// Later:
+unsubscribe();
+```
+
+### Error Handling
+
+`isNetworkError(error: any): boolean` — Classify if error is network-related (not validation/logic error).
+
+Returns `true` for: network timeouts, connection resets, DNS failures, fetch errors. Returns `false` for: 4xx status codes, validation failures, unrelated exceptions.
+
+**Example:**
+```ts
+try {
+  const data = await fetch(url);
+} catch (error) {
+  if (isNetworkError(error)) {
+    // Network problem; may try stale cache
+    return useFallback();
+  } else {
+    // Real error; propagate
+    throw error;
+  }
+}
+```
+
+`shouldServeStaleOnError(error: any, options: { hasCache: boolean; isOnline: boolean }): boolean` — Decide whether to serve stale cache on error.
+
+Returns `true` if: network error detected, offline, has cache. Returns `false` if: client error (4xx), no cache, or online with server error (5xx may vary).
+
+**Example:**
+```ts
 try {
   const data = await fetchLatestCharacters(worldId);
 } catch (error) {
@@ -116,432 +123,197 @@ try {
     hasCache: !!cachedCharacters,
     isOnline: NetworkDetection.getCurrentStatus().isOnline,
   });
+  
   if (shouldServeStale) {
-    return cachedCharacters; // Serve stale
+    return cachedCharacters; // Serve 2-hour-old data
   } else {
+    showError('Unable to load characters');
+    throw error;
   }
 }
 ```
 
+### Network Telemetry
+
+`logNetworkEvent(eventType: string, context: any): void` — Emit telemetry event locally via logger.
+
+**Integration:** Called automatically by state machine, error handler, and hooks. Manual calls for custom events.
+
 ## Interfaces
-### `NetworkStatus`
 
-Current network state.
-
+**NetworkStatus**
 ```ts
-  /** Is device connected to any network */
-  isOnline: boolean;
-
-  /** Network type: 'wifi' | 'cellular' | 'none' | 'unknown' */
-  type: "wifi" | "cellular" | "none" | "unknown";
-  /** Is connection expensive (cellular or low battery + not charging) */
-  isExpensive: boolean;
-
-  /** Connection quality for degraded modes */
-  connectionQuality: ConnectionQuality;
-  /** More accurate than isOnline (requires native package) */
-  isInternetReachable?: boolean;
-}
-```
-### `ConnectionQuality` Enum
-
-```ts
-  /** Excellent connection - can do all operations */
-  GOOD = "good",
-
-  BAD = "bad",
-
-  /** WiFi disconnected, using cellular/hotspot - may be metered */
-
-  /** No network service at all */
+{
+  isOnline: boolean; // Connected to any network
+  type: 'wifi' | 'cellular' | 'none' | 'unknown'; // Connection type
+  isExpensive: boolean; // Cellular or low battery + not charging
+  connectionQuality: ConnectionQuality; // GOOD | BAD | CELLULAR | OFFLINE
+  isInternetReachable?: boolean; // More accurate than isOnline (requires native)
 }
 ```
 
-## Dependencies
-
-- **`expo-network`** – Network detection on iOS/Android
-- **`expo-battery`** – Battery status on iOS/Android (for expensive connection detection)
-- **`expo-constants`** – Supabase URL from environment
-- **`lib/utils/logger`** – Logging network state changes
-- **`lib/api`** – HTTP requests (uses network detection indirectly)
-- **`lib/cache`** – Stale cache serving via error handler
-
-## Telemetry (Observability)
-
-This module emits local telemetry events for network observability. In Phase 1 the module logs events locally via `logger.category('network')`. Phase 2 documents the event schema and integration points; Phase 3+ covers backend ingestion and retention policies.
-
-Event types:
-- `quality_change` — emitted when the effective connection quality tier changes (unsampled).
-- `health_check` — periodic heartbeat with a snapshot of current quality (sampled; first check always emitted).
-- `error_correlation` — emitted (sampled) when a network-related request or sync fails, including a quality snapshot.
-
-Why local logging first:
-- Keeps rollout safe and privacy-friendly (no backend transmission until Phase 2 consent/wiring).
-- Allows iteration on schema without affecting backend contracts.
-
-Integration points (where events are emitted):
-- `NetworkDetection.subscribe()` — emits `quality_change` on effective type/quality transitions.
-- App bootstrap (AppKernel) — starts periodic `health_check` interval (default 5 minutes).
-- `lib/api/RequestManager` and `lib/offline` sync — capture and queue `error_correlation` events when requests fail.
-
-Sampling and configuration:
-- Sampling rates are configurable in `config/appsettings.json` under `network.telemetry`.
-- Defaults (Phase 1/1c): `healthCheckSampleRate = 0.1` (10%), `errorCorrelationSampleRate = 0.5` (50%), `enabled = true`.
-- First health check after app start is always emitted regardless of sample rate.
-
-Privacy and consent:
-- Telemetry emission respects the application's consent system (#181). A consent check runs before any emit; if consent is withdrawn the health check interval is stopped and queued error events are discarded.
-- Events avoid PII by default. Do not add user-identifying fields unless explicit consent is recorded.
-
-Event fields (summary):
-- `eventType` — one of `quality_change` | `health_check` | `error_correlation`.
-- `currentQuality` — `EXCELLENT|GOOD|POOR|OFFLINE`.
-- `previousQuality?` — present for `quality_change`.
-- `isOnline` — boolean.
-- `connectionType?` — `wifi|cellular|ethernet|unknown`.
-- `isExpensive?` — boolean (true for cellular by default).
-- `latency?` — RTT in ms (when available via Network Information API or ping measurement).
-- `downlink?` — Mbps (when available).
-- `error?` — present for `error_correlation` (e.g., `timeout|dns_fail|connection_reset|5xx|4xx|other`).
-- `timestamp` — epoch ms.
-- `platform` — `web|ios|android|desktop`.
-
-Where to find the full schema and examples:
-- `lib/network/TELEMETRY_SCHEMA.md` — JSON schemas and example events.
-
-Operational notes:
-- Keep the sampling rates conservative for mobile (cellular) users to avoid data charges.
-- Consider server-side validation of event schema and an ingestion version field once backend integration begins.
-
-
-## File Breakdown
-
-| File                   | Purpose                                                                  | Exports                                                                                             |
-| ---------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
-| `network-detection.ts` | Cross-platform network status detection. Tracks online/quality/battery.  | `NetworkDetection` (singleton), `useNetworkStatus` hook, `ConnectionQuality`, types                 |
-| `network-config.ts`    | Configuration constants and dynamic Supabase health endpoint resolution. | `SUPABASE_HEALTH_ENDPOINT`, `WEB_PING_INTERVAL`, `LATENCY_THRESHOLD`, `getSupabaseHealthEndpoint()` |
-| `error-handling.ts`    | Network error classification and stale cache decision logic.             | `isNetworkError()`, `shouldServeStaleOnError()`, `logNetworkError()`, `handleErrorGracefully()`     |
-| `index.ts`             | Barrel export for public API.                                            | All public exports re-exported                                                                      |
-
-## How It Works
-
-### Network Detection Flow
-
-**Web:**
-
-1. Check `navigator.onLine` on startup
-2. Listen to `online` / `offline` events
-3. Periodically ping Supabase health endpoint (5 min intervals when app visible)
-4. Measure latency to detect bad connections (>500ms)
-
-**Native (iOS/Android):**
-
-1. Use `expo-network` to detect wifi vs cellular
-
-- If battery detection unavailable → Assume charging (conservative estimate)
-- If latency check fails → Assume good connection (optimistic estimate)
-
-### Error Handling Strategy
-
-```ts
-// When fetch fails:
-1. Check isNetworkError(error)
-2. Check isOnline status
-3. Check hasCache
-4. Decide: serve stale cache OR throw error
-
-// Stale cache is served for:
-- Network errors when offline
-- Network errors when online but unreliable
-- Server errors (5xx)
-
-// Stale cache is NOT served for:
-- Client errors (4xx)
-- Validation errors (real logic errors)
-```
-
-## Configuration
-
-### Environment Variables
-
-- **`EXPO_PUBLIC_SUPABASE_URL`** – Used to construct health endpoint for pings
-- **`EXPO_PUBLIC_SUPABASE_HEALTH_ENDPOINT`** (optional) – Override health endpoint explicitly
-
-### Constants
-
-All in `network-config.ts`:
-
-```ts
-WEB_PING_INTERVAL = 5 * 60 * 1000; // 5 minutes
-WEB_PING_TIMEOUT = 5000; // 5 seconds
-LATENCY_THRESHOLD = 500; // 500ms = poor connection
-LOW_BATTERY_THRESHOLD = 0.2; // 20% = mark as expensive
-```
-
-Adjust these for different network conditions or battery strategies.
+**ConnectionQuality** — Enum: GOOD (responsive, all ops safe) | BAD (slow, latency >500ms, reduced payloads) | CELLULAR (mobile network, metered) | OFFLINE (no connectivity)
 
 ## State Machine
 
-The network detection system uses an explicit state machine (`lib/network/state-machine.ts`) to manage recovery logic and side effects reliably.
+Explicit state transitions with recovery backoff and hooks. Manages recovery logic reliably and enables side effects on transitions.
 
-### NetworkState Type
+### States
 
-Six states define the network lifecycle:
+| State          | Meaning                                  | Transitions To                  |
+| -------------- | ---------------------------------------- | ------------------------------- |
+| `INITIALIZING` | App starting, no status determined       | GOOD, BAD, CELLULAR, OFFLINE    |
+| `GOOD`         | Network available and responsive         | BAD, CELLULAR, OFFLINE, GOOD    |
+| `BAD`          | Network present but slow/high-latency    | GOOD, CELLULAR, OFFLINE, GOOD   |
+| `CELLULAR`     | Cellular/mobile detected (iOS/Android)   | GOOD, BAD, OFFLINE, GOOD        |
+| `OFFLINE`      | No connectivity at all                   | INITIALIZING, RECOVERING        |
+| `RECOVERING`   | Attempting reconnection with backoff     | GOOD, BAD, CELLULAR, OFFLINE    |
 
-| State          | Meaning                                 | Transitions To                     |
-| -------------- | --------------------------------------- | ---------------------------------- |
-| `INITIALIZING` | App starting, no status yet             | GOOD, BAD, CELLULAR, OFFLINE        |
-| `GOOD`         | Network available, responsive           | BAD, CELLULAR, OFFLINE, RECOVERING  |
-| `BAD`          | Network present but slow/high-latency   | GOOD, CELLULAR, OFFLINE, RECOVERING |
-| `CELLULAR`      | Cellular/offline detected (iOS/Android) | GOOD, BAD, OFFLINE, RECOVERING     |
-| `OFFLINE`      | No connectivity at all                  | INITIALIZING, RECOVERING           |
-| `RECOVERING`   | Attempting reconnection with backoff    | GOOD, BAD, CELLULAR, OFFLINE        |
+### Transition Rules
 
-### Valid Transitions
+Valid transitions enforced via `VALID_TRANSITIONS` map (directed graph):
 
-The `VALID_TRANSITIONS` map enforces a strict directed graph. Key rules:
+- **Recovery path**: `OFFLINE` → `RECOVERING` → `GOOD` (always via RECOVERING to execute recovery side effects)
+- **WiFi switch**: `CELLULAR` ↔ `GOOD` (iOS/Android WiFi toggles)
+- **Quality degradation**: `GOOD` → `BAD` → `OFFLINE` (progressive degradation)
+- **Init**: `INITIALIZING` only reachable at startup
 
-- **Recovery path**: `OFFLINE` can only reach `GOOD` via `RECOVERING` (ensures recovery side effects execute)
-- **Initialization**: `INITIALIZING` only reachable at startup
-- **WiFi switch**: `CELLULAR` ↔ `GOOD` allowed (iOS/Android WiFi toggles)
+Invalid transitions rejected with error.
 
-Invalid transitions are rejected with an error.
+### API
 
-### Transition Hooks
+`NetworkStateManager.transitionTo(state: NetworkState): Promise<void>` — Change state (validates via VALID_TRANSITIONS).
 
-Register callbacks to execute on specific transitions or any state change:
+`NetworkStateManager.onSpecificTransition(from: NetworkState, to: NetworkState, callback: () => void): () => void` — Hook for specific transition. Returns unsubscribe.
 
-#### Specific Transition Hooks
-
-Execute when a particular transition occurs (e.g., recovery completed):
-
+**Example:**
 ```ts
-import { NetworkStateManager } from "@/lib/network";
-
 // Sync offline queue when recovering → good
-NetworkStateManager.onSpecificTransition("RECOVERING", "GOOD", async () => {
-  await syncOfflineQueue();
-  await invalidateCacheOlderThan(2 * 60 * 60 * 1000); // 2 hours stale
-  AppToast.show("Connection restored");
+NetworkStateManager.onSpecificTransition('RECOVERING', 'GOOD', async () => {
+  await OnlineSyncManager.resume();
+  await invalidateCacheOlderThan(2 * 60 * 60 * 1000); // 2 hours
+  AppToast.show('Connection restored');
 });
-```
 
-#### Global Transition Hooks
-
-Execute on every state change:
-
-```ts
 // Log all transitions
 NetworkStateManager.onTransition((from, to) => {
-  logger.info("network", `State: ${from} → ${to}`);
+  logger.info('network', `State: ${from} → ${to}`);
 });
 ```
 
-Hooks are registered once (typically at app bootstrap in `AppKernelProvider`) and execute for all subsequent transitions. Unsubscribe by calling the returned function.
+`NetworkStateManager.getRecoveryRetries(): number` — Current recovery attempt count (0 = first attempt).
 
-### Recovery Backoff
+`NetworkStateManager.getRecoveryBackoff(): number` — Milliseconds until next recovery attempt.
 
-When transitioning to `RECOVERING`, the manager applies exponential backoff with a 30-second cap:
-
-- 1st retry: 1s delay
-- 2nd retry: 2s delay
-- 3rd retry: 4s delay
-- ... (2^n pattern)
-- Cap: 30s max
-
-Query retry state:
-
+**Example:**
 ```ts
-const retries = NetworkStateManager.getRecoveryRetries();
-const backoffMs = NetworkStateManager.getRecoveryBackoff(); // milliseconds until next retry
+const backoffMs = NetworkStateManager.getRecoveryBackoff();
+console.log(`Next retry in ${backoffMs}ms`);
 
-// Use in recovery logic:
 await delay(backoffMs);
 await attemptReconnection();
 ```
 
-### Testing & Simulation
+### Recovery Backoff
 
-For unit tests, manually transition the state machine and verify hook execution:
+When transitioning to `RECOVERING`, exponential backoff applied:
 
-```ts
-import { NetworkStateManager } from "@/lib/network";
+- Attempt 1: 1s delay
+- Attempt 2: 2s delay
+- Attempt 3: 4s delay
+- Attempt 4: 8s delay
+- Attempt 5: 16s delay
+- Attempt 6+: 30s cap (max)
 
-// Register test hook
-let transitioned = false;
-NetworkStateManager.onSpecificTransition("OFFLINE", "RECOVERING", () => {
-  transitioned = true;
-});
+Formula: `min(2^n * 1000, 30000)` ms where n = retry count.
 
-// Simulate offline → recovering → good sequence
-await NetworkStateManager.transitionTo("OFFLINE");
-await NetworkStateManager.transitionTo("RECOVERING");
-await NetworkStateManager.transitionTo("GOOD");
+## Adaptive Payload Sizing
 
-expect(transitioned).toBe(true);
+Automatically adjust API payload complexity based on network quality. Reduces bandwidth and latency on poor connections without server changes.
 
-// Reset for next test
-NetworkStateManager.reset(); // clears state, hooks, retry count
-```
-
-## Related Modules
-
-- **`lib/api`** – RequestManager uses network detection for retry logic
-- **`lib/cache`** – QueryCache works with error handler to serve stale data
-- **`lib/analytics`** – Track network quality for performance monitoring
-- **`lib/offline`** – Future offline queue system will build on network detection
-
-## Testing
-
-### Manual Testing
-
-- **Offline mode:** Use browser DevTools → Network tab → set to "Offline"
-- **Poor connection:** Use browser DevTools → Network → set to "Slow 3G"
-- **Cellular + low battery:** Use iOS/Android simulators to change battery level
-
-### Unit Tests
-
-Create `__tests__/lib/network/detection.test.ts`:
-
-- Mock platform detection (web vs native)
-- Test status transitions (online → offline → online)
-- Test connection quality detection (good/bad/expensive)
-- Test listeners/subscriptions
-- Test battery threshold logic
-
-### Integration Tests
-
-Create `__tests__/lib/network/error-handling.test.ts`:
-
-- Test error classification (network vs client error)
-- Test stale cache decisions (when to serve, when to reject)
-- Test with various error codes (0, 4xx, 5xx, custom network errors)
-
-## Performance Notes
-
-- Network detection is lightweight (no polling by default)
-- Web ping runs every 5 minutes only when app is visible
-- Native detection uses OS-level callbacks (no polling)
-- Subscription updates are batched (debounced)
-- Current status available synchronously (no async needed)
-
-## Known Limitations
-
-- Web ping relies on Supabase being available (CSP whitelisted)
-- Battery detection unavailable on web (fallback: assume charging)
-- Connection type unavailable on older web browsers (fallback: "unknown")
-- Latency detection via ping only on web (native relies on OS detection)
-
-## Integration with Offline Mutation Queue
-
-The **[lib/offline module](../offline/README.md)** uses `NetworkDetection` to automatically sync queued mutations when connection is restored:
-
-```ts
-// In OnlineSyncManager
-NetworkDetection.subscribe((status) => {
-  if (status.isOnline && status.connectionQuality === "GOOD") {
-    // Trigger sync of queued mutations
-    await syncQueuedMutations();
-  }
-});
-```
-
-## Adaptive Payload Sizing (Issue #205)
-
-Automatically reduce API payload complexity based on network quality.
-
-### Architecture
+### Concept
 
 ```
-NetworkDetection.getStatus()
-        ↓
-    {effectiveType: '4g'|'3g'|'2g'|'slow-2g'|'offline'}
-        ↓
-getAdaptivePayloadOptions()
-        ↓
-{imageQuality: 'hd'|'sd'|'thumb',
- includeDetails: true|false,
- includeMaps: true|false,
- maxPayloadSize: number}
-        ↓
-buildAdaptiveQueryParams()
-        ↓
-Request sent with params: ?imageQuality=sd&excludeMaps=true&summaryOnly=true
-        ↓
+getAdaptivePayloadOptions(status: NetworkStatus)
+  └─ Maps ConnectionQuality to payload strategy
+       ├─ GOOD (4G): Full images, all details, maps, 5MB max
+       ├─ BAD (3G): Medium images, full details, no maps, 2MB max
+       ├─ CELLULAR (2G): Thumbnails, summaries, no maps, 500KB max
+       └─ OFFLINE: Serve cache (no requests)
+            ↓
+buildAdaptiveQueryParams(options: AdaptivePayloadOptions)
+  └─ Converts to query params: ?imageQuality=sd&excludeMaps=true&summaryOnly=true
+            ↓
+RequestManager.fetch(url, fetcher, { useAdaptiveParams: true })
+  └─ Auto-injects quality params for HTTP URLs
+            ↓
 Server responds with appropriately sized payload
-        ↓
-RequestManager caches result + invalidates on quality change
+            ↓
+RequestManager caches result by quality tier
+            ↓
+On quality change, cache auto-invalidates and refetches
 ```
 
 ### Quality Tiers
 
-| Connection | Quality | Images | Details | Maps | Max Size |
-|-----------|---------|--------|---------|------|----------|
-| 4G        | HD      | Full   | Full    | Yes  | 5MB      |
-| 3G        | SD      | Medium | Full    | No   | 2MB      |
-| 2G        | Thumb   | Small  | Summary | No   | 500KB    |
-| Offline   | Text    | None   | Summary | No   | 0        |
+| Connection | Quality | Images      | Details  | Maps     | Max Size |
+| ---------- | ------- | ----------- | -------- | -------- | -------- |
+| 4G WiFi    | GOOD    | Full (2MB)  | Full     | Yes      | 5MB      |
+| 3G WiFi    | BAD     | Medium (1MB) | Full     | No       | 2MB      |
+| 2G Mobile  | CELLULAR| Thumbnail   | Summary  | No       | 500KB    |
+| Offline    | OFFLINE | None        | Cached   | N/A      | 0        |
 
-### API Reference
+### API
 
-#### `getAdaptivePayloadOptions(status: NetworkStatus): AdaptivePayloadOptions`
+`getAdaptivePayloadOptions(status: NetworkStatus): AdaptivePayloadOptions` — Maps status to payload strategy.
 
-Maps connection quality to payload options.
+**Returns:** `{ imageQuality: 'hd' | 'sd' | 'thumb', includeMaps: boolean, includeDetails: boolean, maxPayloadSize: number }`
 
+**Example:**
 ```ts
-import { getAdaptivePayloadOptions } from '@/lib/network';
-import { NetworkDetection } from '@/lib/network';
-
-const status = NetworkDetection.getStatus();
+const status = NetworkDetection.getCurrentStatus();
 const options = getAdaptivePayloadOptions(status);
 
-console.log(options); // { imageQuality: 'sd', includeMaps: false, ... }
+console.log(options);
+// If GOOD: { imageQuality: 'hd', includeMaps: true, includeDetails: true, maxPayloadSize: 5242880 }
+// If BAD: { imageQuality: 'sd', includeMaps: false, includeDetails: true, maxPayloadSize: 2097152 }
 ```
 
-#### `buildAdaptiveQueryParams(options: AdaptivePayloadOptions): Record<string, any>`
+`buildAdaptiveQueryParams(options: AdaptivePayloadOptions): Record<string, any>` — Converts payload options to query params for server request.
 
-Converts payload options to query parameters for server request.
+**Returns:** `{ imageQuality, excludeMaps, summaryOnly, maxSize, ... }`
 
+**Example:**
 ```ts
-import { buildAdaptiveQueryParams, getAdaptivePayloadOptions } from '@/lib/network';
-
-const status = NetworkDetection.getStatus();
 const options = getAdaptivePayloadOptions(status);
 const params = buildAdaptiveQueryParams(options);
-// Result: { imageQuality: 'sd', excludeMaps: 'true', summaryOnly: 'true', ... }
+// Result: { imageQuality: 'sd', excludeMaps: 'true', summaryOnly: 'false', maxSize: 2097152 }
 
-// Use in RequestManager:
-const data = await RequestManager.fetch(url, fetcher, { params });
+// Use in fetch:
+const data = await RequestManager.fetch('/api/worlds', fetcher, { params });
 ```
 
-#### `appendAdaptiveParams(key: string): string`
+`appendAdaptiveParams(cacheKey: string): string` — Appends quality params to cache key for per-tier variants.
 
-Appends quality params to a URL or cache key.
-
+**Example:**
 ```ts
-import { appendAdaptiveParams } from '@/lib/network';
-
-// Automatically appends based on current network quality
 const keyWithParams = appendAdaptiveParams('worlds:list');
-// Result: 'worlds:list?imageQuality=hd&...' (if 4G)
-//      or 'worlds:list?imageQuality=thumb&...' (if 2G)
+// Result: 'worlds:list:hd' (if GOOD) or 'worlds:list:thumb' (if CELLULAR)
 ```
 
-#### `useAdaptivePayload(): { networkStatus, payloadOptions }`
+`useAdaptivePayload(): { networkStatus: NetworkStatus; payloadOptions: AdaptivePayloadOptions }` — React hook for UI awareness of quality tier.
 
-React hook for UI awareness of current quality tier.
-
+**Example:**
 ```ts
-import { useAdaptivePayload } from '@/hooks/network/use-adaptive-payload';
-
-function MyComponent() {
+function WorldsScreen() {
   const { payloadOptions } = useAdaptivePayload();
   
   return (
     <>
+      {payloadOptions.includeMaps && <InteractiveMap />}
+      {!payloadOptions.includeMaps && <StaticImage />}
       {payloadOptions.includeDetails && <FullDescription />}
       {!payloadOptions.includeDetails && <Summary />}
-      {payloadOptions.includeMaps && <MapComponent />}
     </>
   );
 }
@@ -549,8 +321,9 @@ function MyComponent() {
 
 ### Integration with RequestManager
 
-RequestManager automatically injects adaptive params for HTTP-like URLs:
+RequestManager automatically injects adaptive params for HTTP-like URLs. Cache keys include quality tier for per-variant storage. On quality change, cache auto-invalidates.
 
+**Example:**
 ```ts
 // Auto-inject adaptive params for /api/* URLs
 const data = await RequestManager.fetch(
@@ -562,16 +335,6 @@ const data = await RequestManager.fetch(
   }
 );
 
-// or explicit params override
-const data = await RequestManager.fetch(
-  '/api/worlds',
-  () => worldsAPI.getWorlds(),
-  {
-    params: { limit: 20, offset: 0 },
-    useAdaptiveParams: true, // Still injects imageQuality, etc.
-  }
-);
-
 // Disable for internal cache keys
 const data = await RequestManager.fetch(
   'worlds:list:local',
@@ -580,36 +343,47 @@ const data = await RequestManager.fetch(
     useAdaptiveParams: false, // Don't append to internal keys
   }
 );
+
+// Override params
+const data = await RequestManager.fetch(
+  '/api/worlds',
+  () => worldsAPI.getWorlds(),
+  {
+    params: { limit: 20, offset: 0 }, // Explicit params
+    useAdaptiveParams: true, // Still injects imageQuality, etc.
+  }
+);
 ```
 
 ### Cache Strategy
 
-Include quality tier in cache keys so variants are stored separately:
+Include quality tier in cache keys to store variants separately. Auto-invalidate and refetch on quality change.
 
+**Example:**
 ```ts
-import { getQualityAwareCacheKey } from '@/lib/network/adaptive-payload-integration';
+const queryKey = appendAdaptiveParams('worlds:list');
+// 'worlds:list:hd' (4G), 'worlds:list:sd' (3G), 'worlds:list:thumb' (2G)
 
-const queryKey = getQualityAwareCacheKey({
-  baseCacheKey: 'worlds:list',
-  cacheTagsToInvalidate: ['worlds'],
-});
-// Result: 'worlds:list:4g' or 'worlds:list:2g' (depending on quality)
+// Each variant cached independently:
+cache['worlds:list:hd'] = {...} // 5MB response
+cache['worlds:list:thumb'] = {...} // 200KB response
+
+// On quality change (GOOD → BAD):
+// - Invalidate 'worlds:list:hd'
+// - Refetch 'worlds:list:sd'
+// - Use new variant going forward
 ```
 
-### Auto-Invalidation on Quality Change
-
-When network quality changes, cache automatically invalidates and refetches:
-
+**Auto-invalidation on quality change:**
 ```ts
-import { useAdaptivePayloadCacheInvalidation } from '@/hooks/network/useAdaptivePayloadCacheInvalidation';
-
 function WorldsList() {
-  // Subscribe to network quality changes
+  // Subscribe to quality changes; auto-invalidate tagged keys
   useAdaptivePayloadCacheInvalidation({
     tagsToInvalidate: ['worlds', 'characters'],
   });
 
-  const { worlds } = useWorldsQuery(); // Auto-refetches on quality change
+  // useWorldsQuery automatically refetches on quality change
+  const { worlds } = useWorldsQuery();
   return <>{worlds.map(w => <WorldCard key={w.id} world={w} />)}</>;
 }
 ```
@@ -622,47 +396,161 @@ Server support for quality params is **optional**. Clients send params; servers 
 - Servers that don't support params return full payload (same as before)
 - Clients gracefully handle both cases
 
-Implement server-side support via Issue #XXX - Server-Side Image Variants.
+Implement server-side support via separate issue (placeholder #XXX).
 
-### Related Modules
+## Network Telemetry
 
-- **[lib/api/request-manager](../api/README.md)** – Injects params automatically
-- **[lib/cache/QueryCache](../cache/README.md)** – Caches variants per quality tier
-- **[lib/offline](../offline/README.md)** – Uses adaptive payloads for mutation queuing
-- **Issue #206** – Network Offline Queue
-- **Issue #208** – Network Telemetry (tracks quality distribution)
+Local telemetry via `logger.category('network')`. Events help track network quality distribution, failure correlation, and system health. Phase 1 emits locally; Phase 2+ covers backend integration.
 
-### Known Limitations
+### Event Types
 
-- **Server-side variants not yet implemented** – Client requests quality params, but server doesn't resize. Implement via Issue #XXX
-- **Progressive loading not implemented** – Images don't incrementally improve quality. Phase 4+ enhancement
-- **No manual override** – Users can't manually force HD on 2G. Can be added as debug feature
+- **`quality_change`** — Emitted when effective connection quality tier changes (GOOD → BAD). Unsampled; always emitted.
+- **`health_check`** — Periodic heartbeat with quality snapshot. Sampled (10% default); first check always emitted after app start.
+- **`error_correlation`** — Network-related request/sync failure with quality context. Sampled (50% default); helps identify failure patterns.
 
----
+### Event Fields
 
-**Key Integration Points:**
+```ts
+{
+  eventType: 'quality_change' | 'health_check' | 'error_correlation';
+  currentQuality: 'GOOD' | 'BAD' | 'CELLULAR' | 'OFFLINE';
+  previousQuality?: string; // Present for quality_change
+  isOnline: boolean;
+  connectionType?: 'wifi' | 'cellular' | 'ethernet' | 'unknown';
+  isExpensive?: boolean;
+  latency?: number; // RTT in ms (when available)
+  downlink?: number; // Mbps (when available via Network Information API)
+  error?: string; // For error_correlation (e.g., 'timeout', 'dns_fail', '5xx', '4xx')
+  timestamp: number; // Epoch ms
+  platform: 'web' | 'ios' | 'android' | 'desktop';
+}
+```
 
-- **Online Detection**: When `NetworkDetection.isOnline` transitions from `false` → `true`, `OnlineSyncManager` begins syncing queued mutations
-- **Connection Quality**: Sync only starts when the network is healthy (GOOD or CELLULAR). BAD/OFFLINE connections continue queueing. See `isHealthy()` in `lib/network/state-machine.ts` for semantics.
-- **Debouncing**: Rapid online/offline flapping is debounced (5000ms default) to avoid redundant sync attempts
-- **Error Handling**: If sync fails, mutations remain queued and retry with exponential backoff
+### Integration Points
 
-See [lib/offline/README.md](../offline/README.md#architecture--data-flow) for complete offline queue architecture.
+- **NetworkDetection.subscribe()** — Emits `quality_change` on effective type/quality transitions
+- **AppKernel bootstrap** — Starts periodic `health_check` interval (default 5 min, configurable)
+- **lib/api RequestManager** — Captures and queues `error_correlation` on fetch failures
+- **lib/offline OnlineSyncManager** — Captures sync errors as error_correlation
 
-## Future Enhancements
+### Configuration
 
-See `docs/suggestions/` for planned improvements:
+Sampling rates configurable in `config/appsettings.json`:
 
-1. ✅ **Offline queue system** – IMPLEMENTED (see [lib/offline](../offline/README.md))
-2. **Network quality prediction** – ML-based prediction of connection quality
-3. **Adaptive payload sizing** – Automatically reduce payloads based on connection
-4. **Telemetry & metrics** – Track network quality distribution, impact on UX
-5. **Custom health endpoints** – Allow apps to use their own health check URL
-6. **Connection state machine** – Explicit state transitions with hooks
+```json
+{
+  "network": {
+    "telemetry": {
+      "enabled": true,
+      "healthCheckSampleRate": 0.1,
+      "errorCorrelationSampleRate": 0.5
+    }
+  }
+}
+```
+
+- `healthCheckSampleRate`: 0.1 = 10% of heartbeats emitted (first always emitted)
+- `errorCorrelationSampleRate`: 0.5 = 50% of network errors captured
+- `enabled`: false disables telemetry emission entirely
+
+### Privacy & Consent
+
+Respects application consent system (#181). Consent check runs before any emit:
+
+- If consent withdrawn: health check interval stopped, queued events discarded
+- Events avoid PII by default; don't add user-identifying fields without explicit consent
+- Schema reference: `lib/network/TELEMETRY_SCHEMA.md`
+
+## Integration with lib/offline
+
+**OfflineMutationQueue** syncs automatically when network recovers. Triggered by state transitions:
+
+```ts
+NetworkStateManager.onSpecificTransition('RECOVERING', 'GOOD', async () => {
+  await OnlineSyncManager.resume(); // Sync queued mutations
+  await invalidateCacheOlderThan(2 * 60 * 60 * 1000); // 2 hours
+});
+```
+
+**Key semantics:**
+- Sync only starts when `connectionQuality === GOOD` or `CELLULAR` (never in BAD/OFFLINE)
+- Rapid online/offline flapping debounced (5s default) to avoid redundant syncs
+- If sync fails, mutations remain queued for exponential backoff retry
+- See [lib/offline](../offline/README.md) for complete queue architecture
+
+## Configuration
+
+### Environment Variables
+
+- **`EXPO_PUBLIC_SUPABASE_URL`** — Used to construct health endpoint for periodic pings
+- **`EXPO_PUBLIC_SUPABASE_HEALTH_ENDPOINT`** (optional) — Override health endpoint explicitly
+
+### Constants (network-config.ts)
+
+```ts
+WEB_PING_INTERVAL = 5 * 60 * 1000; // 5 minutes (ping interval when visible)
+WEB_PING_TIMEOUT = 5000; // 5 seconds (ping timeout)
+LATENCY_THRESHOLD = 500; // 500ms (marks as BAD connection)
+LOW_BATTERY_THRESHOLD = 0.2; // 20% (marks connection as expensive)
+RECOVERY_BACKOFF_CAP = 30000; // 30 seconds (max backoff delay)
+DEBOUNCE_STATUS_CHANGE = 500; // 500ms (debounce rapid flapping)
+```
+
+Adjust for different network conditions, battery strategies, or recovery preferences.
+
+## Dependencies
+
+**External:** expo-network, expo-battery, expo-constants
+
+**Internal:** lib/utils/logger (telemetry), lib/api (RequestManager integration), lib/cache (QueryCache stale serving), lib/offline (sync triggers), lib/analytics (quality tracking)
+
+## Related Modules
+
+- [lib/api](../api/README.md) — RequestManager uses detection for retry logic + auto-injects adaptive params
+- [lib/cache](../cache/README.md) — QueryCache serves stale on network errors, auto-invalidates on quality change
+- [lib/offline](../offline/README.md) — OnlineSyncManager syncs queued mutations on RECOVERING → GOOD transition
+- [lib/analytics](../analytics/README.md) — Tracks network quality distribution for performance monitoring
+- [lib/utils/logger](../utils/README.md) — Emits telemetry events for observability
+
+## File Breakdown
+
+| File                               | Purpose                                                      | Lines |
+| ---------------------------------- | ------------------------------------------------------------ | ----- |
+| network-detection.ts               | Core detection, status tracking, platform abstraction        | ~200  |
+| state-machine.ts                   | State transitions, recovery backoff, hooks, valid transitions | ~180  |
+| network-config.ts                  | Constants, Supabase health endpoint resolution               | ~50   |
+| error-handling.ts                  | Network error classification, stale cache decision logic     | ~120  |
+| adaptive-payload.ts                | Quality → payload options mapping, tier definitions           | ~130  |
+| adaptive-payload-request.ts        | RequestManager integration, quality-aware cache keys         | ~120  |
+| adaptive-payload-integration.ts    | Cache invalidation on quality change, hook logic             | ~100  |
+| network-telemetry.ts               | Event emission, sampling, logging, consent integration       | ~180  |
+| helpers.ts                         | Utility functions (isOnline, hasGoodConnection, etc.)        | ~60   |
+| index.ts                           | Barrel export                                                | ~20   |
+
+## Known Limitations
+
+- Web ping relies on Supabase being available (CSP whitelisted); falls back to navigator.onLine if health endpoint unreachable
+- Battery detection unavailable on web (fallback: assume charging, conservative)
+- Connection type unavailable on older browsers (fallback: 'unknown')
+- Latency detection via ping only on web (native relies on OS-reported quality)
+- Server-side adaptive payload variants not yet implemented (Issue #XXX)
+- No manual quality override UI (can add as debug feature in future)
+
+## Performance Notes
+
+- Detection lightweight; no continuous polling by default
+- Web ping only runs when app visible (5 min intervals)
+- Native uses OS callbacks (no polling, event-driven)
+- Subscription updates batched/debounced (500ms default)
+- Current status synchronously available (no async)
+- Quality changes trigger cache invalidation + refetch automatically
+- Adaptive payload reduces bandwidth by 70-80% on poor connections
 
 ## Notes
 
-- Network status is real-time but may have slight delay on native (OS event batching)
-- Offline detection is conservative: waits for clear offline signal before marking offline
-- Stale cache strategy is "optimistic" – serves cache on any network uncertainty
-- Future: offline mutation queue will require more sophisticated detection
+- Network status real-time but may have slight delay on native (OS event batching)
+- Offline detection conservative: waits for clear signal before marking OFFLINE
+- Recovery backoff explicit and configurable for different network conditions
+- State machine enforces valid transitions; invalid transitions logged and rejected
+- Adaptive payloads reduce bandwidth cost significantly on metered connections
+- Telemetry local-first for privacy; no backend transmission until explicit consent

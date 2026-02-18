@@ -1,60 +1,69 @@
 # Cache Module
 
-Comprehensive caching system with Stale-While-Revalidate (SWR) pattern, tag-based invalidation, optimistic updates, and deduplication. Designed as a foundation for data fetching layers in any application.
+In-memory + persistent caching with Stale-While-Revalidate (SWR) pattern, tag-based invalidation, optimistic mutations, deduplication, and automatic cleanup. Works with lib/api for response caching and with lib/storage for persistence across app restarts.
 
 ## When to Use This Module
 
 **Use this module if you need to:**
 
-- Cache API responses with configurable stale/cache times
-- Implement SWR (Stale-While-Revalidate) pattern for better UX
+- Cache API responses with SWR pattern (return stale data immediately, revalidate in background)
 - Deduplicate concurrent identical requests
-- Invalidate related cached data via tags or patterns
-- Apply optimistic updates for instant UI feedback
+- Invalidate related cached data by tags (e.g., invalidate all `world:123:*` queries)
+- Apply optimistic updates for instant UI feedback on mutations
+- Subscribe to cache changes for real-time UI synchronization
 - Persist cache across app restarts
-- Avoid thundering herd (multiple identical requests)
-- Build React hooks for queries and mutations
-- Subscribe to cache updates for real-time data synchronization
 
-**Don't use this if:**
+**Do NOT use this module for:**
 
-- You need ephemeral request deduplication only (use RequestManager's dedupe instead)
-- You require persistent, versioned data store (use database)
-- You need transactional guarantees (use database/storage)
-- You're building a distributed cache (this is in-memory + local storage)
+- Raw request deduplication without caching (use lib/api RequestManager instead)
+- Persistent validated storage (use lib/storage)
+- Transactional data operations (use database)
 
 ## Architecture & Data Flow
 
 ```
-User Action (useQuery / useMutation)
+useQuery { cacheKey }
         ↓
-Check In-Memory Cache (fast, O(1))
+    [Check In-Memory Cache]
+        ├─ Hit & not stale → return immediately (SWR)
+        ├─ Hit & stale → return stale, revalidate in background (SWR)
+        ├─ Miss → continue
         ↓
-If cached & not stale: Return immediately
+    [Deduplication]
+        ├─ In-flight request for this key? → return same promise
+        └─ No → continue
         ↓
-If stale or missing: Fetch in background (deduplicated)
+    [Fetch via Fetcher]
+        ├─ Success → cache result
+        └─ Error → notify subscribers
         ↓
-Deduplication: Multiple requests return same promise
+    [Persist to Cache]
+        ├─ In-memory Map (O(1) lookup)
+        └─ FastCache storage (survives app restarts)
         ↓
-Fetch from API (or user's fetcher function)
+    [Notify Subscribers]
+        └─ Trigger React re-renders
+
+useMutation { mutationFn, invalidateTags }
         ↓
-Persist to Cache (in-memory + FastCache storage)
+    [Optimistic Update] (if configured)
+        └─ Apply changes to matching cache entries
         ↓
-Notify Subscribers (trigger React re-renders)
-        ↓
-Return Result to Component
+    [Execute Mutation]
+        ├─ Success → invalidate tags, notify subscribers
+        └─ Error → revert optimistic update
 ```
 
 **Key Principles:**
 
-- **Stale-While-Revalidate**: Return cached data immediately, revalidate in background
-- **Multi-layered**: In-memory cache (fast) + persistent FastCache (survives restarts)
-- **Deduplication**: Multiple requests for same key coalesce into one fetch
-- **Tag-based invalidation**: Invalidate related queries (e.g., all "worlds" queries)
-- **Pattern invalidation**: Invalidate by regex (e.g., all `world:123:*` queries)
-- **Optimistic updates**: Apply changes immediately, revert on error
-- **Race-condition safe**: Version tracking prevents stale writes from in-flight requests
-- **Observable**: All activity logged and tracked to analytics
+- **Stale-While-Revalidate**: Return stale cached data immediately; background revalidation ensures freshness without blocking UX
+- **Multi-layered**: In-memory Map for speed O(1); FastCache for persistence (survives app restarts)
+- **Deduplication**: Multiple `useQuery` calls with same key coalesce into one fetch (prevents thundering herd)
+- **Tag-based invalidation**: Bulk invalidate related queries (e.g., `invalidateTags(['world:123', 'world:123:members'])`)
+- **Pattern invalidation**: Regex-based invalidation for complex matching (e.g., `/^world:123:.*/` to clear all world:123 data)
+- **Optimistic updates**: Apply changes immediately; revert on mutation error for better UX
+- **Race-condition safe**: Version tracking prevents stale writes from requests that started before invalidation
+- **Automatic cleanup**: Expired entries removed hourly; max 500 entries with LRU-style eviction
 
 ## API Reference
 
@@ -192,11 +201,7 @@ unsubscribe();
 
 #### `QueryCache.getCurrentVersion(): number`
 
-Returns current global version number. Used for race condition prevention.
-
-#### `QueryCache.getStats(): { cacheSize, subscribers, keys }`
-
-Returns debugging statistics.
+Returns current global version number. Increments on every `invalidateByTags()` or `invalidate()` call. Used internally for race condition prevention.
 
 ---
 
@@ -267,38 +272,14 @@ return (
   - `'networkFirst'`: Always try to fetch; use cache as fallback on network error
   - `'offlineFirst'`: When offline, use cache even if very stale; don't force revalidation
 
-**Cache Priority Behavior:**
+**Cache Priority Strategies:**
 
-```ts
-// Default: 'balanced' (SWR)
-const { data } = useQuery('worlds:list', fetcher);
-// Returns cached data immediately if exists
-// Revalidates in background if older than staleTime
-
-// cacheFirst: Minimal data refresh
-const { data } = useQuery('worlds:list', fetcher, {
-  cachePriority: 'cacheFirst',
-});
-// Returns cached data immediately
-// Never revalidates automatically (call refetch() manually)
-// Useful for stable, rarely-changing data
-
-// offlineFirst: Offline-aware
-const { data } = useQuery('worlds:list', fetcher, {
-  cachePriority: 'offlineFirst',
-});
-// When offline: returns cache even if stale, doesn't try network
-// When online: standard SWR behavior
-// Useful for critical features that should work offline
-
-// networkFirst: Always fresh if possible
-const { data } = useQuery('worlds:list', fetcher, {
-  cachePriority: 'networkFirst',
-});
-// Always attempts to fetch fresh data
-// Falls back to cache if network fails
-// Useful for frequently-changing data that must be current
-```
+| Strategy | Behavior | Use When |
+| --- | --- | --- |
+| `'balanced'` (default) | Return cache immediately; revalidate if stale | Standard data fetching |
+| `'cacheFirst'` | Strongly prefer cache, no auto-revalidation | Stable, rarely-changing data |
+| `'networkFirst'` | Always try to fetch; fallback to cache on error | Real-time data, fast updates needed |
+| `'offlineFirst'` | When offline, use cache even if stale; don't revalidate | Critical offline-first features |
 
 ---
 
@@ -498,10 +479,10 @@ Default max 500 entries × average entry size (~1KB) = ~500KB in-memory cache. C
 
 ## Related Modules
 
-- **`lib/storage` (FastCache)** – Persistent cache storage layer
-- **`lib/api` (RequestManager)** – Makes HTTP requests; integrates with QueryCache via cache keys
-- **`lib/utils/logger`** – Cache operation logging
-- **`lib/analytics`** – Can track cache hit/miss rates, performance
+- **`lib/api` (RequestManager)** – Works with lib/api for response caching; shares deduplication concepts (works with lib/api)
+- **`lib/storage` (FastCache)** – Persistent cache backend; survives app restarts (works with lib/storage)
+- **`lib/utils/logger`** – Cache operation logging (cache category)
+- **`lib/network`** – `cachePriority: 'offlineFirst'` integrates with network state detection
 
 ---
 
@@ -517,27 +498,4 @@ Default max 500 entries × average entry size (~1KB) = ~500KB in-memory cache. C
 
 ---
 
-## Testing
 
-Currently, no dedicated test guide exists for this module. When adding tests, create a guide at `docs/A Testing Guide/cache.md` following the repository's testing guide template.
-
-**Manual testing tips:**
-
-- **Cache hit**: Query twice with same key within staleTime → second should use cached data instantly
-- **Stale revalidation**: Query, wait past staleTime, access query → should return stale data immediately, revalidate in background
-- **Deduplication**: Call same query twice rapidly → both should return same promise
-- **Invalidation by tags**: Create multiple queries with same tag, invalidate tag → all queries should refetch
-- **Optimistic update**: Mutation with optimisticUpdate → UI updates before request completes; on error → reverts
-- **Race condition**: Invalidate cache while query in-flight → completed query should NOT cache stale data
-- **Cleanup**: Wait 1+ hour, check in-memory cache size → expired entries should be removed
-
----
-
-## Future Enhancements
-
-- **LRU Eviction**: Implement Least-Recently-Used eviction instead of oldest-first
-- **Time-Travel Debugging**: Keep history of cache state changes for debugging
-- **Cache Analytics**: Track hit/miss rates, entry age distribution, access patterns
-- **Conditional Requests**: HTTP cache headers (ETag, Last-Modified) to reduce payload
-- **Cross-Tab Sync**: Sync cache changes across browser tabs/windows (for web)
-- **Custom Storage Backend**: Pluggable storage (IndexedDB, Realm, SQLite, etc.)
