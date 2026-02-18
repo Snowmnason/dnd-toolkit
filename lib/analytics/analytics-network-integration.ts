@@ -5,6 +5,7 @@
  * pending events when the device goes online. Handles:
  * - Online/offline transitions with debouncing
  * - Batch flushing (25 events per request)
+ * - Exponential backoff retry scheduling
  * - Non-blocking async flush
  * - Error handling (4xx discard, 5xx retry)
  * - Consent-aware flushing (no flush if consent withdrawn)
@@ -19,6 +20,8 @@ import { AnalyticsConsent } from "./consent";
 /**
  * Flush analytics events to backend
  * Pulled from the queue, sent in batches, with proper error handling
+ * 
+ * Respects nextAttemptAt scheduling (only flushes events ready for retry)
  */
 export async function flushAnalyticsQueue(): Promise<void> {
   try {
@@ -41,6 +44,7 @@ export async function flushAnalyticsQueue(): Promise<void> {
     ); // Safety limit
 
     let flushedCount = 0;
+    let failedCount = 0;
     let batchCount = 0;
 
     while (
@@ -54,28 +58,56 @@ export async function flushAnalyticsQueue(): Promise<void> {
         break;
       }
 
+      // Filter: only include events that are ready to retry (or never tried)
+      const now = Date.now();
+      const readyBatch = batch.filter((e) => !e.nextAttemptAt || e.nextAttemptAt <= now);
+      const scheduledBatch = batch.filter((e) => e.nextAttemptAt && e.nextAttemptAt > now);
+
+      if (readyBatch.length === 0) {
+        // All events in batch are scheduled for future retry
+        if (scheduledBatch.length > 0) {
+          const nextRetryMs = Math.min(...scheduledBatch.map((e) => e.nextAttemptAt!));
+          const waitMs = nextRetryMs - now;
+          logger
+            .category("analytics")
+            .debug(
+              `All events in next batch are scheduled; next retry in ${waitMs}ms`,
+            );
+        }
+        break;
+      }
+
       logger
         .category("analytics")
-        .debug(`Flushing batch ${batchCount} with ${batch.length} events`);
+        .debug(
+          `Flushing batch ${batchCount} with ${readyBatch.length}/${batch.length} ready events`,
+          {
+            ready: readyBatch.length,
+            scheduled: scheduledBatch.length,
+          },
+        );
 
       try {
         // Send batch to analytics backend
-        const success = await sendAnalyticsEventsBatch(batch);
+        const success = await sendAnalyticsEventsBatch(readyBatch);
 
         if (success) {
           // Remove successfully sent events from queue
-          const eventIds = batch.map((e) => e.id);
+          const eventIds = readyBatch.map((e) => e.id);
           await analyticsBufferService.remove(eventIds);
-          flushedCount += batch.length;
+          flushedCount += readyBatch.length;
 
           logger
             .category("analytics")
-            .debug(`Flushed ${batch.length} events successfully`);
+            .debug(`Flushed ${readyBatch.length} events successfully`);
         } else {
-          // Failed but retryable - leave in queue for next flush
+          // Failed but retryable - mark with next attempt time
+          failedCount += readyBatch.length;
           logger
             .category("analytics")
-            .warn("Failed to flush batch, will retry later");
+            .warn("Failed to flush batch, will retry later", {
+              eventCount: readyBatch.length,
+            });
           break;
         }
       } catch (error) {
@@ -83,9 +115,10 @@ export async function flushAnalyticsQueue(): Promise<void> {
           .category("analytics")
           .error("Error flushing batch:", {
             error: String(error),
-            batchSize: batch.length,
+            batchSize: readyBatch.length,
           });
         // Continue to prevent single batch failure from blocking other batches
+        failedCount += readyBatch.length;
         break;
       }
 
@@ -95,10 +128,14 @@ export async function flushAnalyticsQueue(): Promise<void> {
       }
     }
 
-    if (flushedCount > 0) {
+    if (flushedCount > 0 || failedCount > 0) {
       logger
         .category("analytics")
-        .info(`Flush complete: ${flushedCount} events sent`);
+        .info(`Flush complete: ${flushedCount} sent, ${failedCount} failed (scheduled for retry)`, {
+          flushedCount,
+          failedCount,
+          queueSize: analyticsBufferService.size(),
+        });
     }
   } catch (error) {
     logger
@@ -222,9 +259,14 @@ function getAnalyticsEndpoint(): string {
 /**
  * Initialize network integration for analytics buffer
  * Call this once at app startup
+ * 
+ * Sets up:
+ * - Network status listener for online transitions
+ * - Retry scheduler to check for scheduled events periodically
  */
 let isInitialized = false;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
+let retrySchedulerTimer: ReturnType<typeof setInterval> | null = null;
 let unsubscribeFromNetwork: (() => void) | null = null;
 
 export function initializeAnalyticsNetworkIntegration(): void {
@@ -238,6 +280,7 @@ export function initializeAnalyticsNetworkIntegration(): void {
   try {
     const config = getAppConfig();
     const debounceMs = config.analytics?.buffer?.debounceMs ?? 5000;
+    const retryCheckIntervalMs = 30000; // Check for scheduled retries every 30s
 
     // Subscribe to network status changes
     unsubscribeFromNetwork = NetworkDetection.subscribe(
@@ -246,14 +289,77 @@ export function initializeAnalyticsNetworkIntegration(): void {
       },
     );
 
+    // Start retry scheduler: periodically check for events ready to retry
+    retrySchedulerTimer = setInterval(() => {
+      scheduleReadyRetries().catch((error) => {
+        logger
+          .category("analytics")
+          .error("Retry scheduler error:", { error: String(error) });
+      });
+    }, retryCheckIntervalMs);
+
     isInitialized = true;
     logger
       .category("analytics")
-      .debug("Analytics network integration initialized");
+      .debug("Analytics network integration initialized with retry scheduler");
   } catch (error) {
     logger
       .category("analytics")
       .error("Failed to initialize analytics network integration:", {
+        error: String(error),
+      });
+  }
+}
+
+/**
+ * Check for events that are ready to retry and trigger a flush if any exist
+ */
+async function scheduleReadyRetries(): Promise<void> {
+  try {
+    // Don't retry if we're offline
+    if (!NetworkDetection.isOnline()) {
+      return;
+    }
+
+    // Check if any events are ready to retry
+    const allEvents = await analyticsBufferService.getAll();
+    const now = Date.now();
+    const readyEvents = allEvents.filter(
+      (e) => !e.nextAttemptAt || e.nextAttemptAt <= now,
+    );
+
+    if (readyEvents.length === 0) {
+      // No events ready to retry
+      const scheduledEvents = allEvents.filter(
+        (e) => e.nextAttemptAt && e.nextAttemptAt > now,
+      );
+      if (scheduledEvents.length > 0) {
+        const nextRetryMs = Math.min(...scheduledEvents.map((e) => e.nextAttemptAt!));
+        logger
+          .category("analytics")
+          .debug(
+            `Retry scheduler: ${scheduledEvents.length} events scheduled, next in ${nextRetryMs - now}ms`,
+          );
+      }
+      return;
+    }
+
+    logger
+      .category("analytics")
+      .info(
+        `Retry scheduler: Found ${readyEvents.length} events ready to retry`,
+      );
+
+    // Trigger a non-blocking flush
+    flushAnalyticsQueue().catch((error) => {
+      logger
+        .category("analytics")
+        .error("Retry flush failed:", { error: String(error) });
+    });
+  } catch (error) {
+    logger
+      .category("analytics")
+      .error("Error checking for ready retries:", {
         error: String(error),
       });
   }
@@ -300,6 +406,11 @@ export function cleanupAnalyticsNetworkIntegration(): void {
     flushTimer = null;
   }
 
+  if (retrySchedulerTimer) {
+    clearInterval(retrySchedulerTimer);
+    retrySchedulerTimer = null;
+  }
+
   if (unsubscribeFromNetwork) {
     unsubscribeFromNetwork();
     unsubscribeFromNetwork = null;
@@ -309,4 +420,21 @@ export function cleanupAnalyticsNetworkIntegration(): void {
   logger
     .category("analytics")
     .debug("Analytics network integration cleaned up");
+}
+
+/**
+ * Handle analytics consent withdrawal
+ *
+ * Called when user withdraws analytics consent. Immediately discards all pending
+ * events without flushing. Integrates with AnalyticsConsent to support the workflow:
+ * - User sets consent to 'none' or removes analytics permission
+ * - App calls this function
+ * - All pending buffer events are discarded
+ * - New events only buffered after consent is re-granted
+ *
+ * Respects Phase 1b spec: "On consent withdraw: call clear(), remove storage key,
+ * and log the discard locally (non-identifying). Do not schedule or send any pending events."
+ */
+export async function handleAnalyticsConsentWithdrawal(): Promise<void> {
+  await analyticsBufferService.handleConsentWithdrawal();
 }

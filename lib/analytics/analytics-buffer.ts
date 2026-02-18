@@ -28,6 +28,8 @@ export interface QueuedAnalyticsEvent {
   payload: Record<string, any>; // Sanitized event data (no PII)
   retryCount: number; // Number of failed delivery attempts
   maxRetries: number; // Max retry attempts before discard (default 5)
+  nextAttemptAt?: number; // When to retry next (milliseconds since epoch); if < now, ready to retry
+  lastErrorReason?: string; // Reason for last failure (e.g., "HTTP 500", "network_error")
   metadata?: {
     offlineAt?: number; // When queued during offline period
     priority?: "high" | "low"; // high = always retry, low = may drop on overflow
@@ -89,6 +91,19 @@ export function generateUUID(): string {
     const v = c === "x" ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
+}
+
+/**
+ * Calculate exponential backoff delay (milliseconds)
+ * Progress: 1s → 2s → 4s → 8s → 16s
+ */
+export function calculateExponentialBackoff(
+  retryCount: number,
+  baseMs: number = 1000,
+): number {
+  // 2^retryCount * baseMs (min 1s, max 16x base)
+  const exponent = Math.min(retryCount, 4); // Cap at 4 (16s max)
+  return Math.pow(2, exponent) * baseMs;
 }
 
 /**
@@ -162,11 +177,60 @@ class AnalyticsBufferService {
         .info(
           `Analytics buffer initialized. Config: enabled=${this.config.enabled}, maxSize=${this.config.maxSize}, maxRetries=${this.config.maxRetries}`,
         );
+
+      // If online and queue has events ready to retry (or never attempted),
+      // schedule an immediate flush to avoid waiting for network flap or 30s scheduler
+      this.scheduleReadyEventsFlushIfOnline();
     } catch (error) {
       logger
         .category("error")
         .error("Failed to initialize analytics buffer:", error);
       this.initialized = true; // Don't block app startup
+    }
+  }
+
+  /**
+   * Schedule an immediate flush if we're online and have ready events
+   * This ensures events queued during offline period flush as soon as app starts online
+   */
+  private scheduleReadyEventsFlushIfOnline(): void {
+    // Lazy import to avoid circular deps
+    try {
+      const { NetworkDetection } = require("@/lib/network/network-detection");
+      if (!NetworkDetection.isOnline()) {
+        return; // Offline, no-op
+      }
+
+      const now = Date.now();
+      const hasReadyEvents = this.queue.some(
+        (e) => !e.nextAttemptAt || e.nextAttemptAt <= now,
+      );
+
+      if (hasReadyEvents) {
+        logger
+          .category("analytics")
+          .debug(
+            `Buffer initialized online with ready events; scheduling immediate flush`,
+          );
+        // Import async here to avoid circular deps at module load time
+        // The flush will happen asynchronously; we don't await it
+        (async () => {
+          try {
+            const { flushAnalyticsQueue } = await import(
+              "./analytics-network-integration"
+            );
+            await flushAnalyticsQueue();
+          } catch (error) {
+            logger
+              .category("analytics")
+              .error("Failed to flush ready events on initialize:", error);
+          }
+        })();
+      }
+    } catch (error) {
+      logger
+        .category("analytics")
+        .debug("Could not check for ready events on initialize (network not available yet)");
     }
   }
 
@@ -307,9 +371,10 @@ class AnalyticsBufferService {
   }
 
   /**
-   * Mark an event as failed (increment retry count)
+   * Mark an event as failed (increment retry count and schedule next attempt)
    *
-   * Called when a flush attempt fails; tracks failure reason
+   * Called when a flush attempt fails; tracks failure reason and schedules next retry via exponential backoff
+   * If max retries exceeded, event is discarded automatically
    */
   async markFailed(id: string, reason: string): Promise<void> {
     const event = this.queue.find((e) => e.id === id);
@@ -321,12 +386,34 @@ class AnalyticsBufferService {
     }
 
     event.retryCount++;
+    event.lastErrorReason = reason;
+
+    // Check if max retries exceeded
+    if (event.retryCount >= event.maxRetries) {
+      // Discard permanently
+      this.queue = this.queue.filter((e) => e.id !== id);
+      await this.persist();
+      logger
+        .category("analytics")
+        .warn(
+          `Analytics event ${id} discarded after ${event.maxRetries} retries: ${reason}`,
+        );
+      return;
+    }
+
+    // Calculate next attempt time using exponential backoff
+    const backoffMs = calculateExponentialBackoff(
+      event.retryCount,
+      this.config.retryBaseMs,
+    );
+    event.nextAttemptAt = Date.now() + backoffMs;
+
     await this.persist();
 
     logger
       .category("analytics")
       .debug(
-        `Marked event ${id} as failed (attempt ${event.retryCount}/${event.maxRetries}): ${reason}`,
+        `Marked event ${id} as failed (attempt ${event.retryCount}/${event.maxRetries}): ${reason} - next attempt in ${backoffMs}ms`,
       );
   }
 
@@ -457,6 +544,31 @@ class AnalyticsBufferService {
    */
   isInitialized(): boolean {
     return this.initialized;
+  }
+
+  /**
+   * Handle consent withdrawal
+   *
+   * Called when user withdraws analytics consent. Immediately discards all pending
+   * events without flushing. Only new events emitted after re-consent are buffered.
+   *
+   * Respects Phase 1b spec: "On consent withdraw: call clear(), remove storage key,
+   * and log the discard locally (non-identifying). Do not schedule or send any pending events."
+   */
+  async handleConsentWithdrawal(): Promise<void> {
+    if (this.queue.length > 0) {
+      const count = this.queue.length;
+      await this.clear();
+      logger
+        .category("analytics")
+        .info(
+          `Analytics consent withdrawn; discarded ${count} pending events without sending`,
+        );
+    } else {
+      logger
+        .category("analytics")
+        .debug("Analytics consent withdrawn; no pending events to discard");
+    }
   }
 }
 
