@@ -295,7 +295,7 @@ class AnalyticsBufferService {
    * Returns the queued event or null if queueing failed
    */
   async enqueue(
-    event: Omit<QueuedAnalyticsEvent, "id" | "timestamp" | "retryCount">,
+    event: Omit<QueuedAnalyticsEvent, "id" | "timestamp" | "retryCount"> & { maxRetries?: number },
   ): Promise<QueuedAnalyticsEvent | null> {
     if (!this.initialized) {
       logger
@@ -310,6 +310,7 @@ class AnalyticsBufferService {
         id: generateUUID(),
         timestamp: Date.now(),
         retryCount: 0,
+        maxRetries: event.maxRetries ?? this.config.maxRetries,
       };
 
       // Check if queue is at max size (FIFO overflow: drop oldest)

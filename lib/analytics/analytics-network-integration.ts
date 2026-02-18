@@ -184,7 +184,7 @@ async function sendAnalyticsEventsBatch(
       return true;
     }
 
-    // 4xx: Permanent failure, discard events
+    // 4xx: Permanent failure, discard events immediately
     if (response.status >= 400 && response.status < 500) {
       logger
         .category("analytics")
@@ -193,12 +193,12 @@ async function sendAnalyticsEventsBatch(
           eventCount: events.length,
         });
 
-      // Mark events as failed and discard if max retries exceeded
+      // Discard events immediately (permanent error)
       for (const event of events) {
-        await analyticsBufferService.markFailed(event.id, `HTTP ${response.status}`);
+        await analyticsBufferService.discard(event.id, `HTTP ${response.status}`);
       }
 
-      return true; // Treat as "handled" to unblock further flushes
+      return true; // Treated as handled so flush can continue
     }
 
     // 5xx or other: Retryable
