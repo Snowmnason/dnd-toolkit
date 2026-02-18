@@ -1,6 +1,6 @@
 # Analytics Module
 
-Provides a flexible, consent-aware analytics and performance monitoring foundation for applications. Supports event tracking, user identification, performance measurement, and session management with built-in privacy controls.
+Consent-aware analytics and performance monitoring. Handles event tracking, user identification, screen/session measurement, and offline event queuing with automatic retry.
 
 ## When to Use This Module
 
@@ -8,228 +8,171 @@ Provides a flexible, consent-aware analytics and performance monitoring foundati
 
 - Track user events and engagement metrics with consent awareness
 - Monitor application performance and identify slow operations
-- Measure screen load times and custom operation duration with [lib/utils's startup time tracking](../utils/README.md)
-- Manage user sessions, retention, and funnel analysis
-- Identify and categorize errors for debugging and error tracking (Sentry)
-- Ensure analytics compliance with privacy regulations (GDPR, CCPA, etc.)
-- Have granular control over what data is collected and when (privacy-first design)
-- Integrate with error reporting and monitoring services
+- Measure screen load times and custom operation durations
+- Manage user sessions, screen views, and error counts
+- Queue events when offline and flush them automatically when reconnected
+- Track A/B test variant assignments and engagement
 
 **Do NOT use this module for:**
 
-- Real-time analytics dashboards (this sends data to Sentry breadcrumbs; use external analytics service for dashboards)
-- Custom event schemas with custom storage (add a persistence layer on top)
-- Cross-device analytics sync (this is single-device; use [lib/database](../database/README.md) for server-side persistence)
-- Telemetry logging (use [lib/utils's Logger](../utils/README.md) instead)
+- Real-time analytics dashboards (events go to Sentry breadcrumbs only; use an external service for dashboards)
+- Cross-device analytics sync (single-device only; use [lib/database](../database/README.md) for server-side persistence)
+- General debug/telemetry logging (use [lib/utils's Logger](../utils/README.md) instead)
 
 ## Architecture & Data Flow
 
 ```
 User Action / Runtime Event
         ↓
-    Check Consent Level
+    Check Consent Level (AnalyticsConsent)
         ↓
-    Sanitize Data (remove sensitive fields)
+    Sanitize Data (strip message, stack, raw error fields)
         ↓
-    Categorize (if error) / Measure (if timing)
-        ↓
-    Is Network Online?
-        ├─ YES ─→ Send to Sentry (if enabled & consent allows)
-        └─ NO  ─→ Queue to Offline Buffer (persisted locally)
+    Is Network Online? (works with lib/network)
+        ├─ YES ─→ Send to Sentry breadcrumb (if sentryEnabled flag is set)
+        └─ NO  ─→ Queue to AnalyticsBuffer (encrypted via lib/storage)
                         ↓
-                  [Buffer waits for online transition]
+                  [Online transition detected]
                         ↓
-                  [Automatic retry with exponential backoff]
+                  [Flush in batches with exponential backoff retry]
         ↓
-    Log to Logger (for debugging & audit trail)
+    Log to Logger (analytics / performance category)
 ```
 
 **Key Principles:**
 
-- **Privacy-first**: All analytics are consent-based; defaults to 'basic' (GDPR compliant)
-- **Offline-aware**: Events are queued locally when offline and automatically flushed when online
-- **Resilient retries**: Failed sends retry with exponential backoff (1s → 2s → 4s → 8s → 16s)
-- **Sanitization**: Sensitive fields (user input, system paths, full errors) are stripped before sending
-- **Graceful degradation**: If Sentry is disabled or unavailable, events are still logged locally
-- **Performance-aware**: Tracks and warns about slow operations; cleans up stale performance marks
+- **Privacy-first**: Defaults to `'basic'` consent (GDPR compliant); no usage or performance events sent without opt-in
+- **Offline-aware**: Events persist to encrypted storage and flush automatically when reconnected (works with lib/network)
+- **Resilient retries**: Failed sends retry with exponential backoff (1s → 2s → 4s → 8s → 16s, capped at 16s)
+- **Sanitization**: Strips `message`, `stack`, and raw error strings before sending; only `error_name` and `error_code` are kept
+- **Graceful degradation**: If Sentry is disabled or the `sentryEnabled` flag is off, all calls are silent no-ops
 
 ## API Reference
 
 ### `Analytics` Object
 
-Main entry point for event tracking and user identification.
+Main entry point. Imported from `@/lib/analytics`.
 
 #### `Analytics.enabled(): boolean`
 
-Returns true if Sentry is configured and the `sentryEnabled` feature flag is set.
-
-```ts
-if (Analytics.enabled()) {
-  // Safe to track analytics
-}
-```
+Returns `true` if Sentry is configured and the `sentryEnabled` feature flag is set. All other methods silently no-op when this is `false`.
 
 #### `Analytics.identify(user: { id?: string; username?: string } | null): void`
 
-Associates subsequent events with a user ID and optional username. Pass `null` to clear the user.
+Associates subsequent Sentry events with a user. Pass `null` to clear (call on logout).
 
 ```ts
 Analytics.identify({ id: "user-123", username: "john_doe" });
-// ... later ...
-Analytics.identify(null); // Clear user on logout
+Analytics.identify(null); // on logout
 ```
 
 #### `Analytics.track(event: string, props?: Record<string, any>): void`
 
-Tracks a generic event with optional properties. Respects consent levels:
-
-- Events named 'screen_view' or 'component_usage' require 'usage' consent
-- Events starting with 'performance' or named 'api_request' require 'performance' consent
-
-```ts
-Analytics.track("user_action", {
-  action_type: "button_click",
-  button_id: "save",
-});
-```
-
-#### `Analytics.trackComponentUsage(params: { component: string; action: string; detail?: Record<string, any> }): void`
-
-Convenience method for tracking component interactions. Automatically sets the event to 'component_usage'.
+Sends a Sentry breadcrumb. Consent is checked automatically:
+- `'screen_view'` and `'component_usage'` require `'usage'` consent
+- Events starting with `'performance'` or named `'api_request'` require `'performance'` consent
 
 ```ts
-Analytics.trackComponentUsage({
-  component: "LoginForm",
-  action: "submit",
-  detail: { method: "email" },
-});
+Analytics.track("user_action", { action_type: "button_click", button_id: "save" });
 ```
 
-#### `Analytics.withTiming<T>(label: string, fn: () => Promise<T> | T, warnMs?: number): Promise<T> | T`
+#### `Analytics.trackComponentUsage(params): void`
 
-Wraps a function to measure execution time and log warnings if it exceeds a threshold. Logs performance breadcrumbs to Sentry if performance consent is allowed.
+Shorthand for `track("component_usage", ...)`. Requires `'usage'` consent.
+
+```ts
+Analytics.trackComponentUsage({ component: "LoginForm", action: "submit", detail: { method: "email" } });
+```
+
+#### `Analytics.withTiming<T>(label, fn, warnMs?): Promise<T> | T`
+
+Wraps a function, measures its duration, and logs a warning if it exceeds the threshold. Sends a performance breadcrumb to Sentry if `'performance'` consent is given.
 
 ```ts
 await Analytics.withTiming("database_query", () => queryDatabase(), 5000);
-// If execution exceeds 5000ms, warns and sends breadcrumb
 ```
 
 #### `Analytics.getThreshold(key: 'slowScreenMs' | 'slowRequestMs'): number`
 
-Returns the configured performance threshold from app config, with a 3000ms fallback.
+Reads the configured threshold from `appsettings.json`. Falls back to `3000ms` if config is unavailable.
 
 ---
 
 ### `Performance` Object
 
-Dedicated performance measurement utilities for custom timing scenarios.
+Manual start/stop measurements for custom timing scenarios.
 
 #### `Performance.startMeasure(label: string): void`
 
-Marks the start of a measurement. Warn if a mark with the same label already exists (prevents duplicate measurements).
-
-```ts
-Performance.startMeasure("data_loading");
-```
+Starts a named measurement. Warns and overwrites if the same label is already active.
 
 #### `Performance.endMeasure(label: string, warnMs?: number): void`
 
-Marks the end of a measurement and tracks the duration. Logs a warning if duration exceeds the threshold.
+Ends the measurement and calls `Analytics.track("performance_measure", ...)` with the duration. Logs a warning if the duration exceeds the threshold.
 
 ```ts
-Performance.endMeasure("data_loading", 2000); // Warn if > 2000ms
+Performance.startMeasure("data_loading");
+// ... work ...
+Performance.endMeasure("data_loading", 2000);
 ```
 
 #### `Performance.useScreenDuration(screenName: string): void`
 
-React hook that automatically measures screen load duration. Starts measurement on mount, ends on unmount.
+React hook. Calls `startMeasure` on mount and `endMeasure` on unmount automatically.
 
 ```ts
 export function MyScreen() {
-  Performance.useScreenDuration('MyScreen');
+  Performance.useScreenDuration("MyScreen");
   return <View>...</View>;
 }
 ```
 
 #### `Performance.cleanupOldMarks(): void`
 
-Internal method called automatically after `startMeasure()`. Removes marks older than 5 minutes to prevent memory leaks.
+Internal. Removes marks older than 5 minutes to prevent memory leaks from abandoned measurements. Called automatically inside `startMeasure`.
 
 ---
 
 ### `sessionManager` Object
 
-Tracks user sessions, screen views, and error counts within a session.
+Tracks session lifetime, screen views, and error counts. Sends `session_started` and `session_ended` events.
 
-#### `sessionManager.startSession(userId?: string): void`
+| Method | Description |
+| ------ | ----------- |
+| `startSession(userId?)` | Starts a session. Ends any active session first. |
+| `endSession()` | Ends the session and tracks duration, screen views, and error count. |
+| `trackScreenView(screenName)` | Increments screen view counter and updates last activity time. |
+| `trackError()` | Increments error counter and updates last activity time. |
+| `getCurrentDuration(): number` | Returns current session duration in milliseconds. |
+| `isSessionActive(): boolean` | Returns `false` if no session or last activity was >30 minutes ago. |
 
-Starts a new session. If a session is already active, ends the previous one first. Tracks a 'session_started' event.
+---
 
-```ts
-sessionManager.startSession("user-456");
-```
+### `AnalyticsConsent` Object
 
-#### `sessionManager.endSession(): void`
+Controls which categories of events are allowed. Defaults to `'basic'` (GDPR safe).
 
-Ends the current session and tracks a 'session_ended' event with aggregated metrics (duration, screen views, errors).
-
-```ts
-sessionManager.endSession();
-```
-
-#### `sessionManager.trackScreenView(screenName: string): void`
-
-Records a screen view within the current session. Increments the screen view counter and updates last activity time.
-
-```ts
-sessionManager.trackScreenView("HomeScreen");
-```
-
-#### `sessionManager.trackError(): void`
-
-Records an error within the current session. Increments error count and updates last activity time.
+| Level | What is tracked |
+| ----- | --------------- |
+| `'none'` | Nothing |
+| `'basic'` | Essential events only (errors, auth, session) |
+| `'full'` | All events including usage and performance |
 
 ```ts
-sessionManager.trackError();
-```
-
-#### `sessionManager.getCurrentDuration(): number`
-
-Returns the current session duration in milliseconds.
-
-```ts
-const durationMs = sessionManager.getCurrentDuration();
-```
-
-#### `sessionManager.isSessionActive(): boolean`
-
-Returns true if the session is still active (no inactivity > 30 minutes).
-
-```ts
-if (!sessionManager.isSessionActive()) {
-  sessionManager.startSession(userId);
-}
+AnalyticsConsent.setLevel("full");
+AnalyticsConsent.getLevel(); // 'full'
+AnalyticsConsent.isAllowed("performance"); // true
 ```
 
 ---
 
-### Analytics Buffer (Offline Mode)
+### Analytics Buffer (Offline Queue)
 
-Automatically queues analytics events when offline and flushes them when the network becomes available. Requires the `analyticsBuffer.enabled` feature flag to be true.
+Persists events to encrypted storage (works with lib/storage) when offline and flushes on reconnect (works with lib/network). Controlled by the `analytics.buffer` config block.
 
-#### `analyticsBufferService.initialize(): void`
+#### `analyticsBufferService.enqueue(event): Promise<QueuedAnalyticsEvent | null>`
 
-Initializes the analytics buffer. Loads persisted queue from storage, validates event retention (7-day max), and sets up network monitoring.
-
-```ts
-import { analyticsBufferService } from "@/lib/analytics";
-
-await analyticsBufferService.initialize();
-```
-
-#### `analyticsBufferService.enqueue(event: Omit<QueuedAnalyticsEvent, "id" | "timestamp" | "retryCount">): Promise<QueuedAnalyticsEvent | null>`
-
-Adds an analytics event to the offline queue. Only enqueues if offline or if network is unreliable. Returns the queued event with generated `id` and `timestamp`, or `null` if enqueueing failed (for example, if the buffer is not initialized or disabled).
+Adds an event to the offline queue. `id`, `timestamp`, and `retryCount` are generated automatically.
 
 ```ts
 await analyticsBufferService.enqueue({
@@ -237,71 +180,21 @@ await analyticsBufferService.enqueue({
   payload: { screen: "HomeScreen" },
   maxRetries: 5,
 });
-// Note: `id`, `timestamp`, and `retryCount` are generated by the service.
 ```
 
 #### `analyticsBufferService.getStats(): AnalyticsBufferStats`
 
-Returns current queue statistics: size, max size, oldest event age, and event type breakdown.
-
-```ts
-const { queueSize, maxSize, oldestEventAge } = analyticsBufferService.getStats();
-// `oldestEventAge` is returned in milliseconds; convert to seconds for human-readable output
-const oldestEventAgeSec = oldestEventAge / 1000;
-console.log(`${queueSize}/${maxSize} events queued (oldest: ${oldestEventAgeSec.toFixed(1)}s)`);
-```
+Returns `queueSize`, `maxSize`, `oldestEventAge` (ms), and a breakdown by event type.
 
 #### `analyticsBufferService.clear(): Promise<void>`
 
-Clears all queued events. Use only for testing or user-initiated data deletion (privacy).
+Clears all queued events. Use only for user-initiated data deletion.
 
-```ts
-await analyticsBufferService.clear();
-```
+#### `calculateExponentialBackoff(retryCount, baseMs?): number`
 
-#### `useAnalyticsBufferStatus(): AnalyticsBufferStatus`
+Returns the delay in ms for a given retry attempt. Base defaults to 1000ms; caps at 16000ms (retry 4+).
 
-React hook for monitoring buffer status in debug/admin screens. Returns queue size, flushing state, last flush time, and queued event types.
-
-```tsx
-export function DebugAnalytics() {
-  const { queueSize, isFlushing, lastFlushTime } = useAnalyticsBufferStatus();
-  
-  return (
-    <View>
-      <Text>Queue: {queueSize} events</Text>
-      <Text>Last flush: {lastFlushTime ? new Date(lastFlushTime).toLocaleTimeString() : 'Never'}</Text>
-      <Text>Status: {isFlushing ? "Flushing..." : "Idle"}</Text>
-    </View>
-  );
-}
-```
-
-#### `calculateExponentialBackoff(retryCount: number, baseMs?: number): number`
-
-Calculates exponential backoff delay for retry scheduling. Returns delay in milliseconds. Used internally by retry logic.
-
-```ts
-// Default base: 1000ms
-calculateExponentialBackoff(0); // 1000ms
-calculateExponentialBackoff(1); // 2000ms
-calculateExponentialBackoff(2); // 4000ms
-calculateExponentialBackoff(3); // 8000ms
-calculateExponentialBackoff(4); // 16000ms (capped at 2^4)
-calculateExponentialBackoff(5); // 16000ms (capped at 2^4)
-```
-
-**Retry Behavior:**
-
-- Events are retried up to `maxRetries` times (default: 5, configurable)
-- Failed sends (5xx, network errors) schedule automatic retry with exponential backoff
-- Permanent failures (4xx) are discarded immediately
-- After `maxRetries` exceeded, event is discarded with logging
-- Automatic flusher checks for ready-to-retry events every 30 seconds
-
-**Configuration:**
-
-Configure buffer behavior in `config/appsettings.json`:
+**Buffer config** (in `config/appsettings.json`):
 
 ```json
 {
@@ -318,72 +211,30 @@ Configure buffer behavior in `config/appsettings.json`:
 }
 ```
 
-| Setting      | Default | Description                                                            |
-| ------------ | ------- | ---------------------------------------------------------------------- |
-| `enabled`    | `true`  | Enable/disable offline queuing                                         |
-| `maxSize`    | `100`   | Max events in queue; older events dropped when exceeded (FIFO)         |
-| `maxRetries` | `5`     | Max retry attempts per event before discard                            |
-| `batchSize`  | `25`    | Events sent per network request                                        |
-| `retryBaseMs`| `1000`  | Base delay for exponential backoff (milliseconds)                      |
-| `debounceMs` | `5000`  | Debounce online transition to prevent flush spam from network flapping |
-
----
-
-### `AnalyticsConsent` Object
-
-Manages consent levels for analytics tracking. Defaults to 'basic' for GDPR compliance.
-
-#### `AnalyticsConsent.setLevel(level: 'none' | 'basic' | 'full'): void`
-
-Sets the consent level:
-
-- `'none'`: No analytics tracking
-- `'basic'`: Only essential events (errors, auth, session)
-- `'full'`: All analytics including usage and performance
-
-```ts
-AnalyticsConsent.setLevel("full"); // User opts in to full tracking
-```
-
-#### `AnalyticsConsent.getLevel(): 'none' | 'basic' | 'full'`
-
-Returns the current consent level.
-
-#### `AnalyticsConsent.isAllowed(category: 'essential' | 'performance' | 'usage'): boolean`
-
-Returns true if tracking is allowed for a given category based on the current consent level.
-
-```ts
-if (AnalyticsConsent.isAllowed("performance")) {
-  // Safe to track performance metrics
-}
-```
+| Setting | Default | Description |
+| ------- | ------- | ----------- |
+| `enabled` | `true` | Turns the offline buffer on/off |
+| `maxSize` | `100` | Max queued events; oldest dropped when exceeded (FIFO) |
+| `maxRetries` | `5` | Attempts before an event is discarded |
+| `batchSize` | `25` | Events per flush request |
+| `retryBaseMs` | `1000` | Base for exponential backoff |
+| `debounceMs` | `5000` | Debounce delay on network-online transitions |
 
 ---
 
 ### Utility Functions
 
-#### `categorizeError(error: any): ErrorCategory`
+#### `categorizeError(error): ErrorCategory`
 
-Categorizes an error into: `'network'`, `'auth'`, `'validation'`, `'timeout'`, or `'unknown'`.
+Classifies an error into `'network'`, `'auth'`, `'validation'`, `'timeout'`, or `'unknown'` by inspecting `message`, `name`, and `code`.
 
-```ts
-const category = categorizeError(new Error("Network timeout"));
-// Returns: 'timeout'
-```
+#### `sanitizeError(err): { error_name?, error_code? } | undefined`
 
-#### `sanitizeError(err: any): { error_name?: string; error_code?: string | number } | undefined`
+Strips everything except `name` and `code` from an error object. Returns `undefined` if neither field is present.
 
-Extracts only safe, structured error identifiers (name and code). Returns `undefined` if error has neither.
+#### `trackFeatureBlocked(params): void`
 
-```ts
-const safe = sanitizeError(error);
-// { error_name: 'TypeError', error_code: 'VALIDATION_ERROR' }
-```
-
-#### `trackFeatureBlocked(params: { feature: string; reason: 'flag_disabled' | 'requires_premium' | 'beta_only' }): void`
-
-Tracks when a feature is blocked due to a flag, paywall, or beta restriction.
+Tracks when a feature is blocked. Sends a `"feature_blocked"` event with `feature` and `reason`.
 
 ```ts
 trackFeatureBlocked({ feature: "export_world", reason: "requires_premium" });
@@ -391,81 +242,23 @@ trackFeatureBlocked({ feature: "export_world", reason: "requires_premium" });
 
 ---
 
-### A/B Testing & Variant Tracking
+### Variant Tracking
 
-Import from `lib/analytics/variant-tracking`:
+A/B test helpers. Import directly from `@/lib/analytics/variant-tracking` or via the barrel.
 
 #### `trackVariantAssignment(event: VariantAssignmentEvent): void`
 
-Tracks when a user is assigned to a variant (A or B). **Automatically called** by the rollout system; manual calls are rarely needed.
-
-```ts
-import { trackVariantAssignment } from "@/lib/analytics/variant-tracking";
-
-trackVariantAssignment({
-  flagName: "characters_v2_screen",
-  variant: "B",
-  userId: "user-123",
-  percentage: 50,
-});
-```
+Fired when a user is bucketed into a variant. Called automatically by the rollout system.
 
 #### `trackVariantEngagement(event: VariantEngagementEvent): void`
 
-Tracks user engagement with a variant feature (clicks, form submissions, etc.).
-
-```ts
-import { trackVariantEngagement } from "@/lib/analytics/variant-tracking";
-
-trackVariantEngagement({
-  flagName: "characters_v2_screen",
-  variant: "B",
-  action: "edit_button_clicked",
-  userId: "user-123",
-  metadata: { button_name: "edit_character" },
-});
-```
+Fired when a user interacts with a variant feature. Provide `flagName`, `variant`, `action`, and `userId`.
 
 #### `trackVariantPerformance(event: VariantPerformanceEvent): void`
 
-Tracks performance metrics per variant for comparison (e.g., screen load times, API response times).
+Fired to record a numeric performance metric for a specific variant (e.g., `screen_load_ms`).
 
-```ts
-import { trackVariantPerformance } from "@/lib/analytics/variant-tracking";
-
-trackVariantPerformance({
-  flagName: "characters_v2_screen",
-  variant: "B",
-  userId: "user-123",
-  metric: "screen_load_ms",
-  value: 1250,
-});
-```
-
-**For component-level tracking**, use the `useVariantTracking()` hook from `@/hooks`:
-
-```tsx
-import { useVariantTracking } from "@/hooks";
-
-export function CharactersV2Screen() {
-  const { trackEngagement, trackPerformance } = useVariantTracking(
-    "characters_v2_screen",
-    "B",
-  );
-
-  return (
-    <Button
-      onPress={() => {
-        trackEngagement("view_details");
-      }}
-    >
-      View Details
-    </Button>
-  );
-}
-```
-
-For detailed A/B testing guide, see [docs/issues/MileStone 2/Tier 3/058 - Per-Variant Tracking/VARIANT_TRACKING_GUIDE.md](../../docs/issues/MileStone%202/Tier%203/058%20-%20Per-Variant%20Tracking/VARIANT_TRACKING_GUIDE.md).
+For component-level usage see the `useVariantTracking()` hook in `hooks/analytics`.
 
 ---
 
@@ -473,15 +266,15 @@ For detailed A/B testing guide, see [docs/issues/MileStone 2/Tier 3/058 - Per-Va
 
 ### External Packages
 
-- **`@sentry/react-native`** – Error reporting and breadcrumb tracking
-- **`expo-constants`** – Access to app config and environment variables
+- **`@sentry/react-native`** – Breadcrumb and user tracking
+- **`expo-constants`** – Reads Sentry DSN from app config
 
 ### Internal Dependencies
 
-- **`lib/config/loader`** – Loads feature flags and performance thresholds
-- **`lib/utils/logger`** – Logs debug and error messages (see logger system docs)
-- **`lib/storage/SecureStorage`** – Encrypted persistent storage for offline queue (analytics buffer only)
-- **`lib/network/network-detection`** – Monitors online/offline state and triggers automatic flush (analytics buffer only)
+- **`lib/config`** – Feature flags (`sentryEnabled`) and performance thresholds
+- **`lib/utils/logger`** – Category-based debug and error logging
+- **`lib/storage`** – Encrypted queue persistence (analytics buffer only)
+- **`lib/network`** – Online/offline detection for automatic flush (analytics buffer only)
 
 ---
 
@@ -489,39 +282,33 @@ For detailed A/B testing guide, see [docs/issues/MileStone 2/Tier 3/058 - Per-Va
 
 ### Sentry Disabled
 
-If Sentry is not configured or the `sentryEnabled` feature flag is false, all analytics calls gracefully no-op. Events are still logged locally for debugging.
+When `sentryEnabled` is `false` or Sentry has no DSN, all `Analytics.*` calls are silent no-ops. Nothing throws.
 
-```ts
-// If Sentry is disabled, these do nothing:
-Analytics.track("event"); // No error, no-op
-Analytics.identify({ id: "user" }); // No error, no-op
-```
+### Circular Dependency
 
-### Circular Dependency Prevention
+`session.ts` does not import `index.ts`. It sends Sentry breadcrumbs directly to avoid a circular import.
 
-`sessionManager` does not import the main `Analytics` object; instead, it sends breadcrumbs directly to Sentry to avoid circular imports.
+### Abandoned Performance Marks
 
-### Performance Mark Cleanup
+If `endMeasure` is never called (e.g., an error interrupted the flow), the mark is silently removed after 5 minutes by `cleanupOldMarks`.
 
-Old performance marks (>5 minutes) are automatically cleaned up to prevent memory leaks. If a mark is still pending after 5 minutes (e.g., an operation never called `endMeasure`), it will be silently removed.
+### Consent Withdrawn Mid-Buffer
 
-### Consent Bypass
+Queued offline events stay in the buffer but will not be flushed until consent is restored. Events are not discarded automatically on consent withdrawal.
 
-Event tracking respects consent levels, but `identify()` and error categorization always work (they don't send data, just prepare it).
+### Buffer Overflow
 
-### Sanitization Failures
+When the queue exceeds `maxSize`, the oldest events are dropped first (FIFO). A session-only `overflowCount` counter tracks dropped events; reset it with `getAndResetOverflowCount()` from `analyticsBufferService`.
 
-If sanitization fails, events are still sent with available data. Errors during sanitization are caught and logged without throwing.
+### Storage Unavailable
 
-### Analytics Buffer Failures
+If SecureStorage is unavailable, the buffer falls back to an in-memory queue. Events will be lost if the app restarts before they are flushed.
 
-The analytics buffer gracefully handles network and storage failures:
+### Flush Error Handling
 
-- **Storage failures**: If SecureStorage is unavailable, the buffer falls back to in-memory queue (events lost on app restart)
-- **Flush failures**: 4xx errors discard events (permanent failure); 5xx and network errors automatically retry with exponential backoff
-- **Consent changes**: If consent is withdrawn during buffering, queued events remain buffered but are not flushed (require re-consent to resume)
-- **Queue overflow**: When queue exceeds `maxSize`, oldest events are dropped first (FIFO overflow)
-- **Event validation**: Corrupted events are skipped during loading; valid events are retained and processed normally
+- **4xx responses**: Event is discarded immediately (permanent failure).
+- **5xx / network errors**: Event is rescheduled with exponential backoff.
+- **Max retries exceeded**: Event is discarded and logged.
 
 ---
 
@@ -529,74 +316,46 @@ The analytics buffer gracefully handles network and storage failures:
 
 ### Breadcrumb Overhead
 
-Each event creates a Sentry breadcrumb, which is stored in memory. Sentry limits breadcrumbs to ~100 per session; older ones are automatically dropped.
-
-### Mark Cleanup Cost
-
-Mark cleanup is O(n) where n = number of active marks (typically < 10). Called after each `startMeasure()`.
+Each `Analytics.track()` call creates one Sentry breadcrumb in memory. Sentry caps the breadcrumb buffer at ~100; older ones are dropped automatically.
 
 ### Consent Checks
 
-Consent checks are O(1) and checked before any Sentry calls, reducing unnecessary overhead when consent is denied.
+All consent checks are O(1) and run before any Sentry call, so denied categories add virtually no overhead.
 
-### Session Management
+### Mark Cleanup
 
-Session tracking is lightweight (only stores a few integers and strings). `isSessionActive()` performs a simple timestamp check (O(1)).
+O(n) scan over active marks (typically fewer than 10). Runs automatically after every `startMeasure` call.
 
-### Analytics Buffer Overhead
+### Buffer Overhead
 
-- **Queue storage**: O(maxSize) persistent storage; encrypted AES-CTR via SecureStorage
-- **Batch flushing**: Network requests sent in configurable batches (default: 25 events/request); minimizes network overhead
-- **Retry scheduler**: Runs every 30 seconds to check for events ready to retry; O(n) scan where n = queued events (typically < 100)
-- **Debouncing**: Online transitions debounced (default: 5s) to prevent flush spam from network flapping
-- **Memory footprint**: Retry metadata (timestamps, error reasons) adds ~200 bytes per queued event
+- Retry scheduler runs every 30 seconds — O(n) scan over queued events (max 100).
+- Online transitions are debounced (default 5s) to avoid flush spam from network flapping.
+- Each queued event adds ~200 bytes of retry metadata to encrypted storage.
 
 ---
 
 ## Related Modules
 
-- **`lib/config`** – Provides feature flags (`sentryEnabled`, `performanceMonitoring`, `analyticsBuffer`) and performance thresholds
-- **`lib/utils/logger`** – Used for debug/error logging; see logger system for category configuration
-- **`lib/storage`** – SecureStorage provides encrypted persistent storage for the analytics buffer queue
-- **`lib/network/network-detection`** – Monitors online/offline state and triggers automatic buffer flush on online transitions
-- **`lib/error`** – Centralized error handling; consider integrating for automatic error categorization
+- **`lib/config`** – Feature flags (`sentryEnabled`) and performance thresholds (`slowScreenMs`, `slowRequestMs`)
+- **`lib/utils/logger`** – Category-based logging used throughout this module (`analytics`, `performance`)
+- **`lib/storage`** – Encrypted queue persistence for the offline buffer
+- **`lib/network`** – Online/offline state monitoring; triggers automatic buffer flush
 
 ---
 
 ## File Breakdown
 
-| File                           | Purpose                                                                                                                                                                                             |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `index.ts`                     | Main entry point. Exports `Analytics`, `Performance`, `trackFeatureBlocked()`, `analyticsBufferService`, and `calculateExponentialBackoff()`. Includes event tracking, user identification, sanitization, and performance measurement with Sentry integration. |
-| `analytics-buffer.ts`          | Offline queue service. Implements persistent FIFO queue for offline analytics events with exponential backoff retry scheduling, automatic discard on max retries, and configuration management.     |
-| `analytics-network-integration.ts` | Network integration layer. Monitors online/offline transitions, automatically flushes queued events when online, manages retry scheduling, and debounces network state changes.                     |
-| `consent.ts`                   | Consent level management. Defaults to 'basic' (GDPR compliant). Provides `AnalyticsConsent` manager with `setLevel()`, `getLevel()`, and `isAllowed()` methods.                                     |
-| `session.ts`                   | Session tracking. Provides `sessionManager` to start/end sessions, track screen views and errors, and query session activity.                                                                       |
-| `error-categorization.ts`      | Error categorization utility. `categorizeError()` classifies errors into network, auth, validation, timeout, or unknown categories.                                                                 |
-| `utils.ts`                     | Shared utilities. Includes `sanitizeError()` to extract safe error fields and `getThreshold()` to retrieve performance thresholds from config.                                                      |
-| `variant-tracking.ts`          | A/B testing and variant analytics. Exports `trackVariantAssignment()`, `trackVariantEngagement()`, `trackVariantPerformance()` for tracking variant assignments and user engagement with A/B tests. |
+| File | Purpose |
+| ---- | ------- |
+| `index.ts` | Barrel and main exports. Defines `Analytics`, `Performance`, and `trackFeatureBlocked()`. Re-exports everything from the other files. |
+| `consent.ts` | `AnalyticsConsent` manager. Tracks consent level (`none` / `basic` / `full`) and exposes `isAllowed()` for category gating. |
+| `session.ts` | `sessionManager`. Tracks session lifetime, screen views, and error count. Sends `session_started` and `session_ended` events. |
+| `analytics-buffer.ts` | Offline event queue. FIFO persistent storage via lib/storage, retry scheduling, overflow tracking, and batch flush logic. |
+| `analytics-network-integration.ts` | Connects the buffer to lib/network. Flushes queued events on online transitions with debouncing and consent checks. |
+| `error-categorization.ts` | `categorizeError()`. Classifies errors into `network`, `auth`, `validation`, `timeout`, or `unknown` by inspecting message, name, and code. |
+| `utils.ts` | Shared helpers: `sanitizeError()` (strips sensitive fields), `getThreshold()` (reads from config). |
+| `variant-tracking.ts` | A/B test helpers: `trackVariantAssignment()`, `trackVariantEngagement()`, `trackVariantPerformance()`. |
 
 ---
 
-## Testing
 
-Currently, no dedicated test guide exists for this module. See the source files for usage patterns. When adding tests, create a guide at `docs/A Testing Guide/analytics.md` following the repository's testing guide template.
-
-**Manual testing tips:**
-
-- Set feature flag `sentryEnabled` to false and verify analytics gracefully no-op
-- Set `AnalyticsConsent.setLevel('none')` and verify no breadcrumbs are sent to Sentry
-- Call `Analytics.withTiming()` with a fast function (should not warn)
-- Call `Analytics.withTiming()` with a slow function (should log warning and breadcrumb)
-- Use browser DevTools Network tab (if web) or Sentry console integration to verify breadcrumbs are sent
-
----
-
-## Future Enhancements
-
-- **Event Replay**: Integrate session replay for debugging user flows
-- **User Properties**: Extend `identify()` to accept custom user properties and tags
-- **Buffer Analytics**: Track buffer flush success rate, average batch size, and retry counts per event category
-- **Compression**: Compress queued events before storage to reduce SecureStorage footprint
-- **Selective Flushing**: Allow filtering events by category or age before flush (e.g., flush only "error" events when low battery)
-- **Server-side Retries**: Offload retry logic to analytics backend for events already sent but failed on acknowledge

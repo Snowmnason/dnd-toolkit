@@ -1,88 +1,60 @@
 # Supabase Edge Functions
 
-This directory contains Supabase Edge Functions used by the DnD Toolkit app.
+Reference copies of Supabase Edge Functions used by the DnD Toolkit app.
 
-## 📋 Functions Overview
+This folder contains code samples and reference docs. Functions are managed and deployed from the Supabase Dashboard (Phase 1). When migrating to the Supabase CLI (Phase 2+), these files may become the canonical source.
 
-| Function                | Auth     | Purpose                                  | Details                                     |
-| ----------------------- | -------- | ---------------------------------------- | ------------------------------------------- |
-| **health**              | Public   | Network connectivity checks              | No auth required, simple 200 OK response    |
-| **get_feature_flags**   | JWT      | Feature flags + entitlements + overrides | Authenticated, consolidated server-side     |
-| **delete-account**      | JWT      | Permanent account deletion               | Authenticated, cascading user data deletion |
-| **invite-link-cleanup** | Internal | Expire old invite links                  | Scheduled/admin only, supports dry-run      |
+## Functions (summary)
 
-## ⚠️ Dashboard Management (Phase 1)
+| Function                | Auth     | Purpose                                  |
+| ----------------------- | -------- | ---------------------------------------- |
+| `health`                | Public   | Network connectivity / health checks     |
+| `get_feature_flags`     | JWT      | Consolidated feature flags & entitlements|
+| `delete-account`        | JWT      | Permanent account deletion (cascading)   |
+| `invite-link-cleanup`   | Internal | Expire old invite links (scheduled/admin)|
 
-**These functions are managed in the Supabase Dashboard, NOT via CLI.**
+## Dashboard Deployment (Phase 1)
 
-The files in this directory are **reference copies** for team visibility and version control. When updating a function:
+These functions are edited and deployed in the Supabase Dashboard. Recommended workflow:
 
-1. Copy the relevant code from this directory
-2. Paste into the Supabase Dashboard editor (`Functions` > `<function-name>`)
-3. Deploy from Dashboard
-4. Commit updated reference files to repo
+1. Copy code from this repo file.
+2. Paste into Supabase Dashboard → Functions → `<function-name>`.
+3. Save & deploy in Dashboard.
+4. Commit reference file updates to the repository for visibility.
 
-**Future:** When migrating to Supabase CLI (Phase 2+), this will become the source of truth and deployment method changes to CLI. No code changes needed.
+Notes:
+- Dashboard provides `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, and service keys automatically.
+- Use `SUPABASE_DB_URL` only for direct Postgres tasks (e.g., cleanup migration jobs).
 
----
+## Patterns & Examples
 
-## 📁 Function Documentation
+### JWT auth (example)
 
-For detailed documentation on each function, see:
-
-- **[health](./functions/health/README.md)** — Network health checks
-- **[get_feature_flags](./functions/get_feature_flags/README.md)** — Feature flag consolidation
-- **[delete-account](./functions/delete-account/README.md)** — Account deletion
-- **[invite-link-cleanup](./functions/invite-link-cleanup/README.md)** — Invite link cleanup
-
----
-
-## 🔧 Environment Variables
-
-When creating functions in Supabase Dashboard:
-
-- `SUPABASE_URL` — Automatically provided by Dashboard
-- `SUPABASE_JWT_SECRET` — Automatically provided by Dashboard
-- `SUPABASE_SERVICE_ROLE_KEY` — Automatically provided by Dashboard
-- `SUPABASE_DB_URL` — For invite-link-cleanup (direct pg connection)
-
-No manual setup needed; Dashboard provides these automatically.
-
----
-
-## 🚀 Common Patterns
-
-### Authentication in Edge Functions
-
-All authenticated functions use JWT verification:
-
-```typescript
-import { jwtVerify } from "https://esm.sh/jose@5.0.0";
-
-const token = authHeader.substring(7); // Remove "Bearer " prefix
+```ts
+import { jwtVerify } from "https://esm.sh/jose@5";
+const token = authHeader.replace(/^Bearer\s+/i, "");
 const secret = new TextEncoder().encode(Deno.env.get("SUPABASE_JWT_SECRET"));
 const verified = await jwtVerify(token, secret);
-const userId = verified.payload.sub; // User ID from JWT
+const userId = verified.payload.sub as string;
 ```
 
-### Error Responses
+### Standard JSON error responses
 
-All functions return JSON with appropriate HTTP status:
-
-```typescript
-// Unauthorized
+```ts
 return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
-
-// Server error
-return new Response(
-  JSON.stringify({ error: "Internal error", message: "..." }),
-  { status: 500 },
-);
+// or
+return new Response(JSON.stringify({ error: "Internal error", message }), { status: 500 });
 ```
 
----
+## Function docs
 
-## 🔗 Related Documentation
+Detailed docs live under `./functions/`:
+- `functions/health/README.md` — health checks
+- `functions/get_feature_flags/README.md` — feature flags consolidation
+- `functions/delete-account/README.md` — account deletion workflow
+- `functions/invite-link-cleanup/README.md` — invite cleanup job
 
-- [Edge Functions Guide](../../docs/issues/MileStone%202/Tier%203/223%20-%20Event-Driven%20Feature%20Flags%20Architecture/EDGE_FUNCTIONS.md) — Complete Edge Functions architecture
-- [Client Integration](../../lib/edge-functions) — Client-side Edge Functions usage
+## Related docs
+
+- Edge functions architecture: `docs/issues/MileStone 2/Tier 3/223 - Event-Driven Feature Flags Architecture/EDGE_FUNCTIONS.md`
+- Client integration samples: `lib/edge-functions`

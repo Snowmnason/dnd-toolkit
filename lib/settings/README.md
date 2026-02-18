@@ -9,15 +9,15 @@ User account and authentication state management operations.
 - **Account Deletion**: Permanent account removal with password re-authentication and full data cleanup
 - **Sign Out**: Complete user session termination with local cache/storage cleanup
 - **Profile Updates**: User-facing profile modifications (e.g., username changes) with validation
-- **Server-Side State Sync**: Account operations that require [lib/database](../database/README.md) coordination
+- **Server-Side State Sync**: Account operations requiring [lib/database](../database/README.md) coordination
 
 **Do NOT use this module for:**
 
-- Changing internal system settings (use [lib/feature-flags](../feature-flags/README.md) or [lib/config](../config/README.md) instead)
+- Changing internal system settings (use [lib/feature-flags](../feature-flags/README.md) or [lib/config](../config/README.md))
 - Temporary user preferences (use [lib/storage's SecureStorage](../storage/README.md) directly)
-- Batch operations on multiple users (this is single-user only)
-- Authentication state changes (use [lib/auth's AuthStateManager](../auth/README.md) instead)
-- Real-time settings synchronization (use [lib/cache's QueryCache](../cache/README.md) instead)
+- Batch operations on multiple users (single-user only)
+- Authentication state changes (use [lib/auth's AuthStateManager](../auth/README.md))
+- Real-time settings synchronization (use [lib/cache's QueryCache](../cache/README.md))
 
 ## Architecture & Data Flow
 
@@ -33,25 +33,11 @@ State Cleanup (AuthStateManager, QueryCache, caches)
 Result with Validation Warning Tracking
 ```
 
-### Key Patterns
+**Key Pattern**: Validation warning system distinguishes client validation failure (error immediately) from client pass + server failure (returns `validationWarning` + `error`). This detects backend security issues or edge cases.
 
-**Validation Warning System**: Distinguishes between:
+**Security-Critical Operations**: Account deletion uses password re-authentication, server-side edge function (not just DB delete), and comprehensive cleanup.
 
-- Client validation failure (returns error immediately)
-- Client validation pass + server validation failure (returns `validationWarning` + `error`)
-
-This helps detect backend security issues or edge cases not caught by client validation.
-
-**Security-Critical Operations**: Account deletion uses:
-
-1. Password re-authentication (fresh Supabase auth check)
-2. Server-side deletion via edge function (not just DB delete)
-3. Comprehensive cleanup (auth state, caches, storage)
-
-**Graceful Degradation**: Sign out continues with local cleanup even if:
-
-- Supabase logout fails (network issue)
-- AuthStateManager.clearAuthState() encounters errors
+**Graceful Degradation**: Sign out continues with local cleanup even if Supabase logout fails (network issue).
 
 ## API Reference
 
@@ -59,48 +45,33 @@ This helps detect backend security issues or edge cases not caught by client val
 
 Permanently deletes the current user's account after password verification.
 
-**Parameters:**
-
-- `password` (string): User's password for re-authentication
+**Behavior:**
+1. Validates password client-side (SQL injection, control characters)
+2. Fetches current authenticated user (fresh, no cache)
+3. Re-authenticates with password via Supabase
+4. Calls edge function to delete account and related data
+5. Clears all auth state and caches
+6. Returns `{ success: true }` on completion
 
 **Returns:**
-
 ```typescript
 interface DeleteAccountResult {
   success: boolean;
-  error?: string; // User-friendly error message
+  error?: string;
   validationWarning?: string; // Server validation failure hint
 }
 ```
 
-**Behavior:**
-
-1. Validates password client-side (SQL injection, control characters)
-2. Fetches current authenticated user from server (fresh, no cache)
-3. Re-authenticates with password via Supabase
-4. Calls `usersDB.deleteCurrentUser()` edge function
-5. Clears all auth state and caches
-6. Returns `{ success: true }` on completion
-
-**Error Handling:**
-
-- `success: false, error: '...'` – Clear client/server error
-- `success: false, validationWarning: '...', error: '...'` – Server rejected valid input (backend validation issue)
-
 **Example:**
-
 ```typescript
 import { deleteUserAccount } from "@/lib/settings";
 
 const result = await deleteUserAccount(userPassword);
 if (!result.success) {
-  console.error(result.error);
+  showError(result.error);
   if (result.validationWarning) {
-    console.warn("Backend validation issue:", result.validationWarning);
+    logSecurityIssue(result.validationWarning);
   }
-} else {
-  // Account deleted, user redirected to login
-  navigateTo("/login");
 }
 ```
 
@@ -111,30 +82,22 @@ if (!result.success) {
 Terminates the current user session and clears all user-specific data.
 
 **Behavior:**
-
 1. Signs out from Supabase (if configured)
 2. Clears AuthStateManager (auth keys, QueryCache, world access verification)
 3. **Preserves** user preferences (theme, scale, language)
 
-**Error Handling:**
-
-- If Supabase logout fails, continues with local cleanup
-- If local cleanup fails during error recovery, logs warning but doesn't throw
-- Always attempts AuthStateManager cleanup, even if Supabase fails
+**Error Handling:** If Supabase logout fails, continues with local cleanup. Always attempts AuthStateManager cleanup.
 
 **Example:**
-
 ```typescript
 import { signOutUser } from "@/lib/settings";
 
 try {
   await signOutUser();
-  // User preferences remain, all user data cleared
   navigateTo("/login");
 } catch (error) {
   console.error("Logout failed:", error);
-  // Attempt manual navigation anyway
-  navigateTo("/login");
+  navigateTo("/login"); // Attempt navigation anyway
 }
 ```
 
@@ -144,55 +107,41 @@ try {
 
 Updates the current user's username with validation.
 
-**Parameters:**
-
-- `newUsername` (string): New username (3-20 chars, letter start, alphanumeric + underscore)
+**Validation Rules:**
+- 3-20 characters
+- Must start with letter
+- Alphanumeric + underscores only
+- No leading/trailing spaces
 
 **Returns:**
-
 ```typescript
 interface UpdateUsernameResult {
   success: boolean;
-  error?: string; // User-friendly error message
-  validationWarning?: string; // Server validation failure hint
+  error?: string;
+  validationWarning?: string;
 }
 ```
 
-**Validation Rules:**
-
-- Must be 3-20 characters
-- Must start with a letter
-- Can contain letters, numbers, underscores only
-- No leading/trailing spaces
-
-**Error Handling:**
-
-- `success: false, error: 'Username is required'` – Empty string
-- `success: false, error: 'Username must start with a letter'` – Invalid start
-- `success: false, error: 'Username already taken...'` – Duplicate on server (PostgreSQL 23505)
-- `success: false, validationWarning: '...', error: '...'` – Server rejected valid input
+**Error Cases:**
+- Empty string: `error: 'Username is required'`
+- Starts with number: `error: 'Username must start with a letter'`
+- Duplicate on server: `error: 'Username already taken...'`
+- Server validation mismatch: `validationWarning` + `error`
 
 **Example:**
-
 ```typescript
 import { updateUsername } from "@/lib/settings";
 
 const result = await updateUsername("newName_123");
 if (!result.success) {
   showError(result.error);
-  if (result.validationWarning) {
-    logSecurityIssue(result.validationWarning);
-  }
 } else {
   showSuccess("Username updated!");
-  // Refresh user context
   await refreshUserProfile();
 }
 ```
 
 ## Interfaces
-
-### `DeleteAccountResult`
 
 ```typescript
 interface DeleteAccountResult {
@@ -200,11 +149,7 @@ interface DeleteAccountResult {
   error?: string;
   validationWarning?: string;
 }
-```
 
-### `UpdateUsernameResult`
-
-```typescript
 interface UpdateUsernameResult {
   success: boolean;
   error?: string;
@@ -231,92 +176,47 @@ interface UpdateUsernameResult {
 
 ### Known Limitations
 
-1. **Password Re-Authentication**: deleteUserAccount requires fresh password entry (cannot use existing session). This is intentional security design but may frustrate users immediately after login.
+1. **Password Re-Authentication**: deleteUserAccount requires fresh password entry (cannot use existing session). Intentional security design but may frustrate users immediately after login.
 
 2. **Network Failures**:
    - Account deletion fails entirely (no partial deletion)
    - Sign out continues with local cleanup (graceful)
-   - Username update fails and user should retry
+   - Username update fails and should be retried
 
-3. **Duplicate Username**: Server returns PostgreSQL error code 23505 (unique constraint). Client checks message for "duplicate" or code "23505" to provide friendly error.
+3. **Duplicate Username**: Server returns PostgreSQL error code 23505 (unique constraint). Client detects "duplicate" in message or code 23505 for friendly error.
 
-4. **Backend Validation Mismatch**: If client validation passes but server rejects, function returns `validationWarning` to indicate potential security issue or schema mismatch.
+4. **Backend Validation Mismatch**: Client validation passes but server rejects → function returns `validationWarning` to indicate potential security issue or schema mismatch.
 
-5. **No Offline Support**: These are account-level operations that require server confirmation. No offline queue or retry mechanism exists.
+5. **No Offline Support**: Account-level operations require server confirmation. No offline queue or retry mechanism exists.
 
 ### Security Considerations
 
 - **SQL Injection Protection**: All inputs validated before sending to server (validatePassword, validateUsername from lib/auth/validation)
-- **Password Re-Auth**: Account deletion explicitly re-authenticates rather than trusting session token
-- **Cascading Cleanup**: Deletion clears not just auth but QueryCache and world access verification (comprehensive)
-- **Supabase Configuration Guard**: Functions check `isSupabaseConfiguredLazy()` before attempting auth operations (supports GH Pages fallback)
+- **Password Re-Auth**: Account deletion re-authenticates rather than trusting session token
+- **Cascading Cleanup**: Deletion clears auth state, QueryCache, and world access verification
+- **Supabase Configuration Guard**: Functions check `isSupabaseConfiguredLazy()` before auth operations (supports GH Pages fallback)
 
 ## Performance Notes
 
-- **Password Re-Authentication**: ~500ms-1s additional latency (Supabase auth check)
-- **Account Deletion**: ~1-3s (includes edge function execution, cache clearing)
+- **Password Re-Authentication**: ~500ms-1s (Supabase auth check)
+- **Account Deletion**: ~1-3s (edge function execution, cache clearing)
 - **Username Update**: ~500-800ms (DB write only)
-- **Sign Out**: ~200-400ms (localStorage/SecureStorage clearing, no server call required)
+- **Sign Out**: ~200-400ms (localStorage/SecureStorage clearing, no server call)
 
-No caching is used for these operations (intentional for security-critical flows).
+No caching used for these operations (intentional for security-critical flows).
 
 ## Related Modules
 
-- **lib/auth** – Authentication state, validation schemas, brute-force protection
+- **lib/auth** – Authentication state, validation schemas
 - **lib/database/users** – User DB operations (deleteCurrentUser, updateCurrentUser)
 - **lib/storage** – SecureStorage for persistent user preferences (preserved during sign out)
 - **lib/cache** – QueryCache (cleared during sign out/delete)
 
 ## File Breakdown
 
-| File              | Purpose                                                  | Lines |
-| ----------------- | -------------------------------------------------------- | ----- |
-| deleteAccount.ts  | Account deletion with password re-auth and cleanup       | ~100  |
-| signOut.ts        | Session termination with graceful error handling         | ~45   |
-| updateUsername.ts | Username update with duplicate/validation error handling | ~65   |
-| index.ts          | Barrel export (public API)                               | 3     |
-
-## Testing
-
-### Manual Testing Checklist
-
-**Delete Account:**
-
-- [ ] Test with correct password (should delete)
-- [ ] Test with incorrect password (should fail with "Password verification failed")
-- [ ] Test with empty password (should fail with "Password is required")
-- [ ] Test with SQL injection attempts in password (should fail with "invalid characters")
-- [ ] Verify all caches are cleared after deletion
-- [ ] Verify user is redirected to login after deletion
-
-**Sign Out:**
-
-- [ ] Test sign out with Supabase configured (should sign out + clear state)
-- [ ] Test sign out without Supabase configured (should clear state only)
-- [ ] Test sign out when network fails (should continue with local cleanup)
-- [ ] Verify user preferences (theme, scale) are preserved after sign out
-- [ ] Verify QueryCache is cleared
-
-**Update Username:**
-
-- [ ] Test with valid username (should update)
-- [ ] Test with duplicate username (should fail with "already taken")
-- [ ] Test with empty username (should fail with "required")
-- [ ] Test with username starting with number (should fail)
-- [ ] Test with invalid characters (should fail)
-- [ ] Test with username < 3 chars (should fail)
-- [ ] Test with username > 20 chars (should fail)
-
-### Validation Testing
-
-All three functions use Zod validation from `lib/auth/validation.ts`. See [lib/schemas/README.md](../schemas/README.md) for comprehensive Zod validation patterns and testing examples.
-
-## Future Enhancements
-
-Currently no enhancement suggestions. This module is intentionally simple and focused on single-user account operations. Potential future extensions:
-
-- **Email Update**: Update email with verification flow (similar to deleteUserAccount re-auth pattern)
-- **Two-Factor Authentication**: Add 2FA setup/removal operations
-- **Session Management**: List active sessions, force logout from other devices
-- **Profile Picture Upload**: Media handling for user avatars
-- **Preferences Sync**: Centralized preference update (currently spread across SecureStorage)
+| File              | Purpose                                                | Lines |
+| ----------------- | ------------------------------------------------------ | ----- |
+| deleteAccount.ts  | Account deletion with password re-auth and cleanup     | ~100  |
+| signOut.ts        | Session termination with graceful error handling       | ~45   |
+| updateUsername.ts | Username update with duplicate/validation error handle | ~65   |
+| index.ts          | Barrel export (public API)                             | 3     |

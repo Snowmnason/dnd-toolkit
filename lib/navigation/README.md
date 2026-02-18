@@ -1,190 +1,155 @@
-# lib/navigation
+# Navigation Module
 
-Centralized declarative navigation and routing system. Manages TopBar appearance, back button behavior, modals, animations, redirects, accessibility, and A/B testing variants for all routes. Single source of truth for route configuration across the entire app.
+Centralized declarative navigation system. Manages TopBar appearance, back button behavior, modals, redirects, and accessibility for all routes. Single source of truth for route configuration.
 
 ## When to Use This Module
 
 **Use this module to:**
 
-- Get route configuration for current navigation context (TopBar title, back button, modals, animations)
-- Build URLs with type-safe parameters via `buildRoute`
+- Get route configuration for current navigation context (TopBar title, back button, redirects)
+- Build URLs with type-safe parameters via `buildRoute()`
 - Normalize and match routes (case-insensitive, aliases supported)
-- Preserve parameters across navigation and deep linking
-- Handle dynamic titles and conditional redirects per route
+- Handle dynamic titles, back targets, and conditional redirects
 - Configure analytics tracking points per route
-- Set up accessibility focus targets and screen reader labels
-- Register and override dynamic routes at runtime
-- **A/B test route variants** with percentage-based user bucketing
-- **Gradually roll out new screens** to subsets of users
+- Set accessibility focus targets per route
+- Dynamically register routes at runtime
 
 **Do NOT use this module for:**
 
-- Authentication/authorization (use [lib/routing's AUTH_CONFIG](../routing/README.md) and [lib/auth's useAuthGuard](../auth/README.md) hook instead)
-- App-level state management (use React Context or [lib/storage's SecureStorage](../storage/README.md) instead)
-- Screen-specific logic (implement in screen components themselves)
-- Modal UI state management (control via React state, not routing)
-- Route protection/access control (use [lib/routing/AUTH_CONFIG](../routing/README.md) for auth levels)
+- Authentication/authorization (use `lib/routing/AUTH_CONFIG` and `lib/auth/useAuthGuard` instead)
+- App-level state management (use React Context instead)
+- Screen-specific logic (implement in screen components)
+- Modal state management (control via React state, not routing)
 
 ## Architecture & Data Flow
 
 ```
-App Navigation
-        ↓
-Current route segments (from useSegments())
+Current route segments
         ↓
 getRouteConfig(context) matches against ROUTE_CONFIGS
-        ↓
-Route matching strategy:
-  1. Exact path match (normalized case)
-  2. Alias match (alternative paths)
-  3. Parent segment match (first part)
-  4. Default fallback
+        ├─ Strategy: exact path → aliases → parent segment → default fallback
         ↓
 Returns RouteConfig with:
-  - TopBar title (static or dynamic)
+  - TopBar title (static or dynamic function)
   - Back button target
-  - Modal/full-screen behavior
   - Conditional redirects
-  - Animations, A11y focus, analytics
-  - Route variants (A/B testing)
+  - A11y focus, analytics, animations
         ↓
-evaluateRouteVariant() determines user variant (if configured)
+evaluateRouteVariant() if A/B testing configured
         ↓
-Renderer uses config + variant to display TopBar + screen
+Renderer uses config to display TopBar + screen
 ```
 
 **Key Principles:**
 
-- **Declarative**: All route config defined in one place (no switch statements in components)
-- **Composable**: Routes organized by screen area (login, main, settings, etc.)
+- **Declarative**: All route config in one place (no switch statements)
+- **Composable**: Routes organized by screen area (login, main, settings)
 - **Type-Safe**: TypeScript enforces valid route properties
-- **Dynamic**: Titles/back-buttons can be functions (access to context)
-- **Smart Matching**: Handles exact paths, aliases, and fallbacks gracefully
-- **Extensible**: Dynamic route registration for plugins/features
+- **Dynamic**: Titles/back-buttons can be functions (access context)
+- **Smart Matching**: Exact paths, aliases, parent segments, fallbacks
 
 ## API Reference
 
-### `getRouteConfig(context: NavigationContext): RouteConfig`
+### Configuration
 
-Get route configuration for current navigation context. Uses intelligent matching (exact → aliases → parent → default).
+#### `getRouteConfig(context): RouteConfig`
 
-```ts
-import { getRouteConfig } from '@/lib/navigation';
+Get route configuration for current navigation context.
 
-export function MyScreen() {
-  const segments = useSegments();
-  const params = useLocalSearchParams();
-  const router = useRouter();
-
-  const config = getRouteConfig({
-    segments,
-    params,
-    router,
-    worldId: params.worldId as string,
-    isMobile: Platform.OS !== 'web',
-  });
-
-  const title = resolveTitle(config, { segments, params, router, isMobile: true });
-
-  return (
-    <View>
-      <TopBar title={title} back={config.back} />
-    </View>
-  );
-}
+```typescript
+const config = getRouteConfig({
+  segments,           // Route segments from useSegments()
+  params,             // URL params from useLocalSearchParams()
+  router,             // Expo Router instance
+  worldId: params.worldId,
+  isMobile: Platform.OS !== 'web',
+});
 ```
 
-### `resolveTitle(config: RouteConfig, context: NavigationContext): string`
+#### `resolveTitle(config, context): string`
 
-Resolve dynamic title if it's a function. Safe to call with string or function titles.
+Resolve dynamic title (function or string).
 
-```ts
+```typescript
 const title = resolveTitle(config, context);
-// If config.title = "Settings" → returns "Settings"
-// If config.title = (ctx) => `${ctx.worldId}` → returns worldId value
 ```
 
-### `resolveBackTarget(config: RouteConfig, context: NavigationContext): string | undefined`
+#### `resolveBackTarget(config, context): string | undefined`
 
-Resolve back button target if it's a function or return string directly.
+Resolve back button target (function or string).
 
-```ts
-const backTarget = resolveBackTarget(config, context);
-// If config.back = "/main" → returns "/main"
-// If config.back = (ctx) => ctx.params.returnTo → returns param value
+```typescript
+const back = resolveBackTarget(config, context);
+if (back) router.push(back);
 ```
 
-### `shouldRedirect(config: RouteConfig, context: NavigationContext): string | undefined`
+#### `shouldRedirect(config, context): string | undefined`
 
-Check if route should redirect. Returns target path if redirect needed, undefined otherwise.
+Check if route should redirect. Returns target path if needed.
 
-```ts
-const redirectTarget = shouldRedirect(config, context);
-if (redirectTarget) {
-  router.push(redirectTarget); // Redirect user
-}
+```typescript
+const redirect = shouldRedirect(config, context);
+if (redirect) router.push(redirect);
 ```
 
-### `buildRoute(path: string, params?: RouteParams): string`
+### URL Building
 
-Build a route with URL parameters. Encodes params as query string.
+#### `buildRoute(path, params?): string`
 
-```ts
-import { buildRoute } from "@/lib/navigation/uri-helpers";
+Build route with URL parameters.
 
-const route = buildRoute("/main/characters-npcs", {
+```typescript
+const route = buildRoute("/main/characters", {
   worldId: "123",
   tab: "npcs",
-  sortBy: "name",
 });
-// Result: "/main/characters-npcs?worldId=123&tab=npcs&sortBy=name"
-
-router.push(route);
+// Result: "/main/characters?worldId=123&tab=npcs"
 ```
 
-### `preserveParams(currentParams: RouteParams, keysToPreserve: string[]): RouteParams`
+#### `preserveParams(currentParams, keysToPreserve): RouteParams`
 
 Extract specific params to preserve across navigation.
 
-```ts
-import { preserveParams } from "@/lib/navigation/uri-helpers";
-
+```typescript
 const preserved = preserveParams(
-  { worldId: "123", tab: "npcs", search: "dragon" },
-  ["worldId", "tab"], // Keep these
+  { worldId: "123", tab: "npcs" },
+  ["worldId", "tab"]
 );
-// Result: { worldId: '123', tab: 'npcs' }
 ```
 
-### `normalizePath(path: string): string`
+### Path Utilities
 
-Normalize route path to lowercase for case-insensitive matching.
+#### `normalizePath(path): string`
 
-```ts
-normalizePath("/Main/Characters"); // Returns "/main/characters"
+Normalize path to lowercase for case-insensitive matching.
+
+```typescript
+normalizePath("/Main/Characters"); // "/main/characters"
 ```
 
-### `pathEquals(path1: string, path2: string): boolean`
+#### `pathEquals(path1, path2): boolean`
 
-Compare two paths case-insensitively.
+Compare paths case-insensitively.
 
-```ts
+```typescript
 pathEquals("/Main/Characters", "/main/characters"); // true
 ```
 
-### `pathStartsWith(path: string, prefix: string): boolean`
+#### `pathStartsWith(path, prefix): boolean`
 
 Check if path starts with prefix (case-insensitive).
 
-```ts
+```typescript
 pathStartsWith("/main/characters/123", "/main/characters"); // true
 ```
 
-### `registerRouteConfig(config: RouteConfig): void`
+### Dynamic Registration
 
-Dynamically register or update a route config at runtime. Useful for feature flags or plugins.
+#### `registerRouteConfig(config): void`
 
-```ts
+Dynamically register or update route config at runtime.
+
+```typescript
 registerRouteConfig({
   path: "/main/treasure",
   title: "Treasure & Loot",
@@ -193,234 +158,107 @@ registerRouteConfig({
 });
 ```
 
-### `getAllRouteConfigs(): RouteConfig[]`
+#### `getAllRouteConfigs(): RouteConfig[]`
 
-Get all registered route configurations. Useful for debugging or testing.
+Get all registered route configurations.
 
-```ts
+```typescript
 const allRoutes = getAllRouteConfigs();
-console.log(`App has ${allRoutes.length} routes`);
-```
-
-### `getTransitionAnimation(config: RouteConfig, context: NavigationContext): AnimationType`
-
-Get animation type for route transition (placeholder for future implementation).
-
-```ts
-const animation = getTransitionAnimation(config, context);
-// Returns: 'slide', 'fade', 'modal', or 'none'
-// Future: Will integrate with Expo Router stack options
 ```
 
 ## Interfaces
 
-### `NavigationContext`
+### RouteConfig
 
-Context passed to route config handlers (dynamic titles, back buttons, redirects).
+Configuration for a single route.
 
-```ts
-interface NavigationContext {
-  segments: string[]; // Route segments from useSegments()
-  params: RouteParams; // URL params
-  router: Router; // Expo Router instance
-  worldId?: string; // Convenience: current world ID
-  userRole?: string; // Convenience: current user role
-  isMobile: boolean; // Is mobile platform (not web)
+```typescript
+interface RouteConfig {
+  path: string;                              // Required: "/main/characters"
+  title: string | ((context) => string);    // Required: static or dynamic
+  showTopBar?: boolean;                      // Optional: default true
+  back?: string | ((context) => string);    // Optional: back target
+  aliases?: string[];                        // Optional: alternative paths
+  redirectIf?: (context) => string | undefined; // Optional: conditional
+  analyticsName?: string;                    // Optional: tracking name
+  a11yFocusTarget?: 'title' | 'firstInteractive' | 'none'; // Optional
 }
 ```
 
-### `RouteConfig`
+## Route Matching Strategy
 
-Configuration for a single route. See [lib/navigation/routes/README.md](routes/README.md) for detailed examples.
+When navigating to `/main/characters/123`:
 
-```ts
-interface RouteConfig {
-  path: string; // Required: "/main/characters"
-  title: string | ((context) => string); // Required: static or dynamic
-  showTopBar?: boolean; // Optional: show TopBar (default: true)
-  showHamburger?: boolean; // Optional: show menu button
-  back?: string | ((context) => string); // Optional: back target
-  aliases?: string[]; // Optional: alternative paths
-  requiredParams?: string[]; // Optional: must have in URL
-  preserveParamsOnBack?: string[]; // Optional: keep these on back nav
-  redirectIf?: (context) => string | undefined; // Optional: conditional redirect
-  modal?: ModalConfig; // Optional: modal config
-  animation?: AnimationType; // Optional: transition animation
-  a11yFocusTarget?: A11yFocusTarget; // Optional: focus target on nav
-  analyticsName?: string; // Optional: tracking name
-  onError?: (error, context) => void; // Optional: error handler
-}
+1. **Exact path match** (case-insensitive) – `/main/characters`
+2. **Alias match** – Alternative paths like `/main/characters-npcs`
+3. **Parent segment match** – `/main/*` catches all under `/main/`
+4. **Fallback** – Uses default config, logs warning
+
+## Modals vs. Full-Screen Routes
+
+**Full-Screen Routes** (in navigation config):
+- Have route URLs (e.g., `/settings/world`)
+- Show TopBar
+- Navigate via `router.push()`
+
+**Modals** (NOT in navigation config):
+- Controlled by React state, not routing
+- Presentational components only
+- Do NOT have route URLs
+
+```typescript
+// ✅ Full-screen route
+{ path: "/settings/world", title: "World Settings", showTopBar: true }
+
+// ✅ Modal (controlled by state)
+<SettingsModal visible={showModal} onDismiss={() => setShowModal(false)} />
+```
+
+## Accessibility
+
+Routes support focus targets on navigation:
+
+| Target | Use Case |
+| --- | --- |
+| `'title'` (default) | Focus TopBar title for screen readers |
+| `'firstInteractive'` | Focus first interactive element (button, input) |
+| `'none'` | No automatic focus (for modals) |
+
+## Analytics
+
+Each route can specify a tracking name sent to analytics system:
+
+```typescript
+{ path: '/main/characters', analyticsName: 'main_characters' }
 ```
 
 ## Dependencies
 
-### External Packages
+### External
 
-- **`expo-router`** – Router instance for navigation (typed as `Router`)
-- **`React`** – Context/state management (implicit)
+- **`expo-router`** – Router instance for navigation
 
-### Internal Dependencies
+### Internal
 
-- **`lib/navigation/routes/`** – App-specific route definitions (login, main, settings, etc.)
-- **`lib/navigation/uri-helpers.ts`** – URL param building and path normalization
-- **`lib/utils/logger`** – Navigation logging (category: 'navigation')
-- **`lib/routing/AUTH_CONFIG`** – Determines which routes are protected (separate concern)
-
-## File Breakdown
-
-| File                   | Purpose                                                                       | Exports                                                                                                                                                             |
-| ---------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `navigation-config.ts` | Core navigation system. Route matching, resolution, and dynamic registration. | `getRouteConfig()`, `resolveTitle()`, `resolveBackTarget()`, `shouldRedirect()`, `registerRouteConfig()`, `getAllRouteConfigs()`, `getTransitionAnimation()`, types |
-| `uri-helpers.ts`       | URL building and path utilities. Parameter handling, normalization, matching. | `buildRoute()`, `preserveParams()`, `normalizePath()`, `pathEquals()`, `pathStartsWith()`, `mergeParams()`, `extractParams()`, types                                |
-| `routes/`              | App-specific route configurations organized by screen area.                   | `LOGIN_ROUTES`, `SELECT_ROUTES`, `MAIN_ROUTES`, `SETTINGS_ROUTES`, `WEB_ROUTES`                                                                                     |
-| `routes/README.md`     | How to add routes and organize by screen area.                                | Documentation                                                                                                                                                       |
-
-## How It Works in a Screen
-
-```tsx
-import { getRouteConfig, resolveTitle, resolveBackTarget } from '@/lib/navigation';
-import { useSegments, useLocalSearchParams, useRouter } from 'expo-router';
-import { Platform } from 'react-native';
-
-export default function CharactersScreen() {
-  const segments = useSegments();
-  const params = useLocalSearchParams();
-  const router = useRouter();
-
-  // 1. Get route config for current route
-  const config = getRouteConfig({
-    segments,
-    params,
-    router,
-    worldId: params.worldId as string,
-    isMobile: Platform.OS !== 'web',
-  });
-
-  // 2. Resolve dynamic title if needed
-  const title = resolveTitle(config, { segments, params, router, isMobile: true });
-
-  // 3. Check for conditional redirect
-  const redirectTarget = shouldRedirect(config, { segments, params, router, isMobile: true });
-  useEffect(() => {
-    if (redirectTarget) {
-      router.push(redirectTarget);
-    }
-  }, [redirectTarget]);
-
-  // 4. Render with resolved config
-  return (
-    <SafeAreaView>
-      {config.showTopBar && (
-        <TopBar
-          title={title}
-          onBack={
-            config.back
-              ? () => router.push(resolveBackTarget(config, {...}))
-              : undefined
-          }
-        />
-      )}
-      {/* Screen content */}
-    </SafeAreaView>
-  );
-}
-```
-
-## Modals vs. Full-Screen Routes
-
-**Key Distinction:**
-
-- **Full-Screen Routes**: Defined in route config, have TopBar, navigate via router.push()
-- **Modals**: Presentational components controlled by React state, NOT in route config. Do NOT have route URLs.
-
-Example:
-
-```tsx
-// ✅ Full-screen route (in navigation-config)
-export const SETTINGS_ROUTES = [
-  {
-    path: "/settings/world",
-    title: "World Settings",
-    showTopBar: true,
-  },
-];
-
-// ✅ Modal (NOT in navigation-config, controlled by state)
-<SettingsModal visible={showModal} onDismiss={() => setShowModal(false)} />;
-```
-
-The `modal` config field is reserved for future modal-as-route patterns.
-
-## Route Matching Strategy
-
-When navigating to `/main/characters/123`, matching strategy is:
-
-1. **Exact path match** (case-insensitive)
-   - Check `/main/characters`
-   - Check aliases: `/main/characters-npcs`, etc.
-
-2. **Parent segment match** (first part)
-   - Check `/main/*`
-   - Default for all `/main/...` routes
-
-3. **Fallback to default**
-   - Uses title "D&D Toolkit"
-   - Logs warning (route not in config)
-
-## Accessibility
-
-Routes support accessibility focus targets:
-
-- **`a11yFocusTarget: 'title'`** (default) – Focus TopBar title on navigation (good for screen readers)
-- **`a11yFocusTarget: 'firstInteractive'`** – Focus first interactive element (e.g., button)
-- **`a11yFocusTarget: 'none'`** – No automatic focus (for modals)
-
-## Analytics Integration
-
-Each route can specify an analytics tracking name:
-
-```ts
-{
-  path: '/main/characters',
-  analyticsName: 'main_characters',  // Sent to analytics
-}
-```
-
-Used by `lib/analytics` to track screen views and user behavior.
+- **`lib/routing/AUTH_CONFIG`** – Determines protected routes
+- **`lib/auth/useAuthGuard`** – Enforces authentication
+- **`lib/analytics`** – Tracks navigation via `analyticsName`
+- **`lib/utils/logger`** – Navigation logging
 
 ## Related Modules
 
 - **`lib/navigation/routes/`** – App-specific route definitions
-- **`lib/routing/AUTH_CONFIG`** – Which routes are protected/public
-- **`lib/auth/useAuthGuard`** – Enforces authentication on protected routes
-- **`lib/analytics`** – Tracks navigation events via `analyticsName`
-- **`app/_layout.tsx`** – Root layout that uses getRouteConfig()
-- **`hooks/use-app-navigation.tsx`** – Custom hook wrapping navigation functions
+- **`lib/routing/AUTH_CONFIG`** – Which routes are protected
+- **`lib/auth/useAuthGuard`** – Route protection enforcement
+- **`lib/analytics`** – Navigation event tracking
+- **`app/_layout.tsx`** – Root layout using route config
 
-## Testing
+## File Breakdown
 
-Currently, no dedicated test guide exists. When adding tests, create a guide at `docs/A Testing Guide/navigation.md`.
-
-**Manual testing tips:**
-
-- Verify dynamic titles render correctly (access context properly)
-- Test conditional redirects (unauthorized world, premium only, etc.)
-- Check parameter preservation on back navigation
-- Verify accessibility focus targets
-- Test animations (visual inspection)
-- Check analytics tracking names are sent
-- Verify aliases work (alternative paths)
-- Test dynamic route registration
-
-## Future Enhancements (Navigation)
-
-- **Deep Linking** – Full URI support with automatic param extraction
-- **Expo Router Animation Integration** – Implement actual stack animations
-- **Plugin Routes** – Plugins register routes dynamically
-
-## Future Enhancements (Routes)
-
-- **Route Groups** – Organize routes into logical groups with shared config (e.g., all /main/\* share same TopBar style)
-- **Dynamic Route Registration** – Plugins register routes at runtime
-- **Nested Route Support** – Better handling of deeply nested paths
-- **Breadcrumb Generation** – Auto-generate breadcrumbs from route hierarchy
+| File | Purpose |
+| --- | --- |
+| `navigation-config.ts` | Core system (route matching, resolution, dynamic registration) |
+| `uri-helpers.ts` | URL building and path utilities (parameter handling, normalization) |
+| `routes/` | App-specific route definitions organized by screen area |
+| `routes/README.md` | How to add routes and organize by screen |
+| `index.ts` | Barrel export of public API |
