@@ -1,9 +1,70 @@
+/* eslint-disable security/detect-object-injection */
 import { vi } from "vitest";
+
+// This file provides test-time shims for native/Expo modules. It intentionally
+// manipulates global objects; rules that flag "object injection" or use of
+// `any` are disabled for this file only.
+
+declare global {
+  // minimal shape we use in tests
+  var ExpoGlobal: { EventEmitter?: new (...args: any[]) => any };
+}
+
+// Ensure native-like globals expected by some Expo modules
+(globalThis as any).__DEV__ = true;
+// Provide Expo build-time env used by some libraries when Babel isn't applied
+process.env.EXPO_OS = process.env.EXPO_OS || "web";
+
+// Minimal ExpoModulesCore shim for test environment
+;(globalThis as any).ExpoGlobal = (globalThis as any).ExpoGlobal || {};
+if (!(globalThis as any).ExpoGlobal.EventEmitter) {
+  class _SimpleEventEmitter {
+    listeners: Record<string, Function[]> = {};
+    addListener(event: string, cb: Function) {
+      this.listeners[event] = this.listeners[event] || [];
+      this.listeners[event].push(cb);
+      return { remove: () => { this.listeners[event] = this.listeners[event].filter(f => f !== cb); } };
+    }
+    removeAllListeners() { this.listeners = {}; }
+    emit(event: string, ...args: any[]) { (this.listeners[event] || []).forEach(f => f(...args)); }
+  }
+  (globalThis as any).ExpoGlobal.EventEmitter = _SimpleEventEmitter as any;
+}
+
+// Mock the runtime module to avoid eager imports that expect native runtime shims
+vi.mock("expo-modules-core", () => ({
+  EventEmitter: (globalThis as any).ExpoGlobal.EventEmitter,
+  // Minimal native bridge helpers expected by downstream libs
+  requireNativeModule: (name: string) => ({}),
+  default: {},
+}));
+
+// Provide a simple implementation of expo-crypto.digest for tests
+vi.mock("expo-crypto", () => ({
+  digest: async (algorithm: string, data: ArrayBuffer | Uint8Array) => {
+    // Use Node's crypto to produce a SHA-256 hash compatible with ArrayBuffer
+    const nodeCrypto = require("crypto");
+    const buf = Buffer.from(data instanceof ArrayBuffer ? new Uint8Array(data) : data as Uint8Array);
+    const hash = nodeCrypto.createHash("sha256").update(buf).digest();
+    return hash.buffer;
+  },
+  CryptoDigestAlgorithm: {
+    SHA256: "SHA-256",
+  },
+  getRandomBytes: (n: number) => {
+    const nodeCrypto = require("crypto");
+    return new Uint8Array(nodeCrypto.randomBytes(n));
+  },
+}));
 
 // Mock react-native to prevent Rollup errors in tests
 vi.mock("react-native", () => ({
   Platform: { OS: "ios" },
   NativeModules: {},
+  // Some expo modules expect TurboModuleRegistry to exist on react-native
+  TurboModuleRegistry: {
+    get: () => null,
+  },
 }));
 
 // Mock expo-constants

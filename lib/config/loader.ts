@@ -100,6 +100,17 @@ export interface AppSettings {
       endpoint?: string | null;
       description?: string;
     };
+    breadcrumbs?: {
+      enabled?: boolean;
+      provider?: string;
+      maxBreadcrumbs?: number;
+      batchSize?: number;
+      maxRetries?: number;
+      retryBaseMs?: number;
+      debounceMs?: number;
+      breadcrumbRetentionDays?: number;
+      description?: string;
+    };
     description?: string;
   };
   thresholds?: {

@@ -300,4 +300,6 @@ export {
   type VariantEngagementEvent,
   type VariantPerformanceEvent
 } from "./variant-tracking";
+// Breadcrumb queue (Phase 1a - offline persistence)
+export { breadcrumbQueue, type BreadcrumbQueueStats } from "./breadcrumb-queue";
 

@@ -141,6 +141,10 @@ export const STORAGE_KEYS = {
   // Analytics event buffer (offline queueing)
   ANALYTICS_OFFLINE_QUEUE: "dnd:analytics:offline_queue",
 
+  // Breadcrumb queue (Sentry offline persistence)
+  BREADCRUMB_QUEUE: "dnd:sentry:breadcrumb_queue",
+  BREADCRUMB_DEDUP_CACHE: "dnd:sentry:sent_fingerprints",
+
   // Network recovery state (retry count, backoff timing)
   NETWORK_RECOVERY_STATE: "dnd:network:recovery_state",
 

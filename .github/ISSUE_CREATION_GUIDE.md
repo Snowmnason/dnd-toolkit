@@ -52,6 +52,8 @@ Each comprehensive issue follows a 5-phase structure:
 
 ---
 
+# Template
+
 ## Issue Header
 
 Start every issue with a header block:
@@ -62,7 +64,12 @@ Start every issue with a header block:
 **Status:** Tier 4 (Category)  
 **Impact:** LARGE / MEDIUM / SMALL — [1-2 sentence impact summary]  
 **Depends on:** #ABC (Feature X), #DEF (Feature Y)  
-**Integrates with:** `lib/module`, `lib/other-module`, Component/Hook name, Feature flags
+**Integrates with:** `lib/module`, `lib/other-module`, Component/Hook name, Feature flags  
+**Impacts (check if applicable):**
+  - [ ] Config (add to appsettings.json AND appsettings.dev.json)
+  - [ ] Storage/Migration (SecureStorage key, schema changes, migration logic)
+  - [ ] PII/Privacy (user data handling, consent checks)
+  - [ ] Encryption (data at rest via SecureStorage)
 
 ## Problem
 ...
@@ -177,35 +184,14 @@ Result: Consent is not reliably persisted, creating compliance risk and UX frict
 
 **Goal:** Show how to fix the problem, broken into phases.
 
-### Format
-
-```markdown
 ## Solution
 
 [1-2 sentence summary: what will be built]
 
-1. **Phase 0** — Understand scope and draft PR body
-2. **Phase 1a** — [Specific sub-feature]
-3. **Phase 1b** — [Next sub-feature, builds on 1a]
-4. **Phase 1c** — [Final sub-feature, completes core]
-5. **Phase 2** — Documentation
-6. **Phase 3** — Usage guides
-7. **Phase 4** — Testing
+## Out of Scope
 
----
-
-## Phase 0: Understand scope and draft PR body
-
-[See Phase 0 section below]
-
----
-
-## Phase 1a: [Specific title]
-
-[See Phase 1a section below]
-
-... (1b, 1c follow)
-```
+- [What is explicitly NOT being addressed in this phase]
+- [Examples: "UI redesign", "Mobile-only feature", "Multi-provider support"]
 
 ### Solution Tips
 
@@ -240,6 +226,7 @@ Result: Consent is not reliably persisted, creating compliance risk and UX frict
   - [Error handling scenario]
 - [ ] Confirm acceptance criteria are clear
 - [ ] Draft PR body (copy into `docs/issues.md` for reference):
+- **Follow the style guide:** See `.github\PR_BODY_TEMPLATE.md` for detailed formatting requirements for all issue docs
 
 \`\`\`markdown
 ## [Feature Name] #XXX
@@ -326,9 +313,6 @@ Result: Consent is not reliably persisted, creating compliance risk and UX frict
 - [ ] [Task 1 with details]
 - [ ] [Task 2]
 
-**Testing (Phase 4):**
-- [Early testing hints to keep in mind]
-
 ---
 
 ## Phase 1c: [Final sub-phase]
@@ -336,15 +320,12 @@ Result: Consent is not reliably persisted, creating compliance risk and UX frict
 **Scope:**
 - [ ] [Summary scope]
 
-**Testing (Phase 4):**
-- [Verification points]
 ```
 
 ### Implementation Phase Tips
 
 - **Be VERY specific:** Include example TypeScript interfaces, method signatures
 - **Sub-phase independence:** Each can be code-reviewed separately
-- **Testing hints:** Add what to test for each sub-phase (full tests in Phase 4)
 - **Configuration:** Show appsettings config JSON
 - **Integration:** Mention how this connects to other systems (#70, #208, etc.)
 - **Commit titles:** Phase headers ARE commit titles (no "Commit title:" prefix)
@@ -385,18 +366,18 @@ Result: Consent is not reliably persisted, creating compliance risk and UX frict
 
 **Scope:**
 
-**Create or update `lib/[module]/README.md`:**
-- [ ] "When to use" section (suitable vs unsuitable use cases)
-- [ ] Architecture diagram or flow chart
-- [ ] API reference:
-  - All public functions/classes
-  - Type signatures
-  - Inline code examples
-- [ ] Integration points (modules this depends on, systems this plugs into)
-- [ ] Error handling guide
-- [ ] Performance notes (if applicable)
-- [ ] Future enhancements section
-- [ ] Related modules
+**Create or update `lib/[module]/README.md` following the repository's style guide:**
+- [ ] "When to Use This Module" section (suitable vs unsuitable use cases)
+- [ ] Architecture & Data Flow (brief description or diagram)
+- [ ] API Reference (all exports with type signatures and code examples)
+- [ ] Dependencies (external packages + internal lib dependencies)
+- [ ] Error Handling & Edge Cases (known limitations, error patterns)
+- [ ] Performance Notes (caching, overhead, optimization tradeoffs)
+- [ ] Related Modules (links to connected lib/* modules)
+- [ ] File Breakdown (what each file does in a table)
+- [ ] Testing section (link to test guide if exists, or manual testing tips)
+- [ ] Future Enhancements (planned improvements or tech debt)
+- [ ] **Must be app-agnostic** – no app-specific language; readable by developers using this in future projects
 ```
 
 ### Phase 2 Tips
@@ -406,6 +387,8 @@ Result: Consent is not reliably persisted, creating compliance risk and UX frict
 - **Architecture diagrams:** ASCII or brief mermaid (help visualize data flow)
 - **Don't document implementation:** Document the API and intent, not internal details
 - **Link to other modules:** Make it easy to discover related functionality
+- **Follow the style guide:** See `.github\README_STYLE_GUIDE.md` for detailed formatting requirements for all issue docs
+- **Avoid Testing/Future sections if not applicable:** Per repository guidelines, these are optional for simple modules but required for complex ones
 
 ### Example README Structure
 
@@ -457,6 +440,13 @@ baseline.recordSample('screen-load', 500);
 
 **Scope:**
 
+**Create `docs/issues/MileStone X/XXX - [Feature]/IMPLEMENTATION_GUIDE.md` (for complex features):**
+- [ ] Architecture overview and data flow
+- [ ] File structure and key classes/interfaces
+- [ ] Integration points with existing modules
+- [ ] Configuration options and appsettings
+- [ ] Error handling patterns and edge cases
+
 **Create `docs/issues/MileStone X/XXX - [Feature]/USAGE_GUIDE.md`:**
 - [ ] Integration checklist (step-by-step how to add to app)
 - [ ] Code examples (all common use cases)
@@ -464,11 +454,6 @@ baseline.recordSample('screen-load', 500);
 - [ ] Debugging section (how to identify issues)
 - [ ] Troubleshooting (common problems + solutions)
 
-**Create `docs/A Testing Guide/[Feature] Testing.md`:**
-- [ ] Manual test cases (14+ cases with detailed steps)
-- [ ] Test data setup (mocks, fixtures)
-- [ ] Platform testing notes (web/iOS/Android variations)
-- [ ] Success criteria (how to know tests passed)
 ```
 
 ### Phase 3 Tips
@@ -485,6 +470,8 @@ baseline.recordSample('screen-load', 500);
   ```
 - **14+ test cases:** Covers happy path, errors, edge cases, offline scenarios
 - **Success criteria:** Quantifiable (not "seems good", but "100% events delivered")
+- **Follow the style guide:** See `.github/ISSUE_DOC_STYLE_GUIDE.md` for detailed formatting requirements for all issue docs
+- **Optional additional docs:** For complex features, consider creating `ARCHITECTURE.md`, `EXAMPLES.md`, `LIMITS.md`, `MISSING.md`, or `VARIANT_TRACKING_GUIDE.md` as needed (see style guide for when to use each)
 
 ### Example Test Case
 
@@ -511,14 +498,14 @@ baseline.recordSample('screen-load', 500);
 ## Phase 4: Comprehensive tests
 
 **Scope:**
-- [ ] Unit tests (`lib/module/file.test.ts`):
+- [ ] Unit tests:
   - [10-15 test cases covering core functionality]
   - [Edge cases]
   - [Validation]
 
 - [ ] Integration tests:
   - [Multi-component interaction]
-  - [With other tier 4 features]
+  - [With other tier X features]
   - [Offline scenarios]
 
 - [ ] End-to-end test:
@@ -532,6 +519,12 @@ baseline.recordSample('screen-load', 500);
 - [ ] Lint & typecheck:
   - `npm run lint` passes
   - `npm run typecheck` passes
+
+**Create or update `docs/A Testing Guide/[Feature] Testing.md`:**
+  - [ ] Manual test cases (appropriate number with detailed steps)
+  - [ ] Test data setup (mocks, fixtures)
+  - [ ] Platform testing notes (web/iOS/Android variations)
+  - [ ] Success criteria (how to know tests passed)
 ```
 
 ### Phase 4 Tips
@@ -541,6 +534,7 @@ baseline.recordSample('screen-load', 500);
 - **E2E tests:** Full workflow (e.g., record sample → restart app → baseline restored)
 - **Stress tests:** Ensure no unbounded growth, handles 100x normal load
 - **Lint check:** Must pass `npm run lint` (no Type errors)
+- **For detailed testing guidance:** See [DETAILED_TESTING_GUIDE.md](.github/DETAILED_TESTING_GUIDE.md)
 
 ---
 
@@ -590,13 +584,6 @@ baseline.recordSample('screen-load', 500);
 - [ ] Lint and typecheck passing
 ```
 
-### Acceptance Criteria Tips
-
-- **Per-phase:** Each phase has its own criteria
-- **Measurable:** Use specific numbers (100 events, 5 retries, <10ms latency)
-- **Verifiable:** Each criterion can be checked (not subjective)
-- **Checkboxes:** Format as `- [ ]` for tracking
-
 ---
 
 ## Dependencies & Notes
@@ -622,6 +609,15 @@ baseline.recordSample('screen-load', 500);
 - **Pre-release stance:** [No backwards compatibility, breaking changes OK]
 - **Builds on:** [References to earlier patterns]
 ```
+
+# General Tips
+
+### Acceptance Criteria Tips
+
+- **Per-phase:** Each phase has its own criteria
+- **Measurable:** Use specific numbers (100 events, 5 retries, <10ms latency)
+- **Verifiable:** Each criterion can be checked (not subjective)
+- **Checkboxes:** Format as `- [ ]` for tracking
 
 ### Dependencies Tips
 

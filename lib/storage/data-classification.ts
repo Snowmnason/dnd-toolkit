@@ -257,6 +257,21 @@ export const DATA_CLASSIFICATIONS: Record<string, DataClassification> = {
     description: "Dynamic job state keys (pattern: job:*)",
   },
 
+  // ========== ANALYTICS & TELEMETRY ==========
+  "dnd:sentry:breadcrumb_queue": {
+    key: "dnd:sentry:breadcrumb_queue",
+    sensitivity: DataSensitivity.SENSITIVE,
+    description: "Offline queue of breadcrumbs (debug events) waiting to be sent to Sentry",
+    ttl: 14 * 24 * 60 * 60 * 1000, // 14 days
+  },
+
+  "dnd:sentry:sent_fingerprints": {
+    key: "dnd:sentry:sent_fingerprints",
+    sensitivity: DataSensitivity.SENSITIVE,
+    description: "Deduplication cache for sent breadcrumbs (fingerprint -> timestamp)",
+    ttl: 24 * 60 * 60 * 1000, // 24 hours
+  },
+
   // ========== RECOVERY & DIAGNOSTICS ==========
   // Pattern: dnd:recovery:* - recovery and diagnostic data
   "dnd:recovery:*": {
