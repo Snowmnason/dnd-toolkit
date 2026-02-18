@@ -138,6 +138,9 @@ export const STORAGE_KEYS = {
   // Offline mutation dead-letter queue (permanent failures)
   OFFLINE_DEAD_LETTER: "dnd:offline:dead_letter",
 
+  // Analytics event buffer (offline queueing)
+  ANALYTICS_OFFLINE_QUEUE: "dnd:analytics:offline_queue",
+
   // Network recovery state (retry count, backoff timing)
   NETWORK_RECOVERY_STATE: "dnd:network:recovery_state",
 

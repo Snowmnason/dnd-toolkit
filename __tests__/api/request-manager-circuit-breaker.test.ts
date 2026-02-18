@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-    CircuitBreakerManager,
-    type CircuitThresholds,
+  CircuitBreakerManager,
+  type CircuitThresholds,
 } from "../../lib/api/circuit-breaker";
 import { parseEndpoint } from "../../lib/api/interceptor";
 
@@ -187,15 +187,15 @@ describe("Circuit Breaker RequestManager Integration", () => {
         treatNetworkErrors: true,
       };
 
-      // Record regular failure
+      // Record a regular failure
       CircuitBreakerManager.recordFailure(cbKey, false, thresholds);
       expect(CircuitBreakerManager.getStats(cbKey).failureCount).toBe(1);
 
-      // In RequestManager, 401/403 errors are not recorded (skipped in recordFailure call)
-      // This test documents the expected behavior where auth errors don't affect the circuit
-      const statsBefore = CircuitBreakerManager.getStats(cbKey).failureCount;
-      const statsAfter = CircuitBreakerManager.getStats(cbKey).failureCount;
-      expect(statsBefore).toBe(statsAfter);
+      // Auth errors (401/403) are excluded at the RequestManager level: it simply does not
+      // call recordFailure() for those status codes. The circuit breaker itself has no
+      // concept of HTTP status — simulate by not calling recordFailure again.
+      // Count must still be 1 (unchanged).
+      expect(CircuitBreakerManager.getStats(cbKey).failureCount).toBe(1);
     });
 
     it("should treat network errors based on configuration", () => {

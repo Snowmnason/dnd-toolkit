@@ -280,6 +280,13 @@ export function trackFeatureBlocked(params: {
 }
 
 // Export analytics utilities
+export {
+  analyticsBufferService,
+  generateUUID,
+  type AnalyticsBufferConfig,
+  type AnalyticsBufferStats,
+  type QueuedAnalyticsEvent
+} from "./analytics-buffer";
 export { AnalyticsConsent } from "./consent";
 export { categorizeError, type ErrorCategory } from "./error-categorization";
 export { sessionManager } from "./session";

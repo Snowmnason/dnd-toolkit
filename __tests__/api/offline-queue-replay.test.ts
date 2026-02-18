@@ -82,22 +82,13 @@ describe("Offline Queue Replay", () => {
   });
 
   describe("initializeOfflineQueueReplay", () => {
-    it("should initialize replay listener", async () => {
+    it("should subscribe to network status changes via NetworkDetection", async () => {
       const { initializeOfflineQueueReplay } =
         await import("@/lib/api/offline-queue-replay");
 
       initializeOfflineQueueReplay();
 
-      expect(mockNetworkDetection.subscribe).toHaveBeenCalled();
-    });
-
-    it("should set up network status change listener", async () => {
-      const { initializeOfflineQueueReplay } =
-        await import("@/lib/api/offline-queue-replay");
-
-      initializeOfflineQueueReplay();
-
-      expect(mockNetworkDetection.subscribe).toHaveBeenCalled();
+      expect(mockNetworkDetection.subscribe).toHaveBeenCalledTimes(1);
     });
   });
 
