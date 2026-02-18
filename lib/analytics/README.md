@@ -234,7 +234,7 @@ Sets up the queue with a provider adapter (e.g., SentryAdapter). Loads persisted
 
 Adds a breadcrumb to the queue. Deduplicates based on fingerprint hash to prevent duplicates.
 
-#### `stats()` — Get queue statistics (count, pending, lastFlush, etc.)
+#### `getStats()` — Get queue statistics (count, pending, lastFlush, etc.)
 
 Returns queue metrics like size, oldest breadcrumb age, provider name.
 
@@ -255,7 +255,7 @@ Returns `{ queueSize, isFlushing, lastFlushTime, oldestBreadcrumbTime, providerN
 ```json
 {
   "analytics": {
-    "breadcrumbQueue": {
+    "breadcrumbs": {
       "enabled": true,
       "maxBreadcrumbs": 500,
       "batchSize": 10,

@@ -24,12 +24,42 @@ export class SentryAdapter implements BreadcrumbProvider {
   name = 'sentry';
   private sentryDsn: string | null = null;
   private sentryEnvelopeEndpoint: string | null = null;
+  private sentryPublicKey: string | null = null;
 
   constructor(dsn?: string) {
     this.sentryDsn = dsn || this._getSentryDsnFromConfig();
     if (this.sentryDsn) {
       this.sentryEnvelopeEndpoint = this._parseEnvelopeEndpoint(this.sentryDsn);
+      this.sentryPublicKey = this._extractPublicKey(this.sentryDsn);
     }
+  }
+
+  /**
+   * Extract public key from Sentry DSN
+   * DSN format: https://<key>@<host>/projects/<org>/<project>
+   */
+  private _extractPublicKey(dsn: string): string | null {
+    try {
+      const url = new URL(dsn);
+      return url.username || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Build X-Sentry-Auth header for envelope request
+   */
+  private _buildSentryAuthHeader(): string | null {
+    if (!this.sentryPublicKey) {
+      return null;
+    }
+
+    const timestamp = Math.floor(Date.now() / 1000);
+    const client = 'sentry.react-native/1.0';
+    const sentry_version = 7;
+
+    return `Sentry sentry_key=${this.sentryPublicKey}, sentry_version=${sentry_version}, sentry_client=${client}, sentry_timestamp=${timestamp}`;
   }
 
   /**
@@ -65,7 +95,8 @@ export class SentryAdapter implements BreadcrumbProvider {
 
   /**
    * Send batch of breadcrumbs to Sentry
-   * Converts QueuedBreadcrumb to Sentry envelope format and POSTs to envelope endpoint
+   * Converts QueuedBreadcrumb to a minimal Sentry event with breadcrumbs array
+   * and sends via envelope format to the endpoint
    */
   async sendBatch(breadcrumbs: QueuedBreadcrumb[]): Promise<BreadcrumbSendResult> {
     if (breadcrumbs.length === 0) {
@@ -87,27 +118,50 @@ export class SentryAdapter implements BreadcrumbProvider {
         `Sending batch of ${breadcrumbs.length} breadcrumbs to Sentry endpoint`
       );
 
-      // Build Sentry envelope with breadcrumbs
-      // Envelope format: header\n + item-header\n + item-payload + item-header\n + item-payload...
-      const envelopeItems = breadcrumbs.map((b) => {
-        const itemHeader = JSON.stringify({
-          type: 'breadcrumb',
-          length: JSON.stringify(b).length,
-        });
-        return `${itemHeader}\n${JSON.stringify(b)}`;
+      // Convert QueuedBreadcrumb[] to Sentry breadcrumb format
+      const sentryBreadcrumbs = breadcrumbs.map((qb) => ({
+        timestamp: qb.timestamp / 1000, // Sentry expects seconds since epoch
+        category: qb.category,
+        level: qb.level,
+        message: qb.message,
+        data: qb.data,
+      }));
+
+      // Build minimal Sentry event with breadcrumbs array
+      // This is a valid envelope item type that Sentry accepts
+      const eventPayload = {
+        breadcrumbs: sentryBreadcrumbs,
+        timestamp: Date.now() / 1000,
+        platform: 'react-native',
+        // Minimal event to satisfy Sentry schema; breadcrumbs are the primary payload
+      };
+
+      // Sentry envelope format: header\n + item-header\n + item-payload
+      const eventHeader = JSON.stringify({
+        type: 'event',
+        length: JSON.stringify(eventPayload).length,
       });
 
-      const envelopeHeader = JSON.stringify({
-        // Empty event payload; we're just sending breadcrumbs
-      });
+      const envelopeHeader = JSON.stringify({});
 
-      const envelope = `${envelopeHeader}\n` + envelopeItems.join('\n');
+      const envelope = `${envelopeHeader}\n${eventHeader}\n${JSON.stringify(eventPayload)}`;
 
-      // POST to Sentry envelope endpoint
+      // POST to Sentry envelope endpoint with authentication
+      const authHeader = this._buildSentryAuthHeader();
+      if (!authHeader) {
+        logger.category('analytics').warn('SentryAdapter', 'No Sentry auth header available');
+        return {
+          sent: [],
+          retry: breadcrumbs.map((b) => b.id),
+          discard: [],
+        };
+      }
+
       const response = await fetch(this.sentryEnvelopeEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-sentry-envelope',
+          'X-Sentry-Auth': authHeader,
         },
         body: envelope,
       });

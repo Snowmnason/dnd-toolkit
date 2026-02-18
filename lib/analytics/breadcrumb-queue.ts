@@ -7,11 +7,12 @@
  * No Sentry imports here — all provider-specific logic is in adapters.
  */
 
+import * as Crypto from 'expo-crypto';
+
 import { getAppConfig } from '@/lib/config';
 import { BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '@/lib/services/provider-adapter';
 import { STORAGE_KEYS, SecureStorage } from '@/lib/storage';
 import { logger } from '@/lib/utils/logger';
-import crypto from 'crypto';
 
 /**
  * In-memory queue statistics (not persisted)
@@ -22,6 +23,7 @@ export interface BreadcrumbQueueStats {
   lastFlushTime?: number;
   overflowCount: number; // Session-only counter
   providerName: string;
+  isFlushing: boolean;
 }
 
 /**
@@ -42,20 +44,40 @@ class BreadcrumbQueueService {
   // Config values with fallbacks (from appsettings or hardcoded defaults)
   private readonly maxBreadcrumbs: number;
   private readonly retentionDays: number;
+  private readonly maxRetries: number;
+  private readonly batchSize: number;
+  private readonly retryBaseMs: number;
   private readonly deduplicationTTL: number;
   private readonly batchSpacingMs: number;
   private readonly debounceMs: number;
 
   constructor() {
     // Load config values from appsettings with fallbacks
-    const config = getAppConfig();
-    const breadcrumbsConfig = config.analytics?.breadcrumbs;
+    // Wrapped in try/catch to handle config load failures gracefully
+    try {
+      const config = getAppConfig();
+      const breadcrumbsConfig = config.analytics?.breadcrumbs;
 
-    this.maxBreadcrumbs = breadcrumbsConfig?.maxBreadcrumbs ?? 500;
-    this.retentionDays = breadcrumbsConfig?.breadcrumbRetentionDays ?? 14;
-    this.deduplicationTTL = 24 * 60 * 60 * 1000; // 24h in ms (hardcoded, not configurable)
-    this.batchSpacingMs = 1500; // Space batches by 1.5s if 100+ pending (hardcoded, not configurable)
-    this.debounceMs = breadcrumbsConfig?.debounceMs ?? 5000; // Debounce flush: once per 5s
+      this.maxBreadcrumbs = breadcrumbsConfig?.maxBreadcrumbs ?? 500;
+      this.retentionDays = breadcrumbsConfig?.breadcrumbRetentionDays ?? 14;
+      this.maxRetries = breadcrumbsConfig?.maxRetries ?? 5;
+      this.batchSize = breadcrumbsConfig?.batchSize ?? 10;
+      this.retryBaseMs = breadcrumbsConfig?.retryBaseMs ?? 1000;
+      this.deduplicationTTL = 24 * 60 * 60 * 1000; // 24h in ms (hardcoded, not configurable)
+      this.batchSpacingMs = 1500; // Space batches by 1.5s if 100+ pending (hardcoded, not configurable)
+      this.debounceMs = breadcrumbsConfig?.debounceMs ?? 5000; // Debounce flush: once per 5s
+    } catch (error) {
+      // Config loading failed; fall back to safe defaults
+      logger.category('analytics').warn('BreadcrumbQueue', `Failed to load config: ${error}, using defaults`);
+      this.maxBreadcrumbs = 500;
+      this.retentionDays = 14;
+      this.maxRetries = 5;
+      this.batchSize = 10;
+      this.retryBaseMs = 1000;
+      this.deduplicationTTL = 24 * 60 * 60 * 1000;
+      this.batchSpacingMs = 1500;
+      this.debounceMs = 5000;
+    }
   }
 
   private networkUnsubscribe: (() => void) | null = null;
@@ -93,6 +115,15 @@ class BreadcrumbQueueService {
       logger.category('analytics').error('BreadcrumbQueue', `Failed to initialize: ${error}`);
       this.queue = [];
       this.deduplicationCache.clear();
+      
+      // Remove corrupted persisted data so we don't fail on next startup
+      try {
+        await SecureStorage.removeItem(STORAGE_KEYS.BREADCRUMB_QUEUE);
+        await SecureStorage.removeItem(STORAGE_KEYS.BREADCRUMB_DEDUP_CACHE);
+        logger.category('analytics').info('BreadcrumbQueue', 'Removed corrupted persisted queue data');
+      } catch (cleanupError) {
+        logger.category('analytics').warn('BreadcrumbQueue', `Failed to clean up corrupted data: ${cleanupError}`);
+      }
     }
   }
 
@@ -107,7 +138,7 @@ class BreadcrumbQueueService {
     }
 
     // Compute fingerprint hash
-    const fingerprint = this._computeFingerprint(breadcrumb);
+    const fingerprint = await this._computeFingerprint(breadcrumb);
 
     // Check dedup cache
     const lastSent = this.deduplicationCache.get(fingerprint);
@@ -121,7 +152,7 @@ class BreadcrumbQueueService {
 
     // Create queued breadcrumb
     const queuedBreadcrumb: QueuedBreadcrumb = {
-      id: crypto.randomBytes(16).toString('hex'),
+      id: this._bytesToHex(Crypto.getRandomBytes(16)),
       timestamp: breadcrumb.timestamp,
       category: breadcrumb.category,
       level: breadcrumb.level,
@@ -129,7 +160,7 @@ class BreadcrumbQueueService {
       data: breadcrumb.data,
       fingerprint,
       retryCount: 0,
-      maxRetries: 5,
+      maxRetries: this.maxRetries,
       metadata: {
         ...breadcrumb.metadata,
         offlineAt: Date.now(),
@@ -200,13 +231,13 @@ class BreadcrumbQueueService {
     }
 
     // Schedule next retry
-    const backoffMs = Math.pow(2, Math.min(breadcrumb.retryCount, 4)) * 1000; // 1s, 2s, 4s, 8s, 16s
+    const backoffMs = Math.pow(2, Math.min(breadcrumb.retryCount, 4)) * this.retryBaseMs; // Exponential backoff with configurable base
     breadcrumb.nextAttemptAt = Date.now() + backoffMs;
 
     await this._persist();
     logger.category('analytics').debug(
       'BreadcrumbQueue',
-      `Markfailed breadcrumb (id: ${id}, retry: ${breadcrumb.retryCount}/${breadcrumb.maxRetries}, next attempt: ${backoffMs}ms)`
+      `Marked failed breadcrumb (id: ${id}, retry: ${breadcrumb.retryCount}/${breadcrumb.maxRetries}, next attempt: ${backoffMs}ms)`
     );
   }
 
@@ -242,6 +273,7 @@ class BreadcrumbQueueService {
       lastFlushTime: this.lastFlushTime,
       overflowCount: this.overflowCount,
       providerName: this.provider?.name || 'unknown',
+      isFlushing: this.isFlushing,
     };
   }
 
@@ -287,7 +319,7 @@ class BreadcrumbQueueService {
       }
 
       // Phase 1c: Dedup-on-flush — skip breadcrumbs with recently-sent fingerprints
-      let batch = this.peek(10); // Provider typically recommends 10 per request
+      let batch = this.peek(this.batchSize); // Configurable batch size
 
       batch = batch.filter((b) => {
         const lastSent = this.deduplicationCache.get(b.fingerprint);
@@ -428,11 +460,23 @@ class BreadcrumbQueueService {
   }
 
   /**
-   * Private: compute SHA1 hash fingerprint
+   * Private: convert Uint8Array to hex string
    */
-  private _computeFingerprint(breadcrumb: Omit<QueuedBreadcrumb, 'id' | 'fingerprint' | 'retryCount' | 'maxRetries'>): string {
+  private _bytesToHex(bytes: Uint8Array): string {
+    return Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  /**
+   * Private: compute SHA1 hash fingerprint (async via expo-crypto)
+   */
+  private async _computeFingerprint(breadcrumb: Omit<QueuedBreadcrumb, 'id' | 'fingerprint' | 'retryCount' | 'maxRetries'>): Promise<string> {
     const canonical = `${breadcrumb.category}:${breadcrumb.level}:${breadcrumb.message}:${JSON.stringify(breadcrumb.data || {})}`;
-    return crypto.createHash('sha1').update(canonical).digest('hex');
+    const encoder = new TextEncoder();
+    const canonicalBytes = encoder.encode(canonical);
+    const hashBuffer = await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA1, canonicalBytes);
+    return this._bytesToHex(new Uint8Array(hashBuffer));
   }
 
   /**

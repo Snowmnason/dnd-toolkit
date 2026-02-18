@@ -68,7 +68,5 @@ Service calls should be cached where appropriate to reduce external requests.
 ## File Breakdown
 | File | Purpose |
 | ---- | ------- |
-| `index.ts` | Barrel export for service clients |
-| `interfaces.ts` | Common service interfaces |
-| `api-service.ts` | Example API service client |</content>
-<parameter name="filePath">p:/CodingProjects/dnd-toolkit/lib/services/README.md
+| `provider-adapter.ts` | Defines provider-agnostic interfaces for breadcrumb providers (QueuedBreadcrumb, BreadcrumbSendResult, etc.) |
+| `sentry/sentry-adapter.ts` | Sentry-specific implementation of BreadcrumbProvider interface |
