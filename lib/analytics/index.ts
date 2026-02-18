@@ -287,6 +287,11 @@ export {
   type AnalyticsBufferStats,
   type QueuedAnalyticsEvent
 } from "./analytics-buffer";
+export {
+  flushAnalyticsQueue,
+  initializeAnalyticsNetworkIntegration,
+  cleanupAnalyticsNetworkIntegration
+} from "./analytics-network-integration";
 export { AnalyticsConsent } from "./consent";
 export { categorizeError, type ErrorCategory } from "./error-categorization";
 export { sessionManager } from "./session";
@@ -299,4 +304,3 @@ export {
   type VariantEngagementEvent,
   type VariantPerformanceEvent
 } from "./variant-tracking";
-

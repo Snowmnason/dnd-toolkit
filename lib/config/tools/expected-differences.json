@@ -72,4 +72,6 @@
   "platforms.web.platformNotes": "Web platform notes differ to document dev vs production behavior",
   "platforms.desktop.thresholds.slowScreenMs": "Desktop thresholds differ between dev and production",
   "platforms.desktop.platformNotes": "Desktop platform notes differ to document dev vs production behavior"
+  ,"analytics.buffer.description": "Analytics buffer description may differ between dev and production (dev: explanatory note; prod: concise operational description)"
+  ,"analytics.description": "Analytics settings description differs between dev and production (dev: testing-oriented note; prod: operational defaults)"
 }

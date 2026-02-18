@@ -49,4 +49,8 @@ export * from "./offline/useForceResync";
 // Storage
 export * from "./storage/useRefreshStorageCache";
 
+// Analytics
+export { useAnalyticsBufferStatus } from "./use-analytics-buffer-status";
+export type { AnalyticsBufferStatus } from "./use-analytics-buffer-status";
+
 // Utilities
