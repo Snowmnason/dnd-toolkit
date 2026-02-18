@@ -85,7 +85,7 @@ The adaptive payload system consists of 5 integrated layers:
 - `NetworkDetection.getStatus()` – Synchronous current status
 - `NetworkDetection.subscribe(callback)` – Listen to changes
 - `useNetworkStatus()` – React hook for UI components
-- `ConnectionQuality` enum: GOOD / BAD / NO_WIFI
+- `ConnectionQuality` enum: GOOD / BAD / CELLULAR
 
 ### Layer 2: Quality Tier Mapping & Payload Options
 
@@ -102,7 +102,7 @@ The adaptive payload system consists of 5 integrated layers:
 │   if GOOD & wifi → HD (full quality)    │
 │   if GOOD & cellular → SD               │
 │   if BAD → Thumb (small images)         │
-│   if NO_WIFI → Text (cache fallback)    │
+│   if CELLULAR → Text (cache fallback)    │
 │ ↓                                        │
 │ Output: AdaptivePayloadOptions           │
 │   - imageQuality: 'hd'|'sd'|'thumb'     │

@@ -2,7 +2,7 @@
  * Network Detection Utilities
  *
  * Provides cross-platform network status detection for web, iOS, and Android.
- * Tracks detailed connection states (good, bad, no-wifi, offline) for implementing
+ * Tracks detailed connection states (good, bad, cellular, offline) for implementing
  * degraded modes and safe modes when network is unavailable or unreliable.
  *
  * Features:
@@ -37,8 +37,8 @@ export enum ConnectionQuality {
   GOOD = "good",
   /** Poor connection - latency/packet loss detected - should use smaller payloads */
   BAD = "bad",
-  /** WiFi disconnected, using cellular/hotspot - may be metered */
-  NO_WIFI = "no-wifi",
+  /** Cellular/hotspot connection (may be metered) */
+  CELLULAR = "cellular",
   /** No network service at all */
   OFFLINE = "offline",
 }
@@ -73,6 +73,23 @@ interface BatteryStatus {
  * Callback when network status changes
  */
 export type NetworkStatusCallback = (status: NetworkStatus) => void;
+
+/**
+ * Convert ConnectionQuality to NetworkState
+ * Standalone function for use in state machine and telemetry
+ */
+export function qualityToNetworkState(quality: ConnectionQuality): NetworkState {
+  switch (quality) {
+    case ConnectionQuality.GOOD:
+      return "GOOD";
+    case ConnectionQuality.BAD:
+      return "BAD";
+    case ConnectionQuality.CELLULAR:
+      return "CELLULAR";
+    case ConnectionQuality.OFFLINE:
+      return "OFFLINE";
+  }
+}
 
 /**
  * Network detection service (cross-platform)
@@ -161,7 +178,7 @@ class NetworkDetectionClass {
       this.isInitialized = true;
 
       // Initialize state machine to detected state
-      const initialNetworkState = this.qualityToNetworkState(
+      const initialNetworkState = qualityToNetworkState(
         this.currentStatus.connectionQuality,
       );
       try {
@@ -498,7 +515,7 @@ class NetworkDetectionClass {
     }
 
     if (this.currentStatus.type === "cellular") {
-      this.updateStatus({ connectionQuality: ConnectionQuality.NO_WIFI });
+      this.updateStatus({ connectionQuality: ConnectionQuality.CELLULAR });
       return;
     }
 
@@ -644,7 +661,7 @@ class NetworkDetectionClass {
         if (state.isInternetReachable === false) {
           quality = ConnectionQuality.OFFLINE;
         } else if (state.type === "cellular") {
-          quality = ConnectionQuality.NO_WIFI;
+          quality = ConnectionQuality.CELLULAR;
         }
 
         this.updateStatus({
@@ -659,27 +676,11 @@ class NetworkDetectionClass {
   }
 
   /**
-   * Convert ConnectionQuality to NetworkState
-   */
-  private qualityToNetworkState(quality: ConnectionQuality): NetworkState {
-    switch (quality) {
-      case ConnectionQuality.GOOD:
-        return "GOOD";
-      case ConnectionQuality.BAD:
-        return "BAD";
-      case ConnectionQuality.NO_WIFI:
-        return "NO_WIFI";
-      case ConnectionQuality.OFFLINE:
-        return "OFFLINE";
-    }
-  }
-
-  /**
    * Convert connection quality to effective network type for adaptive payloads
    *
    * Maps:
    * - OFFLINE → "offline"
-   * - NO_WIFI (cellular) → "3g"
+   * - CELLULAR (cellular) → "3g"
    * - BAD (high latency) → "2g" or "slow-2g" based on severity
    * - GOOD + wifi → "4g"
    * - GOOD + cellular → "3g" (cellular is metered, treat as 3G)
@@ -689,7 +690,7 @@ class NetworkDetectionClass {
       return "offline";
     }
 
-    if (status.connectionQuality === ConnectionQuality.NO_WIFI) {
+    if (status.connectionQuality === ConnectionQuality.CELLULAR) {
       // Cellular networks are typically 3G speed; use 2g if also expensive/low battery
       return status.isExpensive ? "2g" : "3g";
     }
@@ -730,8 +731,8 @@ class NetworkDetectionClass {
 
     // Trigger state transition if connection quality changed
     if (oldStatus.connectionQuality !== this.currentStatus.connectionQuality) {
-      const oldState = this.qualityToNetworkState(oldStatus.connectionQuality);
-      const newState = this.qualityToNetworkState(
+      const oldState = qualityToNetworkState(oldStatus.connectionQuality);
+      const newState = qualityToNetworkState(
         this.currentStatus.connectionQuality,
       );
       this.triggerStateTransition(oldState, newState).catch((error) => {
@@ -793,10 +794,10 @@ class NetworkDetectionClass {
     newState: NetworkState,
   ): Promise<void> {
     try {
-      // If transitioning FROM offline TO a connected state (GOOD/BAD/NO_WIFI),
+      // If transitioning FROM offline TO a connected state (GOOD/BAD/CELLULAR),
       // we must go through RECOVERING first (state machine constraint)
       if (oldState === "OFFLINE" && newState !== "OFFLINE") {
-        const isConnectedState = ["GOOD", "BAD", "NO_WIFI"].includes(newState);
+        const isConnectedState = ["GOOD", "BAD", "CELLULAR"].includes(newState);
         if (isConnectedState) {
           // Transition through RECOVERING: OFFLINE → RECOVERING → newState
           logger.info(

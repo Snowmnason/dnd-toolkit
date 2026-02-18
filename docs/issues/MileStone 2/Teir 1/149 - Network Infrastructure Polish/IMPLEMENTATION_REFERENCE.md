@@ -114,7 +114,7 @@ private updateConnectionQuality(): void {
 
   // 2. Check type
   if (type === 'none') return OFFLINE;
-  if (type === 'cellular') return NO_WIFI;
+  if (type === 'cellular') return CELLULAR;
 
   // 3. Check latency (WiFi only)
   if (type === 'wifi') {
@@ -297,7 +297,7 @@ This allows TypeScript to work without these packages installed (graceful degrad
 export enum ConnectionQuality {
   GOOD = "good",
   BAD = "bad",
-  NO_WIFI = "no-wifi",
+  CELLULAR = "no-wifi",
   OFFLINE = "offline",
 }
 

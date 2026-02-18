@@ -14,7 +14,7 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
     it("returns 4G options for 4g connection", () => {
       const status: NetworkStatus = {
         isOnline: true,
-        type: "cellular",
+        type: "wifi",
         isExpensive: false,
         connectionQuality: ConnectionQuality.GOOD,
         isInternetReachable: true,
@@ -34,8 +34,8 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
     it("returns 3G options for 3g connection", () => {
       const status: NetworkStatus = {
         isOnline: true,
-        type: "cellular",
-        isExpensive: true,
+        type: "wifi",
+        isExpensive: false,
         connectionQuality: ConnectionQuality.GOOD,
         isInternetReachable: true,
         effectiveType: "3g",
@@ -152,7 +152,7 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
     it("verifies payload reduction: 4G vs 2G is at least 50%", () => {
       const status4G: NetworkStatus = {
         isOnline: true,
-        type: "cellular",
+        type: "wifi",
         isExpensive: false,
         connectionQuality: ConnectionQuality.GOOD,
         isInternetReachable: true,
@@ -170,7 +170,7 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
       const options4G = getAdaptivePayloadOptions(status4G);
       const options2G = getAdaptivePayloadOptions(status2G);
 
-      // 4G allows 5MB, 2G allows 500KB = 90% reduction
+      // 4G (WIFI) allows 5MB, 2G allows 500KB = 90% reduction
       const reduction = (1 - options2G.maxPayloadSize / options4G.maxPayloadSize) * 100;
       expect(reduction).toBeGreaterThanOrEqual(50);
       expect(reduction).toBeGreaterThan(89); // ~90% reduction
@@ -407,7 +407,7 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
         {
           status: {
             isOnline: true,
-            type: "cellular",
+            type: "wifi",
             isExpensive: false,
             connectionQuality: ConnectionQuality.GOOD,
             isInternetReachable: true,
@@ -419,8 +419,8 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
         {
           status: {
             isOnline: true,
-            type: "cellular",
-            isExpensive: true,
+            type: "wifi",
+            isExpensive: false,
             connectionQuality: ConnectionQuality.GOOD,
             isInternetReachable: true,
             effectiveType: "3g",
@@ -477,7 +477,7 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
     it("payload sizes decrease monotonically: 4G > 3G > 2G", () => {
       const options4G = getAdaptivePayloadOptions({
         isOnline: true,
-        type: "cellular",
+        type: "wifi",
         isExpensive: false,
         connectionQuality: ConnectionQuality.GOOD,
         isInternetReachable: true,
@@ -485,8 +485,8 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
       });
       const options3G = getAdaptivePayloadOptions({
         isOnline: true,
-        type: "cellular",
-        isExpensive: true,
+        type: "wifi",
+        isExpensive: false,
         connectionQuality: ConnectionQuality.GOOD,
         isInternetReachable: true,
         effectiveType: "3g",
@@ -510,7 +510,7 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
       tiers.forEach((tier) => {
         const status: NetworkStatus = {
           isOnline: true,
-          type: "cellular",
+          type: tier === "4g" ? "wifi" : "cellular",
           isExpensive: tier !== "4g",
           connectionQuality: tier === "4g" ? ConnectionQuality.GOOD : ConnectionQuality.BAD,
           isInternetReachable: true,
@@ -538,10 +538,10 @@ describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {
       tiers.forEach(({ tier, expected }) => {
         const status: NetworkStatus = {
           isOnline: tier !== "offline",
-          type: tier === "offline" ? "none" : "cellular",
-          isExpensive: tier !== "4g" && tier !== "offline",
+          type: tier === "offline" ? "none" : tier === "4g" || tier === "3g" ? "wifi" : "cellular",
+          isExpensive: tier !== "4g" && tier !== "3g" && tier !== "offline",
           connectionQuality:
-            tier === "offline" ? ConnectionQuality.OFFLINE : ConnectionQuality.GOOD,
+            tier === "offline" ? ConnectionQuality.OFFLINE : tier === "2g" || tier === "slow-2g" ? ConnectionQuality.BAD : ConnectionQuality.GOOD,
           isInternetReachable: tier !== "offline",
           effectiveType: tier as any,
         };

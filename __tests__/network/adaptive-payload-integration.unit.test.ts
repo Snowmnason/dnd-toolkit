@@ -7,6 +7,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/network/network-detection", () => ({
   NetworkDetection: { getStatus: vi.fn(), subscribe: vi.fn() },
+  ConnectionQuality: {
+    GOOD: "good",
+    BAD: "bad",
+    CELLULAR: "cellular",
+    OFFLINE: "offline",
+  },
 }));
 
 vi.mock("@/lib/cache/query-cache", () => ({

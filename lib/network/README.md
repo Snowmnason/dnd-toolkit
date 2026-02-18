@@ -34,7 +34,7 @@ Platform-specific detection:
 Normalize to ConnectionQuality:
   - GOOD: Excellent connection, all operations safe
   - BAD: Latency >500ms, packet loss detected, use smaller payloads
-  - NO_WIFI: On cellular/hotspot, possibly metered
+  - CELLULAR: On cellular/hotspot, possibly metered
   - OFFLINE: No network at all
         ↓
 Notify subscribers (real-time updates)
@@ -166,6 +166,54 @@ Current network state.
 - **`lib/api`** – HTTP requests (uses network detection indirectly)
 - **`lib/cache`** – Stale cache serving via error handler
 
+## Telemetry (Observability)
+
+This module emits local telemetry events for network observability. In Phase 1 the module logs events locally via `logger.category('network')`. Phase 2 documents the event schema and integration points; Phase 3+ covers backend ingestion and retention policies.
+
+Event types:
+- `quality_change` — emitted when the effective connection quality tier changes (unsampled).
+- `health_check` — periodic heartbeat with a snapshot of current quality (sampled; first check always emitted).
+- `error_correlation` — emitted (sampled) when a network-related request or sync fails, including a quality snapshot.
+
+Why local logging first:
+- Keeps rollout safe and privacy-friendly (no backend transmission until Phase 2 consent/wiring).
+- Allows iteration on schema without affecting backend contracts.
+
+Integration points (where events are emitted):
+- `NetworkDetection.subscribe()` — emits `quality_change` on effective type/quality transitions.
+- App bootstrap (AppKernel) — starts periodic `health_check` interval (default 5 minutes).
+- `lib/api/RequestManager` and `lib/offline` sync — capture and queue `error_correlation` events when requests fail.
+
+Sampling and configuration:
+- Sampling rates are configurable in `config/appsettings.json` under `network.telemetry`.
+- Defaults (Phase 1/1c): `healthCheckSampleRate = 0.1` (10%), `errorCorrelationSampleRate = 0.5` (50%), `enabled = true`.
+- First health check after app start is always emitted regardless of sample rate.
+
+Privacy and consent:
+- Telemetry emission respects the application's consent system (#181). A consent check runs before any emit; if consent is withdrawn the health check interval is stopped and queued error events are discarded.
+- Events avoid PII by default. Do not add user-identifying fields unless explicit consent is recorded.
+
+Event fields (summary):
+- `eventType` — one of `quality_change` | `health_check` | `error_correlation`.
+- `currentQuality` — `EXCELLENT|GOOD|POOR|OFFLINE`.
+- `previousQuality?` — present for `quality_change`.
+- `isOnline` — boolean.
+- `connectionType?` — `wifi|cellular|ethernet|unknown`.
+- `isExpensive?` — boolean (true for cellular by default).
+- `latency?` — RTT in ms (when available via Network Information API or ping measurement).
+- `downlink?` — Mbps (when available).
+- `error?` — present for `error_correlation` (e.g., `timeout|dns_fail|connection_reset|5xx|4xx|other`).
+- `timestamp` — epoch ms.
+- `platform` — `web|ios|android|desktop`.
+
+Where to find the full schema and examples:
+- `lib/network/TELEMETRY_SCHEMA.md` — JSON schemas and example events.
+
+Operational notes:
+- Keep the sampling rates conservative for mobile (cellular) users to avoid data charges.
+- Consider server-side validation of event schema and an ingestion version field once backend integration begins.
+
+
 ## File Breakdown
 
 | File                   | Purpose                                                                  | Exports                                                                                             |
@@ -242,12 +290,12 @@ Six states define the network lifecycle:
 
 | State          | Meaning                                 | Transitions To                     |
 | -------------- | --------------------------------------- | ---------------------------------- |
-| `INITIALIZING` | App starting, no status yet             | GOOD, BAD, NO_WIFI, OFFLINE        |
-| `GOOD`         | Network available, responsive           | BAD, NO_WIFI, OFFLINE, RECOVERING  |
-| `BAD`          | Network present but slow/high-latency   | GOOD, NO_WIFI, OFFLINE, RECOVERING |
-| `NO_WIFI`      | Cellular/offline detected (iOS/Android) | GOOD, BAD, OFFLINE, RECOVERING     |
+| `INITIALIZING` | App starting, no status yet             | GOOD, BAD, CELLULAR, OFFLINE        |
+| `GOOD`         | Network available, responsive           | BAD, CELLULAR, OFFLINE, RECOVERING  |
+| `BAD`          | Network present but slow/high-latency   | GOOD, CELLULAR, OFFLINE, RECOVERING |
+| `CELLULAR`      | Cellular/offline detected (iOS/Android) | GOOD, BAD, OFFLINE, RECOVERING     |
 | `OFFLINE`      | No connectivity at all                  | INITIALIZING, RECOVERING           |
-| `RECOVERING`   | Attempting reconnection with backoff    | GOOD, BAD, NO_WIFI, OFFLINE        |
+| `RECOVERING`   | Attempting reconnection with backoff    | GOOD, BAD, CELLULAR, OFFLINE        |
 
 ### Valid Transitions
 
@@ -255,7 +303,7 @@ The `VALID_TRANSITIONS` map enforces a strict directed graph. Key rules:
 
 - **Recovery path**: `OFFLINE` can only reach `GOOD` via `RECOVERING` (ensures recovery side effects execute)
 - **Initialization**: `INITIALIZING` only reachable at startup
-- **WiFi switch**: `NO_WIFI` ↔ `GOOD` allowed (iOS/Android WiFi toggles)
+- **WiFi switch**: `CELLULAR` ↔ `GOOD` allowed (iOS/Android WiFi toggles)
 
 Invalid transitions are rejected with an error.
 
@@ -595,7 +643,7 @@ Implement server-side support via Issue #XXX - Server-Side Image Variants.
 **Key Integration Points:**
 
 - **Online Detection**: When `NetworkDetection.isOnline` transitions from `false` → `true`, `OnlineSyncManager` begins syncing queued mutations
-- **Connection Quality**: Sync only starts when quality is stable (GOOD); BAD/NO_WIFI connections continue queueing
+- **Connection Quality**: Sync only starts when the network is healthy (GOOD or CELLULAR). BAD/OFFLINE connections continue queueing. See `isHealthy()` in `lib/network/state-machine.ts` for semantics.
 - **Debouncing**: Rapid online/offline flapping is debounced (5000ms default) to avoid redundant sync attempts
 - **Error Handling**: If sync fails, mutations remain queued and retry with exponential backoff
 

@@ -44,12 +44,12 @@ describe("NetworkDetection State Transitions", () => {
       expect(NetworkStateManager.getState()).toBe("BAD");
     });
 
-    it("should transition OFFLINE → RECOVERING → NO_WIFI on cellular", async () => {
+    it("should transition OFFLINE → RECOVERING → CELLULAR on cellular", async () => {
       await NetworkStateManager.transitionTo("OFFLINE");
       await NetworkStateManager.transitionTo("RECOVERING");
-      await NetworkStateManager.transitionTo("NO_WIFI");
+      await NetworkStateManager.transitionTo("CELLULAR");
 
-      expect(NetworkStateManager.getState()).toBe("NO_WIFI");
+      expect(NetworkStateManager.getState()).toBe("CELLULAR");
     });
 
     it("should not allow direct OFFLINE → GOOD transition (validates constraint)", async () => {
@@ -74,10 +74,10 @@ describe("NetworkDetection State Transitions", () => {
       expect(NetworkStateManager.getState()).toBe("OFFLINE");
     });
 
-    it("should not allow direct OFFLINE → NO_WIFI transition", async () => {
+    it("should not allow direct OFFLINE → CELLULAR transition", async () => {
       await NetworkStateManager.transitionTo("OFFLINE");
 
-      await expect(NetworkStateManager.transitionTo("NO_WIFI")).rejects.toThrow(
+      await expect(NetworkStateManager.transitionTo("CELLULAR")).rejects.toThrow(
         "Invalid state transition",
       );
 

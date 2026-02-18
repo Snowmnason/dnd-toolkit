@@ -124,7 +124,7 @@ const stats = RequestManager.getOfflineQueueStats();
 
 A request is queued when:
 
-1. Network is offline (`NetworkDetection.getStatus().connectionQuality === OFFLINE/NO_WIFI`)
+1. Network is offline (`NetworkDetection.getStatus().connectionQuality === OFFLINE/CELLULAR`)
    **OR**
 2. Circuit breaker is Open (`CircuitBreakerManager.getState() === "Open"`)
 3. **AND** `failOpen: false` (don't fail open - queue instead)

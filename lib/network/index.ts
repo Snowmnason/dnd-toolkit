@@ -12,8 +12,7 @@
 
 export {
   ConnectionQuality,
-  NetworkDetection,
-  useNetworkStatus
+  NetworkDetection, qualityToNetworkState, useNetworkStatus
 } from "./network-detection";
 export type { NetworkStatus, NetworkStatusCallback } from "./network-detection";
 
@@ -57,4 +56,22 @@ export {
   getAdaptiveQueryString,
   shouldDowngradeResource
 } from "./adaptive-payload-request";
+
+export {
+  composeNetworkContext, deriveConnectionType
+} from "./helpers";
+export type { ConnectionType, NetworkContext } from "./helpers";
+
+export {
+  captureErrorCorrelation, cleanupTelemetry,
+  ConnectionQualityTier,
+  emitHealthCheckEvent,
+  emitQualityChangeEvent,
+  emitSampledErrorEvents, ErrorType, getAndClearErrorQueue,
+  getErrorQueue, initializeTelemetry,
+  mapQualityTier,
+  startHealthCheckInterval,
+  stopHealthCheckInterval
+} from "./network-telemetry";
+export type { ErrorCorrelationEvent, NetworkHealthEvent } from "./network-telemetry";
 

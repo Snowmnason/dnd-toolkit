@@ -5,7 +5,14 @@ import {
 } from "../analytics";
 import { QueryCache } from "../cache";
 import { getAppConfig } from "../config";
-import { NetworkDetection, buildAdaptiveQueryParams, getAdaptivePayloadOptions, type PayloadQuality } from "../network";
+import {
+  buildAdaptiveQueryParams,
+  captureErrorCorrelation,
+  ErrorType,
+  getAdaptivePayloadOptions,
+  NetworkDetection,
+  type PayloadQuality,
+} from "../network";
 import { logger } from "../utils/logger";
 import { AuthLayer, type AuthContext } from "./auth-layer";
 import {
@@ -547,20 +554,27 @@ class RequestManagerClass {
     }
 
     // Quality rank: 4g > 3g > 2g > slow-2g > offline
-    const qualityRank: Record<string, number> = {
+    const qualityRank = {
       '4g': 5,
       '3g': 4,
       '2g': 3,
       'slow-2g': 2,
       'offline': 1,
       'unknown': 3, // Treat unknown as 2g-equivalent
+    } as const;
+
+    // Type-safe helper to get quality rank (eliminates object injection warnings)
+    const getRank = (quality: string | undefined): number => {
+      if (!quality) return qualityRank.unknown;
+      const rank = qualityRank[quality as keyof typeof qualityRank];
+      return rank ?? qualityRank.unknown;
     };
 
-    const startQuality = inFlightRequest.effectiveType || 'unknown';
-    const currentQuality = currentStatus.effectiveType || 'unknown';
+    const startQuality = inFlightRequest.effectiveType;
+    const currentQuality = currentStatus.effectiveType;
 
-    const startRank = qualityRank[startQuality] ?? 3;
-    const currentRank = qualityRank[currentQuality] ?? 3;
+    const startRank = getRank(startQuality);
+    const currentRank = getRank(currentQuality);
 
     // Only abort if quality degraded by at least 2 tiers (e.g., 4g → 2g)
     // Minor degradation (4g → 3g) not worth aborting
@@ -1522,6 +1536,23 @@ class RequestManagerClass {
           );
         }
 
+        // ========== TELEMETRY: Capture error correlation ==========
+        // Capture error + network quality snapshot for Phase 1c analysis
+        const errorMsg = (error as Error)?.message || String(error);
+        let mappedErrorType = ErrorType.OTHER;
+        if (errorMsg.includes("timeout") || errorMsg.includes("AbortError")) {
+          mappedErrorType = ErrorType.TIMEOUT;
+        } else if (errorMsg.includes("DNS") || errorMsg.includes("dns")) {
+          mappedErrorType = ErrorType.DNS_FAIL;
+        } else if (errorMsg.includes("connection reset") || errorMsg.includes("ECONNRESET")) {
+          mappedErrorType = ErrorType.CONNECTION_RESET;
+        } else if (statusCode && statusCode >= 500) {
+          mappedErrorType = ErrorType.HTTP_5XX;
+        } else if (statusCode && statusCode >= 400 && statusCode < 500) {
+          mappedErrorType = ErrorType.HTTP_4XX;
+        }
+        captureErrorCorrelation(mappedErrorType, errorMsg, statusCode);
+
         throw error;
       }
 
@@ -1841,11 +1872,10 @@ class RequestManagerClass {
     error: unknown,
     cbKey?: string,
   ): Promise<boolean> {
-    // Check if network is offline (OFFLINE or NO_WIFI)
+    // Check if network is offline. CELLULAR is a valid connected state (per state machine)
+    // and should NOT trigger offline queueing. Only true OFFLINE should queue requests.
     const networkStatus = await NetworkDetection.getStatus();
-    const isOffline =
-      networkStatus.connectionQuality === "offline" ||
-      networkStatus.connectionQuality === "no-wifi";
+    const isOffline = networkStatus.connectionQuality === "offline";
 
     if (isOffline) {
       logger.debug("api", "Should queue: network offline", {

@@ -413,6 +413,23 @@ class AppKernelClass {
               });
           }
 
+          // Initialize network telemetry (Phase 1a: Quality & Health Events)
+          try {
+            const { initializeTelemetry, startHealthCheckInterval } = await import(
+              "@/lib/network"
+            );
+            initializeTelemetry();
+            // Skip initial check since initializeTelemetry() already captured initial state
+            startHealthCheckInterval(300000, true); // 5 minutes default, skip initial
+            logger.category("bootstrap").debug("Network telemetry initialized");
+          } catch (error) {
+            logger
+              .category("bootstrap")
+              .warn("Network telemetry initialization failed (non-critical)", {
+                error: (error as Error).message,
+              });
+          }
+
           // Register feature_flags_refresh job handler (Phase 4: Integration)
           try {
             const { getJobQueue } = await import("@/lib/jobs");
