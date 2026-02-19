@@ -319,11 +319,12 @@ export async function dispatchEvent(
 
   const defaultDispatch = { async: true, debounceMs: 100, queueSize: 100, timeout: 5000 };
   const rawDispatch = config?.analytics?.dispatch ?? {};
-  const dispatchConfig = { ...defaultDispatch, ...rawDispatch } as {
-    async: boolean;
-    debounceMs: number;
-    queueSize: number;
-    timeout: number;
+  // Explicitly pick only known config properties to prevent prototype pollution
+  const dispatchConfig = {
+    async: rawDispatch.async ?? defaultDispatch.async,
+    debounceMs: rawDispatch.debounceMs ?? defaultDispatch.debounceMs,
+    queueSize: rawDispatch.queueSize ?? defaultDispatch.queueSize,
+    timeout: rawDispatch.timeout ?? defaultDispatch.timeout,
   };
 
   // Enqueue event for debounced flush
@@ -422,6 +423,7 @@ async function dispatchSingleWithTimeout(event: AnalyticsEvent, context: ExportC
 
   // Map results per exporter
   const exporterResults = exporters.map((exporter, index) => {
+    // eslint-disable-next-line security/detect-object-injection
     const result = results[index];
     if (result && result.status === 'fulfilled') {
       return { name: exporter.name, status: 'success' as const };
