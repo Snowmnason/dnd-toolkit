@@ -228,7 +228,7 @@ Config via `appsettings.json`:
 
 ## Storage and Versioning
 
-- **Key:** `dnd:performance:baselines` (SecureStorage)
+- **Key:** `dnd:analytics:performance_baselines` (SecureStorage)
 - **Schema version:** Tracks for migrations
 - **Size:** ~1KB per operation (100 samples × 10 bytes/sample)
 - **Encryption:** All data encrypted via SecureStorage

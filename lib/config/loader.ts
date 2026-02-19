@@ -119,7 +119,6 @@ export interface AppSettings {
       description?: string;
     };
     performanceBaseline?: {
-      enabled?: boolean;
       maxSamplesPerOp?: number;
       warmupSamples?: number;
       regressionThresholdPct?: number;

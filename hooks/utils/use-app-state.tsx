@@ -37,16 +37,51 @@ export function useAppState(): boolean {
  * Helper to get current app state (idle or not)
  * Can be called from non-React contexts (e.g., inside class methods)
  * 
+ * Uses lazy singleton pattern: initializes listener on first call (not at module load time)
+ * This avoids module-level side effects and is safe for SSR/test environments
+ * 
  * @returns boolean - true if app is backgrounded, false otherwise
  */
 let currentAppState: AppStateStatus = 'active';
+let isInitialized = false;
+let subscription: ReturnType<typeof AppState.addEventListener> | null = null;
 
-if (Platform.OS !== 'web') {
-  AppState.addEventListener('change', (nextAppState) => {
-    currentAppState = nextAppState;
-  });
+function initializeAppStateListener(): void {
+  if (isInitialized) return;
+  if (Platform.OS === 'web') {
+    isInitialized = true;
+    return;
+  }
+
+  try {
+    subscription = AppState.addEventListener('change', (nextAppState) => {
+      currentAppState = nextAppState;
+    });
+    isInitialized = true;
+  } catch (error) {
+    // Gracefully handle if AppState is unavailable
+    console.warn('Failed to initialize AppState listener:', error);
+    isInitialized = true;
+  }
 }
 
 export function isAppIdle(): boolean {
+  // Lazy initialization: set up listener on first call
+  if (!isInitialized) {
+    initializeAppStateListener();
+  }
   return currentAppState !== 'active';
+}
+
+/**
+ * Optional cleanup function for testing/teardown
+ * @private
+ */
+export function _cleanupAppStateListener(): void {
+  if (subscription) {
+    subscription.remove();
+    subscription = null;
+  }
+  isInitialized = false;
+  currentAppState = 'active';
 }

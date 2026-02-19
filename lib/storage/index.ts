@@ -142,7 +142,7 @@ export const STORAGE_KEYS = {
   ANALYTICS_OFFLINE_QUEUE: "dnd:analytics:offline_queue",
 
   // Performance baseline tracking
-  PERF_BASELINES: "dnd:analytics:perf_baselines",
+  PERF_BASELINES: "dnd:analytics:performance_baselines",
 
   // Breadcrumb queue (Sentry offline persistence)
   BREADCRUMB_QUEUE: "dnd:sentry:breadcrumb_queue",

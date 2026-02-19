@@ -1,37 +1,30 @@
+import { computePercentile } from '@/lib/analytics/performance/performance-baseline';
 import { describe, expect, it } from 'vitest';
-
-// Local helper: nearest-rank percentile (matches design doc)
-function nearestRankPercentile(samples: number[], percentile: number) {
-  if (!Array.isArray(samples) || samples.length === 0) return NaN;
-  const arr = samples.slice().sort((a, b) => a - b);
-  const n = arr.length;
-  const rank = Math.ceil((percentile / 100) * n);
-  return arr[Math.max(0, Math.min(rank - 1, n - 1))];
-}
 
 describe('Percentile computations (nearest-rank)', () => {
   it('computes p50/p95/p99 for 10-sample sequence', () => {
     const samples = [1,2,3,4,5,6,7,8,9,10];
-    expect(nearestRankPercentile(samples, 50)).toBe(5);
-    expect(nearestRankPercentile(samples, 95)).toBe(10);
-    expect(nearestRankPercentile(samples, 99)).toBe(10);
+    expect(computePercentile(samples, 50)).toBe(5);
+    expect(computePercentile(samples, 95)).toBe(10);
+    expect(computePercentile(samples, 99)).toBe(10);
   });
 
   it('handles small arrays and edges', () => {
-    expect(nearestRankPercentile([100], 50)).toBe(100);
-    expect(Number.isNaN(nearestRankPercentile([], 50))).toBe(true);
+    expect(computePercentile([100], 50)).toBe(100);
+    // Implementation returns 0 for empty sample set
+    expect(computePercentile([], 50)).toBe(0);
   });
 
   it('matches example with warm-up skipped', () => {
     // original 1..10, skip first 5 => [6,7,8,9,10]
     const warm = [6,7,8,9,10];
-    expect(nearestRankPercentile(warm, 50)).toBe(8);
+    expect(computePercentile(warm, 50)).toBe(8);
   });
 
   it('supports fractional median expectations for even-length arrays via nearest-rank', () => {
     const arr = [1,2,3,4];
     // nearest-rank p50 => rank = ceil(0.5*4)=2 -> arr[1]=2
-    expect(nearestRankPercentile(arr, 50)).toBe(2);
+    expect(computePercentile(arr, 50)).toBe(2);
   });
 });
 

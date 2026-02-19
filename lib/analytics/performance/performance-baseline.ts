@@ -83,7 +83,7 @@ export interface PerformanceBaselines {
  * @param percentile 0-100
  * @returns The percentile value
  */
-function computePercentile(sortedSamples: number[], percentile: number): number {
+export function computePercentile(sortedSamples: number[], percentile: number): number {
   if (sortedSamples.length === 0) return 0;
   if (sortedSamples.length === 1) return sortedSamples[0];
 
@@ -91,6 +91,32 @@ function computePercentile(sortedSamples: number[], percentile: number): number 
   const rank = Math.ceil((percentile / 100) * sortedSamples.length);
   const index = Math.max(0, Math.min(rank - 1, sortedSamples.length - 1));
   return sortedSamples[index];
+}
+
+/**
+ * Binary insertion helper: maintain sorted order in O(log n)
+ * Inserts value at correct position using binary search
+ * @param sortedArray Array that must already be sorted (ascending)
+ * @param value Value to insert
+ * @returns The array with value inserted in sorted position
+ */
+function binaryInsert(sortedArray: number[], value: number): number[] {
+  // Binary search to find insertion point
+  let left = 0;
+  let right = sortedArray.length;
+
+  while (left < right) {
+    const mid = Math.floor((left + right) / 2);
+    if (sortedArray[mid] < value) {
+      left = mid + 1;
+    } else {
+      right = mid;
+    }
+  }
+
+  // Insert at correct position (maintains sorted order)
+  sortedArray.splice(left, 0, value);
+  return sortedArray;
 }
 
 /**
@@ -297,9 +323,8 @@ export class PerformanceBaselineService {
       return;
     }
 
-    // Add sample and keep sorted
-    samples.push(durationMs);
-    samples.sort((a, b) => a - b);
+    // Add sample with binary insertion (maintains sorted order in O(log n))
+    binaryInsert(samples, durationMs);
 
     // Enforce max samples (FIFO: drop oldest)
     if (samples.length > this.data.config.maxSamplesPerOp) {
@@ -415,6 +440,19 @@ export class PerformanceBaselineService {
       compareValue = baseline.p99 || baseline.p95;
     }
 
+    // Safety check: if compareValue is 0 (e.g., all percentiles still warming up), skip regression detection
+    if (compareValue === 0) {
+      return {
+        isRegression: false,
+        baseline,
+        current: durationMs,
+        delta: 0,
+        deltaPct: 0,
+        threshold,
+        skipped: false,
+      };
+    }
+
     // Check throttling: only alert once per cooldown period for this operation
     const cooldown = this.data.config.regressionCooldownMs ?? 60000;
     const lastAlert = baseline.lastRegressionAlert ?? 0;
@@ -425,6 +463,13 @@ export class PerformanceBaselineService {
     const delta = durationMs - compareValue;
     const deltaPct = (delta / compareValue) * 100;
     const isRegression = deltaPct > threshold;
+
+    // Update throttle timestamp if regression detected and NOT throttled
+    // (encapsulation: handle persistence inside service, not caller)
+    if (isRegression && !isThrottled) {
+      baseline.lastRegressionAlert = now;
+      this.debouncedPersist();
+    }
 
     return {
       isRegression: isRegression && !isThrottled, // Only return true if NOT throttled
@@ -629,15 +674,6 @@ export class PerformanceBaselineService {
     };
 
     logger.debug('performance', `Rebuilt baseline for "${label}" from ${samples.length} samples`);
-  }
-
-  /**
-   * Ensure storage key is in STORAGE_KEYS constant
-   */
-  private static ensureStorageKey(): void {
-    if (!STORAGE_KEYS.PERF_BASELINES) {
-      logger.warn('performance', 'STORAGE_KEYS.PERF_BASELINES not defined, using fallback key');
-    }
   }
 }
 
