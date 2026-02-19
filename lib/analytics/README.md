@@ -278,6 +278,100 @@ Returns `{ queueSize, isFlushing, lastFlushTime, oldestBreadcrumbTime, providerN
 
 ---
 
+### Analytics Exporters (Pluggable Backends)
+
+Pluggable exporter architecture for multi-backend analytics support. Decouples event dispatch from specific analytics services.
+
+#### `AnalyticsExporter` Interface
+
+Contract for implementing custom analytics exporters:
+
+```typescript
+interface AnalyticsExporter {
+  name: string; // Unique identifier
+  version?: string;
+  requiredEvents?: string[]; // Event types this exporter must handle
+  optionalEvents?: string[]; // Event types this exporter can handle
+  export(event: AnalyticsEvent, context?: ExportContext): Promise<void>;
+  validate?(event: AnalyticsEvent): boolean;
+  isEnabled?(): boolean;
+}
+```
+
+#### `AnalyticsEvent` Type
+
+Standardized event structure for all exporters:
+
+```typescript
+interface AnalyticsEvent {
+  id: string;
+  timestamp: number;
+  type: string; // 'error', 'event', 'performance', etc.
+  name: string;
+  category?: string;
+  level?: 'fatal' | 'error' | 'warning' | 'info' | 'debug';
+  userId?: string;
+  sessionId?: string;
+  properties?: Record<string, any>;
+  error?: { message?: string; code?: string };
+  performance?: { duration?: number; metric?: string };
+}
+```
+
+#### `ExporterRegistry` Class
+
+Manages exporter registration and dispatch:
+
+- `register(exporter: AnalyticsExporter)` — Add exporter
+- `unregister(name: string)` — Remove by name
+- `getAll()` — Get all registered exporters
+- `dispatchEvent(event: AnalyticsEvent, context?: ExportContext)` — Dispatch to all enabled exporters
+
+#### Built-in Sentry Exporter
+
+`SentryExporter` implements `AnalyticsExporter` for Sentry integration:
+
+- Maps events to Sentry breadcrumbs/errors
+- Integrates with Breadcrumb Queue for offline persistence
+- Feature flag controlled (`analytics.exporters.sentry.enabled`)
+
+#### Custom Exporter Implementation
+
+To create a custom exporter:
+
+```typescript
+class CustomExporter implements AnalyticsExporter {
+  name = 'custom';
+  requiredEvents = ['event'];
+  
+  async export(event: AnalyticsEvent): Promise<void> {
+    // Send to custom backend
+  }
+  
+  isEnabled(): boolean {
+    return true; // Or check feature flags
+  }
+}
+
+// Register it
+registerExporter(new CustomExporter());
+```
+
+**Exporter config** (in `config/appsettings.json`):
+
+```json
+{
+  "analytics": {
+    "exporters": {
+      "sentry": { "enabled": true },
+      "custom": { "enabled": false }
+    }
+  }
+}
+```
+
+---
+
 ### Utility Functions
 
 #### `categorizeError(error): ErrorCategory`
