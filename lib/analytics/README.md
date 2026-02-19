@@ -9,6 +9,7 @@ Consent-aware analytics and performance monitoring. Handles event tracking, user
 - Track user events and engagement metrics with consent awareness
 - Monitor application performance and identify slow operations
 - Measure screen load times and custom operation durations
+- Track performance baselines and detect regressions over time
 - Manage user sessions, screen views, and error counts
 - Queue events when offline and flush them automatically when reconnected
 - Track A/B test variant assignments and engagement
@@ -426,6 +427,36 @@ For component-level usage see the `useVariantTracking()` hook in `hooks/analytic
 
 ---
 
+### Performance Baseline Service
+
+Tracks historical performance metrics and detects regressions. See `lib/analytics/performance/README.md` for detailed documentation.
+
+#### `performanceBaselineService.initialize(): Promise<void>`
+
+Load baselines from storage and apply config. Call during app bootstrap.
+
+#### `performanceBaselineService.recordSample(label, durationMs, context?): void`
+
+Record a performance measurement. Respects `track-performance-baseline` feature flag.
+
+#### `performanceBaselineService.getBaseline(label): OperationBaseline | null`
+
+Get current baseline percentiles for an operation.
+
+#### `performanceBaselineService.detectRegression(label, durationMs, context?): RegressionDetectionResult`
+
+Check if measurement indicates a regression.
+
+#### `performanceBaselineService.reset(label): Promise<void>`
+
+Clear baseline for an operation.
+
+#### `performanceBaselineService.resetAll(): Promise<void>`
+
+Clear all baselines.
+
+---
+
 ## Dependencies
 
 ### External Packages
@@ -522,8 +553,8 @@ O(n) scan over active marks (typically fewer than 10). Runs automatically after 
 | `sentry/sentry-adapter.ts` | Sentry-specific adapter implementing BreadcrumbProvider. Handles envelope format and rate limits. |
 | `error-categorization.ts` | `categorizeError()`. Classifies errors into `network`, `auth`, `validation`, `timeout`, or `unknown` by inspecting message, name, and code. |
 | `utils.ts` | Shared helpers: `sanitizeError()` (strips sensitive fields), `getThreshold()` (reads from config). |
-| `variant-tracking.ts` | A/B test helpers: `trackVariantAssignment()`, `trackVariantEngagement()`, `trackVariantPerformance()`. |
-
----
+| `performance/` | Performance baseline tracking and regression detection. |
+| `performance/performance-baseline.ts` | `PerformanceBaselineService` singleton. Tracks historical percentiles, detects regressions, handles warm-up and idle filtering. |
+| `performance/README.md` | Documentation for performance baseline tracking module. |
 
 
