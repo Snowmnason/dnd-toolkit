@@ -75,4 +75,7 @@
   ,"analytics.buffer.description": "Analytics buffer description may differ between dev and production (dev: explanatory note; prod: concise operational description)"
   ,"analytics.breadcrumbs.description": "Sentry breadcrumb queue configuration (offline persistence). enabled: queue breadcrumbs when offline. provider: Sentry adapter name. maxBreadcrumbs: max breadcrumbs in queue (FIFO overflow). batchSize: breadcrumbs per flush request. maxRetries: max retry attempts per breadcrumb (then discard). retryBaseMs: base exponential backoff (1s→2s→4s→8s→16s). debounceMs: debounce flush on network flaps (once per 5s). breadcrumbRetentionDays: discard breadcrumbs older than N days (don't waste quota)."
   ,"analytics.description": "Analytics settings description differs between dev and production (dev: testing-oriented note; prod: operational defaults)"
+  ,"analytics.dispatch.description": "Event dispatch configuration differs between dev and production (dev: same as production; prod: detailed operational description)"
+  ,"analytics.exporters.description": "Exporter enable/disable settings may differ between dev and production (feature flag control)"
+  ,"analytics.exporters.sentry.description": "Sentry exporter enable/disable description differs (dev: enabled for testing; prod: standard)"
 }

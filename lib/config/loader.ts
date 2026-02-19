@@ -111,6 +111,17 @@ export interface AppSettings {
       breadcrumbRetentionDays?: number;
       description?: string;
     };
+    dispatch?: {
+      async?: boolean;
+      debounceMs?: number;
+      queueSize?: number;
+      timeout?: number;
+      description?: string;
+    };
+    exporters?: {
+      [exporterName: string]: any;
+      description?: string;
+    };
     description?: string;
   };
   thresholds?: {

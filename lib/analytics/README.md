@@ -278,6 +278,114 @@ Returns `{ queueSize, isFlushing, lastFlushTime, oldestBreadcrumbTime, providerN
 
 ---
 
+### Analytics Exporters (Pluggable Backends)
+
+Pluggable exporter architecture for multi-backend analytics support. Decouples event dispatch from specific analytics services.
+
+#### `AnalyticsExporter` Interface
+
+Contract for implementing custom analytics exporters:
+
+```typescript
+interface AnalyticsExporter {
+  name: string; // Unique identifier
+  version?: string;
+  requiredEvents?: string[]; // Event types this exporter must handle
+  optionalEvents?: string[]; // Event types this exporter can handle
+  export(event: AnalyticsEvent, context?: ExportContext): Promise<void>;
+  validate?(event: AnalyticsEvent): boolean;
+  isEnabled?(): boolean;
+}
+```
+
+#### `AnalyticsEvent` Type
+
+Standardized event structure for all exporters:
+
+```typescript
+interface AnalyticsEvent {
+  id: string; // UUID
+  timestamp: number; // ms since epoch
+  type: string; // 'pageview', 'event', 'error', 'performance', 'custom'
+  name: string; // Event name ('user_signup', 'api_error', etc.)
+  category?: string; // 'navigation', 'commerce', 'social', 'custom'
+  level?: 'debug' | 'info' | 'warning' | 'error' | 'fatal'; // Severity
+  userId?: string; // Who did this
+  sessionId?: string; // Session context
+  properties: Record<string, unknown>; // Event-specific data
+  error?: {
+    message: string;
+    stack?: string;
+    code?: string;
+  };
+  performance?: {
+    duration: number; // ms
+    metric?: string; // FCP, LCP, INP, etc.
+  };
+}
+```
+
+#### `ExporterRegistry` Class
+
+Manages exporter registration:
+
+- `register(exporter: AnalyticsExporter)` — Add exporter
+- `unregister(name: string)` — Remove by name
+- `get(name: string)` — Get exporter by name
+- `getAll()` — Get all registered exporters
+- `isRegistered(name: string)` — Check if registered
+
+#### `dispatchEvent(event: AnalyticsEvent, context?: ExportContext)` — Standalone Function
+
+Dispatches events to all enabled exporters asynchronously with error isolation.
+
+#### Built-in Sentry Exporter
+
+`SentryExporter` implements `AnalyticsExporter` for Sentry integration:
+
+- Maps events to Sentry breadcrumbs/errors
+- Integrates with Breadcrumb Queue for offline persistence
+- Feature flag controlled (`analytics.exporters.sentry.enabled`)
+
+#### Custom Exporter Implementation
+
+To create a custom exporter:
+
+```typescript
+import { exporterRegistry } from '@/lib/analytics/exporters';
+
+class CustomExporter implements AnalyticsExporter {
+  name = 'custom';
+  requiredEvents = ['event'];
+  
+  async export(event: AnalyticsEvent): Promise<void> {
+    // Send to custom backend
+  }
+  
+  isEnabled(): boolean {
+    return true; // Or check feature flags
+  }
+}
+
+// Register it
+exporterRegistry.register(new CustomExporter());
+```
+
+**Exporter config** (in `config/appsettings.json`):
+
+```json
+{
+  "analytics": {
+    "exporters": {
+      "sentry": { "enabled": true },
+      "custom": { "enabled": false }
+    }
+  }
+}
+```
+
+---
+
 ### Utility Functions
 
 #### `categorizeError(error): ErrorCategory`
