@@ -1,11 +1,13 @@
 import * as Sentry from "@sentry/react-native";
 import Constants from "expo-constants";
 import { useEffect } from "react";
+import { isAppIdle } from "../../hooks/utils/use-app-state";
 import { getAppConfig } from "../config/loader";
 import { logger } from "../utils/logger";
 import { AnalyticsConsent } from "./consent";
 import { categorizeError } from "./error-categorization";
 import { createExportContext, dispatchEvent } from "./exporters";
+import { performanceBaselineService } from "./performance/performance-baseline";
 import { getThreshold, sanitizeError } from "./utils";
 
 type AnalyticsEventProps = Record<string, any>;
@@ -99,6 +101,34 @@ function withTiming<T>(
           threshold: slowScreenThreshold,
         });
     }
+    
+    // Record baseline sample with idle-time context (app backgrounded = idle measurement)
+    const context = { isIdle: isAppIdle() };
+    performanceBaselineService.recordSample(label, duration_ms, context);
+    const result = performanceBaselineService.detectRegression(label, duration_ms, context);
+    if (result.isRegression) {
+      logger.warn(
+        "performance",
+        `Performance regression detected for '${label}': ${result.current}ms vs p95 ${result.baseline?.p95}ms (threshold: ${result.threshold}ms, delta: ${result.deltaPct?.toFixed(1)}%)`
+      );
+      // Emit regression event via #178 exporters (fire-and-forget)
+      const regressionEvent = {
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: Date.now(),
+        type: 'performance' as const,
+        name: 'regression_detected',
+        properties: {
+          operation: label,
+          current_ms: result.current,
+          p95_ms: result.baseline?.p95,
+          threshold_ms: result.threshold,
+          delta_pct: result.deltaPct,
+        },
+      };
+      const exportContext = createExportContext(false);
+      dispatchEvent(regressionEvent, exportContext);
+    }
+    
     if (isSentryEnabled() && AnalyticsConsent.isAllowed("performance")) {
       try {
         const errorCategory = extra?.error
@@ -298,6 +328,34 @@ export const Performance = {
     Analytics.track("performance_measure", { label, duration_ms: duration });
     if (duration > slowScreenThreshold)
       logger.warn("performance", `Slow operation: ${label} took ${duration}ms`);
+    
+    // Record baseline sample with idle-time context (app backgrounded = idle measurement)
+    const context = { isIdle: isAppIdle() };
+    performanceBaselineService.recordSample(label, duration, context);
+    const result = performanceBaselineService.detectRegression(label, duration, context);
+    if (result.isRegression) {
+      logger.warn(
+        "performance",
+        `Performance regression detected for '${label}': ${result.current}ms vs p95 ${result.baseline?.p95}ms (threshold: ${result.threshold}ms, delta: ${result.deltaPct?.toFixed(1)}%)`
+      );
+      // Emit regression event via #178 exporters (fire-and-forget)
+      const regressionEvent = {
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: Date.now(),
+        type: 'performance' as const,
+        name: 'regression_detected',
+        properties: {
+          operation: label,
+          current_ms: result.current,
+          p95_ms: result.baseline?.p95,
+          threshold_ms: result.threshold,
+          delta_pct: result.deltaPct,
+        },
+      };
+      const exportContext = createExportContext(false);
+      dispatchEvent(regressionEvent, exportContext);
+      // Don't await — fire-and-forget pattern for exporter failures
+    }
   },
 
   /**
