@@ -54,3 +54,5 @@ export { useAnalyticsBufferStatus } from "./analytics/use-analytics-buffer-statu
 export type { AnalyticsBufferStatus } from "./analytics/use-analytics-buffer-status";
 
 // Utilities
+export { isAppIdle, useAppState } from "./utils/use-app-state";
+

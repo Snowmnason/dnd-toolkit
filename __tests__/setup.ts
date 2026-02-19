@@ -58,14 +58,43 @@ vi.mock("expo-crypto", () => ({
 }));
 
 // Mock react-native to prevent Rollup errors in tests
-vi.mock("react-native", () => ({
-  Platform: { OS: "ios" },
-  NativeModules: {},
-  // Some expo modules expect TurboModuleRegistry to exist on react-native
-  TurboModuleRegistry: {
-    get: () => null,
-  },
-}));
+vi.mock("react-native", () => {
+  // Minimal AppState emitter that supports add/remove listeners and a currentState
+  const listeners: Map<symbol, { type: string; cb: Function }> = new Map();
+
+  const AppState = {
+    currentState: 'active',
+    addEventListener: (type: string, cb: (nextAppState: string) => void) => {
+      const key = Symbol();
+      listeners.set(key, { type, cb });
+      return { remove: () => listeners.delete(key) };
+    },
+    removeEventListener: (type: string, cb: (nextAppState: string) => void) => {
+      for (const [k, v] of listeners) {
+        if (v.type === type && v.cb === cb) {
+          listeners.delete(k);
+          break;
+        }
+      }
+    },
+    // test helper to emit events from tests if needed
+    __emit: (type: string, nextState: string) => {
+      for (const v of listeners.values()) {
+        if (v.type === type) v.cb(nextState);
+      }
+    },
+  } as any;
+
+  return {
+    Platform: { OS: "ios" },
+    NativeModules: {},
+    // Some expo modules expect TurboModuleRegistry to exist on react-native
+    TurboModuleRegistry: {
+      get: () => null,
+    },
+    AppState,
+  } as any;
+});
 
 // Mock expo-constants
 vi.mock("expo-constants", () => ({

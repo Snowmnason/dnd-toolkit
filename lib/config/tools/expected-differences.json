@@ -78,4 +78,5 @@
   ,"analytics.dispatch.description": "Event dispatch configuration differs between dev and production (dev: same as production; prod: detailed operational description)"
   ,"analytics.exporters.description": "Exporter enable/disable settings may differ between dev and production (feature flag control)"
   ,"analytics.exporters.sentry.description": "Sentry exporter enable/disable description differs (dev: enabled for testing; prod: standard)"
+  ,"analytics.performanceBaseline.description": "Performance baseline tracking description differs: dev uses verbose explanation for testing; prod uses concise operational details"
 }

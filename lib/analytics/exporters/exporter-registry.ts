@@ -233,9 +233,13 @@ export function createExportContext(
   if (offline === undefined) {
     try {
       // Dynamically import to avoid circular dependencies
-      // Note: This requires NetworkDetection to be available
-      // For now, default to online (false) if not provided
-      isOffline = false;
+      const { NetworkDetection } = require('@/lib/network/network-detection');
+      const status = NetworkDetection.getStatus();
+      isOffline = !status.isOnline;
+      logger.debug(
+        'analytics',
+        `createExportContext: Network status=${status.isOnline ? 'online' : 'offline'}, quality=${status.connectionQuality}`
+      );
     } catch (error) {
       // If dynamic import fails, default to online and log for diagnostics
       logger.debug(

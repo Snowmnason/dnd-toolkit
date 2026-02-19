@@ -118,6 +118,13 @@ export interface AppSettings {
       timeout?: number;
       description?: string;
     };
+    performanceBaseline?: {
+      maxSamplesPerOp?: number;
+      warmupSamples?: number;
+      regressionThresholdPct?: number;
+      percentileForCompare?: number;
+      description?: string;
+    };
     exporters?: {
       [exporterName: string]: any;
       description?: string;
