@@ -28,6 +28,7 @@ export interface OperationBaseline {
   count: number; // Total sample count (including warm-up)
   warmupCount: number; // How many cold-start samples skipped
   idleSkippedCount: number; // How many idle samples excluded from baseline
+  droppedCount?: number; // How many samples dropped due to max limit
   p50: number; // Milliseconds (median)
   p95: number; // Milliseconds (95th percentile)
   p99: number; // Milliseconds (99th percentile)
@@ -35,6 +36,7 @@ export interface OperationBaseline {
   max?: number; // Maximum observed
   mean?: number; // Average of non-warm-up samples
   lastUpdated: number; // Timestamp (ms)
+  lastRegressionAlert?: number; // Last time regression alert was fired (for throttling)
   version: number; // Schema version for migrations
 }
 
@@ -55,9 +57,12 @@ export interface RegressionDetectionResult {
  * Configuration for baseline tracking
  */
 export interface PerformanceBaselineConfig {
-  maxSamplesPerOp: number; // Default 100
-  warmupSamples: number; // Default 5
-  regressionThresholdPct: number; // Default 20
+  maxSamplesPerOp: number; // Default 100, max array size per operation
+  warmupSamples: number; // Default 5, skip first N samples
+  regressionThresholdPct: number; // Default 20, threshold % above percentile
+  percentileForCompare: number; // Default 95, which percentile to compare (50, 95, 99)
+  maxOperations?: number; // Default 500, max distinct operation labels to track
+  regressionCooldownMs?: number; // Default 60000 (1 min), throttle per-label regression alerts
 }
 
 /**
@@ -95,9 +100,11 @@ function computePercentile(sortedSamples: number[], percentile: number): number 
 export class PerformanceBaselineService {
   private data: PerformanceBaselines | null = null;
   private isInitialized = false;
+  private persistTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingPersist = false;
 
   /**
-   * Initialize service: load baselines from SecureStorage
+   * Initialize service: load baselines from SecureStorage and apply runtime config
    * Called once during app bootstrap
    */
   async initialize(): Promise<void> {
@@ -108,20 +115,26 @@ export class PerformanceBaselineService {
       if (stored) {
         try {
           this.data = JSON.parse(stored);
-          // Validate and migrate if needed
+          // Validate and migrate if needed (includes config-driven trimming)
           this.validateAndMigrate();
         } catch (error) {
           logger.error('performance', `Failed to parse stored baselines: ${error}, rebuilding`);
           this.data = this.createEmptyStorage();
-          await this.persist();
+          this.debouncedPersist();
         }
       } else {
         this.data = this.createEmptyStorage();
       }
 
+      // Apply runtime config (overrides defaults)
+      this.applyRuntimeConfig();
+
+      // Prune excess operations if needed (global ops cap)
+      this.pruneExcessOperations();
+
       this.isInitialized = true;
       if (this.data) {
-        logger.debug('performance', `Baselines initialized: ${Object.keys(this.data.baselines).length} operations tracked`);
+        logger.debug('performance', `Baselines initialized: ${Object.keys(this.data.baselines).length} operations tracked, config: max=${this.data.config.maxSamplesPerOp} samples, warmup=${this.data.config.warmupSamples}, threshold=${this.data.config.regressionThresholdPct}%, percentile=p${this.data.config.percentileForCompare}`);
       }
     } catch (error) {
       logger.error('performance', `Failed to initialize baselines: ${error}`);
@@ -131,13 +144,107 @@ export class PerformanceBaselineService {
   }
 
   /**
+   * Apply runtime config from appsettings to override defaults
+   * @private
+   */
+  private applyRuntimeConfig(): void {
+    if (!this.data) return;
+
+    try {
+      const config = getAppConfig();
+      const perfConfig = config?.analytics?.performanceBaseline;
+
+      if (perfConfig) {
+        if (typeof perfConfig.maxSamplesPerOp === 'number') {
+          this.data.config.maxSamplesPerOp = perfConfig.maxSamplesPerOp;
+        }
+        if (typeof perfConfig.warmupSamples === 'number') {
+          this.data.config.warmupSamples = perfConfig.warmupSamples;
+        }
+        if (typeof perfConfig.regressionThresholdPct === 'number') {
+          this.data.config.regressionThresholdPct = perfConfig.regressionThresholdPct;
+        }
+        if (typeof perfConfig.percentileForCompare === 'number') {
+          this.data.config.percentileForCompare = perfConfig.percentileForCompare;
+        }
+      }
+
+      logger.debug('performance', `Runtime config applied: max=${this.data.config.maxSamplesPerOp}, warmup=${this.data.config.warmupSamples}, threshold=${this.data.config.regressionThresholdPct}%, percentile=p${this.data.config.percentileForCompare}`);
+    } catch (error) {
+      logger.debug('performance', `Failed to apply runtime config: ${error}`);
+    }
+  }
+
+  /**
+   * Prune excess operations if count exceeds maxOperations (LRU: keep most recent)
+   * @private
+   */
+  private pruneExcessOperations(): void {
+    if (!this.data) return;
+
+    const maxOps = this.data.config.maxOperations ?? 500;
+    const opCount = Object.keys(this.data.baselines).length;
+
+    if (opCount > maxOps) {
+      const entriesToPrune = opCount - maxOps;
+      const sorted = Object.entries(this.data.baselines)
+        .sort((a, b) => (b[1].lastUpdated ?? 0) - (a[1].lastUpdated ?? 0));
+
+      for (let i = 0; i < entriesToPrune && i < sorted.length; i++) {
+        const label = sorted[sorted.length - 1 - i][0];
+        delete this.data.baselines[label];
+        delete this.data.samples[label];
+        logger.debug('performance', `Pruned stale operation: "${label}" (LRU exceeded maxOperations: ${maxOps})`);
+      }
+    }
+  }
+
+  /**
+   * Debounced persist: batch writes to avoid overlapping storage operations
+   * @private
+   */
+  private debouncedPersist(): void {
+    if (this.persistTimer) {
+      clearTimeout(this.persistTimer);
+    }
+
+    this.pendingPersist = true;
+
+    // Batch writes: wait 500ms for more changes before persisting
+    this.persistTimer = setTimeout(() => {
+      this.persistTimer = null;
+      if (this.pendingPersist) {
+        this.pendingPersist = false;
+        this.persist().catch(err => logger.debug('performance', `Debounced persist failed: ${err}`));
+      }
+    }, 500);
+  }
+
+  /**
+   * Immediate persist (used by debouncedPersist and critical operations)
+   * @private
+   */
+  private async persist(): Promise<void> {
+    if (!this.data) return;
+
+    try {
+      this.data.lastUpdated = Date.now();
+      const serialized = JSON.stringify(this.data);
+      await SecureStorage.setItem(STORAGE_KEYS.PERF_BASELINES, serialized);
+    } catch (error) {
+      logger.error('performance', `Failed to persist baselines: ${error}`);
+    }
+  }
+
+  /**
    * Record a performance sample for an operation
    * Respects the track-performance-baseline feature flag
+   * Fire-and-forget: persists to storage asynchronously without blocking
    * @param label Operation name (e.g. 'screen-load')
    * @param durationMs Duration in milliseconds
    * @param context Optional context (isIdle flag)
    */
-  async recordSample(label: string, durationMs: number, context?: { isIdle?: boolean }): Promise<void> {
+  recordSample(label: string, durationMs: number, context?: { isIdle?: boolean }): void {
     if (!this.isInitialized) {
       logger.warn('performance', 'recordSample called before initialize()');
       return;
@@ -169,6 +276,7 @@ export class PerformanceBaselineService {
         count: 0,
         warmupCount: 0,
         idleSkippedCount: 0,
+        droppedCount: 0,
         p50: 0,
         p95: 0,
         p99: 0,
@@ -184,7 +292,8 @@ export class PerformanceBaselineService {
     // If idle, skip recording in baseline but track count
     if (isIdle) {
       baseline.idleSkippedCount = (baseline.idleSkippedCount ?? 0) + 1;
-      await this.persist();
+      logger.debug('performance', `Idle measurement recorded for "${label}" (total idle skip: ${baseline.idleSkippedCount})`);
+      this.debouncedPersist();
       return;
     }
 
@@ -194,8 +303,12 @@ export class PerformanceBaselineService {
 
     // Enforce max samples (FIFO: drop oldest)
     if (samples.length > this.data.config.maxSamplesPerOp) {
-      samples.shift();
-      logger.debug('performance', `Sample limit reached for "${label}", dropped oldest`);
+      const dropped = samples.shift();
+      baseline.droppedCount = (baseline.droppedCount ?? 0) + 1;
+      logger.debug(
+        'performance',
+        `Sample limit reached for "${label}" (max: ${this.data.config.maxSamplesPerOp}), dropped oldest sample: ${dropped}ms (total dropped: ${baseline.droppedCount})`
+      );
     }
 
     // Update baseline statistics
@@ -214,20 +327,30 @@ export class PerformanceBaselineService {
       baseline.p95 = 0;
       baseline.p99 = 0;
       baseline.mean = 0;
+      logger.debug(
+        'performance',
+        `Warm-up sample recorded for "${label}" (${baseline.warmupCount}/${warmupSources}): ${durationMs}ms`
+      );
     } else {
       // Baseline is active: use samples 6+ for percentiles
       const activeS = samples.slice(warmupSources);
       baseline.warmupCount = warmupSources;
+      const oldP95 = baseline.p95;
       baseline.p50 = computePercentile(activeS, 50);
       baseline.p95 = computePercentile(activeS, 95);
       baseline.p99 = computePercentile(activeS, 99);
       baseline.mean = activeS.reduce((a, b) => a + b, 0) / activeS.length;
+
+      logger.debug(
+        'performance',
+        `Baseline updated for "${label}": p50=${baseline.p50.toFixed(2)}ms, p95=${baseline.p95.toFixed(2)}ms (was ${oldP95.toFixed(2)}ms), p99=${baseline.p99.toFixed(2)}ms, count=${baseline.count}, mean=${baseline.mean.toFixed(2)}ms`
+      );
     }
 
     baseline.lastUpdated = Date.now();
 
-    // Persist to storage
-    await this.persist();
+    // Persist to storage via debounced batching (fire-and-forget, errors logged internally)
+    this.debouncedPersist();
   }
 
   /**
@@ -269,8 +392,9 @@ export class PerformanceBaselineService {
 
     const baseline = this.data.baselines[label];
     const threshold = this.data.config.regressionThresholdPct;
+    const percentileChoice = this.data.config.percentileForCompare ?? 95;
 
-    if (!baseline || baseline.p95 === 0) {
+    if (!baseline || (baseline.p95 === 0 && baseline.p50 === 0 && baseline.p99 === 0)) {
       // No baseline yet
       return {
         isRegression: false,
@@ -283,13 +407,27 @@ export class PerformanceBaselineService {
       };
     }
 
-    // Compare to p95
-    const delta = durationMs - baseline.p95;
-    const deltaPct = (delta / baseline.p95) * 100;
+    // Select percentile to compare against based on config
+    let compareValue = baseline.p95; // default
+    if (percentileChoice === 50) {
+      compareValue = baseline.p50 || baseline.p95; // fallback to p95 if p50 not computed yet
+    } else if (percentileChoice === 99) {
+      compareValue = baseline.p99 || baseline.p95;
+    }
+
+    // Check throttling: only alert once per cooldown period for this operation
+    const cooldown = this.data.config.regressionCooldownMs ?? 60000;
+    const lastAlert = baseline.lastRegressionAlert ?? 0;
+    const now = Date.now();
+    const isThrottled = (now - lastAlert) < cooldown;
+
+    // Compare to selected percentile
+    const delta = durationMs - compareValue;
+    const deltaPct = (delta / compareValue) * 100;
     const isRegression = deltaPct > threshold;
 
     return {
-      isRegression,
+      isRegression: isRegression && !isThrottled, // Only return true if NOT throttled
       baseline,
       current: durationMs,
       delta,
@@ -357,12 +495,11 @@ export class PerformanceBaselineService {
     try {
       const config = getAppConfig();
       
-      // Check feature flag: track-performance-baseline
-      // For now, we'll check the config features object with a loose access
+      // Check feature flag: track-performance-baseline in featureFlags section
       // Default to true (enabled) if not explicitly disabled
-      const features = config?.features as Record<string, unknown>;
-      // Cast to Record<string, unknown> to access dynamic keys safely
-      const trackingEnabled = features?.['track-performance-baseline'];
+      const featureFlags = config?.featureFlags as Record<string, any>;
+      const trackingFlag = featureFlags?.['track-performance-baseline'];
+      const trackingEnabled = trackingFlag?.enabled;
       
       // If explicitly set to false, disable; otherwise default to enabled
       return trackingEnabled !== false;
@@ -387,6 +524,9 @@ export class PerformanceBaselineService {
         maxSamplesPerOp: 100,
         warmupSamples: 5,
         regressionThresholdPct: 20,
+        percentileForCompare: 95,
+        maxOperations: 500,
+        regressionCooldownMs: 60000,
       },
     };
   }
@@ -402,6 +542,24 @@ export class PerformanceBaselineService {
       logger.warn('performance', `Unknown schema version: ${this.data.version}, recreating`);
       this.data = this.createEmptyStorage();
       return;
+    }
+
+    // Migrate config: ensure all new fields present  
+    this.data.config.percentileForCompare = this.data.config.percentileForCompare ?? 95;
+    this.data.config.maxOperations = this.data.config.maxOperations ?? 500;
+    this.data.config.regressionCooldownMs = this.data.config.regressionCooldownMs ?? 60000;
+
+    // Trim samples if maxSamplesPerOp has shrunk
+    for (const [label, samples] of Object.entries(this.data.samples)) {
+      if (samples && samples.length > this.data.config.maxSamplesPerOp) {
+        const trimmed = samples.slice(samples.length - this.data.config.maxSamplesPerOp);
+        this.data.samples[label] = trimmed;
+        const dropped = samples.length - trimmed.length;
+        if (this.data.baselines[label]) {
+          this.data.baselines[label].droppedCount = (this.data.baselines[label].droppedCount ?? 0) + dropped;
+        }
+        logger.debug('performance', `Trimmed ${dropped} samples for "${label}" due to config change (max: ${this.data.config.maxSamplesPerOp})`);
+      }
     }
 
     // Validate baselines
@@ -430,7 +588,9 @@ export class PerformanceBaselineService {
     // Ensure all expected fields
     for (const baseline of Object.values(this.data.baselines)) {
       baseline.idleSkippedCount = baseline.idleSkippedCount ?? 0;
+      baseline.droppedCount = baseline.droppedCount ?? 0;
       baseline.warmupCount = baseline.warmupCount ?? 0;
+      baseline.lastRegressionAlert = baseline.lastRegressionAlert ?? 0;
     }
 
     this.data.lastUpdated = Date.now();
@@ -457,6 +617,7 @@ export class PerformanceBaselineService {
       count: samples.length,
       warmupCount: Math.min(warmupN, samples.length),
       idleSkippedCount: this.data.baselines[label]?.idleSkippedCount ?? 0,
+      droppedCount: this.data.baselines[label]?.droppedCount ?? 0,
       p50: activeSamples.length > 0 ? computePercentile(activeSamples, 50) : 0,
       p95: activeSamples.length > 0 ? computePercentile(activeSamples, 95) : 0,
       p99: activeSamples.length > 0 ? computePercentile(activeSamples, 99) : 0,
@@ -468,21 +629,6 @@ export class PerformanceBaselineService {
     };
 
     logger.debug('performance', `Rebuilt baseline for "${label}" from ${samples.length} samples`);
-  }
-
-  /**
-   * Persist storage to SecureStorage
-   */
-  private async persist(): Promise<void> {
-    if (!this.data) return;
-
-    try {
-      this.data.lastUpdated = Date.now();
-      const serialized = JSON.stringify(this.data);
-      await SecureStorage.setItem(STORAGE_KEYS.PERF_BASELINES, serialized);
-    } catch (error) {
-      logger.error('performance', `Failed to persist baselines: ${error}`);
-    }
   }
 
   /**

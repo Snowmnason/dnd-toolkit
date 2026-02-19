@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/react-native";
 import Constants from "expo-constants";
 import { useEffect } from "react";
+import { Platform } from "react-native";
 import { isAppIdle } from "../../hooks/utils/use-app-state";
 import { getAppConfig } from "../config/loader";
 import { logger } from "../utils/logger";
@@ -106,12 +107,19 @@ function withTiming<T>(
     const context = { isIdle: isAppIdle() };
     performanceBaselineService.recordSample(label, duration_ms, context);
     const result = performanceBaselineService.detectRegression(label, duration_ms, context);
-    if (result.isRegression) {
+    
+    if (result.isRegression && AnalyticsConsent.isAllowed('performance')) {
+      // Update lastRegressionAlert to throttle future alerts
+      if (result.baseline) {
+        result.baseline.lastRegressionAlert = Date.now();
+      }
+
       logger.warn(
         "performance",
-        `Performance regression detected for '${label}': ${result.current}ms vs p95 ${result.baseline?.p95}ms (threshold: ${result.threshold}ms, delta: ${result.deltaPct?.toFixed(1)}%)`
+        `Performance regression detected for '${label}': ${result.current}ms vs baseline ${result.baseline?.p95}ms (threshold: ${result.threshold}%, delta: ${result.deltaPct?.toFixed(1)}%, samples: ${result.baseline?.count ?? 0}, app_version: ${Constants.expoConfig?.version ?? 'unknown'}, platform: ${Platform.OS})`
       );
-      // Emit regression event via #178 exporters (fire-and-forget)
+      
+      // Emit regression event via #178 exporters (fire-and-forget) with rich context
       const regressionEvent = {
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: Date.now(),
@@ -120,12 +128,22 @@ function withTiming<T>(
         properties: {
           operation: label,
           current_ms: result.current,
-          p95_ms: result.baseline?.p95,
-          threshold_ms: result.threshold,
+          baseline_p50_ms: result.baseline?.p50,
+          baseline_p95_ms: result.baseline?.p95,
+          baseline_p99_ms: result.baseline?.p99,
+          baseline_mean_ms: result.baseline?.mean,
+          baseline_count: result.baseline?.count,
+          threshold_pct: result.threshold,
+          delta_ms: result.delta,
           delta_pct: result.deltaPct,
+          warmup_skipped: result.baseline?.warmupCount,
+          idle_skipped: result.baseline?.idleSkippedCount,
+          samples_dropped: result.baseline?.droppedCount,
+          app_version: Constants.expoConfig?.version ?? 'unknown',
+          platform: Platform.OS,
         },
       };
-      const exportContext = createExportContext(false);
+      const exportContext = createExportContext();
       dispatchEvent(regressionEvent, exportContext);
     }
     
@@ -256,7 +274,7 @@ export const Analytics = {
         };
 
         // Create context with current network status
-        const context = createExportContext(false); // TODO: integrate with NetworkDetection
+        const context = createExportContext(); // NetworkDetection auto-detects offline status
 
         // Dispatch to all registered exporters (fire-and-forget)
         // dispatchEvent uses Promise.allSettled internally, so it never rejects
@@ -352,7 +370,7 @@ export const Performance = {
           delta_pct: result.deltaPct,
         },
       };
-      const exportContext = createExportContext(false);
+      const exportContext = createExportContext();
       dispatchEvent(regressionEvent, exportContext);
       // Don't await — fire-and-forget pattern for exporter failures
     }
