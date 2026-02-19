@@ -366,3 +366,10 @@ export {
 // Breadcrumb queue (Phase 1a - offline persistence)
 export { breadcrumbQueue, type BreadcrumbQueueStats } from "./breadcrumb-queue";
 
+export {
+  OperationBaseline, PerformanceBaselineConfig,
+  PerformanceBaselines,
+  PerformanceBaselineService,
+  performanceBaselineService, RegressionDetectionResult
+} from './performance/performance-baseline';
+

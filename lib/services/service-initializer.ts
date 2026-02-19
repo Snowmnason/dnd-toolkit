@@ -12,6 +12,7 @@
  */
 
 import { AnalyticsExporter, exporterRegistry } from '@/lib/analytics/exporters';
+import { performanceBaselineService } from '@/lib/analytics/performance/performance-baseline';
 import { logger } from '@/lib/utils/logger';
 import { SentryExporter } from './sentry/sentry-analytics-exporter';
 
@@ -25,6 +26,9 @@ export async function initializeServices(): Promise<void> {
   logger.info('bootstrap', 'Initializing services...');
 
   try {
+    // Initialize performance baseline service (loads baselines from SecureStorage)
+    await performanceBaselineService.initialize();
+
     // Register Sentry analytics exporter
     await initializeSentryExporter();
 
