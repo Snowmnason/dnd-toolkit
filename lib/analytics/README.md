@@ -304,28 +304,40 @@ Standardized event structure for all exporters:
 
 ```typescript
 interface AnalyticsEvent {
-  id: string;
-  timestamp: number;
-  type: string; // 'error', 'event', 'performance', etc.
-  name: string;
-  category?: string;
-  level?: 'fatal' | 'error' | 'warning' | 'info' | 'debug';
-  userId?: string;
-  sessionId?: string;
-  properties?: Record<string, any>;
-  error?: { message?: string; code?: string };
-  performance?: { duration?: number; metric?: string };
+  id: string; // UUID
+  timestamp: number; // ms since epoch
+  type: string; // 'pageview', 'event', 'error', 'performance', 'custom'
+  name: string; // Event name ('user_signup', 'api_error', etc.)
+  category?: string; // 'navigation', 'commerce', 'social', 'custom'
+  level?: 'debug' | 'info' | 'warning' | 'error' | 'fatal'; // Severity
+  userId?: string; // Who did this
+  sessionId?: string; // Session context
+  properties: Record<string, unknown>; // Event-specific data
+  error?: {
+    message: string;
+    stack?: string;
+    code?: string;
+  };
+  performance?: {
+    duration: number; // ms
+    metric?: string; // FCP, LCP, INP, etc.
+  };
 }
 ```
 
 #### `ExporterRegistry` Class
 
-Manages exporter registration and dispatch:
+Manages exporter registration:
 
 - `register(exporter: AnalyticsExporter)` — Add exporter
 - `unregister(name: string)` — Remove by name
+- `get(name: string)` — Get exporter by name
 - `getAll()` — Get all registered exporters
-- `dispatchEvent(event: AnalyticsEvent, context?: ExportContext)` — Dispatch to all enabled exporters
+- `isRegistered(name: string)` — Check if registered
+
+#### `dispatchEvent(event: AnalyticsEvent, context?: ExportContext)` — Standalone Function
+
+Dispatches events to all enabled exporters asynchronously with error isolation.
 
 #### Built-in Sentry Exporter
 
@@ -340,6 +352,8 @@ Manages exporter registration and dispatch:
 To create a custom exporter:
 
 ```typescript
+import { exporterRegistry } from '@/lib/analytics/exporters';
+
 class CustomExporter implements AnalyticsExporter {
   name = 'custom';
   requiredEvents = ['event'];
@@ -354,7 +368,7 @@ class CustomExporter implements AnalyticsExporter {
 }
 
 // Register it
-registerExporter(new CustomExporter());
+exporterRegistry.register(new CustomExporter());
 ```
 
 **Exporter config** (in `config/appsettings.json`):

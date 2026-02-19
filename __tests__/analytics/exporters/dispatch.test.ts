@@ -41,6 +41,9 @@ describe('dispatchEvent', () => {
     // Should not throw even though one exporter fails
     await expect(dispatchEvent(event)).resolves.toBeUndefined();
 
+    // Wait for debounced flush to run (dispatch is async by default)
+    await new Promise((res) => setTimeout(res, 150));
+
     // ok exporter called
     expect((ok.export as any).mock.calls.length).toBe(1);
     // failing exporter called too

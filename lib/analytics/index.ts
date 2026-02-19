@@ -66,6 +66,20 @@ function isSentryEnabled(): boolean {
   }
 }
 
+/**
+ * Check if analytics system should be enabled
+ * Analytics is enabled if EITHER Sentry is enabled OR exporters are available
+ * This decouples the analytics system from Sentry specifically
+ */
+function isAnalyticsEnabled(): boolean {
+  // Analytics is enabled if Sentry is available
+  if (isSentryEnabled()) return true;
+
+  // For exporters: default to enabled so dispatch attempt runs
+  // (exporters will check their own enabled status during dispatch)
+  return true;
+}
+
 function withTiming<T>(
   label: string,
   fn: () => Promise<T> | T,
@@ -139,36 +153,39 @@ function withTiming<T>(
 }
 
 export const Analytics = {
+  /**
+   * Check if analytics is enabled
+   * Returns true if Sentry is enabled OR exporters may be available
+   * Allows pluggable exporters to work even when Sentry is disabled
+   */
   enabled(): boolean {
-    return isSentryEnabled();
+    return isAnalyticsEnabled();
   },
 
   getThreshold,
 
   identify(user: { id?: string; username?: string } | null): void {
-    if (!this.enabled()) {
-      logger
-        .category("analytics")
-        .debug("Analytics disabled, skipping user identification");
-      return;
-    }
-    try {
-      if (user?.id) {
-        Sentry.setUser({ id: user.id, username: user.username });
+    // Only send user identification to Sentry if Sentry is enabled
+    // (exporters don't use this method, they get context from dispatch)
+    if (isSentryEnabled()) {
+      try {
+        if (user?.id) {
+          Sentry.setUser({ id: user.id, username: user.username });
+          logger
+            .category("analytics")
+            .debug("User identified in Sentry", {
+              userId: user.id,
+              username: user.username,
+            });
+        } else {
+          Sentry.setUser(null);
+          logger.category("analytics").debug("User cleared from Sentry");
+        }
+      } catch (e) {
         logger
           .category("analytics")
-          .debug("User identified in analytics", {
-            userId: user.id,
-            username: user.username,
-          });
-      } else {
-        Sentry.setUser(null);
-        logger.category("analytics").debug("User cleared from analytics");
+          .error("Failed to identify user in Sentry", { error: String(e) });
       }
-    } catch (e) {
-      logger
-        .category("analytics")
-        .error("Failed to identify user in analytics", { error: String(e) });
     }
   },
 
@@ -183,18 +200,10 @@ export const Analytics = {
     }
 
     const safeProps = sanitizeProps(props);
-    try {
-      // Keep existing Sentry breadcrumb for backward compatibility
-      Sentry.addBreadcrumb({
-        category: "analytics",
-        message: event,
-        data: safeProps,
-        level: "info",
-      });
-    } catch {}
-
+    
     // Dispatch to all registered exporters asynchronously (fire-and-forget)
-    // This allows the new exporter system to handle the event in parallel
+    // Sentry breadcrumbs are now routed through the SentryExporter
+    // (exporter system respects analytics.exporters.sentry.enabled config)
     this._dispatchToExporters(event, safeProps);
   },
 
@@ -219,13 +228,11 @@ export const Analytics = {
         // Create context with current network status
         const context = createExportContext(false); // TODO: integrate with NetworkDetection
 
-        // Dispatch to all registered exporters
-        dispatchEvent(analyticsEvent, context).catch((error) => {
-          logger.debug(
-            'analytics',
-            `Exporter dispatch error (non-blocking): ${error}`
-          );
-        });
+        // Dispatch to all registered exporters (fire-and-forget)
+        // dispatchEvent uses Promise.allSettled internally, so it never rejects
+        // due to exporter failures; errors are logged within dispatchEvent
+        dispatchEvent(analyticsEvent, context);
+        // Don't await or .catch() — exporter failures are isolated and logged internally
       } catch (error) {
         logger.debug(
           'analytics',

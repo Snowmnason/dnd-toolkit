@@ -3,6 +3,7 @@
  * Provides pluggable exporter architecture for multi-backend analytics
  */
 
+import { getAppConfig } from '@/lib/config/loader';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -104,8 +105,8 @@ function validateEventGlobal(event: AnalyticsEvent): ValidationResult {
     errors.push('Event name must be a non-empty string');
   }
 
-  if (event.properties !== null && typeof event.properties !== 'object') {
-    errors.push('Event properties must be an object or null');
+  if (!event.properties || typeof event.properties !== 'object' || Array.isArray(event.properties)) {
+    errors.push('Event properties must be a non-null object');
   }
 
   return {
@@ -307,81 +308,141 @@ export async function dispatchEvent(
   event: AnalyticsEvent,
   context?: ExportContext
 ): Promise<void> {
+  // Read dispatch configuration
+  const config = (() => {
+    try {
+      return getAppConfig();
+    } catch {
+      return undefined;
+    }
+  })();
+
+  const defaultDispatch = { async: true, debounceMs: 100, queueSize: 100, timeout: 5000 };
+  const rawDispatch = config?.analytics?.dispatch ?? {};
+  const dispatchConfig = { ...defaultDispatch, ...rawDispatch } as {
+    async: boolean;
+    debounceMs: number;
+    queueSize: number;
+    timeout: number;
+  };
+
+  // Enqueue event for debounced flush
+  enqueueEvent({ event, context }, dispatchConfig);
+
+  // If caller requested synchronous dispatch (async=false), flush immediately
+  if (dispatchConfig.async === false) {
+    await flushQueue(dispatchConfig);
+  }
+}
+
+// Internal queue and flush logic
+type Queued = { event: AnalyticsEvent; context?: ExportContext };
+const pendingQueue: Queued[] = [];
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let isFlushing = false;
+
+function enqueueEvent(item: Queued, cfg: { async: boolean; debounceMs: number; queueSize: number; timeout: number }) {
+  // Enforce queue size (drop oldest)
+  if (pendingQueue.length >= cfg.queueSize) {
+    const dropped = pendingQueue.shift();
+    logger.warn('analytics', 'Dispatch queue full, dropping oldest event', { dropped: dropped?.event?.name });
+  }
+  pendingQueue.push(item);
+
+  // Schedule debounced flush
+  if (debounceTimer) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    // Fire and forget the flush (errors handled internally)
+    flushQueue(cfg).catch((e) => {
+      logger.warn('analytics', 'Flush queue failed', { error: String(e) });
+    });
+  }, cfg.debounceMs);
+}
+
+async function flushQueue(cfg: { async: boolean; debounceMs: number; queueSize: number; timeout: number }) {
+  if (isFlushing) return;
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
+
+  if (pendingQueue.length === 0) return;
+
+  isFlushing = true;
+  const batch = pendingQueue.splice(0, pendingQueue.length);
+
+  try {
+    for (const item of batch) {
+      // Process each event independently but honor the timeout for each dispatch
+      await dispatchSingleWithTimeout(item.event, item.context, cfg.timeout);
+    }
+  } finally {
+    isFlushing = false;
+  }
+}
+
+async function dispatchSingleWithTimeout(event: AnalyticsEvent, context: ExportContext | undefined, timeoutMs: number) {
   // Get enabled exporters for this event type
   const exporters = exporterRegistry.getExportersForEventType(event.type);
 
   if (exporters.length === 0) {
-    logger.debug(
-      'analytics',
-      `No exporters registered for event type "${event.type}", skipping dispatch`
-    );
+    logger.debug('analytics', `No exporters registered for event type "${event.type}", skipping dispatch`);
     return;
   }
 
   // Validate event globally and per-exporter
   if (!validateEvent(event, exporters)) {
-    logger.warn(
-      'analytics',
-      `Event "${event.name}" dropped due to validation failure`
-    );
+    logger.warn('analytics', `Event "${event.name}" dropped due to validation failure`);
     return;
   }
 
-  // Dispatch to all exporters in parallel with error isolation
-  // Each exporter is wrapped to ensure Promise.allSettled catches errors
   const exportPromises = exporters.map((exporter) =>
     exporter
       .export(event, context)
       .catch((error) => {
-        // Log individual exporter errors with exporter name and context
-        const errorMsg =
-          error instanceof Error ? error.message : String(error);
-        logger.error(
-          'analytics',
-          `Exporter "${exporter.name}" failed on event "${event.name}": ${errorMsg}`
-        );
-        throw error; // Re-throw for allSettled to capture as rejected
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        logger.error('analytics', `Exporter "${exporter.name}" failed on event "${event.name}": ${errorMsg}`);
+        throw error;
       })
   );
 
-  const results = await Promise.allSettled(exportPromises);
+  // Wait for all exporters or timeout
+  const waitAll = Promise.allSettled(exportPromises);
+  const race = await Promise.race([
+    waitAll,
+    new Promise((res) => setTimeout(() => res('__timeout__'), timeoutMs)),
+  ]);
 
-  // Log per-exporter results
-  // Iterate over exporters (trusted source) and look up corresponding results
+  if (race === '__timeout__') {
+    logger.warn('analytics', `Dispatch for event "${event.name}" timed out after ${timeoutMs}ms`);
+    return;
+  }
+
+  const results = race as PromiseSettledResult<unknown>[];
+
+  // Map results per exporter
   const exporterResults = exporters.map((exporter, index) => {
-    // eslint-disable-next-line security/detect-object-injection
     const result = results[index];
-    if (result.status === 'fulfilled') {
-      return {
-        name: exporter.name,
-        status: 'success' as const,
-      };
+    if (result && result.status === 'fulfilled') {
+      return { name: exporter.name, status: 'success' as const };
     } else {
       return {
         name: exporter.name,
         status: 'failed' as const,
-        error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+        error: result && 'reason' in result && result.reason instanceof Error ? result.reason.message : String(result?.reason),
       };
     }
   });
 
-  // Log summary with per-exporter details
   const succeeded = exporterResults.filter((r) => r.status === 'success').length;
   const failed = exporterResults.filter((r) => r.status === 'failed').length;
 
-  logger.debug(
-    'analytics',
-    `Event "${event.name}" dispatch complete: ${succeeded}/${exporters.length} exporters succeeded${failed > 0 ? `, ${failed} failed` : ''}`
-  );
+  logger.debug('analytics', `Event "${event.name}" dispatch complete: ${succeeded}/${exporters.length} exporters succeeded${failed > 0 ? `, ${failed} failed` : ''}`);
 
-  // Log individual failures for debugging
   const failedResults = exporterResults.filter((r) => r.status === 'failed');
   if (failedResults.length > 0) {
     for (const result of failedResults) {
-      logger.debug(
-        'analytics',
-        `  - Exporter "${result.name}" failed: ${result.error}`
-      );
+      logger.debug('analytics', `  - Exporter "${result.name}" failed: ${result.error}`);
     }
   }
 }

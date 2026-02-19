@@ -22,15 +22,15 @@ import { SentryExporter } from './sentry/sentry-analytics-exporter';
  * Safe to call multiple times (idempotent)
  */
 export async function initializeServices(): Promise<void> {
-  logger.info('services', 'Initializing all services...');
+  logger.info('bootstrap', 'Initializing services...');
 
   try {
     // Register Sentry analytics exporter
     await initializeSentryExporter();
 
-    logger.info('services', 'All services initialized successfully');
+    logger.info('bootstrap', 'All services initialized successfully');
   } catch (error) {
-    logger.error('services', `Failed to initialize services: ${error}`);
+    logger.error('bootstrap', `Failed to initialize services: ${error}`);
     throw error;
   }
 }
@@ -44,7 +44,10 @@ async function initializeSentryExporter(): Promise<void> {
     const sentryExporter: AnalyticsExporter = new SentryExporter();
 
     // Check if enabled via config before registering
-    if (sentryExporter.isEnabled?.()) {
+    // Note: isEnabled is optional on AnalyticsExporter interface.
+    // Only skip registration if isEnabled explicitly returns false.
+    // If isEnabled is undefined (method doesn't exist), default to enabled.
+    if (sentryExporter.isEnabled?.() !== false) {
       // Initialize exporter if it has an initialize lifecycle hook
       if (sentryExporter.initialize) {
         await sentryExporter.initialize();
@@ -52,13 +55,13 @@ async function initializeSentryExporter(): Promise<void> {
 
       // Register to global registry
       exporterRegistry.register(sentryExporter);
-      logger.debug('services', 'Sentry exporter initialized and registered');
+      logger.debug('bootstrap', 'Sentry exporter initialized and registered');
     } else {
-      logger.debug('services', 'Sentry exporter is disabled in config, skipping registration');
+      logger.debug('bootstrap', 'Sentry exporter is disabled in config, skipping registration');
     }
   } catch (error) {
     logger.warn(
-      'services',
+      'bootstrap',
       `Failed to initialize Sentry exporter: ${error}. Continuing without it.`
     );
     // Don't throw - if Sentry exporter fails, other services should still work

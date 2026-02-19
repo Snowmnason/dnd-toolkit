@@ -11,9 +11,9 @@
 
 import { breadcrumbQueue } from '@/lib/analytics/breadcrumb-queue';
 import {
-    AnalyticsEvent,
-    AnalyticsExporter,
-    ExportContext,
+  AnalyticsEvent,
+  AnalyticsExporter,
+  ExportContext,
 } from '@/lib/analytics/exporters/exporter-registry';
 import { getAppConfig } from '@/lib/config';
 import { SentryAdapter } from '@/lib/services/sentry/sentry-adapter';
@@ -26,8 +26,8 @@ import { logger } from '@/lib/utils/logger';
 export class SentryExporter implements AnalyticsExporter {
   name = 'sentry';
   version = '7.2.0'; // Sentry SDK version (@sentry/react-native) for compatibility tracking
-  requiredEvents = ['error', 'fatal']; // Always handle errors
-  optionalEvents = ['event', 'performance', 'navigation']; // Optional breadcrumbs
+  requiredEvents = ['error']; // Always handle errors
+  optionalEvents = ['event', 'pageview', 'performance', 'custom']; // Optional breadcrumbs
 
   private sentryAdapter: SentryAdapter | null = null;
 
@@ -39,6 +39,29 @@ export class SentryExporter implements AnalyticsExporter {
         'SentryExporter',
         `Failed to initialize Sentry adapter: ${error}`
       );
+    }
+  }
+
+  /**
+   * Initialize the Sentry exporter
+   * Sets up breadcrumb queue with Sentry adapter for offline persistence
+   * Called during service initialization before exporter registration
+   */
+  async initialize(): Promise<void> {
+    try {
+      // Create and initialize Sentry adapter for breadcrumb queue
+      const adapter = new SentryAdapter();
+      await breadcrumbQueue.initialize(adapter);
+      logger.category('analytics').debug(
+        'SentryExporter',
+        'Initialized breadcrumb queue with Sentry adapter'
+      );
+    } catch (error) {
+      logger.category('analytics').warn(
+        'SentryExporter',
+        `Failed to initialize breadcrumb queue: ${error}`
+      );
+      // Don't throw - exporter can still work, just won't queue offline
     }
   }
 
