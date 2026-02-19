@@ -5,6 +5,7 @@ import { getAppConfig } from "../config/loader";
 import { logger } from "../utils/logger";
 import { AnalyticsConsent } from "./consent";
 import { categorizeError } from "./error-categorization";
+import { createExportContext, dispatchEvent } from "./exporters";
 import { getThreshold, sanitizeError } from "./utils";
 
 type AnalyticsEventProps = Record<string, any>;
@@ -183,6 +184,7 @@ export const Analytics = {
 
     const safeProps = sanitizeProps(props);
     try {
+      // Keep existing Sentry breadcrumb for backward compatibility
       Sentry.addBreadcrumb({
         category: "analytics",
         message: event,
@@ -190,6 +192,60 @@ export const Analytics = {
         level: "info",
       });
     } catch {}
+
+    // Dispatch to all registered exporters asynchronously (fire-and-forget)
+    // This allows the new exporter system to handle the event in parallel
+    this._dispatchToExporters(event, safeProps);
+  },
+
+  /**
+   * Private: Dispatch event to all registered exporters
+   * Fire-and-forget: doesn't block Analytics.track() call
+   * Errors are logged but don't affect the caller
+   */
+  _dispatchToExporters(eventName: string, props: AnalyticsEventProps | undefined): void {
+    // Fire-and-forget: don't await, don't block
+    Promise.resolve().then(() => {
+      try {
+        // Create analytics event for exporter system
+        const analyticsEvent = {
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Simple UUID
+          timestamp: Date.now(),
+          type: this._mapEventType(eventName),
+          name: eventName,
+          properties: props || {},
+        };
+
+        // Create context with current network status
+        const context = createExportContext(false); // TODO: integrate with NetworkDetection
+
+        // Dispatch to all registered exporters
+        dispatchEvent(analyticsEvent, context).catch((error) => {
+          logger.debug(
+            'analytics',
+            `Exporter dispatch error (non-blocking): ${error}`
+          );
+        });
+      } catch (error) {
+        logger.debug(
+          'analytics',
+          `Failed to dispatch to exporters: ${error}`
+        );
+        // Silently fail - don't let exporter issues affect Analytics.track()
+      }
+    });
+  },
+
+  /**
+   * Private: Map Analytics.track() event names to exporter event types
+   */
+  _mapEventType(
+    eventName: string
+  ): 'pageview' | 'event' | 'error' | 'performance' | 'custom' {
+    if (eventName === 'screen_view') return 'pageview';
+    if (eventName.startsWith('performance')) return 'performance';
+    if (eventName.includes('error')) return 'error';
+    return 'event';
   },
 
   trackComponentUsage(params: {

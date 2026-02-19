@@ -572,6 +572,21 @@ class AppKernelClass {
         .category("bootstrap")
         .info(`✅ appReady = true (auth phase still running in background)`);
 
+      // Initialize services (Sentry exporter, future analytics integrations)
+      try {
+        const { initializeServices } = await import("@/lib/services");
+        await initializeServices();
+        logger
+          .category("bootstrap")
+          .info("Services initialized successfully");
+      } catch (error) {
+        logger
+          .category("bootstrap")
+          .warn("Services initialization failed (non-critical)", {
+            error: (error as Error).message,
+          });
+      }
+
       // Initialize Feature Flags Manager (non-blocking)
       try {
         const { FeatureFlagsManager } =

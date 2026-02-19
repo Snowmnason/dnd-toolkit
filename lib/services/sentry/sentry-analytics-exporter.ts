@@ -14,7 +14,7 @@ import {
     AnalyticsEvent,
     AnalyticsExporter,
     ExportContext,
-} from '@/lib/analytics/exporters';
+} from '@/lib/analytics/exporters/exporter-registry';
 import { getAppConfig } from '@/lib/config';
 import { SentryAdapter } from '@/lib/services/sentry/sentry-adapter';
 import { logger } from '@/lib/utils/logger';
