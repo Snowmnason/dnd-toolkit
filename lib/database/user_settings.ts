@@ -1,7 +1,7 @@
 import { RequestManager } from "../api/request-manager";
 import { QueryCache } from "../cache";
 import { logger } from "../utils/logger";
-import { validateCurrentUser } from "./common";
+import { getCurrentUserProfile, validateUserForWrite } from "./common";
 import { supabase } from "./supabase";
 
 export interface UserSettings {
@@ -65,8 +65,8 @@ export const userSettingsDB = {
     }
 
     // Fetch from database
-    const authUser = await validateCurrentUser();
-    if (!authUser) {
+    const currentUser = await getCurrentUserProfile();
+    if (!currentUser) {
       logger.debug("storage", "No authenticated user found");
       return null;
     }
@@ -74,18 +74,18 @@ export const userSettingsDB = {
     logger.debug(
       "storage",
       "Fetching user settings from database for user_id:",
-      authUser.auth_id,
+      currentUser.id,
     );
 
     // Use RequestManager to wrap database fetch with deduplication, retries, timeout
     const data = await RequestManager.fetch(
-      `user:settings:${authUser.auth_id}`,
+      `user:settings:${currentUser.id}`,
       async () => {
         const { data, error } = await supabase
           .schema('public')
           .from('user_settings')
           .select("*")
-          .eq("user_id", authUser.auth_id)
+          .eq("user_id", currentUser.id)
           .single();
 
         if (error) {
@@ -107,7 +107,7 @@ export const userSettingsDB = {
               code: error.code,
               details: error.details,
               hint: error.hint,
-              user_id: authUser.auth_id,
+              user_id: currentUser.id,
             },
           );
 
@@ -129,7 +129,7 @@ export const userSettingsDB = {
         "storage",
         "User settings is null - no settings record yet",
         {
-          userId: authUser.auth_id,
+          userId: currentUser.id,
         },
       );
       return null;
@@ -168,11 +168,8 @@ export const userSettingsDB = {
     return RequestManager.fetch(
       `user:settings:consent:update:${Date.now()}`,
       async () => {
-        // Validate user is authenticated
-        const authUser = await validateCurrentUser();
-        if (!authUser) {
-          throw new Error("Not authenticated");
-        }
+        // Validate user is authenticated and get internal user.id (throws if not authenticated)
+        const currentUser = await validateUserForWrite();
 
         // Validate consent level
         const validLevels = ['none', 'basic', 'full'];
@@ -185,7 +182,7 @@ export const userSettingsDB = {
         }
 
         logger.debug("storage", "Updating analytics consent level:", {
-          userId: authUser.auth_id,
+          userId: currentUser.id,
           newLevel: level,
         });
 
@@ -193,7 +190,7 @@ export const userSettingsDB = {
           .schema('public')
           .from('user_settings')
           .update({ analytics_consent_level: level })
-          .eq('user_id', authUser.auth_id)
+          .eq('user_id', currentUser.id)
           .select('analytics_consent_level')
           .single();
 
@@ -201,19 +198,19 @@ export const userSettingsDB = {
           logger.error("storage", "Error updating analytics consent level:", {
             message: error.message,
             code: error.code,
-            userId: authUser.auth_id,
+            userId: currentUser.id,
             level,
           });
           throw new Error(error.message || "Failed to update consent level");
         }
 
         logger.info("storage", "Analytics consent level updated successfully:", {
-          userId: authUser.auth_id,
+          userId: currentUser.id,
           level: data.analytics_consent_level,
         });
 
         // Invalidate user settings cache
-        await QueryCache.invalidateByTags(['user:settings', `user:${authUser.auth_id}:settings`]);
+        await QueryCache.invalidateByTags(['user:settings', `user:${currentUser.id}:settings`]);
 
         // Update cached settings with new consent level
         try {

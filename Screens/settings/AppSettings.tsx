@@ -55,7 +55,8 @@ export function AppSettings() {
       </View>
 
       {/* Row 2: Analytics Consent Toggle */}
-      <View style={{ flexDirection: 'column', gap: S.space.sm }}>
+      <View style={{ flexDirection: 'row', gap: S.space.sm }}>
+        <View style={{ flex: 1, flexDirection: 'column' }}>
         <Switch
           heading="Analytics Consent"
           checked={consentLevel === 'full'}
@@ -71,6 +72,13 @@ export function AppSettings() {
             ? 'Full tracking: analytics enabled'
             : 'Basic tracking: GDPR-safe minimum only'}
         </SubTitle>
+        </View>
+        <Button
+          text="Setting 4"
+          variant="secondary"
+          onPress={() => {}}
+          style={{ flex: 1 }}
+        />
       </View>
 
       {/* Row 3: Placeholder buttons */}
