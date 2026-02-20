@@ -433,6 +433,7 @@ export {
   cleanupAnalyticsNetworkIntegration, flushAnalyticsQueue, handleAnalyticsConsentWithdrawal, initializeAnalyticsNetworkIntegration
 } from "./analytics-network-integration";
 export { AnalyticsConsent } from "./consent";
+export { ConsentSyncQueue, type PendingConsentSync } from "./consent-sync-queue";
 export { categorizeError, type ErrorCategory } from "./error-categorization";
 export { sessionManager } from "./session";
 export { getThreshold, sanitizeError } from "./utils";

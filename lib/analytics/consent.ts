@@ -8,28 +8,206 @@
  * Default: 'basic' consent level (essential tracking only)
  * This ensures GDPR compliance out-of-the-box. Users must explicitly
  * opt-in to 'full' tracking for usage analytics and performance monitoring.
+ * 
+ * Persistence: Consent level is stored in SecureStorage to survive app restarts.
+ * Initialize early during app bootstrap via initialize().
  */
+
+import { SecureStorage, STORAGE_KEYS } from '@/lib/storage';
+import { logger } from '@/lib/utils/logger';
 
 export type ConsentLevel = 'none' | 'basic' | 'full';
 
+const DEFAULT_CONSENT: ConsentLevel = 'basic';
+
 class AnalyticsConsentManager {
-  private consentLevel: ConsentLevel = 'basic'; // Default to basic for GDPR compliance
+  private consentLevel: ConsentLevel = DEFAULT_CONSENT;
+  private isInitialized = false;
 
   /**
-   * Set the consent level
-   * - 'none': No analytics tracking
-   * - 'basic': Only essential events (errors, auth)
-   * - 'full': All analytics events including usage/performance
+   * Initialize consent with read priority: database (if authenticated) → SecureStorage → default 'basic'.
+   *
+   * Options:
+   * - maxAgeMs: Cache freshness threshold (default 4 hours). Stale cache triggers DB refresh.
+   * - forceRefresh: Skip cache, always fetch from database if authenticated
+   *
+   * Read Strategy:
+   * 1. Check SecureStorage cache with timestamp validation (respects maxAgeMs parameter)
+   * 2. If cache fresh, return it (SecureStorage is source of truth to save DB calls)
+   * 3. If cache stale/missing and authenticated, fetch from database
+   * 4. Cache database result back to SecureStorage for next time
+   * 5. If not authenticated or DB read fails, fall back to SecureStorage or default
+   *
+   * Call this early during app bootstrap, before analytics dispatch.
    */
-  setLevel(level: ConsentLevel): void {
-    this.consentLevel = level;
+  async initialize(options?: { maxAgeMs?: number; forceRefresh?: boolean }): Promise<ConsentLevel> {
+    const maxAgeMs = options?.maxAgeMs ?? (4 * 60 * 60 * 1000); // Default 4 hours
+    const forceRefresh = options?.forceRefresh ?? false;
+    let sourceOfTruth: ConsentLevel = DEFAULT_CONSENT;
+
+    try {
+      // Step 1: Try SecureStorage cache first (source of truth after initial load)
+      if (!forceRefresh) {
+        const stored = await SecureStorage.getItem(STORAGE_KEYS.ANALYTICS_CONSENT);
+        const cacheMeta = await SecureStorage.getJSON<{ timestamp: number }>(
+          `${STORAGE_KEYS.ANALYTICS_CONSENT}_meta`,
+        );
+
+        if (stored && this.isValidConsentLevel(stored) && cacheMeta) {
+          const cacheAge = Date.now() - cacheMeta.timestamp;
+          const isCacheFresh = cacheAge < maxAgeMs;
+
+          if (isCacheFresh) {
+            // Cache is fresh - trust SecureStorage as source of truth
+            sourceOfTruth = stored as ConsentLevel;
+            logger.category('analytics').debug('consent_initialized', `Loaded from SecureStorage cache (age: ${cacheAge}ms)`, {
+              level: sourceOfTruth,
+            });
+            this.consentLevel = sourceOfTruth;
+            this.isInitialized = true;
+            return sourceOfTruth;
+          }
+
+          // Cache is stale - will try to refresh from database below
+          logger.category('analytics').debug('consent_initialized', `SecureStorage cache stale (age: ${cacheAge}ms), refreshing from database`);
+        }
+      } else {
+        logger.category('analytics').debug('consent_initialized', 'Force refresh requested, skipping cache');
+      }
+
+      // Step 2: Try database if authenticated and cache is stale/missing
+      try {
+        const { userSettingsDB } = await import('@/lib/database');
+        const { isSupabaseConfigured } = await import('@/lib/database');
+
+        if (isSupabaseConfigured()) {
+          // Attempt to fetch user settings from database
+          const settings = await userSettingsDB.fetchCurrentUserSettings({ forceRefresh: true });
+          if (settings && settings.analytics_consent_level && this.isValidConsentLevel(settings.analytics_consent_level)) {
+            sourceOfTruth = settings.analytics_consent_level as ConsentLevel;
+            logger.category('analytics').debug('consent_initialized', 'Loaded from database', {
+              level: sourceOfTruth,
+            });
+
+            // Cache the database result back to SecureStorage for next time
+            try {
+              await SecureStorage.setItem(STORAGE_KEYS.ANALYTICS_CONSENT, sourceOfTruth);
+              await SecureStorage.setJSON(`${STORAGE_KEYS.ANALYTICS_CONSENT}_meta`, {
+                timestamp: Date.now(),
+                source: 'database',
+              });
+            } catch (storageErr) {
+              logger.category('analytics').warn('consent_initialized', 'Failed to cache consent to SecureStorage (non-critical)', {
+                error: storageErr,
+              });
+            }
+
+            this.consentLevel = sourceOfTruth;
+            this.isInitialized = true;
+            return sourceOfTruth;
+          }
+        }
+      } catch (dbErr) {
+        // Database read failed (not authenticated or offline or DB error)
+        // Fall back to SecureStorage cache or default below
+        logger.category('analytics').debug('consent_initialized', 'Database read failed, falling back to SecureStorage or default', {
+          error: dbErr instanceof Error ? dbErr.message : String(dbErr),
+        });
+      }
+
+      // Step 3: Fall back to stale SecureStorage cache if available
+      const stored = await SecureStorage.getItem(STORAGE_KEYS.ANALYTICS_CONSENT);
+      if (stored && this.isValidConsentLevel(stored)) {
+        sourceOfTruth = stored as ConsentLevel;
+        logger.category('analytics').debug('consent_initialized', 'Using stale SecureStorage cache as fallback', {
+          level: sourceOfTruth,
+        });
+        this.consentLevel = sourceOfTruth;
+        this.isInitialized = true;
+        return sourceOfTruth;
+      }
+
+      // Step 4: Fall back to default
+      logger.category('analytics').debug('consent_initialized', 'Using default consent level', {
+        level: DEFAULT_CONSENT,
+      });
+      sourceOfTruth = DEFAULT_CONSENT;
+    } catch (err) {
+      // Catch-all for any unexpected errors
+      logger.category('analytics').error('consent_initialized', 'Unexpected error during initialization, using default', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      sourceOfTruth = DEFAULT_CONSENT;
+    }
+
+    this.consentLevel = sourceOfTruth;
+    this.isInitialized = true;
+    return sourceOfTruth;
   }
 
   /**
-   * Get current consent level
+   * Set the consent level and persist to SecureStorage.
+   * - 'none': No analytics tracking
+   * - 'basic': Only essential events (errors, auth)
+   * - 'full': All analytics events including usage/performance
+   * 
+   * Non-blocking: Persists locally immediately, queues server sync for later.
+   */
+  async setLevel(level: ConsentLevel): Promise<void> {
+    if (!this.isValidConsentLevel(level)) {
+      const error = new Error(`Invalid consent level: ${level}`);
+      logger.category('analytics').error('consent', 'Attempted to set invalid consent level', { level, error });
+      throw error;
+    }
+    this.consentLevel = level;
+    try {
+      await SecureStorage.setItem(STORAGE_KEYS.ANALYTICS_CONSENT, level);
+    } catch (err) {
+      logger.category('analytics').error('consent', 'Failed to persist consent level to storage', { level, error: err });
+    }
+
+    // Queue the update to sync queue (fire-and-forget, non-blocking)
+    // This will sync the change to the database when online
+    try {
+      const { ConsentSyncQueue } = await import('./consent-sync-queue');
+      const syncId = await ConsentSyncQueue.enqueue(level);
+      logger.category('analytics').debug('consent', 'Queued consent change for sync', { level, syncId });
+    } catch (err) {
+      logger.category('analytics').warn('consent', 'Failed to queue consent sync (non-critical)', { level, error: err });
+      // Don't throw - local persistence succeeded, queue failure is non-blocking
+    }
+  }
+
+  /**
+   * Get current consent level (in-memory)
    */
   getLevel(): ConsentLevel {
     return this.consentLevel;
+  }
+
+  /**
+   * Get stored consent from SecureStorage without updating in-memory state.
+   */
+  async getStoredConsent(): Promise<ConsentLevel> {
+    try {
+      const stored = await SecureStorage.getItem(STORAGE_KEYS.ANALYTICS_CONSENT);
+      if (stored && this.isValidConsentLevel(stored)) {
+        return stored as ConsentLevel;
+      }
+    } catch (err) {
+      // Ignore storage errors
+      logger.category('analytics').error('consent', 'Failed to retrieve stored consent level from storage', { error: err });
+    }
+    return DEFAULT_CONSENT;
+  }
+
+  /**
+   * Reset consent to default 'basic' (for testing only)
+   */
+  resetToDefault(): void {
+    this.consentLevel = DEFAULT_CONSENT;
+    this.isInitialized = false;
+    logger.category('analytics').info('consent', 'Consent reset to default');
   }
 
   /**
@@ -39,6 +217,13 @@ class AnalyticsConsentManager {
     if (this.consentLevel === 'none') return false;
     if (this.consentLevel === 'basic') return category === 'essential';
     return true; // 'full' allows everything
+  }
+
+  /**
+   * Validate consent level
+   */
+  private isValidConsentLevel(level: any): level is ConsentLevel {
+    return ['none', 'basic', 'full'].includes(level);
   }
 }
 
