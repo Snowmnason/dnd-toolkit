@@ -564,6 +564,44 @@ class AppKernelClass {
               });
             // Non-critical: app continues with default consent
           }
+
+          // Initialize consent sync queue and set up network hook for auto-processing
+          try {
+            const { ConsentSyncQueue } = await import("@/lib/analytics/consent-sync-queue");
+            
+            // Load persisted consent sync items from storage
+            await ConsentSyncQueue.initialize();
+            
+            // Set up network detection hook to automatically process queue on reconnect
+            // Only process items that are ready for retry (respects retry backoff)
+            const networkUnsubscribeForConsent = NetworkDetection.subscribe((status) => {
+              if (status.isOnline && ConsentSyncQueue.size() > 0) {
+                ConsentSyncQueue.processQueue().catch((error) => {
+                  logger
+                    .category("analytics")
+                    .warn("Failed to process consent sync queue on network recovery", { error });
+                });
+              }
+            });
+            
+            // Store unsubscribe function for cleanup on app shutdown
+            if (!this.networkUnsubscribe) {
+              this.networkUnsubscribe = networkUnsubscribeForConsent;
+            }
+            
+            logger
+              .category("bootstrap")
+              .debug("Consent sync queue initialized", {
+                queueSize: ConsentSyncQueue.size(),
+              });
+          } catch (consentQueueError) {
+            logger
+              .category("bootstrap")
+              .warn("Failed to initialize consent sync queue (non-critical)", {
+                error: (consentQueueError as Error).message,
+              });
+            // Non-critical: app continues without consent queue processing
+          }
         } catch (e) {
           this.authCompletionTime = performance.now() - authPhaseStart;
           logger

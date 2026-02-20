@@ -5,7 +5,7 @@
  * Allows users to opt-in/out of analytics collection at runtime.
  * Future-proofs for GDPR, privacy regulations, and user preferences.
  * 
- * Default: 'basic' consent level (essential tracking only)
+ * Default: Read from config.analytics.consent.defaultLevel (or 'basic' if missing/invalid).
  * This ensures GDPR compliance out-of-the-box. Users must explicitly
  * opt-in to 'full' tracking for usage analytics and performance monitoring.
  * 
@@ -19,25 +19,52 @@ import { logger } from '@/lib/utils/logger';
 
 export type ConsentLevel = 'none' | 'basic' | 'full';
 
-const DEFAULT_CONSENT: ConsentLevel = 'basic';
+/**
+ * Read and validate the configured default consent level.
+ * Ensures config.analytics.consent.defaultLevel is a valid ConsentLevel,
+ * falling back to 'basic' (GDPR minimum) if missing or invalid.
+ *
+ * Logs a warning if an invalid value is detected in config.
+ */
+function getConfiguredDefaultConsent(): ConsentLevel {
+  const config = getAppConfig();
+  const configValue = config.analytics?.consent?.defaultLevel;
+
+  // Validate that the configured value is a valid ConsentLevel
+  if (configValue && ['none', 'basic', 'full'].includes(configValue)) {
+    return configValue as ConsentLevel;
+  }
+
+  // Invalid or missing config - log and fall back to 'basic'
+  if (configValue) {
+    logger.category('analytics').warn('Invalid analytics consent level in config, using default', {
+      configured: configValue,
+      fallback: 'basic',
+    });
+  }
+
+  return 'basic';
+}
+
+const DEFAULT_CONSENT: ConsentLevel = getConfiguredDefaultConsent();
 
 class AnalyticsConsentManager {
   private consentLevel: ConsentLevel = DEFAULT_CONSENT;
   private isInitialized = false;
 
   /**
-   * Initialize consent with read priority: database (if authenticated) → SecureStorage → default 'basic'.
+   * Initialize consent by preferring a fresh SecureStorage cache, then database, then default.
    *
    * Options:
-   * - maxAgeMs: Cache freshness threshold (default 4 hours). Stale cache triggers DB refresh.
+   * - maxAgeMs: Cache freshness threshold (default 4 hours). Fresh cache is trusted; stale cache triggers DB refresh.
    * - forceRefresh: Skip cache, always fetch from database if authenticated
    *
-   * Read Strategy:
-   * 1. Check SecureStorage cache with timestamp validation (respects maxAgeMs parameter)
-   * 2. If cache fresh, return it (SecureStorage is source of truth to save DB calls)
-   * 3. If cache stale/missing and authenticated, fetch from database
-   * 4. Cache database result back to SecureStorage for next time
-   * 5. If not authenticated or DB read fails, fall back to SecureStorage or default
+   * Read Strategy (actual behavior):
+   * 1. Check SecureStorage cache with timestamp validation (respects `maxAgeMs`).
+   * 2. If cache is fresh, return it (SecureStorage is treated as the source of truth).
+   * 3. If cache is stale/missing and authenticated, fetch from database.
+   * 4. Cache database result back to SecureStorage for next time.
+   * 5. If not authenticated or DB read fails, fall back to stale cache (if present) or configured default.
    *
    * Call this early during app bootstrap, before analytics dispatch.
    */
@@ -65,7 +92,7 @@ class AnalyticsConsentManager {
       if (!forceRefresh) {
         const stored = await SecureStorage.getItem(STORAGE_KEYS.ANALYTICS_CONSENT);
         const cacheMeta = await SecureStorage.getJSON<{ timestamp: number }>(
-          `${STORAGE_KEYS.ANALYTICS_CONSENT}_meta`,
+          STORAGE_KEYS.ANALYTICS_CONSENT_META,
         );
 
         if (stored && this.isValidConsentLevel(stored) && cacheMeta) {
@@ -107,7 +134,7 @@ class AnalyticsConsentManager {
             // Cache the database result back to SecureStorage for next time
             try {
               await SecureStorage.setItem(STORAGE_KEYS.ANALYTICS_CONSENT, sourceOfTruth);
-              await SecureStorage.setJSON(`${STORAGE_KEYS.ANALYTICS_CONSENT}_meta`, {
+              await SecureStorage.setJSON(STORAGE_KEYS.ANALYTICS_CONSENT_META, {
                 timestamp: Date.now(),
                 source: 'database',
               });
@@ -191,6 +218,11 @@ class AnalyticsConsentManager {
 
     try {
       await SecureStorage.setItem(STORAGE_KEYS.ANALYTICS_CONSENT, level);
+      // Update meta timestamp so next app start treats cache as fresh
+      await SecureStorage.setJSON(STORAGE_KEYS.ANALYTICS_CONSENT_META, {
+        timestamp: Date.now(),
+        source: 'user',
+      });
     } catch (err) {
       logger.category('analytics').error('consent', 'Failed to persist consent level to storage', { level, error: err });
     }

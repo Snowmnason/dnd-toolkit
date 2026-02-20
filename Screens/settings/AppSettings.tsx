@@ -60,8 +60,12 @@ export function AppSettings() {
         <Switch
           heading="Analytics Consent"
           checked={consentLevel === 'full'}
-          onChange={async (isFullConsent) => {
-            await setConsentLevel(isFullConsent ? 'full' : 'basic')
+          onChange={(isFullConsent) => {
+            const newLevel = isFullConsent ? 'full' : 'basic'
+            void setConsentLevel(newLevel).catch((error) => {
+              // Silently log errors; toast shown by useAnalyticsConsent hook if needed
+              console.error('[Analytics] Failed to set consent level:', error)
+            })
           }}
           disabled={consentLoading}
           leftLabel="Basic"

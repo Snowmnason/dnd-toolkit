@@ -150,6 +150,7 @@ export const STORAGE_KEYS = {
 
   // Analytics consent (persisted user choice)
   ANALYTICS_CONSENT: "dnd:analytics:consent",
+  ANALYTICS_CONSENT_META: "dnd:analytics:consent_meta",
 
   // Analytics consent sync queue (pending DB updates)
   CONSENT_SYNC_QUEUE: "dnd:analytics:consent_sync_queue",

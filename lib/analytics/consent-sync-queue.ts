@@ -69,15 +69,27 @@ function calculateNextRetry(retryCount: number): number {
  * Consent Sync Queue Service
  *
  * Singleton that manages queueing and processing consent changes for database sync.
+ * Features:
+ * - Persistent queue (survives app restart)
+ * - Automatic retry scheduling with exponential backoff
+ * - NetworkDetection hook for auto-processing on reconnect
+ * - Retry timeout for automatic processing of ready items
  */
 class ConsentSyncQueueService {
   private queue: PendingConsentSync[] = [];
   private isInitialized = false;
   private isProcessing = false;
+  private retryTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  private networkUnsubscribe: (() => void) | null = null;
+  private lastNetworkOnlineTime = 0;
+  private networkDebounceMs = 5000; // Debounce network transitions to prevent spam
 
   /**
    * Initialize the queue from storage
    * Call once on app startup
+   * 
+   * Loads persisted queue items and triggers processQueue() if there are pending items
+   * ready for retry.
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
@@ -94,6 +106,11 @@ class ConsentSyncQueueService {
         logger
           .category('analytics')
           .debug(`Loaded ${this.queue.length} pending consent syncs from storage`);
+        
+        // If there are pending items, schedule a retry check
+        if (this.queue.length > 0) {
+          this.scheduleRetryTimeout();
+        }
       }
       this.isInitialized = true;
     } catch (error) {
@@ -107,10 +124,26 @@ class ConsentSyncQueueService {
   /**
    * Enqueue a consent change for syncing to database
    * Non-blocking - adds to queue and returns immediately
+   *
+   * **Coalescing:** If there are already pending items, replaces them with this latest change.
+   * Only the most recent consent level matters, so we avoid unbounded queue growth when
+   * users change consent multiple times while offline.
    */
   async enqueue(level: ConsentLevel): Promise<string> {
     if (!this.isInitialized) {
       await this.initialize();
+    }
+
+    // Coalesce: Remove any existing pending items and replace with latest level
+    // (User changing consent 3 times → only final state persists)
+    if (this.queue.length > 0) {
+      logger
+        .category('analytics')
+        .debug(`Coalescing ${this.queue.length} pending items into new change`, {
+          oldLevel: this.queue[0]?.level,
+          newLevel: level,
+        });
+      this.queue = [];
     }
 
     const id = generateId();
@@ -135,6 +168,9 @@ class ConsentSyncQueueService {
         .category('analytics')
         .error('Background consent sync processing failed', { error });
     });
+
+    // Schedule retry timeout for any pending items
+    this.scheduleRetryTimeout();
 
     return id;
   }
@@ -185,6 +221,9 @@ class ConsentSyncQueueService {
 
       // Persist updated queue
       await this.persist();
+      
+      // Reschedule retry timeout based on any remaining pending items
+      this.scheduleRetryTimeout();
     } catch (error) {
       logger
         .category('analytics')
@@ -222,6 +261,13 @@ class ConsentSyncQueueService {
 
   /**
    * Handle sync failure with retry logic
+   *
+   * Retries with exponential backoff up to maxRetries. After max retries exceeded,
+   * **discards the item** to prevent unbounded queue growth (e.g., failed auth → daily retries forever).
+   *
+   * Rationale: Consent sync failures are typically auth-related (not authenticated at sync time).
+   * Retrying forever serves no purpose. Next time user changes consent (or logs in + changes consent),
+   * a new item will be enqueued with fresh retry count.
    */
   private async handleSyncFailure(
     item: PendingConsentSync,
@@ -243,17 +289,17 @@ class ConsentSyncQueueService {
           nextRetryAt: new Date(item.nextRetryAt).toISOString(),
         });
     } else {
-      // Max retries exceeded - log and keep in queue for manual inspection
+      // Max retries exceeded - discard item to prevent unbounded queue
       logger
         .category('analytics')
-        .error(`Consent sync failed, max retries exceeded`, {
+        .error(`Consent sync failed, max retries exceeded; discarding item`, {
           id: item.id,
           error: errorMsg,
           retries: item.retryCount,
         });
 
-      // Stop retrying but keep in queue (can be manually cleared)
-      item.nextRetryAt = Date.now() + 24 * 60 * 60 * 1000; // Retry once per day
+      // Remove item from queue
+      this.queue = this.queue.filter((i) => i.id !== item.id);
     }
   }
 
@@ -267,6 +313,116 @@ class ConsentSyncQueueService {
       logger
         .category('analytics')
         .error('Failed to persist consent sync queue', { error });
+    }
+  }
+
+  /**
+   * Schedule a timeout to process the queue when the next retry item is ready.
+   * Prevents blocking the main thread and wakes up automatically at the right time.
+   * @internal
+   */
+  private scheduleRetryTimeout(): void {
+    // Clear any existing timeout
+    if (this.retryTimeoutHandle) {
+      clearTimeout(this.retryTimeoutHandle);
+      this.retryTimeoutHandle = null;
+    }
+
+    if (this.queue.length === 0) {
+      return; // Nothing to retry
+    }
+
+    // Find next item ready for retry
+    const now = Date.now();
+    const nextRetryItem = this.queue.reduce<PendingConsentSync | null>(
+      (nearest, item) => {
+        if (!nearest || item.nextRetryAt < nearest.nextRetryAt) {
+          return item;
+        }
+        return nearest;
+      },
+      null,
+    );
+
+    if (!nextRetryItem) {
+      return;
+    }
+
+    const delayMs = Math.max(0, nextRetryItem.nextRetryAt - now);
+
+    // Schedule timeout to check if item is ready
+    // Add small jitter to prevent thundering herd if multiple queues scheduled similarly
+    const jitteredDelayMs = delayMs + Math.random() * 100;
+
+    this.retryTimeoutHandle = setTimeout(() => {
+      this.retryTimeoutHandle = null;
+      this.processQueue().catch((error) => {
+        logger
+          .category('analytics')
+          .warn('Retry timeout processing failed', { error });
+      });
+    }, jitteredDelayMs);
+
+    logger
+      .category('analytics')
+      .debug(`Scheduled next consent sync retry in ${delayMs}ms`);
+  }
+
+  /**
+   * Hook into NetworkDetection for automatic processing on reconnect.
+   * Triggers processQueue() when device transitions from offline → online.
+   */
+  hookNetworkDetection(networkDetection: { subscribe: (cb: (status: { isOnline: boolean }) => void) => () => void }): void {
+    if (this.networkUnsubscribe) {
+      logger
+        .category('analytics')
+        .warn('ConsentSyncQueue', 'NetworkDetection already hooked');
+      return;
+    }
+
+    let wasOnline = true; // Assume online on initial hook
+
+    this.networkUnsubscribe = networkDetection.subscribe(async (status) => {
+      const now = Date.now();
+      const isOnline = status.isOnline;
+
+      // Online transition (false -> true) with debounce
+      if (isOnline && !wasOnline && now - this.lastNetworkOnlineTime >= this.networkDebounceMs) {
+        this.lastNetworkOnlineTime = now;
+        logger
+          .category('analytics')
+          .info('ConsentSyncQueue', 'Online transition detected, triggering auto-process');
+
+        // Process in background (non-blocking)
+        this.processQueue().catch((err) => {
+          logger
+            .category('analytics')
+            .warn('ConsentSyncQueue', `Auto-process failed: ${err}`);
+        });
+      }
+
+      wasOnline = isOnline;
+    });
+
+    logger.category('analytics').info('ConsentSyncQueue', 'NetworkDetection hook installed');
+  }
+
+  /**
+   * Unhook from NetworkDetection
+   */
+  unhookNetworkDetection(): void {
+    if (this.networkUnsubscribe) {
+      this.networkUnsubscribe();
+      this.networkUnsubscribe = null;
+      logger
+        .category('analytics')
+        .info('ConsentSyncQueue', 'NetworkDetection hook removed');
+    }
+
+    // Also clear retry timeout
+    if (this.retryTimeoutHandle) {
+      clearTimeout(this.retryTimeoutHandle);
+      this.retryTimeoutHandle = null;
     }
   }
 
@@ -315,6 +471,7 @@ export function getConsentSyncQueue(): ConsentSyncQueueService {
 export const ConsentSyncQueue = {
   /**
    * Initialize queue from storage (call once at app startup)
+   * Loads persisted queue items and schedules retry timeout if needed
    */
   async initialize(): Promise<void> {
     return getConsentSyncQueue().initialize();
@@ -353,6 +510,20 @@ export const ConsentSyncQueue = {
    */
   async clear(): Promise<void> {
     return getConsentSyncQueue().clear();
+  },
+
+  /**
+   * Hook into NetworkDetection for automatic processing on reconnect
+   */
+  hookNetworkDetection(networkDetection: { subscribe: (cb: (status: { isOnline: boolean }) => void) => () => void }): void {
+    return getConsentSyncQueue().hookNetworkDetection(networkDetection);
+  },
+
+  /**
+   * Unhook from NetworkDetection
+   */
+  unhookNetworkDetection(): void {
+    return getConsentSyncQueue().unhookNetworkDetection();
   },
 };
 

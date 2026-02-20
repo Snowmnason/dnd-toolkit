@@ -169,7 +169,7 @@ Manages user consent levels for analytics tracking. Persists consent across app 
 ```
 App Bootstrap (AppKernel.initialize)
         ↓
-AnalyticsConsent.initialize()  ← Read priority: DB → SecureStorage → default 'basic'
+AnalyticsConsent.initialize()  ← Read priority: fresh SecureStorage → DB → stale SecureStorage → default 'basic'
         ↓
 [Consent restored from storage/database]
         ↓
@@ -199,7 +199,7 @@ AnalyticsConsent.setLevel()  ← Persist to SecureStorage + queue DB sync
 
 Initializes consent from storage. **Call during app bootstrap (AppKernel does this automatically).**
 
-Read priority: database (if authenticated) → SecureStorage cache → default `'basic'`.
+Read priority: fresh SecureStorage cache → database (if authenticated) → stale SecureStorage cache → default `'basic'`.
 
 ```ts
 // Called automatically by AppKernel - manual calls usually unnecessary
@@ -298,7 +298,9 @@ Queues consent level updates for syncing to the database when online. Handles of
 
 ##### `ConsentSyncQueue.initialize(): Promise<void>`
 
-Initializes queue from storage. **Call during app bootstrap (AppKernel does this automatically).**
+Initializes queue from storage and sets up automatic processing. **Called automatically by AppKernel during auth phase bootstrap.**
+
+Loads any persisted sync items from SecureStorage and schedules retry timeouts for items ready to process. Also registers a network listener that automatically processes the queue when the device comes back online.
 
 ```ts
 // Called automatically by AppKernel - manual calls usually unnecessary
@@ -349,8 +351,8 @@ await ConsentSyncQueue.clear(); // Clear all pending syncs
 #### Integration Points
 
 - **AnalyticsConsent.setLevel()**: Automatically queues database sync on consent changes
-- **Network recovery**: Queue processes automatically when connection restored
-- **AppKernel Bootstrap**: `ConsentSyncQueue.initialize()` called during startup
+- **Network recovery**: Queue processes automatically when connection restored (via NetworkDetection subscription)
+- **AppKernel Bootstrap**: `ConsentSyncQueue.initialize()` called during auth phase, loads persisted items and sets up network listener for automatic processing
 
 ---
 

@@ -9,7 +9,7 @@ vi.mock('@/lib/config/loader', () => ({
 }));
 
 // Provide a test-local mock for storage so we can reliably observe calls
-vi.mock('@/lib/storage', () => {
+    vi.mock('@/lib/storage', () => {
   return {
     SecureStorage: {
       getItem: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock('@/lib/storage', () => {
       getJSON: vi.fn(),
       setJSON: vi.fn(),
     },
-    STORAGE_KEYS: { ANALYTICS_CONSENT: 'dnd:analytics:consent' },
+    STORAGE_KEYS: { ANALYTICS_CONSENT: 'dnd:analytics:consent', ANALYTICS_CONSENT_META: 'dnd:analytics:consent_meta' },
   };
 });
 

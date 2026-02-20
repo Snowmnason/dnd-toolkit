@@ -1,5 +1,4 @@
 import { RequestManager } from "../api/request-manager";
-import { QueryCache } from "../cache";
 import { logger } from "../utils/logger";
 import { getCurrentUserProfile, validateUserForWrite } from "./common";
 import { supabase } from "./supabase";
@@ -31,7 +30,7 @@ export const userSettingsDB = {
           STORAGE_KEYS.USER_SETTINGS,
         );
         const cacheMeta = await SecureStorage.getJSON<{ timestamp: number }>(
-          `${STORAGE_KEYS.USER_SETTINGS}_meta`,
+          STORAGE_KEYS.USER_SETTINGS_META,
         );
 
         // Cache is valid only if both settings data and metadata exist, and metadata is fresh
@@ -148,7 +147,7 @@ export const userSettingsDB = {
       const { SecureStorage, STORAGE_KEYS } = await import("../storage");
 
       await SecureStorage.setJSON(STORAGE_KEYS.USER_SETTINGS, data);
-      await SecureStorage.setJSON(`${STORAGE_KEYS.USER_SETTINGS}_meta`, {
+      await SecureStorage.setJSON(STORAGE_KEYS.USER_SETTINGS_META, {
         timestamp: Date.now(),
         source: "supabase",
       });
@@ -208,9 +207,6 @@ export const userSettingsDB = {
           userId: currentUser.id,
           level: data.analytics_consent_level,
         });
-
-        // Invalidate user settings cache
-        await QueryCache.invalidateByTags(['user:settings', `user:${currentUser.id}:settings`]);
 
         // Update cached settings with new consent level
         try {
