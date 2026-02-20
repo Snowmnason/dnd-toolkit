@@ -13,6 +13,7 @@ Consent-aware analytics and performance monitoring. Handles event tracking, user
 - Manage user sessions, screen views, and error counts
 - Queue events when offline and flush them automatically when reconnected
 - Track A/B test variant assignments and engagement
+- **Manage user consent levels for GDPR compliance** (persist across app restarts, sync to database)
 
 **Do NOT use this module for:**
 
@@ -151,19 +152,207 @@ Tracks session lifetime, screen views, and error counts. Sends `session_started`
 
 ### `AnalyticsConsent` Object
 
-Controls which categories of events are allowed. Defaults to `'basic'` (GDPR safe).
+**GDPR-compliant consent management with persistent storage and database sync.**
 
-| Level | What is tracked |
-| ----- | --------------- |
-| `'none'` | Nothing |
-| `'basic'` | Essential events only (errors, auth, session) |
-| `'full'` | All events including usage and performance |
+Manages user consent levels for analytics tracking. Persists consent across app restarts using SecureStorage and optionally syncs to database for cross-device agreement. Defaults to `'basic'` level (GDPR safe) on first launch.
+
+#### Consent Level Semantics
+
+| Level | What is tracked | GDPR Compliance |
+| ----- | --------------- | --------------- |
+| `'none'` | Nothing (analytics disabled) | ✅ Fully compliant |
+| `'basic'` | Essential events only (errors, auth, session) | ✅ GDPR safe minimum |
+| `'full'` | All events including usage and performance | ⚠️ Requires explicit opt-in |
+
+#### Architecture: Persistence → Restore → Event Emission Flow
+
+```
+App Bootstrap (AppKernel.initialize)
+        ↓
+AnalyticsConsent.initialize()  ← Read priority: fresh SecureStorage → DB → stale SecureStorage → default 'basic'
+        ↓
+[Consent restored from storage/database]
+        ↓
+User Action / Runtime Event
+        ↓
+AnalyticsConsent.isAllowed(category)  ← Check consent before emission
+        ↓
+[Event allowed] → Emit to Sentry/analytics
+[Event blocked] → Silent no-op
+        ↓
+User changes consent (via UI hook)
+        ↓
+AnalyticsConsent.setLevel()  ← Persist to SecureStorage + queue DB sync
+```
+
+**Key Principles:**
+
+- **Privacy-first**: Defaults to `'basic'` (essential tracking only) for GDPR compliance
+- **Persistent**: Survives app restarts via SecureStorage encryption (AES-256-CTR)
+- **Cross-device sync**: Database-backed for profile consistency (optional)
+- **Non-blocking**: Storage operations are async; app continues with defaults on failure
+- **Feature-gated**: `'persist-analytics-consent'` flag controls persistence behavior
+
+#### API Reference
+
+##### `AnalyticsConsent.initialize(options?): Promise<ConsentLevel>`
+
+Initializes consent from storage. **Call during app bootstrap (AppKernel does this automatically).**
+
+Read priority: fresh SecureStorage cache → database (if authenticated) → stale SecureStorage cache → default `'basic'`.
 
 ```ts
-AnalyticsConsent.setLevel("full");
-AnalyticsConsent.getLevel(); // 'full'
-AnalyticsConsent.isAllowed("performance"); // true
+// Called automatically by AppKernel - manual calls usually unnecessary
+const level = await AnalyticsConsent.initialize({
+  maxAgeMs: 4 * 60 * 60 * 1000,  // 4 hours cache freshness
+  forceRefresh: false,            // Skip cache, force DB fetch
+});
 ```
+
+##### `AnalyticsConsent.setLevel(level: ConsentLevel): Promise<void>`
+
+Updates consent level and persists to SecureStorage. Queues database sync for cross-device agreement.
+
+Non-blocking: persists locally immediately, syncs to database asynchronously.
+
+```ts
+await AnalyticsConsent.setLevel('full');  // Enables all tracking
+await AnalyticsConsent.setLevel('basic'); // GDPR-safe minimum
+await AnalyticsConsent.setLevel('none');  // Disables all tracking
+```
+
+##### `AnalyticsConsent.getLevel(): ConsentLevel`
+
+Returns current in-memory consent level.
+
+```ts
+const level = AnalyticsConsent.getLevel(); // 'basic' | 'full' | 'none'
+```
+
+##### `AnalyticsConsent.isAllowed(category: 'essential' | 'performance' | 'usage'): boolean`
+
+Checks if a tracking category is allowed based on current consent level.
+
+```ts
+if (AnalyticsConsent.isAllowed('performance')) {
+  // Send performance events
+}
+if (AnalyticsConsent.isAllowed('usage')) {
+  // Send usage analytics
+}
+// 'essential' always allowed (errors, auth, session)
+```
+
+##### `AnalyticsConsent.getStoredConsent(): Promise<ConsentLevel>`
+
+Reads consent directly from SecureStorage (bypasses in-memory state).
+
+```ts
+const stored = await AnalyticsConsent.getStoredConsent(); // For diagnostics
+```
+
+#### Integration Points
+
+- **#70 (Analytics Buffer)**: Respects consent when queueing events; clears buffer on consent downgrade
+- **#178 (Custom Exporters)**: Events gated by consent before export
+- **AppKernel Bootstrap**: `AnalyticsConsent.initialize()` called early in startup sequence
+- **Settings UI**: Toggle switch in `Screens/settings/AppSettings.tsx` via `useAnalyticsConsent()` hook
+- **Database Sync**: Consent changes queued via `ConsentSyncQueue` for cross-device agreement
+
+#### GDPR/Compliance Context
+
+- **Default 'basic'**: Ensures GDPR compliance out-of-the-box without user action
+- **Explicit opt-in**: Users must actively choose 'full' tracking
+- **Consent withdrawal**: Downgrading consent clears existing analytics buffer
+- **Audit trail**: Consent changes logged via `logger.category('analytics')`
+- **Data minimization**: Only essential data sent at 'basic' level
+- **Platform notes**:
+  - **Web**: Uses localStorage via SecureStorage (encrypted)
+  - **iOS**: Uses Keychain via Expo SecureStore
+  - **Android**: Uses SharedPreferences via Expo SecureStore
+  - **Desktop**: Uses OS-specific secure storage
+
+#### Future Enhancements
+
+- **Granular consent levels**: Per-category toggles (performance, usage, marketing)
+- **Audit history UI**: Show consent change timeline
+- **Server-side sync**: Conflict resolution for cross-device consent changes
+- **Consent expiration**: Time-based consent refresh requirements
+
+---
+
+### `ConsentSyncQueue` Object
+
+**Asynchronous database sync for consent changes.**
+
+Queues consent level updates for syncing to the database when online. Handles offline scenarios with automatic retry on network recovery. Fire-and-forget design ensures consent changes are non-blocking.
+
+#### Features
+
+- **Persistent queue**: Survives app restarts via SecureStorage
+- **Network-aware**: Automatically processes on network recovery
+- **Exponential backoff**: Retries failed syncs (2s → 4s → 8s → 16s → 30s max)
+- **Fire-and-forget**: Non-blocking, doesn't wait for database confirmation
+
+#### API Reference
+
+##### `ConsentSyncQueue.initialize(): Promise<void>`
+
+Initializes queue from storage and sets up automatic processing. **Called automatically by AppKernel during auth phase bootstrap.**
+
+Loads any persisted sync items from SecureStorage and schedules retry timeouts for items ready to process. Also registers a network listener that automatically processes the queue when the device comes back online.
+
+```ts
+// Called automatically by AppKernel - manual calls usually unnecessary
+await ConsentSyncQueue.initialize();
+```
+
+##### `ConsentSyncQueue.enqueue(level: ConsentLevel): Promise<string>`
+
+Queues a consent change for database sync. Returns queue ID for tracking.
+
+```ts
+const syncId = await ConsentSyncQueue.enqueue('full');
+// Consent change queued for database sync
+```
+
+##### `ConsentSyncQueue.processQueue(): Promise<void>`
+
+Manually processes pending syncs. Called automatically on network recovery.
+
+```ts
+await ConsentSyncQueue.processQueue(); // Process all pending syncs
+```
+
+##### `ConsentSyncQueue.size(): number`
+
+Returns current queue size (for diagnostics).
+
+```ts
+const pending = ConsentSyncQueue.size(); // Number of pending syncs
+```
+
+##### `ConsentSyncQueue.getAll(): PendingConsentSync[]`
+
+Returns all pending syncs (for debugging).
+
+```ts
+const pending = ConsentSyncQueue.getAll(); // Array of pending items
+```
+
+##### `ConsentSyncQueue.clear(): Promise<void>`
+
+Clears the queue (use with caution, for testing/recovery).
+
+```ts
+await ConsentSyncQueue.clear(); // Clear all pending syncs
+```
+
+#### Integration Points
+
+- **AnalyticsConsent.setLevel()**: Automatically queues database sync on consent changes
+- **Network recovery**: Queue processes automatically when connection restored (via NetworkDetection subscription)
+- **AppKernel Bootstrap**: `ConsentSyncQueue.initialize()` called during auth phase, loads persisted items and sets up network listener for automatic processing
 
 ---
 

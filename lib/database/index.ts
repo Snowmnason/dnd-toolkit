@@ -10,41 +10,45 @@ export { getSupabaseClient, isSupabaseConfigured, supabase } from "./supabase";
 
 // Common utilities
 export {
-    executeParallelQueries,
-    getCurrentUserProfile,
-    validateUserForWrite
+  executeParallelQueries,
+  getCurrentUserProfile,
+  validateUserForWrite
 } from "./common";
 
 // User operations
 export { usersDB } from "./users";
 export type { CreateUserData, UpdateUserData, User } from "./users";
 
+// User settings operations
+export { userSettingsDB } from "./user_settings";
+export type { UserSettings } from "./user_settings";
+
 // World operations
 export { worldsDB } from "./worlds";
 export type {
-    AccessRole,
-    CreateWorldData,
-    World,
-    WorldAccess,
-    WorldWithAccess
+  AccessRole,
+  CreateWorldData,
+  World,
+  WorldAccess,
+  WorldWithAccess
 } from "./worlds";
 
 // Invite operations
 export {
-    createInviteLink,
-    deleteInviteLink,
-    getWorldInviteLinks,
-    invitesDB,
-    validateInviteToken
+  createInviteLink,
+  deleteInviteLink,
+  getWorldInviteLinks,
+  invitesDB,
+  validateInviteToken
 } from "./invites";
 
 // Entitlements operations
 export {
-    fetchEntitlementOverridesByUserId,
-    fetchEntitlementsByUserId,
-    hasEntitlement,
-    type EntitlementOverrideRow,
-    type EntitlementRow
+  fetchEntitlementOverridesByUserId,
+  fetchEntitlementsByUserId,
+  hasEntitlement,
+  type EntitlementOverrideRow,
+  type EntitlementRow
 } from "./entitlements";
 
 // Feature flags operations
@@ -52,7 +56,7 @@ export type { FeatureFlagRow } from "./feature-flags";
 
 // Feature flag overrides operations
 export type {
-    FeatureFlagOverrideRow,
-    OverrideTargetType
+  FeatureFlagOverrideRow,
+  OverrideTargetType
 } from "./feature-flag-overrides";
 

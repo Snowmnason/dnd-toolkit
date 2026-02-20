@@ -43,17 +43,19 @@ CREATE TABLE public.users (
 -- USER_SETTINGS: Separated from users for extensibility and portability.
 -- One row per user; auto-created on signup via trigger.
 CREATE TABLE public.user_settings (
-  user_id     uuid        NOT NULL,
-  theme       text        NOT NULL DEFAULT 'auto',
-  language    text        NOT NULL DEFAULT 'en',
-  timezone    text        NOT NULL DEFAULT 'UTC',
-  preferences jsonb       NOT NULL DEFAULT '{}',  -- Future: notifications, accessibility, etc.
-  updated_at  timestamptz NOT NULL DEFAULT now(),
+  user_id                   uuid        NOT NULL,
+  theme                     text        NOT NULL DEFAULT 'auto',
+  language                  text        NOT NULL DEFAULT 'en',
+  timezone                  text        NOT NULL DEFAULT 'UTC',
+  preferences               jsonb       NOT NULL DEFAULT '{}',  -- Future: notifications, accessibility, etc.
+  analytics_consent_level   text        NOT NULL DEFAULT 'basic',  -- 'none' | 'basic' | 'full' (GDPR-compliant default)
+  updated_at                timestamptz NOT NULL DEFAULT now(),
 
   CONSTRAINT user_settings_pkey PRIMARY KEY (user_id),
   CONSTRAINT user_settings_user_id_fkey FOREIGN KEY (user_id)
     REFERENCES public.users(id) ON DELETE CASCADE,
-  CONSTRAINT ck_theme_valid CHECK (theme IN ('light', 'dark', 'auto'))
+  CONSTRAINT ck_theme_valid CHECK (theme IN ('light', 'dark', 'auto')),
+  CONSTRAINT ck_analytics_consent_level_valid CHECK (analytics_consent_level IN ('none', 'basic', 'full'))
 );
 
 

@@ -32,6 +32,7 @@ Per-user preferences. One row per user; auto-created on signup via trigger.
 | `timezone`    | text        | No       | `'UTC'`  | Timezone preference                       |
 | `preferences` | jsonb       | No       | `'{}'`   | Future: notifications, accessibility      |
 | `updated_at`  | timestamptz | No       | `now()`  | Auto-updated by trigger                   |
+| `analytics_consent_level` | test | No  | `basic`  | 
 
 **Note**: Reminder preferences are stored per-entitlement in `feature_flag.entitlements.remind_user`, not globally.
 

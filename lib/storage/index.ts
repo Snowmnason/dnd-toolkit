@@ -115,6 +115,10 @@ export const STORAGE_KEYS = {
   THEME_MODE: "dnd:user:theme_mode",
   SCALE_PREFERENCE: "dnd:user:scale",
 
+  // User settings (theme, language, timezone, preferences, analytics_consent_level)
+  USER_SETTINGS: "dnd:user:settings",
+  USER_SETTINGS_META: "dnd:user:settings_meta",
+
   // Feature flags / dev settings
   DEV_MODE: "dnd:dev:mode",
 
@@ -143,6 +147,13 @@ export const STORAGE_KEYS = {
 
   // Performance baseline tracking
   PERF_BASELINES: "dnd:analytics:performance_baselines",
+
+  // Analytics consent (persisted user choice)
+  ANALYTICS_CONSENT: "dnd:analytics:consent",
+  ANALYTICS_CONSENT_META: "dnd:analytics:consent_meta",
+
+  // Analytics consent sync queue (pending DB updates)
+  CONSENT_SYNC_QUEUE: "dnd:analytics:consent_sync_queue",
 
   // Breadcrumb queue (Sentry offline persistence)
   BREADCRUMB_QUEUE: "dnd:sentry:breadcrumb_queue",

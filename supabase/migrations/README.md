@@ -12,6 +12,26 @@ Migrations are organized chronologically and must be run in order:
 4. **004_audit_schema.sql** — Audit logging and change tracking
 5. **005_add_cohorts.sql** — Cohort management and user cohort memberships
 
+## Public Schema (001)
+
+### Tables
+
+| Table | Purpose | Key Columns | Indexes | Constraints |
+|-------|---------|-------------|---------|-------------|
+| `public.users` | Core identity; bridges auth.users to app | `id` (uuid PK), `auth_id` (uuid FK), `username`, `is_admin`, `created_at`, `updated_at`, `deleted_at` (soft delete) | `auth_id` (unique), `created_at DESC`, `deleted_at IS NULL` (partial) | FK to `auth.users(id)`, username not empty |
+| `public.user_settings` | Per-user preferences & consent | `user_id` (uuid PK FK), `theme`, `language`, `timezone`, `preferences` (jsonb), `analytics_consent_level` ('none' \| 'basic' \| 'full', default 'basic'), `updated_at` | `user_id` (PK) | FK to `public.users(id)`, `theme` IN valid values, `analytics_consent_level` IN ('none', 'basic', 'full') |
+
+### Semantics
+
+**`analytics_consent_level` column:**
+- **'none'**: No analytics tracking (strict privacy)
+- **'basic'**: Essential tracking only (errors, auth events, GDPR minimum)
+- **'full'**: All tracking enabled (usage, performance, diagnostics)
+- **Default**: 'basic' (GDPR-safe, privacy-first)
+- **Synced from**: `SecureStorage` at app runtime; optional server sync for cross-device agreement
+- **Auto-initialized**: ON signup via `handle_new_user()` trigger to default 'basic'
+- **Updated by**: Users via settings UI, synced to SecureStorage + queued for database update
+
 ## Feature Flags Schema (003/004/005)
 
 ### Tables

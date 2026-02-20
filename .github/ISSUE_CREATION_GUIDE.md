@@ -16,15 +16,14 @@
 4. [Codebase Status](#codebase-status)
 5. [Solution & Phases](#solution--phases)
 6. [Phase 0: Discussion](#phase-0-discussion)
-7. [Phase 1a/1b/1c: Implementation](#phase-1a1b1c-implementation)
+7. [Phase 1: Tracks (Implementation)](#phase-1-tracks-implementation)
 8. [Phase 2: Documentation](#phase-2-documentation)
 9. [Phase 3: Usage Guides](#phase-3-usage-guides)
 10. [Phase 4: Testing](#phase-4-testing)
 11. [Acceptance Criteria](#acceptance-criteria)
 12. [Dependencies & Notes](#dependencies--notes)
-13. [Research Tips](#research-tips)
-14. [Writing Style](#writing-style)
-15. [Quick Checklist](#quick-checklist)
+13. [Formatting Conventions](#formatting-conventions)
+14. [Quick Checklist](#quick-checklist)
 
 ---
 
@@ -37,7 +36,7 @@ Each comprehensive issue follows a 5-phase structure:
 | Phase | Purpose | Scope | Deliverable |
 |-------|---------|-------|-------------|
 | **Phase 0** | Understanding & Planning | Discussion, clarifying questions, draft PR body | Shared understanding of scope |
-| **Phase 1a/1b/1c** | Implementation | Core feature, split into 3 focused sub-phases | Working code with <10-word commit titles |
+| **Phase 1: Tracks** | Implementation | Isolated tracks (A+B Core, C Integration, D Adoption, E Hardening) — include what applies | Working code per track, each independently reviewable |
 | **Phase 2** | Documentation | Module README, API reference, architecture | lib/[module]/README.md |
 | **Phase 3** | Guides & Testing | Usage guide, test guide with manual cases | docs/issues/MileStone/... |
 | **Phase 4** | Testing | Unit, integration, E2E, stress tests | Test coverage verified |
@@ -45,7 +44,7 @@ Each comprehensive issue follows a 5-phase structure:
 ### Why This Structure?
 
 - **Phase 0:** Ensures both developer and user understand scope before code starts (prevents rework)
-- **Phase 1a/1b/1c:** Splits large features into logically independent parts (easier review, smaller PRs)
+- **Phase 1 Tracks:** Isolates each concern (Core+Surface, Integration, Adoption, Hardening) so each track is reviewable independently — Track E keeps logging/warnings out of Track C reviews
 - **Phase 2:** Ensures API is documented as it's built (not retrofit)
 - **Phase 3:** Creates reusable guides for future developers
 - **Phase 4:** Guarantees quality (unit + integration + E2E + stress)
@@ -58,7 +57,6 @@ Each comprehensive issue follows a 5-phase structure:
 
 Start every issue with a header block:
 
-```markdown
 # Issue #XXX: [Feature Name]
 
 **Status:** Tier 4 (Category)  
@@ -66,14 +64,10 @@ Start every issue with a header block:
 **Depends on:** #ABC (Feature X), #DEF (Feature Y)  
 **Integrates with:** `lib/module`, `lib/other-module`, Component/Hook name, Feature flags  
 **Impacts (check if applicable):**
-  - [ ] Config (add to appsettings.json AND appsettings.dev.json)
+  - [ ] Config — edit `appsettings.json`, `appsettings.dev.json`, config loader, `expected-differences.json`
   - [ ] Storage/Migration (SecureStorage key, schema changes, migration logic)
   - [ ] PII/Privacy (user data handling, consent checks)
   - [ ] Encryption (data at rest via SecureStorage)
-
-## Problem
-...
-```
 
 ### Header Fields Explained
 
@@ -99,7 +93,6 @@ Start every issue with a header block:
 
 ### Format
 
-```markdown
 ## Problem
 
 [Current broken behavior with 2-3 concrete examples]
@@ -109,22 +102,6 @@ Start every issue with a header block:
 - **Issue 3** — Real-world impact on users/developers
 
 Result: [1-2 sentence summary of impact]
-```
-
-### Example
-
-```markdown
-## Problem
-
-Analytics consent is reset on app restart:
-
-- **Lost consent** — User opts into 'full' tracking → app restarts → consent resets to 'basic'
-- **Friction & friction** — Users must re-consent every session (poor UX)
-- **GDPR risk** — Without persistent consent, tracking may not be legally compliant
-- **Silent tracking** — App may emit events without user's current consent level
-
-Result: Consent is not reliably persisted, creating compliance risk and UX friction.
-```
 
 ### Problem Writing Tips
 
@@ -141,7 +118,6 @@ Result: Consent is not reliably persisted, creating compliance risk and UX frict
 
 ### Format
 
-```markdown
 ## Codebase Status
 
 **Currently Implemented:**
@@ -152,23 +128,6 @@ Result: Consent is not reliably persisted, creating compliance risk and UX frict
 - ⚠️ **[Missing piece 1]** — [Why needed, impact]
 - ⚠️ **[Missing piece 2]** — [Example: no API exists, code tightly coupled]
 - ⚠️ **[Missing piece 3]** — [Volume of work: "No README", "No test guide"]
-```
-
-### Example
-
-```markdown
-## Codebase Status
-
-**Currently Implemented:**
-- ✅ `lib/offline/mutation-queue.ts` — Offline queue pattern (FIFO, SecureStorage, retry backoff)
-- ✅ `lib/network/network-detection.ts` — Online/offline detection
-- ✅ #70 implementation — Analytics Buffer exists
-
-**Gap Analysis:**
-- ⚠️ **No Sentry breadcrumb persistence** — Breadcrumbs lost when app restarts
-- ⚠️ **No integration with Sentry transport** — Queue exists but doesn't sync with Sentry
-- ⚠️ **No README** for offline Sentry module
-```
 
 ### Gap Analysis Best Practices
 
@@ -196,9 +155,9 @@ Result: Consent is not reliably persisted, creating compliance risk and UX frict
 ### Solution Tips
 
 - **Lead with big picture:** One sentence saying what architecture/pattern you're using
-- **3 sub-phases:** Break Phase 1 into a, b, c (manageable 1-2 week chunks)
-- **Sub-phase progression:** Each builds on previous (1b uses output of 1a, etc.)
-- **Phase names are commit titles:** "Implement percentile computation and regression detection" NOT "Phase 1b: Implement..."
+- **Use Tracks:** Include only the tracks that apply — A+B (always), C (always), D (if migrating), E (recommended)
+- **Track isolation:** Each track is a separate review unit; don't mix concerns across tracks
+- **Track titles are commit titles:** "Create consent manager and barrel exports" NOT "Track A+B: Create..."
 
 ---
 
@@ -206,9 +165,6 @@ Result: Consent is not reliably persisted, creating compliance risk and UX frict
 
 **Goal:** Ensure developer and stakeholder agree on scope BEFORE any code is written.
 
-### Format
-
-```markdown
 ## Phase 0: Understand scope and draft PR body
 
 **Scope:**
@@ -241,17 +197,17 @@ Result: Consent is not reliably persisted, creating compliance risk and UX frict
 - [Design decision 1]
 - [Design decision 2]
 
-### Phases
-- Phase 1a: [What's built]
-- Phase 1b: [What's built]
-- Phase 1c: [What's built]
+### Tracks
+- Track A+B: [Core files + barrel exports]
+- Track C: [Runtime integration]
+- Track D: [Adoption/migration, if applicable]
+- Track E: [Hardening — logging, warnings, edge cases]
 - Phase 2-4: [Docs, tests]
 
 ### Success Criteria
 - [Criterion 1]
 - [Criterion 2]
 \`\`\`
-```
 
 ### Phase 0 Tips
 
@@ -260,98 +216,231 @@ Result: Consent is not reliably persisted, creating compliance risk and UX frict
 - **Draft PR body:** This is reference documentation (NOT a GitHub PR yet); it's a shared understanding
 - **Clear acceptance criteria:** Make sure 3-5 success criteria are non-ambiguous
 
-### Example Key Questions (per issue type)
+## Phase 1: Tracks (Implementation)
 
-**For persistence features (#181 consent):**
-- What if storage is full? — Drop? Block?
-- How to recover from corruption? — Validate on load, migrate if needed?
-- First-time user defaults? — GDPR-safe 'basic' or ask?
+**Goal:** Build and wire the feature in isolated, reviewable increments.
 
-**For queueing features (#70 analytics buffer):**
-- Max queue size? — How many events before dropping?
-- Retry strategy? — Exponential backoff or fixed delays?
-- Deduplication? — How to prevent duplicate events?
+Phase 1 uses a **Tracks model** — include only the tracks that apply. Each track is a separate review unit.
 
-**For multi-backend features (#178 exporters):**
-- Error isolation? — One exporter fails, should others run?
-- Async or sync? — Block dispatch or non-blocking?
-- Feature flag control? — How to enable/disable per exporter?
+| Track | Name | Required? | Goal |
+|-------|------|-----------|------|
+| **A+B** | Core + Surface | Always (new system) | Build files in isolation, add barrel exports |
+| **C** | Integration | Always | Wire into runtime (providers, hooks, bootstrap) |
+| **D** | Adoption | Only if replacing something | Migrate call sites, remove old code |
+| **E** | Hardening | Recommended | Logging, warnings, edge cases, type polish |
+| **F** | Codebase Checklist | Always (before PR) | Final verification — PII, analytics gates, network resilience, safe mode |
+
+> **For update issues:** Add a **Track 0 — Intent + Impact** step before coding (format below).
 
 ---
 
-## Phase 1a/1b/1c: Implementation
+### Track 0 — Intent + Impact (update issues only)
 
-**Goal:** Detailed implementation guidance for 3 focused sub-phases.
+Before writing any code on an update issue, define:
 
-### Format for Each Phase
+- **What is changing?** — behavior, signature, data shape, side effects
+- **Is it breaking?** — yes/no + migration plan or feature flag scope
+- **Impacted modules list** — even if incomplete (prevents "forgot to update X" PR churn)
+- **Rollout plan** — flag / adapter / direct swap
 
-```markdown
-## Phase 1a: [Specific title]
+✅ Exit: reviewer can see exactly what's changing and which files will be touched before a line of code is written.
+
+---
+
+### Track A+B — Core + Surface
+
+**Goal:** The new system works in isolation and has a clean public API.
+
+**Scope:**
+- [ ] Create files, types, interfaces under `lib/module/`
+- [ ] Implement core logic + edge cases
+- [ ] Add internal validation (zod/guards), error types
+- [ ] Add barrel exports (`lib/module/index.ts`)
+- [ ] Define the one recommended import path
+- [ ] Hide internals — only expose the public surface
+
+✅ Exit: runs/unit-tests locally without touching app routing or UI. Reviewer can tell what's public vs private instantly.
+
+---
+
+### Track C — Integration
+
+**Goal:** The app can actually use the system.
+
+**Scope:**
+- [ ] Add providers/hooks (if needed)
+- [ ] Connect to navigation, bootstrap, request-manager, storage, cache, etc.
+- [ ] Honor feature flags / dev-prod config (if relevant)
+- [ ] Update `appsettings.json`, `appsettings.dev.json`, config loader, `expected-differences.json` (if applicable)
+
+✅ Exit: feature is exercisable from the app (even if only in a dev screen or via logs).
+
+---
+
+### Track D — Adoption (only if migrating from old system)
+
+**Goal:** Existing code stops doing the old thing.
+
+**Scope:**
+- [ ] Update impacted modules (list them explicitly)
+- [ ] Replace old utilities / patterns
+- [ ] Remove duplicated logic
+- [ ] Mark any temporary compat adapters with `// TODO: remove after #XXX`
+
+✅ Exit: no "half old / half new" behavior remains (or it's explicitly staged with a TODO).
+
+---
+
+### Track E — Hardening
+
+**Goal:** Remove papercuts that cause PR churn. Keep isolated from Track C so logging/warnings don't pollute that review.
+
+**Scope:**
+- [ ] Fill edge cases discovered during Track C/D
+- [ ] Tighten types
+- [ ] Add runtime safety checks + clearer error messages
+- [ ] Add logger categories and consistent error handling
+- [ ] Fix any console warnings introduced
+
+✅ Exit: `npm run lint` passes, no TypeScript errors, no noisy console output.
+
+---
+
+### Track F — Codebase Checklist
+
+**Goal:** Final verification pass before PR. Confirm the feature is coded safely and integrated correctly with the app's cross-cutting concerns. This is a copy-paste checklist — tick what applies, skip what doesn't.
+
+> ⚠️ This is a **coding checklist** only — testing and documentation have their own phases (2-4).
+
+**Scope:**
+- [ ] **PII Safety** — No user-identifiable data in logs, analytics events, or Sentry breadcrumbs; sanitized before leaving device
+- [ ] **Analytics Consent Gate** — All analytics events check consent level before emitting; respects `ConsentLevel` (#181)
+- [ ] **Safe Mode / Degradation** — Feature degrades gracefully; fallback UI exists; safe mode considered (#172)
+- [ ] **Network Resilience** — Works offline or queues operations; circuit breaker aware (#206, #217)
+- [ ] **Adaptive Payload** — Request payload sized for network quality where relevant (#205)
+- [ ] **Background Jobs** — Async operations use job queue, not fire-and-forget promises (#167)
+- [ ] **Feature Flag Gating** — Feature is gated if experimental; progressive rollout considered
+- [ ] **Navigation System** — Centralized Navigation System that helps allow proper routing and auth grauds
+- [ ] **Cache Invalidation** — Any data writes properly invalidate related cache tags; no orphaned stale data
+- [ ] **Performance Baseline** — Screen/request timing tracked where relevant; slow operation thresholds respected (#180)
+- [ ] **Config Support** — Behaviour is env-aware; feature toggles in `appsettings.json` if needed
+- [ ] **Error Handling** — Errors categorized, user-facing messages exist, recovery path defined
+
+✅ Exit: All applicable items checked. PR reviewer can see which items were skipped and why.
+
+---
+
+### Format for Each Track
+
+## Track A+B: [Specific title]
 
 **Scope:**
 - [ ] Create `lib/module/file.ts`:
   - [Interface/type definition]
   - [Class with methods]
-  - [Helper functions]
   - [Error handling approach]
-  - [Config via appsettings]
+- [ ] Barrel export in `lib/module/index.ts`
 
-- [ ] [Specific second task]
-  - Implementation details
-  - Integration point
-  
-- [ ] [Third task if needed]
+✅ Exit: [What to verify before moving to Track C]
 
-**Verification only (no server changes yet):**
-- [What to verify before moving to Phase 1b]
+### Optional: Sub-Tracks (when a track is large)
 
----
+If Track A+B (or any track) has multiple **independent concerns**, break it into **Sub-tracks** that can be reviewed/implemented in sequence:
 
-## Phase 1b: [Next logical feature]
+```markdown
+## Track A+B: [Specific title with multiple concerns]
 
-**Scope:**
-- [ ] [Task 1 with details]
+**Goal:** [Overall goal]
+
+**Scope — Sub-track 1: [First independent concern]**
+- [ ] [Task 1]
 - [ ] [Task 2]
 
+✅ Exit: [Sub-track 1 specific exit criteria]
+
 ---
 
-## Phase 1c: [Final sub-phase]
+**Scope — Sub-track 2: [Second independent concern]**
+- [ ] [Task 3]
+- [ ] [Task 4]
 
-**Scope:**
-- [ ] [Summary scope]
+✅ Exit: [Sub-track 2 specific exit criteria]
 
+---
+
+**Scope — Sub-track 3: [Third independent concern]**
+- [ ] [Task 5]
+
+✅ Exit: [Sub-track 3 specific exit criteria and final track exit]
 ```
 
-### Implementation Phase Tips
+**When to use sub-tracks:**
+- A single track is large enough that it has 2+ independent concerns (e.g., local storage + database persistence)
+- Each sub-track can be implemented/reviewed independently
+- Dependencies between sub-tracks are clear
 
-- **Be VERY specific:** Include example TypeScript interfaces, method signatures
-- **Sub-phase independence:** Each can be code-reviewed separately
-- **Configuration:** Show appsettings config JSON
-- **Integration:** Mention how this connects to other systems (#70, #208, etc.)
-- **Commit titles:** Phase headers ARE commit titles (no "Commit title:" prefix)
+**When NOT to use sub-tracks:**
+- Track is already small (A+B are usually 1-2 files, C is 1-2 changes). Avoid over-organizing.
+- Tasks are sequential and depend heavily on each other.
 
-### Example Scope Item (Detailed)
+---
+
+## Track C: [Integration title]
+
+**Scope:**
+- [ ] [Task with details]
+- [ ] Config: `appsettings.json`, `appsettings.dev.json`, loader, `expected-differences.json`
+
+✅ Exit: [What to verify]
+
+---
+
+## Track E: Hardening
+
+**Scope:**
+- [ ] [Logging + warnings + edge cases]
+
+✅ Exit: lint passes, no TypeScript errors, no console noise
+
+---
+
+## Track F: Codebase Checklist
+
+- [ ] **PII Safety** — [tick or note N/A]
+- [ ] **Analytics Consent Gate** — [tick or note N/A]
+- [ ] **Safe Mode / Degradation** — [tick or note N/A]
+- [ ] **Network Resilience** — [tick or note N/A]
+- [ ] **Adaptive Payload** — [tick or note N/A]
+- [ ] **Background Jobs** — [tick or note N/A]
+- [ ] **Feature Flag Gating** — [tick or note N/A]
+- [ ] **Cache Invalidation** — [tick or note N/A]
+- [ ] **Performance Baseline** — [tick or note N/A]
+- [ ] **Config Support** — [tick or note N/A]
+- [ ] **Error Handling** — [tick or note N/A]
+
+✅ Exit: All applicable items checked. Skipped items noted as N/A.
+
+### Tracks Tips
+
+- **Track isolation:** Do not mix A+B work into Track C — each track is its own review unit
+- **Track E is always separate:** Logging and warning fixes go here, not in C — keeps C reviews clean
+- **Config always in Track C:** All `appsettings.*` + `expected-differences.json` edits belong in Track C
+- **Sub-tracks for large tracks:** If a single track has 2+ independent concerns (e.g., local + database persistence), break into Sub-track 1, 2, 3 — each with its own exit criteria. Avoids single PRs being too large.
+- **Specific over vague:** Include TypeScript interfaces, method signatures, config JSON
+- **Track titles are commit titles:** e.g., "Create consent manager and barrel exports"
+
+### Example Track A+B Scope Item
 
 ```markdown
 - [ ] Create `lib/analytics/performance-baseline.ts`:
-  - `OperationBaseline` type:
-    ```typescript
-    {
-      label: string;
-      p50: number;
-      p95: number;
-      p99: number;
-      lastUpdated: number;
-      version: number;
-    }
-    ```
+  - `OperationBaseline` type: `{ label, p50, p95, p99, lastUpdated, version }`
   - `PerformanceBaselineService` class:
     - `initialize()` → Load from SecureStorage
     - `recordSample(label, duration)` → Add + persist
     - `getBaseline(label)` → Return p50/p95/p99
   - Storage key: `dnd:performance:baselines` (use STORAGE_KEYS)
   - Validation: Ensure p50 ≤ p95 ≤ p99
-```
+- [ ] Export from `lib/analytics/index.ts`
 
 ---
 
@@ -359,9 +448,6 @@ Result: Consent is not reliably persisted, creating compliance risk and UX frict
 
 **Goal:** Module README documenting architecture, API, integration points.
 
-### Format
-
-```markdown
 ## Phase 2: Create lib/[module]/README.md
 
 **Scope:**
@@ -378,7 +464,7 @@ Result: Consent is not reliably persisted, creating compliance risk and UX frict
 - [ ] Testing section (link to test guide if exists, or manual testing tips)
 - [ ] Future Enhancements (planned improvements or tech debt)
 - [ ] **Must be app-agnostic** – no app-specific language; readable by developers using this in future projects
-```
+
 
 ### Phase 2 Tips
 
@@ -390,53 +476,13 @@ Result: Consent is not reliably persisted, creating compliance risk and UX frict
 - **Follow the style guide:** See `.github\README_STYLE_GUIDE.md` for detailed formatting requirements for all issue docs
 - **Avoid Testing/Future sections if not applicable:** Per repository guidelines, these are optional for simple modules but required for complex ones
 
-### Example README Structure
-
-```markdown
-# Performance Baseline Module
-
-## When to Use This Module
-
-Use this module when you need to:
-- Track performance metrics over time
-- Detect regressions (e.g., screen got 20% slower)
-- Monitor baselines (p50, p95, p99 percentiles)
-
-Do NOT use this module for:
-- Real-time dashboards (use raw metrics instead)
-- Single-sample measurements (need historical context)
-
-## Architecture
-
-recordSample(duration) → update percentiles → compare to baseline → emit regression event
-
-## API Reference
-
-### recordSample(label: string, durationMs: number): void
-Add a measurement to baseline for named operation.
-
-```
-const baseline = new PerformanceBaselineService();
-baseline.recordSample('screen-load', 500);
-```
-
-## Integration Points
-
-- #70 (Analytics Buffer) — Queue regression events offline
-- #178 (Custom Exporters) — Export regression to backend
-- #208 (Network Telemetry) — Log via category('performance')
-```
-
 ---
 
 ## Phase 3: Usage Guides
 
 **Goal:** Real-world integration guide + test guide for manual testing.
 
-### Format
-
-```markdown
-## Phase 3: Create usage guide and test guide
+## Phase 3: Create usage guide
 
 **Scope:**
 
@@ -454,37 +500,20 @@ baseline.recordSample('screen-load', 500);
 - [ ] Debugging section (how to identify issues)
 - [ ] Troubleshooting (common problems + solutions)
 
-```
+Additional files are allowed and encouraged when needed:
+
+| File (example names) | When to create it |
+| -------------------- | ----------------- |
+| `ARCHITECTURE.md` | When the feature has a non-trivial data flow or system design worth diagramming separately |
+| `EXAMPLES.md` | When the Usage Guide would get too long with all examples inline |
+| `LIMITS.md` | When the feature has important constraints, quotas, or known boundaries a dev needs to know |
+| `MISSING.md` or `GAPS.md` | When scope was intentionally cut and a future dev needs to know what is not done yet |
+| `VARIANT_TRACKING_GUIDE.md` | Feature-specific doc for A/B test variant tracking, etc. |
 
 ### Phase 3 Tips
 
-- **Integration checklist:** Step-by-step ([ ] for each step), not prose
-- **Code examples:** Minimal but complete (copy-paste ready)
-- **Test cases:** Format:
-  ```markdown
-  - [ ] Case: [What is being tested]
-    - Setup: [Prerequisites]
-    - Steps: 1. ... 2. ... 3. ...
-    - Expected: [What should happen]
-    - Platform: web, iOS, Android (list applicable)
-  ```
-- **14+ test cases:** Covers happy path, errors, edge cases, offline scenarios
-- **Success criteria:** Quantifiable (not "seems good", but "100% events delivered")
 - **Follow the style guide:** See `.github/ISSUE_DOC_STYLE_GUIDE.md` for detailed formatting requirements for all issue docs
 - **Optional additional docs:** For complex features, consider creating `ARCHITECTURE.md`, `EXAMPLES.md`, `LIMITS.md`, `MISSING.md`, or `VARIANT_TRACKING_GUIDE.md` as needed (see style guide for when to use each)
-
-### Example Test Case
-
-```markdown
-- [ ] Breadcrumb offline → queued to SecureStorage
-  - Setup: AnalyticsConsent initialized, network offline
-  - Steps:
-    1. Call Sentry.addBreadcrumb({message: 'test'})
-    2. Verify SecureStorage has `dnd:sentry:breadcrumb_queue`
-    3. Check queue contains 1 breadcrumb with correct message
-  - Expected: Breadcrumb persisted, Sentry not called (offline)
-  - Platform: web, iOS, Android
-```
 
 ---
 
@@ -492,9 +521,6 @@ baseline.recordSample('screen-load', 500);
 
 **Goal:** Comprehensive test coverage (unit, integration, E2E, stress).
 
-### Format
-
-```markdown
 ## Phase 4: Comprehensive tests
 
 **Scope:**
@@ -542,28 +568,13 @@ baseline.recordSample('screen-load', 500);
 
 **Goal:** Measurable, verifiable criteria for each phase.
 
-### Format
-
-```markdown
 ## Acceptance Criteria
 
-**Phase 1a (Queue Structure):**
+**Phase 1 (CODING)**
 - [ ] Queue persists to SecureStorage
 - [ ] FIFO overflow drops oldest (max 100)
 - [ ] Validation prevents corrupted data
 - [ ] Storage key uses STORAGE_KEYS constant
-
-**Phase 1b (Integration):**
-- [ ] NetworkDetection triggers flush on online
-- [ ] Batch size respected (25 per request)
-- [ ] Non-blocking (async)
-- [ ] Success (200-299): Events removed
-- [ ] Failure (5xx): Events stay in queue
-
-**Phase 1c (Retry Logic):**
-- [ ] Exponential backoff (1s, 2s, 4s, 8s, 16s)
-- [ ] Max retries = 5; exceeds = discard
-- [ ] Logging works
 
 **Phase 2 (README):**
 - [ ] README.md created
@@ -573,8 +584,6 @@ baseline.recordSample('screen-load', 500);
 
 **Phase 3 (Guides):**
 - [ ] USAGE_GUIDE.md created
-- [ ] Testing.md created
-- [ ] 14+ test cases documented
 - [ ] Success criteria quantified
 
 **Phase 4 (Tests):**
@@ -582,7 +591,6 @@ baseline.recordSample('screen-load', 500);
 - [ ] Integration tests passing
 - [ ] E2E test passing
 - [ ] Lint and typecheck passing
-```
 
 ---
 
@@ -634,60 +642,7 @@ baseline.recordSample('screen-load', 500);
 
 ---
 
-## Research Tips
-
-### Files to Read Before Writing Issue
-
-1. **Related implementation files:**
-   ```
-   lib/offline/mutation-queue.ts (if queueing feature)
-   lib/network/network-detection.ts (if network-dependent)
-   lib/storage/SecureStorage.ts (if persistence needed)
-   lib/analytics/ (if analytics-related)
-   ```
-
-2. **Previous Tier issues (to understand patterns):**
-   - Tier 3 issues #054-#228 (feature flags system)
-   - Tier 4 issues #206-#181 (offline & analytics)
-
-3. **Dependencies:**
-   - Check if feature flags exist (`lib/feature-flags.ts`)
-   - Check storage layer (`lib/storage/index.ts` for STORAGE_KEYS)
-   - Check logging (`lib/utils/logger.ts` for categories)
-
-### Genealogy Search
-
-```bash
-# Find existing references to feature
-grep -r "breadcrumb" lib/  # Find Sentry-related code
-grep -r "SecureStorage" lib/ # Find persistence patterns
-grep -r "NetworkDetection" lib/ # Find network-dependent code
-
-# Check recent changes
-git log --oneline lib/analytics/ | head -20
-git log --oneline docs/issues/
-```
-
-### Gap Analysis Research Strategy
-
-1. **Search for related code:** Is there 50% of what we need already?
-2. **Check tests:** Do tests exist? If not, feature likely not complete
-3. **Check README:** If no lib/module/README.md, API is likely undocumented
-4. **Check coverage:** Missing test guide? Missing usage guide? = gaps
-5. **Check integration:** Is this connected to other modules or standalone?
-
----
-
-## Writing Style
-
-### Tone & Voice
-
-- **Technical but accessible:** Write for engineers who know the codebase
-- **Specific over vague:** "Queue breadcrumbs to SecureStorage" not "Add offline support"
-- **Active voice:** "The queue drops oldest events" not "Oldest events are dropped"
-- **Concrete examples:** Show TypeScript, not pseudocode (where possible)
-
-### Formatting Conventions
+## Formatting Conventions
 
 | Element | Format | Example |
 |---------|--------|---------|
@@ -701,37 +656,14 @@ git log --oneline docs/issues/
 | **Code blocks** | Triple backticks + language | \`\`\`typescript ... \`\`\` |
 | **Emphasis** | **bold** for important terms, *italics* for emphasis | `**critical**`, *non-blocking* |
 
-### Section Conventions
+### Conventions
 
-- **Phase headers** are commit titles: "Create queue structure" not "Phase 1a: Create..."
+- **Track/Phase headers** are commit titles: "Create queue structure" not "Track A+B: Create..."
 - **Checkboxes** for all task lists: `- [ ] Task name`
-- **Subheadings** use ## for phase-level, ### for task-level
+- **Subheadings** use `##` for phase/track-level, `###` for task-level
 - **Inline code** for all technical terms (files, types, flags)
-- **Links** to related resources: `(see #206 offline queue pattern)`
-
-### Length Guidelines
-
-| Section | Target length | Why |
-|---------|---------------|-----|
-| Problem | 150-250 words | Specific, grounded (not too abstract) |
-| Codebase Status | 100-200 words | Quick scan of current state |
-| Phase 0 | 300-400 words | Sets up discussion, prevents rework |
-| Phase 1a | 500-700 words | Detailed implementation guidance |
-| Phase 1b | 400-600 words | Builds on Phase 1a, adds specifics |
-| Phase 1c | 400-600 words | Completes core feature |
-| Phase 2 | 500-800 words | Comprehensive API docs |
-| Phase 3 | 1000-1500 words | Usage guide + test guide both included |
-| Phase 4 | 600-900 words | Test coverage details |
-| **Total** | **4000-6000 words** | Comprehensive but focused |
-
-### Specificity Examples
-
-| ❌ Vague | ✅ Specific |
-|----------|----------|
-| "Add offline support" | "Queue analytics events when offline, flush when online via #206 queue pattern" |
-| "Improve performance" | "Compute p50/p95/p99 percentiles, detect regression if current > p95 + 20%" |
-| "Handle errors" | "Corrupted consent: validate on load, migrate schema, fallback to default 'basic'" |
-| "Make it work offline" | "Breadcrumbs queued to SecureStorage (max 500), synced via Sentry transport when online" |
+- **Specific over vague:** "Queue breadcrumbs to SecureStorage (max 500)" not "Add offline support"
+- **Active voice:** "The queue drops oldest events" not "Oldest events are dropped"
 
 ---
 
@@ -741,11 +673,15 @@ Use this before submitting an issue:
 
 ### Issue Structure
 - [ ] Header present (Status, Impact, Depends on, Integrates with)
+- [ ] Config `Impacts` checkbox expanded — `appsettings.json`, `appsettings.dev.json`, loader, `expected-differences.json`
 - [ ] Problem statement has 3-4 bullet points
 - [ ] Codebase Status split into "Implemented" and "Gaps"
-- [ ] 5-7 phases listed (0, 1a, 1b, 1c, 2, 3, 4)
+- [ ] Phases listed: 0, 1 (Tracks), 2, 3, 4
 - [ ] Phase 0 has 5 Key Questions
-- [ ] Phases 1a/1b/1c each have detailed Scope
+- [ ] Track 0 included if this is an update issue
+- [ ] Phase 1 tracks listed: A+B (always), C (always), D (if migrating), E (recommended), F (always before PR)
+- [ ] Track F completed — all applicable items checked or marked N/A
+- [ ] Each track has a clear ✅ Exit criteria
 - [ ] Phase 2 is README creation
 - [ ] Phase 3 is USAGE_GUIDE + Testing.md
 - [ ] Phase 4 is comprehensive tests
@@ -755,8 +691,8 @@ Use this before submitting an issue:
 - [ ] All class/function names use backticks
 - [ ] Issue references use #XXX format
 - [ ] Code examples are TypeScript (not pseudocode)
-- [ ] Each phase has verification or testing hints
-- [ ] Acceptance criteria are per-phase and measurable
+- [ ] Each track has ✅ Exit criteria
+- [ ] Acceptance criteria are per-track and measurable
 - [ ] Dependencies section explains WHY, not just lists
 - [ ] Notes section includes design principles + future work
 
@@ -767,19 +703,11 @@ Use this before submitting an issue:
 - [ ] Identified actual storage keys/constants used
 - [ ] Noted feature flags that might control this
 
-### Writing
-- [ ] 4000-6000 words total (comprehensive but focused)
-- [ ] No jargon without explanation
-- [ ] Specific examples (not generic "this will improve...")
-- [ ] Active voice mostly (not passive)
-- [ ] Bold for key terms, code formatting for technical terms
-- [ ] Emoji and exclamation points avoided (professional tone)
-
 ### Phase 0 Specific
 - [ ] 5 Key Questions tailored to THIS issue (not generic)
 - [ ] 5-8 edge cases listed
 - [ ] Draft PR body included (markdown code block)
-- [ ] Draft body includes: Features, Key Decisions, Phases, Success Criteria
+- [ ] Draft body includes: Features, Key Decisions, Tracks, Success Criteria
 
 ---
 
@@ -814,12 +742,14 @@ Result: [1-2 sentence business impact]
 Build [architecture/pattern description]:
 
 1. **Phase 0** — Understand scope
-2. **Phase 1a** — [Core feature 1]
-3. **Phase 1b** — [Core feature 2]
-4. **Phase 1c** — [Core feature 3]
-5. **Phase 2** — Documentation
-6. **Phase 3** — Guides
-7. **Phase 4** — Testing
+2. **Track A+B** — [Core files + barrel exports]
+3. **Track C** — [Runtime integration]
+4. **Track D** — [Adoption, if migrating]
+5. **Track E** — [Hardening — logging, warnings, edge cases]
+6. **Track F** — Codebase Checklist
+7. **Phase 2** — Documentation
+8. **Phase 3** — Guides
+9. **Phase 4** — Testing
 
 ---
 
@@ -848,11 +778,12 @@ Build [architecture/pattern description]:
 ### Key Decisions
 - [Decision 1]
 
-### Phases
-- Phase 1a: [What]
-- Phase 1b: [What]
-- Phase 1c: [What]
-- Phase 2-4: [Coverage]
+### Tracks
+- Track A+B: [Core files + barrel exports]
+- Track C: [Runtime integration]
+- Track D: [Adoption/migration, if applicable]
+- Track E: [Hardening — logging, warnings, edge cases]
+- Phase 2-4: [Docs, tests]
 
 ### Success Criteria
 - [Criterion 1]
@@ -860,27 +791,60 @@ Build [architecture/pattern description]:
 
 ---
 
-## Phase 1a: [Title]
+## Track A+B: [Core + Surface title]
 
 **Scope:**
-- [ ] [Task with details]
+- [ ] Create `lib/module/file.ts` — [types, class, logic]
+- [ ] Barrel export in `lib/module/index.ts`
 
-**Verification only:**
-- [What to verify]
+✅ Exit: [What to verify before Track C]
 
 ---
 
-## Phase 1b: [Title]
+## Track C: [Integration title]
 
 **Scope:**
-- [ ] [Task]
+- [ ] [Provider/hook/bootstrap task]
+- [ ] Config: `appsettings.json`, `appsettings.dev.json`, loader, `expected-differences.json` (if applicable)
+
+✅ Exit: [Feature exercisable from app]
 
 ---
 
-## Phase 1c: [Title]
+## Track D: [Adoption title] *(only if migrating)*
 
 **Scope:**
-- [ ] [Task]
+- [ ] Update: [list impacted modules]
+- [ ] Remove old: [what to delete]
+
+✅ Exit: No half-old/half-new behavior remains
+
+---
+
+## Track E: Hardening
+
+**Scope:**
+- [ ] [Logging, warnings, edge cases]
+
+✅ Exit: `npm run lint` passes, no TypeScript errors, no console noise
+
+---
+
+## Track F: Codebase Checklist
+
+- [ ] **PII Safety** — [tick or N/A]
+- [ ] **Analytics Consent Gate** — [tick or N/A]
+- [ ] **Safe Mode / Degradation** — [tick or N/A]
+- [ ] **Network Resilience** — [tick or N/A]
+- [ ] **Adaptive Payload** — [tick or N/A]
+- [ ] **Background Jobs** — [tick or N/A]
+- [ ] **Feature Flag Gating** — [tick or N/A]
+- [ ] **Cache Invalidation** — [tick or N/A]
+- [ ] **Performance Baseline** — [tick or N/A]
+- [ ] **Config Support** — [tick or N/A]
+- [ ] **Error Handling** — [tick or N/A]
+
+✅ Exit: All applicable items checked. Skipped items noted as N/A.
 
 ---
 
@@ -920,16 +884,22 @@ Build [architecture/pattern description]:
 
 ## Acceptance Criteria
 
-**Phase 1a:**
+**Track A+B:**
 - [ ] [Criterion 1]
 
-**Phase 1b:**
+**Track C:**
 - [ ] [Criterion 1]
 
-**Phase 1c:**
+**Track D:** *(if applicable)*
 - [ ] [Criterion 1]
 
-**Phase 2-4:**
+**Track E:**
+- [ ] lint passes, no TypeScript errors
+
+**Track F (Codebase Checklist):**
+- [ ] All applicable items checked or marked N/A
+
+**Phase 2-4:****
 - [ ] [Criterion 1]
 
 ---
@@ -968,5 +938,3 @@ Build [architecture/pattern description]:
 5. **Test your writing:** Can someone actually implement from this? Can they pass acceptance criteria?
 
 ---
-
-**Happy issue writing! 🚀**
