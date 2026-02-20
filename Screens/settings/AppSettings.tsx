@@ -1,5 +1,5 @@
-import { Button, SubTitle } from '@/components/ui'
-import { useForceResync, useRefreshStorageCache } from '@/hooks'
+import { Button, SubTitle, Switch } from '@/components/ui'
+import { useAnalyticsConsent, useForceResync, useRefreshStorageCache } from '@/hooks'
 import { useNetworkStatus } from '@/lib/network'
 import { useScale } from '@/theme'
 import { View } from 'react-native'
@@ -10,6 +10,7 @@ import { View } from 'react-native'
  * 
  * Force Refresh: Fetches latest user data from server, bypassing the 4-hour cache
  * Force Resync: Triggers offline queue sync if mutations are pending
+ * Analytics Consent: Toggle between basic (GDPR-safe minimum) and full tracking
  * Toasts are displayed globally via AppToastLayer at app root.
  */
 export function AppSettings() {
@@ -20,6 +21,8 @@ export function AppSettings() {
   const { isResyncing, handleForceResync } = useForceResync({ isOffline })
 
   const { isRefreshing, handleRefreshStorageCache } = useRefreshStorageCache({ isOffline })
+
+  const { level: consentLevel, setLevel: setConsentLevel, isLoading: consentLoading } = useAnalyticsConsent()
 
   return (
     <View style={{ gap: S.space.md }}>
@@ -51,24 +54,33 @@ export function AppSettings() {
         </View>
       </View>
 
-      {/* Row 2: Placeholder buttons */}
-      <View style={{ flexDirection: 'row', gap: S.space.sm }}>
-        <Button
-          text="Setting 3"
-          variant="secondary"
-          onPress={() => {}}
-          style={{ flex: 1 }}
+      {/* Row 2: Analytics Consent Toggle */}
+      <View style={{ flexDirection: 'column', gap: S.space.sm }}>
+        <Switch
+          heading="Analytics Consent"
+          checked={consentLevel === 'full'}
+          onChange={async (isFullConsent) => {
+            await setConsentLevel(isFullConsent ? 'full' : 'basic')
+          }}
+          disabled={consentLoading}
+          leftLabel="Basic"
+          rightLabel="Full"
         />
+        <SubTitle textType='primary' style={{ marginLeft: S.space.md }}>
+          {consentLevel === 'full'
+            ? 'Full tracking: analytics enabled'
+            : 'Basic tracking: GDPR-safe minimum only'}
+        </SubTitle>
+      </View>
+
+      {/* Row 3: Placeholder buttons */}
+      <View style={{ flexDirection: 'row', gap: S.space.sm }}>
         <Button
           text="Setting 4"
           variant="secondary"
           onPress={() => {}}
           style={{ flex: 1 }}
         />
-      </View>
-
-      {/* Row 3: Single button for now */}
-      <View style={{ flexDirection: 'row' }}>
         <Button
           text="Setting 5"
           variant="secondary"

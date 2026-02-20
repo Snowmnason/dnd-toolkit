@@ -13,6 +13,7 @@
  * Initialize early during app bootstrap via initialize().
  */
 
+import { getAppConfig } from '@/lib/config/loader';
 import { SecureStorage, STORAGE_KEYS } from '@/lib/storage';
 import { logger } from '@/lib/utils/logger';
 
@@ -45,7 +46,21 @@ class AnalyticsConsentManager {
     const forceRefresh = options?.forceRefresh ?? false;
     let sourceOfTruth: ConsentLevel = DEFAULT_CONSENT;
 
+    // Check if persistence is enabled via feature flag
+    const config = getAppConfig();
+    const persistenceEnabled = config.featureFlags?.['persist-analytics-consent']?.enabled ?? true;
+
     try {
+      // If persistence is disabled, skip all storage operations and use default
+      if (!persistenceEnabled) {
+        logger.category('analytics').debug('consent_initialized', 'Consent persistence disabled by feature flag, using default', {
+          level: DEFAULT_CONSENT,
+        });
+        this.consentLevel = DEFAULT_CONSENT;
+        this.isInitialized = true;
+        return DEFAULT_CONSENT;
+      }
+
       // Step 1: Try SecureStorage cache first (source of truth after initial load)
       if (!forceRefresh) {
         const stored = await SecureStorage.getItem(STORAGE_KEYS.ANALYTICS_CONSENT);
@@ -152,6 +167,9 @@ class AnalyticsConsentManager {
    * - 'full': All analytics events including usage/performance
    * 
    * Non-blocking: Persists locally immediately, queues server sync for later.
+   * 
+   * If 'persist-analytics-consent' feature flag is disabled, updates in-memory state only
+   * (no SecureStorage or database persistence).
    */
   async setLevel(level: ConsentLevel): Promise<void> {
     if (!this.isValidConsentLevel(level)) {
@@ -160,6 +178,17 @@ class AnalyticsConsentManager {
       throw error;
     }
     this.consentLevel = level;
+
+    // Check if persistence is enabled via feature flag
+    const config = getAppConfig();
+    const persistenceEnabled = config.featureFlags?.['persist-analytics-consent']?.enabled ?? true;
+
+    // If persistence is disabled, skip all storage operations
+    if (!persistenceEnabled) {
+      logger.category('analytics').debug('consent', 'Consent persistence disabled by feature flag, skipping storage sync', { level });
+      return;
+    }
+
     try {
       await SecureStorage.setItem(STORAGE_KEYS.ANALYTICS_CONSENT, level);
     } catch (err) {

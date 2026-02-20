@@ -546,6 +546,24 @@ class AppKernelClass {
               });
             // Non-critical: app continues without offline queue
           }
+
+          // Initialize analytics consent (restores from storage or database)
+          try {
+            const { AnalyticsConsent } = await import("@/lib/analytics");
+            const initialLevel = await AnalyticsConsent.initialize();
+            logger
+              .category("bootstrap")
+              .info("Analytics consent initialized", {
+                level: initialLevel,
+              });
+          } catch (consentError) {
+            logger
+              .category("bootstrap")
+              .warn("Failed to initialize analytics consent (non-critical)", {
+                error: (consentError as Error).message,
+              });
+            // Non-critical: app continues with default consent
+          }
         } catch (e) {
           this.authCompletionTime = performance.now() - authPhaseStart;
           logger

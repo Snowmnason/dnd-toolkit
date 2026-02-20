@@ -89,6 +89,10 @@ export interface AppSettings {
     description?: string;
   };
   analytics?: {
+    consent?: {
+      defaultLevel?: string; // 'none' | 'basic' | 'full'
+      description?: string;
+    };
     buffer?: {
       enabled?: boolean;
       maxSize?: number;
