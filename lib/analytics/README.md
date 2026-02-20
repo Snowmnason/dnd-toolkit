@@ -191,7 +191,6 @@ AnalyticsConsent.setLevel()  ← Persist to SecureStorage + queue DB sync
 - **Persistent**: Survives app restarts via SecureStorage encryption (AES-256-CTR)
 - **Cross-device sync**: Database-backed for profile consistency (optional)
 - **Non-blocking**: Storage operations are async; app continues with defaults on failure
-- **Feature-gated**: `'persist-analytics-consent'` flag controls persistence behavior
 
 #### API Reference
 
@@ -626,7 +625,7 @@ Load baselines from storage and apply config. Call during app bootstrap.
 
 #### `performanceBaselineService.recordSample(label, durationMs, context?): void`
 
-Record a performance measurement. Respects `track-performance-baseline` feature flag.
+Record a performance measurement.
 
 #### `performanceBaselineService.getBaseline(label): OperationBaseline | null`
 

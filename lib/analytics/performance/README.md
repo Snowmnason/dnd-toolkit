@@ -182,12 +182,7 @@ Excludes measurements when:
 - App is backgrounded (`AppState` inactive/paused)
 - User hasn't interacted for >60s (dwell time vs load time)
 
-## Feature Flag Integration
-
-Controlled by `track-performance-baseline` feature flag:
-
-- **Enabled:** Records samples, detects regressions, persists baselines
-- **Disabled:** Skips recording, allows queries (comparison still works)
+## AppConfig Integration
 
 Config via `appsettings.json`:
 

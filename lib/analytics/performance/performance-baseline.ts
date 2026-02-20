@@ -276,13 +276,6 @@ export class PerformanceBaselineService {
       return;
     }
 
-    // Check if baseline tracking is enabled via feature flag
-    // If disabled, skip recording but allow queries (comparison still works)
-    const isTrackingEnabled = this.isBaselineTrackingEnabled();
-    if (!isTrackingEnabled) {
-      return;
-    }
-
     // Validate input
     if (!Number.isFinite(durationMs) || durationMs < 0) {
       logger.warn('performance', `Invalid duration for "${label}": ${durationMs}`);
@@ -532,28 +525,7 @@ export class PerformanceBaselineService {
     logger.debug('performance', 'All baselines reset');
   }
 
-  /**
-   * Check if baseline tracking is enabled via feature flag
-   * @private
-   */
-  private isBaselineTrackingEnabled(): boolean {
-    try {
-      const config = getAppConfig();
-      
-      // Check feature flag: track-performance-baseline in featureFlags section
-      // Default to true (enabled) if not explicitly disabled
-      const featureFlags = config?.featureFlags as Record<string, any>;
-      const trackingFlag = featureFlags?.['track-performance-baseline'];
-      const trackingEnabled = trackingFlag?.enabled;
-      
-      // If explicitly set to false, disable; otherwise default to enabled
-      return trackingEnabled !== false;
-    } catch (error) {
-      // If config can't be read, default to enabled
-      logger.debug('performance', `Failed to check feature flag: ${error}, defaulting to enabled`);
-      return true;
-    }
-  }
+
 
   /**
    * Create empty storage structure

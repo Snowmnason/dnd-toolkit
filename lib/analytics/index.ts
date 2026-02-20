@@ -425,12 +425,12 @@ export function trackFeatureBlocked(params: {
 
 // Export analytics utilities
 export {
-  analyticsBufferService, calculateExponentialBackoff, generateUUID, type AnalyticsBufferConfig,
-  type AnalyticsBufferStats,
-  type QueuedAnalyticsEvent
+    analyticsBufferService, calculateExponentialBackoff, generateUUID, type AnalyticsBufferConfig,
+    type AnalyticsBufferStats,
+    type QueuedAnalyticsEvent
 } from "./analytics-buffer";
 export {
-  cleanupAnalyticsNetworkIntegration, flushAnalyticsQueue, handleAnalyticsConsentWithdrawal, initializeAnalyticsNetworkIntegration
+    cleanupAnalyticsNetworkIntegration, flushAnalyticsQueue, handleAnalyticsConsentWithdrawal, initializeAnalyticsNetworkIntegration
 } from "./analytics-network-integration";
 export { AnalyticsConsent, type ConsentLevel } from "./consent";
 export { ConsentSyncQueue, type PendingConsentSync } from "./consent-sync-queue";
@@ -438,20 +438,30 @@ export { categorizeError, type ErrorCategory } from "./error-categorization";
 export { sessionManager } from "./session";
 export { getThreshold, sanitizeError } from "./utils";
 export {
-  trackVariantAssignment,
-  trackVariantEngagement,
-  trackVariantPerformance,
-  type VariantAssignmentEvent,
-  type VariantEngagementEvent,
-  type VariantPerformanceEvent
+    trackVariantAssignment,
+    trackVariantEngagement,
+    trackVariantPerformance,
+    type VariantAssignmentEvent,
+    type VariantEngagementEvent,
+    type VariantPerformanceEvent
 } from "./variant-tracking";
 // Breadcrumb queue (Phase 1a - offline persistence)
 export { breadcrumbQueue, type BreadcrumbQueueStats } from "./breadcrumb-queue";
 
 export {
-  OperationBaseline, PerformanceBaselineConfig,
-  PerformanceBaselines,
-  PerformanceBaselineService,
-  performanceBaselineService, RegressionDetectionResult
+    OperationBaseline, PerformanceBaselineConfig,
+    PerformanceBaselines,
+    PerformanceBaselineService,
+    performanceBaselineService, RegressionDetectionResult
 } from './performance/performance-baseline';
+
+// Consent gating (centralized privacy checks at dispatch layer)
+export {
+    DEFAULT_EVENT_CONSENT_MAPPING,
+    getConsentCategoryForEvent,
+    registerEventConsentMapping,
+    shouldEmitEvent,
+    type ConsentCategory
+} from './consent-gating';
+
 

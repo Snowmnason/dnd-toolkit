@@ -125,7 +125,6 @@ if (AnalyticsConsent.isAllowed('essential')) {
 **Problem**: Consent resets to 'basic' after app restart.
 
 **Solutions**:
-- Check `persist-analytics-consent` feature flag is enabled
 - Verify SecureStorage is working (check device storage permissions)
 - Check logs for storage errors: `logger.category('analytics')`
 

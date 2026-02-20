@@ -266,11 +266,6 @@ const [isInitialized, setIsInitialized] = useState(false);
 
 ## Rollback Plan
 
-### Feature Flag Control
-- `'persist-analytics-consent'` flag controls all persistence
-- Can disable to revert to in-memory behavior
-- Gradual rollout possible
-
 ### Data Cleanup
 - `AnalyticsConsent.resetToDefault()` for testing
 - `ConsentSyncQueue.clear()` removes pending syncs
