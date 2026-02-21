@@ -54,6 +54,7 @@ export interface AppSettings {
     pingIntervalMs?: number;
     pingTimeoutMs?: number;
     statusCheckTimeoutMs?: number;
+    debounceStatusChangeMs?: number;
     description?: string;
   };
   api?: {

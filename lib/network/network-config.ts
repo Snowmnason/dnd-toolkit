@@ -69,12 +69,21 @@ export function getStatusCheckTimeout(): number {
 }
 
 /**
+ * Get network status change debounce delay from config (default: 500ms)
+ * Prevents excessive notifications on flaky connections
+ */
+export function getDebounceStatusChangeMs(): number {
+  return getAppConfig().network?.debounceStatusChangeMs ?? 500;
+}
+
+/**
  * Latency threshold for poor connection detection (500ms)
  * Pings exceeding this latency are considered "bad" connection
  */
 export const LATENCY_THRESHOLD = 500;
 
 /**
+
  * Low battery threshold (20%)
  * When battery drops below this, cellular connections are marked as "expensive"
  */

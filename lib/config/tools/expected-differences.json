@@ -79,4 +79,7 @@
   ,"analytics.exporters.description": "Exporter enable/disable settings may differ between dev and production (feature flag control)"
   ,"analytics.exporters.sentry.description": "Sentry exporter enable/disable description differs (dev: enabled for testing; prod: standard)"
   ,"analytics.performanceBaseline.description": "Performance baseline tracking description differs: dev uses verbose explanation for testing; prod uses concise operational details"
+  ,"network.debounceStatusChangeMs": "Debounce delay for network status changes; dev uses a lower value (100ms) for faster testing, production defaults to 500ms to coalesce flaps and avoid churn"
+  ,"image.loader.retryDelayMs": "Image loader retry/backoff delay; dev may use shorter delays for faster retries during testing, production should use longer backoff to avoid rapid retries on flaky networks"
+  ,"image.loader.maxRetries": "Maximum number of retries for image loading; dev may reduce retries to speed up tests, production should use conservative retry counts to balance UX and network load"
 }
