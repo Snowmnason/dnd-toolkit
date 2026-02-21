@@ -15,8 +15,6 @@ Every PR body should include:
 3. **Goals & Rationale** — Brief explanation of design decisions
 4. **Key behaviors** — Bullet list of what the feature does
 5. **Files touched (high-level)** — Quick reference with file purpose
-6. **Manual review checklist** — Specific commands/checks reviewers should run
-7. **Testing notes** — What's pending (docs, tests) and why
 8. **How to validate quickly** — 3-5 manual steps to smoke-test
 9. **Notes / Follow-ups** — What's pending for future PRs
 10. **Status** — Current implementation phase completion
