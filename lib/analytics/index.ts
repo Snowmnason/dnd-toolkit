@@ -5,7 +5,6 @@ import { Platform } from "react-native";
 import { isAppIdle } from "../../hooks/utils/use-app-state";
 import { getAppConfig } from "../config/loader";
 import { logger } from "../utils/logger";
-import { AnalyticsConsent } from "./consent";
 import { categorizeError } from "./error-categorization";
 import { createExportContext, dispatchEvent } from "./exporters";
 import { performanceBaselineService } from "./performance/performance-baseline";
@@ -108,13 +107,14 @@ function withTiming<T>(
     performanceBaselineService.recordSample(label, duration_ms, context);
     const result = performanceBaselineService.detectRegression(label, duration_ms, context);
     
-    if (result.isRegression && AnalyticsConsent.isAllowed('performance')) {
+    if (result.isRegression) {
       logger.warn(
         "performance",
         `Performance regression detected for '${label}': ${result.current}ms vs baseline ${result.baseline?.p95}ms (threshold: ${result.threshold}%, delta: ${result.deltaPct?.toFixed(1)}%, samples: ${result.baseline?.count ?? 0}, app_version: ${Constants.expoConfig?.version ?? 'unknown'}, platform: ${Platform.OS})`
       );
       
       // Emit regression event via #178 exporters (fire-and-forget) with rich context
+      // dispatchEvent() gates by consent; no need to check here
       const regressionEvent = {
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: Date.now(),
@@ -142,11 +142,12 @@ function withTiming<T>(
       dispatchEvent(regressionEvent, exportContext);
     }
     
-    if (isSentryEnabled() && AnalyticsConsent.isAllowed("performance")) {
+    if (isSentryEnabled()) {
       try {
         const errorCategory = extra?.error
           ? categorizeError(extra.error)
           : undefined;
+        // Breadcrumb routed through SentryExporter, gated at dispatchEvent() layer
         Sentry.addBreadcrumb({
           category: "performance",
           message: label,
@@ -234,13 +235,6 @@ export const Analytics = {
 
   track(event: string, props?: AnalyticsEventProps): void {
     if (!this.enabled()) return;
-    // Check consent before tracking
-    if (event === "screen_view" || event === "component_usage") {
-      if (!AnalyticsConsent.isAllowed("usage")) return;
-    }
-    if (event.startsWith("performance") || event === "api_request") {
-      if (!AnalyticsConsent.isAllowed("performance")) return;
-    }
 
     const safeProps = sanitizeProps(props);
     
@@ -346,12 +340,13 @@ export const Performance = {
     const context = { isIdle: isAppIdle() };
     performanceBaselineService.recordSample(label, duration, context);
     const result = performanceBaselineService.detectRegression(label, duration, context);
-    if (result.isRegression && AnalyticsConsent.isAllowed('performance')) {
+    if (result.isRegression) {
       logger.warn(
         "performance",
         `Performance regression detected for '${label}': ${result.current}ms vs p95 ${result.baseline?.p95}ms (threshold: ${result.threshold}%, delta: ${result.deltaPct?.toFixed(1)}%)`
       );
       // Emit regression event via #178 exporters (fire-and-forget)
+      // dispatchEvent() gates by consent; no need to check here
       const regressionEvent = {
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: Date.now(),
@@ -425,12 +420,12 @@ export function trackFeatureBlocked(params: {
 
 // Export analytics utilities
 export {
-    analyticsBufferService, calculateExponentialBackoff, generateUUID, type AnalyticsBufferConfig,
-    type AnalyticsBufferStats,
-    type QueuedAnalyticsEvent
+  analyticsBufferService, calculateExponentialBackoff, generateUUID, type AnalyticsBufferConfig,
+  type AnalyticsBufferStats,
+  type QueuedAnalyticsEvent
 } from "./analytics-buffer";
 export {
-    cleanupAnalyticsNetworkIntegration, flushAnalyticsQueue, handleAnalyticsConsentWithdrawal, initializeAnalyticsNetworkIntegration
+  cleanupAnalyticsNetworkIntegration, flushAnalyticsQueue, handleAnalyticsConsentWithdrawal, initializeAnalyticsNetworkIntegration
 } from "./analytics-network-integration";
 export { AnalyticsConsent, type ConsentLevel } from "./consent";
 export { ConsentSyncQueue, type PendingConsentSync } from "./consent-sync-queue";
@@ -438,30 +433,30 @@ export { categorizeError, type ErrorCategory } from "./error-categorization";
 export { sessionManager } from "./session";
 export { getThreshold, sanitizeError } from "./utils";
 export {
-    trackVariantAssignment,
-    trackVariantEngagement,
-    trackVariantPerformance,
-    type VariantAssignmentEvent,
-    type VariantEngagementEvent,
-    type VariantPerformanceEvent
+  trackVariantAssignment,
+  trackVariantEngagement,
+  trackVariantPerformance,
+  type VariantAssignmentEvent,
+  type VariantEngagementEvent,
+  type VariantPerformanceEvent
 } from "./variant-tracking";
 // Breadcrumb queue (Phase 1a - offline persistence)
 export { breadcrumbQueue, type BreadcrumbQueueStats } from "./breadcrumb-queue";
 
 export {
-    OperationBaseline, PerformanceBaselineConfig,
-    PerformanceBaselines,
-    PerformanceBaselineService,
-    performanceBaselineService, RegressionDetectionResult
+  OperationBaseline, PerformanceBaselineConfig,
+  PerformanceBaselines,
+  PerformanceBaselineService,
+  performanceBaselineService, RegressionDetectionResult
 } from './performance/performance-baseline';
 
 // Consent gating (centralized privacy checks at dispatch layer)
 export {
-    DEFAULT_EVENT_CONSENT_MAPPING,
-    getConsentCategoryForEvent,
-    registerEventConsentMapping,
-    shouldEmitEvent,
-    type ConsentCategory
+  DEFAULT_EVENT_CONSENT_MAPPING,
+  getConsentCategoryForEvent,
+  registerEventConsentMapping,
+  shouldEmitEvent,
+  type ConsentCategory
 } from './consent-gating';
 
 

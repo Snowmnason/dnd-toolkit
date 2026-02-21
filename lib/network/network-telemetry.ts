@@ -50,7 +50,7 @@
  * Sampling and privacy controls are handled in Phase 1c.
  */
 
-import { AnalyticsConsent } from "@/lib/analytics";
+import { AnalyticsConsent, shouldEmitEvent } from "@/lib/analytics";
 import { getPlatformName } from "@/lib/config/platform-config";
 import { composeNetworkContext, type ConnectionType, type NetworkContext } from "@/lib/network/helpers";
 import { NetworkDetection, type NetworkStatus } from "@/lib/network/network-detection";
@@ -242,7 +242,7 @@ function hasPrivacyConsent(): boolean {
 
     // Check centralized analytics consent system
     // Network telemetry is considered 'performance' data
-    return AnalyticsConsent.isAllowed("performance");
+    return shouldEmitEvent('performance', AnalyticsConsent.getLevel());
   } catch {
     // Legacy default: if consent system or config loading errors occur, fall
     // back to legacy behavior (telemetry enabled). This keeps development and
