@@ -15,6 +15,10 @@
  * - ERROR: A critical phase failed
  */
 
+import {
+  cleanupAnalyticsNetworkIntegration,
+  initializeAnalyticsNetworkIntegration,
+} from "@/lib/analytics/analytics-network-integration";
 import { NetworkCascadeDetector } from "@/lib/error/network-cascade-detector";
 import type { SafeModeState } from "@/lib/error/safe-mode";
 import {
@@ -426,6 +430,18 @@ class AppKernelClass {
             logger
               .category("bootstrap")
               .warn("Network telemetry initialization failed (non-critical)", {
+                error: (error as Error).message,
+              });
+          }
+
+          // Initialize analytics network integration (Phase 1b: Buffer auto-flush on reconnect)
+          try {
+            initializeAnalyticsNetworkIntegration();
+            logger.category("bootstrap").debug("Analytics network integration initialized");
+          } catch (error) {
+            logger
+              .category("bootstrap")
+              .warn("Analytics network integration initialization failed (non-critical)", {
                 error: (error as Error).message,
               });
           }
@@ -1249,6 +1265,15 @@ class AppKernelClass {
    */
   destroy(): void {
     logger.category("bootstrap").info("AppKernel shutting down");
+
+    // Cleanup analytics network integration
+    try {
+      cleanupAnalyticsNetworkIntegration();
+    } catch (error) {
+      logger.category("bootstrap").warn("Failed to cleanup analytics network integration", {
+        error: (error as Error).message,
+      });
+    }
 
     // Unsubscribe from network changes
     if (this.networkUnsubscribe) {

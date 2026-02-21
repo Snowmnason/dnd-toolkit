@@ -15,15 +15,16 @@
  */
 
 import {
-  LATENCY_THRESHOLD,
-  LOW_BATTERY_THRESHOLD,
-  getSupabaseHealthEndpoint,
-  getWebPingInterval,
-  getWebPingTimeout,
+    LATENCY_THRESHOLD,
+    LOW_BATTERY_THRESHOLD,
+    getDebounceStatusChangeMs,
+    getSupabaseHealthEndpoint,
+    getWebPingInterval,
+    getWebPingTimeout,
 } from "@/lib/network/network-config";
 import {
-  NetworkStateManager,
-  type NetworkState,
+    NetworkStateManager,
+    type NetworkState,
 } from "@/lib/network/state-machine";
 import { logger } from "@/lib/utils/logger";
 import * as React from "react";
@@ -115,6 +116,8 @@ class NetworkDetectionClass {
 
   private listeners: Set<NetworkStatusCallback> = new Set();
   private isInitialized = false;
+  private statusChangeTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingStatusUpdate: Partial<NetworkStatus> | null = null;
   private webPingTimer: ReturnType<typeof setInterval> | null = null;
   private batteryUnsubscribe: (() => void) | null = null;
   private networkUnsubscribe: (() => void) | null = null;
@@ -217,6 +220,13 @@ class NetworkDetectionClass {
     if (this.batteryUnsubscribe) {
       this.batteryUnsubscribe();
       this.batteryUnsubscribe = null;
+    }
+
+    // Clean up status change debounce timer
+    if (this.statusChangeTimer) {
+      clearTimeout(this.statusChangeTimer);
+      this.statusChangeTimer = null;
+      this.pendingStatusUpdate = null;
     }
 
     // Clean up web ping timer
@@ -720,9 +730,34 @@ class NetworkDetectionClass {
   }
 
   /**
-   * Update status and notify listeners
+   * Debounce status changes to prevent excessive notifications on flaky networks
+   * Rapidly changing status (e.g. 100+ changes/sec on unstable connection) are coalesced
+   * into a single status update after 500ms of stable state.
    */
-  private updateStatus(partial: Partial<NetworkStatus>): void {
+  private debounceStatusChange(partial: Partial<NetworkStatus>): void {
+    // Store the pending update (accumulate if multiple updates arrive before debounce fires)
+    this.pendingStatusUpdate = { ...this.pendingStatusUpdate, ...partial };
+
+    // Cancel existing timer if scheduled
+    if (this.statusChangeTimer) {
+      clearTimeout(this.statusChangeTimer);
+    }
+
+    // Schedule status update after debounce delay
+    const debounceMs = getDebounceStatusChangeMs();
+    this.statusChangeTimer = setTimeout(() => {
+      if (this.pendingStatusUpdate) {
+        this.applyDebouncedStatusUpdate(this.pendingStatusUpdate);
+        this.pendingStatusUpdate = null;
+      }
+      this.statusChangeTimer = null;
+    }, debounceMs);
+  }
+
+  /**
+   * Apply the debounced status update (called after debounce delay has elapsed)
+   */
+  private applyDebouncedStatusUpdate(partial: Partial<NetworkStatus>): void {
     const oldStatus = { ...this.currentStatus };
     this.currentStatus = { ...this.currentStatus, ...partial };
 
@@ -780,6 +815,13 @@ class NetworkDetectionClass {
     }
 
     this.notifyListeners();
+  }
+
+  /**
+   * Update status and notify listeners (debounced to prevent flap spam)
+   */
+  private updateStatus(partial: Partial<NetworkStatus>): void {
+    this.debounceStatusChange(partial);
   }
 
   /**

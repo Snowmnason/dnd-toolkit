@@ -161,14 +161,18 @@ Resolve via timestamp comparison. Returns `{ strategy, shouldRetry, shouldKeep, 
 
 | File                         | Purpose                                             | Lines |
 | ---------------------------- | --------------------------------------------------- | ----- |
-| mutation-queue.ts            | Persistent, encrypted FIFO mutation queue           | ~200  |
-| sync-manager.ts              | Network watcher, batch processor, retry handler     | ~450  |
-| conflict-resolution.ts       | Last-Write-Wins conflict resolution                 | ~200  |
-| sync-handlers.ts             | Per-table pluggable handler registry                | ~150  |
-| types.ts                     | Strongly typed mutation, sync, conflict structures  | ~150  |
-| utils.ts                     | Helpers (enqueue, optimistic update, etc.)          | ~80   |
-| use-offline-notifications.ts | React hook for offline status UI                    | ~50   |
-| use-sync-notifications.ts    | React hook for sync status UI                       | ~50   |
-| index.ts                     | Barrel export                                       | ~60   |
+| offline-recovery.ts          | Recovery strategies, auth replay, backoff logic     | 1064  |
+| sync-manager.ts              | Network watcher, batch processor, retry handler     | 689   |
+| mutation-queue.ts            | Persistent, encrypted FIFO mutation queue           | 305   |
+| types.ts                     | Strongly typed mutation, sync, conflict structures  | 314   |
+| utils.ts                     | Helpers (enqueue, optimistic update, etc.)          | 364   |
+| conflict-resolution.ts       | Last-Write-Wins conflict resolution                 | 218   |
+| sync-handlers.ts             | Per-table pluggable handler registry                | 153   |
+| conflict-queue-manager.ts    | Conflict queue management and UI triggers           | 114   |
+| use-offline-notifications.ts | React hook for offline status UI                    | 95    |
+| use-sync-notifications.ts    | React hook for sync status UI                       | 135   |
+| use-conflict-queue.ts        | React hook for conflict queue UI                    | 122   |
+| index.ts                     | Barrel export                                       | 75    |
+| **Total**                    | **All offline module files combined**               | **3548** |
 
 ---

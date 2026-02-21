@@ -61,7 +61,7 @@ When a review requests a correction, verify:
 npm run typecheck                                           # TypeScript type checking
 npm run lint                                                # ESLint validation
 npm run test                                                # Unit/integration tests
-node --import tsx lib/config/tools/run-config-validate.ts  # Config validation
+npm run config:validate                                     # Config validation
 ```
 
 **If any validation fails:**
