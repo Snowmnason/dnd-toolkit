@@ -6,9 +6,16 @@ export type {
 } from '@/lib/services';
 
 export {
-    AuthError, EmailAlreadyExistsError, getAuthProvider,
-    getAuthProviderSync, InvalidCredentialsError,
-    NetworkError, ProviderInitializationError, registerAuthProvider, UserNotFoundError
+    AuthError,
+    createValidatedAuthProvider,
+    EmailAlreadyExistsError,
+    getAuthProvider,
+    getAuthProviderSync,
+    InvalidCredentialsError,
+    NetworkError,
+    ProviderInitializationError,
+    registerAuthProvider,
+    UserNotFoundError,
 } from '@/lib/services';
 
 export {

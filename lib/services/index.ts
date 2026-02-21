@@ -9,10 +9,18 @@ export { SentryExporter } from './sentry/sentry-analytics-exporter';
 
 // Auth Provider Interface & Registration API
 export {
-    AuthError, EmailAlreadyExistsError, getAuthProvider,
+    AuthError,
+    createValidatedAuthProvider,
+    EmailAlreadyExistsError,
+    getAuthProvider,
     getAuthProviderSync,
-    getProviderDebugInfo, InvalidCredentialsError,
-    NetworkError, ProviderInitializationError, registerAuthProvider, UserNotFoundError, type AuthProvider,
+    getProviderDebugInfo,
+    InvalidCredentialsError,
+    NetworkError,
+    ProviderInitializationError,
+    registerAuthProvider,
+    UserNotFoundError,
+    type AuthProvider,
     type AuthResult,
     type Session
 } from './auth-provider';

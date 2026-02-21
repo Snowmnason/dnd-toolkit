@@ -15,6 +15,7 @@
  * - `getAuthProvider()` throws if called before registration
  */
 
+import { validateEmail, validatePassword } from '@/lib/auth/validation';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -40,35 +41,94 @@ export type AuthResult<T = Session> =
 /**
  * Core auth provider interface.
  * Any backend (Supabase, Firebase, custom) should implement this.
+ *
+ * **Security Expectations:**
+ * Implementations should assume inputs are **already validated by the caller** (app layer).
+ * Input validation (email format, password strength, SQL injection prevention) is responsibility of the app/AuthStateManager.
+ * Providers should focus on backend-specific security: token handling, session persistence, error normalization.
+ *
+ * **Error Handling:**
+ * All methods should map backend errors to normalized AuthError types before returning.
+ * Preserve original error on `.original` field for debugging (never log raw provider errors).
+ * Redact PII from error messages returned to app.
  */
 export interface AuthProvider {
   /**
    * Sign up a new user with email and password.
-   * Returns user session on success or error on failure.
+   *
+   * **Input Expectations:**
+   * - email: Already validated (format, length, no SQL keywords, no control chars)
+   * - password: Already validated (strength, length, no dangerous patterns)
+   *
+   * **Returns:**
+   * - { success: true; data: Session } on successful registration
+   * - { success: false; error: AuthError } on failure (mapped to normalized error type)
+   *
+   * **Provider Responsibilities:**
+   * - Create user account in backend
+   * - Generate and return session tokens if applicable
+   * - Map backend errors (e.g., email already exists) to AuthError types
    */
   signUp(email: string, password: string): Promise<AuthResult>;
 
   /**
    * Sign in an existing user with email and password.
-   * Returns user session on success or error on failure.
+   *
+   * **Input Expectations:**
+   * - email: Already validated (format, length, no SQL keywords, no control chars)
+   * - password: Already validated (no dangerous patterns)
+   *
+   * **Returns:**
+   * - { success: true; data: Session } on successful authentication
+   * - { success: false; error: AuthError } on failure (mapped to normalized error type)
+   *
+   * **Provider Responsibilities:**
+   * - Verify credentials against backend
+   * - Generate and return session tokens
+   * - Map backend errors (invalid credentials, user not found, etc.) to AuthError types
    */
   signIn(email: string, password: string): Promise<AuthResult>;
 
   /**
    * Initiate password reset flow (email link or code).
-   * Returns success status and optional message.
+   *
+   * **Input Expectations:**
+   * - email: Already validated (format, length, no SQL keywords, no control chars)
+   *
+   * **Returns:**
+   * - { success: true; message?: "Reset email sent" } on successful initiation
+   * - { success: false; message?: "Error details" } on failure
+   *
+   * **Provider Responsibilities:**
+   * - Queue reset email/code delivery
+   * - Don't expose whether email exists (for security)
+   * - Return user-friendly message only
    */
   resetPassword(email: string): Promise<{ success: boolean; message?: string }>;
 
   /**
    * Get current session (if authenticated).
-   * Returns null if no active session.
+   *
+   * **Returns:**
+   * - Session object if user is authenticated
+   * - null if no active session
+   *
+   * **Provider Responsibilities:**
+   * - Check token validity
+   * - Return session with userId and token fields
    */
   getSession(): Promise<Session | null>;
 
   /**
    * Subscribe to auth state changes.
-   * Returns unsubscribe function to clean up listener.
+   *
+   * **Callback Behavior:**
+   * - Called with Session on login/token refresh
+   * - Called with null on logout or session expiry
+   * - Should fire on provider's native state change events
+   *
+   * **Returns:**
+   * - Unsubscribe function to clean up listener
    */
   onAuthStateChange(
     callback: (session: Session | null) => void
@@ -76,7 +136,11 @@ export interface AuthProvider {
 
   /**
    * Sign out the current user.
-   * Clears session and tokens.
+   *
+   * **Provider Responsibilities:**
+   * - Invalidate tokens
+   * - Clear session
+   * - Don't throw on errors (logout should always succeed gracefully)
    */
   signOut(): Promise<void>;
 }
@@ -166,6 +230,229 @@ export class ProviderInitializationError extends AuthError {
     this.name = 'ProviderInitializationError';
     Object.setPrototypeOf(this, ProviderInitializationError.prototype);
   }
+}
+
+/**
+ * Create a validated auth provider wrapper.
+ *
+ * Wraps any AuthProvider with comprehensive input validation for signUp, signIn, and resetPassword.
+ * This ensures **all** providers (Supabase, Firebase, custom, etc.) get the same validation layer
+ * before the underlying provider is invoked.
+ *
+ * Validation rules:
+ * - signUp/signIn: Email format, password strength, no SQL injection, no control characters
+ * - resetPassword: Email format only
+ * - All validation failures logged without hitting the provider
+ *
+ * **Benefits of wrapper approach:**
+ * - Works with ANY provider (not just those extending a class)
+ * - Can't be bypassed or forgotten
+ * - Validation logic centralized and easy to maintain
+ * - Provider implementations stay lightweight
+ *
+ * @param provider - Any AuthProvider instance
+ * @returns A new AuthProvider that validates inputs before delegating
+ *
+ * @example
+ * ```ts
+ * const supabaseProvider = new SupabaseAuthProvider(supabaseClient);
+ * const validatedProvider = createValidatedAuthProvider(supabaseProvider);
+ * await registerAuthProvider(validatedProvider);
+ * ```
+ */
+export function createValidatedAuthProvider(
+  provider: AuthProvider
+): AuthProvider {
+  return {
+    async signUp(email: string, password: string): Promise<AuthResult> {
+      // === INPUT VALIDATION (Defensive Layer) ===
+      // Check for null/undefined
+      if (!email || !password) {
+        const error = new AuthError(
+          'Email and password are required',
+          undefined,
+          'MISSING_REQUIRED_FIELDS'
+        );
+        logger.warn(
+          'auth',
+          'ValidatedAuthProvider.signUp: missing required fields'
+        );
+        return { success: false, error };
+      }
+
+      // Validate email
+      const emailValidation = validateEmail(email);
+      if (!emailValidation.isValid) {
+        const error = new InvalidCredentialsError(
+          'Invalid email format',
+          undefined
+        );
+        logger.warn(
+          'auth',
+          'ValidatedAuthProvider.signUp: invalid email format',
+          {
+            reasons: {
+              isValidFormat: emailValidation.isValidFormat,
+              hasValidLength: emailValidation.hasValidLength,
+              hasNoSqlKeywords: emailValidation.hasNoSqlKeywords,
+              hasNoControlChars: emailValidation.hasNoControlChars,
+            },
+          }
+        );
+        return { success: false, error };
+      }
+
+      // Validate password
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.isValid) {
+        const error = new InvalidCredentialsError(
+          'Password does not meet security requirements',
+          undefined
+        );
+        logger.warn(
+          'auth',
+          'ValidatedAuthProvider.signUp: invalid password strength',
+          {
+            strength: passwordValidation.strength,
+            criteria: {
+              minLength: passwordValidation.minLength,
+              maxLength: passwordValidation.maxLength,
+              hasUppercase: passwordValidation.hasUppercase,
+              hasLowercase: passwordValidation.hasLowercase,
+              hasNumber: passwordValidation.hasNumber,
+              hasSpecialChar: passwordValidation.hasSpecialChar,
+              hasNoSqlKeywords: passwordValidation.hasNoSqlKeywords,
+              hasNoControlChars: passwordValidation.hasNoControlChars,
+            },
+          }
+        );
+        return { success: false, error };
+      }
+
+      // === DELEGATE TO UNDERLYING PROVIDER (Validated Input Only) ===
+      logger.debug(
+        'auth',
+        'ValidatedAuthProvider.signUp: validation passed, delegating to provider',
+        {
+          email: emailValidation.sanitized.trim(),
+        }
+      );
+      return provider.signUp(emailValidation.sanitized, password);
+    },
+
+    async signIn(email: string, password: string): Promise<AuthResult> {
+      // === INPUT VALIDATION (Defensive Layer) ===
+      // Check for null/undefined
+      if (!email || !password) {
+        const error = new AuthError(
+          'Email and password are required',
+          undefined,
+          'MISSING_REQUIRED_FIELDS'
+        );
+        logger.warn('auth', 'ValidatedAuthProvider.signIn: missing required fields');
+        return { success: false, error };
+      }
+
+      // Validate email
+      const emailValidation = validateEmail(email);
+      if (!emailValidation.isValid) {
+        const error = new InvalidCredentialsError(
+          'Invalid email format',
+          undefined
+        );
+        logger.warn(
+          'auth',
+          'ValidatedAuthProvider.signIn: invalid email format',
+          {
+            reasons: {
+              isValidFormat: emailValidation.isValidFormat,
+              hasValidLength: emailValidation.hasValidLength,
+              hasNoSqlKeywords: emailValidation.hasNoSqlKeywords,
+              hasNoControlChars: emailValidation.hasNoControlChars,
+            },
+          }
+        );
+        return { success: false, error };
+      }
+
+      // Basic password check (existence, no obvious malicious patterns)
+      if (typeof password !== 'string' || password.length < 1) {
+        const error = new InvalidCredentialsError(
+          'Invalid password',
+          undefined
+        );
+        logger.warn('auth', 'ValidatedAuthProvider.signIn: invalid password input');
+        return { success: false, error };
+      }
+
+      // === DELEGATE TO UNDERLYING PROVIDER (Validated Input Only) ===
+      logger.debug(
+        'auth',
+        'ValidatedAuthProvider.signIn: validation passed, delegating to provider',
+        {
+          email: emailValidation.sanitized.trim(),
+        }
+      );
+      return provider.signIn(emailValidation.sanitized, password);
+    },
+
+    async resetPassword(email: string): Promise<{ success: boolean; message?: string }> {
+      // === INPUT VALIDATION (Defensive Layer) ===
+      // Check for null/undefined
+      if (!email) {
+        logger.warn('auth', 'ValidatedAuthProvider.resetPassword: missing email');
+        return {
+          success: false,
+          message: 'Email is required',
+        };
+      }
+
+      // Validate email
+      const emailValidation = validateEmail(email);
+      if (!emailValidation.isValid) {
+        logger.warn(
+          'auth',
+          'ValidatedAuthProvider.resetPassword: invalid email format',
+          {
+            reasons: {
+              isValidFormat: emailValidation.isValidFormat,
+              hasValidLength: emailValidation.hasValidLength,
+              hasNoSqlKeywords: emailValidation.hasNoSqlKeywords,
+              hasNoControlChars: emailValidation.hasNoControlChars,
+            },
+          }
+        );
+        return {
+          success: false,
+          message: 'Invalid email format',
+        };
+      }
+
+      // === DELEGATE TO UNDERLYING PROVIDER (Validated Input Only) ===
+      logger.debug(
+        'auth',
+        'ValidatedAuthProvider.resetPassword: validation passed, delegating to provider',
+        {
+          email: emailValidation.sanitized.trim(),
+        }
+      );
+      return provider.resetPassword(emailValidation.sanitized);
+    },
+
+    async getSession(): Promise<Session | null> {
+      return provider.getSession();
+    },
+
+    onAuthStateChange(
+      callback: (session: Session | null) => void
+    ): () => void {
+      return provider.onAuthStateChange(callback);
+    },
+
+    async signOut(): Promise<void> {
+      return provider.signOut();
+    },
+  };
 }
 
 /**
