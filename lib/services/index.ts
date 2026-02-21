@@ -1,11 +1,24 @@
 /**
  * Services Initialization Barrel
- * Re-exports all service initialization and exporter utilities
+ * Re-exports all service initialization, auth provider, and exporter utilities
  */
 
 export { initializeServices } from './service-initializer';
 
 export { SentryExporter } from './sentry/sentry-analytics-exporter';
+
+// Auth Provider Interface & Registration API
+export {
+    AuthError, EmailAlreadyExistsError, getAuthProvider,
+    getAuthProviderSync,
+    getProviderDebugInfo, InvalidCredentialsError,
+    NetworkError, ProviderInitializationError, registerAuthProvider, UserNotFoundError, type AuthProvider,
+    type AuthResult,
+    type Session
+} from './auth-provider';
+
+// Supabase Auth Provider Implementation
+export { SupabaseAuthProvider } from './supabase/supabase-auth-provider';
 
 export {
     createExportContext,

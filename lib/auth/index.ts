@@ -1,3 +1,16 @@
+// Re-export auth provider types from services for convenience
+export type {
+    AuthProvider,
+    AuthResult,
+    Session
+} from '@/lib/services';
+
+export {
+    AuthError, EmailAlreadyExistsError, getAuthProvider,
+    getAuthProviderSync, InvalidCredentialsError,
+    NetworkError, ProviderInitializationError, registerAuthProvider, UserNotFoundError
+} from '@/lib/services';
+
 export {
     checkAuthGuard,
     recordAuthFailure,
