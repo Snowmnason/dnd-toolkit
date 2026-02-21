@@ -37,28 +37,41 @@ export function useAnalyticsConsent(options?: {
 
   // Initialize consent on mount
   useEffect(() => {
+    let mounted = true;
+
     const initializeConsent = async () => {
       setIsLoading(true);
       try {
         const initialLevel = await AnalyticsConsent.initialize(options);
-        setLevelState(initialLevel);
-        setIsInitialized(true);
-        logger.category('analytics').debug('hook_initialized', 'useAnalyticsConsent hook initialized', {
-          level: initialLevel,
-        });
+        if (mounted) {
+          setLevelState(initialLevel);
+          setIsInitialized(true);
+          logger.category('analytics').debug('hook_initialized', 'useAnalyticsConsent hook initialized', {
+            level: initialLevel,
+          });
+        }
       } catch (err) {
-        logger.category('analytics').error('hook_initialized', 'Failed to initialize consent hook', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-        // Use current in-memory level even if initialization failed
-        setLevelState(AnalyticsConsent.getLevel());
-        setIsInitialized(true);
+        if (mounted) {
+          logger.category('analytics').error('hook_initialized', 'Failed to initialize consent hook', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+          // Use current in-memory level even if initialization failed
+          setLevelState(AnalyticsConsent.getLevel());
+          setIsInitialized(true);
+        }
       } finally {
-        setIsLoading(false);
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     initializeConsent();
+
+    // Cleanup: mark component as unmounted to prevent setState calls
+    return () => {
+      mounted = false;
+    };
   }, [options?.maxAgeMs, options?.forceRefresh]);
 
   // Update consent level and persist

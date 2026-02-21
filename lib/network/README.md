@@ -516,16 +516,17 @@ Adjust for different network conditions, battery strategies, or recovery prefere
 
 | File                               | Purpose                                                      | Lines |
 | ---------------------------------- | ------------------------------------------------------------ | ----- |
-| network-detection.ts               | Core detection, status tracking, platform abstraction        | ~200  |
-| state-machine.ts                   | State transitions, recovery backoff, hooks, valid transitions | ~180  |
-| network-config.ts                  | Constants, Supabase health endpoint resolution               | ~50   |
-| error-handling.ts                  | Network error classification, stale cache decision logic     | ~120  |
-| adaptive-payload.ts                | Quality → payload options mapping, tier definitions           | ~130  |
-| adaptive-payload-request.ts        | RequestManager integration, quality-aware cache keys         | ~120  |
-| adaptive-payload-integration.ts    | Cache invalidation on quality change, hook logic             | ~100  |
-| network-telemetry.ts               | Event emission, sampling, logging, consent integration       | ~180  |
-| helpers.ts                         | Utility functions (isOnline, hasGoodConnection, etc.)        | ~60   |
-| index.ts                           | Barrel export                                                | ~20   |
+| network-detection.ts               | Core detection, status tracking, platform abstraction        | 1018  |
+| state-machine.ts                   | State transitions, recovery backoff, hooks, valid transitions | 291   |
+| network-config.ts                  | Constants, Supabase health endpoint resolution               | 90    |
+| error-handling.ts                  | Network error classification, stale cache decision logic     | 192   |
+| adaptive-payload.ts                | Quality → payload options mapping, tier definitions           | 240   |
+| adaptive-payload-request.ts        | RequestManager integration, quality-aware cache keys         | 146   |
+| adaptive-payload-integration.ts    | Cache invalidation on quality change, hook logic             | 163   |
+| network-telemetry.ts               | Event emission, sampling, logging, consent integration       | 593   |
+| helpers.ts                         | Utility functions (isOnline, hasGoodConnection, etc.)        | 97    |
+| index.ts                           | Barrel export                                                | 77    |
+| **Total**                          | **All network module files combined**                        | **3107** |
 
 ## Known Limitations
 

@@ -44,6 +44,10 @@ export function useAdaptivePayloadCacheInvalidation(options: {
 }): void {
   const { tagsToInvalidate, skipInitialCheck = true } = options;
 
+  // Memoize tags as a stable string key to prevent unnecessary effect re-runs
+  // (array reference changes on every render, but key stays same if tags are identical)
+  const tagsKey = tagsToInvalidate.join(',');
+
   useEffect(() => {
     let previousEffectiveType: string | undefined = NetworkDetection.getStatus()
       ?.effectiveType;
@@ -86,7 +90,11 @@ export function useAdaptivePayloadCacheInvalidation(options: {
     return () => {
       unsubscribe();
     };
-  }, [tagsToInvalidate, skipInitialCheck]);
+    // Rationale: tagsKey is the stable dependency derived from tagsToInvalidate.
+    // Including tagsToInvalidate directly would cause re-runs on each new array reference,
+    // potentially triggering infinite renders. tagsKey (string) safely tracks content changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tagsKey, skipInitialCheck]);
 }
 
 /**

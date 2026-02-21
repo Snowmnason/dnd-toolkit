@@ -55,6 +55,18 @@ export interface AppSettings {
     pingTimeoutMs?: number;
     statusCheckTimeoutMs?: number;
     debounceStatusChangeMs?: number;
+    adaptivePayload?: {
+      enabled?: boolean;
+      compressionEnabled?: boolean;
+      compressionThresholdKb?: number;
+      qualityTiers?: {
+        fast?: { latencyMs?: number; useFullPayload?: boolean };
+        good?: { latencyMs?: number; useFullPayload?: boolean };
+        slow?: { latencyMs?: number; skipOptionalFields?: boolean };
+        verySlow?: { latencyMs?: number; skipOptionalFields?: boolean };
+      };
+      description?: string;
+    };
     description?: string;
   };
   api?: {
@@ -78,6 +90,15 @@ export interface AppSettings {
   sync?: {
     debounceMs?: number;
     retryBaseMs?: number;
+    description?: string;
+  };
+  offline?: {
+    enabled?: boolean;
+    maxQueueSize?: number;
+    maxRetries?: number;
+    retryIntervalMs?: number;
+    circuitBreakerThreshold?: number;
+    circuitBreakerResetMs?: number;
     description?: string;
   };
   storage?: {

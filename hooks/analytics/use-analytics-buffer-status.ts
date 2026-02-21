@@ -6,6 +6,7 @@
  */
 
 import { analyticsBufferService, notifyBufferStateChange } from "@/lib/analytics/analytics-buffer";
+import { logger } from "@/lib/utils/logger";
 import { useEffect, useState } from "react";
 
 export interface AnalyticsBufferStatus {
@@ -66,7 +67,9 @@ export function useAnalyticsBufferStatus(): AnalyticsBufferStatus {
 
     // Initial update (state may have changed since hook was mounted)
     updateStatus().catch((error) => {
-      console.error("Error updating analytics buffer status:", error);
+      logger
+        .category('analytics')
+        .error('Error updating analytics buffer status', { error });
     });
 
     return () => {

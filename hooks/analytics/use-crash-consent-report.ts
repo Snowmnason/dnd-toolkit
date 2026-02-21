@@ -1,4 +1,5 @@
 import { AnalyticsConsent, getCrashReportPayload } from '@/lib/analytics';
+import { logger } from '@/lib/utils/logger';
 import * as Sentry from '@sentry/react-native';
 import { useCallback } from 'react';
 
@@ -50,11 +51,13 @@ export function useCrashConsentReport() {
         await Sentry.close();
 
         // Log the opt-in for analytics/debugging
-        console.log(
-          '[CrashOptIn] User sent crash report from none-consent fallback'
-        );
+        logger
+          .category('analytics')
+          .info('User sent crash report from none-consent fallback');
       } catch (err) {
-        console.error('[CrashOptIn] Failed to send crash report', err);
+        logger
+          .category('analytics')
+          .error('Failed to send crash report', { error: err });
       }
     },
     []
