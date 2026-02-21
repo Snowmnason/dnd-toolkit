@@ -1,6 +1,8 @@
 import * as Sentry from "@sentry/react-native";
 import {
   Analytics,
+  AnalyticsConsent,
+  getCrashReportPayload,
   sanitizeError as sanitizeErrorForAnalytics,
 } from "../analytics";
 import { QueryCache } from "../cache";
@@ -1718,23 +1720,41 @@ class RequestManagerClass {
     },
   ): void {
     try {
-      Sentry.captureException(error, {
-        tags: {
-          component: "request-manager",
-          requestKey: context.key,
-        },
-        contexts: {
-          request: {
-            key: context.key,
-            dedupe: context.options.dedupe,
-            retries: context.options.retries,
-            failOpen: context.options.failOpen,
-            timeout: context.options.timeout,
-            rateLimited: !!context.options.rateLimitKey,
+      // Convert error to Error instance if needed
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      
+      // Get tiered payload based on consent level
+      const captureOptions = getCrashReportPayload(errorObj, undefined, AnalyticsConsent.getLevel());
+      
+      if (captureOptions !== null) {
+        // Merge request-specific context into the tiered payload
+        const mergedOptions = {
+          ...captureOptions,
+          tags: {
+            ...(captureOptions.tags || {}),
+            component: "request-manager",
+            requestKey: context.key,
           },
-        },
-        level: "error",
-      });
+          contexts: {
+            ...(captureOptions.contexts || {}),
+            request: {
+              key: context.key,
+              dedupe: context.options.dedupe,
+              retries: context.options.retries,
+              failOpen: context.options.failOpen,
+              timeout: context.options.timeout,
+              rateLimited: !!context.options.rateLimitKey,
+            },
+          },
+        };
+        
+        Sentry.captureException(errorObj, mergedOptions);
+      } else {
+        logger.warn(
+          "request-manager",
+          "Error not sent to Sentry (consent=none; awaiting user opt-in)",
+        );
+      }
     } catch (sentryError) {
       logger.warn(
         "request-manager",

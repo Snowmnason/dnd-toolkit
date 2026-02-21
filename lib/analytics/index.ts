@@ -6,6 +6,7 @@ import { isAppIdle } from "../../hooks/utils/use-app-state";
 import { getAppConfig } from "../config/loader";
 import { logger } from "../utils/logger";
 import { AnalyticsConsent } from "./consent";
+import { shouldEmitEvent } from "./consent-gating";
 import { categorizeError } from "./error-categorization";
 import { createExportContext, dispatchEvent } from "./exporters";
 import { performanceBaselineService } from "./performance/performance-baseline";
@@ -108,13 +109,14 @@ function withTiming<T>(
     performanceBaselineService.recordSample(label, duration_ms, context);
     const result = performanceBaselineService.detectRegression(label, duration_ms, context);
     
-    if (result.isRegression && AnalyticsConsent.isAllowed('performance')) {
+    if (result.isRegression) {
       logger.warn(
         "performance",
         `Performance regression detected for '${label}': ${result.current}ms vs baseline ${result.baseline?.p95}ms (threshold: ${result.threshold}%, delta: ${result.deltaPct?.toFixed(1)}%, samples: ${result.baseline?.count ?? 0}, app_version: ${Constants.expoConfig?.version ?? 'unknown'}, platform: ${Platform.OS})`
       );
       
       // Emit regression event via #178 exporters (fire-and-forget) with rich context
+      // dispatchEvent() gates by consent; no need to check here
       const regressionEvent = {
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: Date.now(),
@@ -142,11 +144,12 @@ function withTiming<T>(
       dispatchEvent(regressionEvent, exportContext);
     }
     
-    if (isSentryEnabled() && AnalyticsConsent.isAllowed("performance")) {
+    if (isSentryEnabled() && shouldEmitEvent('performance', AnalyticsConsent.getLevel())) {
       try {
         const errorCategory = extra?.error
           ? categorizeError(extra.error)
           : undefined;
+        // Consent-gated: only add breadcrumb if user has performance consent
         Sentry.addBreadcrumb({
           category: "performance",
           message: label,
@@ -212,14 +215,21 @@ export const Analytics = {
     // (exporters don't use this method, they get context from dispatch)
     if (isSentryEnabled()) {
       try {
+        const consentLevel = AnalyticsConsent.getLevel();
         if (user?.id) {
-          Sentry.setUser({ id: user.id, username: user.username });
-          logger
-            .category("analytics")
-            .debug("User identified in Sentry", {
-              userId: user.id,
-              username: user.username,
-            });
+          // Per tiered reporting docs:
+          // - 'none': no user context
+          // - 'basic': minimal payload (error, message, stack, app version) — NO user context
+          // - 'full': complete payload with user context (user id, username, breadcrumbs)
+          if (consentLevel === 'full') {
+            // Consent=full: send complete user context (both id and username)
+            Sentry.setUser({ id: user.id, username: user.username });
+            logger.category("analytics").debug("User identified in Sentry (full, consent=full)", { userId: user.id, username: user.username });
+          } else {
+            // Consent=none or basic: clear user context (both tiers exclude user info)
+            Sentry.setUser(null);
+            logger.category("analytics").debug("User context cleared from Sentry (consent=none|basic)");
+          }
         } else {
           Sentry.setUser(null);
           logger.category("analytics").debug("User cleared from Sentry");
@@ -234,13 +244,6 @@ export const Analytics = {
 
   track(event: string, props?: AnalyticsEventProps): void {
     if (!this.enabled()) return;
-    // Check consent before tracking
-    if (event === "screen_view" || event === "component_usage") {
-      if (!AnalyticsConsent.isAllowed("usage")) return;
-    }
-    if (event.startsWith("performance") || event === "api_request") {
-      if (!AnalyticsConsent.isAllowed("performance")) return;
-    }
 
     const safeProps = sanitizeProps(props);
     
@@ -346,12 +349,13 @@ export const Performance = {
     const context = { isIdle: isAppIdle() };
     performanceBaselineService.recordSample(label, duration, context);
     const result = performanceBaselineService.detectRegression(label, duration, context);
-    if (result.isRegression && AnalyticsConsent.isAllowed('performance')) {
+    if (result.isRegression) {
       logger.warn(
         "performance",
         `Performance regression detected for '${label}': ${result.current}ms vs p95 ${result.baseline?.p95}ms (threshold: ${result.threshold}%, delta: ${result.deltaPct?.toFixed(1)}%)`
       );
       // Emit regression event via #178 exporters (fire-and-forget)
+      // dispatchEvent() gates by consent; no need to check here
       const regressionEvent = {
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: Date.now(),
@@ -454,4 +458,17 @@ export {
   PerformanceBaselineService,
   performanceBaselineService, RegressionDetectionResult
 } from './performance/performance-baseline';
+
+// Consent gating (centralized privacy checks at dispatch layer)
+export {
+  DEFAULT_EVENT_CONSENT_MAPPING,
+  getConsentCategoryForEvent,
+  registerEventConsentMapping,
+  shouldEmitEvent,
+  type ConsentCategory
+} from './consent-gating';
+
+// Tiered error reporting based on consent level
+export { getCrashReportPayload } from './consent-error-payload';
+
 

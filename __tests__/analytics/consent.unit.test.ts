@@ -3,13 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnalyticsConsent, ConsentLevel } from '@/lib/analytics/consent';
 import { SecureStorage } from '@/lib/storage';
 
-// Ensure feature-flag for persistence is enabled in tests
-vi.mock('@/lib/config/loader', () => ({
-  getAppConfig: () => ({ featureFlags: { 'persist-analytics-consent': { enabled: true } } }),
-}));
-
 // Provide a test-local mock for storage so we can reliably observe calls
-    vi.mock('@/lib/storage', () => {
+vi.mock('@/lib/storage', () => {
   return {
     SecureStorage: {
       getItem: vi.fn(),

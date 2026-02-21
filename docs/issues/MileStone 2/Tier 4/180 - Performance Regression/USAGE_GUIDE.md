@@ -194,7 +194,6 @@ Configure thresholds and limits in `appsettings.json`:
 ## Troubleshooting
 
 ### Baselines Not Recording
-- Check `track-performance-baseline` feature flag is `true`
 - Ensure `performanceBaselineService.initialize()` called during app startup
 - Verify `durationMs` is positive finite number
 - Idle samples (`isIdle: true`) are tracked but excluded from baseline

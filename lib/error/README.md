@@ -144,6 +144,45 @@ if (isSyncDisabled) {
 }
 ```
 
+### Tiered Error Reporting
+
+Error reporting respects user consent levels with tiered payload scoping. Integrated with Sentry for crash reporting and API error tracking.
+
+#### Consent-Based Payload Scoping
+
+- **`none`**: No error reporting (errors stored locally; user prompted for opt-in via dialog)
+- **`basic`**: Minimal payload (error type, message, stack trace, app version) - no component stack, user context, or breadcrumbs
+- **`full`**: Full payload (includes component stack, user context, breadcrumbs, device info)
+
+#### `getCrashReportPayload(error: Error, componentStack?: string, consent: ConsentLevel): SentryCaptureOptions | null`
+
+Builds consent-appropriate Sentry capture options. Returns `null` for `none` consent (no send).
+
+**Parameters:**
+- `error`: The Error object to report
+- `componentStack?`: React component stack (for render errors)
+- `consent`: Current analytics consent level
+
+**Returns:** Sentry capture options or `null` if reporting disabled
+
+**Example:**
+```typescript
+import { getCrashReportPayload, AnalyticsConsent } from "@/lib/analytics";
+
+try {
+  // risky operation
+} catch (error) {
+  const options = getCrashReportPayload(error, componentStack, AnalyticsConsent.getLevel());
+  if (options) {
+    Sentry.captureException(error, options);
+  }
+}
+```
+
+**Integration Points:**
+- `ErrorBoundary.tsx`: Catches React render errors with tiered reporting
+- `lib/api/request-manager.ts`: Reports API failures with consent scoping
+
 ## Dependencies
 
 ### External
@@ -198,7 +237,7 @@ All events respect analytics consent and don't include sensitive data.
 ## Related Modules
 
 - **`lib/kernel`** – Stores and manages safe mode state; integrates with bootstrap phases
-- **`lib/analytics`** – Tracks safe mode events (user behavior, recovery success rates)
+- **`lib/analytics`** – Tracks safe mode events (user behavior, recovery success rates); provides `getCrashReportPayload()` for tiered error reporting based on consent levels
 - **`lib/auth`** – AuthStateManager can trigger AUTH safe mode reasons
 - **`lib/storage`** – SecureStorage validation triggers STORAGE safe mode reasons
 - **ErrorBoundary.tsx** – Separate React error boundary (pre-existing, catches render errors)

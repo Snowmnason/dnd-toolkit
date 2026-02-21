@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { breadcrumbQueue } from '@/lib/analytics/breadcrumb-queue';
@@ -22,7 +23,7 @@ describe('BreadcrumbQueue - Stress', () => {
     for (let i = 0; i < total; i++) {
       // sequential enqueue to ensure persistence logic exercised
       // Use increasing timestamps so oldest are obvious
-      // eslint-disable-next-line no-await-in-loop
+       
       await breadcrumbQueue.enqueue({ timestamp: Date.now() + i, category: 'stress', level: 'info', message: `msg-${i}`, data: { i } } as any);
     }
 

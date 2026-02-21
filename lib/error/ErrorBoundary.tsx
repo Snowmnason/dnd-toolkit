@@ -1,5 +1,7 @@
 import * as Sentry from '@sentry/react-native';
 import { Component, ErrorInfo, ReactNode } from 'react';
+import { AnalyticsConsent } from '../analytics/consent';
+import { getCrashReportPayload } from '../analytics/consent-error-payload';
 import { sessionManager } from '../analytics/session';
 import { logger } from '../utils/logger';
 
@@ -41,13 +43,17 @@ export class AppErrorBoundary extends Component<Props, State> {
 
     // Send to Sentry crash reporting service
     try {
-      Sentry.captureException(error, {
-        contexts: {
-          react: {
-            componentStack: errorInfo.componentStack,
-          },
-        },
-      });
+      const captureOptions = getCrashReportPayload(
+        error,
+        errorInfo.componentStack || undefined,
+        AnalyticsConsent.getLevel()
+      );
+      if (captureOptions !== null) {
+        Sentry.captureException(error, captureOptions);
+      } else {
+        logger.warn('ui', 'Error not sent to Sentry (consent=none; awaiting user opt-in via dialog)');
+        // TODO: Show crash consent dialog here (out of scope Phase 1)
+      }
     } catch (sentryError) {
       // Sentry might not be available (e.g., on web in some cases)
       logger.warn('ui', 'Could not send error to Sentry:', sentryError);

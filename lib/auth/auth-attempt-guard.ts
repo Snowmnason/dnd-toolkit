@@ -1,3 +1,5 @@
+import { AnalyticsConsent } from "../analytics/consent";
+import { shouldEmitEvent } from "../analytics/consent-gating";
 import { STORAGE_KEYS } from "../storage/index";
 import { getStorageBackend } from "../storage/privacy";
 import { logger } from "../utils/logger";
@@ -126,10 +128,11 @@ export const recordAuthFailure = async (
   if (record.attempts >= MAX_ATTEMPTS) {
     record.lockedUntil = now + LOCKOUT_MS;
     // Report lockout to Sentry asynchronously if available (don't block rate limit logic)
+    // Auth lockout is a security event; treat as 'performance' (requires >= basic consent)
     initSentryInstance()
       .then((Sentry) => {
         try {
-          if (Sentry?.captureMessage) {
+          if (Sentry?.captureMessage && shouldEmitEvent('performance', AnalyticsConsent.getLevel())) {
             Sentry.captureMessage("auth.lockout", {
               level: "warning",
               tags: {

@@ -3,6 +3,8 @@
  * Provides pluggable exporter architecture for multi-backend analytics
  */
 
+import { AnalyticsConsent } from '@/lib/analytics/consent';
+import { getConsentCategoryForEvent, shouldEmitEvent } from '@/lib/analytics/consent-gating';
 import { getAppConfig } from '@/lib/config/loader';
 import { logger } from '@/lib/utils/logger';
 
@@ -387,6 +389,18 @@ async function flushQueue(cfg: { async: boolean; debounceMs: number; queueSize: 
 }
 
 async function dispatchSingleWithTimeout(event: AnalyticsEvent, context: ExportContext | undefined, timeoutMs: number) {
+  // Check consent gate before dispatching
+  const consentCategory = getConsentCategoryForEvent(event.type, event.name);
+  const consentLevel = AnalyticsConsent.getLevel();
+  
+  if (!shouldEmitEvent(consentCategory, consentLevel)) {
+    logger.debug(
+      'analytics',
+      `Event '${event.name}' dropped (category=${consentCategory ?? 'unmapped'}, level=${consentLevel})`
+    );
+    return;
+  }
+
   // Get enabled exporters for this event type
   const exporters = exporterRegistry.getExportersForEventType(event.type);
 

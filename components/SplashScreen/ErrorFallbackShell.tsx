@@ -42,12 +42,12 @@ export interface ErrorFallbackShellProps {
   recoveryMessage?: string;
   /** Primary button text for recovery action */
   primaryButtonText: string;
-  /** Primary button callback */
-  onPrimaryAction: () => void;
+  /** Primary button callback (can be async) */
+  onPrimaryAction: () => void | Promise<void>;
   /** Optional secondary button text */
   secondaryButtonText?: string;
-  /** Optional secondary button callback */
-  onSecondaryAction?: () => void;
+  /** Optional secondary button callback (can be async) */
+  onSecondaryAction?: () => void | Promise<void>;
   /** Optional footer content (e.g., VersionDisplay) */
   footer?: React.ReactNode;
   /** Message pack to use ('default' or 'safe-mode') */

@@ -338,7 +338,7 @@ Standard stale/cache time presets for use in custom clients:
 
 ### External Packages
 
-- **`@sentry/react-native`** – Error reporting and request context tracking
+- **`@sentry/react-native`** – Error reporting with tiered consent-based payload scoping (none/basic/full levels)
 
 ### Internal Dependencies
 
@@ -374,7 +374,7 @@ Errors thrown inside interceptor hooks are caught and logged. Execution continue
 
 ### Retry Exhaustion
 
-After all retries are used, if `failOpen: false` (default), the error is thrown and reported to Sentry. If `failOpen: true`, `null` is returned.
+After all retries are used, if `failOpen: false` (default), the error is thrown and reported to Sentry with tiered payload scoping based on user consent. If `failOpen: true`, `null` is returned.
 
 ## Performance Notes
 

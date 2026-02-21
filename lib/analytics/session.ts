@@ -7,6 +7,8 @@ import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
 import { getAppConfig } from '../config/loader';
 import { logger } from '../utils/logger';
+import { AnalyticsConsent } from './consent';
+import { shouldEmitEvent } from './consent-gating';
 
 interface SessionData {
   startedAt: number;
@@ -121,6 +123,10 @@ class SessionManager {
       const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN || Constants.expoConfig?.extra?.sentryDsn;
       const perfFlag = getAppConfig().features?.performanceMonitoring;
       if (!dsn || !perfFlag) return;
+
+      // Session lifecycle events are usage-level data (behavioral: when sessions start/end)
+      // Require 'full' consent before sending to Sentry
+      if (!shouldEmitEvent('usage', AnalyticsConsent.getLevel())) return;
 
       Sentry.addBreadcrumb({
         category: 'analytics',

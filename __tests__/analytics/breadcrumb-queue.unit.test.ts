@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { breadcrumbQueue } from '@/lib/analytics/breadcrumb-queue';
+import { AnalyticsConsent } from '@/lib/analytics/consent';
 
 const mockProvider = {
   name: 'mock-provider',
@@ -15,6 +17,13 @@ describe('BreadcrumbQueue - Unit', () => {
     } catch (e) {
       // ignore
     }
+    // Ensure consent allows usage-level breadcrumbs in tests
+    try {
+      await AnalyticsConsent.setLevel('full');
+    } catch (e) {
+      // ignore in constrained test env
+    }
+
     // Initialize with a simple provider if not initialized
     try {
       await breadcrumbQueue.initialize(mockProvider as any);

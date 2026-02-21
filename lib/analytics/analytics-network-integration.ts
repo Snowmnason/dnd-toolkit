@@ -43,18 +43,9 @@ export async function flushAnalyticsQueue(): Promise<void> {
   isFlushing = true;
 
   try {
-    // Check consent before flushing
-    // Note: "usage" consent is for user behavior analytics like screen_view
-    // "performance" is for performance metrics
-    // For the buffer, we respect general "usage" consent (conservative)
-    if (!AnalyticsConsent.isAllowed("usage")) {
-      logger
-        .category("analytics")
-        .debug("Analytics consent not given, skipping flush");
-      return;
-    }
-
     // Signal that flush is starting
+    // Events in buffer are already gated at dispatchEvent() enqueue time;
+    // per-event gating at dispatch applies, not blanket flush gate
     _setAnalyticsBufferFlushing(true);
 
     // Get config

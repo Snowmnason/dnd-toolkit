@@ -41,7 +41,7 @@
  * ✗ app-specific data or customer data
  *
  * Privacy Controls:
- * - Consent gating: respects config.network.telemetry.enabled and AnalyticsConsent.isAllowed('performance')
+ * - Consent gating: respects config.network.telemetry.enabled and shouldEmitEvent('performance', AnalyticsConsent.getLevel())
  * - Integrates with lib/analytics/consent.ts for centralized consent management
  * - If consent is not granted or config disabled, NO data is captured or emitted
  * - Error queue is bounded to prevent memory exhaustion; oldest events dropped on overflow
@@ -50,7 +50,7 @@
  * Sampling and privacy controls are handled in Phase 1c.
  */
 
-import { AnalyticsConsent } from "@/lib/analytics";
+import { AnalyticsConsent, shouldEmitEvent } from "@/lib/analytics";
 import { getPlatformName } from "@/lib/config/platform-config";
 import { composeNetworkContext, type ConnectionType, type NetworkContext } from "@/lib/network/helpers";
 import { NetworkDetection, type NetworkStatus } from "@/lib/network/network-detection";
@@ -225,7 +225,7 @@ function shouldSample(sampleRate: number): boolean {
  * 
  * Behavior:
  * - If config.network.telemetry.enabled === false => false (config takes priority)
- * - Otherwise, check AnalyticsConsent.isAllowed('performance')
+ * - Otherwise, check shouldEmitEvent('performance', AnalyticsConsent.getLevel())
  * 
  * @returns true if telemetry is enabled and user has consented to performance tracking
  */
@@ -242,7 +242,7 @@ function hasPrivacyConsent(): boolean {
 
     // Check centralized analytics consent system
     // Network telemetry is considered 'performance' data
-    return AnalyticsConsent.isAllowed("performance");
+    return shouldEmitEvent('performance', AnalyticsConsent.getLevel());
   } catch {
     // Legacy default: if consent system or config loading errors occur, fall
     // back to legacy behavior (telemetry enabled). This keeps development and
