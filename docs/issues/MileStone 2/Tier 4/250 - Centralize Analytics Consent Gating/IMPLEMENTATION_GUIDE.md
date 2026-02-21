@@ -75,10 +75,12 @@ The `shouldEmitEvent()` function implements the consent rules:
 
 ```typescript
 function shouldEmitEvent(category: ConsentCategory | null, consentLevel: ConsentLevel): boolean {
-  if (category === 'essential') return true; // Always emit for debugging
+  if (category === 'essential') return true; // Always emit (even 'none' — keep essential list small)
   if (category === 'performance') return consentLevel !== 'none';
   if (category === 'usage') return consentLevel === 'full';
-  return true; // Default to essential for unmapped events
+  // Unmapped events default to 'performance' — requires >= 'basic' consent.
+  // This prevents forgotten events from leaking to 'none' consent users.
+  return consentLevel !== 'none';
 }
 ```
 
@@ -170,7 +172,7 @@ Some consent checks remain at collection time (not dispatch):
 - Clear logging of dropped events for debugging
 
 ### Safe Defaults
-- Unmapped events default to 'essential' (emit)
+- Unmapped events default to `'performance'` (requires >= `'basic'` consent — never leaks to `'none'` users)
 - Consent manager defaults to 'basic' if uninitialized
 - Error boundary catches gate failures
 

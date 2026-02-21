@@ -28,11 +28,15 @@ export function useCrashConsentReport() {
    * Send a crash report with full payload when user explicitly opts in.
    * Treats the opt-in as temporary 'full' consent for this single error.
    * 
+   * This function is async and waits for Sentry to flush the event to ensure
+   * the report is sent before the app continues (e.g., restart).
+   * 
    * @param error - The error to report
    * @param componentStack - Optional React component stack
+   * @returns Promise that resolves once the report has been queued and flushed
    */
   const sendCrashReport = useCallback(
-    (error: Error, componentStack?: string) => {
+    async (error: Error, componentStack?: string) => {
       try {
         // Generate full tiered payload as if user has 'full' consent
         const payload = getCrashReportPayload(error, componentStack, 'full');
@@ -40,6 +44,10 @@ export function useCrashConsentReport() {
         if (payload) {
           Sentry.captureException(error, payload);
         }
+
+        // Flush Sentry to ensure the event is sent before returning
+        // Sentry.close() waits for pending events to be sent (timeout handled internally)
+        await Sentry.close();
 
         // Log the opt-in for analytics/debugging
         console.log(

@@ -107,8 +107,9 @@ export function getCrashReportPayload(
       // Rich extra data: version, user context, session info, etc.
       extra: {
         app_version: process.env.EXPO_PUBLIC_APP_VERSION || 'unknown',
-        // Note: Do NOT include raw user context here; let Sentry middleware handle user identification
-        // If you need custom user context, use Sentry.setUser() in bootstrap, not per-error
+        // Note: User context is managed by Analytics.identify(), which respects consent
+        // For 'basic' and 'none' consent, Sentry.setUser() is cleared; for 'full', it's set.
+        // Do not include raw user context here; let Sentry.setUser() (via identify) handle it.
       },
 
       // Include all breadcrumbs (Sentry will limit to recent ones)

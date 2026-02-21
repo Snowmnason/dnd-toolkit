@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { breadcrumbQueue } from '@/lib/analytics/breadcrumb-queue';

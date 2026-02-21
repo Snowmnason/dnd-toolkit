@@ -29,7 +29,7 @@
   - `performance`: allowed for `basic` and `full`
   - `usage`: allowed only for `full`
 - `dispatchEvent()` and `breadcrumbQueue.enqueue()` call the gate before exporting or persisting.
-- Unmapped events default to `essential` (fail-safe) and should log a warning.
+- Unmapped events default to `performance` (requires >= `basic` consent — never leaks to `none` users) and log a warning to prompt the developer to add an explicit mapping.
 
 ---
 
@@ -77,16 +77,19 @@ npx vitest __tests__/analytics/consent-gating.unit.test.ts --run
 
 ---
 
-### ✗ Test 3: Unmapped Events — Safe default and warning
+### ✗ Test 3: Unmapped Events — Strict default and warning
 
-**Scenario:** An event name is not in mapping and should be treated safely.
+**Scenario:** An event name is not in mapping; it must not leak to `none` consent users.
 
 **Steps:**
 1. Emit an event with a random unique name (e.g., `qa_unmapped_event_12345`).
-2. With consent = `basic`, verify `dispatchEvent()` allows it (default to `essential`) and that a developer warning was logged.
+2. With consent = `none`, verify `dispatchEvent()` **drops** the event and that a developer warning was logged.
+3. With consent = `basic`, verify `dispatchEvent()` **allows** the event (defaults to `performance` tier).
 
 **Expected Outcome:**
-- ✅ Event is emitted (safe default), and a warning appears in logs noting unmapped event.
+- ✅ `none` consent: event is **dropped** (not leaked).
+- ✅ `basic`/`full` consent: event is emitted.
+- ✅ A warning appears in logs prompting developer to add an explicit mapping.
 
 ---
 

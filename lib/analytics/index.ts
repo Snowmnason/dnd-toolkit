@@ -217,18 +217,18 @@ export const Analytics = {
       try {
         const consentLevel = AnalyticsConsent.getLevel();
         if (user?.id) {
-          if (consentLevel === 'none') {
-            // Consent=none: clear any previously set user so it won't appear in crash reports
-            Sentry.setUser(null);
-            logger.category("analytics").debug("User context cleared from Sentry (consent=none)");
-          } else if (consentLevel === 'basic') {
-            // Consent=basic: send minimal user context (ID only, no username)
-            Sentry.setUser({ id: user.id });
-            logger.category("analytics").debug("User identified in Sentry (minimal, consent=basic)", { userId: user.id });
-          } else {
-            // Consent=full: send full user context
+          // Per tiered reporting docs:
+          // - 'none': no user context
+          // - 'basic': minimal payload (error, message, stack, app version) — NO user context
+          // - 'full': complete payload with user context (user id, username, breadcrumbs)
+          if (consentLevel === 'full') {
+            // Consent=full: send complete user context (both id and username)
             Sentry.setUser({ id: user.id, username: user.username });
             logger.category("analytics").debug("User identified in Sentry (full, consent=full)", { userId: user.id, username: user.username });
+          } else {
+            // Consent=none or basic: clear user context (both tiers exclude user info)
+            Sentry.setUser(null);
+            logger.category("analytics").debug("User context cleared from Sentry (consent=none|basic)");
           }
         } else {
           Sentry.setUser(null);

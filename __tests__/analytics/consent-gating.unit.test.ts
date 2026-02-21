@@ -1,10 +1,11 @@
+/* eslint-disable security/detect-object-injection */
 import { describe, expect, it } from 'vitest';
 
 import { ConsentLevel } from '@/lib/analytics/consent';
 import {
-    DEFAULT_EVENT_CONSENT_MAPPING,
-    getConsentCategoryForEvent,
-    shouldEmitEvent,
+  DEFAULT_EVENT_CONSENT_MAPPING,
+  getConsentCategoryForEvent,
+  shouldEmitEvent,
 } from '@/lib/analytics/consent-gating';
 
 describe('Consent Gating — unit', () => {
@@ -53,13 +54,16 @@ describe('Consent Gating — unit', () => {
     expect(shouldEmitEvent(usageCat, full)).toBe(true);
   });
 
-  it('treats unmapped events as essential (safe default)', () => {
+  it('treats unmapped events as performance (strict default — never leaks to none)', () => {
     const unknownEvent = '__this_event_is_not_mapped__';
     const cat = getConsentCategoryForEvent(undefined, unknownEvent);
     expect(cat).toBeNull();
 
-    // shouldEmitEvent should treat null/unmapped as essential semantics (allowed always)
-    expect(shouldEmitEvent(cat, 'none')).toBe(true);
+    // shouldEmitEvent should treat null/unmapped as 'performance' semantics:
+    // - 'none'  → false (blocked — doesn't leak to users who opted out)
+    // - 'basic' → true  (allowed — user accepted basic tracking)
+    // - 'full'  → true  (allowed)
+    expect(shouldEmitEvent(cat, 'none')).toBe(false);
     expect(shouldEmitEvent(cat, 'basic')).toBe(true);
     expect(shouldEmitEvent(cat, 'full')).toBe(true);
   });

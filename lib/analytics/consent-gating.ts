@@ -12,7 +12,9 @@
  * - **'essential'**: Always emit (even for 'none', but marked as optional send)
  * - **'performance'**: Emit if consentLevel >= 'basic'
  * - **'usage'**: Emit only if consentLevel === 'full'
- * - **null/unmapped**: Default to 'essential' (fail-safe, avoids data loss)
+ * - **null/unmapped**: Default to 'performance' (requires >= 'basic' consent).
+ *   This prevents forgotten events from leaking to 'none' consent users.
+ *   A warning is logged to prompt the developer to add an explicit mapping.
  */
 
 import type { ConsentLevel } from '@/lib/analytics/consent';
@@ -63,7 +65,7 @@ export function registerEventConsentMapping(
  * Get the consent category required for an event.
  *
  * Looks up event in runtime mapping first, then default mapping.
- * Returns null if not found; caller should apply default (typically 'essential').
+ * Returns null if not found; caller should apply default ('performance' — requires >= 'basic' consent).
  *
  * @param eventType - Event type (unused; kept for API consistency with future expansion)
  * @param eventName - Event name to look up
@@ -86,7 +88,7 @@ export function getConsentCategoryForEvent(
   if (!category) {
     logger
       .category('analytics')
-      .warn(`Event '${eventName}' not in consent mapping; treating as 'essential'`);
+      .warn(`Event '${eventName}' not in consent mapping; defaulting to 'performance' (requires >= 'basic' consent). Add an explicit mapping to event-consent-mapping.ts.`);
     return null;
   }
 
@@ -100,7 +102,7 @@ export function getConsentCategoryForEvent(
  * - **'essential'**: Always emit (true), even for 'none' consent (but marked as optional send)
  * - **'performance'**: Emit if consentLevel >= 'basic'
  * - **'usage'**: Emit only if consentLevel === 'full'
- * - **null/unmapped**: Default to 'essential' (emit for >= basic)
+ * - **null/unmapped**: Default to 'performance' (requires >= 'basic' consent, never leaks to 'none')
  *
  * @param category - Consent category from mapping, or null if unmapped
  * @param consentLevel - User's current consent level
@@ -116,15 +118,20 @@ export function getConsentCategoryForEvent(
  * // Essential event with none consent → true (pass, but optional send)
  * shouldEmitEvent('essential', 'none') // true
  *
- * // Unmapped event with basic consent → true (default to essential)
+ * // Unmapped event with basic consent → true (default to 'performance', basic >= basic)
  * shouldEmitEvent(null, 'basic') // true
+ *
+ * // Unmapped event with none consent → false (default to 'performance', none < basic)
+ * shouldEmitEvent(null, 'none') // false
  */
 export function shouldEmitEvent(
   category: ConsentCategory | null,
   consentLevel: ConsentLevel
 ): boolean {
-  // Unmapped events default to 'essential' to avoid data loss
-  const effectiveCategory = category || 'essential';
+  // Unmapped events default to 'performance' (requires >= 'basic' consent).
+  // This ensures forgotten/new events cannot leak to 'none' consent users.
+  // A warning is already logged by getConsentCategoryForEvent() for unmapped names.
+  const effectiveCategory = category || 'performance';
 
   switch (effectiveCategory) {
     case 'essential':

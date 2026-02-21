@@ -10,22 +10,37 @@ export type ConsentCategory = 'essential' | 'performance' | 'usage';
 /**
  * Event type to consent category mapping.
  *
- * - **essential**: Emit if user has >= 'basic' consent (default for unmapped events)
- * - **performance**: Emit if user has >= 'basic' consent
- * - **usage**: Emit if user has === 'full' consent
+ * - **essential**: Always emit — even for consent level 'none'. Reserve for critical
+ *   system-health events (crashes, fatal errors, safe mode). Keep this list small.
+ * - **performance**: Emit if consentLevel >= 'basic'
+ * - **usage**: Emit only if consentLevel === 'full'
  *
- * Add new events as the app grows. See lib/analytics/consent-gating.ts for gate logic.
+ * **Unmapped events default to 'performance'** (requires at least 'basic' consent).
+ * This prevents forgotten/new events from leaking to users with 'none' consent.
+ * A warning is also logged so the developer knows to add a mapping.
+ *
+ * Add new events here as the app grows. See lib/analytics/consent-gating.ts for gate logic.
  */
 export const DEFAULT_EVENT_CONSENT_MAPPING = new Map<string, ConsentCategory>([
-  // Essential events (errors, regressions, system health)
-  // These are required for debugging and system monitoring
+  // ─── Essential events ────────────────────────────────────────────────────────
+  // Always emitted — even for 'none' consent. Only errors, crashes, and critical
+  // system-health signals belong here. Keep this list intentionally small.
   ['error', 'essential'],
   ['fatal', 'essential'],
   ['regression_detected', 'essential'],
-  ['api_request', 'essential'],
   ['api_error', 'essential'],
 
-  // Performance events (performance metrics, A/B testing)
+  // Safe mode — system health/debugging; must always reach the backend
+  ['safe_mode_entered', 'essential'],
+  ['safe_mode_action', 'essential'],
+  ['safe_mode_recovery_action_selected', 'essential'],
+  ['safe_mode_recovery_action_succeeded', 'essential'],
+  ['safe_mode_recovery_action_failed', 'essential'],
+
+  // Bootstrap — kernel lifecycle; required for reliability monitoring
+  ['app_bootstrap_complete', 'essential'],
+
+  // ─── Performance events ──────────────────────────────────────────────────────
   // Requires >= 'basic' consent (user opted into basic tracking)
   ['performance_measure', 'performance'],
   ['variant_assigned', 'performance'],
@@ -33,11 +48,16 @@ export const DEFAULT_EVENT_CONSENT_MAPPING = new Map<string, ConsentCategory>([
   ['variant_performance', 'performance'],
   ['request_latency', 'performance'],
   ['page_load_time', 'performance'],
+  ['feature_blocked', 'performance'],
+  ['api_request', 'performance'],
 
-  // Usage events (user interactions, feature engagement)
+  // ─── Usage events ────────────────────────────────────────────────────────────
   // Requires 'full' consent (user opted into full usage tracking)
   ['screen_view', 'usage'],
   ['component_usage', 'usage'],
   ['feature_usage', 'usage'],
-  ['feature_blocked', 'usage'],
+
+  // Session lifecycle — behavioural data; requires full consent
+  ['session_started', 'usage'],
+  ['session_ended', 'usage'],
 ]);

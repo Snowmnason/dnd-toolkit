@@ -32,10 +32,13 @@ export function CrashFallBack({ error, onRetry }: CrashFallBackProps) {
     }
   };
 
-  const handleSendReport = () => {
+  const handleSendReportAndRestart = async () => {
     if (error) {
-      sendCrashReport(error);
+      // Await the report send to ensure it's flushed before restarting
+      await sendCrashReport(error);
     }
+    // Now safe to restart — report has been sent and flushed
+    handleRestart();
   };
 
   return (
@@ -45,11 +48,11 @@ export function CrashFallBack({ error, onRetry }: CrashFallBackProps) {
         showDetails={showDetailedErrors && !!error}
         recoveryMessage={
           canOptIn
-            ? "We encountered a critical error. Help us fix it by sending a crash report (no personal data), or restart without sending."
+            ? "We encountered a critical error. Help us fix it by sending a crash report (error, stack trace, breadcrumbs, and device info), or restart without sending."
             : "Don't worry - your adventure is safe! Try rolling for initiative (restarting) or contact your DM (support) if this keeps happening."
         }
         primaryButtonText={canOptIn ? 'Send Report & Restart' : onRetry ? 'Try Again' : 'Restart App'}
-        onPrimaryAction={canOptIn ? handleSendReport : onRetry || handleRestart}
+        onPrimaryAction={canOptIn ? handleSendReportAndRestart : onRetry || handleRestart}
         secondaryButtonText={canOptIn ? 'Restart Without Sending' : onRetry ? 'Restart App' : undefined}
         onSecondaryAction={canOptIn ? handleRestart : onRetry ? handleRestart : undefined}
         footer={<VersionDisplay />}

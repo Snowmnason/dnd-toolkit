@@ -235,9 +235,9 @@ Analytics.track('test_event', { data: 'test' });
 4. **Review logs**: Look for "dropped due to consent level" messages
 
 ### Unmapped Events
-- Unmapped events default to 'essential' category
-- Check logs for "Unmapped event" warnings
-- Add proper mapping to prevent warnings
+- Unmapped events default to `'performance'` (requires >= `'basic'` consent — won't leak to `'none'` consent users)
+- Check logs for warnings: `Event '...' not in consent mapping; defaulting to 'performance'`
+- Add an explicit mapping in `lib/analytics/event-consent-mapping.ts` to silence warnings and express intent
 
 ### Performance Issues
 - Consent checks are synchronous and fast
@@ -273,9 +273,9 @@ Analytics.track('api_request', { endpoint: '/data' });
 - Avoid PII in event names or properties
 
 ### Category Selection
-- Default to 'essential' for debugging events
-- Use 'performance' for technical metrics
-- Reserve 'usage' for business intelligence
+- Use `'essential'` **only** for events that must always reach the backend (errors, safe mode, bootstrap). Keep this list intentionally small.
+- Use `'performance'` for technical metrics and debugging events that require at least basic consent
+- Reserve `'usage'` for business intelligence and behavioural data
 
 ### Error Handling
 - Always check `getCrashReportPayload()` return value
