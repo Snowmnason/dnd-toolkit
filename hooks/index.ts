@@ -54,6 +54,7 @@ export { useAnalyticsBufferStatus } from "./analytics/use-analytics-buffer-statu
 export type { AnalyticsBufferStatus } from "./analytics/use-analytics-buffer-status";
 export { useAnalyticsConsent } from "./analytics/use-analytics-consent";
 export type { UseAnalyticsConsentReturn } from "./analytics/use-analytics-consent";
+export { useCrashConsentReport } from "./analytics/use-crash-consent-report";
 
 // Utilities
 export { isAppIdle, useAppState } from "./utils/use-app-state";
