@@ -16,6 +16,7 @@
  */
 
 import { validateEmail, validatePassword } from '@/lib/auth/validation';
+import { isDevelopment } from '@/lib/config/loader';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -147,18 +148,24 @@ export interface AuthProvider {
 
 /**
  * Base error class for all auth errors.
- * Provides normalization and PII redaction for logging.
+ * Provides normalization, PII redaction for logging, and user-facing messages.
  */
 export class AuthError extends Error {
   public readonly original?: any; // Original provider error
   public readonly code?: string; // Provider-specific error code
   public readonly timestamp: number = Date.now();
+  /**
+   * User-facing message safe to display in UI.
+   * Redacts sensitive details but explains what went wrong.
+   */
+  public readonly userMessage: string;
 
-  constructor(message: string, original?: any, code?: string) {
+  constructor(message: string, original?: any, code?: string, userMessage?: string) {
     super(message);
     this.name = 'AuthError';
     this.original = original;
     this.code = code;
+    this.userMessage = userMessage || 'An authentication error occurred. Please try again.';
     Object.setPrototypeOf(this, AuthError.prototype);
   }
 
@@ -181,8 +188,12 @@ export class AuthError extends Error {
  * User provided invalid email or password.
  */
 export class InvalidCredentialsError extends AuthError {
-  constructor(message = 'Invalid credentials', original?: any) {
-    super(message, original, 'INVALID_CREDENTIALS');
+  constructor(
+    message = 'Invalid credentials',
+    original?: any,
+    userMessage = 'Please check your email and password and try again.'
+  ) {
+    super(message, original, 'INVALID_CREDENTIALS', userMessage);
     this.name = 'InvalidCredentialsError';
     Object.setPrototypeOf(this, InvalidCredentialsError.prototype);
   }
@@ -192,8 +203,12 @@ export class InvalidCredentialsError extends AuthError {
  * Network error (timeout, no connection, etc.).
  */
 export class NetworkError extends AuthError {
-  constructor(message = 'Network error', original?: any) {
-    super(message, original, 'NETWORK_ERROR');
+  constructor(
+    message = 'Network error',
+    original?: any,
+    userMessage = 'The server took too long to respond. Please check your connection and try again.'
+  ) {
+    super(message, original, 'NETWORK_ERROR', userMessage);
     this.name = 'NetworkError';
     Object.setPrototypeOf(this, NetworkError.prototype);
   }
@@ -203,8 +218,12 @@ export class NetworkError extends AuthError {
  * User not found (during sign in or reset password).
  */
 export class UserNotFoundError extends AuthError {
-  constructor(message = 'User not found', original?: any) {
-    super(message, original, 'USER_NOT_FOUND');
+  constructor(
+    message = 'User not found',
+    original?: any,
+    userMessage = 'No account found with that email. Please sign up first.'
+  ) {
+    super(message, original, 'USER_NOT_FOUND', userMessage);
     this.name = 'UserNotFoundError';
     Object.setPrototypeOf(this, UserNotFoundError.prototype);
   }
@@ -214,8 +233,12 @@ export class UserNotFoundError extends AuthError {
  * Email already registered/exists.
  */
 export class EmailAlreadyExistsError extends AuthError {
-  constructor(message = 'Email already exists', original?: any) {
-    super(message, original, 'EMAIL_ALREADY_EXISTS');
+  constructor(
+    message = 'Email already exists',
+    original?: any,
+    userMessage = 'An account with that email already exists. Please sign in or use a different email.'
+  ) {
+    super(message, original, 'EMAIL_ALREADY_EXISTS', userMessage);
     this.name = 'EmailAlreadyExistsError';
     Object.setPrototypeOf(this, EmailAlreadyExistsError.prototype);
   }
@@ -225,8 +248,12 @@ export class EmailAlreadyExistsError extends AuthError {
  * Provider initialization or configuration error.
  */
 export class ProviderInitializationError extends AuthError {
-  constructor(message = 'Provider initialization failed', original?: any) {
-    super(message, original, 'PROVIDER_INIT_ERROR');
+  constructor(
+    message = 'Provider initialization failed',
+    original?: any,
+    userMessage = 'Authentication service is temporarily unavailable. Please try again later.'
+  ) {
+    super(message, original, 'PROVIDER_INIT_ERROR', userMessage);
     this.name = 'ProviderInitializationError';
     Object.setPrototypeOf(this, ProviderInitializationError.prototype);
   }
@@ -493,14 +520,22 @@ export async function registerAuthProvider(
  * If a factory was registered, instantiate it on first call.
  * Throws if no provider has been registered yet.
  *
+ * **Dev-only Warning:** In development, logs a detailed message if provider is not initialized,
+ * suggesting to check that `registerAuthProvider()` was called during app bootstrap.
+ *
  * @throws ProviderInitializationError if provider not initialized
  */
 export async function getAuthProvider(): Promise<AuthProvider> {
   if (!registeredProvider) {
+    const debugHint = isDevelopment()
+      ? 'Did you call registerAuthProvider() during app bootstrap? Check: lib/services/service-initializer.ts → initializeServices() → initializeAuthProvider()'
+      : 'Please restart the app and contact support if the problem persists.';
     const error = new ProviderInitializationError(
-      'No auth provider registered. Call registerAuthProvider() during app bootstrap.'
+      `No auth provider registered. ${debugHint}`,
+      undefined,
+      'Authentication service is not available. Please restart the app.'
     );
-    logger.error('auth', error.message);
+    logger.error('auth', error.toLog());
     throw error;
   }
 
@@ -517,13 +552,21 @@ export async function getAuthProvider(): Promise<AuthProvider> {
           logger.debug('auth', 'Instantiating auth provider from factory...');
           const provider = await registeredProvider();
           providerInstance = provider;
-          logger.debug('auth', 'Auth provider factory instantiated', {
+          logger.info('bootstrap', 'Auth provider factory instantiated', {
             providerType: provider.constructor.name,
           });
           return provider;
         } catch (error) {
-          logger.error('auth', 'Auth provider factory failed:', error);
-          throw error;
+          const err = error as Error;
+          logger.error(
+            'bootstrap',
+            `Auth provider factory failed: ${err.message}`
+          );
+          throw new ProviderInitializationError(
+            `Auth provider initialization failed: ${err.message}`,
+            error,
+            'Authentication service failed to initialize. Please contact support if the problem persists.'
+          );
         }
       })();
     }

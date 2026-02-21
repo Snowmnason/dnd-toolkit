@@ -18,6 +18,7 @@ import {
     InvalidCredentialsError,
     NetworkError,
     Session,
+    UserNotFoundError,
 } from '@/lib/services/auth-provider';
 import { logger } from '@/lib/utils/logger';
 
@@ -262,58 +263,116 @@ export class SupabaseAuthProvider implements AuthProvider {
   /**
    * Map Supabase AuthError to normalized error types.
    * Preserves original error on `.original` field for debugging.
+   *
+   * **Error Mapping Strategy:**
+   * 1. Check error code (most reliable)
+   * 2. Check error message patterns (case-insensitive)
+   * 3. Check exception type (network errors)
+   * 4. Default to generic AuthError
+   *
+   * **User-Facing Messages:**
+   * Network/timeout errors → suggest checking connection
+   * Invalid credentials → suggest retry with correct details
+   * Email exists → suggest sign in instead
+   * Other errors → generic "try again" message
    */
   private mapSupabaseError(supabaseError: any): AuthError {
     const message = supabaseError?.message || 'Unknown auth error';
     const code = supabaseError?.code || supabaseError?.status;
+    const messageLower = message.toLowerCase();
 
     logger.debug('auth', 'Mapping Supabase error:', {
       code,
       message,
+      type: supabaseError?.constructor?.name,
     });
 
     // Invalid credentials
     if (
-      message.includes('Invalid login credentials') ||
-      message.includes('invalid credentials') ||
-      message.includes('Invalid email or password') ||
+      messageLower.includes('invalid login credentials') ||
+      messageLower.includes('invalid credentials') ||
+      messageLower.includes('invalid email or password') ||
+      messageLower.includes('incorrect password') ||
       code === 'invalid_credentials'
     ) {
       return new InvalidCredentialsError(message, supabaseError);
     }
 
-    // Email already exists
+    // Email already exists (signup conflicts)
     if (
-      message.includes('User already registered') ||
-      message.includes('already registered') ||
-      message.includes('already been registered') ||
-      message.includes('email address not available') ||
-      message.includes('duplicate key value') ||
-      code === '23505'
+      messageLower.includes('user already registered') ||
+      messageLower.includes('already registered') ||
+      messageLower.includes('already been registered') ||
+      messageLower.includes('email address not available') ||
+      messageLower.includes('duplicate key value') ||
+      messageLower.includes('duplicate email') ||
+      messageLower.includes('unique constraint') ||
+      code === '23505' || // Postgres unique constraint error
+      code === 'user_already_exists'
     ) {
       return new EmailAlreadyExistsError(message, supabaseError);
     }
 
-    // User not found
+    // User not found (signin/reset password target)
     if (
-      message.includes('User not found') ||
-      message.includes('user not found') ||
+      messageLower.includes('user not found') ||
+      messageLower.includes('no user found') ||
+      messageLower.includes('user does not exist') ||
       code === 'user_not_found'
     ) {
-      return new AuthError(message, supabaseError, 'USER_NOT_FOUND');
+      return new UserNotFoundError(message, supabaseError);
     }
 
-    // Network errors
+    // Network errors and timeouts
     if (
-      message.includes('Request timeout') ||
-      message.includes('Network') ||
-      message.includes('fetch failed') ||
-      supabaseError instanceof TypeError
+      messageLower.includes('request timeout') ||
+      messageLower.includes('network') ||
+      messageLower.includes('fetch failed') ||
+      messageLower.includes('econnrefused') ||
+      messageLower.includes('enotfound') ||
+      messageLower.includes('time out') ||
+      supabaseError instanceof TypeError ||
+      code === 'NETWORK_ERROR' ||
+      code === 'ETIMEDOUT'
     ) {
       return new NetworkError(message, supabaseError);
     }
 
+    // Email verification or signup flow errors
+    if (
+      messageLower.includes('email verification') ||
+      messageLower.includes('confirm your email') ||
+      messageLower.includes('please confirm') ||
+      messageLower.includes('unverified email')
+    ) {
+      return new AuthError(
+        message,
+        supabaseError,
+        'EMAIL_NOT_CONFIRMED',
+        'Please verify your email address before signing in.'
+      );
+    }
+
+    // Password requirements not met
+    if (
+      messageLower.includes('password too short') ||
+      messageLower.includes('password length') ||
+      messageLower.includes('password must') ||
+      code === 'password_too_short'
+    ) {
+      return new InvalidCredentialsError(
+        message,
+        supabaseError,
+        'Your password does not meet security requirements. Please use a stronger password.'
+      );
+    }
+
     // Default: generic auth error
-    return new AuthError(message, supabaseError, code);
+    return new AuthError(
+      message,
+      supabaseError,
+      code,
+      'An authentication error occurred. Please try again.'
+    );
   }
 }

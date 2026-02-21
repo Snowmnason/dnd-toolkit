@@ -10,18 +10,12 @@ export type AuthState = 'loading' | 'authenticated' | 'unauthenticated';
 
 export interface AuthGuardOptions {
   forceVerification?: boolean; // Always check Supabase, ignore cache age
-  // FUTURE: Add these when implementing role-based permissions (Phase 4d):
-  // requiredRole?: 'owner' | 'dm' | 'player' | 'any';
-  // requiredPermission?: 'read' | 'write';
 }
 
-// FUTURE: Add these when implementing role-based permissions (Phase 4d):
-// export type AuthLevel = 'account-only' | 'world-required' | 'world-owner' | 'world-dm';
-
-// Cache dynamic imports to prevent re-importing modules on every auth check
-let supabaseCache: any = null;
-let isSupabaseConfiguredCache: any = null;
-
+/**
+ * Auth guard hook using injected provider abstraction
+ * Protects routes based on authentication level
+ */
 export function useAuthGuard(
   bootstrapReadyOrUndefined?: boolean,
   level: AuthLevel = 'account-only',
@@ -33,7 +27,7 @@ export function useAuthGuard(
   const [authState, setAuthState] = useState<AuthState>('loading');
   const [subscriptionReady, setSubscriptionReady] = useState(false);
   const hasRedirectedRef = useRef(false);
-  const subscriptionReadyRef = useRef(false); // Track if we've already set subscriptionReady
+  const subscriptionReadyRef = useRef(false);
   
   // If bootstrapReadyOrUndefined is undefined, use kernel; otherwise use the provided value
   const kernel = useAppKernel();
@@ -50,50 +44,39 @@ export function useAuthGuard(
     hasRedirectedRef.current = false;
   }, [firstSegment]);
 
-  // Subscribe to auth state changes ONLY ONCE on mount
-  // Only instanceId is in dependencies (stable due to useState)
+  /**
+   * Subscribe to auth state changes from the provider
+   * Only runs once on mount
+   */
   useEffect(() => {
-    let subscription: { unsubscribe: () => void } | null = null;
+    let unsubscribe: (() => void) | null = null;
     let mounted = true;
 
-    logger.info('security', `[GUARD:${instanceId}] 🟢 Setting up auth state subscription`);
+    logger.info('security', `[GUARD:${instanceId}] 🟢 Setting up auth state subscription via provider`);
 
     const setup = async () => {
       try {
-        // Use cached imports to avoid re-loading modules
-        if (!supabaseCache) {
-          const imported = await import('@/lib/database/supabase');
-          supabaseCache = imported.supabase;
-          isSupabaseConfiguredCache = imported.isSupabaseConfigured;
-        }
+        const provider = AuthStateManager.getProvider();
         
-        if (!isSupabaseConfiguredCache()) {
-          logger.warn('security', `[GUARD:${instanceId}] ⚠️ Supabase not configured, skipping subscription`);
-          setSubscriptionReady(true);
-          return;
-        }
-
-        const {
-          data: { subscription: sub },
-        } = supabaseCache.auth.onAuthStateChange(async (event: string, session: any) => {
+        // Subscribe to provider's auth state changes
+        unsubscribe = provider.onAuthStateChange(async (session) => {
           if (!mounted) {
             logger.debug('security', `[GUARD:${instanceId}] 🔇 Subscription event received after unmount, ignoring`);
             return;
           }
           
-          logger.debug('security', `[GUARD:${instanceId}] 🔔 onAuthStateChange: event=${event}, hasSession=${!!session}`);
+          logger.debug('security', `[GUARD:${instanceId}] 🔔 onAuthStateChange: hasSession=${!!session}`);
           
-          // CRITICAL: Mark subscription as ready once we get first event
+          // Mark subscription as ready once we get first event
           if (!subscriptionReadyRef.current) {
             subscriptionReadyRef.current = true;
-            logger.info('security', `[GUARD:${instanceId}] ✅ Subscription ready with first event: ${event}`);
+            logger.info('security', `[GUARD:${instanceId}] ✅ Subscription ready`);
             setSubscriptionReady(true);
           }
           
-          // CRITICAL: If we get a session event, sync it to local auth state immediately
-          // This ensures isAuthenticated() will return true on next check
-          if (session && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')) {
-            logger.info('security', `[GUARD:${instanceId}] 🔄 Syncing Supabase session to local auth state`);
+          // Sync session to local auth state
+          if (session) {
+            logger.info('security', `[GUARD:${instanceId}] 🔄 Syncing session to local auth state`);
             await AuthStateManager.setHasAccount(true);
           }
           
@@ -106,7 +89,7 @@ export function useAuthGuard(
             setAuthState('unauthenticated');
           }
         });
-        subscription = sub ?? null;
+        
         logger.info('security', `[GUARD:${instanceId}] 🔗 Subscription listener registered`);
       } catch (error) {
         logger.error('security', `[GUARD:${instanceId}] Error setting up auth subscription:`, error);
@@ -117,25 +100,26 @@ export function useAuthGuard(
     setup();
     return () => {
       mounted = false;
-      if (subscription) {
+      if (unsubscribe) {
         logger.info('security', `[GUARD:${instanceId}] 🔴 Cleaning up subscription`);
-        subscription.unsubscribe();
+        unsubscribe();
       }
     };
   }, [instanceId]); // Only run once on mount
 
-  // Core auth check ONLY runs on protected routes AFTER subscription is ready
+  /**
+   * Core auth check - runs after subscription is ready and app is ready
+   */
   useEffect(() => {
     if (!appReady) return;
     
     // For protected routes, wait for subscription to establish before checking auth
-    // This ensures session is synced to local storage
     if (isProtectedRoute && !subscriptionReady) {
       logger.debug('security', `[GUARD:${instanceId}] ⏳ Waiting for subscription to be ready before auth check on protected route`);
       return;
     }
 
-logger.debug('security', `[GUARD:${instanceId}] 🚀 Starting core auth check, isProtectedRoute=${isProtectedRoute}, level=${level}, params.worldId=${params.worldId}`);
+    logger.debug('security', `[GUARD:${instanceId}] 🚀 Starting core auth check, isProtectedRoute=${isProtectedRoute}, level=${level}, params.worldId=${params.worldId}`);
 
     let mounted = true;
     const check = async () => {
@@ -165,19 +149,17 @@ logger.debug('security', `[GUARD:${instanceId}] 🚀 Starting core auth check, i
             
             logger.info('security', `[GUARD:${instanceId}] 🌍 World-required: verifying access to world ${worldId}`);
             
-            // NEW: Check if this is a sensitive page that needs forced verification
+            // Check if this is a sensitive page that needs forced verification
             if (options?.forceVerification) {
-              logger.info('security', `[GUARD:${instanceId}] 🔒 Sensitive page - forcing Supabase verification for world ${worldId}`);
+              logger.info('security', `[GUARD:${instanceId}] 🔒 Sensitive page - forcing verification for world ${worldId}`);
               
-              // Force Supabase check regardless of cache age
               const verification = await AuthStateManager.verifyWorldAccessWithDatabase(
                 worldId,
                 (reason: string) => {
                   logger.warn('security', `[GUARD:${instanceId}] Access denied on sensitive page:`, reason);
-                  // Could show error modal/toast here
                   router.replace('/select/world-selection');
                 },
-                { forceFresh: true } // Pass option to skip cache age check
+                { forceFresh: true }
               );
               
               logger.info('security', `[GUARD:${instanceId}] 🔒 Force verification result: hasAccess=${verification.hasAccess}`);
@@ -191,14 +173,13 @@ logger.debug('security', `[GUARD:${instanceId}] 🚀 Starting core auth check, i
                 return;
               }
             } else {
-              // Normal cache-first check (existing logic)
+              // Normal cache-first check
               logger.info('security', `[GUARD:${instanceId}] 🌍 Cache-first verification for world ${worldId}`);
               
               const verification = await AuthStateManager.verifyWorldAccessWithDatabase(
                 worldId,
                 (reason: string) => {
                   logger.warn('security', `[GUARD:${instanceId}] Access revoked:`, reason);
-                  // Could show error modal/toast here
                   router.replace('/select/world-selection');
                 }
               );
@@ -216,6 +197,7 @@ logger.debug('security', `[GUARD:${instanceId}] 🚀 Starting core auth check, i
             }
           }
 
+          //TODO: In the future, we can add more granular permission checks here based on the "level" and route params (e.g. worldId) to enforce DM vs Player access, read vs write permissions, etc.
           // FUTURE: Add role-based checks here when implementing DM/Player permissions (Phase 4d)
           // if (level === 'world-owner' || level === 'world-dm') {
           //   const userRole = await getUserRole(); // from AppParamsVolatileContext

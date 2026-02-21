@@ -1,10 +1,14 @@
+import { type AuthProvider } from "../services";
 import {
-    clearAllUserData,
-    getPrivacyStorageBackend,
-    SecureStorage,
-    STORAGE_KEYS,
+  clearAllUserData,
+  getPrivacyStorageBackend,
+  SecureStorage,
+  STORAGE_KEYS,
 } from "../storage";
 import { logger } from "../utils/logger";
+
+// Injected auth provider (set via configure())
+let authProvider: AuthProvider | null = null;
 
 // Cache dynamic imports to prevent re-importing modules on every auth check
 let supabaseCache: any = null;
@@ -22,6 +26,39 @@ export interface CacheMetadata {
 }
 
 export const AuthStateManager = {
+  /**
+   * Configure the auth provider to use for auth operations.
+   * Call this once during app bootstrap before any auth methods are invoked.
+   *
+   * @param provider - The AuthProvider instance to use (Supabase by default)
+   * @param options - Optional configuration (reserved for future use)
+   */
+  configure(provider: AuthProvider, options?: any): void {
+    if (!provider) {
+      logger.error('auth', 'AuthStateManager.configure: provider is null/undefined');
+      throw new Error('AuthStateManager.configure: provider is required');
+    }
+    authProvider = provider;
+    logger.info('auth', 'AuthStateManager configured with provider', {
+      providerType: provider.constructor.name,
+    });
+  },
+
+  /**
+   * Get the configured auth provider.
+   * Throws if configure() has not been called yet.
+   * @internal
+   */
+  getProvider(): AuthProvider {
+    if (!authProvider) {
+      logger.error('auth', 'AuthStateManager.getProvider: provider not configured');
+      throw new Error(
+        'Auth provider not configured. Call AuthStateManager.configure() during app bootstrap.'
+      );
+    }
+    return authProvider;
+  },
+
   // Save the Supabase session to encrypted storage (web platform workaround)
   // Since web has persistSession=false for security, we manually save/restore the session
   async saveAuthSession(session: any): Promise<void> {

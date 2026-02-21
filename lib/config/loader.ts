@@ -38,6 +38,10 @@ export interface AppSettings {
     mockSupabase: boolean;
     verboseErrorMessages: boolean;
   };
+  auth?: {
+    provider?: string; // "supabase" | "firebase" | "custom"
+    description?: string;
+  };
   devTools: {
     enableConsoleLogger: boolean;
     enableNetworkLogger: boolean;

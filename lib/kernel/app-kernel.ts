@@ -644,13 +644,33 @@ class AppKernelClass {
         .category("bootstrap")
         .info(`✅ appReady = true (auth phase still running in background)`);
 
-      // Initialize services (Sentry exporter, future analytics integrations)
+      // Initialize services (auth provider, Sentry exporter, analytics integrations)
       try {
         const { initializeServices } = await import("@/lib/services");
         await initializeServices();
         logger
           .category("bootstrap")
           .info("Services initialized successfully");
+
+        // Configure AuthStateManager with the registered auth provider
+        // initializeServices() already registered the provider, now wire it into AuthStateManager
+        try {
+          const { getAuthProvider } = await import("@/lib/services");
+          const { AuthStateManager } = await import("@/lib/auth/auth-state");
+          
+          const provider = await getAuthProvider();
+          AuthStateManager.configure(provider);
+          logger
+            .category("bootstrap")
+            .info("AuthStateManager configured with registered provider");
+        } catch (error) {
+          logger
+            .category("bootstrap")
+            .error("Failed to configure AuthStateManager with provider:", {
+              error: (error as Error).message,
+            });
+          throw error; // Auth is critical, don't continue if configuration fails
+        }
       } catch (error) {
         logger
           .category("bootstrap")
