@@ -10,7 +10,7 @@
 import * as Crypto from 'expo-crypto';
 
 import { AnalyticsConsent } from '@/lib/analytics/consent';
-import { getConsentCategoryForEvent, shouldEmitEvent } from '@/lib/analytics/consent-gating';
+import { type ConsentCategory, shouldEmitEvent } from '@/lib/analytics/consent-gating';
 import { getAppConfig } from '@/lib/config';
 import { BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '@/lib/services/provider-adapter';
 import { STORAGE_KEYS, SecureStorage } from '@/lib/storage';
@@ -139,16 +139,14 @@ class BreadcrumbQueueService {
       return null;
     }
 
-    // NEW: Check consent gate before persisting breadcrumb
-    // Map breadcrumb category to consent category for gating
+    // Check consent gate before persisting breadcrumb
     const consentCategory = this._getConsentCategoryForBreadcrumb(breadcrumb.category);
     const consentLevel = AnalyticsConsent.getLevel();
 
     if (!shouldEmitEvent(consentCategory, consentLevel)) {
       logger.category('analytics').debug(
         'BreadcrumbQueue',
-        `Breadcrumb dropped due to consent level`,
-        { breadcrumbCategory: breadcrumb.category, consentCategory, consentLevel }
+        `Breadcrumb '${breadcrumb.category}' dropped (category=${consentCategory}, level=${consentLevel})`
       );
       return null;
     }
@@ -501,7 +499,7 @@ class BreadcrumbQueueService {
   private _getConsentCategoryForBreadcrumb(breadcrumbCategory: string) {
     // Map breadcrumb categories to consent categories
     // Most breadcrumbs are performance/diagnostic; only essential breadcrumbs are always sent
-    const consentMapping: Record<string, ReturnType<typeof getConsentCategoryForEvent>> = {
+    const consentMapping: Record<string, ConsentCategory> = {
       // Essential breadcrumbs (errors, exceptions)
       error: 'essential',
       exception: 'essential',
@@ -520,7 +518,12 @@ class BreadcrumbQueueService {
       custom: 'usage',
     };
 
-    return consentMapping[breadcrumbCategory] ?? 'essential'; // Default to essential for unmapped categories
+    const mapped = consentMapping[breadcrumbCategory];
+    if (mapped === undefined) {
+      logger.category('analytics').warn('BreadcrumbQueue', `Unmapped breadcrumb category '${breadcrumbCategory}'; defaulting to 'performance'`);
+      return 'performance';
+    }
+    return mapped;
   }
 
   /**

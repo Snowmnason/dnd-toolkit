@@ -1,33 +1,30 @@
 /**
- * @file Consent gating for analytics events.
+ * @file Centralized consent gating for analytics events and breadcrumbs.
  *
- * Maps event types to consent categories and provides gate logic to determine
- * if an event should be emitted based on user consent level.
+ * This module provides the core gate logic for filtering events and breadcrumbs
+ * based on user consent level. All analytics dispatch and breadcrumb queueing
+ * must flow through these functions to ensure consistent, privacy-first filtering.
  *
- * This module centralizes consent checking logic at the dispatch layer, so all
- * events (whether from call sites or breadcrumb queue) are consistently gated.
+ * **Design Principle:** Consent checks happen at the dispatch layer (dispatchEvent, breadcrumbQueue.enqueue),
+ * not at call sites. This creates a single choke point for enforcement.
  *
- * **Design**: Event mapping is centralized in event-consent-mapping.ts and can be
- * extended at runtime via registerEventConsentMapping(). Unmapped events default
- * to 'essential' (safe).
- *
- * **Gate Logic**:
- * - 'none' consent: Block all events (user opted out)
- * - 'basic' consent: Allow essential + performance events
- * - 'full' consent: Allow all events (essential + performance + usage)
- *
- * See lib/analytics/README.md for architecture overview.
+ * **Gate Logic** (3-tier):
+ * - **'essential'**: Always emit (even for 'none', but marked as optional send)
+ * - **'performance'**: Emit if consentLevel >= 'basic'
+ * - **'usage'**: Emit only if consentLevel === 'full'
+ * - **null/unmapped**: Default to 'essential' (fail-safe, avoids data loss)
  */
 
-import { AnalyticsConsent } from '@/lib/analytics/consent';
+import type { ConsentLevel } from '@/lib/analytics/consent';
 import {
     ConsentCategory,
     DEFAULT_EVENT_CONSENT_MAPPING,
 } from '@/lib/analytics/event-consent-mapping';
 import { logger } from '@/lib/utils/logger';
 
-// Re-export for convenience (importers can use either consent-gating or event-consent-mapping)
+// Re-export for convenience
 export { ConsentCategory, DEFAULT_EVENT_CONSENT_MAPPING };
+export type { ConsentLevel };
 
 /**
  * Runtime-extended consent mapping.
@@ -39,25 +36,26 @@ let runtimeMapping = new Map<string, ConsentCategory>();
  * Register additional event-to-consent mappings at runtime.
  *
  * Used by extensions/plugins that add custom analytics events.
- * Provided map is merged with default mapping; runtime mappings override
+ * Provided mappings are merged with default mapping; runtime mappings override
  * defaults for the same event names.
  *
- * @param mapping Record of event name → consent category
- * @throws Error if any category is invalid
+ * @param overrides - Map of event names to consent categories
+ *
+ * @example
+ * registerEventConsentMapping(new Map([
+ *   ['custom_event', 'usage'],
+ *   ['plugin_metric', 'performance'],
+ * ]));
  */
 export function registerEventConsentMapping(
-  mapping: Record<string, ConsentCategory>
+  overrides: Map<string, ConsentCategory>
 ): void {
-  // Validate all categories
-  const validCategories: ConsentCategory[] = ['essential', 'performance', 'usage'];
-  for (const [eventName, category] of Object.entries(mapping)) {
-    if (!validCategories.includes(category)) {
-      const msg = `Invalid consent category '${category}' for event '${eventName}'`;
-      logger.category('analytics').error(msg);
-      throw new Error(msg);
-    }
-    // Add to runtime mapping (Map is safe for dynamic keys)
+  for (const [eventName, category] of overrides.entries()) {
     runtimeMapping.set(eventName, category);
+    logger.category('analytics').debug('Event consent mapping registered', {
+      eventName,
+      category,
+    });
   }
 }
 
@@ -65,67 +63,84 @@ export function registerEventConsentMapping(
  * Get the consent category required for an event.
  *
  * Looks up event in runtime mapping first, then default mapping.
- * If not found, defaults to 'essential' (fail-safe).
+ * Returns null if not found; caller should apply default (typically 'essential').
  *
- * @param eventType Optional event type (unused; kept for API consistency)
- * @param eventName Event name to look up
- * @returns Consent category required to emit the event
+ * @param eventType - Event type (unused; kept for API consistency with future expansion)
+ * @param eventName - Event name to look up
+ * @returns Consent category or null if unmapped
+ *
+ * @example
+ * const category = getConsentCategoryForEvent(undefined, 'screen_view');
+ * // Returns 'usage'
+ *
+ * const unknown = getConsentCategoryForEvent(undefined, 'custom_event');
+ * // Returns null
  */
 export function getConsentCategoryForEvent(
   eventType: string | undefined,
   eventName: string
-): ConsentCategory {
-  // Check runtime mapping first (Map.get is safe), then default mapping
+): ConsentCategory | null {
+  // Check runtime mapping first, then default mapping
   let category = runtimeMapping.get(eventName) ?? DEFAULT_EVENT_CONSENT_MAPPING.get(eventName);
 
   if (!category) {
     logger
       .category('analytics')
-      .debug(
-        `Event '${eventName}' not in consent mapping; defaulting to 'essential'`
-      );
-    return 'essential';
+      .warn(`Event '${eventName}' not in consent mapping; treating as 'essential'`);
+    return null;
   }
 
   return category;
 }
 
 /**
- * Evaluate whether an event should be emitted based on consent level.
+ * Determine if an event should be emitted based on its consent category and user's consent level.
  *
- * **Gate Logic**:
- * - 'none' consent: Block all events
- * - 'basic' consent: Allow essential + performance events
- * - 'full' consent: Allow all events
+ * **Gate Logic** (3-tier):
+ * - **'essential'**: Always emit (true), even for 'none' consent (but marked as optional send)
+ * - **'performance'**: Emit if consentLevel >= 'basic'
+ * - **'usage'**: Emit only if consentLevel === 'full'
+ * - **null/unmapped**: Default to 'essential' (emit for >= basic)
  *
- * @param category Consent category of the event
- * @param consentLevel Optional explicit consent level. If not provided, reads from AnalyticsConsent.
- * @returns true if event should emit, false if it should be dropped
+ * @param category - Consent category from mapping, or null if unmapped
+ * @param consentLevel - User's current consent level
+ * @returns true if event should emit; false if it should be dropped
+ *
+ * @example
+ * // Usage event with basic consent → false (drop)
+ * shouldEmitEvent('usage', 'basic') // false
+ *
+ * // Performance event with basic consent → true (pass)
+ * shouldEmitEvent('performance', 'basic') // true
+ *
+ * // Essential event with none consent → true (pass, but optional send)
+ * shouldEmitEvent('essential', 'none') // true
+ *
+ * // Unmapped event with basic consent → true (default to essential)
+ * shouldEmitEvent(null, 'basic') // true
  */
 export function shouldEmitEvent(
-  category: ConsentCategory,
-  consentLevel?: ReturnType<typeof AnalyticsConsent.getLevel>
+  category: ConsentCategory | null,
+  consentLevel: ConsentLevel
 ): boolean {
-  const level = consentLevel ?? AnalyticsConsent.getLevel();
+  // Unmapped events default to 'essential' to avoid data loss
+  const effectiveCategory = category || 'essential';
 
-  // 'none' blocks all
-  if (level === 'none') {
-    return false;
+  switch (effectiveCategory) {
+    case 'essential':
+      // Essential events always emit, even for 'none' (but will be optional send)
+      return true;
+
+    case 'performance':
+      // Requires at least 'basic' consent
+      return consentLevel === 'basic' || consentLevel === 'full';
+
+    case 'usage':
+      // Requires 'full' consent
+      return consentLevel === 'full';
+
+    default:
+      // Fallback to essential for any unexpected category
+      return true;
   }
-
-  // 'basic' allows essential + performance
-  if (level === 'basic') {
-    return category === 'essential' || category === 'performance';
-  }
-
-  // 'full' allows all
-  if (level === 'full') {
-    return true;
-  }
-
-  // Invalid level: block as fail-safe
-  logger
-    .category('analytics')
-    .warn(`Invalid consent level '${level}'; blocking event (fail-safe)`);
-  return false;
 }

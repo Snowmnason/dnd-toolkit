@@ -188,6 +188,8 @@ class AnalyticsConsentManager {
       logger.category('analytics').error('consent', 'Attempted to set invalid consent level', { level, error });
       throw error;
     }
+
+    const previousLevel = this.consentLevel;
     this.consentLevel = level;
 
     try {
@@ -199,6 +201,24 @@ class AnalyticsConsentManager {
       });
     } catch (err) {
       logger.category('analytics').error('consent', 'Failed to persist consent level to storage', { level, error: err });
+    }
+
+    // If consent was downgraded, purge all pending analytics buffers and breadcrumbs
+    const CONSENT_ORDER: Record<ConsentLevel, number> = { none: 0, basic: 1, full: 2 };
+    if (CONSENT_ORDER[level] < CONSENT_ORDER[previousLevel]) {
+      logger.category('analytics').info('consent', 'Consent downgraded — purging analytics buffers and breadcrumbs', { previousLevel, level });
+      try {
+        const { handleAnalyticsConsentWithdrawal } = await import('./analytics-network-integration');
+        await handleAnalyticsConsentWithdrawal();
+      } catch (err) {
+        logger.category('analytics').warn('consent', 'Failed to purge analytics buffer on consent withdrawal (non-critical)', { error: err });
+      }
+      try {
+        const { breadcrumbQueue } = await import('./breadcrumb-queue');
+        await breadcrumbQueue.clear();
+      } catch (err) {
+        logger.category('analytics').warn('consent', 'Failed to purge breadcrumb queue on consent withdrawal (non-critical)', { error: err });
+      }
     }
 
     // Queue the update to sync queue (fire-and-forget, non-blocking)
@@ -246,12 +266,27 @@ class AnalyticsConsentManager {
   }
 
   /**
-   * Check if tracking is allowed for a given consent category
+   * Check if tracking is allowed for a given consent category.
+   *
+   * @deprecated Prefer `shouldEmitEvent(category, AnalyticsConsent.getLevel())` from consent-gating.ts.
+   * This method is kept for backwards-compat with tests; logic mirrors shouldEmitEvent().
+   *
+   * Gate logic:
+   * - 'essential': always true (even for 'none')
+   * - 'performance': true if >= 'basic'
+   * - 'usage': true only for 'full'
    */
   isAllowed(category: 'essential' | 'performance' | 'usage'): boolean {
-    if (this.consentLevel === 'none') return false;
-    if (this.consentLevel === 'basic') return category === 'essential';
-    return true; // 'full' allows everything
+    switch (category) {
+      case 'essential':
+        return true; // Essential always allowed, even for 'none'
+      case 'performance':
+        return this.consentLevel === 'basic' || this.consentLevel === 'full';
+      case 'usage':
+        return this.consentLevel === 'full';
+      default:
+        return true;
+    }
   }
 
   /**

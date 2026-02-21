@@ -41,7 +41,7 @@
  * ✗ app-specific data or customer data
  *
  * Privacy Controls:
- * - Consent gating: respects config.network.telemetry.enabled and AnalyticsConsent.isAllowed('performance')
+ * - Consent gating: respects config.network.telemetry.enabled and shouldEmitEvent('performance', AnalyticsConsent.getLevel())
  * - Integrates with lib/analytics/consent.ts for centralized consent management
  * - If consent is not granted or config disabled, NO data is captured or emitted
  * - Error queue is bounded to prevent memory exhaustion; oldest events dropped on overflow
@@ -225,7 +225,7 @@ function shouldSample(sampleRate: number): boolean {
  * 
  * Behavior:
  * - If config.network.telemetry.enabled === false => false (config takes priority)
- * - Otherwise, check AnalyticsConsent.isAllowed('performance')
+ * - Otherwise, check shouldEmitEvent('performance', AnalyticsConsent.getLevel())
  * 
  * @returns true if telemetry is enabled and user has consented to performance tracking
  */

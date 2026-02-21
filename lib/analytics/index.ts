@@ -5,6 +5,8 @@ import { Platform } from "react-native";
 import { isAppIdle } from "../../hooks/utils/use-app-state";
 import { getAppConfig } from "../config/loader";
 import { logger } from "../utils/logger";
+import { AnalyticsConsent } from "./consent";
+import { shouldEmitEvent } from "./consent-gating";
 import { categorizeError } from "./error-categorization";
 import { createExportContext, dispatchEvent } from "./exporters";
 import { performanceBaselineService } from "./performance/performance-baseline";
@@ -142,12 +144,12 @@ function withTiming<T>(
       dispatchEvent(regressionEvent, exportContext);
     }
     
-    if (isSentryEnabled()) {
+    if (isSentryEnabled() && shouldEmitEvent('performance', AnalyticsConsent.getLevel())) {
       try {
         const errorCategory = extra?.error
           ? categorizeError(extra.error)
           : undefined;
-        // Breadcrumb routed through SentryExporter, gated at dispatchEvent() layer
+        // Consent-gated: only add breadcrumb if user has performance consent
         Sentry.addBreadcrumb({
           category: "performance",
           message: label,
@@ -213,14 +215,21 @@ export const Analytics = {
     // (exporters don't use this method, they get context from dispatch)
     if (isSentryEnabled()) {
       try {
+        const consentLevel = AnalyticsConsent.getLevel();
         if (user?.id) {
-          Sentry.setUser({ id: user.id, username: user.username });
-          logger
-            .category("analytics")
-            .debug("User identified in Sentry", {
-              userId: user.id,
-              username: user.username,
-            });
+          if (consentLevel === 'none') {
+            // Consent=none: clear any previously set user so it won't appear in crash reports
+            Sentry.setUser(null);
+            logger.category("analytics").debug("User context cleared from Sentry (consent=none)");
+          } else if (consentLevel === 'basic') {
+            // Consent=basic: send minimal user context (ID only, no username)
+            Sentry.setUser({ id: user.id });
+            logger.category("analytics").debug("User identified in Sentry (minimal, consent=basic)", { userId: user.id });
+          } else {
+            // Consent=full: send full user context
+            Sentry.setUser({ id: user.id, username: user.username });
+            logger.category("analytics").debug("User identified in Sentry (full, consent=full)", { userId: user.id, username: user.username });
+          }
         } else {
           Sentry.setUser(null);
           logger.category("analytics").debug("User cleared from Sentry");
@@ -458,5 +467,8 @@ export {
   shouldEmitEvent,
   type ConsentCategory
 } from './consent-gating';
+
+// Tiered error reporting based on consent level
+export { getCrashReportPayload } from './consent-error-payload';
 
 
