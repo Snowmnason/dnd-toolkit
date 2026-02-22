@@ -59,3 +59,18 @@ export {
     type SeverityLevel as ErrorSeverityLevel
 } from './error-tracker';
 
+// Database Provider (Supabase/PostgreSQL/Firebase abstraction)
+export {
+    DatabaseProvider,
+    getDatabaseProvider,
+    NoOpDatabaseProvider,
+    QueryBuilder,
+    QueryError,
+    QueryResult,
+    registerDatabaseProvider,
+    resetDatabaseProvider
+} from './database-adapter';
+
+// Supabase Database Provider Implementation
+export { SupabaseDatabaseProvider } from './supabase/supabase-database-provider';
+
