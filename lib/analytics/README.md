@@ -31,7 +31,7 @@ User Action / Runtime Event
     Sanitize Data (strip message, stack, raw error fields)
         ↓
     Is Network Online? (works with lib/network)
-        ├─ YES ─→ Send to Sentry breadcrumb (if sentryEnabled flag is set)
+        ├─ YES ─→ Send to ErrorTracker (via getErrorTracker().addBreadcrumb())
         └─ NO  ─→ Queue to AnalyticsBuffer (encrypted via lib/storage)
                         ↓
                   [Online transition detected]
@@ -47,7 +47,7 @@ User Action / Runtime Event
 - **Offline-aware**: Events persist to encrypted storage and flush automatically when reconnected (works with lib/network)
 - **Resilient retries**: Failed sends retry with exponential backoff (1s → 2s → 4s → 8s → 16s, capped at 16s)
 - **Sanitization**: Strips `message`, `stack`, and raw error strings before sending; only `error_name` and `error_code` are kept
-- **Graceful degradation**: If Sentry is disabled or the `sentryEnabled` flag is off, all calls are silent no-ops
+- **Graceful degradation**: If error tracking is disabled or the tracker is NoOp, all calls are silent no-ops
 
 ## API Reference
 
@@ -57,11 +57,11 @@ Main entry point. Imported from `@/lib/analytics`.
 
 #### `Analytics.enabled(): boolean`
 
-Returns `true` if Sentry is configured and the `sentryEnabled` feature flag is set. All other methods silently no-op when this is `false`.
+Returns `true` if error tracking is configured and enabled. All other methods silently no-op when this is `false`.
 
 #### `Analytics.identify(user: { id?: string; username?: string } | null): void`
 
-Associates subsequent Sentry events with a user. Pass `null` to clear (call on logout).
+Associates subsequent error tracking events with a user via `getErrorTracker().setUser()`. Pass `null` to clear (call on logout).
 
 ```ts
 Analytics.identify({ id: "user-123", username: "john_doe" });
@@ -70,7 +70,7 @@ Analytics.identify(null); // on logout
 
 #### `Analytics.track(event: string, props?: Record<string, any>): void`
 
-Sends a Sentry breadcrumb. Consent is checked automatically:
+Sends a breadcrumb via `getErrorTracker().addBreadcrumb()`. Consent is checked automatically:
 - `'screen_view'` and `'component_usage'` require `'usage'` consent
 - Events starting with `'performance'` or named `'api_request'` require `'performance'` consent
 
@@ -88,7 +88,7 @@ Analytics.trackComponentUsage({ component: "LoginForm", action: "submit", detail
 
 #### `Analytics.withTiming<T>(label, fn, warnMs?): Promise<T> | T`
 
-Wraps a function, measures its duration, and logs a warning if it exceeds the threshold. Sends a performance breadcrumb to Sentry if `'performance'` consent is given.
+Wraps a function, measures its duration, and logs a warning if it exceeds the threshold. Sends a performance breadcrumb via error tracker if `'performance'` consent is given.
 
 ```ts
 await Analytics.withTiming("database_query", () => queryDatabase(), 5000);
@@ -649,12 +649,12 @@ Clear all baselines.
 
 ### External Packages
 
-- **`@sentry/react-native`** – Breadcrumb and user tracking
-- **`expo-constants`** – Reads Sentry DSN from app config
+- **`expo-constants`** – Reads configuration from app config
 
 ### Internal Dependencies
 
-- **`lib/config`** – Feature flags (`sentryEnabled`) and performance thresholds
+- **`lib/services`** – ErrorTrackerProvider for breadcrumb and user tracking
+- **`lib/config`** – Feature flags and performance thresholds
 - **`lib/utils/logger`** – Category-based debug and error logging
 - **`lib/storage`** – Encrypted queue persistence (analytics buffer only)
 - **`lib/network`** – Online/offline detection for automatic flush (analytics buffer only)
@@ -663,13 +663,13 @@ Clear all baselines.
 
 ## Error Handling & Edge Cases
 
-### Sentry Disabled
+### Error Tracking Disabled
 
-When `sentryEnabled` is `false` or Sentry has no DSN, all `Analytics.*` calls are silent no-ops. Nothing throws.
+When error tracking is disabled or NoOp tracker is registered, all `Analytics.*` calls are silent no-ops. Nothing throws.
 
 ### Circular Dependency
 
-`session.ts` does not import `index.ts`. It sends Sentry breadcrumbs directly to avoid a circular import.
+`session.ts` uses `getErrorTracker()` directly to avoid circular imports with the main analytics module.
 
 ### Abandoned Performance Marks
 
