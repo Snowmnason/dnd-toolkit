@@ -76,3 +76,16 @@ export { SupabaseDatabaseProvider } from './supabase/supabase-database-provider'
 
 // Supabase Initializer — database bootstrap (env vars, client, provider registration)
 export { initializeSupabaseDatabaseProvider, resetSupabaseInitializer } from './supabase/supabase-initializer';
+// Service Status Tracking — visibility into service readiness
+export {
+    areCriticalServicesReady,
+    getAllServiceStatuses,
+    getServiceStatus,
+    getServiceStatusDetail,
+    isServiceReady,
+    resetServiceStatus,
+    updateServiceStatus,
+    type ServiceReadiness,
+    type ServiceStatus,
+    type ServiceStatusDetail
+} from './service-status';
