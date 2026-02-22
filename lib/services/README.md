@@ -162,6 +162,7 @@ export interface AuthProvider {
   getSession(): Promise<Session | null>;
   onAuthStateChange(callback: (session: Session | null) => void): () => void;
   signOut(): Promise<void>;
+  restoreSession(rawSession: any): Promise<boolean>;
 }
 ```
 
@@ -180,14 +181,17 @@ All errors include an optional `.original` field with the provider-specific erro
 #### Registration API
 
 ```typescript
-// Register a provider (instance or factory)
-registerAuthProvider(provider: AuthProvider | (() => Promise<AuthProvider>));
+// Register a provider (async operation)
+registerAuthProvider(provider: AuthProvider | (() => Promise<AuthProvider>)): Promise<void>;
 
-// Get the registered provider
-getAuthProvider(): AuthProvider;
+// Get the registered provider (async)
+getAuthProvider(): Promise<AuthProvider>;
 
-// List registered providers (debugging)
-listRegisteredProviders(): string[];
+// Get the registered provider synchronously (returns null if not set)
+getAuthProviderSync(): AuthProvider | null;
+
+// Get debug info about the registered provider
+getProviderDebugInfo(): { name: string; isConfigured: boolean; ... };
 ```
 
 #### Usage Example
@@ -196,10 +200,17 @@ listRegisteredProviders(): string[];
 import { registerAuthProvider, SupabaseAuthProvider } from '@/lib/services';
 
 // Register default Supabase provider
-registerAuthProvider(new SupabaseAuthProvider(supabaseClient));
+await registerAuthProvider(new SupabaseAuthProvider(supabaseClient));
 
-// Or register a custom provider
-registerAuthProvider(new MyCustomAuthProvider(config));
+// Get the provider (async)
+const provider = await getAuthProvider();
+await provider.signIn('user@example.com', 'password');
+
+// Or use sync variant for non-async contexts (returns null if not set)
+const providerSync = getAuthProviderSync();
+if (providerSync) {
+  // provider is available
+}
 ```
 
 ### Supported Providers

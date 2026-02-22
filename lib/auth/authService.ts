@@ -1,17 +1,18 @@
 import type { AuthResponse, AuthTokenResponse } from "@supabase/supabase-js";
 
+import { EmailAlreadyExistsError, InvalidCredentialsError, NetworkError, RateLimitError } from "@/lib/services";
 import { RequestManager } from "../api/request-manager";
 import {
-    getSupabaseClientLazy,
-    isSupabaseConfiguredLazy,
+  getSupabaseClientLazy,
+  isSupabaseConfiguredLazy,
 } from "../database/supabase-lazy";
 import { usersDB } from "../database/users";
 import { SecureStorage, STORAGE_KEYS } from "../storage";
 import { logger } from "../utils/logger";
 import {
-    checkAuthGuard,
-    recordAuthFailure,
-    recordAuthSuccess,
+  checkAuthGuard,
+  recordAuthFailure,
+  recordAuthSuccess,
 } from "./auth-attempt-guard";
 import { isExistingUser, validateEmail, validatePassword } from "./validation";
 
@@ -35,6 +36,57 @@ export interface ResetPasswordResult {
   error?: string;
   message?: string;
   showEmailNotFoundModal?: boolean;
+}
+
+/**
+ * Error retry strategy classification.
+ * Determines whether an error should auto-retry or require user action.
+ *
+ * **Auto-retry (transient failures):**
+ * - NetworkError (connection issues, timeouts) — user should retry after network restored
+ * - RateLimitError — suggest waiting before retrying (provides retryAfterSeconds)
+ *
+ * **No auto-retry (permanent failures):**
+ * - InvalidCredentialsError — user must submit correct credentials again
+ * - EmailAlreadyExistsError — user must use different email
+ * - Other AuthErrors — require user intervention
+ */
+interface ErrorRetryStrategy {
+  shouldAutoRetry: boolean;
+  suggestRetryAfterMs?: number;
+  reason: string;
+}
+
+function classifyErrorRetryStrategy(error: unknown): ErrorRetryStrategy {
+  if (error instanceof NetworkError) {
+    return {
+      shouldAutoRetry: true,
+      suggestRetryAfterMs: 2000, // Wait 2s before auto-retry
+      reason: "transient_network_failure",
+    };
+  }
+
+  if (error instanceof RateLimitError) {
+    return {
+      shouldAutoRetry: false, // User should wait, not retry immediately
+      suggestRetryAfterMs: (error.retryAfterSeconds || 60) * 1000,
+      reason: "rate_limit_exceeded",
+    };
+  }
+
+  // Permanent failures: InvalidCredentialsError, EmailAlreadyExistsError, etc.
+  if (error instanceof InvalidCredentialsError || error instanceof EmailAlreadyExistsError) {
+    return {
+      shouldAutoRetry: false,
+      reason: "permanent_failure",
+    };
+  }
+
+  // Unknown or other errors: don't auto-retry
+  return {
+    shouldAutoRetry: false,
+    reason: "unknown_error",
+  };
 }
 
 // Sign up a new user

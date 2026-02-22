@@ -283,17 +283,9 @@ export interface OfflineQueueStats {
 /**
  * Phase 4: Privacy Redaction Rules
  * Defines which fields should be stripped before persisting mutations
+ * RedactionRule type is imported from centralized redaction manager
  */
-export interface RedactionRule {
-  /** Field paths to redact (e.g., "password", "token", "email") */
-  fields: string[];
-
-  /** Whether to redact entire object if field matches (implemented in RedactionManager.redactObject) */
-  redactParent?: boolean;
-
-  /** Replacement value (default: undefined to delete field) */
-  replacement?: string | null;
-}
+export type { RedactionRule } from "@/lib/utils/redaction-manager";
 
 /**
  * Phase 4: Auth Retry Metadata

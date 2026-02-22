@@ -18,6 +18,7 @@ export {
     InvalidCredentialsError,
     NetworkError,
     ProviderInitializationError,
+    RateLimitError,
     registerAuthProvider,
     UserNotFoundError,
     type AuthProvider,

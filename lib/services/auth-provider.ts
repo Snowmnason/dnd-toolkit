@@ -17,7 +17,7 @@
 
 import { validateEmail, validatePassword } from '@/lib/auth/validation';
 import { isDevelopment } from '@/lib/config/loader';
-import { logger } from '@/lib/utils/logger';
+import { logger, RedactionManager } from '@/lib/utils';
 
 /**
  * Session data returned by auth provider.
@@ -144,6 +144,28 @@ export interface AuthProvider {
    * - Don't throw on errors (logout should always succeed gracefully)
    */
   signOut(): Promise<void>;
+
+  /**
+   * Restore a previously saved session during app bootstrap.
+   *
+   * Called when restoring a user's session from encrypted storage after app restart.
+   * The provider implementation should set the session in the provider's session state
+   * (e.g., for Supabase, call auth.setSession()).
+   *
+   * **Input:**
+   * - rawSession: The raw session object previously saved by the provider
+   *
+   * **Returns:**
+   * - true if restore was successful and session is valid
+   * - false if the session is invalid/expired (caller should clear stale session)
+   *
+   * **Provider Responsibilities:**
+   * - Set the session in provider's internal state
+   * - Validate token expiry if applicable
+   * - Return false for expired/invalid sessions so caller clears stale data
+   * - Don't throw; return false for any restoration failures
+   */
+  restoreSession(rawSession: any): Promise<boolean>;
 }
 
 /**
@@ -171,12 +193,17 @@ export class AuthError extends Error {
 
   /**
    * Return a safe log representation with PII redacted.
-   * Include enough context for debugging without exposing sensitive data.
+   * Uses RedactionManager to remove sensitive fields (email, tokens, passwords, etc.)
+   * Safe to log to console, error tracking, or analytics without exposing user data.
    */
   toLog(): Record<string, any> {
+    const redactedMessage = RedactionManager.redactObject({
+      message: this.message,
+    })?.message || this.message;
+
     return {
       type: this.name,
-      message: this.message,
+      message: redactedMessage,
       code: this.code,
       timestamp: this.timestamp,
       // Note: do NOT log .original or raw provider error
@@ -241,6 +268,27 @@ export class EmailAlreadyExistsError extends AuthError {
     super(message, original, 'EMAIL_ALREADY_EXISTS', userMessage);
     this.name = 'EmailAlreadyExistsError';
     Object.setPrototypeOf(this, EmailAlreadyExistsError.prototype);
+  }
+}
+
+/**
+ * Rate limit exceeded (too many auth attempts).
+ * Indicates provider-side throttling (e.g., 429 response).
+ * User should wait before retrying.
+ */
+export class RateLimitError extends AuthError {
+  public readonly retryAfterSeconds?: number; // Seconds to wait before retry
+
+  constructor(
+    message = 'Too many authentication attempts',
+    original?: any,
+    retryAfterSeconds?: number,
+    userMessage = 'Too many attempts. Please try again in a few minutes.'
+  ) {
+    super(message, original, 'RATE_LIMIT', userMessage);
+    this.name = 'RateLimitError';
+    this.retryAfterSeconds = retryAfterSeconds;
+    Object.setPrototypeOf(this, RateLimitError.prototype);
   }
 }
 
@@ -478,6 +526,12 @@ export function createValidatedAuthProvider(
 
     async signOut(): Promise<void> {
       return provider.signOut();
+    },
+
+    async restoreSession(rawSession: any): Promise<boolean> {
+      // No validation needed for restore - provider handles session schema validation
+      // Just delegate to underlying provider
+      return provider.restoreSession(rawSession);
     },
   };
 }

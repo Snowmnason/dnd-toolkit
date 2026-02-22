@@ -6,7 +6,7 @@ import { logger } from '../utils/logger';
 import { AuthStateManager } from './auth-state';
 
 export type AuthLevel = 'account-only' | 'world-required';
-export type AuthState = 'loading' | 'authenticated' | 'unauthenticated';
+export type AuthGuardState = 'loading' | 'authenticated' | 'unauthenticated';
 
 export interface AuthGuardOptions {
   forceVerification?: boolean; // Always check Supabase, ignore cache age
@@ -20,11 +20,11 @@ export function useAuthGuard(
   bootstrapReadyOrUndefined?: boolean,
   level: AuthLevel = 'account-only',
   options?: AuthGuardOptions
-): AuthState {
+): AuthGuardState {
   const router = useRouter();
   const segments = useSegments();
   const params = useLocalSearchParams();
-  const [authState, setAuthState] = useState<AuthState>('loading');
+  const [authState, setAuthState] = useState<AuthGuardState>('loading');
   const [subscriptionReady, setSubscriptionReady] = useState(false);
   const hasRedirectedRef = useRef(false);
   const subscriptionReadyRef = useRef(false);

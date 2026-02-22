@@ -144,7 +144,7 @@ export function redactForLogs(value: unknown, key?: string): string {
   // Apply global redaction patterns for common PII
   // Lazy import to avoid circular dependencies
   try {
-    const { redactPII } = require("@/lib/utils/pii-redaction");
+    const { redactPII } = require("@/lib/utils/redaction-manager");
     return redactPII(str);
   } catch {
     // Fallback if import fails - apply basic patterns

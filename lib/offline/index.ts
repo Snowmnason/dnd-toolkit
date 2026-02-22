@@ -37,39 +37,25 @@ export { useConflictQueue } from "./use-conflict-queue";
 export { useOfflineNotifications } from "./use-offline-notifications";
 export { useSyncNotifications } from "./use-sync-notifications";
 export {
-    enqueueIfOffline,
-    isQueuedMutation,
-    getCacheKeyPatternForMutation,
-    createOptimisticUpdate,
-    rollbackOptimisticUpdate,
-    reducePayloadByPersistence
+    createOptimisticUpdate, enqueueIfOffline, getCacheKeyPatternForMutation, isQueuedMutation, reducePayloadByPersistence, rollbackOptimisticUpdate
 } from "./utils";
 
 export type {
-    MutationOperation,
+    AuthReplayMetadata, MutationOperation,
     MutationPersistence,
-    OfflineSyncConfig,
-    OfflineSyncStatus,
-    QueuedMutation,
-    SyncConflict,
-    SyncResult,
     // Phase 4 types
     NetworkErrorContract,
-    OfflineQueueStats,
-    RedactionRule,
-    AuthReplayMetadata,
+    OfflineQueueStats, OfflineSyncConfig,
+    OfflineSyncStatus,
+    QueuedMutation, RedactionRule, SyncConflict,
+    SyncResult
 } from "./types";
 
 export { SyncStatus } from "./types";
 
 // Phase 4 Enhancements
 export {
-    Phase4Enhancements,
-    RedactionManager,
-    AuthReplayManager,
-    NetworkErrorClassifier,
-    BackoffScheduler,
-    OfflineQueueStatsCollector,
-    CircuitBreakerReplayManager,
-    FetcherRegistryFallback,
+    AuthReplayManager, BackoffScheduler, CircuitBreakerReplayManager,
+    FetcherRegistryFallback, NetworkErrorClassifier, OfflineQueueStatsCollector, Phase4Enhancements
 } from "./offline-recovery";
+

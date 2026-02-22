@@ -16,8 +16,9 @@ import { AnalyticsExporter, exporterRegistry } from '@/lib/analytics/exporters';
 import { performanceBaselineService } from '@/lib/analytics/performance/performance-baseline';
 import { getAppConfig } from '@/lib/config/loader';
 import { logger } from '@/lib/utils/logger';
-import { createValidatedAuthProvider, registerAuthProvider, SupabaseAuthProvider, type AuthProvider } from './index';
+import { createValidatedAuthProvider, registerAuthProvider, type AuthProvider } from './auth-provider';
 import { SentryExporter } from './sentry/sentry-analytics-exporter';
+import { SupabaseAuthProvider } from './supabase/supabase-auth-provider';
 
 /**
  * Initialize all services
@@ -71,6 +72,8 @@ async function initializeAuthProvider(): Promise<void> {
             logger.debug('bootstrap', 'Supabase auth provider instantiated');
             provider = supabaseProvider;
           } else {
+            // Supabase not configured (no env vars) — skip provider registration
+            // AppKernel will detect missing provider via getAuthProviderSync() and skip auth wiring
             logger.warn('bootstrap', 'Supabase not configured; auth provider will not be set');
             return;
           }
@@ -92,7 +95,10 @@ async function initializeAuthProvider(): Promise<void> {
             logger.debug('bootstrap', 'Supabase auth provider instantiated (fallback)');
             provider = supabaseProvider;
           } else {
-            throw new Error('Fallback to Supabase failed: not configured');
+            // Supabase not configured (no env vars) — skip provider registration
+            // AppKernel will detect missing provider via getAuthProviderSync() and skip auth wiring
+            logger.warn('bootstrap', 'Fallback Supabase not configured; auth provider will not be set');
+            return;
           }
         } catch (error) {
           logger.error('bootstrap', `Failed to initialize fallback Supabase provider: ${error}`);

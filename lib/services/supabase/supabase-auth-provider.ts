@@ -11,14 +11,15 @@
  */
 
 import {
-    AuthError,
-    AuthProvider,
-    AuthResult,
-    EmailAlreadyExistsError,
-    InvalidCredentialsError,
-    NetworkError,
-    Session,
-    UserNotFoundError,
+  AuthError,
+  AuthProvider,
+  AuthResult,
+  EmailAlreadyExistsError,
+  InvalidCredentialsError,
+  NetworkError,
+  RateLimitError,
+  Session,
+  UserNotFoundError,
 } from '@/lib/services/auth-provider';
 import { logger } from '@/lib/utils/logger';
 
@@ -45,10 +46,11 @@ export class SupabaseAuthProvider implements AuthProvider {
   /**
    * Sign up a new user with email and password.
    * Returns session on success or normalized error.
+   * Note: Supabase may return user without session if email confirmation is required.
    */
   async signUp(email: string, password: string): Promise<AuthResult> {
     try {
-      logger.debug('auth', 'Supabase: signUp attempt', { email: email.trim() });
+      logger.debug('auth', 'Supabase: signUp attempt');
 
       const { data, error } = await this.supabaseClient.auth.signUp({
         email,
@@ -62,9 +64,20 @@ export class SupabaseAuthProvider implements AuthProvider {
       }
 
       if (data?.user) {
-        const session = this.sessionFromSupabaseSession(data.session);
+        // Supabase may return user without session (e.g., email confirmation required)
+        // Handle both cases: full session, or partial session with just userId
+        let session: Session;
+        if (data.session) {
+          session = this.sessionFromSupabaseSession(data.session);
+        } else {
+          // No session yet (email confirmation pending); return partial session with userId only
+          session = {
+            userId: data.user.id,
+          };
+        }
         logger.debug('auth', 'Supabase signUp success', {
           userId: data.user.id,
+          hasSession: !!data.session,
         });
         return { success: true, data: session };
       }
@@ -89,7 +102,7 @@ export class SupabaseAuthProvider implements AuthProvider {
    */
   async signIn(email: string, password: string): Promise<AuthResult> {
     try {
-      logger.debug('auth', 'Supabase: signIn attempt', { email: email.trim() });
+      logger.debug('auth', 'Supabase: signIn attempt');
 
       const { data, error } = await this.supabaseClient.auth.signInWithPassword(
         {
@@ -126,15 +139,14 @@ export class SupabaseAuthProvider implements AuthProvider {
   /**
    * Initiate password reset flow.
    * Supabase sends reset email to user.
+   * Redirect URL must match an existing route handler (/login/auth-redirect)
    */
   async resetPassword(email: string): Promise<{
     success: boolean;
     message?: string;
   }> {
     try {
-      logger.debug('auth', 'Supabase: resetPassword attempt', {
-        email: email.trim(),
-      });
+      logger.debug('auth', 'Supabase: resetPassword attempt');
 
       const baseUrl =
         typeof window !== 'undefined'
@@ -144,7 +156,7 @@ export class SupabaseAuthProvider implements AuthProvider {
       const { error } = await this.supabaseClient.auth.resetPasswordForEmail(
         email,
         {
-          redirectTo: `${baseUrl}/login/reset-password-confirm`,
+          redirectTo: `${baseUrl}/login/auth-redirect?action=reset-password`,
         }
       );
 
@@ -160,9 +172,7 @@ export class SupabaseAuthProvider implements AuthProvider {
         };
       }
 
-      logger.info('auth', 'Supabase resetPassword success', {
-        email: email.trim(),
-      });
+      logger.info('auth', 'Supabase resetPassword success');
       return {
         success: true,
         message: 'Reset email sent. Check your inbox.',
@@ -246,6 +256,52 @@ export class SupabaseAuthProvider implements AuthProvider {
   }
 
   /**
+   * Restore a previously saved session during app bootstrap.
+   * Sets the session on the Supabase client.
+   *
+   * @param rawSession - The raw session object (access token, refresh token, etc.)
+   * @returns true if restore was successful, false if expired/invalid
+   */
+  async restoreSession(rawSession: any): Promise<boolean> {
+    try {
+      if (!rawSession) {
+        logger.debug('auth', 'Supabase: restoreSession skipped (no session data)');
+        return false;
+      }
+
+      logger.info('auth', 'Supabase: restoring session from storage', {
+        userId: rawSession.user?.id,
+      });
+
+      const { error } = await this.supabaseClient.auth.setSession({
+        access_token: rawSession.access_token,
+        refresh_token: rawSession.refresh_token,
+        expires_at: rawSession.expires_at,
+        expires_in: rawSession.expires_in,
+        token_type: rawSession.token_type,
+        user: rawSession.user,
+      });
+
+      if (error) {
+        logger.warn(
+          'auth',
+          'Supabase: failed to restore session',
+          { error: error.message }
+        );
+        return false; // Session is invalid/expired
+      }
+
+      logger.info('auth', 'Supabase: session restored successfully', {
+        userId: rawSession.user?.id,
+      });
+      return true;
+    } catch (err) {
+      logger.error('auth', 'Supabase: exception during session restore:', err);
+      return false;
+    }
+  }
+
+  /**
    * Convert Supabase session to normalized Session type.
    */
   private sessionFromSupabaseSession(supabaseSession: any): Session {
@@ -321,6 +377,20 @@ export class SupabaseAuthProvider implements AuthProvider {
       code === 'user_not_found'
     ) {
       return new UserNotFoundError(message, supabaseError);
+    }
+
+    // Rate limit exceeded (too many attempts)
+    if (
+      code === 429 ||
+      code === 'RATE_LIMIT' ||
+      messageLower.includes('too many') ||
+      messageLower.includes('rate limit') ||
+      messageLower.includes('throttle')
+    ) {
+      // Try to extract retry-after seconds from message (pattern: "123 seconds" or "123s")
+      const retryAfterMatch = messageLower.match(/(\d+)/);
+      const retryAfterSeconds = retryAfterMatch?.[1] ? parseInt(retryAfterMatch[1], 10) : undefined;
+      return new RateLimitError(message, supabaseError, retryAfterSeconds);
     }
 
     // Network errors and timeouts

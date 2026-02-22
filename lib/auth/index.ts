@@ -14,8 +14,9 @@ export {
     InvalidCredentialsError,
     NetworkError,
     ProviderInitializationError,
+    RateLimitError,
     registerAuthProvider,
-    UserNotFoundError,
+    UserNotFoundError
 } from '@/lib/services';
 
 export {
@@ -26,8 +27,8 @@ export {
 } from "./auth-attempt-guard";
 export {
     AuthStateManager,
-    type CacheMetadata,
-    type SupabaseAuthState
+    type AuthState,
+    type CacheMetadata
 } from "./auth-state";
 export {
     checkPendingInvites,
@@ -50,9 +51,7 @@ export {
 } from "./sessionService";
 export {
     useAuthGuard,
-    type AuthGuardOptions,
-    type AuthLevel,
-    type AuthState
+    type AuthGuardOptions, type AuthGuardState, type AuthLevel
 } from "./useAuthGuard";
 export { useResetPasswordConfirm } from "./useResetPasswordConfirm";
 export { useSignInForm } from "./useSignInForm";
