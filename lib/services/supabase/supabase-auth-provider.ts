@@ -48,13 +48,14 @@ export class SupabaseAuthProvider implements AuthProvider {
    * Returns session on success or normalized error.
    * Note: Supabase may return user without session if email confirmation is required.
    */
-  async signUp(email: string, password: string): Promise<AuthResult> {
+  async signUp(email: string, password: string, options?: Record<string, any>): Promise<AuthResult> {
     try {
       logger.debug('auth', 'Supabase: signUp attempt');
 
       const { data, error } = await this.supabaseClient.auth.signUp({
         email,
         password,
+        options,
       });
 
       if (error) {
@@ -182,6 +183,48 @@ export class SupabaseAuthProvider implements AuthProvider {
       return {
         success: false,
         message: 'An error occurred. Please try again.',
+      };
+    }
+  }
+
+  /**
+   * Update the authenticated user's password.
+   * Requires active session (typically from password reset token).
+   */
+  async updatePassword(newPassword: string): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      logger.debug('auth', 'Supabase: updatePassword attempt');
+
+      const { error } = await this.supabaseClient.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) {
+        logger.warn('auth', 'Supabase updatePassword error:', error.message);
+        
+        if (error.message.includes('Password')) {
+          return {
+            success: false,
+            error: 'Password does not meet requirements. Please ensure it is at least 6 characters long.',
+          };
+        }
+
+        return {
+          success: false,
+          error: error.message || 'Failed to update password. Please try again.',
+        };
+      }
+
+      logger.info('auth', 'Supabase updatePassword success');
+      return { success: true };
+    } catch (err) {
+      logger.error('auth', 'Supabase updatePassword exception:', err);
+      return {
+        success: false,
+        error: 'An error occurred while updating password. Please try again.',
       };
     }
   }

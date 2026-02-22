@@ -1,8 +1,5 @@
+import { getAuthProvider } from "@/lib/services";
 import { AuthStateManager } from "../auth/auth-state";
-import {
-    getSupabaseClientLazy,
-    isSupabaseConfiguredLazy,
-} from "../services/supabase/supabase-lazy";
 import { getPrivacyStorageBackend, STORAGE_KEYS } from "../storage";
 import { logger } from "../utils/logger";
 
@@ -26,16 +23,14 @@ export async function signOutUser(): Promise<void> {
       "🔓 Starting sign out process - clearing all user data and caches",
     );
 
-    // Sign out from Supabase if configured
-    if (await isSupabaseConfiguredLazy()) {
-      const supabase = await getSupabaseClientLazy();
-      try {
-        await supabase.auth.signOut();
-        logger.info("auth", "✅ Signed out from Supabase");
-      } catch (error) {
-        logger.error("auth", "Error signing out from Supabase:", error);
-        // Continue with local cleanup even if Supabase logout fails
-      }
+    // Sign out from auth provider
+    try {
+      const authProvider = await getAuthProvider();
+      await authProvider.signOut();
+      logger.info("auth", "✅ Signed out from auth provider");
+    } catch (error) {
+      logger.error("auth", "Error signing out from auth provider:", error);
+      // Continue with local cleanup even if provider logout fails
     }
 
     // Clear all auth state (includes QueryCache, world access cache, and auth keys)

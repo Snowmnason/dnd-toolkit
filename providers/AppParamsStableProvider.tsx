@@ -432,37 +432,23 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
 
     const setupAuthWatcher = async () => {
       try {
-        const { isSupabaseConfigured } =
-          await import("@/lib/services/supabase/supabase-client");
-        if (!isSupabaseConfigured()) {
-          logger.debug(
-            "context",
-            "AppParamsStableProvider: Supabase not configured, skipping auth watcher",
-          );
-          return;
-        }
-
-        const { supabase } = await import("@/lib/services/supabase/supabase-client");
-        const {
-          data: { subscription: sub },
-        } = supabase.auth.onAuthStateChange(async (event: string) => {
-          if (
-            mounted &&
-            (event === "SIGNED_IN" || event === "INITIAL_SESSION")
-          ) {
+        const { getAuthProvider } = await import("@/lib/services");
+        const authProvider = await getAuthProvider();
+        const unsubscribe = authProvider.onAuthStateChange(async (session) => {
+          if (mounted && session !== null) {
             logger.debug(
               "context",
-              `AppParamsStableProvider: Auth state changed (${event}), reloading userId...`,
+              "AppParamsStableProvider: Auth state changed (signed in), reloading userId...",
             );
             // Small delay to ensure async storage operations complete
             await new Promise((resolve) => setTimeout(resolve, 50));
             if (mounted) {
               setAuthStateVersion((v) => v + 1);
             }
-          } else if (mounted && event === "SIGNED_OUT") {
+          } else if (mounted && session === null) {
             logger.debug(
               "context",
-              "AppParamsStableProvider: Auth state changed (SIGNED_OUT), clearing params and cache metadata...",
+              "AppParamsStableProvider: Auth state changed (signed out), clearing params and cache metadata...",
             );
             // Clear everything including metadata to force fresh verification on next sign-in
             setStableParams({ userId: undefined, connectedWorldIds: [] });
@@ -479,7 +465,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
             });
           }
         });
-        subscription = sub ?? null;
+        subscription = { unsubscribe };
       } catch (error) {
         logger.debug(
           "context",

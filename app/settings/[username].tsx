@@ -4,10 +4,8 @@ import {
   signOutUser,
   usersDB,
 } from "@/lib";
-// SUPABASE_AUTH: Direct auth operations — to be migrated to getAuthProvider() in Track D
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
-import { isSupabaseConfigured, supabase } from "@/lib/services/supabase/supabase-client";
-import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
+import { getAuthProvider } from "@/lib/services";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, View } from "react-native";
@@ -47,18 +45,11 @@ export default function SettingsPage() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    // Double-check: require confirmed Supabase session before proceeding
-    if (!isSupabaseConfigured()) {
-      logger.debug("settings", "Supabase not configured; redirecting to welcome");
-      const target = buildNavigationTarget('/', {}, []);
-      router.replace(target as any);
-      return;
-    }
-
-    supabase.auth
-      .getSession()
-      .then(({ data: { session } }: { data: { session: Session | null } }) => {
-        const user: User | null = session?.user ?? null;
+    // Double-check: require confirmed authenticated session before proceeding
+    getAuthProvider()
+      .then((authProvider) => authProvider.getSession())
+      .then((session) => {
+        const user = session?.raw?.user ?? null;
         if (!user || !user.email_confirmed_at) {
           logger.debug("settings", "No confirmed user session, redirecting");
           const target = buildNavigationTarget('/', {}, []);
@@ -88,20 +79,22 @@ export default function SettingsPage() {
         );
       });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      (_event: AuthChangeEvent, session: Session | null) => {
-        const user: User | null = session?.user ?? null;
-        if (!user) {
-          logger.debug("settings", "Auth state changed: user signed out");
-          const target = buildNavigationTarget('/', {}, []);
-          router.replace(target as any);
-        }
-      }
-    );
+    let unsubscribeAuth: (() => void) | null = null;
+    getAuthProvider()
+      .then((authProvider) => {
+        unsubscribeAuth = authProvider.onAuthStateChange((session) => {
+          if (!session) {
+            logger.debug("settings", "Auth state changed: user signed out");
+            const target = buildNavigationTarget('/', {}, []);
+            router.replace(target as any);
+          }
+        });
+      })
+      .catch(() => {
+        // Auth provider not available, auth watcher is skipped
+      });
 
-    return () => subscription?.unsubscribe?.();
+    return () => unsubscribeAuth?.();
   }, [router]);
 
   const handleSignOutConfirm = async () => {

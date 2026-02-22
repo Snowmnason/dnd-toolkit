@@ -21,6 +21,10 @@ export function createMockAuthProvider(overrides?: Partial<AuthProvider>): AuthP
       return { success: true, message: 'reset-sent' };
     },
 
+    async updatePassword(newPassword: string): Promise<{ success: boolean; error?: string }> {
+      return { success: true };
+    },
+
     async getSession(): Promise<Session | null> {
       return { userId: 'user:test', accessToken: 'tok' };
     },

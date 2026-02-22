@@ -61,6 +61,7 @@ export interface AuthProvider {
    * **Input Expectations:**
    * - email: Already validated (format, length, no SQL keywords, no control chars)
    * - password: Already validated (strength, length, no dangerous patterns)
+   * - options: Optional provider-specific options (e.g., emailRedirectTo for email confirmation)
    *
    * **Returns:**
    * - { success: true; data: Session } on successful registration
@@ -71,7 +72,7 @@ export interface AuthProvider {
    * - Generate and return session tokens if applicable
    * - Map backend errors (e.g., email already exists) to AuthError types
    */
-  signUp(email: string, password: string): Promise<AuthResult>;
+  signUp(email: string, password: string, options?: Record<string, any>): Promise<AuthResult>;
 
   /**
    * Sign in an existing user with email and password.
@@ -107,6 +108,27 @@ export interface AuthProvider {
    * - Return user-friendly message only
    */
   resetPassword(email: string): Promise<{ success: boolean; message?: string }>;
+
+  /**
+   * Update the authenticated user's password.
+   *
+   * Called after password reset flow when user has active reset token session.
+   * Requires an authenticated session (typically from password reset link).
+   *
+   * **Input:**
+   * - newPassword: The new password (already validated by caller)
+   *
+   * **Returns:**
+   * - { success: true } on successful password update
+   * - { success: false; error?: string } on failure
+   *
+   * **Provider Responsibilities:**
+   * - Update password in backend
+   * - Validate that user has valid session/reset token
+   * - Return user-friendly error messages
+   * - Maintain session after password update (don't log user out)
+   */
+  updatePassword(newPassword: string): Promise<{ success: boolean; error?: string }>;
 
   /**
    * Get current session from local cache (if authenticated).
@@ -555,6 +577,11 @@ export function createValidatedAuthProvider(
 
     async signOut(): Promise<void> {
       return provider.signOut();
+    },
+
+    async updatePassword(newPassword: string): Promise<{ success: boolean; error?: string }> {
+      // No validation needed - provider handles password complexity validation
+      return provider.updatePassword(newPassword);
     },
 
     async restoreSession(rawSession: any): Promise<boolean> {
