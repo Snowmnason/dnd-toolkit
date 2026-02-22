@@ -17,7 +17,8 @@
 
 import { Button, ButtonText } from '@/components/ui';
 import { AuthStateManager, logger } from '@/lib';
-import { supabase } from '@/lib/database/supabase';
+// SUPABASE_AUTH: Direct auth operations — to be migrated to getAuthProvider() in Track D
+import { supabase } from '@/lib/services/supabase/supabase-client';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';

@@ -71,7 +71,7 @@ async function validateAuthHealth(): Promise<void> {
 
     // Lazy-import to avoid circular dependency
     const { isSupabaseConfiguredLazy } =
-      await import("@/lib/database/supabase-lazy");
+      await import("@/lib/services/supabase/supabase-lazy");
     if (!(await isSupabaseConfiguredLazy())) {
       logger
         .category("auth")

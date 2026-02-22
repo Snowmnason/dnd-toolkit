@@ -12,7 +12,7 @@ import {
 import { Body } from '@/components/ui';
 import { logger, openEmailApp } from '@/lib';
 // SUPABASE_AUTH: Direct auth operations — to be migrated to getAuthProvider() in Track D
-import { supabase } from '@/lib/database/supabase';
+import { supabase } from '@/lib/services/supabase/supabase-client';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';

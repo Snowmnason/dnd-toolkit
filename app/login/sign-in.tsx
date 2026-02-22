@@ -8,7 +8,7 @@ import {
 import { AppToast } from '@/components/ui';
 import { AuthStateManager, buildRoute, logger, useSignInForm } from '@/lib';
 // SUPABASE_AUTH: Direct auth operations — to be migrated to getAuthProvider() in Track D
-import { supabase } from '@/lib/database/supabase';
+import { supabase } from '@/lib/services/supabase/supabase-client';
 import { useScale } from '@/theme';
 import type { Href } from 'expo-router';
 import { useRouter } from 'expo-router';

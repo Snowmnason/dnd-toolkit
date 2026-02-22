@@ -15,7 +15,7 @@ import {
 import { Body } from "@/components/ui";
 import { logger, usersDB, useSignUpForm } from "@/lib";
 // SUPABASE_AUTH: Direct auth operations — to be migrated to getAuthProvider() in Track D
-import { supabase } from "@/lib/database/supabase";
+import { supabase } from "@/lib/services/supabase/supabase-client";
 import { useScale } from "@/theme";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";

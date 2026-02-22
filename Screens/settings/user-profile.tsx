@@ -39,7 +39,7 @@ export default function UserProfile({ profile }: UserProfileProps) {
   useEffect(() => {
     const fetchSessionUser = async () => {
       try {
-        const { supabase } = await import("../../lib/database/supabase");
+        const { supabase } = await import("../../lib/services/supabase/supabase-client");
         // Use cached session instead of making network call
         const {
           data: { session },

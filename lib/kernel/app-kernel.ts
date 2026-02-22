@@ -699,7 +699,7 @@ class AppKernelClass {
           const { FeatureFlagsManager } =
             await import("@/lib/feature-flags/server-sync");
           const { getDatabaseProvider } = await import("@/lib/services");
-          const { getSupabaseClient } = await import("@/lib/database/supabase");
+          const { getSupabaseClient } = await import("@/lib/services/supabase/supabase-client");
 
           if (!getDatabaseProvider().isConfigured()) {
             logger
@@ -826,7 +826,7 @@ class AppKernelClass {
           import("react-native"),
           import("@/lib/storage"),
           import("@/lib/analytics"),
-          import("@/lib/database/supabase"),
+          import("@/lib/services/supabase/supabase-client"),
         ]);
 
       // Platform detection

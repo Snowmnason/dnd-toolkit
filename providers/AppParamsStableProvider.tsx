@@ -2,12 +2,12 @@ import { AuthStateManager } from "@/lib/auth/auth-state";
 import { getPrivacyStorageBackend, STORAGE_KEYS } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import React, {
-  createContext as createReactContext,
-  ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
+    createContext as createReactContext,
+    ReactNode,
+    useCallback,
+    useContext,
+    useEffect,
+    useState,
 } from "react";
 import { createContext, useContextSelector } from "use-context-selector";
 
@@ -433,7 +433,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     const setupAuthWatcher = async () => {
       try {
         const { isSupabaseConfigured } =
-          await import("@/lib/database/supabase");
+          await import("@/lib/services/supabase/supabase-client");
         if (!isSupabaseConfigured()) {
           logger.debug(
             "context",
@@ -442,7 +442,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const { supabase } = await import("@/lib/database/supabase");
+        const { supabase } = await import("@/lib/services/supabase/supabase-client");
         const {
           data: { subscription: sub },
         } = supabase.auth.onAuthStateChange(async (event: string) => {

@@ -105,7 +105,7 @@ export function getEdgeFunctionUrl(
  * otherwise builds from SUPABASE_URL + /functions/v1/health
  *
  * Falls back to Constants.expoConfig?.extra?.supabaseUrl if env var not set
- * (matches behavior in lib/database/supabase.ts for consistency)
+ * (matches behavior in lib/services/supabase/supabase-client.ts for consistency)
  *
  * @returns Full health endpoint URL, or empty string if not configured
  */
@@ -115,7 +115,7 @@ export function getHealthEndpointUrl(): string {
   if (explicit && explicit.trim()) return explicit.trim();
 
   // Otherwise, build it from Supabase URL + health function path
-  // Try environment variable first, then fall back to expo-constants config (matches lib/database/supabase.ts)
+  // Try environment variable first, then fall back to expo-constants config (matches lib/services/supabase/supabase-client.ts)
   const supabaseUrl =
     process.env.EXPO_PUBLIC_SUPABASE_URL ||
     Constants.expoConfig?.extra?.supabaseUrl;

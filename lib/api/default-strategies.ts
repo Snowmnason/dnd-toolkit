@@ -7,7 +7,7 @@
 import {
   getSupabaseClientLazy,
   isSupabaseConfiguredLazy,
-} from "../database/supabase-lazy";
+} from "../services/supabase/supabase-lazy";
 import { logger } from "../utils/logger";
 import { AuthStrategy, type AuthContext } from "./auth-layer";
 

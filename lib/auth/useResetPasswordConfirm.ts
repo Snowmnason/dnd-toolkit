@@ -3,8 +3,8 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Platform } from 'react-native';
-import { getSupabaseClientLazy, isSupabaseConfiguredLazy } from '../database/supabase-lazy';
 import { resetPasswordSchema, type ResetPasswordFormData } from '../schemas/auth.schema';
+import { getSupabaseClientLazy, isSupabaseConfiguredLazy } from '../services/supabase/supabase-lazy';
 import { logger } from '../utils/logger';
 import { updatePassword } from './authService';
 

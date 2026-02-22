@@ -1,8 +1,8 @@
 import { AuthStateManager } from "../auth/auth-state";
 import {
-  getSupabaseClientLazy,
-  isSupabaseConfiguredLazy,
-} from "../database/supabase-lazy";
+    getSupabaseClientLazy,
+    isSupabaseConfiguredLazy,
+} from "../services/supabase/supabase-lazy";
 import { getPrivacyStorageBackend, STORAGE_KEYS } from "../storage";
 import { logger } from "../utils/logger";
 

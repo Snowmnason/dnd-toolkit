@@ -1,10 +1,10 @@
 /**
- * Lazy-loading wrapper for the Supabase database module.
+ * Lazy-loading wrapper for the Supabase client module.
  * Use this in UI/route/auth layers to avoid statically importing the Supabase client
  * in environments that may not have env vars configured (e.g., GH Pages demo).
  *
- * The /lib/database modules themselves (e.g., users.ts, common.ts) can and should
- * use static imports of supabase.ts since they are the authoritative data layer.
+ * The entity files (e.g., users.ts, common.ts) use getDatabaseProvider() instead
+ * and do not need this lazy loader.
  *
  * Usage:
  *   if (!await isSupabaseConfiguredLazy()) { return handleOfflineMode(); }
@@ -13,7 +13,7 @@
  */
 
 export async function getSupabaseModule() {
-  return await import('./supabase');
+  return await import('./supabase-client');
 }
 
 export async function isSupabaseConfiguredLazy() {

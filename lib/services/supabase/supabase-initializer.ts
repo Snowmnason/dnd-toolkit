@@ -72,7 +72,7 @@ export async function initializeSupabaseDatabaseProvider(): Promise<boolean> {
   }
 
   // ── Step 2: Check configuration ───────────────────────────────────────────
-  const { getSupabaseClient, isSupabaseConfigured } = await import('@/lib/database/supabase');
+  const { getSupabaseClient, isSupabaseConfigured } = await import('./supabase-client');
 
   if (!isSupabaseConfigured()) {
     logger.warn(

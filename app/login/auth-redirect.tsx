@@ -2,7 +2,7 @@ import { AuthModal } from "@/components/auth_components";
 import { Caption } from "@/components/ui";
 import { AuthStateManager, logger, usersDB, worldsDB } from "@/lib";
 // SUPABASE_AUTH: Direct auth operations — to be migrated to getAuthProvider() in Track D
-import { supabase } from "@/lib/database/supabase";
+import { supabase } from "@/lib/services/supabase/supabase-client";
 import { getPrivacyStorageBackend, STORAGE_KEYS } from "@/lib/storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";

@@ -1,5 +1,5 @@
-import { getSupabaseClientLazy, isSupabaseConfiguredLazy } from '../database/supabase-lazy';
 import { usersDB } from '../database/users';
+import { getSupabaseClientLazy, isSupabaseConfiguredLazy } from '../services/supabase/supabase-lazy';
 import { logger } from '../utils/logger';
 import { AuthStateManager } from './auth-state';
 

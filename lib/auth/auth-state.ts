@@ -1,9 +1,9 @@
 import { type AuthProvider } from "../services";
 import {
-  clearAllUserData,
-  getPrivacyStorageBackend,
-  SecureStorage,
-  STORAGE_KEYS,
+    clearAllUserData,
+    getPrivacyStorageBackend,
+    SecureStorage,
+    STORAGE_KEYS,
 } from "../storage";
 import { logger } from "../utils/logger";
 
@@ -434,7 +434,7 @@ export const AuthStateManager = {
 
       // Use cached supabase import to avoid re-loading modules
       if (!supabaseCache) {
-        const imported = await import("../database/supabase");
+        const imported = await import("../services/supabase/supabase-client");
         supabaseCache = imported.supabase;
         isSupabaseConfiguredCache = imported.isSupabaseConfigured;
       }
@@ -499,7 +499,7 @@ export const AuthStateManager = {
 
       // Use cached supabase import
       if (!supabaseCache) {
-        const imported = await import("../database/supabase");
+        const imported = await import("../services/supabase/supabase-client");
         supabaseCache = imported.supabase;
         isSupabaseConfiguredCache = imported.isSupabaseConfigured;
       }
@@ -775,7 +775,7 @@ export const AuthStateManager = {
   ): Promise<{ hasAccess: boolean; reason?: string }> {
     try {
       if (!isSupabaseConfiguredCache) {
-        const imported = await import("../database/supabase");
+        const imported = await import("../services/supabase/supabase-client");
         isSupabaseConfiguredCache = imported.isSupabaseConfigured;
         supabaseCache = imported.supabase;
       }
@@ -844,7 +844,7 @@ export const AuthStateManager = {
 
       // Use cached supabase import to avoid re-loading modules
       if (!supabaseCache) {
-        const imported = await import("../database/supabase");
+        const imported = await import("../services/supabase/supabase-client");
         supabaseCache = imported.supabase;
         isSupabaseConfiguredCache = imported.isSupabaseConfigured;
       }

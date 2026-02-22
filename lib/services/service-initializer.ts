@@ -120,7 +120,7 @@ async function initializeAuthProvider(): Promise<void> {
     switch (providerName.toLowerCase()) {
       case 'supabase': {
         try {
-          const { getSupabaseClient, isSupabaseConfigured } = await import('@/lib/database/supabase');
+          const { getSupabaseClient, isSupabaseConfigured } = await import('./supabase/supabase-client');
           if (isSupabaseConfigured()) {
             const supabaseClient = getSupabaseClient();
             const supabaseProvider = new SupabaseAuthProvider(supabaseClient);
@@ -143,7 +143,7 @@ async function initializeAuthProvider(): Promise<void> {
         logger.warn('bootstrap', `Unknown auth provider: ${providerName}. Defaulting to supabase.`);
         // Fall through to supabase as fallback
         try {
-          const { getSupabaseClient, isSupabaseConfigured } = await import('@/lib/database/supabase');
+          const { getSupabaseClient, isSupabaseConfigured } = await import('./supabase/supabase-client');
           if (isSupabaseConfigured()) {
             const supabaseClient = getSupabaseClient();
             const supabaseProvider = new SupabaseAuthProvider(supabaseClient);
