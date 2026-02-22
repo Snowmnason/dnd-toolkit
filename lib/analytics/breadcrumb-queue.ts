@@ -9,7 +9,8 @@
 
 import * as Crypto from 'expo-crypto';
 
-import { AnalyticsConsent, type ConsentCategory, shouldEmitEvent } from '@/lib/analytics';
+import { AnalyticsConsent } from '@/lib/analytics/consent';
+import { shouldEmitEvent, type ConsentCategory } from '@/lib/analytics/consent-gating';
 import { getAppConfig } from '@/lib/config';
 import { BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '@/lib/services';
 import { STORAGE_KEYS, SecureStorage } from '@/lib/storage';

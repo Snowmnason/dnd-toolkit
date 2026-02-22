@@ -1,6 +1,6 @@
 # Kernel Module
 
-Centralized application bootstrap and lifecycle management. Orchestrates startup phases (configuration, preload, storage, network, auth) into single explicit contract. Ensures app is fully initialized before rendering main UI and provides real-time phase tracking.
+Centralized application bootstrap and lifecycle management. Orchestrates startup phases (configuration, preload, network, storage, services, auth) into single explicit contract. Ensures all critical systems initialized before rendering main UI. Provides real-time phase tracking and recovery mechanisms.
 
 ## When to Use This Module
 
@@ -27,15 +27,17 @@ App Startup
 AppKernelProvider mounted
         ↓
 AppKernel.initialize() starts
-        ├─ CONFIG: Load env vars, init Supabase
-        ├─ PRELOAD: Load critical fonts/images (<500ms)
-        ├─ STORAGE: Validate & migrate cache
-        ├─ NETWORK: Initialize offline/online detection
-        ├─ AUTH: Restore session (non-blocking, in parallel)
-        └─ READY: All critical phases done, safe to render UI
+        ├─ CONFIG: Load env vars, init Supabase client (MUST run first)
+        ├─ PRELOAD: Load critical fonts/images (<500ms target)
+        ├─ NETWORK: Initialize network detection & online status (before storage for offline awareness)
+        ├─ STORAGE: Validate & migrate cache (knows network status)
+        ├─ SERVICES: Register auth provider, error tracker, analytics exporter (blocking, MUST be before AUTH)
+        ├─ AUTH: Restore session, initialize auth state (non-blocking, provider already registered)
+        └─ READY: Critical systems initialized, safe to render UI (auth completing in background)
         ↓
-Post-READY:
-        └─ Feature Flags: Initialize FeatureFlagsManager, bootstrap flags, sync legacy system
+Post-READY (non-critical, async):
+        ├─ Feature Flags: Bootstrap from server, sync to legacy system
+        └─ Analytics: Track bootstrap metrics
         ↓
 UI renders with kernel.phases.appReady = true
 ```
@@ -44,7 +46,9 @@ UI renders with kernel.phases.appReady = true
 
 - **Single Source of Truth**: One kernel instance; all consumers subscribe to same state
 - **Explicit Phases**: Clear progression; consumers know what's initialized
-- **Non-Blocking Auth**: Auth phase doesn't block app readiness
+- **Services Before Auth**: Services (auth provider, error tracker) registered synchronously before AUTH phase starts, eliminating the race condition
+- **Network Awareness**: Storage knows network status for intelligent offline fallback
+- **Non-Blocking Auth**: AUTH completes in background - appReady is set immediately after auth begins (but provider is guaranteed registered)
 - **Error Recovery**: Critical failures accessible via `kernel.error`; retry via `AppKernel.retry()`
 - **Timing Tracking**: Each phase duration measured in `kernel.timing`
 - **Observable**: Kernel state broadcast to all subscribers on change
@@ -59,7 +63,7 @@ Initializes kernel. Safe to call multiple times—only initializes once (idempot
 
 ```typescript
 await AppKernel.initialize();
-// App now in CONFIG → PRELOAD → STORAGE → NETWORK → READY or ERROR
+// App now in CONFIG → PRELOAD → NETWORK → STORAGE → SERVICES → AUTH → READY or ERROR
 ```
 
 #### `AppKernel.getState(): AppKernelState`

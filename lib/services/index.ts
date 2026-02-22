@@ -5,7 +5,6 @@
 
 export { initializeServices } from './service-initializer';
 
-export { SentryExporter } from './sentry/sentry-analytics-exporter';
 export { SentryErrorTracker } from './sentry/sentry-error-tracker';
 
 // Auth Provider Interface & Registration API

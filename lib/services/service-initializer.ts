@@ -18,7 +18,6 @@ import { getAppConfig } from '@/lib/config/loader';
 import { logger } from '@/lib/utils/logger';
 import { createValidatedAuthProvider, registerAuthProvider, type AuthProvider } from './auth-provider';
 import { NoOpErrorTracker, registerErrorTracker } from './error-tracker';
-import { SentryExporter } from './sentry/sentry-analytics-exporter';
 import { initializeSentryErrorTracker } from './sentry/sentry-service-initializer';
 import { SupabaseAuthProvider } from './supabase/supabase-auth-provider';
 
@@ -215,6 +214,9 @@ async function initializeSentryExporter(): Promise<void> {
     // Switch on provider name to select implementation
     switch (providerName.toLowerCase()) {
       case 'sentry': {
+        // Lazy-load SentryExporter to avoid require cycle
+        // (sentry-analytics-exporter imports from lib/analytics, which imports services)
+        const { SentryExporter } = await import('./sentry/sentry-analytics-exporter');
         const sentryExporter: AnalyticsExporter = new SentryExporter();
 
         // Initialize exporter if it has an initialize lifecycle hook

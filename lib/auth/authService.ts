@@ -1,5 +1,13 @@
 import type { AuthResponse, AuthTokenResponse } from "@supabase/supabase-js";
 
+import {
+  AuthError,
+  EmailAlreadyExistsError,
+  InvalidCredentialsError,
+  NetworkError,
+  RateLimitError,
+  UserNotFoundError,
+} from "@/lib/services";
 import { RequestManager } from "../api/request-manager";
 import {
   getSupabaseClientLazy,
@@ -13,7 +21,6 @@ import {
   recordAuthFailure,
   recordAuthSuccess,
 } from "./auth-attempt-guard";
-import { AuthError, EmailAlreadyExistsError, InvalidCredentialsError, NetworkError, RateLimitError, UserNotFoundError } from "./index";
 import { isExistingUser, validateEmail, validatePassword } from "./validation";
 
 export interface SignUpResult {
