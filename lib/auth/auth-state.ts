@@ -1,10 +1,17 @@
+import { type AuthProvider } from "../services";
 import {
-    clearAllUserData,
-    getPrivacyStorageBackend,
-    SecureStorage,
-    STORAGE_KEYS,
+  clearAllUserData,
+  getPrivacyStorageBackend,
+  SecureStorage,
+  STORAGE_KEYS,
 } from "../storage";
 import { logger } from "../utils/logger";
+
+// Session schema version for future migrations
+const AUTH_SESSION_VERSION = 1;
+
+// Injected auth provider (set via configure())
+let authProvider: AuthProvider | null = null;
 
 // Cache dynamic imports to prevent re-importing modules on every auth check
 let supabaseCache: any = null;
@@ -12,7 +19,11 @@ let isSupabaseConfiguredCache: any = null;
 let usersDBCache: any = null;
 let worldsDBCache: any = null;
 
-export interface SupabaseAuthState {
+/**
+ * Application-level auth state (provider-agnostic).
+ * Tracks whether the authenticated user has an account in our system.
+ */
+export interface AuthState {
   hasAccount: boolean;
 }
 
@@ -22,6 +33,39 @@ export interface CacheMetadata {
 }
 
 export const AuthStateManager = {
+  /**
+   * Configure the auth provider to use for auth operations.
+   * Call this once during app bootstrap before any auth methods are invoked.
+   *
+   * @param provider - The AuthProvider instance to use (Supabase by default)
+   * @param options - Optional configuration (reserved for future use)
+   */
+  configure(provider: AuthProvider, options?: any): void {
+    if (!provider) {
+      logger.error('auth', 'AuthStateManager.configure: provider is null/undefined');
+      throw new Error('AuthStateManager.configure: provider is required');
+    }
+    authProvider = provider;
+    logger.info('auth', 'AuthStateManager configured with provider', {
+      providerType: provider.constructor.name,
+    });
+  },
+
+  /**
+   * Get the configured auth provider.
+   * Throws if configure() has not been called yet.
+   * @internal
+   */
+  getProvider(): AuthProvider {
+    if (!authProvider) {
+      logger.error('auth', 'AuthStateManager.getProvider: provider not configured');
+      throw new Error(
+        'Auth provider not configured. Call AuthStateManager.configure() during app bootstrap.'
+      );
+    }
+    return authProvider;
+  },
+
   // Save the Supabase session to encrypted storage (web platform workaround)
   // Since web has persistSession=false for security, we manually save/restore the session
   async saveAuthSession(session: any): Promise<void> {
@@ -50,6 +94,7 @@ export const AuthStateManager = {
       
       // Save only the essential session data needed to restore
       const sessionData = {
+        version: AUTH_SESSION_VERSION,
         access_token: session.access_token,
         refresh_token: session.refresh_token,
         expires_at: session.expires_at,
@@ -77,7 +122,7 @@ export const AuthStateManager = {
     }
   },
 
-  // Restore the Supabase session from encrypted storage (web platform workaround)
+  // Restore the session from encrypted storage via the auth provider (provider-agnostic)
   async restoreAuthSession(): Promise<void> {
     try {
       const key = STORAGE_KEYS.AUTH_SESSION;
@@ -89,65 +134,61 @@ export const AuthStateManager = {
         return;
       }
 
+      // Check session schema version for future migrations
+      const sessionVersion = sessionData.version || 0;
+      if (sessionVersion !== AUTH_SESSION_VERSION) {
+        logger.warn(
+          "auth",
+          `Session schema version mismatch (stored: ${sessionVersion}, current: ${AUTH_SESSION_VERSION}). Clearing stale session.`
+        );
+        // Clear incompatible session; user will need to re-authenticate
+        await this.clearAuthSession();
+        return;
+      }
+
       logger.info("auth", "🔄 Restoring auth session from storage", {
         auth_id: sessionData.user?.id,
-        email: sessionData.user?.email,
         hasAccessToken: !!sessionData.access_token,
+        version: sessionVersion,
       });
 
-      // Only restore on web platform (mobile uses Supabase's built-in async storage)
+      // Only restore on web platform (mobile uses provider's built-in async storage)
       if (typeof window === "undefined") {
-        logger.debug("auth", "Skipping manual session restore on mobile (uses platform-native storage)");
-        return;
-      }
-
-      // Import Supabase dynamically
-      const imported = await import("../database/supabase");
-      const { getSupabaseClient, isSupabaseConfigured } = imported;
-
-      if (!isSupabaseConfigured()) {
-        logger.debug("auth", "Supabase not configured, skipping session restore");
-        return;
-      }
-
-      try {
-        const supabase = getSupabaseClient();
-        
-        // Set the session on the Supabase client
-        // This tells Supabase to use this session for authenticated requests
-        // Pass full session data including user object for proper restoration
-        const { error } = await supabase.auth.setSession({
-          access_token: sessionData.access_token,
-          refresh_token: sessionData.refresh_token,
-          expires_at: sessionData.expires_at,
-          expires_in: sessionData.expires_in,
-          token_type: sessionData.token_type,
-          user: sessionData.user,
-        });
-
-        if (error) {
-          logger.warn(
-            "auth",
-            "❌ Failed to restore session to Supabase client",
-            { error: error.message },
-          );
-          // If restoration fails (e.g., token expired), clear the stale session
-          await this.clearAuthSession();
-          return;
-        }
-
-        logger.info(
+        logger.debug(
           "auth",
-          "✅ AUTH_SESSION restored! User should now be authenticated",
-          { auth_id: sessionData.user?.id },
+          "Skipping manual session restore on mobile (uses platform-native storage)"
         );
-      } catch (error) {
-        logger.error("auth", "Error restoring auth session to Supabase:", error);
-        // Clear stale session on error
-        await this.clearAuthSession();
+        return;
       }
+
+      // Get the configured auth provider and attempt to restore session
+      const provider = this.getProvider();
+      const success = await provider.restoreSession(sessionData);
+
+      if (!success) {
+        logger.warn(
+          "auth",
+          "❌ Auth provider failed to restore session (likely expired or invalid)"
+        );
+        // If restoration fails (e.g., token expired), clear the stale session
+        await this.clearAuthSession();
+        return;
+      }
+
+      logger.info(
+        "auth",
+        "✅ AUTH_SESSION restored! User should now be authenticated",
+        { auth_id: sessionData.user?.id }
+      );
     } catch (error) {
       logger.error("auth", "Error restoring auth session:", error);
+      // Clear stale session on error
+      try {
+        await this.clearAuthSession();
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (_) {
+        // Ignore errors during cleanup
+      }
     }
   },
 
@@ -169,11 +210,11 @@ export const AuthStateManager = {
   // - null/deleted → hasAccount: false (go to welcome)
   // - false/logout → hasAccount: false (go to welcome)
   // - true/logged in → hasAccount: true (continue)
-  async getAuthState(): Promise<SupabaseAuthState> {
+  async getAuthState(): Promise<AuthState> {
     try {
       const storageKey = STORAGE_KEYS.HAS_ACCOUNT;
       const authState =
-        await SecureStorage.getJSON<SupabaseAuthState>(storageKey);
+        await SecureStorage.getJSON<AuthState>(storageKey);
       // Explicitly handle all falsy cases: null, undefined, or false
       // All of these should result in hasAccount: false for consistent auth routing
       return { hasAccount: authState?.hasAccount === true };
@@ -186,7 +227,7 @@ export const AuthStateManager = {
   // Set user has created/logged into account
   async setHasAccount(hasAccount: boolean): Promise<void> {
     try {
-      const newState: SupabaseAuthState = { hasAccount };
+      const newState: AuthState = { hasAccount };
       const storageKey = STORAGE_KEYS.HAS_ACCOUNT;
       const backend = getPrivacyStorageBackend(storageKey);
       await backend.setJSON(storageKey, newState);

@@ -17,248 +17,19 @@
  */
 
 import type { AuthContext } from "@/lib/api/auth-layer";
-import { logger } from "@/lib/utils/logger";
+import { logger, RedactionManager } from "@/lib/utils";
 import type {
   AuthReplayMetadata,
   NetworkErrorContract,
   OfflineQueueStats,
   QueuedMutation,
-  RedactionRule,
 } from "./types";
 
 // Re-export QueuedMutation for test imports
 export type { QueuedMutation };
 
-/**
- * Phase 4: Deterministic Redaction Manager
- *
- * Ensures no tokens, passwords, or PII are persisted to SecureStorage.
- * Uses deterministic rules to identify and strip sensitive fields.
- */
-export const RedactionManager: {
-  defaultRules: RedactionRule[];
-  shouldRedact(fieldPath: string, rules: RedactionRule[]): boolean;
-  findMatchingRule(
-    fieldPath: string,
-    rules: RedactionRule[],
-  ): RedactionRule | undefined;
-  redactObject(
-    obj: Record<string, any>,
-    rules?: RedactionRule[],
-    path?: string,
-  ): Record<string, any> | undefined;
-  _redactObjectImpl(
-    obj: Record<string, any>,
-    rules?: RedactionRule[],
-    path?: string,
-    visited?: Set<any>,
-  ): Record<string, any> | undefined;
-  validateRedaction(
-    obj: Record<string, any>,
-    forbiddenFields?: string[],
-  ): string[];
-} = {
-  /**
-   * Standard redaction rules for common sensitive fields
-   */
-  defaultRules: [
-    // Authorization headers and tokens
-    { fields: ["authorization", "auth", "token", "refreshToken", "idToken"] },
-    // Session/identity
-    { fields: ["password", "secret", "privateKey", "api_key", "apiKey"] },
-    // Personal identifiable information
-    { fields: ["email", "phone", "ssn", "creditCard", "bankAccount"] },
-    // OAuth tokens
-    { fields: ["access_token", "refresh_token", "oauth_token"] },
-  ] as RedactionRule[],
-
-  /**
-   * Check if a field path should be redacted based on rules
-   *
-   * @param fieldPath - Dot-separated path (e.g., "user.email", "password")
-   * @param rules - Redaction rules to apply
-   * @returns true if field should be redacted
-   */
-  shouldRedact(fieldPath: string, rules: RedactionRule[]): boolean {
-    const normalizedPath = fieldPath.toLowerCase();
-    return rules.some((rule) =>
-      rule.fields.some((field) => {
-        const normalizedField = field.toLowerCase();
-        // Match exact field or path segment
-        return (
-          normalizedPath === normalizedField ||
-          normalizedPath.endsWith(`.${normalizedField}`) ||
-          normalizedPath.startsWith(`${normalizedField}.`)
-        );
-      }),
-    );
-  },
-
-  /**
-   * Find the matching rule for a field path using the same logic as shouldRedact
-   * Reuses path-matching logic (exact, suffix, prefix) to ensure consistency
-   *
-   * @param fieldPath - Path to match
-   * @param rules - Rules to search
-   * @returns The first matching rule, or undefined if no match
-   */
-  findMatchingRule(
-    fieldPath: string,
-    rules: RedactionRule[],
-  ): RedactionRule | undefined {
-    const normalizedPath = fieldPath.toLowerCase();
-    return rules.find((rule) =>
-      rule.fields.some((field) => {
-        const normalizedField = field.toLowerCase();
-        // Match exact field or path segment (same as shouldRedact)
-        return (
-          normalizedPath === normalizedField ||
-          normalizedPath.endsWith(`.${normalizedField}`) ||
-          normalizedPath.startsWith(`${normalizedField}.`)
-        );
-      }),
-    );
-  },
-
-  /**
-   * Recursively redact sensitive fields from an object
-   *
-   * @param obj - Object to redact
-   * @param rules - Redaction rules
-   * @param path - Current path (used internally for recursion)
-   * @param visited - Set of visited objects to prevent circular references
-   * @returns Redacted copy of object
-   */
-  redactObject(
-    obj: Record<string, any>,
-    rules: RedactionRule[] = RedactionManager.defaultRules,
-    path: string = "",
-  ): Record<string, any> | undefined {
-    // Use internal implementation with circular reference tracking
-    return this._redactObjectImpl(obj, rules, path, new Set());
-  },
-
-  /**
-   * Internal implementation that tracks visited objects
-   * @internal
-   */
-  _redactObjectImpl(
-    obj: Record<string, any>,
-    rules: RedactionRule[] = RedactionManager.defaultRules,
-    path: string = "",
-    visited: Set<any> = new Set(),
-  ): Record<string, any> | undefined {
-    // Prevent circular references
-    if (visited.has(obj)) {
-      return undefined; // Break circular reference
-    }
-    visited.add(obj);
-
-    try {
-      // Check if any field in this object matches a rule with redactParent
-      // Only apply to nested objects (path is not empty)
-      if (path) {
-        for (const [key] of Object.entries(obj)) {
-          const currentPath = `${path}.${key}`;
-          if (this.shouldRedact(currentPath, rules)) {
-            const rule = this.findMatchingRule(currentPath, rules);
-            if (rule?.redactParent) {
-              // Redact the entire parent object
-              return undefined;
-            }
-          }
-        }
-      }
-
-      const redacted: Record<string, any> = {};
-
-      for (const [key, value] of Object.entries(obj)) {
-        const currentPath = path ? `${path}.${key}` : key;
-
-        if (value !== null && typeof value === "object") {
-          if (Array.isArray(value)) {
-            // Redact array items if they're objects
-            /* eslint-disable-next-line security/detect-object-injection */
-            redacted[key] = value.map((item) =>
-              typeof item === "object" && item !== null
-                ? this._redactObjectImpl(item, rules, currentPath, visited)
-                : item,
-            );
-          } else {
-            // Recursively redact nested objects
-            const redactedNested = this._redactObjectImpl(
-              value,
-              rules,
-              currentPath,
-              visited,
-            );
-            /* eslint-disable-next-line security/detect-object-injection */
-            redacted[key] =
-              redactedNested !== undefined ? redactedNested : undefined;
-          }
-        } else if (this.shouldRedact(currentPath, rules)) {
-          // Find the matching rule to get replacement value
-          const rule = this.findMatchingRule(currentPath, rules);
-          /* eslint-disable-next-line security/detect-object-injection */
-          redacted[key] =
-            rule?.replacement !== undefined ? rule.replacement : undefined;
-        } else {
-          /* eslint-disable-next-line security/detect-object-injection */
-          redacted[key] = value;
-        }
-      }
-
-      return redacted;
-    } finally {
-      visited.delete(obj);
-    }
-  },
-
-  /**
-   * Validate that no sensitive fields remain in object
-   * Used in tests to ensure redaction worked
-   *
-   * @param obj - Object to check
-   * @param forbiddenFields - Fields that should not exist
-   * @returns Array of found forbidden fields (empty if clean)
-   */
-  validateRedaction(
-    obj: Record<string, any>,
-    forbiddenFields: string[] = [
-      "token",
-      "password",
-      "authorization",
-      "email",
-      "phone",
-    ],
-  ): string[] {
-    const found: string[] = [];
-
-    const checkObject = (current: any, path: string = ""): void => {
-      if (current === null || typeof current !== "object") {
-        return;
-      }
-
-      for (const [key, value] of Object.entries(current)) {
-        const currentPath = path ? `${path}.${key}` : key;
-        const lowerKey = key.toLowerCase();
-
-        if (forbiddenFields.some((f) => lowerKey.includes(f.toLowerCase()))) {
-          // Do not include raw values here to avoid leaking PII/tokens into logs.
-          // Only record the field path for audit purposes.
-          found.push(currentPath);
-        }
-
-        if (value !== null && typeof value === "object") {
-          checkObject(value, currentPath);
-        }
-      }
-    };
-
-    checkObject(obj);
-    return found;
-  },
-};
+// Re-export RedactionManager from centralized location
+  export { RedactionManager };
 
 /**
  * Phase 4: Auth Replay Manager
@@ -1022,7 +793,8 @@ export const FetcherRegistryFallback = {
  * High-level API for Phase 4 features
  */
 export const Phase4Enhancements = {
-  RedactionManager,
+  // RedactionManager now imported from centralized utils
+  RedactionManager: RedactionManager as typeof RedactionManager,
   AuthReplayManager,
   NetworkErrorClassifier,
   BackoffScheduler,

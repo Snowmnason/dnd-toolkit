@@ -644,13 +644,56 @@ class AppKernelClass {
         .category("bootstrap")
         .info(`✅ appReady = true (auth phase still running in background)`);
 
-      // Initialize services (Sentry exporter, future analytics integrations)
+      // Initialize services (auth provider, Sentry exporter, analytics integrations)
       try {
         const { initializeServices } = await import("@/lib/services");
         await initializeServices();
         logger
           .category("bootstrap")
           .info("Services initialized successfully");
+
+        // Configure AuthStateManager with the registered auth provider (if available)
+        // initializeServices() may not have registered a provider if Supabase is not configured
+        try {
+          const { getAuthProviderSync } = await import("@/lib/services");
+          const { AuthStateManager } = await import("@/lib/auth/auth-state");
+          
+          const provider = getAuthProviderSync();
+          
+          if (!provider) {
+            // Auth not available (e.g., no Supabase env vars)
+            // Skip wiring and log warning; auth-guarded routes will fail gracefully
+            logger
+              .category("bootstrap")
+              .warn("No auth provider registered — auth features unavailable. Public routes only.");
+          } else {
+            AuthStateManager.configure(provider);
+            logger
+              .category("bootstrap")
+              .info("AuthStateManager configured with registered provider");
+          }
+        } catch (error) {
+          logger
+            .category("bootstrap")
+            .error("Failed to configure AuthStateManager with provider:", {
+              error: (error as Error).message,
+            });
+          
+          // Provider configuration failure is critical — don't silently swallow.
+          // Set safe mode to inform the user and provide recovery options.
+          const safeMode = createSafeModeState(
+            SafeModeReason.KERNEL_CONFIG_FAILED,
+            {
+              details: "Auth provider configuration failed",
+              originalError: error instanceof Error ? error : new Error(String(error)),
+            }
+          );
+          this.setSafeMode(safeMode);
+          
+          logger
+            .category("bootstrap")
+            .warn("Auth provider configuration failed — entering safe mode");
+        }
       } catch (error) {
         logger
           .category("bootstrap")

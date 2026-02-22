@@ -1,6 +1,6 @@
 # Auth Module
 
-Email/password authentication system with brute-force protection, secure session persistence, input validation, Supabase integration, route guards, and background health monitoring. Session state survives app restarts via encrypted storage; auth attempts are rate-limited (5 attempts per 10 minutes) with automatic 15-minute lockout on failure.
+Email/password authentication system with brute-force protection, secure session persistence, input validation, pluggable auth providers (Supabase, Firebase, custom), route guards, and background health monitoring. Session state survives app restarts via encrypted storage; auth attempts are rate-limited (5 attempts per 10 minutes) with automatic 15-minute lockout on failure.
 
 ## When to Use This Module
 
@@ -10,7 +10,7 @@ Email/password authentication system with brute-force protection, secure session
 - Protect routes based on authentication state (logged in vs. logged out)
 - Handle brute-force attacks with automatic rate limiting and lockout (5 attempts / 10 min)
 - Persist user sessions across app restarts via encrypted storage
-- Support optional Supabase for auth provider backend
+- Support pluggable auth providers (Supabase, Firebase, custom backends)
 - Validate email, password, and username inputs with ReDoS-safe regex
 - Integrate auth state with route navigation (redirects, login screens)
 
@@ -34,8 +34,8 @@ Check Auth Attempt Guard (brute-force protection)
         ├─ 15 min lockout after exceeding threshold
         ├─ Tracked in encrypted storage
         ↓
-Call Auth Provider (Supabase, optional)
-        ├─ Lazy-loaded, guarded by isSupabaseConfigured()
+Call Auth Provider (injected from lib/services)
+        ├─ Provider-agnostic interface (Supabase, Firebase, custom)
         ├─ Made via lib/api RequestManager (retry, dedup)
         ↓
 Persist Session to SecureStorage
@@ -56,9 +56,21 @@ UI Triggers Redirect (route guards, navigation)
 - **Brute-force protected**: Rate limiting per email per operation type (signin, signup, reset)
 - **Validated inputs**: Email/password/username validated (ReDoS-safe) before reaching auth provider
 - **Session recovery**: Auth state persists; app recovers session on restart via SecureStorage
-- **Provider-agnostic**: Core logic independent of auth provider (Supabase or custom)
+- **Provider-agnostic**: Core logic independent of auth provider (injected from lib/services)
 - **Graceful degradation**: Offline support via SecureStorage; no external call required for auth checks
 - **Observable**: All state changes logged; integrates with analytics (works with lib/analytics)
+
+## Provider Injection
+
+Auth providers are injected from `lib/services` via dependency injection, enabling multi-backend support:
+
+- **Default Provider**: SupabaseAuthProvider (registered during kernel bootstrap)
+- **Provider Interface**: All providers implement `AuthProvider` from `@/lib/services`
+- **Injection Point**: `AuthStateManager.configure(provider)` called by kernel
+- **Error Handling**: Provider errors normalized to common types (InvalidCredentialsError, NetworkError, etc.)
+- **No Direct Imports**: Auth module never imports Supabase directly; uses injected provider
+
+This design allows swapping auth backends (Firebase, custom) without changing auth module code.
 
 ## API Reference
 
@@ -66,7 +78,9 @@ UI Triggers Redirect (route guards, navigation)
 
 Manages local auth state storage and retrieval.
 
-#### `AuthStateManager.getAuthState(): Promise<SupabaseAuthState>`
+#### `AuthStateManager.getAuthState(): Promise<AuthState>`
+
+Returns current authentication state (`{ hasAccount: boolean }`).
 
 Returns current authentication state (`{ hasAccount: boolean }`).
 
@@ -91,7 +105,7 @@ await AuthStateManager.setHasAccount(false); // After logout
 Persists session information after successful auth provider login. Updates `hasAccount: true` and caches optional user email.
 
 ```ts
-await AuthStateManager.setSession(supabaseSession);
+await AuthStateManager.setSession(providerSession);
 ```
 
 #### `AuthStateManager.clearAuthState(): Promise<void>`
@@ -339,15 +353,16 @@ Sanitizes string input: removes null bytes, control characters, limits length to
 
 ### External Packages
 
-- **`@supabase/supabase-js`** (optional, lazy-loaded) – Auth provider integration
+- **`@supabase/supabase-js`** (optional) – Default auth provider implementation
 - **`expo-router`** – Routing and navigation (for route protection)
 
 ### Internal Dependencies
 
+- **`lib/services`** – Injected auth provider (AuthProvider interface)
 - **`lib/storage` (SecureStorage)** – Encrypted storage for auth state and attempts
 - **`lib/cache` (QueryCache)** – Cleared on logout to prevent stale user data leaks
 - **`lib/api` (RequestManager)** – Makes auth API calls (signup, signin, reset password)
-- **`lib/database` (Supabase lazy)** – Optional auth provider; guarded by `isSupabaseConfigured()`
+- **`lib/database`** – Database operations (may be used by auth providers)
 - **`lib/utils/logger`** – Logs auth events and security incidents
 - **`lib/analytics`** – Tracks auth flows (signup, signin, failures)
 - **`lib/kernel`** – App bootstrap state for route guards
@@ -356,9 +371,9 @@ Sanitizes string input: removes null bytes, control characters, limits length to
 
 ## Error Handling & Edge Cases
 
-### Supabase Not Configured
+### Auth Provider Not Available
 
-If Supabase is not configured (e.g., GitHub Pages, no env vars), the module degrades gracefully:
+If no auth provider is configured or available (e.g., network issues, misconfiguration), the module degrades gracefully:
 
 - `signUpUser()` returns error: "Unable to connect to servers"
 - `useAuthGuard()` skips subscription setup
@@ -374,7 +389,7 @@ After 5 failed attempts in 10 minutes, further attempts fail with: `"Too many si
 
 ### Email Already Exists (Signup)
 
-Supabase returns error, module detects common patterns ("User already registered", "duplicate key") and sets `showEmailExistsModal: true` to trigger UI modal.
+Auth provider returns `EmailAlreadyExistsError`, module sets `showEmailExistsModal: true` to trigger UI modal.
 
 ### Invalid Password (Signup)
 
@@ -410,7 +425,7 @@ Auth attempt guard loads/saves JSON from SecureStorage. O(1) per check (small JS
 
 ### Route Guard Subscription
 
-`useAuthGuard()` sets up Supabase auth subscription once per mount. Listens to future auth state changes; no polling.
+`useAuthGuard()` sets up auth provider subscription once per mount. Listens to future auth state changes; no polling.
 
 ### Session Recovery
 
@@ -420,7 +435,8 @@ On app launch, a single `checkUserSession()` call. If session valid and profile 
 
 ## Related Modules
 
-- **`lib/database` (Supabase)** – Auth provider integration; optional, guarded by `isSupabaseConfigured()`
+- **`lib/services`** – Auth provider abstraction and dependency injection
+- **`lib/database`** – Database operations (used by auth providers)
 - **`lib/storage` (SecureStorage)** – Encrypts and stores auth state, attempt history, sensitive user data
 - **`lib/cache` (QueryCache)** – Cleared on logout to prevent stale data leaks; coordinates with auth lifecycle
 - **`lib/api` (RequestManager)** – Makes auth API calls; provides retry/rate limit for signup/signin
@@ -445,3 +461,5 @@ On app launch, a single `checkUserSession()` call. If session valid and profile 
 | `redirectSafety.ts`                                                                         | Redirect safety utilities (not detailed here; likely prevents open redirects).                                                                                               |
 | `encrypted-storage.ts`                                                                      | Legacy file (likely deprecated in favor of `lib/storage/SecureStorage`).                                                                                                     |
 | `useSignInForm.ts`, `useSignUpForm.ts`, `useResetPasswordConfirm.ts`, `useWelcomeScreen.ts` | React hooks for form state management and auth flows. UI-specific (app-layer), not core auth logic.                                                                          |
+
+**Note**: Auth provider implementations (e.g., SupabaseAuthProvider) are now located in `lib/services/` for better separation of concerns and reusability across projects.

@@ -2,17 +2,18 @@ import type { AuthResponse, AuthTokenResponse } from "@supabase/supabase-js";
 
 import { RequestManager } from "../api/request-manager";
 import {
-    getSupabaseClientLazy,
-    isSupabaseConfiguredLazy,
+  getSupabaseClientLazy,
+  isSupabaseConfiguredLazy,
 } from "../database/supabase-lazy";
 import { usersDB } from "../database/users";
 import { SecureStorage, STORAGE_KEYS } from "../storage";
 import { logger } from "../utils/logger";
 import {
-    checkAuthGuard,
-    recordAuthFailure,
-    recordAuthSuccess,
+  checkAuthGuard,
+  recordAuthFailure,
+  recordAuthSuccess,
 } from "./auth-attempt-guard";
+import { AuthError, EmailAlreadyExistsError, InvalidCredentialsError, NetworkError, RateLimitError, UserNotFoundError } from "./index";
 import { isExistingUser, validateEmail, validatePassword } from "./validation";
 
 export interface SignUpResult {
@@ -35,6 +36,135 @@ export interface ResetPasswordResult {
   error?: string;
   message?: string;
   showEmailNotFoundModal?: boolean;
+}
+
+/**
+ * Error retry strategy classification.
+ * Determines whether an error should auto-retry or require user action.
+ *
+ * **Auto-retry (transient failures):**
+ * - NetworkError (connection issues, timeouts) — user should retry after network restored
+ * - RateLimitError — suggest waiting before retrying (provides retryAfterSeconds)
+ *
+ * **No auto-retry (permanent failures):**
+ * - InvalidCredentialsError — user must submit correct credentials again
+ * - EmailAlreadyExistsError — user must use different email
+ * - Other AuthErrors — require user intervention
+ */
+interface ErrorRetryStrategy {
+  shouldAutoRetry: boolean;
+  suggestRetryAfterMs?: number;
+  reason: string;
+}
+
+/**
+ * Map Supabase errors to normalized AuthError types.
+ * Provides consistent error classification across signup/signin flows.
+ */
+function mapSupabaseErrorToNormalized(supabaseError: any): AuthError {
+  const message = supabaseError?.message || 'Unknown auth error';
+  const code = supabaseError?.code || supabaseError?.status;
+  const messageLower = message.toLowerCase();
+
+  // Invalid credentials
+  if (
+    messageLower.includes('invalid login credentials') ||
+    messageLower.includes('invalid credentials') ||
+    messageLower.includes('invalid email or password') ||
+    messageLower.includes('incorrect password') ||
+    code === 'invalid_credentials'
+  ) {
+    return new InvalidCredentialsError(message, supabaseError);
+  }
+
+  // Email already exists (signup conflicts)
+  if (
+    messageLower.includes('user already registered') ||
+    messageLower.includes('already registered') ||
+    messageLower.includes('already been registered') ||
+    messageLower.includes('email address not available') ||
+    messageLower.includes('duplicate key value') ||
+    messageLower.includes('duplicate email') ||
+    messageLower.includes('unique constraint') ||
+    code === '23505' || // Postgres unique constraint error
+    code === 'user_already_exists'
+  ) {
+    return new EmailAlreadyExistsError(message, supabaseError);
+  }
+
+  // User not found (reset password target)
+  if (
+    messageLower.includes('user not found') ||
+    messageLower.includes('no user found') ||
+    messageLower.includes('user does not exist') ||
+    code === 'user_not_found'
+  ) {
+    return new UserNotFoundError(message, supabaseError);
+  }
+
+  // Rate limit exceeded (too many attempts)
+  if (
+    code === 429 ||
+    code === 'RATE_LIMIT' ||
+    messageLower.includes('too many') ||
+    messageLower.includes('rate limit') ||
+    messageLower.includes('throttle')
+  ) {
+    // Try to extract retry-after seconds from message (pattern: "123 seconds" or "123s")
+    const retryAfterMatch = messageLower.match(/(\d+)/);
+    const retryAfterSeconds = retryAfterMatch?.[1] ? parseInt(retryAfterMatch[1], 10) : undefined;
+    return new RateLimitError(message, supabaseError, retryAfterSeconds);
+  }
+
+  // Network errors and timeouts
+  if (
+    messageLower.includes('request timeout') ||
+    messageLower.includes('network') ||
+    messageLower.includes('fetch failed') ||
+    messageLower.includes('econnrefused') ||
+    messageLower.includes('enotfound') ||
+    messageLower.includes('time out') ||
+    supabaseError instanceof TypeError ||
+    code === 'NETWORK_ERROR' ||
+    code === 'ETIMEDOUT'
+  ) {
+    return new NetworkError(message, supabaseError);
+  }
+
+  // Default: generic AuthError
+  return new AuthError(message, supabaseError, code);
+}
+
+function classifyErrorRetryStrategy(error: unknown): ErrorRetryStrategy {
+  if (error instanceof NetworkError) {
+    return {
+      shouldAutoRetry: true,
+      suggestRetryAfterMs: 2000, // Wait 2s before auto-retry
+      reason: "transient_network_failure",
+    };
+  }
+
+  if (error instanceof RateLimitError) {
+    return {
+      shouldAutoRetry: false, // User should wait, not retry immediately
+      suggestRetryAfterMs: (error.retryAfterSeconds || 60) * 1000,
+      reason: "rate_limit_exceeded",
+    };
+  }
+
+  // Permanent failures: InvalidCredentialsError, EmailAlreadyExistsError, etc.
+  if (error instanceof InvalidCredentialsError || error instanceof EmailAlreadyExistsError) {
+    return {
+      shouldAutoRetry: false,
+      reason: "permanent_failure",
+    };
+  }
+
+  // Unknown or other errors: don't auto-retry
+  return {
+    shouldAutoRetry: false,
+    reason: "unknown_error",
+  };
 }
 
 // Sign up a new user
@@ -121,15 +251,18 @@ export const signUpUser = async (
 
     if (signupError) {
       await recordAuthFailure(sanitizedEmail, "signup");
+      
+      // Map Supabase error to normalized error type and classify retry strategy
+      const normalizedError = mapSupabaseErrorToNormalized(signupError);
+      const retryStrategy = classifyErrorRetryStrategy(normalizedError);
+      
+      logger.debug("auth", `Signup error classified: ${retryStrategy.reason}`, {
+        shouldAutoRetry: retryStrategy.shouldAutoRetry,
+        suggestRetryAfterMs: retryStrategy.suggestRetryAfterMs,
+      });
+      
       // Check for email already exists error
-      if (
-        signupError.message.includes("User already registered") ||
-        signupError.message.includes("already registered") ||
-        signupError.message.includes("already been registered") ||
-        signupError.message.includes("email address not available") ||
-        signupError.message.includes("duplicate key value") ||
-        signupError.code === "23505"
-      ) {
+      if (normalizedError instanceof EmailAlreadyExistsError) {
         return { success: false, showEmailExistsModal: true };
       }
 
@@ -260,11 +393,18 @@ export const signInUser = async (
 
     if (signInError) {
       await recordAuthFailure(sanitizedEmail, "signin");
+      
+      // Map Supabase error to normalized error type and classify retry strategy
+      const normalizedError = mapSupabaseErrorToNormalized(signInError);
+      const retryStrategy = classifyErrorRetryStrategy(normalizedError);
+      
       logger.error("auth", `❌ Sign-in error:`, signInError.message);
-      if (
-        signInError.message.includes("Invalid login credentials") ||
-        signInError.message.includes("invalid credentials")
-      ) {
+      logger.debug("auth", `Sign-in error classified: ${retryStrategy.reason}`, {
+        shouldAutoRetry: retryStrategy.shouldAutoRetry,
+        suggestRetryAfterMs: retryStrategy.suggestRetryAfterMs,
+      });
+      
+      if (normalizedError instanceof InvalidCredentialsError) {
         return {
           success: false,
           error:

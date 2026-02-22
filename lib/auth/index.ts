@@ -1,3 +1,24 @@
+// Re-export auth provider types from services for convenience
+export type {
+    AuthProvider,
+    AuthResult,
+    Session
+} from '@/lib/services';
+
+export {
+    AuthError,
+    createValidatedAuthProvider,
+    EmailAlreadyExistsError,
+    getAuthProvider,
+    getAuthProviderSync,
+    InvalidCredentialsError,
+    NetworkError,
+    ProviderInitializationError,
+    RateLimitError,
+    registerAuthProvider,
+    UserNotFoundError
+} from '@/lib/services';
+
 export {
     checkAuthGuard,
     recordAuthFailure,
@@ -6,8 +27,8 @@ export {
 } from "./auth-attempt-guard";
 export {
     AuthStateManager,
-    type CacheMetadata,
-    type SupabaseAuthState
+    type AuthState,
+    type CacheMetadata
 } from "./auth-state";
 export {
     checkPendingInvites,
@@ -30,9 +51,7 @@ export {
 } from "./sessionService";
 export {
     useAuthGuard,
-    type AuthGuardOptions,
-    type AuthLevel,
-    type AuthState
+    type AuthGuardOptions, type AuthGuardState, type AuthLevel
 } from "./useAuthGuard";
 export { useResetPasswordConfirm } from "./useResetPasswordConfirm";
 export { useSignInForm } from "./useSignInForm";
