@@ -102,5 +102,10 @@
     "typescript": "~5.9.2",
     "vitest": "^4.0.18"
   },
+  "overrides": {
+    "minimatch": ">=10.2.1",
+    "rimraf": ">=5.0.11",
+    "glob": ">=10.5.1"
+  },
   "private": true
 }
