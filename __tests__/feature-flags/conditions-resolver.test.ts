@@ -5,15 +5,20 @@
  * Note: These are unit tests focused on the internal resolution logic
  */
 
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// Now import modules under test after mocks are in place
 import * as configModule from "@/lib/config/loader";
 import * as platformModule from "@/lib/config/platform-config";
 import { FeatureFlagsManager } from "@/lib/feature-flags/server-sync";
 import { SecureStorage } from "@/lib/storage";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock dependencies to avoid React-Native parsing errors
-vi.mock("@/lib/config/loader");
-vi.mock("@/lib/config/platform-config");
+// Hoist and provide safe mocks before importing modules that read config at import-time
+vi.mock("@/lib/config/loader", () => ({
+  getAppConfig: vi.fn(() => ({ environment: "production", featureFlags: {}, analytics: { consent: { defaultLevel: 'basic' } } })),
+  isDevelopment: vi.fn(() => false),
+}));
+vi.mock("@/lib/config/platform-config", () => ({ getPlatformName: vi.fn(() => "web") }));
 vi.mock("@/lib/storage", () => ({
   SecureStorage: {
     setJSON: vi.fn(),
