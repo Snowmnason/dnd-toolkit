@@ -1,6 +1,6 @@
 # Database Module
 
-Type-safe Supabase PostgreSQL database layer providing app-specific data operations for worlds, users, invites, and entitlements. Enforces Row-Level Security (RLS) for multi-tenant isolation, integrates with `lib/api` (RequestManager) for deduplication and retry, and `lib/cache` (QueryCache) for result persistence.
+Type-safe database layer providing app-specific data operations for worlds, users, invites, and entitlements. Uses pluggable DatabaseProvider abstraction for backend flexibility, enforces Row-Level Security (RLS) for multi-tenant isolation, integrates with `lib/api` (RequestManager) for deduplication and retry, and `lib/cache` (QueryCache) for result persistence.
 
 ## When to Use This Module
 
@@ -15,7 +15,7 @@ Type-safe Supabase PostgreSQL database layer providing app-specific data operati
 **Do NOT use this module for:**
 
 - Authentication operations (use `lib/auth` instead)
-- Raw Supabase queries without encapsulation (always wrap in domain-specific functions)
+- Direct database provider calls (always wrap in domain-specific functions)
 - Circumventing RLS policies (never bypass auth; policies protect data integrity)
 - Synchronous/blocking database calls (all operations are async)
 
@@ -30,7 +30,11 @@ Validate User (getCurrentUserProfile, validateUserForWrite)
         ↓
 RequestManager.fetch (dedupe, retry, integrate with QueryCache)
         ↓
-Supabase Client Call (RLS policies enforce access control)
+DatabaseProvider.from() → QueryBuilder chain → execute()
+        ↓
+Provider Implementation (Supabase/PostgreSQL/Firebase)
+        ↓
+Database Call (RLS policies enforce access control)
         ↓
 Handle Response & Update Cache (QueryCache invalidation on mutations)
         ↓
@@ -39,7 +43,8 @@ Return Result to UI
 
 **Key Principles:**
 
-- **RLS-Enforced**: All queries respect Supabase RLS policies; no cross-user data leaks
+- **Provider-Abstraction**: Database operations go through DatabaseProvider interface (backend-swappable)
+- **RLS-Enforced**: All queries respect database RLS policies; no cross-user data leaks
 - **Type-Safe**: All data models (User, World, WorldAccess) have TypeScript interfaces
 - **Deduplified**: RequestManager prevents duplicate queries (same key = same result)
 - **Cached**: QueryCache stores results; invalidated on CREATE/UPDATE/DELETE
@@ -247,51 +252,49 @@ const [user, worlds, invites] = await executeParallelQueries([
 
 ### Feature Flags & Entitlements
 
-#### `fetchFeatureFlags(supabase: SupabaseClient): Promise<FeatureFlagRow[]>`
+**Note:** Feature flag fetching has been migrated to edge functions. Direct database queries are deprecated.
 
-Fetch all global feature flags. Called by FeatureFlagsManager at app startup.
+#### `fetchEntitlementsByUserId(userId: string): Promise<EntitlementRow[]>`
 
-```typescript
-const flags = await fetchFeatureFlags(supabaseClient);
-```
-
-#### `fetchEntitlementsByUserId(supabase: SupabaseClient, userId: string): Promise<EntitlementRow[]>`
-
-Fetch all entitlements for a user. Called by FeatureFlagsManager for fresh checks.
+Fetch all entitlements for a user. Uses DatabaseProvider internally.
 
 ```typescript
-const entitlements = await fetchEntitlementsByUserId(supabaseClient, userId);
+const entitlements = await fetchEntitlementsByUserId(userId);
 ```
 
-#### `hasEntitlement(supabase: SupabaseClient, userId: string, key: string): Promise<boolean>`
+#### `hasEntitlement(userId: string, entitlementKey: string): Promise<boolean>`
 
-Check if user has active entitlement. Automatically handles expiry.
+Check if user has active entitlement. Uses DatabaseProvider internally.
 
 ```typescript
-const isPremium = await hasEntitlement(supabaseClient, userId, "premium");
+const isPremium = await hasEntitlement(userId, "premium");
 ```
 
-#### `fetchOverridesByUserId(supabase: SupabaseClient, userId: string): Promise<FeatureFlagOverrideRow[]>`
+#### `fetchEntitlementOverridesByUserId(userId: string): Promise<EntitlementOverrideRow[]>`
 
-Fetch per-user feature flag overrides (admin tool). Server-side filters for non-revoked, non-expired overrides.
+Fetch per-user entitlement overrides. Uses DatabaseProvider internally.
 
 ```typescript
-const overrides = await fetchOverridesByUserId(supabaseClient, userId);
+const overrides = await fetchEntitlementOverridesByUserId(userId);
 ```
+
+**Deprecated Functions:**
+- `fetchFeatureFlags()` - Migrated to edge function `get_feature_flags`
+- `fetchOverridesByUserId()` - Migrated to edge function `get_feature_flags`
 
 ## Dependencies
 
 ### External Packages
 
-- **`@supabase/supabase-js`** – Supabase client SDK (lazy-loaded, optional)
-- **`expo-constants`** – Environment variable access
+- **None** - Database operations abstracted through DatabaseProvider
 
 ### Environment Variables
 
-- **`EXPO_PUBLIC_SUPABASE_URL`**, **`EXPO_PUBLIC_SUPABASE_ANON_KEY`** – Injected at build time via GitHub Actions
+- **Provider-specific** - Handled by DatabaseProvider implementation
 
 ### Internal Dependencies
 
+- **`lib/services` (DatabaseProvider)** – Pluggable database backend abstraction
 - **`lib/api` (RequestManager)** – Deduplication, retry, rate limiting
 - **`lib/cache` (QueryCache)** – Result caching and invalidation
 - **`lib/auth` (AuthStateManager)** – User profile and auth state
@@ -396,7 +399,6 @@ RLS policies add <10ms per query. Security benefit far outweighs cost.
 
 | File | Purpose |
 | --- | --- |
-| `supabase.ts` | Lazy-loaded Supabase client with platform-specific session handling (web: no persistence, mobile: encrypted via platform-native) |
 | `common.ts` | Shared utilities: user validation, caching strategy, parallel query execution |
 | `users.ts` | User profile CRUD (create, get, update); integrates with AuthStateManager |
 | `worlds.ts` | World CRUD (create, get, list, update, delete) and access management (grant/revoke); core gameplay entity |
@@ -405,3 +407,5 @@ RLS policies add <10ms per query. Security benefit far outweighs cost.
 | `feature-flags.ts` | Feature flag queries (fetch global flags) |
 | `feature-flag-overrides.ts` | Per-user feature flag override queries (admin tool) |
 | `index.ts` | Barrel export of public API |
+
+**Note:** All entity files use `getDatabaseProvider()` from `lib/services` for database operations. Direct database client imports have been abstracted away for backend flexibility.
