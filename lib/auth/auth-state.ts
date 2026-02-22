@@ -691,11 +691,11 @@ export const AuthStateManager = {
    * This prevents the thundering herd problem.
    * 
    * @param worldIds - World IDs to verify
-   * @returns Map of worldId => hasAccess
+   * @returns Object with results Map and deferred flag
    */
   async batchVerifyWorldAccess(
     worldIds: string[],
-  ): Promise<Map<string, boolean>> {
+  ): Promise<{ results: Map<string, boolean>; deferred: boolean }> {
     logger.info(
       "auth",
       `[BATCH-VERIFY] Starting batch verification for ${worldIds.length} worlds`,
@@ -719,11 +719,11 @@ export const AuthStateManager = {
         const result = await this.verifyWorldAccessWithDatabase(worldId);
         results.set(worldId, result.hasAccess);
       }
-      return results;
+      return { results, deferred: false };
     }
 
-    // If refresh returned null (session not ready), return false for all worlds
-    // This prevents granting access to unauthenticated users during app startup.
+    // If refresh returned null (session not ready), signal deferred.
+    // Callers must NOT treat deferred results as verified 0-world state.
     // Screens should listen to auth state changes and re-verify once session is ready.
     if (refreshResult === null) {
       logger.info(
@@ -735,7 +735,7 @@ export const AuthStateManager = {
       for (const worldId of worldIds) {
         results.set(worldId, false); // Deny access until session is ready
       }
-      return results;
+      return { results, deferred: true };
     }
 
     // Now check cache for each world locally (no DB calls needed)
@@ -763,7 +763,7 @@ export const AuthStateManager = {
       "auth",
       `[BATCH-VERIFY] Complete: ${results.size} worlds verified`,
     );
-    return results;
+    return { results, deferred: false };
   },
 
   /**

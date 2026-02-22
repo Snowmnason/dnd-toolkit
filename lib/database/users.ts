@@ -1,8 +1,7 @@
 import { RequestManager } from "../api/request-manager";
-import { getAuthProvider } from "../auth";
 import { validateUsername } from "../auth/validation";
 import { QueryCache } from "../cache";
-import { getDatabaseProvider } from "../services";
+import { getAuthProvider, getDatabaseProvider } from "../services";
 import { logger } from "../utils/logger";
 import { validateCurrentUser, validateUserForWrite } from "./common";
 

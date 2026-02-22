@@ -1,7 +1,6 @@
 import { isDevelopment } from "@/lib/config/loader";
 
-import { getAuthProvider } from "../auth";
-import { getDatabaseProvider } from "../services";
+import { getAuthProvider, getDatabaseProvider } from "../services";
 import { logger } from "../utils/logger";
 import type { User } from "./users";
 

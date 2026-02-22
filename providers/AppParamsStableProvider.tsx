@@ -275,12 +275,22 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         // Batch verify all worlds efficiently (prevents per-world refresh spam)
         // Instead of N parallel calls to verifyWorldAccessWithDatabase (which could each call
         // refreshAllWorldsCache), do ONE bulk refresh then verify all from cache
-        const accessMap = await AuthStateManager.batchVerifyWorldAccess(
+        const batchResult = await AuthStateManager.batchVerifyWorldAccess(
           cachedWorldIds,
         );
 
+        // CRITICAL: If verification was deferred (session not ready), do NOT touch the cache.
+        // The auth watcher or userId effect will trigger re-verification once session is ready.
+        if (batchResult.deferred) {
+          logger.info(
+            "context",
+            "AppParamsStableProvider: Verification deferred (session not ready), keeping cached worlds until session is available",
+          );
+          return;
+        }
+
         const verifiedWorldIds: string[] = [];
-        const results = Array.from(accessMap.entries());
+        const results = Array.from(batchResult.results.entries());
 
         for (const [worldId, hasAccess] of results) {
           if (hasAccess) {
@@ -429,8 +439,9 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
     let subscription: { unsubscribe: () => void } | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const setupAuthWatcher = async () => {
+    const setupAuthWatcher = async (attempt = 1) => {
       try {
         const { getAuthProvider } = await import("@/lib/services");
         const authProvider = await getAuthProvider();
@@ -467,11 +478,27 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         });
         subscription = { unsubscribe };
       } catch (error) {
-        logger.debug(
-          "context",
-          "AppParamsStableProvider: Error setting up auth watcher:",
-          error,
-        );
+        // Auth provider may not be registered yet during early bootstrap.
+        // Retry with exponential backoff (500ms, 1s, 2s) until services phase completes.
+        const MAX_RETRIES = 5;
+        if (attempt < MAX_RETRIES && mounted) {
+          const delayMs = Math.min(500 * Math.pow(2, attempt - 1), 4000);
+          logger.debug(
+            "context",
+            `AppParamsStableProvider: Auth provider not ready, retrying in ${delayMs}ms (attempt ${attempt}/${MAX_RETRIES})`,
+          );
+          retryTimer = setTimeout(() => {
+            if (mounted) {
+              setupAuthWatcher(attempt + 1);
+            }
+          }, delayMs);
+        } else {
+          logger.warn(
+            "context",
+            `AppParamsStableProvider: Failed to set up auth watcher after ${attempt} attempts`,
+            error,
+          );
+        }
       }
     };
 
@@ -479,6 +506,9 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false;
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+      }
       if (subscription) {
         subscription.unsubscribe();
       }
