@@ -1,5 +1,6 @@
-import { logger, supabase } from '@/lib'
-import React from 'react'
+import { logger } from '@/lib'
+// SUPABASE_AUTH: Direct auth operations — to be migrated to getAuthProvider() in Track D
+import { supabase } from '@/lib/database/supabase'
 import { Button } from 'react-native'
 
 async function onSignOutButtonPress() {

@@ -16,10 +16,12 @@
  */
 
 import { Button, ButtonText } from '@/components/ui';
-import { AuthStateManager, logger, supabase } from '@/lib';
+import { AuthStateManager, logger } from '@/lib';
+// SUPABASE_AUTH: Direct auth operations — to be migrated to getAuthProvider() in Track D
+import { supabase } from '@/lib/database/supabase';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 
 

@@ -17,21 +17,21 @@
  */
 
 import {
-  cleanupAnalyticsNetworkIntegration,
-  initializeAnalyticsNetworkIntegration,
+    cleanupAnalyticsNetworkIntegration,
+    initializeAnalyticsNetworkIntegration,
 } from "@/lib/analytics/analytics-network-integration";
 import { NetworkCascadeDetector } from "@/lib/error/network-cascade-detector";
 import type { SafeModeState } from "@/lib/error/safe-mode";
 import {
-  createSafeModeState,
-  DEFAULT_SAFE_MODE_CONFIG,
-  SafeModeLevel,
-  SafeModeReason,
+    createSafeModeState,
+    DEFAULT_SAFE_MODE_CONFIG,
+    SafeModeLevel,
+    SafeModeReason,
 } from "@/lib/error/safe-mode";
 import { getStorageDefaults } from "@/lib/kernel/storage-defaults";
 import {
-  NetworkDetection,
-  NetworkStatus,
+    NetworkDetection,
+    NetworkStatus,
 } from "@/lib/network/network-detection";
 import { validateClassifications } from "@/lib/storage/data-classification";
 import { logger } from "@/lib/utils/logger";
@@ -249,44 +249,27 @@ class AppKernelClass {
       // and the auth adapter can safely restore session tokens from storage.
       await this.runPhase("config", async () => {
         try {
-          logger.category("bootstrap").info("Initializing Supabase client...");
+          logger.category("bootstrap").info("Initializing database provider...");
 
-          const Constants = await import("expo-constants");
-          const expoExtra = Constants.default.expoConfig?.extra || {};
+          // Delegate all database bootstrap to the provider initializer:
+          // env var injection (Constants → process.env), client eager init,
+          // and DatabaseProvider registration in one idempotent call.
+          //
+          // To swap the database backend: replace the import below with a
+          // different *-initializer — no other kernel changes required.
+          const { initializeSupabaseDatabaseProvider } = await import(
+            "@/lib/services/supabase/supabase-initializer"
+          );
+          const configured = await initializeSupabaseDatabaseProvider();
 
-          // Ensure Supabase env vars are set in process.env (from Constants if needed)
-          if (!process.env.EXPO_PUBLIC_SUPABASE_URL && expoExtra.supabaseUrl) {
-            (process.env as any).EXPO_PUBLIC_SUPABASE_URL =
-              expoExtra.supabaseUrl;
+          if (configured) {
             logger
               .category("bootstrap")
-              .debug("EXPO_PUBLIC_SUPABASE_URL set from app.json extras");
-          }
-          if (
-            !process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY &&
-            expoExtra.supabaseAnonKey
-          ) {
-            (process.env as any).EXPO_PUBLIC_SUPABASE_ANON_KEY =
-              expoExtra.supabaseAnonKey;
-            logger
-              .category("bootstrap")
-              .debug("EXPO_PUBLIC_SUPABASE_ANON_KEY set from app.json extras");
-          }
-
-          // Initialize Supabase client if configured
-          // This allows the auth adapter to restore session tokens IMMEDIATELY
-          const supMod = await import("@/lib/database/supabase");
-          if (supMod.isSupabaseConfigured()) {
-            supMod.getSupabaseClient();
-            logger
-              .category("bootstrap")
-              .info(
-                "✅ Supabase client initialized - session restoration in progress",
-              );
+              .info("✅ Database provider initialized — session restoration in progress");
           } else {
             logger
               .category("bootstrap")
-              .warn("Supabase not configured - continuing with degraded auth");
+              .warn("Database not configured — continuing with degraded auth");
           }
         } catch (error) {
           logger.category("bootstrap").error("CONFIG phase failed", {
@@ -715,13 +698,13 @@ class AppKernelClass {
         try {
           const { FeatureFlagsManager } =
             await import("@/lib/feature-flags/server-sync");
-          const { getSupabaseClient, isSupabaseConfigured } =
-            await import("@/lib/database/supabase");
+          const { getDatabaseProvider } = await import("@/lib/services");
+          const { getSupabaseClient } = await import("@/lib/database/supabase");
 
-          if (!isSupabaseConfigured()) {
+          if (!getDatabaseProvider().isConfigured()) {
             logger
               .category("bootstrap")
-              .warn("Supabase not configured — skipping feature flags bootstrap");
+              .warn("Database not configured — skipping feature flags bootstrap");
           } else {
             const supClient = getSupabaseClient();
             // Try to get userId from storage (may be available from a previous session)

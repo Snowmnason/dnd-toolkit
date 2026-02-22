@@ -1,11 +1,11 @@
 import {
   deleteUserAccount,
-  isSupabaseConfigured,
   logger,
   signOutUser,
-  supabase,
   usersDB,
 } from "@/lib";
+// SUPABASE_AUTH: Direct auth operations — to be migrated to getAuthProvider() in Track D
+import { isSupabaseConfigured, supabase } from "@/lib/database/supabase";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { useRouter } from "expo-router";

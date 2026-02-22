@@ -74,3 +74,5 @@ export {
 // Supabase Database Provider Implementation
 export { SupabaseDatabaseProvider } from './supabase/supabase-database-provider';
 
+// Supabase Initializer — database bootstrap (env vars, client, provider registration)
+export { initializeSupabaseDatabaseProvider, resetSupabaseInitializer } from './supabase/supabase-initializer';

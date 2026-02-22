@@ -31,6 +31,10 @@ export async function initializeServices(): Promise<void> {
   logger.info('bootstrap', 'Initializing services...');
 
   try {
+    // Initialize database provider FIRST — entity files depend on getDatabaseProvider()
+    // This must run before auth and any other service that may trigger entity queries
+    await initializeDatabaseProvider();
+
     // Initialize auth provider (Supabase by default)
     await initializeAuthProvider();
 
@@ -47,6 +51,53 @@ export async function initializeServices(): Promise<void> {
   } catch (error) {
     logger.error('bootstrap', `Failed to initialize services: ${error}`);
     throw error;
+  }
+}
+
+/**
+ * Initialize and register the database provider
+ * Selected from config (services.database.provider), defaults to 'supabase'
+ *
+ * Switch-board function: reads config and delegates to the provider-specific initializer.
+ * Adding a new database backend = add a new case + a new *-initializer file.
+ * Mirrors the Sentry/error-tracker pattern in initializeErrorTracker().
+ */
+async function initializeDatabaseProvider(): Promise<void> {
+  try {
+    const config = getAppConfig();
+    const providerName = config.services?.database?.provider || 'supabase';
+    logger.debug('bootstrap', `Initializing database provider: ${providerName}`);
+
+    switch (providerName.toLowerCase()) {
+      case 'supabase': {
+        // Delegate to Supabase-specific init (env vars, client, provider registration)
+        // Isolated in lib/services/supabase/supabase-initializer.ts — same pattern as Sentry
+        const { initializeSupabaseDatabaseProvider } = await import('./supabase/supabase-initializer');
+        const initialized = await initializeSupabaseDatabaseProvider();
+        if (initialized) {
+          logger.info('bootstrap', '[Database] Supabase provider initialized successfully');
+        } else {
+          logger.warn('bootstrap', '[Database] Supabase not configured — using NoOpDatabaseProvider');
+        }
+        break;
+      }
+
+      default: {
+        logger.warn('bootstrap', `[Database] Unknown provider: ${providerName}. Registering NoOp fallback.`);
+        const { NoOpDatabaseProvider, registerDatabaseProvider } = await import('./database-adapter');
+        registerDatabaseProvider(new NoOpDatabaseProvider());
+        break;
+      }
+    }
+  } catch (error) {
+    logger.error('bootstrap', `[Database] Failed to initialize: ${error}`);
+    // Always leave a registered provider so the app can start in degraded mode
+    // rather than crashing with "getDatabaseProvider called before registration"
+    try {
+      const { NoOpDatabaseProvider, registerDatabaseProvider } = await import('./database-adapter');
+      registerDatabaseProvider(new NoOpDatabaseProvider());
+    } catch { /* ignore secondary failure */ }
+    // Don't re-throw — database failure shouldn't prevent auth/analytics from starting
   }
 }
 

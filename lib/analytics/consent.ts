@@ -107,9 +107,9 @@ class AnalyticsConsentManager {
       // Step 2: Try database if authenticated and cache is stale/missing
       try {
         const { userSettingsDB } = await import('@/lib/database');
-        const { isSupabaseConfigured } = await import('@/lib/database');
+        const { getDatabaseProvider } = await import('@/lib/services');
 
-        if (isSupabaseConfigured()) {
+        if (getDatabaseProvider().isConfigured()) {
           // Attempt to fetch user settings from database
           const settings = await userSettingsDB.fetchCurrentUserSettings({ forceRefresh: true });
           if (settings && settings.analytics_consent_level && this.isValidConsentLevel(settings.analytics_consent_level)) {
@@ -205,6 +205,7 @@ class AnalyticsConsentManager {
 
     // If consent was downgraded, purge all pending analytics buffers and breadcrumbs
     const CONSENT_ORDER: Record<ConsentLevel, number> = { none: 0, basic: 1, full: 2 };
+    // eslint-disable-next-line security/detect-object-injection
     if (CONSENT_ORDER[level] < CONSENT_ORDER[previousLevel]) {
       logger.category('analytics').info('consent', 'Consent downgraded — purging analytics buffers and breadcrumbs', { previousLevel, level });
       try {
