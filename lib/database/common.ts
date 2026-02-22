@@ -1,7 +1,8 @@
 import { isDevelopment } from "@/lib/config/loader";
 
+import { getAuthProvider } from "../auth";
+import { getDatabaseProvider } from "../services";
 import { logger } from "../utils/logger";
-import { supabase } from "./supabase";
 import type { User } from "./users";
 
 /**
@@ -59,10 +60,8 @@ export async function requireUserProfile(): Promise<User> {
  */
 export async function getCurrentAuthId(): Promise<string | null> {
   // Check cached session (no network call)
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  return session?.user?.id || null;
+  const session = await (await getAuthProvider()).getSession();
+  return session?.userId || null;
 }
 
 /**
@@ -89,14 +88,12 @@ export async function validateCurrentUser(): Promise<{
   auth_id: string;
   email: string;
 } | null> {
-  // This makes a network call to validate the token
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  // getUser() makes a live server round-trip to validate the JWT — not a cached read.
+  // This preserves the original supabase.auth.getUser() semantics for security-critical callers.
+  const session = await (await getAuthProvider()).getUser();
 
-  if (error || !user) {
-    logger.debug("storage", "User validation failed:", error?.message);
+  if (!session) {
+    logger.debug("storage", "User validation failed: token rejected by server");
 
     if (isDevelopment()) {
       logger.warn(
@@ -109,8 +106,8 @@ export async function validateCurrentUser(): Promise<{
   }
 
   return {
-    auth_id: user.id,
-    email: user.email || "",
+    auth_id: session.userId,
+    email: session.email || '',
   };
 }
 
@@ -147,9 +144,8 @@ export async function validateUserForWrite(): Promise<User> {
   }
 
   // Fetch full user profile from database with fresh auth
-  const { data: userProfile, error } = await supabase
-    .schema('public')
-    .from('users')
+  const { data: userProfile, error } = await getDatabaseProvider()
+    .from('users', 'public')
     .select("*")
     .eq("auth_id", validatedAuth.auth_id)
     .single();

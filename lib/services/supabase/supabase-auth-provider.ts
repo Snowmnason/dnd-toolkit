@@ -11,15 +11,15 @@
  */
 
 import {
-  AuthError,
-  AuthProvider,
-  AuthResult,
-  EmailAlreadyExistsError,
-  InvalidCredentialsError,
-  NetworkError,
-  RateLimitError,
-  Session,
-  UserNotFoundError,
+    AuthError,
+    AuthProvider,
+    AuthResult,
+    EmailAlreadyExistsError,
+    InvalidCredentialsError,
+    NetworkError,
+    RateLimitError,
+    Session,
+    UserNotFoundError,
 } from '@/lib/services/auth-provider';
 import { logger } from '@/lib/utils/logger';
 
@@ -189,6 +189,7 @@ export class SupabaseAuthProvider implements AuthProvider {
   /**
    * Get current session (if authenticated).
    * Returns null if no active session.
+   * Returns from Supabase's local cache — no network call.
    */
   async getSession(): Promise<Session | null> {
     try {
@@ -206,6 +207,35 @@ export class SupabaseAuthProvider implements AuthProvider {
       return null;
     } catch (err) {
       logger.error('auth', 'Supabase getSession exception:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Validate the current user with the server (live network call).
+   * Uses supabase.auth.getUser() which verifies the JWT server-side.
+   * Returns null if token is expired, revoked, or invalid.
+   */
+  async getUser(): Promise<Session | null> {
+    try {
+      const { data, error } = await this.supabaseClient.auth.getUser();
+
+      if (error) {
+        logger.warn('auth', 'Supabase getUser error:', error.message);
+        return null;
+      }
+
+      if (data?.user) {
+        return {
+          userId: data.user.id,
+          email: data.user.email,
+          raw: { user: data.user },
+        };
+      }
+
+      return null;
+    } catch (err) {
+      logger.error('auth', 'Supabase getUser exception:', err);
       return null;
     }
   }
@@ -307,6 +337,7 @@ export class SupabaseAuthProvider implements AuthProvider {
   private sessionFromSupabaseSession(supabaseSession: any): Session {
     return {
       userId: supabaseSession.user?.id || '',
+      email: supabaseSession.user?.email,
       accessToken: supabaseSession.access_token,
       refreshToken: supabaseSession.refresh_token,
       expiresAt: supabaseSession.expires_at

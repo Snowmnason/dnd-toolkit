@@ -1,6 +1,8 @@
 import { RequestManager } from "../api/request-manager";
+import { getAuthProvider } from "../auth";
 import { QueryCache } from "../cache";
 import { CACHE_TAGS } from "../cache/keys";
+import { getDatabaseProvider } from "../services";
 import { SecureStorage, STORAGE_KEYS } from "../storage";
 import { worldAccessCache } from "../storage/world-access-cache";
 import { logger } from "../utils/logger";
@@ -9,7 +11,6 @@ import {
   getCurrentUserProfile,
   validateUserForWrite,
 } from "./common";
-import { supabase } from "./supabase";
 
 // Access role types for better type safety and maintainability
 // 'dm' (dungeon master) is the only role with owner-level access to worlds
@@ -82,9 +83,8 @@ export const worldsDB = {
           owner_id: currentUser.id,
         };
 
-        const { data, error } = await supabase
-          .schema('worlds')
-          .from('worlds')
+        const { data, error } = await getDatabaseProvider()
+          .from('worlds', 'worlds')
           .insert(insertData)
           .select()
           .single();
@@ -211,16 +211,13 @@ export const worldsDB = {
       // Persistent storage gives us world IDs quickly, but we need DB to determine owner vs member roles
       {
         // DEBUG: Log session state and userId being used for queries
-        const { getSupabaseClient, isSupabaseConfigured } = await import("./supabase");
-        if (isSupabaseConfigured()) {
+        if (getDatabaseProvider().isConfigured()) {
           try {
-            const client = getSupabaseClient();
-            const { data: sesData } = await client.auth.getSession();
+            const session = await (await getAuthProvider()).getSession();
             logger.debug("storage", "🔍 World query debug info", {
               userId: currentUserId,
-              hasSession: !!sesData?.session,
-              sessionAuthId: sesData?.session?.user?.id,
-              sessionEmail: sesData?.session?.user?.email,
+              hasSession: !!session,
+              sessionUserId: session?.userId,
             });
           } catch (sessionCheckErr) {
             logger.warn("storage", "Failed to check session state during world query debug", sessionCheckErr);
@@ -236,18 +233,18 @@ export const worldsDB = {
             ]
           >(
             // Get world_access records where user_id matches (includes world_id and role)
-            supabase
-              .schema('worlds')
-              .from("world_access")
+            getDatabaseProvider()
+              .from("world_access", 'worlds')
               .select("world_id, user_role, permissions")
-              .eq("user_id", currentUserId),
+              .eq("user_id", currentUserId)
+              .execute(),
 
             // Get world IDs where owner_id matches
-            supabase
-              .schema('worlds')
-              .from("worlds")
+            getDatabaseProvider()
+              .from("worlds", 'worlds')
               .select("world_id")
               .eq("owner_id", currentUserId)
+              .execute()
           );
         };
 
@@ -390,14 +387,14 @@ export const worldsDB = {
     // - Use a database view that merges roles
     // - Or implement server-side cursor pagination
     const worldIds = Array.from(worldIdSet);
-    const { data: worldsData, error: worldsError } = await supabase
-      .schema('worlds')
-      .from('worlds')
+    const { data: worldsData, error: worldsError } = await getDatabaseProvider()
+      .from('worlds', 'worlds')
       .select("*")
       .in("world_id", worldIds)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
+      .range(offset, offset + limit - 1)
+      .execute();
 
     if (worldsError) {
       logger.error("storage", "Error fetching paginated worlds:", worldsError);
@@ -445,9 +442,8 @@ export const worldsDB = {
         // Validate before write
         const user = await validateUserForWrite();
 
-        const { data, error } = await supabase
-          .schema('worlds')
-          .from('worlds')
+        const { data, error } = await getDatabaseProvider()
+          .from('worlds', 'worlds')
           .update({ name: newName })
           .eq("world_id", worldId)
           .eq("owner_id", user.id)
@@ -487,9 +483,8 @@ export const worldsDB = {
         // Validate before write
         const user = await validateUserForWrite();
 
-        const { data, error } = await supabase
-          .schema('worlds')
-          .from('worlds')
+        const { data, error } = await getDatabaseProvider()
+          .from('worlds', 'worlds')
           .update(updates)
           .eq("world_id", worldId)
           .eq("owner_id", user.id)
@@ -526,12 +521,12 @@ export const worldsDB = {
         // Validate before write
         const user = await validateUserForWrite();
 
-        const { error } = await supabase
-          .schema('worlds')
-          .from('worlds')
+        const { error } = await getDatabaseProvider()
+          .from('worlds', 'worlds')
           .update({ deleted_at: new Date().toISOString() })
           .eq("world_id", worldId)
-          .eq("owner_id", user.id); // Ensure only owner can delete
+          .eq("owner_id", user.id) // Ensure only owner can delete
+          .execute();
 
         if (error) {
           logger.error("storage", "Error deleting world:", error);
@@ -565,9 +560,8 @@ export const worldsDB = {
       async () => {
         // Uses server-side function to avoid client-side DELETE policies on world_access.
         // The RPC always applies to the current authenticated user.
-        const { error } = await supabase
-          .schema('worlds')
-          .rpc("leave_world", { p_world_id: worldId });
+        const { error } = await getDatabaseProvider()
+          .rpc("leave_world", { p_world_id: worldId }, 'worlds');
 
         if (error) {
           logger.error("storage", "Error removing user from world:", error);
@@ -607,17 +601,15 @@ export const worldsDB = {
         const [worldResult, accessResult] = await executeParallelQueries<
           [{ data: any | null; error: any }, { data: any | null; error: any }]
         >(
-          supabase
-            .schema('worlds')
-            .from('worlds')
+          getDatabaseProvider()
+            .from('worlds', 'worlds')
             .select("owner_id")
             .eq("world_id", worldId)
             .eq("owner_id", userId)
             .maybeSingle(),
 
-          supabase
-            .schema('worlds')
-            .from("world_access")
+          getDatabaseProvider()
+            .from("world_access", 'worlds')
             .select("id")
             .eq("world_id", worldId)
             .eq("user_id", userId)
@@ -659,14 +651,12 @@ export const worldsDB = {
       async () => {
         // Joining via invite is enforced server-side; userId is ignored by the RPC.
         // We keep userId in the API to minimize callsite changes and for cache tagging.
-        const { data, error } = await supabase
-          .schema('worlds')
+        const { data, error } = await getDatabaseProvider()
           .rpc("join_world_with_invite", {
             p_world_id: worldId,
             p_token: inviteToken,
             p_user_role: userRole,
-          })
-          .single();
+          }, 'worlds');
 
         if (error) {
           logger.error("storage", "Error adding user to world:", error);
@@ -706,9 +696,8 @@ export const worldsDB = {
     return RequestManager.fetch(
       `world:members:${worldId}`,
       async () => {
-        const { data, error } = await supabase
-          .schema('worlds')
-          .from("world_access")
+        const { data, error } = await getDatabaseProvider()
+          .from("world_access", 'worlds')
           .select(
             `
             *,
@@ -716,7 +705,8 @@ export const worldsDB = {
           `,
           )
           .eq("world_id", worldId)
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false })
+          .execute();
 
         if (error) {
           logger.error("storage", "Error fetching world members:", error);
@@ -749,9 +739,8 @@ export const worldsDB = {
     return RequestManager.fetch(
       `world:detail:${worldId}`,
       async () => {
-        const { data, error } = await supabase
-          .schema('worlds')
-          .from('worlds')
+        const { data, error } = await getDatabaseProvider()
+          .from('worlds', 'worlds')
           .select("*")
           .eq("world_id", worldId)
           .single();

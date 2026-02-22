@@ -1,8 +1,8 @@
 import { RequestManager } from "../api/request-manager";
 import { QueryCache } from "../cache";
+import { getDatabaseProvider } from "../services";
 import { logger } from "../utils/logger";
 import { validateUserForWrite } from "./common";
-import { supabase } from "./supabase";
 
 /**
  * Database operations for invite links
@@ -39,12 +39,11 @@ export async function createInviteLink(
       hoursValid,
     });
 
-    const { data, error } = await supabase
-      .schema('worlds')
+    const { data, error } = await getDatabaseProvider()
       .rpc('create_invite_link', {
         p_world_id: worldId,
         p_hours_valid: hoursValid,
-      });
+      }, 'worlds');
 
     if (error) {
       logger.error("storage", "Failed to create invite link", error);
@@ -94,11 +93,10 @@ export async function validateInviteToken(
     const result = await RequestManager.fetch(
       `invite:validate:${token}`,
       async () => {
-        const { data, error } = await supabase
-          .schema('worlds')
+        const { data, error } = await getDatabaseProvider()
           .rpc("resolve_invite_token", {
             p_token: token,
-          });
+          }, 'worlds');
 
         if (error) {
           logger.error("storage", "Invalid invite token", error);
@@ -166,11 +164,10 @@ export async function deleteInviteLink(
   try {
     logger.info("storage", `Deleting invite link: ${token}`);
 
-    const { error } = await supabase
-      .schema('worlds')
+    const { error } = await getDatabaseProvider()
       .rpc('delete_invite_link', {
         p_token: token,
-      });
+      }, 'worlds');
 
     if (error) {
       logger.error("storage", "Failed to delete invite link", error);
@@ -202,13 +199,13 @@ export async function getWorldInviteLinks(
     const data = await RequestManager.fetch(
       `invites:world:${worldId}`,
       async () => {
-        const { data, error } = await supabase
-          .schema('worlds')
-          .from('invite_links')
+        const { data, error } = await getDatabaseProvider()
+          .from('invite_links', 'worlds')
           .select("*")
           .eq("world_id", worldId)
           .gt("expires_at", new Date().toISOString())
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false })
+          .execute();
 
         if (error) {
           logger.error("storage", "Failed to fetch invite links", error);

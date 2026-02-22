@@ -1,9 +1,10 @@
 import { RequestManager } from "../api/request-manager";
+import { getAuthProvider } from "../auth";
 import { validateUsername } from "../auth/validation";
 import { QueryCache } from "../cache";
+import { getDatabaseProvider } from "../services";
 import { logger } from "../utils/logger";
 import { validateCurrentUser, validateUserForWrite } from "./common";
-import { supabase } from "./supabase";
 
 export interface User {
   id: string;
@@ -66,9 +67,8 @@ export const usersDB = {
         // Note: display_name removed from schema
         logger.debug("storage", "Inserting user data into database:", userData);
 
-        const { data, error } = await supabase
-          .schema('public')
-          .from('users')
+        const { data, error } = await getDatabaseProvider()
+          .from('users', 'public')
           .insert(userData)
           .select()
           .single();
@@ -173,29 +173,26 @@ export const usersDB = {
     }
 
     // Fetch from database
-    const {
-      data: { session },
-      error: authError,
-    } = await supabase.auth.getSession();
+    let session;
+    try {
+      const authProv = await getAuthProvider();
+      session = await authProv.getSession();
+    } catch (authError: any) {
+      logger.error("storage", "Auth error in getCurrentUser:", authError);
+      throw new Error(authError?.message || "Authentication error");
+    }
 
     logger.debug("storage", "Auth session check result:", {
       hasSession: !!session,
-      userId: session?.user?.id,
-      authError: authError?.message,
+      userId: session?.userId,
     });
 
-    if (authError) {
-      logger.error("storage", "Auth error in getCurrentUser:", authError);
-      throw new Error(authError.message || "Authentication error");
-    }
-
-    if (!session?.user) {
+    if (!session?.userId) {
       logger.debug("storage", "No authenticated user found (no session)");
       return null;
     }
 
-    const authUser = session.user;
-    const authId = authUser.id;
+    const authId = session.userId;
 
     logger.debug(
       "storage",
@@ -207,9 +204,8 @@ export const usersDB = {
     const data = await RequestManager.fetch(
       `user:profile:${authId}`,
       async () => {
-        const { data, error } = await supabase
-          .schema('public')
-          .from('users')
+        const { data, error } = await getDatabaseProvider()
+          .from('users', 'public')
           .select("*")
           .eq("auth_id", authId)
           .single();
@@ -310,9 +306,8 @@ export const usersDB = {
 
         // Note: display_name removed from schema
 
-        const { data, error } = await supabase
-          .schema('public')
-          .from('users')
+        const { data, error } = await getDatabaseProvider()
+          .from('users', 'public')
           .update(updates)
           .eq("auth_id", authUser.id)
           .select()
@@ -358,9 +353,12 @@ export const usersDB = {
         const user = await validateCurrentUser();
         if (!user) throw new Error("Not authenticated");
 
-        // call your Edge Function by name (no URL needed, no body needed)
-        const { data, error: fnError } =
-          await supabase.functions.invoke("delete-account");
+        // EDGE_FUNCTION: functions.invoke() is Supabase-specific and intentionally out of scope
+        // for the DatabaseProvider abstraction. getRawClient() provides the escape hatch to reach
+        // Supabase-only APIs (edge functions, realtime) without re-importing the SDK directly.
+        const rawClient = getDatabaseProvider().getRawClient?.();
+        if (!rawClient) throw new Error("Edge function calls require a configured Supabase client");
+        const { data, error: fnError } = await rawClient.functions.invoke("delete-account");
         if (fnError)
           throw new Error(fnError.message || "Failed to delete account");
         logger.debug("storage", "Account deletion function response:", data);

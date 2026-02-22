@@ -108,6 +108,16 @@ class SupabaseQueryBuilder implements QueryBuilder {
     return this;
   }
 
+  or(filter: string): QueryBuilder {
+    this.pending.filters.push({ type: 'or', args: [filter] });
+    return this;
+  }
+
+  not(column: string, operator: string, value: any): QueryBuilder {
+    this.pending.filters.push({ type: 'not', args: [column, operator, value] });
+    return this;
+  }
+
   order(column: string, options?: { ascending?: boolean }): QueryBuilder {
     this.pending.operations.push({
       type: 'order',
@@ -121,58 +131,22 @@ class SupabaseQueryBuilder implements QueryBuilder {
     return this;
   }
 
+  range(from: number, to: number): QueryBuilder {
+    this.pending.operations.push({ type: 'range', args: [from, to] });
+    return this;
+  }
+
   async single(): Promise<QueryResult> {
-    const result = await this.executeInternal();
-    if (result.error) return result;
-
-    // Validate single row expectation
-    if (!result.data) {
-      return {
-        data: null,
-        error: {
-          message: 'No rows returned',
-          code: 'PGRST116',
-          details: 'Call to single() did not return exactly one row',
-        },
-      };
-    }
-
-    if (Array.isArray(result.data) && result.data.length !== 1) {
-      return {
-        data: null,
-        error: {
-          message: `Expected exactly one row, got ${Array.isArray(result.data) ? result.data.length : 'unexpected'}`,
-          code: 'PGRST116',
-          details: 'single() requires exactly one matching row',
-        },
-      };
-    }
-
-    return result;
+    // Delegate to Supabase's native .single() so it sends the correct
+    // Accept: application/vnd.pgrst.object+json header and handles PGRST116
+    // (0 or >1 rows) natively at the API level.
+    return this.executeInternal('single');
   }
 
   async maybeSingle(): Promise<QueryResult> {
-    const result = await this.executeInternal();
-    if (result.error) return result;
-
-    // Allow 0 or 1 rows
-    if (Array.isArray(result.data) && result.data.length > 1) {
-      return {
-        data: null,
-        error: {
-          message: `Expected at most one row, got ${result.data.length}`,
-          code: 'PGRST116',
-          details: 'maybeSingle() allows 0 or 1 rows, not more',
-        },
-      };
-    }
-
-    // Convert single-element array to object, or keep null
-    if (Array.isArray(result.data) && result.data.length === 1) {
-      return { data: result.data[0], error: null };
-    }
-
-    return result;
+    // Delegate to Supabase's native .maybeSingle() — returns null for 0 rows,
+    // errors on >1 row natively.
+    return this.executeInternal('maybeSingle');
   }
 
   async execute(): Promise<QueryResult> {
@@ -180,16 +154,23 @@ class SupabaseQueryBuilder implements QueryBuilder {
   }
 
   /**
-   * Build and execute the query against Supabase
+   * Build and execute the query against Supabase.
+   *
+   * @param terminator - Optional row-count enforcer applied as the final
+   *   step of the Supabase chain. Passing 'single' or 'maybeSingle' lets the
+   *   Supabase SDK (PostgREST) handle PGRST116 errors natively rather than
+   *   re-implementing the logic in JS.
    */
-  private async executeInternal(): Promise<QueryResult> {
+  private async executeInternal(
+    terminator?: 'single' | 'maybeSingle'
+  ): Promise<QueryResult> {
     try {
       // Start with schema and table
       let query = this.supabaseClient
         .schema(this.pending.schema)
         .from(this.pending.table);
 
-      // Apply operations (select, insert, update, delete)
+      // Apply DML / column-selection operations (select, insert, update, delete)
       for (const op of this.pending.operations) {
         if (op.type === 'select') {
           query = query.select(op.args[0]);
@@ -203,10 +184,12 @@ class SupabaseQueryBuilder implements QueryBuilder {
           query = query.order(op.args[0], op.args[1]);
         } else if (op.type === 'limit') {
           query = query.limit(op.args[0]);
+        } else if (op.type === 'range') {
+          query = query.range(op.args[0], op.args[1]);
         }
       }
 
-      // Apply filters
+      // Apply filters (WHERE clauses)
       for (const filter of this.pending.filters) {
         if (filter.type === 'eq') {
           query = query.eq(filter.args[0], filter.args[1]);
@@ -224,11 +207,23 @@ class SupabaseQueryBuilder implements QueryBuilder {
           query = query.in(filter.args[0], filter.args[1]);
         } else if (filter.type === 'is') {
           query = query.is(filter.args[0], filter.args[1]);
+        } else if (filter.type === 'or') {
+          // `or` and `not` are not on Supabase's static chain type at this point
+          // because TypeScript loses the overloaded return type after chaining.
+          // Both methods exist at runtime; the cast is safe and contained here.
+          query = (query as any).or(filter.args[0]);
+        } else if (filter.type === 'not') {
+          query = (query as any).not(filter.args[0], filter.args[1], filter.args[2]);
         }
       }
 
-      // Execute and return normalized response
-      const { data, error } = await query;
+      // Apply row-count terminator LAST so Supabase handles it natively
+      const { data, error } =
+        terminator === 'single'
+          ? await query.single()
+          : terminator === 'maybeSingle'
+            ? await query.maybeSingle()
+            : await query;
 
       if (error) {
         return {
@@ -277,7 +272,6 @@ class SupabaseQueryBuilder implements QueryBuilder {
 export class SupabaseDatabaseProvider implements DatabaseProvider {
   readonly name = 'Supabase';
   private supabaseClient: any;
-  private cachedConfigured: boolean | null = null;
 
   constructor(supabaseClient: any) {
     this.supabaseClient = supabaseClient;
@@ -326,15 +320,11 @@ export class SupabaseDatabaseProvider implements DatabaseProvider {
   }
 
   isConfigured(): boolean {
-    // Check if client is initialized and has auth/rest methods
-    if (this.cachedConfigured === null) {
-      this.cachedConfigured = !!(
-        this.supabaseClient &&
-        typeof this.supabaseClient.from === 'function' &&
-        typeof this.supabaseClient.rpc === 'function'
-      );
-    }
-    return this.cachedConfigured;
+    return !!(
+      this.supabaseClient &&
+      typeof this.supabaseClient.from === 'function' &&
+      typeof this.supabaseClient.rpc === 'function'
+    );
   }
 
   getRawClient(): any {

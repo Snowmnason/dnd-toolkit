@@ -25,6 +25,11 @@ export function createMockAuthProvider(overrides?: Partial<AuthProvider>): AuthP
       return { userId: 'user:test', accessToken: 'tok' };
     },
 
+    async getUser(): Promise<Session | null> {
+      // Mock: same as getSession (no real server round-trip in tests)
+      return { userId: 'user:test', accessToken: 'tok' };
+    },
+
     onAuthStateChange(callback: (session: Session | null) => void): () => void {
       // no-op: fire nothing
       return () => {};

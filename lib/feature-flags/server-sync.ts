@@ -29,8 +29,8 @@ import { logger } from "@/lib/utils/logger";
 
 // Relative module imports (local)
 import {
-  evaluateAdvancedCondition,
-  validateAdvancedCondition,
+    evaluateAdvancedCondition,
+    validateAdvancedCondition,
 } from "./advanced-conditions";
 import { FlagEvaluationCache } from "./cache";
 import { isUserInCohort } from "./cohorts";
@@ -1738,7 +1738,6 @@ class FeatureFlagsManagerClass {
 
         // Fetch fresh to verify
         const entitlements = await fetchEntitlementsByUserId(
-          this.supabaseClient,
           userId,
         );
         const fresh = entitlements.find((e) => e.key === name);
@@ -1790,12 +1789,7 @@ class FeatureFlagsManagerClass {
 
     // No cache: try fresh query
     try {
-      if (!this.supabaseClient) {
-        throw new Error("Supabase client not initialized");
-      }
-
       const entitlements = await fetchEntitlementsByUserId(
-        this.supabaseClient,
         userId,
       );
       const entitlement = entitlements.find((e) => e.key === name);

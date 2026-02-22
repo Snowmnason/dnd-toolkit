@@ -131,6 +131,20 @@ export interface QueryBuilder {
   is(column: string, value: null | boolean): QueryBuilder;
 
   /**
+   * Apply a raw PostgREST OR filter
+   * @param filter - PostgREST filter string, e.g. "col1.is.null,col2.gt.value"
+   */
+  or(filter: string): QueryBuilder;
+
+  /**
+   * Negate a filter condition
+   * @param column - Column name
+   * @param operator - PostgREST operator string, e.g. "is", "eq", "gt"
+   * @param value - Value to filter against
+   */
+  not(column: string, operator: string, value: any): QueryBuilder;
+
+  /**
    * Order results
    * @param column - Column name to order by
    * @param options - { ascending?: boolean } (default: ascending = true)
@@ -142,6 +156,13 @@ export interface QueryBuilder {
    * @param count - Number of rows to return
    */
   limit(count: number): QueryBuilder;
+
+  /**
+   * Paginate results by row index range (inclusive on both ends)
+   * @param from - Start index (0-based)
+   * @param to - End index (inclusive)
+   */
+  range(from: number, to: number): QueryBuilder;
 
   /**
    * Execute and return exactly one row (throws if 0 or >1 rows)
@@ -199,8 +220,9 @@ export interface DatabaseProvider {
   readonly name: string;
 
   /**
-   * Optional: Get the raw client for edge cases (e.g., Supabase functions)
-   * @deprecated Prefer using DatabaseProvider methods. Only use for Supabase-specific edge functions.
+   * Optional: Get the raw client for edge cases (e.g., Supabase functions).
+   * This is the intended escape hatch for provider-specific APIs that cannot
+   * be abstracted (e.g., Supabase edge functions, realtime subscriptions).
    */
   getRawClient?(): any;
 }
@@ -219,7 +241,7 @@ export class NoOpDatabaseProvider implements DatabaseProvider {
         `DatabaseProvider not registered. This usually means the app is running ` +
         `without database credentials or initialization failed. Check Supabase config.`
     );
-    logger.category('api').error(error.message);
+    logger.category('storage').error(error.message);
     throw error;
   }
 
@@ -246,21 +268,23 @@ export class NoOpDatabaseProvider implements DatabaseProvider {
  */
 let registeredProvider: DatabaseProvider | null = null;
 const noOpProvider = new NoOpDatabaseProvider();
+let hasWarnedNotRegistered = false;
 
 /**
  * Get the current database provider
- * Returns NoOp if no provider has been registered
+ * Returns NoOp if no provider has been registered.
  *
- * Safe to call before app fully boots; will throw clear error if query attempted
- * before registration.
+ * Safe to call before app fully boots; will throw a clear error if a query is
+ * attempted before registration. Logs a single dev-only warning the first time.
  */
 export function getDatabaseProvider(): DatabaseProvider {
   if (!registeredProvider) {
-    if (process.env.NODE_ENV === 'development') {
-      console.warn(
+    if (!hasWarnedNotRegistered) {
+      hasWarnedNotRegistered = true;
+      logger.category('storage').warn(
         '[Database] getDatabaseProvider() called before registerDatabaseProvider(). ' +
-          'Returning NoOp provider which will throw on query attempts. ' +
-          'Ensure DatabaseProvider is registered in service-initializer before any entity queries run.'
+          'Returning NoOp provider — queries will throw until a provider is registered. ' +
+          'Ensure DatabaseProvider is registered in service-initializer before entity queries run.'
       );
     }
     return noOpProvider;
@@ -276,8 +300,9 @@ export function getDatabaseProvider(): DatabaseProvider {
  */
 export function registerDatabaseProvider(provider: DatabaseProvider): void {
   registeredProvider = provider;
+  hasWarnedNotRegistered = false; // reset so re-registration warnings work cleanly
   logger
-    .category('api')
+    .category('storage')
     .info(`Database provider registered: ${provider.name}`);
 }
 
@@ -287,4 +312,5 @@ export function registerDatabaseProvider(provider: DatabaseProvider): void {
  */
 export function resetDatabaseProvider(): void {
   registeredProvider = null;
+  hasWarnedNotRegistered = false;
 }

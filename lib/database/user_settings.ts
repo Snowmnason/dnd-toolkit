@@ -1,7 +1,7 @@
 import { RequestManager } from "../api/request-manager";
+import { getDatabaseProvider } from "../services";
 import { logger } from "../utils/logger";
 import { getCurrentUserProfile, validateUserForWrite } from "./common";
-import { supabase } from "./supabase";
 
 export interface UserSettings {
   user_id: string;
@@ -80,9 +80,8 @@ export const userSettingsDB = {
     const data = await RequestManager.fetch(
       `user:settings:${currentUser.id}`,
       async () => {
-        const { data, error } = await supabase
-          .schema('public')
-          .from('user_settings')
+        const { data, error } = await getDatabaseProvider()
+          .from('user_settings', 'public')
           .select("*")
           .eq("user_id", currentUser.id)
           .single();
@@ -185,9 +184,8 @@ export const userSettingsDB = {
           newLevel: level,
         });
 
-        const { data, error } = await supabase
-          .schema('public')
-          .from('user_settings')
+        const { data, error } = await getDatabaseProvider()
+          .from('user_settings', 'public')
           .update({ analytics_consent_level: level })
           .eq('user_id', currentUser.id)
           .select('analytics_consent_level')
