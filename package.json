@@ -1,7 +1,7 @@
 {
   "name": "dnd-toolkit",
   "main": "index.tsx",
-  "version": "1.57.35",
+  "version": "1.57.36",
   "homepage": "https://dnd-tool.thesnowpost.com/",
   "scripts": {
     "start": "expo start",
