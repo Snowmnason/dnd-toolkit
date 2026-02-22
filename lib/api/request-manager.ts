@@ -833,7 +833,7 @@ class RequestManagerClass {
         // not the current request's startedAt, ensuring accurate duration for deduplicated requests
         return deduplicatedPromise.catch((error) => {
           logger.error("api", "Deduplicated request failed:", { key: enrichedKey, error });
-          this.reportErrorToSentry(error, { key: enrichedKey, options: options_ });
+          this.reportErrorToTracker(error, { key: enrichedKey, options: options_ });
 
           if (options_.failOpen) {
             logger.warn(
@@ -1254,8 +1254,8 @@ class RequestManagerClass {
     } catch (error) {
       logger.error("request-manager", "Request failed:", { key: enrichedKey, error });
 
-      // ========== SENTRY REPORTING ==========
-      this.reportErrorToSentry(error, { key: enrichedKey, options: options_ });
+      // ========== ERROR TRACKER REPORTING ==========
+      this.reportErrorToTracker(error, { key: enrichedKey, options: options_ });
 
       // Tracking for thrown path (in case promise creation failed early)
       const duration_ms = Date.now() - startedAt;
@@ -1709,7 +1709,7 @@ class RequestManagerClass {
    * @param error - The error that occurred
    * @param context - Context about the request
    */
-  private reportErrorToSentry(
+  private reportErrorToTracker(
     error: unknown,
     context: {
       key: string;

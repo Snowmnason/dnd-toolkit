@@ -212,6 +212,23 @@ export interface AppSettings {
       };
     } & Record<string, any> // Allow additional properties for specific flags
   >;
+  services?: {
+    auth?: {
+      provider?: string; // 'supabase' (default) | future providers
+      enabled?: boolean;
+      description?: string;
+    };
+    analytics?: {
+      provider?: string; // 'sentry' (default) | future providers
+      enabled?: boolean;
+      description?: string;
+    };
+    errorProvider?: {
+      provider?: string; // 'sentry' (default) | future providers
+      enabled?: boolean;
+      description?: string;
+    };
+  };
   platforms?: {
     web?: Partial<AppSettings>;
     ios?: Partial<AppSettings>;

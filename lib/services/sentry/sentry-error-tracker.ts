@@ -2,7 +2,8 @@
  * Sentry Error Tracker Implementation
  *
  * Implements ErrorTrackerProvider interface for Sentry error tracking.
- * This is the ONLY file outside of app initialization that imports from @sentry/react-native.
+ * All Sentry SDK call sites are isolated to lib/services/sentry/ — see also
+ * sentry-adapter.ts (breadcrumbs) and service-initializer.ts (SDK init).
  *
  * All direct Sentry SDK calls are isolated here. Callers use the provider interface
  * and never import Sentry directly.
@@ -32,13 +33,16 @@ import {
 function isSentryEnabled(): boolean {
   try {
     const config = getAppConfig();
-    // Check sentryEnabled feature flag first - this is the primary control
+
+    // Primary control: feature flag
     if (!config.features?.sentryEnabled) return false;
 
+    // Also respect the central services config if present
+    const errorServiceEnabled = config.services?.errorProvider?.enabled;
+    if (typeof errorServiceEnabled === 'boolean' && !errorServiceEnabled) return false;
+
     // Check for valid DSN
-    const dsn =
-      process.env.EXPO_PUBLIC_SENTRY_DSN ||
-      Constants.expoConfig?.extra?.sentryDsn;
+    const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN || Constants.expoConfig?.extra?.sentryDsn;
     return !!dsn;
   } catch {
     return false;

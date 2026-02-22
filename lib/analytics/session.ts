@@ -3,7 +3,6 @@
  * Tracks user sessions, duration, and engagement metrics
  */
 
-import Constants from 'expo-constants';
 import { getAppConfig } from '../config/loader';
 import { getErrorTracker } from '../services';
 import { logger } from '../utils/logger';
@@ -120,9 +119,8 @@ class SessionManager {
    */
   private trackEvent(event: string, data?: Record<string, any>): void {
     try {
-      const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN || Constants.expoConfig?.extra?.sentryDsn;
       const perfFlag = getAppConfig().features?.performanceMonitoring;
-      if (!dsn || !perfFlag) return;
+      if (!getErrorTracker().isEnabled() || !perfFlag) return;
 
       // Session lifecycle events are usage-level data (behavioral: when sessions start/end)
       // Require 'full' consent before sending to error tracker

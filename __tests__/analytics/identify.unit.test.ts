@@ -1,23 +1,30 @@
 /* eslint-disable import/first */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@sentry/react-native', () => ({ setUser: vi.fn() }));
+const mockSetUser = vi.fn();
+const mockTracker = {
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
+  addBreadcrumb: vi.fn(),
+  setUser: mockSetUser,
+  isEnabled: vi.fn().mockReturnValue(true),
+};
 
-// Ensure getAppConfig reports Sentry enabled for the test environment
-vi.mock('@/lib/config/loader', () => ({ getAppConfig: () => ({ features: { sentryEnabled: true } }) }));
+vi.mock('@/lib/services', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/services')>();
+  return { ...actual, getErrorTracker: () => mockTracker };
+});
 
-// Ensure isSentryEnabled() sees a DSN during tests so Sentry calls run
-process.env.EXPO_PUBLIC_SENTRY_DSN = 'https://examplePublicKey@o0.ingest.sentry.io/0';
+vi.mock('@/lib/config/loader', () => ({ getAppConfig: () => ({ features: { sentryEnabled: true } }), isDevelopment: () => false }));
 
 import { Analytics } from '@/lib/analytics';
 import { AnalyticsConsent } from '@/lib/analytics/consent';
-import * as Sentry from '@sentry/react-native';
 
 beforeEach(async () => {
   // Reset consent to default (basic) before each test
   AnalyticsConsent.resetToDefault?.();
   // Clear mock
-  (Sentry.setUser as any).mockClear();
+  mockSetUser.mockClear();
 });
 
 describe('Analytics.identify consent behavior', () => {
@@ -26,16 +33,16 @@ describe('Analytics.identify consent behavior', () => {
 
     await AnalyticsConsent.setLevel('none');
     Analytics.identify(user);
-    expect(Sentry.setUser).toHaveBeenCalledWith(null);
+    expect(mockSetUser).toHaveBeenCalledWith(null);
 
-    (Sentry.setUser as any).mockClear();
+    mockSetUser.mockClear();
     await AnalyticsConsent.setLevel('basic');
     Analytics.identify(user);
-    expect(Sentry.setUser).toHaveBeenCalledWith(null);
+    expect(mockSetUser).toHaveBeenCalledWith(null);
 
-    (Sentry.setUser as any).mockClear();
+    mockSetUser.mockClear();
     await AnalyticsConsent.setLevel('full');
     Analytics.identify(user);
-    expect(Sentry.setUser).toHaveBeenCalledWith({ id: 'u1', username: 'bob' });
+    expect(mockSetUser).toHaveBeenCalledWith({ id: 'u1', username: 'bob' });
   });
 });

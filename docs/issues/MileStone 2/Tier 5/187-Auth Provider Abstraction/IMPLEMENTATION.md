@@ -482,7 +482,8 @@ export async function initializeServices(): Promise<void> {
 // lib/services/service-initializer.ts
 
 export async function initializeServices(config: AppConfig): Promise<void> {
-  const providerType = config.auth?.provider || 'supabase';
+  const authService = config.services?.auth;
+  const providerType = authService?.provider || 'supabase';
 
   switch (providerType) {
     case 'supabase':
@@ -496,7 +497,7 @@ export async function initializeServices(config: AppConfig): Promise<void> {
       break;
 
     case 'custom':
-      const customProvider = await createCustomProvider(config.auth.providerConfig);
+      const customProvider = await createCustomProvider(authService?.providerConfig);
       registerAuthProvider(customProvider);
       break;
 

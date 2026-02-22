@@ -355,7 +355,7 @@ export async function initializeServices() {
   registerAuthProvider(new SupabaseAuthProvider(supabaseClient));
   
   // Future: conditional registration based on config
-  // if (config.auth.provider === 'firebase') {
+  // if (config.services?.auth?.provider === 'firebase') {
   //   registerAuthProvider(new FirebaseAuthProvider());
   // }
 }

@@ -7,15 +7,12 @@ import { useSplashScreen } from "@/hooks/ui";
 import { NotificationProvider } from "@/hooks/utils";
 import {
   Analytics,
-  APP_VERSION,
   AppErrorBoundary,
   AppKernel,
   AppKernelProvider,
   buildNavigationTarget,
   executeRecoveryAction,
-  getAppConfig,
   getRouteConfig,
-  lazyLoadInBackground,
   logger,
   resolveBackTarget,
   resolveTitle,
@@ -28,7 +25,6 @@ import { AppToastProvider } from "@/lib/toast/app-toast-context";
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ThemeProvider, UseTheme } from "@/providers/ThemeProvider";
-import Constants from "expo-constants";
 import {
   Stack,
   useLocalSearchParams,
@@ -58,20 +54,6 @@ import {
 } from "../providers/AppParamsVolatileProvider";
 import { PlatformProvider, usePlatform } from "../providers/PlatformProvider";
 
-// Check if Sentry is enabled via feature flag
-const config = getAppConfig();
-const isSentryEnabled = config.features?.sentryEnabled ?? false;
-
-// Get Sentry DSN from environment variables
-const sentryDsn =
-  process.env.EXPO_PUBLIC_SENTRY_DSN || Constants.expoConfig?.extra?.sentryDsn;
-
-// Get environment from Expo config or default to development/production
-const environment =
-  process.env.EXPO_PUBLIC_ENVIRONMENT ||
-  Constants.expoConfig?.extra?.environment ||
-  "production";
-
 // Suppress known benign warning from React Navigation / Expo Router
 // "Blocked aria-hidden on an element because its descendant retained focus"
 // This is a focus management timing issue in the navigation library and doesn't affect functionality
@@ -92,51 +74,6 @@ if (typeof window !== "undefined") {
     }
     originalWarn(...args);
   };
-}
-
-const isDev = environment === "development";
-
-// Lazy initialize Sentry only if enabled via feature flag AND DSN is provided
-if (isSentryEnabled && sentryDsn) {
-  lazyLoadInBackground(async () => {
-    const Sentry = await import("@sentry/react-native");
-    Sentry.init({
-      dsn: sentryDsn,
-      environment,
-      release: `dnd-toolkit@${APP_VERSION}`,
-      debug: isDev,
-      sampleRate: isDev ? 1.0 : 0.1,
-      sendDefaultPii: true,
-      enableLogs: isDev,
-      beforeSend: (event) => {
-        if (isDev) {
-          if (
-            event.exception?.values?.[0]?.value?.includes(
-              "Network request failed",
-            )
-          ) {
-            return null;
-          }
-          if (event.exception?.values?.[0]?.value?.includes("Loading chunk")) {
-            return null;
-          }
-        }
-        return event;
-      },
-    });
-    logger.info("[Sentry] Initialized in background");
-    return Sentry;
-  }, "Sentry").catch((error) => {
-    logger.warn("[Sentry] Failed to initialize:", error);
-  });
-} else {
-  if (!isSentryEnabled) {
-    logger.info(
-      "[Sentry] Disabled via feature flag (sentryEnabled=false) - not loading",
-    );
-  } else if (!sentryDsn) {
-    logger.info("[Sentry] Disabled - no DSN provided");
-  }
 }
 
 function RootLayoutContent() {
