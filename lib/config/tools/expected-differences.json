@@ -79,7 +79,7 @@
   ,"analytics.exporters.description": "Exporter enable/disable settings may differ between dev and production (feature flag control)"
   ,"analytics.exporters.sentry.description": "Sentry exporter enable/disable description differs (dev: enabled for testing; prod: standard)"
   ,"analytics.performanceBaseline.description": "Performance baseline tracking description differs: dev uses verbose explanation for testing; prod uses concise operational details"
-  ,"auth.description": "Auth provider description differs between dev and production (dev: mentions mock option for testing; prod: recommends supabase for production)"
+  ,"services.auth.description": "Auth provider description differs between dev and production (dev: mentions mock option for testing; prod: recommends supabase for production)"
   ,"network.debounceStatusChangeMs": "Debounce delay for network status changes; dev uses a lower value (100ms) for faster testing, production defaults to 500ms to coalesce flaps and avoid churn"
   ,"network.adaptivePayload.compressionEnabled": "Compression is disabled in dev for easier debugging of payloads; enabled in production for performance"
   ,"network.adaptivePayload.compressionThresholdKb": "Compression threshold is lower in dev (1KB) for easier testing; higher in production (5KB) to avoid compressing small payloads"

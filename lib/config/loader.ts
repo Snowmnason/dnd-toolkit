@@ -32,7 +32,6 @@ export interface AppSettings {
     devBypass: boolean;
     mockData: boolean;
     performanceMonitoring: boolean;
-    sentryEnabled: boolean;
   };
   overrides: {
     mockSupabase: boolean;
@@ -212,6 +211,23 @@ export interface AppSettings {
       };
     } & Record<string, any> // Allow additional properties for specific flags
   >;
+  services?: {
+    auth?: {
+      provider?: string; // 'supabase' (default) | future providers
+      enabled?: boolean;
+      description?: string;
+    };
+    analytics?: {
+      provider?: string; // 'sentry' (default) | future providers
+      enabled?: boolean;
+      description?: string;
+    };
+    errorProvider?: {
+      provider?: string; // 'sentry' (default) | future providers
+      enabled?: boolean;
+      description?: string;
+    };
+  };
   platforms?: {
     web?: Partial<AppSettings>;
     ios?: Partial<AppSettings>;
@@ -404,7 +420,25 @@ export function getAppConfig(): AppSettings {
  * Useful for compile-time guards.
  */
 export function isDevelopment(): boolean {
-  return process.env.EXPO_PUBLIC_ENVIRONMENT === "development";
+  // Prefer build-time bundler flag when available (React Native/Expo):
+  // `__DEV__` is set in development builds by Metro/Expo bundler. Use it
+  // to surface dev-only warnings even when EXPO_PUBLIC_ENVIRONMENT isn't set.
+  // Fallbacks:
+  //  - EXPO_PUBLIC_ENVIRONMENT env var
+  //  - already-loaded cached config (if getAppConfig() was called)
+  // This makes the helper robust for both dev builds and dev-config scenarios.
+  try {
+    const devFlag = (typeof (global as any).__DEV__ !== "undefined" && (global as any).__DEV__ === true) ||
+      (typeof __DEV__ !== "undefined" && __DEV__ === true);
+    if (devFlag) return true;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (e) {
+    // ignore - globals might not be available in some test environments
+  }
+
+  if (process.env.EXPO_PUBLIC_ENVIRONMENT === "development") return true;
+  if (cachedConfig && cachedConfig.environment === "development") return true;
+  return false;
 }
 
 /**

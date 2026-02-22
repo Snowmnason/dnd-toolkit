@@ -1,8 +1,8 @@
-import * as Sentry from '@sentry/react-native';
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { AnalyticsConsent } from '../analytics/consent';
 import { getCrashReportPayload } from '../analytics/consent-error-payload';
 import { sessionManager } from '../analytics/session';
+import { getErrorTracker } from '../services';
 import { logger } from '../utils/logger';
 
 interface Props {
@@ -19,7 +19,7 @@ interface State {
  * Global Error Boundary Component
  *
  * Catches unhandled errors in the React component tree
- * Logs errors to console and Sentry
+ * Logs errors to console and error tracking service
  * Displays a user-friendly crash fallback screen via renderFallback prop
  */
 export class AppErrorBoundary extends Component<Props, State> {
@@ -41,7 +41,7 @@ export class AppErrorBoundary extends Component<Props, State> {
       logger.warn('ui', 'Could not track error in session:', sessionError);
     }
 
-    // Send to Sentry crash reporting service
+    // Send to error tracking service
     try {
       const captureOptions = getCrashReportPayload(
         error,
@@ -49,14 +49,14 @@ export class AppErrorBoundary extends Component<Props, State> {
         AnalyticsConsent.getLevel()
       );
       if (captureOptions !== null) {
-        Sentry.captureException(error, captureOptions);
+        getErrorTracker().captureException(error, captureOptions);
       } else {
-        logger.warn('ui', 'Error not sent to Sentry (consent=none; awaiting user opt-in via dialog)');
+        logger.warn('ui', 'Error not sent to error tracker (consent=none; awaiting user opt-in via dialog)');
         // TODO: Show crash consent dialog here (out of scope Phase 1)
       }
-    } catch (sentryError) {
-      // Sentry might not be available (e.g., on web in some cases)
-      logger.warn('ui', 'Could not send error to Sentry:', sentryError);
+    } catch (trackerError) {
+      // Error tracker might not be available (e.g., on web in some cases)
+      logger.warn('ui', 'Could not send error to error tracker:', trackerError);
     }
   }
 

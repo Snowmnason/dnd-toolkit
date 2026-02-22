@@ -146,7 +146,7 @@ if (isSyncDisabled) {
 
 ### Tiered Error Reporting
 
-Error reporting respects user consent levels with tiered payload scoping. Integrated with Sentry for crash reporting and API error tracking.
+Error reporting respects user consent levels with tiered payload scoping. Integrated with error tracking providers for crash reporting and API error tracking.
 
 #### Consent-Based Payload Scoping
 
@@ -154,27 +154,28 @@ Error reporting respects user consent levels with tiered payload scoping. Integr
 - **`basic`**: Minimal payload (error type, message, stack trace, app version) - no component stack, user context, or breadcrumbs
 - **`full`**: Full payload (includes component stack, user context, breadcrumbs, device info)
 
-#### `getCrashReportPayload(error: Error, componentStack?: string, consent: ConsentLevel): SentryCaptureOptions | null`
+#### `getCrashReportPayload(error: Error, componentStack?: string, consent: ConsentLevel): ErrorCaptureOptions | null`
 
-Builds consent-appropriate Sentry capture options. Returns `null` for `none` consent (no send).
+Builds consent-appropriate error capture options for the ErrorTrackerProvider. Returns `null` for `none` consent (no send).
 
 **Parameters:**
 - `error`: The Error object to report
 - `componentStack?`: React component stack (for render errors)
 - `consent`: Current analytics consent level
 
-**Returns:** Sentry capture options or `null` if reporting disabled
+**Returns:** Error capture options or `null` if reporting disabled
 
 **Example:**
 ```typescript
 import { getCrashReportPayload, AnalyticsConsent } from "@/lib/analytics";
+import { getErrorTracker } from "@/lib/services";
 
 try {
   // risky operation
 } catch (error) {
   const options = getCrashReportPayload(error, componentStack, AnalyticsConsent.getLevel());
   if (options) {
-    Sentry.captureException(error, options);
+    getErrorTracker().captureException(error, options);
   }
 }
 ```

@@ -468,6 +468,7 @@ If Track A+B (or any track) has multiple **independent concerns**, break it into
 
 ### Phase 2 Tips
 
+- **⚠️ Module root level ONLY:** README.md is ONLY created at `lib/[module]/README.md`. NEVER create nested READMEs like `lib/[module]/sentry/README.md` or `lib/[module]/providers/README.md`. All module docs consolidate into ONE root README.
 - **Focus on developer experience:** This is for FUTURE developers using this module
 - **Code examples:** Show common usage patterns (best case, error case)
 - **Architecture diagrams:** ASCII or brief mermaid (help visualize data flow)
@@ -480,27 +481,29 @@ If Track A+B (or any track) has multiple **independent concerns**, break it into
 
 ## Phase 3: Usage Guides
 
-**Goal:** Real-world integration guide + test guide for manual testing.
+**Goal:** Real-world integration guide for developers using the feature.
 
-## Phase 3: Create usage guide
+## Phase 3: Create usage guides
+
+**⚠️ IMPORTANT:** Phase 3 creates **exactly 2 mandatory files** + optional docs based on the specific issue. Do NOT create a separate "Testing Guide" file — testing documentation is Phase 4 only.
 
 **Scope:**
 
-**Create `docs/issues/MileStone X/XXX - [Feature]/IMPLEMENTATION_GUIDE.md` (for complex features):**
-- [ ] Architecture overview and data flow
-- [ ] File structure and key classes/interfaces
-- [ ] Integration points with existing modules
-- [ ] Configuration options and appsettings
-- [ ] Error handling patterns and edge cases
-
-**Create `docs/issues/MileStone X/XXX - [Feature]/USAGE_GUIDE.md`:**
+**Create `docs/issues/MileStone X/XXX - [Feature]/USAGE_GUIDE.md` (MANDATORY):**
 - [ ] Integration checklist (step-by-step how to add to app)
 - [ ] Code examples (all common use cases)
 - [ ] Common patterns (recommended ways to use)
 - [ ] Debugging section (how to identify issues)
 - [ ] Troubleshooting (common problems + solutions)
 
-Additional files are allowed and encouraged when needed:
+**Create `docs/issues/MileStone X/XXX - [Feature]/IMPLEMENTATION_GUIDE.md` (MANDATORY):**
+- [ ] Architecture overview and data flow
+- [ ] File structure and key classes/interfaces
+- [ ] Integration points with existing modules
+- [ ] Configuration options and appsettings
+- [ ] Error handling patterns and edge cases
+
+**Optional additional docs** (create only if the issue warrants them):
 
 | File (example names) | When to create it |
 | -------------------- | ----------------- |
@@ -512,8 +515,10 @@ Additional files are allowed and encouraged when needed:
 
 ### Phase 3 Tips
 
+- **Exactly 2 mandatory files:** USAGE_GUIDE.md and IMPLEMENTATION_GUIDE.md. No more, no less.
+- **No testing docs here:** Testing guides belong in Phase 4 only (in `docs/A Testing Guide/`)
+- **Optional docs only when justified:** Don't create `ARCHITECTURE.md` unless the feature is genuinely complex; use IMPLEMENTATION_GUIDE.md by default
 - **Follow the style guide:** See `.github/ISSUE_DOC_STYLE_GUIDE.md` for detailed formatting requirements for all issue docs
-- **Optional additional docs:** For complex features, consider creating `ARCHITECTURE.md`, `EXAMPLES.md`, `LIMITS.md`, `MISSING.md`, or `VARIANT_TRACKING_GUIDE.md` as needed (see style guide for when to use each)
 
 ---
 
@@ -555,6 +560,12 @@ Additional files are allowed and encouraged when needed:
 
 ### Phase 4 Tips
 
+- **⚠️ Test folder structure is NON-NEGOTIABLE:** ALL test files MUST be in `__tests__` folders ONLY. Examples:
+  - ✅ `lib/services/__tests__/auth-provider.test.ts`
+  - ✅ `lib/services/__tests__/error-tracker.test.ts`
+  - ❌ `lib/services/auth-provider.test.ts` (WRONG: test file in source folder)
+  - ❌ `lib/services/sentry/__tests__/sentry-error-tracker.test.ts` (WRONG: __tests__ nested too deep; move to `lib/services/__tests__/`)
+- **Organize by feature:** Group related test files in one `__tests__` folder per lib/[module]
 - **Unit tests:** Focus on individual functions/methods; mock dependencies
 - **Integration tests:** Combine multiple modules; test real interactions
 - **E2E tests:** Full workflow (e.g., record sample → restart app → baseline restored)
@@ -670,6 +681,14 @@ Additional files are allowed and encouraged when needed:
 ## Quick Checklist
 
 Use this before submitting an issue:
+
+### ⚠️ Critical Guidelines (Non-Negotiable)
+
+These 3 practices are MANDATORY for all new lib/[module] issues:
+
+- [ ] **Phase 2 (README):** One README.md at `lib/[module]/README.md` ONLY. No nested READMEs in subdirectories like `lib/[module]/sentry/README.md`.
+- [ ] **Phase 3 (Docs):** Exactly 2 mandatory files (`USAGE_GUIDE.md` + `IMPLEMENTATION_GUIDE.md`) + optional docs only when the issue genuinely warrants them. NO separate test guide files in Phase 3.
+- [ ] **Phase 4 (Tests):** ALL test files in `lib/[module]/__tests__/` folders ONLY. Never scatter tests like `lib/[module]/auth-provider.test.ts` or nest them deeper like `lib/[module]/sentry/__tests__/`.
 
 ### Issue Structure
 - [ ] Header present (Status, Impact, Depends on, Integrates with)

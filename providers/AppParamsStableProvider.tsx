@@ -459,6 +459,24 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
             if (mounted) {
               setAuthStateVersion((v) => v + 1);
             }
+          } else if (mounted && event === "SIGNED_OUT") {
+            logger.debug(
+              "context",
+              "AppParamsStableProvider: Auth state changed (SIGNED_OUT), clearing params and cache metadata...",
+            );
+            // Clear everything including metadata to force fresh verification on next sign-in
+            setStableParams({ userId: undefined, connectedWorldIds: [] });
+            const backend = getPrivacyStorageBackend(
+              STORAGE_KEYS.CONNECTED_WORLDS,
+            );
+            void Promise.all([
+              backend.removeItem(STORAGE_KEYS.CONNECTED_WORLDS),
+              getPrivacyStorageBackend(CONNECTED_WORLDS_METADATA).removeItem(
+                CONNECTED_WORLDS_METADATA,
+              ),
+            ]).catch(() => {
+              /* silently ignore cleanup errors on logout */
+            });
           }
         });
         subscription = sub ?? null;
@@ -545,11 +563,17 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
 
     // Always clear storage, regardless of state (prevents stale data if storage/state mismatch occurs)
     const backend = getPrivacyStorageBackend(STORAGE_KEYS.CONNECTED_WORLDS);
-    void backend.removeItem(STORAGE_KEYS.CONNECTED_WORLDS).catch(
-      (error) => {
-        logger.error("other", "Failed to clear connected worlds cache", error);
-      },
-    );
+    void Promise.all([
+      backend.removeItem(STORAGE_KEYS.CONNECTED_WORLDS),
+      // CRITICAL: Also clear metadata to avoid cache stale-ness bug on sign-in
+      // If metadata remains, next user's loadFromStorage() sees old lastVerifiedAt
+      // and thinks "confirmed empty state" instead of doing fresh verification
+      getPrivacyStorageBackend(CONNECTED_WORLDS_METADATA).removeItem(
+        CONNECTED_WORLDS_METADATA,
+      ),
+    ]).catch((error) => {
+      logger.error("other", "Failed to clear connected worlds cache/metadata", error);
+    });
   }, []);
 
   const hasAccessToWorld = useCallback(

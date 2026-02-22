@@ -1,3 +1,5 @@
+import { isDevelopment } from "@/lib/config/loader";
+
 import { logger } from "../utils/logger";
 import { supabase } from "./supabase";
 import type { User } from "./users";
@@ -96,7 +98,7 @@ export async function validateCurrentUser(): Promise<{
   if (error || !user) {
     logger.debug("storage", "User validation failed:", error?.message);
 
-    if (__DEV__) {
+    if (isDevelopment()) {
       logger.warn(
         "storage",
         "DEV MODE: Auth validation failed. Do NOT bypass authentication here; use test utilities to mock identity.",

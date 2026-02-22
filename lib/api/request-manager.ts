@@ -1,4 +1,3 @@
-import * as Sentry from "@sentry/react-native";
 import {
   Analytics,
   AnalyticsConsent,
@@ -15,6 +14,7 @@ import {
   NetworkDetection,
   type PayloadQuality,
 } from "../network";
+import { getErrorTracker } from "../services";
 import { logger } from "../utils/logger";
 import { AuthLayer, type AuthContext } from "./auth-layer";
 import {
@@ -833,7 +833,7 @@ class RequestManagerClass {
         // not the current request's startedAt, ensuring accurate duration for deduplicated requests
         return deduplicatedPromise.catch((error) => {
           logger.error("api", "Deduplicated request failed:", { key: enrichedKey, error });
-          this.reportErrorToSentry(error, { key: enrichedKey, options: options_ });
+          this.reportErrorToTracker(error, { key: enrichedKey, options: options_ });
 
           if (options_.failOpen) {
             logger.warn(
@@ -1254,8 +1254,8 @@ class RequestManagerClass {
     } catch (error) {
       logger.error("request-manager", "Request failed:", { key: enrichedKey, error });
 
-      // ========== SENTRY REPORTING ==========
-      this.reportErrorToSentry(error, { key: enrichedKey, options: options_ });
+      // ========== ERROR TRACKER REPORTING ==========
+      this.reportErrorToTracker(error, { key: enrichedKey, options: options_ });
 
       // Tracking for thrown path (in case promise creation failed early)
       const duration_ms = Date.now() - startedAt;
@@ -1704,12 +1704,12 @@ class RequestManagerClass {
   }
 
   /**
-   * Report request errors to Sentry
+   * Report request errors to error tracker
    *
    * @param error - The error that occurred
    * @param context - Context about the request
    */
-  private reportErrorToSentry(
+  private reportErrorToTracker(
     error: unknown,
     context: {
       key: string;
@@ -1748,18 +1748,18 @@ class RequestManagerClass {
           },
         };
         
-        Sentry.captureException(errorObj, mergedOptions);
+        getErrorTracker().captureException(errorObj, mergedOptions);
       } else {
         logger.warn(
           "request-manager",
-          "Error not sent to Sentry (consent=none; awaiting user opt-in)",
+          "Error not sent to error tracker (consent=none; awaiting user opt-in)",
         );
       }
-    } catch (sentryError) {
+    } catch (trackerError) {
       logger.warn(
         "request-manager",
-        "Failed to report to Sentry:",
-        sentryError,
+        "Failed to report to error tracker:",
+        trackerError,
       );
     }
   }

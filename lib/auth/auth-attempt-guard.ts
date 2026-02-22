@@ -1,25 +1,9 @@
 import { AnalyticsConsent } from "../analytics/consent";
 import { shouldEmitEvent } from "../analytics/consent-gating";
+import { getErrorTracker } from "../services";
 import { STORAGE_KEYS } from "../storage/index";
 import { getStorageBackend } from "../storage/privacy";
 import { logger } from "../utils/logger";
-
-// Lazy import Sentry only when needed to reduce bundle size when disabled
-const getSentry = async () => {
-  try {
-    return await import("@sentry/react-native");
-  } catch {
-    return null;
-  }
-};
-
-let sentryInstance: any = null;
-const initSentryInstance = async () => {
-  if (!sentryInstance) {
-    sentryInstance = await getSentry();
-  }
-  return sentryInstance;
-};
 
 export type AuthGuardScope = "signin" | "signup" | "reset";
 
@@ -127,35 +111,36 @@ export const recordAuthFailure = async (
 
   if (record.attempts >= MAX_ATTEMPTS) {
     record.lockedUntil = now + LOCKOUT_MS;
-    // Report lockout to Sentry asynchronously if available (don't block rate limit logic)
+    // Report lockout to error tracker with structured security telemetry
     // Auth lockout is a security event; treat as 'performance' (requires >= basic consent)
-    initSentryInstance()
-      .then((Sentry) => {
-        try {
-          if (Sentry?.captureMessage && shouldEmitEvent('performance', AnalyticsConsent.getLevel())) {
-            Sentry.captureMessage("auth.lockout", {
-              level: "warning",
-              tags: {
-                scope,
-                emailDomain: email.split("@")[1] || "unknown",
-              },
-              extra: {
-                attempts: record.attempts,
-                windowMs: WINDOW_MS,
-                lockoutMs: LOCKOUT_MS,
-              },
-            });
+    try {
+      if (shouldEmitEvent('performance', AnalyticsConsent.getLevel())) {
+        const emailDomain = email.split('@')[1] || 'unknown';
+        getErrorTracker().captureException(
+          new Error('auth.lockout'),
+          {
+            level: 'warning',
+            tags: {
+              event_type: 'auth_lockout',
+              scope,
+              email_domain: emailDomain,
+            },
+            extra: {
+              attempts: record.attempts,
+              max_attempts: MAX_ATTEMPTS,
+              lockout_duration_ms: LOCKOUT_MS,
+              lockout_until: record.lockedUntil,
+              window_ms: WINDOW_MS,
+            },
           }
-        } catch {
-          logger.debug(
-            "security",
-            "Sentry disabled or failed to report lockout",
-          );
-        }
-      })
-      .catch(() => {
-        // Sentry init failed, continue without reporting
-      });
+        );
+      }
+    } catch {
+      logger.debug(
+        "security",
+        "Error tracker disabled or failed to report lockout",
+      );
+    }
   }
 
   // eslint-disable-next-line security/detect-object-injection

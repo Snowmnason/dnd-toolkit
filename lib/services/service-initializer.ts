@@ -17,7 +17,8 @@ import { performanceBaselineService } from '@/lib/analytics/performance/performa
 import { getAppConfig } from '@/lib/config/loader';
 import { logger } from '@/lib/utils/logger';
 import { createValidatedAuthProvider, registerAuthProvider, type AuthProvider } from './auth-provider';
-import { SentryExporter } from './sentry/sentry-analytics-exporter';
+import { NoOpErrorTracker, registerErrorTracker } from './error-tracker';
+import { initializeSentryErrorTracker } from './sentry/sentry-service-initializer';
 import { SupabaseAuthProvider } from './supabase/supabase-auth-provider';
 
 /**
@@ -35,6 +36,9 @@ export async function initializeServices(): Promise<void> {
 
     // Initialize performance baseline service (loads baselines from SecureStorage)
     await performanceBaselineService.initialize();
+
+    // Initialize error tracker (Sentry by default)
+    await initializeErrorTracker();
 
     // Register Sentry analytics exporter
     await initializeSentryExporter();
@@ -56,7 +60,7 @@ async function initializeAuthProvider(): Promise<void> {
   try {
     // Read provider selection from config
     const config = getAppConfig();
-    const providerName = config.auth?.provider || 'supabase';
+    const providerName = config.services?.auth?.provider || 'supabase';
     logger.debug('bootstrap', `Initializing auth provider: ${providerName}`);
 
     // Create provider instance based on config
@@ -126,35 +130,139 @@ async function initializeAuthProvider(): Promise<void> {
 }
 
 /**
- * Initialize and register Sentry analytics exporter
- * Only registers if Sentry is enabled and configured
+ * Initialize and register the error tracker
+ * Single-source-of-truth: SDK initializes if EITHER errorProvider OR analytics is enabled.
+ * This allows independent toggle of error tracking and analytics without SDK redundancy.
+ *
+ * Two-layer gating:
+ * 1. SDK Initialization: config.services.errorProvider.enabled OR config.services.analytics.enabled
+ *    SDK is never imported/initialized if both are false (zero overhead, full abstraction from Sentry).
+ * 2. User Identification: Even if SDK initialized, setUser() is gated by consent level.
+ *    If consent === 'none', SDK operates silently (breadcrumbs/events queued) but no PII sent.
+ *
+ * Delegates to lib/services/sentry/sentry-service-initializer.ts if SDK should init.
+ * Falls back to NoOpErrorTracker if no service needs it or on error.
+ *
+ * Supported providers: 'sentry' (default)
+ * Future: 'datadog', 'rollbar', custom implementations
  */
-async function initializeSentryExporter(): Promise<void> {
+async function initializeErrorTracker(): Promise<void> {
   try {
-    const sentryExporter: AnalyticsExporter = new SentryExporter();
+    const config = getAppConfig();
+    const errorService = config.services?.errorProvider;
+    const analyticsService = config.services?.analytics;
 
-    // Check if enabled via config before registering
-    // Note: isEnabled is optional on AnalyticsExporter interface.
-    // Only skip registration if isEnabled explicitly returns false.
-    // If isEnabled is undefined (method doesn't exist), default to enabled.
-    if (sentryExporter.isEnabled?.() !== false) {
-      // Initialize exporter if it has an initialize lifecycle hook
-      if (sentryExporter.initialize) {
-        await sentryExporter.initialize();
+    // SWITCH #1: SDK on/off — enables if either error tracking or analytics needs it
+    const errorProviderEnabled = errorService?.enabled ?? false;
+    const analyticsEnabled = analyticsService?.enabled ?? false;
+    const sdkNeeded = errorProviderEnabled || analyticsEnabled;
+
+    if (!sdkNeeded) {
+      logger.info(
+        'bootstrap',
+        `[Error Tracker] Both errorProvider and analytics disabled — using NoOpErrorTracker`
+      );
+      registerErrorTracker(new NoOpErrorTracker());
+      return;
+    }
+
+    const providerName = errorService?.provider ?? 'sentry';
+
+    logger.debug('bootstrap', `Initializing error tracker provider: ${providerName}`);
+
+    // Switch on provider name to select implementation
+    switch (providerName.toLowerCase()) {
+      case 'sentry': {
+        // Delegate to Sentry-specific init (SDK + tracker registration)
+        // This isolates all Sentry concerns to lib/services/sentry/
+        const initialized = await initializeSentryErrorTracker();
+        if (initialized) {
+          logger.info('bootstrap', `[Error Tracker] Sentry provider initialized successfully`);
+        } else {
+          logger.info('bootstrap', `[Error Tracker] Sentry provider skipped (no DSN) — using NoOpErrorTracker`);
+          registerErrorTracker(new NoOpErrorTracker());
+        }
+        break;
       }
 
-      // Register to global registry
-      exporterRegistry.register(sentryExporter);
-      logger.debug('bootstrap', 'Sentry exporter initialized and registered');
-    } else {
-      logger.debug('bootstrap', 'Sentry exporter is disabled in config, skipping registration');
+      default: {
+        logger.warn(
+          'bootstrap',
+          `[Error Tracker] Unknown provider: ${providerName}. Defaulting to NoOp.`
+        );
+        registerErrorTracker(new NoOpErrorTracker());
+        break;
+      }
     }
   } catch (error) {
     logger.warn(
       'bootstrap',
-      `Failed to initialize Sentry exporter: ${error}. Continuing without it.`
+      `[Error Tracker] Failed to initialize: ${error}. Falling back to NoOp.`
     );
-    // Don't throw - if Sentry exporter fails, other services should still work
+    // Ensure we always have a tracker registered, even on error
+    registerErrorTracker(new NoOpErrorTracker());
+  }
+}
+
+/**
+ * Initialize and register analytics exporter
+ * Reads provider selection from config.services.analytics
+ * Delegates to the selected provider's exporter (e.g., SentryExporter)
+ * If disabled, skips registration
+ *
+ * Supported providers: 'sentry' (default)
+ * Future: 'datadog', 'segment', custom implementations
+ */
+async function initializeSentryExporter(): Promise<void> {
+  try {
+    const config = getAppConfig();
+    const analyticsService = config.services?.analytics;
+    const enabled = analyticsService?.enabled ?? true;
+    const providerName = analyticsService?.provider ?? 'sentry';
+
+    if (!enabled) {
+      logger.info(
+        'bootstrap',
+        `[Analytics Exporter] Disabled in config (provider: ${providerName}), skipping registration`
+      );
+      return;
+    }
+
+    logger.debug('bootstrap', `Initializing analytics exporter provider: ${providerName}`);
+
+    // Switch on provider name to select implementation
+    switch (providerName.toLowerCase()) {
+      case 'sentry': {
+        // Lazy-load SentryExporter to avoid require cycle
+        // (sentry-analytics-exporter imports from lib/analytics, which imports services)
+        const { SentryExporter } = await import('./sentry/sentry-analytics-exporter');
+        const sentryExporter: AnalyticsExporter = new SentryExporter();
+
+        // Initialize exporter if it has an initialize lifecycle hook
+        if (sentryExporter.initialize) {
+          await sentryExporter.initialize();
+        }
+
+        // Register to global registry
+        exporterRegistry.register(sentryExporter);
+        logger.info('bootstrap', `[Analytics Exporter] Sentry exporter initialized and registered`);
+        break;
+      }
+
+      default: {
+        logger.warn(
+          'bootstrap',
+          `[Analytics Exporter] Unknown provider: ${providerName}. Skipping registration.`
+        );
+        break;
+      }
+    }
+  } catch (error) {
+    logger.warn(
+      'bootstrap',
+      `[Analytics Exporter] Failed to initialize: ${error}. Continuing without it.`
+    );
+    // Don't throw - if analytics exporter fails, other services should still work
   }
 }
 

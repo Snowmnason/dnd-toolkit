@@ -1,16 +1,17 @@
 /**
  * AppKernel - Centralized app bootstrap and lifecycle management
  *
- * Consolidates all bootstrapping phases (config, preload, storage, auth, network, app ready)
+ * Consolidates all bootstrapping phases (config, preload, network, storage, services, auth, app ready)
  * into a single, explicit contract. Ensures all consumers subscribe to one source of truth.
  *
- * Phases:
+ * Phases (in order):
  * - IDLE: Initial state, not started
  * - CONFIG: Load Supabase env vars & initialize client (MUST run first)
  * - PRELOAD: Loading fonts, platform assets (critical, <500ms target)
- * - STORAGE: Cache validation & migrations (Supabase client already ready)
- * - NETWORK: Network detection initialization
- * - AUTH: Session restoration (non-blocking, can proceed to READY without waiting)
+ * - NETWORK: Network detection initialization (before storage for offline awareness)
+ * - STORAGE: Cache validation & migrations (knows network status)
+ * - SERVICES: Register auth provider, error tracker, analytics exporters (must be before AUTH)
+ * - AUTH: Session restoration (non-blocking, fires in background after services ready)
  * - READY: App is ready to render main UI
  * - ERROR: A critical phase failed
  */
@@ -46,8 +47,9 @@ export enum KernelPhase {
   IDLE = "idle",
   CONFIG = "config",
   PRELOAD = "preload",
-  STORAGE = "storage",
   NETWORK = "network",
+  STORAGE = "storage",
+  SERVICES = "services",
   AUTH = "auth",
   READY = "ready",
   ERROR = "error",
@@ -99,8 +101,9 @@ export interface AppKernelState {
   phases: {
     configReady: boolean;
     preloadReady: boolean;
-    storageReady: boolean;
     networkReady: boolean;
+    storageReady: boolean;
+    servicesReady: boolean;
     authReady: boolean;
     appReady: boolean;
   };
@@ -119,8 +122,9 @@ class AppKernelClass {
     phases: {
       configReady: false,
       preloadReady: false,
-      storageReady: false,
       networkReady: false,
+      storageReady: false,
+      servicesReady: false,
       authReady: false,
       appReady: false,
     },
@@ -332,45 +336,7 @@ class AppKernelClass {
         }
       });
 
-      // Phase 2: Storage (cache validation/migrations and initialization)
-      await this.runPhase("storage", async () => {
-        try {
-          // Validate data classification registry integrity early
-          // Catch configuration errors (mismatched keys, invalid sensitivity, bad patterns) immediately
-          validateClassifications();
-          logger
-            .category("bootstrap")
-            .debug("Data classification registry validated");
-
-          // Initialize storage health monitoring (validates storage + starts polling)
-          const { initializeStorageHealthMonitoring } =
-            await import("@/lib/storage/storage-health-monitor");
-          await initializeStorageHealthMonitoring();
-
-          // Initialize all storage keys with safe defaults on startup
-          await this.initializeStorageDefaults();
-
-          // Validate critical storage entries during bootstrap
-          // Only validate what's needed for app to function - don't block on world data
-          logger
-            .category("bootstrap")
-            .debug("Running storage validation for critical cache entries");
-
-          // Storage validation happens lazily on first access via SecureStorage.getValidatedJSON()
-          // This phase ensures storage system is initialized and ready
-          logger
-            .category("bootstrap")
-            .debug("Storage system initialized and ready");
-        } catch (error) {
-          logger
-            .category("bootstrap")
-            .warn("Storage validation warning (non-critical)", {
-              error: (error as Error).message,
-            });
-        }
-      });
-
-      // Phase 3: Network (initialize detection)
+      // Phase 2: Network (initialize detection - BEFORE storage for offline awareness)
       await this.runPhase("network", async () => {
         try {
           await NetworkDetection.initialize();
@@ -482,8 +448,94 @@ class AppKernelClass {
         }
       });
 
-      // Phase 4: Auth (restore session - non-blocking)
-      // Start in background without awaiting
+      // Phase 3: Storage (cache validation/migrations - runs AFTER network, knows offline status)
+      await this.runPhase("storage", async () => {
+        try {
+          // Validate data classification registry integrity early
+          // Catch configuration errors (mismatched keys, invalid sensitivity, bad patterns) immediately
+          validateClassifications();
+          logger
+            .category("bootstrap")
+            .debug("Data classification registry validated");
+
+          // Initialize storage health monitoring (validates storage + starts polling)
+          const { initializeStorageHealthMonitoring } =
+            await import("@/lib/storage/storage-health-monitor");
+          await initializeStorageHealthMonitoring();
+
+          // Initialize all storage keys with safe defaults on startup
+          await this.initializeStorageDefaults();
+
+          // Validate critical storage entries during bootstrap
+          // Only validate what's needed for app to function - don't block on world data
+          logger
+            .category("bootstrap")
+            .debug("Running storage validation for critical cache entries");
+
+          // Storage validation happens lazily on first access via SecureStorage.getValidatedJSON()
+          // This phase ensures storage system is initialized and ready
+          logger
+            .category("bootstrap")
+            .debug("Storage system initialized and ready");
+        } catch (error) {
+          logger
+            .category("bootstrap")
+            .warn("Storage validation warning (non-critical)", {
+              error: (error as Error).message,
+            });
+        }
+      });
+
+      // Phase 4: Services (register auth provider, error tracker, analytics exporter)
+      // MUST be before AUTH so AuthStateManager can use the registered provider
+      await this.runPhase("services", async () => {
+        const { initializeServices } = await import("@/lib/services");
+        await initializeServices();
+        logger
+          .category("bootstrap")
+          .info("✅ Services initialized successfully");
+
+        // Configure AuthStateManager with the registered auth provider (if available)
+        // initializeServices() may not have registered a provider if Supabase is not configured
+        const { getAuthProviderSync } = await import("@/lib/services");
+        const { AuthStateManager } = await import("@/lib/auth/auth-state");
+
+        const provider = getAuthProviderSync();
+
+        if (!provider) {
+          // Auth not available (e.g., no Supabase env vars)
+          // Skip wiring and log warning; auth-guarded routes will fail gracefully
+          logger
+            .category("bootstrap")
+            .warn("No auth provider registered — auth features unavailable. Public routes only.");
+        } else {
+          try {
+            AuthStateManager.configure(provider);
+            logger
+              .category("bootstrap")
+              .info("AuthStateManager configured with registered provider");
+          } catch (error) {
+            logger
+              .category("bootstrap")
+              .error("Failed to configure AuthStateManager with provider", {
+                error: (error as Error).message,
+              });
+            const safeMode = createSafeModeState(
+              SafeModeReason.KERNEL_CONFIG_FAILED,
+              {
+                details: "Auth provider configuration failed",
+                originalError: error instanceof Error ? error : new Error(String(error)),
+              }
+            );
+            this.setSafeMode(safeMode);
+            throw error; // Let runPhase propagate — services are critical
+          }
+        }
+      });
+
+      // Phase 5: Auth (restore session - non-blocking, services already registered)
+      // Services ran synchronously above, so AuthStateManager already has a registered
+      // provider. Auth is fired in background so appReady is not gated on network latency.
       this.runPhase("auth", async () => {
         const authPhaseStart = performance.now();
         try {
@@ -524,7 +576,7 @@ class AppKernelClass {
             await import("@/lib/auth/auth-health-monitor");
           await initializeAuthHealthMonitoring();
 
-          // Track auth completion time (completes after appReady)
+          // Track auth completion time
           this.authCompletionTime = performance.now() - authPhaseStart;
 
           // Mark auth as ready after successful load
@@ -535,7 +587,7 @@ class AppKernelClass {
           logger
             .category("bootstrap")
             .info(
-              `✅ authReady = true (${this.authCompletionTime}ms delay, after app ready)`,
+              `✅ authReady = true (${this.authCompletionTime}ms)`,
             );
 
           // Initialize offline queue system
@@ -634,7 +686,7 @@ class AppKernelClass {
         });
       });
 
-      // Mark app ready - don't wait for auth
+      // Mark app ready - services ready, auth completing in background
       this.updateState({
         currentPhase: KernelPhase.READY,
         phases: { ...this.state.phases, appReady: true },
@@ -642,134 +694,9 @@ class AppKernelClass {
 
       logger
         .category("bootstrap")
-        .info(`✅ appReady = true (auth phase still running in background)`);
+        .info(`✅ appReady = true (auth phase running in background, provider already registered)`);
 
-      // Initialize services (auth provider, Sentry exporter, analytics integrations)
-      try {
-        const { initializeServices } = await import("@/lib/services");
-        await initializeServices();
-        logger
-          .category("bootstrap")
-          .info("Services initialized successfully");
-
-        // Configure AuthStateManager with the registered auth provider (if available)
-        // initializeServices() may not have registered a provider if Supabase is not configured
-        try {
-          const { getAuthProviderSync } = await import("@/lib/services");
-          const { AuthStateManager } = await import("@/lib/auth/auth-state");
-          
-          const provider = getAuthProviderSync();
-          
-          if (!provider) {
-            // Auth not available (e.g., no Supabase env vars)
-            // Skip wiring and log warning; auth-guarded routes will fail gracefully
-            logger
-              .category("bootstrap")
-              .warn("No auth provider registered — auth features unavailable. Public routes only.");
-          } else {
-            AuthStateManager.configure(provider);
-            logger
-              .category("bootstrap")
-              .info("AuthStateManager configured with registered provider");
-          }
-        } catch (error) {
-          logger
-            .category("bootstrap")
-            .error("Failed to configure AuthStateManager with provider:", {
-              error: (error as Error).message,
-            });
-          
-          // Provider configuration failure is critical — don't silently swallow.
-          // Set safe mode to inform the user and provide recovery options.
-          const safeMode = createSafeModeState(
-            SafeModeReason.KERNEL_CONFIG_FAILED,
-            {
-              details: "Auth provider configuration failed",
-              originalError: error instanceof Error ? error : new Error(String(error)),
-            }
-          );
-          this.setSafeMode(safeMode);
-          
-          logger
-            .category("bootstrap")
-            .warn("Auth provider configuration failed — entering safe mode");
-        }
-      } catch (error) {
-        logger
-          .category("bootstrap")
-          .warn("Services initialization failed (non-critical)", {
-            error: (error as Error).message,
-          });
-      }
-
-      // Initialize Feature Flags Manager (non-blocking)
-      try {
-        const { FeatureFlagsManager } =
-          await import("@/lib/feature-flags/server-sync");
-        const { getSupabaseClient } = await import("@/lib/database/supabase");
-
-        // Initialize with Supabase client
-        const supClient = getSupabaseClient();
-        // Try to get userId from storage (may be available from a previous session)
-        // Auth runs asynchronously, so we can't guarantee it's available yet,
-        // but SecureStorage may have the user data from a prior session.
-        let userId: string | undefined;
-        try {
-          const { AuthStateManager } = await import("@/lib/auth/auth-state");
-          userId = await AuthStateManager.getUserId();
-        } catch {
-          // userId unavailable - remote per-user overrides won't load this time
-        }
-        await FeatureFlagsManager.initialize(supClient, userId);
-
-        // Verify device clock validity early
-        const clockValid = await FeatureFlagsManager.verifyDeviceClock();
-        if (!clockValid) {
-          logger
-            .category("bootstrap")
-            .warn(
-              "Device clock validation failed - premium features may be restricted",
-            );
-        }
-
-        // Bootstrap flags from server (one-time fetch at startup)
-        await FeatureFlagsManager.bootstrapFlags();
-        logger
-          .category("bootstrap")
-          .info("Feature flags bootstrapped successfully");
-
-        // Bridge server-synced flags to the legacy FeatureFlags system
-        // and reconfigure the Logger so it respects the remote debugLogs value.
-        try {
-          const { FeatureFlags } =
-            await import("@/lib/feature-flags/feature-flags");
-          const serverFlags = FeatureFlagsManager.getAllFlags();
-
-          // 1. Sync legacy system so useFeatureFlag hooks see server values
-          FeatureFlags.syncFromServer(serverFlags);
-
-          // 2. Reconfigure Logger with the resolved debugLogs value
-          const debugLogsEnabled = FeatureFlagsManager.getFlag(
-            "debugLogs",
-            false,
-          );
-          logger.reconfigure(debugLogsEnabled);
-        } catch (bridgeError) {
-          logger
-            .category("bootstrap")
-            .warn(
-              "Failed to bridge server flags to legacy system (non-critical):",
-              { error: (bridgeError as Error).message },
-            );
-        }
-      } catch (error) {
-        logger
-          .category("bootstrap")
-          .warn("Feature flags bootstrap failed (using hardcoded fallback):", {
-            error: (error as Error).message,
-          });
-      }
-
+      // Log timing summary immediately — appReady is set, all critical phases complete
       const totalBootstrapTime = Object.values(this.state.timing).reduce(
         (a, b) => a + b,
         0,
@@ -778,27 +705,100 @@ class AppKernelClass {
       logger.category("bootstrap").info("AppKernel ready", {
         timing: this.state.timing,
         totalMs: totalBootstrapTime,
-        note: "Auth phase runs asynchronously and not included in total",
+        note: "Auth phase runs asynchronously - not included in total. Provider registered before auth starts.",
       });
 
-      // Track performance metrics in Analytics
-      try {
-        const { Analytics } = await import("@/lib/analytics");
-        Analytics.track("app_bootstrap_complete", {
-          total: totalBootstrapTime,
-          ...this.state.timing,
-          authCompletedAsynchronously: true,
-          postAppReadyAuthMs: this.authCompletionTime || 0,
-        });
-        logger.category("bootstrap").debug("Bootstrap metrics tracked");
-      } catch (analyticsError) {
-        // Non-critical - don't block on analytics
+      // Fire-and-forget: feature flags + analytics tracking
+      // Neither is critical; they should not block or slow appReady
+      ;(async () => {
+        // Initialize Feature Flags Manager
+        try {
+          const { FeatureFlagsManager } =
+            await import("@/lib/feature-flags/server-sync");
+          const { getSupabaseClient, isSupabaseConfigured } =
+            await import("@/lib/database/supabase");
+
+          if (!isSupabaseConfigured()) {
+            logger
+              .category("bootstrap")
+              .warn("Supabase not configured — skipping feature flags bootstrap");
+          } else {
+            const supClient = getSupabaseClient();
+            // Try to get userId from storage (may be available from a previous session)
+            // Auth runs asynchronously, so we can't guarantee it's available yet,
+            // but SecureStorage may have the user data from a prior session.
+            let userId: string | undefined;
+            try {
+              const { AuthStateManager } = await import("@/lib/auth/auth-state");
+              userId = await AuthStateManager.getUserId();
+            } catch {
+              // userId unavailable - remote per-user overrides won't load this time
+            }
+            await FeatureFlagsManager.initialize(supClient, userId);
+
+            // Verify device clock validity early
+            const clockValid = await FeatureFlagsManager.verifyDeviceClock();
+            if (!clockValid) {
+              logger
+                .category("bootstrap")
+                .warn("Device clock validation failed - premium features may be restricted");
+            }
+
+            // Bootstrap flags from server (one-time fetch at startup)
+            await FeatureFlagsManager.bootstrapFlags();
+            logger.category("bootstrap").info("Feature flags bootstrapped successfully");
+
+            // Bridge server-synced flags to the legacy FeatureFlags system
+            // and reconfigure the Logger so it respects the remote debugLogs value.
+            try {
+              const { FeatureFlags } =
+                await import("@/lib/feature-flags/feature-flags");
+              const serverFlags = FeatureFlagsManager.getAllFlags();
+
+              // 1. Sync legacy system so useFeatureFlag hooks see server values
+              FeatureFlags.syncFromServer(serverFlags);
+
+              // 2. Reconfigure Logger with the resolved debugLogs value
+              const debugLogsEnabled = FeatureFlagsManager.getFlag("debugLogs", false);
+              logger.reconfigure(debugLogsEnabled);
+            } catch (bridgeError) {
+              logger
+                .category("bootstrap")
+                .warn("Failed to bridge server flags to legacy system (non-critical)", {
+                  error: (bridgeError as Error).message,
+                });
+            }
+          }
+        } catch (error) {
+          logger
+            .category("bootstrap")
+            .warn("Feature flags bootstrap failed (using hardcoded fallback)", {
+              error: (error as Error).message,
+            });
+        }
+
+        // Track performance metrics in Analytics
+        try {
+          const { Analytics } = await import("@/lib/analytics");
+          Analytics.track("app_bootstrap_complete", {
+            total: totalBootstrapTime,
+            ...this.state.timing,
+            authCompletedAsynchronously: true,
+            authDurationMs: this.authCompletionTime || 0,
+          });
+          logger.category("bootstrap").debug("Bootstrap metrics tracked");
+        } catch (analyticsError) {
+          logger
+            .category("bootstrap")
+            .debug(`Analytics tracking skipped: ${(analyticsError as Error).message}`);
+        }
+      })().catch((e) => {
         logger
           .category("bootstrap")
-          .debug(
-            `Analytics tracking skipped: ${(analyticsError as Error).message}`,
-          );
-      }
+          .warn("Post-ready background tasks failed (non-critical)", {
+            error: (e as Error).message,
+          });
+      });
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       logger.category("bootstrap").error("AppKernel initialization failed", {
@@ -824,6 +824,7 @@ class AppKernelClass {
 
   /**
    * Detect platform and available capabilities
+   * All checks run in parallel via Promise.allSettled for faster startup
    */
   private async detectCapabilities(): Promise<void> {
     const capabilities: KernelCapabilities = {
@@ -836,46 +837,56 @@ class AppKernelClass {
     };
 
     try {
-      // Detect platform
-      const { Platform } = await import("react-native");
+      // Run all independent capability checks in parallel
+      const [platformResult, storageResult, analyticsResult, supabaseResult] =
+        await Promise.allSettled([
+          import("react-native"),
+          import("@/lib/storage"),
+          import("@/lib/analytics"),
+          import("@/lib/database/supabase"),
+        ]);
 
-      // Electron detection: check if running in Electron environment
-      const isElectron =
-        typeof window !== "undefined" && (window as any).electron !== undefined;
+      // Platform detection
+      if (platformResult.status === "fulfilled") {
+        const { Platform } = platformResult.value;
+        const isElectron =
+          typeof window !== "undefined" && (window as any).electron !== undefined;
+        capabilities.platform = isElectron
+          ? "desktop"
+          : Platform.OS === "web"
+            ? "web"
+            : Platform.OS === "ios"
+              ? "ios"
+              : Platform.OS === "android"
+                ? "android"
+                : "unknown";
+      } else {
+        logger.category("bootstrap").warn("Platform detection failed");
+      }
 
-      capabilities.platform = isElectron
-        ? "desktop"
-        : Platform.OS === "web"
-          ? "web"
-          : Platform.OS === "ios"
-            ? "ios"
-            : Platform.OS === "android"
-              ? "android"
-              : "unknown";
-
-      // Check if storage is available
-      try {
-        await import("@/lib/storage");
-        capabilities.storage = true;
-      } catch {
+      // Storage availability
+      capabilities.storage = storageResult.status === "fulfilled";
+      if (storageResult.status === "rejected") {
         logger.category("bootstrap").warn("Storage not available");
       }
 
-      // Check if analytics is configured
-      try {
-        const { Analytics } = await import("@/lib/analytics");
-        capabilities.analytics = Analytics.enabled();
-      } catch {
+      // Analytics availability
+      if (analyticsResult.status === "fulfilled") {
+        try {
+          capabilities.analytics = analyticsResult.value.Analytics.enabled();
+        } catch {
+          logger.category("bootstrap").debug("Analytics.enabled() failed");
+        }
+      } else {
         logger.category("bootstrap").debug("Analytics not available");
       }
 
-      // Check if backend (Supabase) is configured
-      try {
-        const { isSupabaseConfigured } =
-          await import("@/lib/database/supabase");
+      // Backend (Supabase) availability
+      if (supabaseResult.status === "fulfilled") {
+        const { isSupabaseConfigured } = supabaseResult.value;
         capabilities.backend = isSupabaseConfigured();
         capabilities.auth = isSupabaseConfigured(); // Auth depends on backend
-      } catch {
+      } else {
         logger.category("bootstrap").debug("Backend not configured");
       }
 
@@ -1013,8 +1024,9 @@ class AppKernelClass {
       phases: {
         configReady: false,
         preloadReady: false,
-        storageReady: false,
         networkReady: false,
+        storageReady: false,
+        servicesReady: false,
         authReady: false,
         appReady: false,
       },
@@ -1175,19 +1187,25 @@ class AppKernelClass {
 
       const { SecureStorage } = await import("@/lib/storage");
 
-      // Initialize each key if it doesn't exist. Storage defaults are lazily
-      // loaded from storage-defaults.ts for centralized management.
+      // Check each key and collect those that need initialization
       const defaults = getStorageDefaults();
-      for (const [key, defaultValue] of Object.entries(defaults)) {
-        const existing = await SecureStorage.getItem(key);
-        if (existing === null && defaultValue !== null) {
-          // Key doesn't exist and we have a default - set it
-          await SecureStorage.setItem(key, defaultValue);
-          logger
-            .category("bootstrap")
-            .debug(`Storage key initialized: ${key} = ${defaultValue}`);
-        }
-      }
+      const entries = Object.entries(defaults).filter(([, v]) => v !== null) as [string, string][];
+
+      // Read all keys in parallel, then write missing ones in parallel
+      const existingValues = await Promise.all(
+        entries.map(([key]) => SecureStorage.getItem(key)),
+      );
+
+      await Promise.all(
+        entries
+          .filter((_, i) => existingValues[i] === null)
+          .map(async ([key, defaultValue]) => {
+            await SecureStorage.setItem(key, defaultValue);
+            logger
+              .category("bootstrap")
+              .debug(`Storage key initialized: ${key} = ${defaultValue}`);
+          }),
+      );
 
       logger
         .category("bootstrap")

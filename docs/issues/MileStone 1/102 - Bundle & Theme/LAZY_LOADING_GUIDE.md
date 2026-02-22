@@ -150,11 +150,12 @@ export default LazyStyleDesktop;
 
 ```typescript
 import { lazyLoadInBackground } from '@/lib/utils/lazy-imports';
+import { isSentryEnabled } from '@/lib/services/sentry/sentry-error-tracker';
 
 const config = getAppConfig();
-const isSentryEnabled = config.features?.sentryEnabled ?? false;
+const sentryDsn = Constants.expoConfig.extra?.sentryDsn || process.env.SENTRY_DSN;
 
-if (isSentryEnabled && sentryDsn) {
+if (isSentryEnabled() && sentryDsn) {
   lazyLoadInBackground(
     async () => {
       const Sentry = await import('@sentry/react-native');
