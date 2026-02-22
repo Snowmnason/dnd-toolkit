@@ -1,6 +1,6 @@
 import { AnalyticsConsent, getCrashReportPayload } from '@/lib/analytics';
+import { getErrorTracker } from '@/lib/services';
 import { logger } from '@/lib/utils/logger';
-import * as Sentry from '@sentry/react-native';
 import { useCallback } from 'react';
 
 /**
@@ -43,12 +43,11 @@ export function useCrashConsentReport() {
         const payload = getCrashReportPayload(error, componentStack, 'full');
 
         if (payload) {
-          Sentry.captureException(error, payload);
+          getErrorTracker().captureException(error, payload);
         }
 
-        // Flush Sentry to ensure the event is sent before returning
-        // Sentry.close() waits for pending events to be sent (timeout handled internally)
-        await Sentry.close();
+        // TODO: Add flush/close lifecycle method to ErrorTrackerProvider for graceful Sentry shutdown
+        // For now, we're doing best-effort delivery without waiting for confirmation
 
         // Log the opt-in for analytics/debugging
         logger
@@ -60,7 +59,7 @@ export function useCrashConsentReport() {
           .error('Failed to send crash report', { error: err });
       }
     },
-    []
+    [],
   );
 
   return { canOptIn, sendCrashReport };

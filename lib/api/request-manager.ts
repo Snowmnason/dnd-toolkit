@@ -1,4 +1,3 @@
-import * as Sentry from "@sentry/react-native";
 import {
   Analytics,
   AnalyticsConsent,
@@ -15,6 +14,7 @@ import {
   NetworkDetection,
   type PayloadQuality,
 } from "../network";
+import { getErrorTracker } from "../services";
 import { logger } from "../utils/logger";
 import { AuthLayer, type AuthContext } from "./auth-layer";
 import {
@@ -1704,7 +1704,7 @@ class RequestManagerClass {
   }
 
   /**
-   * Report request errors to Sentry
+   * Report request errors to error tracker
    *
    * @param error - The error that occurred
    * @param context - Context about the request
@@ -1748,18 +1748,18 @@ class RequestManagerClass {
           },
         };
         
-        Sentry.captureException(errorObj, mergedOptions);
+        getErrorTracker().captureException(errorObj, mergedOptions);
       } else {
         logger.warn(
           "request-manager",
-          "Error not sent to Sentry (consent=none; awaiting user opt-in)",
+          "Error not sent to error tracker (consent=none; awaiting user opt-in)",
         );
       }
-    } catch (sentryError) {
+    } catch (trackerError) {
       logger.warn(
         "request-manager",
-        "Failed to report to Sentry:",
-        sentryError,
+        "Failed to report to error tracker:",
+        trackerError,
       );
     }
   }

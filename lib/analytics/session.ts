@@ -3,9 +3,9 @@
  * Tracks user sessions, duration, and engagement metrics
  */
 
-import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
 import { getAppConfig } from '../config/loader';
+import { getErrorTracker } from '../services';
 import { logger } from '../utils/logger';
 import { AnalyticsConsent } from './consent';
 import { shouldEmitEvent } from './consent-gating';
@@ -115,7 +115,7 @@ class SessionManager {
   }
 
   /**
-   * Internal method to track session events to Sentry
+   * Internal method to track session events to error tracker
    * Avoids circular dependency with Analytics module
    */
   private trackEvent(event: string, data?: Record<string, any>): void {
@@ -125,10 +125,10 @@ class SessionManager {
       if (!dsn || !perfFlag) return;
 
       // Session lifecycle events are usage-level data (behavioral: when sessions start/end)
-      // Require 'full' consent before sending to Sentry
+      // Require 'full' consent before sending to error tracker
       if (!shouldEmitEvent('usage', AnalyticsConsent.getLevel())) return;
 
-      Sentry.addBreadcrumb({
+      getErrorTracker().addBreadcrumb({
         category: 'analytics',
         message: event,
         data,

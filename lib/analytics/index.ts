@@ -1,9 +1,8 @@
-import * as Sentry from "@sentry/react-native";
 import Constants from "expo-constants";
 import { useEffect } from "react";
 import { Platform } from "react-native";
 import { isAppIdle } from "../../hooks/utils/use-app-state";
-import { getAppConfig } from "../config/loader";
+import { getErrorTracker } from "../services";
 import { logger } from "../utils/logger";
 import { AnalyticsConsent } from "./consent";
 import { shouldEmitEvent } from "./consent-gating";
@@ -54,30 +53,14 @@ const sanitizeProps = (
   return cloned;
 };
 
-function isSentryEnabled(): boolean {
-  try {
-    const config = getAppConfig();
-    // Check sentryEnabled feature flag first - this is the primary control
-    if (!config.features?.sentryEnabled) return false;
-
-    // Only require DSN; performanceMonitoring is for performance features only
-    const dsn =
-      process.env.EXPO_PUBLIC_SENTRY_DSN ||
-      Constants.expoConfig?.extra?.sentryDsn;
-    return !!dsn;
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Check if analytics system should be enabled
- * Analytics is enabled if EITHER Sentry is enabled OR exporters are available
- * This decouples the analytics system from Sentry specifically
+ * Analytics is enabled if EITHER error tracker is enabled OR exporters are available
+ * This decouples the analytics system from any specific error tracking backend
  */
 function isAnalyticsEnabled(): boolean {
-  // Analytics is enabled if Sentry is available
-  if (isSentryEnabled()) return true;
+  // Analytics is enabled if error tracker is available
+  if (getErrorTracker().isEnabled()) return true;
 
   // For exporters: default to enabled so dispatch attempt runs
   // (exporters will check their own enabled status during dispatch)
@@ -144,13 +127,13 @@ function withTiming<T>(
       dispatchEvent(regressionEvent, exportContext);
     }
     
-    if (isSentryEnabled() && shouldEmitEvent('performance', AnalyticsConsent.getLevel())) {
+    if (getErrorTracker().isEnabled() && shouldEmitEvent('performance', AnalyticsConsent.getLevel())) {
       try {
         const errorCategory = extra?.error
           ? categorizeError(extra.error)
           : undefined;
         // Consent-gated: only add breadcrumb if user has performance consent
-        Sentry.addBreadcrumb({
+        getErrorTracker().addBreadcrumb({
           category: "performance",
           message: label,
           data: { duration_ms, ok, error_category: errorCategory, ...extra },
@@ -158,7 +141,7 @@ function withTiming<T>(
         });
         logger
           .category("analytics")
-          .debug("Performance breadcrumb sent to Sentry", {
+          .debug("Performance breadcrumb sent to error tracker", {
             operation: label,
             duration_ms,
             ok,
@@ -211,9 +194,9 @@ export const Analytics = {
   getThreshold,
 
   identify(user: { id?: string; username?: string } | null): void {
-    // Only send user identification to Sentry if Sentry is enabled
+    // Only send user identification to error tracker if enabled
     // (exporters don't use this method, they get context from dispatch)
-    if (isSentryEnabled()) {
+    if (getErrorTracker().isEnabled()) {
       try {
         const consentLevel = AnalyticsConsent.getLevel();
         if (user?.id) {
@@ -223,21 +206,21 @@ export const Analytics = {
           // - 'full': complete payload with user context (user id, username, breadcrumbs)
           if (consentLevel === 'full') {
             // Consent=full: send complete user context (both id and username)
-            Sentry.setUser({ id: user.id, username: user.username });
-            logger.category("analytics").debug("User identified in Sentry (full, consent=full)", { userId: user.id, username: user.username });
+            getErrorTracker().setUser({ id: user.id, username: user.username });
+            logger.category("analytics").debug("User identified in error tracker (full, consent=full)", { userId: user.id, username: user.username });
           } else {
             // Consent=none or basic: clear user context (both tiers exclude user info)
-            Sentry.setUser(null);
-            logger.category("analytics").debug("User context cleared from Sentry (consent=none|basic)");
+            getErrorTracker().setUser(null);
+            logger.category("analytics").debug("User context cleared from error tracker (consent=none|basic)");
           }
         } else {
-          Sentry.setUser(null);
-          logger.category("analytics").debug("User cleared from Sentry");
+          getErrorTracker().setUser(null);
+          logger.category("analytics").debug("User cleared from error tracker");
         }
       } catch (e) {
         logger
           .category("analytics")
-          .error("Failed to identify user in Sentry", { error: String(e) });
+          .error("Failed to identify user in error tracker", { error: String(e) });
       }
     }
   },
