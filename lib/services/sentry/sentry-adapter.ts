@@ -9,7 +9,7 @@
 
 import { logger } from '@/lib/utils/logger';
 import * as Sentry from '@sentry/react-native';
-import { BatchSendDecision, BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '../provider-adapter';
+import { BatchSendDecision, BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '../breadcrumb-adapter';
 
 /**
  * Sentry Breadcrumb Provider Adapter
@@ -289,7 +289,7 @@ export class SentryAdapter implements BreadcrumbProvider {
  * Call during app bootstrap (e.g., in AppKernel.initialize())
  */
 export function registerSentryAdapter(dsn?: string): SentryAdapter {
-  const { registerAdapter } = require('../provider-adapter');
+  const { registerAdapter } = require('../breadcrumb-adapter');
   const adapter = new SentryAdapter(dsn);
   registerAdapter('sentry', () => adapter);
   logger.category('analytics').info('SentryAdapter', 'Registered as provider adapter');

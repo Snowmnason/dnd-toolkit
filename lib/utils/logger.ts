@@ -11,7 +11,7 @@
  * - Automatic PII redaction for sensitive data (emails, tokens, IDs)
  */
 
-import { getAppConfig } from "@/lib/config/loader";
+import { getAppConfig, isDevelopment } from "@/lib/config/loader";
 import { redactForLogs } from "@/lib/storage/privacy";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -242,7 +242,7 @@ class Logger {
     // Automatically redact PII/sensitive data from all arguments (production only)
     // In dev mode, show full error messages for easier debugging
     const redactedArgs = args.map((arg) => {
-      if (__DEV__) {
+      if (isDevelopment()) {
         // In dev environment, don't redact - show full errors for debugging
         return arg;
       }

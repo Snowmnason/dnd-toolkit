@@ -9,12 +9,11 @@
 
 import * as Crypto from 'expo-crypto';
 
-import { AnalyticsConsent } from '@/lib/analytics/consent';
-import { type ConsentCategory, shouldEmitEvent } from '@/lib/analytics/consent-gating';
+import { AnalyticsConsent, type ConsentCategory, shouldEmitEvent } from '@/lib/analytics';
 import { getAppConfig } from '@/lib/config';
-import { BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '@/lib/services/provider-adapter';
+import { BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '@/lib/services';
 import { STORAGE_KEYS, SecureStorage } from '@/lib/storage';
-import { logger } from '@/lib/utils/logger';
+import { logger } from '@/lib/utils';
 
 /**
  * In-memory queue statistics (not persisted)

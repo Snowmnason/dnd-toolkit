@@ -6,6 +6,7 @@
 export { initializeServices } from './service-initializer';
 
 export { SentryExporter } from './sentry/sentry-analytics-exporter';
+export { SentryErrorTracker } from './sentry/sentry-error-tracker';
 
 // Auth Provider Interface & Registration API
 export {
@@ -35,4 +36,27 @@ export {
     type AnalyticsExporter,
     type ExportContext
 } from '@/lib/analytics/exporters';
+
+export {
+    BreadcrumbProvider,
+    BreadcrumbSendResult,
+    getAdapter,
+    listAdapters,
+    QueuedBreadcrumb,
+    registerAdapter
+} from './breadcrumb-adapter';
+
+// Error Tracker Provider (Sentry/DataDog abstraction)
+export {
+    ErrorCaptureOptions,
+    ErrorTrackerProvider,
+    getErrorTracker,
+    NoOpErrorTracker,
+    registerErrorTracker,
+    resetErrorTracker,
+    SeverityLevel,
+    TrackerBreadcrumb,
+    TrackerUser,
+    type SeverityLevel as ErrorSeverityLevel
+} from './error-tracker';
 
