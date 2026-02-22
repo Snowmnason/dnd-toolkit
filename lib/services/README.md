@@ -307,12 +307,9 @@ export async function initializeServices() {
 {
   "services": {
     "errorProvider": {
-      "type": "datadog",
+      "provider": "datadog",
       "enabled": true,
-      "config": {
-        "apiKey": "your-api-key",
-        "applicationId": "your-app-id"
-      }
+      "description": "DataDog error tracking for production monitoring"
     }
   }
 }
@@ -347,10 +344,9 @@ Service calls should be cached where appropriate to reduce external requests.
 | File | Purpose |
 | ---- | ------- |
 | `breadcrumb-adapter.ts` | Defines provider-agnostic interfaces for breadcrumb providers (QueuedBreadcrumb, BreadcrumbSendResult, etc.) |
-| `error-tracker.ts` | ErrorTrackerProvider interface and registration API for pluggable error tracking backends |
+| `error-tracker.ts` | ErrorTrackerProvider interface, registration API, and NoOpErrorTracker implementation for pluggable error tracking backends |
 | `sentry/sentry-adapter.ts` | Sentry-specific implementation of BreadcrumbProvider interface |
 | `sentry/sentry-error-tracker.ts` | Sentry-specific implementation of ErrorTrackerProvider interface |
-| `no-op-error-tracker.ts` | NoOpErrorTracker implementation that silently ignores all calls |
 | `auth-provider.ts` | AuthProvider interface and registration API for pluggable auth backends |
 | `supabase/supabase-auth-provider.ts` | SupabaseAuthProvider implementation of AuthProvider interface |
 | `service-initializer.ts` | Registers default providers (SentryErrorTracker, SupabaseAuthProvider) during kernel bootstrap |

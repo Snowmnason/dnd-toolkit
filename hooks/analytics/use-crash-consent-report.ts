@@ -43,11 +43,23 @@ export function useCrashConsentReport() {
         const payload = getCrashReportPayload(error, componentStack, 'full');
 
         if (payload) {
-          getErrorTracker().captureException(error, payload);
-        }
+          const tracker = getErrorTracker();
+          tracker.captureException(error, payload);
 
-        // TODO: Add flush/close lifecycle method to ErrorTrackerProvider for graceful Sentry shutdown
-        // For now, we're doing best-effort delivery without waiting for confirmation
+          // Attempt to flush pending events to the tracker (Sentry supports flush with timeout)
+          try {
+            if (typeof tracker.flush === 'function') {
+              const flushed = await tracker.flush(2000);
+              if (!flushed) {
+                logger.category('analytics').warn('Crash report flush did not complete within timeout');
+              }
+            } else {
+              // No flush available on tracker - best-effort only
+            }
+          } catch (flushErr) {
+            logger.category('analytics').warn('Crash report flush failed', { error: flushErr });
+          }
+        }
 
         // Log the opt-in for analytics/debugging
         logger

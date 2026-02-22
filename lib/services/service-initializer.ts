@@ -131,9 +131,17 @@ async function initializeAuthProvider(): Promise<void> {
 
 /**
  * Initialize and register the error tracker
- * Reads provider selection from config.services.errorProvider
- * Delegates to lib/services/sentry/sentry-service-initializer.ts if enabled
- * Falls back to NoOpErrorTracker if disabled or on error
+ * Single-source-of-truth: SDK initializes if EITHER errorProvider OR analytics is enabled.
+ * This allows independent toggle of error tracking and analytics without SDK redundancy.
+ *
+ * Two-layer gating:
+ * 1. SDK Initialization: config.services.errorProvider.enabled OR config.services.analytics.enabled
+ *    SDK is never imported/initialized if both are false (zero overhead, full abstraction from Sentry).
+ * 2. User Identification: Even if SDK initialized, setUser() is gated by consent level.
+ *    If consent === 'none', SDK operates silently (breadcrumbs/events queued) but no PII sent.
+ *
+ * Delegates to lib/services/sentry/sentry-service-initializer.ts if SDK should init.
+ * Falls back to NoOpErrorTracker if no service needs it or on error.
  *
  * Supported providers: 'sentry' (default)
  * Future: 'datadog', 'rollbar', custom implementations
@@ -142,17 +150,23 @@ async function initializeErrorTracker(): Promise<void> {
   try {
     const config = getAppConfig();
     const errorService = config.services?.errorProvider;
-    const enabled = errorService?.enabled ?? true;
-    const providerName = errorService?.provider ?? 'sentry';
+    const analyticsService = config.services?.analytics;
 
-    if (!enabled) {
+    // SWITCH #1: SDK on/off — enables if either error tracking or analytics needs it
+    const errorProviderEnabled = errorService?.enabled ?? false;
+    const analyticsEnabled = analyticsService?.enabled ?? false;
+    const sdkNeeded = errorProviderEnabled || analyticsEnabled;
+
+    if (!sdkNeeded) {
       logger.info(
         'bootstrap',
-        `[Error Tracker] Disabled in config (provider: ${providerName}) — using NoOpErrorTracker`
+        `[Error Tracker] Both errorProvider and analytics disabled — using NoOpErrorTracker`
       );
       registerErrorTracker(new NoOpErrorTracker());
       return;
     }
+
+    const providerName = errorService?.provider ?? 'sentry';
 
     logger.debug('bootstrap', `Initializing error tracker provider: ${providerName}`);
 
@@ -161,8 +175,13 @@ async function initializeErrorTracker(): Promise<void> {
       case 'sentry': {
         // Delegate to Sentry-specific init (SDK + tracker registration)
         // This isolates all Sentry concerns to lib/services/sentry/
-        await initializeSentryErrorTracker();
-        logger.info('bootstrap', `[Error Tracker] Sentry provider initialized successfully`);
+        const initialized = await initializeSentryErrorTracker();
+        if (initialized) {
+          logger.info('bootstrap', `[Error Tracker] Sentry provider initialized successfully`);
+        } else {
+          logger.info('bootstrap', `[Error Tracker] Sentry provider skipped (no DSN) — using NoOpErrorTracker`);
+          registerErrorTracker(new NoOpErrorTracker());
+        }
         break;
       }
 

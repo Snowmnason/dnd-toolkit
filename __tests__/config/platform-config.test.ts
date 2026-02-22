@@ -17,7 +17,7 @@ describe("mergeConfigForPlatform", () => {
     version: 1,
     description: "Test config",
     environment: "development",
-    features: { consoleLogging: true, devBypass: false, mockData: false, performanceMonitoring: false, sentryEnabled: false },
+    features: { consoleLogging: true, devBypass: false, mockData: false, performanceMonitoring: false },
     overrides: { mockSupabase: false, verboseErrorMessages: false },
     devTools: { enableConsoleLogger: true, enableNetworkLogger: false, enablePerformanceLogger: false, enableReduxDevTools: false, enableReactDevTools: false },
     featureFlags: { testFlag: { enabled: true, description: "Test flag" } },

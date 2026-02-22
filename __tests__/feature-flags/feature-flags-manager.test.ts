@@ -60,6 +60,12 @@ vi.mock("@/lib/storage", () => ({
   },
 }));
 
+// Ensure production path (calls Edge Function) during tests
+vi.mock('@/lib/config/loader', () => ({
+  getAppConfig: () => ({ remoteConfig: {}, features: {}, services: {} }),
+  isDevelopment: () => false,
+}));
+
 // Mock database helpers (only entitlements are still direct)
 vi.mock("@/lib/database/entitlements", () => ({
   fetchEntitlementsByUserId: vi.fn(),

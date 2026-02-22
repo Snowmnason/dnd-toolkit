@@ -719,7 +719,7 @@ O(n) scan over active marks (typically fewer than 10). Runs automatically after 
 
 ## Related Modules
 
-- **`lib/config`** – Feature flags (`sentryEnabled`) and performance thresholds (`slowScreenMs`, `slowRequestMs`)
+- **`lib/config`** – Service configuration (`errorProvider.enabled`, `analytics.enabled`) and performance thresholds (`slowScreenMs`, `slowRequestMs`)
 - **`lib/utils/logger`** – Category-based logging used throughout this module (`analytics`, `performance`)
 - **`lib/storage`** – Encrypted queue persistence for the offline buffer
 - **`lib/network`** – Online/offline state monitoring; triggers automatic buffer flush

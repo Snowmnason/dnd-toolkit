@@ -91,6 +91,12 @@ export interface ErrorTrackerProvider {
    * @returns true if tracker will deliver events
    */
   isEnabled(): boolean;
+
+  /**
+   * Flush any pending events to the backend and optionally wait up to `timeoutMs` milliseconds.
+   * Returns true if flush succeeded within the timeout, false otherwise.
+   */
+  flush?(timeoutMs?: number): Promise<boolean>;
 }
 
 /**
@@ -138,6 +144,11 @@ export class NoOpErrorTracker implements ErrorTrackerProvider {
 
   isEnabled(): boolean {
     return false;
+  }
+
+  async flush(_timeoutMs?: number): Promise<boolean> {
+    // No-op: nothing to flush. Return true to indicate 'flushed'.
+    return true;
   }
 }
 

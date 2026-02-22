@@ -56,7 +56,7 @@ Two JSON files, both following `AppSettings` schema:
 | --- | --- |
 | `version` | Schema version for migrations |
 | `environment` | `"production"` or `"development"` |
-| `features` | Boolean toggles: consoleLogging, devBypass, mockData, performanceMonitoring, sentryEnabled |
+| `features` | Boolean toggles: consoleLogging, devBypass, mockData, performanceMonitoring |
 | `overrides` | Runtime flags: mockSupabase, verboseErrorMessages |
 | `devTools` | Dev-only: enableConsoleLogger, enableNetworkLogger, etc. |
 | `featureFlags` | Flags with `{ enabled, description, kind }` |
@@ -286,7 +286,7 @@ Polls every 1000ms, applies full pipeline (load → migrate → validate), updat
 - **`lib/utils/logger`** – Validation logging (bootstrap category)
 - **`lib/kernel`** – Calls `validateConfig()` during Phase 0, `initializeHotReload()` during bootstrap
 - **`lib/auth`** – Uses `config.features.mockSupabase` for mock auth in dev
-- **`lib/analytics`** – Uses `config.features.sentryEnabled` to gate Sentry initialization
+- **`lib/analytics`** – Uses `config.services.errorProvider.enabled` or `config.services.analytics.enabled` to gate Sentry SDK initialization
 
 ## File Breakdown
 

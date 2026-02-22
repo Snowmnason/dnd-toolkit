@@ -15,7 +15,7 @@ vi.mock('@/lib/services', async (importOriginal) => {
   return { ...actual, getErrorTracker: () => mockTracker };
 });
 
-vi.mock('@/lib/config/loader', () => ({ getAppConfig: () => ({ features: { sentryEnabled: true } }), isDevelopment: () => false }));
+vi.mock('@/lib/config/loader', () => ({ getAppConfig: () => ({ features: {} }), isDevelopment: () => false }));
 
 import { Analytics } from '@/lib/analytics';
 import { AnalyticsConsent } from '@/lib/analytics/consent';

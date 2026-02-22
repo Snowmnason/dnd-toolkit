@@ -111,11 +111,29 @@ export const recordAuthFailure = async (
 
   if (record.attempts >= MAX_ATTEMPTS) {
     record.lockedUntil = now + LOCKOUT_MS;
-    // Report lockout to error tracker (don't block rate limit logic)
+    // Report lockout to error tracker with structured security telemetry
     // Auth lockout is a security event; treat as 'performance' (requires >= basic consent)
     try {
       if (shouldEmitEvent('performance', AnalyticsConsent.getLevel())) {
-        getErrorTracker().captureMessage("auth.lockout", "warning");
+        const emailDomain = email.split('@')[1] || 'unknown';
+        getErrorTracker().captureException(
+          new Error('auth.lockout'),
+          {
+            level: 'warning',
+            tags: {
+              event_type: 'auth_lockout',
+              scope,
+              email_domain: emailDomain,
+            },
+            extra: {
+              attempts: record.attempts,
+              max_attempts: MAX_ATTEMPTS,
+              lockout_duration_ms: LOCKOUT_MS,
+              lockout_until: record.lockedUntil,
+              window_ms: WINDOW_MS,
+            },
+          }
+        );
       }
     } catch {
       logger.debug(

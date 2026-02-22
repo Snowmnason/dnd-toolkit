@@ -67,7 +67,6 @@ const REQUIRED_FEATURES: (keyof AppSettings["features"])[] = [
   "devBypass",
   "mockData",
   "performanceMonitoring",
-  "sentryEnabled",
 ];
 
 /**

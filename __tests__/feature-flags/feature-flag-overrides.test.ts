@@ -27,6 +27,12 @@ vi.mock("@/lib/storage", () => ({
   },
 }));
 
+// Ensure production path (calls Edge Function) during tests
+vi.mock('@/lib/config/loader', () => ({
+  getAppConfig: () => ({ remoteConfig: {}, features: {}, services: {} }),
+  isDevelopment: () => false,
+}));
+
 vi.mock("@/lib/utils/logger", () => ({
   logger: {
     debug: vi.fn(),

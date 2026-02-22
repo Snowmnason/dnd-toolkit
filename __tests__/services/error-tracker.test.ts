@@ -17,25 +17,25 @@ vi.mock('expo-constants', () => ({
   expoConfig: { extra: { sentryDsn: 'test-dsn' } },
 }));
 
-vi.mock('@/lib/config/loader', () => ({
-  getAppConfig: () => ({ features: { sentryEnabled: true }, services: { errorProvider: { enabled: true } } }),
+vi.mock('@/lib/config', () => ({
+  getAppConfig: () => ({ services: { errorProvider: { enabled: true } } }),
   isDevelopment: () => false,
 }));
 
 import {
-    ErrorCaptureOptions,
-    getErrorTracker,
-    NoOpErrorTracker,
-    registerErrorTracker,
-    resetErrorTracker,
+  ErrorCaptureOptions,
+  getErrorTracker,
+  NoOpErrorTracker,
+  registerErrorTracker,
+  resetErrorTracker,
 } from '@/lib/services/error-tracker';
 
 describe('ErrorTrackerProvider', () => {
   beforeEach(() => {
     // Ensure clean singleton state between tests
     resetErrorTracker();
-    // Clear env used by Sentry enablement
-    delete process.env.EXPO_PUBLIC_SENTRY_DSN;
+    // Ensure DSN present for Sentry enablement checks
+    process.env.EXPO_PUBLIC_SENTRY_DSN = 'test-dsn';
     vi.resetAllMocks();
   });
 
@@ -79,52 +79,45 @@ describe('ErrorTrackerProvider', () => {
   });
 
   it('SentryErrorTracker calls Sentry SDK with mapped options', async () => {
-    try {
-      // Import SentryErrorTracker after top-level mocks
-      const { SentryErrorTracker: Tracker } = await import('@/lib/services/sentry/sentry-error-tracker');
-      const tracker = new Tracker();
+    // Import SentryErrorTracker after top-level mocks
+    const { SentryErrorTracker: Tracker } = await import('@/lib/services/sentry/sentry-error-tracker');
+    const tracker = new Tracker();
 
-      // captureException mapping
-      const opts: ErrorCaptureOptions = {
-        tags: { t: '1' },
-        extra: { k: 'v' },
-        level: 'error',
-        fingerprint: ['f1'],
-        contexts: { os: { name: 'test' } },
-      };
+    // captureException mapping
+    const opts: ErrorCaptureOptions = {
+      tags: { t: '1' },
+      extra: { k: 'v' },
+      level: 'error',
+      fingerprint: ['f1'],
+      contexts: { os: { name: 'test' } },
+    };
 
-      tracker.captureException(new Error('fail'), opts);
-      expect(captureException).toHaveBeenCalledTimes(1);
-      const callArgs = captureException.mock.calls[0];
-      expect(callArgs[0].message).toBe('fail');
-      expect(callArgs[1].tags).toEqual(opts.tags);
-      expect(callArgs[1].extra).toEqual(opts.extra);
-      expect(callArgs[1].level).toBe(opts.level);
-      expect(callArgs[1].fingerprint).toEqual(opts.fingerprint);
+    tracker.captureException(new Error('fail'), opts);
+    expect(captureException).toHaveBeenCalledTimes(1);
+    const callArgs = captureException.mock.calls[0];
+    expect(callArgs[0].message).toBe('fail');
+    expect(callArgs[1].tags).toEqual(opts.tags);
+    expect(callArgs[1].extra).toEqual(opts.extra);
+    expect(callArgs[1].level).toBe(opts.level);
+    expect(callArgs[1].fingerprint).toEqual(opts.fingerprint);
 
-      // captureMessage mapping
-      tracker.captureMessage('mymessage', 'warning');
-      expect(captureMessage).toHaveBeenCalledWith('mymessage', 'warning');
+    // captureMessage mapping
+    tracker.captureMessage('mymessage', 'warning');
+    expect(captureMessage).toHaveBeenCalledWith('mymessage', 'warning');
 
-      // addBreadcrumb mapping (timestamp conversion)
-      const now = Date.now();
-      tracker.addBreadcrumb({ category: 'api', message: 'called', timestamp: now, level: 'info' });
-      expect(addBreadcrumb).toHaveBeenCalledTimes(1);
-      const bcArg = addBreadcrumb.mock.calls[0][0];
-      expect(bcArg.category).toBe('api');
-      expect(bcArg.message).toBe('called');
-      expect(bcArg.level).toBe('info');
-      // timestamp converted to seconds
-      expect(bcArg.timestamp).toBeCloseTo(now / 1000, 0);
+    // addBreadcrumb mapping (timestamp conversion)
+    const now = Date.now();
+    tracker.addBreadcrumb({ category: 'api', message: 'called', timestamp: now, level: 'info' });
+    expect(addBreadcrumb).toHaveBeenCalledTimes(1);
+    const bcArg = addBreadcrumb.mock.calls[0][0];
+    expect(bcArg.category).toBe('api');
+    expect(bcArg.message).toBe('called');
+    expect(bcArg.level).toBe('info');
+    // timestamp converted to seconds
+    expect(bcArg.timestamp).toBeCloseTo(now / 1000, 0);
 
-      // setUser mapping
-      tracker.setUser({ id: 'u1', email: 'e@d' });
-      expect(setUser).toHaveBeenCalledWith({ id: 'u1', email: 'e@d' });
-    } catch (err) {
-      // If environment is missing react-native/polyfills, skip assertions but
-      // surface a helpful message so CI can be configured appropriately.
-      // Mark test as passed in this environment.
-      expect(err).toBeTruthy();
-    }
+    // setUser mapping
+    tracker.setUser({ id: 'u1', email: 'e@d' });
+    expect(setUser).toHaveBeenCalledWith({ id: 'u1', email: 'e@d' });
   });
 });
