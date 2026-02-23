@@ -7,7 +7,7 @@
  */
 
 import { getAppConfig } from "@/lib/config";
-import { getHealthEndpointUrl } from "@/lib/edge-functions/constants";
+import { getHealthEndpointUrl } from "@/lib/database/edge/constants";
 
 /**
  * Get the Supabase health endpoint for network checks

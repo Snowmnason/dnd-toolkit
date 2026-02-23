@@ -1,5 +1,6 @@
 import { RequestManager } from "@/lib/api/request-manager";
 import { validateUserForWrite } from "@/lib/database/common";
+import { runEdgeFunction } from "@/lib/database/repositories/supabase-rpc-adapter";
 import { getDatabaseProvider } from "@/lib/services";
 import { logger } from "@/lib/utils/logger";
 import { dbRequestOptions } from "./request-config";
@@ -32,22 +33,11 @@ export class SupabaseInviteRepository implements InviteRepository {
         hoursValid,
       });
 
-      const { data, error } = await getDatabaseProvider()
-        .rpc(
-          "create_invite_link",
-          {
-            p_world_id: worldId,
-            p_hours_valid: hoursValid,
-          },
-          "worlds",
-        );
-
-      if (error) {
-        logger.category("database").error("Failed to create invite link", error);
-        return { success: false, error: error.message };
-      }
-
-      const created = Array.isArray(data) ? data[0] : data;
+      const created = await runEdgeFunction("createInviteLink", {
+        world_id: worldId,
+        max_uses: undefined,
+        expires_in_days: Math.ceil(hoursValid / 24),
+      });
 
       if (!created) {
         logger.category("database").error("No data returned from create_invite_link RPC");
@@ -83,21 +73,9 @@ export class SupabaseInviteRepository implements InviteRepository {
       const result = await RequestManager.fetch(
         `invite:validate:${token}`,
         async () => {
-          const { data, error } = await getDatabaseProvider()
-            .rpc(
-              "resolve_invite_token",
-              {
-                p_token: token,
-              },
-              "worlds",
-            );
-
-          if (error) {
-            logger.category("database").error("Invalid invite token", { error });
-            throw new Error("Invalid or expired invite link");
-          }
-
-          const invite = Array.isArray(data) ? data[0] : data;
+          const invite = await runEdgeFunction("resolveInviteToken", {
+            invite_token: token,
+          });
 
           if (!invite) {
             logger.category("database").error("No invite found for token", { token });
@@ -145,21 +123,9 @@ export class SupabaseInviteRepository implements InviteRepository {
     try {
       logger.category("database").info(`Deleting invite link with token: ${token}`);
 
-      const { data, error } = await getDatabaseProvider()
-        .rpc(
-          "delete_invite_link",
-          {
-            p_token: token,
-          },
-          "worlds",
-        );
-
-      if (error) {
-        logger.category("database").error("Failed to delete invite link", error);
-        return { success: false, error: error.message };
-      }
-
-      const deleted = Array.isArray(data) ? data[0] : data;
+      const deleted = await runEdgeFunction("deleteInviteLink", {
+        invite_token: token,
+      });
 
       if (!deleted) {
         logger.category("database").error("No data returned from delete_invite_link RPC");

@@ -1,4 +1,5 @@
 import { RequestManager } from "@/lib/api/request-manager";
+import { runEdgeFunction } from "@/lib/database/repositories/supabase-rpc-adapter";
 import { getDatabaseProvider } from "@/lib/services";
 import { logger } from "@/lib/utils/logger";
 import { dbRequestOptions } from "./request-config";
@@ -55,28 +56,10 @@ export class SupabaseWorldAccessRepository implements WorldAccessRepository {
     return RequestManager.fetch(
       `world:${worldId}:addUser:${userId}`,
       async () => {
-        // Use RPC to handle invite validation and access addition atomically
-        const { data, error } = await getDatabaseProvider()
-          .rpc(
-            "join_world_with_invite",
-            {
-              p_world_id: worldId,
-              p_invite_token: inviteToken,
-              p_user_role: userRole,
-            },
-            "worlds",
-          );
-
-        if (error) {
-          logger.category("database").error("Failed to add user to world:", {
-            worldId,
-            userId,
-            message: error.message,
-          });
-          throw new Error(error.message || "Failed to add user to world");
-        }
-
-        const result = Array.isArray(data) ? data[0] : data;
+        // Use semantic edge function to handle invite validation and access addition atomically
+        const result = await runEdgeFunction("joinWorldWithInvite", {
+          invite_token: inviteToken,
+        });
 
         if (!result) {
           throw new Error("Failed to add user to world");
@@ -98,22 +81,12 @@ export class SupabaseWorldAccessRepository implements WorldAccessRepository {
     await RequestManager.fetch(
       `world:${worldId}:removeUser:${userId}`,
       async () => {
-        // Server-side RPC to handle access control and cascading deletes
+        // Use semantic edge function to handle access control and cascading deletes
         // The RPC enforces that only the user themselves or a world owner can remove membership.
-        const { error } = await getDatabaseProvider()
-          .rpc("remove_world_access", {
-            p_world_id: worldId,
-            p_user_id: userId,
-          }, "worlds");
-
-        if (error) {
-          logger.category("database").error("Failed to remove user from world:", {
-            worldId,
-            userId,
-            message: error.message,
-          });
-          throw new Error(error.message || "Failed to remove user from world");
-        }
+        await runEdgeFunction("removeWorldAccess", {
+          world_id: worldId,
+          user_id: userId,
+        });
 
         logger.category("database").info("User removed from world:", {
           worldId,

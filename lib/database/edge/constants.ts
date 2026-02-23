@@ -6,7 +6,7 @@
  *
  * **Usage:**
  * ```typescript
- * import { EDGE_FUNCTIONS } from "@/lib/edge-functions/constants";
+ * import { EDGE_FUNCTIONS } from "@/lib/database/edge/constants";
  *
  * // Get full URL
  * const fullUrl = `${supabaseUrl}${EDGE_FUNCTIONS.GET_FEATURE_FLAGS}`;
