@@ -1,7 +1,8 @@
 import { isDevelopment } from "@/lib/config/loader";
 
-import { getAuthProvider, getDatabaseProvider } from "../services";
+import { getAuthProvider } from "../services";
 import { logger } from "../utils/logger";
+import { getUserRepository } from "./repositories";
 import type { User } from "./users";
 
 /**
@@ -142,14 +143,11 @@ export async function validateUserForWrite(): Promise<User> {
   }
 
   // Fetch full user profile from database with fresh auth
-  const { data: userProfile, error } = await getDatabaseProvider()
-    .from('users', 'public')
-    .select("*")
-    .eq("auth_id", validatedAuth.auth_id)
-    .single();
+  // validatedAuth.auth_id matches the session.userId, so getCurrentUser() fetches the same row
+  const userProfile = await getUserRepository().getCurrentUser({ forceRefresh: true });
 
-  if (error || !userProfile) {
-    logger.category("database").error("User profile not found during write validation:", error);
+  if (!userProfile) {
+    logger.category("database").error("User profile not found during write validation");
     throw new Error("User profile not found - cannot perform write operation");
   }
 

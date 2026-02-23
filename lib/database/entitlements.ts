@@ -1,10 +1,10 @@
 /**
  * Entitlements Database Queries
  *
- * This module provides client-side REST API helpers for querying user entitlements
- * from the Supabase `feature_flag.entitlements` table.
+ * This module provides client-side helpers for querying user entitlements.
+ * All queries are delegated to `EntitlementsRepository` (Supabase implementation).
  *
- * **Schema**: feature_flag.entitlements
+ * **Schema**: feature_flags.entitlements
  * - id: uuid (PK)
  * - user_id: uuid (FK to users)
  * - key: text (entitlement name)
@@ -17,83 +17,25 @@
  * use `lib/feature-flags/FeatureFlagsManager` and React hooks instead.
  */
 
-import { getDatabaseProvider } from "../services";
+import { getEntitlementsRepository } from "./repositories";
+
+// ---------------------------------------------------------------------------
+// Row types — kept here as the canonical source; re-exported from repositories/types.ts
+// ---------------------------------------------------------------------------
 
 export interface EntitlementRow {
   id: string;
   user_id: string;
   key: string;
-  is_active: boolean; // Manual revoke + auto-marked when expired
-  remind_user: boolean; // Flag to remind user when expired
+  is_active: boolean;
+  remind_user: boolean;
   created_at: string;
   updated_at: string;
   expires_at: string | null;
 }
 
 /**
- * Fetch all entitlements for a given user
- *
- * @param userId - User ID (UUID) to fetch entitlements for
- * @returns List of user entitlements
- */
-export async function fetchEntitlementsByUserId(
-  userId: string,
-): Promise<EntitlementRow[]> {
-  const { data, error } = await getDatabaseProvider()
-    .from('entitlements', 'feature_flags')
-    .select(
-      "id, user_id, key, is_active, remind_user, created_at, updated_at, expires_at",
-    )
-    .eq("user_id", userId)
-    .eq("is_active", true) // Only fetch active entitlements
-    .execute();
-
-  if (error) {
-    throw new Error(
-      `Failed to fetch entitlements for user ${userId}: ${error.message}`,
-    );
-  }
-
-  return (data || []) as EntitlementRow[];
-}
-
-/**
- * Check if a user has a specific entitlement
- *
- * Checks both existence and expiry (if expires_at is set).
- *
- * @param userId - User ID (UUID)
- * @param entitlementKey - Entitlement key to check
- * @returns true if user has active (non-expired) entitlement, false otherwise
- */
-export async function hasEntitlement(
-  userId: string,
-  entitlementKey: string,
-): Promise<boolean> {
-  const { data, error } = await getDatabaseProvider()
-    .from('entitlements', 'feature_flags')
-    .select("is_active, expires_at")
-    .eq("user_id", userId)
-    .eq("key", entitlementKey)
-    .eq("is_active", true) // Only check active entitlements
-    .maybeSingle();
-
-  if (error || !data) {
-    return false; // No entitlement found = false
-  }
-
-  // If expires_at is null, the entitlement never expires
-  if (data.expires_at === null) {
-    return true;
-  }
-
-  // Check if the entitlement has expired
-  const expiryTime = new Date(data.expires_at).getTime();
-  return expiryTime > Date.now();
-}
-
-/**
- * Entitlement override row (admin grant/revoke tool)
+ * Entitlement override row (admin grant/revoke tool).
  *
  * Overrides allow admins to temporarily grant or revoke entitlements
  * without modifying the base entitlement rows.
@@ -102,169 +44,99 @@ export interface EntitlementOverrideRow {
   id: string;
   user_id: string;
   entitlement_key: string;
-  is_active: boolean; // true = force grant, false = force revoke
+  is_active: boolean;
   expires_at: string | null;
   reason: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
-  revoked: boolean; // Soft-revoke for audit trail
+  revoked: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Query helpers — thin delegation to EntitlementsRepository
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch all active entitlements for a given user.
+ */
+export async function fetchEntitlementsByUserId(
+  userId: string,
+): Promise<EntitlementRow[]> {
+  return getEntitlementsRepository().getByUserId(userId);
 }
 
 /**
- * Fetch all active entitlement overrides for a given user
+ * Check if a user has a specific active (non-expired) entitlement.
+ */
+export async function hasEntitlement(
+  userId: string,
+  entitlementKey: string,
+): Promise<boolean> {
+  return getEntitlementsRepository().hasEntitlement(userId, entitlementKey);
+}
+
+/**
+ * Fetch all active entitlement overrides for a given user.
  *
- * Filters for non-revoked overrides that have not expired.
- * Overrides provide temporary admin-controlled grants/revokes.
- *
- * @param userId - User ID (UUID) to fetch overrides for
- * @returns List of active user entitlement overrides
+ * Returns non-revoked overrides that have not expired.
  */
 export async function fetchEntitlementOverridesByUserId(
   userId: string,
 ): Promise<EntitlementOverrideRow[]> {
-  const now = new Date().toISOString();
-
-  const { data, error } = await getDatabaseProvider()
-    .from('entitlements_overrides', 'feature_flags')
-    .select(
-      "id, user_id, entitlement_key, is_active, expires_at, reason, created_by, created_at, updated_at, revoked",
-    )
-    .eq("user_id", userId)
-    .eq("revoked", false)
-    .or(`expires_at.is.null,expires_at.gt.${now}`)
-    .execute();
-
-  if (error) {
-    throw new Error(
-      `Failed to fetch entitlement overrides for user ${userId}: ${error.message}`,
-    );
-  }
-
-  return (data || []) as EntitlementOverrideRow[];
+  return getEntitlementsRepository().getOverridesByUserId(userId);
 }
 
 /**
- * Set the remind_user flag for a specific entitlement
+ * Set the remind_user flag for a specific entitlement.
  *
- * Updates whether users should be reminded about this entitlement's expiration.
- *
- * @param entitlementId - Entitlement ID (UUID)
- * @param remindUser - true to enable reminders, false to disable
- * @returns true on success, throws error on failure
+ * @returns true on success, throws on failure
  */
 export async function setEntitlementReminderFlag(
   entitlementId: string,
   remindUser: boolean,
 ): Promise<boolean> {
-  const { error } = await getDatabaseProvider()
-    .from('entitlements', 'feature_flags')
-    .update({ remind_user: remindUser, updated_at: new Date().toISOString() })
-    .eq('id', entitlementId)
-    .execute();
-
-  if (error) {
-    throw new Error(
-      `Failed to update remind_user for entitlement ${entitlementId}: ${error.message}`,
-    );
-  }
-
+  await getEntitlementsRepository().setReminderFlag(entitlementId, remindUser);
   return true;
 }
 
 /**
- * Fetch entitlements that should trigger reminders
- *
- * Returns entitlements where:
- * - is_active = true
- * - remind_user = true
- * - expires_at is within the reminder window (optional filter on client)
- *
- * @param userId - User ID (UUID) to fetch remindable entitlements for
- * @returns List of entitlements that should trigger reminders
+ * Fetch entitlements that should trigger reminders (is_active, remind_user, has expiry).
  */
 export async function fetchRemindableEntitlements(
   userId: string,
 ): Promise<EntitlementRow[]> {
-  const { data, error } = await getDatabaseProvider()
-    .from('entitlements', 'feature_flags')
-    .select(
-      'id, user_id, key, is_active, remind_user, created_at, updated_at, expires_at',
-    )
-    .eq('user_id', userId)
-    .eq('is_active', true)
-    .eq('remind_user', true)
-    .not('expires_at', 'is', null) // Only include entitlements that expire
-    .execute();
-
-  if (error) {
-    throw new Error(
-      `Failed to fetch remindable entitlements for user ${userId}: ${error.message}`,
-    );
-  }
-
-  return (data || []) as EntitlementRow[];
+  return getEntitlementsRepository().getRemindable(userId);
 }
 
 /**
- * Fetch entitlements that have expired beyond the grace period
+ * Fetch entitlements that have expired beyond the grace period.
  *
- * Returns active entitlements where:
- * - is_active = true
- * - expires_at < (now - gracePeriodDays)
+ * Computes the cutoff date from the grace period and delegates to the repository.
  *
- * @param gracePeriodDays - Number of days after expiry to wait before deactivation
- * @returns List of expired entitlements past the grace period
+ * @param gracePeriodDays - Days after expiry to wait before deactivation
  */
 export async function fetchExpiredEntitlements(
   gracePeriodDays: number,
 ): Promise<EntitlementRow[]> {
-  const now = new Date();
-  const graceCutoffDate = new Date(now.getTime() - gracePeriodDays * 24 * 60 * 60 * 1000);
-
-  const { data, error } = await getDatabaseProvider()
-    .from('entitlements', 'feature_flags')
-    .select('id, user_id, key, is_active, remind_user, created_at, updated_at, expires_at')
-    .eq('is_active', true)
-    .lt('expires_at', graceCutoffDate.toISOString())
-    .execute();
-
-  if (error) {
-    throw new Error(
-      `Failed to fetch expired entitlements: ${error.message}`,
-    );
-  }
-
-  return (data || []) as EntitlementRow[];
+  const cutoff = new Date(Date.now() - gracePeriodDays * 24 * 60 * 60 * 1000);
+  return getEntitlementsRepository().getExpiredBeforeDate(cutoff.toISOString());
 }
 
 /**
- * Deactivate a batch of entitlements
+ * Deactivate a batch of entitlements (sets is_active = false).
  *
- * Marks the given entitlements as is_active = false.
+ * @returns Number of entitlements deactivated
+/**
+ * Deactivate a batch of entitlements (sets is_active = false).
  *
- * @param entitlementIds - Array of entitlement IDs (UUIDs) to deactivate
  * @returns Number of entitlements deactivated
  */
 export async function deactivateEntitlements(
   entitlementIds: string[],
 ): Promise<number> {
-  if (entitlementIds.length === 0) {
-    return 0;
-  }
-
-  const { error } = await getDatabaseProvider()
-    .from('entitlements', 'feature_flags')
-    .update({ is_active: false, updated_at: new Date().toISOString() })
-    .in('id', entitlementIds)
-    .execute();
-
-  if (error) {
-    throw new Error(
-      `Failed to deactivate entitlements: ${error.message}`,
-    );
-  }
-
+  if (entitlementIds.length === 0) return 0;
+  await getEntitlementsRepository().deactivate(entitlementIds);
   return entitlementIds.length;
 }
 
