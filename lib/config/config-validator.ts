@@ -296,6 +296,11 @@ function validateAppSettingsImpl(config: AppSettings): ConfigValidationResult {
             "bootstrap",
             "error",
             "feature_flags",
+            "database",
+            "offline",
+            "jobs",
+            "buckets",
+            "realtime",
             "other",
           ];
           for (const cat of requiredCategories) {

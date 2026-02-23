@@ -39,8 +39,8 @@ export {
   DataSensitivity,
   validateClassifications,
   type DataClassification
-} from "./data-classification";
-export { FastCache } from "./FastCache";
+} from "./cache/data-classification";
+export { FastCache } from "./cache/FastCache";
 export {
   classifyKey,
   clearAllUserData,
@@ -51,9 +51,8 @@ export {
   isSensitiveData,
   redactForLogs,
   shouldUseSecureStorage
-} from "./privacy";
-export { SecureStorage } from "./SecureStorage";
-export { STORAGE_BACKEND_CONFIG, type StorageBackend } from "./storage-config";
+} from "./cache/privacy";
+export { SecureStorage } from "./cache/SecureStorage";
 export {
   batchStorageOperation,
   checkStorageHealth,
@@ -72,7 +71,8 @@ export {
   type StorageGracefulResult,
   type StorageOperation,
   type StorageOperationOptions
-} from "./storage-error-handling";
+} from "./cache/storage-error-handling";
+export { STORAGE_BACKEND_CONFIG, type StorageBackend } from "./storage-config";
 export { updateStorageCache } from "./update-storage-cache";
 
 /**

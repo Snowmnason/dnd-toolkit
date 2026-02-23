@@ -1,11 +1,11 @@
 import { Platform } from "react-native";
-import { getAppConfig } from "../config";
+import { getAppConfig } from "../../config";
 
 // Lazy import logger to avoid circular dependency with config
 let loggerCache: any = null;
 const getLogger = () => {
   if (!loggerCache) {
-    loggerCache = require("../utils/logger").logger;
+    loggerCache = require("../../utils/logger").logger;
   }
   return loggerCache;
 };
@@ -27,12 +27,14 @@ interface StorageAPI {
 }
 
 // Get sessionStorage for web (ephemeral cache, cleared on session end)
+// FastCache intentionally uses unencrypted sessionStorage for performance (5-10x faster than SecureStorage)
+// This is safe because FastCache data is non-sensitive, ephemeral, and refetchable on demand
 const getSessionStorage = (): StorageAPI => {
-  if (typeof sessionStorage !== "undefined") {
-    return sessionStorage;
+  if (Platform.OS === "web" && typeof window !== "undefined" && window.sessionStorage) {
+    return window.sessionStorage as StorageAPI;
   }
 
-  // Return no-op implementation for Node.js environments
+  // Return no-op implementation for non-web environments (mobile, Node.js)
   return {
     getItem: () => null,
     setItem: () => {},

@@ -8,7 +8,6 @@
  * @example
  * // Register a Supabase RPC adapter
  * registerEdgeFunction('leaveWorld', {
- *   name: 'leaveWorld',
  *   handler: (input) => runSupabaseRpc('leave_world', input)
  * });
  *
@@ -24,9 +23,13 @@ import { logger } from "@/lib/utils";
  * Each implementation maps a semantic function name to a backend-specific handler.
  */
 export interface EdgeFunctionImplementation<Input = any, Output = any> {
-  /** Semantic function name (e.g., 'leaveWorld', 'createInviteLink') */
-  name: string;
-  /** Backend-specific handler that executes the function */
+  /**
+   * Backend-specific handler that executes the function.
+   *
+   * Note: `name` is intentionally absent. The registry keys by the string passed to
+   * registerEdgeFunction(). Storing name on the object risks name/key mismatches.
+   * Use getRegisteredEdgeFunctions() for introspection.
+   */
   handler: (input: Input) => Promise<Output>;
 }
 
@@ -116,7 +119,6 @@ const registry = new EdgeFunctionRegistry();
  *
  * @example
  * registerEdgeFunction('leaveWorld', {
- *   name: 'leaveWorld',
  *   handler: async (input) => { ... }
  * });
  */

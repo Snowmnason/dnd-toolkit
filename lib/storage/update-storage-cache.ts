@@ -1,7 +1,7 @@
 import { logger } from "../utils/logger";
 // Import directly from storage modules to avoid circular dependency with index.ts
 // index.ts exports updateStorageCache, and this file needs storage functions
-import { getStorageBackend } from "./privacy";
+import { getStorageBackend } from "./cache/privacy";
 
 // Import STORAGE_KEYS consistently
 // Note: We import directly from storage-config to avoid circular dependency

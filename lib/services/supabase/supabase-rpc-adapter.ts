@@ -16,9 +16,9 @@ import { logger } from "@/lib/utils";
 
 /**
  * Generic edge function implementation interface
+ * Note: `name` is not stored on the object — keyed by registry string. See lib/database/edge/registry.ts.
  */
 export interface EdgeFunctionImplementation<Input = any, Output = any> {
-  name: string;
   handler: (input: Input) => Promise<Output>;
 }
 
@@ -188,7 +188,6 @@ export function createSupabaseRpcAdapter<
   Output extends EdgeFunctionOutput = any
 >(functionName: string): EdgeFunctionImplementation<Input, Output> {
   return {
-    name: functionName,
     handler: (input: Input) => runEdgeFunction<Output>(functionName, input),
   };
 }

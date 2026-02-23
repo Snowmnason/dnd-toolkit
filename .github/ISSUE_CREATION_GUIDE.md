@@ -17,37 +17,32 @@
 5. [Solution & Phases](#solution--phases)
 6. [Phase 0: Discussion](#phase-0-discussion)
 7. [Phase 1: Tracks (Implementation)](#phase-1-tracks-implementation)
-8. [Phase 2: Documentation](#phase-2-documentation)
-9. [Phase 3: Usage Guides](#phase-3-usage-guides)
-10. [Phase 4: Testing](#phase-4-testing)
-11. [Acceptance Criteria](#acceptance-criteria)
-12. [Dependencies & Notes](#dependencies--notes)
-13. [Formatting Conventions](#formatting-conventions)
-14. [Quick Checklist](#quick-checklist)
+8. [Acceptance Criteria](#acceptance-criteria)
+9. [Dependencies & Notes](#dependencies--notes)
+10. [Formatting Conventions](#formatting-conventions)
+11. [Quick Checklist](#quick-checklist)
 
 ---
 
 ## Overview
 
-### 5-Phase Methodology
+### 2-Phase Methodology (+ Acceptance Criteria for Docs/Testing)
 
-Each comprehensive issue follows a 5-phase structure:
+Each comprehensive issue follows a 2-phase structure, with documentation and testing tracked separately:
 
 | Phase | Purpose | Scope | Deliverable |
 |-------|---------|-------|-------------|
 | **Phase 0** | Understanding & Planning | Discussion, clarifying questions, draft PR body | Shared understanding of scope |
 | **Phase 1: Tracks** | Implementation | Isolated tracks (A+B Core, C Integration, D Adoption, E Hardening) — include what applies | Working code per track, each independently reviewable |
-| **Phase 2** | Documentation | Module README, API reference, architecture | lib/[module]/README.md |
-| **Phase 3** | Guides & Testing | Usage guide, test guide with manual cases | docs/issues/MileStone/... |
-| **Phase 4** | Testing | Unit, integration, E2E, stress tests | Test coverage verified |
+| **Acceptance Criteria** | README, Guides, Tests | Tracked as checklists (not phase descriptions) | Docs/tests delegated to separate agent workflows |
 
 ### Why This Structure?
 
 - **Phase 0:** Ensures both developer and user understand scope before code starts (prevents rework)
 - **Phase 1 Tracks:** Isolates each concern (Core+Surface, Integration, Adoption, Hardening) so each track is reviewable independently — Track E keeps logging/warnings out of Track C reviews
-- **Phase 2:** Ensures API is documented as it's built (not retrofit)
-- **Phase 3:** Creates reusable guides for future developers
-- **Phase 4:** Guarantees quality (unit + integration + E2E + stress)
+- **Acceptance Criteria — Docs/Tests:** Phase 1 stays focused on **writing code**. Documentation (README, guides) and testing are listed as checklists in Acceptance Criteria, and are handled by separate agent workflows so developers don't context-switch between coding and docs writing.
+
+> **Key principle:** Phase 0 and Phase 1 are for **development** (no documentation writing). Phases 2-4 (README, guides, tests) are tracked as acceptance criteria and delegated to separate specialized workflows.
 
 ---
 
@@ -347,7 +342,7 @@ Before writing any code on an update issue, define:
 
 If Track A+B (or any track) has multiple **independent concerns**, break it into **Sub-tracks** that can be reviewed/implemented in sequence:
 
-```markdown
+ 
 ## Track A+B: [Specific title with multiple concerns]
 
 **Goal:** [Overall goal]
@@ -372,7 +367,7 @@ If Track A+B (or any track) has multiple **independent concerns**, break it into
 - [ ] [Task 5]
 
 ✅ Exit: [Sub-track 3 specific exit criteria and final track exit]
-```
+ 
 
 **When to use sub-tracks:**
 - A single track is large enough that it has 2+ independent concerns (e.g., local storage + database persistence)
@@ -431,7 +426,7 @@ If Track A+B (or any track) has multiple **independent concerns**, break it into
 
 ### Example Track A+B Scope Item
 
-```markdown
+ 
 - [ ] Create `lib/analytics/performance-baseline.ts`:
   - `OperationBaseline` type: `{ label, p50, p95, p99, lastUpdated, version }`
   - `PerformanceBaselineService` class:
@@ -444,164 +439,60 @@ If Track A+B (or any track) has multiple **independent concerns**, break it into
 
 ---
 
-## Phase 2: Documentation
+## Documentation & Testing Workflows
 
-**Goal:** Module README documenting architecture, API, integration points.
+**Important:** Phases 2 (Documentation), 3 (Guides), and 4 (Testing) are **NOT part of the issue narrative**. Instead, they are tracked in [Acceptance Criteria](#acceptance-criteria) as checklists and handled by **separate specialized agent workflows** to avoid context-switching.
 
-## Phase 2: Create lib/[module]/README.md
+**Why separate workflows?**
+- Developers focus on Phase 0 (discussion) + Phase 1 (code implementation) without distraction
+- Documentation (README, usage guides) goes to a dedicated documentation agent
+- Testing is handled by a testing/QA agent
+- Each workflow can be parallelized independently
 
-**Scope:**
-
-**Create or update `lib/[module]/README.md` following the repository's style guide:**
-- [ ] "When to Use This Module" section (suitable vs unsuitable use cases)
-- [ ] Architecture & Data Flow (brief description or diagram)
-- [ ] API Reference (all exports with type signatures and code examples)
-- [ ] Dependencies (external packages + internal lib dependencies)
-- [ ] Error Handling & Edge Cases (known limitations, error patterns)
-- [ ] Performance Notes (caching, overhead, optimization tradeoffs)
-- [ ] Related Modules (links to connected lib/* modules)
-- [ ] File Breakdown (what each file does in a table)
-- [ ] Testing section (link to test guide if exists, or manual testing tips)
-- [ ] Future Enhancements (planned improvements or tech debt)
-- [ ] **Must be app-agnostic** – no app-specific language; readable by developers using this in future projects
-
-
-### Phase 2 Tips
-
-- **⚠️ Module root level ONLY:** README.md is ONLY created at `lib/[module]/README.md`. NEVER create nested READMEs like `lib/[module]/sentry/README.md` or `lib/[module]/providers/README.md`. All module docs consolidate into ONE root README.
-- **Focus on developer experience:** This is for FUTURE developers using this module
-- **Code examples:** Show common usage patterns (best case, error case)
-- **Architecture diagrams:** ASCII or brief mermaid (help visualize data flow)
-- **Don't document implementation:** Document the API and intent, not internal details
-- **Link to other modules:** Make it easy to discover related functionality
-- **Follow the style guide:** See `.github\README_STYLE_GUIDE.md` for detailed formatting requirements for all issue docs
-- **Avoid Testing/Future sections if not applicable:** Per repository guidelines, these are optional for simple modules but required for complex ones
-
----
-
-## Phase 3: Usage Guides
-
-**Goal:** Real-world integration guide for developers using the feature.
-
-## Phase 3: Create usage guides
-
-**⚠️ IMPORTANT:** Phase 3 creates **exactly 2 mandatory files** + optional docs based on the specific issue. Do NOT create a separate "Testing Guide" file — testing documentation is Phase 4 only.
-
-**Scope:**
-
-**Create `docs/issues/MileStone X/XXX - [Feature]/USAGE_GUIDE.md` (MANDATORY):**
-- [ ] Integration checklist (step-by-step how to add to app)
-- [ ] Code examples (all common use cases)
-- [ ] Common patterns (recommended ways to use)
-- [ ] Debugging section (how to identify issues)
-- [ ] Troubleshooting (common problems + solutions)
-
-**Create `docs/issues/MileStone X/XXX - [Feature]/IMPLEMENTATION_GUIDE.md` (MANDATORY):**
-- [ ] Architecture overview and data flow
-- [ ] File structure and key classes/interfaces
-- [ ] Integration points with existing modules
-- [ ] Configuration options and appsettings
-- [ ] Error handling patterns and edge cases
-
-**Optional additional docs** (create only if the issue warrants them):
-
-| File (example names) | When to create it |
-| -------------------- | ----------------- |
-| `ARCHITECTURE.md` | When the feature has a non-trivial data flow or system design worth diagramming separately |
-| `EXAMPLES.md` | When the Usage Guide would get too long with all examples inline |
-| `LIMITS.md` | When the feature has important constraints, quotas, or known boundaries a dev needs to know |
-| `MISSING.md` or `GAPS.md` | When scope was intentionally cut and a future dev needs to know what is not done yet |
-| `VARIANT_TRACKING_GUIDE.md` | Feature-specific doc for A/B test variant tracking, etc. |
-
-### Phase 3 Tips
-
-- **Exactly 2 mandatory files:** USAGE_GUIDE.md and IMPLEMENTATION_GUIDE.md. No more, no less.
-- **No testing docs here:** Testing guides belong in Phase 4 only (in `docs/A Testing Guide/`)
-- **Optional docs only when justified:** Don't create `ARCHITECTURE.md` unless the feature is genuinely complex; use IMPLEMENTATION_GUIDE.md by default
-- **Follow the style guide:** See `.github/ISSUE_DOC_STYLE_GUIDE.md` for detailed formatting requirements for all issue docs
-
----
-
-## Phase 4: Testing
-
-**Goal:** Comprehensive test coverage (unit, integration, E2E, stress).
-
-## Phase 4: Comprehensive tests
-
-**Scope:**
-- [ ] Unit tests:
-  - [10-15 test cases covering core functionality]
-  - [Edge cases]
-  - [Validation]
-
-- [ ] Integration tests:
-  - [Multi-component interaction]
-  - [With other tier X features]
-  - [Offline scenarios]
-
-- [ ] End-to-end test:
-  - [Full workflow from start to finish]
-
-- [ ] Stress tests:
-  - [High volume of operations]
-  - [Concurrent calls]
-  - [Storage limits]
-
-- [ ] Lint & typecheck:
-  - `npm run lint` passes
-  - `npm run typecheck` passes
-
-**Create or update `docs/A Testing Guide/[Feature] Testing.md`:**
-  - [ ] Manual test cases (appropriate number with detailed steps)
-  - [ ] Test data setup (mocks, fixtures)
-  - [ ] Platform testing notes (web/iOS/Android variations)
-  - [ ] Success criteria (how to know tests passed)
-```
-
-### Phase 4 Tips
-
-- **⚠️ Test folder structure is NON-NEGOTIABLE:** ALL test files MUST be in `__tests__` folders ONLY. Examples:
-  - ✅ `lib/services/__tests__/auth-provider.test.ts`
-  - ✅ `lib/services/__tests__/error-tracker.test.ts`
-  - ❌ `lib/services/auth-provider.test.ts` (WRONG: test file in source folder)
-  - ❌ `lib/services/sentry/__tests__/sentry-error-tracker.test.ts` (WRONG: __tests__ nested too deep; move to `lib/services/__tests__/`)
-- **Organize by feature:** Group related test files in one `__tests__` folder per lib/[module]
-- **Unit tests:** Focus on individual functions/methods; mock dependencies
-- **Integration tests:** Combine multiple modules; test real interactions
-- **E2E tests:** Full workflow (e.g., record sample → restart app → baseline restored)
-- **Stress tests:** Ensure no unbounded growth, handles 100x normal load
-- **Lint check:** Must pass `npm run lint` (no Type errors)
-- **For detailed testing guidance:** See [DETAILED_TESTING_GUIDE.md](.github/DETAILED_TESTING_GUIDE.md)
+This keeps issues lean and focused on technical decision-making and implementation.
 
 ---
 
 ## Acceptance Criteria
 
-**Goal:** Measurable, verifiable criteria for each phase.
+**Goal:** Measurable, verifiable criteria including code implementation AND accompanying documentation/tests.
 
+### Format
+
+Simple checklists — hand these to separate agent workflows for documentation and testing.
+
+ 
 ## Acceptance Criteria
 
-**Phase 1 (CODING)**
-- [ ] Queue persists to SecureStorage
-- [ ] FIFO overflow drops oldest (max 100)
-- [ ] Validation prevents corrupted data
-- [ ] Storage key uses STORAGE_KEYS constant
+**Phase 1 (Implementation):**
+- [ ] [Specific code criterion]
+- [ ] [Integration criterion]
+- [ ] [Config/setup criterion]
 
 **Phase 2 (README):**
-- [ ] README.md created
-- [ ] Architecture diagram included
-- [ ] API reference complete
-- [ ] Examples provided
+- [ ] `lib/[module]/README.md` with architecture, API reference, examples
+- [ ] All public exports documented
+- [ ] Integration points with other modules clearly explained
 
 **Phase 3 (Guides):**
-- [ ] USAGE_GUIDE.md created
-- [ ] Success criteria quantified
+- [ ] `docs/issues/MileStone X/[Feature]/USAGE_GUIDE.md` with integration checklist, examples, common patterns, debugging
+- [ ] `docs/issues/MileStone X/[Feature]/IMPLEMENTATION_GUIDE.md` with architecture overview, file structure, integration points
 
 **Phase 4 (Tests):**
-- [ ] Unit tests: 80%+ coverage
-- [ ] Integration tests passing
-- [ ] E2E test passing
-- [ ] Lint and typecheck passing
+- [ ] Unit tests (80%+ coverage) for core logic
+- [ ] Integration tests for module interactions
+- [ ] E2E test for full workflow
+- [ ] `npm run lint` and `npm run typecheck` passing
+- [ ] `docs/A Testing Guide/[Feature] Testing.md` with manual test cases and success criteria
+ 
+
+### Acceptance Criteria Tips
+
+- **Phase 1:** Focus on WHAT the code does (not HOW it's tested). Checkboxes for each deliverable.
+- **Phase 2-4:** Simple checklists of WHAT to document/test. No descriptions of implementation.
+- **Measurable:** Use specific targets (80%+ coverage, 5-8 manual test cases)
+- **Verifiable:** Each criterion can be objectively checked
+- **Separate workflows:** Don't mix implementation details with doc/test requirements — they're delegated independently
 
 ---
 
@@ -611,7 +502,7 @@ If Track A+B (or any track) has multiple **independent concerns**, break it into
 
 ### Format
 
-```markdown
+ 
 ## Dependencies
 
 - `lib/module/` — [What this depends on and why]
@@ -627,7 +518,7 @@ If Track A+B (or any track) has multiple **independent concerns**, break it into
 - **Future work:** [Extensions or improvements for later]
 - **Pre-release stance:** [No backwards compatibility, breaking changes OK]
 - **Builds on:** [References to earlier patterns]
-```
+ 
 
 # General Tips
 
@@ -695,15 +586,13 @@ These 3 practices are MANDATORY for all new lib/[module] issues:
 - [ ] Config `Impacts` checkbox expanded — `appsettings.json`, `appsettings.dev.json`, loader, `expected-differences.json`
 - [ ] Problem statement has 3-4 bullet points
 - [ ] Codebase Status split into "Implemented" and "Gaps"
-- [ ] Phases listed: 0, 1 (Tracks), 2, 3, 4
+- [ ] Solution lists Phase 0 + Phase 1 Tracks + Acceptance Criteria
 - [ ] Phase 0 has 5 Key Questions
 - [ ] Track 0 included if this is an update issue
 - [ ] Phase 1 tracks listed: A+B (always), C (always), D (if migrating), E (recommended), F (always before PR)
 - [ ] Track F completed — all applicable items checked or marked N/A
 - [ ] Each track has a clear ✅ Exit criteria
-- [ ] Phase 2 is README creation
-- [ ] Phase 3 is USAGE_GUIDE + Testing.md
-- [ ] Phase 4 is comprehensive tests
+- [ ] Acceptance Criteria lists Phase 2 (README), Phase 3 (Guides), Phase 4 (Tests) as checklists
 
 ### Content Quality
 - [ ] All file paths use backticks (`lib/module/file.ts`)
@@ -734,7 +623,7 @@ These 3 practices are MANDATORY for all new lib/[module] issues:
 
 Create a new issue file with this structure:
 
-```markdown
+ 
 # Issue #XXX: [Feature Name]
 
 **Status:** Tier 4 (Category)  
@@ -760,15 +649,13 @@ Result: [1-2 sentence business impact]
 
 Build [architecture/pattern description]:
 
-1. **Phase 0** — Understand scope
-2. **Track A+B** — [Core files + barrel exports]
-3. **Track C** — [Runtime integration]
-4. **Track D** — [Adoption, if migrating]
-5. **Track E** — [Hardening — logging, warnings, edge cases]
-6. **Track F** — Codebase Checklist
-7. **Phase 2** — Documentation
-8. **Phase 3** — Guides
-9. **Phase 4** — Testing
+1. **Phase 0** — Understand scope and discussion
+2. **Phase 1 - Track A+B** — Core implementation + barrel exports
+3. **Phase 1 - Track C** — Runtime integration
+4. **Phase 1 - Track D** — Adoption/migration (if applicable)
+5. **Phase 1 - Track E** — Hardening (logging, warnings, edge cases)
+6. **Phase 1 - Track F** — Codebase checklist
+7. **Acceptance Criteria** — Phase 2 (README), Phase 3 (Guides), Phase 4 (Tests)
 
 ---
 
@@ -867,40 +754,6 @@ Build [architecture/pattern description]:
 
 ---
 
-## Phase 2: Create lib/module/README.md
-
-**Scope:**
-- [ ] Create README.md with sections
-
----
-
-## Phase 3: Create usage guide and test guide
-
-**Scope:**
-
-**Create `docs/issues/.../USAGE_GUIDE.md`:**
-- [ ] Integration checklist
-- [ ] Code examples
-- [ ] Debugging section
-
-**Create `docs/A Testing Guide/[Feature] Testing.md`:**
-- [ ] 14+ manual test cases
-- [ ] Test data setup
-- [ ] Success criteria
-
----
-
-## Phase 4: Comprehensive tests
-
-**Scope:**
-- [ ] Unit tests
-- [ ] Integration tests
-- [ ] E2E test
-- [ ] Stress tests
-- [ ] Lint & typecheck
-
----
-
 ## Acceptance Criteria
 
 **Track A+B:**
@@ -918,8 +771,21 @@ Build [architecture/pattern description]:
 **Track F (Codebase Checklist):**
 - [ ] All applicable items checked or marked N/A
 
-**Phase 2-4:****
-- [ ] [Criterion 1]
+**Phase 2 (README):**
+- [ ] `lib/[module]/README.md` created with: When to Use, Architecture, API Reference, Dependencies, Error Handling, Performance Notes, File Breakdown, Testing, Future Enhancements
+*Reference .github\README_STYLE_GUIDE.md*
+
+**Phase 3 (Guides):**
+- [ ] `docs/issues/.../USAGE_GUIDE.md` with examples, troubleshooting, best practices
+- [ ] `docs/issues/.../IMPLEMENTATION.md` What files were added or edited and what each change does.
+- [ ] `docs/issues/.../*.md` any optional docs (if feature warrants)
+*Reference .github/ISSUE_DOC_STYLE_GUIDE.md*
+
+**Phase 4 (Tests):**
+- [ ] Unit tests pass
+- [ ] Integration tests pass
+- [ ] No console errors or warnings
+- [ ] `docs/A Testing Guide/[Feature] Testing.md` with 14+ manual test cases (if feature warrants)
 
 ---
 
@@ -935,7 +801,7 @@ Build [architecture/pattern description]:
 - **Design principle:** [Why this approach]
 - **Important caveat:** [What to watch for]
 - **Pre-release:** [No backwards compatibility]
-```
+ 
 
 ---
 

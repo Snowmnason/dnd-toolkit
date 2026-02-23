@@ -33,7 +33,7 @@ import {
   NetworkDetection,
   NetworkStatus,
 } from "@/lib/network/network-detection";
-import { validateClassifications } from "@/lib/storage/data-classification";
+import { validateClassifications } from "@/lib/storage/cache/data-classification";
 import { logger } from "@/lib/utils/logger";
 
 // FUTURE ENHANCEMENT: Phase Progress Callbacks
@@ -424,7 +424,7 @@ class AppKernelClass {
 
           // Initialize storage health monitoring (validates storage + starts polling)
           const { initializeStorageHealthMonitoring } =
-            await import("@/lib/storage/storage-health-monitor");
+            await import("@/lib/storage/cache/storage-health-monitor");
           await initializeStorageHealthMonitoring();
 
           // Initialize all storage keys with safe defaults on startup

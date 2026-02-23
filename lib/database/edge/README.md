@@ -71,7 +71,6 @@ import { registerEdgeFunction, type EdgeFunctionImplementation } from "@/lib/dat
 
 // Register a custom implementation
 const customImpl: EdgeFunctionImplementation = {
-  name: 'leaveWorld',
   handler: async (input) => {
     // Your custom backend call here
     return { success: true };
@@ -252,7 +251,6 @@ beforeEach(() => {
 
   // Register mocks
   registerEdgeFunction('createInviteLink', {
-    name: 'createInviteLink',
     handler: async () => ({
       invite_token: 'mock-token',
       invite_code: 'ABC123',
