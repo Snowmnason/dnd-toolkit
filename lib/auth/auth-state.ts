@@ -1,9 +1,9 @@
 import { type AuthProvider } from "../services";
 import {
-    clearAllUserData,
-    getPrivacyStorageBackend,
-    SecureStorage,
-    STORAGE_KEYS,
+  clearAllUserData,
+  getPrivacyStorageBackend,
+  SecureStorage,
+  STORAGE_KEYS,
 } from "../storage";
 import { logger } from "../utils/logger";
 
@@ -713,6 +713,11 @@ export const AuthStateManager = {
         "[BATCH-VERIFY] Bulk refresh failed, falling back to per-world verification",
         error,
       );
+      logger.warn(
+        "database",
+        "[BATCH-VERIFY] Bulk refresh failed (updateStorageCache.refreshAllWorldsCache), falling back to per-world verification",
+        error,
+      );
       // Fall back to per-world verification if bulk fails
       const results = new Map<string, boolean>();
       for (const worldId of worldIds) {
@@ -729,6 +734,10 @@ export const AuthStateManager = {
       logger.info(
         "auth",
         "[BATCH-VERIFY] Refresh deferred (session not ready), denying access until verified",
+      );
+      logger.info(
+        "database",
+        "[BATCH-VERIFY] Refresh deferred (session not ready) — deferred=true",
       );
       const results = new Map<string, boolean>();
       // Deny access for all worlds until session is ready and we can verify
@@ -761,6 +770,10 @@ export const AuthStateManager = {
 
     logger.info(
       "auth",
+      `[BATCH-VERIFY] Complete: ${results.size} worlds verified`,
+    );
+    logger.info(
+      "database",
       `[BATCH-VERIFY] Complete: ${results.size} worlds verified`,
     );
     return { results, deferred: false };

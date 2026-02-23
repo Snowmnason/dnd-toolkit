@@ -241,7 +241,7 @@ export class NoOpDatabaseProvider implements DatabaseProvider {
         `DatabaseProvider not registered. This usually means the app is running ` +
         `without database credentials or initialization failed. Check Supabase config.`
     );
-    logger.category('storage').error(error.message);
+    logger.category('database').error(error.message);
     throw error;
   }
 
@@ -281,7 +281,7 @@ export function getDatabaseProvider(): DatabaseProvider {
   if (!registeredProvider) {
     if (!hasWarnedNotRegistered) {
       hasWarnedNotRegistered = true;
-      logger.category('storage').warn(
+      logger.category('database').warn(
         '[Database] getDatabaseProvider() called before registerDatabaseProvider(). ' +
           'Returning NoOp provider — queries will throw until a provider is registered. ' +
           'Ensure DatabaseProvider is registered in service-initializer before entity queries run.'
@@ -302,7 +302,7 @@ export function registerDatabaseProvider(provider: DatabaseProvider): void {
   registeredProvider = provider;
   hasWarnedNotRegistered = false; // reset so re-registration warnings work cleanly
   logger
-    .category('storage')
+    .category('database')
     .info(`Database provider registered: ${provider.name}`);
 }
 

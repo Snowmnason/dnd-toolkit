@@ -41,7 +41,7 @@ export const usersDB = {
     return RequestManager.fetch(
       `user:create:${userData.auth_id}`,
       async () => {
-        logger.info("storage", "Starting user profile creation", {
+        logger.category("database").info("Starting user profile creation", {
           auth_id: userData.auth_id,
           username: userData.username,
           usernameLength: userData.username?.length,
@@ -50,21 +50,21 @@ export const usersDB = {
         // Validate and sanitize username if provided
         if (userData.username) {
           const usernameValidation = validateUsername(userData.username);
-          logger.debug("storage", "Username validation result:", {
+          logger.category("database").debug("Username validation result:", {
             isValid: usernameValidation.isValid,
             sanitized: usernameValidation.sanitized,
             original: userData.username,
           });
 
           if (!usernameValidation.isValid) {
-            logger.error("storage", "Username validation failed");
+            logger.category("database").error("Username validation failed");
             throw new Error("Username contains invalid characters or format");
           }
           userData.username = usernameValidation.sanitized;
         }
 
         // Note: display_name removed from schema
-        logger.debug("storage", "Inserting user data into database:", userData);
+        logger.category("database").debug("Inserting user data into database:", userData);
 
         const { data, error } = await getDatabaseProvider()
           .from('users', 'public')
@@ -73,7 +73,7 @@ export const usersDB = {
           .single();
 
         if (error) {
-          logger.error("storage", "Database error during user creation:", {
+          logger.category("database").error("Database error during user creation:", {
             message: error.message,
             code: error.code,
             details: error.details,
@@ -82,7 +82,7 @@ export const usersDB = {
           throw new Error(error.message || "Failed to create user profile");
         }
 
-        logger.info("storage", "User profile created successfully:", {
+        logger.category("database").info("User profile created successfully:", {
           id: data.id,
           auth_id: data.auth_id,
           username: data.username,
@@ -94,11 +94,7 @@ export const usersDB = {
           const { AuthStateManager } = await import("../auth/auth-state");
           await AuthStateManager.saveUserData(data);
         } catch (storageError) {
-          logger.warn(
-            "storage",
-            "Failed to save user data to storage (non-critical):",
-            storageError,
-          );
+          logger.category("database").warn("Failed to save user data to storage (non-critical):", storageError);
         }
 
         return data;
@@ -125,7 +121,7 @@ export const usersDB = {
 
   // Get current user's profile
   async getCurrentUser(options?: { maxAgeMs?: number; forceRefresh?: boolean }): Promise<User | null> {
-    logger.debug("storage", "Starting getCurrentUser", options);
+    logger.category("database").debug("Starting getCurrentUser", options);
 
     const maxAgeMs = options?.maxAgeMs ?? (4 * 60 * 60 * 1000); // Default 4 hours
     const forceRefresh = options?.forceRefresh ?? false;
@@ -147,28 +143,18 @@ export const usersDB = {
           const isCacheFresh = cacheAge < maxAgeMs;
 
           if (isCacheFresh) {
-            logger.debug(
-              "storage",
-              `User profile loaded from cache (age: ${cacheAge}ms)`,
-            );
+            logger.category("database").debug(`User profile loaded from cache (age: ${cacheAge}ms)`);
             return cachedUser;
           }
           // Cache is stale - fall through to fetch from DB
-          logger.debug(
-            "storage",
-            `User profile cache stale (age: ${cacheAge}ms), refreshing from database`,
-          );
+          logger.category("database").debug(`User profile cache stale (age: ${cacheAge}ms), refreshing from database`);
         }
         // If meta is missing or cache is missing, treat as cache miss and fetch from DB
       } catch (storageError) {
-        logger.warn(
-          "storage",
-          "Could not load from storage, fetching from DB:",
-          storageError,
-        );
+        logger.category("database").warn("Could not load from storage, fetching from DB:", storageError);
       }
     } else {
-      logger.debug("storage", "Force refresh requested, skipping cache");
+      logger.category("database").debug("Force refresh requested, skipping cache");
     }
 
     // Fetch from database
@@ -177,27 +163,23 @@ export const usersDB = {
       const authProv = await getAuthProvider();
       session = await authProv.getSession();
     } catch (authError: any) {
-      logger.error("storage", "Auth error in getCurrentUser:", authError);
+      logger.category("database").error("Auth error in getCurrentUser:", authError);
       throw new Error(authError?.message || "Authentication error");
     }
 
-    logger.debug("storage", "Auth session check result:", {
+    logger.category("database").debug("Auth session check result:", {
       hasSession: !!session,
       userId: session?.userId,
     });
 
     if (!session?.userId) {
-      logger.debug("storage", "No authenticated user found (no session)");
+      logger.category("database").debug("No authenticated user found (no session)");
       return null;
     }
 
     const authId = session.userId;
 
-    logger.debug(
-      "storage",
-      "Fetching user profile from database for auth_id:",
-      authId,
-    );
+    logger.category("database").debug("Fetching user profile from database for auth_id:", authId);
 
     // Use RequestManager to wrap database fetch with deduplication, retries, timeout
     const data = await RequestManager.fetch(
@@ -212,25 +194,18 @@ export const usersDB = {
         if (error) {
           if (error.code === "PGRST116") {
             // This is expected for new users who haven't created a profile yet
-            logger.debug(
-              "storage",
-              "No profile exists yet for user - this is expected for new users",
-            );
+            logger.category("database").debug("No profile exists yet for user - this is expected for new users");
             return null;
           }
 
           // Only log as error for unexpected database issues
-          logger.error(
-            "storage",
-            "Unexpected database error in getCurrentUser:",
-            {
-              message: error.message,
-              code: error.code,
-              details: error.details,
-              hint: error.hint,
-              auth_id: authId,
-            },
-          );
+          logger.category("database").error("Unexpected database error in getCurrentUser:", {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+            auth_id: authId,
+          });
 
           throw new Error(error.message || "Failed to fetch user profile");
         }

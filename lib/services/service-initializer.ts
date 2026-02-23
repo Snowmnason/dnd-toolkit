@@ -91,7 +91,7 @@ async function initializeDatabaseProvider(): Promise<void> {
     const enabled = databaseService?.enabled ?? true;
     if (!enabled) {
       logger.info(
-        'bootstrap',
+        'database',
         '[Database] Disabled in config (services.database.enabled=false) — registering NoOpDatabaseProvider. ' +
           'Database queries will throw until re-enabled and the app restarted.'
       );
@@ -102,7 +102,7 @@ async function initializeDatabaseProvider(): Promise<void> {
     }
 
     const providerName = databaseService?.provider || 'supabase';
-    logger.debug('bootstrap', `Initializing database provider: ${providerName}`);
+    logger.debug('database', `Initializing database provider: ${providerName}`);
 
     switch (providerName.toLowerCase()) {
       case 'supabase': {
@@ -121,17 +121,17 @@ async function initializeDatabaseProvider(): Promise<void> {
         const { initializeSupabaseDatabaseProvider } = await import('./supabase/supabase-initializer');
         const initialized = await initializeSupabaseDatabaseProvider();
         if (initialized) {
-          logger.info('bootstrap', '[Database] Supabase provider initialized successfully');
+          logger.info('database', '[Database] Supabase provider initialized successfully');
           updateServiceStatus('database', 'ready', 'supabase');
         } else {
-          logger.warn('bootstrap', '[Database] Supabase not configured — using NoOpDatabaseProvider');
+          logger.warn('database', '[Database] Supabase not configured — using NoOpDatabaseProvider');
           updateServiceStatus('database', 'degraded', 'supabase', 'Environment vars present but init incomplete');
         }
         break;
       }
 
       default: {
-        logger.warn('bootstrap', `[Database] Unknown provider: ${providerName}. Registering NoOp fallback.`);
+        logger.warn('database', `[Database] Unknown provider: ${providerName}. Registering NoOp fallback.`);
         const { NoOpDatabaseProvider, registerDatabaseProvider } = await import('./database-adapter');
         registerDatabaseProvider(new NoOpDatabaseProvider());
         updateServiceStatus('database', 'failed', providerName, `Unknown provider: ${providerName}`);

@@ -92,11 +92,10 @@ export async function validateCurrentUser(): Promise<{
   const session = await (await getAuthProvider()).getUser();
 
   if (!session) {
-    logger.debug("storage", "User validation failed: token rejected by server");
+    logger.category("database").debug("User validation failed: token rejected by server");
 
     if (isDevelopment()) {
-      logger.warn(
-        "storage",
+      logger.category("database").warn(
         "DEV MODE: Auth validation failed. Do NOT bypass authentication here; use test utilities to mock identity.",
       );
     }
@@ -150,11 +149,7 @@ export async function validateUserForWrite(): Promise<User> {
     .single();
 
   if (error || !userProfile) {
-    logger.error(
-      "storage",
-      "User profile not found during write validation:",
-      error,
-    );
+    logger.category("database").error("User profile not found during write validation:", error);
     throw new Error("User profile not found - cannot perform write operation");
   }
 
@@ -162,11 +157,7 @@ export async function validateUserForWrite(): Promise<User> {
   try {
     await AuthStateManager.saveUserData(userProfile);
   } catch (cacheError) {
-    logger.warn(
-      "storage",
-      "Failed to update cache after write validation (non-critical):",
-      cacheError,
-    );
+    logger.category("database").warn("Failed to update cache after write validation (non-critical):", cacheError);
   }
 
   return userProfile;
@@ -205,12 +196,12 @@ export function extractData<T>(
   context: string,
 ): T {
   if (result.error) {
-    logger.error("storage", `${context}:`, result.error);
+    logger.category("database").error(`${context}:`, result.error);
     throw new Error(result.error.message || `${context} failed`);
   }
 
   if (result.data === null) {
-    logger.error("storage", `${context}: No data returned`);
+    logger.category("database").error(`${context}: No data returned`);
     throw new Error(`${context}: No data returned`);
   }
 

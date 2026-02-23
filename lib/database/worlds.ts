@@ -174,12 +174,9 @@ export const worldsDB = {
       // Use cached world IDs and roles
       worldIdSet = new Set(cachedData.worldIds);
       roleMap = new Map(cachedData.roles);
-      logger.debug(
-        "storage",
+      logger.category("database").debug(
         `Using cached world IDs for user ${currentUserId}`,
-        {
-          count: worldIdSet.size,
-        },
+        { count: worldIdSet.size },
       );
     } else {
       // Try a persistent fallback: use encrypted connected_worlds stored in localStorage
@@ -193,18 +190,13 @@ export const worldsDB = {
           worldIdSet = new Set(persisted);
           roleMap = new Map();
 
-          logger.debug(
-            "storage",
+          logger.category("database").debug(
             `Using persisted connected_worlds for user ${currentUserId}`,
             { count: worldIdSet.size },
           );
         }
       } catch (err) {
-        logger.debug(
-          "storage",
-          "Error reading persisted connected_worlds (non-fatal)",
-          err,
-        );
+        logger.category("database").debug( "Error reading persisted connected_worlds (non-fatal)", err,);
       }
 
       // ALWAYS fetch from DB to get role information, even if seeded from persistent
@@ -214,7 +206,7 @@ export const worldsDB = {
         if (getDatabaseProvider().isConfigured()) {
           try {
             const session = await (await getAuthProvider()).getSession();
-            logger.debug("storage", "🔍 World query debug info", {
+            logger.category("database").debug("🔍 World query debug info", {
               userId: currentUserId,
               hasSession: !!session,
               sessionUserId: session?.userId,
@@ -258,7 +250,7 @@ export const worldsDB = {
         const ownedCount = ownedWorldIdsResult.data?.length || 0;
         
         if (accessCount === 0 && ownedCount === 0 && retryAttempt === 0) {
-          logger.debug("storage", "⏳ Got 0 worlds on first query, retrying after 500ms (RLS sync delay)");
+          logger.category("database").debug("⏳ Got 0 worlds on first query, retrying after 500ms (RLS sync delay)");
           // Wait for RLS to sync with the authenticated session
           await new Promise(resolve => setTimeout(resolve, 500));
           retryAttempt = 1;
@@ -271,7 +263,7 @@ export const worldsDB = {
         const totalCount = finalAccessCount + finalOwnedCount;
         
         if (totalCount === 0) {
-          logger.warn("storage", "⚠️ World query returned 0 results after retry", {
+          logger.category("database").warn("⚠️ World query returned 0 results after retry", {
             userId: currentUserId,
             accessRecordsCount: finalAccessCount,
             ownedWorldsCount: finalOwnedCount,
@@ -281,7 +273,7 @@ export const worldsDB = {
             note: "User likely has no worlds, or RLS is blocking all access",
           });
         } else {
-          logger.debug("storage", "🌍 World query results", {
+          logger.category("database").debug("🌍 World query results", {
             accessRecordsCount: finalAccessCount,
             ownedWorldsCount: finalOwnedCount,
             total: totalCount,
@@ -290,22 +282,14 @@ export const worldsDB = {
         }
 
         if (accessRecordsResult.error) {
-          logger.error(
-            "storage",
-            "Error fetching access records:",
-            accessRecordsResult.error,
-          );
+          logger.category("database").error("Error fetching access records:", accessRecordsResult.error);
           throw new Error(
             accessRecordsResult.error.message || "Failed to fetch access records",
           );
         }
 
         if (ownedWorldIdsResult.error) {
-          logger.error(
-            "storage",
-            "Error fetching owned world IDs:",
-            ownedWorldIdsResult.error,
-          );
+          logger.category("database").error("Error fetching owned world IDs:", ownedWorldIdsResult.error);
           throw new Error(
             ownedWorldIdsResult.error.message ||
               "Failed to fetch owned world IDs",
@@ -364,7 +348,7 @@ export const worldsDB = {
           }
         );
 
-        logger.debug("storage", `Cached world IDs for user ${currentUserId}`, {
+        logger.category("database").debug(`Cached world IDs for user ${currentUserId}`, {
           count: worldIdSet.size,
         });
       }

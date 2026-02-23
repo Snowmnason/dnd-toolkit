@@ -17,21 +17,21 @@
  */
 
 import {
-    cleanupAnalyticsNetworkIntegration,
-    initializeAnalyticsNetworkIntegration,
+  cleanupAnalyticsNetworkIntegration,
+  initializeAnalyticsNetworkIntegration,
 } from "@/lib/analytics/analytics-network-integration";
 import { NetworkCascadeDetector } from "@/lib/error/network-cascade-detector";
 import type { SafeModeState } from "@/lib/error/safe-mode";
 import {
-    createSafeModeState,
-    DEFAULT_SAFE_MODE_CONFIG,
-    SafeModeLevel,
-    SafeModeReason,
+  createSafeModeState,
+  DEFAULT_SAFE_MODE_CONFIG,
+  SafeModeLevel,
+  SafeModeReason,
 } from "@/lib/error/safe-mode";
 import { getStorageDefaults } from "@/lib/kernel/storage-defaults";
 import {
-    NetworkDetection,
-    NetworkStatus,
+  NetworkDetection,
+  NetworkStatus,
 } from "@/lib/network/network-detection";
 import { validateClassifications } from "@/lib/storage/data-classification";
 import { logger } from "@/lib/utils/logger";
@@ -244,33 +244,14 @@ class AppKernelClass {
 
       startTimeout();
 
-      // Phase 0: CONFIG (initialize Supabase env vars and client FIRST)
-      // This MUST run before PRELOAD, STORAGE, and AUTH so that Supabase is ready
-      // and the auth adapter can safely restore session tokens from storage.
+      // Phase 0: CONFIG
+      // Database provider initialization is deferred to the SERVICES phase
+      // to keep kernel responsibilities focused and avoid duplicated init.
       await this.runPhase("config", async () => {
         try {
-          logger.category("bootstrap").info("Initializing database provider...");
-
-          // Delegate all database bootstrap to the provider initializer:
-          // env var injection (Constants → process.env), client eager init,
-          // and DatabaseProvider registration in one idempotent call.
-          //
-          // To swap the database backend: replace the import below with a
-          // different *-initializer — no other kernel changes required.
-          const { initializeSupabaseDatabaseProvider } = await import(
-            "@/lib/services/supabase/supabase-initializer"
-          );
-          const configured = await initializeSupabaseDatabaseProvider();
-
-          if (configured) {
-            logger
-              .category("bootstrap")
-              .info("✅ Database provider initialized — session restoration in progress");
-          } else {
-            logger
-              .category("bootstrap")
-              .warn("Database not configured — continuing with degraded auth");
-          }
+          logger
+            .category("bootstrap")
+            .info("CONFIG phase completed — deferring database provider initialization to SERVICES phase");
         } catch (error) {
           logger.category("bootstrap").error("CONFIG phase failed", {
             error: (error as Error).message,

@@ -152,8 +152,8 @@ export const updateStorageCache = {
         const userWorlds = await worldsDB.getMyWorlds(userId);
 
         logger.info(
-          "storage",
-          `Fetched ${userWorlds.length} worlds from database`,
+          "database",
+          `worldsDB.getMyWorlds returned ${userWorlds.length} worlds for user ${userId}`,
         );
 
         // Build rich cache structure with role breakdown
