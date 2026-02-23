@@ -11,15 +11,15 @@
  */
 
 import {
-    AuthError,
-    AuthProvider,
-    AuthResult,
-    EmailAlreadyExistsError,
-    InvalidCredentialsError,
-    NetworkError,
-    RateLimitError,
-    Session,
-    UserNotFoundError,
+  AuthError,
+  AuthProvider,
+  AuthResult,
+  EmailAlreadyExistsError,
+  InvalidCredentialsError,
+  NetworkError,
+  RateLimitError,
+  Session,
+  UserNotFoundError,
 } from '@/lib/services/auth-provider';
 import { logger } from '@/lib/utils/logger';
 
@@ -138,6 +138,98 @@ export class SupabaseAuthProvider implements AuthProvider {
   }
 
   /**
+   * Initiate OAuth sign-in flow.
+   * Returns URL for browser redirect or session if native flow completed.
+   */
+  async signInWithOAuth(
+    provider: string,
+    options?: Record<string, any>
+  ): Promise<{ url?: string; session?: Session }> {
+    try {
+      logger.debug('auth', 'Supabase: signInWithOAuth attempt', { provider });
+
+      const { data, error } = await this.supabaseClient.auth.signInWithOAuth({
+        provider: provider as any,
+        options: options || {},
+      });
+
+      if (error) {
+        logger.error('auth', 'Supabase signInWithOAuth error:', error.message);
+        throw new AuthError('OAuth sign-in failed', error);
+      }
+
+      if (data?.url) {
+        logger.debug('auth', 'Supabase signInWithOAuth URL generated', { provider });
+        return { url: data.url };
+      }
+
+      if (data?.session) {
+        const session = this.sessionFromSupabaseSession(data.session);
+        logger.info('auth', 'Supabase signInWithOAuth success', { provider });
+        return { session };
+      }
+
+      throw new AuthError('OAuth sign-in failed: unknown response');
+    } catch (err) {
+      if (err instanceof AuthError) throw err;
+      const normalized = new AuthError(
+        'OAuth sign-in failed',
+        err,
+        'SUPABASE_EXCEPTION'
+      );
+      logger.error('auth', 'Supabase signInWithOAuth exception:', normalized.toLog());
+      throw normalized;
+    }
+  }
+
+  /**
+   * Sign in using an ID token from native OAuth flow.
+   * Used for Apple, Google, and other providers with ID token support.
+   */
+  async signInWithIdToken(
+    provider: string,
+    token: string,
+    options?: Record<string, any>
+  ): Promise<AuthResult> {
+    try {
+      logger.debug('auth', 'Supabase: signInWithIdToken attempt', { provider });
+
+      const { data, error } = await this.supabaseClient.auth.signInWithIdToken({
+        provider: provider as any,
+        token,
+        access_token: options?.access_token,
+        nonce: options?.nonce,
+      });
+
+      if (error) {
+        const normalized = this.mapSupabaseError(error);
+        logger.debug('auth', 'Supabase signInWithIdToken error:', normalized.toLog());
+        return { success: false, error: normalized };
+      }
+
+      if (data?.user && data?.session) {
+        const session = this.sessionFromSupabaseSession(data.session);
+        logger.info('auth', 'Supabase signInWithIdToken success', {
+          provider,
+          userId: data.user.id,
+        });
+        return { success: true, data: session };
+      }
+
+      const error_ = new AuthError('ID token sign-in failed: unknown response');
+      return { success: false, error: error_ };
+    } catch (err) {
+      const normalized = new AuthError(
+        'ID token sign-in failed',
+        err,
+        'SUPABASE_EXCEPTION'
+      );
+      logger.error('auth', 'Supabase signInWithIdToken exception:', normalized.toLog());
+      return { success: false, error: normalized };
+    }
+  }
+
+  /**
    * Initiate password reset flow.
    * Supabase sends reset email to user.
    * Redirect URL must match an existing route handler (/login/auth-redirect)
@@ -180,6 +272,48 @@ export class SupabaseAuthProvider implements AuthProvider {
       };
     } catch (err) {
       logger.error('auth', 'Supabase resetPassword exception:', err);
+      return {
+        success: false,
+        message: 'An error occurred. Please try again.',
+      };
+    }
+  }
+
+  /**
+   * Resend a confirmation email (for signup confirmation or email verification).
+   * Calls Supabase's resend() method to re-queue the confirmation email.
+   */
+  async resend(email: string): Promise<{
+    success: boolean;
+    message?: string;
+  }> {
+    try {
+      logger.debug('auth', 'Supabase: resend attempt');
+
+      const { error } = await this.supabaseClient.auth.resend({
+        type: 'signup',
+        email,
+      });
+
+      if (error) {
+        logger.warn(
+          'auth',
+          'Supabase resend error:',
+          error.message
+        );
+        return {
+          success: false,
+          message: 'Failed to resend confirmation email. Please try again.',
+        };
+      }
+
+      logger.info('auth', 'Supabase resend success');
+      return {
+        success: true,
+        message: 'Confirmation email sent. Check your inbox.',
+      };
+    } catch (err) {
+      logger.error('auth', 'Supabase resend exception:', err);
       return {
         success: false,
         message: 'An error occurred. Please try again.',

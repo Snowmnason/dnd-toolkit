@@ -13,9 +13,7 @@ import {
   FormAuthInput,
 } from "@/components/auth_components";
 import { Body } from "@/components/ui";
-import { logger, usersDB, useSignUpForm } from "@/lib";
-// SUPABASE_AUTH: Direct auth operations — to be migrated to getAuthProvider() in Track D
-import { supabase } from "@/lib/services/supabase/supabase-client";
+import { getCurrentSession, logger, usersDB, useSignUpForm } from "@/lib";
 import { useScale } from "@/theme";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -32,24 +30,14 @@ export default function CompleteProfileScreen() {
     const checkAuthAndProfile = async () => {
       logger.info("auth", "Starting auth and profile check");
       try {
-        // Use cached session instead of making network call
-        const {
-          data: { session },
-          error: authError,
-        } = await supabase.auth.getSession();
+        // Use convenience function instead of direct provider call
+        const session = await getCurrentSession();
         logger.debug("auth", "Auth session check result:", {
           hasSession: !!session,
-          userId: session?.user?.id,
-          authError: authError?.message,
+          userId: session?.userId,
         });
 
-        if (authError) {
-          logger.error("auth", "Auth session error:", authError);
-          router.replace("/login/sign-in");
-          return;
-        }
-
-        if (!session?.user) {
+        if (!session) {
           logger.warn(
             "auth",
             "No authenticated user found, redirecting to sign-in",
@@ -58,7 +46,7 @@ export default function CompleteProfileScreen() {
           return;
         }
 
-        const authUser = session.user;
+        // Session is obtained from provider (no need for separate authUser)
 
         // Try to get existing profile (might not exist for new users)
         logger.debug("auth", "Fetching user profile from database");
@@ -80,7 +68,7 @@ export default function CompleteProfileScreen() {
             "auth",
             "No database profile found - this is expected for new users",
           );
-          setUser(authUser);
+          setUser({ id: session.userId, email: session.email });
         }
 
         // Robust profile validation - only redirect if profile is truly complete

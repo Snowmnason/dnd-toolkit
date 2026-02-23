@@ -17,8 +17,7 @@
 
 import { Button, ButtonText } from '@/components/ui';
 import { AuthStateManager, logger } from '@/lib';
-// SUPABASE_AUTH: Direct auth operations — to be migrated to getAuthProvider() in Track D
-import { supabase } from '@/lib/services/supabase/supabase-client';
+import { getAuthProvider } from '@/lib/auth';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -62,20 +61,18 @@ async function onAppleButtonPressIOS() {
     logger.info('auth', 'Apple credential:', credential);
 
     if (credential.identityToken) {
-      const { data, error } = await supabase.auth.signInWithIdToken({
-        provider: 'apple',
-        token: credential.identityToken,
-      });
+      const provider = await getAuthProvider();
+      const result = await provider.signInWithIdToken('apple', credential.identityToken);
 
-      if (error) {
-        logger.error('auth', 'Error signing in with Apple:', error);
-        Alert.alert('Authentication Error', error.message);
+      if (!result.success) {
+        logger.error('auth', 'Error signing in with Apple:', result.error?.message);
+        Alert.alert('Authentication Error', result.error?.message || 'Failed to sign in with Apple');
         return;
       }
 
-      if (data) {
-        logger.info('auth', 'Apple sign in successful:', data);
-        await handleAuthSuccess(data);
+      if (result.data) {
+        logger.info('auth', 'Apple sign in successful:', result.data);
+        await handleAuthSuccess(result.data);
       }
     }
   } catch (error: any) {
@@ -97,21 +94,20 @@ async function onAppleButtonSuccessWeb(appleAuthRequestResponse: any) {
         appleAuthRequestResponse.authorization.id_token && 
         appleAuthRequestResponse.authorization.code) {
       
-      const { data, error } = await supabase.auth.signInWithIdToken({
-        provider: 'apple',
-        token: appleAuthRequestResponse.authorization.id_token,
+      const provider = await getAuthProvider();
+      const result = await provider.signInWithIdToken('apple', appleAuthRequestResponse.authorization.id_token, {
         access_token: appleAuthRequestResponse.authorization.code,
       });
 
-      if (error) {
-        logger.error('auth', 'Error signing in with Apple:', error);
-        Alert.alert('Authentication Error', error.message);
+      if (!result.success) {
+        logger.error('auth', 'Error signing in with Apple:', result.error?.message);
+        Alert.alert('Authentication Error', result.error?.message || 'Failed to sign in with Apple');
         return;
       }
 
-      if (data) {
-        logger.info('auth', 'Apple sign in successful:', data);
-        await handleAuthSuccess(data);
+      if (result.data) {
+        logger.info('auth', 'Apple sign in successful:', result.data);
+        await handleAuthSuccess(result.data);
       }
     }
   } catch (error) {

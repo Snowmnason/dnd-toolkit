@@ -30,14 +30,28 @@ export {
     type AuthState,
     type CacheMetadata
 } from "./auth-state";
+// High-level semantic auth operations (primary exports)
+export {
+    getCurrentSession,
+    listenToAuthStateChanges,
+    resendConfirmationEmail,
+    sendPasswordReset,
+    signInUser,
+    signOutSessionOnly,
+    signUpUser,
+    updatePassword,
+    type AuthOperationResult,
+    type ResendOperationResult,
+    type ResetPasswordOperationResult,
+    type SignInOperationResult,
+    type SignUpOperationResult
+} from "./auth-operations";
+
+// Legacy authService exports for backward compatibility
 export {
     checkPendingInvites,
     generateWorldInviteLink,
     isEmailExistsError,
-    sendPasswordReset,
-    signInUser,
-    signUpUser,
-    updatePassword,
     type ResetPasswordResult,
     type SignInResult,
     type SignUpResult
