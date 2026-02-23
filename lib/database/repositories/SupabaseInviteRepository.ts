@@ -1,6 +1,6 @@
 import { RequestManager } from "@/lib/api/request-manager";
 import { validateUserForWrite } from "@/lib/database/common";
-import { runEdgeFunction } from "@/lib/database/repositories/supabase-rpc-adapter";
+import { executeEdgeFunction } from "@/lib/database/edge";
 import { getDatabaseProvider } from "@/lib/services";
 import { logger } from "@/lib/utils/logger";
 import { dbRequestOptions } from "./request-config";
@@ -33,7 +33,7 @@ export class SupabaseInviteRepository implements InviteRepository {
         hoursValid,
       });
 
-      const created = await runEdgeFunction("createInviteLink", {
+      const created = await executeEdgeFunction("createInviteLink", {
         world_id: worldId,
         max_uses: undefined,
         expires_in_days: Math.ceil(hoursValid / 24),
@@ -73,7 +73,7 @@ export class SupabaseInviteRepository implements InviteRepository {
       const result = await RequestManager.fetch(
         `invite:validate:${token}`,
         async () => {
-          const invite = await runEdgeFunction("resolveInviteToken", {
+          const invite = await executeEdgeFunction("resolveInviteToken", {
             invite_token: token,
           });
 
@@ -123,7 +123,7 @@ export class SupabaseInviteRepository implements InviteRepository {
     try {
       logger.category("database").info(`Deleting invite link with token: ${token}`);
 
-      const deleted = await runEdgeFunction("deleteInviteLink", {
+      const deleted = await executeEdgeFunction("deleteInviteLink", {
         invite_token: token,
       });
 

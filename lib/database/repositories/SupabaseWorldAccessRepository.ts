@@ -1,5 +1,5 @@
 import { RequestManager } from "@/lib/api/request-manager";
-import { runEdgeFunction } from "@/lib/database/repositories/supabase-rpc-adapter";
+import { executeEdgeFunction } from "@/lib/database/edge";
 import { getDatabaseProvider } from "@/lib/services";
 import { logger } from "@/lib/utils/logger";
 import { dbRequestOptions } from "./request-config";
@@ -57,7 +57,7 @@ export class SupabaseWorldAccessRepository implements WorldAccessRepository {
       `world:${worldId}:addUser:${userId}`,
       async () => {
         // Use semantic edge function to handle invite validation and access addition atomically
-        const result = await runEdgeFunction("joinWorldWithInvite", {
+        const result = await executeEdgeFunction("joinWorldWithInvite", {
           invite_token: inviteToken,
         });
 
@@ -83,7 +83,7 @@ export class SupabaseWorldAccessRepository implements WorldAccessRepository {
       async () => {
         // Use semantic edge function to handle access control and cascading deletes
         // The RPC enforces that only the user themselves or a world owner can remove membership.
-        await runEdgeFunction("removeWorldAccess", {
+        await executeEdgeFunction("removeWorldAccess", {
           world_id: worldId,
           user_id: userId,
         });

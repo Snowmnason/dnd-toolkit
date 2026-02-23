@@ -20,8 +20,10 @@
  */
 
 import { logger } from '@/lib/utils/logger';
+import { registerEdgeFunction } from '../../database/edge';
 import { NoOpDatabaseProvider, registerDatabaseProvider } from '../database-adapter';
 import { SupabaseDatabaseProvider } from './supabase-database-provider';
+import { createSupabaseRpcAdapter } from './supabase-rpc-adapter';
 
 /** Module-scope guard — prevents double initialization */
 let _initialized = false;
@@ -94,6 +96,25 @@ export async function initializeSupabaseDatabaseProvider(): Promise<boolean> {
   // ── Step 4: Register DatabaseProvider ─────────────────────────────────────
   registerDatabaseProvider(new SupabaseDatabaseProvider(client));
   logger.debug('bootstrap', '[Supabase Initializer] SupabaseDatabaseProvider registered');
+
+  // ── Step 5: Register RPC adapters with edge-function registry ──────────────
+  // Maps semantic edge function names to Supabase RPC implementations.
+  // This allows repositories to call executeEdgeFunction() without knowing the backend.
+  const rpcFunctionNames = [
+    'leaveWorld',
+    'joinWorldWithInvite',
+    'createInviteLink',
+    'resolveInviteToken',
+    'deleteInviteLink',
+    'removeWorldAccess',
+  ];
+
+  rpcFunctionNames.forEach((functionName) => {
+    const adapter = createSupabaseRpcAdapter(functionName);
+    registerEdgeFunction(functionName, adapter);
+  });
+
+  logger.debug('bootstrap', `[Supabase Initializer] Registered ${rpcFunctionNames.length} RPC edge functions`);
 
   return true;
 }

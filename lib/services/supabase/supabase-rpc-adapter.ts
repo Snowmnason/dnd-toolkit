@@ -15,20 +15,6 @@ import { getDatabaseProvider } from "@/lib/services";
 import { logger } from "@/lib/utils";
 
 /**
- * Check if Supabase is configured (dynamically imported to avoid circular deps)
- */
-async function getIsSupabaseConfigured(): Promise<boolean> {
-  try {
-    const { isSupabaseConfigured } = await import(
-      "@/lib/services/supabase/supabase-client"
-    );
-    return isSupabaseConfigured();
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Generic edge function implementation interface
  */
 export interface EdgeFunctionImplementation<Input = any, Output = any> {
@@ -145,8 +131,7 @@ export async function runEdgeFunction<T extends EdgeFunctionOutput = any>(
   functionName: string,
   input: EdgeFunctionInput
 ): Promise<T> {
-  const isConfigured = await getIsSupabaseConfigured();
-  if (!isConfigured) {
+  if (!getDatabaseProvider().isConfigured()) {
     throw new Error(
       "Edge functions require Supabase configuration to be initialized"
     );
