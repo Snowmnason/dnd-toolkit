@@ -1,13 +1,21 @@
 /**
  * Default Auth Strategies for AuthLayer
  *
- * Concrete implementations of AuthStrategy for common auth patterns
+ * Concrete implementations of AuthStrategy for common auth patterns.
+ *
+ * NOTE: This file is intentionally kept coupled to Supabase for token refresh operations.
+ * Token lifecycle (refreshSession, getSession) is infrastructure-level and varies wildly
+ * between auth providers (Supabase uses 1-hour JWT with refresh tokens, Firebase has
+ * different patterns, OAuth providers may not support refresh at all).
+ * 
+ * User-facing auth operations (signup, signin, logout) are abstracted via AuthProvider.
+ * Low-level token management stays provider-specific to avoid over-abstraction.
  */
 
 import {
   getSupabaseClientLazy,
   isSupabaseConfiguredLazy,
-} from "../database/supabase-lazy";
+} from "../services/supabase/supabase-lazy";
 import { logger } from "../utils/logger";
 import { AuthStrategy, type AuthContext } from "./auth-layer";
 

@@ -59,3 +59,33 @@ export {
     type SeverityLevel as ErrorSeverityLevel
 } from './error-tracker';
 
+// Database Provider (Supabase/PostgreSQL/Firebase abstraction)
+export {
+    DatabaseProvider,
+    getDatabaseProvider,
+    NoOpDatabaseProvider,
+    QueryBuilder,
+    QueryError,
+    QueryResult,
+    registerDatabaseProvider,
+    resetDatabaseProvider
+} from './database-adapter';
+
+// Supabase Database Provider Implementation
+export { SupabaseDatabaseProvider } from './supabase/supabase-database-provider';
+
+// Supabase Initializer — database bootstrap (env vars, client, provider registration)
+export { initializeSupabaseDatabaseProvider, resetSupabaseInitializer } from './supabase/supabase-initializer';
+// Service Status Tracking — visibility into service readiness
+export {
+    areCriticalServicesReady,
+    getAllServiceStatuses,
+    getServiceStatus,
+    getServiceStatusDetail,
+    isServiceReady,
+    resetServiceStatus,
+    updateServiceStatus,
+    type ServiceReadiness,
+    type ServiceStatus,
+    type ServiceStatusDetail
+} from './service-status';

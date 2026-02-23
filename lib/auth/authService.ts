@@ -1,27 +1,21 @@
-import type { AuthResponse, AuthTokenResponse } from "@supabase/supabase-js";
-
 import {
-  AuthError,
-  EmailAlreadyExistsError,
-  InvalidCredentialsError,
-  NetworkError,
-  RateLimitError,
-  UserNotFoundError,
+    AuthError,
+    EmailAlreadyExistsError,
+    getAuthProvider,
+    InvalidCredentialsError,
+    NetworkError,
+    RateLimitError,
+    UserNotFoundError,
 } from "@/lib/services";
-import { RequestManager } from "../api/request-manager";
-import {
-  getSupabaseClientLazy,
-  isSupabaseConfiguredLazy,
-} from "../database/supabase-lazy";
 import { usersDB } from "../database/users";
 import { SecureStorage, STORAGE_KEYS } from "../storage";
 import { logger } from "../utils/logger";
 import {
-  checkAuthGuard,
-  recordAuthFailure,
-  recordAuthSuccess,
+    checkAuthGuard,
+    recordAuthFailure,
+    recordAuthSuccess,
 } from "./auth-attempt-guard";
-import { isExistingUser, validateEmail, validatePassword } from "./validation";
+import { validateEmail, validatePassword } from "./validation";
 
 export interface SignUpResult {
   success: boolean;
@@ -201,15 +195,6 @@ export const signUpUser = async (
     // Use sanitized email
     const sanitizedEmail = emailValidation.sanitized;
 
-    // Check if Supabase is configured before attempting signup
-    if (!(await isSupabaseConfiguredLazy())) {
-      return {
-        success: false,
-        error:
-          "Unable to connect to servers. Please check your internet connection and try again.",
-      };
-    }
-
     const guard = await checkAuthGuard(sanitizedEmail, "signup");
     if (!guard.allowed) {
       const retrySeconds = guard.retryAfterMs
@@ -228,40 +213,20 @@ export const signUpUser = async (
         ? window.location.origin
         : "https://dnd-tool.thesnowpost.com";
 
-    const signupResponse = await RequestManager.fetch<AuthResponse>(
-      `auth:signup:${sanitizedEmail}`,
-      async () => {
-        const configured = await isSupabaseConfiguredLazy();
-        if (!configured) throw new Error("Supabase not configured");
-        const supabase = await getSupabaseClientLazy();
-        return supabase.auth.signUp({
-          email: sanitizedEmail,
-          password,
-          options: {
-            emailRedirectTo: `${baseUrl}/login/auth-redirect?action=signup-confirm`,
-          },
-        });
-      },
-      {
-        rateLimitKey: `auth:signup:${sanitizedEmail}`,
-        retries: 1,
-        timeout: 10000,
-        authStrategy: "public",
-      },
-    );
+    // Call AuthProvider directly (no RequestManager wrapper for auth operations)
+    const authProvider = await getAuthProvider();
+    const signupResult = await authProvider.signUp(sanitizedEmail, password, {
+      emailRedirectTo: `${baseUrl}/login/auth-redirect?action=signup-confirm`,
+    });
 
-    const signupError = signupResponse?.error ?? null;
-    const signupData = signupResponse?.data;
-
-    // Give Supabase a moment to process
+    // Give backend a moment to process
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    if (signupError) {
+    if (!signupResult.success) {
       await recordAuthFailure(sanitizedEmail, "signup");
       
-      // Map Supabase error to normalized error type and classify retry strategy
-      const normalizedError = mapSupabaseErrorToNormalized(signupError);
-      const retryStrategy = classifyErrorRetryStrategy(normalizedError);
+      const error = signupResult.error;
+      const retryStrategy = classifyErrorRetryStrategy(error);
       
       logger.debug("auth", `Signup error classified: ${retryStrategy.reason}`, {
         shouldAutoRetry: retryStrategy.shouldAutoRetry,
@@ -269,11 +234,11 @@ export const signUpUser = async (
       });
       
       // Check for email already exists error
-      if (normalizedError instanceof EmailAlreadyExistsError) {
+      if (error instanceof EmailAlreadyExistsError) {
         return { success: false, showEmailExistsModal: true };
       }
 
-      if (signupError.message.includes("Password")) {
+      if (error.message.includes("Password")) {
         return {
           success: false,
           error:
@@ -283,17 +248,11 @@ export const signUpUser = async (
         return {
           success: false,
           error:
-            signupError.message || "Account creation failed. Please try again.",
+            error.message || "Account creation failed. Please try again.",
         };
       }
-    } else if (signupData?.user) {
+    } else {
       await recordAuthSuccess(sanitizedEmail, "signup");
-      // Check if this is an existing user trying to sign up again
-      if (isExistingUser(signupData)) {
-        return { success: false, showEmailExistsModal: true };
-      }
-
-      // No profile creation during signup - that happens in complete-profile screen
 
       // Successful signup
       return {
@@ -338,18 +297,6 @@ export const signInUser = async (
     const sanitizedEmail = emailValidation.sanitized;
     logger.debug("auth", `✅ Email validated: ${sanitizedEmail}`);
 
-    // Check if Supabase is configured before attempting signin
-    if (!(await isSupabaseConfiguredLazy())) {
-      logger.error("auth", "❌ Supabase not configured");
-      return {
-        success: false,
-        error:
-          "Unable to connect to servers. Please check your internet connection and try again.",
-      };
-    }
-
-    logger.debug("auth", "✅ Supabase configured, proceeding with sign-in");
-
     const guard = await checkAuthGuard(sanitizedEmail, "signin");
     if (!guard.allowed) {
       const retrySeconds = guard.retryAfterMs
@@ -369,49 +316,30 @@ export const signInUser = async (
 
     logger.debug(
       "auth",
-      `🔐 Calling Supabase signInWithPassword for ${sanitizedEmail}...`,
+      `🔐 Calling AuthProvider signIn for ${sanitizedEmail}...`,
     );
     const signInStartTime = Date.now();
 
-    const signInResponse = await RequestManager.fetch<AuthTokenResponse>(
-      `auth:signin:${sanitizedEmail}`,
-      async () => {
-        const configured = await isSupabaseConfiguredLazy();
-        if (!configured) throw new Error("Supabase not configured");
-        const supabase = await getSupabaseClientLazy();
-        return supabase.auth.signInWithPassword({
-          email: sanitizedEmail,
-          password,
-        });
-      },
-      {
-        rateLimitKey: `auth:signin:${sanitizedEmail}`,
-        retries: 1,
-        timeout: 10000,
-        authStrategy: "public",
-      },
-    );
+    // Call AuthProvider directly (no RequestManager wrapper for auth operations)
+    const authProvider = await getAuthProvider();
+    const signInResult = await authProvider.signIn(sanitizedEmail, password);
 
     const signInElapsed = Date.now() - signInStartTime;
     logger.debug("auth", `⏱️ Sign-in API call completed in ${signInElapsed}ms`);
 
-    const signInError = signInResponse?.error ?? null;
-    const signInData = signInResponse?.data;
-
-    if (signInError) {
+    if (!signInResult.success) {
       await recordAuthFailure(sanitizedEmail, "signin");
       
-      // Map Supabase error to normalized error type and classify retry strategy
-      const normalizedError = mapSupabaseErrorToNormalized(signInError);
-      const retryStrategy = classifyErrorRetryStrategy(normalizedError);
+      const error = signInResult.error;
+      const retryStrategy = classifyErrorRetryStrategy(error);
       
-      logger.error("auth", `❌ Sign-in error:`, signInError.message);
+      logger.error("auth", `❌ Sign-in error:`, error.message);
       logger.debug("auth", `Sign-in error classified: ${retryStrategy.reason}`, {
         shouldAutoRetry: retryStrategy.shouldAutoRetry,
         suggestRetryAfterMs: retryStrategy.suggestRetryAfterMs,
       });
       
-      if (normalizedError instanceof InvalidCredentialsError) {
+      if (error instanceof InvalidCredentialsError) {
         return {
           success: false,
           error:
@@ -419,7 +347,7 @@ export const signInUser = async (
         };
       }
 
-      if (signInError.message.includes("Email not confirmed")) {
+      if (error.message.includes("Email not confirmed")) {
         return {
           success: false,
           error:
@@ -429,36 +357,37 @@ export const signInUser = async (
 
       return {
         success: false,
-        error: signInError.message || "Sign in failed. Please try again.",
+        error: error.message || "Sign in failed. Please try again.",
       };
     }
 
-    if (signInData?.user) {
-      await recordAuthSuccess(sanitizedEmail, "signin");
-      logger.info(
-        "auth",
-        `✅ Sign-in successful for ${sanitizedEmail}, setting auth state...`,
-      );
+    // Successful sign in
+    const session = signInResult.data;
+    await recordAuthSuccess(sanitizedEmail, "signin");
+    logger.info(
+      "auth",
+      `✅ Sign-in successful for ${sanitizedEmail}, setting auth state...`,
+    );
 
-      // Set local auth state so route guards work immediately
-      const { AuthStateManager } = await import("./auth-state");
-      
-      // CRITICAL: Save the session tokens to encrypted storage (web platform)
-      // This must happen BEFORE setHasAccount to ensure tokens are persisted
-      logger.debug("auth", "🔐 signInData structure:", {
-        hasUser: !!signInData.user,
-        hasSession: !!signInData.session,
-        sessionKeys: signInData.session ? Object.keys(signInData.session) : [],
-        hasAccessToken: !!signInData.session?.access_token,
-        hasRefreshToken: !!signInData.session?.refresh_token,
-      });
+    // Set local auth state so route guards work immediately
+    const { AuthStateManager } = await import("./auth-state");
+    
+    // CRITICAL: Save the session tokens to encrypted storage (web platform)
+    // This must happen BEFORE setHasAccount to ensure tokens are persisted
+    logger.debug("auth", "🔐 Session structure:", {
+      hasUserId: !!session.userId,
+      hasEmail: !!session.email,
+      hasAccessToken: !!session.accessToken,
+      hasRefreshToken: !!session.refreshToken,
+      hasRaw: !!session.raw,
+    });
 
-      if (signInData.session) {
-        logger.debug("auth", "💾 Persisting auth session tokens to storage...");
-        await AuthStateManager.setSession(signInData.session);
-      } else {
-        logger.warn("auth", "⚠️ No session data in sign-in response (signInData.session is null/undefined)");
-      }
+    if (session.raw) {
+      logger.debug("auth", "💾 Persisting auth session tokens to storage...");
+      await AuthStateManager.setSession(session.raw);
+    } else {
+      logger.warn("auth", "⚠️ No raw session data in sign-in response");
+    }
       
       await AuthStateManager.setHasAccount(true);
 
@@ -548,12 +477,6 @@ export const signInUser = async (
           redirectTo: "/select/world-selection",
         };
       }
-    }
-
-    return {
-      success: false,
-      error: "An unexpected error occurred. Please try again.",
-    };
   } catch (error) {
     logger.error("auth", "Sign in error:", error);
     const message = (error as Error)?.message?.includes("Request timeout")
@@ -595,15 +518,6 @@ export const sendPasswordReset = async (
     // Use sanitized email
     const sanitizedEmail = emailValidation.sanitized;
 
-    // Check if Supabase is configured before attempting password reset
-    if (!(await isSupabaseConfiguredLazy())) {
-      return {
-        success: false,
-        error:
-          "Unable to connect to servers. Please check your internet connection and try again.",
-      };
-    }
-
     const guard = await checkAuthGuard(sanitizedEmail, "reset");
     if (!guard.allowed) {
       const retrySeconds = guard.retryAfterMs
@@ -618,42 +532,15 @@ export const sendPasswordReset = async (
     }
 
     // Proceed with password reset; backend will send email only if account exists.
-    const baseUrl =
-      typeof window !== "undefined"
-        ? window.location.origin
-        : "https://dnd-tool.thesnowpost.com";
-    const resetResponse = await RequestManager.fetch<AuthResponse>(
-      `auth:reset:${sanitizedEmail}`,
-      async () => {
-        const configured = await isSupabaseConfiguredLazy();
-        if (!configured) throw new Error("Supabase not configured");
-        const supabase = await getSupabaseClientLazy();
-        return supabase.auth.resetPasswordForEmail(sanitizedEmail, {
-          redirectTo: `${baseUrl}/login/auth-redirect?action=reset-password`,
-        });
-      },
-      {
-        rateLimitKey: `auth:reset:${sanitizedEmail}`,
-        retries: 1,
-        timeout: 10000,
-        authStrategy: "public",
-      },
-    );
+    const authProvider = await getAuthProvider();
+    const resetResult = await authProvider.resetPassword(sanitizedEmail);
 
-    const resetError = resetResponse?.error ?? null;
-
-    if (resetError) {
-      // Log full error details for debugging (helps identify network failures, config issues, rate limiting, etc.)
-      // But return generic message to user to prevent email enumeration
+    if (!resetResult.success) {
+      // Log error details for debugging, but return generic message to prevent email enumeration
       logger.error(
         "auth",
         "Password reset API error (full details for debugging):",
-        {
-          message: resetError.message,
-          code: resetError.code,
-          status: (resetError as any)?.status,
-          details: resetError,
-        },
+        { message: resetResult.message },
       );
       return {
         success: true,
@@ -683,32 +570,13 @@ export const updatePassword = async (
   newPassword: string,
 ): Promise<ResetPasswordResult> => {
   try {
-    // Check if Supabase is configured before attempting password update
-    if (!(await isSupabaseConfiguredLazy())) {
+    const authProvider = await getAuthProvider();
+    const result = await authProvider.updatePassword(newPassword);
+
+    if (!result.success) {
       return {
         success: false,
-        error:
-          "Unable to connect to servers. Please check your internet connection and try again.",
-      };
-    }
-    const supabase = await getSupabaseClientLazy();
-
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
-
-    if (error) {
-      if (error.message.includes("Password")) {
-        return {
-          success: false,
-          error:
-            "Password does not meet requirements. Please ensure it is at least 6 characters long.",
-        };
-      }
-
-      return {
-        success: false,
-        error: error.message || "Failed to update password. Please try again.",
+        error: result.error || "Failed to update password. Please try again.",
       };
     }
 

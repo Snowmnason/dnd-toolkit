@@ -107,7 +107,7 @@ export const updateStorageCache = {
         // CRITICAL: Check if Supabase session is ready before attempting world query
         // Without a valid session, RLS policies will block access and return 0 worlds
         const { getSupabaseClient, isSupabaseConfigured } = await import(
-          "../database/supabase"
+          "../services/supabase/supabase-client"
         );
         if (isSupabaseConfigured()) {
           try {
@@ -152,8 +152,8 @@ export const updateStorageCache = {
         const userWorlds = await worldsDB.getMyWorlds(userId);
 
         logger.info(
-          "storage",
-          `Fetched ${userWorlds.length} worlds from database`,
+          "database",
+          `worldsDB.getMyWorlds returned ${userWorlds.length} worlds for user ${userId}`,
         );
 
         // Build rich cache structure with role breakdown

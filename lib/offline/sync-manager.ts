@@ -28,29 +28,29 @@
 import { QueryCache } from "@/lib/cache/query-cache";
 import { getAppConfig } from "@/lib/config";
 import {
-  createSafeModeState,
-  NetworkCascadeDetector,
-  SafeModeReason,
+    createSafeModeState,
+    NetworkCascadeDetector,
+    SafeModeReason,
 } from "@/lib/error";
 import { AppKernel } from "@/lib/kernel/app-kernel";
 import {
-  NetworkDetection,
-  type NetworkStatus,
+    NetworkDetection,
+    type NetworkStatus,
 } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
 import { getConflictQueueManager } from "./conflict-queue-manager";
 import { executeConflictResolution } from "./conflict-resolution";
 import { OfflineMutationQueue } from "./mutation-queue";
 import {
-  CircuitBreakerReplayManager,
-  NetworkErrorClassifier,
+    CircuitBreakerReplayManager,
+    NetworkErrorClassifier,
 } from "./offline-recovery";
 import { executeSyncHandler } from "./sync-handlers";
 import type {
-  OfflineSyncConfig,
-  OfflineSyncStatus,
-  QueuedMutation,
-  SyncResult,
+    OfflineSyncConfig,
+    OfflineSyncStatus,
+    QueuedMutation,
+    SyncResult,
 } from "./types";
 
 /**
@@ -385,7 +385,7 @@ class OnlineSyncManagerService {
         );
 
       // Dynamically import Supabase client
-      const { supabase } = await import("@/lib/database/supabase");
+      const { supabase } = await import("@/lib/services/supabase/supabase-client");
 
       // Execute via registered handler for this table
       const handlerResult = await executeSyncHandler(mutation, supabase);

@@ -6,9 +6,11 @@ import {
   FormAuthInput
 } from '@/components/auth_components';
 import { AppToast } from '@/components/ui';
-import { AuthStateManager, buildRoute, logger, supabase, useSignInForm } from '@/lib';
-import type { Href } from 'expo-router';
+import { AuthStateManager, buildRoute, logger, useSignInForm } from '@/lib';
+// SUPABASE_AUTH: Direct auth operations — to be migrated to getAuthProvider() in Track D
+import { supabase } from '@/lib/services/supabase/supabase-client';
 import { useScale } from '@/theme';
+import type { Href } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { TextInput } from 'react-native';

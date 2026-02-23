@@ -120,7 +120,7 @@ export const getSupabaseClient = () => {
             hasAccessToken: !!session.access_token,
           });
           // Dynamically import to avoid circular dependency
-          import('../auth/auth-state').then(({ AuthStateManager }) => {
+          import('../../auth/auth-state').then(({ AuthStateManager }) => {
             AuthStateManager.saveAuthSession(session).catch((err) => {
               logger.error('storage', 'Failed to save auth session:', err);
             });
@@ -128,7 +128,7 @@ export const getSupabaseClient = () => {
         } else if (event === 'SIGNED_OUT') {
           logger.info('storage', '🔓 User signed out');
           // Clear the saved session
-          import('../auth/auth-state').then(({ AuthStateManager }) => {
+          import('../../auth/auth-state').then(({ AuthStateManager }) => {
             AuthStateManager.clearAuthSession().catch((err) => {
               logger.error('storage', 'Failed to clear auth session:', err);
             });
@@ -136,7 +136,7 @@ export const getSupabaseClient = () => {
         } else if (event === 'TOKEN_REFRESHED' && session) {
           logger.debug('storage', '🔄 Token refreshed, updating saved session');
           // Update the saved session with new tokens
-          import('../auth/auth-state').then(({ AuthStateManager }) => {
+          import('../../auth/auth-state').then(({ AuthStateManager }) => {
             AuthStateManager.saveAuthSession(session).catch((err) => {
               logger.error('storage', 'Failed to update auth session:', err);
             });
@@ -165,4 +165,3 @@ export const supabase = new Proxy({} as any, {
     return getSupabaseClient()[prop];
   }
 });
-

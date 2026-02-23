@@ -3,8 +3,8 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Platform } from 'react-native';
-import { getSupabaseClientLazy, isSupabaseConfiguredLazy } from '../database/supabase-lazy';
 import { resetPasswordSchema, type ResetPasswordFormData } from '../schemas/auth.schema';
+import { getAuthProvider } from '@/lib/services';
 import { logger } from '../utils/logger';
 import { updatePassword } from './authService';
 
@@ -40,12 +40,7 @@ export const useResetPasswordConfirm = () => {
   useEffect(() => {
     const getUserInfo = async () => {
       try {
-        if (!await isSupabaseConfiguredLazy()) {
-          logger.warn('auth', 'Supabase not configured, cannot reset password');
-          setError('Unable to connect to servers. Please check your internet connection.');
-          return;
-        }
-        const supabase = await getSupabaseClientLazy();
+        const authProvider = await getAuthProvider();
         
         // Check if we have URL parameters for the reset token
         if (Platform.OS === 'web') {
@@ -54,26 +49,26 @@ export const useResetPasswordConfirm = () => {
           const refreshToken = urlParams.get('refresh_token');
           
           if (accessToken && refreshToken) {
-            // Set the session with the tokens from the URL
-            const { data, error } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken
-            });
+            // Restore the session with tokens from the URL
+            const restored = await authProvider.restoreSession({ access_token: accessToken, refresh_token: refreshToken });
             
-            if (!error && data.user) {
-              setUserEmail(data.user.email || '');
-              logger.info('auth', 'Reset session established for:', data.user.email);
+            if (restored) {
+              const userSession = await authProvider.getUser();
+              if (userSession) {
+                setUserEmail(userSession.email || userSession.raw?.user?.email || '');
+                logger.info('auth', 'Reset session established for:', userSession.email);
+              }
             } else {
-              logger.error('auth', 'Failed to establish reset session:', error);
+              logger.error('auth', 'Failed to establish reset session');
               setError('Invalid or expired reset link. Please request a new password reset.');
             }
           }
         }
         
         // Fallback: try to get current user if already in session
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user && user.email && !userEmail) {
-          setUserEmail(user.email);
+        const existingSession = await authProvider.getUser();
+        if (existingSession && existingSession.email && !userEmail) {
+          setUserEmail(existingSession.email);
         }
       } catch (err) {
         logger.error('auth', 'Error getting user info:', err);

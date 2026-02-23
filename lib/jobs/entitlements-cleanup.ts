@@ -13,7 +13,6 @@ import {
   deactivateEntitlements,
   fetchExpiredEntitlements,
 } from '../database/entitlements';
-import { supabase } from '../database/supabase';
 import { logger } from '../utils/logger';
 
 export interface EntitlementsCleanupPayload {
@@ -41,7 +40,7 @@ export async function handleEntitlementsCleanup(
 
   try {
     // Fetch expired entitlements past grace period using DB helper
-    const cleanupList = await fetchExpiredEntitlements(supabase, gracePeriodDays);
+    const cleanupList = await fetchExpiredEntitlements(gracePeriodDays);
 
     logger.category('jobs').info(
       `Found ${cleanupList.length} expired entitlements to deactivate`,
@@ -68,7 +67,7 @@ export async function handleEntitlementsCleanup(
 
     // Batch deactivate all expired entitlements using DB helper
     const expiredIds = cleanupList.map((e) => e.id);
-    const cleaned = await deactivateEntitlements(supabase, expiredIds);
+    const cleaned = await deactivateEntitlements(expiredIds);
 
     logger.category('jobs').info(
       `Successfully marked ${cleaned} entitlements as inactive`,

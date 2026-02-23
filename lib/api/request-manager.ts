@@ -406,6 +406,7 @@ class RequestManagerClass {
       'thumb': 'text-only',
       'text-only': 'text-only', // Already at minimum
     };
+    // eslint-disable-next-line security/detect-object-injection
     return degradeMap[quality];
   }
 

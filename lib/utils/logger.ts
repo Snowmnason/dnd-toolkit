@@ -23,6 +23,7 @@ type LogCategory =
   | "network" // Network detection and status
   | "performance" // Performance monitoring and timing
   | "storage" // Data storage and caching
+  | "database" // Database queries and provider init
   | "ui" // UI components and rendering
   | "analytics" // Analytics and tracking
   | "security" // Security-related operations
@@ -172,6 +173,7 @@ class Logger {
     if (categories.feature_flags !== false) enabled.push("feature_flags");
     if (categories.performance !== false) enabled.push("performance");
     if (categories.storage !== false) enabled.push("storage");
+    if (categories.database !== false) enabled.push("database");
     if (categories.ui !== false) enabled.push("ui");
     if (categories.analytics !== false) enabled.push("analytics");
     if (categories.security !== false) enabled.push("security");
@@ -197,6 +199,7 @@ class Logger {
    */
   private isValidCategory(str: string): str is LogCategory {
     const validCategories: LogCategory[] = [
+      "database",
       "auth",
       "navigation",
       "api",

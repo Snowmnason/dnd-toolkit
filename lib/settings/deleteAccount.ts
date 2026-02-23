@@ -1,7 +1,7 @@
+import { getAuthProvider } from '@/lib/services';
 import { AuthStateManager } from '../auth/auth-state';
 import { validatePassword } from '../auth/validation';
 import { validateCurrentUser } from '../database/common';
-import { getSupabaseClientLazy, isSupabaseConfiguredLazy } from '../database/supabase-lazy';
 import { usersDB } from '../database/users';
 import { logger } from '../utils/logger';
 
@@ -39,14 +39,11 @@ export async function deleteUserAccount(password: string): Promise<DeleteAccount
 
     // Re-authenticate with password before deletion for security
     logger.debug('auth', 'Re-authenticating user before account deletion');
-    if (!await isSupabaseConfiguredLazy()) throw new Error('Supabase not configured');
-    const supabase = await getSupabaseClientLazy();
-    const { error: reAuthError } = await supabase.auth.signInWithPassword({
-      email: authUser.email,
-      password: password
-    });
+    const authProvider = await getAuthProvider();
+    const reAuthResult = await authProvider.signIn(authUser.email, password);
 
-    if (reAuthError) {
+    if (!reAuthResult.success) {
+      const reAuthError = reAuthResult.error;
       logger.error('auth', 'Re-authentication failed:', reAuthError);
       // If password passed client validation but failed auth, mark as validation warning
       const isBackendValidationFailure = passwordValidation.isValid;
@@ -69,9 +66,10 @@ export async function deleteUserAccount(password: string): Promise<DeleteAccount
     // Clean up local state and sign out
     logger.debug('auth', 'Clearing local auth state');
     await AuthStateManager.clearAuthState();
-    if (await isSupabaseConfiguredLazy()) {
-      const supabase = await getSupabaseClientLazy();
-      await supabase.auth.signOut();
+    try {
+      await (await getAuthProvider()).signOut();
+    } catch {
+      // Ignore signout errors during account deletion cleanup
     }
     
     logger.info('auth', 'Account deletion and cleanup completed');

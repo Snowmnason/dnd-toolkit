@@ -217,6 +217,11 @@ export interface AppSettings {
       enabled?: boolean;
       description?: string;
     };
+    database?: {
+      provider?: string; // 'supabase' (default) | future: 'postgres', 'firebase'
+      enabled?: boolean;
+      description?: string;
+    };
     analytics?: {
       provider?: string; // 'sentry' (default) | future providers
       enabled?: boolean;

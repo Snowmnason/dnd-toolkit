@@ -16,10 +16,12 @@
  */
 
 import { Button, ButtonText } from '@/components/ui';
-import { AuthStateManager, logger, supabase } from '@/lib';
+import { AuthStateManager, logger } from '@/lib';
+// SUPABASE_AUTH: Direct auth operations — to be migrated to getAuthProvider() in Track D
+import { supabase } from '@/lib/services/supabase/supabase-client';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 
 // Complete auth session setup for mobile

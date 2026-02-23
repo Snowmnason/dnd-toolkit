@@ -224,7 +224,6 @@ describe("FeatureFlagsManager", () => {
       expect(result.granted).toBe(true);
       expect(result.source).toBe("server");
       expect(fetchEntitlementsByUserId).toHaveBeenCalledWith(
-        mockSupabase,
         userId,
       );
     });

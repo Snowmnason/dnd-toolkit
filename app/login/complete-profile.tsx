@@ -1,19 +1,21 @@
 import {
-    AuthActionGroup,
-    AuthBody,
-    AuthBodyFooter,
-    AuthButton,
-    AuthButtonSecondary,
-    AuthCaption,
-    AuthError,
-    AuthForm,
-    AuthRoot,
-    AuthSubTitle,
-    AuthTitle,
-    FormAuthInput,
+  AuthActionGroup,
+  AuthBody,
+  AuthBodyFooter,
+  AuthButton,
+  AuthButtonSecondary,
+  AuthCaption,
+  AuthError,
+  AuthForm,
+  AuthRoot,
+  AuthSubTitle,
+  AuthTitle,
+  FormAuthInput,
 } from "@/components/auth_components";
 import { Body } from "@/components/ui";
-import { logger, supabase, usersDB, useSignUpForm } from "@/lib";
+import { logger, usersDB, useSignUpForm } from "@/lib";
+// SUPABASE_AUTH: Direct auth operations — to be migrated to getAuthProvider() in Track D
+import { supabase } from "@/lib/services/supabase/supabase-client";
 import { useScale } from "@/theme";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";

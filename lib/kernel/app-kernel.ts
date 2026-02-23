@@ -244,50 +244,14 @@ class AppKernelClass {
 
       startTimeout();
 
-      // Phase 0: CONFIG (initialize Supabase env vars and client FIRST)
-      // This MUST run before PRELOAD, STORAGE, and AUTH so that Supabase is ready
-      // and the auth adapter can safely restore session tokens from storage.
+      // Phase 0: CONFIG
+      // Database provider initialization is deferred to the SERVICES phase
+      // to keep kernel responsibilities focused and avoid duplicated init.
       await this.runPhase("config", async () => {
         try {
-          logger.category("bootstrap").info("Initializing Supabase client...");
-
-          const Constants = await import("expo-constants");
-          const expoExtra = Constants.default.expoConfig?.extra || {};
-
-          // Ensure Supabase env vars are set in process.env (from Constants if needed)
-          if (!process.env.EXPO_PUBLIC_SUPABASE_URL && expoExtra.supabaseUrl) {
-            (process.env as any).EXPO_PUBLIC_SUPABASE_URL =
-              expoExtra.supabaseUrl;
-            logger
-              .category("bootstrap")
-              .debug("EXPO_PUBLIC_SUPABASE_URL set from app.json extras");
-          }
-          if (
-            !process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY &&
-            expoExtra.supabaseAnonKey
-          ) {
-            (process.env as any).EXPO_PUBLIC_SUPABASE_ANON_KEY =
-              expoExtra.supabaseAnonKey;
-            logger
-              .category("bootstrap")
-              .debug("EXPO_PUBLIC_SUPABASE_ANON_KEY set from app.json extras");
-          }
-
-          // Initialize Supabase client if configured
-          // This allows the auth adapter to restore session tokens IMMEDIATELY
-          const supMod = await import("@/lib/database/supabase");
-          if (supMod.isSupabaseConfigured()) {
-            supMod.getSupabaseClient();
-            logger
-              .category("bootstrap")
-              .info(
-                "✅ Supabase client initialized - session restoration in progress",
-              );
-          } else {
-            logger
-              .category("bootstrap")
-              .warn("Supabase not configured - continuing with degraded auth");
-          }
+          logger
+            .category("bootstrap")
+            .info("CONFIG phase completed — deferring database provider initialization to SERVICES phase");
         } catch (error) {
           logger.category("bootstrap").error("CONFIG phase failed", {
             error: (error as Error).message,
@@ -715,13 +679,13 @@ class AppKernelClass {
         try {
           const { FeatureFlagsManager } =
             await import("@/lib/feature-flags/server-sync");
-          const { getSupabaseClient, isSupabaseConfigured } =
-            await import("@/lib/database/supabase");
+          const { getDatabaseProvider } = await import("@/lib/services");
+          const { getSupabaseClient } = await import("@/lib/services/supabase/supabase-client");
 
-          if (!isSupabaseConfigured()) {
+          if (!getDatabaseProvider().isConfigured()) {
             logger
               .category("bootstrap")
-              .warn("Supabase not configured — skipping feature flags bootstrap");
+              .warn("Database not configured — skipping feature flags bootstrap");
           } else {
             const supClient = getSupabaseClient();
             // Try to get userId from storage (may be available from a previous session)
@@ -843,7 +807,7 @@ class AppKernelClass {
           import("react-native"),
           import("@/lib/storage"),
           import("@/lib/analytics"),
-          import("@/lib/database/supabase"),
+          import("@/lib/services/supabase/supabase-client"),
         ]);
 
       // Platform detection

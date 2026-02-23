@@ -238,15 +238,15 @@ class ConsentSyncQueueService {
    * @throws If the database update fails
    */
   private async syncToDatabase(item: PendingConsentSync): Promise<void> {
-    // Dynamically import to avoid circular depends and Supabase config checks
-    const { isSupabaseConfigured } = await import('@/lib/database');
+    // Dynamically import to avoid circular depends and database config checks
+    const { getDatabaseProvider } = await import('@/lib/services');
     const { userSettingsDB } = await import('@/lib/database');
 
-    if (!isSupabaseConfigured()) {
-      // No-op if Supabase not configured (e.g., GitHub Pages deployment)
+    if (!getDatabaseProvider().isConfigured()) {
+      // No-op if database not configured (e.g., GitHub Pages deployment)
       logger
         .category('analytics')
-        .debug('Skipping consent sync - Supabase not configured');
+        .debug('Skipping consent sync - database not configured');
       return;
     }
 

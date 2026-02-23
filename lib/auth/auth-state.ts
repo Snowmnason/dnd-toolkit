@@ -434,7 +434,7 @@ export const AuthStateManager = {
 
       // Use cached supabase import to avoid re-loading modules
       if (!supabaseCache) {
-        const imported = await import("../database/supabase");
+        const imported = await import("../services/supabase/supabase-client");
         supabaseCache = imported.supabase;
         isSupabaseConfiguredCache = imported.isSupabaseConfigured;
       }
@@ -499,7 +499,7 @@ export const AuthStateManager = {
 
       // Use cached supabase import
       if (!supabaseCache) {
-        const imported = await import("../database/supabase");
+        const imported = await import("../services/supabase/supabase-client");
         supabaseCache = imported.supabase;
         isSupabaseConfiguredCache = imported.isSupabaseConfigured;
       }
@@ -691,11 +691,11 @@ export const AuthStateManager = {
    * This prevents the thundering herd problem.
    * 
    * @param worldIds - World IDs to verify
-   * @returns Map of worldId => hasAccess
+   * @returns Object with results Map and deferred flag
    */
   async batchVerifyWorldAccess(
     worldIds: string[],
-  ): Promise<Map<string, boolean>> {
+  ): Promise<{ results: Map<string, boolean>; deferred: boolean }> {
     logger.info(
       "auth",
       `[BATCH-VERIFY] Starting batch verification for ${worldIds.length} worlds`,
@@ -713,29 +713,38 @@ export const AuthStateManager = {
         "[BATCH-VERIFY] Bulk refresh failed, falling back to per-world verification",
         error,
       );
+      logger.warn(
+        "database",
+        "[BATCH-VERIFY] Bulk refresh failed (updateStorageCache.refreshAllWorldsCache), falling back to per-world verification",
+        error,
+      );
       // Fall back to per-world verification if bulk fails
       const results = new Map<string, boolean>();
       for (const worldId of worldIds) {
         const result = await this.verifyWorldAccessWithDatabase(worldId);
         results.set(worldId, result.hasAccess);
       }
-      return results;
+      return { results, deferred: false };
     }
 
-    // If refresh returned null (session not ready), return false for all worlds
-    // This prevents granting access to unauthenticated users during app startup.
+    // If refresh returned null (session not ready), signal deferred.
+    // Callers must NOT treat deferred results as verified 0-world state.
     // Screens should listen to auth state changes and re-verify once session is ready.
     if (refreshResult === null) {
       logger.info(
         "auth",
         "[BATCH-VERIFY] Refresh deferred (session not ready), denying access until verified",
       );
+      logger.info(
+        "database",
+        "[BATCH-VERIFY] Refresh deferred (session not ready) — deferred=true",
+      );
       const results = new Map<string, boolean>();
       // Deny access for all worlds until session is ready and we can verify
       for (const worldId of worldIds) {
         results.set(worldId, false); // Deny access until session is ready
       }
-      return results;
+      return { results, deferred: true };
     }
 
     // Now check cache for each world locally (no DB calls needed)
@@ -763,7 +772,11 @@ export const AuthStateManager = {
       "auth",
       `[BATCH-VERIFY] Complete: ${results.size} worlds verified`,
     );
-    return results;
+    logger.info(
+      "database",
+      `[BATCH-VERIFY] Complete: ${results.size} worlds verified`,
+    );
+    return { results, deferred: false };
   },
 
   /**
@@ -775,7 +788,7 @@ export const AuthStateManager = {
   ): Promise<{ hasAccess: boolean; reason?: string }> {
     try {
       if (!isSupabaseConfiguredCache) {
-        const imported = await import("../database/supabase");
+        const imported = await import("../services/supabase/supabase-client");
         isSupabaseConfiguredCache = imported.isSupabaseConfigured;
         supabaseCache = imported.supabase;
       }
@@ -844,7 +857,7 @@ export const AuthStateManager = {
 
       // Use cached supabase import to avoid re-loading modules
       if (!supabaseCache) {
-        const imported = await import("../database/supabase");
+        const imported = await import("../services/supabase/supabase-client");
         supabaseCache = imported.supabase;
         isSupabaseConfiguredCache = imported.isSupabaseConfigured;
       }

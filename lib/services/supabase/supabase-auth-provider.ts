@@ -11,15 +11,15 @@
  */
 
 import {
-  AuthError,
-  AuthProvider,
-  AuthResult,
-  EmailAlreadyExistsError,
-  InvalidCredentialsError,
-  NetworkError,
-  RateLimitError,
-  Session,
-  UserNotFoundError,
+    AuthError,
+    AuthProvider,
+    AuthResult,
+    EmailAlreadyExistsError,
+    InvalidCredentialsError,
+    NetworkError,
+    RateLimitError,
+    Session,
+    UserNotFoundError,
 } from '@/lib/services/auth-provider';
 import { logger } from '@/lib/utils/logger';
 
@@ -48,13 +48,14 @@ export class SupabaseAuthProvider implements AuthProvider {
    * Returns session on success or normalized error.
    * Note: Supabase may return user without session if email confirmation is required.
    */
-  async signUp(email: string, password: string): Promise<AuthResult> {
+  async signUp(email: string, password: string, options?: Record<string, any>): Promise<AuthResult> {
     try {
       logger.debug('auth', 'Supabase: signUp attempt');
 
       const { data, error } = await this.supabaseClient.auth.signUp({
         email,
         password,
+        options,
       });
 
       if (error) {
@@ -187,8 +188,51 @@ export class SupabaseAuthProvider implements AuthProvider {
   }
 
   /**
+   * Update the authenticated user's password.
+   * Requires active session (typically from password reset token).
+   */
+  async updatePassword(newPassword: string): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      logger.debug('auth', 'Supabase: updatePassword attempt');
+
+      const { error } = await this.supabaseClient.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) {
+        logger.warn('auth', 'Supabase updatePassword error:', error.message);
+        
+        if (error.message.includes('Password')) {
+          return {
+            success: false,
+            error: 'Password does not meet requirements. Please ensure it is at least 6 characters long.',
+          };
+        }
+
+        return {
+          success: false,
+          error: error.message || 'Failed to update password. Please try again.',
+        };
+      }
+
+      logger.info('auth', 'Supabase updatePassword success');
+      return { success: true };
+    } catch (err) {
+      logger.error('auth', 'Supabase updatePassword exception:', err);
+      return {
+        success: false,
+        error: 'An error occurred while updating password. Please try again.',
+      };
+    }
+  }
+
+  /**
    * Get current session (if authenticated).
    * Returns null if no active session.
+   * Returns from Supabase's local cache — no network call.
    */
   async getSession(): Promise<Session | null> {
     try {
@@ -206,6 +250,35 @@ export class SupabaseAuthProvider implements AuthProvider {
       return null;
     } catch (err) {
       logger.error('auth', 'Supabase getSession exception:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Validate the current user with the server (live network call).
+   * Uses supabase.auth.getUser() which verifies the JWT server-side.
+   * Returns null if token is expired, revoked, or invalid.
+   */
+  async getUser(): Promise<Session | null> {
+    try {
+      const { data, error } = await this.supabaseClient.auth.getUser();
+
+      if (error) {
+        logger.warn('auth', 'Supabase getUser error:', error.message);
+        return null;
+      }
+
+      if (data?.user) {
+        return {
+          userId: data.user.id,
+          email: data.user.email,
+          raw: { user: data.user },
+        };
+      }
+
+      return null;
+    } catch (err) {
+      logger.error('auth', 'Supabase getUser exception:', err);
       return null;
     }
   }
@@ -307,6 +380,7 @@ export class SupabaseAuthProvider implements AuthProvider {
   private sessionFromSupabaseSession(supabaseSession: any): Session {
     return {
       userId: supabaseSession.user?.id || '',
+      email: supabaseSession.user?.email,
       accessToken: supabaseSession.access_token,
       refreshToken: supabaseSession.refresh_token,
       expiresAt: supabaseSession.expires_at

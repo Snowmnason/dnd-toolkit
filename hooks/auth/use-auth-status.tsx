@@ -1,4 +1,5 @@
-import { logger, supabase } from '@/lib/';
+import { getAuthProvider } from '@/lib/auth';
+import { logger } from '@/lib/utils/logger';
 import { useEffect, useState } from 'react';
 
 export function useAuthStatus() {
@@ -8,8 +9,8 @@ export function useAuthStatus() {
     const checkAuthStatus = async () => {
       try {
         // Use cached session instead of making network call
-        const { data: { session } } = await supabase.auth.getSession();
-        setIsUserLoggedIn(session?.user !== null);
+        const session = await (await getAuthProvider()).getSession();
+        setIsUserLoggedIn(session !== null);
       } catch (error) {
         logger.error('auth', 'Error checking auth status:', error);
         setIsUserLoggedIn(false);

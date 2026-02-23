@@ -25,6 +25,7 @@ import { logger, RedactionManager } from '@/lib/utils';
  */
 export interface Session {
   userId: string;
+  email?: string;       // User email — populated by providers that have it (e.g. Supabase)
   accessToken?: string;
   refreshToken?: string;
   expiresAt?: number;
@@ -60,6 +61,7 @@ export interface AuthProvider {
    * **Input Expectations:**
    * - email: Already validated (format, length, no SQL keywords, no control chars)
    * - password: Already validated (strength, length, no dangerous patterns)
+   * - options: Optional provider-specific options (e.g., emailRedirectTo for email confirmation)
    *
    * **Returns:**
    * - { success: true; data: Session } on successful registration
@@ -70,7 +72,7 @@ export interface AuthProvider {
    * - Generate and return session tokens if applicable
    * - Map backend errors (e.g., email already exists) to AuthError types
    */
-  signUp(email: string, password: string): Promise<AuthResult>;
+  signUp(email: string, password: string, options?: Record<string, any>): Promise<AuthResult>;
 
   /**
    * Sign in an existing user with email and password.
@@ -108,17 +110,62 @@ export interface AuthProvider {
   resetPassword(email: string): Promise<{ success: boolean; message?: string }>;
 
   /**
-   * Get current session (if authenticated).
+   * Update the authenticated user's password.
+   *
+   * Called after password reset flow when user has active reset token session.
+   * Requires an authenticated session (typically from password reset link).
+   *
+   * **Input:**
+   * - newPassword: The new password (already validated by caller)
+   *
+   * **Returns:**
+   * - { success: true } on successful password update
+   * - { success: false; error?: string } on failure
+   *
+   * **Provider Responsibilities:**
+   * - Update password in backend
+   * - Validate that user has valid session/reset token
+   * - Return user-friendly error messages
+   * - Maintain session after password update (don't log user out)
+   */
+  updatePassword(newPassword: string): Promise<{ success: boolean; error?: string }>;
+
+  /**
+   * Get current session from local cache (if authenticated).
    *
    * **Returns:**
    * - Session object if user is authenticated
    * - null if no active session
    *
    * **Provider Responsibilities:**
-   * - Check token validity
-   * - Return session with userId and token fields
+   * - Return locally cached session (no network call)
+   * - Use for general auth checks, route guards, and display logic
+   * - For security-critical operations (write guards, account deletion), prefer getUser()
    */
   getSession(): Promise<Session | null>;
+
+  /**
+   * Validate the current user with the server (live network call).
+   *
+   * Unlike getSession() which returns from local cache, this method makes a
+   * round-trip to the auth server to verify the token is still valid.
+   *
+   * **Returns:**
+   * - Session object if the token is valid (userId + raw provider user)
+   * - null if token is expired, revoked, or user no longer exists
+   *
+   * **Provider Responsibilities:**
+   * - Make a network call to the auth backend
+   * - Validate token freshness server-side
+   * - Return session with userId and raw user data (email accessible via session.raw?.user?.email)
+   *
+   * **When to use:**
+   * - Security-critical write guards (validateUserForWrite)
+   * - Account deletion
+   * - Password changes
+   * - Any operation where a stale local cache would be dangerous
+   */
+  getUser(): Promise<Session | null>;
 
   /**
    * Subscribe to auth state changes.
@@ -518,6 +565,10 @@ export function createValidatedAuthProvider(
       return provider.getSession();
     },
 
+    async getUser(): Promise<Session | null> {
+      return provider.getUser();
+    },
+
     onAuthStateChange(
       callback: (session: Session | null) => void
     ): () => void {
@@ -526,6 +577,11 @@ export function createValidatedAuthProvider(
 
     async signOut(): Promise<void> {
       return provider.signOut();
+    },
+
+    async updatePassword(newPassword: string): Promise<{ success: boolean; error?: string }> {
+      // No validation needed - provider handles password complexity validation
+      return provider.updatePassword(newPassword);
     },
 
     async restoreSession(rawSession: any): Promise<boolean> {
