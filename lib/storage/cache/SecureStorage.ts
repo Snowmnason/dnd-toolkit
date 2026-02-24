@@ -11,7 +11,7 @@ import { getStorageBackend, type StorageBackend } from "../storage-config";
 let loggerCache: any = null;
 const getLogger = () => {
   if (!loggerCache) {
-    loggerCache = require("../utils/logger").logger;
+    loggerCache = require("../../utils/logger").logger;
   }
   return loggerCache;
 };
