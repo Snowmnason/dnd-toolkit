@@ -2,6 +2,7 @@ import { useAuthStateListener } from "@/hooks/auth";
 import {
   deleteUserAccount,
   getCurrentSession,
+  isEmailConfirmed,
   logger,
   signOutUser,
   usersDB,
@@ -58,8 +59,7 @@ export default function SettingsPage() {
     // Double-check: require confirmed authenticated session before proceeding
     getCurrentSession()
       .then((session) => {
-        const user = session?.raw?.user ?? null;
-        if (!user || !user.email_confirmed_at) {
+        if (!isEmailConfirmed(session)) {
           logger.debug("settings", "No confirmed user session, redirecting");
           const target = buildNavigationTarget('/', {}, []);
           router.replace(target as any);

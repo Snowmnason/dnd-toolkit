@@ -2,12 +2,12 @@ import { AuthStateManager } from "@/lib/auth/auth-state";
 import { getPrivacyStorageBackend, STORAGE_KEYS } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import React, {
-    createContext as createReactContext,
-    ReactNode,
-    useCallback,
-    useContext,
-    useEffect,
-    useState,
+  createContext as createReactContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
 } from "react";
 import { createContext, useContextSelector } from "use-context-selector";
 
@@ -70,6 +70,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
   });
   const [authStateVersion, setAuthStateVersion] = useState(0);
   const previousUserIdRef = React.useRef<string | undefined>(undefined);
+  const isVerifyingRef = React.useRef(false);
 
   // Load from storage on mount AND when auth state changes
   useEffect(() => {
@@ -257,6 +258,11 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
       richCache: ConnectedWorldsCache | null | undefined,
       isErrorState: boolean,
     ) {
+      if (isVerifyingRef.current) {
+        logger.debug("context", "AppParamsStableProvider: Verification already running - skipping new request");
+        return;
+      }
+      isVerifyingRef.current = true;
       try {
         logger.info(
           "context",
@@ -429,6 +435,8 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
           verificationError,
         );
         // On verification error, keep cached worlds and surface to user
+      } finally {
+        isVerifyingRef.current = false;
       }
     }
 
@@ -440,12 +448,15 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     let subscription: { unsubscribe: () => void } | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let watcherToken = 0;
 
-    const setupAuthWatcher = async (attempt = 1) => {
+    const setupAuthWatcher = async (attempt = 1, token = ++watcherToken) => {
+      const localToken = token;
       try {
         const { getAuthProvider } = await import("@/lib/services");
         const authProvider = await getAuthProvider();
         const unsubscribe = authProvider.onAuthStateChange(async (session) => {
+          if (localToken !== watcherToken) return; // stale watcher
           if (mounted && session !== null) {
             logger.debug(
               "context",
@@ -489,7 +500,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
           );
           retryTimer = setTimeout(() => {
             if (mounted) {
-              setupAuthWatcher(attempt + 1);
+              setupAuthWatcher(attempt + 1, localToken);
             }
           }, delayMs);
         } else {
@@ -509,6 +520,8 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
       if (retryTimer) {
         clearTimeout(retryTimer);
       }
+      // Invalidate any in-flight watcher
+      watcherToken++;
       if (subscription) {
         subscription.unsubscribe();
       }

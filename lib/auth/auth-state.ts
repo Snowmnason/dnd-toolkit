@@ -11,6 +11,19 @@ import { logger } from "../utils/logger";
 // Session schema version for future migrations
 const AUTH_SESSION_VERSION = 1;
 
+/**
+ * Helper: determine whether a session indicates an email-confirmed user.
+ * Centralizes provider-specific checks (Supabase or other providers' shapes).
+ */
+export function isEmailConfirmed(session: any | null): boolean {
+  if (!session) return false;
+  // Support multiple session shapes: supabase (session.user) or wrapped/raw session
+  const user = (session.user ?? session.raw?.user) as any | undefined;
+  if (!user) return false;
+  // Supabase uses `email_confirmed_at`. Some providers may use `confirmed_at`.
+  return Boolean(user.email_confirmed_at ?? user.confirmed_at);
+}
+
 // Injected auth provider (set via configure())
 let authProvider: AuthProvider | null = null;
 
@@ -466,7 +479,7 @@ export const AuthStateManager = {
         clearTimeout(timeoutId!); // ✅ Clean up the timer
 
         // If we got a session, verify it's confirmed
-        if (session?.user && session.user.email_confirmed_at) {
+        if (isEmailConfirmed(session)) {
           return true;
         }
 
