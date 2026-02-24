@@ -10,17 +10,11 @@ import {
   AuthTitle
 } from '@/components/auth_components';
 import { Body } from '@/components/ui';
+import { useAuthStateListener } from '@/hooks/auth';
 import { logger, openEmailApp } from '@/lib';
-// SUPABASE_AUTH: Direct auth operations — to be migrated to getAuthProvider() in Track D
-import { supabase } from '@/lib/services/supabase/supabase-client';
-import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
-
-
-
-
 
 export default function EmailConfirmationScreen() {
   const router = useRouter();
@@ -33,6 +27,19 @@ export default function EmailConfirmationScreen() {
   
   const userEmail = Array.isArray(email) ? email[0] : email || '';
 
+  // Use hook with callback to detect email confirmation
+  const { resendConfirmation } = useAuthStateListener((session) => {
+    logger.debug('auth', 'Auth state change:', session?.email);
+    
+    // When session becomes available with matching email, user confirmed email
+    if (session && session.email === userEmail) {
+      // User successfully confirmed email
+      // Redirect to sign-in so they can manually complete their account setup
+      logger.info('auth', 'Email confirmed, redirecting to sign-in');
+      router.replace('/login/sign-in');
+    }
+  });
+
   // Cleanup timer on unmount
   useEffect(() => {
     return () => {
@@ -42,67 +49,43 @@ export default function EmailConfirmationScreen() {
     };
   }, []);
 
-  // Listen for auth state changes (for auto-signin after email confirmation)
-  useEffect(() => {
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
-  logger.debug('auth', 'Auth state change:', event, session?.user?.email);
-      
-      if (event === 'SIGNED_IN' && session?.user?.email === userEmail) {
-        // User successfully confirmed email
-        // Redirect to sign-in so they can manually complete their account setup
-        logger.info('auth', 'Email confirmed, redirecting to sign-in');
-        router.replace('/login/sign-in');
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [userEmail, router]);
-
   const handleResendEmail = async () => {
     if (!userEmail || isCountingDown) return;
     
     setLoading(true);
-    try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: userEmail
-      });
-      
-      if (error) {
-        Alert.alert('Error', error.message);
-        setLoading(false);
-        return;
-      } else {
-        setShowEmailSentModal(true);
-        
-        // Start countdown and disable button immediately
-        setLoading(false); // Stop loading spinner
-        setIsCountingDown(true);
-        let countdown = 30;
-        setWaitingResend(`(${countdown}s)`);
-        
-        timerRef.current = setInterval(() => {
-          countdown--;
-          logger.debug('auth', 'Countdown:', countdown);
-          if (countdown > 0) {
-            setWaitingResend(`(${countdown}s)`);
-          } else {
-            // Re-enable button and reset text
-            logger.debug('auth', 'Timer finished, re-enabling button');
-            setWaitingResend('Resend Email');
-            setIsCountingDown(false);
-            if (timerRef.current) {
-              clearInterval(timerRef.current);
-              timerRef.current = null;
-            }
-          }
-        }, 1000);
-      }
-    } catch {
-      Alert.alert('Error', 'Failed to resend email');
+    
+    // Use hook's convenience action (handles rate limiting and error mapping)
+    const result = await resendConfirmation(userEmail);
+    
+    if (!result.success) {
+      Alert.alert('Error', result.error || 'Failed to resend email');
       setLoading(false);
+      return;
     }
-    // Note: setLoading(false) is handled above in success case
+    
+    // Success: show modal and start countdown
+    setShowEmailSentModal(true);
+    setLoading(false);
+    setIsCountingDown(true);
+    let countdown = 30;
+    setWaitingResend(`(${countdown}s)`);
+    
+    timerRef.current = setInterval(() => {
+      countdown--;
+      logger.debug('auth', 'Countdown:', countdown);
+      if (countdown > 0) {
+        setWaitingResend(`(${countdown}s)`);
+      } else {
+        // Re-enable button and reset text
+        logger.debug('auth', 'Timer finished, re-enabling button');
+        setWaitingResend('Resend Email');
+        setIsCountingDown(false);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+      }
+    }, 1000);
   };
 
   // TODO: Clarify email-change intent and implementation

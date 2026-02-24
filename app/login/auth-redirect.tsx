@@ -1,8 +1,7 @@
 import { AuthModal } from "@/components/auth_components";
 import { Caption } from "@/components/ui";
-import { AuthStateManager, logger, usersDB, worldsDB } from "@/lib";
-// SUPABASE_AUTH: Direct auth operations — to be migrated to getAuthProvider() in Track D
-import { supabase } from "@/lib/services/supabase/supabase-client";
+import { AuthStateManager, getCurrentSession, logger, usersDB, worldsDB } from "@/lib";
+import { getAuthProvider } from "@/lib/auth";
 import { getPrivacyStorageBackend, STORAGE_KEYS } from "@/lib/storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -105,6 +104,8 @@ export default function AuthRedirect() {
 
         // First, handle any auth tokens from the URL
         let hasValidSession = false;
+        const provider = await getAuthProvider();
+        
         if (typeof window !== "undefined") {
           const hash = window.location.hash;
           if (hash) {
@@ -118,13 +119,13 @@ export default function AuthRedirect() {
                 "Setting session from email link...",
               );
 
-              const { error } = await supabase.auth.setSession({
+              const restored = await provider.restoreSession({
                 access_token: accessToken,
                 refresh_token: refreshToken,
               });
 
-              if (error) {
-                logger.error("auth-redirect", "Session error:", error);
+              if (!restored) {
+                logger.error("auth-redirect", "Session restoration failed");
                 setErrorMessage("Invalid or expired link. Please try again.");
                 setShowErrorModal(true);
                 return;
@@ -138,9 +139,7 @@ export default function AuthRedirect() {
 
         // Check if user already has a session (for direct visits)
         if (!hasValidSession) {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
+          const session = await getCurrentSession();
           hasValidSession = !!session;
         }
 
@@ -346,9 +345,7 @@ export default function AuthRedirect() {
         logger.debug("auth-redirect", "Found pending invite:", pendingInvite);
 
         // Check if user is now logged in
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        const session = await getCurrentSession();
         if (session) {
           logger.info(
             "auth-redirect",

@@ -1,7 +1,5 @@
-import { RequestManager } from "../api/request-manager";
-import { getDatabaseProvider } from "../services";
 import { logger } from "../utils/logger";
-import { getCurrentUserProfile, validateUserForWrite } from "./common";
+import { getUserSettingsRepository } from "./repositories";
 
 export interface UserSettings {
   user_id: string;
@@ -16,7 +14,7 @@ export interface UserSettings {
 export const userSettingsDB = {
   // Fetch all user settings for current user and cache to SecureStorage
   async fetchCurrentUserSettings(options?: { maxAgeMs?: number; forceRefresh?: boolean }): Promise<UserSettings | null> {
-    logger.debug("storage", "Starting fetchCurrentUserSettings", options);
+    logger.category("database").debug("Starting fetchCurrentUserSettings", options);
 
     const maxAgeMs = options?.maxAgeMs ?? (4 * 60 * 60 * 1000); // Default 4 hours
     const forceRefresh = options?.forceRefresh ?? false;
@@ -39,101 +37,36 @@ export const userSettingsDB = {
           const isCacheFresh = cacheAge < maxAgeMs;
 
           if (isCacheFresh) {
-            logger.debug(
-              "storage",
+            logger.category("database").debug(
               `User settings loaded from cache (age: ${cacheAge}ms)`,
             );
             return cachedSettings;
           }
           // Cache is stale - fall through to fetch from DB
-          logger.debug(
-            "storage",
+          logger.category("database").debug(
             `User settings cache stale (age: ${cacheAge}ms), refreshing from database`,
           );
         }
         // If meta is missing or cache is missing, treat as cache miss and fetch from DB
       } catch (storageError) {
-        logger.warn(
-          "storage",
+        logger.category("database").warn(
           "Could not load from storage, fetching from DB:",
           storageError,
         );
       }
     } else {
-      logger.debug("storage", "Force refresh requested, skipping cache");
+      logger.category("database").debug("Force refresh requested, skipping cache");
     }
 
-    // Fetch from database
-    const currentUser = await getCurrentUserProfile();
-    if (!currentUser) {
-      logger.debug("storage", "No authenticated user found");
-      return null;
-    }
-
-    logger.debug(
-      "storage",
-      "Fetching user settings from database for user_id:",
-      currentUser.id,
-    );
-
-    // Use RequestManager to wrap database fetch with deduplication, retries, timeout
-    const data = await RequestManager.fetch(
-      `user:settings:${currentUser.id}`,
-      async () => {
-        const { data, error } = await getDatabaseProvider()
-          .from('user_settings', 'public')
-          .select("*")
-          .eq("user_id", currentUser.id)
-          .single();
-
-        if (error) {
-          if (error.code === "PGRST116") {
-            // Settings don't exist yet (shouldn't happen if user exists, but handle gracefully)
-            logger.debug(
-              "storage",
-              "No settings exist yet for user - this is unexpected but recoverable",
-            );
-            return null;
-          }
-
-          // Only log as error for unexpected database issues
-          logger.error(
-            "storage",
-            "Unexpected database error in fetchCurrentUserSettings:",
-            {
-              message: error.message,
-              code: error.code,
-              details: error.details,
-              hint: error.hint,
-              user_id: currentUser.id,
-            },
-          );
-
-          throw new Error(error.message || "Failed to fetch user settings");
-        }
-
-        return data;
-      },
-      {
-        dedupe: true,
-        retries: 2,
-        timeout: 15000,
-        authStrategy: "user",
-      },
-    );
+    // Fetch from database via repository
+    const data = await getUserSettingsRepository().fetchCurrentUserSettings();
 
     if (!data) {
-      logger.debug(
-        "storage",
-        "User settings is null - no settings record yet",
-        {
-          userId: currentUser.id,
-        },
-      );
+      logger.category("database").debug("User settings is null - no settings record yet");
       return null;
     }
 
-    logger.info("storage", "User settings fetched successfully:", {
+    logger.category("database").info("User settings fetched successfully:", {
       user_id: data.user_id,
       theme: data.theme,
       language: data.language,
@@ -151,8 +84,7 @@ export const userSettingsDB = {
         source: "supabase",
       });
     } catch (storageError) {
-      logger.warn(
-        "storage",
+      logger.category("database").warn(
         "Failed to save user settings to storage (non-critical):",
         storageError,
       );
@@ -163,75 +95,34 @@ export const userSettingsDB = {
 
   // Update analytics consent level in current user's settings
   async updateAnalyticsConsentLevel(level: string): Promise<string> {
-    return RequestManager.fetch(
-      `user:settings:consent:update:${Date.now()}`,
-      async () => {
-        // Validate user is authenticated and get internal user.id (throws if not authenticated)
-        const currentUser = await validateUserForWrite();
+    // Validate consent level (business rule stays in caller)
+    const validLevels = ['none', 'basic', 'full'];
+    if (!validLevels.includes(level)) {
+      logger.category("database").error("Invalid consent level provided:", { level, validLevels });
+      throw new Error(`Invalid consent level: ${level}. Must be one of: ${validLevels.join(', ')}`);
+    }
 
-        // Validate consent level
-        const validLevels = ['none', 'basic', 'full'];
-        if (!validLevels.includes(level)) {
-          logger.error("storage", "Invalid consent level provided:", {
-            level,
-            validLevels,
-          });
-          throw new Error(`Invalid consent level: ${level}. Must be one of: ${validLevels.join(', ')}`);
-        }
+    logger.category("database").debug("Updating analytics consent level:", { newLevel: level });
 
-        logger.debug("storage", "Updating analytics consent level:", {
-          userId: currentUser.id,
-          newLevel: level,
-        });
+    const result = await getUserSettingsRepository().updateAnalyticsConsentLevel(level);
 
-        const { data, error } = await getDatabaseProvider()
-          .from('user_settings', 'public')
-          .update({ analytics_consent_level: level })
-          .eq('user_id', currentUser.id)
-          .select('analytics_consent_level')
-          .single();
+    // Update cached settings with new consent level
+    try {
+      const { SecureStorage, STORAGE_KEYS } = await import("../storage");
+      const cachedSettings = await SecureStorage.getJSON<UserSettings>(
+        STORAGE_KEYS.USER_SETTINGS,
+      );
+      if (cachedSettings) {
+        cachedSettings.analytics_consent_level = level;
+        await SecureStorage.setJSON(STORAGE_KEYS.USER_SETTINGS, cachedSettings);
+      }
+    } catch (storageError) {
+      logger.category("database").warn(
+        "Failed to update cached settings (non-critical):",
+        storageError,
+      );
+    }
 
-        if (error) {
-          logger.error("storage", "Error updating analytics consent level:", {
-            message: error.message,
-            code: error.code,
-            userId: currentUser.id,
-            level,
-          });
-          throw new Error(error.message || "Failed to update consent level");
-        }
-
-        logger.info("storage", "Analytics consent level updated successfully:", {
-          userId: currentUser.id,
-          level: data.analytics_consent_level,
-        });
-
-        // Update cached settings with new consent level
-        try {
-          const { SecureStorage, STORAGE_KEYS } = await import("../storage");
-          const cachedSettings = await SecureStorage.getJSON<UserSettings>(
-            STORAGE_KEYS.USER_SETTINGS,
-          );
-          if (cachedSettings) {
-            cachedSettings.analytics_consent_level = level;
-            await SecureStorage.setJSON(STORAGE_KEYS.USER_SETTINGS, cachedSettings);
-          }
-        } catch (storageError) {
-          logger.warn(
-            "storage",
-            "Failed to update cached settings (non-critical):",
-            storageError,
-          );
-        }
-
-        return data.analytics_consent_level;
-      },
-      {
-        dedupe: false,
-        retries: 3,
-        timeout: 10000,
-        authStrategy: "user",
-      },
-    );
+    return result;
   },
 };

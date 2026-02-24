@@ -16,10 +16,10 @@ Enterprise-grade, cross-platform, encrypted storage and cache system for all per
 **Do NOT use this module for:**
 
 - Direct `localStorage` / `sessionStorage` / `AsyncStorage` / `EncryptedStorage` calls (always route through `SecureStorage`)
-- Purely in-memory, session-scoped state (use React state or [lib/cache's FastCache](../cache/README.md#fastcache-ephemeral-in-memory-cache))
+- Purely in-memory, session-scoped state (use React state or [lib/storage/cache/FastCache](../cache/README.md#fastcache-ephemeral-in-memory-cache))
 - Large binary data (encryption adds 5-10% overhead)
 - Analytics or event logs (use [lib/analytics](../analytics/README.md) instead)
-- Real-time data (use [lib/cache](../cache/README.md) with SWR pattern instead)
+- Real-time data (use [lib/realtime](../realtime/README.md) instead)
 - Distributed/multi-user state (this is local device storage)
 
 ## Data Classification & Privacy Levels

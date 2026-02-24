@@ -93,6 +93,56 @@ export interface AuthProvider {
   signIn(email: string, password: string): Promise<AuthResult>;
 
   /**
+   * Initiate OAuth sign-in flow (OAuth 2.0 with provider redirect).
+   *
+   * For web: Returns a URL that should be opened in a browser or redirect.
+   * For mobile: May initiate native flow or return a URL to open with a browser library.
+   *
+   * **Input:**
+   * - provider: 'google', 'apple', etc.
+   * - options: Provider-specific options (redirectTo, skipBrowserRedirect, queryParams, etc.)
+   *
+   * **Returns:**
+   * - { url: string } if browser flow needed (open in browser, then handle callback)
+   * - { session: Session } if native flow completed immediately
+   * - Throws error on failure
+   *
+   * **Provider Responsibilities:**
+   * - Initiate OAuth flow with provider
+   * - Return URL for browser redirect (most common case)
+   * - Map provider errors to AuthError types
+   */
+  signInWithOAuth(
+    provider: string,
+    options?: Record<string, any>
+  ): Promise<{ url?: string; session?: Session }>;
+
+  /**
+   * Sign in using an ID token (typically from native authentication libraries).
+   *
+   * Used after native sign-in flows (Apple, Google) that return ID tokens.
+   *
+   * **Input:**
+   * - provider: 'apple', 'google', etc.
+   * - token: ID token from native authentication library
+   * - options: Optional provider-specific options (e.g., access_token code)
+   *
+   * **Returns:**
+   * - { success: true; data: Session } on successful authentication
+   * - { success: false; error: AuthError } on failure
+   *
+   * **Provider Responsibilities:**
+   * - Validate ID token with provider
+   * - Exchange token for session if needed
+   * - Map provider errors to AuthError types
+   */
+  signInWithIdToken(
+    provider: string,
+    token: string,
+    options?: Record<string, any>
+  ): Promise<AuthResult>;
+
+  /**
    * Initiate password reset flow (email link or code).
    *
    * **Input Expectations:**
@@ -108,6 +158,24 @@ export interface AuthProvider {
    * - Return user-friendly message only
    */
   resetPassword(email: string): Promise<{ success: boolean; message?: string }>;
+
+  /**
+   * Resend a confirmation email (for signup confirmation or email verification).
+   *
+   * **Input Expectations:**
+   * - email: Already validated (format, length, no SQL keywords, no control chars)
+   *
+   * **Returns:**
+   * - { success: true; message?: "Confirmation email sent" } on successful resend
+   * - { success: false; message?: "Error details" } on failure
+   *
+   * **Provider Responsibilities:**
+   * - Queue confirmation email delivery
+   * - Don't expose whether email exists (for security)
+   * - Return user-friendly message only
+   * - Handle rate limiting gracefully
+   */
+  resend(email: string): Promise<{ success: boolean; message?: string }>;
 
   /**
    * Update the authenticated user's password.
@@ -518,6 +586,57 @@ export function createValidatedAuthProvider(
       return provider.signIn(emailValidation.sanitized, password);
     },
 
+    async signInWithOAuth(
+      provider_: string,
+      options?: Record<string, any>
+    ): Promise<{ url?: string; session?: Session }> {
+      // === INPUT VALIDATION (Defensive Layer) ===
+      if (!provider_) {
+        logger.warn('auth', 'ValidatedAuthProvider.signInWithOAuth: missing provider');
+        throw new AuthError('Provider is required', undefined, 'MISSING_REQUIRED_FIELDS');
+      }
+
+      if (typeof provider_ !== 'string') {
+        logger.warn('auth', 'ValidatedAuthProvider.signInWithOAuth: invalid provider type');
+        throw new AuthError('Provider must be a string', undefined, 'INVALID_PROVIDER');
+      }
+
+      // === DELEGATE TO UNDERLYING PROVIDER ===
+      logger.debug('auth', 'ValidatedAuthProvider.signInWithOAuth: delegating to provider', {
+        provider: provider_,
+      });
+      return provider.signInWithOAuth(provider_, options);
+    },
+
+    async signInWithIdToken(
+      provider_: string,
+      token: string,
+      options?: Record<string, any>
+    ): Promise<AuthResult> {
+      // === INPUT VALIDATION (Defensive Layer) ===
+      if (!provider_ || !token) {
+        const error = new AuthError(
+          'Provider and token are required',
+          undefined,
+          'MISSING_REQUIRED_FIELDS'
+        );
+        logger.warn('auth', 'ValidatedAuthProvider.signInWithIdToken: missing required fields');
+        return { success: false, error };
+      }
+
+      if (typeof provider_ !== 'string' || typeof token !== 'string') {
+        const error = new AuthError('Provider and token must be strings', undefined, 'INVALID_INPUT');
+        logger.warn('auth', 'ValidatedAuthProvider.signInWithIdToken: invalid input types');
+        return { success: false, error };
+      }
+
+      // === DELEGATE TO UNDERLYING PROVIDER ===
+      logger.debug('auth', 'ValidatedAuthProvider.signInWithIdToken: delegating to provider', {
+        provider: provider_,
+      });
+      return provider.signInWithIdToken(provider_, token, options);
+    },
+
     async resetPassword(email: string): Promise<{ success: boolean; message?: string }> {
       // === INPUT VALIDATION (Defensive Layer) ===
       // Check for null/undefined
@@ -559,6 +678,49 @@ export function createValidatedAuthProvider(
         }
       );
       return provider.resetPassword(emailValidation.sanitized);
+    },
+
+    async resend(email: string): Promise<{ success: boolean; message?: string }> {
+      // === INPUT VALIDATION (Defensive Layer) ===
+      // Check for null/undefined
+      if (!email) {
+        logger.warn('auth', 'ValidatedAuthProvider.resend: missing email');
+        return {
+          success: false,
+          message: 'Email is required',
+        };
+      }
+
+      // Validate email
+      const emailValidation = validateEmail(email);
+      if (!emailValidation.isValid) {
+        logger.warn(
+          'auth',
+          'ValidatedAuthProvider.resend: invalid email format',
+          {
+            reasons: {
+              isValidFormat: emailValidation.isValidFormat,
+              hasValidLength: emailValidation.hasValidLength,
+              hasNoSqlKeywords: emailValidation.hasNoSqlKeywords,
+              hasNoControlChars: emailValidation.hasNoControlChars,
+            },
+          }
+        );
+        return {
+          success: false,
+          message: 'Invalid email format',
+        };
+      }
+
+      // === DELEGATE TO UNDERLYING PROVIDER (Validated Input Only) ===
+      logger.debug(
+        'auth',
+        'ValidatedAuthProvider.resend: validation passed, delegating to provider',
+        {
+          email: emailValidation.sanitized.trim(),
+        }
+      );
+      return provider.resend(emailValidation.sanitized);
     },
 
     async getSession(): Promise<Session | null> {

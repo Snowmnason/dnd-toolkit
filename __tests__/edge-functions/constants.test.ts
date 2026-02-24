@@ -12,7 +12,7 @@ import {
   EDGE_FUNCTIONS,
   getEdgeFunctionUrl,
   getHealthEndpointUrl,
-} from "@/lib/edge-functions/constants";
+} from "@/lib/database/edge/constants";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("Edge Function URL Constants", () => {

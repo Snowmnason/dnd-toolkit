@@ -1,9 +1,7 @@
-import { RequestManager } from "../api/request-manager";
 import { validateUsername } from "../auth/validation";
 import { QueryCache } from "../cache";
-import { getAuthProvider, getDatabaseProvider } from "../services";
 import { logger } from "../utils/logger";
-import { validateCurrentUser, validateUserForWrite } from "./common";
+import { getUserRepository } from "./repositories";
 
 export interface User {
   id: string;
@@ -26,86 +24,29 @@ export interface UpdateUserData {
   is_admin?: boolean;
 }
 
-export interface UserSettings {
-  user_id: string;
-  theme: string;
-  language: string;
-  timezone: string;
-  preferences: Record<string, unknown>;
-  updated_at: string;
-}
-
 export const usersDB = {
   // Create a new user profile (called after auth signup) with input validation
   async create(userData: CreateUserData): Promise<User> {
-    return RequestManager.fetch(
-      `user:create:${userData.auth_id}`,
-      async () => {
-        logger.category("database").info("Starting user profile creation", {
-          auth_id: userData.auth_id,
-          username: userData.username,
-          usernameLength: userData.username?.length,
-        });
+    // Username validation before hitting DB (business rule, caught early)
+    if (userData.username) {
+      const usernameValidation = validateUsername(userData.username);
+      if (!usernameValidation.isValid) {
+        throw new Error("Username contains invalid characters or format");
+      }
+      userData = { ...userData, username: usernameValidation.sanitized };
+    }
 
-        // Validate and sanitize username if provided
-        if (userData.username) {
-          const usernameValidation = validateUsername(userData.username);
-          logger.category("database").debug("Username validation result:", {
-            isValid: usernameValidation.isValid,
-            sanitized: usernameValidation.sanitized,
-            original: userData.username,
-          });
+    const data = await getUserRepository().create(userData);
 
-          if (!usernameValidation.isValid) {
-            logger.category("database").error("Username validation failed");
-            throw new Error("Username contains invalid characters or format");
-          }
-          userData.username = usernameValidation.sanitized;
-        }
+    // Save user data to local storage (caller cache responsibility)
+    try {
+      const { AuthStateManager } = await import("../auth/auth-state");
+      await AuthStateManager.saveUserData(data);
+    } catch (storageError) {
+      logger.category("database").warn("Failed to save user data to storage (non-critical):", storageError);
+    }
 
-        // Note: display_name removed from schema
-        logger.category("database").debug("Inserting user data into database:", userData);
-
-        const { data, error } = await getDatabaseProvider()
-          .from('users', 'public')
-          .insert(userData)
-          .select()
-          .single();
-
-        if (error) {
-          logger.category("database").error("Database error during user creation:", {
-            message: error.message,
-            code: error.code,
-            details: error.details,
-            hint: error.hint,
-          });
-          throw new Error(error.message || "Failed to create user profile");
-        }
-
-        logger.category("database").info("User profile created successfully:", {
-          id: data.id,
-          auth_id: data.auth_id,
-          username: data.username,
-          created_at: data.created_at,
-        });
-
-        // Save user data to local storage
-        try {
-          const { AuthStateManager } = await import("../auth/auth-state");
-          await AuthStateManager.saveUserData(data);
-        } catch (storageError) {
-          logger.category("database").warn("Failed to save user data to storage (non-critical):", storageError);
-        }
-
-        return data;
-      },
-      {
-        dedupe: false,
-        retries: 3,
-        timeout: 15000,
-        authStrategy: "user",
-      },
-    );
+    return data;
   },
 
   // Create user with default values after signup (called from auth triggers or signup)
@@ -157,83 +98,15 @@ export const usersDB = {
       logger.category("database").debug("Force refresh requested, skipping cache");
     }
 
-    // Fetch from database
-    let session;
-    try {
-      const authProv = await getAuthProvider();
-      session = await authProv.getSession();
-    } catch (authError: any) {
-      logger.category("database").error("Auth error in getCurrentUser:", authError);
-      throw new Error(authError?.message || "Authentication error");
-    }
-
-    logger.category("database").debug("Auth session check result:", {
-      hasSession: !!session,
-      userId: session?.userId,
-    });
-
-    if (!session?.userId) {
-      logger.category("database").debug("No authenticated user found (no session)");
-      return null;
-    }
-
-    const authId = session.userId;
-
-    logger.category("database").debug("Fetching user profile from database for auth_id:", authId);
-
-    // Use RequestManager to wrap database fetch with deduplication, retries, timeout
-    const data = await RequestManager.fetch(
-      `user:profile:${authId}`,
-      async () => {
-        const { data, error } = await getDatabaseProvider()
-          .from('users', 'public')
-          .select("*")
-          .eq("auth_id", authId)
-          .single();
-
-        if (error) {
-          if (error.code === "PGRST116") {
-            // This is expected for new users who haven't created a profile yet
-            logger.category("database").debug("No profile exists yet for user - this is expected for new users");
-            return null;
-          }
-
-          // Only log as error for unexpected database issues
-          logger.category("database").error("Unexpected database error in getCurrentUser:", {
-            message: error.message,
-            code: error.code,
-            details: error.details,
-            hint: error.hint,
-            auth_id: authId,
-          });
-
-          throw new Error(error.message || "Failed to fetch user profile");
-        }
-
-        return data;
-      },
-      {
-        dedupe: true,
-        retries: 2,
-        timeout: 15000,
-        authStrategy: "user",
-      },
-    );
+    // Fetch from database via repository
+    const data = await getUserRepository().getCurrentUser();
 
     if (!data) {
-      // Note: null only means profile doesn't exist for new user (PGRST116 error).
-      // RequestManager errors are thrown (failOpen defaults to false), not returned as null.
-      logger.debug(
-        "storage",
-        "User profile is null - new user without profile yet",
-        {
-          userId: authId,
-        },
-      );
+      logger.category("database").debug("User profile is null - new user without profile yet");
       return null;
     }
 
-    logger.info("storage", "User profile fetched successfully:", {
+    logger.category("database").info("User profile fetched successfully:", {
       id: data.id,
       auth_id: data.auth_id,
       username: data.username,
@@ -251,11 +124,7 @@ export const usersDB = {
         source: "supabase",
       });
     } catch (storageError) {
-      logger.warn(
-        "storage",
-        "Failed to save user data to storage (non-critical):",
-        storageError,
-      );
+      logger.category("database").warn("Failed to save user data to storage (non-critical):", storageError);
     }
 
     return data;
@@ -263,90 +132,39 @@ export const usersDB = {
 
   // Update current user's profile with input validation
   async updateCurrentUser(updates: UpdateUserData): Promise<User> {
-    return RequestManager.fetch(
-      `user:update:${Date.now()}`,
-      async () => {
-        // Validate before write operation
-        const authUser = await validateUserForWrite();
+    // Validate and sanitize username before hitting DB (business rule, caught early)
+    if (updates.username) {
+      const usernameValidation = validateUsername(updates.username);
+      if (!usernameValidation.isValid) {
+        throw new Error("Username contains invalid characters or format");
+      }
+      updates = { ...updates, username: usernameValidation.sanitized };
+    }
 
-        // Validate and sanitize username if being updated
-        if (updates.username) {
-          const usernameValidation = validateUsername(updates.username);
-          if (!usernameValidation.isValid) {
-            throw new Error("Username contains invalid characters or format");
-          }
-          updates.username = usernameValidation.sanitized;
-        }
+    const data = await getUserRepository().updateCurrentUser(updates);
 
-        // Note: display_name removed from schema
+    // Invalidate user profile cache (caller cache responsibility)
+    await QueryCache.invalidateByTags(["users", `user:${data.id}`]);
 
-        const { data, error } = await getDatabaseProvider()
-          .from('users', 'public')
-          .update(updates)
-          .eq("auth_id", authUser.id)
-          .select()
-          .single();
+    // Save updated user data to local storage
+    try {
+      const { AuthStateManager } = await import("../auth/auth-state");
+      await AuthStateManager.saveUserData(data);
+    } catch (storageError) {
+      logger.category("database").warn("Failed to save updated user data to storage (non-critical):", storageError);
+    }
 
-        if (error) {
-          logger.error("storage", "Error updating user profile:", error);
-          throw new Error(error.message || "Failed to update user profile");
-        }
-
-        // Invalidate user profile cache
-        await QueryCache.invalidateByTags(["users", `user:${data.id}`]);
-
-        // Save updated user data to local storage
-        try {
-          const { AuthStateManager } = await import("../auth/auth-state");
-          await AuthStateManager.saveUserData(data);
-        } catch (storageError) {
-          logger.warn(
-            "storage",
-            "Failed to save updated user data to storage (non-critical):",
-            storageError,
-          );
-        }
-
-        return data;
-      },
-      {
-        dedupe: false,
-        retries: 3,
-        timeout: 15000,
-        authStrategy: "user",
-      },
-    );
+    return data;
   },
 
   async deleteCurrentUser(): Promise<boolean> {
-    const result = await RequestManager.fetch(
-      `user:delete:${Date.now()}`,
-      async () => {
-        // SECURITY-CRITICAL: Account deletion requires server validation
-        // Must use validateCurrentUser() to ensure user is truly authenticated with server
-        const user = await validateCurrentUser();
-        if (!user) throw new Error("Not authenticated");
+    const result = await getUserRepository().deleteCurrentUser();
 
-        // EDGE_FUNCTION: functions.invoke() is Supabase-specific and intentionally out of scope
-        // for the DatabaseProvider abstraction. getRawClient() provides the escape hatch to reach
-        // Supabase-only APIs (edge functions, realtime) without re-importing the SDK directly.
-        const rawClient = getDatabaseProvider().getRawClient?.();
-        if (!rawClient) throw new Error("Edge function calls require a configured Supabase client");
-        const { data, error: fnError } = await rawClient.functions.invoke("delete-account");
-        if (fnError)
-          throw new Error(fnError.message || "Failed to delete account");
-        logger.debug("storage", "Account deletion function response:", data);
-        return true;
-      },
-      {
-        dedupe: false,
-        retries: 3,
-        timeout: 15000,
-        authStrategy: "user",
-      },
-    );
+    // Invalidate user profile cache on successful deletion
+    if (result) {
+      await QueryCache.invalidateByTags(["users"]);
+    }
 
-    // RequestManager may return null if failOpen is enabled; normalize to boolean
-    return result ?? false;
+    return result;
   },
 };

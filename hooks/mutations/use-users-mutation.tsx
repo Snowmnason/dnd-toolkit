@@ -86,9 +86,6 @@ export function useDeleteAccountMutation() {
 
         const result = await usersDB.deleteCurrentUser();
 
-        // Invalidate user cache
-        await QueryCache.invalidateByTags(['users']);
-
         return result;
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);

@@ -1,11 +1,13 @@
+import { useAuthStateListener } from "@/hooks/auth";
 import {
   deleteUserAccount,
+  getCurrentSession,
+  isEmailConfirmed,
   logger,
   signOutUser,
   usersDB,
 } from "@/lib";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
-import { getAuthProvider } from "@/lib/services";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, View } from "react-native";
@@ -44,13 +46,20 @@ export default function SettingsPage() {
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
 
+  // Listen for sign-outs and redirect
+  useAuthStateListener((session) => {
+    if (!session) {
+      logger.debug("settings", "Auth state changed: user signed out");
+      const target = buildNavigationTarget('/', {}, []);
+      router.replace(target as any);
+    }
+  });
+
   useEffect(() => {
     // Double-check: require confirmed authenticated session before proceeding
-    getAuthProvider()
-      .then((authProvider) => authProvider.getSession())
+    getCurrentSession()
       .then((session) => {
-        const user = session?.raw?.user ?? null;
-        if (!user || !user.email_confirmed_at) {
+        if (!isEmailConfirmed(session)) {
           logger.debug("settings", "No confirmed user session, redirecting");
           const target = buildNavigationTarget('/', {}, []);
           router.replace(target as any);
@@ -78,23 +87,6 @@ export default function SettingsPage() {
           err
         );
       });
-
-    let unsubscribeAuth: (() => void) | null = null;
-    getAuthProvider()
-      .then((authProvider) => {
-        unsubscribeAuth = authProvider.onAuthStateChange((session) => {
-          if (!session) {
-            logger.debug("settings", "Auth state changed: user signed out");
-            const target = buildNavigationTarget('/', {}, []);
-            router.replace(target as any);
-          }
-        });
-      })
-      .catch(() => {
-        // Auth provider not available, auth watcher is skipped
-      });
-
-    return () => unsubscribeAuth?.();
   }, [router]);
 
   const handleSignOutConfirm = async () => {

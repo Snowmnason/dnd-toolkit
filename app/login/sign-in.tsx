@@ -6,9 +6,7 @@ import {
   FormAuthInput
 } from '@/components/auth_components';
 import { AppToast } from '@/components/ui';
-import { AuthStateManager, buildRoute, logger, useSignInForm } from '@/lib';
-// SUPABASE_AUTH: Direct auth operations — to be migrated to getAuthProvider() in Track D
-import { supabase } from '@/lib/services/supabase/supabase-client';
+import { AuthStateManager, buildRoute, getCurrentSession, logger, resendConfirmationEmail, useSignInForm } from '@/lib';
 import { useScale } from '@/theme';
 import type { Href } from 'expo-router';
 import { useRouter } from 'expo-router';
@@ -42,60 +40,60 @@ export default function SignInScreen() {
   } = useSignInForm();
 
   // Heavy-duty auth check: verify with Supabase and ensure all data exists
-  useEffect(() => {
-    const verifyAuthStatus = async () => {
-      try {
-        logger.debug('auth', 'Sign-in screen: Performing heavy-duty auth verification');
-        
-        // Check 1: Local storage has account flag
-        const authState = await AuthStateManager.getAuthState();
-        if (!authState.hasAccount) {
-          logger.debug('auth', 'Sign-in screen: No account flag in storage, showing login form');
-          return;
-        }
-        
-        // Check 2: Verify with Supabase that session is still valid
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError || !session) {
-          logger.warn('auth', 'Sign-in screen: Session invalid or expired', sessionError?.message);
-          return;
-        }
-        
-        // Check 3: Verify user data exists in storage
-        const userData = await AuthStateManager.getUserData();
-        if (!userData || !userData.id) {
-          logger.warn('auth', 'Sign-in screen: User data missing from storage');
-          return;
-        }
-        
-        // All checks passed - user is authenticated
-        logger.info('auth', 'Sign-in screen: All checks passed, redirecting to world selection');
-        router.replace('/select/world-selection');
-      } catch (error) {
-        logger.error('auth', 'Sign-in screen: Error during verification:', error);
-        // If verification fails, just show login form (no harm)
+  // Use a callback instead of useEffect to avoid running on every render
+  const verifyAuthStatus = async () => {
+    try {
+      logger.debug('auth', 'Sign-in screen: Performing heavy-duty auth verification');
+      
+      // Check 1: Local storage has account flag
+      const authState = await AuthStateManager.getAuthState();
+      if (!authState.hasAccount) {
+        logger.debug('auth', 'Sign-in screen: No account flag in storage, showing login form');
+        return;
       }
-    };
+      
+      // Check 2: Verify session is still valid using convenience function
+      const session = await getCurrentSession();
+      if (!session) {
+        logger.warn('auth', 'Sign-in screen: Session invalid or expired');
+        return;
+      }
+      
+      // Check 3: Verify user data exists in storage
+      const userData = await AuthStateManager.getUserData();
+      if (!userData || !userData.id) {
+        logger.warn('auth', 'Sign-in screen: User data missing from storage');
+        return;
+      }
+      
+      // All checks passed - user is authenticated
+      logger.info('auth', 'Sign-in screen: All checks passed, redirecting to world selection');
+      router.replace('/select/world-selection');
+    } catch (error) {
+      logger.error('auth', 'Sign-in screen: Error during verification:', error);
+      // If verification fails, just show login form (no harm)
+    }
+  };
 
+  // Run verification once on mount using a ref to prevent double-run in development
+  const verifyRef = useRef(false);
+  if (!verifyRef.current) {
+    verifyRef.current = true;
     verifyAuthStatus();
-  }, [router]);
+  }
 
   const handleResendConfirmationFromError = async (email: string) => {
     setIsResendingEmail(true);
     try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: email
-      });
+      const result = await resendConfirmationEmail(email);
       
-      if (error) {
-        // Note: This would need to be handled differently since authError is managed by the hook
-        logger.error('auth', 'Failed to resend email:', error.message);
+      if (!result.success) {
+        logger.error('auth', 'Failed to resend email:', result.error);
       } else {
         logger.info('auth', 'Confirmation email sent!');
       }
-    } catch {
-      logger.error('auth', 'Failed to resend confirmation email.');
+    } catch (err) {
+      logger.error('auth', 'Failed to resend confirmation email.', err);
     } finally {
       setIsResendingEmail(false);
     }

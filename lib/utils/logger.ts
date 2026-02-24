@@ -12,7 +12,7 @@
  */
 
 import { getAppConfig, isDevelopment } from "@/lib/config/loader";
-import { redactForLogs } from "@/lib/storage/privacy";
+import { redactForLogs } from "@/lib/storage/cache/privacy";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -31,6 +31,8 @@ type LogCategory =
   | "jobs" // Background job queue and task processing
   | "error" // Error handling and reporting
   | "offline" // Offline sync and queue handling
+  | "buckets" // File/blob storage operations
+  | "realtime" // Real-time subscriptions and events
   | "other" // Catch-all for miscellaneous logs
   | "feature_flags"; // Feature flag related logs
 

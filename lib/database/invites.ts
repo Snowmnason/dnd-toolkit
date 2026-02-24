@@ -1,8 +1,5 @@
-import { RequestManager } from "../api/request-manager";
 import { QueryCache } from "../cache";
-import { getDatabaseProvider } from "../services";
-import { logger } from "../utils/logger";
-import { validateUserForWrite } from "./common";
+import { getInviteRepository } from "./repositories";
 
 /**
  * Database operations for invite links
@@ -29,125 +26,30 @@ interface CreateInviteLinkParams {
 export async function createInviteLink(
   params: CreateInviteLinkParams,
 ): Promise<{ success: boolean; inviteLink?: InviteLink; error?: string }> {
-  try {
-    const { worldId, hoursValid = 24 } = params;
+  const result = await getInviteRepository().create(params);
 
-    // Validate before write operation
-    await validateUserForWrite();
-
-    logger.category("database").info(`Creating invite link for world ${worldId}`, {
-      hoursValid,
-    });
-
-    const { data, error } = await getDatabaseProvider()
-      .rpc('create_invite_link', {
-        p_world_id: worldId,
-        p_hours_valid: hoursValid,
-      }, 'worlds');
-
-    if (error) {
-      logger.category("database").error("Failed to create invite link", error);
-      return { success: false, error: error.message };
-    }
-
-    const created = Array.isArray(data) ? data[0] : data;
-
-    if (!created) {
-      logger.category("database").error("No data returned from create_invite_link RPC");
-      return { success: false, error: "Failed to create invite link" };
-    }
-
-    logger.success(`Invite link created with token: ${created.token}`);
-
-    // Invalidate invite links cache for this world
-    await QueryCache.invalidate(`world:${worldId}:invites`);
-
-    return {
-      success: true,
-      inviteLink: {
-        world_id: worldId,
-        token: created.token,
-        expires_at: created.expires_at,
-        created_at: created.created_at,
-      },
-    };
-  } catch (error) {
-    logger.error("storage", "Unexpected error creating invite link", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
+  if (result.success && result.data) {
+    // Invalidate invite links cache for this world (caller cache responsibility)
+    await QueryCache.invalidate(`world:${params.worldId}:invites`);
+    return { success: true, inviteLink: result.data };
   }
+
+  return { success: false, error: result.error };
 }
 
 /**
  * Validate an invite token and get the associated world
- * Uses RequestManager for deduplication and retry
  */
 export async function validateInviteToken(
   token: string,
 ): Promise<{ success: boolean; worldId?: string; error?: string }> {
-  try {
-    logger.category("database").info(`Validating invite token: ${token}`);
+  const result = await getInviteRepository().validate(token);
 
-    const result = await RequestManager.fetch(
-      `invite:validate:${token}`,
-      async () => {
-        const { data, error } = await getDatabaseProvider()
-          .rpc("resolve_invite_token", {
-            p_token: token,
-          }, 'worlds');
-
-        if (error) {
-          logger.category("database").error("Invalid invite token", error);
-          throw new Error("Invalid or expired invite link");
-        }
-
-        const invite = Array.isArray(data) ? data[0] : data;
-
-        if (!invite) {
-          logger.category("database").error("No invite found for token");
-          throw new Error("Invalid invite link");
-        }
-
-        // Check if expired
-        const expiresAt = new Date(invite.expires_at);
-        if (expiresAt < new Date()) {
-          logger.category("database").warn("Invite token expired", { expiresAt });
-          throw new Error("This invite link has expired");
-        }
-
-        logger.success(`Valid invite token for world: ${invite.world_id}`);
-        return invite;
-      },
-      {
-        dedupe: true,
-        retries: 2,
-        timeout: 10000,
-        authStrategy: "invite",
-      },
-    );
-
-    if (!result) {
-      return { success: false, error: "Invalid or expired invite link" };
-    }
-
-    // Type guard: ensure result has the expected properties
-    if (!result.world_id) {
-      return { success: false, error: "Invalid invite link structure" };
-    }
-
-    return {
-      success: true,
-      worldId: result.world_id,
-    };
-  } catch (error) {
-    logger.error("storage", "Unexpected error validating token", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
+  if (result.success && result.data) {
+    return { success: true, worldId: result.data };
   }
+
+  return { success: false, error: result.error };
 }
 
 /**
@@ -161,83 +63,23 @@ export async function validateInviteToken(
 export async function deleteInviteLink(
   token: string,
 ): Promise<{ success: boolean; error?: string }> {
-  try {
-    logger.category("database").info(`Deleting invite link: ${token}`);
-
-    const { error } = await getDatabaseProvider()
-      .rpc('delete_invite_link', {
-        p_token: token,
-      }, 'worlds');
-
-    if (error) {
-      logger.category("database").error("Failed to delete invite link", error);
-      return { success: false, error: error.message };
-    }
-
-    logger.success("Invite link deleted successfully");
-
-    return { success: true };
-  } catch (error) {
-    logger.error("storage", "Unexpected error deleting invite link", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-  }
+  const result = await getInviteRepository().delete(token);
+  return { success: result.success, error: result.error };
 }
 
 /**
  * Get all active invite links for a world (for management UI)
- * Uses RequestManager for deduplication and retry
  */
 export async function getWorldInviteLinks(
   worldId: string,
 ): Promise<{ success: boolean; invites?: InviteLink[]; error?: string }> {
-  try {
-    logger.category("database").info(`Fetching invite links for world: ${worldId}`);
+  const result = await getInviteRepository().listByWorld(worldId);
 
-    const data = await RequestManager.fetch(
-      `invites:world:${worldId}`,
-      async () => {
-        const { data, error } = await getDatabaseProvider()
-          .from('invite_links', 'worlds')
-          .select("*")
-          .eq("world_id", worldId)
-          .gt("expires_at", new Date().toISOString())
-          .order("created_at", { ascending: false })
-          .execute();
-
-        if (error) {
-          logger.category("database").error("Failed to fetch invite links", error);
-          throw new Error(error.message);
-        }
-
-        return data;
-      },
-      {
-        dedupe: true,
-        retries: 2,
-        timeout: 15000,
-        authStrategy: "user",
-      },
-    );
-
-    // Ensure data is always an array, even if null from failOpen
-    const invites = Array.isArray(data) ? data : [];
-
-    logger.category("database").info(`Found ${invites.length} active invite links`);
-
-    return {
-      success: true,
-      invites,
-    };
-  } catch (error) {
-    logger.error("storage", "Unexpected error fetching invite links", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
+  if (result.success) {
+    return { success: true, invites: result.data ?? [] };
   }
+
+  return { success: false, error: result.error };
 }
 
 // Export as invitesDB for consistency with other database modules

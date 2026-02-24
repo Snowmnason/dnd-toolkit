@@ -48,6 +48,12 @@ export async function initializeServices(): Promise<void> {
     // This must run before auth and any other service that may trigger entity queries
     await initializeDatabaseProvider();
 
+    // Initialize repositories SECOND — must happen after DatabaseProvider
+    // Repositories depend on getDatabaseProvider() being available
+    // This must run before AUTH phase, which calls usersDB.getCurrentUser()
+    const { initializeRepositories } = await import('@/lib/database/repository-initializer');
+    await initializeRepositories();
+
     // Initialize auth provider (Supabase by default)
     await initializeAuthProvider();
 

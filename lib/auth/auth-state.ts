@@ -1,3 +1,4 @@
+import { getUserRepository, getWorldAccessRepository } from "../database/repositories";
 import { type AuthProvider } from "../services";
 import {
   clearAllUserData,
@@ -10,14 +11,25 @@ import { logger } from "../utils/logger";
 // Session schema version for future migrations
 const AUTH_SESSION_VERSION = 1;
 
+/**
+ * Helper: determine whether a session indicates an email-confirmed user.
+ * Centralizes provider-specific checks (Supabase or other providers' shapes).
+ */
+export function isEmailConfirmed(session: any | null): boolean {
+  if (!session) return false;
+  // Support multiple session shapes: supabase (session.user) or wrapped/raw session
+  const user = (session.user ?? session.raw?.user) as any | undefined;
+  if (!user) return false;
+  // Supabase uses `email_confirmed_at`. Some providers may use `confirmed_at`.
+  return Boolean(user.email_confirmed_at ?? user.confirmed_at);
+}
+
 // Injected auth provider (set via configure())
 let authProvider: AuthProvider | null = null;
 
 // Cache dynamic imports to prevent re-importing modules on every auth check
 let supabaseCache: any = null;
 let isSupabaseConfiguredCache: any = null;
-let usersDBCache: any = null;
-let worldsDBCache: any = null;
 
 /**
  * Application-level auth state (provider-agnostic).
@@ -467,7 +479,7 @@ export const AuthStateManager = {
         clearTimeout(timeoutId!); // ✅ Clean up the timer
 
         // If we got a session, verify it's confirmed
-        if (session?.user && session.user.email_confirmed_at) {
+        if (isEmailConfirmed(session)) {
           return true;
         }
 
@@ -812,14 +824,9 @@ export const AuthStateManager = {
         `[VERIFY:DB] Checking world access - worldId=${worldId}, userId=${userId}`,
       );
 
-      // Use worldsDB helper to check access (checks both owner and member status)
-      if (!worldsDBCache) {
-        const imported = await import("../database/worlds");
-        worldsDBCache = imported.worldsDB;
-      }
-
+      // Use repository to check access (checks both owner and member status)
       try {
-        const hasAccess = await worldsDBCache.isUserInWorld(worldId, userId);
+        const hasAccess = await getWorldAccessRepository().isUserInWorld(worldId, userId);
         logger.debug(
           "auth",
           `[VERIFY:DB] isUserInWorld result - worldId=${worldId}, userId=${userId}, hasAccess=${hasAccess}`,
@@ -888,12 +895,7 @@ export const AuthStateManager = {
       // Try to fetch the user profile once (may fail)
       let userProfile: any = null;
       try {
-        // Use cached usersDB import
-        if (!usersDBCache) {
-          const imported = await import("../database/users");
-          usersDBCache = imported.usersDB;
-        }
-        userProfile = await usersDBCache.getCurrentUser();
+        userProfile = await getUserRepository().getCurrentUser();
       } catch (dbError) {
         logger.debug("auth", "Database error checking profile:", dbError);
         // If DB fails, allow user to continue to main (graceful degradation)

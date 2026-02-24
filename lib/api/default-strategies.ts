@@ -12,6 +12,7 @@
  * Low-level token management stays provider-specific to avoid over-abstraction.
  */
 
+import { getAuthProviderSync } from "../services";
 import {
   getSupabaseClientLazy,
   isSupabaseConfiguredLazy,
@@ -54,24 +55,23 @@ export function createUserAuthStrategy(): AuthStrategy {
           return cachedToken.token;
         }
 
-        // Check if Supabase is configured before attempting to get session
-        const configured = await isSupabaseConfiguredLazy();
-        if (!configured) {
-          logger.debug("auth", "Supabase not configured, no token available");
+        // Check if auth provider is configured before attempting to get session
+        const provider = getAuthProviderSync();
+        if (!provider) {
+          logger.debug("auth", "Auth provider not configured, no token available");
           cachedToken = null;
           return null;
         }
 
-        const supabase = await getSupabaseClientLazy();
-        const { data, error } = await supabase.auth.getSession();
+        const session = await provider.getSession();
 
-        if (error || !data.session) {
+        if (!session?.accessToken) {
           logger.debug("auth", "No valid session found");
           cachedToken = null;
           return null;
         }
 
-        const token = data.session.access_token;
+        const token = session.accessToken;
 
         // JWT tokens are typically 1 hour (3600s). Refresh at 80% TTL (2880s = 48 min)
         // This way cache expires before actual token expiry, triggering fresh fetch before 401
@@ -130,7 +130,10 @@ export function createUserAuthStrategy(): AuthStrategy {
 
           // Log out user since refresh is no longer possible
           try {
-            await supabase.auth.signOut();
+            const provider = getAuthProviderSync();
+            if (provider) {
+              await provider.signOut();
+            }
           } catch (signOutError) {
             logger.error("auth", "Failed to sign out after refresh failure:", {
               signOutError,
@@ -246,21 +249,20 @@ export function createInviteAuthStrategy(): AuthStrategy {
           return cachedToken.token;
         }
 
-        // Check if Supabase is configured
-        const configured = await isSupabaseConfiguredLazy();
-        if (!configured) {
+        // Check if auth provider is configured
+        const provider = getAuthProviderSync();
+        if (!provider) {
           logger.debug(
             "auth",
-            "Supabase not configured for invite, proceeding without token",
+            "Auth provider not configured for invite, proceeding without token",
           );
           cachedToken = null;
           return null;
         }
 
-        const supabase = await getSupabaseClientLazy();
-        const { data, error } = await supabase.auth.getSession();
+        const session = await provider.getSession();
 
-        if (error || !data.session) {
+        if (!session?.accessToken) {
           logger.debug(
             "auth",
             "No valid session for invite, proceeding without token",
@@ -269,7 +271,7 @@ export function createInviteAuthStrategy(): AuthStrategy {
           return null;
         }
 
-        const token = data.session.access_token;
+        const token = session.accessToken;
         const tokenTTL = 3600 * 1000; // 1 hour
         cachedToken = {
           token,

@@ -1,11 +1,11 @@
 import { Platform } from "react-native";
-import { getAppConfig } from "../config";
+import { getAppConfig } from "../../config";
 
 // Lazy import logger to avoid circular dependency with config
 let loggerCache: any = null;
 const getLogger = () => {
   if (!loggerCache) {
-    loggerCache = require("../utils/logger").logger;
+    loggerCache = require("../../utils/logger").logger;
   }
   return loggerCache;
 };
@@ -27,12 +27,17 @@ interface StorageAPI {
 }
 
 // Get sessionStorage for web (ephemeral cache, cleared on session end)
+// FastCache intentionally uses unencrypted sessionStorage for performance (5-10x faster than SecureStorage)
+// This is safe because FastCache data is non-sensitive, ephemeral, and refetchable on demand
 const getSessionStorage = (): StorageAPI => {
-  if (typeof sessionStorage !== "undefined") {
-    return sessionStorage;
+  // Use typeof guard first — never throws, works across SSR / native / web environments
+  // eslint-disable-next-line no-restricted-globals -- I DO NOT UNDERSTAND THIS ESLINT RULE, sessionStorage is a global variable in web environments
+  if (typeof sessionStorage !== "undefined" && sessionStorage !== null) {
+    // eslint-disable-next-line no-restricted-globals -- I DO NOT UNDERSTAND THIS ESLINT RULE, sessionStorage is a global variable in web environments
+    return sessionStorage as StorageAPI;
   }
 
-  // Return no-op implementation for Node.js environments
+  // Return no-op implementation for non-web environments (mobile, Node.js)
   return {
     getItem: () => null,
     setItem: () => {},

@@ -17,8 +17,29 @@ export function createMockAuthProvider(overrides?: Partial<AuthProvider>): AuthP
       return { success: true, data: { userId: `user:${email}`, accessToken: 'tok' } };
     },
 
+    async signInWithOAuth(
+      provider: string,
+      options?: Record<string, any>
+    ): Promise<{ url?: string; session?: Session }> {
+      // Mock: return a fake OAuth URL (tests can override if needed)
+      return { url: `https://auth.example.com/oauth/${provider}?callback=app://success` };
+    },
+
+    async signInWithIdToken(
+      provider: string,
+      token: string,
+      options?: Record<string, any>
+    ): Promise<AuthResult> {
+      // Mock: simulate successful ID token sign-in
+      return { success: true, data: { userId: `user:${provider}`, accessToken: token } };
+    },
+
     async resetPassword(email: string): Promise<{ success: boolean; message?: string }> {
       return { success: true, message: 'reset-sent' };
+    },
+
+    async resend(email: string): Promise<{ success: boolean; message?: string }> {
+      return { success: true, message: 'confirmation-sent' };
     },
 
     async updatePassword(newPassword: string): Promise<{ success: boolean; error?: string }> {
