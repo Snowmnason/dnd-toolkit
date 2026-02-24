@@ -1,10 +1,19 @@
-import {
-  EmailAlreadyExistsError,
-  InvalidCredentialsError,
-  NetworkError,
-  RateLimitError,
-  UserNotFoundError,
-} from '@/lib/services';
+// Lazy-loaded to avoid circular dependency: ERROR_CODES -> services -> analytics -> storage -> ERROR_CODES
+let cachedServiceErrors: any = null;
+
+function getServiceErrorClasses() {
+  if (!cachedServiceErrors) {
+    const services = require('@/lib/services');
+    cachedServiceErrors = {
+      EmailAlreadyExistsError: services.EmailAlreadyExistsError,
+      InvalidCredentialsError: services.InvalidCredentialsError,
+      NetworkError: services.NetworkError,
+      RateLimitError: services.RateLimitError,
+      UserNotFoundError: services.UserNotFoundError,
+    };
+  }
+  return cachedServiceErrors;
+}
 
 // ============================================================================
 // CENTRAL ERROR CODE REGISTRY
@@ -175,11 +184,12 @@ export type AnyErrorCode =
  * Map a normalized AuthError instance to a canonical `AuthErrorCode`.
  */
 export function mapAuthErrorToCode(error: unknown): AuthErrorCode {
-  if (error instanceof InvalidCredentialsError) return ERROR_CODES.AUTH.INVALID_CREDENTIALS;
-  if (error instanceof EmailAlreadyExistsError)  return ERROR_CODES.AUTH.EMAIL_ALREADY_EXISTS;
-  if (error instanceof UserNotFoundError)        return ERROR_CODES.AUTH.USER_NOT_FOUND;
-  if (error instanceof NetworkError)             return ERROR_CODES.AUTH.UNKNOWN; // auth context — use AUTH.UNKNOWN
-  if (error instanceof RateLimitError)           return ERROR_CODES.AUTH.RATE_LIMIT;
+  const serviceErrors = getServiceErrorClasses();
+  if (error instanceof serviceErrors.InvalidCredentialsError) return ERROR_CODES.AUTH.INVALID_CREDENTIALS;
+  if (error instanceof serviceErrors.EmailAlreadyExistsError)  return ERROR_CODES.AUTH.EMAIL_ALREADY_EXISTS;
+  if (error instanceof serviceErrors.UserNotFoundError)        return ERROR_CODES.AUTH.USER_NOT_FOUND;
+  if (error instanceof serviceErrors.NetworkError)             return ERROR_CODES.AUTH.UNKNOWN; // auth context — use AUTH.UNKNOWN
+  if (error instanceof serviceErrors.RateLimitError)           return ERROR_CODES.AUTH.RATE_LIMIT;
   return ERROR_CODES.AUTH.UNKNOWN;
 }
 

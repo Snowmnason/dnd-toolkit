@@ -12,11 +12,30 @@
  */
 
 import { getAppConfig } from "@/lib/config/loader";
-import { AppError, isAppError } from "@/lib/error/app-error";
-import { ERROR_CODES_METADATA } from "@/lib/utils/ERROR_CODES";
 import { RedactionManager } from "@/lib/utils/redaction-manager";
 
-// ANSI color codes (terminal colors)
+// Lazy imports to break circular dependency
+// These are required only inside functions, not at module load time
+let cachedErrorCodesMetadata: any = null;
+function getErrorCodesMetadata() {
+  if (!cachedErrorCodesMetadata) {
+    cachedErrorCodesMetadata = require("@/lib/utils/ERROR_CODES").ERROR_CODES_METADATA;
+  }
+  return cachedErrorCodesMetadata;
+}
+
+function isAppError(error: any): error is any {
+  // Duck-type check: if it has 'code', 'category', 'severity' properties, treat it as AppError
+  return (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    "category" in error &&
+    "severity" in error
+  );
+}
+
+// ANSI color codes (terminal colors and backgrounds)
 const COLORS = {
   reset: "\x1b[0m",
   bold: "\x1b[1m",
@@ -27,6 +46,14 @@ const COLORS = {
   blue: "\x1b[34m",
   magenta: "\x1b[35m",
   cyan: "\x1b[36m",
+  white: "\x1b[37m",
+  orange: "\x1b[1m\x1b[38;5;214m", // Brighter bold orange (ANSI 256 color 214)
+  // Background colors only (text color unchanged)
+  bgRed: "\x1b[41m",
+  bgYellow: "\x1b[43m",
+  bgMagenta: "\x1b[45m",
+  bgBlue: "\x1b[44m",
+  bgGreen: "\x1b[42m",
 } as const;
 
 type LogLevel = "debug" | "info" | "warn" | "error" | "analytics" | "perf";
@@ -61,7 +88,7 @@ interface LoggerConfig {
 interface LogMetadata {
   [key: string]: any;
   code?: string;
-  appError?: AppError | Error;
+  appError?: Error | any; // AppError or Error, avoid import cycle
 }
 
 /**
@@ -267,7 +294,7 @@ function logToConsole(
 
   // Extract error code & AppError if present
   let code: string | undefined;
-  let appError: AppError | Error | undefined;
+  let appError: any;
   let restMetadata = { ...metadata };
 
   if (metadata?.appError) {
@@ -282,9 +309,12 @@ function logToConsole(
 
   // Enrich with ERROR_CODES_METADATA if code is present
   let enrichment = "";
-  if (code && ERROR_CODES_METADATA[code as keyof typeof ERROR_CODES_METADATA]) {
-    const meta = ERROR_CODES_METADATA[code as keyof typeof ERROR_CODES_METADATA];
-    enrichment = ` code=${code} severity=${meta.severity} errorCategory=${meta.category} userMessage="${meta.userMessage || ""}"`;
+  if (code) {
+    const metadata = getErrorCodesMetadata();
+    if (metadata[code as keyof typeof metadata]) {
+      const meta = metadata[code as keyof typeof metadata];
+      enrichment = ` code=${code} severity=${meta.severity} errorCategory=${meta.category} userMessage="${meta.userMessage || ""}"`;
+    }
   }
 
   // Redact sensitive keys in metadata or varargs
@@ -299,23 +329,26 @@ function logToConsole(
   // Format key=value pairs for simple values
   const kvPairs = formatKeyValuePairs(redactedMetadata);
 
-  // Build log line with colors
-  const color = getColorForLevel(level);
+  // Build log line (without ANSI codes for web; browser console handles styling)
   const timestamp = config.showTimestamp
     ? new Date().toISOString().split("T")[1].split(".")[0] + " "
     : "";
-  const categoryTag = config.showContext ? `[${category}] ` : "";
+  const categoryColor = getCategoryColor(category);
+  const categoryTag = config.showContext ? `${categoryColor}[${category}]${COLORS.reset} ` : "";
 
-  let logLine = `${color}${timestamp}${categoryTag}${message}${enrichment}${COLORS.reset}`;
+  let logLine = `${timestamp}${categoryTag}${message}${enrichment}`;
   if (kvPairs) {
     logLine += ` — ${kvPairs}`;
   }
 
+  // Use appropriate console method for level (browser console colors whole box)
+  const consoleMethod = getConsoleMethod(level);
+  
   // Print main line and any varargs
   if (redactedVarargs.length > 0) {
-    console.log(logLine, ...redactedVarargs);
+    consoleMethod(logLine, ...redactedVarargs);
   } else {
-    console.log(logLine);
+    consoleMethod(logLine);
   }
 
   // Print objects from metadata as indented blocks below
@@ -371,21 +404,68 @@ function extractMetadata(args: any[]): LogMetadata | undefined {
 }
 
 /**
- * Get ANSI color code for log level
+ * Get appropriate console method for log level 
+ * (console.error, console.warn, console.log, etc.)
+ * In browser, this colors the entire log entry background
  */
-function getColorForLevel(level: LogLevel): string {
+function getConsoleMethod(level: LogLevel): typeof console.log {
   switch (level) {
     case "error":
-      return COLORS.bold + COLORS.red;
+      return console.error;   // Red background
     case "warn":
-      return COLORS.yellow;
+      return console.warn;    // Yellow background
     case "debug":
-      return COLORS.magenta;
+      return console.debug;   // Gray background
     case "analytics":
-      return COLORS.blue;
     case "perf":
-      return COLORS.green;
+      return console.info;    // Blue/cyan background
     case "info":
+    default:
+      return console.log;     // Default (no background)
+  }
+}
+
+/**
+ * Get fancy text color for category tags (for terminal/web console)
+ */
+function getCategoryColor(category: LogCategory): string {
+  // Only apply ANSI colors for terminal; web console will ignore them but they won't hurt
+  switch (category) {
+    case "auth":
+      return COLORS.cyan;
+    case "api":
+      return COLORS.blue;
+    case "storage":
+      return COLORS.yellow;
+    case "performance":
+      return COLORS.green;
+    case "analytics":
+      return COLORS.magenta;
+    case "error":
+      return COLORS.red;
+    case "bootstrap":
+      return COLORS.orange;
+    case "database":
+      return COLORS.blue;
+    case "network":
+      return COLORS.cyan;
+    case "security":
+      return COLORS.red;
+    case "jobs":
+      return COLORS.magenta;
+    case "offline":
+      return COLORS.yellow;
+    case "navigation":
+      return COLORS.cyan;
+    case "ui":
+      return COLORS.magenta;
+    case "buckets":
+      return COLORS.green;
+    case "realtime":
+      return COLORS.blue;
+    case "feature_flags":
+      return COLORS.magenta;
+    case "other":
     default:
       return COLORS.reset;
   }
