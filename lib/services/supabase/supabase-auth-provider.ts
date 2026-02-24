@@ -22,6 +22,8 @@ import {
   UserNotFoundError,
 } from '@/lib/services/auth-provider';
 import { logger } from '@/lib/utils/logger';
+import { ERROR_CODES } from '@/lib/utils/ERROR_CODES';
+import { mapSupabaseAuthCode } from './supabase-error-translation';
 
 /**
  * Supabase auth provider implementation.
@@ -610,8 +612,8 @@ export class SupabaseAuthProvider implements AuthProvider {
       messageLower.includes('enotfound') ||
       messageLower.includes('time out') ||
       supabaseError instanceof TypeError ||
-      code === 'NETWORK_ERROR' ||
-      code === 'ETIMEDOUT'
+      code === ERROR_CODES.NETWORK.RAW.NETWORK_ERROR ||
+      code === ERROR_CODES.NETWORK.RAW.ETIMEDOUT
     ) {
       return new NetworkError(message, supabaseError);
     }
@@ -626,7 +628,7 @@ export class SupabaseAuthProvider implements AuthProvider {
       return new AuthError(
         message,
         supabaseError,
-        'EMAIL_NOT_CONFIRMED',
+        ERROR_CODES.AUTH.EMAIL_NOT_CONFIRMED,
         'Please verify your email address before signing in.'
       );
     }
@@ -645,11 +647,11 @@ export class SupabaseAuthProvider implements AuthProvider {
       );
     }
 
-    // Default: generic auth error
+    // Default: generic auth error — translate raw Supabase code to canonical AUTH code
     return new AuthError(
       message,
       supabaseError,
-      code,
+      mapSupabaseAuthCode(code),
       'An authentication error occurred. Please try again.'
     );
   }

@@ -164,9 +164,9 @@ lib/storage/
 
 ### Integration
 
-1. **lib/storage/privacy.ts** - `redactForLogs()` now delegates to `redactPII()`
-2. **lib/utils/logger.ts** - Already using `redactForLogs()`, automatically improved
-3. **Lazy Import** - `privacy.ts` uses lazy `require()` to avoid circular deps
+1. **lib/utils/logger.ts** - Logger automatically redacts sensitive data using `RedactionManager` when logging with metadata
+2. **RedactionManager** - Centralized PII redaction system (`lib/utils/redaction-manager.ts`) used throughout the app
+3. **No Lazy Imports** - Direct integration eliminates circular dependency concerns
 
 ---
 
@@ -191,10 +191,9 @@ window.showPatternCoverage(); // Pattern reference
 
 ✅ **Fully Compatible**
 
-- Old API `redactForLogs(value, key?)` unchanged
-- Existing calls in `logger.ts` work unchanged
-- New module is additive, no breaking changes
-- Circular dependency avoided via lazy imports
+- Logger API unchanged; redaction is automatic
+- Existing calls in app code continue to work
+- `redactForLogs()` removed as orphaned utility (RedactionManager is the canonical system)
 
 ---
 

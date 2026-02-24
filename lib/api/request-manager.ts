@@ -6,6 +6,7 @@ import {
 } from "../analytics";
 import { QueryCache } from "../cache";
 import { getAppConfig } from "../config";
+import { enrichError, extractErrorCode } from "../error";
 import {
   buildAdaptiveQueryParams,
   captureErrorCorrelation,
@@ -15,6 +16,7 @@ import {
   type PayloadQuality,
 } from "../network";
 import { getErrorTracker } from "../services";
+import { ERROR_CODES, type ErrorCodeType } from "../utils/ERROR_CODES";
 import { logger } from "../utils/logger";
 import { AuthLayer, type AuthContext } from "./auth-layer";
 import {
@@ -833,7 +835,13 @@ class RequestManagerClass {
         // Note: Duration tracking uses the original request's timestamp (pending.timestamp)
         // not the current request's startedAt, ensuring accurate duration for deduplicated requests
         return deduplicatedPromise.catch((error) => {
-          logger.error("api", "Deduplicated request failed:", { key: enrichedKey, error });
+          const dedupErrorCode = extractErrorCode(error);
+          if (dedupErrorCode) {
+            const enriched = enrichError(error instanceof Error ? error : new Error(String(error)), dedupErrorCode);
+            logger.category(enriched.category as any).error(`Deduplicated request failed: ${enriched.message}`, enriched.toLogMetadata());
+          } else {
+            logger.error("api", "Deduplicated request failed:", { key: enrichedKey, error });
+          }
           this.reportErrorToTracker(error, { key: enrichedKey, options: options_ });
 
           if (options_.failOpen) {
@@ -1145,7 +1153,7 @@ class RequestManagerClass {
 
             // Skip recording auth errors (401, 403) - AuthLayer handles these separately
             // and they should not trigger circuit breaker failures
-            const isAuthError = error?.status === 401 || error?.status === 403;
+            const isAuthError = error?.status === ERROR_CODES.HTTP.UNAUTHORIZED || error?.status === ERROR_CODES.HTTP.FORBIDDEN;
 
             if (!isAuthError) {
               // Record failure in circuit breaker
@@ -1253,10 +1261,11 @@ class RequestManagerClass {
 
       return await circuitBreakerRecordedPromise;
     } catch (error) {
-      logger.error("request-manager", "Request failed:", { key: enrichedKey, error });
+      // Determine error code for enrichment
+      const errorCode = extractErrorCode(error);
 
       // ========== ERROR TRACKER REPORTING ==========
-      this.reportErrorToTracker(error, { key: enrichedKey, options: options_ });
+      this.reportErrorToTracker(error, { key: enrichedKey, options: options_, errorCode });
 
       // Tracking for thrown path (in case promise creation failed early)
       const duration_ms = Date.now() - startedAt;
@@ -1363,11 +1372,12 @@ class RequestManagerClass {
       // (distinct from 403 Forbidden which means auth succeeded but permission denied)
       const status = (error as any)?.status || (error as any)?.code;
 
-      if (status === 401 && retryCount < 1) {
+      if (status === ERROR_CODES.HTTP.UNAUTHORIZED && retryCount < 1) {
         // Only retry once on 401
-        logger.info("api", "Got 401, attempting token refresh", {
-          key,
-          strategy: strategyName,
+        logger.category("auth").info("Got 401, attempting token refresh", {
+            code: ERROR_CODES.HTTP.UNAUTHORIZED,
+            key,
+            strategy: strategyName,
         });
 
         try {
@@ -1411,7 +1421,9 @@ class RequestManagerClass {
           // Only user-session strategies should trigger logout on auth failure
           // This prevents unrelated 401s (e.g., public/invite/external strategies)
           // from logging out the user
-          logger.error("api", "Token refresh failed", {
+          const refreshErrorCode = extractErrorCode(refreshError) || ERROR_CODES.AUTH.SESSION_EXPIRED;
+          logger.category("auth").error("Token refresh failed", {
+            code: refreshErrorCode,
             key,
             strategy: strategyName,
             error: refreshError,
@@ -1705,10 +1717,13 @@ class RequestManagerClass {
   }
 
   /**
-   * Report request errors to error tracker
+   * Report request errors to error tracker with error code enrichment
+   *
+   * Uses error enrichment abstraction to add error codes and metadata to Sentry breadcrumbs
+   * for better filtering, grouping, and observability.
    *
    * @param error - The error that occurred
-   * @param context - Context about the request
+   * @param context - Context about the request (key, options, optional errorCode)
    */
   private reportErrorToTracker(
     error: unknown,
@@ -1718,23 +1733,61 @@ class RequestManagerClass {
         authStrategy?: string;
         interceptors?: RequestInterceptor[];
       };
+      errorCode?: ErrorCodeType;
     },
   ): void {
     try {
       // Convert error to Error instance if needed
       const errorObj = error instanceof Error ? error : new Error(String(error));
-      
+
+      // Determine error code if not provided
+      let errorCode = context.errorCode;
+      if (!errorCode) {
+        // Try to extract from AppError
+        errorCode = extractErrorCode(error);
+        // Don't fall back to HTTP status—statusToErrorCode returns numeric codes
+        // Only enrich if we have a string error code
+      }
+
+      // Enrich error with metadata (for Sentry and logging)
+      const enriched = errorCode
+        ? enrichError(errorObj, errorCode, {
+            requestKey: context.key,
+            endpoint: context.key,
+            dedupe: context.options.dedupe,
+            retries: context.options.retries,
+            failOpen: context.options.failOpen,
+            timeout: context.options.timeout,
+            rateLimited: !!context.options.rateLimitKey,
+          })
+        : null;
+
+      // Log to logger with enriched metadata
+      if (enriched) {
+        logger.category(enriched.category as any).error(
+          `Request failed: ${enriched.message}`,
+          enriched.toLogMetadata()
+        );
+      } else {
+        logger.error(
+          "api",
+          "Request failed",
+          { key: context.key, error: errorObj }
+        );
+      }
+
       // Get tiered payload based on consent level
       const captureOptions = getCrashReportPayload(errorObj, undefined, AnalyticsConsent.getLevel());
-      
+
       if (captureOptions !== null) {
-        // Merge request-specific context into the tiered payload
+        // Build Sentry options with error code enrichment
         const mergedOptions = {
           ...captureOptions,
           tags: {
             ...(captureOptions.tags || {}),
             component: "request-manager",
             requestKey: context.key,
+            ...(enriched ? { errorCode: enriched.code, errorCategory: enriched.category } : {}),
           },
           contexts: {
             ...(captureOptions.contexts || {}),
@@ -1746,21 +1799,31 @@ class RequestManagerClass {
               timeout: context.options.timeout,
               rateLimited: !!context.options.rateLimitKey,
             },
+            ...(enriched ? { errorEnrichment: enriched.toJSON() } : {}),
           },
+          breadcrumbs: enriched
+            ? [
+                {
+                  message: enriched.toBreadcrumb().message,
+                  data: enriched.toBreadcrumb().data,
+                  level: enriched.severity,
+                },
+              ]
+            : undefined,
         };
-        
+
         getErrorTracker().captureException(errorObj, mergedOptions);
       } else {
         logger.warn(
           "request-manager",
-          "Error not sent to error tracker (consent=none; awaiting user opt-in)",
+          "Error not sent to error tracker (consent=none; awaiting user opt-in)"
         );
       }
     } catch (trackerError) {
       logger.warn(
         "request-manager",
         "Failed to report to error tracker:",
-        trackerError,
+        trackerError
       );
     }
   }

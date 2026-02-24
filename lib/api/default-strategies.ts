@@ -17,6 +17,7 @@ import {
   getSupabaseClientLazy,
   isSupabaseConfiguredLazy,
 } from "../services/supabase/supabase-lazy";
+import { ERROR_CODES } from "../utils/ERROR_CODES";
 import { logger } from "../utils/logger";
 import { AuthStrategy, type AuthContext } from "./auth-layer";
 
@@ -49,7 +50,7 @@ export function createUserAuthStrategy(): AuthStrategy {
         // OPTIMIZATION: Check cached token first
         // Only call Supabase if cache is expired or doesn't exist
         if (cachedToken && Date.now() < cachedToken.expiresAt) {
-          logger.debug("auth", "Using cached token", {
+          logger.category("auth").debug("Using cached token", {
             endpoint: context.endpoint,
           });
           return cachedToken.token;
@@ -58,7 +59,7 @@ export function createUserAuthStrategy(): AuthStrategy {
         // Check if auth provider is configured before attempting to get session
         const provider = getAuthProviderSync();
         if (!provider) {
-          logger.debug("auth", "Auth provider not configured, no token available");
+          logger.category("auth").debug("Auth provider not configured, no token available");
           cachedToken = null;
           return null;
         }
@@ -66,7 +67,7 @@ export function createUserAuthStrategy(): AuthStrategy {
         const session = await provider.getSession();
 
         if (!session?.accessToken) {
-          logger.debug("auth", "No valid session found");
+          logger.category("auth").debug("No valid session found");
           cachedToken = null;
           return null;
         }
@@ -83,14 +84,15 @@ export function createUserAuthStrategy(): AuthStrategy {
           expiresAt: Date.now() + refreshThreshold,
         };
 
-        logger.debug("auth", "Fetched fresh token from Supabase", {
+        logger.category("auth").debug("Fetched fresh token from Supabase", {
           endpoint: context.endpoint,
           cacheExpiresIn: refreshThreshold,
         });
 
         return token;
       } catch (error) {
-        logger.error("auth", "Failed to get user token:", {
+        logger.category("auth").error("Failed to get user token", {
+          code: ERROR_CODES.AUTH.UNKNOWN,
           error,
           endpoint: context.endpoint,
         });
@@ -101,7 +103,7 @@ export function createUserAuthStrategy(): AuthStrategy {
 
     async onTokenExpire(context: AuthContext): Promise<void> {
       try {
-        logger.debug("auth", "Token expired, attempting refresh", {
+        logger.category("auth").debug("Token expired, attempting refresh", {
           endpoint: context.endpoint,
           retryCount: context.retryCount,
         });
@@ -112,7 +114,8 @@ export function createUserAuthStrategy(): AuthStrategy {
         // Check if Supabase is configured
         const configured = await isSupabaseConfiguredLazy();
         if (!configured) {
-          logger.warn("auth", "Supabase not configured, cannot refresh token", {
+          logger.category("auth").warn("Supabase not configured, cannot refresh token", {
+            code: ERROR_CODES.AUTH.UNKNOWN,
             endpoint: context.endpoint,
           });
           throw new Error("Supabase not configured for token refresh");
@@ -123,7 +126,8 @@ export function createUserAuthStrategy(): AuthStrategy {
 
         if (error || !data.session) {
           // Refresh failed - session is truly invalid
-          logger.warn("auth", "Token refresh failed, session invalid", {
+          logger.category("auth").warn("Token refresh failed, session invalid", {
+            code: ERROR_CODES.AUTH.SESSION_EXPIRED,
             error: error?.message || "No session after refresh",
             endpoint: context.endpoint,
           });
@@ -135,7 +139,7 @@ export function createUserAuthStrategy(): AuthStrategy {
               await provider.signOut();
             }
           } catch (signOutError) {
-            logger.error("auth", "Failed to sign out after refresh failure:", {
+            logger.category("auth").error("Failed to sign out after refresh failure", {
               signOutError,
             });
           }
@@ -144,18 +148,21 @@ export function createUserAuthStrategy(): AuthStrategy {
           const { AuthStateManager } = await import("../auth/auth-state");
           await AuthStateManager.clearAuthState();
 
-          logger.info("auth", "User logged out due to failed token refresh");
+          logger.category("auth").info("User logged out due to failed token refresh");
 
           throw new Error("Token refresh failed and session is invalid");
         }
 
         // Refresh succeeded - new token is now in Supabase session
         // Next getToken() call will fetch it and cache it
-        logger.info("auth", "Token refresh succeeded", {
+        logger.category("auth").info("Token refresh succeeded", {
           endpoint: context.endpoint,
         });
       } catch (error) {
-        logger.error("auth", "Failed to handle token expiry:", { error });
+        logger.category("auth").error("Failed to handle token expiry", {
+          code: ERROR_CODES.AUTH.SESSION_EXPIRED,
+          error,
+        });
         // Re-throw so auth layer can handle the error and request-manager knows retry failed
         throw error;
       }
@@ -195,8 +202,7 @@ export function createPublicAuthStrategy(): AuthStrategy {
 
     async onTokenExpire(context: AuthContext): Promise<void> {
       // Public endpoints don't have tokens, so this should never be called
-      logger.debug(
-        "auth",
+      logger.category("auth").debug(
         "Token expire called on public strategy (unexpected)",
         {
           endpoint: context.endpoint,
@@ -243,7 +249,7 @@ export function createInviteAuthStrategy(): AuthStrategy {
       try {
         // OPTIMIZATION: Check cached token first
         if (cachedToken && Date.now() < cachedToken.expiresAt) {
-          logger.debug("auth", "Using cached token for invite", {
+          logger.category("auth").debug("Using cached token for invite", {
             endpoint: context.endpoint,
           });
           return cachedToken.token;
@@ -252,8 +258,7 @@ export function createInviteAuthStrategy(): AuthStrategy {
         // Check if auth provider is configured
         const provider = getAuthProviderSync();
         if (!provider) {
-          logger.debug(
-            "auth",
+          logger.category("auth").debug(
             "Auth provider not configured for invite, proceeding without token",
           );
           cachedToken = null;
@@ -263,8 +268,7 @@ export function createInviteAuthStrategy(): AuthStrategy {
         const session = await provider.getSession();
 
         if (!session?.accessToken) {
-          logger.debug(
-            "auth",
+          logger.category("auth").debug(
             "No valid session for invite, proceeding without token",
           );
           cachedToken = null;
@@ -278,13 +282,14 @@ export function createInviteAuthStrategy(): AuthStrategy {
           expiresAt: Date.now() + tokenTTL * 0.8, // Refresh at 80% TTL
         };
 
-        logger.debug("auth", "Got token for invite strategy", {
+        logger.category("auth").debug("Got token for invite strategy", {
           endpoint: context.endpoint,
         });
 
         return token;
       } catch (error) {
-        logger.error("auth", "Failed to get invite token:", {
+        logger.category("auth").error("Failed to get invite token", {
+          code: ERROR_CODES.AUTH.UNKNOWN,
           error,
           endpoint: context.endpoint,
         });
@@ -306,8 +311,7 @@ export function createInviteAuthStrategy(): AuthStrategy {
       // 3. Invite validation is NOT a security-critical auth operation
       //
       // Simply log and let RequestManager handle the 401 as a normal error.
-      logger.warn(
-        "auth",
+      logger.category("auth").warn(
         "Invite validation got 401, not clearing auth state",
         {
           endpoint: context.endpoint,

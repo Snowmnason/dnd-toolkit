@@ -146,7 +146,7 @@ vi.mock("@/lib/network/network-detection", () => ({
   },
 }));
 
-// Mock logger
+// Mock logger with new API (category chaining + analytics/perf methods)
 vi.mock("@/lib/utils/logger", () => ({
   logger: {
     category: vi.fn(() => ({
@@ -154,11 +154,16 @@ vi.mock("@/lib/utils/logger", () => ({
       info: vi.fn(),
       warn: vi.fn(),
       error: vi.fn(),
+      analytics: vi.fn(),
+      perf: vi.fn(),
     })),
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
+    analytics: vi.fn(),
+    perf: vi.fn(),
+    reconfigure: vi.fn(),
   },
 }));
 

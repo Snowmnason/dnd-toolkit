@@ -52,7 +52,6 @@ export {
 export {
   checkPendingInvites,
   generateWorldInviteLink,
-  isEmailExistsError,
   type ResetPasswordResult,
   type SignInResult,
   type SignUpResult

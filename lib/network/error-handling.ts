@@ -7,6 +7,7 @@
  */
 
 import { logger } from '../utils/logger';
+import { ERROR_CODES } from '../utils/ERROR_CODES';
 import { NetworkDetection } from './network-detection';
 
 /**
@@ -38,18 +39,18 @@ export function isNetworkError(error: any): boolean {
 
   // Check common error codes
   if (
-    errorCode === 'NETWORK_ERROR' ||
-    errorCode === 'FETCH_ERROR' ||
-    errorCode === 'TIMEOUT' ||
-    errorCode === 'ENOTFOUND' ||
-    errorCode === 'ECONNREFUSED' ||
-    errorCode === 'ECONNRESET'
+    errorCode === ERROR_CODES.NETWORK.RAW.NETWORK_ERROR ||
+    errorCode === ERROR_CODES.NETWORK.RAW.FETCH_ERROR ||
+    errorCode === ERROR_CODES.NETWORK.RAW.TIMEOUT ||
+    errorCode === ERROR_CODES.NETWORK.RAW.ENOTFOUND ||
+    errorCode === ERROR_CODES.NETWORK.RAW.ECONNREFUSED ||
+    errorCode === ERROR_CODES.NETWORK.RAW.ECONNRESET
   ) {
     return true;
   }
 
   // HTTP status codes that indicate network issues
-  if (error?.status >= 500 || error?.status === 0) {
+  if (error?.status >= ERROR_CODES.HTTP.INTERNAL_SERVER_ERROR || error?.status === 0) {
     return true;
   }
 
@@ -89,7 +90,7 @@ export function shouldServeStaleOnError(error: any, options: {
   }
 
   // Server error (5xx) → Serve stale
-  if (error?.status >= 500) {
+  if (error?.status >= ERROR_CODES.HTTP.INTERNAL_SERVER_ERROR) {
     return true;
   }
 

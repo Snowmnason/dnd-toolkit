@@ -1,3 +1,12 @@
+export { AppError, isAppError, toAppError } from "./app-error";
+export { ERROR_CODE_REFERENCE, type ErrorCodeReference } from "./error-code-reference";
+export {
+    enrichError,
+    enrichErrors,
+    extractErrorCode,
+    isEnrichedError,
+    type EnrichedError
+} from "./error-enrichment";
 export { AppErrorBoundary } from "./ErrorBoundary";
 export {
     checkFeatureGating,
@@ -25,4 +34,16 @@ export {
     type SafeModeConfig,
     type SafeModeState
 } from "./safe-mode";
+export {
+    assertValidErrorCode,
+    getAllErrorCodes,
+    getErrorCategory,
+    getErrorCodesByCategory,
+    getErrorSeverity,
+    getErrorUserMessage,
+    getRetryStrategy,
+    isRecoverableError,
+    isValidErrorCode,
+    validateErrorCodeDev
+} from "./validate-error-code";
 

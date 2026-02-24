@@ -33,7 +33,7 @@ All data stored here is classified by sensitivity level to determine encryption,
 | **SENSITIVE**     | High        | SecureStorage | Yes (AES-256) | On logout  | User world list, characters  |
 | **PII**           | Critical    | SecureStorage | Yes (AES-256) | On logout  | Email, session tokens        |
 
-**For developers:** Register new keys in `DATA_CLASSIFICATIONS` (data-classification.ts). Use `getStorageBackend(key)` for automatic routing and `redactForLogs(data, key)` when logging.
+**For developers:** Register new keys in `DATA_CLASSIFICATIONS` (data-classification.ts). Use `getStorageBackend(key)` for automatic routing. For PII redaction, use the centralized `RedactionManager` (see `lib/utils/redaction-manager.ts`).
 
 Full policy: [docs/issues/MileStone 2/168 - Privacy PII Data/PRIVACY_POLICY.md](../../docs/issues/MileStone%202/168%20-%20Privacy%20PII%20Data/PRIVACY_POLICY.md)
 

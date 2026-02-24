@@ -1,19 +1,18 @@
 import {
-    AuthError,
-    EmailAlreadyExistsError,
-    getAuthProvider,
-    InvalidCredentialsError,
-    NetworkError,
-    RateLimitError,
-    UserNotFoundError,
+  EmailAlreadyExistsError,
+  getAuthProvider,
+  InvalidCredentialsError,
+  NetworkError,
+  RateLimitError
 } from "@/lib/services";
 import { usersDB } from "../database/users";
 import { SecureStorage, STORAGE_KEYS } from "../storage";
+import { ERROR_CODES, RetryErrorCode } from "../utils/ERROR_CODES";
 import { logger } from "../utils/logger";
 import {
-    checkAuthGuard,
-    recordAuthFailure,
-    recordAuthSuccess,
+  checkAuthGuard,
+  recordAuthFailure,
+  recordAuthSuccess,
 } from "./auth-attempt-guard";
 import { validateEmail, validatePassword } from "./validation";
 
@@ -55,93 +54,18 @@ export interface ResetPasswordResult {
 interface ErrorRetryStrategy {
   shouldAutoRetry: boolean;
   suggestRetryAfterMs?: number;
-  reason: string;
+  reason: RetryErrorCode;
 }
 
-/**
- * Map Supabase errors to normalized AuthError types.
- * Provides consistent error classification across signup/signin flows.
- */
-function mapSupabaseErrorToNormalized(supabaseError: any): AuthError {
-  const message = supabaseError?.message || 'Unknown auth error';
-  const code = supabaseError?.code || supabaseError?.status;
-  const messageLower = message.toLowerCase();
-
-  // Invalid credentials
-  if (
-    messageLower.includes('invalid login credentials') ||
-    messageLower.includes('invalid credentials') ||
-    messageLower.includes('invalid email or password') ||
-    messageLower.includes('incorrect password') ||
-    code === 'invalid_credentials'
-  ) {
-    return new InvalidCredentialsError(message, supabaseError);
-  }
-
-  // Email already exists (signup conflicts)
-  if (
-    messageLower.includes('user already registered') ||
-    messageLower.includes('already registered') ||
-    messageLower.includes('already been registered') ||
-    messageLower.includes('email address not available') ||
-    messageLower.includes('duplicate key value') ||
-    messageLower.includes('duplicate email') ||
-    messageLower.includes('unique constraint') ||
-    code === '23505' || // Postgres unique constraint error
-    code === 'user_already_exists'
-  ) {
-    return new EmailAlreadyExistsError(message, supabaseError);
-  }
-
-  // User not found (reset password target)
-  if (
-    messageLower.includes('user not found') ||
-    messageLower.includes('no user found') ||
-    messageLower.includes('user does not exist') ||
-    code === 'user_not_found'
-  ) {
-    return new UserNotFoundError(message, supabaseError);
-  }
-
-  // Rate limit exceeded (too many attempts)
-  if (
-    code === 429 ||
-    code === 'RATE_LIMIT' ||
-    messageLower.includes('too many') ||
-    messageLower.includes('rate limit') ||
-    messageLower.includes('throttle')
-  ) {
-    // Try to extract retry-after seconds from message (pattern: "123 seconds" or "123s")
-    const retryAfterMatch = messageLower.match(/(\d+)/);
-    const retryAfterSeconds = retryAfterMatch?.[1] ? parseInt(retryAfterMatch[1], 10) : undefined;
-    return new RateLimitError(message, supabaseError, retryAfterSeconds);
-  }
-
-  // Network errors and timeouts
-  if (
-    messageLower.includes('request timeout') ||
-    messageLower.includes('network') ||
-    messageLower.includes('fetch failed') ||
-    messageLower.includes('econnrefused') ||
-    messageLower.includes('enotfound') ||
-    messageLower.includes('time out') ||
-    supabaseError instanceof TypeError ||
-    code === 'NETWORK_ERROR' ||
-    code === 'ETIMEDOUT'
-  ) {
-    return new NetworkError(message, supabaseError);
-  }
-
-  // Default: generic AuthError
-  return new AuthError(message, supabaseError, code);
-}
+// NOTE: mapSupabaseErrorToNormalized moved to lib/services/supabase/supabase-auth-provider.ts
+// Use getAuthProvider().signUp/signIn which uses that canonical provider implementation
 
 function classifyErrorRetryStrategy(error: unknown): ErrorRetryStrategy {
   if (error instanceof NetworkError) {
     return {
       shouldAutoRetry: true,
       suggestRetryAfterMs: 2000, // Wait 2s before auto-retry
-      reason: "transient_network_failure",
+      reason: ERROR_CODES.RETRY.TRANSIENT_NETWORK_FAILURE,
     };
   }
 
@@ -149,7 +73,7 @@ function classifyErrorRetryStrategy(error: unknown): ErrorRetryStrategy {
     return {
       shouldAutoRetry: false, // User should wait, not retry immediately
       suggestRetryAfterMs: (error.retryAfterSeconds || 60) * 1000,
-      reason: "rate_limit_exceeded",
+      reason: ERROR_CODES.RETRY.RATE_LIMIT_EXCEEDED,
     };
   }
 
@@ -157,14 +81,14 @@ function classifyErrorRetryStrategy(error: unknown): ErrorRetryStrategy {
   if (error instanceof InvalidCredentialsError || error instanceof EmailAlreadyExistsError) {
     return {
       shouldAutoRetry: false,
-      reason: "permanent_failure",
+      reason: ERROR_CODES.RETRY.PERMANENT_FAILURE,
     };
   }
 
   // Unknown or other errors: don't auto-retry
   return {
     shouldAutoRetry: false,
-    reason: "unknown_error",
+    reason: ERROR_CODES.RETRY.UNKNOWN,
   };
 }
 
@@ -261,10 +185,6 @@ export const signUpUser = async (
       };
     }
 
-    return {
-      success: false,
-      error: "An unexpected error occurred. Please try again.",
-    };
   } catch (error) {
     logger.error("auth", "Sign up error:", error);
     const message = (error as Error)?.message?.includes("Request timeout")
@@ -486,18 +406,6 @@ export const signInUser = async (
         : "Sign in failed. Please try again.";
     return { success: false, error: message };
   }
-};
-
-// Check if email already exists error
-export const isEmailExistsError = (error: any): boolean => {
-  return (
-    error?.message?.includes("User already registered") ||
-    error?.message?.includes("already registered") ||
-    error?.message?.includes("already been registered") ||
-    error?.message?.includes("email address not available") ||
-    error?.message?.includes("duplicate key value") ||
-    error?.code === "23505"
-  );
 };
 
 // Send password reset email

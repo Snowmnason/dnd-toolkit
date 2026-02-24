@@ -12,6 +12,7 @@
  */
 
 import { logger } from '../../utils/logger';
+import { ERROR_CODES, StorageErrorCode } from '../../utils/ERROR_CODES';
 
 // ==========================================
 // Types
@@ -29,6 +30,7 @@ export interface StorageErrorInfo {
   operation: StorageOperation;
   key?: string;
   message: string;
+  code?: StorageErrorCode; // Canonical error code
   isRecoverable: boolean; // Can we retry?
   isCritical: boolean; // Will cause data loss?
   originalError: Error;
@@ -95,6 +97,15 @@ export function classifyStorageError(error: unknown, operation: StorageOperation
     message.includes('denied') ||
     message.includes('access');
 
+  // Determine canonical error code
+  let code: StorageErrorCode = ERROR_CODES.STORAGE.UNKNOWN;
+  if (isQuotaExceeded) code = ERROR_CODES.STORAGE.QUOTA_EXCEEDED;
+  else if (isCorruptedData) code = ERROR_CODES.STORAGE.PARSE_ERROR;
+  else if (isEncryptionError && message.includes('encrypt')) code = ERROR_CODES.STORAGE.ENCRYPTION_FAILED;
+  else if (isEncryptionError && message.includes('decrypt')) code = ERROR_CODES.STORAGE.DECRYPTION_FAILED;
+  else if (isPermissionError) code = ERROR_CODES.STORAGE.PERMISSION_DENIED;
+  else if (isNetworkError) code = ERROR_CODES.STORAGE.UNKNOWN; // Network errors aren't storage-specific
+
   // Determine recoverability
   const isRecoverable =
     !isQuotaExceeded && // Quota usually requires cleanup
@@ -107,6 +118,7 @@ export function classifyStorageError(error: unknown, operation: StorageOperation
 
   return {
     operation,
+    code,
     message,
     isRecoverable,
     isCritical,

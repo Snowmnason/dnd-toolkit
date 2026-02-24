@@ -23,6 +23,8 @@
  * calculateBackoffDelay(2, 1000) // ~4000ms ±800ms
  * calculateBackoffDelay(5, 1000) // ~32000ms ±6400ms (capped)
  */
+import { ERROR_CODES } from '../utils/ERROR_CODES';
+
 export function calculateBackoffDelay(
   retryCount: number,
   baseDelayMs: number = 1000,
@@ -93,26 +95,37 @@ export function isRetryable(error: any): boolean {
   const message = String(error.message || error).toLowerCase();
 
   // Non-retryable HTTP status codes
-  const nonRetryableCodes = [400, 401, 403, 404];
+  const nonRetryableCodes = [
+    ERROR_CODES.HTTP.BAD_REQUEST,
+    ERROR_CODES.HTTP.UNAUTHORIZED,
+    ERROR_CODES.HTTP.FORBIDDEN,
+    ERROR_CODES.HTTP.NOT_FOUND,
+  ];
   if (nonRetryableCodes.includes(code)) {
     return false;
   }
 
   // Retryable HTTP status codes (5xx, 429)
-  const retryableCodes = [429, 500, 502, 503, 504];
+  const retryableCodes = [
+    ERROR_CODES.HTTP.RATE_LIMITED,
+    ERROR_CODES.HTTP.INTERNAL_SERVER_ERROR,
+    ERROR_CODES.HTTP.BAD_GATEWAY,
+    ERROR_CODES.HTTP.SERVICE_UNAVAILABLE,
+    ERROR_CODES.HTTP.GATEWAY_TIMEOUT,
+  ];
   if (retryableCodes.includes(code)) {
     return true;
   }
 
-  // Network error patterns (retryable)
+  // Network error patterns (retryable) — lowercase message matching against known OS codes
   const networkPatterns = [
-    "econnrefused",
-    "econnreset",
-    "etimeout",
-    "enetreset",
-    "socket hang up",
-    "network error",
-    "offline",
+    ERROR_CODES.NETWORK.RAW.ECONNREFUSED.toLowerCase(),
+    ERROR_CODES.NETWORK.RAW.ECONNRESET.toLowerCase(),
+    ERROR_CODES.NETWORK.RAW.ETIMEDOUT.toLowerCase(),
+    ERROR_CODES.NETWORK.RAW.ENETRESET.toLowerCase(),
+    'socket hang up',
+    'network error',
+    'offline',
   ];
   if (networkPatterns.some((pattern) => message.includes(pattern))) {
     return true;

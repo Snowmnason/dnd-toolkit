@@ -36,7 +36,7 @@ import {
     type Session,
     UserNotFoundError,
 } from "@/lib/services";
-import { mapAuthErrorToCode } from "../utils/ERROR_CODES";
+import { mapAuthErrorToCode, ERROR_CODES, RetryErrorCode } from "../utils/ERROR_CODES";
 import { logger } from "../utils/logger";
 import {
     checkAuthGuard,
@@ -95,7 +95,7 @@ export interface ResendOperationResult extends AuthOperationResult {
 interface ErrorRetryStrategy {
   shouldAutoRetry: boolean;
   suggestRetryAfterMs?: number;
-  reason: string;
+  reason: RetryErrorCode;
 }
 
 // ============================================================================
@@ -114,7 +114,7 @@ function classifyErrorRetryStrategy(error: unknown): ErrorRetryStrategy {
     return {
       shouldAutoRetry: true,
       suggestRetryAfterMs: 2000,
-      reason: "transient_network_failure",
+      reason: ERROR_CODES.RETRY.TRANSIENT_NETWORK_FAILURE,
     };
   }
 
@@ -122,7 +122,7 @@ function classifyErrorRetryStrategy(error: unknown): ErrorRetryStrategy {
     return {
       shouldAutoRetry: false,
       suggestRetryAfterMs: (error.retryAfterSeconds || 60) * 1000,
-      reason: "rate_limit_exceeded",
+      reason: ERROR_CODES.RETRY.RATE_LIMIT_EXCEEDED,
     };
   }
 
@@ -132,13 +132,13 @@ function classifyErrorRetryStrategy(error: unknown): ErrorRetryStrategy {
   ) {
     return {
       shouldAutoRetry: false,
-      reason: "permanent_failure",
+      reason: ERROR_CODES.RETRY.PERMANENT_FAILURE,
     };
   }
 
   return {
     shouldAutoRetry: false,
-    reason: "unknown_error",
+    reason: ERROR_CODES.RETRY.UNKNOWN,
   };
 }
 
@@ -699,7 +699,6 @@ export const listenToAuthStateChanges = async (
 export {
     checkPendingInvites,
     generateWorldInviteLink,
-    isEmailExistsError,
     type ResetPasswordResult,
     type SignInResult,
     type SignUpResult

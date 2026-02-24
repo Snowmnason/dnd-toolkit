@@ -1,6 +1,6 @@
 import { AuthModal } from "@/components/auth_components";
 import { Caption } from "@/components/ui";
-import { AuthStateManager, getCurrentSession, logger, usersDB, worldsDB } from "@/lib";
+import { AuthStateManager, getCurrentSession, logger, usersDB, worldsDB, ERROR_CODES } from "@/lib";
 import { getAuthProvider } from "@/lib/auth";
 import { getPrivacyStorageBackend, STORAGE_KEYS } from "@/lib/storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -78,7 +78,10 @@ export default function AuthRedirect() {
       const userProfile = await usersDB.getCurrentUser();
       return userProfile?.id || undefined;
     } catch (error) {
-      logger.error("auth-redirect", "Error fetching user ID:", error);
+      logger.error("auth-redirect", "Error fetching user ID:", {
+        code: ERROR_CODES.AUTH.UNKNOWN,
+        error
+      });
       return undefined;
     }
   };
@@ -219,7 +222,10 @@ export default function AuthRedirect() {
             }
         }
       } catch (error) {
-        logger.error("auth-redirect", "Auth redirect error:", error);
+        logger.error("auth-redirect", "Auth redirect error:", {
+          code: ERROR_CODES.UNKNOWN.GENERAL,
+          error
+        });
         setErrorMessage("Something went wrong. Please try again.");
         setShowErrorModal(true);
       } finally {

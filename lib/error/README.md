@@ -1,23 +1,40 @@
 # Error Module
 
-Safe mode resilience system that detects and gracefully handles critical app failures, providing users with clear recovery options instead of crashes. Integrates with AppKernel for state management and observable failure tracking.
+Centralized error handling system with type-safe error codes, structured metadata, and safe mode resilience. Provides consistent error management across the application with graceful failure handling and user recovery options.
 
 ## When to Use This Module
 
-**Trigger safe mode when critical systems fail:**
+**For centralized error handling:**
+- Throwing and catching type-safe errors with structured metadata
+- Converting unknown errors to AppError instances
+- Getting user-friendly error messages and recovery strategies
+- Validating error codes and accessing error metadata
 
-- Storage is corrupted or unreadable
-- Auth session is invalid and cannot be restored
-- Kernel bootstrap times out
-- Network/sync failures persist across multiple retries
+**For safe mode resilience:**
+- Trigger safe mode when critical systems fail (storage corruption, auth failures, kernel timeouts)
+- Handle persistent network/sync failures across multiple retries
+- Provide users with clear recovery options instead of crashes
 
-**Don't trigger safe mode for:**
-
+**Don't use for:**
 - Transient network glitches (use retry logic instead)
 - Missing optional features (disable gracefully)
 - Single failed API calls (use normal error handling)
 
 ## Architecture & Data Flow
+
+### Centralized Error Handling
+
+```
+App Code
+  ↓
+Throw/Catch AppError with ERROR_CODES
+  ↓
+Type-safe error codes + structured metadata
+  ↓
+Consistent logging, user messages, retry strategies
+```
+
+### Safe Mode Resilience
 
 ```
 NORMAL (healthy)
@@ -39,6 +56,13 @@ back to NORMAL (if successful)
 
 **Key Components:**
 
+**Error Handling:**
+- **AppError** – Typed error class enforcing valid error codes from ERROR_CODES
+- **ERROR_CODES integration** – Centralized registry with metadata (severity, recoverability, user messages)
+- **Validation helpers** – Type guards, metadata accessors, error conversion utilities
+- **Error enrichment** – Automatic metadata population for logging and analytics
+
+**Safe Mode:**
 - **SafeModeLevel** – State machine: NORMAL, DEGRADED, SAFE, RECOVERY
 - **SafeModeReason** – Why it triggered (storage, auth, network, kernel, etc.)
 - **SafeModeState** – Immutable snapshot (level, reason, affected features, recovery options, timestamp)
@@ -48,7 +72,86 @@ back to NORMAL (if successful)
 
 ## API Reference
 
-### SafeModeLevel Enum
+### Centralized Error Handling
+
+#### `AppError` Class
+
+Typed error class that enforces valid error codes from ERROR_CODES registry.
+
+```typescript
+class AppError extends Error {
+  constructor(code: string, message: string, cause?: Error);
+  
+  readonly code: string;           // ERROR_CODES.* value
+  readonly category: string;       // 'auth', 'network', etc.
+  readonly severity: ErrorSeverity; // 'critical', 'high', 'medium', 'low'
+  readonly recoverable: boolean;   // Can be resolved with retry/user action
+  readonly retryStrategy: RetryStrategy; // 'exponential-backoff', 'linear', 'none'
+  readonly timestamp: number;      // When error was created
+  readonly userMessage?: string;   // User-friendly message
+  
+  toJSON(): object;                // Structured serialization
+}
+```
+
+**Example:**
+```typescript
+import { AppError } from '@/lib/error';
+import { ERROR_CODES } from '@/lib/utils';
+
+throw new AppError(
+  ERROR_CODES.AUTH.INVALID_CREDENTIALS,
+  'Invalid email or password'
+);
+```
+
+#### Type Guards & Helpers
+
+**`isAppError(error: unknown): error is AppError`**
+Check if error is an AppError instance.
+
+**`toAppError(error: unknown): AppError`**
+Convert any error to AppError (preserves AppError, wraps others).
+
+**`getErrorSeverity(code: string): ErrorSeverity`**
+Get severity level for error code.
+
+**`getErrorUserMessage(code: string): string | undefined`**
+Get user-friendly message for error code.
+
+**`isRecoverableError(code: string): boolean`**
+Check if error can be recovered from.
+
+**Example:**
+```typescript
+import { isAppError, getErrorSeverity, isRecoverableError } from '@/lib/error';
+
+try {
+  await riskyOperation();
+} catch (error) {
+  if (isAppError(error)) {
+    if (isRecoverableError(error.code)) {
+      // Retry logic
+    }
+    logger.error(error.category, error.message, { code: error.code });
+  }
+}
+```
+
+#### Error Code Validation
+
+**`validateErrorCodeDev(code: string, context: string): void`**
+Development-only validation that warns on invalid error codes.
+
+**`getAllErrorCodes(): string[]`**
+Get all registered error codes.
+
+**`getErrorCodesByCategory(category: string): string[]`**
+Get error codes for specific category.
+
+---
+
+### Safe Mode System
 
 ```typescript
 enum SafeModeLevel {
