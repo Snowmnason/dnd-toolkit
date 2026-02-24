@@ -262,8 +262,10 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         logger.debug("context", "AppParamsStableProvider: Verification already running - skipping new request");
         return;
       }
-      isVerifyingRef.current = true;
       try {
+        // Set inside try so the finally block always resets the flag,
+        // even if an exception is thrown anywhere in the verification body.
+        isVerifyingRef.current = true;
         logger.info(
           "context",
           `AppParamsStableProvider: Starting background world verification (errorState: ${isErrorState})`,
@@ -455,6 +457,9 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
       try {
         const { getAuthProvider } = await import("@/lib/services");
         const authProvider = await getAuthProvider();
+        // Re-check staleness after the async await — a newer watcher may have been
+        // started while we were waiting for the auth provider to become available.
+        if (localToken !== watcherToken) return;
         const unsubscribe = authProvider.onAuthStateChange(async (session) => {
           if (localToken !== watcherToken) return; // stale watcher
           if (mounted && session !== null) {

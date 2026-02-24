@@ -30,8 +30,11 @@ interface StorageAPI {
 // FastCache intentionally uses unencrypted sessionStorage for performance (5-10x faster than SecureStorage)
 // This is safe because FastCache data is non-sensitive, ephemeral, and refetchable on demand
 const getSessionStorage = (): StorageAPI => {
-  if (Platform.OS === "web" && typeof window !== "undefined" && window.sessionStorage) {
-    return window.sessionStorage as StorageAPI;
+  // Use typeof guard first — never throws, works across SSR / native / web environments
+  // eslint-disable-next-line no-restricted-globals -- I DO NOT UNDERSTAND THIS ESLINT RULE, sessionStorage is a global variable in web environments
+  if (typeof sessionStorage !== "undefined" && sessionStorage !== null) {
+    // eslint-disable-next-line no-restricted-globals -- I DO NOT UNDERSTAND THIS ESLINT RULE, sessionStorage is a global variable in web environments
+    return sessionStorage as StorageAPI;
   }
 
   // Return no-op implementation for non-web environments (mobile, Node.js)

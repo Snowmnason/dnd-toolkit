@@ -11,8 +11,7 @@
  * - removeWorldAccess
  */
 
-import { getDatabaseProvider } from "@/lib/services";
-import { logger } from "@/lib/utils";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * Generic edge function implementation interface
@@ -131,6 +130,9 @@ export async function runEdgeFunction<T extends EdgeFunctionOutput = any>(
   functionName: string,
   input: EdgeFunctionInput
 ): Promise<T> {
+  // Dynamically import the services barrel at runtime to avoid top-level
+  // circular imports while allowing tests to mock `@/lib/services`.
+  const { getDatabaseProvider } = await import('@/lib/services');
   if (!getDatabaseProvider().isConfigured()) {
     throw new Error(
       "Edge functions require Supabase configuration to be initialized"
