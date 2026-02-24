@@ -31,9 +31,9 @@ lib/database/edge/
 └── [future] implementations/
     └── supabase-rpc-adapter.ts   ← Supabase RPC mapper
 
-lib/database/repositories/
+lib/services/supabase/
 └── supabase-rpc-adapter.ts ← Supabase-specific: maps semantic names to RPC procedures
-                            (alternative location: could move to lib/database/edge/implementations/)
+                            (moved from lib/database/repositories/)
 
 lib/edge-functions/
 └── index.ts             ← Compatibility shim, re-exports from lib/database/edge/
@@ -55,7 +55,7 @@ const result = await executeEdgeFunction('leaveWorld', {
 ### Use the Semantic RPC Adapter
 
 ```typescript
-import { runEdgeFunction } from "@/lib/database/repositories/supabase-rpc-adapter";
+import { runEdgeFunction } from "@/lib/services/supabase/supabase-rpc-adapter";
 
 // Direct semantic call to Supabase RPC (no registration needed)
 const result = await runEdgeFunction('createInviteLink', {
@@ -191,7 +191,7 @@ function getEdgeFunction<Input = any, Output = any>(
 
 ### `runEdgeFunction(name, input)`
 
-Direct call to Supabase RPC (from `supabase-rpc-adapter.ts`). No registration needed.
+Direct call to Supabase RPC (from `lib/services/supabase/supabase-rpc-adapter.ts`). No registration needed.
 
 ```typescript
 async function runEdgeFunction<T extends EdgeFunctionOutput = any>(
@@ -269,7 +269,7 @@ afterEach(() => {
 Use the real Supabase adapter in integration tests:
 
 ```typescript
-import { runEdgeFunction } from "@/lib/database/repositories/supabase-rpc-adapter";
+import { runEdgeFunction } from "@/lib/services/supabase/supabase-rpc-adapter";
 
 // This calls real Supabase RPC (requires valid auth)
 const result = await runEdgeFunction('createInviteLink', {

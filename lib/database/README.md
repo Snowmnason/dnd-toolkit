@@ -1,6 +1,6 @@
 # Database Module
 
-Type-safe database layer providing app-specific data operations for worlds, users, invites, and entitlements. Uses pluggable DatabaseProvider abstraction for backend flexibility, enforces Row-Level Security (RLS) for multi-tenant isolation, integrates with `lib/api` (RequestManager) for deduplication and retry, and `lib/cache` (QueryCache) for result persistence.
+Type-safe database layer providing app-specific data operations for worlds, users, invites, and entitlements. Uses pluggable DatabaseProvider abstraction for backend flexibility, enforces Row-Level Security (RLS) for multi-tenant isolation, integrates with `lib/api` (RequestManager) for deduplication and retry, and `lib/storage/cache` (FastCache) for result persistence.
 
 ## When to Use This Module
 
@@ -294,9 +294,9 @@ const overrides = await fetchEntitlementOverridesByUserId(userId);
 
 ### Internal Dependencies
 
-- **`lib/services` (DatabaseProvider)** – Pluggable database backend abstraction
+- **`lib/services` (DatabaseProvider)** – Pluggable database backend abstraction and RPC adapters
 - **`lib/api` (RequestManager)** – Deduplication, retry, rate limiting
-- **`lib/cache` (QueryCache)** – Result caching and invalidation
+- **`lib/storage/cache` (FastCache)** – Result caching and invalidation
 - **`lib/auth` (AuthStateManager)** – User profile and auth state
 - **`lib/storage` (SecureStorage)** – Encrypted token and user data persistence
 - **`lib/utils/logger`** – Query logging (storage category)
@@ -388,24 +388,29 @@ RLS policies add <10ms per query. Security benefit far outweighs cost.
 ## Related Modules
 
 - **`lib/api`** – Works with RequestManager for deduplication and retry
-- **`lib/cache`** – Works with QueryCache for result caching and invalidation
+- **`lib/storage/cache`** – Works with FastCache for result caching and invalidation
 - **`lib/auth`** – Works with AuthStateManager for user profile and session
 - **`lib/storage`** – Works with SecureStorage for encrypted token persistence
 - **`lib/premium`** – Uses entitlements queries for subscription tier checks
 - **`lib/feature-flags`** – Works with feature flags and overrides queries
+- **`lib/database/edge`** – Edge functions for complex database operations
+- **`lib/services/supabase`** – Supabase-specific implementations and RPC adapters
 - **`lib/utils/logger`** – Logs all database operations (storage category)
 
 ## File Breakdown
 
-| File | Purpose |
+| File/Directory | Purpose |
 | --- | --- |
 | `common.ts` | Shared utilities: user validation, caching strategy, parallel query execution |
 | `users.ts` | User profile CRUD (create, get, update); integrates with AuthStateManager |
+| `user_settings.ts` | User settings and preferences management |
 | `worlds.ts` | World CRUD (create, get, list, update, delete) and access management (grant/revoke); core gameplay entity |
 | `invites.ts` | Invite link operations (create, redeem, list, revoke); enables world sharing |
 | `entitlements.ts` | Entitlement queries (fetch by user, check active, fetch overrides) |
 | `feature-flags.ts` | Feature flag queries (fetch global flags) |
 | `feature-flag-overrides.ts` | Per-user feature flag override queries (admin tool) |
+| `edge/` | Edge functions abstraction layer for stored procedures and RPC calls |
+| `repositories/` | Repository pattern implementations for different database operations |
 | `index.ts` | Barrel export of public API |
 
-**Note:** All entity files use `getDatabaseProvider()` from `lib/services` for database operations. Direct database client imports have been abstracted away for backend flexibility.
+**Note:** All entity files use `getDatabaseProvider()` from `lib/services` for database operations. Edge functions are abstracted through `lib/database/edge` registry. Direct database client imports have been abstracted away for backend flexibility.
