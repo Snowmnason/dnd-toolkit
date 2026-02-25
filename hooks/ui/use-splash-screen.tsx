@@ -33,19 +33,13 @@ export function useSplashScreen() {
 
     // Wait for kernel to become ready
     if (!kernel.phases.appReady) {
-      logger.category('ui').debug("⏳ Waiting for app kernel to complete...");
       return;
     }
-
-    logger.category('ui').debug(
-      `✅ Kernel ready, starting ${SPLASH_BUFFER_MS}ms buffer on ${Platform.OS}`,
-    );
 
     // Add platform-specific buffer after kernel completes
     const timer = setTimeout(() => {
       setBufferComplete(true);
       setShowSplash(false);
-      logger.category('ui').debug("🎬 Splash screen hidden, app ready");
     }, SPLASH_BUFFER_MS);
 
     return () => clearTimeout(timer);

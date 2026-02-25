@@ -65,8 +65,6 @@ export async function initializeServices(): Promise<void> {
 
     // Register Sentry analytics exporter
     await initializeSentryExporter();
-
-    logger.category('bootstrap').info('All services initialized successfully');
   } catch (error) {
     logger.category('bootstrap').error(`Failed to initialize services: ${error}`);
     throw error;
@@ -126,7 +124,6 @@ async function initializeDatabaseProvider(): Promise<void> {
         const { initializeSupabaseDatabaseProvider } = await import('./supabase/supabase-initializer');
         const initialized = await initializeSupabaseDatabaseProvider();
         if (initialized) {
-          logger.category('database').info('[Database] Supabase provider initialized successfully');
           updateServiceStatus('database', 'ready', 'supabase');
         } else {
           logger.category('database').warn('[Database] Supabase not configured — using NoOpDatabaseProvider');

@@ -240,7 +240,6 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
       isErrorState: boolean,
     ) {
       if (isVerifyingRef.current) {
-        logger.category('auth').debug("AppParamsStableProvider: Verification already running - skipping new request");
         return;
       }
       try {

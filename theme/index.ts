@@ -29,7 +29,6 @@ export async function preloadThemes() {
         logger.category('bootstrap').debug(`Preloaded assets for theme: ${name}`);
       }
     }
-    logger.category('bootstrap').debug("All themes preloaded successfully");
   } catch (error) {
     logger.category('bootstrap').warn("Theme preload error (non-critical):", error);
   }

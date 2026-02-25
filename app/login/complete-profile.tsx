@@ -28,7 +28,6 @@ export default function CompleteProfileScreen() {
   // Check if user is authenticated and needs to complete profile
   useEffect(() => {
     const checkAuthAndProfile = async () => {
-      logger.category('auth').info("Starting auth and profile check");
       try {
         // Use convenience function instead of direct provider call
         const session = await getCurrentSession();

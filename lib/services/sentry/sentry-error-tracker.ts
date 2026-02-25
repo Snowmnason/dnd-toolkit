@@ -122,9 +122,6 @@ export class SentryErrorTracker implements ErrorTrackerProvider {
     // Consent level 'none' means SDK stays silent on user data; 'basic' and 'full' allow identification.
     const consentLevel = AnalyticsConsent.getLevel();
     if (consentLevel === 'none' && user !== null) {
-      if (isDevelopment()) {
-        logger.category('error').debug('[SentryErrorTracker] setUser suppressed: consent level is "none"');
-      }
       return;
     }
 

@@ -45,7 +45,6 @@ let _initialized = false;
  */
 export async function initializeSupabaseDatabaseProvider(): Promise<boolean> {
   if (_initialized) {
-    logger.category('bootstrap').debug('[Supabase Initializer] Already initialized — skipping');
     const { getDatabaseProvider } = await import('../database-adapter');
     return getDatabaseProvider().isConfigured();
   }
@@ -61,11 +60,9 @@ export async function initializeSupabaseDatabaseProvider(): Promise<boolean> {
 
     if (!process.env.EXPO_PUBLIC_SUPABASE_URL && expoExtra.supabaseUrl) {
       (process.env as any).EXPO_PUBLIC_SUPABASE_URL = expoExtra.supabaseUrl;
-      logger.category('bootstrap').debug('[Supabase Initializer] EXPO_PUBLIC_SUPABASE_URL set from app.json extras');
     }
     if (!process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY && expoExtra.supabaseAnonKey) {
       (process.env as any).EXPO_PUBLIC_SUPABASE_ANON_KEY = expoExtra.supabaseAnonKey;
-      logger.category('bootstrap').debug('[Supabase Initializer] EXPO_PUBLIC_SUPABASE_ANON_KEY set from app.json extras');
     }
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (e) {

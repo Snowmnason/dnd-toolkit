@@ -46,8 +46,6 @@ export async function updateUsername(newUsername: string): Promise<UpdateUsernam
     await usersDB.updateCurrentUser({
       username: usernameValidation.sanitized
     });
-
-    logger.category('database').info('Username updated successfully');
     return { success: true };
 
   } catch (error: any) {

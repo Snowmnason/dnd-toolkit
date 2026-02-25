@@ -160,9 +160,7 @@ export default function AuthRedirect() {
               // Profile complete - preload worlds before navigating to world selection
               // This ensures the cache is warm when the page mounts, avoiding the loading race condition
               try {
-                logger.category('auth').debug("Preloading worlds for user", { userId: userProfile.id });
                 await worldsDB.getMyWorlds(userProfile.id);
-                logger.category('auth').debug("Worlds preloaded successfully");
               } catch (preloadError) {
                 logger.category('auth').warn("Failed to preload worlds (non-critical)", { error: preloadError });
                 // Non-critical: app works even if preload fails, just shows loading screen longer
@@ -281,7 +279,6 @@ export default function AuthRedirect() {
         setCurrentUserId(userProfile.id);
 
         // Check if user is already in the world
-        logger.category('auth').debug("Checking if user is already in world...");
         const isAlreadyMember = await worldsDB.isUserInWorld(
           inviteWorldId,
           userProfile.id,

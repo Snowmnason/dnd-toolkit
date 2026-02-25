@@ -65,8 +65,6 @@ export const useSignUpForm = (mode: SignUpMode = "signup", user?: any) => {
       }
 
       setLoading(true);
-      logger.category('auth').info("Starting profile creation in complete-profile mode");
-
       try {
         logger.category('auth').debug("Creating user profile with data:", {
           auth_id: user.id,

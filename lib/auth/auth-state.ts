@@ -357,7 +357,12 @@ export const AuthStateManager = {
       const userData = await backend.getJSON<{ id: string }>(
         STORAGE_KEYS.USER_DATA,
       );
-      return userData?.id;
+      const userId = userData?.id;
+      // Set context stack with userId for all subsequent logs
+      if (userId) {
+        logger.setContext({ userId });
+      }
+      return userId;
     } catch (error) {
       logger.category('auth').error("Error getting user ID:", error);
       return undefined;
@@ -371,6 +376,10 @@ export const AuthStateManager = {
       const userData = await backend.getJSON(STORAGE_KEYS.USER_DATA);
       
       if (userData) {
+        // (A) Set context for userId if available
+        if (userData.id) {
+          logger.setContext({ userId: userData.id });
+        }
         logger.category('auth').debug("📖 getUserData returning from storage:", {
           id: userData.id,
           id_length: userData.id?.length,

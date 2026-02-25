@@ -110,8 +110,6 @@ class OnlineSyncManagerService {
       // Check initial network status
       const initialStatus = NetworkDetection.getStatus();
       this.onNetworkStatusChanged(initialStatus);
-
-      logger.category("storage").info("OnlineSyncManager initialized");
     } catch (error) {
       logger
         .category("error")
@@ -164,7 +162,6 @@ class OnlineSyncManagerService {
     }
 
     if (this.isSyncing) {
-      logger.category("storage").debug("Sync already in progress");
       return this.lastSyncStatus;
     }
 

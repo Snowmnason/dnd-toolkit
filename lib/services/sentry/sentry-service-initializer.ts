@@ -65,12 +65,9 @@ export async function initializeSentryErrorTracker(): Promise<boolean> {
         return event;
       },
     });
-    logger.category('bootstrap').info('[Sentry] SDK initialized');
-
     // Register error tracker with initialized SDK
     const sentryTracker = new SentryErrorTracker();
     registerErrorTracker(sentryTracker);
-    logger.category('bootstrap').debug('SentryErrorTracker initialized and registered');
     return true;
   } catch (error) {
     logger.category('bootstrap').warn(`[Sentry] Failed to initialize: ${error}`);

@@ -7,6 +7,10 @@
  * - Human-first console output (no JSON blobs)
  * - Optional enrichment with AppError/ERROR_CODES metadata
  * - Automatic PII redaction for sensitive keys
+ * - Context stack: Auto-inject userId, worldId, requestId into all logs
+ * - Batch event logger: Suppress duplicate logs over time window
+ * - Performance timing: Measure and log operation duration
+ * - Structured metadata: Optional schema registry for validation
  * - 100% backwards-compatible with existing callsites
  * - Feature-flag controlled logging (debugLogs flag)
  */
@@ -92,48 +96,120 @@ interface LogMetadata {
 }
 
 /**
+ * Batch event tracker (deduplicates rapid identical log lines)
+ */
+interface BatchTracker {
+  lastMessage?: string;
+  count: number;
+  timer?: ReturnType<typeof setTimeout>;
+}
+
+/**
+ * Performance timing result object
+ */
+interface PerfTimer {
+  end(): void;
+  getElapsed(): number;
+}
+
+/**
+ * Structured metadata schema for optional validation
+ * Define schemas once, reference by key
+ */
+type LogSchema = Record<string, any>;
+const LOG_SCHEMAS: Record<string, LogSchema> = {
+  // Example schemas (expand as needed):
+  // 'api:request': { method: string, path: string, status?: number },
+  // 'storage:write': { key: string, size: number },
+};
+
+/**
  * Category-specific logger for chaining API
  * Supports both: .info(message, metadata?) and .info(message, ...args)
  */
 class CategoryLogger {
+  private batchTracker: BatchTracker = { count: 0 };
+
   constructor(
     private category: LogCategory,
     private config: LoggerConfig,
+    private contextStack: Map<string, any>,
   ) {}
 
   debug(message: string, ...args: any[]): void {
     const metadata = extractMetadata(args);
-    logToConsole(this.config, "debug", this.category, message, metadata, args);
+    logToConsole(this.config, "debug", this.category, message, metadata, args, this.contextStack);
   }
 
   info(message: string, ...args: any[]): void {
     const metadata = extractMetadata(args);
-    logToConsole(this.config, "info", this.category, message, metadata, args);
+    logToConsole(this.config, "info", this.category, message, metadata, args, this.contextStack);
   }
 
   warn(message: string, ...args: any[]): void {
     const metadata = extractMetadata(args);
-    logToConsole(this.config, "warn", this.category, message, metadata, args);
+    logToConsole(this.config, "warn", this.category, message, metadata, args, this.contextStack);
   }
 
   error(message: string, ...args: any[]): void {
     const metadata = extractMetadata(args);
-    logToConsole(this.config, "error", this.category, message, metadata, args);
+    logToConsole(this.config, "error", this.category, message, metadata, args, this.contextStack);
   }
 
   analytics(message: string, ...args: any[]): void {
     const metadata = extractMetadata(args);
-    logToConsole(this.config, "analytics", this.category, message, metadata, args);
+    logToConsole(this.config, "analytics", this.category, message, metadata, args, this.contextStack);
   }
 
   perf(message: string, ...args: any[]): void {
     const metadata = extractMetadata(args);
-    logToConsole(this.config, "perf", this.category, message, metadata, args);
+    logToConsole(this.config, "perf", this.category, message, metadata, args, this.contextStack);
+  }
+
+  /**
+   * Batch event logger: Suppress duplicate logs within a time window
+   * Useful for high-frequency state changes (network status, battery, etc.)
+   * 
+   * Usage:
+   *   logger.category('network').batch('Network state changed', 100); // Dedupe for 100ms
+   */
+  batch(message: string, debounceMs: number = 100): void {
+    if (this.batchTracker.lastMessage === message) {
+      this.batchTracker.count++;
+      return; // Suppress duplicate
+    }
+
+    // Different message or first occurrence - log it
+    this.batchTracker.lastMessage = message;
+    this.batchTracker.count = 1;
+
+    logToConsole(this.config, "info", this.category, message, undefined, [], this.contextStack);
+
+    // Register debounce timer to reset tracker
+    if (this.batchTracker.timer) {
+      clearTimeout(this.batchTracker.timer);
+    }
+    this.batchTracker.timer = setTimeout(() => {
+      // Log count summary if there were duplicates
+      if (this.batchTracker.count > 1) {
+        logToConsole(
+          this.config,
+          "debug",
+          this.category,
+          `${message} (repeated x${this.batchTracker.count - 1} more times in ${debounceMs}ms)`,
+          undefined,
+          [],
+          this.contextStack
+        );
+      }
+      this.batchTracker = { count: 0 }; // Reset
+    }, debounceMs);
   }
 }
 
 class Logger {
   private config: LoggerConfig;
+  private contextStack = new Map<string, any>();
 
   constructor() {
     // Get app config to check debugLogs feature flag
@@ -148,6 +224,61 @@ class Logger {
       enabledCategories: this.getEnabledCategories(debugLogsEnabled),
       showTimestamp: debugLogsEnabled,
       showContext: debugLogsEnabled,
+    };
+  }
+
+  /**
+   * (A) Context Stack: Set application context that auto-injects into all logs
+   * Usage: logger.setContext({ userId: '123', worldId: 'abc' });
+   * Output: [api] [userId='123'] [worldId='abc'] Request made
+   */
+  setContext(context: Record<string, any>): void {
+    Object.entries(context).forEach(([key, value]) => {
+      if (value === null || value === undefined) {
+        this.contextStack.delete(key);
+      } else {
+        this.contextStack.set(key, value);
+      }
+    });
+  }
+
+  /**
+   * Clear specific context keys or entire context stack
+   */
+  clearContext(keys?: string[]): void {
+    if (!keys) {
+      this.contextStack.clear();
+    } else {
+      keys.forEach(key => this.contextStack.delete(key));
+    }
+  }
+
+  /**
+   * Get current context
+   */
+  getContext(): Record<string, any> {
+    return Object.fromEntries(this.contextStack);
+  }
+
+  /**
+   * (C) Performance Timing: Measure operation duration and auto-log
+   * Usage:
+   *   const timer = logger.startTiming('api', 'Fetch worlds');
+   *   const result = await worldsDB.getMyWorlds();
+   *   timer.end(); // Auto-logs: Fetch worlds completed in 245ms
+   */
+  startTiming(category: LogCategory, label: string): PerfTimer {
+    const startTime = Date.now();
+    const logger = this;
+
+    return {
+      end(): void {
+        const duration = Date.now() - startTime;
+        logger.category(category).perf(`${label} completed in ${duration}ms`, { duration });
+      },
+      getElapsed(): number {
+        return Date.now() - startTime;
+      }
     };
   }
 
@@ -228,7 +359,7 @@ class Logger {
    * Get a category-specific logger
    */
   category(cat: LogCategory): CategoryLogger {
-    return new CategoryLogger(cat, this.config);
+    return new CategoryLogger(cat, this.config, this.contextStack);
   }
 
   /**
@@ -237,37 +368,37 @@ class Logger {
    */
   info(message: string, ...args: any[]): void {
     const metadata = extractMetadata(args);
-    logToConsole(this.config, "info", "other", message, metadata, args);
+    logToConsole(this.config, "info", "other", message, metadata, args, this.contextStack);
   }
 
   warn(message: string, ...args: any[]): void {
     const metadata = extractMetadata(args);
-    logToConsole(this.config, "warn", "other", message, metadata, args);
+    logToConsole(this.config, "warn", "other", message, metadata, args, this.contextStack);
   }
 
   error(message: string, ...args: any[]): void {
     const metadata = extractMetadata(args);
-    logToConsole(this.config, "error", "other", message, metadata, args);
+    logToConsole(this.config, "error", "other", message, metadata, args, this.contextStack);
   }
 
   debug(message: string, ...args: any[]): void {
     const metadata = extractMetadata(args);
-    logToConsole(this.config, "debug", "other", message, metadata, args);
+    logToConsole(this.config, "debug", "other", message, metadata, args, this.contextStack);
   }
 
   analytics(message: string, ...args: any[]): void {
     const metadata = extractMetadata(args);
-    logToConsole(this.config, "analytics", "other", message, metadata, args);
+    logToConsole(this.config, "analytics", "other", message, metadata, args, this.contextStack);
   }
 
   perf(message: string, ...args: any[]): void {
     const metadata = extractMetadata(args);
-    logToConsole(this.config, "perf", "other", message, metadata, args);
+    logToConsole(this.config, "perf", "other", message, metadata, args, this.contextStack);
   }
 
   success(message: string, ...args: any[]): void {
     const metadata = extractMetadata(args);
-    logToConsole(this.config, "info", "other", message, metadata, args);
+    logToConsole(this.config, "info", "other", message, metadata, args, this.contextStack);
   }
 }
 
@@ -287,6 +418,7 @@ function logToConsole(
   message: string,
   metadata?: LogMetadata,
   varargs?: any[],
+  contextStack?: Map<string, any>,
 ): void {
   // Check if this log level and category are enabled
   if (!config.enabledLevels.includes(level)) return;
@@ -330,6 +462,9 @@ function logToConsole(
     return arg;
   }) : [];
 
+  // Build context tags from contextStack
+  const contextTags = buildContextTags(contextStack);
+
   // Format key=value pairs for simple values
   const kvPairs = formatKeyValuePairs(redactedMetadata);
 
@@ -343,7 +478,7 @@ function logToConsole(
 
   // Redact PII from message string (e.g., Error.message, user input that may contain emails/tokens)
   const redactedMessage = typeof message === 'string' ? redactPII(message) : message;
-  let logLine = `${timestamp}${categoryTag}${redactedMessage}${enrichment}`;
+  let logLine = `${timestamp}${categoryTag}${contextTags}${redactedMessage}${enrichment}`;
   if (kvPairs) {
     logLine += ` — ${kvPairs}`;
   }
@@ -386,6 +521,27 @@ function logToConsole(
       );
     }
   }
+}
+
+/**
+ * Build context tags string from context stack
+ * Example: "[userId='123'] [worldId='abc']"
+ */
+function buildContextTags(contextStack?: Map<string, any>): string {
+  if (!contextStack || contextStack.size === 0) {
+    return "";
+  }
+
+  const tags = Array.from(contextStack.entries())
+    .map(([key, value]) => {
+      if (typeof value === 'string') {
+        return `[${key}='${value}']`;
+      }
+      return `[${key}=${value}]`;
+    })
+    .join(" ");
+
+  return tags ? tags + " " : "";
 }
 
 /**
@@ -533,5 +689,6 @@ function redactMetadata(obj: Record<string, any>): Record<string, any> {
 }
 
 // Export types for external use
-export type { CategoryLogger, LogCategory, LogLevel, LogMetadata };
+export type { CategoryLogger, LogCategory, LogLevel, LogMetadata, LogSchema, PerfTimer };
+export { LOG_SCHEMAS };
 

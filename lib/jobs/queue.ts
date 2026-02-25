@@ -118,8 +118,6 @@ export class BackgroundJobQueue {
 
     // Import SecureStorageAdapter for sensitive job routing (lazy-loaded)
     this.secureStorageAdapter = null;
-
-    logger.category("jobs").info("Initialized BackgroundJobQueue");
   }
 
   /**

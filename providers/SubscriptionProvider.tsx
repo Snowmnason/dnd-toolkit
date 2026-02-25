@@ -45,11 +45,6 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       try {
         // TODO: Replace with real backend fetch when implemented
         const sub = await SubscriptionManager.getSubscription();
-        if (sub) {
-          logger.category('analytics').debug('SubscriptionProvider: subscription loaded', { tier: sub.tier });
-        } else {
-          logger.category('analytics').debug('SubscriptionProvider: no subscription found (free tier)');
-        }
         setSubscription(sub);
       } catch (error) {
         logger.category('analytics').error('SubscriptionProvider: failed to load subscription', { error: String(error) });

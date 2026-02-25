@@ -53,17 +53,13 @@ export async function deleteUserAccount(password: string): Promise<DeleteAccount
     }
 
     // Call the edge function to delete everything
-    logger.category('auth').info('Starting account deletion process');
     const result = await usersDB.deleteCurrentUser();
     
     if (!result) {
       throw new Error('Account deletion failed. Please try again later.');
     }
 
-    // Success - log and proceed with cleanup
-    logger.category('auth').info('Account deletion completed successfully, result:', result);
-    
-    // Clean up local state and sign out
+    // Success - clean up local state and sign out
     logger.category('auth').debug('Clearing local auth state');
     await AuthStateManager.clearAuthState();
     try {
@@ -71,8 +67,6 @@ export async function deleteUserAccount(password: string): Promise<DeleteAccount
     } catch {
       // Ignore signout errors during account deletion cleanup
     }
-    
-    logger.category('auth').info('Account deletion and cleanup completed');
     
     return { success: true };
     

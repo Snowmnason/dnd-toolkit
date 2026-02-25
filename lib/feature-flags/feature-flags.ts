@@ -200,7 +200,6 @@ class FeatureFlagsManager {
       const cached =
         await backend.getJSON<Record<string, FeatureFlag>>("feature_flags:v1");
       if (cached) {
-        logger.category('feature_flags').debug("Loaded feature flags from cache");
         return cached;
       }
     } catch (error) {

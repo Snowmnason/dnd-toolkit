@@ -17,7 +17,7 @@ import {
 } from "../network";
 import { getErrorTracker } from "../services";
 import { ERROR_CODES, type ErrorCodeType } from "../utils/ERROR_CODES";
-import { logger, type LogCategory } from "../utils/logger";
+import { logger, type LogCategory, type PerfTimer } from "../utils/logger";
 import { AuthLayer, type AuthContext } from "./auth-layer";
 import {
   CircuitBreakerManager,
@@ -1509,9 +1509,15 @@ class RequestManagerClass {
       interceptors?: RequestInterceptor[];
       context?: Record<string, any>; // Pass context through interceptor hooks
     },
+    timer?: PerfTimer,
   ): Promise<T> {
     // Calculate current attempt number (0-indexed)
     const attemptNumber = totalRetries - retriesLeft;
+    
+    // (C) Performance timing: Start timer on first attempt only
+    if (attemptNumber === 0 && !timer) {
+      timer = logger.startTiming('api', `Request ${requestContext?.endpoint || requestContext?.key}`);
+    }
 
     try {
       const result = await this.executeWithTimeout(fn(attemptNumber), timeout);
@@ -1528,9 +1534,28 @@ class RequestManagerClass {
         );
       }
 
+      // End timer on successful completion
+      if (timer) {
+        const elapsed = timer.getElapsed();
+        logger.category('api').perf(`Request ${requestContext?.endpoint || requestContext?.key} completed`, { 
+          duration: elapsed,
+          endpoint: requestContext?.endpoint,
+          key: requestContext?.key 
+        });
+      }
       return result;
     } catch (error) {
       if (retriesLeft <= 0) {
+        // End timer on final failure after all retries exhausted
+        if (timer) {
+          const elapsed = timer.getElapsed();
+          logger.category('api').perf(`Request ${requestContext?.endpoint || requestContext?.key} failed after retries`, { 
+            duration: elapsed,
+            endpoint: requestContext?.endpoint,
+            key: requestContext?.key,
+            error: (error as Error).message
+          });
+        }
         // ========== INTERCEPTOR: onError ==========
         // Only call error interceptors when RequestManager exhausts retries
         // (not for AuthLayer 401 handling—that's handled by AuthLayer.onTokenExpire)
@@ -1637,6 +1662,7 @@ class RequestManagerClass {
         timeout,
         totalRetries,
         requestContext,
+        timer, // Pass timer through recursive calls
       );
     }
   }

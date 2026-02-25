@@ -120,8 +120,10 @@ class NetworkStateMachine {
       throw new Error(error);
     }
 
-    logger.category('network').info(
-      `State transition: ${fromState} → ${toState}${reason ? ` (${reason})` : ""}`,
+    // Use batch() to suppress rapid duplicate state transitions (network is flaky)
+    logger.category('network').batch(
+      `State: ${fromState} → ${toState}${reason ? ` (${reason})` : ""}`,
+      100 // Dedupe within 100ms window
     );
 
     // Execute global hooks first

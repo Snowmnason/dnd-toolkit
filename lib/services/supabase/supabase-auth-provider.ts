@@ -42,7 +42,6 @@ export class SupabaseAuthProvider implements AuthProvider {
       throw new Error('SupabaseAuthProvider requires a Supabase client instance');
     }
     this.supabaseClient = supabaseClient;
-    logger.category('auth').debug('SupabaseAuthProvider initialized');
   }
 
   /**
@@ -263,7 +262,6 @@ export class SupabaseAuthProvider implements AuthProvider {
         };
       }
 
-      logger.category('auth').info('Supabase resetPassword success');
       return {
         success: true,
         message: 'Reset email sent. Check your inbox.',

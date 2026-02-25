@@ -347,18 +347,16 @@ class NetworkDetectionClass {
             this.batteryLevelListener = () => {
               this.currentBattery.level = battery.level;
               this.updateExpensiveFlag();
-              logger.category("network").debug("Battery level changed", {
-                level: battery.level,
-              });
+              // (B) Batch logging: Suppress rapid battery level changes
+              logger.category("network").batch(`Battery: ${battery.level}%`, 500);
             };
             battery.addEventListener("levelchange", this.batteryLevelListener);
 
             this.batteryChargingListener = () => {
               this.currentBattery.charging = battery.charging;
               this.updateExpensiveFlag();
-              logger.category("network").debug("Charging state changed", {
-                charging: battery.charging,
-              });
+              // (B) Batch logging: Suppress rapid charging state changes
+              logger.category("network").batch(`Charging: ${battery.charging ? "on" : "off"}`, 500);
             };
             battery.addEventListener(
               "chargingchange",
@@ -397,10 +395,6 @@ class NetworkDetectionClass {
                 ) {
                   this.currentBattery = { level, charging };
                   this.updateExpensiveFlag();
-                  logger.category("network").debug("Battery state updated", {
-                    level,
-                    charging,
-                  });
                 }
               } catch (batteryError) {
                 logger
@@ -438,10 +432,6 @@ class NetworkDetectionClass {
 
     // Do initial ping
     this.performWebPing();
-
-    logger.category("network").debug("Web periodic ping initialized", {
-      interval: getWebPingInterval(),
-    });
   }
 
   /**
@@ -561,12 +551,6 @@ class NetworkDetectionClass {
 
     if (newIsExpensive !== this.currentStatus.isExpensive) {
       this.updateStatus({ isExpensive: newIsExpensive });
-      logger.category("network").debug("Expensive flag updated", {
-        newValue: newIsExpensive,
-        reason: isCellular ? "cellular" : "low-battery",
-        batteryLevel: this.currentBattery.level,
-        charging: this.currentBattery.charging,
-      });
     }
   }
 
@@ -785,10 +769,8 @@ class NetworkDetectionClass {
     }
 
     if (oldStatus.type !== this.currentStatus.type) {
-      logger.category("network").debug("Network type changed", {
-        from: oldStatus.type,
-        to: this.currentStatus.type,
-      });
+      // (B) Batch logging: Suppress rapid network type changes
+      logger.category("network").batch(`Network type: ${oldStatus.type} → ${this.currentStatus.type}`, 200);
     }
 
     if (oldStatus.connectionQuality !== this.currentStatus.connectionQuality) {
@@ -800,10 +782,8 @@ class NetworkDetectionClass {
     }
 
     if (oldStatus.isExpensive !== this.currentStatus.isExpensive) {
-      logger.category("network").debug("Expensive flag changed", {
-        from: oldStatus.isExpensive,
-        to: this.currentStatus.isExpensive,
-      });
+      // (B) Batch logging: Suppress rapid expensive flag changes (high-frequency on variable networks)
+      logger.category("network").batch(`Expensive: ${this.currentStatus.isExpensive ? "true" : "false"}`, 200);
     }
 
     if (oldStatus.effectiveType !== this.currentStatus.effectiveType) {
