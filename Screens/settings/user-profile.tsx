@@ -45,7 +45,7 @@ export default function UserProfile({ profile }: UserProfileProps) {
         const authSession = await authProvider.getSession();
         setSessionUser(authSession?.raw?.user ?? null);
       } catch (error) {
-        logger.error("user-profile", "Error fetching session user:", error);
+        logger.category('storage').error("Error fetching session user:", error);
       } finally {
         setLoadingSession(false);
       }
@@ -76,14 +76,14 @@ export default function UserProfile({ profile }: UserProfileProps) {
       }
 
       setShowUsernameModal(false);
-      logger.info("user-profile", "Username updated successfully");
+      logger.category('other').info("Username updated successfully");
 
       // Refresh the page to reflect the new username
       if (typeof window !== "undefined") {
         window.location.reload();
       }
     } catch (error: any) {
-      logger.error("user-profile", "Username update error:", error);
+      logger.category('other').error("Username update error:", error);
       setUsernameError(error?.message || "Failed to update username");
     } finally {
       setUpdatingUsername(false);

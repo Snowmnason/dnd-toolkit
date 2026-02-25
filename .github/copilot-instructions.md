@@ -53,7 +53,7 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 
 ## Logger System
 
-- Use category-based logging: `logger.category('auth').info('message')` or `logger.info('auth', 'message')`
+- Use category-based logging: `logger.category('auth').info('message')` (avoid the legacy `logger.info('auth', ...)` form)
 - Categories: `auth`, `navigation`, `api`, `performance`, `storage`, `ui`, `analytics`, `security`, `bootstrap`, `error`, `other`
 - Configure categories in `config/appsettings.*.json` under `featureFlags.loggerCategories`
 - See `docs/issues/MileStone 1/108 - Improve Logger System with Categories and Filtering/LOGGER_SYSTEM.md`

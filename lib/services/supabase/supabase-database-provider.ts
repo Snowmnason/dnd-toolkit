@@ -10,11 +10,12 @@
  * Error mapping converts Supabase `PostgrestError` to `QueryError`.
  */
 
+import { ERROR_CODES } from '../../utils/ERROR_CODES';
 import {
-    DatabaseProvider,
-    QueryBuilder,
-    QueryError,
-    QueryResult,
+  DatabaseProvider,
+  QueryBuilder,
+  QueryError,
+  QueryResult,
 } from '../database-adapter';
 
 /**
@@ -241,7 +242,7 @@ class SupabaseQueryBuilder implements QueryBuilder {
         data: null,
         error: {
           message: err?.message || 'Unknown query error',
-          code: 'UNKNOWN_ERROR',
+          code: ERROR_CODES.DATABASE.UNKNOWN,
           details: err?.toString?.(),
         },
       };
@@ -296,7 +297,7 @@ export class SupabaseDatabaseProvider implements DatabaseProvider {
           data: null,
           error: {
             message: error.message || 'RPC call failed',
-            code: error.code || 'RPC_ERROR',
+            code: error.code || ERROR_CODES.DATABASE.QUERY_FAILED,
             details: error.details,
             hint: error.hint,
           },
@@ -312,7 +313,7 @@ export class SupabaseDatabaseProvider implements DatabaseProvider {
         data: null,
         error: {
           message: err?.message || 'RPC execution error',
-          code: 'RPC_ERROR',
+          code: ERROR_CODES.DATABASE.QUERY_FAILED,
           details: err?.toString?.(),
         },
       };

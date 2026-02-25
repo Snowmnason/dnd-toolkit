@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useState } from 'react';
-import { usersDB, User, UpdateUserData } from '@/lib/database/users';
 import { QueryCache } from '@/lib/cache';
+import { UpdateUserData, User, usersDB } from '@/lib/database/users';
 import { logger } from '@/lib/utils/logger';
+import { useCallback, useState } from 'react';
 
 /**
  * Hook for updating current user profile with cache invalidation
@@ -44,7 +44,7 @@ export function useUpdateUserMutation() {
         return result;
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        logger.error('hooks', 'Failed to update user:', err);
+        logger.category('other').error('Failed to update user:', err);
         setUpdateError(errorMsg);
         throw err;
       } finally {
@@ -89,7 +89,7 @@ export function useDeleteAccountMutation() {
         return result;
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        logger.error('hooks', 'Failed to delete account:', err);
+        logger.category('other').error('Failed to delete account:', err);
         setDeleteError(errorMsg);
         throw err;
       } finally {

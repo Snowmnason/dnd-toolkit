@@ -18,7 +18,7 @@ export default function MainLayout() {
 
   // All hooks must be called unconditionally (before any conditional returns)
   useEffect(() => {
-    logger.info("[MainLayout] Rendering with params", {
+    logger.category("navigation").info("[MainLayout] Rendering with params", {
       worldId: params.worldId,
       userRole: params.userRole,
     });
@@ -34,7 +34,7 @@ export default function MainLayout() {
 
     // If no worldId in URL, redirect (shouldn't happen as guard checks this)
     if (!urlWorldId) {
-      logger.warn(
+      logger.category("navigation").warn(
         "[MainLayout] No worldId in URL, redirecting to world selection",
       );
       router.replace(buildRoute("/select/world-selection") as any);
@@ -43,7 +43,7 @@ export default function MainLayout() {
 
     // The auth guard already verified access via Supabase, so we're good
     // (see useAuthGuard with 'world-required' level in this component)
-    logger.debug("[MainLayout] Auth guard passed, rendering world screen", {
+    logger.category("navigation").debug("[MainLayout] Auth guard passed, rendering world screen", {
       urlWorldId,
     });
   }, [authState, params.worldId, router]);

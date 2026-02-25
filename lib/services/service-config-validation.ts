@@ -120,7 +120,7 @@ export function logValidationResult(
   isRequired: boolean = true
 ): void {
   if (result.valid) {
-    logger.debug('bootstrap', `[${service}] Configuration valid`);
+    logger.category('bootstrap').debug(`[${service}] Configuration valid`);
     return;
   }
 

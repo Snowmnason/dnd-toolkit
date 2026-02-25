@@ -116,22 +116,22 @@ class NetworkStateMachine {
     // Validate transition (against current state, not stale state)
     if (!this.isValidTransition(fromState, toState)) {
       const error = `Invalid state transition: ${fromState} → ${toState}`;
-      logger.warn("network", error);
+      logger.category('network').warn(error);
       throw new Error(error);
     }
 
-    logger.info(
-      "network",
-      `State transition: ${fromState} → ${toState}${reason ? ` (${reason})` : ""}`,
+    // Use batch() to suppress rapid duplicate state transitions (network is flaky)
+    logger.category('network').batch(
+      `State: ${fromState} → ${toState}${reason ? ` (${reason})` : ""}`,
+      100 // Dedupe within 100ms window
     );
 
     // Execute global hooks first
     for (const hook of this.globalHooks) {
       try {
         await hook(fromState, toState);
-      } catch (error) {
-        logger.error(
-          "network",
+        } catch (error) {
+        logger.category('network').error(
           `Global hook failed during ${fromState} → ${toState}: ${error}`,
         );
       }
@@ -145,8 +145,7 @@ class NetworkStateMachine {
         try {
           await hook();
         } catch (error) {
-          logger.error(
-            "network",
+          logger.category('network').error(
             `Transition hook failed during ${hookKey}: ${error}`,
           );
         }
@@ -166,8 +165,7 @@ class NetworkStateMachine {
     if (toState === "RECOVERING") {
       this.recoveryRetries++;
       if (this.recoveryRetries > this.maxRecoveryRetries) {
-        logger.warn(
-          "network",
+        logger.category('network').warn(
           `Max recovery retries (${this.maxRecoveryRetries}) exceeded`,
         );
       }

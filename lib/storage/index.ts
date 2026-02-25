@@ -49,7 +49,6 @@ export {
   getRetentionInfo,
   getSensitiveKeys,
   isSensitiveData,
-  redactForLogs,
   shouldUseSecureStorage
 } from "./cache/privacy";
 export { SecureStorage } from "./cache/SecureStorage";

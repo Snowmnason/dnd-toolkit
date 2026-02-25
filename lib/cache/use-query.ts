@@ -147,7 +147,7 @@ export function useQuery<T>(
       const error = err instanceof Error ? err : new Error(String(err));
       setError(error);
       onError?.(error);
-      logger.error(`[useQuery] Fetch failed for key "${key}":`, error);
+      logger.category('storage').error(`[useQuery] Fetch failed for key "${key}":`, error);
     } finally {
       if (isMountedRef.current) {
         setIsValidating(false);
@@ -269,7 +269,7 @@ export function useQuery<T>(
         const error = err instanceof Error ? err : new Error(String(err));
         setError(error);
         onError?.(error);
-        logger.error(`[useQuery] Initial load failed for key "${key}":`, error);
+        logger.category('storage').error(`[useQuery] Initial load failed for key "${key}":`, error);
       } finally {
         if (isMountedRef.current) {
           setIsLoading(false);
@@ -313,9 +313,9 @@ export function useQuery<T>(
       // Log transitions
       if (wasOffline !== isOfflineRef.current) {
         if (isOfflineRef.current) {
-          logger.debug('cache', `Offline detected for key: ${key}; using cache-only mode`);
+          logger.category('storage').debug(`Offline detected for key: ${key}; using cache-only mode`);
         } else {
-          logger.debug('cache', `Online detected for key: ${key}; may need revalidation`);
+          logger.category('storage').debug(`Online detected for key: ${key}; may need revalidation`);
           // Note: Automatic revalidation on come-back-online is deferred to next query focus
           // To force revalidation on coming online, call refetch() explicitly
         }

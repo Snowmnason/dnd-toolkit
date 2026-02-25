@@ -183,7 +183,7 @@ queue.registerHandler("my_job", async (payload, ctx) => {
       throw error; // Queue will retry
     }
     // Non-retryable errors should be handled by handler
-    logger.error("Permanent failure", error);
+    logger.category('other').error("Permanent failure", error);
     return { failed: true, reason: error.message };
   }
 });

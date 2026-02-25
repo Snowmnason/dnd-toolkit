@@ -29,8 +29,8 @@ import { logger } from "@/lib/utils/logger";
 
 // Relative module imports (local)
 import {
-    evaluateAdvancedCondition,
-    validateAdvancedCondition,
+  evaluateAdvancedCondition,
+  validateAdvancedCondition,
 } from "./advanced-conditions";
 import { FlagEvaluationCache } from "./cache";
 import { isUserInCohort } from "./cohorts";
@@ -314,7 +314,7 @@ class FeatureFlagsManagerClass {
   async initialize(supabaseClient: any, userId?: string): Promise<void> {
     this.supabaseClient = supabaseClient;
     this.userId = userId || null;
-    logger.debug("feature_flags", "FeatureFlagsManager initialized", {
+    logger.category('feature_flags').debug("FeatureFlagsManager initialized", {
       userId,
     });
   }
@@ -331,7 +331,7 @@ class FeatureFlagsManagerClass {
         throw new Error("Supabase client not initialized");
       }
 
-      logger.debug("feature_flags", "Invoking get_feature_flags Edge Function");
+      logger.category('feature_flags').debug("Invoking get_feature_flags Edge Function");
 
       const response = await this.supabaseClient.functions.invoke(
         "get_feature_flags",
@@ -347,7 +347,7 @@ class FeatureFlagsManagerClass {
         throw new Error(`Edge Function error: ${response.error.message}`);
       }
 
-      logger.debug("feature_flags", "Edge Function response received", {
+      logger.category('feature_flags').debug("Edge Function response received", {
         flagCount: response.data?.flags?.length || 0,
         entitlementCount: response.data?.entitlements?.length || 0,
         overrideCount: response.data?.overrides?.length || 0,
@@ -356,7 +356,7 @@ class FeatureFlagsManagerClass {
       return response.data;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      logger.warn("feature_flags", "Failed to invoke Edge Function", errorMsg);
+      logger.category('feature_flags').warn("Failed to invoke Edge Function", errorMsg);
       return null;
     }
   }
@@ -375,7 +375,7 @@ class FeatureFlagsManagerClass {
    */
   async bootstrapFlags(): Promise<void> {
     if (this.bootstrapped) {
-      logger.debug("feature_flags", "Already bootstrapped, skipping");
+      logger.category('feature_flags').debug("Already bootstrapped, skipping");
       return;
     }
 
@@ -383,7 +383,7 @@ class FeatureFlagsManagerClass {
 
     if (isDev) {
       // Development: Use local config only, no remote fetch
-      logger.info("feature_flags", "Development mode: using local config only");
+      logger.category('feature_flags').info("Development mode: using local config only");
       this.loadHardcodedFlags();
       this.bootstrapped = true;
       this.notifySubscribers(this.currentFlags);
@@ -391,7 +391,7 @@ class FeatureFlagsManagerClass {
     }
 
     // Production: Fetch from server via Edge Function
-    logger.info("feature_flags", "Bootstrapping feature flags from server");
+    logger.category('feature_flags').info("Bootstrapping feature flags from server");
 
     try {
       if (!this.supabaseClient) {
@@ -428,11 +428,11 @@ class FeatureFlagsManagerClass {
             Object.fromEntries(this.cachedEntitlements),
           );
 
-          logger.debug("feature_flags", "Cached entitlements", {
+          logger.category('feature_flags').debug("Cached entitlements", {
             count: this.cachedEntitlements.size,
           });
         } catch (error) {
-          logger.warn("feature_flags", "Failed to process entitlements", error);
+          logger.category('feature_flags').warn("Failed to process entitlements", error);
           await this.loadCachedEntitlements();
         }
       } else if (allEntitlements && allEntitlements.length > 0) {
@@ -440,8 +440,7 @@ class FeatureFlagsManagerClass {
         this.cachedEntitlements = new Map(
           allEntitlements.map((e) => [e.key, e]),
         );
-        logger.debug(
-          "feature_flags",
+        logger.category('feature_flags').warn(
           "Loaded entitlements (in-memory only, userId unavailable)",
           {
             count: this.cachedEntitlements.size,
@@ -480,20 +479,18 @@ class FeatureFlagsManagerClass {
             Object.fromEntries(this.remoteEntitlementOverrides),
           );
 
-          logger.debug("feature_flags", "Processed remote flag overrides", {
+          logger.category('feature_flags').debug("Processed remote flag overrides", {
             count: this.remoteOverrides.size,
           });
 
-          logger.debug(
-            "feature_flags",
+          logger.category('feature_flags').warn(
             "Processed remote entitlement overrides",
             {
               count: this.remoteEntitlementOverrides.size,
             },
           );
         } catch (error) {
-          logger.warn(
-            "feature_flags",
+          logger.category('feature_flags').warn(
             "Failed to process flag overrides",
             error,
           );
@@ -515,12 +512,11 @@ class FeatureFlagsManagerClass {
             Object.fromEntries(this.cachedRollouts),
           );
 
-          logger.debug("feature_flags", "Cached rollout config", {
+          logger.category('feature_flags').debug("Cached rollout config", {
             count: this.cachedRollouts.size,
           });
         } catch (error) {
-          logger.warn(
-            "feature_flags",
+          logger.category('feature_flags').warn(
             "Failed to process rollout config",
             error,
           );
@@ -534,13 +530,9 @@ class FeatureFlagsManagerClass {
           await SecureStorage.removeItem(
             `${STORAGE_KEYS.FEATURE_FLAGS}:rollouts`,
           );
-          logger.debug(
-            "feature_flags",
-            "Cleared rollout config (server disabled)",
-          );
+          logger.category('feature_flags').debug("Cleared rollout config (server disabled)");
         } catch (error) {
-          logger.warn(
-            "feature_flags",
+          logger.category('feature_flags').warn(
             "Failed to clear cached rollouts",
             error,
           );
@@ -567,11 +559,11 @@ class FeatureFlagsManagerClass {
             Object.fromEntries(this.cachedCohorts),
           );
 
-          logger.debug("feature_flags", "Cached cohorts", {
+          logger.category('feature_flags').debug("Cached cohorts", {
             count: this.cachedCohorts.size,
           });
         } catch (error) {
-          logger.warn("feature_flags", "Failed to process cohorts", error);
+          logger.category('feature_flags').warn("Failed to process cohorts", error);
           await this.loadCachedCohorts();
         }
       } else if (allCohorts !== undefined && allCohorts !== null) {
@@ -581,10 +573,9 @@ class FeatureFlagsManagerClass {
           await SecureStorage.removeItem(
             `${STORAGE_KEYS.FEATURE_FLAGS}:cohorts`,
           );
-          logger.debug("feature_flags", "Cleared cohorts (server disabled)");
+          logger.category('feature_flags').debug("Cleared cohorts (server disabled)");
         } catch (error) {
-          logger.warn(
-            "feature_flags",
+          logger.category('feature_flags').warn(
             "Failed to clear cached cohorts",
             error,
           );
@@ -611,8 +602,7 @@ class FeatureFlagsManagerClass {
               for (const [slug, cohort] of this.cachedCohorts.entries()) {
                 if (cohort.id === m.cohort_id) {
                   // Return enriched membership with resolved slug
-                  logger.debug(
-                    "feature_flags",
+                  logger.category('feature_flags').warn(
                     `Enriched membership with cohort_slug: ${m.cohort_id} → ${slug}`,
                   );
                   return {
@@ -633,16 +623,14 @@ class FeatureFlagsManagerClass {
             this.cachedUserCohortMemberships,
           );
 
-          logger.debug(
-            "feature_flags",
+          logger.category('feature_flags').warn(
             "Cached user cohort memberships",
             {
               count: this.cachedUserCohortMemberships.length,
             },
           );
         } catch (error) {
-          logger.warn(
-            "feature_flags",
+          logger.category('feature_flags').warn(
             "Failed to process user cohort memberships",
             error,
           );
@@ -659,13 +647,11 @@ class FeatureFlagsManagerClass {
           await SecureStorage.removeItem(
             `${STORAGE_KEYS.FEATURE_FLAGS}:user_cohort_memberships:${this.userId}`,
           );
-          logger.debug(
-            "feature_flags",
+          logger.category('feature_flags').warn(
             "Cleared user cohort memberships (user in no cohorts)",
           );
         } catch (error) {
-          logger.warn(
-            "feature_flags",
+          logger.category('feature_flags').warn(
             "Failed to clear cached user cohort memberships",
             error,
           );
@@ -697,8 +683,7 @@ class FeatureFlagsManagerClass {
             }
 
             if (!cohortSlug) {
-              logger.warn(
-                "feature_flags",
+              logger.category('feature_flags').warn(
                 `Unable to resolve cohort slug for assignment ${assignment.flag_name} → ${assignment.cohort_id}`,
               );
               continue;
@@ -725,13 +710,12 @@ class FeatureFlagsManagerClass {
             persistedAssignments,
           );
 
-          logger.debug("feature_flags", "Cached cohort flag assignments", {
+          logger.category('feature_flags').debug("Cached cohort flag assignments", {
             flagsWithAssignments: assignmentMap.size,
             totalAssignments: allCohortAssignments.length,
           });
         } catch (error) {
-          logger.warn(
-            "feature_flags",
+          logger.category('feature_flags').warn(
             "Failed to process cohort assignments",
             error,
           );
@@ -747,10 +731,9 @@ class FeatureFlagsManagerClass {
           await SecureStorage.removeItem(
             `${STORAGE_KEYS.FEATURE_FLAGS}:cohort_assignments`,
           );
-          logger.debug("feature_flags", "Cleared cohort assignments (disabled)");
+          logger.category('feature_flags').debug("Cleared cohort assignments (disabled)");
         } catch (error) {
-          logger.warn(
-            "feature_flags",
+          logger.category('feature_flags').warn(
             "Failed to clear cached cohort assignments",
             error,
           );
@@ -794,7 +777,7 @@ class FeatureFlagsManagerClass {
         fetchedAt: Date.now(),
       });
 
-      logger.info("feature_flags", "Bootstrapped successfully from server", {
+      logger.category('feature_flags').info("Bootstrapped successfully from server", {
         flagCount: newFlags.size,
         overrideCount: this.remoteOverrides.size,
       });
@@ -802,8 +785,7 @@ class FeatureFlagsManagerClass {
       // Notify subscribers
       this.notifySubscribers(newFlags);
     } catch (error) {
-      logger.warn(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         "Server bootstrap failed, using fallback",
         error,
       );
@@ -822,7 +804,7 @@ class FeatureFlagsManagerClass {
           await this.loadCachedRemoteOverrides();
           await this.loadCachedRemoteEntitlementOverrides();
           await this.loadCachedRollouts(); // NEW: Load cached rollouts
-          logger.info("feature_flags", "Loaded from last known state", {
+          logger.category('feature_flags').info("Loaded from last known state", {
             flagCount: this.currentFlags.size,
             overrideCount: this.remoteOverrides.size,
             age: Date.now() - cached.fetchedAt,
@@ -831,13 +813,13 @@ class FeatureFlagsManagerClass {
           return;
         }
       } catch {
-        logger.debug("feature_flags", "No cached flags available");
+        logger.category('feature_flags').debug("No cached flags available");
       }
 
       // Final fallback: Load hardcoded config
       this.loadHardcodedFlags();
       this.bootstrapped = true;
-      logger.info("feature_flags", "Using hardcoded fallback", {
+      logger.category('feature_flags').info("Using hardcoded fallback", {
         flagCount: this.currentFlags.size,
       });
       this.notifySubscribers(this.currentFlags);
@@ -865,13 +847,12 @@ class FeatureFlagsManagerClass {
       );
       if (cached) {
         this.remoteOverrides = new Map(Object.entries(cached));
-        logger.debug("feature_flags", "Loaded cached remote overrides", {
+        logger.category('feature_flags').debug("Loaded cached remote overrides", {
           count: this.remoteOverrides.size,
         });
       }
     } catch (error) {
-      logger.warn(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         "Failed to load cached remote overrides",
         error,
       );
@@ -891,8 +872,7 @@ class FeatureFlagsManagerClass {
       );
       if (cached) {
         this.remoteEntitlementOverrides = new Map(Object.entries(cached));
-        logger.debug(
-          "feature_flags",
+        logger.category('feature_flags').debug(
           "Loaded cached remote entitlement overrides",
           {
             count: this.remoteEntitlementOverrides.size,
@@ -900,8 +880,7 @@ class FeatureFlagsManagerClass {
         );
       }
     } catch (error) {
-      logger.warn(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         "Failed to load cached remote entitlement overrides",
         error,
       );
@@ -919,12 +898,12 @@ class FeatureFlagsManagerClass {
       >(`${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`);
       if (cached) {
         this.cachedEntitlements = new Map(Object.entries(cached));
-        logger.debug("feature_flags", "Loaded cached entitlements", {
+        logger.category('feature_flags').debug("Loaded cached entitlements", {
           count: this.cachedEntitlements.size,
         });
       }
     } catch (error) {
-      logger.warn("feature_flags", "Failed to load cached entitlements", error);
+      logger.category('feature_flags').warn("Failed to load cached entitlements", error);
     }
   }
 
@@ -938,12 +917,12 @@ class FeatureFlagsManagerClass {
       >(`${STORAGE_KEYS.FEATURE_FLAGS}:rollouts`);
       if (cached) {
         this.cachedRollouts = new Map(Object.entries(cached));
-        logger.debug("feature_flags", "Loaded cached rollout config", {
+        logger.category('feature_flags').debug("Loaded cached rollout config", {
           count: this.cachedRollouts.size,
         });
       }
     } catch (error) {
-      logger.warn("feature_flags", "Failed to load cached rollouts", error);
+      logger.category('feature_flags').warn("Failed to load cached rollouts", error);
     }
   }
 
@@ -957,12 +936,12 @@ class FeatureFlagsManagerClass {
       );
       if (cached) {
         this.cachedCohorts = new Map(Object.entries(cached));
-        logger.debug("feature_flags", "Loaded cached cohorts", {
+        logger.category('feature_flags').debug("Loaded cached cohorts", {
           count: this.cachedCohorts.size,
         });
       }
     } catch (error) {
-      logger.warn("feature_flags", "Failed to load cached cohorts", error);
+      logger.category('feature_flags').warn("Failed to load cached cohorts", error);
     }
   }
 
@@ -999,8 +978,7 @@ class FeatureFlagsManagerClass {
           return m;
         });
 
-        logger.debug(
-          "feature_flags",
+        logger.category('feature_flags').warn(
           "Loaded cached user cohort memberships",
           {
             count: this.cachedUserCohortMemberships.length,
@@ -1008,8 +986,7 @@ class FeatureFlagsManagerClass {
         );
       }
     } catch (error) {
-      logger.warn(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         "Failed to load cached user cohort memberships",
         error,
       );
@@ -1033,13 +1010,12 @@ class FeatureFlagsManagerClass {
             new Set(slugs),
           ]),
         );
-        logger.debug("feature_flags", "Loaded cached cohort assignments", {
+        logger.category('feature_flags').debug("Loaded cached cohort assignments", {
           flags: this.cachedCohortAssignments.size,
         });
       }
     } catch (error) {
-      logger.warn(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         "Failed to load cached cohort assignments",
         error,
       );
@@ -1053,7 +1029,7 @@ class FeatureFlagsManagerClass {
    */
   private async subscribeToRealtimeUpdates(): Promise<void> {
     if (!this.supabaseClient || !this.userId) {
-      logger.debug("feature_flags", "Realtime subscriptions not available");
+      logger.category('feature_flags').debug("Realtime subscriptions not available");
       return;
     }
 
@@ -1074,7 +1050,7 @@ class FeatureFlagsManagerClass {
         )
         .subscribe((status: string) => {
           if (status === "SUBSCRIBED") {
-            logger.debug("feature_flags", "Subscribed to feature_flags table");
+            logger.category('feature_flags').debug("Subscribed to feature_flags table");
           }
         });
 
@@ -1097,10 +1073,7 @@ class FeatureFlagsManagerClass {
         )
         .subscribe((status: string) => {
           if (status === "SUBSCRIBED") {
-            logger.debug(
-              "feature_flags",
-              "Subscribed to entitlements for user",
-            );
+            logger.category('feature_flags').debug("Subscribed to entitlements for user");
           }
         });
 
@@ -1123,10 +1096,7 @@ class FeatureFlagsManagerClass {
         )
         .subscribe((status: string) => {
           if (status === "SUBSCRIBED") {
-            logger.debug(
-              "feature_flags",
-              "Subscribed to feature_flag_overrides for user",
-            );
+            logger.category('feature_flags').debug("Subscribed to feature_flag_overrides for user");
           }
         });
 
@@ -1149,10 +1119,7 @@ class FeatureFlagsManagerClass {
         )
         .subscribe((status: string) => {
           if (status === "SUBSCRIBED") {
-            logger.debug(
-              "feature_flags",
-              "Subscribed to entitlements_overrides for user",
-            );
+            logger.category('feature_flags').debug("Subscribed to entitlements_overrides for user");
           }
         });
 
@@ -1219,10 +1186,9 @@ class FeatureFlagsManagerClass {
         membershipsChannel,
       );
 
-      logger.info("feature_flags", "Realtime subscriptions established");
+      logger.category('feature_flags').info("Realtime subscriptions established");
     } catch (error) {
-      logger.warn(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         "Failed to setup Realtime subscriptions",
         error,
       );
@@ -1244,7 +1210,7 @@ class FeatureFlagsManagerClass {
         // Flag was deleted, remove from current flags
         if (flag?.flag_name) {
           this.currentFlags.delete(flag.flag_name);
-          logger.debug("feature_flags", `Flag deleted:`, flag.flag_name);
+          logger.category('feature_flags').debug(`Flag deleted:`, flag.flag_name);
           // Invalidate evaluation cache for this flag
           this.invalidateFlagCache(flag.flag_name);
         }
@@ -1260,7 +1226,7 @@ class FeatureFlagsManagerClass {
             description: flag.description,
             source: "server",
           });
-          logger.debug("feature_flags", `Flag ${eventType}:`, flag.flag_name);
+          logger.category('feature_flags').debug(`Flag ${eventType}:`, flag.flag_name);
           // Invalidate evaluation cache for this flag
           this.invalidateFlagCache(flag.flag_name);
         }
@@ -1274,7 +1240,7 @@ class FeatureFlagsManagerClass {
 
       this.notifySubscribers(this.currentFlags);
     } catch (error) {
-      logger.warn("feature_flags", "Error handling flag change", error);
+      logger.category('feature_flags').warn("Error handling flag change", error);
     }
   }
 
@@ -1296,7 +1262,7 @@ class FeatureFlagsManagerClass {
       if (eventType === "DELETE") {
         // Entitlement was revoked/deleted
         this.cachedEntitlements.delete(entitlementKey);
-        logger.debug("feature_flags", `Entitlement revoked: ${entitlementKey}`);
+        logger.category('feature_flags').debug(`Entitlement revoked: ${entitlementKey}`);
         // Clear evaluation cache since user's role/entitlements changed
         this.clearEvaluationCache();
       } else if (eventType === "INSERT" || eventType === "UPDATE") {
@@ -1306,8 +1272,7 @@ class FeatureFlagsManagerClass {
             entitlementKey,
             entitlementData as CachedEntitlement,
           );
-          logger.debug(
-            "feature_flags",
+          logger.category('feature_flags').debug(
             `Entitlement ${eventType}:`,
             entitlementKey,
           );
@@ -1322,7 +1287,7 @@ class FeatureFlagsManagerClass {
         Object.fromEntries(this.cachedEntitlements),
       );
     } catch (error) {
-      logger.warn("feature_flags", "Error handling entitlement change", error);
+      logger.category('feature_flags').warn("Error handling entitlement change", error);
     }
   }
 
@@ -1345,13 +1310,13 @@ class FeatureFlagsManagerClass {
       if (eventType === "DELETE") {
         // Override was revoked, remove from map
         this.remoteOverrides.delete(targetName);
-        logger.debug("feature_flags", `Override revoked: ${targetName}`);
+        logger.category('feature_flags').debug(`Override revoked: ${targetName}`);
         // Invalidate evaluation cache for this flag
         this.invalidateFlagCache(targetName);
       } else {
         // Track normalized flag override (DB realtime row or Edge synthetic row)
         this.remoteOverrides.set(targetName, normalized);
-        logger.debug("feature_flags", `Override ${eventType}: ${targetName}`);
+        logger.category('feature_flags').debug(`Override ${eventType}: ${targetName}`);
         // Invalidate evaluation cache for this flag
         this.invalidateFlagCache(targetName);
       }
@@ -1365,7 +1330,7 @@ class FeatureFlagsManagerClass {
       // Notify subscribers of flag changes
       this.notifySubscribers(this.currentFlags);
     } catch (error) {
-      logger.warn("feature_flags", "Error handling override change", error);
+      logger.category('feature_flags').warn("Error handling override change", error);
     }
   }
 
@@ -1387,14 +1352,12 @@ class FeatureFlagsManagerClass {
 
       if (eventType === "DELETE") {
         this.remoteEntitlementOverrides.delete(entitlementKey);
-        logger.debug(
-          "feature_flags",
+        logger.category('feature_flags').debug(
           `Entitlement override deleted: ${entitlementKey}`,
         );
       } else {
         this.remoteEntitlementOverrides.set(entitlementKey, normalized);
-        logger.debug(
-          "feature_flags",
+        logger.category('feature_flags').debug(
           `Entitlement override ${eventType}: ${entitlementKey}`,
         );
       }
@@ -1407,8 +1370,7 @@ class FeatureFlagsManagerClass {
       this.clearEvaluationCache();
       this.notifySubscribers(this.currentFlags);
     } catch (error) {
-      logger.warn(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         "Error handling entitlement override change",
         error,
       );
@@ -1427,13 +1389,13 @@ class FeatureFlagsManagerClass {
 
       if (eventType === "DELETE") {
         this.cachedRollouts.delete(flagName);
-        logger.debug("feature_flags", `Rollout deleted: ${flagName}`);
+        logger.category('feature_flags').debug(`Rollout deleted: ${flagName}`);
       } else {
         this.cachedRollouts.set(flagName, {
           percentage: Number(rollout.percentage),
           seed: rollout.seed ?? undefined,
         });
-        logger.debug("feature_flags", `Rollout ${eventType}: ${flagName}`);
+        logger.category('feature_flags').debug(`Rollout ${eventType}: ${flagName}`);
       }
 
       await SecureStorage.setJSON(
@@ -1441,7 +1403,7 @@ class FeatureFlagsManagerClass {
         Object.fromEntries(this.cachedRollouts),
       );
     } catch (error) {
-      logger.warn("feature_flags", "Error handling rollout change", error);
+      logger.category('feature_flags').warn("Error handling rollout change", error);
     }
   }
 
@@ -1457,10 +1419,10 @@ class FeatureFlagsManagerClass {
 
       if (eventType === "DELETE") {
         this.cachedCohorts.delete(slug);
-        logger.debug("feature_flags", `Cohort deleted: ${slug}`);
+        logger.category('feature_flags').debug(`Cohort deleted: ${slug}`);
       } else {
         this.cachedCohorts.set(slug, cohort as CachedCohort);
-        logger.debug("feature_flags", `Cohort ${eventType}: ${slug}`);
+        logger.category('feature_flags').debug(`Cohort ${eventType}: ${slug}`);
       }
 
       await SecureStorage.setJSON(
@@ -1471,7 +1433,7 @@ class FeatureFlagsManagerClass {
       this.clearEvaluationCache();
       this.notifySubscribers(this.currentFlags);
     } catch (error) {
-      logger.warn("feature_flags", "Error handling cohort change", error);
+      logger.category('feature_flags').warn("Error handling cohort change", error);
     }
   }
 
@@ -1493,10 +1455,7 @@ class FeatureFlagsManagerClass {
         this.cachedUserCohortMemberships = this.cachedUserCohortMemberships.filter(
           (m) => m.id !== membership.id,
         );
-        logger.debug(
-          "feature_flags",
-          `User cohort membership deleted: ${membership.id}`,
-        );
+        logger.category('feature_flags').debug(`User cohort membership deleted: ${membership.id}`);
       } else {
         const enriched: CachedUserCohortMembership = {
           ...membership,
@@ -1510,10 +1469,7 @@ class FeatureFlagsManagerClass {
           enriched,
         ];
 
-        logger.debug(
-          "feature_flags",
-          `User cohort membership ${eventType}: ${enriched.id}`,
-        );
+        logger.category('feature_flags').debug(`User cohort membership ${eventType}: ${enriched.id}`);
       }
 
       await SecureStorage.setJSON(
@@ -1524,8 +1480,7 @@ class FeatureFlagsManagerClass {
       this.clearEvaluationCache();
       this.notifySubscribers(this.currentFlags);
     } catch (error) {
-      logger.warn(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         "Error handling user cohort membership change",
         error,
       );
@@ -1576,8 +1531,7 @@ class FeatureFlagsManagerClass {
           remoteOverride.expires_at === null ||
           new Date(remoteOverride.expires_at).getTime() > Date.now()
         ) {
-          logger.debug(
-            "feature_flags",
+          logger.category('feature_flags').warn(
             `Flag ${name} from remote override: ${remoteOverride.enabled}`,
           );
           return remoteOverride.enabled;
@@ -1588,8 +1542,7 @@ class FeatureFlagsManagerClass {
     // Priority 2: Local user override (admin testing)
     if (this.userOverrides.has(name)) {
       const value = this.userOverrides.get(name);
-      logger.debug(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         `Flag ${name} from local override: ${value}`,
       );
       return value ?? fallback;
@@ -1599,8 +1552,7 @@ class FeatureFlagsManagerClass {
     const flagState = this.currentFlags.get(name);
     if (flagState !== undefined) {
       const value = flagState.enabled;
-      logger.debug(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         `Flag ${name} from ${flagState.source}: ${value}`,
       );
       return value;
@@ -1619,8 +1571,7 @@ class FeatureFlagsManagerClass {
         typeof hardcoded === "object" &&
         "enabled" in hardcoded
       ) {
-        logger.debug(
-          "feature_flags",
+        logger.category('feature_flags').warn(
           `Flag ${name} from hardcoded: ${hardcoded.enabled}`,
         );
         return !!hardcoded.enabled;
@@ -1628,8 +1579,7 @@ class FeatureFlagsManagerClass {
     }
 
     // Default fallback
-    logger.debug(
-      "feature_flags",
+    logger.category('feature_flags').warn(
       `Flag ${name} not found, using fallback: ${fallback}`,
     );
     return fallback;
@@ -1653,8 +1603,7 @@ class FeatureFlagsManagerClass {
     const overrideKey = `${userId}:${name}`;
     if (this.userOverrides.has(overrideKey)) {
       const value = this.userOverrides.get(overrideKey) ?? false;
-      logger.debug(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         `Entitlement ${name} from override: ${value}`,
       );
       return {
@@ -1667,8 +1616,7 @@ class FeatureFlagsManagerClass {
     // Check for invalid clock first (fail-secure)
     const clockInvalid = await this.checkClockValidity();
     if (clockInvalid) {
-      logger.warn(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         "Device clock invalid, denying entitlement",
         { name },
       );
@@ -1685,8 +1633,7 @@ class FeatureFlagsManagerClass {
       )
     ) {
       const granted = remoteEntitlementOverride.action === "grant";
-      logger.debug(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         `Entitlement ${name} from remote override: ${granted}`,
       );
       return {
@@ -1707,7 +1654,7 @@ class FeatureFlagsManagerClass {
 
       if (!isExpired) {
         // Cache is still valid
-        logger.debug("feature_flags", `Entitlement ${name} from cache: true`, {
+        logger.category('feature_flags').debug(`Entitlement ${name} from cache: true`, {
           expiresAt: cached.expires_at,
         });
         return {
@@ -1718,15 +1665,13 @@ class FeatureFlagsManagerClass {
       }
 
       // Cache expired, try fresh query as security check
-      logger.debug(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         `Entitlement ${name} has expired, verifying with server`,
       );
       try {
         if (!this.supabaseClient) {
           // Offline and expired: deny access (security: fail-secure)
-          logger.warn(
-            "feature_flags",
+          logger.category('feature_flags').warn(
             `Entitlement ${name} expired and offline, denying`,
           );
           return {
@@ -1766,16 +1711,14 @@ class FeatureFlagsManagerClass {
           this.cachedEntitlements.delete(name);
         }
 
-        logger.debug(
-          "feature_flags",
+        logger.category('feature_flags').warn(
           `Entitlement ${name} verified: ${granted}`,
           { expiresAt: fresh?.expires_at },
         );
         return { granted, source: "server", expiresAt: fresh?.expires_at };
       } catch (error) {
         // Server check failed, offline and expired: deny access (fail-secure)
-        logger.warn(
-          "feature_flags",
+        logger.category('feature_flags').warn(
           `Fresh entitlement check failed for ${name}, expired and offline, denying`,
           error,
         );
@@ -1809,8 +1752,7 @@ class FeatureFlagsManagerClass {
         }
       }
 
-      logger.debug(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         `Entitlement ${name} from server: ${granted}`,
         {
           expiresAt: entitlement?.expires_at,
@@ -1818,8 +1760,7 @@ class FeatureFlagsManagerClass {
       );
       return { granted, source: "server", expiresAt: entitlement?.expires_at };
     } catch (error) {
-      logger.warn(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         `Server check failed for ${name}, denying access`,
         error,
       );
@@ -1871,7 +1812,7 @@ class FeatureFlagsManagerClass {
 
       if (skew > tolerance) {
         // Clock went backward
-        logger.error("feature_flags", "Clock manipulation detected", {
+        logger.category('feature_flags').error("Clock manipulation detected", {
           skew,
           tolerance,
         });
@@ -1888,7 +1829,7 @@ class FeatureFlagsManagerClass {
       await SecureStorage.setJSON("dnd:last_clock_check", { timestamp: now });
       return true;
     } catch (error) {
-      logger.error("feature_flags", "Clock verification failed", error);
+      logger.category('feature_flags').error("Clock verification failed", error);
       return true; // Default to valid (don't block on verification error)
     }
   }
@@ -1898,7 +1839,7 @@ class FeatureFlagsManagerClass {
    */
   setOverride(key: string, value: boolean): void {
     this.userOverrides.set(key, value);
-    logger.info("feature_flags", `Override set: ${key} = ${value}`);
+    logger.category('feature_flags').info(`Override set: ${key} = ${value}`);
 
     // If it's a flag override, notify subscribers
     if (!key.includes(":")) {
@@ -1912,7 +1853,7 @@ class FeatureFlagsManagerClass {
    */
   clearOverride(key: string): void {
     this.userOverrides.delete(key);
-    logger.info("feature_flags", `Override cleared: ${key}`);
+    logger.category('feature_flags').info(`Override cleared: ${key}`);
 
     // If it's a flag override, notify subscribers
     if (!key.includes(":")) {
@@ -1926,7 +1867,7 @@ class FeatureFlagsManagerClass {
    */
   clearAllOverrides(): void {
     this.userOverrides.clear();
-    logger.info("feature_flags", "All overrides cleared");
+    logger.category('feature_flags').info("All overrides cleared");
     this.clearEvaluationCache();
     this.notifySubscribers(this.currentFlags);
   }
@@ -1950,7 +1891,7 @@ class FeatureFlagsManagerClass {
       try {
         callback(flagsObject);
       } catch (error) {
-        logger.error("feature_flags", "Subscriber notification failed", error);
+        logger.category('feature_flags').error("Subscriber notification failed", error);
       }
     }
   }
@@ -1974,10 +1915,9 @@ class FeatureFlagsManagerClass {
           await this.supabaseClient?.removeChannel(channel);
         }
         this.realtimeSubscriptions.clear();
-        logger.debug("feature_flags", "Unsubscribed from Realtime channels");
+        logger.category('feature_flags').debug("Unsubscribed from Realtime channels");
       } catch (error) {
-        logger.warn(
-          "feature_flags",
+        logger.category('feature_flags').warn(
           "Failed to unsubscribe from Realtime",
           error,
         );
@@ -1996,8 +1936,7 @@ class FeatureFlagsManagerClass {
         await SecureStorage.removeItem(`${STORAGE_KEYS.FEATURE_FLAGS}:cohorts`);
         await SecureStorage.removeItem(`${STORAGE_KEYS.FEATURE_FLAGS}:cohort_assignments`);
       } catch (error) {
-        logger.warn(
-          "feature_flags",
+        logger.category('feature_flags').warn(
           "Failed to clear persisted cohorts or cohort assignments",
           error,
         );
@@ -2038,17 +1977,16 @@ class FeatureFlagsManagerClass {
         }
 
         if (keysToRemove.length > 0) {
-          logger.debug("feature_flags", "Cleared override cache entries", {
+          logger.category('feature_flags').debug("Cleared override cache entries", {
             count: keysToRemove.length,
           });
         }
       } catch (error) {
-        logger.warn("feature_flags", "Failed to clear override cache", error);
+        logger.category('feature_flags').warn("Failed to clear override cache", error);
         // Continue with other cleanup steps
       }
 
-      logger.info(
-        "feature_flags",
+      logger.category("feature_flags").info(
         "Cleared all cached flags, entitlements, overrides, cohorts, and cohort assignments",
       );
 
@@ -2062,7 +2000,7 @@ class FeatureFlagsManagerClass {
       this.cachedRollouts.clear(); // NEW: Clear rollouts cache too
       this.bootstrapped = false;
     } catch (error) {
-      logger.error("feature_flags", "Failed to clear cache", error);
+      logger.category('feature_flags').error("Failed to clear cache", error);
     }
   }
 
@@ -2109,8 +2047,7 @@ class FeatureFlagsManagerClass {
           remoteOverride.expires_at === null ||
           new Date(remoteOverride.expires_at).getTime() > Date.now()
         ) {
-          logger.debug(
-            "feature_flags",
+          logger.category('feature_flags').warn(
             `Rollout ${flagName}: remote override exists, skipping rollout evaluation`,
           );
           // Override takes precedence; rollout not evaluated
@@ -2121,8 +2058,7 @@ class FeatureFlagsManagerClass {
 
     // Priority 2: If local user override exists, it takes precedence (skip rollout)
     if (this.userOverrides.has(flagName)) {
-      logger.debug(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         `Rollout ${flagName}: local override exists, skipping rollout evaluation`,
       );
       return this.userOverrides.get(flagName) ?? fallback;
@@ -2139,8 +2075,7 @@ class FeatureFlagsManagerClass {
         rolloutConfig.seed,
       );
 
-      logger.debug(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         `Rollout ${flagName}: user=${userId}, percentage=${rolloutConfig.percentage}%, in_rollout=${inRollout}`,
       );
 
@@ -2159,8 +2094,7 @@ class FeatureFlagsManagerClass {
     }
 
     // No rollout config: return fallback
-    logger.debug(
-      "feature_flags",
+    logger.category('feature_flags').warn(
       `Rollout ${flagName}: no config, using fallback=${fallback}`,
     );
     return fallback;
@@ -2244,7 +2178,7 @@ class FeatureFlagsManagerClass {
     );
 
     if (cachedResult !== undefined) {
-      logger.debug("feature_flags", `Flag evaluation cache hit: ${flagName}`);
+      logger.category('feature_flags').debug(`Flag evaluation cache hit: ${flagName}`);
       return cachedResult;
     }
 
@@ -2297,8 +2231,7 @@ class FeatureFlagsManagerClass {
 
     // Detect circular dependency: if flag is already being resolved, fail closed
     if (resolving.has(cacheKey)) {
-      logger.warn(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         `Circular dependency detected for flag ${flagName}. Returning false to prevent infinite recursion.`,
       );
       memo.set(cacheKey, false);
@@ -2324,8 +2257,7 @@ class FeatureFlagsManagerClass {
     // Get the flag definition from current flags
     const flagState = this.currentFlags.get(flagName);
     if (!flagState) {
-      logger.warn(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         `Flag not found: ${flagName}, treating as disabled`,
       );
       memo.set(cacheKey, false);
@@ -2376,8 +2308,7 @@ class FeatureFlagsManagerClass {
           flagConfig.conditionLogic as any,
         );
         if (validationErrors.length > 0) {
-          logger.error(
-            "feature_flags",
+          logger.category('feature_flags').error(
             `Invalid conditionLogic for flag ${flagName}: ${validationErrors.join("; ")}`,
           );
           memo.set(cacheKey, false);
@@ -2393,8 +2324,7 @@ class FeatureFlagsManagerClass {
           return false;
         }
       } catch (error) {
-        logger.error(
-          "feature_flags",
+        logger.category('feature_flags').error(
           `Error evaluating advanced conditions for ${flagName}: ${error}`,
         );
         memo.set(cacheKey, false);
@@ -2416,8 +2346,7 @@ class FeatureFlagsManagerClass {
         // Recursively check each dependency with the same context and resolving set
         const depEnabled = this._resolveFlag(depName, context, memo, resolving);
         if (!depEnabled) {
-          logger.debug(
-            "feature_flags",
+          logger.category('feature_flags').warn(
             `Flag ${flagName} disabled: dependency ${depName} is disabled`,
           );
           memo.set(cacheKey, false);
@@ -2481,16 +2410,14 @@ class FeatureFlagsManagerClass {
       // cachedCohorts is keyed by slug, so we need to search for the matching ID
       for (const [slug, cohort] of this.cachedCohorts.entries()) {
         if (cohort.id === membership.cohort_id) {
-          logger.debug(
-            "feature_flags",
+          logger.category('feature_flags').warn(
             `Resolved cohort slug from ID: ${membership.cohort_id} → ${slug}`,
           );
           return slug;
         }
       }
       // Cohort not found in cache (may be loading or invalid ID)
-      logger.warn(
-        "feature_flags",
+      logger.category('feature_flags').warn(
         `Failed to resolve cohort slug from ID: ${membership.cohort_id}`,
       );
     }
@@ -2520,8 +2447,7 @@ class FeatureFlagsManagerClass {
     if (serverAssignments && serverAssignments.size > 0) {
       // Use server-provided assignments as source of truth
       requiredCohorts = Array.from(serverAssignments);
-      logger.debug(
-        "feature_flags",
+      logger.category('feature_flags').debug(
         `Using server assignments for flag ${flagName}: ${requiredCohorts.join(", ")}`,
       );
     } else {
@@ -2536,8 +2462,7 @@ class FeatureFlagsManagerClass {
       }
 
       requiredCohorts = flagConfig.cohorts;
-      logger.debug(
-        "feature_flags",
+      logger.category('feature_flags').debug(
         `Using app config cohorts for flag ${flagName}: ${requiredCohorts.join(", ")}`,
       );
     }
@@ -2559,8 +2484,7 @@ class FeatureFlagsManagerClass {
         (!membership.expires_at || new Date(membership.expires_at) > new Date())
       ) {
         // User has active membership in a required cohort
-        logger.debug(
-          "feature_flags",
+        logger.category('feature_flags').debug(
           `User explicitly in cohort ${cohortSlug} for flag ${flagName}`,
         );
         return true;
@@ -2583,8 +2507,7 @@ class FeatureFlagsManagerClass {
       // Use isUserInCohort from lib/feature-flags/cohorts.ts
       // This implements deterministic bucketing based on user ID and cohort seed
       if (isUserInCohort(this.userId, cohort)) {
-        logger.debug(
-          "feature_flags",
+        logger.category('feature_flags').debug(
           `User bucketed into cohort ${cohortSlug} for flag ${flagName}`,
         );
         return true;
@@ -2624,8 +2547,7 @@ class FeatureFlagsManagerClass {
           flagConfig.conditionLogic as any,
         );
         if (validationErrors.length > 0) {
-          logger.warn(
-            "feature_flags",
+          logger.category('feature_flags').warn(
             `Invalid conditionLogic for flag "${flagName}": ${validationErrors.join("; ")}`,
           );
         }
@@ -2635,8 +2557,7 @@ class FeatureFlagsManagerClass {
       if (flagConfig.cohorts && Array.isArray(flagConfig.cohorts)) {
         for (const cohortSlug of flagConfig.cohorts) {
           if (!this.cachedCohorts.has(cohortSlug)) {
-            logger.warn(
-              "feature_flags",
+            logger.category('feature_flags').warn(
               `Flag "${flagName}" references unknown cohort "${cohortSlug}"`,
             );
           }
@@ -2647,8 +2568,7 @@ class FeatureFlagsManagerClass {
       if (flagConfig.dependsOn && Array.isArray(flagConfig.dependsOn)) {
         for (const depName of flagConfig.dependsOn) {
           if (!allFlagNames.has(depName)) {
-            logger.warn(
-              "feature_flags",
+            logger.category('feature_flags').warn(
               `Flag "${flagName}" depends on missing flag "${depName}"`,
             );
           }
@@ -2660,8 +2580,7 @@ class FeatureFlagsManagerClass {
     for (const flagName of allFlagNames) {
       const cycle = this._detectCycle(flagName, flags, new Set(), new Set());
       if (cycle) {
-        logger.warn(
-          "feature_flags",
+        logger.category('feature_flags').warn(
           `Circular dependency detected: ${cycle.join(" → ")}`,
         );
       }
@@ -2731,8 +2650,7 @@ class FeatureFlagsManagerClass {
    */
   invalidateFlagCache(flagName: string): void {
     this.evaluationCache.invalidateFlag(flagName);
-    logger.debug(
-      "feature_flags",
+    logger.category('feature_flags').warn(
       `Invalidated evaluation cache for flag: ${flagName}`,
     );
   }
@@ -2761,8 +2679,7 @@ class FeatureFlagsManagerClass {
    */
   invalidateRoleCache(userRole: string): void {
     this.evaluationCache.invalidateRole(userRole);
-    logger.debug(
-      "feature_flags",
+    logger.category('feature_flags').warn(
       `Invalidated evaluation cache for role: ${userRole}`,
     );
   }
@@ -2781,7 +2698,7 @@ class FeatureFlagsManagerClass {
    */
   clearEvaluationCache(): void {
     this.evaluationCache.clear();
-    logger.info("feature_flags", "Cleared all evaluation cache entries");
+    logger.category('feature_flags').info("Cleared all evaluation cache entries");
   }
 
   /**
@@ -2834,8 +2751,7 @@ class FeatureFlagsManagerClass {
           }
         }
 
-        logger.debug(
-          "feature_flags",
+        logger.category('feature_flags').warn(
           `Found cached user role: ${entitlement.key}`,
         );
         return entitlement.key;
@@ -2843,7 +2759,7 @@ class FeatureFlagsManagerClass {
     }
 
     // No role entitlements found
-    logger.debug("feature_flags", "No cached user role found, using 'unknown'");
+    logger.category('feature_flags').warn("No cached user role found, using 'unknown'");
     return "unknown";
   }
 

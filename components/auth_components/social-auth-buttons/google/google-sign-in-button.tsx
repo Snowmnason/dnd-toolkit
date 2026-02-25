@@ -54,7 +54,7 @@ async function handleAuthSuccess(data: any) {
 // Mobile/Native Google auth with comprehensive OAuth flow
 async function onGoogleButtonPressMobile() {
   try {
-    logger.debug('auth', 'onGoogleButtonPressMobile - start');
+  logger.category('auth').debug('onGoogleButtonPressMobile - start');
     
     // Extract URL parameters for OAuth callback
     function extractParamsFromUrl(url: string) {
@@ -81,7 +81,7 @@ async function onGoogleButtonPressMobile() {
 
     const googleOAuthUrl = oauthResult.url;
     if (!googleOAuthUrl) {
-      logger.error('auth', 'No OAuth URL found!');
+      logger.category('auth').error('No OAuth URL found!');
       Alert.alert('Authentication Error', 'Failed to initialize Google sign-in');
       return;
     }
@@ -92,46 +92,46 @@ async function onGoogleButtonPressMobile() {
       `dnd-toolkit://google-auth`,
       { showInRecents: true },
     ).catch((err) => {
-      logger.error('auth', 'onGoogleButtonPressMobile - openAuthSessionAsync - error', { err });
+      logger.category('auth').error('onGoogleButtonPressMobile - openAuthSessionAsync - error', { err });
       throw err;
     });
 
-    logger.debug('auth', 'onGoogleButtonPressMobile - openAuthSessionAsync - result', { browserResult });
+    logger.category('auth').debug('onGoogleButtonPressMobile - openAuthSessionAsync - result', { browserResult });
 
     if (browserResult && browserResult.type === "success") {
-      logger.debug('auth', 'onGoogleButtonPressMobile - openAuthSessionAsync - success');
+      logger.category('auth').debug('onGoogleButtonPressMobile - openAuthSessionAsync - success');
       const params = extractParamsFromUrl(browserResult.url);
-      logger.debug('auth', 'onGoogleButtonPressMobile - extracted params', { params });
+      logger.category('auth').debug('onGoogleButtonPressMobile - extracted params', { params });
 
       if (params.access_token && params.refresh_token) {
-        logger.debug('auth', 'onGoogleButtonPressMobile - restoring session');
+        logger.category('auth').debug('onGoogleButtonPressMobile - restoring session');
         const restored = await provider.restoreSession({
           access_token: params.access_token,
           refresh_token: params.refresh_token,
         });
 
         if (!restored) {
-          logger.error('auth', 'onGoogleButtonPressMobile - restoreSession failed');
+          logger.category('auth').error('onGoogleButtonPressMobile - restoreSession failed');
           Alert.alert('Authentication Error', 'Failed to restore session');
           return;
         }
 
-        logger.debug('auth', 'onGoogleButtonPressMobile - restoreSession success');
+        logger.category('auth').debug('onGoogleButtonPressMobile - restoreSession success');
         await handleAuthSuccess({});
       } else {
-        logger.error('auth', 'onGoogleButtonPressMobile - missing tokens in response');
+        logger.category('auth').error('onGoogleButtonPressMobile - missing tokens in response');
         Alert.alert('Authentication Error', 'Failed to retrieve authentication tokens');
       }
     } else if (browserResult && browserResult.type === "cancel") {
-      logger.debug('auth', 'onGoogleButtonPressMobile - user canceled');
+      logger.category('auth').debug('onGoogleButtonPressMobile - user canceled');
       // User canceled - don't show error
       return;
     } else {
-      logger.error('auth', 'onGoogleButtonPressMobile - openAuthSessionAsync failed', { browserResult });
+      logger.category('auth').error('onGoogleButtonPressMobile - openAuthSessionAsync failed', { browserResult });
       Alert.alert('Authentication Error', 'Google sign-in was unsuccessful');
     }
   } catch (error) {
-    logger.error('auth', 'Google auth error:', error);
+    logger.category('auth').error('Google auth error:', error);
     Alert.alert('Error', 'An unexpected error occurred during Google sign-in');
   }
 }
@@ -139,31 +139,31 @@ async function onGoogleButtonPressMobile() {
 // Web Google auth success handler
 async function onGoogleButtonSuccessWeb(authRequestResponse: any) {
   try {
-    logger.debug('auth', 'Google sign in successful:', { authRequestResponse });
+    logger.category('auth').debug('Google sign in successful:', { authRequestResponse });
     
     if (authRequestResponse.clientId && authRequestResponse.credential) {
       const provider = await getAuthProvider();
       const result = await provider.signInWithIdToken('google', authRequestResponse.credential);
 
       if (!result.success) {
-        logger.error('auth', 'Error signing in with Google:', result.error?.message);
+        logger.category('auth').error('Error signing in with Google:', result.error?.message);
         Alert.alert('Authentication Error', result.error?.message || 'Failed to sign in with Google');
         return;
       }
 
       if (result.data) {
-        logger.info('auth', 'Google sign in successful:', result.data);
+        logger.category('auth').info('Google sign in successful:', result.data);
         await handleAuthSuccess(result.data);
       }
     }
   } catch (error) {
-    logger.error('auth', 'Google auth error:', error);
+    logger.category('auth').error('Google auth error:', error);
     Alert.alert('Error', 'An unexpected error occurred');
   }
 }
 
 function onGoogleButtonFailureWeb() {
-  logger.error('auth', 'Error signing in with Google');
+  logger.category('auth').error('Error signing in with Google');
   Alert.alert('Authentication Error', 'Google sign-in failed. Please try again.');
 }
 
@@ -189,7 +189,7 @@ function GoogleButtonWeb({ disabled }: { disabled: boolean }) {
           GoogleLogin: module.GoogleLogin,
         });
       } catch (error) {
-        logger.warn('auth', 'Google OAuth web library not available:', error);
+        logger.category('auth').warn('Google OAuth web library not available:', error);
       } finally {
         setIsLoading(false);
       }

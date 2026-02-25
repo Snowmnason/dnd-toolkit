@@ -27,7 +27,7 @@ class SessionManager {
   startSession(userId?: string): void {
     // End existing session if active
     if (this.currentSession) {
-      logger.debug('analytics', 'Ending existing session before starting new one');
+      logger.category('analytics').debug('Ending existing session before starting new one');
       this.endSession();
     }
 
@@ -45,7 +45,7 @@ class SessionManager {
       timestamp: now,
     });
 
-    logger.debug('analytics', 'Session started:', { userId });
+    logger.category('analytics').analytics('Session started:', { userId });
   }
 
   /**
@@ -66,7 +66,7 @@ class SessionManager {
       userId: this.currentSession.userId || undefined,
     });
 
-    logger.debug('analytics', 'Session ended:', {
+    logger.category('analytics').analytics('Session ended:', {
       durationMinutes,
       screenViews: this.currentSession.screenViews,
       errors: this.currentSession.errorCount,
@@ -133,7 +133,7 @@ class SessionManager {
         level: 'info',
       });
     } catch (err) {
-      logger.warn('analytics', 'Failed to track session event:', err);
+      logger.category('analytics').warn('Failed to track session event:', err);
     }
   }
 }

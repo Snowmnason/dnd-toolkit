@@ -22,11 +22,11 @@ export async function lazyLoad<T>(
   try {
     const module = await importFn();
     const duration = Date.now() - startTime;
-    logger.debug('lazy-load', `✅ ${moduleName} loaded (${duration}ms)`);
+    logger.category('performance').perf(`✅ ${moduleName} loaded (${duration}ms)`);
     return module;
   } catch (error) {
     const duration = Date.now() - startTime;
-    logger.error('lazy-load', `❌ Failed to load ${moduleName} (${duration}ms):`, error);
+    logger.category('performance').error(`❌ Failed to load ${moduleName} (${duration}ms):`, error);
     throw error;
   }
 }
@@ -42,7 +42,7 @@ export function lazyLoadInBackground<T>(
   moduleName: string = 'Module'
 ): Promise<T> {
   return lazyLoad(importFn, moduleName).catch((error) => {
-    logger.warn('lazy-load', `Background load of ${moduleName} failed, will retry on demand`);
+    logger.category('performance').warn(`Background load of ${moduleName} failed, will retry on demand`);
     // Return a rejected promise but don't throw - background loads are non-critical
     return Promise.reject(error);
   });

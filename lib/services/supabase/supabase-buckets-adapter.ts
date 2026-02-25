@@ -182,6 +182,6 @@ export function createSupabaseBucketsAdapter() {
  * // registerBucketOperation('downloadFile', bucketsAdapter.downloadFileOperation());
  * // registerBucketOperation('deleteFile', bucketsAdapter.deleteFileOperation());
  * // registerBucketOperation('getPublicUrl', bucketsAdapter.getPublicUrlOperation());
- * // logger.debug('bootstrap', 'Registered 4 Supabase bucket operations');
+ * // logger.category('bootstrap').debug('Registered 4 Supabase bucket operations');
  * ```
  */

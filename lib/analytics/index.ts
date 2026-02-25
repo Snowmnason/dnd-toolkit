@@ -78,9 +78,7 @@ function withTiming<T>(
   const finish = (ok: boolean, extra?: any) => {
     const duration_ms = Date.now() - start;
     if (duration_ms > slowScreenThreshold) {
-      logger
-        .category("performance")
-        .warn("Slow operation detected", {
+      logger.category("performance").warn("Slow operation detected", {
           operation: label,
           duration_ms,
           threshold: slowScreenThreshold,
@@ -93,8 +91,7 @@ function withTiming<T>(
     const result = performanceBaselineService.detectRegression(label, duration_ms, context);
     
     if (result.isRegression) {
-      logger.warn(
-        "performance",
+      logger.category('performance').perf(
         `Performance regression detected for '${label}': ${result.current}ms vs baseline ${result.baseline?.p95}ms (threshold: ${result.threshold}%, delta: ${result.deltaPct?.toFixed(1)}%, samples: ${result.baseline?.count ?? 0}, app_version: ${Constants.expoConfig?.version ?? 'unknown'}, platform: ${Platform.OS})`
       );
       
@@ -139,9 +136,7 @@ function withTiming<T>(
           data: { duration_ms, ok, error_category: errorCategory, ...extra },
           level: "info",
         });
-        logger
-          .category("analytics")
-          .debug("Performance breadcrumb sent to error tracker", {
+        logger.category("analytics").debug("Performance breadcrumb sent to error tracker", {
             operation: label,
             duration_ms,
             ok,
@@ -218,9 +213,7 @@ export const Analytics = {
           logger.category("analytics").debug("User cleared from error tracker");
         }
       } catch (e) {
-        logger
-          .category("analytics")
-          .error("Failed to identify user in error tracker", { error: String(e) });
+        logger.category("analytics").error("Failed to identify user in error tracker", { error: String(e) });
       }
     }
   },
@@ -263,10 +256,7 @@ export const Analytics = {
         dispatchEvent(analyticsEvent, context);
         // Don't await or .catch() — exporter failures are isolated and logged internally
       } catch (error) {
-        logger.debug(
-          'analytics',
-          `Failed to dispatch to exporters: ${error}`
-        );
+        logger.category('analytics').debug(`Failed to dispatch to exporters: ${error}`);
         // Silently fail - don't let exporter issues affect Analytics.track()
       }
     });
@@ -309,10 +299,7 @@ export const Performance = {
   startMeasure(label: string) {
     const existing = this.marks.get(label);
     if (existing) {
-      logger.warn(
-        "performance",
-        `Mark '${label}' already exists, overwriting (potential duplicate measurement)`,
-      );
+      logger.category('performance').warn(`Mark '${label}' already exists, overwriting (potential duplicate measurement)`);
     }
     this.marks.set(label, Date.now());
     this.cleanupOldMarks();
@@ -326,17 +313,14 @@ export const Performance = {
     this.marks.delete(label);
     Analytics.track("performance_measure", { label, duration_ms: duration });
     if (duration > slowScreenThreshold)
-      logger.warn("performance", `Slow operation: ${label} took ${duration}ms`);
+      logger.category('performance').perf(`Slow operation: ${label} took ${duration}ms`);
     
     // Record baseline sample with idle-time context (app backgrounded = idle measurement)
     const context = { isIdle: isAppIdle() };
     performanceBaselineService.recordSample(label, duration, context);
     const result = performanceBaselineService.detectRegression(label, duration, context);
     if (result.isRegression) {
-      logger.warn(
-        "performance",
-        `Performance regression detected for '${label}': ${result.current}ms vs p95 ${result.baseline?.p95}ms (threshold: ${result.threshold}%, delta: ${result.deltaPct?.toFixed(1)}%)`
-      );
+      logger.category('performance').perf(`Performance regression detected for '${label}': ${result.current}ms vs p95 ${result.baseline?.p95}ms (threshold: ${result.threshold}%, delta: ${result.deltaPct?.toFixed(1)}%)`);
       // Emit regression event via #178 exporters (fire-and-forget)
       // dispatchEvent() gates by consent; no need to check here
       const regressionEvent = {
@@ -383,7 +367,7 @@ export const Performance = {
     });
 
     staleLabels.forEach((label) => {
-      logger.debug("performance", `Removing stale mark: ${label}`);
+      logger.category('performance').debug(`Removing stale mark: ${label}`);
       this.marks.delete(label);
     });
   },

@@ -33,7 +33,7 @@ All data stored here is classified by sensitivity level to determine encryption,
 | **SENSITIVE**     | High        | SecureStorage | Yes (AES-256) | On logout  | User world list, characters  |
 | **PII**           | Critical    | SecureStorage | Yes (AES-256) | On logout  | Email, session tokens        |
 
-**For developers:** Register new keys in `DATA_CLASSIFICATIONS` (data-classification.ts). Use `getStorageBackend(key)` for automatic routing and `redactForLogs(data, key)` when logging.
+**For developers:** Register new keys in `DATA_CLASSIFICATIONS` (data-classification.ts). Use `getStorageBackend(key)` for automatic routing. For PII redaction, use the centralized `RedactionManager` (see `lib/utils/redaction-manager.ts`).
 
 Full policy: [docs/issues/MileStone 2/168 - Privacy PII Data/PRIVACY_POLICY.md](../../docs/issues/MileStone%202/168%20-%20Privacy%20PII%20Data/PRIVACY_POLICY.md)
 
@@ -196,8 +196,8 @@ Get cache statistics (item count, estimated size, quota percentage).
 **Example:**
 ```ts
 const stats = await FastCache.getStats();
-if (stats.quotaPercentage > 80) {
-  logger.warn("storage", "FastCache quota 80% full");
+  if (stats.quotaPercentage > 80) {
+  logger.category('storage').warn("FastCache quota 80% full");
 }
 ```
 
@@ -236,7 +236,7 @@ const result = await safeStorageSet({
   key: STORAGE_KEYS.USER_DATA,
   value: userData,
   fallbackValue: "{}",
-  onError: (err) => logger.error("storage", "Failed to save:", err),
+  onError: (err) => logger.category('storage').error("Failed to save:", err),
 });
 
 if (!result.success) {
@@ -263,8 +263,8 @@ const result = await batchStorageOperation([
   { operation: "set", key: STORAGE_KEYS.THEME_PREFERENCE, value: "dark" },
 ]);
 
-if (result.failed > 0) {
-  logger.warn("storage", `${result.failed} operations failed`);
+  if (result.failed > 0) {
+  logger.category('storage').warn(`${result.failed} operations failed`);
 }
 ```
 

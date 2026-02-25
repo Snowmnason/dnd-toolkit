@@ -26,12 +26,11 @@ export async function preloadThemes() {
     for (const [name, theme] of Object.entries(allThemes)) {
       if (typeof (theme as any).preload === "function") {
         await (theme as any).preload();
-        logger.debug("other", `Preloaded assets for theme: ${name}`);
+        logger.category('bootstrap').debug(`Preloaded assets for theme: ${name}`);
       }
     }
-    logger.debug("other", "All themes preloaded successfully");
   } catch (error) {
-    logger.warn("other", "Theme preload error (non-critical):", error);
+    logger.category('bootstrap').warn("Theme preload error (non-critical):", error);
   }
 }
 

@@ -216,7 +216,7 @@ try {
   await SecureStorage.setItem('key', 'value');
 } catch (error) {
   // Handle storage failure (rare, but possible if storage quota exceeded)
-  logger.error('Failed to save:', error);
+  logger.catogery("storage").error('Failed to save:', error);
 }
 
 // Safe to call - returns null on any error

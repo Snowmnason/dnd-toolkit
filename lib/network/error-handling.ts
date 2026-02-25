@@ -7,6 +7,7 @@
  */
 
 import { logger } from '../utils/logger';
+import { ERROR_CODES } from '../utils/ERROR_CODES';
 import { NetworkDetection } from './network-detection';
 
 /**
@@ -38,18 +39,18 @@ export function isNetworkError(error: any): boolean {
 
   // Check common error codes
   if (
-    errorCode === 'NETWORK_ERROR' ||
-    errorCode === 'FETCH_ERROR' ||
-    errorCode === 'TIMEOUT' ||
-    errorCode === 'ENOTFOUND' ||
-    errorCode === 'ECONNREFUSED' ||
-    errorCode === 'ECONNRESET'
+    errorCode === ERROR_CODES.NETWORK.RAW.NETWORK_ERROR ||
+    errorCode === ERROR_CODES.NETWORK.RAW.FETCH_ERROR ||
+    errorCode === ERROR_CODES.NETWORK.RAW.TIMEOUT ||
+    errorCode === ERROR_CODES.NETWORK.RAW.ENOTFOUND ||
+    errorCode === ERROR_CODES.NETWORK.RAW.ECONNREFUSED ||
+    errorCode === ERROR_CODES.NETWORK.RAW.ECONNRESET
   ) {
     return true;
   }
 
   // HTTP status codes that indicate network issues
-  if (error?.status >= 500 || error?.status === 0) {
+  if (error?.status >= ERROR_CODES.HTTP.INTERNAL_SERVER_ERROR || error?.status === 0) {
     return true;
   }
 
@@ -89,7 +90,7 @@ export function shouldServeStaleOnError(error: any, options: {
   }
 
   // Server error (5xx) → Serve stale
-  if (error?.status >= 500) {
+  if (error?.status >= ERROR_CODES.HTTP.INTERNAL_SERVER_ERROR) {
     return true;
   }
 
@@ -113,13 +114,13 @@ export function logNetworkError(
   const { key, operation, isNetworkError, isOnline, servedStale } = context;
 
   if (servedStale) {
-    logger.warn('network', `Serving stale cache for ${operation}:`, {
+    logger.category('network').warn(`Serving stale cache for ${operation}:`, {
       key,
       isOnline,
       error: error?.message,
     });
   } else {
-    logger.error('network', `${operation} failed for ${key}:`, {
+    logger.category('network').error(`${operation} failed for ${key}:`, {
       isNetworkError,
       isOnline,
       error: error?.message,
@@ -170,7 +171,7 @@ export async function handleErrorGracefully(error: any, context: {
     try {
       cachedData = await getCachedData();
     } catch (cacheError) {
-      logger.warn('network', 'Failed to retrieve cache for fallback:', { key, cacheError });
+      logger.category('network').warn('Failed to retrieve cache for fallback:', { key, cacheError });
     }
   }
 

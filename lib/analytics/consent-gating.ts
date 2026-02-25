@@ -19,8 +19,8 @@
 
 import type { ConsentLevel } from '@/lib/analytics/consent';
 import {
-    ConsentCategory,
-    DEFAULT_EVENT_CONSENT_MAPPING,
+  ConsentCategory,
+  DEFAULT_EVENT_CONSENT_MAPPING,
 } from '@/lib/analytics/event-consent-mapping';
 import { logger } from '@/lib/utils/logger';
 
@@ -54,7 +54,7 @@ export function registerEventConsentMapping(
 ): void {
   for (const [eventName, category] of overrides.entries()) {
     runtimeMapping.set(eventName, category);
-    logger.category('analytics').debug('Event consent mapping registered', {
+    logger.category('analytics').info('Event consent mapping registered', {
       eventName,
       category,
     });

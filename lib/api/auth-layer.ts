@@ -126,11 +126,11 @@ class AuthLayerClass {
       const error = new Error(
         `Strategy '${name}' already registered. Call clearAuthStrategies() first if re-registration is intended.`,
       );
-      logger.error("auth", `Cannot register strategy: ${error.message}`);
+      logger.category('auth').error(`Cannot register strategy: ${error.message}`);
       throw error;
     }
     this.strategies.set(name, strategy);
-    logger.debug("auth", `Registered auth strategy: ${name}`);
+    logger.category('auth').debug(`Registered auth strategy: ${name}`);
   }
 
   /**
@@ -149,7 +149,7 @@ class AuthLayerClass {
   clearAuthStrategies(): void {
     this.strategies.clear();
     this.refreshLocks.clear();
-    logger.debug("auth", "Cleared all auth strategies");
+    logger.category('auth').debug("Cleared all auth strategies");
   }
 
   /**
@@ -176,7 +176,7 @@ class AuthLayerClass {
   ): Promise<Record<string, string>> {
     const strategy = this.getAuthStrategy(strategyName);
     if (!strategy) {
-      logger.warn("auth", `Strategy '${strategyName}' not found`, {
+      logger.category('auth').warn(`Strategy '${strategyName}' not found`, {
         endpoint: context.endpoint,
       });
       return headers;
@@ -185,7 +185,7 @@ class AuthLayerClass {
     try {
       const token = await strategy.getToken(context);
       if (!token) {
-        logger.debug("auth", `No token from strategy '${strategyName}'`, {
+        logger.category('auth').debug(`No token from strategy '${strategyName}'`, {
           endpoint: context.endpoint,
         });
         return headers;
@@ -196,7 +196,7 @@ class AuthLayerClass {
         Authorization: `Bearer ${token}`,
       };
     } catch (error) {
-      logger.error("auth", `Failed to get token from '${strategyName}':`, {
+      logger.category('auth').error(`Failed to get token from '${strategyName}':`, {
         error,
         endpoint: context.endpoint,
       });
@@ -231,7 +231,7 @@ class AuthLayerClass {
   handle401Response(strategyName: string, context: AuthContext): Promise<void> {
     const strategy = this.getAuthStrategy(strategyName);
     if (!strategy) {
-      logger.warn("auth", `Strategy '${strategyName}' not found for 401`, {
+      logger.category('auth').warn(`Strategy '${strategyName}' not found for 401`, {
         endpoint: context.endpoint,
       });
       return Promise.resolve();
@@ -241,7 +241,7 @@ class AuthLayerClass {
     let refreshPromise = this.refreshLocks.get(strategyName);
 
     if (refreshPromise) {
-      logger.debug("auth", `Waiting for ${strategyName} token refresh`, {
+      logger.category('auth').debug(`Waiting for ${strategyName} token refresh`, {
         endpoint: context.endpoint,
       });
       return refreshPromise;
@@ -250,7 +250,7 @@ class AuthLayerClass {
     // Start new refresh
     refreshPromise = (async () => {
       try {
-        logger.debug("auth", `Starting ${strategyName} token refresh`, {
+        logger.category('auth').debug(`Starting ${strategyName} token refresh`, {
           endpoint: context.endpoint,
         });
 
@@ -258,11 +258,11 @@ class AuthLayerClass {
           await strategy.onTokenExpire(context);
         }
 
-        logger.info("auth", `Completed ${strategyName} token refresh`, {
+        logger.category('auth').info(`Completed ${strategyName} token refresh`, {
           endpoint: context.endpoint,
         });
       } catch (error) {
-        logger.error("auth", `Failed ${strategyName} token refresh:`, {
+        logger.category('auth').error(`Failed ${strategyName} token refresh:`, {
           error,
           endpoint: context.endpoint,
         });

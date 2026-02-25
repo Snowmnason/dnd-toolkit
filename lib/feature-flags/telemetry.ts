@@ -86,8 +86,7 @@ export class FeatureFlagsTelemetry {
 
     // Log failures immediately
     if (!metric.success) {
-      logger.error(
-        "feature_flags",
+      logger.category("feature_flags").error(
         `Condition evaluation failed for "${metric.flagName}": ${metric.errorMessage}`,
       );
     }

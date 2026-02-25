@@ -100,71 +100,6 @@ export function getStorageBackend(
 }
 
 /**
- * Redact sensitive data from string for logging.
- * Replaces PII patterns with [REDACTED].
- *
- * If a specific key is provided, uses its redaction pattern first,
- * then applies global patterns for common PII.
- *
- * Uses comprehensive PII patterns from lib/utils/pii-redaction:
- * - Prefixed patterns: email: ..., token: ..., userid: ..., etc.
- * - Standalone patterns: bare email addresses, JWT tokens, UUIDs, API keys
- */
-export function redactForLogs(value: unknown, key?: string): string {
-  if (value === null || value === undefined) return "";
-
-  let str: string;
-  if (typeof value === "string") {
-    str = value;
-  } else if (value instanceof Error) {
-    // JSON.stringify(new Error('x')) => '{}', which destroys useful debugging info.
-    // Preserve common fields while still running through our redaction pipeline.
-    str = JSON.stringify({
-      name: value.name,
-      message: value.message,
-      stack: value.stack,
-    });
-  } else {
-    try {
-      str = JSON.stringify(value);
-    } catch {
-      str = String(value);
-    }
-  }
-
-  // If specific key provided, use its redaction pattern
-  if (key) {
-    // eslint-disable-next-line security/detect-object-injection
-    const classification = DATA_CLASSIFICATIONS[key];
-    if (classification?.redactionPattern) {
-      str = str.replace(classification.redactionPattern, "[REDACTED]");
-    }
-  }
-
-  // Apply global redaction patterns for common PII
-  // Lazy import to avoid circular dependencies
-  try {
-    const { redactPII } = require("@/lib/utils/redaction-manager");
-    return redactPII(str);
-  } catch {
-    // Fallback if import fails - apply basic patterns
-    const basicPatterns = [
-      /\bemail["\s:=]+(["\']?[\w\.\-\+]+@[\w\.\-]+\.\w+)/gi,
-      /\btoken["\s:=]+(["\']?[A-Za-z0-9_\-\.]+)/gi,
-      /\bsession["\s:=]+(["\']?[a-zA-Z0-9\-_\.]+)/gi,
-      /\b(userid|user_id)["\s:=]+(["\']?[a-zA-Z0-9\-_\.]+)/gi,
-      /\bid["\s:=]+(["\']?[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/gi,
-    ];
-
-    for (const pattern of basicPatterns) {
-      str = str.replace(pattern, "[REDACTED]");
-    }
-
-    return str;
-  }
-}
-
-/**
  * Check if data classified as sensitive or PII.
  * These are keys that require special handling (encryption, redaction, clearing on logout).
  */
@@ -215,7 +150,7 @@ export async function clearAllUserData(): Promise<void> {
     // Log error but continue with registry-only cleanup
     import("@/lib/utils/logger")
       .then(({ logger }) => {
-        logger.warn("privacy", "Failed to get storage keys", error);
+        logger.category('storage').warn("Failed to get storage keys", error);
       })
       .catch(() => {
         // Ignore logger import errors
@@ -266,8 +201,7 @@ export async function clearAllUserData(): Promise<void> {
       // Lazy import logger to avoid circular dependency
       import("@/lib/utils/logger")
         .then(({ logger }) => {
-          logger.error(
-            "privacy",
+          logger.category('security').error(
             `Failed to clear key ${key}: ${error instanceof Error ? error.message : String(error)}`,
           );
         })
@@ -291,8 +225,7 @@ export async function clearAllUserData(): Promise<void> {
         // Log error but continue
         import("@/lib/utils/logger")
           .then(({ logger }) => {
-            logger.warn(
-              "privacy",
+            logger.category('security').warn(
               `Failed to clear prefix ${prefix}: ${error instanceof Error ? error.message : String(error)}`,
             );
           })
@@ -306,8 +239,7 @@ export async function clearAllUserData(): Promise<void> {
   // 6. Log completion
   import("@/lib/utils/logger")
     .then(({ logger }) => {
-      logger.info(
-        "privacy",
+      logger.category('security').info(
         `Cleared user data: ${successCount} keys cleared, ${failureCount} failures`,
       );
     })

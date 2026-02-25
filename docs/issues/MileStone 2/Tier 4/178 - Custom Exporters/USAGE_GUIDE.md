@@ -112,7 +112,7 @@ class ResilientExporter implements AnalyticsExporter {
       await sendToBackend(event);
     } catch (error) {
       // Log but don't throw - error isolation handles this
-      logger.warn('analytics', `Export failed: ${error.message}`);
+      logger.category('analytics').warn(`Export failed: ${error.message}`);
       // Optionally queue for retry
       await queueForRetry(event);
     }

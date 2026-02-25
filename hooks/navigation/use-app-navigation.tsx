@@ -51,7 +51,7 @@ export function useAppNavigation() {
 
         router.push(target as any);
       } catch (error) {
-        logger.warn(
+        logger.category('navigation').warn(
           `useAppNavigation: Failed to navigate to ${pathname}`,
           error,
         );
@@ -89,7 +89,7 @@ export function useAppNavigation() {
 
         router.replace(target as any);
       } catch (error) {
-        logger.warn(
+        logger.category('navigation').warn(
           `useAppNavigation: Failed to replace route ${pathname}`,
           error,
         );

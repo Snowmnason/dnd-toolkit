@@ -43,34 +43,34 @@ export default function SignInScreen() {
   // Use a callback instead of useEffect to avoid running on every render
   const verifyAuthStatus = async () => {
     try {
-      logger.debug('auth', 'Sign-in screen: Performing heavy-duty auth verification');
+      logger.category('auth').debug('Sign-in screen: Performing heavy-duty auth verification');
       
       // Check 1: Local storage has account flag
       const authState = await AuthStateManager.getAuthState();
       if (!authState.hasAccount) {
-        logger.debug('auth', 'Sign-in screen: No account flag in storage, showing login form');
+        logger.category('auth').debug('Sign-in screen: No account flag in storage, showing login form');
         return;
       }
       
       // Check 2: Verify session is still valid using convenience function
       const session = await getCurrentSession();
       if (!session) {
-        logger.warn('auth', 'Sign-in screen: Session invalid or expired');
+        logger.category('auth').warn('Sign-in screen: Session invalid or expired');
         return;
       }
       
       // Check 3: Verify user data exists in storage
       const userData = await AuthStateManager.getUserData();
       if (!userData || !userData.id) {
-        logger.warn('auth', 'Sign-in screen: User data missing from storage');
+        logger.category('auth').warn('Sign-in screen: User data missing from storage');
         return;
       }
       
       // All checks passed - user is authenticated
-      logger.info('auth', 'Sign-in screen: All checks passed, redirecting to world selection');
+      logger.category('auth').info('Sign-in screen: All checks passed, redirecting to world selection');
       router.replace('/select/world-selection');
     } catch (error) {
-      logger.error('auth', 'Sign-in screen: Error during verification:', error);
+      logger.category('auth').error('Sign-in screen: Error during verification:', error);
       // If verification fails, just show login form (no harm)
     }
   };
@@ -88,12 +88,12 @@ export default function SignInScreen() {
       const result = await resendConfirmationEmail(email);
       
       if (!result.success) {
-        logger.error('auth', 'Failed to resend email:', result.error);
+        logger.category('auth').error('Failed to resend email:', result.error);
       } else {
-        logger.info('auth', 'Confirmation email sent!');
+        logger.category('auth').info('Confirmation email sent!');
       }
     } catch (err) {
-      logger.error('auth', 'Failed to resend confirmation email.', err);
+      logger.category('auth').error('Failed to resend confirmation email.', err);
     } finally {
       setIsResendingEmail(false);
     }

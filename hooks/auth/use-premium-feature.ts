@@ -63,7 +63,7 @@ export function usePremiumFeature(featureKey?: string): UsePremiumFeatureState {
       trackFeatureBlocked({ feature: featureKey!, reason: 'requires_premium' });
     } catch (error) {
       // Log tracking failures for debugging without blocking feature checks
-      logger.debug('other', 'Failed to track feature blocked event:', error);
+      logger.category('other').debug('Failed to track feature blocked event:', error);
     }
     trackedRef.current = true;
   }, [shouldCheckPremium, state.loading, state.isAvailable, featureKey]);

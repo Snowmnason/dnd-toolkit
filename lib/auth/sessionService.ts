@@ -28,7 +28,7 @@ export const checkUserSession = async (): Promise<SessionCheckResult> => {
       };
     }
 
-  logger.info('auth', 'Valid session found for:', session.email);
+  logger.category('auth').info('Valid session found for:', session.email);
     
     // Update auth state
     await AuthStateManager.setHasAccount(true);
@@ -44,7 +44,7 @@ export const checkUserSession = async (): Promise<SessionCheckResult> => {
         };
       }
     } catch (profileError) {
-      logger.warn('auth', 'Profile check failed:', profileError);
+      logger.category('auth').warn('Profile check failed:', profileError);
       // Profile doesn't exist or can't be retrieved
     }
     
@@ -56,7 +56,7 @@ export const checkUserSession = async (): Promise<SessionCheckResult> => {
     };
     
   } catch (error) {
-    logger.error('auth', 'Session check error:', error);
+    logger.category('auth').error('Session check error:', error);
     return {
       hasValidSession: false,
       hasCompleteProfile: false,
@@ -72,7 +72,7 @@ export const prepareAuthNavigation = async (): Promise<void> => {
   try {
     await AuthStateManager.setHasAccount(true);
   } catch (error) {
-    logger.error('auth', 'Auth state preparation error:', error);
+    logger.category('auth').error('Auth state preparation error:', error);
     throw new Error('Unable to prepare authentication state');
   }
 };

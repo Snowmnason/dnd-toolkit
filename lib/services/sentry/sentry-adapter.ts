@@ -113,7 +113,7 @@ export class SentryAdapter implements BreadcrumbProvider {
     }
 
     try {
-      logger.category('analytics').debug(
+      logger.category('analytics').analytics(
         'SentryAdapter',
         `Sending batch of ${breadcrumbs.length} breadcrumbs to Sentry endpoint`
       );
@@ -171,7 +171,7 @@ export class SentryAdapter implements BreadcrumbProvider {
 
       switch (decision.action) {
         case 'success':
-          logger.category('analytics').debug(
+          logger.category('analytics').analytics(
             'SentryAdapter',
             `Sent ${breadcrumbs.length} breadcrumbs successfully`
           );
@@ -181,11 +181,11 @@ export class SentryAdapter implements BreadcrumbProvider {
             discard: [],
           };
 
-        case 'rate_limited':
-          logger.category('analytics').warn(
-            'SentryAdapter',
-            `Rate limited: will retry after ${decision.retryAfterMs}ms`
-          );
+          case 'rate_limited':
+            logger.category('analytics').warn(
+              'SentryAdapter',
+              `Rate limited: will retry after ${decision.retryAfterMs}ms`
+            );
           return {
             sent: [],
             retry: breadcrumbs.map((b) => b.id),
@@ -292,7 +292,7 @@ export function registerSentryAdapter(dsn?: string): SentryAdapter {
   const { registerAdapter } = require('../breadcrumb-adapter');
   const adapter = new SentryAdapter(dsn);
   registerAdapter('sentry', () => adapter);
-  logger.category('analytics').info('SentryAdapter', 'Registered as provider adapter');
+  logger.category('analytics').analytics('SentryAdapter', 'Registered as provider adapter');
   return adapter;
 }
 
@@ -357,7 +357,7 @@ export function hookSentryAddBreadcrumb(
     logger.category('analytics').warn('SentryAdapter', 'Could not hook Sentry.addBreadcrumb (may be read-only)');
   }
 
-  logger.category('analytics').info('SentryAdapter', 'Sentry.addBreadcrumb hook installed');
+  logger.category('analytics').analytics('SentryAdapter', 'Sentry.addBreadcrumb hook installed');
 
   // Return unsubscribe function
   return () => {
@@ -370,6 +370,6 @@ export function hookSentryAddBreadcrumb(
     } catch {
       // Ignore
     }
-    logger.category('analytics').info('SentryAdapter', 'Sentry.addBreadcrumb hook removed');
+    logger.category('analytics').analytics('SentryAdapter', 'Sentry.addBreadcrumb hook removed');
   };
 }

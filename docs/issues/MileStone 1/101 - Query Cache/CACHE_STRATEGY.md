@@ -423,7 +423,7 @@ export function useCacheStats() {
     const cacheStats = QueryCache.getStats();
     setStats(cacheStats);
 
-    logger.debug('cache', 'Cache stats:', cacheStats);
+    logger.category('cache').debug('Cache stats:', cacheStats);
   }, []);
 
   return stats;
@@ -434,14 +434,14 @@ export function useCacheStats() {
 
 ```typescript
 // Log cache hits vs misses
-logger.debug('cache', 'Cache hit:', { key, age: Date.now() - entry.timestamp });
-logger.debug('cache', 'Cache miss:', { key, revalidating: true });
+logger.category('cache').debug('Cache hit:', { key, age: Date.now() - entry.timestamp });
+logger.category('cache').debug('Cache miss:', { key, revalidating: true });
 
 // Log invalidations
-logger.info('cache', 'Invalidated by tags:', { tags, affectedKeys: count });
+logger.category('cache').info('Invalidated by tags:', { tags, affectedKeys: count });
 
 // Log errors
-logger.error('cache', 'Failed to fetch fresh data:', { key, error });
+logger.category('cache').error('Failed to fetch fresh data:', { key, error });
 ```
 
 ### DevTools Integration (Future)

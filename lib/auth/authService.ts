@@ -1,19 +1,18 @@
 import {
-    AuthError,
-    EmailAlreadyExistsError,
-    getAuthProvider,
-    InvalidCredentialsError,
-    NetworkError,
-    RateLimitError,
-    UserNotFoundError,
+  EmailAlreadyExistsError,
+  getAuthProvider,
+  InvalidCredentialsError,
+  NetworkError,
+  RateLimitError
 } from "@/lib/services";
 import { usersDB } from "../database/users";
 import { SecureStorage, STORAGE_KEYS } from "../storage";
+import { ERROR_CODES, RetryErrorCode } from "../utils/ERROR_CODES";
 import { logger } from "../utils/logger";
 import {
-    checkAuthGuard,
-    recordAuthFailure,
-    recordAuthSuccess,
+  checkAuthGuard,
+  recordAuthFailure,
+  recordAuthSuccess,
 } from "./auth-attempt-guard";
 import { validateEmail, validatePassword } from "./validation";
 
@@ -55,93 +54,18 @@ export interface ResetPasswordResult {
 interface ErrorRetryStrategy {
   shouldAutoRetry: boolean;
   suggestRetryAfterMs?: number;
-  reason: string;
+  reason: RetryErrorCode;
 }
 
-/**
- * Map Supabase errors to normalized AuthError types.
- * Provides consistent error classification across signup/signin flows.
- */
-function mapSupabaseErrorToNormalized(supabaseError: any): AuthError {
-  const message = supabaseError?.message || 'Unknown auth error';
-  const code = supabaseError?.code || supabaseError?.status;
-  const messageLower = message.toLowerCase();
-
-  // Invalid credentials
-  if (
-    messageLower.includes('invalid login credentials') ||
-    messageLower.includes('invalid credentials') ||
-    messageLower.includes('invalid email or password') ||
-    messageLower.includes('incorrect password') ||
-    code === 'invalid_credentials'
-  ) {
-    return new InvalidCredentialsError(message, supabaseError);
-  }
-
-  // Email already exists (signup conflicts)
-  if (
-    messageLower.includes('user already registered') ||
-    messageLower.includes('already registered') ||
-    messageLower.includes('already been registered') ||
-    messageLower.includes('email address not available') ||
-    messageLower.includes('duplicate key value') ||
-    messageLower.includes('duplicate email') ||
-    messageLower.includes('unique constraint') ||
-    code === '23505' || // Postgres unique constraint error
-    code === 'user_already_exists'
-  ) {
-    return new EmailAlreadyExistsError(message, supabaseError);
-  }
-
-  // User not found (reset password target)
-  if (
-    messageLower.includes('user not found') ||
-    messageLower.includes('no user found') ||
-    messageLower.includes('user does not exist') ||
-    code === 'user_not_found'
-  ) {
-    return new UserNotFoundError(message, supabaseError);
-  }
-
-  // Rate limit exceeded (too many attempts)
-  if (
-    code === 429 ||
-    code === 'RATE_LIMIT' ||
-    messageLower.includes('too many') ||
-    messageLower.includes('rate limit') ||
-    messageLower.includes('throttle')
-  ) {
-    // Try to extract retry-after seconds from message (pattern: "123 seconds" or "123s")
-    const retryAfterMatch = messageLower.match(/(\d+)/);
-    const retryAfterSeconds = retryAfterMatch?.[1] ? parseInt(retryAfterMatch[1], 10) : undefined;
-    return new RateLimitError(message, supabaseError, retryAfterSeconds);
-  }
-
-  // Network errors and timeouts
-  if (
-    messageLower.includes('request timeout') ||
-    messageLower.includes('network') ||
-    messageLower.includes('fetch failed') ||
-    messageLower.includes('econnrefused') ||
-    messageLower.includes('enotfound') ||
-    messageLower.includes('time out') ||
-    supabaseError instanceof TypeError ||
-    code === 'NETWORK_ERROR' ||
-    code === 'ETIMEDOUT'
-  ) {
-    return new NetworkError(message, supabaseError);
-  }
-
-  // Default: generic AuthError
-  return new AuthError(message, supabaseError, code);
-}
+// NOTE: mapSupabaseErrorToNormalized moved to lib/services/supabase/supabase-auth-provider.ts
+// Use getAuthProvider().signUp/signIn which uses that canonical provider implementation
 
 function classifyErrorRetryStrategy(error: unknown): ErrorRetryStrategy {
   if (error instanceof NetworkError) {
     return {
       shouldAutoRetry: true,
       suggestRetryAfterMs: 2000, // Wait 2s before auto-retry
-      reason: "transient_network_failure",
+      reason: ERROR_CODES.RETRY.TRANSIENT_NETWORK_FAILURE,
     };
   }
 
@@ -149,7 +73,7 @@ function classifyErrorRetryStrategy(error: unknown): ErrorRetryStrategy {
     return {
       shouldAutoRetry: false, // User should wait, not retry immediately
       suggestRetryAfterMs: (error.retryAfterSeconds || 60) * 1000,
-      reason: "rate_limit_exceeded",
+      reason: ERROR_CODES.RETRY.RATE_LIMIT_EXCEEDED,
     };
   }
 
@@ -157,14 +81,14 @@ function classifyErrorRetryStrategy(error: unknown): ErrorRetryStrategy {
   if (error instanceof InvalidCredentialsError || error instanceof EmailAlreadyExistsError) {
     return {
       shouldAutoRetry: false,
-      reason: "permanent_failure",
+      reason: ERROR_CODES.RETRY.PERMANENT_FAILURE,
     };
   }
 
   // Unknown or other errors: don't auto-retry
   return {
     shouldAutoRetry: false,
-    reason: "unknown_error",
+    reason: ERROR_CODES.RETRY.UNKNOWN,
   };
 }
 
@@ -228,7 +152,7 @@ export const signUpUser = async (
       const error = signupResult.error;
       const retryStrategy = classifyErrorRetryStrategy(error);
       
-      logger.debug("auth", `Signup error classified: ${retryStrategy.reason}`, {
+      logger.category('auth').debug(`Signup error classified: ${retryStrategy.reason}`, {
         shouldAutoRetry: retryStrategy.shouldAutoRetry,
         suggestRetryAfterMs: retryStrategy.suggestRetryAfterMs,
       });
@@ -261,12 +185,8 @@ export const signUpUser = async (
       };
     }
 
-    return {
-      success: false,
-      error: "An unexpected error occurred. Please try again.",
-    };
   } catch (error) {
-    logger.error("auth", "Sign up error:", error);
+    logger.category('auth').error("Sign up error:", error);
     const message = (error as Error)?.message?.includes("Request timeout")
       ? "The server took too long to respond. Please try again."
       : "An unexpected error occurred. Please try again.";
@@ -279,14 +199,14 @@ export const signInUser = async (
   email: string,
   password: string,
 ): Promise<SignInResult> => {
-  logger.debug("auth", `🔐 Sign-in attempt for email: ${email}`);
+  logger.category('auth').debug(`🔐 Sign-in attempt for email: ${email}`);
 
   try {
     // Validate and sanitize inputs
     const emailValidation = validateEmail(email);
 
     if (!emailValidation.isValid) {
-      logger.warn("auth", "❌ Invalid email format");
+      logger.category('auth').warn("Invalid email format");
       return {
         success: false,
         error: "Please enter a valid email address.",
@@ -295,16 +215,15 @@ export const signInUser = async (
 
     // Use sanitized email
     const sanitizedEmail = emailValidation.sanitized;
-    logger.debug("auth", `✅ Email validated: ${sanitizedEmail}`);
+    logger.category('auth').debug(`Email validated: ${sanitizedEmail}`);
 
     const guard = await checkAuthGuard(sanitizedEmail, "signin");
     if (!guard.allowed) {
       const retrySeconds = guard.retryAfterMs
         ? Math.ceil(guard.retryAfterMs / 1000)
         : undefined;
-      logger.warn(
-        "auth",
-        `🚫 Auth guard blocked sign-in for ${sanitizedEmail}`,
+      logger.category('auth').warn(
+        `Auth guard blocked sign-in for ${sanitizedEmail}`,
       );
       return {
         success: false,
@@ -314,8 +233,7 @@ export const signInUser = async (
       };
     }
 
-    logger.debug(
-      "auth",
+    logger.category('auth').debug(
       `🔐 Calling AuthProvider signIn for ${sanitizedEmail}...`,
     );
     const signInStartTime = Date.now();
@@ -325,7 +243,7 @@ export const signInUser = async (
     const signInResult = await authProvider.signIn(sanitizedEmail, password);
 
     const signInElapsed = Date.now() - signInStartTime;
-    logger.debug("auth", `⏱️ Sign-in API call completed in ${signInElapsed}ms`);
+    logger.category('auth').debug(`⏱Sign-in API call completed in ${signInElapsed}ms`);
 
     if (!signInResult.success) {
       await recordAuthFailure(sanitizedEmail, "signin");
@@ -333,8 +251,8 @@ export const signInUser = async (
       const error = signInResult.error;
       const retryStrategy = classifyErrorRetryStrategy(error);
       
-      logger.error("auth", `❌ Sign-in error:`, error.message);
-      logger.debug("auth", `Sign-in error classified: ${retryStrategy.reason}`, {
+      logger.category('auth').error(`❌ Sign-in error:`, error.message);
+      logger.category('auth').debug(`Sign-in error classified: ${retryStrategy.reason}`, {
         shouldAutoRetry: retryStrategy.shouldAutoRetry,
         suggestRetryAfterMs: retryStrategy.suggestRetryAfterMs,
       });
@@ -364,8 +282,7 @@ export const signInUser = async (
     // Successful sign in
     const session = signInResult.data;
     await recordAuthSuccess(sanitizedEmail, "signin");
-    logger.info(
-      "auth",
+    logger.category('auth').info(
       `✅ Sign-in successful for ${sanitizedEmail}, setting auth state...`,
     );
 
@@ -374,7 +291,7 @@ export const signInUser = async (
     
     // CRITICAL: Save the session tokens to encrypted storage (web platform)
     // This must happen BEFORE setHasAccount to ensure tokens are persisted
-    logger.debug("auth", "🔐 Session structure:", {
+    logger.category('auth').debug("🔐 Session structure:", {
       hasUserId: !!session.userId,
       hasEmail: !!session.email,
       hasAccessToken: !!session.accessToken,
@@ -383,10 +300,10 @@ export const signInUser = async (
     });
 
     if (session.raw) {
-      logger.debug("auth", "💾 Persisting auth session tokens to storage...");
+      logger.category('auth').debug("Persisting auth session tokens to storage...");
       await AuthStateManager.setSession(session.raw);
     } else {
-      logger.warn("auth", "⚠️ No raw session data in sign-in response");
+      logger.category('auth').warn("No raw session data in sign-in response");
     }
       
       await AuthStateManager.setHasAccount(true);
@@ -397,23 +314,22 @@ export const signInUser = async (
         STORAGE_KEYS.LAST_LOGGED_IN,
         Date.now().toString(),
       );
-      logger.debug("auth", "✅ Auth state set, login timestamp recorded");
+      logger.category('auth').debug("Auth state set, login timestamp recorded");
 
       // Check if user has a complete profile
       try {
         const profileStartTime = Date.now();
         const userProfile = await usersDB.getCurrentUser();
         const profileElapsed = Date.now() - profileStartTime;
-        logger.debug(
-          "auth",
+        logger.category('auth').debug(
           `⏱️ User profile fetch completed in ${profileElapsed}ms`,
         );
 
         // CRITICAL: Ensure user data is saved to storage before continuing
         // This ensures the userId context can load it immediately when the route renders
-        logger.debug("auth", "💾 Ensuring user data is saved to storage...");
+        logger.category('auth').debug("💾 Ensuring user data is saved to storage...");
         await AuthStateManager.saveUserData(userProfile);
-        logger.debug("auth", "✅ User data saved, userId available in storage");
+        logger.category('auth').debug("✅ User data saved, userId available in storage");
 
         // Robust profile validation
         const hasValidProfile =
@@ -421,15 +337,13 @@ export const signInUser = async (
           userProfile.username &&
           userProfile.username.trim().length > 0;
 
-        logger.debug(
-          "auth",
+        logger.category('auth').debug(
           `Profile validation: hasValidProfile=${hasValidProfile}`,
         );
 
         // Check for pending invites
         const pendingInvite = await checkPendingInvites();
-        logger.debug(
-          "auth",
+        logger.category('auth').debug(
           `Pending invite check: ${pendingInvite ? "found" : "none"}`,
         );
 
@@ -437,8 +351,7 @@ export const signInUser = async (
           // Profile is complete
           if (pendingInvite) {
             // Has pending invite - redirect to auth-redirect to process it
-            logger.info(
-              "auth",
+            logger.category('auth').info(
               `🎫 Redirecting to auth-redirect for pending invite`,
             );
             if (typeof window !== "undefined") {
@@ -450,7 +363,7 @@ export const signInUser = async (
             };
           } else {
             // No pending invite - go to world selection
-            logger.info("auth", `🌍 Redirecting to world selection`);
+            logger.category('auth').info(`🌍 Redirecting to world selection`);
             return {
               success: true,
               redirectTo: "/select/world-selection",
@@ -464,8 +377,7 @@ export const signInUser = async (
           };
         }
       } catch (profileError) {
-        logger.error(
-          "auth",
+        logger.category("auth").error(
           "Database error during sign-in profile check:",
           profileError,
         );
@@ -478,7 +390,7 @@ export const signInUser = async (
         };
       }
   } catch (error) {
-    logger.error("auth", "Sign in error:", error);
+    logger.category('auth').error("Sign in error:", error);
     const message = (error as Error)?.message?.includes("Request timeout")
       ? "The server took too long to respond. Please try again."
       : (error as Error)?.message?.includes("fetch")
@@ -486,18 +398,6 @@ export const signInUser = async (
         : "Sign in failed. Please try again.";
     return { success: false, error: message };
   }
-};
-
-// Check if email already exists error
-export const isEmailExistsError = (error: any): boolean => {
-  return (
-    error?.message?.includes("User already registered") ||
-    error?.message?.includes("already registered") ||
-    error?.message?.includes("already been registered") ||
-    error?.message?.includes("email address not available") ||
-    error?.message?.includes("duplicate key value") ||
-    error?.code === "23505"
-  );
 };
 
 // Send password reset email
@@ -537,8 +437,7 @@ export const sendPasswordReset = async (
 
     if (!resetResult.success) {
       // Log error details for debugging, but return generic message to prevent email enumeration
-      logger.error(
-        "auth",
+      logger.category("auth").error(
         "Password reset API error (full details for debugging):",
         { message: resetResult.message },
       );
@@ -557,7 +456,7 @@ export const sendPasswordReset = async (
         "If that email exists, a reset link has been sent. Please check your inbox.",
     };
   } catch (error) {
-    logger.error("auth", "Password reset error:", error);
+    logger.category('auth').error("Password reset error:", error);
     const message = (error as Error)?.message?.includes("Request timeout")
       ? "The server took too long to respond. Please try again."
       : "An unexpected error occurred. Please try again.";
@@ -586,7 +485,7 @@ export const updatePassword = async (
         "Password updated successfully! You can now sign in with your new password.",
     };
   } catch (error) {
-    logger.error("auth", "Password update error:", error);
+    logger.category('auth').error("Password update error:", error);
     return {
       success: false,
       error: "An unexpected error occurred. Please try again.",
@@ -636,13 +535,13 @@ export const generateWorldInviteLink = async (
     if (typeof window !== "undefined" && window.navigator?.clipboard) {
       try {
         await window.navigator.clipboard.writeText(inviteLink);
-        logger.debug("auth", "Invite link copied to clipboard!");
+        logger.category('auth').debug("Invite link copied to clipboard!");
       } catch {
-        logger.debug("auth", "Could not copy to clipboard automatically");
+        logger.category('auth').debug("Could not copy to clipboard automatically");
       }
     }
 
-    logger.info("auth", "World Invite Link Generated:", {
+    logger.category('auth').info("World Invite Link Generated:", {
       world: worldName,
       token: result.inviteLink.token,
       expires: result.inviteLink.expires_at,
@@ -654,7 +553,7 @@ export const generateWorldInviteLink = async (
       inviteLink,
     };
   } catch (error) {
-    logger.error("auth", "Failed to generate invite link:", error);
+    logger.category('auth').error("Failed to generate invite link:", error);
     return {
       success: false,
       error: "Failed to generate invite link",
@@ -680,7 +579,7 @@ export const checkPendingInvites = async (): Promise<{
           await SecureStorage.removeItem(STORAGE_KEYS.PENDING_INVITE);
         }
       } catch (error) {
-        logger.error("auth", "Error parsing pending invite:", error);
+        logger.category('auth').error("Error parsing pending invite:", error);
         await SecureStorage.removeItem(STORAGE_KEYS.PENDING_INVITE);
       }
     }

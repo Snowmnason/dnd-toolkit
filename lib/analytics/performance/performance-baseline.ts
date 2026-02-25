@@ -144,7 +144,7 @@ export class PerformanceBaselineService {
           // Validate and migrate if needed (includes config-driven trimming)
           this.validateAndMigrate();
         } catch (error) {
-          logger.error('performance', `Failed to parse stored baselines: ${error}, rebuilding`);
+          logger.category('performance').error(`Failed to parse stored baselines: ${error}, rebuilding`);
           this.data = this.createEmptyStorage();
           this.debouncedPersist();
         }
@@ -160,10 +160,10 @@ export class PerformanceBaselineService {
 
       this.isInitialized = true;
       if (this.data) {
-        logger.debug('performance', `Baselines initialized: ${Object.keys(this.data.baselines).length} operations tracked, config: max=${this.data.config.maxSamplesPerOp} samples, warmup=${this.data.config.warmupSamples}, threshold=${this.data.config.regressionThresholdPct}%, percentile=p${this.data.config.percentileForCompare}`);
+        logger.category('performance').debug(`Baselines initialized: ${Object.keys(this.data.baselines).length} operations tracked, config: max=${this.data.config.maxSamplesPerOp} samples, warmup=${this.data.config.warmupSamples}, threshold=${this.data.config.regressionThresholdPct}%, percentile=p${this.data.config.percentileForCompare}`);
       }
     } catch (error) {
-      logger.error('performance', `Failed to initialize baselines: ${error}`);
+      logger.category('performance').error(`Failed to initialize baselines: ${error}`);
       this.data = this.createEmptyStorage();
       this.isInitialized = true;
     }
@@ -195,9 +195,9 @@ export class PerformanceBaselineService {
         }
       }
 
-      logger.debug('performance', `Runtime config applied: max=${this.data.config.maxSamplesPerOp}, warmup=${this.data.config.warmupSamples}, threshold=${this.data.config.regressionThresholdPct}%, percentile=p${this.data.config.percentileForCompare}`);
+      logger.category('performance').perf(`Runtime config applied: max=${this.data.config.maxSamplesPerOp}, warmup=${this.data.config.warmupSamples}, threshold=${this.data.config.regressionThresholdPct}%, percentile=p${this.data.config.percentileForCompare}`);
     } catch (error) {
-      logger.debug('performance', `Failed to apply runtime config: ${error}`);
+      logger.category('performance').debug(`Failed to apply runtime config: ${error}`);
     }
   }
 
@@ -220,7 +220,7 @@ export class PerformanceBaselineService {
         const label = sorted[sorted.length - 1 - i][0];
         delete this.data.baselines[label];
         delete this.data.samples[label];
-        logger.debug('performance', `Pruned stale operation: "${label}" (LRU exceeded maxOperations: ${maxOps})`);
+        logger.category('performance').perf(`Pruned stale operation: "${label}" (LRU exceeded maxOperations: ${maxOps})`);
       }
     }
   }
@@ -241,7 +241,7 @@ export class PerformanceBaselineService {
       this.persistTimer = null;
       if (this.pendingPersist) {
         this.pendingPersist = false;
-        this.persist().catch(err => logger.debug('performance', `Debounced persist failed: ${err}`));
+        this.persist().catch(err => logger.category('performance').debug(`Debounced persist failed: ${err}`));
       }
     }, 500);
   }
@@ -258,7 +258,7 @@ export class PerformanceBaselineService {
       const serialized = JSON.stringify(this.data);
       await SecureStorage.setItem(STORAGE_KEYS.PERF_BASELINES, serialized);
     } catch (error) {
-      logger.error('performance', `Failed to persist baselines: ${error}`);
+      logger.category('performance').error(`Failed to persist baselines: ${error}`);
     }
   }
 
@@ -272,13 +272,13 @@ export class PerformanceBaselineService {
    */
   recordSample(label: string, durationMs: number, context?: { isIdle?: boolean }): void {
     if (!this.isInitialized) {
-      logger.warn('performance', 'recordSample called before initialize()');
+      logger.category('performance').warn('recordSample called before initialize()');
       return;
     }
 
     // Validate input
     if (!Number.isFinite(durationMs) || durationMs < 0) {
-      logger.warn('performance', `Invalid duration for "${label}": ${durationMs}`);
+      logger.category('performance').perf(`Invalid duration for "${label}": ${durationMs}`);
       return;
     }
 
@@ -311,7 +311,7 @@ export class PerformanceBaselineService {
     // If idle, skip recording in baseline but track count
     if (isIdle) {
       baseline.idleSkippedCount = (baseline.idleSkippedCount ?? 0) + 1;
-      logger.debug('performance', `Idle measurement recorded for "${label}" (total idle skip: ${baseline.idleSkippedCount})`);
+      logger.category('performance').perf(`Idle measurement recorded for "${label}" (total idle skip: ${baseline.idleSkippedCount})`);
       this.debouncedPersist();
       return;
     }
@@ -323,10 +323,7 @@ export class PerformanceBaselineService {
     if (samples.length > this.data.config.maxSamplesPerOp) {
       const dropped = samples.shift();
       baseline.droppedCount = (baseline.droppedCount ?? 0) + 1;
-      logger.debug(
-        'performance',
-        `Sample limit reached for "${label}" (max: ${this.data.config.maxSamplesPerOp}), dropped oldest sample: ${dropped}ms (total dropped: ${baseline.droppedCount})`
-      );
+      logger.category('performance').perf(`Sample limit reached for "${label}" (max: ${this.data.config.maxSamplesPerOp}), dropped oldest sample: ${dropped}ms (total dropped: ${baseline.droppedCount})`);
     }
 
     // Update baseline statistics
@@ -345,10 +342,7 @@ export class PerformanceBaselineService {
       baseline.p95 = 0;
       baseline.p99 = 0;
       baseline.mean = 0;
-      logger.debug(
-        'performance',
-        `Warm-up sample recorded for "${label}" (${baseline.warmupCount}/${warmupSources}): ${durationMs}ms`
-      );
+      logger.category('performance').perf(`Warm-up sample recorded for "${label}" (${baseline.warmupCount}/${warmupSources}): ${durationMs}ms`);
     } else {
       // Baseline is active: use samples 6+ for percentiles
       const activeS = samples.slice(warmupSources);
@@ -359,10 +353,7 @@ export class PerformanceBaselineService {
       baseline.p99 = computePercentile(activeS, 99);
       baseline.mean = activeS.reduce((a, b) => a + b, 0) / activeS.length;
 
-      logger.debug(
-        'performance',
-        `Baseline updated for "${label}": p50=${baseline.p50.toFixed(2)}ms, p95=${baseline.p95.toFixed(2)}ms (was ${oldP95.toFixed(2)}ms), p99=${baseline.p99.toFixed(2)}ms, count=${baseline.count}, mean=${baseline.mean.toFixed(2)}ms`
-      );
+      logger.category('performance').perf(`Baseline updated for "${label}": p50=${baseline.p50.toFixed(2)}ms, p95=${baseline.p95.toFixed(2)}ms (was ${oldP95.toFixed(2)}ms), p99=${baseline.p99.toFixed(2)}ms, count=${baseline.count}, mean=${baseline.mean.toFixed(2)}ms`);
     }
 
     baseline.lastUpdated = Date.now();
@@ -509,7 +500,7 @@ export class PerformanceBaselineService {
     this.data.lastUpdated = Date.now();
 
     await this.persist();
-    logger.debug('performance', `Baseline reset for "${label}"`);
+    logger.category('performance').debug(`Baseline reset for "${label}"`);
   }
 
   /**
@@ -522,7 +513,7 @@ export class PerformanceBaselineService {
 
     this.data = this.createEmptyStorage();
     await this.persist();
-    logger.debug('performance', 'All baselines reset');
+    logger.category('performance').debug('All baselines reset');
   }
 
 
@@ -556,7 +547,7 @@ export class PerformanceBaselineService {
 
     // Check schema version
     if (this.data.version !== 1) {
-      logger.warn('performance', `Unknown schema version: ${this.data.version}, recreating`);
+      logger.category('performance').perf(`Unknown schema version: ${this.data.version}, recreating`);
       this.data = this.createEmptyStorage();
       return;
     }
@@ -575,7 +566,7 @@ export class PerformanceBaselineService {
         if (this.data.baselines[label]) {
           this.data.baselines[label].droppedCount = (this.data.baselines[label].droppedCount ?? 0) + dropped;
         }
-        logger.debug('performance', `Trimmed ${dropped} samples for "${label}" due to config change (max: ${this.data.config.maxSamplesPerOp})`);
+        logger.category('performance').perf(`Trimmed ${dropped} samples for "${label}" due to config change (max: ${this.data.config.maxSamplesPerOp})`);
       }
     }
 
@@ -583,10 +574,7 @@ export class PerformanceBaselineService {
     for (const [label, baseline] of Object.entries(this.data.baselines)) {
       // Validate percentile ordering
       if (!(baseline.p50 <= baseline.p95 && baseline.p95 <= baseline.p99)) {
-        logger.warn(
-          'performance',
-          `Invalid percentile ordering for "${label}": p50[${baseline.p50}] > p95[${baseline.p95}] > p99[${baseline.p99}]`
-        );
+        logger.category('performance').perf(`Invalid percentile ordering for "${label}": p50[${baseline.p50}] > p95[${baseline.p95}] > p99[${baseline.p99}]`);
         // Mark for rebuild (if samples exist)
         if (this.data.samples[label]?.length) {
           this.rebuildBaseline(label);
@@ -597,7 +585,7 @@ export class PerformanceBaselineService {
 
       // Validate min/max ordering
       if (baseline.min && baseline.max && baseline.min > baseline.max) {
-        logger.warn('performance', `Invalid min/max for "${label}": min[${baseline.min}] > max[${baseline.max}]`);
+        logger.category('performance').perf(`Invalid min/max for "${label}": min[${baseline.min}] > max[${baseline.max}]`);
         delete this.data.baselines[label];
       }
     }
@@ -645,7 +633,7 @@ export class PerformanceBaselineService {
       version: 1,
     };
 
-    logger.debug('performance', `Rebuilt baseline for "${label}" from ${samples.length} samples`);
+    logger.category('performance').debug(`Rebuilt baseline for "${label}" from ${samples.length} samples`);
   }
 }
 

@@ -33,7 +33,7 @@ const loadStore = async (): Promise<Record<string, AttemptRecord>> => {
     if (!raw) return {};
     return JSON.parse(raw);
   } catch (error) {
-    logger.error("security", "Failed to load auth attempt store", error);
+    logger.category('security').error("Failed to load auth attempt store", error);
     return {};
   }
 };
@@ -43,7 +43,7 @@ const persistStore = async (store: Record<string, AttemptRecord>) => {
     const backend = getStorageBackend(STORAGE_KEYS.AUTH_ATTEMPTS);
     await backend.setJSON(STORAGE_KEYS.AUTH_ATTEMPTS, store);
   } catch (error) {
-    logger.error("security", "Failed to persist auth attempt store", error);
+    logger.category('security').error("Failed to persist auth attempt store", error);
   }
 };
 
@@ -136,8 +136,7 @@ export const recordAuthFailure = async (
         );
       }
     } catch {
-      logger.debug(
-        "security",
+      logger.category('security').debug(
         "Error tracker disabled or failed to report lockout",
       );
     }

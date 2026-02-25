@@ -573,8 +573,6 @@ export function initializeTelemetry(): void {
     initialStatus.effectiveType,
     getLatencyFromAPI(),
   );
-
-  logger.category("network").debug("Network telemetry initialized");
 }
 
 /**

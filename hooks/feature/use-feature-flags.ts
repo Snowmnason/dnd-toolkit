@@ -49,13 +49,13 @@ export function useFeatureFlags(
       const source = allFlags[flagName]?.source || "fallback";
 
       setState({ enabled, loading: false, error: null, source });
-      logger.debug("ui", `useFeatureFlags(${flagName}): initialized`, {
+      logger.category('feature_flags').debug(`useFeatureFlags(${flagName}): initialized`, {
         enabled,
         source,
       });
     } catch (error) {
       setState({ enabled: fallback, loading: false, error: error as Error });
-      logger.error("ui", `useFeatureFlags(${flagName}): error`, error);
+      logger.category('feature_flags').error(`useFeatureFlags(${flagName}): error`, error);
     }
 
     // Subscribe to updates
@@ -65,7 +65,7 @@ export function useFeatureFlags(
         /* eslint-disable-next-line security/detect-object-injection */
         const source = updatedFlags[flagName]?.source || "fallback";
         setState({ enabled, loading: false, error: null, source });
-        logger.debug("ui", `useFeatureFlags(${flagName}): updated`, {
+        logger.category('feature_flags').debug(`useFeatureFlags(${flagName}): updated`, {
           enabled,
           source,
         });

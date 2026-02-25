@@ -80,7 +80,7 @@ export function useWorlds(
       tags: [CACHE_TAGS.worlds, CACHE_TAGS.user(userId || "current")],
       // Query fires immediately, skipCache forces DB fetch on fresh sign-in
       onError: (err) => {
-        logger.error("cache", "Error loading worlds:", err);
+        logger.category('storage').error("Error loading worlds:", err);
       },
     },
   );

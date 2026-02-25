@@ -43,7 +43,7 @@ export function useRefreshStorageCache({
     try {
       await updateStorageCache.refreshEverything();
 
-      logger.info('other', 'Force refresh completed successfully');
+      logger.category('storage').info('Force refresh completed successfully');
 
       const elapsedTime = Date.now() - startTime;
       const minDisplayTime = 2000;
@@ -55,7 +55,7 @@ export function useRefreshStorageCache({
         }
       }, remainingTime);
     } catch (error: any) {
-      logger.error('other', 'Force refresh failed:', error);
+      logger.category('storage').error('Force refresh failed:', error);
       if (isMountedRef.current) {
         showToast('Failed to sync data. Please try again.', 'error', 4000);
       }

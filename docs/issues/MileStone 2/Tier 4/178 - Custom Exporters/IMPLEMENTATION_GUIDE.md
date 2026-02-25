@@ -141,7 +141,7 @@ async function dispatchEvent(event: AnalyticsEvent, context?: ExportContext): Pr
   results.forEach((result, i) => {
     const exporter = eligibleExporters[i];
     if (result.status === 'rejected') {
-      logger.warn('analytics', `Exporter ${exporter.name} failed: ${result.reason}`);
+      logger.category('analytics').warn(`Exporter ${exporter.name} failed: ${result.reason}`);
     }
   });
 }

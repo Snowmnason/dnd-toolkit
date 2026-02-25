@@ -14,7 +14,7 @@
  *
  *   // Subscribe to config changes
  *   const unsubscribe = hotReload.subscribe((newConfig) => {
- *     logger.info("config", "Config changed!");
+ *     logger.category('config').info("Config changed!");
  *     updateModuleState(newConfig);
  *   });
  */
@@ -128,17 +128,17 @@ export class ConfigHotReload {
   async start(options: HotReloadOptions = {}): Promise<void> {
     // Only allow in development; silently skip in production
     if (!this.isDevelopmentMode()) {
-      logger.info("bootstrap", "Hot-reload skipped (production mode)");
+      logger.category('bootstrap').info("Hot-reload skipped (production mode)");
       return;
     }
 
     if (this.isWatching) {
-      logger.info("bootstrap", "Hot-reload already running");
+      logger.category('bootstrap').info("Hot-reload already running");
       return;
     }
 
     this.isWatching = true;
-    logger.debug("bootstrap", "Config hot-reload started");
+    logger.category('bootstrap').debug("Config hot-reload started");
 
     const interval = options.pollInterval || 2000; // Default: 2000ms (less aggressive)
     const debounceInterval = options.debounceInterval || 300; // Debounce rapid writes
@@ -158,7 +158,7 @@ export class ConfigHotReload {
       clearTimeout(this.debounceTimeout);
       this.debounceTimeout = null;
     }
-    logger.debug("bootstrap", "Config hot-reload stopped");
+    logger.category('bootstrap').debug("Config hot-reload stopped");
   }
 
   /**
@@ -228,34 +228,30 @@ export class ConfigHotReload {
                   const oldConfig = this.currentConfig;
                   this.currentConfig = newConfig;
 
-                  logger.debug("other", "Config hot-reloaded");
+                  logger.category('other').debug("Config hot-reloaded");
                   this.notifyListeners(newConfig);
 
                   if (onReload) {
                     try {
                       await onReload(oldConfig, newConfig);
                     } catch (callbackError) {
-                      logger.error(
-                        "other",
-                        `onReload callback failed: ${callbackError}`
-                      );
+                      logger.category('other').error(`onReload callback failed: ${callbackError}`);
                     }
                   }
                 }
               } catch (validationError) {
                 // Validation failed: keep old config and log error
-                logger.warn(
-                  "other",
-                  `Config validation failed, keeping previous config: ${validationError}`
-                );
+                  logger.category('other').warn(
+                    `Config validation failed, keeping previous config: ${validationError}`
+                  );
               }
             } catch (error) {
-              logger.debug("other", `Hot-reload processing failed: ${error}`);
+              logger.category('other').debug(`Hot-reload processing failed: ${error}`);
             }
           }, debounceInterval);
         }
       } catch (error) {
-        logger.debug("other", `Hot-reload check failed: ${error}`);
+        logger.category('other').debug(`Hot-reload check failed: ${error}`);
       }
 
       // Schedule next poll
@@ -397,7 +393,7 @@ export class ConfigHotReload {
       try {
         listener(config);
       } catch (error) {
-        logger.error("other", `Listener error: ${error}`);
+        logger.category('other').error(`Listener error: ${error}`);
       }
     }
   }
@@ -434,7 +430,7 @@ export function initializeHotReload(
   initialConfig: AppSettings
 ): ConfigHotReload {
   if (hotReloadInstance) {
-    logger.warn("bootstrap", "Hot-reload already initialized");
+    logger.category('bootstrap').warn("Hot-reload already initialized");
     return hotReloadInstance;
   }
   hotReloadInstance = new ConfigHotReload(initialConfig);

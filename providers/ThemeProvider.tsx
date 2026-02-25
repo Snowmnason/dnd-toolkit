@@ -58,9 +58,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
         if (savedFamily && allThemes[savedFamily as ThemeFamily]) {
           setFamilyState(savedFamily as ThemeFamily);
-          logger.category("ui").debug("ThemeProvider: loaded saved family", {
-            family: savedFamily,
-          });
         } else {
           setFamilyState("classic");
           familyBackend

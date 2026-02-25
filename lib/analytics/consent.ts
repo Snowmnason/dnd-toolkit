@@ -36,8 +36,8 @@ function getConfiguredDefaultConsent(): ConsentLevel {
   }
 
   // Invalid or missing config - log and fall back to 'basic'
-  if (configValue) {
-    logger.category('analytics').warn('Invalid analytics consent level in config, using default', {
+    if (configValue) {
+    logger.category('analytics').warn('InvalidConsentConfig', 'Invalid analytics consent level in config, using default', {
       configured: configValue,
       fallback: 'basic',
     });
@@ -89,7 +89,7 @@ class AnalyticsConsentManager {
           if (isCacheFresh) {
             // Cache is fresh - trust SecureStorage as source of truth
             sourceOfTruth = stored as ConsentLevel;
-            logger.category('analytics').debug('consent_initialized', `Loaded from SecureStorage cache (age: ${cacheAge}ms)`, {
+            logger.category('analytics').analytics('consent_initialized', `Loaded from SecureStorage cache (age: ${cacheAge}ms)`, {
               level: sourceOfTruth,
             });
             this.consentLevel = sourceOfTruth;
@@ -98,10 +98,10 @@ class AnalyticsConsentManager {
           }
 
           // Cache is stale - will try to refresh from database below
-          logger.category('analytics').debug('consent_initialized', `SecureStorage cache stale (age: ${cacheAge}ms), refreshing from database`);
+          logger.category('analytics').analytics('consent_initialized', `SecureStorage cache stale (age: ${cacheAge}ms), refreshing from database`);
         }
       } else {
-        logger.category('analytics').debug('consent_initialized', 'Force refresh requested, skipping cache');
+        logger.category('analytics').analytics('consent_initialized', 'Force refresh requested, skipping cache');
       }
 
       // Step 2: Try database if authenticated and cache is stale/missing
@@ -114,7 +114,7 @@ class AnalyticsConsentManager {
           const settings = await userSettingsDB.fetchCurrentUserSettings({ forceRefresh: true });
           if (settings && settings.analytics_consent_level && this.isValidConsentLevel(settings.analytics_consent_level)) {
             sourceOfTruth = settings.analytics_consent_level as ConsentLevel;
-            logger.category('analytics').debug('consent_initialized', 'Loaded from database', {
+            logger.category('analytics').analytics('consent_initialized', 'Loaded from database', {
               level: sourceOfTruth,
             });
 
@@ -139,7 +139,7 @@ class AnalyticsConsentManager {
       } catch (dbErr) {
         // Database read failed (not authenticated or offline or DB error)
         // Fall back to SecureStorage cache or default below
-        logger.category('analytics').debug('consent_initialized', 'Database read failed, falling back to SecureStorage or default', {
+        logger.category('analytics').warn('consent_initialized', 'Database read failed, falling back to SecureStorage or default', {
           error: dbErr instanceof Error ? dbErr.message : String(dbErr),
         });
       }
@@ -148,7 +148,7 @@ class AnalyticsConsentManager {
       const stored = await SecureStorage.getItem(STORAGE_KEYS.ANALYTICS_CONSENT);
       if (stored && this.isValidConsentLevel(stored)) {
         sourceOfTruth = stored as ConsentLevel;
-        logger.category('analytics').debug('consent_initialized', 'Using stale SecureStorage cache as fallback', {
+        logger.category('analytics').analytics('consent_initialized', 'Using stale SecureStorage cache as fallback', {
           level: sourceOfTruth,
         });
         this.consentLevel = sourceOfTruth;
@@ -157,7 +157,7 @@ class AnalyticsConsentManager {
       }
 
       // Step 4: Fall back to default
-      logger.category('analytics').debug('consent_initialized', 'Using default consent level', {
+      logger.category('analytics').analytics('consent_initialized', 'Using default consent level', {
         level: DEFAULT_CONSENT,
       });
       sourceOfTruth = DEFAULT_CONSENT;
@@ -207,7 +207,7 @@ class AnalyticsConsentManager {
     const CONSENT_ORDER: Record<ConsentLevel, number> = { none: 0, basic: 1, full: 2 };
     // eslint-disable-next-line security/detect-object-injection
     if (CONSENT_ORDER[level] < CONSENT_ORDER[previousLevel]) {
-      logger.category('analytics').info('consent', 'Consent downgraded — purging analytics buffers and breadcrumbs', { previousLevel, level });
+      logger.category('analytics').analytics('consent', 'Consent downgraded — purging analytics buffers and breadcrumbs', { previousLevel, level });
       try {
         const { handleAnalyticsConsentWithdrawal } = await import('./analytics-network-integration');
         await handleAnalyticsConsentWithdrawal();
@@ -227,7 +227,7 @@ class AnalyticsConsentManager {
     try {
       const { ConsentSyncQueue } = await import('./consent-sync-queue');
       const syncId = await ConsentSyncQueue.enqueue(level);
-      logger.category('analytics').debug('consent', 'Queued consent change for sync', { level, syncId });
+      logger.category('analytics').analytics('consent', 'Queued consent change for sync', { level, syncId });
     } catch (err) {
       logger.category('analytics').warn('consent', 'Failed to queue consent sync (non-critical)', { level, error: err });
       // Don't throw - local persistence succeeded, queue failure is non-blocking
@@ -263,7 +263,7 @@ class AnalyticsConsentManager {
   resetToDefault(): void {
     this.consentLevel = DEFAULT_CONSENT;
     this.isInitialized = false;
-    logger.category('analytics').info('consent', 'Consent reset to default');
+    logger.category('analytics').analytics('consent', 'Consent reset to default');
   }
 
   /**

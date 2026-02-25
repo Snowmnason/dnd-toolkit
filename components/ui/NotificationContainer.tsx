@@ -15,20 +15,15 @@ function NotificationContainerInner() {
   const { notifications } = useNotifications();
 
   useEffect(() => {
-    logger.debug("ui", "Mount");
-    return () => logger.debug("ui", "Unmount");
+    logger.category("ui").debug("Mount");
+    return () => logger.category("ui").debug("Unmount");
   }, []);
 
   useEffect(() => {
-    logger.debug(
-      "ui",
-      "Notifications updated:",
-      notifications.length,
-      notifications.map((n) => n.id),
-    );
+    logger.category("ui").debug("Notifications updated:", notifications.length, notifications.map((n) => n.id));
   }, [notifications]);
 
-  logger.debug("ui", "Rendering with", notifications.length, "notifications");
+  logger.category("ui").debug("Rendering with", notifications.length, "notifications");
 
   // Only return notifications - no full-screen wrapper
   // Each notification handles its own positioning and pointer events

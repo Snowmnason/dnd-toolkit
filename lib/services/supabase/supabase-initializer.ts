@@ -45,7 +45,6 @@ let _initialized = false;
  */
 export async function initializeSupabaseDatabaseProvider(): Promise<boolean> {
   if (_initialized) {
-    logger.debug('bootstrap', '[Supabase Initializer] Already initialized — skipping');
     const { getDatabaseProvider } = await import('../database-adapter');
     return getDatabaseProvider().isConfigured();
   }
@@ -61,24 +60,21 @@ export async function initializeSupabaseDatabaseProvider(): Promise<boolean> {
 
     if (!process.env.EXPO_PUBLIC_SUPABASE_URL && expoExtra.supabaseUrl) {
       (process.env as any).EXPO_PUBLIC_SUPABASE_URL = expoExtra.supabaseUrl;
-      logger.debug('bootstrap', '[Supabase Initializer] EXPO_PUBLIC_SUPABASE_URL set from app.json extras');
     }
     if (!process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY && expoExtra.supabaseAnonKey) {
       (process.env as any).EXPO_PUBLIC_SUPABASE_ANON_KEY = expoExtra.supabaseAnonKey;
-      logger.debug('bootstrap', '[Supabase Initializer] EXPO_PUBLIC_SUPABASE_ANON_KEY set from app.json extras');
     }
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (e) {
     // expo-constants unavailable (non-Expo environments) — env vars must be in process.env already
-    logger.debug('bootstrap', '[Supabase Initializer] expo-constants unavailable; relying on process.env');
+    logger.category('bootstrap').debug('[Supabase Initializer] expo-constants unavailable; relying on process.env');
   }
 
   // ── Step 2: Check configuration ───────────────────────────────────────────
   const { getSupabaseClient, isSupabaseConfigured } = await import('./supabase-client');
 
   if (!isSupabaseConfigured()) {
-    logger.warn(
-      'bootstrap',
+    logger.category('bootstrap').warn(
       '[Supabase Initializer] Not configured (missing env vars) — registering NoOpDatabaseProvider. ' +
         'Database queries will throw until a provider is registered.'
     );
@@ -91,11 +87,11 @@ export async function initializeSupabaseDatabaseProvider(): Promise<boolean> {
   // timer starts immediately. Without this, the first getSession() call would
   // trigger initialization lazily, potentially after key auth windows close.
   const client = getSupabaseClient();
-  logger.info('bootstrap', '[Supabase Initializer] Client initialized — session restoration in progress');
+  logger.category('bootstrap').info('[Supabase Initializer] Client initialized — session restoration in progress');
 
   // ── Step 4: Register DatabaseProvider ─────────────────────────────────────
   registerDatabaseProvider(new SupabaseDatabaseProvider(client));
-  logger.debug('bootstrap', '[Supabase Initializer] SupabaseDatabaseProvider registered');
+  logger.category('bootstrap').debug('[Supabase Initializer] SupabaseDatabaseProvider registered');
 
   // ── Step 5: Register RPC adapters with edge-function registry ──────────────
   // Maps semantic edge function names to Supabase RPC implementations.
@@ -114,7 +110,7 @@ export async function initializeSupabaseDatabaseProvider(): Promise<boolean> {
     registerEdgeFunction(functionName, adapter);
   });
 
-  logger.debug('bootstrap', `[Supabase Initializer] Registered ${rpcFunctionNames.length} RPC edge functions`);
+  logger.category('bootstrap').debug(`[Supabase Initializer] Registered ${rpcFunctionNames.length} RPC edge functions`);
 
   return true;
 }

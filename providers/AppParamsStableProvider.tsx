@@ -76,15 +76,11 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function loadFromStorage() {
       try {
-        logger.debug(
-          "context",
+        logger.category('storage').debug(
           "AppParamsStableProvider: Loading userId from storage",
         );
         const userId = await AuthStateManager.getUserId();
-        logger.debug(
-          "context",
-          `AppParamsStableProvider: Loaded userId=${userId}`,
-        );
+        logger.category('storage').debug(`AppParamsStableProvider: Loaded userId=${userId}`);
         if (userId) {
           setStableParams((prev) => ({ ...prev, userId }));
         } else {
@@ -120,8 +116,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         if (isEmptyCache) {
           if (isCacheRecent) {
             // Fresh verification returned 0 worlds - not an error, just confirmed empty
-            logger.debug(
-              "context",
+            logger.category('storage').debug(
               `AppParamsStableProvider: Cache is empty but recently verified (${getTimeSinceVerification(richCache)}m ago) - confirmed empty state`,
             );
             setStableParams((prev) => ({
@@ -130,16 +125,14 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
             }));
           } else {
             // Old/missing metadata with empty cache - error state, attempt recovery
-            logger.debug(
-              "context",
+            logger.category('storage').debug(
               "AppParamsStableProvider: Cache is empty and stale - treating as error state, will attempt verification",
             );
 
             // IMPORTANT: If userId unavailable (transient auth state), don't block UI
             // Set empty worlds and let screen render - verification will retry when userId arrives
             if (!userId) {
-              logger.debug(
-                "context",
+              logger.category('storage').debug(
                 "AppParamsStableProvider: Error state but no userId yet (auth still loading) - showing empty worlds, will verify once auth completes",
               );
               setStableParams((prev) => ({
@@ -153,10 +146,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
             }
           }
         } else {
-          logger.debug(
-            "context",
-            `AppParamsStableProvider: Loaded ${worldIds.length} worlds from persistent cache`,
-          );
+          logger.category('storage').debug(`AppParamsStableProvider: Loaded ${worldIds.length} worlds from persistent cache`);
 
           // IMPORTANT: Set UI immediately with cached worlds (no blocking)
           // This prevents blank screen on startup/restart
@@ -165,8 +155,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
             connectedWorldIds: worldIds,
           }));
 
-          logger.debug(
-            "context",
+          logger.category('storage').debug(
             `AppParamsStableProvider: Rich cache metadata - DM: ${richCache?.counts.dm || 0}, Player: ${richCache?.counts.player || 0}, Last verified: ${richCache?.lastVerifiedAt ? new Date(richCache.lastVerifiedAt).toISOString() : "never"}`,
           );
 
@@ -175,18 +164,11 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
           if (shouldVerify) {
             startBackgroundVerification(userId, worldIds, richCache, false);
           } else {
-            logger.debug(
-              "context",
-              "AppParamsStableProvider: Cache is fresh, skipping verification (offline-friendly)",
-            );
+            logger.category('storage').debug("AppParamsStableProvider: Cache is fresh, skipping verification (offline-friendly)");
           }
         }
       } catch (error) {
-        logger.error(
-          "context",
-          "AppParamsStableProvider: Error loading from storage:",
-          error,
-        );
+        logger.category('storage').error("AppParamsStableProvider: Error loading from storage:", error);
       }
     }
 
@@ -232,8 +214,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
       const cacheAgeMs = Date.now() - richCache.lastVerifiedAt;
       const isStale = cacheAgeMs > fourHoursMs;
 
-      logger.debug(
-        "context",
+      logger.category('storage').debug(
         `AppParamsStableProvider: Cache age check - ${(cacheAgeMs / 1000 / 60).toFixed(1)}m old, stale threshold: 240m, isStale: ${isStale}`,
       );
 
@@ -259,22 +240,19 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
       isErrorState: boolean,
     ) {
       if (isVerifyingRef.current) {
-        logger.debug("context", "AppParamsStableProvider: Verification already running - skipping new request");
         return;
       }
       try {
         // Set inside try so the finally block always resets the flag,
         // even if an exception is thrown anywhere in the verification body.
         isVerifyingRef.current = true;
-        logger.info(
-          "context",
+        logger.category('storage').info(
           `AppParamsStableProvider: Starting background world verification (errorState: ${isErrorState})`,
         );
 
         // If empty cache (error state) and no userId, can't verify
         if (isErrorState && !userId) {
-          logger.warn(
-            "context",
+          logger.category('storage').warn( 
             "AppParamsStableProvider: Empty cache but no userId - cannot verify, waiting for auth",
           );
           return;
@@ -290,8 +268,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         // CRITICAL: If verification was deferred (session not ready), do NOT touch the cache.
         // The auth watcher or userId effect will trigger re-verification once session is ready.
         if (batchResult.deferred) {
-          logger.info(
-            "context",
+          logger.category('storage').info(
             "AppParamsStableProvider: Verification deferred (session not ready), keeping cached worlds until session is available",
           );
           return;
@@ -304,15 +281,13 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
           if (hasAccess) {
             verifiedWorldIds.push(worldId);
           } else {
-            logger.info(
-              "context",
+            logger.category('storage').info(
               `World ${worldId} access denied or stale`,
             );
           }
         }
 
-        logger.info(
-          "context",
+        logger.category('storage').info(
           "AppParamsStableProvider: Verification complete",
           {
             cached: cachedWorldIds.length,
@@ -324,8 +299,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         // ERROR STATE RECOVERY: If cache was empty, populate from verification results
         if (isErrorState && cachedWorldIds.length === 0) {
           if (verifiedWorldIds.length > 0) {
-            logger.info(
-              "context",
+            logger.category('storage').info(
               `AppParamsStableProvider: Recovered ${verifiedWorldIds.length} worlds from error state`,
             );
             // Set state with verified worlds
@@ -343,8 +317,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
               verifiedWorldIds,
             );
           } else {
-            logger.info(
-              "context",
+            logger.category('storage').info(
               `AppParamsStableProvider: Error state verified - user has 0 worlds`,
             );
             setStableParams((prev) => ({
@@ -359,8 +332,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         // If verification returned 0:
         // - It's a legitimate state (user truly has 0 worlds) → clear cache
         if (verifiedWorldIds.length === 0 && cachedWorldIds.length > 0) {
-          logger.info(
-            "context",
+          logger.category('storage').info(
             `AppParamsStableProvider: Verification returned 0 worlds. User has no worlds. Clearing cache.`,
           );
           // Legitimate 0: clear cache and state
@@ -396,15 +368,13 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         const playerMetSafe =
           playerVerified >= playerThreshold || playerWorlds.length === 0;
 
-        logger.debug(
-          "context",
+        logger.category("storage").debug(
           `AppParamsStableProvider: Threshold check - DM: ${dmVerified}/${dmThreshold}, Player: ${playerVerified}/${playerThreshold}`,
         );
 
         // Only update cache if thresholds are met
         if (!dmMetSafe || !playerMetSafe) {
-          logger.warn(
-            "context",
+          logger.category("storage").warn(
             `AppParamsStableProvider: Verification did not meet safety thresholds. DM met: ${dmMetSafe}, Player met: ${playerMetSafe}. Cache preserved.`,
           );
           // Don't update cache - keep using what was there
@@ -426,13 +396,11 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
           verifiedWorldIds,
         );
 
-        logger.info(
-          "context",
+        logger.category("storage").info(
           "AppParamsStableProvider: Cache updated with verified worlds",
         );
       } catch (verificationError) {
-        logger.warn(
-          "context",
+        logger.category("storage").warn(
           "AppParamsStableProvider: Verification error, keeping cached worlds",
           verificationError,
         );
@@ -463,8 +431,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         const unsubscribe = authProvider.onAuthStateChange(async (session) => {
           if (localToken !== watcherToken) return; // stale watcher
           if (mounted && session !== null) {
-            logger.debug(
-              "context",
+            logger.category('auth').debug(
               "AppParamsStableProvider: Auth state changed (signed in), reloading userId...",
             );
             // Small delay to ensure async storage operations complete
@@ -473,8 +440,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
               setAuthStateVersion((v) => v + 1);
             }
           } else if (mounted && session === null) {
-            logger.debug(
-              "context",
+            logger.category('auth').debug(
               "AppParamsStableProvider: Auth state changed (signed out), clearing params and cache metadata...",
             );
             // Clear everything including metadata to force fresh verification on next sign-in
@@ -499,8 +465,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         const MAX_RETRIES = 5;
         if (attempt < MAX_RETRIES && mounted) {
           const delayMs = Math.min(500 * Math.pow(2, attempt - 1), 4000);
-          logger.debug(
-            "context",
+          logger.category("storage").debug(
             `AppParamsStableProvider: Auth provider not ready, retrying in ${delayMs}ms (attempt ${attempt}/${MAX_RETRIES})`,
           );
           retryTimer = setTimeout(() => {
@@ -509,8 +474,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
             }
           }, delayMs);
         } else {
-          logger.warn(
-            "context",
+          logger.category("storage").warn(
             `AppParamsStableProvider: Failed to set up auth watcher after ${attempt} attempts`,
             error,
           );
@@ -540,8 +504,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     const nowHasUserId = stableParams.userId !== undefined;
 
     if (hadNoUserId && nowHasUserId && stableParams.connectedWorldIds.length === 0) {
-      logger.info(
-        "context",
+      logger.category("storage").info(
         "AppParamsStableProvider: UserId just became available with empty worlds - forcing re-verification to catch auth race condition",
       );
       // Bump authStateVersion to trigger loadFromStorage again
@@ -562,8 +525,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     const backend = getPrivacyStorageBackend(STORAGE_KEYS.CONNECTED_WORLDS);
     void backend.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, worldIds).catch(
       (error) => {
-        logger.error(
-          "other",
+        logger.category('storage').error(
           "Failed to persist connected worlds cache",
           error,
         );
@@ -606,7 +568,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         CONNECTED_WORLDS_METADATA,
       ),
     ]).catch((error) => {
-      logger.error("other", "Failed to clear connected worlds cache/metadata", error);
+      logger.category('storage').error("Failed to clear connected worlds cache/metadata", error);
     });
   }, []);
 

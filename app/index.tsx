@@ -46,8 +46,7 @@ export default function HomePage() {
     const timer = setTimeout(() => {
       // Only show failsafe if we're still waiting for auth check
       if (!isAuthChecked) {
-        logger.warn(
-          "bootstrap",
+        logger.category("bootstrap").warn(
           "⏱️ Failsafe timeout reached, showing manual navigation button",
         );
         setShowFailsafe(true);
@@ -61,11 +60,11 @@ export default function HomePage() {
   React.useEffect(() => {
     // Don't proceed until kernel is complete
     if (!kernel.phases.appReady) {
-      logger.debug("bootstrap", "⏸️ Waiting for kernel to complete");
+      logger.category("bootstrap").debug("⏸️ Waiting for kernel to complete");
       return;
     }
 
-    logger.info("bootstrap", "🚀 Kernel ready! Checking login recency...");
+    logger.category("bootstrap").info("🚀 Kernel ready! Checking login recency...");
 
     const checkLoginRecency = async () => {
       try {
@@ -80,9 +79,8 @@ export default function HomePage() {
         const hasAccount = authState?.hasAccount === true;
 
         // If user explicitly logged out (hasAccount is false/null/undefined), show welcome
-        if (!hasAccount) {
-          logger.debug(
-            "bootstrap",
+        if (!hasAccount) {  
+          logger.category("bootstrap").debug(
             "⏭️ User not logged in (hasAccount=false), showing welcome",
           );
           setIsAuthChecked(true);
@@ -99,10 +97,9 @@ export default function HomePage() {
         );
 
         if (!lastLoggedInStr) {
-          logger.debug(
-            "bootstrap",
-            "⏭️ No recent login found, showing welcome",
-          );
+          logger.category("bootstrap").debug(
+              "⏭️ No recent login found, showing welcome",
+            );
           setIsAuthChecked(true);
           setHasAccount(false);
           return;
@@ -114,8 +111,7 @@ export default function HomePage() {
         const isWithinSevenDays = now - lastLoggedInMs < sevenDaysMs;
 
         if (isWithinSevenDays) {
-          logger.info(
-            "bootstrap",
+          logger.category("bootstrap").info(
             `✅ Recent login detected (${Math.floor((now - lastLoggedInMs) / (1000 * 60 * 60))} hours ago), redirecting to world selection`
           );
           setIsAuthChecked(true);
@@ -127,16 +123,14 @@ export default function HomePage() {
           return;
         }
 
-        logger.debug(
-          "bootstrap",
+        logger.category("bootstrap").debug(
           "⏭️ Login is stale (>7 days), showing welcome",
         );
         setIsAuthChecked(true);
         setHasAccount(false);
       } catch (error) {
         // If check fails, just show welcome - no harm done
-        logger.debug(
-          "bootstrap",
+        logger.category("bootstrap").debug(
           "⚠️ Login recency check failed, showing welcome:",
           error,
         );
@@ -153,8 +147,7 @@ export default function HomePage() {
     const loadingMessage = kernel.phases.preloadReady
       ? "Restoring session..."
       : "Loading assets...";
-    logger.debug(
-      "bootstrap",
+    logger.category("bootstrap").debug(
       "⏳ Rendering index loading overlay:",
       loadingMessage,
     );
@@ -174,8 +167,7 @@ export default function HomePage() {
   // For authenticated users: they'll see the welcome screen momentarily,
   // but the select route guard will pull them to /select/world-selection
   if (isAuthChecked) {
-    logger.debug(
-      "bootstrap",
+    logger.category("bootstrap").debug(
       `📋 Rendering welcome screen (hasAccount: ${hasAccount})`,
     );
 
@@ -188,8 +180,7 @@ export default function HomePage() {
             <TouchableOpacity
               style={styles.failsafeButton}
               onPress={() => {
-                logger.info(
-                  "bootstrap",
+                logger.category("bootstrap").info(
                   "🚪 User clicked failsafe button, navigating to welcome",
                 );
                 // Welcome screen is already showing, so this is a manual refresh
@@ -207,7 +198,7 @@ export default function HomePage() {
   }
 
   // Show loading while determining auth status
-  logger.debug("bootstrap", "⏳ Checking auth status...");
+  logger.category("bootstrap").debug("⏳ Checking auth status...");
   return (
     <View style={styles.container}>
       <LoadingOverlay

@@ -41,7 +41,7 @@ const supabaseAnonKey =
   Constants.expoConfig?.extra?.supabaseAnonKey;
 
 // Log configuration status for debugging
-logger.debug('storage', 'Loading Supabase Configuration:', {
+logger.category('storage').debug('Loading Supabase Configuration:', {
   hasUrl: !!supabaseUrl,
   hasKey: !!supabaseAnonKey,
   urlLength: supabaseUrl?.length || 0,
@@ -61,7 +61,7 @@ export const isSupabaseConfigured = () => {
   );
 
   if (!hasLoggedSupabaseConfig) {
-    logger.info('storage', `Supabase Configuration Status: ${configured ? '✅ CONFIGURED' : '❌ NOT CONFIGURED'}`, {
+    logger.category('storage').info(`Supabase Configuration Status: ${configured ? '✅ CONFIGURED' : '❌ NOT CONFIGURED'}`, {
       hasUrl: !!supabaseUrl,
       hasKey: !!supabaseAnonKey,
       urlLength: supabaseUrl?.length || 0,
@@ -94,12 +94,12 @@ export const getSupabaseClient = () => {
     // Web users will re-authenticate on page reload (secure trade-off)
     if (typeof window !== 'undefined') {
       authConfig.persistSession = false;
-      logger.info('storage', '🔒 Web: Session persistence disabled for security (users re-auth on reload)');
+      logger.category('storage').info('🔒 Web: Session persistence disabled for security (users re-auth on reload)');
     } else {
       // Mobile: Enable session persistence with platform-native async storage
       // AsyncStorage on mobile is automatically encrypted via EncryptedStorage
       authConfig.persistSession = true;
-      logger.info('storage', '📱 Mobile: Session persistence enabled via platform-native async storage (encrypted)');
+      logger.category('storage').info('Mobile: Session persistence enabled via platform-native async storage (encrypted)');
     }
 
     _supabaseClient = createClient(
@@ -115,30 +115,30 @@ export const getSupabaseClient = () => {
     if (typeof window !== 'undefined') {
       _supabaseClient.auth.onAuthStateChange((event: string, session: any) => {
         if (event === 'SIGNED_IN' && session) {
-          logger.info('storage', '✅ User authenticated (saving session to encrypted storage)', {
+          logger.category('storage').info('✅ User authenticated (saving session to encrypted storage)', {
             auth_id: session.user?.id,
             hasAccessToken: !!session.access_token,
           });
           // Dynamically import to avoid circular dependency
           import('../../auth/auth-state').then(({ AuthStateManager }) => {
             AuthStateManager.saveAuthSession(session).catch((err) => {
-              logger.error('storage', 'Failed to save auth session:', err);
+              logger.category('storage').error('Failed to save auth session:', err);
             });
           });
         } else if (event === 'SIGNED_OUT') {
-          logger.info('storage', '🔓 User signed out');
+          logger.category('storage').info('🔓 User signed out');
           // Clear the saved session
           import('../../auth/auth-state').then(({ AuthStateManager }) => {
             AuthStateManager.clearAuthSession().catch((err) => {
-              logger.error('storage', 'Failed to clear auth session:', err);
+              logger.category('storage').error('Failed to clear auth session:', err);
             });
           });
         } else if (event === 'TOKEN_REFRESHED' && session) {
-          logger.debug('storage', '🔄 Token refreshed, updating saved session');
+          logger.category('storage').debug('🔄 Token refreshed, updating saved session');
           // Update the saved session with new tokens
           import('../../auth/auth-state').then(({ AuthStateManager }) => {
             AuthStateManager.saveAuthSession(session).catch((err) => {
-              logger.error('storage', 'Failed to update auth session:', err);
+              logger.category('storage').error('Failed to update auth session:', err);
             });
           });
         }
@@ -153,7 +153,7 @@ export const getSupabaseClient = () => {
 export const supabase = new Proxy({} as any, {
   get(target, prop) {
     if (!isSupabaseConfigured()) {
-      logger.warn('storage', 'Server connection unavailable - operations will be skipped');
+      logger.category('storage').warn('Server connection unavailable - operations will be skipped');
       // Return a mock object that doesn't throw but logs warnings
       return new Proxy({} as any, {
         get() {

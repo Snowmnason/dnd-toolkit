@@ -36,7 +36,7 @@ import {
     type Session,
     UserNotFoundError,
 } from "@/lib/services";
-import { mapAuthErrorToCode } from "../utils/ERROR_CODES";
+import { mapAuthErrorToCode, ERROR_CODES, RetryErrorCode } from "../utils/ERROR_CODES";
 import { logger } from "../utils/logger";
 import {
     checkAuthGuard,
@@ -95,7 +95,7 @@ export interface ResendOperationResult extends AuthOperationResult {
 interface ErrorRetryStrategy {
   shouldAutoRetry: boolean;
   suggestRetryAfterMs?: number;
-  reason: string;
+  reason: RetryErrorCode;
 }
 
 // ============================================================================
@@ -114,7 +114,7 @@ function classifyErrorRetryStrategy(error: unknown): ErrorRetryStrategy {
     return {
       shouldAutoRetry: true,
       suggestRetryAfterMs: 2000,
-      reason: "transient_network_failure",
+      reason: ERROR_CODES.RETRY.TRANSIENT_NETWORK_FAILURE,
     };
   }
 
@@ -122,7 +122,7 @@ function classifyErrorRetryStrategy(error: unknown): ErrorRetryStrategy {
     return {
       shouldAutoRetry: false,
       suggestRetryAfterMs: (error.retryAfterSeconds || 60) * 1000,
-      reason: "rate_limit_exceeded",
+      reason: ERROR_CODES.RETRY.RATE_LIMIT_EXCEEDED,
     };
   }
 
@@ -132,13 +132,13 @@ function classifyErrorRetryStrategy(error: unknown): ErrorRetryStrategy {
   ) {
     return {
       shouldAutoRetry: false,
-      reason: "permanent_failure",
+      reason: ERROR_CODES.RETRY.PERMANENT_FAILURE,
     };
   }
 
   return {
     shouldAutoRetry: false,
-    reason: "unknown_error",
+    reason: ERROR_CODES.RETRY.UNKNOWN,
   };
 }
 
@@ -225,7 +225,7 @@ export const signUpUser = async (
       const retryStrategy = classifyErrorRetryStrategy(error);
       const errorCode = mapAuthErrorToCode(error);
 
-      logger.debug("auth", `Signup error classified: ${retryStrategy.reason}`, {
+      logger.category('auth').debug(`Signup error classified: ${retryStrategy.reason}`, {
         shouldAutoRetry: retryStrategy.shouldAutoRetry,
         suggestRetryAfterMs: retryStrategy.suggestRetryAfterMs,
         errorCode,
@@ -258,7 +258,7 @@ export const signUpUser = async (
       )}`,
     };
   } catch (error) {
-    logger.error("auth", "Sign up error:", error);
+    logger.category('auth').error("Sign up error:", error);
     const message = (error as Error)?.message?.includes("Request timeout")
       ? "The server took too long to respond. Please try again."
       : "An unexpected error occurred. Please try again.";
@@ -330,7 +330,7 @@ export const signInUser = async (
       const retryStrategy = classifyErrorRetryStrategy(error);
       const errorCode = mapAuthErrorToCode(error);
 
-      logger.debug("auth", `Sign in error classified: ${retryStrategy.reason}`, {
+      logger.category('auth').debug(`Sign in error classified: ${retryStrategy.reason}`, {
         shouldAutoRetry: retryStrategy.shouldAutoRetry,
         suggestRetryAfterMs: retryStrategy.suggestRetryAfterMs,
         errorCode,
@@ -360,7 +360,7 @@ export const signInUser = async (
       success: true,
     };
   } catch (error) {
-    logger.error("auth", "Sign in error:", error);
+    logger.category('auth').error("Sign in error:", error);
     const message = (error as Error)?.message?.includes("Request timeout")
       ? "The server took too long to respond. Please try again."
       : "An unexpected error occurred. Please try again.";
@@ -408,7 +408,7 @@ export const sendPasswordReset = async (
     const resetResult = await authProvider.resetPassword(sanitizedEmail);
 
     if (!resetResult.success) {
-      logger.warn("auth", "Reset password failed for email:", {
+      logger.category('auth').warn("Reset password failed for email:", {
         email: sanitizedEmail,
         message: resetResult.message,
       });
@@ -421,13 +421,13 @@ export const sendPasswordReset = async (
       };
     }
 
-    logger.info("auth", "Password reset email sent", { email: sanitizedEmail });
+    logger.category('auth').info("Password reset email sent", { email: sanitizedEmail });
     return {
       success: true,
       message: "Check your email for a password reset link.",
     };
   } catch (error) {
-    logger.error("auth", "Password reset error:", error);
+    logger.category('auth').error("Password reset error:", error);
     return {
       success: false,
       error: "An unexpected error occurred. Please try again.",
@@ -484,20 +484,20 @@ export const updatePassword = async (
     const updateResult = await authProvider.updatePassword(newPassword);
 
     if (!updateResult.success) {
-      logger.error("auth", "Update password error:", updateResult.error);
+      logger.category('auth').error("Update password error:", updateResult.error);
       return {
         success: false,
         error: updateResult.error || "Failed to update password. Please try again.",
       };
     }
 
-    logger.info("auth", "Password updated successfully");
+    logger.category('auth').info("Password updated successfully");
     return {
       success: true,
       message: "Password updated successfully.",
     };
   } catch (error) {
-    logger.error("auth", "Update password error:", error);
+    logger.category('auth').error("Update password error:", error);
     return {
       success: false,
       error: "An unexpected error occurred. Please try again.",
@@ -562,7 +562,7 @@ export const resendConfirmationEmail = async (
     const resendResult = await authProvider.resend(sanitizedEmail);
 
     if (!resendResult.success) {
-      logger.warn("auth", "Resend confirmation failed:", {
+      logger.category('auth').warn("Resend confirmation failed:", {
         email: sanitizedEmail,
         message: resendResult.message,
       });
@@ -574,14 +574,14 @@ export const resendConfirmationEmail = async (
       };
     }
 
-    logger.info("auth", "Confirmation email resent", { email: sanitizedEmail });
+    logger.category('auth').info("Confirmation email resent", { email: sanitizedEmail });
     return {
       success: true,
       message: resendResult.message || "Confirmation email sent.",
       retryAfterMs: 30000, // Suggest 30 second cooldown for UI
     };
   } catch (error) {
-    logger.error("auth", "Resend confirmation error:", error);
+    logger.category('auth').error("Resend confirmation error:", error);
     return {
       success: false,
       error: "An unexpected error occurred. Please try again.",
@@ -615,13 +615,13 @@ export const signOutSessionOnly = async (): Promise<AuthOperationResult> => {
     const authProvider = await getAuthProvider();
     await authProvider.signOut();
 
-    logger.info("auth", "User signed out from session");
+    logger.category('auth').info("User signed out from session");
     return {
       success: true,
       message: "Signed out successfully.",
     };
   } catch (error) {
-    logger.error("auth", "Sign out error:", error);
+    logger.category('auth').error("Sign out error:", error);
     return {
       success: false,
       error: "An unexpected error occurred during sign out.",
@@ -650,8 +650,8 @@ export const getCurrentSession = async (): Promise<Session | null> => {
   try {
     const provider = await getAuthProvider();
     return await provider.getSession();
-  } catch (error) {
-    logger.error("auth", "Failed to get current session:", error);
+    } catch (error) {
+    logger.category('auth').error("Failed to get current session:", error);
     return null;
   }
 };
@@ -682,7 +682,7 @@ export const listenToAuthStateChanges = async (
     const provider = await getAuthProvider();
     return provider.onAuthStateChange(callback);
   } catch (error) {
-    logger.error("auth", "Failed to set up auth state listener:", error);
+    logger.category('auth').error("Failed to set up auth state listener:", error);
     return () => {}; // No-op cleanup on failure
   }
 };
@@ -699,7 +699,6 @@ export const listenToAuthStateChanges = async (
 export {
     checkPendingInvites,
     generateWorldInviteLink,
-    isEmailExistsError,
     type ResetPasswordResult,
     type SignInResult,
     type SignUpResult

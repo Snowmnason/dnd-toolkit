@@ -27,7 +27,10 @@
  */
 export function generateImageName(userId: string, fileType: string): string {
   // TODO: Implement
-  console.warn('[buckets] generateImageName not implemented');
+  // Use centralized logger
+   
+  const { logger } = require('@/lib/utils/logger');
+  logger.category('buckets').warn('[buckets] generateImageName not implemented');
   throw new Error('generateImageName placeholder — implementation pending');
 }
 
@@ -53,7 +56,10 @@ export function normalizeImageUrl(
   height?: number
 ): string {
   // TODO: Implement
-  console.warn('[buckets] normalizeImageUrl not implemented');
+  // Use centralized logger
+   
+  const { logger } = require('@/lib/utils/logger');
+  logger.category('buckets').warn('[buckets] normalizeImageUrl not implemented');
   throw new Error('normalizeImageUrl placeholder — implementation pending');
 }
 
@@ -72,7 +78,10 @@ export function normalizeImageUrl(
  */
 export function validateImageFile(file: File): boolean {
   // TODO: Implement
-  console.warn('[buckets] validateImageFile not implemented');
+  // Use centralized logger
+   
+  const { logger } = require('@/lib/utils/logger');
+  logger.category('buckets').warn('[buckets] validateImageFile not implemented');
   throw new Error('validateImageFile placeholder — implementation pending');
 }
 
@@ -93,6 +102,9 @@ export function getImageMetadata(
   file: File
 ): { width?: number; height?: number; mimeType: string; size: number } {
   // TODO: Implement
-  console.warn('[buckets] getImageMetadata not implemented');
+  // Use centralized logger
+   
+  const { logger } = require('@/lib/utils/logger');
+  logger.category('buckets').warn('[buckets] getImageMetadata not implemented');
   throw new Error('getImageMetadata placeholder — implementation pending');
 }

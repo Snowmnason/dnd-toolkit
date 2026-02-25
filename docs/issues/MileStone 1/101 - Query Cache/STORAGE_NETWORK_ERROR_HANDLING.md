@@ -130,7 +130,7 @@ async getAuthState(): Promise<SupabaseAuthState> {
     const authState = await SecureStorage.getJSON<SupabaseAuthState>(storageKey);
     return authState || { hasAccount: false };
   } catch (error) {
-    logger.error('auth', 'Error getting auth state:', error);
+    logger.category('auth').error('Error getting auth state:', error);
     return { hasAccount: false };
   }
 }
@@ -146,7 +146,7 @@ async getAuthState(): Promise<SupabaseAuthState> {
   );
 
   if (!result.success) {
-    logger.warn('auth', 'Using fallback auth state due to storage error', {
+    logger.category('auth').warn('Using fallback auth state due to storage error', {
       error: result.error?.message,
     });
   }
@@ -181,7 +181,7 @@ const revalidate = async () => {
     // Try to persist (with graceful failure)
     const persistResult = await safeStorageSetJSON(key, data);
     if (!persistResult.success) {
-      logger.warn('cache', 'Failed to persist data, keeping in-memory', {
+      logger.category('cache').warn('Failed to persist data, keeping in-memory', {
         key,
         error: persistResult.error?.message,
       });
@@ -231,7 +231,7 @@ if (result.success && Array.isArray(result.data)) {
   setStableParams(prev => ({ ...prev, connectedWorldIds: result.data }));
 } else {
   // Show offline indicator if storage failed
-  logger.warn('context', 'Failed to load connected worlds', {
+  logger.category('context').warn('Failed to load connected worlds', {
     error: result.error?.message,
   });
 }
@@ -377,7 +377,7 @@ const data = await SecureStorage.getJSON(key); // Throws on error
 ```typescript
 const health = await checkStorageHealth(SecureStorage);
 if (!health.isHealthy) {
-  logger.error('storage', 'Storage health check failed', health.errors);
+  logger.category('storage').error('Storage health check failed', health.errors);
   // Maybe trigger cleanup or alert user
 }
 ```
@@ -392,7 +392,7 @@ logStorageError(errorInfo, {
 });
 
 // All network errors logged with context
-logger.warn('network', 'Request failed, attempting graceful degradation', {
+logger.category('network').warn('Request failed, attempting graceful degradation', {
   url,
   statusCode: error.status,
   hasCache: !!cachedData,

@@ -1,6 +1,6 @@
 # lib/utils
 
-Foundational utilities for logging, image optimization, entitlements, lazy imports, startup timing, versioning, and web font loading. Provides cross-platform, production-ready tools for common app needs.
+Foundational utilities for logging, image optimization, entitlements, lazy imports, startup timing, versioning, web font loading, and error codes. Provides cross-platform, production-ready tools for common app needs.
 
 ## When to Use This Module
 
@@ -14,6 +14,7 @@ Foundational utilities for logging, image optimization, entitlements, lazy impor
 - Measuring app startup performance metrics on native platforms
 - Accessing current app version for About screens, update checks, or error reporting
 - Injecting custom web fonts on web and Electron platforms
+- Type-safe error codes and metadata for consistent error handling across the application
 
 **Do NOT use this module for:**
 
@@ -30,7 +31,7 @@ App Code
   ↓
 Import from lib/utils
   ↓
-[Logger | Image Optimization | Entitlements | Lazy Imports | Startup Time | Version | Web Font Loader]
+[Logger | Image Optimization | Entitlements | Lazy Imports | Startup Time | Version | Web Font Loader | Error Codes]
   ↓
 Platform-specific or cross-platform implementation
 ```
@@ -45,8 +46,81 @@ Platform-specific or cross-platform implementation
 - **startup-time.ts**: Native startup time measurement (0 on web/desktop)
 - **version.ts**: Current app version constant
 - **web-font-loader.ts**: Custom font injection for web/Electron
+- **ERROR_CODES.ts**: Centralized registry of type-safe error codes and metadata
 
 ## API Reference
+
+### Error Codes (`ERROR_CODES.ts`)
+
+Centralized registry of type-safe error codes with structured metadata for consistent error handling.
+
+#### `ERROR_CODES: Record<string, Record<string, string>>`
+
+Registry of all valid error codes organized by category.
+
+**Categories:**
+- `AUTH` - Authentication/authorization errors
+- `NETWORK` - Connectivity and transport errors  
+- `DATABASE` - Data operations errors
+- `STORAGE` - Storage and persistence errors
+- `HTTP` - HTTP status code mappings
+- `VALIDATION` - Input validation errors
+- `RETRY` - Retry strategy errors
+
+**Example:**
+```ts
+import { ERROR_CODES } from "@/lib/utils";
+
+throw new AppError(ERROR_CODES.AUTH.INVALID_CREDENTIALS, "Invalid email or password");
+```
+
+#### `ERROR_CODES_METADATA: Record<string, ErrorCodeMetadata>`
+
+Structured metadata for each error code including severity, recoverability, retry strategy, and user messages.
+
+**Example:**
+```ts
+import { ERROR_CODES_METADATA } from "@/lib/utils";
+
+const meta = ERROR_CODES_METADATA[ERROR_CODES.AUTH.INVALID_CREDENTIALS];
+// {
+//   severity: 'low',
+//   recoverable: true,
+//   retryStrategy: 'none',
+//   userMessage: 'Invalid email or password. Please try again.',
+//   category: 'auth'
+// }
+```
+
+#### Error Code Types
+
+Type-safe error code types for each category:
+
+```ts
+import type { AuthErrorCode, NetworkErrorCode, DatabaseErrorCode } from "@/lib/utils";
+
+function handleAuthError(code: AuthErrorCode) {
+  // TypeScript ensures only AUTH.* codes are passed
+}
+```
+
+#### Helper Functions
+
+**`getErrorCodesByCategory(category: string): string[]`**
+Returns all error codes for a category.
+
+**`mapSupabaseError(error: any): string`**
+Maps Supabase errors to standardized error codes.
+
+**Example:**
+```ts
+import { getErrorCodesByCategory, mapSupabaseError } from "@/lib/utils";
+
+const authCodes = getErrorCodesByCategory('auth');
+const code = mapSupabaseError(supabaseError);
+```
+
+---
 
 ### Logger (`logger.ts`)
 
@@ -71,9 +145,9 @@ Log at different levels.
 
 **Example:**
 ```ts
-logger.info("api", "Worlds fetched successfully");
+logger.category('api').info("Worlds fetched successfully");
 logger.group("bootstrap", "Initialization", false);
-logger.info("bootstrap", "Loading config");
+logger.category('bootstrap').info("Loading config");
 logger.groupEnd();
 ```
 
@@ -334,7 +408,7 @@ await injectWebFonts();
 try {
   const module = await lazyLoad(() => import("./Missing"), "Missing");
 } catch (err) {
-  logger.error("lazy-load", "Failed to load Missing:", err);
+  logger.category('lazy-load').error("Failed to load Missing:", err);
   // Handle gracefully
 }
 ```
@@ -380,4 +454,5 @@ try {
 | startup-time.ts       | Native startup time measurement        |
 | version.ts            | App version constant                   |
 | web-font-loader.ts    | Web/Electron font injection            |
+| ERROR_CODES.ts        | Centralized error code registry        |
 | index.ts              | Barrel export                          |

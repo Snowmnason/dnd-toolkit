@@ -269,10 +269,10 @@ import { logger } from '@/lib/utils/logger';
 
 // Category-specific logger (recommended)
 const authLogger = logger.category('auth');
-authLogger.info('User logged in');
+logger.category("auth").info('User logged in');
 
-// Traditional style (still works)
-logger.info('auth', 'User logged in');
+// Preferred category form
+logger.category('auth').info('User logged in');
 ```
 
 **Docs:** [LOGGER_SYSTEM.md](108%20-%20Improve%20Logger%20System%20with%20Categories%20and%20Filtering/LOGGER_SYSTEM.md)

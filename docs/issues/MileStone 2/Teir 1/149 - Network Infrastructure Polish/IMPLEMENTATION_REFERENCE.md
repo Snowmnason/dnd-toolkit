@@ -216,7 +216,7 @@ All errors are non-blocking and gracefully degrade:
 try {
   const NetInfo = await import("@react-native-community/netinfo");
 } catch (error) {
-  logger.debug("Failed to load NetInfo (non-critical)");
+  logger.catorgy("-").debug("Failed to load NetInfo (non-critical)");
   // Continue without native detection
   return null;
 }
@@ -225,7 +225,7 @@ try {
 try {
   listener(currentStatus);
 } catch (error) {
-  logger.error("Listener error", error);
+  logger.catogery("other").error("Listener error", error);
   // Continue notifying other listeners
 }
 
@@ -233,7 +233,7 @@ try {
 try {
   const battery = await navigator.getBattery?.();
 } catch (error) {
-  logger.debug("Battery API unavailable");
+  logger.catorgy("-").debug("Battery API unavailable");
   // Continue without battery tracking
 }
 ```

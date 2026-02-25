@@ -16,7 +16,7 @@ export const useWelcomeScreen = () => {
       // Session checking should only happen on app startup, not when user clicks "Sign In"
       router.push('/login/sign-in');
     } catch (error) {
-      logger.error('auth', 'Navigation error:', error);
+      logger.category('auth').error('Navigation error:', error);
       Alert.alert('Error', 'Unable to navigate to sign-in');
     } finally {
       setIsLoading(false);
@@ -29,7 +29,7 @@ export const useWelcomeScreen = () => {
       await prepareAuthNavigation();
       router.push('/login/sign-up');
     } catch (error) {
-      logger.error('auth', 'Navigation preparation error:', error);
+      logger.category('auth').error('Navigation preparation error:', error);
       Alert.alert('Error', 'Unable to navigate to sign-up');
     } finally {
       setIsLoading(false);

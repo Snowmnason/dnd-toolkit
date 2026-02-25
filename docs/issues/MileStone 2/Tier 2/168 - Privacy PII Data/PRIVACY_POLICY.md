@@ -152,11 +152,16 @@ We classify all user data by **sensitivity level** to determine storage backend,
 **Example:**
 
 ```typescript
-import { redactForLogs } from "@/lib/storage";
+import { RedactionManager } from "@/lib/utils/redaction-manager";
 
-logger.error("auth", redactForLogs({ email, token, userId }));
+// Redact individual values
+const redactedEmail = RedactionManager.redactPII(email);
+logger.category('auth').error({ email: redactedEmail, token: RedactionManager.redactPII(token), userId });
+
+// Or redact entire objects
+const redactedData = RedactionManager.redactObject({ email, token, userId });
+logger.category('auth').error( redactedData);
 // Output: "auth { email: '[REDACTED]', token: '[REDACTED]', userId: '[REDACTED]' }"
-```
 
 ### SENSITIVE Data
 
@@ -171,9 +176,11 @@ logger.error("auth", redactForLogs({ email, token, userId }));
 **Example:**
 
 ```typescript
-logger.info("world", redactForLogs({ worldId, worldName }));
+import { RedactionManager } from "@/lib/utils/redaction-manager";
+
+const redactedData = RedactionManager.redactObject({ worldId, worldName });
+logger.catogry("-").info("world", redactedData);
 // Output: "world { worldId: '[REDACTED]', worldName: '[REDACTED]' }"
-```
 
 ### NON_SENSITIVE & PUBLIC Data
 
@@ -182,7 +189,7 @@ logger.info("world", redactForLogs({ worldId, worldName }));
 **Example:**
 
 ```typescript
-logger.debug("feature", { version: "1.0.0", theme: "dark" });
+logger.catorgy("-").debug("feature", { version: "1.0.0", theme: "dark" });
 // Output: "feature { version: '1.0.0', theme: 'dark' }"
 ```
 
@@ -270,7 +277,7 @@ When adding new storage keys:
 1. **Classify the data:** Is it PUBLIC, NON_SENSITIVE, SENSITIVE, or PII?
 2. **Register in `DATA_CLASSIFICATIONS`:** Add entry with sensitivity level and TTL
 3. **Use correct backend:** Let `getStorageBackend(key)` route automatically
-4. **Redact in logs:** Use `redactForLogs(data, key)` when logging
+4. **Redact in logs:** Use `RedactionManager.redactObject()` or `RedactionManager.redactPII()` when logging sensitive data (see `lib/utils/redaction-manager.ts`)
 
 **Example:**
 
@@ -288,12 +295,14 @@ export const DATA_CLASSIFICATIONS = {
 };
 
 // Use
-import { getStorageBackend, redactForLogs } from "@/lib/storage";
+import { getStorageBackend } from "@/lib/storage";
+import { RedactionManager } from "@/lib/utils/redaction-manager";
 
 const backend = getStorageBackend("secure:my_data"); // Returns SecureStorage
 await backend.setItem("secure:my_data", userData);
 
-logger.info("game", redactForLogs(userData, "secure:my_data"));
+const redactedData = RedactionManager.redactObject(userData);
+logger.category("other").info("game", redactedData);
 ```
 
 ### For Compliance Teams

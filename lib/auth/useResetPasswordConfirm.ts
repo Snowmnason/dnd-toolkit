@@ -56,10 +56,10 @@ export const useResetPasswordConfirm = () => {
               const userSession = await authProvider.getUser();
               if (userSession) {
                 setUserEmail(userSession.email || userSession.raw?.user?.email || '');
-                logger.info('auth', 'Reset session established for:', userSession.email);
+                logger.category('auth').info('Reset session established for:', userSession.email);
               }
             } else {
-              logger.error('auth', 'Failed to establish reset session');
+              logger.category('auth').error('Failed to establish reset session');
               setError('Invalid or expired reset link. Please request a new password reset.');
             }
           }
@@ -71,7 +71,7 @@ export const useResetPasswordConfirm = () => {
           setUserEmail(existingSession.email);
         }
       } catch (err) {
-        logger.error('auth', 'Error getting user info:', err);
+        logger.category('auth').error('Error getting user info:', err);
         setError('Failed to verify reset token. Please try again.');
       }
     };
