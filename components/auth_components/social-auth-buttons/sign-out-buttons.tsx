@@ -6,9 +6,9 @@ async function onSignOutButtonPress() {
   try {
     const provider = await getAuthProvider();
     await provider.signOut();
-    logger.info('auth', 'User signed out successfully');
+    logger.category('auth').info('User signed out successfully');
   } catch (error) {
-    logger.error('auth', 'Error signing out:', error)
+    logger.category('auth').error('Error signing out:', error)
   }
 }
 

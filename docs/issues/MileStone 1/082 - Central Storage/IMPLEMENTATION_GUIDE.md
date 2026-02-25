@@ -43,7 +43,7 @@ export function MyComponent() {
         const saved = await SecureStorage.getJSON(STORAGE_KEYS.MY_FEATURE_CONFIG);
         setConfig(saved || { /* defaults */ });
       } catch (error) {
-        logger.error('Failed to load config:', error);
+        logger.catogery("other").error('Failed to load config:', error);
       } finally {
         setLoading(false);
       }

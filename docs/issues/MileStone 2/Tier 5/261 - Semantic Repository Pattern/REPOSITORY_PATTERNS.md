@@ -155,7 +155,7 @@ class SupabaseUserRepository implements UserRepository {
 
       return result.data;
     } catch (error) {
-      logger.error('UserRepository.getById failed', { id, error });
+      logger.category('storage').error('UserRepository.getById failed', { id, error });
       throw error;
     }
   }
@@ -213,7 +213,7 @@ export function registerRepository<K extends keyof RepositoryRegistry>(
   repository: RepositoryRegistry[K]
 ): void {
   repositories[name] = repository;
-  logger.info('Repository registered', { name });
+  logger.category('other').info('Repository registered', { name });
 }
 
 export function getUserRepository(): UserRepository {

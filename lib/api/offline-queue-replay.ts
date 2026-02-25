@@ -24,13 +24,9 @@ export async function initializeOfflineQueueReplay(): Promise<void> {
       },
     );
 
-    logger.info("api", "Offline queue replay listener initialized");
+    logger.category('api').info("Offline queue replay listener initialized");
   } catch (error) {
-    logger.error(
-      "api",
-      "Failed to initialize offline queue replay listener",
-      error,
-    );
+    logger.category('api').error("Failed to initialize offline queue replay listener", error);
   }
 }
 
@@ -42,7 +38,7 @@ export function cleanupOfflineQueueReplay(): void {
   if (statusChangeUnsubscribe) {
     statusChangeUnsubscribe();
     statusChangeUnsubscribe = null;
-    logger.debug("api", "Offline queue replay listener cleaned up");
+    logger.category('api').debug("Offline queue replay listener cleaned up");
   }
 }
 
@@ -52,7 +48,7 @@ export function cleanupOfflineQueueReplay(): void {
 async function handleNetworkStatusChange(status: NetworkStatus): Promise<void> {
   // Trigger replay when connectivity is restored (GOOD quality)
   if (status.connectionQuality === "good") {
-    logger.info("api", "Network restored, flushing offline queue", {
+    logger.category('api').info("Network restored, flushing offline queue", {
       isOnline: status.isOnline,
       connectionQuality: status.connectionQuality,
     });
@@ -60,10 +56,10 @@ async function handleNetworkStatusChange(status: NetworkStatus): Promise<void> {
     try {
       await RequestManager.flushOfflineQueue();
     } catch (error) {
-      logger.error("api", "Error flushing offline queue on reconnect", error);
+      logger.category('api').error("Error flushing offline queue on reconnect", error);
     }
   } else if (status.connectionQuality === "offline") {
-    logger.debug("api", "Network offline, pausing queue replay", {
+    logger.category('api').debug("Network offline, pausing queue replay", {
       connectionQuality: status.connectionQuality,
     });
   }

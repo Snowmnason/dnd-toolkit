@@ -114,13 +114,13 @@ export function logNetworkError(
   const { key, operation, isNetworkError, isOnline, servedStale } = context;
 
   if (servedStale) {
-    logger.warn('network', `Serving stale cache for ${operation}:`, {
+    logger.category('network').warn(`Serving stale cache for ${operation}:`, {
       key,
       isOnline,
       error: error?.message,
     });
   } else {
-    logger.error('network', `${operation} failed for ${key}:`, {
+    logger.category('network').error(`${operation} failed for ${key}:`, {
       isNetworkError,
       isOnline,
       error: error?.message,
@@ -171,7 +171,7 @@ export async function handleErrorGracefully(error: any, context: {
     try {
       cachedData = await getCachedData();
     } catch (cacheError) {
-      logger.warn('network', 'Failed to retrieve cache for fallback:', { key, cacheError });
+      logger.category('network').warn('Failed to retrieve cache for fallback:', { key, cacheError });
     }
   }
 

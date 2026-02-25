@@ -116,16 +116,16 @@ async function handleOperationWithRetry() {
       }
 
       // Log with structured data
-      logger.error(error.category, error.message, {
-        code: error.code,
-        severity: error.severity,
-        recoverable: error.recoverable
-      });
+      logger.category(error.category).error(error.message, {
+          code: error.code,
+          severity: error.severity,
+          recoverable: error.recoverable
+        });
     }
 
     // Convert unknown errors
     const appError = toAppError(error);
-    logger.error('operation', appError.message, appError.toJSON());
+    logger.category('operation').error(appError.message, appError.toJSON());
   }
 }
 ```
@@ -153,7 +153,7 @@ function showErrorToUser(error: AppError) {
 import { logger } from '@/lib/utils';
 
 function logErrorWithCode(error: AppError) {
-  logger.error(error.category, error.message, {
+  logger.category(error.category).error(error.message, {
     code: error.code,
     severity: error.severity,
     recoverable: error.recoverable,

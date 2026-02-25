@@ -25,7 +25,7 @@ export function useSplashScreen() {
     const splashEnabled = FeatureFlags.isEnabled("splashScreen");
 
     if (!splashEnabled) {
-      logger.debug("ui", "🎬 Splash screen disabled via feature flag");
+      logger.category('ui').debug("🎬 Splash screen disabled via feature flag");
       setShowSplash(false);
       setBufferComplete(true);
       return;
@@ -33,12 +33,11 @@ export function useSplashScreen() {
 
     // Wait for kernel to become ready
     if (!kernel.phases.appReady) {
-      logger.debug("ui", "⏳ Waiting for app kernel to complete...");
+      logger.category('ui').debug("⏳ Waiting for app kernel to complete...");
       return;
     }
 
-    logger.debug(
-      "ui",
+    logger.category('ui').debug(
       `✅ Kernel ready, starting ${SPLASH_BUFFER_MS}ms buffer on ${Platform.OS}`,
     );
 
@@ -46,7 +45,7 @@ export function useSplashScreen() {
     const timer = setTimeout(() => {
       setBufferComplete(true);
       setShowSplash(false);
-      logger.debug("ui", "🎬 Splash screen hidden, app ready");
+      logger.category('ui').debug("🎬 Splash screen hidden, app ready");
     }, SPLASH_BUFFER_MS);
 
     return () => clearTimeout(timer);

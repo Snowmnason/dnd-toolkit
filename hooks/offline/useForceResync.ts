@@ -49,7 +49,7 @@ export function useForceResync({ isOffline }: { isOffline: boolean }): UseForceR
         }
       }, remainingTime);
     } catch (error: any) {
-      logger.error('other', 'Force resync failed:', error);
+      logger.category('storage').error('Force resync failed:', error);
       if (isMountedRef.current) {
         showToast('Failed to resync data. Please try again.', 'error', 4000);
       }

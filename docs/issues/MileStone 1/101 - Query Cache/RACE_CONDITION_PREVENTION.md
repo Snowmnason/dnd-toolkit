@@ -74,7 +74,7 @@ class QueryCacheClass {
 
     await Promise.all(keysToInvalidate.map(key => this.remove(key)));
 
-    logger.info('cache', `Invalidated ${keysToInvalidate.length} entries`, {
+    logger.category('cache').info(`Invalidated ${keysToInvalidate.length} entries`, {
       tags,
       newVersion: this.globalVersion,
     });
@@ -88,7 +88,7 @@ class QueryCacheClass {
 
     // ... invalidation logic ...
 
-    logger.info('cache', `Invalidated by pattern`, {
+    logger.category('cache').info(`Invalidated by pattern`, {
       pattern: pattern.toString(),
       newVersion: this.globalVersion,
     });
@@ -109,7 +109,7 @@ class QueryCacheClass {
   ): Promise<void> {
     // Race condition prevention: Reject stale writes
     if (requestVersion !== undefined && requestVersion < this.globalVersion) {
-      logger.debug('cache', `Stale version for ${key}, discarding result`, {
+      logger.category('cache').debug(`Stale version for ${key}, discarding result`, {
         requestVersion,
         currentVersion: this.globalVersion,
       });
@@ -221,7 +221,7 @@ await QueryCache.set('worlds:list', oldData, options, versionAtStart=5);
 
 // Inside set():
 if (5 < 6) { // requestVersion < globalVersion
-  logger.debug('Stale version for worlds:list, discarding result');
+  logger.catogery("other").debug('Stale version for worlds:list, discarding result');
   return; // ❌ DATA NOT CACHED
 }
 ```

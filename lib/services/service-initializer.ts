@@ -41,7 +41,7 @@ import { SupabaseAuthProvider } from './supabase/supabase-auth-provider';
  * Safe to call multiple times (idempotent)
  */
 export async function initializeServices(): Promise<void> {
-  logger.info('bootstrap', 'Initializing services...');
+  logger.category('bootstrap').info('Initializing services...');
 
   try {
     // Initialize database provider FIRST — entity files depend on getDatabaseProvider()
@@ -66,9 +66,9 @@ export async function initializeServices(): Promise<void> {
     // Register Sentry analytics exporter
     await initializeSentryExporter();
 
-    logger.info('bootstrap', 'All services initialized successfully');
+    logger.category('bootstrap').info('All services initialized successfully');
   } catch (error) {
-    logger.error('bootstrap', `Failed to initialize services: ${error}`);
+    logger.category('bootstrap').error(`Failed to initialize services: ${error}`);
     throw error;
   }
 }
@@ -96,8 +96,7 @@ async function initializeDatabaseProvider(): Promise<void> {
     // GATE: respect enabled flag — default true (database is load-bearing)
     const enabled = databaseService?.enabled ?? true;
     if (!enabled) {
-      logger.info(
-        'database',
+      logger.category('database').info(
         '[Database] Disabled in config (services.database.enabled=false) — registering NoOpDatabaseProvider. ' +
           'Database queries will throw until re-enabled and the app restarted.'
       );
@@ -108,7 +107,7 @@ async function initializeDatabaseProvider(): Promise<void> {
     }
 
     const providerName = databaseService?.provider || 'supabase';
-    logger.debug('database', `Initializing database provider: ${providerName}`);
+    logger.category('database').debug(`Initializing database provider: ${providerName}`);
 
     switch (providerName.toLowerCase()) {
       case 'supabase': {
@@ -127,17 +126,17 @@ async function initializeDatabaseProvider(): Promise<void> {
         const { initializeSupabaseDatabaseProvider } = await import('./supabase/supabase-initializer');
         const initialized = await initializeSupabaseDatabaseProvider();
         if (initialized) {
-          logger.info('database', '[Database] Supabase provider initialized successfully');
+          logger.category('database').info('[Database] Supabase provider initialized successfully');
           updateServiceStatus('database', 'ready', 'supabase');
         } else {
-          logger.warn('database', '[Database] Supabase not configured — using NoOpDatabaseProvider');
+          logger.category('database').warn('[Database] Supabase not configured — using NoOpDatabaseProvider');
           updateServiceStatus('database', 'degraded', 'supabase', 'Environment vars present but init incomplete');
         }
         break;
       }
 
       default: {
-        logger.warn('database', `[Database] Unknown provider: ${providerName}. Registering NoOp fallback.`);
+        logger.category('database').warn(`[Database] Unknown provider: ${providerName}. Registering NoOp fallback.`);
         const { NoOpDatabaseProvider, registerDatabaseProvider } = await import('./database-adapter');
         registerDatabaseProvider(new NoOpDatabaseProvider());
         updateServiceStatus('database', 'failed', providerName, `Unknown provider: ${providerName}`);
@@ -145,7 +144,7 @@ async function initializeDatabaseProvider(): Promise<void> {
       }
     }
   } catch (error) {
-    logger.error('bootstrap', `[Database] Runtime failure during initialization: ${error}`);
+    logger.category('bootstrap').error(`[Database] Runtime failure during initialization: ${error}`);
     // Always leave a registered provider so the app can start in degraded mode
     // rather than crashing with "getDatabaseProvider called before registration"
     try {
@@ -169,7 +168,7 @@ async function initializeAuthProvider(): Promise<void> {
     const config = getAppConfig();
     const authService = config.services?.auth;
     const providerName = authService?.provider || 'supabase';
-    logger.debug('bootstrap', `Initializing auth provider: ${providerName}`);
+    logger.category('bootstrap').debug(`Initializing auth provider: ${providerName}`);
 
     // Create provider instance based on config
     let provider: AuthProvider | null = null;
@@ -182,7 +181,7 @@ async function initializeAuthProvider(): Promise<void> {
           if (!validation.valid) {
             logValidationResult('Auth', validation, true);
             updateServiceStatus('auth', 'failed', 'supabase', validation.errors[0]);
-            logger.warn('bootstrap', 'Supabase not configured; auth provider will not be set');
+            logger.category('bootstrap').warn('Supabase not configured; auth provider will not be set');
             return;
           }
 
@@ -190,17 +189,17 @@ async function initializeAuthProvider(): Promise<void> {
           if (isSupabaseConfigured()) {
             const supabaseClient = getSupabaseClient();
             const supabaseProvider = new SupabaseAuthProvider(supabaseClient);
-            logger.debug('bootstrap', 'Supabase auth provider instantiated');
+            logger.category('bootstrap').debug('Supabase auth provider instantiated');
             provider = supabaseProvider;
           } else {
             // Supabase not configured (no env vars) — skip provider registration
             // AppKernel will detect missing provider via getAuthProviderSync() and skip auth wiring
-            logger.warn('bootstrap', 'Supabase not configured; auth provider will not be set');
+            logger.category('bootstrap').warn('Supabase not configured; auth provider will not be set');
             updateServiceStatus('auth', 'failed', 'supabase', 'Not configured');
             return;
           }
         } catch (error) {
-          logger.error('bootstrap', `Failed to load Supabase for auth provider: ${error}`);
+          logger.category('bootstrap').error(`Failed to load Supabase for auth provider: ${error}`);
           updateServiceStatus('auth', 'failed', 'supabase', `Runtime error: ${error}`);
           throw error;
         }
@@ -208,7 +207,7 @@ async function initializeAuthProvider(): Promise<void> {
       }
 
       default: {
-        logger.warn('bootstrap', `Unknown auth provider: ${providerName}. Defaulting to supabase.`);
+        logger.category('bootstrap').warn(`Unknown auth provider: ${providerName}. Defaulting to supabase.`);
         // Fall through to supabase as fallback
         try {
           const validation = validateSupabaseAuthConfig();
@@ -222,17 +221,17 @@ async function initializeAuthProvider(): Promise<void> {
           if (isSupabaseConfigured()) {
             const supabaseClient = getSupabaseClient();
             const supabaseProvider = new SupabaseAuthProvider(supabaseClient);
-            logger.debug('bootstrap', 'Supabase auth provider instantiated (fallback)');
+            logger.category('bootstrap').debug('Supabase auth provider instantiated (fallback)');
             provider = supabaseProvider;
           } else {
             // Supabase not configured (no env vars) — skip provider registration
             // AppKernel will detect missing provider via getAuthProviderSync() and skip auth wiring
-            logger.warn('bootstrap', 'Fallback Supabase not configured; auth provider will not be set');
+            logger.category('bootstrap').warn('Fallback Supabase not configured; auth provider will not be set');
             updateServiceStatus('auth', 'failed', 'supabase', 'Fallback not configured');
             return;
           }
         } catch (error) {
-          logger.error('bootstrap', `Failed to initialize fallback Supabase provider: ${error}`);
+          logger.category('bootstrap').error(`Failed to initialize fallback Supabase provider: ${error}`);
           updateServiceStatus('auth', 'failed', 'supabase', `Fallback runtime error: ${error}`);
           throw error;
         }
@@ -241,7 +240,7 @@ async function initializeAuthProvider(): Promise<void> {
     }
 
     if (!provider) {
-      logger.error('bootstrap', 'Auth provider instantiation failed');
+      logger.category('bootstrap').error('Auth provider instantiation failed');
       updateServiceStatus('auth', 'failed', providerName, 'Provider instantiation failed');
       throw new Error('Auth provider failed to instantiate');
     }
@@ -251,10 +250,10 @@ async function initializeAuthProvider(): Promise<void> {
 
     // Register globally so AuthStateManager and other code can access it
     await registerAuthProvider(validatedProvider);
-    logger.info('bootstrap', `Auth provider '${providerName}' registered successfully`);
+    logger.category('bootstrap').info(`Auth provider '${providerName}' registered successfully`);
     updateServiceStatus('auth', 'ready', providerName);
   } catch (error) {
-    logger.error('bootstrap', `Failed to initialize auth provider: ${error}`);
+    logger.category('bootstrap').error(`Failed to initialize auth provider: ${error}`);
     // Auth is critical, record failure and re-throw
     updateServiceStatus('auth', 'failed', 'unknown', `${error}`);
     throw error; // Auth is critical, don't continue if provider fails
@@ -290,8 +289,7 @@ async function initializeErrorTracker(): Promise<void> {
     const sdkNeeded = errorProviderEnabled || analyticsEnabled;
 
     if (!sdkNeeded) {
-      logger.info(
-        'bootstrap',
+      logger.category('bootstrap').info(
         `[Error Tracker] Both errorProvider and analytics disabled — using NoOpErrorTracker`
       );
       registerErrorTracker(new NoOpErrorTracker());
@@ -301,7 +299,7 @@ async function initializeErrorTracker(): Promise<void> {
 
     const providerName = errorService?.provider ?? 'sentry';
 
-    logger.debug('bootstrap', `Initializing error tracker provider: ${providerName}`);
+    logger.category('bootstrap').debug(`Initializing error tracker provider: ${providerName}`);
 
     // Switch on provider name to select implementation
     switch (providerName.toLowerCase()) {
@@ -310,7 +308,7 @@ async function initializeErrorTracker(): Promise<void> {
         const validation = validateSentryErrorConfig();
         if (!validation.valid) {
           logValidationResult('Error Tracker', validation, false);
-          logger.info('bootstrap', '[Error Tracker] Sentry misconfigured — using NoOpErrorTracker');
+          logger.category('bootstrap').info('[Error Tracker] Sentry misconfigured — using NoOpErrorTracker');
           registerErrorTracker(new NoOpErrorTracker());
           updateServiceStatus('errorTracker', 'degraded', 'sentry', validation.errors[0]);
           break;
@@ -320,10 +318,10 @@ async function initializeErrorTracker(): Promise<void> {
         // This isolates all Sentry concerns to lib/services/sentry/
         const initialized = await initializeSentryErrorTracker();
         if (initialized) {
-          logger.info('bootstrap', `[Error Tracker] Sentry provider initialized successfully`);
+          logger.category('bootstrap').info(`[Error Tracker] Sentry provider initialized successfully`);
           updateServiceStatus('errorTracker', 'ready', 'sentry');
         } else {
-          logger.info('bootstrap', `[Error Tracker] Sentry provider skipped (no DSN) — using NoOpErrorTracker`);
+          logger.category('bootstrap').info(`[Error Tracker] Sentry provider skipped (no DSN) — using NoOpErrorTracker`);
           registerErrorTracker(new NoOpErrorTracker());
           updateServiceStatus('errorTracker', 'degraded', 'sentry', 'DSN not configured');
         }
@@ -331,8 +329,8 @@ async function initializeErrorTracker(): Promise<void> {
       }
 
       default: {
-        logger.warn(
-          'bootstrap',
+        logger.category('bootstrap').warn(
+          
           `[Error Tracker] Unknown provider: ${providerName}. Defaulting to NoOp.`
         );
         registerErrorTracker(new NoOpErrorTracker());
@@ -341,8 +339,7 @@ async function initializeErrorTracker(): Promise<void> {
       }
     }
   } catch (error) {
-    logger.warn(
-      'bootstrap',
+    logger.category('bootstrap').warn(
       `[Error Tracker] Runtime failure: ${error}. Falling back to NoOp.`
     );
     // Ensure we always have a tracker registered, even on error
@@ -368,15 +365,14 @@ async function initializeSentryExporter(): Promise<void> {
     const providerName = analyticsService?.provider ?? 'sentry';
 
     if (!enabled) {
-      logger.info(
-        'bootstrap',
+      logger.category('bootstrap').info(
         `[Analytics Exporter] Disabled in config (provider: ${providerName}), skipping registration`
       );
       updateServiceStatus('analytics', 'disabled', 'none', 'Disabled via config');
       return;
     }
 
-    logger.debug('bootstrap', `Initializing analytics exporter provider: ${providerName}`);
+    logger.category('bootstrap').debug(`Initializing analytics exporter provider: ${providerName}`);
 
     // Switch on provider name to select implementation
     switch (providerName.toLowerCase()) {
@@ -385,7 +381,7 @@ async function initializeSentryExporter(): Promise<void> {
         const validation = validateSentryAnalyticsConfig();
         if (!validation.valid) {
           logValidationResult('Analytics', validation, false);
-          logger.info('bootstrap', '[Analytics Exporter] Sentry misconfigured — skipping');
+          logger.category('bootstrap').info('[Analytics Exporter] Sentry misconfigured — skipping');
           updateServiceStatus('analytics', 'degraded', 'sentry', validation.errors[0]);
           break;
         }
@@ -402,14 +398,13 @@ async function initializeSentryExporter(): Promise<void> {
 
         // Register to global registry
         exporterRegistry.register(sentryExporter);
-        logger.info('bootstrap', `[Analytics Exporter] Sentry exporter initialized and registered`);
+        logger.category('bootstrap').info(`[Analytics Exporter] Sentry exporter initialized and registered`);
         updateServiceStatus('analytics', 'ready', 'sentry');
         break;
       }
 
       default: {
-        logger.warn(
-          'bootstrap',
+        logger.category('bootstrap').warn(
           `[Analytics Exporter] Unknown provider: ${providerName}. Skipping registration.`
         );
         updateServiceStatus('analytics', 'failed', providerName, `Unknown provider: ${providerName}`);
@@ -417,8 +412,7 @@ async function initializeSentryExporter(): Promise<void> {
       }
     }
   } catch (error) {
-    logger.warn(
-      'bootstrap',
+    logger.category('bootstrap').warn(
       `[Analytics Exporter] Runtime failure: ${error}. Continuing without it.`
     );
     updateServiceStatus('analytics', 'failed', 'unknown', `Runtime error: ${error}`);

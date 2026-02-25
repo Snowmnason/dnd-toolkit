@@ -244,10 +244,10 @@ Registers global interceptors that run on every request. Hooks run serially in r
 InterceptorManager.register({
   name: "logging",
   onBeforeRequest({ url, endpoint }) {
-    logger.info("api", `Request: ${endpoint}`);
+    logger.category('api').info(`Request: ${endpoint}`);
   },
   onError({ error, statusCode, queued }) {
-    logger.error("api", `Failed: ${statusCode}`, { queued });
+    logger.category('api').error(`Failed: ${statusCode}`, { queued });
   },
 });
 ```

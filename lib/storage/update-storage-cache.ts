@@ -87,14 +87,12 @@ export const updateStorageCache = {
     if (inFlightRefresh) {
       const lockAgeMsec = Date.now() - inFlightRefresh.timestamp;
       if (lockAgeMsec < INBOUND_REFRESH_TIMEOUT_MS) {
-        logger.debug(
-          "storage",
+        logger.category('storage').debug(
           `World cache refresh already in flight (${lockAgeMsec}ms old), sharing in-flight request`,
         );
         return inFlightRefresh.promise;
       } else {
-        logger.warn(
-          "storage",
+        logger.category('storage').warn(
           `Stale in-flight refresh lock detected (${lockAgeMsec}ms old), clearing and starting fresh`,
         );
         inFlightRefresh = null;
@@ -114,15 +112,13 @@ export const updateStorageCache = {
             const client = getSupabaseClient();
             const { data: sessionData } = await client.auth.getSession();
             if (!sessionData?.session) {
-              logger.info(
-                "storage",
+              logger.category('storage').info(
                 "Session not ready yet, deferring world cache refresh",
               );
               return null; // Return null to signal "not ready, try again later"
             }
           } catch (sessionCheckErr) {
-            logger.warn(
-              "storage",
+            logger.category('storage').warn(
               "Failed to check session state, deferring world cache refresh",
               sessionCheckErr,
             );
@@ -138,21 +134,19 @@ export const updateStorageCache = {
         const userId = userData?.id;
 
         if (!userId) {
-          logger.warn(
-            "storage",
+          logger.category('storage').warn(
             "No userId in SecureStorage, skipping cache refresh",
           );
           return null;
         }
 
-        logger.info("storage", `Refreshing all worlds cache for user ${userId}`);
+        logger.category('storage').info(`Refreshing all worlds cache for user ${userId}`);
 
         // Call existing database function (no new Supabase query)
         const { worldsDB } = await import("../database/worlds");
         const userWorlds = await worldsDB.getMyWorlds(userId);
 
-        logger.info(
-          "database",
+        logger.category('database').info(
           `worldsDB.getMyWorlds returned ${userWorlds.length} worlds for user ${userId}`,
         );
 
@@ -218,14 +212,13 @@ export const updateStorageCache = {
           }),
         );
 
-        logger.info(
-          "storage",
+        logger.category('storage').info(
           `Updated cache for ${worldList.length} worlds (DM: ${roleMap.dm.length}, Player: ${roleMap.player.length})`,
         );
 
         return richCache;
       } catch (error) {
-        logger.error("storage", "Error refreshing all worlds cache:", error);
+        logger.category('storage').error("Error refreshing all worlds cache", error);
         throw error;
       } finally {
         // Always clear the in-flight lock, whether success or failure
@@ -252,7 +245,7 @@ export const updateStorageCache = {
    */
   async refreshUserProfile(): Promise<void> {
     try {
-      logger.info("storage", "Refreshing user profile cache");
+      logger.category('storage').info("Refreshing user profile cache");
 
       // Use centralized DB layer instead of direct Supabase query
       // This ensures consistent error handling, retries, and deduplication
@@ -262,7 +255,7 @@ export const updateStorageCache = {
       const userProfile = await usersDB.getCurrentUser();
 
       if (!userProfile) {
-        logger.warn("storage", "User profile not found");
+        logger.category('storage').warn("User profile not found");
         return;
       }
 
@@ -278,12 +271,11 @@ export const updateStorageCache = {
         source: "db_refresh",
       });
 
-      logger.info(
-        "storage",
+      logger.category('storage').info(
         `User profile cache updated for user ${userProfile.id}`,
       );
     } catch (error) {
-      logger.error("storage", "Error refreshing user profile cache:", error);
+      logger.category('storage').error("Error refreshing user profile cache:", error);
       throw error;
     }
   },
@@ -296,16 +288,16 @@ export const updateStorageCache = {
    */
   async refreshEverything(): Promise<void> {
     try {
-      logger.info("storage", "Refreshing all caches");
+      logger.category('storage').info("Refreshing all caches");
 
       await Promise.all([
         updateStorageCache.refreshAllWorldsCache(),
         updateStorageCache.refreshUserProfile(),
       ]);
 
-      logger.info("storage", "All caches refreshed successfully");
+      logger.category('storage').info("All caches refreshed successfully");
     } catch (error) {
-      logger.error("storage", "Error refreshing all caches:", error);
+      logger.category('storage').error("Error refreshing all caches:", error);
       throw error;
     }
   },

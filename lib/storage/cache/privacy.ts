@@ -150,7 +150,7 @@ export async function clearAllUserData(): Promise<void> {
     // Log error but continue with registry-only cleanup
     import("@/lib/utils/logger")
       .then(({ logger }) => {
-        logger.warn("privacy", "Failed to get storage keys", error);
+        logger.category('storage').warn("Failed to get storage keys", error);
       })
       .catch(() => {
         // Ignore logger import errors
@@ -201,8 +201,7 @@ export async function clearAllUserData(): Promise<void> {
       // Lazy import logger to avoid circular dependency
       import("@/lib/utils/logger")
         .then(({ logger }) => {
-          logger.error(
-            "privacy",
+          logger.category('security').error(
             `Failed to clear key ${key}: ${error instanceof Error ? error.message : String(error)}`,
           );
         })
@@ -226,8 +225,7 @@ export async function clearAllUserData(): Promise<void> {
         // Log error but continue
         import("@/lib/utils/logger")
           .then(({ logger }) => {
-            logger.warn(
-              "privacy",
+            logger.category('security').warn(
               `Failed to clear prefix ${prefix}: ${error instanceof Error ? error.message : String(error)}`,
             );
           })
@@ -241,8 +239,7 @@ export async function clearAllUserData(): Promise<void> {
   // 6. Log completion
   import("@/lib/utils/logger")
     .then(({ logger }) => {
-      logger.info(
-        "privacy",
+      logger.category('security').info(
         `Cleared user data: ${successCount} keys cleared, ${failureCount} failures`,
       );
     })

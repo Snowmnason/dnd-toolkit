@@ -52,7 +52,7 @@ export function useAuthGuard(
     let unsubscribe: (() => void) | null = null;
     let mounted = true;
 
-    logger.info('security', `[GUARD:${instanceId}] 🟢 Setting up auth state subscription via provider`);
+    logger.category('security').info(`[GUARD:${instanceId}] 🟢 Setting up auth state subscription via provider`);
 
     const setup = async () => {
       try {
@@ -61,38 +61,38 @@ export function useAuthGuard(
         // Subscribe to provider's auth state changes
         unsubscribe = provider.onAuthStateChange(async (session) => {
           if (!mounted) {
-            logger.debug('security', `[GUARD:${instanceId}] 🔇 Subscription event received after unmount, ignoring`);
+            logger.category('security').debug(`[GUARD:${instanceId}] 🔇 Subscription event received after unmount, ignoring`);
             return;
           }
           
-          logger.debug('security', `[GUARD:${instanceId}] 🔔 onAuthStateChange: hasSession=${!!session}`);
+          logger.category('security').debug(`[GUARD:${instanceId}] 🔔 onAuthStateChange: hasSession=${!!session}`);
           
           // Mark subscription as ready once we get first event
           if (!subscriptionReadyRef.current) {
             subscriptionReadyRef.current = true;
-            logger.info('security', `[GUARD:${instanceId}] ✅ Subscription ready`);
+            logger.category('security').info(`[GUARD:${instanceId}] ✅ Subscription ready`);
             setSubscriptionReady(true);
           }
           
           // Sync session to local auth state
           if (session) {
-            logger.info('security', `[GUARD:${instanceId}] 🔄 Syncing session to local auth state`);
+            logger.category('security').info(`[GUARD:${instanceId}] 🔄 Syncing session to local auth state`);
             await AuthStateManager.setHasAccount(true);
           }
           
           try {
             const authenticated = await AuthStateManager.isAuthenticated();
-            logger.debug('security', `[GUARD:${instanceId}] ✓ Updated auth state to: ${authenticated ? 'authenticated' : 'unauthenticated'}`);
+            logger.category('security').debug(`[GUARD:${instanceId}] ✓ Updated auth state to: ${authenticated ? 'authenticated' : 'unauthenticated'}`);
             setAuthState(authenticated ? 'authenticated' : 'unauthenticated');
           } catch (error) {
-            logger.error('security', `[GUARD:${instanceId}] Error in auth state change handler:`, error);
+            logger.category('security').error(`[GUARD:${instanceId}] Error in auth state change handler:`, error);
             setAuthState('unauthenticated');
           }
         });
         
-        logger.info('security', `[GUARD:${instanceId}] 🔗 Subscription listener registered`);
+        logger.category('security').info(`[GUARD:${instanceId}] 🔗 Subscription listener registered`);
       } catch (error) {
-        logger.error('security', `[GUARD:${instanceId}] Error setting up auth subscription:`, error);
+        logger.category('security').error(`[GUARD:${instanceId}] Error setting up auth subscription:`, error);
         setSubscriptionReady(true); // Allow fallback
       }
     };
@@ -101,7 +101,7 @@ export function useAuthGuard(
     return () => {
       mounted = false;
       if (unsubscribe) {
-        logger.info('security', `[GUARD:${instanceId}] 🔴 Cleaning up subscription`);
+        logger.category('security').info(`[GUARD:${instanceId}] 🔴 Cleaning up subscription`);
         unsubscribe();
       }
     };
@@ -115,22 +115,22 @@ export function useAuthGuard(
     
     // For protected routes, wait for subscription to establish before checking auth
     if (isProtectedRoute && !subscriptionReady) {
-      logger.debug('security', `[GUARD:${instanceId}] ⏳ Waiting for subscription to be ready before auth check on protected route`);
+      logger.category('security').debug(`[GUARD:${instanceId}] ⏳ Waiting for subscription to be ready before auth check on protected route`);
       return;
     }
 
-    logger.debug('security', `[GUARD:${instanceId}] 🚀 Starting core auth check, isProtectedRoute=${isProtectedRoute}, level=${level}, params.worldId=${params.worldId}`);
+    logger.category('security').debug(`[GUARD:${instanceId}] 🚀 Starting core auth check, isProtectedRoute=${isProtectedRoute}, level=${level}, params.worldId=${params.worldId}`);
 
     let mounted = true;
     const check = async () => {
       try {
         const authenticated = await AuthStateManager.isAuthenticated();
-        logger.debug('security', `[GUARD:${instanceId}] ✓ isAuthenticated returned: ${authenticated}`);
+        logger.category('security').debug(`[GUARD:${instanceId}] ✓ isAuthenticated returned: ${authenticated}`);
 
         if (mounted) {
           if (isProtectedRoute && !authenticated && !hasRedirectedRef.current) {
             hasRedirectedRef.current = true;
-            logger.warn('security', `[GUARD:${instanceId}] ❌ Protected route but not authenticated, redirecting to login`);
+            logger.category('security').warn(`[GUARD:${instanceId}] ❌ Protected route but not authenticated, redirecting to login`);
             router.replace(AUTH_CONFIG.redirectOnUnauthenticated);
             setAuthState('unauthenticated');
             return;
@@ -140,29 +140,29 @@ export function useAuthGuard(
           if (level === 'world-required') {
             const worldId = typeof params.worldId === 'string' ? params.worldId : undefined;
             
-            if (!worldId) {
-              logger.warn('security', `[GUARD:${instanceId}] ❌ World-required level but no worldId in params, redirecting to select`);
+              if (!worldId) {
+              logger.category('security').warn(`[GUARD:${instanceId}] ❌ World-required level but no worldId in params, redirecting to select`);
               router.replace('/select/world-selection');
               setAuthState('unauthenticated');
               return;
             }
             
-            logger.info('security', `[GUARD:${instanceId}] 🌍 World-required: verifying access to world ${worldId}`);
+            logger.category('security').info(`[GUARD:${instanceId}] 🌍 World-required: verifying access to world ${worldId}`);
             
             // Check if this is a sensitive page that needs forced verification
             if (options?.forceVerification) {
-              logger.info('security', `[GUARD:${instanceId}] 🔒 Sensitive page - forcing verification for world ${worldId}`);
+              logger.category('security').info(`[GUARD:${instanceId}] 🔒 Sensitive page - forcing verification for world ${worldId}`);
               
               const verification = await AuthStateManager.verifyWorldAccessWithDatabase(
                 worldId,
                 (reason: string) => {
-                  logger.warn('security', `[GUARD:${instanceId}] Access denied on sensitive page:`, reason);
+                  logger.category('security').warn(`[GUARD:${instanceId}] Access denied on sensitive page:`, reason);
                   router.replace('/select/world-selection');
                 },
                 { forceFresh: true }
               );
               
-              logger.info('security', `[GUARD:${instanceId}] 🔒 Force verification result: hasAccess=${verification.hasAccess}`);
+              logger.category('security').info(`[GUARD:${instanceId}] 🔒 Force verification result: hasAccess=${verification.hasAccess}`);
               
               if (!verification.hasAccess) {
                 if (mounted && !hasRedirectedRef.current) {
@@ -174,17 +174,17 @@ export function useAuthGuard(
               }
             } else {
               // Normal cache-first check
-              logger.info('security', `[GUARD:${instanceId}] 🌍 Cache-first verification for world ${worldId}`);
+              logger.category('security').info(`[GUARD:${instanceId}] 🌍 Cache-first verification for world ${worldId}`);
               
               const verification = await AuthStateManager.verifyWorldAccessWithDatabase(
                 worldId,
                 (reason: string) => {
-                  logger.warn('security', `[GUARD:${instanceId}] Access revoked:`, reason);
+                  logger.category('security').warn(`[GUARD:${instanceId}] Access revoked:`, reason);
                   router.replace('/select/world-selection');
                 }
               );
               
-              logger.info('security', `[GUARD:${instanceId}] 🌍 Verification result: hasAccess=${verification.hasAccess}, fromCache=${verification.fromCache}`);
+              logger.category('security').info(`[GUARD:${instanceId}] 🌍 Verification result: hasAccess=${verification.hasAccess}, fromCache=${verification.fromCache}`);
               
               if (!verification.hasAccess) {
                 if (mounted && !hasRedirectedRef.current) {
@@ -204,14 +204,14 @@ export function useAuthGuard(
           //   const worldPermissions = await getWorldPermissions(worldId);
           //   
           //   if (level === 'world-owner' && userRole !== 'owner') {
-          //     logger.warn('security', `[GUARD:${instanceId}] Owner access required but user role=${userRole}`);
+          //     logger.category('security').warn(`[GUARD:${instanceId}] Owner access required but user role=${userRole}`);
           //     router.replace('/select/world-selection');
           //     setAuthState('unauthenticated');
           //     return;
           //   }
           //   
           //   if (level === 'world-dm' && !['owner', 'dm'].includes(userRole)) {
-          //     logger.warn('security', `[GUARD:${instanceId}] DM access required but user role=${userRole}`);
+          //     logger.category('security').warn(`[GUARD:${instanceId}] DM access required but user role=${userRole}`);
           //     router.replace('/select/world-selection');
           //     setAuthState('unauthenticated');
           //     return;
@@ -222,7 +222,7 @@ export function useAuthGuard(
           // if (options?.requiredPermission === 'write') {
           //   const permissions = await getWorldPermissions(worldId); // { read: boolean, write: boolean }
           //   if (!permissions.write) {
-          //     logger.warn('security', `[GUARD:${instanceId}] Write permission required but user has read-only`);
+          //     logger.category('security').warn(`[GUARD:${instanceId}] Write permission required but user has read-only`);
           //     router.replace('/select/world-selection');
           //     setAuthState('unauthenticated');
           //     return;
@@ -232,7 +232,7 @@ export function useAuthGuard(
           setAuthState(authenticated ? 'authenticated' : 'unauthenticated');
         }
       } catch (error) {
-        logger.error('security', `[GUARD:${instanceId}] Error in auth check:`, error);
+        logger.category('security').error(`[GUARD:${instanceId}] Error in auth check:`, error);
         if (mounted) {
           if (isProtectedRoute && !hasRedirectedRef.current) {
             hasRedirectedRef.current = true;

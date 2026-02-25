@@ -145,9 +145,9 @@ Log at different levels.
 
 **Example:**
 ```ts
-logger.info("api", "Worlds fetched successfully");
+logger.category('api').info("Worlds fetched successfully");
 logger.group("bootstrap", "Initialization", false);
-logger.info("bootstrap", "Loading config");
+logger.category('bootstrap').info("Loading config");
 logger.groupEnd();
 ```
 
@@ -408,7 +408,7 @@ await injectWebFonts();
 try {
   const module = await lazyLoad(() => import("./Missing"), "Missing");
 } catch (err) {
-  logger.error("lazy-load", "Failed to load Missing:", err);
+  logger.category('lazy-load').error("Failed to load Missing:", err);
   // Handle gracefully
 }
 ```

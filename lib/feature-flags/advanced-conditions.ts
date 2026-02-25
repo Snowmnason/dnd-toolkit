@@ -129,8 +129,7 @@ class ConditionPluginRegistry {
    */
   register(plugin: ConditionPlugin): void {
     if (this.plugins.has(plugin.name)) {
-      logger.warn(
-        "feature_flags",
+      logger.category("feature_flags").warn(
         `Overwriting plugin: ${plugin.name}`,
       );
     }
@@ -160,8 +159,7 @@ class ConditionPluginRegistry {
     depth: number = 0,
   ): boolean | undefined {
     if (depth > this.maxDepth) {
-      logger.error(
-        "feature_flags",
+      logger.category("feature_flags").error(
         `Max recursion depth exceeded for condition evaluation`,
       );
       return undefined;
@@ -257,8 +255,7 @@ export function evaluateAdvancedCondition(
   const maxDepth = pluginRegistry.getMaxDepth();
 
   if (depth > maxDepth) {
-    logger.error(
-      "feature_flags",
+    logger.category("feature_flags").error(
       `Max recursion depth (${maxDepth}) exceeded in condition evaluation`,
     );
     return false;
@@ -282,14 +279,12 @@ export function evaluateAdvancedCondition(
     // - OR with no conditions: false (no conditions to satisfy)
     if (expression.conditions.length === 0) {
       if (expression.operator === "AND") {
-        logger.warn(
-          "feature_flags",
+        logger.category("feature_flags").warn(
           `Empty AND expression. This should have been caught during validation.`,
         );
         return true; // Vacuously true: all (zero) conditions are satisfied
       } else if (expression.operator === "OR") {
-        logger.warn(
-          "feature_flags",
+        logger.category("feature_flags").warn(
           `Empty OR expression. This should have been caught during validation.`,
         );
         return false; // No conditions to satisfy
@@ -350,8 +345,7 @@ export function evaluateAdvancedCondition(
     return result ?? false; // Default to false if plugin can't evaluate
   }
 
-  logger.warn(
-    "feature_flags",
+  logger.category("feature_flags").warn(
     `Unknown condition type: ${condition.type}`,
   );
   return false;

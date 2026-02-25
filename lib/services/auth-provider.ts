@@ -463,8 +463,7 @@ export function createValidatedAuthProvider(
           undefined,
           'MISSING_REQUIRED_FIELDS'
         );
-        logger.warn(
-          'auth',
+        logger.category('auth').warn(
           'ValidatedAuthProvider.signUp: missing required fields'
         );
         return { success: false, error };
@@ -477,9 +476,8 @@ export function createValidatedAuthProvider(
           'Invalid email format',
           undefined
         );
-        logger.warn(
-          'auth',
-          'ValidatedAuthProvider.signUp: invalid email format',
+          logger.category('auth').warn(
+            'ValidatedAuthProvider.signUp: invalid email format',
           {
             reasons: {
               isValidFormat: emailValidation.isValidFormat,
@@ -499,8 +497,7 @@ export function createValidatedAuthProvider(
           'Password does not meet security requirements',
           undefined
         );
-        logger.warn(
-          'auth',
+        logger.category('auth').warn(
           'ValidatedAuthProvider.signUp: invalid password strength',
           {
             strength: passwordValidation.strength,
@@ -520,8 +517,7 @@ export function createValidatedAuthProvider(
       }
 
       // === DELEGATE TO UNDERLYING PROVIDER (Validated Input Only) ===
-      logger.debug(
-        'auth',
+      logger.category('auth').warn(
         'ValidatedAuthProvider.signUp: validation passed, delegating to provider',
         {
           email: emailValidation.sanitized.trim(),
@@ -539,7 +535,7 @@ export function createValidatedAuthProvider(
           undefined,
           'MISSING_REQUIRED_FIELDS'
         );
-        logger.warn('auth', 'ValidatedAuthProvider.signIn: missing required fields');
+        logger.category('auth').warn('ValidatedAuthProvider.signIn: missing required fields');
         return { success: false, error };
       }
 
@@ -550,8 +546,7 @@ export function createValidatedAuthProvider(
           'Invalid email format',
           undefined
         );
-        logger.warn(
-          'auth',
+        logger.category('auth').warn(
           'ValidatedAuthProvider.signIn: invalid email format',
           {
             reasons: {
@@ -571,13 +566,12 @@ export function createValidatedAuthProvider(
           'Invalid password',
           undefined
         );
-        logger.warn('auth', 'ValidatedAuthProvider.signIn: invalid password input');
+        logger.category('auth').warn('ValidatedAuthProvider.signIn: invalid password input');
         return { success: false, error };
       }
 
       // === DELEGATE TO UNDERLYING PROVIDER (Validated Input Only) ===
-      logger.debug(
-        'auth',
+      logger.category('auth').debug(
         'ValidatedAuthProvider.signIn: validation passed, delegating to provider',
         {
           email: emailValidation.sanitized.trim(),
@@ -592,17 +586,17 @@ export function createValidatedAuthProvider(
     ): Promise<{ url?: string; session?: Session }> {
       // === INPUT VALIDATION (Defensive Layer) ===
       if (!provider_) {
-        logger.warn('auth', 'ValidatedAuthProvider.signInWithOAuth: missing provider');
+        logger.category('auth').warn('ValidatedAuthProvider.signInWithOAuth: missing provider');
         throw new AuthError('Provider is required', undefined, 'MISSING_REQUIRED_FIELDS');
       }
 
       if (typeof provider_ !== 'string') {
-        logger.warn('auth', 'ValidatedAuthProvider.signInWithOAuth: invalid provider type');
+        logger.category('auth').warn('ValidatedAuthProvider.signInWithOAuth: invalid provider type');
         throw new AuthError('Provider must be a string', undefined, 'INVALID_PROVIDER');
       }
 
       // === DELEGATE TO UNDERLYING PROVIDER ===
-      logger.debug('auth', 'ValidatedAuthProvider.signInWithOAuth: delegating to provider', {
+      logger.category('auth').debug('ValidatedAuthProvider.signInWithOAuth: delegating to provider', {
         provider: provider_,
       });
       return provider.signInWithOAuth(provider_, options);
@@ -620,18 +614,18 @@ export function createValidatedAuthProvider(
           undefined,
           'MISSING_REQUIRED_FIELDS'
         );
-        logger.warn('auth', 'ValidatedAuthProvider.signInWithIdToken: missing required fields');
+        logger.category('auth').warn('ValidatedAuthProvider.signInWithIdToken: missing required fields');
         return { success: false, error };
       }
 
       if (typeof provider_ !== 'string' || typeof token !== 'string') {
         const error = new AuthError('Provider and token must be strings', undefined, 'INVALID_INPUT');
-        logger.warn('auth', 'ValidatedAuthProvider.signInWithIdToken: invalid input types');
+        logger.category('auth').warn('ValidatedAuthProvider.signInWithIdToken: invalid input types');
         return { success: false, error };
       }
 
       // === DELEGATE TO UNDERLYING PROVIDER ===
-      logger.debug('auth', 'ValidatedAuthProvider.signInWithIdToken: delegating to provider', {
+      logger.category('auth').debug('ValidatedAuthProvider.signInWithIdToken: delegating to provider', {
         provider: provider_,
       });
       return provider.signInWithIdToken(provider_, token, options);
@@ -641,7 +635,7 @@ export function createValidatedAuthProvider(
       // === INPUT VALIDATION (Defensive Layer) ===
       // Check for null/undefined
       if (!email) {
-        logger.warn('auth', 'ValidatedAuthProvider.resetPassword: missing email');
+        logger.category('auth').warn('ValidatedAuthProvider.resetPassword: missing email');
         return {
           success: false,
           message: 'Email is required',
@@ -651,12 +645,9 @@ export function createValidatedAuthProvider(
       // Validate email
       const emailValidation = validateEmail(email);
       if (!emailValidation.isValid) {
-        logger.warn(
-          'auth',
-          'ValidatedAuthProvider.resetPassword: invalid email format',
-          {
-            reasons: {
-              isValidFormat: emailValidation.isValidFormat,
+        logger.category('auth').warn('ValidatedAuthProvider.resetPassword: invalid email format', {
+          reasons: {
+            isValidFormat: emailValidation.isValidFormat,
               hasValidLength: emailValidation.hasValidLength,
               hasNoSqlKeywords: emailValidation.hasNoSqlKeywords,
               hasNoControlChars: emailValidation.hasNoControlChars,
@@ -670,13 +661,9 @@ export function createValidatedAuthProvider(
       }
 
       // === DELEGATE TO UNDERLYING PROVIDER (Validated Input Only) ===
-      logger.debug(
-        'auth',
-        'ValidatedAuthProvider.resetPassword: validation passed, delegating to provider',
-        {
-          email: emailValidation.sanitized.trim(),
-        }
-      );
+      logger.category('auth').debug('ValidatedAuthProvider.resetPassword: validation passed, delegating to provider', {
+        email: emailValidation.sanitized.trim(),
+      });
       return provider.resetPassword(emailValidation.sanitized);
     },
 
@@ -684,7 +671,7 @@ export function createValidatedAuthProvider(
       // === INPUT VALIDATION (Defensive Layer) ===
       // Check for null/undefined
       if (!email) {
-        logger.warn('auth', 'ValidatedAuthProvider.resend: missing email');
+        logger.category('auth').warn('ValidatedAuthProvider.resend: missing email');
         return {
           success: false,
           message: 'Email is required',
@@ -694,18 +681,14 @@ export function createValidatedAuthProvider(
       // Validate email
       const emailValidation = validateEmail(email);
       if (!emailValidation.isValid) {
-        logger.warn(
-          'auth',
-          'ValidatedAuthProvider.resend: invalid email format',
-          {
-            reasons: {
-              isValidFormat: emailValidation.isValidFormat,
-              hasValidLength: emailValidation.hasValidLength,
-              hasNoSqlKeywords: emailValidation.hasNoSqlKeywords,
-              hasNoControlChars: emailValidation.hasNoControlChars,
-            },
-          }
-        );
+        logger.category('auth').warn('ValidatedAuthProvider.resend: invalid email format', {
+          reasons: {
+            isValidFormat: emailValidation.isValidFormat,
+            hasValidLength: emailValidation.hasValidLength,
+            hasNoSqlKeywords: emailValidation.hasNoSqlKeywords,
+            hasNoControlChars: emailValidation.hasNoControlChars,
+          },
+        });
         return {
           success: false,
           message: 'Invalid email format',
@@ -713,13 +696,9 @@ export function createValidatedAuthProvider(
       }
 
       // === DELEGATE TO UNDERLYING PROVIDER (Validated Input Only) ===
-      logger.debug(
-        'auth',
-        'ValidatedAuthProvider.resend: validation passed, delegating to provider',
-        {
-          email: emailValidation.sanitized.trim(),
-        }
-      );
+      logger.category('auth').debug('ValidatedAuthProvider.resend: validation passed, delegating to provider', {
+        email: emailValidation.sanitized.trim(),
+      });
       return provider.resend(emailValidation.sanitized);
     },
 
@@ -773,12 +752,12 @@ export async function registerAuthProvider(
   provider: AuthProvider | (() => Promise<AuthProvider>)
 ): Promise<void> {
   if (typeof provider === 'function') {
-    logger.debug('auth', 'Registering auth provider (async factory)');
+    logger.category('auth').debug('Registering auth provider (async factory)');
     registeredProvider = provider;
     providerInstance = null;
     providerPromise = null;
   } else {
-    logger.debug('auth', 'Registering auth provider (instance)', {
+    logger.category('auth').debug('Registering auth provider (instance)', {
       providerType: provider.constructor.name,
     });
     registeredProvider = provider;
@@ -807,7 +786,7 @@ export async function getAuthProvider(): Promise<AuthProvider> {
       undefined,
       'Authentication service is not available. Please restart the app.'
     );
-    logger.error('auth', error.toLog());
+    logger.category('auth').error('No auth provider registered', error.toLog());
     throw error;
   }
 
@@ -821,19 +800,16 @@ export async function getAuthProvider(): Promise<AuthProvider> {
     if (!providerPromise) {
       providerPromise = (async () => {
         try {
-          logger.debug('auth', 'Instantiating auth provider from factory...');
+          logger.category('auth').debug('Instantiating auth provider from factory...');
           const provider = await registeredProvider();
           providerInstance = provider;
-          logger.info('bootstrap', 'Auth provider factory instantiated', {
+          logger.category('bootstrap').info('Auth provider factory instantiated', {
             providerType: provider.constructor.name,
           });
           return provider;
         } catch (error) {
           const err = error as Error;
-          logger.error(
-            'bootstrap',
-            `Auth provider factory failed: ${err.message}`
-          );
+          logger.category('bootstrap').error(`Auth provider factory failed: ${err.message}`);
           throw new ProviderInitializationError(
             `Auth provider initialization failed: ${err.message}`,
             error,

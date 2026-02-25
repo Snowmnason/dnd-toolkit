@@ -70,7 +70,7 @@ class BreadcrumbQueueService {
       this.debounceMs = breadcrumbsConfig?.debounceMs ?? 5000; // Debounce flush: once per 5s
     } catch (error) {
       // Config loading failed; fall back to safe defaults
-      logger.category('analytics').warn('BreadcrumbQueue', `Failed to load config: ${error}, using defaults`);
+      logger.category('analytics').error('BreadcrumbQueue', `Failed to load config: ${error}, using defaults`);
       this.maxBreadcrumbs = 500;
       this.retentionDays = 14;
       this.maxRetries = 5;
@@ -94,14 +94,14 @@ class BreadcrumbQueueService {
     }
 
     this.provider = provider;
-    logger.category('analytics').info('BreadcrumbQueue', `Initializing with provider: ${provider.name}`);
+    logger.category('analytics').analytics('BreadcrumbQueue', `Initializing with provider: ${provider.name}`);
 
     try {
       // Load queue from storage
       const stored = await SecureStorage.getItem(STORAGE_KEYS.BREADCRUMB_QUEUE);
       if (stored) {
         this.queue = JSON.parse(stored) as QueuedBreadcrumb[];
-        logger.category('analytics').info('BreadcrumbQueue', `Loaded ${this.queue.length} breadcrumbs from storage`);
+        logger.category('analytics').analytics('BreadcrumbQueue', `Loaded ${this.queue.length} breadcrumbs from storage`);
       }
 
       // Load deduplication cache
@@ -122,7 +122,7 @@ class BreadcrumbQueueService {
       try {
         await SecureStorage.removeItem(STORAGE_KEYS.BREADCRUMB_QUEUE);
         await SecureStorage.removeItem(STORAGE_KEYS.BREADCRUMB_DEDUP_CACHE);
-        logger.category('analytics').info('BreadcrumbQueue', 'Removed corrupted persisted queue data');
+        logger.category('analytics').analytics('BreadcrumbQueue', 'Removed corrupted persisted queue data');
       } catch (cleanupError) {
         logger.category('analytics').warn('BreadcrumbQueue', `Failed to clean up corrupted data: ${cleanupError}`);
       }
@@ -135,7 +135,7 @@ class BreadcrumbQueueService {
    */
   async enqueue(breadcrumb: Omit<QueuedBreadcrumb, 'id' | 'fingerprint' | 'retryCount' | 'maxRetries'>): Promise<QueuedBreadcrumb | null> {
     if (!this.provider) {
-      logger.category('analytics').warn('BreadcrumbQueue', 'enqueue called before initialization');
+      logger.category('analytics').analytics('BreadcrumbQueue', 'enqueue called before initialization');
       return null;
     }
 
@@ -144,7 +144,7 @@ class BreadcrumbQueueService {
     const consentLevel = AnalyticsConsent.getLevel();
 
     if (!shouldEmitEvent(consentCategory, consentLevel)) {
-      logger.category('analytics').debug(
+      logger.category('analytics').warn(
         'BreadcrumbQueue',
         `Breadcrumb '${breadcrumb.category}' dropped (category=${consentCategory}, level=${consentLevel})`
       );
@@ -157,7 +157,7 @@ class BreadcrumbQueueService {
     // Check dedup cache
     const lastSent = this.deduplicationCache.get(fingerprint);
     if (lastSent && Date.now() - lastSent < this.deduplicationTTL) {
-      logger.category('analytics').debug(
+      logger.category('analytics').warn(
         'BreadcrumbQueue',
         `Skipping duplicate breadcrumb (fingerprint: ${fingerprint})`
       );
@@ -197,7 +197,7 @@ class BreadcrumbQueueService {
     // Persist to storage
     await this._persist();
 
-    logger.category('analytics').debug(
+    logger.category('analytics').analytics(
       'BreadcrumbQueue',
       `Enqueued breadcrumb (id: ${queuedBreadcrumb.id}, queue size: ${this.queue.length})`
     );
@@ -222,7 +222,7 @@ class BreadcrumbQueueService {
 
     if (before !== this.queue.length) {
       await this._persist();
-      logger.category('analytics').debug(
+      logger.category('analytics').info(
         'BreadcrumbQueue',
         `Removed ${before - this.queue.length} breadcrumbs, queue size: ${this.queue.length}`
       );
@@ -249,7 +249,7 @@ class BreadcrumbQueueService {
     breadcrumb.nextAttemptAt = Date.now() + backoffMs;
 
     await this._persist();
-    logger.category('analytics').debug(
+    logger.category('analytics').warn(
       'BreadcrumbQueue',
       `Marked failed breadcrumb (id: ${id}, retry: ${breadcrumb.retryCount}/${breadcrumb.maxRetries}, next attempt: ${backoffMs}ms)`
     );
@@ -313,7 +313,7 @@ class BreadcrumbQueueService {
 
     // Phase 1c: Rate limit backoff — don't flush if we're rate-limited
     if (now < this.nextFlushAfterMs) {
-      logger.category('analytics').debug(
+      logger.category('analytics').analytics(
         'BreadcrumbQueue',
         `Rate-limited: next flush in ${this.nextFlushAfterMs - now}ms`
       );
@@ -327,7 +327,7 @@ class BreadcrumbQueueService {
       // Phase 1c: Batch spacing — if 100+ pending, space batches apart to avoid rate limit
       const hasLargeQueue = this.queue.length >= 100;
       if (hasLargeQueue && this.lastFlushTime && now - this.lastFlushTime < this.batchSpacingMs) {
-        logger.category('analytics').debug('BreadcrumbQueue', `Batch spacing: deferring flush (${this.queue.length} pending)`);
+        logger.category('analytics').info('BreadcrumbQueue', `Batch spacing: deferring flush (${this.queue.length} pending)`);
         this.isFlushing = false;
         return;
       }
@@ -338,7 +338,7 @@ class BreadcrumbQueueService {
       batch = batch.filter((b) => {
         const lastSent = this.deduplicationCache.get(b.fingerprint);
         if (lastSent && now - lastSent < this.deduplicationTTL) {
-          logger.category('analytics').debug(
+          logger.category('analytics').info(
             'BreadcrumbQueue',
             `Skipping duplicate on flush (fingerprint: ${b.fingerprint})`
           );
@@ -348,7 +348,7 @@ class BreadcrumbQueueService {
       });
 
       if (batch.length === 0) {
-        logger.category('analytics').debug('BreadcrumbQueue', 'No new breadcrumbs to flush (all deduplicated)');
+        logger.category('analytics').analytics('BreadcrumbQueue', 'No new breadcrumbs to flush (all deduplicated)');
         this.isFlushing = false;
         return;
       }
@@ -356,7 +356,7 @@ class BreadcrumbQueueService {
       // Track current batch IDs (Phase 1c: prevent double-retry)
       this.currentBatchIds = new Set(batch.map((b) => b.id));
 
-      logger.category('analytics').info(
+      logger.category('analytics').analytics(
         'BreadcrumbQueue',
         `Flushing batch of ${batch.length} breadcrumbs via ${this.provider.name}`
       );
@@ -374,7 +374,7 @@ class BreadcrumbQueueService {
         }
         await this._persistDedupCache();
         await this.remove(result.sent);
-        logger.category('analytics').debug('BreadcrumbQueue', `Sent ${result.sent.length} breadcrumbs`);
+        logger.category('analytics').analytics('BreadcrumbQueue', `Sent ${result.sent.length} breadcrumbs`);
       }
 
       // Process retries (5xx, network errors, rate-limited)
@@ -405,7 +405,7 @@ class BreadcrumbQueueService {
       this.lastFlushTime = now;
       this.currentBatchIds.clear();
 
-      logger.category('analytics').info(
+      logger.category('analytics').analytics(
         'BreadcrumbQueue',
         `Flush complete: sent ${result.sent.length}, retry ${result.retry.length}, discard ${result.discard.length}`
       );
@@ -426,7 +426,7 @@ class BreadcrumbQueueService {
     this.overflowCount = 0;
     await SecureStorage.removeItem(STORAGE_KEYS.BREADCRUMB_QUEUE);
     await SecureStorage.removeItem(STORAGE_KEYS.BREADCRUMB_DEDUP_CACHE);
-    logger.category('analytics').info('BreadcrumbQueue', 'Queue cleared');
+    logger.category('analytics').analytics('BreadcrumbQueue', 'Queue cleared');
   }
 
   /**
@@ -518,6 +518,7 @@ class BreadcrumbQueueService {
       custom: 'usage',
     };
 
+    // eslint-disable-next-line security/detect-object-injection
     const mapped = consentMapping[breadcrumbCategory];
     if (mapped === undefined) {
       logger.category('analytics').warn('BreadcrumbQueue', `Unmapped breadcrumb category '${breadcrumbCategory}'; defaulting to 'performance'`);
@@ -568,8 +569,8 @@ class BreadcrumbQueueService {
 
     // Remove old breadcrumbs (>14 days)
     this.queue = this.queue.filter((b) => {
-      if (now - b.timestamp > maxAgeMs) {
-        logger.category('analytics').debug('BreadcrumbQueue', `Dropping old breadcrumb (id: ${b.id})`);
+        if (now - b.timestamp > maxAgeMs) {
+        logger.category('analytics').info('BreadcrumbQueue', `Dropping old breadcrumb (id: ${b.id})`);
         return false;
       }
       return true;
@@ -580,7 +581,7 @@ class BreadcrumbQueueService {
       const dropped = this.queue.length - this.maxBreadcrumbs;
       this.queue = this.queue.slice(-this.maxBreadcrumbs);
       this.overflowCount += dropped;
-      logger.category('analytics').warn('BreadcrumbQueue', `Trimmed ${dropped} old breadcrumbs on load`);
+      logger.category('analytics').info('BreadcrumbQueue', `Trimmed ${dropped} old breadcrumbs on load`);
     }
 
     if (before !== this.queue.length) {

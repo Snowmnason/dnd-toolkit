@@ -275,23 +275,19 @@ export abstract class APIClient {
 
     // Phase 5: Validate auth strategy if declared
     if (config.authStrategy) {
-      logger.debug("api", `Validating auth strategy for ${this.clientName}`, {
+      logger.category('auth').debug(`Validating auth strategy for ${this.clientName}`, {
         authStrategy: config.authStrategy,
       });
       // Note: Full validation would require checking AuthLayer registry
       // For now, we log at debug level to help catch misconfiguration
       if (!config.authStrategy.match(/^[a-z-]+$/)) {
-        logger.warn(
-          "api",
-          `Invalid auth strategy format: ${config.authStrategy}`,
-          {
-            clientName: this.clientName,
-          },
-        );
+        logger.category('auth').warn(`Invalid auth strategy format: ${config.authStrategy}`, {
+          clientName: this.clientName,
+        });
       }
     }
 
-    logger.debug("api", `Initialized ${this.clientName}`, {
+    logger.category('api').debug(`Initialized ${this.clientName}`, {
       baseUrl: this.config.baseUrl,
       authStrategy: this.config.authStrategy,
       circuitBreakerKey: this.config.circuitBreakerKey,
@@ -305,7 +301,7 @@ export abstract class APIClient {
    */
   use(interceptor: RequestInterceptor): this {
     this.interceptors.push(interceptor);
-    logger.debug("api", `Registered interceptor on ${this.clientName}`, {
+    logger.category('api').debug(`Registered interceptor on ${this.clientName}`, {
       interceptorName: interceptor.name || "unnamed",
     });
     return this;
@@ -341,7 +337,7 @@ export abstract class APIClient {
       circuitBreakerKey &&
       CircuitBreakerManager.getState(circuitBreakerKey) === "Open"
     ) {
-      logger.debug("api", `Circuit breaker open for ${methodName}`, {
+      logger.category('api').debug(`Circuit breaker open for ${methodName}`, {
         cacheKey,
         circuitBreakerKey,
       });
@@ -349,7 +345,7 @@ export abstract class APIClient {
       // Return stale cache if available
       const staleData = await this.config.queryCache.get<T>(cacheKey);
       if (staleData) {
-        logger.info("api", `Circuit open - returning stale cache`, {
+        logger.category('api').info(`Circuit open - returning stale cache`, {
           cacheKey,
         });
         return staleData;
@@ -365,7 +361,7 @@ export abstract class APIClient {
     const isStale = await this.config.queryCache.isStale(cacheKey);
 
     if (cached && !isStale) {
-      logger.debug("api", `Cache hit for ${methodName}`, { cacheKey });
+      logger.category('api').debug(`Cache hit for ${methodName}`, { cacheKey });
       return cached;
     }
 
@@ -373,7 +369,7 @@ export abstract class APIClient {
     // If cache is stale AND staleWhileRevalidate is enabled, return stale immediately
     // and revalidate in background
     if (cached && isStale && options?.staleWhileRevalidate) {
-      logger.debug("api", `Stale-while-revalidate for ${methodName}`, {
+      logger.category('api').debug(`Stale-while-revalidate for ${methodName}`, {
         cacheKey,
       });
       // Return stale data immediately
@@ -424,7 +420,7 @@ export abstract class APIClient {
         try {
           validatedData = options.responseSchema.parse(data);
         } catch (error) {
-          logger.error("api", `Validation failed for ${methodName}`, { error });
+          logger.category('api').error(`Validation failed for ${methodName}`, { error });
           const apiError = this.transformValidationError(error);
           throw new AppError(apiError);
         }
@@ -447,7 +443,7 @@ export abstract class APIClient {
         try {
           await Promise.resolve(options.onSuccess(validatedData));
         } catch (error) {
-          logger.error("api", `onSuccess hook failed for ${methodName}`, {
+          logger.category('api').error(`onSuccess hook failed for ${methodName}`, {
             error,
           });
         }
@@ -460,7 +456,7 @@ export abstract class APIClient {
         try {
           await Promise.resolve(options.onError(error as Error));
         } catch (hookError) {
-          logger.error("api", `onError hook failed for ${methodName}`, {
+          logger.category('api').error(`onError hook failed for ${methodName}`, {
             error: hookError,
           });
         }
@@ -469,7 +465,7 @@ export abstract class APIClient {
       // Return stale cache if available (graceful fallback)
       const staleData = await this.config.queryCache.get<T>(cacheKey);
       if (staleData) {
-        logger.info("api", `Fetch failed - returning stale cache`, {
+        logger.category('api').info(`Fetch failed - returning stale cache`, {
           cacheKey,
           error,
         });
@@ -519,14 +515,14 @@ export abstract class APIClient {
     // Phase 3: Run validation before write if provided
     if (options?.validateBeforeWrite) {
       try {
-        logger.debug("api", `Running validateBeforeWrite for ${methodName}`, {
+        logger.category('api').debug(`Running validateBeforeWrite for ${methodName}`, {
           cacheKey,
         });
         // Validation runs for side effects (e.g., permission checks)
         // Result is not used in Phase 3 (can be extended in Phase 4 for context passing)
         await options.validateBeforeWrite();
       } catch (error) {
-        logger.error("api", `validateBeforeWrite failed for ${methodName}`, {
+        logger.category('api').error(`validateBeforeWrite failed for ${methodName}`, {
           error,
         });
         throw error;
@@ -538,7 +534,7 @@ export abstract class APIClient {
       circuitBreakerKey &&
       CircuitBreakerManager.getState(circuitBreakerKey) === "Open"
     ) {
-      logger.debug("api", `Circuit breaker open for ${methodName}`, {
+      logger.category('api').debug(`Circuit breaker open for ${methodName}`, {
         cacheKey,
         circuitBreakerKey,
       });
@@ -563,7 +559,7 @@ export abstract class APIClient {
         // (explicitly set after injectedHeaders to ensure it's not overridden)
         if (options?.idempotencyKey) {
           headers["Idempotency-Key"] = options.idempotencyKey;
-          logger.debug("api", `Adding idempotency key for ${methodName}`, {
+          logger.category('api').debug(`Adding idempotency key for ${methodName}`, {
             idempotencyKey: options.idempotencyKey,
           });
         }
@@ -604,7 +600,7 @@ export abstract class APIClient {
         try {
           validatedData = options.responseSchema.parse(data);
         } catch (error) {
-          logger.error("api", `Validation failed for ${methodName}`, { error });
+          logger.category('api').error(`Validation failed for ${methodName}`, { error });
           const apiError = this.transformValidationError(error);
           throw new AppError(apiError);
         }
@@ -613,7 +609,7 @@ export abstract class APIClient {
       // Invalidate related cache entries
       if (options?.invalidateTags && options.invalidateTags.length > 0) {
         await this.config.queryCache.invalidateByTags(options.invalidateTags);
-        logger.debug("api", `Invalidated tags for ${methodName}`, {
+        logger.category('api').debug(`Invalidated tags for ${methodName}`, {
           tags: options.invalidateTags,
         });
       }
@@ -626,7 +622,7 @@ export abstract class APIClient {
         await this.config.queryCache.invalidateByTags(
           options.invalidateOtherTags,
         );
-        logger.debug("api", `Cascade invalidated tags for ${methodName}`, {
+        logger.category('api').debug(`Cascade invalidated tags for ${methodName}`, {
           tags: options.invalidateOtherTags,
         });
       }
@@ -636,7 +632,7 @@ export abstract class APIClient {
         try {
           await Promise.resolve(options.onSuccess(validatedData));
         } catch (error) {
-          logger.error("api", `onSuccess hook failed for ${methodName}`, {
+          logger.category('api').error(`onSuccess hook failed for ${methodName}`, {
             error,
           });
         }
@@ -649,14 +645,13 @@ export abstract class APIClient {
         try {
           const mappedError = options.errorHandler(error);
           if (mappedError) {
-            logger.debug(
-              "api",
-              `Custom error handler mapped error for ${methodName}`,
-              {
-                from: (error as any)?.type,
-                to: mappedError.type,
-              },
-            );
+              logger.category('api').debug(
+                `Custom error handler mapped error for ${methodName}`,
+                {
+                  from: (error as any)?.type,
+                  to: mappedError.type,
+                },
+              );
             const mappedErr = new Error(
               (error as Error).message || `Error (${mappedError.type})`,
             );
@@ -664,7 +659,7 @@ export abstract class APIClient {
             throw mappedErr;
           }
         } catch (handlerError) {
-          logger.error("api", `Error handler failed for ${methodName}`, {
+          logger.category('api').error(`Error handler failed for ${methodName}`, {
             error: handlerError,
           });
           // Continue with original error if handler fails
@@ -675,7 +670,7 @@ export abstract class APIClient {
       // Note: Actual retry logic is handled by RequestManager
       if (options?.retryOnError || options?.noRetryOnError) {
         const errorType = (error as any)?.type || "unknown";
-        logger.debug("api", `Error handler evaluated retry strategy`, {
+        logger.category('api').debug(`Error handler evaluated retry strategy`, {
           methodName,
           errorType,
           retryOnError: options?.retryOnError,
@@ -688,7 +683,7 @@ export abstract class APIClient {
       // const networkStatus = await NetworkDetection.getStatus();
       // if (!networkStatus.isOnline || (options?.shouldQueue && options.shouldQueue(error))) {
       //   // Queue for replay
-      //   logger.info('api', `Mutation queued for replay`, { cacheKey, methodName });
+      //   logger.category('api').info(`Mutation queued for replay`, { cacheKey, methodName });
       //   // Phase 2 will implement OfflineQueueManager.enqueue()
       //   return null; // Return null to indicate queued
       // }
@@ -698,7 +693,7 @@ export abstract class APIClient {
         try {
           await Promise.resolve(options.onError(error as Error));
         } catch (hookError) {
-          logger.error("api", `onError hook failed for ${methodName}`, {
+          logger.category('api').error(`onError hook failed for ${methodName}`, {
             error: hookError,
           });
         }
@@ -748,13 +743,13 @@ export abstract class APIClient {
     const cached = await this.config.queryCache.get<T>(cacheKey);
     const isStale = await this.config.queryCache.isStale(cacheKey);
     if (cached && !isStale) {
-      logger.debug("api", `Cache hit for batch ${methodName}`, { cacheKey });
+      logger.category('api').debug(`Cache hit for batch ${methodName}`, { cacheKey });
       return cached;
     }
 
     try {
       // Fetch all queries in parallel
-      logger.debug("api", `Executing batch queries for ${methodName}`, {
+      logger.category('api').debug(`Executing batch queries for ${methodName}`, {
         queryCount: config.queries.length,
       });
 
@@ -769,7 +764,7 @@ export abstract class APIClient {
             }
             return { [query.key]: await response.json() };
           } catch (error) {
-            logger.error("api", `Batch query failed for ${query.key}`, {
+            logger.category('api').error(`Batch query failed for ${query.key}`, {
               error,
             });
             throw error;
@@ -790,7 +785,7 @@ export abstract class APIClient {
           successCount++;
         } else {
           errors[query.key] = result.reason;
-          logger.warn("api", `Batch query partial failure for ${query.key}`, {
+          logger.category('api').warn(`Batch query partial failure for ${query.key}`, {
             error: result.reason,
           });
         }
@@ -798,8 +793,7 @@ export abstract class APIClient {
 
       // Log partial failure summary
       if (Object.keys(errors).length > 0) {
-        logger.info(
-          "api",
+        logger.category('api').info(
           `Batch completed with partial failures: ${successCount}/${config.queries.length}`,
           {
             failedKeys: Object.keys(errors),
@@ -833,7 +827,7 @@ export abstract class APIClient {
       // Invalidate related cache entries (Phase 3: added for consistency with mutation)
       if (config.invalidateTags && config.invalidateTags.length > 0) {
         await this.config.queryCache.invalidateByTags(config.invalidateTags);
-        logger.debug("api", `Invalidated tags for batch ${methodName}`, {
+        logger.category('api').debug(`Invalidated tags for batch ${methodName}`, {
           tags: config.invalidateTags,
         });
       }
@@ -843,7 +837,7 @@ export abstract class APIClient {
         try {
           await Promise.resolve(config.onSuccess(combinedData));
         } catch (error) {
-          logger.error("api", `onSuccess hook failed for batch ${methodName}`, {
+          logger.category('api').error(`onSuccess hook failed for batch ${methodName}`, {
             error,
           });
         }
@@ -856,7 +850,7 @@ export abstract class APIClient {
         try {
           await Promise.resolve(config.onError(error as Error));
         } catch (hookError) {
-          logger.error("api", `onError hook failed for batch ${methodName}`, {
+          logger.category('api').error(`onError hook failed for batch ${methodName}`, {
             error: hookError,
           });
         }
@@ -865,7 +859,7 @@ export abstract class APIClient {
       // Return stale cache if available
       const staleData = await this.config.queryCache.get<T>(cacheKey);
       if (staleData) {
-        logger.info("api", `Batch fetch failed - returning stale cache`, {
+        logger.category('api').info(`Batch fetch failed - returning stale cache`, {
           cacheKey,
           error,
         });
@@ -997,7 +991,7 @@ export abstract class APIClient {
     options?: QueryOptions<T>,
   ): Promise<void> {
     try {
-      logger.debug("api", `Background revalidation started for ${methodName}`);
+      logger.category('api').debug(`Background revalidation started for ${methodName}`);
 
       const cacheKey = this.generateCacheKey(
         methodName,
@@ -1041,13 +1035,9 @@ export abstract class APIClient {
           try {
             validatedData = options.responseSchema.parse(data);
           } catch (error) {
-            logger.error(
-              "api",
-              `Revalidation validation failed for ${methodName}`,
-              {
-                error,
-              },
-            );
+            logger.category('api').error(`Revalidation validation failed for ${methodName}`, {
+              error,
+            });
             return; // Don't update cache on validation failure
           }
         }
@@ -1065,13 +1055,10 @@ export abstract class APIClient {
           requestVersion,
         );
 
-        logger.debug(
-          "api",
-          `Background revalidation successful for ${methodName}`,
-        );
+        logger.category('api').debug(`Background revalidation successful for ${methodName}`);
       }
     } catch (error) {
-      logger.debug("api", `Background revalidation failed for ${methodName}`, {
+      logger.category('api').debug(`Background revalidation failed for ${methodName}`, {
         error,
       });
       // Silently fail - don't disrupt user experience

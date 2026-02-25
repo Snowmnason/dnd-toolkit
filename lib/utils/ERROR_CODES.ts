@@ -160,12 +160,13 @@ export const ERROR_CODES = {
 // ============================================================================
 
 export type AuthErrorCode       = typeof ERROR_CODES.AUTH[keyof typeof ERROR_CODES.AUTH];
-export type NetworkErrorCode    = typeof ERROR_CODES.NETWORK[keyof typeof ERROR_CODES.NETWORK];
+export type NetworkErrorCode    = typeof ERROR_CODES.NETWORK[Exclude<keyof typeof ERROR_CODES.NETWORK, 'RAW'>];
 export type DatabaseErrorCode   = typeof ERROR_CODES.DATABASE[keyof typeof ERROR_CODES.DATABASE];
 export type StorageErrorCode    = typeof ERROR_CODES.STORAGE[keyof typeof ERROR_CODES.STORAGE];
 export type HttpStatusCode      = typeof ERROR_CODES.HTTP[keyof typeof ERROR_CODES.HTTP];
 export type ValidationErrorCode = typeof ERROR_CODES.VALIDATION[keyof typeof ERROR_CODES.VALIDATION];
 export type RetryErrorCode      = typeof ERROR_CODES.RETRY[keyof typeof ERROR_CODES.RETRY];
+export type UnknownErrorCode    = typeof ERROR_CODES.UNKNOWN[keyof typeof ERROR_CODES.UNKNOWN];
 
 /** Union of all string error codes (excludes HTTP numeric codes). */
 export type AnyErrorCode =
@@ -174,7 +175,8 @@ export type AnyErrorCode =
   | DatabaseErrorCode
   | StorageErrorCode
   | ValidationErrorCode
-  | RetryErrorCode;
+  | RetryErrorCode
+  | UnknownErrorCode;
 
 // ============================================================================
 // AUTH HELPERS
@@ -494,4 +496,4 @@ export const ERROR_CODES_METADATA: Record<string, ErrorCodeMetadata> = {
 /**
  * Type-safe type for all error codes (string union)
  */
-export type ErrorCodeType = AnyErrorCode | typeof ERROR_CODES.UNKNOWN.GENERAL;
+export type ErrorCodeType = AnyErrorCode;

@@ -359,7 +359,7 @@ class DualWriteUserRepository implements UserRepository {
     try {
       // Also write to old backend (async, don't wait)
       this.secondary.create(data).catch(error => {
-        logger.warn('Dual write to secondary failed', { error });
+        logger.category('storage').warn('Dual write to secondary failed', { error });
       });
     } catch (error) {
       // Ignore secondary write failures

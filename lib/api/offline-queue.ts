@@ -159,7 +159,7 @@ export const OfflineQueueManager = {
     };
 
     if (!this._config.enabled) {
-      logger.info("api", "Offline queue disabled");
+      logger.category('api').info("Offline queue disabled");
       this._isInitialized = true;
       return;
     }
@@ -175,7 +175,7 @@ export const OfflineQueueManager = {
           const queueData = (stored as VersionedCacheEntry<OfflineQueueData>)
             .data;
           this._queue = new Map(queueData.entries.map((e) => [e.key, e]));
-          logger.info("api", "Offline queue loaded", {
+          logger.category('api').info("Offline queue loaded", {
             length: this._queue.size,
             oldestEntry: this._getOldestEntryTime(),
           });
@@ -193,11 +193,11 @@ export const OfflineQueueManager = {
           }
         } else {
           this._queue.clear();
-          logger.warn("api", "Offline queue reset due to validation failure");
+          logger.category('api').warn("Offline queue reset due to validation failure");
         }
       }
     } catch (error) {
-      logger.error("api", "Error loading offline queue", error);
+      logger.category('api').error("Error loading offline queue", error);
       this._queue.clear();
     }
 
@@ -228,17 +228,13 @@ export const OfflineQueueManager = {
       this._queue.clear();
       entriesToKeep.forEach((e) => this._queue.set(e.key, e));
 
-      logger.warn(
-        "api",
-        "Offline queue size exceeded, dropped oldest entries",
-        {
-          queueSize: this._queue.size,
-        },
-      );
+      logger.category('api').warn("Offline queue size exceeded, dropped oldest entries", {
+        queueSize: this._queue.size,
+      });
     }
 
     await this._persist();
-    logger.debug("api", "Request queued for offline replay", {
+    logger.category('api').debug("Request queued for offline replay", {
       key: entry.key,
       queueLength: this._queue.size,
     });
@@ -274,7 +270,7 @@ export const OfflineQueueManager = {
 
     // If max attempts exceeded, remove from queue
     if (entry.attempts > this._config.maxRetryAttempts) {
-      logger.warn("api", "Offline queue entry max retries exceeded", {
+      logger.category('api').warn("Offline queue entry max retries exceeded", {
         key,
         attempts: entry.attempts,
       });
@@ -335,7 +331,7 @@ export const OfflineQueueManager = {
 
       await SecureStorage.setJSON(STORAGE_KEYS.OFFLINE_QUEUE, versionedEntry);
     } catch (error) {
-      logger.error("api", "Error persisting offline queue", error);
+      logger.category('api').error("Error persisting offline queue", error);
     }
   },
 

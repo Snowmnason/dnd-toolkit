@@ -41,7 +41,7 @@ export const worldAccessCache = {
           timestamp: Date.now(),
           source: `db_mutation:${source}`,
         });
-        logger.debug('storage', `Updated world access flag for ${worldId}`);
+        logger.category('storage').debug(`Updated world access flag for ${worldId}`);
       } else {
         // Remove access flag, update metadata to reflect removal
         await backend.removeItem(cacheKey);
@@ -50,12 +50,11 @@ export const worldAccessCache = {
           source: `db_mutation:${source}`,
           removed: true,
         });
-        logger.debug('storage', `Removed world access flag for ${worldId}`);
+        logger.category('storage').debug(`Removed world access flag for ${worldId}`);
       }
     } catch (error) {
       // Log but do not throw — DB operation is canonical
-      logger.error(
-        'storage',
+      logger.category('storage').error(
         `Failed to update world access cache for ${worldId}`,
         error
       );
@@ -74,10 +73,9 @@ export const worldAccessCache = {
       const backend = getPrivacyStorageBackend(cacheKey);
       await backend.removeItem(cacheKey);
       await backend.removeItem(metaKey);
-      logger.debug('storage', `Cleared all access flags for world ${worldId}`);
+      logger.category('storage').debug(`Cleared all access flags for world ${worldId}`);
     } catch (error) {
-      logger.error(
-        'storage',
+      logger.category('storage').error(
         `Failed to clear world access cache for ${worldId}`,
         error
       );

@@ -21,8 +21,8 @@ import {
   Session,
   UserNotFoundError,
 } from '@/lib/services/auth-provider';
-import { logger } from '@/lib/utils/logger';
 import { ERROR_CODES } from '@/lib/utils/ERROR_CODES';
+import { logger } from '@/lib/utils/logger';
 import { mapSupabaseAuthCode } from './supabase-error-translation';
 
 /**
@@ -42,7 +42,7 @@ export class SupabaseAuthProvider implements AuthProvider {
       throw new Error('SupabaseAuthProvider requires a Supabase client instance');
     }
     this.supabaseClient = supabaseClient;
-    logger.debug('auth', 'SupabaseAuthProvider initialized');
+    logger.category('auth').debug('SupabaseAuthProvider initialized');
   }
 
   /**
@@ -52,7 +52,7 @@ export class SupabaseAuthProvider implements AuthProvider {
    */
   async signUp(email: string, password: string, options?: Record<string, any>): Promise<AuthResult> {
     try {
-      logger.debug('auth', 'Supabase: signUp attempt');
+      logger.category('auth').debug('Supabase: signUp attempt');
 
       const { data, error } = await this.supabaseClient.auth.signUp({
         email,
@@ -62,7 +62,7 @@ export class SupabaseAuthProvider implements AuthProvider {
 
       if (error) {
         const normalized = this.mapSupabaseError(error);
-        logger.debug('auth', 'Supabase signUp error:', normalized.toLog());
+        logger.category('auth').debug('Supabase signUp error:', normalized.toLog());
         return { success: false, error: normalized };
       }
 
@@ -78,7 +78,7 @@ export class SupabaseAuthProvider implements AuthProvider {
             userId: data.user.id,
           };
         }
-        logger.debug('auth', 'Supabase signUp success', {
+        logger.category('auth').debug('Supabase signUp success', {
           userId: data.user.id,
           hasSession: !!data.session,
         });
@@ -94,7 +94,7 @@ export class SupabaseAuthProvider implements AuthProvider {
         err,
         'SUPABASE_EXCEPTION'
       );
-      logger.error('auth', 'Supabase signUp exception:', normalized.toLog());
+      logger.category('auth').error('Supabase signUp exception:', normalized.toLog());
       return { success: false, error: normalized };
     }
   }
@@ -105,7 +105,7 @@ export class SupabaseAuthProvider implements AuthProvider {
    */
   async signIn(email: string, password: string): Promise<AuthResult> {
     try {
-      logger.debug('auth', 'Supabase: signIn attempt');
+      logger.category('auth').debug('Supabase: signIn attempt');
 
       const { data, error } = await this.supabaseClient.auth.signInWithPassword(
         {
@@ -116,13 +116,13 @@ export class SupabaseAuthProvider implements AuthProvider {
 
       if (error) {
         const normalized = this.mapSupabaseError(error);
-        logger.debug('auth', 'Supabase signIn error:', normalized.toLog());
+        logger.category('auth').debug('Supabase signIn error:', normalized.toLog());
         return { success: false, error: normalized };
       }
 
       if (data?.user && data?.session) {
         const session = this.sessionFromSupabaseSession(data.session);
-        logger.info('auth', 'Supabase signIn success', { userId: data.user.id });
+        logger.category('auth').info('Supabase signIn success', { userId: data.user.id });
         return { success: true, data: session };
       }
 
@@ -134,7 +134,7 @@ export class SupabaseAuthProvider implements AuthProvider {
         err,
         'SUPABASE_EXCEPTION'
       );
-      logger.error('auth', 'Supabase signIn exception:', normalized.toLog());
+      logger.category('auth').error('Supabase signIn exception:', normalized.toLog());
       return { success: false, error: normalized };
     }
   }
@@ -148,7 +148,7 @@ export class SupabaseAuthProvider implements AuthProvider {
     options?: Record<string, any>
   ): Promise<{ url?: string; session?: Session }> {
     try {
-      logger.debug('auth', 'Supabase: signInWithOAuth attempt', { provider });
+      logger.category('auth').debug('Supabase: signInWithOAuth attempt', { provider });
 
       const { data, error } = await this.supabaseClient.auth.signInWithOAuth({
         provider: provider as any,
@@ -156,18 +156,18 @@ export class SupabaseAuthProvider implements AuthProvider {
       });
 
       if (error) {
-        logger.error('auth', 'Supabase signInWithOAuth error:', error.message);
+        logger.category('auth').error('Supabase signInWithOAuth error:', error.message);
         throw new AuthError('OAuth sign-in failed', error);
       }
 
       if (data?.url) {
-        logger.debug('auth', 'Supabase signInWithOAuth URL generated', { provider });
+        logger.category('auth').debug('Supabase signInWithOAuth URL generated', { provider });
         return { url: data.url };
       }
 
       if (data?.session) {
         const session = this.sessionFromSupabaseSession(data.session);
-        logger.info('auth', 'Supabase signInWithOAuth success', { provider });
+        logger.category('auth').info('Supabase signInWithOAuth success', { provider });
         return { session };
       }
 
@@ -179,7 +179,7 @@ export class SupabaseAuthProvider implements AuthProvider {
         err,
         'SUPABASE_EXCEPTION'
       );
-      logger.error('auth', 'Supabase signInWithOAuth exception:', normalized.toLog());
+      logger.category('auth').error('Supabase signInWithOAuth exception:', normalized.toLog());
       throw normalized;
     }
   }
@@ -194,7 +194,7 @@ export class SupabaseAuthProvider implements AuthProvider {
     options?: Record<string, any>
   ): Promise<AuthResult> {
     try {
-      logger.debug('auth', 'Supabase: signInWithIdToken attempt', { provider });
+      logger.category('auth').debug('Supabase: signInWithIdToken attempt', { provider });
 
       const { data, error } = await this.supabaseClient.auth.signInWithIdToken({
         provider: provider as any,
@@ -205,13 +205,13 @@ export class SupabaseAuthProvider implements AuthProvider {
 
       if (error) {
         const normalized = this.mapSupabaseError(error);
-        logger.debug('auth', 'Supabase signInWithIdToken error:', normalized.toLog());
+        logger.category('auth').debug('Supabase signInWithIdToken error:', normalized.toLog());
         return { success: false, error: normalized };
       }
 
       if (data?.user && data?.session) {
         const session = this.sessionFromSupabaseSession(data.session);
-        logger.info('auth', 'Supabase signInWithIdToken success', {
+        logger.category('auth').info('Supabase signInWithIdToken success', {
           provider,
           userId: data.user.id,
         });
@@ -226,7 +226,7 @@ export class SupabaseAuthProvider implements AuthProvider {
         err,
         'SUPABASE_EXCEPTION'
       );
-      logger.error('auth', 'Supabase signInWithIdToken exception:', normalized.toLog());
+      logger.category('auth').error('Supabase signInWithIdToken exception:', normalized.toLog());
       return { success: false, error: normalized };
     }
   }
@@ -241,7 +241,7 @@ export class SupabaseAuthProvider implements AuthProvider {
     message?: string;
   }> {
     try {
-      logger.debug('auth', 'Supabase: resetPassword attempt');
+      logger.category('auth').debug('Supabase: resetPassword attempt');
 
       const baseUrl =
         typeof window !== 'undefined'
@@ -256,24 +256,20 @@ export class SupabaseAuthProvider implements AuthProvider {
       );
 
       if (error) {
-        logger.warn(
-          'auth',
-          'Supabase resetPassword error:',
-          error.message
-        );
+        logger.category('auth').warn('Supabase resetPassword error:', error.message);
         return {
           success: false,
           message: 'Failed to send reset email. Please try again.',
         };
       }
 
-      logger.info('auth', 'Supabase resetPassword success');
+      logger.category('auth').info('Supabase resetPassword success');
       return {
         success: true,
         message: 'Reset email sent. Check your inbox.',
       };
     } catch (err) {
-      logger.error('auth', 'Supabase resetPassword exception:', err);
+      logger.category('auth').error('Supabase resetPassword exception:', err);
       return {
         success: false,
         message: 'An error occurred. Please try again.',
@@ -290,7 +286,7 @@ export class SupabaseAuthProvider implements AuthProvider {
     message?: string;
   }> {
     try {
-      logger.debug('auth', 'Supabase: resend attempt');
+      logger.category('auth').debug('Supabase: resend attempt');
 
       const { error } = await this.supabaseClient.auth.resend({
         type: 'signup',
@@ -298,24 +294,20 @@ export class SupabaseAuthProvider implements AuthProvider {
       });
 
       if (error) {
-        logger.warn(
-          'auth',
-          'Supabase resend error:',
-          error.message
-        );
+        logger.category('auth').warn('Supabase resend error:', error.message);
         return {
           success: false,
           message: 'Failed to resend confirmation email. Please try again.',
         };
       }
 
-      logger.info('auth', 'Supabase resend success');
+      logger.category('auth').info('Supabase resend success');
       return {
         success: true,
         message: 'Confirmation email sent. Check your inbox.',
       };
     } catch (err) {
-      logger.error('auth', 'Supabase resend exception:', err);
+      logger.category('auth').error('Supabase resend exception:', err);
       return {
         success: false,
         message: 'An error occurred. Please try again.',
@@ -332,14 +324,14 @@ export class SupabaseAuthProvider implements AuthProvider {
     error?: string;
   }> {
     try {
-      logger.debug('auth', 'Supabase: updatePassword attempt');
+      logger.category('auth').debug('Supabase: updatePassword attempt');
 
       const { error } = await this.supabaseClient.auth.updateUser({
         password: newPassword,
       });
 
       if (error) {
-        logger.warn('auth', 'Supabase updatePassword error:', error.message);
+        logger.category('auth').warn('Supabase updatePassword error:', error.message);
         
         if (error.message.includes('Password')) {
           return {
@@ -354,10 +346,10 @@ export class SupabaseAuthProvider implements AuthProvider {
         };
       }
 
-      logger.info('auth', 'Supabase updatePassword success');
+      logger.category('auth').info('Supabase updatePassword success');
       return { success: true };
     } catch (err) {
-      logger.error('auth', 'Supabase updatePassword exception:', err);
+      logger.category('auth').error('Supabase updatePassword exception:', err);
       return {
         success: false,
         error: 'An error occurred while updating password. Please try again.',
@@ -375,7 +367,7 @@ export class SupabaseAuthProvider implements AuthProvider {
       const { data, error } = await this.supabaseClient.auth.getSession();
 
       if (error) {
-        logger.warn('auth', 'Supabase getSession error:', error.message);
+        logger.category('auth').warn('Supabase getSession error:', error.message);
         return null;
       }
 
@@ -385,7 +377,7 @@ export class SupabaseAuthProvider implements AuthProvider {
 
       return null;
     } catch (err) {
-      logger.error('auth', 'Supabase getSession exception:', err);
+      logger.category('auth').error('Supabase getSession exception:', err);
       return null;
     }
   }
@@ -400,7 +392,7 @@ export class SupabaseAuthProvider implements AuthProvider {
       const { data, error } = await this.supabaseClient.auth.getUser();
 
       if (error) {
-        logger.warn('auth', 'Supabase getUser error:', error.message);
+        logger.category('auth').warn('Supabase getUser error:', error.message);
         return null;
       }
 
@@ -414,7 +406,7 @@ export class SupabaseAuthProvider implements AuthProvider {
 
       return null;
     } catch (err) {
-      logger.error('auth', 'Supabase getUser exception:', err);
+      logger.category('auth').error('Supabase getUser exception:', err);
       return null;
     }
   }
@@ -447,19 +439,19 @@ export class SupabaseAuthProvider implements AuthProvider {
    */
   async signOut(): Promise<void> {
     try {
-      logger.debug('auth', 'Supabase: signOut');
+      logger.category('auth').debug('Supabase: signOut');
 
       const { error } = await this.supabaseClient.auth.signOut();
 
       if (error) {
-        logger.warn('auth', 'Supabase signOut error:', error.message);
+        logger.category('auth').warn('Supabase signOut error:', error.message);
         // Don't throw; sign out partially succeeded
         return;
       }
 
-      logger.info('auth', 'Supabase signOut success');
+      logger.category('auth').info('Supabase signOut success');
     } catch (err) {
-      logger.error('auth', 'Supabase signOut exception:', err);
+      logger.category('auth').error('Supabase signOut exception:', err);
       // Don't throw on logout errors
     }
   }
@@ -474,11 +466,11 @@ export class SupabaseAuthProvider implements AuthProvider {
   async restoreSession(rawSession: any): Promise<boolean> {
     try {
       if (!rawSession) {
-        logger.debug('auth', 'Supabase: restoreSession skipped (no session data)');
+        logger.category('auth').debug('Supabase: restoreSession skipped (no session data)');
         return false;
       }
 
-      logger.info('auth', 'Supabase: restoring session from storage', {
+      logger.category('auth').info('Supabase: restoring session from storage', {
         userId: rawSession.user?.id,
       });
 
@@ -492,20 +484,16 @@ export class SupabaseAuthProvider implements AuthProvider {
       });
 
       if (error) {
-        logger.warn(
-          'auth',
-          'Supabase: failed to restore session',
-          { error: error.message }
-        );
+        logger.category('auth').warn('Supabase: failed to restore session', { error: error.message });
         return false; // Session is invalid/expired
       }
 
-      logger.info('auth', 'Supabase: session restored successfully', {
+      logger.category('auth').info('Supabase: session restored successfully', {
         userId: rawSession.user?.id,
       });
       return true;
     } catch (err) {
-      logger.error('auth', 'Supabase: exception during session restore:', err);
+      logger.category('auth').error('Supabase: exception during session restore:', err);
       return false;
     }
   }
@@ -547,7 +535,7 @@ export class SupabaseAuthProvider implements AuthProvider {
     const code = supabaseError?.code || supabaseError?.status;
     const messageLower = message.toLowerCase();
 
-    logger.debug('auth', 'Mapping Supabase error:', {
+    logger.category('auth').debug('Mapping Supabase error:', {
       code,
       message,
       type: supabaseError?.constructor?.name,

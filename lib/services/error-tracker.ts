@@ -13,6 +13,7 @@
  */
 
 import { isDevelopment } from '@/lib/config/loader';
+import { logger } from '@/lib/utils/logger';
 
 /**
  * Severity level for captured messages
@@ -111,14 +112,10 @@ export class NoOpErrorTracker implements ErrorTrackerProvider {
     // Log dev-only warning once per session
     if (
       isDevelopment() &&
-      !this.warningLogged &&
-      typeof console !== 'undefined' &&
-      console.warn
+      !this.warningLogged
     ) {
       this.warningLogged = true;
-      console.warn(
-        '[ErrorTracker] NoOp tracker in use — error tracking is disabled. Check if Sentry is configured.',
-      );
+      logger.category('error').warn('[ErrorTracker] NoOp tracker in use — error tracking is disabled. Check if Sentry is configured.');
     }
   }
 
@@ -175,10 +172,8 @@ export function getErrorTracker(): ErrorTrackerProvider {
  * @throws Logs dev-only warning on double-registration (last-wins semantics)
  */
 export function registerErrorTracker(tracker: ErrorTrackerProvider): void {
-  if (trackerRegistered && isDevelopment()) {
-    console.warn(
-      '[ErrorTracker] Tracker already registered; replacing with new instance. This may indicate duplicate initialization.',
-    );
+    if (trackerRegistered && isDevelopment()) {
+    logger.category('error').warn('[ErrorTracker] Tracker already registered; replacing with new instance. This may indicate duplicate initialization.');
   }
 
   trackerInstance = tracker;

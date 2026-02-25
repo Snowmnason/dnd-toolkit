@@ -38,7 +38,7 @@ export async function initializeSentryErrorTracker(): Promise<boolean> {
   const isDev = isDevelopment();
 
   if (!sentryDsn) {
-    logger.info('bootstrap', '[Sentry] No DSN provided — SDK not initialized');
+    logger.category('bootstrap').info('[Sentry] No DSN provided — SDK not initialized');
     return false;
   }
 
@@ -65,15 +65,15 @@ export async function initializeSentryErrorTracker(): Promise<boolean> {
         return event;
       },
     });
-    logger.info('bootstrap', '[Sentry] SDK initialized');
+    logger.category('bootstrap').info('[Sentry] SDK initialized');
 
     // Register error tracker with initialized SDK
     const sentryTracker = new SentryErrorTracker();
     registerErrorTracker(sentryTracker);
-    logger.debug('bootstrap', 'SentryErrorTracker initialized and registered');
+    logger.category('bootstrap').debug('SentryErrorTracker initialized and registered');
     return true;
   } catch (error) {
-    logger.warn('bootstrap', `[Sentry] Failed to initialize: ${error}`);
+    logger.category('bootstrap').warn(`[Sentry] Failed to initialize: ${error}`);
     throw error;
   }
 }

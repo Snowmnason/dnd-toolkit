@@ -54,11 +54,11 @@ export const AuthStateManager = {
    */
   configure(provider: AuthProvider, options?: any): void {
     if (!provider) {
-      logger.error('auth', 'AuthStateManager.configure: provider is null/undefined');
+      logger.category('auth').error('AuthStateManager.configure: provider is null/undefined');
       throw new Error('AuthStateManager.configure: provider is required');
     }
     authProvider = provider;
-    logger.info('auth', 'AuthStateManager configured with provider', {
+    logger.category('auth').info('AuthStateManager configured with provider', {
       providerType: provider.constructor.name,
     });
   },
@@ -70,7 +70,7 @@ export const AuthStateManager = {
    */
   getProvider(): AuthProvider {
     if (!authProvider) {
-      logger.error('auth', 'AuthStateManager.getProvider: provider not configured');
+      logger.category('auth').error('AuthStateManager.getProvider: provider not configured');
       throw new Error(
         'Auth provider not configured. Call AuthStateManager.configure() during app bootstrap.'
       );
@@ -83,12 +83,12 @@ export const AuthStateManager = {
   async saveAuthSession(session: any): Promise<void> {
     try {
       if (!session) {
-        logger.debug("auth", "saveAuthSession: null session, clearing");
+        logger.category('auth').debug("saveAuthSession: null session, clearing");
         await this.clearAuthSession();
         return;
       }
 
-      logger.info("auth", "📝 Saving auth session (SIGNED_IN event)", {
+      logger.category('auth').info("Saving auth session (SIGNED_IN event)", {
         auth_id: session.user?.id,
         hasAccessToken: !!session.access_token,
         hasRefreshToken: !!session.refresh_token,
@@ -96,11 +96,11 @@ export const AuthStateManager = {
       });
 
       const key = STORAGE_KEYS.AUTH_SESSION;
-      logger.debug("auth", "📍 Getting storage backend for key", { key });
+      logger.category('auth').debug("Getting storage backend for key", { key });
       
       const backend = getPrivacyStorageBackend(key);
       if (!backend) {
-        logger.error("auth", "❌ Failed to get storage backend - returned null");
+        logger.category('auth').error("Failed to get storage backend - returned null");
         return;
       }
       
@@ -118,16 +118,15 @@ export const AuthStateManager = {
         },
       };
       
-      logger.debug("auth", "💾 Calling backend.setJSON...", { keyLength: key.length, dataSize: JSON.stringify(sessionData).length });
+      logger.category('auth').debug("Calling backend.setJSON...", { keyLength: key.length, dataSize: JSON.stringify(sessionData).length });
       await backend.setJSON(key, sessionData);
       
-      logger.info(
-        "auth",
-        "✅ Successfully saved AUTH_SESSION to encrypted storage",
+      logger.category('auth').info(
+        "Successfully saved AUTH_SESSION to encrypted storage",
         { auth_id: session.user?.id },
       );
     } catch (error) {
-      logger.error("auth", "❌ ERROR in saveAuthSession:", {
+      logger.category('auth').error("ERROR in saveAuthSession:", {
         errorMessage: error instanceof Error ? error.message : String(error),
         errorStack: error instanceof Error ? error.stack : undefined,
       });
@@ -142,15 +141,14 @@ export const AuthStateManager = {
       const sessionData = await backend.getJSON<any>(key);
 
       if (!sessionData) {
-        logger.debug("auth", "🔍 No AUTH_SESSION key in storage to restore");
+        logger.category('auth').debug("🔍 No AUTH_SESSION key in storage to restore");
         return;
       }
 
       // Check session schema version for future migrations
       const sessionVersion = sessionData.version || 0;
       if (sessionVersion !== AUTH_SESSION_VERSION) {
-        logger.warn(
-          "auth",
+        logger.category('auth').warn(
           `Session schema version mismatch (stored: ${sessionVersion}, current: ${AUTH_SESSION_VERSION}). Clearing stale session.`
         );
         // Clear incompatible session; user will need to re-authenticate
@@ -158,7 +156,7 @@ export const AuthStateManager = {
         return;
       }
 
-      logger.info("auth", "🔄 Restoring auth session from storage", {
+      logger.category('auth').info("Restoring auth session from storage", {
         auth_id: sessionData.user?.id,
         hasAccessToken: !!sessionData.access_token,
         version: sessionVersion,
@@ -166,8 +164,7 @@ export const AuthStateManager = {
 
       // Only restore on web platform (mobile uses provider's built-in async storage)
       if (typeof window === "undefined") {
-        logger.debug(
-          "auth",
+        logger.category('auth').debug(
           "Skipping manual session restore on mobile (uses platform-native storage)"
         );
         return;
@@ -178,22 +175,20 @@ export const AuthStateManager = {
       const success = await provider.restoreSession(sessionData);
 
       if (!success) {
-        logger.warn(
-          "auth",
-          "❌ Auth provider failed to restore session (likely expired or invalid)"
+        logger.category('auth').warn(
+          "Auth provider failed to restore session (likely expired or invalid)"
         );
         // If restoration fails (e.g., token expired), clear the stale session
         await this.clearAuthSession();
         return;
       }
 
-      logger.info(
-        "auth",
-        "✅ AUTH_SESSION restored! User should now be authenticated",
+      logger.category('auth').info(
+        "AUTH_SESSION restored! User should now be authenticated",
         { auth_id: sessionData.user?.id }
       );
     } catch (error) {
-      logger.error("auth", "Error restoring auth session:", error);
+      logger.category('auth').error("Error restoring auth session:", error);
       // Clear stale session on error
       try {
         await this.clearAuthSession();
@@ -210,9 +205,9 @@ export const AuthStateManager = {
       const key = STORAGE_KEYS.AUTH_SESSION;
       const backend = getPrivacyStorageBackend(key);
       await backend.removeItem(key);
-      logger.debug("auth", "Cleared auth session from storage");
+      logger.category('auth').debug("Cleared auth session from storage");
     } catch (error) {
-      logger.error("auth", "Error clearing auth session:", error);
+      logger.category('auth').error("Error clearing auth session:", error);
     }
   },
 
@@ -231,7 +226,7 @@ export const AuthStateManager = {
       // All of these should result in hasAccount: false for consistent auth routing
       return { hasAccount: authState?.hasAccount === true };
     } catch (error) {
-      logger.error("auth", "Error getting auth state:", error);
+      logger.category('auth').error("Error getting auth state:", error);
       return { hasAccount: false };
     }
   },
@@ -244,14 +239,14 @@ export const AuthStateManager = {
       const backend = getPrivacyStorageBackend(storageKey);
       await backend.setJSON(storageKey, newState);
     } catch (error) {
-      logger.error("auth", "Error setting hasAccount:", error);
+      logger.category('auth').error("Error setting hasAccount:", error);
     }
   },
 
   // Store session information or mark that user has an account when a session exists
   async setSession(session: any): Promise<void> {
     try {
-      logger.info("auth", "🔐 setSession called with:", {
+      logger.category('auth').info("🔐 setSession called with:", {
         hasSession: !!session,
         hasUser: !!session?.user,
         hasAccessToken: !!session?.access_token,
@@ -261,7 +256,7 @@ export const AuthStateManager = {
       });
 
       if (!session) {
-        logger.warn("auth", "⚠️ setSession received null/undefined session - not saving");
+        logger.category('auth').warn("⚠️ setSession received null/undefined session - not saving");
         return;
       }
 
@@ -279,11 +274,11 @@ export const AuthStateManager = {
           const backend = getPrivacyStorageBackend(key);
           await backend.setItem(key, session.user.email);
         } catch (error) {
-          logger.error("auth", "Error caching session email:", error);
+          logger.category('auth').error("Error caching session email:", error);
         }
       }
     } catch (error) {
-      logger.error("auth", "Error saving auth state:", error);
+      logger.category('auth').error("Error saving auth state:", error);
     }
   },
 
@@ -342,26 +337,16 @@ export const AuthStateManager = {
         );
 
         if (worldAccessKeys.length > 0) {
-          logger.debug(
-            "auth",
-            `Cleared ${worldAccessKeys.length} world access cache entries`,
-          );
+          logger.category('auth').debug(`Cleared ${worldAccessKeys.length} world access cache entries`);
         }
       } catch (error) {
-        logger.warn(
-          "auth",
-          "Could not clear world access cache entries:",
-          error,
-        );
+        logger.category('auth').warn("Could not clear world access cache entries:", error);
         // Continue even if this fails - world access cache is non-critical
       }
 
-      logger.debug(
-        "auth",
-        "Cleared all auth storage keys and user-specific caches",
-      );
+      logger.category('auth').debug("Cleared all auth storage keys and user-specific caches");
     } catch (error) {
-      logger.error("auth", "Error clearing auth state:", error);
+      logger.category('auth').error("Error clearing auth state:", error);
     }
   },
 
@@ -374,7 +359,7 @@ export const AuthStateManager = {
       );
       return userData?.id;
     } catch (error) {
-      logger.error("auth", "Error getting user ID:", error);
+      logger.category('auth').error("Error getting user ID:", error);
       return undefined;
     }
   },
@@ -386,7 +371,7 @@ export const AuthStateManager = {
       const userData = await backend.getJSON(STORAGE_KEYS.USER_DATA);
       
       if (userData) {
-        logger.debug("auth", "📖 getUserData returning from storage:", {
+        logger.category('auth').debug("📖 getUserData returning from storage:", {
           id: userData.id,
           id_length: userData.id?.length,
           auth_id: userData.auth_id,
@@ -395,12 +380,12 @@ export const AuthStateManager = {
           isFullProfile: userData.id && userData.id.length === 36,
         });
       } else {
-        logger.debug("auth", "📖 getUserData: storage is empty (no user data)");
+        logger.category('auth').debug("📖 getUserData: storage is empty (no user data)");
       }
       
       return userData;
     } catch (error) {
-      logger.error("auth", "Error getting user data:", error);
+      logger.category('auth').error("Error getting user data:", error);
       return undefined;
     }
   },
@@ -409,11 +394,11 @@ export const AuthStateManager = {
   async saveUserData(userData: any): Promise<void> {
     try {
       if (!userData) {
-        logger.warn("auth", "saveUserData: received null/undefined userData");
+        logger.category('auth').warn("saveUserData: received null/undefined userData");
         return;
       }
 
-      logger.info("auth", "💾 Saving user data to storage", {
+      logger.category('auth').info("💾 Saving user data to storage", {
         id: userData.id,
         auth_id: userData.auth_id,
         username: userData.username,
@@ -424,11 +409,11 @@ export const AuthStateManager = {
       const backend = getPrivacyStorageBackend(STORAGE_KEYS.USER_DATA);
       await backend.setJSON(STORAGE_KEYS.USER_DATA, userData);
       
-      logger.info("auth", "✅ User data saved successfully", {
+      logger.category('auth').info("✅ User data saved successfully", {
         id: userData.id,
       });
     } catch (error) {
-      logger.error("auth", "Error saving user data:", error);
+      logger.category('auth').error("Error saving user data:", error);
     }
   },
 
@@ -454,7 +439,7 @@ export const AuthStateManager = {
       // If Supabase isn't configured (like on GitHub Pages without env vars),
       // fall back to local auth state
       if (!isSupabaseConfiguredCache()) {
-        logger.warn("auth", "Supabase not configured, using local auth state");
+        logger.category('auth').warn("Supabase not configured, using local auth state");
         return authState.hasAccount;
       }
 
@@ -491,7 +476,7 @@ export const AuthStateManager = {
         return authState.hasAccount;
       }
     } catch (error) {
-      logger.error("auth", "Error checking authentication:", error);
+      logger.category('auth').error("Error checking authentication:", error);
       // On error, fall back to local auth state
       try {
         const authState = await this.getAuthState();
@@ -507,7 +492,7 @@ export const AuthStateManager = {
   // ==========================================
   async logout(): Promise<void> {
     try {
-      logger.info("auth", "🔓 Logging out...");
+      logger.category('auth').info("🔓 Logging out...");
 
       // Use cached supabase import
       if (!supabaseCache) {
@@ -520,9 +505,9 @@ export const AuthStateManager = {
       if (isSupabaseConfiguredCache()) {
         try {
           await supabaseCache.auth.signOut();
-          logger.info("auth", "✅ Signed out from Supabase");
+          logger.category('auth').info("✅ Signed out from Supabase");
         } catch (error) {
-          logger.error("auth", "Error signing out from Supabase:", error);
+          logger.category('auth').error("Error signing out from Supabase:", error);
         }
       }
 
@@ -542,16 +527,15 @@ export const AuthStateManager = {
         modeBackend.setItem(STORAGE_KEYS.THEME_MODE, "dark"),
       ]);
 
-      logger.info("auth", "✅ Logout complete");
+      logger.category('auth').info("✅ Logout complete");
     } catch (error) {
-      logger.error("auth", "Error during logout:", error);
+      logger.category('auth').error("Error during logout:", error);
       // Don't throw - fail gracefully and ensure auth state is cleared
       try {
         await clearAllUserData();
         await this.clearAuthState();
       } catch (clearError) {
-        logger.error(
-          "auth",
+        logger.category('auth').error(
           "Failed to clear auth state during error recovery:",
           clearError,
         );
@@ -582,10 +566,7 @@ export const AuthStateManager = {
     fromCache: boolean;
     isVerifying: boolean;
   }> {
-    logger.info(
-      "auth",
-      `[VERIFY:START] Verifying world ${worldId}, forceFresh=${options?.forceFresh}`,
-    );
+    logger.category('auth').info(`[VERIFY:START] Verifying world ${worldId}, forceFresh=${options?.forceFresh}`);
 
     // Cache freshness window: only trust cache younger than 4 hours
     // After 4 hours, always refresh via updateStorageCache service to catch permission changes
@@ -596,10 +577,7 @@ export const AuthStateManager = {
     try {
       // If forceFresh is true, skip cache and refresh from database
       if (options?.forceFresh) {
-        logger.info(
-          "auth",
-          `[VERIFY:FORCE] Force fresh check for world ${worldId}`,
-        );
+        logger.category('auth').info(`[VERIFY:FORCE] Force fresh check for world ${worldId}`);
 
         // Refresh all worlds cache (if one is stale, all are stale)
         const { updateStorageCache } =
@@ -609,7 +587,7 @@ export const AuthStateManager = {
         // Now check cache - it's been refreshed
         const backend = getPrivacyStorageBackend(cacheKey);
         const freshCached = await backend.getJSON<boolean>(cacheKey);
-        logger.info("auth", `[VERIFY:FORCE-RESULT] hasAccess=${freshCached}`);
+        logger.category('auth').info(`[VERIFY:FORCE-RESULT] hasAccess=${freshCached}`);
 
         return {
           hasAccess: freshCached === true,
@@ -626,17 +604,11 @@ export const AuthStateManager = {
       const cacheAge = cacheMeta ? Date.now() - cacheMeta.timestamp : Infinity;
       const isCacheFresh = cacheAge < CACHE_FRESH_THRESHOLD;
 
-      logger.info(
-        "auth",
-        `[VERIFY:CACHE] world=${worldId}, hasCache=${cached !== null}, ageMs=${cacheAge}, isCacheFresh=${isCacheFresh}`,
-      );
+      logger.category('auth').info(`[VERIFY:CACHE] world=${worldId}, hasCache=${cached !== null}, ageMs=${cacheAge}, isCacheFresh=${isCacheFresh}`);
 
       // Step 2: If cache is fresh AND exists, trust it
       if (isCacheFresh && cached !== null) {
-        logger.info(
-          "auth",
-          `[VERIFY:FRESH] Cache fresh for world ${worldId}, trusting cache, hasAccess=${cached}`,
-        );
+        logger.category('auth').info(`[VERIFY:FRESH] Cache fresh for world ${worldId}, trusting cache, hasAccess=${cached}`);
         return {
           hasAccess: cached === true,
           fromCache: true,
@@ -646,10 +618,7 @@ export const AuthStateManager = {
 
       // Step 3: Cache is stale or missing - refresh all worlds then check again
       // If one world is stale, all worlds are stale - refresh everything at once
-      logger.info(
-        "auth",
-        `[VERIFY:STALE] Cache ${cached === null ? "missing" : "stale"}, refreshing all worlds from database`,
-      );
+      logger.category('auth').info(`[VERIFY:STALE] Cache ${cached === null ? "missing" : "stale"}, refreshing all worlds from database`);
 
       // Refresh all worlds cache (userId from SecureStorage never stale)
       const { updateStorageCache } =
@@ -658,7 +627,7 @@ export const AuthStateManager = {
 
       // Now check cache again - it's been refreshed
       const freshCached = await backend.getJSON<boolean>(cacheKey);
-      logger.info("auth", `[VERIFY:FRESH-RESULT] hasAccess=${freshCached}`);
+      logger.category('auth').info(`[VERIFY:FRESH-RESULT] hasAccess=${freshCached}`);
 
       return {
         hasAccess: freshCached === true,
@@ -666,7 +635,7 @@ export const AuthStateManager = {
         isVerifying: false,
       };
     } catch (error) {
-      logger.error("auth", `[VERIFY:ERROR] Cache check failed:`, error);
+      logger.category('auth').error(`[VERIFY:ERROR] Cache check failed:`, error);
       // Fallback: refresh all worlds cache and try again
       try {
         const { updateStorageCache } =
@@ -680,11 +649,7 @@ export const AuthStateManager = {
           isVerifying: false,
         };
       } catch (dbError) {
-        logger.error(
-          "auth",
-          `[VERIFY:FAIL] Database refresh also failed:`,
-          dbError,
-        );
+        logger.category('auth').error(`[VERIFY:FAIL] Database refresh also failed:`, dbError);
         // On complete failure, deny access for security
         return {
           hasAccess: false,
@@ -708,10 +673,7 @@ export const AuthStateManager = {
   async batchVerifyWorldAccess(
     worldIds: string[],
   ): Promise<{ results: Map<string, boolean>; deferred: boolean }> {
-    logger.info(
-      "auth",
-      `[BATCH-VERIFY] Starting batch verification for ${worldIds.length} worlds`,
-    );
+    logger.category('auth').info(`[BATCH-VERIFY] Starting batch verification for ${worldIds.length} worlds`);
 
     // Do ONE bulk refresh to get all world access flags at once
     const { updateStorageCache } =
@@ -720,16 +682,8 @@ export const AuthStateManager = {
     try {
       refreshResult = await updateStorageCache.refreshAllWorldsCache();
     } catch (error) {
-      logger.warn(
-        "auth",
-        "[BATCH-VERIFY] Bulk refresh failed, falling back to per-world verification",
-        error,
-      );
-      logger.warn(
-        "database",
-        "[BATCH-VERIFY] Bulk refresh failed (updateStorageCache.refreshAllWorldsCache), falling back to per-world verification",
-        error,
-      );
+      logger.category('auth').warn("[BATCH-VERIFY] Bulk refresh failed, falling back to per-world verification", error);
+      logger.category('database').warn("[BATCH-VERIFY] Bulk refresh failed (updateStorageCache.refreshAllWorldsCache), falling back to per-world verification", error);
       // Fall back to per-world verification if bulk fails
       const results = new Map<string, boolean>();
       for (const worldId of worldIds) {
@@ -743,12 +697,10 @@ export const AuthStateManager = {
     // Callers must NOT treat deferred results as verified 0-world state.
     // Screens should listen to auth state changes and re-verify once session is ready.
     if (refreshResult === null) {
-      logger.info(
-        "auth",
+      logger.category("auth").info(
         "[BATCH-VERIFY] Refresh deferred (session not ready), denying access until verified",
       );
-      logger.info(
-        "database",
+      logger.category("database").info(
         "[BATCH-VERIFY] Refresh deferred (session not ready) — deferred=true",
       );
       const results = new Map<string, boolean>();
@@ -768,26 +720,16 @@ export const AuthStateManager = {
       try {
         const cached = await backend.getJSON<boolean>(cacheKey);
         results.set(worldId, cached === true);
-        logger.debug("auth", `[BATCH-VERIFY] ${worldId}=${cached === true}`);
+        logger.category('auth').debug(`[BATCH-VERIFY] ${worldId}=${cached === true}`);
       } catch (error) {
-        logger.error(
-          "auth",
-          `[BATCH-VERIFY] Failed to check cache for ${worldId}`,
-          error,
-        );
+        logger.category('auth').error(`[BATCH-VERIFY] Failed to check cache for ${worldId}`, error);
         // If we can't read cache, deny access for security
         results.set(worldId, false);
       }
     }
 
-    logger.info(
-      "auth",
-      `[BATCH-VERIFY] Complete: ${results.size} worlds verified`,
-    );
-    logger.info(
-      "database",
-      `[BATCH-VERIFY] Complete: ${results.size} worlds verified`,
-    );
+    logger.category('auth').info(`[BATCH-VERIFY] Complete: ${results.size} worlds verified`);
+    logger.category('database').info(`[BATCH-VERIFY] Complete: ${results.size} worlds verified`);
     return { results, deferred: false };
   },
 
@@ -806,10 +748,7 @@ export const AuthStateManager = {
       }
 
       if (!isSupabaseConfiguredCache()) {
-        logger.warn(
-          "auth",
-          "[VERIFY] Supabase not configured, allowing access",
-        );
+        logger.category('auth').warn("[VERIFY] Supabase not configured, allowing access");
         return { hasAccess: true };
       }
 
@@ -819,29 +758,23 @@ export const AuthStateManager = {
         return { hasAccess: false, reason: "Not authenticated" };
       }
 
-      logger.debug(
-        "auth",
-        `[VERIFY:DB] Checking world access - worldId=${worldId}, userId=${userId}`,
-      );
+      logger.category('auth').debug(`[VERIFY:DB] Checking world access - worldId=${worldId}, userId=${userId}`);
 
       // Use repository to check access (checks both owner and member status)
       try {
         const hasAccess = await getWorldAccessRepository().isUserInWorld(worldId, userId);
-        logger.debug(
-          "auth",
-          `[VERIFY:DB] isUserInWorld result - worldId=${worldId}, userId=${userId}, hasAccess=${hasAccess}`,
-        );
+        logger.category('auth').debug(`[VERIFY:DB] isUserInWorld result - worldId=${worldId}, userId=${userId}, hasAccess=${hasAccess}`);
         if (hasAccess) {
           return { hasAccess: true };
         } else {
           return { hasAccess: false, reason: "Not a member of this world" };
         }
       } catch (error) {
-        logger.debug("auth", `[VERIFY] World access check failed (database layer):`, error);
+        logger.category('auth').debug(`[VERIFY] World access check failed (database layer):`, error);
         throw error;
       }
     } catch (error) {
-      logger.error("auth", `[VERIFY] Supabase query failed:`, error);
+      logger.category('auth').error(`[VERIFY] Supabase query failed:`, error);
       throw error; // Let caller handle
     }
   },
@@ -871,7 +804,7 @@ export const AuthStateManager = {
 
       // If Supabase isn't configured, fall back to local state
       if (!isSupabaseConfiguredCache()) {
-        logger.warn("auth", "Supabase not configured - defaulting to welcome");
+        logger.category('auth').warn("Supabase not configured - defaulting to welcome");
         // If no account flag, go to welcome (covers undefined, null, false)
         if (!authState.hasAccount) {
           return { routingDecision: "welcome", profileId: null };
@@ -885,10 +818,7 @@ export const AuthStateManager = {
 
       // If there's a Supabase session, ensure local auth state is synced
       if (session && !authState.hasAccount) {
-        logger.info(
-          "auth",
-          "🔄 [getRoutingDecision] Found Supabase session but local hasAccount=false, syncing...",
-        );
+        logger.category('auth').info("🔄 [getRoutingDecision] Found Supabase session but local hasAccount=false, syncing...");
         await this.setHasAccount(true);
       }
 
@@ -897,7 +827,7 @@ export const AuthStateManager = {
       try {
         userProfile = await getUserRepository().getCurrentUser();
       } catch (dbError) {
-        logger.debug("auth", "Database error checking profile:", dbError);
+        logger.category('auth').debug("Database error checking profile:", dbError);
         // If DB fails, allow user to continue to main (graceful degradation)
         if (session)
           return {
@@ -974,7 +904,7 @@ export const AuthStateManager = {
         .debug("Routing to welcome: no account or session");
       return { routingDecision: "welcome", profileId: null };
     } catch (error) {
-      logger.error("auth", "Error determining routing decision:", error);
+      logger.category('auth').error("Error determining routing decision:", error);
       // On any error, default to welcome (safest redirect)
       return { routingDecision: "welcome", profileId: null };
     }

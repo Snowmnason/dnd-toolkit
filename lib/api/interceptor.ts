@@ -143,13 +143,12 @@ export async function executeHooksSerially<T>(
         }
         // Attach error handler to avoid unhandled rejections
         executionPromise.catch((error) => {
-          logger.error(
-            "api",
+          logger.category('api').error(
             `Error in non-blocking ${hookName} hook [${index}]:`,
             { error },
           );
         });
-        logger.debug("api", `Scheduled non-blocking hook`, {
+        logger.category('api').debug(`Scheduled non-blocking hook`, {
           hookName,
           index,
           timeout: interceptor.timeout,
@@ -185,7 +184,7 @@ export async function executeHooksSerially<T>(
             throw timeoutError;
           }
 
-          logger.debug("api", `Hook completed within timeout`, {
+          logger.category('api').debug(`Hook completed within timeout`, {
             hookName,
             index,
             timeout: interceptor.timeout,
@@ -196,7 +195,7 @@ export async function executeHooksSerially<T>(
         }
       }
     } catch (error) {
-      logger.error("api", `Error in ${hookName} hook [${index}]:`, { error });
+      logger.category('api').error(`Error in ${hookName} hook [${index}]:`, { error });
       // Continue to next hook even if this one fails
     }
     index++;
@@ -228,10 +227,7 @@ class InterceptorManagerClass {
    */
   registerInterceptor(interceptor: RequestInterceptor): void {
     this.interceptors.push(interceptor);
-    logger.debug(
-      "api",
-      `Registered interceptor: ${interceptor.name || "unnamed"}`,
-    );
+    logger.category('api').debug(`Registered interceptor: ${interceptor.name || "unnamed"}`);
   }
 
   /**
@@ -243,10 +239,7 @@ class InterceptorManagerClass {
     const index = this.interceptors.indexOf(interceptor);
     if (index >= 0) {
       this.interceptors.splice(index, 1);
-      logger.debug(
-        "api",
-        `Unregistered interceptor: ${interceptor.name || "unnamed"}`,
-      );
+      logger.category('api').debug(`Unregistered interceptor: ${interceptor.name || "unnamed"}`);
     }
   }
 

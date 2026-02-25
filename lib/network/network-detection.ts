@@ -15,16 +15,16 @@
  */
 
 import {
-    LATENCY_THRESHOLD,
-    LOW_BATTERY_THRESHOLD,
-    getDebounceStatusChangeMs,
-    getSupabaseHealthEndpoint,
-    getWebPingInterval,
-    getWebPingTimeout,
+  LATENCY_THRESHOLD,
+  LOW_BATTERY_THRESHOLD,
+  getDebounceStatusChangeMs,
+  getSupabaseHealthEndpoint,
+  getWebPingInterval,
+  getWebPingTimeout,
 } from "@/lib/network/network-config";
 import {
-    NetworkStateManager,
-    type NetworkState,
+  NetworkStateManager,
+  type NetworkState,
 } from "@/lib/network/state-machine";
 import { logger } from "@/lib/utils/logger";
 import * as React from "react";
@@ -190,7 +190,7 @@ class NetworkDetectionClass {
           "initial detection",
         );
       } catch (error) {
-        logger.warn("network", `Failed to set initial network state: ${error}`);
+        logger.category('network').warn(`Failed to set initial network state: ${error}`);
       }
 
       logger
@@ -771,7 +771,7 @@ class NetworkDetectionClass {
         this.currentStatus.connectionQuality,
       );
       this.triggerStateTransition(oldState, newState).catch((error) => {
-        logger.warn("network", `Failed to transition state: ${error}`);
+        logger.category('network').warn(`Failed to transition state: ${error}`);
       });
     }
 
@@ -842,8 +842,7 @@ class NetworkDetectionClass {
         const isConnectedState = ["GOOD", "BAD", "CELLULAR"].includes(newState);
         if (isConnectedState) {
           // Transition through RECOVERING: OFFLINE → RECOVERING → newState
-          logger.info(
-            "network",
+          logger.category("network").info(
             `Offline recovery detected: ${oldState} → RECOVERING → ${newState}`,
           );
           await NetworkStateManager.transitionTo(
@@ -862,10 +861,7 @@ class NetworkDetectionClass {
       // For all other transitions, go directly
       await NetworkStateManager.transitionTo(newState, `from ${oldState}`);
     } catch (error) {
-      logger.warn(
-        "network",
-        `Failed state transition ${oldState} → ${newState}: ${error}`,
-      );
+      logger.category('network').warn(`Failed state transition ${oldState} → ${newState}: ${error}`,);
     }
   }
 
@@ -877,9 +873,7 @@ class NetworkDetectionClass {
       try {
         listener(this.currentStatus);
       } catch (error) {
-        logger
-          .category("network")
-          .error("Network status listener error:", error);
+        logger.category("network").error("Network status listener error:", error);
       }
     }
   }

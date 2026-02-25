@@ -175,8 +175,7 @@ export class EncryptedStorage {
           } catch (error) {
             // SecureStore can fail in some environments (e.g., Expo Go on certain devices)
             // Fall back to AsyncStorage with a warning
-            logger.warn(
-              "storage",
+            logger.category('storage').warn(
               "SecureStore unavailable, falling back to AsyncStorage for key storage (less secure):",
               error,
             );
@@ -205,7 +204,7 @@ export class EncryptedStorage {
         }
       }
     } catch (error) {
-      logger.error("storage", "Error initializing encryption key:", error);
+      logger.category('storage').error("Error initializing encryption key:", error);
     }
 
     // Fallback
@@ -253,7 +252,7 @@ export class EncryptedStorage {
 
       return btoa(JSON.stringify(combined));
     } catch (error) {
-      logger.error("storage", "Encryption failed:", error);
+      logger.category('storage').error("Encryption failed:", error);
       throw error;
     }
   }
@@ -524,7 +523,7 @@ export class EncryptedStorage {
       await this.platformSetItem(key, encryptedValue);
       logger.category("storage").debug(`Item stored: ${key}`);
     } catch (error) {
-      logger.error("storage", `Error storing ${key}:`, error);
+      logger.category('storage').error(`Error storing ${key}:`, error);
       throw error;
     }
   }
@@ -557,26 +556,24 @@ export class EncryptedStorage {
         try {
           await this.platformRemoveItem(key);
         } catch (removeError) {
-          logger.error(
-            "storage",
-            `Failed to remove corrupted data for ${key}:`,
-            removeError,
-          );
+          logger.category('storage').error(
+              `Failed to remove corrupted data for ${key}:`,
+              removeError,
+            );
         }
         return null;
       }
 
       if (error instanceof DecryptionError) {
         // Transient decryption errors (not auth failures) - do NOT delete
-        logger.warn(
-          "storage",
+        logger.category('storage').warn(
           `Decryption error for ${key} (not removing data - may be transient): ${error.message}`,
         );
         return null;
       }
 
       // Unknown error - log but do not auto-delete
-      logger.error("storage", `Unexpected error retrieving ${key}:`, error);
+      logger.category('storage').error(`Unexpected error retrieving ${key}:`, error);
       return null;
     }
   }
@@ -586,7 +583,7 @@ export class EncryptedStorage {
     try {
       await this.platformRemoveItem(key);
     } catch (error) {
-      logger.error("storage", "Error removing encrypted data:", error);
+      logger.category('storage').error("Error removing encrypted data:", error);
       throw error;
     }
   }
@@ -609,11 +606,10 @@ export class EncryptedStorage {
           try {
             await SecureStore.deleteItemAsync(this.ENCRYPTION_KEY_STORAGE_KEY);
           } catch (error) {
-            logger.warn(
-              "storage",
-              "Failed to clear encryption key from SecureStore:",
-              error,
-            );
+            logger.category('storage').warn(
+                "Failed to clear encryption key from SecureStore:",
+                error,
+              );
           }
         }
         if (AsyncStorage) {
@@ -621,7 +617,7 @@ export class EncryptedStorage {
         }
       }
     } catch (error) {
-      logger.error("storage", "Error clearing encrypted data:", error);
+      logger.category('storage').error("Error clearing encrypted data:", error);
       throw error;
     }
   }
@@ -644,7 +640,7 @@ export class EncryptedStorage {
       }
       return [];
     } catch (error) {
-      logger.error("storage", "Error getting all keys:", error);
+      logger.category('storage').error("Error getting all keys:", error);
       return [];
     }
   }

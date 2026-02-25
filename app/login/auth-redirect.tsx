@@ -1,6 +1,6 @@
 import { AuthModal } from "@/components/auth_components";
 import { Caption } from "@/components/ui";
-import { AuthStateManager, getCurrentSession, logger, usersDB, worldsDB, ERROR_CODES } from "@/lib";
+import { AuthStateManager, ERROR_CODES, getCurrentSession, logger, usersDB, worldsDB } from "@/lib";
 import { getAuthProvider } from "@/lib/auth";
 import { getPrivacyStorageBackend, STORAGE_KEYS } from "@/lib/storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -70,7 +70,7 @@ export default function AuthRedirect() {
       // Try storage first
       const userId = await AuthStateManager.getUserId();
       if (userId) {
-        logger.debug("auth-redirect", "User ID loaded from storage:", userId);
+        logger.category('auth').debug('User ID loaded from storage', { userId });
         return userId;
       }
 
@@ -78,10 +78,7 @@ export default function AuthRedirect() {
       const userProfile = await usersDB.getCurrentUser();
       return userProfile?.id || undefined;
     } catch (error) {
-      logger.error("auth-redirect", "Error fetching user ID:", {
-        code: ERROR_CODES.AUTH.UNKNOWN,
-        error
-      });
+      logger.category('auth').error('Error fetching user ID', { code: ERROR_CODES.AUTH.UNKNOWN, error });
       return undefined;
     }
   };
@@ -95,15 +92,12 @@ export default function AuthRedirect() {
           typeof window !== "undefined" ? window.location.hash : ""
         }`;
         if (lastProcessedRef.current === key) {
-          logger.debug(
-            "auth-redirect",
-            "Duplicate processing detected, skipping",
-          );
+          logger.category('auth').debug('Duplicate processing detected, skipping');
           setProcessing(false);
           return;
         }
         lastProcessedRef.current = key;
-        logger.debug("auth-redirect", "Auth redirect action:", action);
+        logger.category('auth').debug('Auth redirect action', { action });
 
         // First, handle any auth tokens from the URL
         let hasValidSession = false;
@@ -117,10 +111,7 @@ export default function AuthRedirect() {
             const refreshToken = hashParams.get("refresh_token");
 
             if (accessToken && refreshToken) {
-              logger.debug(
-                "auth-redirect",
-                "Setting session from email link...",
-              );
+              logger.category("auth").debug("Setting session from email link...");
 
               const restored = await provider.restoreSession({
                 access_token: accessToken,
@@ -128,12 +119,12 @@ export default function AuthRedirect() {
               });
 
               if (!restored) {
-                logger.error("auth-redirect", "Session restoration failed");
+                logger.category("auth").error("Session restoration failed");
                 setErrorMessage("Invalid or expired link. Please try again.");
                 setShowErrorModal(true);
                 return;
               }
-              logger.info("auth-redirect", "Session established");
+              logger.category("auth").info("Session established");
               await AuthStateManager.setHasAccount(true);
               hasValidSession = true;
             }
@@ -155,7 +146,7 @@ export default function AuthRedirect() {
           if (userId) {
             // User data in storage, use it
             userProfile = await AuthStateManager.getUserData();
-            logger.debug("auth-redirect", "User profile loaded from storage");
+            logger.category('auth').debug("User profile loaded from storage");
           } else {
             // Not in storage, fetch from database
             userProfile = await usersDB.getCurrentUser();
@@ -169,11 +160,11 @@ export default function AuthRedirect() {
               // Profile complete - preload worlds before navigating to world selection
               // This ensures the cache is warm when the page mounts, avoiding the loading race condition
               try {
-                logger.debug("auth-redirect", "Preloading worlds for user:", userProfile.id);
+                logger.category('auth').debug("Preloading worlds for user", { userId: userProfile.id });
                 await worldsDB.getMyWorlds(userProfile.id);
-                logger.debug("auth-redirect", "Worlds preloaded successfully");
+                logger.category('auth').debug("Worlds preloaded successfully");
               } catch (preloadError) {
-                logger.warn("auth-redirect", "Failed to preload worlds (non-critical):", preloadError);
+                logger.category('auth').warn("Failed to preload worlds (non-critical)", { error: preloadError });
                 // Non-critical: app works even if preload fails, just shows loading screen longer
               }
               
@@ -194,13 +185,13 @@ export default function AuthRedirect() {
         switch (action) {
           case "signup-confirm":
             // User confirmed email from signup -> go to complete profile
-            logger.debug("auth-redirect", "Redirecting to complete profile...");
+            logger.category('auth').debug("Redirecting to complete profile...");
             router.replace("/login/complete-profile");
             break;
 
           case "reset-password":
             // User clicked password reset link -> go to reset password page
-            logger.debug("auth-redirect", "Redirecting to reset password...");
+            logger.category('auth').debug("Redirecting to reset password...");
             router.replace("/login/reset-password");
             break;
 
@@ -222,7 +213,7 @@ export default function AuthRedirect() {
             }
         }
       } catch (error) {
-        logger.error("auth-redirect", "Auth redirect error:", {
+        logger.category("auth").error("Auth redirect error:", {
           code: ERROR_CODES.UNKNOWN.GENERAL,
           error
         });
@@ -234,7 +225,7 @@ export default function AuthRedirect() {
     };
 
     const handleWorldInvite = async (hasValidSession: boolean) => {
-      logger.debug("auth-redirect", "Processing world invite...");
+      logger.category('auth').debug("Processing world invite...");
 
       const inviteToken = params.token as string;
       const inviteWorldName = params.worldName as string;
@@ -253,7 +244,7 @@ export default function AuthRedirect() {
       const { invitesDB } = await import("../../lib/database/invites");
 
       // Validate the invite token first
-      logger.debug("auth-redirect", "Validating invite token...");
+      logger.category('auth').debug("Validating invite token...");
       const validationResult = await invitesDB.validateInviteToken(inviteToken);
 
       if (!validationResult.success || !validationResult.worldId) {
@@ -269,10 +260,7 @@ export default function AuthRedirect() {
 
       if (!hasValidSession) {
         // User not logged in - save invite token and redirect to sign in
-        logger.debug(
-          "auth-redirect",
-          "Saving pending invite for after login...",
-        );
+        logger.category('auth').debug("Saving pending invite for after login...");
         await savePendingInvite(inviteToken, decodedWorldName);
 
         setWorldName(decodedWorldName);
@@ -281,7 +269,7 @@ export default function AuthRedirect() {
       }
 
       // User is logged in - process invite immediately
-      logger.info("auth-redirect", "User logged in, processing invite...");
+      logger.category('auth').info("User logged in, processing invite...");
 
       try {
         // Get user's profile
@@ -293,46 +281,37 @@ export default function AuthRedirect() {
         setCurrentUserId(userProfile.id);
 
         // Check if user is already in the world
-        logger.debug(
-          "auth-redirect",
-          "Checking if user is already in world...",
-        );
+        logger.category('auth').debug("Checking if user is already in world...");
         const isAlreadyMember = await worldsDB.isUserInWorld(
           inviteWorldId,
           userProfile.id,
         );
 
         if (isAlreadyMember) {
-          logger.info(
-            "auth-redirect",
-            "User is already a member of this world",
-          );
+          logger.category('auth').info("User is already a member of this world");
           setWorldName(decodedWorldName);
           setShowAlreadyMemberModal(true);
           return;
         }
 
         // Add user to world in database
-        logger.info("auth-redirect", "Adding user to world:", inviteWorldId);
+        logger.category('auth').info("Adding user to world", { worldId: inviteWorldId });
         await worldsDB.addUserToWorld(
           inviteWorldId,
           userProfile.id,
           inviteToken,
           "player",
         );
-        logger.success("auth-redirect", "User successfully added to world");
+        logger.category('auth').info("User successfully added to world");
 
         setWorldName(decodedWorldName);
         setShowWelcomeModal(true);
       } catch (error) {
-        logger.error("auth-redirect", "Failed to add user to world:", error);
+        logger.category("other").error("Failed to add user to world:", error);
 
         // Check if user is already in the world (database constraint error)
         if (error instanceof Error && error.message.includes("duplicate")) {
-          logger.info(
-            "auth-redirect",
-            "User already in world (duplicate key), showing already member modal",
-          );
+          logger.category("other").info("User already in world (duplicate key), showing already member modal");
           setWorldName(decodedWorldName);
           setShowAlreadyMemberModal(true);
         } else {
@@ -348,15 +327,12 @@ export default function AuthRedirect() {
     const checkForPendingInvites = async () => {
       const pendingInvite = await getPendingInvite();
       if (pendingInvite) {
-        logger.debug("auth-redirect", "Found pending invite:", pendingInvite);
+        logger.category("other").debug("Found pending invite:", pendingInvite);
 
         // Check if user is now logged in
         const session = await getCurrentSession();
         if (session) {
-          logger.info(
-            "auth-redirect",
-            "User logged in, processing pending invite...",
-          );
+          logger.category("other").info("User logged in, processing pending invite...");
           await clearPendingInvite();
 
           try {
@@ -364,7 +340,7 @@ export default function AuthRedirect() {
             const { invitesDB } = await import("../../lib/database/invites");
 
             // Validate the token and get worldId
-            logger.debug("auth-redirect", "Validating pending invite token...");
+            logger.category("other").debug("Validating pending invite token...");
             const validationResult = await invitesDB.validateInviteToken(
               pendingInvite.token,
             );
@@ -381,62 +357,39 @@ export default function AuthRedirect() {
               throw new Error("User profile not found");
             }
             // Check if user is already in the world
-            logger.debug(
-              "auth-redirect",
-              "Checking if user is already in world...",
-            );
+            logger.category("other").debug("Checking if user is already in world...");
             const isAlreadyMember = await worldsDB.isUserInWorld(
               validationResult.worldId,
               userProfile.id,
             );
             if (isAlreadyMember) {
-              logger.info(
-                "auth-redirect",
-                "User is already a member of this world (pending invite)",
-              );
+              logger.category("other").info("User is already a member of this world (pending invite)");
               setWorldName(pendingInvite.worldName);
               setShowAlreadyMemberModal(true);
               return;
             }
             // Add user to world in database
-            logger.info(
-              "auth-redirect",
-              "Adding user to world from pending invite:",
-              validationResult.worldId,
-            );
+            logger.category("other").info("Adding user to world from pending invite:", validationResult.worldId);
             await worldsDB.addUserToWorld(
               validationResult.worldId,
               userProfile.id,
               pendingInvite.token,
               "player",
             );
-            logger.success(
-              "auth-redirect",
-              "User successfully added to world from pending invite",
-            );
+            logger.category("other").info("User successfully added to world from pending invite");
             setWorldName(pendingInvite.worldName);
             setShowWelcomeModal(true);
           } catch (error) {
-            logger.error(
-              "auth-redirect",
-              "Failed to add user to world from pending invite:",
-              error,
-            );
+            logger.category("other").error("Failed to add user to world from pending invite:", error);
 
             // Check if user is already in the world (database constraint error)
             if (error instanceof Error && error.message.includes("duplicate")) {
-              logger.info(
-                "auth-redirect",
-                "User already in world from pending invite (duplicate key), showing already member modal",
-              );
+              logger.category("other").info("User already in world from pending invite (duplicate key), showing already member modal");
               setWorldName(pendingInvite.worldName);
               setShowAlreadyMemberModal(true);
             } else {
               // Other error - show error message but don't completely fail
-              logger.error(
-                "auth-redirect",
-                "Failed to process pending invite, but continuing...",
-              );
+              logger.category("other").error("Failed to process pending invite, but continuing...");
 
               // Don't show success modal if invite was invalid/expired
               if (
@@ -470,10 +423,10 @@ export default function AuthRedirect() {
       
       // Preload worlds before navigating to ensure cache is warm
       try {
-        logger.debug("auth-redirect", "Preloading worlds after invite welcome");
+        logger.category("ui").debug("Preloading worlds after invite welcome");
         await worldsDB.getMyWorlds(userId);
       } catch (preloadError) {
-        logger.warn("auth-redirect", "Failed to preload worlds (non-critical):", preloadError);
+        logger.category("ui").warn("Failed to preload worlds (non-critical):", preloadError);
       }
     }
 
@@ -569,10 +522,10 @@ export default function AuthRedirect() {
             
             // Preload worlds before navigating to ensure cache is warm
             try {
-              logger.debug("auth-redirect", "Preloading worlds after already member");
+              logger.category("ui").debug("Preloading worlds after already member");
               await worldsDB.getMyWorlds(userId);
             } catch (preloadError) {
-              logger.warn("auth-redirect", "Failed to preload worlds (non-critical):", preloadError);
+              logger.category("ui").warn("Failed to preload worlds (non-critical):", preloadError);
             }
           }
 
@@ -590,11 +543,11 @@ export default function AuthRedirect() {
               try {
                 const userId = currentUserId || (await getCurrentUserId());
                 if (userId) {
-                  logger.debug("auth-redirect", "Preloading worlds before navigate to world selection");
+                  logger.category("other").debug("Preloading worlds before navigate to world selection");
                   await worldsDB.getMyWorlds(userId);
                 }
-              } catch (preloadError) {
-                logger.warn("auth-redirect", "Failed to preload worlds (non-critical):", preloadError);
+                } catch (preloadError) {
+                logger.category("other").warn("Failed to preload worlds (non-critical):", preloadError);
               }
               
               router.replace("/select/world-selection");

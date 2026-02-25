@@ -103,9 +103,9 @@ class ConsentSyncQueueService {
 
       if (Array.isArray(stored)) {
         this.queue = stored;
-        logger
-          .category('analytics')
-          .debug(`Loaded ${this.queue.length} pending consent syncs from storage`);
+          logger
+            .category('analytics')
+            .analytics(`Loaded ${this.queue.length} pending consent syncs from storage`);
         
         // If there are pending items, schedule a retry check
         if (this.queue.length > 0) {
@@ -115,8 +115,8 @@ class ConsentSyncQueueService {
       this.isInitialized = true;
     } catch (error) {
       logger
-        .category('analytics')
-        .error('Failed to initialize consent sync queue from storage', { error });
+      .category('analytics')
+      .error('Failed to initialize consent sync queue from storage', { error });
       this.isInitialized = true; // Don't block app startup
     }
   }
@@ -139,7 +139,7 @@ class ConsentSyncQueueService {
     if (this.queue.length > 0) {
       logger
         .category('analytics')
-        .debug(`Coalescing ${this.queue.length} pending items into new change`, {
+        .analytics(`Coalescing ${this.queue.length} pending items into new change`, {
           oldLevel: this.queue[0]?.level,
           newLevel: level,
         });
@@ -160,7 +160,7 @@ class ConsentSyncQueueService {
 
     logger
       .category('analytics')
-      .debug(`Queued consent sync: ${id}`, { level, queueSize: this.queue.length });
+      .analytics(`Queued consent sync: ${id}`, { level, queueSize: this.queue.length });
 
     // Non-blocking: trigger processing in background
     this.processQueue().catch((error) => {
@@ -202,7 +202,7 @@ class ConsentSyncQueueService {
 
       logger
         .category('analytics')
-        .debug(`Processing ${readyItems.length} pending consent syncs`);
+        .analytics(`Processing ${readyItems.length} pending consent syncs`);
 
       // Process each item
       for (const item of readyItems) {
@@ -212,7 +212,7 @@ class ConsentSyncQueueService {
           this.queue = this.queue.filter((i) => i.id !== item.id);
           logger
             .category('analytics')
-            .debug(`Consent sync succeeded: ${item.id}`, { level: item.level });
+            .analytics(`Consent sync succeeded: ${item.id}`, { level: item.level });
         } catch (error) {
           // Handle retry logic
           await this.handleSyncFailure(item, error);
@@ -246,7 +246,7 @@ class ConsentSyncQueueService {
       // No-op if database not configured (e.g., GitHub Pages deployment)
       logger
         .category('analytics')
-        .debug('Skipping consent sync - database not configured');
+        .analytics('Skipping consent sync - database not configured');
       return;
     }
 
@@ -256,7 +256,7 @@ class ConsentSyncQueueService {
 
     logger
       .category('analytics')
-      .info(`Consent level synced to database: ${item.level}`);
+      .analytics(`Consent level synced to database: ${item.level}`);
   }
 
   /**
@@ -365,7 +365,7 @@ class ConsentSyncQueueService {
 
     logger
       .category('analytics')
-      .debug(`Scheduled next consent sync retry in ${delayMs}ms`);
+      .analytics(`Scheduled next consent sync retry in ${delayMs}ms`);
   }
 
   /**
@@ -376,7 +376,7 @@ class ConsentSyncQueueService {
     if (this.networkUnsubscribe) {
       logger
         .category('analytics')
-        .warn('ConsentSyncQueue', 'NetworkDetection already hooked');
+        .info('ConsentSyncQueue', 'NetworkDetection already hooked');
       return;
     }
 
@@ -397,7 +397,7 @@ class ConsentSyncQueueService {
         this.processQueue().catch((err) => {
           logger
             .category('analytics')
-            .warn('ConsentSyncQueue', `Auto-process failed: ${err}`);
+            .error('ConsentSyncQueue', `Auto-process failed: ${err}`);
         });
       }
 
@@ -416,7 +416,7 @@ class ConsentSyncQueueService {
       this.networkUnsubscribe = null;
       logger
         .category('analytics')
-        .info('ConsentSyncQueue', 'NetworkDetection hook removed');
+        .analytics('ConsentSyncQueue', 'NetworkDetection hook removed');
     }
 
     // Also clear retry timeout

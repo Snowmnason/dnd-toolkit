@@ -132,7 +132,7 @@ export function useMutation<TData = unknown, TError = Error>(
         const error = (err instanceof Error ? err : new Error(String(err))) as TError;
         setError(error);
         onError?.(error);
-        logger.error('[useMutation] Mutation failed:', err);
+        logger.category('storage').error('[useMutation] Mutation failed:', err);
         throw error;
       } finally {
         if (isMountedRef.current) {

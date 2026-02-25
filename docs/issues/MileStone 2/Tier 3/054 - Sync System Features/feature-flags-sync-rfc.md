@@ -374,7 +374,7 @@ async refreshFromServer() {
 
     // ... handle response
   } catch (error) {
-    logger.warn('Flag refresh failed (using cache)', error);
+    logger.category('feature_flag').warn('Flag refresh failed (using cache)', error);
   }
 }
 ```
@@ -385,7 +385,7 @@ async refreshFromServer() {
 // Check CB state before calling function
 const key = 'feature_flags:endpoint';
 if (CircuitBreakerManager.isOpen(key)) {
-  logger.debug('Flags endpoint circuit open, using cache');
+  logger.category('feature_flag').debug('Flags endpoint circuit open, using cache');
   return; // Skip refresh
 }
 
@@ -432,9 +432,9 @@ networkStateMachine.onSpecificTransition("RECOVERING", "GOOD", async () => {
   // NEW: Refresh flags with fresh auth
   try {
     await FeatureFlagsManager.refreshFromServer();
-    logger.info("Flags refreshed on recovery");
+    logger.category('feature_flag').info("Flags refreshed on recovery");
   } catch (error) {
-    logger.warn("Flags refresh failed on recovery", error);
+    logger.category('feature_flag').warn("Flags refresh failed on recovery", error);
     // Use cache (non-blocking)
   }
 });
@@ -537,7 +537,7 @@ getEntitlement(name: string): { granted: boolean, expiresAt?: number } {
 
   // Security: Detect clock manipulation (backward clock)
   if (lastVerified && now < lastVerified - CLOCK_SKEW_TOLERANCE) {
-    logger.warn('security', 'Clock manipulation detected', {
+    logger.category('security').warn('Clock manipulation detected', {
       lastVerified,
       now,
       skew: lastVerified - now,
@@ -584,7 +584,7 @@ async function verifyDeviceClock(): Promise<boolean> {
 
   if (skew > CLOCK_SKEW_TOLERANCE) {
     // Clock was set backward
-    logger.error("security", "Device clock appears manipulated", { skew });
+    logger.category("security").error("Device clock appears manipulated", { skew });
 
     // Lock out premium features
     await SecureStorage.set("dnd:clock_invalid", {

@@ -18,8 +18,7 @@ import { logger } from "../utils/logger";
  */
 export async function signOutUser(): Promise<void> {
   try {
-    logger.info(
-      "auth",
+    logger.category('auth').info(
       "🔓 Starting sign out process - clearing all user data and caches",
     );
 
@@ -27,9 +26,9 @@ export async function signOutUser(): Promise<void> {
     try {
       const authProvider = await getAuthProvider();
       await authProvider.signOut();
-      logger.info("auth", "✅ Signed out from auth provider");
+      logger.category('auth').info("✅ Signed out from auth provider");
     } catch (error) {
-      logger.error("auth", "Error signing out from auth provider:", error);
+      logger.category('auth').error("Error signing out from auth provider", error);
       // Continue with local cleanup even if provider logout fails
     }
 
@@ -47,22 +46,19 @@ export async function signOutUser(): Promise<void> {
       modeBackend.setItem(STORAGE_KEYS.THEME_MODE, "dark"),
     ]);
 
-    logger.info(
-      "auth",
+    logger.category('auth').info(
       "✅ Sign out completed successfully - all user data and caches cleared",
     );
   } catch (error) {
-    logger.error("auth", "❌ Sign out error:", error);
+    logger.category('auth').error("Sign out error", error);
     // Try to clear local state even if error occurred
     try {
       await AuthStateManager.clearAuthState();
-      logger.info(
-        "auth",
+      logger.category('auth').info(
         "⚠️ Supabase signout failed but local state was cleared",
       );
     } catch (clearError) {
-      logger.error(
-        "auth",
+      logger.category('auth').error(
         "Failed to clear local state during error recovery:",
         clearError,
       );

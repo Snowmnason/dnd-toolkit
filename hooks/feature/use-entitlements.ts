@@ -73,10 +73,9 @@ export function useEntitlement(
 
     async function checkEntitlement() {
       if (!userId) {
-        logger.warn(
-          "ui",
-          `useEntitlement: no userId provided for ${entitlementName}`,
-        );
+        logger.category('ui').warn(
+            `useEntitlement: no userId provided for ${entitlementName}`,
+          );
         if (isMounted) {
           setStatus({
             granted: false,
@@ -103,15 +102,13 @@ export function useEntitlement(
             expiresAt: result.expiresAt,
           });
 
-          logger.debug(
-            "ui",
+          logger.category('ui').debug(
             `useEntitlement: ${entitlementName} = ${result.granted} (source: ${result.source})`,
             { userId, source: result.source, expiresAt: result.expiresAt },
           );
         }
       } catch (error) {
-        logger.error(
-          "ui",
+        logger.category('ui').error(
           `useEntitlement: failed to check ${entitlementName}`,
           error,
         );
@@ -136,15 +133,13 @@ export function useEntitlement(
         config.remoteConfig?.entitlementPollIntervalMs || 5 * 60 * 1000;
 
       pollInterval = setInterval(() => {
-        logger.debug(
-          "ui",
+        logger.category('ui').debug(
           `useEntitlement: auto-refreshing ${entitlementName} for user ${userId}`,
         );
         checkEntitlement();
       }, pollInterval_ms);
 
-      logger.debug(
-        "ui",
+      logger.category('ui').debug(
         `useEntitlement: enabled auto-refresh for ${entitlementName}`,
         { interval: pollInterval_ms },
       );

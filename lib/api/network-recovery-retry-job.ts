@@ -55,7 +55,7 @@ export const NetworkRecoveryRetryJobManager = {
 
     const enabled = config?.enabled ?? true;
     if (!enabled) {
-      logger.info("network", "Network recovery retry job disabled");
+      logger.category('network').info("Network recovery retry job disabled");
       return;
     }
 
@@ -67,18 +67,12 @@ export const NetworkRecoveryRetryJobManager = {
 
     // Register hooks to start/stop retry job based on state transitions
     networkStateMachine.onSpecificTransition("GOOD", "RECOVERING", async () => {
-      logger.info(
-        "network",
-        "Transitioning to RECOVERING: starting auto-retry",
-      );
+      logger.category('network').info("Transitioning to RECOVERING: starting auto-retry");
       await this._startRetryJob();
     });
 
     networkStateMachine.onSpecificTransition("BAD", "RECOVERING", async () => {
-      logger.info(
-        "network",
-        "Transitioning to RECOVERING: starting auto-retry",
-      );
+      logger.category('network').info("Transitioning to RECOVERING: starting auto-retry");
       await this._startRetryJob();
     });
 
@@ -86,26 +80,20 @@ export const NetworkRecoveryRetryJobManager = {
       "CELLULAR",
       "RECOVERING",
       async () => {
-        logger.info(
-          "network",
-          "Transitioning to RECOVERING: starting auto-retry",
-        );
+        logger.category('network').info("Transitioning to RECOVERING: starting auto-retry");
         await this._startRetryJob();
       },
     );
 
     // Stop retry job on successful recovery
     networkStateMachine.onSpecificTransition("RECOVERING", "GOOD", async () => {
-      logger.info("network", "Recovery successful: stopping auto-retry");
+      logger.category('network').info("Recovery successful: stopping auto-retry");
       await this._stopRetryJob();
     });
 
     // Also stop on other recovery scenarios (unlikely but possible)
     networkStateMachine.onSpecificTransition("RECOVERING", "BAD", async () => {
-      logger.info(
-        "network",
-        "Transitioned RECOVERING → BAD: stopping auto-retry",
-      );
+      logger.category('network').info("Transitioned RECOVERING → BAD: stopping auto-retry");
       await this._stopRetryJob();
     });
 
@@ -113,15 +101,12 @@ export const NetworkRecoveryRetryJobManager = {
       "RECOVERING",
       "CELLULAR",
       async () => {
-        logger.info(
-          "network",
-          "Transitioned RECOVERING → CELLULAR: stopping auto-retry",
-        );
+        logger.category('network').info("Transitioned RECOVERING → CELLULAR: stopping auto-retry");
         await this._stopRetryJob();
       },
     );
 
-    logger.info("network", "Network recovery retry job initialized");
+    logger.category('network').info("Network recovery retry job initialized");
   },
 
   /**
@@ -129,7 +114,7 @@ export const NetworkRecoveryRetryJobManager = {
    */
   async _startRetryJob(): Promise<void> {
     if (this._isRunning) {
-      logger.debug("network", "Retry job already running");
+      logger.category('network').debug("Retry job already running");
       return;
     }
 
@@ -145,12 +130,12 @@ export const NetworkRecoveryRetryJobManager = {
         maxRetries: 0, // Don't retry the retry job itself; let it handle retries internally
       });
 
-      logger.info("network", "Enqueued network recovery retry job", { jobId });
+      logger.category('network').info("Enqueued network recovery retry job", { jobId });
 
       // Trigger immediate processing
       await this._jobQueue.runNext();
     } catch (error) {
-      logger.error("network", "Failed to start retry job", error);
+      logger.category('network').error("Failed to start retry job", error);
       this._isRunning = false;
     }
   },
@@ -160,7 +145,7 @@ export const NetworkRecoveryRetryJobManager = {
    */
   async _stopRetryJob(): Promise<void> {
     this._isRunning = false;
-    logger.debug("network", "Stopping network recovery retry job");
+    logger.category('network').debug("Stopping network recovery retry job");
   },
 
   /**
@@ -175,7 +160,7 @@ export const NetworkRecoveryRetryJobManager = {
 
     // Only retry if still in RECOVERING state
     if (state !== "RECOVERING") {
-      logger.debug("network", "Not in RECOVERING state, skipping retry", {
+      logger.category('network').debug("Not in RECOVERING state, skipping retry", {
         state,
       });
       return;
@@ -183,7 +168,7 @@ export const NetworkRecoveryRetryJobManager = {
 
     // Check if app is backgrounded
     if (this._isAppInBackground) {
-      logger.debug("network", "App backgrounded, pausing retry");
+      logger.category('network').debug("App backgrounded, pausing retry");
       return;
     }
 
@@ -192,7 +177,7 @@ export const NetworkRecoveryRetryJobManager = {
     const maxRetries = this._config?.maxRetries ?? 5;
 
     if (retryState.retries >= maxRetries) {
-      logger.warn("network", "Max recovery retries exceeded", {
+      logger.category('network').warn("Max recovery retries exceeded", {
         retries: retryState.retries,
       });
       // Don't retry further; let user manually recover
@@ -203,7 +188,7 @@ export const NetworkRecoveryRetryJobManager = {
       const backoffMs = NetworkRecoveryManager.getTimeUntilNextRetry();
 
       if (backoffMs > 0) {
-        logger.debug("network", "Waiting for backoff before retry", {
+        logger.category('network').debug("Waiting for backoff before retry", {
           backoffMs,
         });
         // Schedule next attempt via job queue with delay
@@ -218,11 +203,11 @@ export const NetworkRecoveryRetryJobManager = {
       }
 
       // Check network reachability
-      logger.debug("network", "Checking network reachability");
+      logger.category('network').debug("Checking network reachability");
       const status = NetworkDetection.getStatus();
 
       if (status.isOnline) {
-        logger.info("network", "Network reachable! Transitioning to GOOD");
+        logger.category('network').info("Network reachable! Transitioning to GOOD");
         await this._networkStateMachine.transitionTo(
           "GOOD",
           "Auto-retry successful",
@@ -232,7 +217,7 @@ export const NetworkRecoveryRetryJobManager = {
       }
 
       // Still offline: increment retry count and retry
-      logger.info("network", "Network still unreachable, scheduling retry", {
+      logger.category('network').info("Network still unreachable, scheduling retry", {
         retries: retryState.retries,
       });
 
@@ -240,7 +225,7 @@ export const NetworkRecoveryRetryJobManager = {
 
       // Requeue the job with backoff
       const nextBackoff = NetworkRecoveryManager.getTimeUntilNextRetry();
-      logger.debug("network", "Scheduling next retry attempt", {
+      logger.category('network').debug("Scheduling next retry attempt", {
         backoffMs: nextBackoff,
       });
 
@@ -251,7 +236,7 @@ export const NetworkRecoveryRetryJobManager = {
         maxRetries: 0,
       });
     } catch (error) {
-      logger.error("network", "Error during recovery retry", error);
+      logger.category('network').error("Error during recovery retry", error);
 
       // Requeue for next attempt
       if (this._isRunning) {
@@ -263,7 +248,7 @@ export const NetworkRecoveryRetryJobManager = {
             maxRetries: 0,
           });
         } catch (requeueError) {
-          logger.error("network", "Failed to requeue retry job", requeueError);
+          logger.category('network').error("Failed to requeue retry job", requeueError);
         }
       }
     }
@@ -274,7 +259,7 @@ export const NetworkRecoveryRetryJobManager = {
    */
   handleAppBackground(): void {
     this._isAppInBackground = true;
-    logger.debug("network", "App backgrounded: pausing retry attempts");
+    logger.category('network').debug("App backgrounded: pausing retry attempts");
   },
 
   /**
@@ -282,14 +267,14 @@ export const NetworkRecoveryRetryJobManager = {
    */
   async handleAppForeground(): Promise<void> {
     this._isAppInBackground = false;
-    logger.debug("network", "App in foreground: resuming retry attempts");
+    logger.category('network').debug("App in foreground: resuming retry attempts");
 
     // Immediately attempt retry if still in RECOVERING
     if (
       this._isRunning &&
       this._networkStateMachine?.getState() === "RECOVERING"
     ) {
-      logger.debug("network", "Triggering retry on app foreground");
+      logger.category('network').debug("Triggering retry on app foreground");
       await this._jobQueue.runNext();
     }
   },

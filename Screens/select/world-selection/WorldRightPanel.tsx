@@ -107,7 +107,7 @@ export function WorldRightPanel({
               onPress={() => {
                 if (!selectedWorld) return;
 
-                logger.info("[WorldRightPanel] Open button pressed", {
+                logger.category('ui').info("[WorldRightPanel] Open button pressed", {
                   worldId: selectedWorld.world_id,
                   userRole: selectedWorld.user_role,
                 });

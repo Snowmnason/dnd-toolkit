@@ -106,8 +106,7 @@ function RootLayoutContent() {
   // Log every render with session ID
   // Debug: Uncomment to trace root layout renders
   // useEffect(() => {
-  //   logger.debug(
-  //     "navigation",
+  //   logger.category('navigation').debug(
   //     `[SESSION:${sessionId}] 📍 Root layout rendered - route: ${segments[0] || "index"}`,
   //   );
   // }, [sessionId, segments]);
@@ -140,7 +139,7 @@ function RootLayoutContent() {
 
       // If no world in context yet, seed from URL once (owner navigating directly to their world)
       if (!worldId && urlWorldId) {
-        logger.info("[NavGuard] Seeding world from URL on main route", {
+        logger.category("navigation").info("[NavGuard] Seeding world from URL on main route", {
           urlWorldId,
           urlUserRole,
         });

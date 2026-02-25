@@ -28,18 +28,17 @@ export default function CompleteProfileScreen() {
   // Check if user is authenticated and needs to complete profile
   useEffect(() => {
     const checkAuthAndProfile = async () => {
-      logger.info("auth", "Starting auth and profile check");
+      logger.category('auth').info("Starting auth and profile check");
       try {
         // Use convenience function instead of direct provider call
         const session = await getCurrentSession();
-        logger.debug("auth", "Auth session check result:", {
+        logger.category('auth').debug("Auth session check result:", {
           hasSession: !!session,
           userId: session?.userId,
         });
 
         if (!session) {
-          logger.warn(
-            "auth",
+          logger.category('auth').warn(
             "No authenticated user found, redirecting to sign-in",
           );
           router.replace("/login/sign-in");
@@ -49,9 +48,9 @@ export default function CompleteProfileScreen() {
         // Session is obtained from provider (no need for separate authUser)
 
         // Try to get existing profile (might not exist for new users)
-        logger.debug("auth", "Fetching user profile from database");
+        logger.category('auth').debug("Fetching user profile from database");
         const existingProfile = await usersDB.getCurrentUser();
-        logger.info("auth", "Profile fetch result:", {
+        logger.category('auth').info("Profile fetch result:", {
           hasProfile: !!existingProfile,
           profileId: existingProfile?.id,
           profileUsername: existingProfile?.username,
@@ -64,8 +63,7 @@ export default function CompleteProfileScreen() {
         } else {
           // No profile exists - this is expected for new users
           // Use the auth user data to create the profile
-          logger.info(
-            "auth",
+          logger.category('auth').info(
             "No database profile found - this is expected for new users",
           );
           setUser({ id: session.userId, email: session.email });
@@ -77,7 +75,7 @@ export default function CompleteProfileScreen() {
           existingProfile.username &&
           existingProfile.username.trim().length > 0;
 
-        logger.debug("auth", "Profile validation:", {
+        logger.category('auth').debug("Profile validation:", {
           hasValidProfile,
           hasExistingProfile: !!existingProfile,
           username: existingProfile?.username,
@@ -85,23 +83,21 @@ export default function CompleteProfileScreen() {
         });
 
         if (hasValidProfile) {
-          logger.info(
-            "auth",
+          logger.category('auth').info(
             "User already has complete profile, redirecting to world selection",
           );
           router.replace("/select/world-selection");
           return;
         }
-        logger.info(
-          "auth",
+        logger.category('auth').info(
           "User needs to complete profile, staying on this screen",
         );
       } catch (error) {
-        logger.error("auth", "Auth check error:", error);
+        logger.category('auth').error("Auth check error:", error);
         router.replace("/login/sign-in");
       } finally {
         setInitializing(false);
-        logger.debug("auth", "Auth check completed, initializing set to false");
+        logger.category('auth').debug("Auth check completed, initializing set to false");
       }
     };
 

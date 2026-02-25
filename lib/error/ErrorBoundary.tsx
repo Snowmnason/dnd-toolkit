@@ -32,13 +32,13 @@ export class AppErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log error details for debugging
-    logger.error('ui', 'Uncaught error:', error, errorInfo);
+    logger.category('ui').error('Uncaught error:', error, errorInfo);
 
     // Track error in session
     try {
       sessionManager.trackError();
     } catch (sessionError) {
-      logger.warn('ui', 'Could not track error in session:', sessionError);
+      logger.category('ui').warn('Could not track error in session:', sessionError);
     }
 
     // Send to error tracking service
@@ -51,12 +51,12 @@ export class AppErrorBoundary extends Component<Props, State> {
       if (captureOptions !== null) {
         getErrorTracker().captureException(error, captureOptions);
       } else {
-        logger.warn('ui', 'Error not sent to error tracker (consent=none; awaiting user opt-in via dialog)');
+        logger.category('ui').warn('Error not sent to error tracker (consent=none; awaiting user opt-in via dialog)');
         // TODO: Show crash consent dialog here (out of scope Phase 1)
       }
     } catch (trackerError) {
       // Error tracker might not be available (e.g., on web in some cases)
-      logger.warn('ui', 'Could not send error to error tracker:', trackerError);
+      logger.category('ui').warn('Could not send error to error tracker:', trackerError);
     }
   }
 

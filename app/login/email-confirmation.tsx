@@ -29,13 +29,13 @@ export default function EmailConfirmationScreen() {
 
   // Use hook with callback to detect email confirmation
   const { resendConfirmation } = useAuthStateListener((session) => {
-    logger.debug('auth', 'Auth state change:', session?.email);
+    logger.category('auth').debug('Auth state change:', session?.email);
     
     // When session becomes available with matching email, user confirmed email
     if (session && session.email === userEmail) {
       // User successfully confirmed email
       // Redirect to sign-in so they can manually complete their account setup
-      logger.info('auth', 'Email confirmed, redirecting to sign-in');
+      logger.category('auth').info('Email confirmed, redirecting to sign-in');
       router.replace('/login/sign-in');
     }
   });
@@ -72,12 +72,12 @@ export default function EmailConfirmationScreen() {
     
     timerRef.current = setInterval(() => {
       countdown--;
-      logger.debug('auth', 'Countdown:', countdown);
+      logger.category('auth').debug('Countdown:', countdown);
       if (countdown > 0) {
         setWaitingResend(`(${countdown}s)`);
       } else {
         // Re-enable button and reset text
-        logger.debug('auth', 'Timer finished, re-enabling button');
+        logger.category('auth').debug('Timer finished, re-enabling button');
         setWaitingResend('Resend Email');
         setIsCountingDown(false);
         if (timerRef.current) {

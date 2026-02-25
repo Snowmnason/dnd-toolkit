@@ -64,7 +64,7 @@ export const NetworkRecoveryManager = {
     if (this._notificationCallback) {
       this._notificationCallback(message);
     } else {
-      logger.info("network", `Notification (callback not set): ${message}`);
+      logger.category('network').info(`Notification (callback not set): ${message}`);
     }
   },
   /**
@@ -81,12 +81,12 @@ export const NetworkRecoveryManager = {
 
       if (stored) {
         this._recoveryState = stored;
-        logger.info("network", "Recovery state hydrated from storage", {
+        logger.category('network').info("Recovery state hydrated from storage", {
           retries: this._recoveryState.retries,
         });
       }
     } catch (error) {
-      logger.error("network", "Error loading recovery state", error);
+      logger.category('network').error("Error loading recovery state", error);
       // Continue with defaults
     }
 
@@ -119,7 +119,7 @@ export const NetworkRecoveryManager = {
 
     await this._persistRecoveryState();
 
-    logger.debug("api", "Recovery backoff scheduled", {
+    logger.category('api').debug("Recovery backoff scheduled", {
       retries: this._recoveryState.retries,
       baseBackoffMs,
       jitteredBackoffMs,
@@ -164,7 +164,7 @@ export const NetworkRecoveryManager = {
         this._recoveryState,
       );
     } catch (error) {
-      logger.error("network", "Error persisting recovery state", error);
+      logger.category('network').error("Error persisting recovery state", error);
     }
   },
 
@@ -191,7 +191,7 @@ export const NetworkRecoveryManager = {
 export async function registerNetworkRecoveryHooks(
   networkStateMachine: any,
 ): Promise<void> {
-  logger.info("network", "Registering network recovery hooks");
+  logger.category('network').info("Registering network recovery hooks");
 
   // Phase 4: Helper to wrap recovery steps with error boundaries
   async function executeRecoveryStep(
@@ -202,7 +202,7 @@ export async function registerNetworkRecoveryHooks(
       await fn();
       return true;
     } catch (error) {
-      logger.error("network", `Recovery step failed: ${name}`, error);
+      logger.category('network').error(`Recovery step failed: ${name}`, error);
       return false;
     }
   }
@@ -212,15 +212,15 @@ export async function registerNetworkRecoveryHooks(
     "RECOVERING" as NetworkState,
     "GOOD" as NetworkState,
     async () => {
-      logger.info("network", "Executing RECOVERING → GOOD recovery hooks");
+      logger.category('network').info("Executing RECOVERING → GOOD recovery hooks");
 
       // Phase 4: Execute recovery steps with error boundaries (don't fail on individual step errors)
       const stepResults = {
         queueSync: await executeRecoveryStep("queue-sync", async () => {
-          logger.debug("network", "Syncing offline queue mutations");
+          logger.category('network').debug("Syncing offline queue mutations");
           await RequestManager.flushOfflineQueue();
           const stats = OfflineQueueManager.getStats();
-          logger.info("network", "Offline queue synced", {
+          logger.category('network').info("Offline queue synced", {
             remaining: stats.queueLength,
             maxRetries: stats.maxRetryAttempts,
           });
@@ -229,11 +229,11 @@ export async function registerNetworkRecoveryHooks(
         cacheInvalidation: await executeRecoveryStep(
           "cache-invalidation",
           async () => {
-            logger.debug("network", "Invalidating stale cache entries");
+            logger.category('network').debug("Invalidating stale cache entries");
             const staleDuration = 2 * 60 * 60 * 1000; // 2 hours
             const invalidatedCount =
               await QueryCache.invalidateOlderThan(staleDuration);
-            logger.info("network", "Stale cache invalidated", {
+            logger.category('network').info("Stale cache invalidated", {
               count: invalidatedCount,
               staleDuration,
             });
@@ -270,7 +270,7 @@ export async function registerNetworkRecoveryHooks(
     "GOOD" as NetworkState,
     "OFFLINE" as NetworkState,
     async () => {
-      logger.info("network", "Executing GOOD → OFFLINE notification");
+      logger.category('network').info("Executing GOOD → OFFLINE notification");
 
       await executeRecoveryStep("offline-notification", async () => {
         NetworkRecoveryManager._notify(
@@ -285,7 +285,7 @@ export async function registerNetworkRecoveryHooks(
     "BAD" as NetworkState,
     "OFFLINE" as NetworkState,
     async () => {
-      logger.info("network", "Executing BAD → OFFLINE notification");
+      logger.category('network').info("Executing BAD → OFFLINE notification");
       await executeRecoveryStep("bad-offline-notification", async () => {
         NetworkRecoveryManager._notify(
           "Connection lost - changes will sync when online",
@@ -298,7 +298,7 @@ export async function registerNetworkRecoveryHooks(
     "CELLULAR" as NetworkState,
     "OFFLINE" as NetworkState,
     async () => {
-      logger.info("network", "Executing CELLULAR → OFFLINE notification");
+      logger.category('network').info("Executing CELLULAR → OFFLINE notification");
       await executeRecoveryStep("cellular-offline-notification", async () => {
         NetworkRecoveryManager._notify(
           "No connection - changes will sync when online",
@@ -307,5 +307,5 @@ export async function registerNetworkRecoveryHooks(
     },
   );
 
-  logger.info("network", "Network recovery hooks registered successfully");
+  logger.category('network').info("Network recovery hooks registered successfully");
 }

@@ -286,7 +286,7 @@ All errors logged with context:
 
 ```typescript
 // Storage error
-logger.warn('storage', 'Failed to read user data', {
+logger.category('storage').warn('Failed to read user data', {
   key: 'dnd:auth:user_data',
   operation: 'get',
   error: 'CorruptedData',
@@ -294,7 +294,7 @@ logger.warn('storage', 'Failed to read user data', {
 });
 
 // Network error
-logger.warn('network', 'Request timeout, serving stale', {
+logger.category('network').warn('Request timeout, serving stale', {
   url: '/api/worlds',
   statusCode: undefined,
   hasCache: true,
@@ -500,7 +500,7 @@ const result = await safeStorageGetJSON('my_key', SecureStorage, {
 ```typescript
 const result = await safeStorageSetJSON('my_key', data, SecureStorage);
 if (!result.success) {
-  logger.warn('Failed to save, but continuing...', result.error?.message);
+  logger.category('storage').warn('Failed to save, but continuing...', result.error?.message);
 }
 ```
 

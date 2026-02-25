@@ -14,7 +14,7 @@ function useSignOut() {
       // Navigate to index (which will show welcome screen)
       router.replace('/');
     } catch (error) {
-      logger.error('auth', 'Error during sign out:', error);
+      logger.category('auth').error('Error during sign out:', error);
       // Still redirect even if logout failed
       router.replace('/');
     }

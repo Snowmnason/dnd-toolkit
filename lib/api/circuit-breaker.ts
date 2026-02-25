@@ -104,7 +104,7 @@ class CircuitBreakerManagerClass {
       circuit.state = "Half-Open";
       circuit.lastTransitionAt = Date.now();
       circuit.halfOpenProbeInFlight = false;
-      logger.warn("api", `Circuit breaker Half-Open (recovery test): ${key}`, {
+      logger.category('api').warn(`Circuit breaker Half-Open (recovery test): ${key}`, {
         endpoint: key,
         nextRecoveryAt: circuit.nextRecoveryAt,
       });
@@ -166,13 +166,9 @@ class CircuitBreakerManagerClass {
       circuit.failureWindow = [];
       circuit.consecutiveHalfOpenFailures = 0;
       circuit.lastTransitionAt = Date.now();
-      logger.debug(
-        "api",
-        `Circuit breaker Closed (recovery successful): ${key}`,
-        {
-          endpoint: key,
-        },
-      );
+      logger.category('api').debug(`Circuit breaker Closed (recovery successful): ${key}`, {
+        endpoint: key,
+      });
     } else if (circuit.state === "Closed") {
       circuit.consecutiveFailures = 0;
     }
@@ -240,7 +236,7 @@ class CircuitBreakerManagerClass {
       circuit.state = "Open";
       circuit.nextRecoveryAt = now + thresholds.baseTimeoutMs;
       circuit.lastTransitionAt = now;
-      logger.warn("api", `Circuit breaker Open: ${key}`, {
+      logger.category('api').warn(`Circuit breaker Open: ${key}`, {
         endpoint: key,
         failures: circuit.consecutiveFailures,
         failureRate: failureRate.toFixed(1),
@@ -260,15 +256,11 @@ class CircuitBreakerManagerClass {
       );
       circuit.nextRecoveryAt = now + nextTimeout;
       circuit.lastTransitionAt = now;
-      logger.warn(
-        "api",
-        `Circuit breaker Open (Half-Open recovery failed): ${key}`,
-        {
-          endpoint: key,
-          consecutiveHalfOpenFailures: circuit.consecutiveHalfOpenFailures,
-          nextRecoveryAt: circuit.nextRecoveryAt,
-        },
-      );
+      logger.category('api').warn(`Circuit breaker Open (Half-Open recovery failed): ${key}`, {
+        endpoint: key,
+        consecutiveHalfOpenFailures: circuit.consecutiveHalfOpenFailures,
+        nextRecoveryAt: circuit.nextRecoveryAt,
+      });
     }
   }
 
@@ -305,14 +297,10 @@ class CircuitBreakerManagerClass {
         circuit.state = "Half-Open";
         circuit.lastTransitionAt = Date.now();
 
-        logger.info(
-          "api",
-          `Circuit breaker Half-Open (recovery probe): ${key}`,
-          {
-            endpoint: key,
-            consecutiveHalfOpenFailures: circuit.consecutiveHalfOpenFailures,
-          },
-        );
+        logger.category('api').info(`Circuit breaker Half-Open (recovery probe): ${key}`, {
+          endpoint: key,
+          consecutiveHalfOpenFailures: circuit.consecutiveHalfOpenFailures,
+        });
 
         return true;
       }
@@ -335,7 +323,7 @@ class CircuitBreakerManagerClass {
         circuit.nextRecoveryAt = 0;
         circuit.consecutiveHalfOpenFailures = 0;
         circuit.lastTransitionAt = Date.now();
-        logger.debug("api", `Circuit breaker manually reset: ${key}`, {
+        logger.category('api').debug(`Circuit breaker manually reset: ${key}`, {
           endpoint: key,
         });
       }
@@ -350,7 +338,7 @@ class CircuitBreakerManagerClass {
         circuit.consecutiveHalfOpenFailures = 0;
         circuit.lastTransitionAt = Date.now();
       }
-      logger.debug("api", "Circuit breaker manually reset (all)", {});
+      logger.category('api').debug("Circuit breaker manually reset (all)", {});
     }
   }
 

@@ -50,8 +50,7 @@ export async function initializeRepositories(): Promise<boolean> {
   // Check that DatabaseProvider is ready
   const databaseProvider = getDatabaseProvider();
   if (!databaseProvider.isConfigured()) {
-    logger.warn(
-      "bootstrap",
+    logger.category('bootstrap').warn(
       "[Repository Initializer] DatabaseProvider not configured — skipping repository initialization. " +
         "Repositories will fail until DatabaseProvider is ready."
     );
@@ -76,8 +75,7 @@ export async function initializeRepositories(): Promise<boolean> {
     logger.category("bootstrap").info("✅ All repositories initialized and registered");
     return true;
   } catch (error) {
-    logger.error(
-      "bootstrap",
+    logger.category("bootstrap").error(
       `[Repository Initializer] Failed to initialize repositories: ${error}`,
     );
     throw error;

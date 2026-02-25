@@ -64,7 +64,7 @@ export function EditWorldModal({
     try {
       await onGenerateInviteLink();
     } catch (error) {
-      logger.error("ui", "Failed to generate invite link:", error);
+      logger.category("ui").error("Failed to generate invite link:", error);
     }
   };
 
@@ -83,7 +83,7 @@ export function EditWorldModal({
         await onDeleteWorld();
         onClose();
       } catch (error) {
-        logger.error("ui", "Failed to delete world:", error);
+        logger.category("ui").error("Failed to delete world:", error);
         setDeleteDisabled(false);
       }
     }

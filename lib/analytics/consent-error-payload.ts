@@ -59,7 +59,7 @@ export function getCrashReportPayload(
   // CONSENT = 'none': No automatic send; user must opt-in via dialog
   // ============================================================================
   if (consentLevel === 'none') {
-    logger.category('analytics').debug('Error not sent (consent=none; awaiting user opt-in via dialog)');
+    logger.category('analytics').warn('ErrorNotSent:consent=none', 'Error not sent (consent=none; awaiting user opt-in via dialog)');
     // Return null to signal caller: do not send automatically
     // Caller should show optional dialog offering user the chance to send
     return null;
@@ -69,7 +69,7 @@ export function getCrashReportPayload(
   // CONSENT = 'basic': Minimal payload (error, stack, version) auto-sent
   // ============================================================================
   if (consentLevel === 'basic') {
-    logger.category('analytics').debug('Sending error with minimal payload (consent=basic)');
+    logger.category('analytics').warn('SendingMinimalErrorPayload', 'Sending error with minimal payload (consent=basic)');
 
     const minimalOptions: Record<string, any> = {
       // NO contexts (avoids device info, OS, screen resolution, etc.)
@@ -95,7 +95,7 @@ export function getCrashReportPayload(
   // CONSENT = 'full': Full payload with all context auto-sent
   // ============================================================================
   if (consentLevel === 'full') {
-    logger.category('analytics').debug('Sending error with full payload (consent=full)');
+    logger.category('analytics').warn('SendingFullErrorPayload', 'Sending error with full payload (consent=full)');
 
     const fullOptions: Record<string, any> = {
       // Full contexts: device, OS, screen, browser, runtime
@@ -127,7 +127,7 @@ export function getCrashReportPayload(
   // ============================================================================
   // FALLBACK: Invalid consent level
   // ============================================================================
-  logger.category('analytics').warn(`Invalid consent level '${consentLevel}'; defaulting to minimal payload`);
+  logger.category('analytics').warn('InvalidConsentLevel', `Invalid consent level '${consentLevel}'; defaulting to minimal payload`);
   // Default to minimal payload for safety
   return {
     contexts: {},

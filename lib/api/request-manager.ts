@@ -17,7 +17,7 @@ import {
 } from "../network";
 import { getErrorTracker } from "../services";
 import { ERROR_CODES, type ErrorCodeType } from "../utils/ERROR_CODES";
-import { logger } from "../utils/logger";
+import { logger, type LogCategory } from "../utils/logger";
 import { AuthLayer, type AuthContext } from "./auth-layer";
 import {
   CircuitBreakerManager,
@@ -316,6 +316,41 @@ const RATE_LIMIT_CONFIG = {
   maxTokens: 20, // Allow bursts up to 2 seconds worth
 };
 
+/**
+ * Map EnrichedError severity to Sentry breadcrumb level
+ * EnrichedError uses 'critical'|'error'|'warning', but Sentry expects 'fatal'|'error'|'warning'|'info'|'debug'
+ */
+function mapToSentrySeverity(severity: 'critical' | 'error' | 'warning'): 'fatal' | 'error' | 'warning' {
+  switch (severity) {
+    case 'critical':
+      return 'fatal';  // Map critical to fatal (most severe Sentry level)
+    case 'error':
+    case 'warning':
+    default:
+      return severity;
+  }
+}
+
+/**
+ * Map ERROR_CODES_METADATA.category (string) to a valid LogCategory
+ * ERROR_CODES metadata uses: 'auth', 'network', 'database', 'storage', 'validation', 'unknown'
+ * LogCategory includes: 'auth', 'navigation', 'api', 'network', 'database', 'storage', 'ui', 'analytics', etc.
+ * Maps unrecognized categories to 'error' fallback
+ */
+function mapErrorCodeCategoryToLogCategory(category: string): LogCategory {
+  switch (category) {
+    case 'auth':
+    case 'network':
+    case 'database':
+    case 'storage':
+      return category as LogCategory;
+    case 'validation':
+    case 'unknown':
+    default:
+      return 'error';
+  }
+}
+
 // ==========================================
 // Request Manager Class
 // ==========================================
@@ -497,7 +532,7 @@ class RequestManagerClass {
         }
 
         if (this.shouldAbortAndRetryDueToQualityDegradation(key, 2000)) {
-          logger.info('api', 'Aborting in-flight GET due to quality degradation', {
+          logger.category('api').info('Aborting in-flight GET due to quality degradation', {
             key,
             startQuality: entry.effectiveType,
             currentQuality: status.effectiveType,
@@ -767,7 +802,7 @@ class RequestManagerClass {
           const isStale = await QueryCache.isStale(enrichedKey);
           if (!isStale) {
             // Cache hit and not stale - return immediately
-            logger.debug("api", "QueryCache hit (not stale):", { key: enrichedKey });
+            logger.category('api').debug("QueryCache hit (not stale):", { key: enrichedKey });
             Analytics.track("api_request", {
               key: enrichedKey,
               ok: true,
@@ -777,14 +812,13 @@ class RequestManagerClass {
             return cached;
           }
           // Cache stale - fall through to fetch, but return cached data while fetching
-          logger.debug(
-            "api",
+          logger.category('api').debug(
             "QueryCache stale (will revalidate in background):",
             { key: enrichedKey },
           );
         }
       } catch (error) {
-        logger.warn("api", "QueryCache read error:", { key: enrichedKey, error });
+        logger.category('api').warn("QueryCache read error", { key: enrichedKey, error });
         // Continue with normal fetch if cache read fails
       }
     }
@@ -798,7 +832,7 @@ class RequestManagerClass {
           const slowRequestThreshold =
             Analytics.getThreshold?.("slowRequestMs") ?? 3000;
           if (duration_ms > slowRequestThreshold) {
-            logger.warn("api", `Slow request: ${enrichedKey} took ${duration_ms}ms`);
+            logger.category('api').warn(`Slow request: ${enrichedKey} took ${duration_ms}ms`);
           }
           return value;
         },
@@ -813,10 +847,7 @@ class RequestManagerClass {
           const slowRequestThreshold =
             Analytics.getThreshold?.("slowRequestMs") ?? 3000;
           if (duration_ms > slowRequestThreshold) {
-            logger.warn(
-              "api",
-              `Slow failed request: ${enrichedKey} took ${duration_ms}ms`,
-            );
+            logger.category('api').warn(`Slow failed request: ${enrichedKey} took ${duration_ms}ms`);
           }
           throw err;
         },
@@ -829,7 +860,7 @@ class RequestManagerClass {
     try {
       // ========== DEDUPE CHECK ==========
       if (options_.dedupe && this.pendingRequests.has(enrichedKey)) {
-        logger.debug("api", "Returning deduplicated request:", enrichedKey);
+        logger.category('api').debug("Returning deduplicated request:", enrichedKey);
         const pending = this.pendingRequests.get(enrichedKey)!;
         const deduplicatedPromise = pending.promise as Promise<T>;
         // Note: Duration tracking uses the original request's timestamp (pending.timestamp)
@@ -838,15 +869,14 @@ class RequestManagerClass {
           const dedupErrorCode = extractErrorCode(error);
           if (dedupErrorCode) {
             const enriched = enrichError(error instanceof Error ? error : new Error(String(error)), dedupErrorCode);
-            logger.category(enriched.category as any).error(`Deduplicated request failed: ${enriched.message}`, enriched.toLogMetadata());
+            logger.category(mapErrorCodeCategoryToLogCategory(enriched.category)).error(`Deduplicated request failed: ${enriched.message}`, enriched.toLogMetadata());
           } else {
-            logger.error("api", "Deduplicated request failed:", { key: enrichedKey, error });
+            logger.category('api').error("Deduplicated request failed", { key: enrichedKey, error });
           }
           this.reportErrorToTracker(error, { key: enrichedKey, options: options_ });
 
           if (options_.failOpen) {
-            logger.warn(
-              "api",
+            logger.category('api').warn(
               "Fail-open enabled for deduplicated request, returning null:",
               enrichedKey,
             );
@@ -861,7 +891,7 @@ class RequestManagerClass {
       if (options_.rateLimitKey) {
         const canProceed = this.checkRateLimit(options_.rateLimitKey);
         if (!canProceed) {
-          logger.warn("api", "Rate limited:", options_.rateLimitKey);
+          logger.category('api').warn("Rate limited", { rateLimitKey: options_.rateLimitKey });
           if (options_.failOpen) {
             return null;
           }
@@ -879,7 +909,7 @@ class RequestManagerClass {
         const cbState = CircuitBreakerManager.getState(cbKey);
         if (cbState === "Open") {
           const stats = CircuitBreakerManager.getStats(cbKey);
-          logger.warn("api", "Circuit breaker open, fast-failing:", {
+          logger.category('api').warn("Circuit breaker open, fast-failing", {
             endpoint: cbKey,
             recoveryAt: stats.nextRecoveryAt,
           });
@@ -903,8 +933,7 @@ class RequestManagerClass {
               requestContext, // Pass context and idempotencyKey for queue preservation
             );
             await OfflineQueueManager.enqueue(entry);
-            logger.info(
-              "api",
+            logger.category('api').info(
               "Circuit-breaker open: request queued for offline replay",
               { key: enrichedKey },
             );
@@ -924,8 +953,7 @@ class RequestManagerClass {
                 options_.interceptors,
               );
             } catch (hookErr) {
-              logger.warn(
-                "api",
+              logger.category('api').warn(
                 "Interceptor error while reporting queued circuit-breaker request",
                 hookErr,
               );
@@ -933,8 +961,7 @@ class RequestManagerClass {
 
             return null;
           } catch (queueErr) {
-            logger.warn(
-              "api",
+            logger.category('api').warn(
               "Failed to queue request while circuit breaker open, falling back to error",
               { key: enrichedKey, error: queueErr },
             );
@@ -948,8 +975,7 @@ class RequestManagerClass {
           cbState === "Half-Open" &&
           !CircuitBreakerManager.tryAcquireProbe(cbKey)
         ) {
-          logger.debug(
-            "api",
+          logger.category('api').debug(
             "Circuit breaker Half-Open probe already in flight, fast-failing:",
             {
               endpoint: cbKey,
@@ -1042,7 +1068,7 @@ class RequestManagerClass {
             // Update requestInit with new headers
             requestInit.headers = authHeaders;
 
-            logger.debug("api", "Auth middleware: prepared headers", {
+            logger.category('api').debug("Auth middleware: prepared headers", {
               key: enrichedKey,
               strategy: options_.authStrategy,
               hasAuth: !!authHeaders["Authorization"],
@@ -1113,9 +1139,9 @@ class RequestManagerClass {
                 },
                 versionAtStart,
               );
-              logger.debug("api", "Persisted to QueryCache:", { key: enrichedKey });
+              logger.category('api').debug("Persisted to QueryCache:", { key: enrichedKey });
             } catch (error) {
-              logger.warn("api", "QueryCache persistence failed:", {
+              logger.category('api').warn("QueryCache persistence failed:", {
                 key: enrichedKey,
                 error,
               });
@@ -1212,11 +1238,7 @@ class RequestManagerClass {
           .catch((cleanupError) => {
             // Log cleanup failures for debugging without blocking the main operation.
             // Cleanup errors are unexpected and indicate potential memory leaks.
-            logger.warn(
-              "request-manager",
-              "Cleanup handler error (unexpected):",
-              cleanupError,
-            );
+            logger.category('api').warn("Cleanup handler error (unexpected):", cleanupError);
           });
       }
 
@@ -1231,11 +1253,7 @@ class RequestManagerClass {
             () => this.untrackInFlightGetRequest(enrichedKey),
           )
           .catch((cleanupError) => {
-            logger.warn(
-              "request-manager",
-              "In-flight tracker cleanup error (unexpected):",
-              cleanupError,
-            );
+            logger.category('api').warn("In-flight tracker cleanup error (unexpected):", cleanupError);
           });
       }
 
@@ -1290,7 +1308,7 @@ class RequestManagerClass {
             requestContext, // Pass context and idempotencyKey for queue preservation
           );
           await OfflineQueueManager.enqueue(entry);
-          logger.info("api", "Request queued for offline replay", { key: enrichedKey });
+          logger.category('api').info("Request queued for offline replay", { key: enrichedKey });
           // Notify error interceptors that the request was queued
           try {
             await InterceptorManager.executeErrorHooks(
@@ -1306,8 +1324,7 @@ class RequestManagerClass {
               options_.interceptors,
             );
           } catch (hookErr) {
-            logger.warn(
-              "api",
+            logger.category('api').warn(
               "Interceptor error while reporting queued request",
               hookErr,
             );
@@ -1316,7 +1333,7 @@ class RequestManagerClass {
           // Don't throw - queued successfully, return null as if failOpen was true
           return null;
         } catch (queueError) {
-          logger.warn("api", "Failed to queue request for offline replay", {
+          logger.category('api').warn("Failed to queue request for offline replay", {
             key: enrichedKey,
             error: queueError,
           });
@@ -1326,8 +1343,7 @@ class RequestManagerClass {
 
       // ========== FAIL OPEN BEHAVIOR ==========
       if (options_.failOpen) {
-        logger.warn(
-          "request-manager",
+        logger.category('api').warn(
           "Fail-open enabled, returning null:",
           enrichedKey,
         );
@@ -1375,7 +1391,7 @@ class RequestManagerClass {
       if (status === ERROR_CODES.HTTP.UNAUTHORIZED && retryCount < 1) {
         // Only retry once on 401
         logger.category("auth").info("Got 401, attempting token refresh", {
-            code: ERROR_CODES.HTTP.UNAUTHORIZED,
+            httpStatus: ERROR_CODES.HTTP.UNAUTHORIZED,
             key,
             strategy: strategyName,
         });
@@ -1385,8 +1401,7 @@ class RequestManagerClass {
           // Let offline mode queue the request for retry when connection restored
           const { NetworkDetection } = await import("@/lib/network");
           if (!NetworkDetection.getStatus().isOnline) {
-            logger.debug(
-              "api",
+            logger.category('api').debug(
               "Offline detected—skipping token refresh, letting offline queue handle retry",
               {
                 key,
@@ -1411,7 +1426,7 @@ class RequestManagerClass {
           await AuthLayer.handle401Response(strategyName, context);
 
           // Retry the request once after token refresh
-          logger.debug("api", "Retrying request after token refresh", {
+          logger.category('api').debug("Retrying request after token refresh", {
             key,
             strategy: strategyName,
           });
@@ -1441,35 +1456,23 @@ class RequestManagerClass {
               // 2. SecureStorage is wiped (session data, refresh token cleared)
               // 3. Route guards detect cleared state and redirect to /login
               // 4. Prevents infinite 401 loops (token can't be refreshed)
-              logger.warn(
-                "api",
-                "Clearing auth state due to 401 on auth strategy",
-                {
-                  key,
-                  strategy: strategyName,
-                },
-              );
+              logger.category('api').warn("Clearing auth state due to 401 on auth strategy", {
+                key,
+                strategy: strategyName,
+              });
               const { AuthStateManager } =
                 await import("@/lib/auth/auth-state");
               await AuthStateManager.clearAuthState();
             } catch (clearError) {
-              logger.error(
-                "api",
-                "Failed to clear auth state on refresh failure",
-                {
-                  error: clearError,
-                },
-              );
+              logger.category('api').error("Failed to clear auth state on refresh failure", {
+                error: clearError,
+              });
             }
           } else {
-            logger.debug(
-              "api",
-              "Not clearing auth state (strategy does not require it)",
-              {
-                key,
-                strategy: strategyName,
-              },
-            );
+            logger.category('api').debug("Not clearing auth state (strategy does not require it)", {
+              key,
+              strategy: strategyName,
+            });
           }
 
           // Re-throw original 401 error (don't retry)
@@ -1584,7 +1587,7 @@ class RequestManagerClass {
           const currentQuality = retryState.initialQuality;
           const downgradedQuality = this.downgradeAdaptiveQuality(currentQuality);
           retryState.initialQuality = downgradedQuality;
-          logger.info("api", "Downgrading image quality on abort", {
+          logger.category('api').info("Downgrading image quality on abort", {
             key: requestContext.key,
             from: currentQuality,
             to: downgradedQuality,
@@ -1592,7 +1595,7 @@ class RequestManagerClass {
             retriesLeft,
           });
         } else {
-          logger.debug("api", "Request aborted due to network quality degradation", {
+          logger.category('api').debug("Request aborted due to network quality degradation", {
             key: requestContext.key,
             attemptNumber,
             retriesLeft,
@@ -1601,7 +1604,7 @@ class RequestManagerClass {
         }
       }
 
-      logger.debug("request-manager", "Retrying after error:", {
+      logger.category('api').debug("Retrying after error:", {
         error: (error as Error).message,
         retriesLeft,
         attemptNumber,
@@ -1764,16 +1767,12 @@ class RequestManagerClass {
 
       // Log to logger with enriched metadata
       if (enriched) {
-        logger.category(enriched.category as any).error(
+        logger.category(mapErrorCodeCategoryToLogCategory(enriched.category)).error(
           `Request failed: ${enriched.message}`,
           enriched.toLogMetadata()
         );
       } else {
-        logger.error(
-          "api",
-          "Request failed",
-          { key: context.key, error: errorObj }
-        );
+        logger.category('api').error("Request failed", { key: context.key, error: errorObj });
       }
 
       // Get tiered payload based on consent level
@@ -1806,7 +1805,7 @@ class RequestManagerClass {
                 {
                   message: enriched.toBreadcrumb().message,
                   data: enriched.toBreadcrumb().data,
-                  level: enriched.severity,
+                  level: mapToSentrySeverity(enriched.severity),
                 },
               ]
             : undefined,
@@ -1814,17 +1813,10 @@ class RequestManagerClass {
 
         getErrorTracker().captureException(errorObj, mergedOptions);
       } else {
-        logger.warn(
-          "request-manager",
-          "Error not sent to error tracker (consent=none; awaiting user opt-in)"
-        );
+        logger.category('api').warn("Error not sent to error tracker (consent=none; awaiting user opt-in)");
       }
     } catch (trackerError) {
-      logger.warn(
-        "request-manager",
-        "Failed to report to error tracker:",
-        trackerError
-      );
+      logger.category('api').warn("Failed to report to error tracker:", trackerError);
     }
   }
 
@@ -1852,7 +1844,7 @@ class RequestManagerClass {
    * WARNING: Only use during logout/cleanup
    */
   clearPending(): void {
-    logger.debug("request-manager", "Clearing pending requests");
+    logger.category('api').debug("Clearing pending requests");
     this.pendingRequests.clear();
   }
 
@@ -1864,10 +1856,10 @@ class RequestManagerClass {
   resetRateLimit(key?: string): void {
     if (key) {
       this.rateLimitBuckets.delete(key);
-      logger.debug("request-manager", "Reset rate limit for:", key);
+      logger.category('api').debug("Reset rate limit for:", key);
     } else {
       this.rateLimitBuckets.clear();
-      logger.debug("request-manager", "Reset all rate limits");
+      logger.category('api').debug("Reset all rate limits");
     }
   }
 
@@ -1882,11 +1874,11 @@ class RequestManagerClass {
     const entries = key ? allEntries.filter((e) => e.key === key) : allEntries;
 
     if (entries.length === 0) {
-      logger.debug("api", "No offline queue entries to flush", { key });
+      logger.category('api').debug("No offline queue entries to flush", { key });
       return;
     }
 
-    logger.info("api", "Flushing offline queue", {
+    logger.category('api').info("Flushing offline queue", {
       count: entries.length,
       oldestEntryTime: OfflineQueueManager.getStats().oldestEntryTime,
     });
@@ -1897,8 +1889,7 @@ class RequestManagerClass {
         const isEligible = await OfflineQueueManager.recordAttempt(entry.key);
         if (!isEligible) {
           // Entry exceeded max retries and was removed; skip replay
-          logger.debug(
-            "api",
+          logger.category('api').debug(
             "Offline queue entry skipped (max retries exceeded)",
             {
               key: entry.key,
@@ -1916,12 +1907,12 @@ class RequestManagerClass {
 
         // Success: remove from queue
         await OfflineQueueManager.dequeue(entry.key);
-        logger.info("api", "Offline queue entry replayed successfully", {
+        logger.category('api').info("Offline queue entry replayed successfully", {
           key: entry.key,
           attempts: entry.attempts,
         });
       } catch (error) {
-        logger.warn("api", "Offline queue replay failed", {
+        logger.category('api').warn("Offline queue replay failed", {
           key: entry.key,
           attempts: entry.attempts,
           error,
@@ -1945,7 +1936,7 @@ class RequestManagerClass {
    */
   clearFetcherRegistry(): void {
     this.fetcherRegistry.clear();
-    logger.debug("api", "Fetcher registry cleared");
+    logger.category('api').debug("Fetcher registry cleared");
   }
 
   /**
@@ -1962,7 +1953,7 @@ class RequestManagerClass {
     const isOffline = networkStatus.connectionQuality === "offline";
 
     if (isOffline) {
-      logger.debug("api", "Should queue: network offline", {
+      logger.category('api').debug("Should queue: network offline", {
         connectionQuality: networkStatus.connectionQuality,
       });
       return true;
@@ -1972,7 +1963,7 @@ class RequestManagerClass {
     if (cbKey) {
       const cbState = CircuitBreakerManager.getState(cbKey);
       if (cbState === "Open") {
-        logger.debug("api", "Should queue: circuit breaker open", {
+        logger.category('api').debug("Should queue: circuit breaker open", {
           endpoint: cbKey,
         });
         return true;
@@ -1986,7 +1977,7 @@ class RequestManagerClass {
       (error as any)?.name === "AbortError"; // Request aborted
 
     if (isNetworkError && !isOffline) {
-      logger.debug("api", "Should queue: network-level error detected", {
+      logger.category('api').debug("Should queue: network-level error detected", {
         errorType: (error as any)?.name,
       });
       return true;
@@ -2055,8 +2046,7 @@ class RequestManagerClass {
     const registeredFetcher = this.fetcherRegistry.get(entry.key);
 
     if (registeredFetcher) {
-      logger.debug(
-        "api",
+      logger.category('api').debug(
         "Offline queue entry: using registered fetcher from registry",
         {
           key: entry.key,
@@ -2069,8 +2059,7 @@ class RequestManagerClass {
     // Fallback: if fetcher not in registry, reconstruct a basic fetch call
     // This allows replays even if the original fetcher isn't registered
     // Supports simple HTTP operations
-    logger.debug(
-      "api",
+    logger.category('api').debug(
       "Offline queue entry: reconstructing fetcher from stored metadata",
       {
         key: entry.key,
@@ -2107,8 +2096,7 @@ class RequestManagerClass {
 
       // Reject replay for non-HTTP URLs to avoid Fetch API errors
       if (!/^https?:\/\//i.test(url) && !url.startsWith('/')) {
-        logger.warn(
-          "api",
+        logger.category('api').warn(
           "Offline replay: stored url is not HTTP(S) or absolute path, cannot replay",
           { key: entry.key, url },
         );
@@ -2142,7 +2130,7 @@ class RequestManagerClass {
    * Should be called during app termination or hard reset
    */
   shutdown(): void {
-    logger.debug("request-manager", "Shutting down RequestManager");
+    logger.category('api').debug("Shutting down RequestManager");
     this.stopCleanupTimer();
     this.clearPending();
     this.resetRateLimit();

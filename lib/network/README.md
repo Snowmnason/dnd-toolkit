@@ -197,7 +197,7 @@ NetworkStateManager.onSpecificTransition('RECOVERING', 'GOOD', async () => {
 
 // Log all transitions
 NetworkStateManager.onTransition((from, to) => {
-  logger.info('network', `State: ${from} → ${to}`);
+  logger.category('network').info(`State: ${from} → ${to}`);
 });
 ```
 

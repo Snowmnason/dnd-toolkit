@@ -58,20 +58,20 @@ async function onAppleButtonPressIOS() {
       ],
     });
 
-    logger.info('auth', 'Apple credential:', credential);
+    logger.category('auth').info('Apple credential:', credential);
 
     if (credential.identityToken) {
       const provider = await getAuthProvider();
       const result = await provider.signInWithIdToken('apple', credential.identityToken);
 
       if (!result.success) {
-        logger.error('auth', 'Error signing in with Apple:', result.error?.message);
+        logger.category('auth').error('Error signing in with Apple:', result.error?.message);
         Alert.alert('Authentication Error', result.error?.message || 'Failed to sign in with Apple');
         return;
       }
 
       if (result.data) {
-        logger.info('auth', 'Apple sign in successful:', result.data);
+        logger.category('auth').info('Apple sign in successful:', result.data);
         await handleAuthSuccess(result.data);
       }
     }
@@ -80,7 +80,7 @@ async function onAppleButtonPressIOS() {
       // User canceled the sign-in flow
       return;
     }
-    logger.error('auth', 'Apple auth error:', error);
+    logger.category('auth').error('Apple auth error:', error);
     Alert.alert('Error', 'Apple sign-in failed. Please try again.');
   }
 }
@@ -88,7 +88,7 @@ async function onAppleButtonPressIOS() {
 // Web Apple auth success handler
 async function onAppleButtonSuccessWeb(appleAuthRequestResponse: any) {
   try {
-    logger.debug('auth', 'Apple sign in successful:', { appleAuthRequestResponse });
+    logger.category('auth').debug('Apple sign in successful:', { appleAuthRequestResponse });
     
     if (appleAuthRequestResponse.authorization && 
         appleAuthRequestResponse.authorization.id_token && 
@@ -100,24 +100,24 @@ async function onAppleButtonSuccessWeb(appleAuthRequestResponse: any) {
       });
 
       if (!result.success) {
-        logger.error('auth', 'Error signing in with Apple:', result.error?.message);
+        logger.category('auth').error('Error signing in with Apple:', result.error?.message);
         Alert.alert('Authentication Error', result.error?.message || 'Failed to sign in with Apple');
         return;
       }
 
       if (result.data) {
-        logger.info('auth', 'Apple sign in successful:', result.data);
+        logger.category('auth').info('Apple sign in successful:', result.data);
         await handleAuthSuccess(result.data);
       }
     }
   } catch (error) {
-    logger.error('auth', 'Apple auth error:', error);
+    logger.category('auth').error('Apple auth error:', error);
     Alert.alert('Error', 'An unexpected error occurred');
   }
 }
 
 function onAppleButtonFailureWeb(error: any) {
-  logger.error('auth', 'Error signing in with Apple:', error);
+  logger.category('auth').error('Error signing in with Apple:', error);
   Alert.alert('Authentication Error', 'Apple sign-in failed. Please try again.');
 }
 
@@ -142,7 +142,7 @@ function AppleButtonWeb({ disabled }: { disabled: boolean }) {
           AppleSignin: module.default,
         });
       } catch (error) {
-        logger.warn('auth', 'Apple signin web library not available:', error);
+        logger.category('auth').warn('Apple signin web library not available:', error);
       } finally {
         setIsLoading(false);
       }

@@ -137,7 +137,7 @@ if (flagConfig.conditionLogic) {
       flagConfig.conditionLogic as any,
     );
     if (validationErrors.length > 0) {
-      logger.error("feature_flags", `Invalid conditionLogic...`);
+      logger.category('feature-flags').error("Invalid conditionLogic...`);
       return false;
     }
 
@@ -147,7 +147,7 @@ if (flagConfig.conditionLogic) {
     );
     if (!conditionsPass) return false;
   } catch (error) {
-    logger.error("feature_flags", `Error evaluating advanced conditions...`);
+    logger.category('feature-flags').error(`Error evaluating advanced conditions...`);
     return false;
   }
 } else if (flagConfig.conditions) {
@@ -165,7 +165,7 @@ if (flagConfig.conditionLogic) {
     flagConfig.conditionLogic as any,
   );
   if (validationErrors.length > 0) {
-    logger.warn("featureFlags", `Invalid conditionLogic for flag...`);
+    logger.category('feature-flags').warn(`Invalid conditionLogic for flag...`);
   }
 }
 ```

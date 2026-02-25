@@ -11,8 +11,8 @@
  * - Platform-specific storage failures
  */
 
-import { logger } from '../../utils/logger';
 import { ERROR_CODES, StorageErrorCode } from '../../utils/ERROR_CODES';
+import { logger } from '../../utils/logger';
 
 // ==========================================
 // Types
@@ -213,8 +213,7 @@ export async function handleStorageErrorGracefully<T = any>(
   const useFallback = shouldServeFallbackOnStorageError(errorInfo);
 
   if (useFallback && options.fallbackValue !== undefined) {
-    logger.warn(
-      'storage',
+    logger.category('storage').warn(
       `Serving fallback data for ${options.operation} on key: ${options.key}`,
       { hasRecovery: !!options.fallbackValue }
     );

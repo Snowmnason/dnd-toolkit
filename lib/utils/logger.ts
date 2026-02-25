@@ -12,7 +12,7 @@
  */
 
 import { getAppConfig } from "@/lib/config/loader";
-import { RedactionManager } from "@/lib/utils/redaction-manager";
+import { redactPII, RedactionManager } from "@/lib/utils/redaction-manager";
 
 // Lazy imports to break circular dependency
 // These are required only inside functions, not at module load time
@@ -323,6 +323,10 @@ function logToConsole(
     if (typeof arg === 'object' && arg !== null && !(arg instanceof Error)) {
       return RedactionManager.redactObject(arg) || arg;
     }
+    // Apply string redaction to string varargs (PII like emails, tokens, etc.)
+    if (typeof arg === 'string') {
+      return redactPII(arg);
+    }
     return arg;
   }) : [];
 
@@ -334,9 +338,12 @@ function logToConsole(
     ? new Date().toISOString().split("T")[1].split(".")[0] + " "
     : "";
   const categoryColor = getCategoryColor(category);
-  const categoryTag = config.showContext ? `${categoryColor}[${category}]${COLORS.reset} ` : "";
+  const resetCode = categoryColor ? COLORS.reset : ''; // Only add reset if color was applied
+  const categoryTag = config.showContext ? `${categoryColor}[${category}]${resetCode} ` : "";
 
-  let logLine = `${timestamp}${categoryTag}${message}${enrichment}`;
+  // Redact PII from message string (e.g., Error.message, user input that may contain emails/tokens)
+  const redactedMessage = typeof message === 'string' ? redactPII(message) : message;
+  let logLine = `${timestamp}${categoryTag}${redactedMessage}${enrichment}`;
   if (kvPairs) {
     logLine += ` — ${kvPairs}`;
   }
@@ -367,8 +374,10 @@ function logToConsole(
 
   // If appError has a stack, print it (for errors only)
   if (level === "error" && appError) {
-    const stack = (appError as Error).stack;
+    let stack = (appError as Error).stack;
     if (stack) {
+      // Redact PII from stack traces (may contain email, tokens, file paths with sensitive info)
+      stack = redactPII(stack);
       console.log(
         `  stack:\n${stack
           .split("\n")
@@ -397,6 +406,9 @@ function extractMetadata(args: any[]): LogMetadata | undefined {
     !Array.isArray(first) &&
     first.constructor === Object
   ) {
+    // Remove metadata from args to prevent double-logging
+    // Shift out the first element so it doesn't appear in varargs
+    args.shift();
     return first as LogMetadata;
   }
   
@@ -426,10 +438,32 @@ function getConsoleMethod(level: LogLevel): typeof console.log {
 }
 
 /**
+ * Detect if the current environment supports ANSI color codes
+ * - Browser: window is defined → no ANSI support
+ * - TTY terminal: process.stdout.isTTY is true → ANSI support
+ * - Otherwise: no ANSI support
+ */
+function supportsAnsiColors(): boolean {
+  // Browser-like environments (web, RN web, Electron renderer)
+  if (typeof window !== 'undefined') {
+    return false;
+  }
+  // Terminal/TTY environments (Metro, Node terminal)
+  if (typeof process !== 'undefined' && process.stdout?.isTTY === true) {
+    return true;
+  }
+  // Default: no ANSI support (file output, log aggregators, etc.)
+  return false;
+}
+
+/**
  * Get fancy text color for category tags (for terminal/web console)
  */
 function getCategoryColor(category: LogCategory): string {
-  // Only apply ANSI colors for terminal; web console will ignore them but they won't hurt
+  // Only apply ANSI colors in TTY terminals; disable in browser/web to avoid raw escape sequences
+  if (!supportsAnsiColors()) {
+    return '';
+  }
   switch (category) {
     case "auth":
       return COLORS.cyan;

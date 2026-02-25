@@ -129,19 +129,16 @@ export class ExporterRegistry {
    */
   register(exporter: AnalyticsExporter): void {
     if (!exporter.name) {
-      logger.warn('analytics', 'Cannot register exporter: name is required');
+      logger.category('analytics').warn('Cannot register exporter: name is required');
       return;
     }
 
     if (this._exporters.has(exporter.name)) {
-      logger.warn(
-        'analytics',
-        `Exporter "${exporter.name}" already registered; overwriting`
-      );
+      logger.category('analytics').warn(`Exporter "${exporter.name}" already registered; overwriting`);
     }
 
     this._exporters.set(exporter.name, exporter);
-    logger.info('analytics', `Exporter "${exporter.name}" registered`);
+    logger.category('analytics').info(`Exporter "${exporter.name}" registered`);
   }
 
   /**
@@ -149,9 +146,9 @@ export class ExporterRegistry {
    */
   unregister(name: string): void {
     if (this._exporters.delete(name)) {
-      logger.info('analytics', `Exporter "${name}" unregistered`);
+      logger.category('analytics').info(`Exporter "${name}" unregistered`);
     } else {
-      logger.warn('analytics', `Cannot unregister "${name}": not found`);
+      logger.category('analytics').warn(`Cannot unregister "${name}": not found`);
     }
   }
 
@@ -181,7 +178,7 @@ export class ExporterRegistry {
    */
   clear(): void {
     this._exporters.clear();
-    logger.debug('analytics', 'Exporter registry cleared');
+    logger.category('analytics').debug('Exporter registry cleared');
   }
 
   /**
@@ -238,14 +235,12 @@ export function createExportContext(
       const { NetworkDetection } = require('@/lib/network/network-detection');
       const status = NetworkDetection.getStatus();
       isOffline = !status.isOnline;
-      logger.debug(
-        'analytics',
+      logger.category('analytics').debug(
         `createExportContext: Network status=${status.isOnline ? 'online' : 'offline'}, quality=${status.connectionQuality}`
       );
     } catch (error) {
       // If dynamic import fails, default to online and log for diagnostics
-      logger.debug(
-        'analytics',
+      logger.category('analytics').debug(
         'createExportContext: NetworkDetection import failed, defaulting to online',
         { error: String(error) },
       );
@@ -272,8 +267,7 @@ export function validateEvent(
   // Global validation
   const globalValidation = validateEventGlobal(event);
   if (!globalValidation.isValid) {
-    logger.warn(
-      'analytics',
+    logger.category('analytics').warn(
       `Event validation failed: ${globalValidation.errors.join('; ')}`
     );
     return false;
@@ -282,8 +276,7 @@ export function validateEvent(
   // Per-exporter validation (each exporter's validate method)
   for (const exporter of exporters) {
     if (exporter.validate && !exporter.validate(event)) {
-      logger.warn(
-        'analytics',
+      logger.category('analytics').warn(
         `Event validation failed for exporter "${exporter.name}"`
       );
     }
@@ -352,16 +345,16 @@ function enqueueEvent(item: Queued, cfg: { async: boolean; debounceMs: number; q
   // Enforce queue size (drop oldest)
   if (pendingQueue.length >= cfg.queueSize) {
     const dropped = pendingQueue.shift();
-    logger.warn('analytics', 'Dispatch queue full, dropping oldest event', { dropped: dropped?.event?.name });
+    logger.category('analytics').warn('Dispatch queue full, dropping oldest event', { dropped: dropped?.event?.name });
   }
   pendingQueue.push(item);
 
   // Schedule debounced flush
   if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
+    debounceTimer = setTimeout(() => {
     // Fire and forget the flush (errors handled internally)
     flushQueue(cfg).catch((e) => {
-      logger.warn('analytics', 'Flush queue failed', { error: String(e) });
+      logger.category('analytics').warn('Flush queue failed', { error: String(e) });
     });
   }, cfg.debounceMs);
 }
@@ -393,11 +386,8 @@ async function dispatchSingleWithTimeout(event: AnalyticsEvent, context: ExportC
   const consentCategory = getConsentCategoryForEvent(event.type, event.name);
   const consentLevel = AnalyticsConsent.getLevel();
   
-  if (!shouldEmitEvent(consentCategory, consentLevel)) {
-    logger.debug(
-      'analytics',
-      `Event '${event.name}' dropped (category=${consentCategory ?? 'unmapped'}, level=${consentLevel})`
-    );
+    if (!shouldEmitEvent(consentCategory, consentLevel)) {
+    logger.category('analytics').analytics(`Event '${event.name}' dropped (category=${consentCategory ?? 'unmapped'}, level=${consentLevel})`);
     return;
   }
 
@@ -405,22 +395,22 @@ async function dispatchSingleWithTimeout(event: AnalyticsEvent, context: ExportC
   const exporters = exporterRegistry.getExportersForEventType(event.type);
 
   if (exporters.length === 0) {
-    logger.debug('analytics', `No exporters registered for event type "${event.type}", skipping dispatch`);
+    logger.category('analytics').debug(`No exporters registered for event type "${event.type}", skipping dispatch`);
     return;
   }
 
   // Validate event globally and per-exporter
-  if (!validateEvent(event, exporters)) {
-    logger.warn('analytics', `Event "${event.name}" dropped due to validation failure`);
+    if (!validateEvent(event, exporters)) {
+    logger.category('analytics').warn(`Event "${event.name}" dropped due to validation failure`);
     return;
   }
 
   const exportPromises = exporters.map((exporter) =>
     exporter
       .export(event, context)
-      .catch((error) => {
+        .catch((error) => {
         const errorMsg = error instanceof Error ? error.message : String(error);
-        logger.error('analytics', `Exporter "${exporter.name}" failed on event "${event.name}": ${errorMsg}`);
+        logger.category('analytics').error(`Exporter "${exporter.name}" failed on event "${event.name}": ${errorMsg}`);
         throw error;
       })
   );
@@ -433,7 +423,7 @@ async function dispatchSingleWithTimeout(event: AnalyticsEvent, context: ExportC
   ]);
 
   if (race === '__timeout__') {
-    logger.warn('analytics', `Dispatch for event "${event.name}" timed out after ${timeoutMs}ms`);
+    logger.category('analytics').warn(`Dispatch for event "${event.name}" timed out after ${timeoutMs}ms`);
     return;
   }
 
@@ -457,12 +447,12 @@ async function dispatchSingleWithTimeout(event: AnalyticsEvent, context: ExportC
   const succeeded = exporterResults.filter((r) => r.status === 'success').length;
   const failed = exporterResults.filter((r) => r.status === 'failed').length;
 
-  logger.debug('analytics', `Event "${event.name}" dispatch complete: ${succeeded}/${exporters.length} exporters succeeded${failed > 0 ? `, ${failed} failed` : ''}`);
+  logger.category('analytics').perf(`Event "${event.name}" dispatch complete: ${succeeded}/${exporters.length} exporters succeeded${failed > 0 ? `, ${failed} failed` : ''}`);
 
   const failedResults = exporterResults.filter((r) => r.status === 'failed');
   if (failedResults.length > 0) {
     for (const result of failedResults) {
-      logger.debug('analytics', `  - Exporter "${result.name}" failed: ${result.error}`);
+      logger.category('analytics').error(`  - Exporter "${result.name}" failed: ${result.error}`);
     }
   }
 }

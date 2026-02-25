@@ -67,7 +67,7 @@ if (options_.useQueryCache) {
       const isStale = await QueryCache.isStale(key);
       if (!isStale) {
         // Cache hit and fresh - return immediately!
-        logger.debug('api', 'QueryCache hit (not stale):', { key });
+        logger.category('api').debug('QueryCache hit (not stale):', { key });
         Analytics.track('api_request', { 
           key, 
           ok: true, 
@@ -77,10 +77,10 @@ if (options_.useQueryCache) {
         return cached;
       }
       // Cache stale - fall through to fetch
-      logger.debug('api', 'QueryCache stale (will revalidate):', { key });
+      logger.category('api').debug('QueryCache stale (will revalidate):', { key });
     }
   } catch (error) {
-    logger.warn('api', 'QueryCache read error:', { key, error });
+    logger.category('api').warn('QueryCache read error:', { key, error });
     // Continue with normal fetch if cache read fails
   }
 }
@@ -127,9 +127,9 @@ if (options_.useQueryCache) {
           },
           versionAtStart // Version check: if invalidation occurred, reject
         );
-        logger.debug('api', 'Persisted to QueryCache:', { key });
+        logger.category('api').debug('Persisted to QueryCache:', { key });
       } catch (error) {
-        logger.warn('api', 'QueryCache persistence failed:', { key, error });
+        logger.category('api').warn('QueryCache persistence failed:', { key, error });
         // Don't throw - cache persistence failure shouldn't break request
       }
       return result;
@@ -262,7 +262,7 @@ Time 200ms:  Original query fetch completes
              
              Inside set():
              if (5 < 6) {  // requestVersion < globalVersion
-               logger.debug('Stale version, discarding');
+               logger.catogery("other").debug('Stale version, discarding');
                return; // Don't cache
              }
 ```
@@ -326,7 +326,7 @@ if (options_.useQueryCache) {
     const cached = await QueryCache.get<T>(key);
     // ...
   } catch (error) {
-    logger.warn('api', 'QueryCache read error:', { key, error });
+    logger.category('api').warn('QueryCache read error:', { key, error });
     // Continue with normal fetch - don't propagate
   }
 }
@@ -337,7 +337,7 @@ if (options_.useQueryCache) {
 try {
   await QueryCache.set(key, result, options, versionAtStart);
 } catch (error) {
-  logger.warn('api', 'QueryCache persistence failed:', { key, error });
+  logger.category('api').warn('QueryCache persistence failed:', { key, error });
   // Don't throw - request already succeeded
 }
 ```

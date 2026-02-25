@@ -11,7 +11,8 @@
  *   // Enrich error with code before tracking/logging
  *   const enriched = enrichError(error, ERROR_CODES.NETWORK.TIMEOUT);
  *   getErrorTracker().captureException(enriched.originalError, { breadcrumbs: [enriched.toBreadcrumb()] });
- *   logger.error(enriched.category, enriched.message, enriched.toLogMetadata());
+ *   // Use category-chaining API for logging:
+ *   logger.category(enriched.category as any).error(enriched.message, enriched.toLogMetadata());
  */
 
 import { isAppError } from '@/lib/error/app-error';
@@ -163,7 +164,7 @@ export function enrichError(
 
     /**
      * Format as logger metadata
-     * Can be passed directly to logger.error(category, message, metadata)
+     * Can be passed directly to logger.category("other").error(message, metadata)
      */
     toLogMetadata() {
       return {

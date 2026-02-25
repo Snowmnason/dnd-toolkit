@@ -133,7 +133,7 @@ try {
     if (isRecoverableError(error.code)) {
       // Retry logic
     }
-    logger.error(error.category, error.message, { code: error.code });
+    logger.category(error.category).error(error.message, { code: error.code });
   }
 }
 ```

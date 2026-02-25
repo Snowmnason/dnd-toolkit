@@ -156,11 +156,11 @@ import { RedactionManager } from "@/lib/utils/redaction-manager";
 
 // Redact individual values
 const redactedEmail = RedactionManager.redactPII(email);
-logger.error("auth", { email: redactedEmail, token: RedactionManager.redactPII(token), userId });
+logger.category('auth').error({ email: redactedEmail, token: RedactionManager.redactPII(token), userId });
 
 // Or redact entire objects
 const redactedData = RedactionManager.redactObject({ email, token, userId });
-logger.error("auth", redactedData);
+logger.category('auth').error( redactedData);
 // Output: "auth { email: '[REDACTED]', token: '[REDACTED]', userId: '[REDACTED]' }"
 
 ### SENSITIVE Data
@@ -179,7 +179,7 @@ logger.error("auth", redactedData);
 import { RedactionManager } from "@/lib/utils/redaction-manager";
 
 const redactedData = RedactionManager.redactObject({ worldId, worldName });
-logger.info("world", redactedData);
+logger.catogry("-").info("world", redactedData);
 // Output: "world { worldId: '[REDACTED]', worldName: '[REDACTED]' }"
 
 ### NON_SENSITIVE & PUBLIC Data
@@ -189,7 +189,7 @@ logger.info("world", redactedData);
 **Example:**
 
 ```typescript
-logger.debug("feature", { version: "1.0.0", theme: "dark" });
+logger.catorgy("-").debug("feature", { version: "1.0.0", theme: "dark" });
 // Output: "feature { version: '1.0.0', theme: 'dark' }"
 ```
 
@@ -302,7 +302,7 @@ const backend = getStorageBackend("secure:my_data"); // Returns SecureStorage
 await backend.setItem("secure:my_data", userData);
 
 const redactedData = RedactionManager.redactObject(userData);
-logger.info("game", redactedData);
+logger.category("other").info("game", redactedData);
 ```
 
 ### For Compliance Teams

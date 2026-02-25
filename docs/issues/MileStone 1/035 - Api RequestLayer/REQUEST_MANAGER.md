@@ -340,7 +340,7 @@ try {
   const worlds = await RequestManager.fetch(key, fetcher);
   setWorlds(worlds);
 } catch (error) {
-  logger.error('Failed to fetch worlds:', error);
+  logger.category('api').error('Failed to fetch worlds:', error);
   // Sentry has already been notified
   showErrorToast('Failed to load worlds');
 }

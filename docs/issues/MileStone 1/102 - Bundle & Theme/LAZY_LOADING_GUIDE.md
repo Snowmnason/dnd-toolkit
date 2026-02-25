@@ -167,7 +167,7 @@ if (isSentryEnabled() && sentryDsn) {
     },
     'Sentry'
   ).catch((error) => {
-    logger.warn('[Sentry] Failed to initialize:', error);
+    logger.category('other').warn('Failed to initialize:', error);
   });
 }
 ```
@@ -184,9 +184,9 @@ if (isSentryEnabled() && sentryDsn) {
 ```typescript
 // Load themes in background (non-blocking)
 preloadThemes().then(() => {
-  blog.debug("bootstrap", `✅ Themes preloaded in background`);
+  loger.catogery('bootstrap').debug(`✅ Themes preloaded in background`);
 }).catch((err) => {
-  blog.warn("bootstrap", "Background theme preload failed:", err);
+  loger.catogery('bootstrap').warn("Background theme preload failed:", err);
 });
 ```
 
@@ -289,7 +289,7 @@ lazyLoadInBackground(
   () => import('./Module'),
   'Module'
 ).catch((error) => {
-  logger.warn('Module failed to load:', error);
+  logger.category('other').warn('Module failed to load:', error);
   // App continues working without it
 });
 ```

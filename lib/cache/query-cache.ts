@@ -107,14 +107,14 @@ class QueryCacheClass {
       // Check if cache is expired (beyond cacheTime)
       const age = Date.now() - entry.timestamp;
       if (age > entry.cacheTime) {
-        logger.debug("cache", `Cache expired for key: ${key}`);
+        logger.category('storage').debug(`Cache expired for key: ${key}`);
         await this.remove(key);
         return null;
       }
 
       return entry.data;
     } catch (error) {
-      logger.error("cache", `Error reading cache for ${key}:`, error);
+      logger.category('storage').error(`Error reading cache for ${key}:`, error);
       return null;
     }
   }
@@ -138,7 +138,7 @@ class QueryCacheClass {
     try {
       // Race condition prevention: Check if invalidation happened during request
       if (requestVersion !== undefined && requestVersion < this.globalVersion) {
-        logger.debug("cache", `Stale version for ${key}, discarding result`, {
+        logger.category('storage').debug(`Stale version for ${key}, discarding result`, {
           requestVersion,
           currentVersion: this.globalVersion,
         });
@@ -169,13 +169,13 @@ class QueryCacheClass {
       // Notify subscribers
       this.notifySubscribers(key, data);
 
-      logger.debug("cache", `Cached data for key: ${key}`, {
+      logger.category('storage').debug(`Cached data for key: ${key}`, {
         tags: entry.tags,
         staleTime: entry.staleTime,
         version: entry.version,
       });
     } catch (error) {
-      logger.error("cache", `Error setting cache for ${key}:`, error);
+      logger.category('storage').error(`Error setting cache for ${key}:`, error);
     }
   }
 
@@ -197,7 +197,7 @@ class QueryCacheClass {
    */
   async fetchWithDedupe<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
     if (this.pendingRequests.has(key)) {
-      logger.debug("cache", `Deduplicating request for key: ${key}`);
+      logger.category('storage').debug(`Deduplicating request for key: ${key}`);
       return this.pendingRequests.get(key)!;
     }
 
@@ -254,7 +254,7 @@ class QueryCacheClass {
         this.inMemoryCache.set(key, optimisticEntry);
         this.notifySubscribers(key, newValue);
 
-        logger.debug("cache", `Applied optimistic update for key: ${key}`);
+        logger.category('storage').debug(`Applied optimistic update for key: ${key}`);
       }
     }
 
@@ -271,7 +271,7 @@ class QueryCacheClass {
             };
             this.inMemoryCache.set(key, revertedEntry);
             this.notifySubscribers(key, previousValue);
-            logger.debug("cache", `Reverted optimistic update for key: ${key}`);
+            logger.category('storage').debug(`Reverted optimistic update for key: ${key}`);
           }
         }
       }
@@ -286,9 +286,9 @@ class QueryCacheClass {
       this.inMemoryCache.delete(key);
       const storageKey = this.toCacheKey(key);
       await FastCache.removeItem(storageKey);
-      logger.debug("cache", `Removed cache for key: ${key}`);
+      logger.category('storage').debug(`Removed cache for key: ${key}`);
     } catch (error) {
-      logger.error("cache", `Error removing cache for ${key}:`, error);
+      logger.category('storage').error(`Error removing cache for ${key}:`, error);
     }
   }
 
@@ -305,9 +305,9 @@ class QueryCacheClass {
         keys.map((key) => FastCache.removeItem(this.toCacheKey(key))),
       );
 
-      logger.info("cache", "Cleared all query cache");
+      logger.category('storage').info("Cleared all query cache");
     } catch (error) {
-      logger.error("cache", "Error clearing cache:", error);
+      logger.category('storage').error("Error clearing cache:", error);
     }
   }
 
@@ -345,8 +345,7 @@ class QueryCacheClass {
 
       await Promise.all(keysToInvalidate.map((key) => this.remove(key)));
 
-      logger.info(
-        "cache",
+      logger.category('storage').info(
         `Invalidated ${keysToInvalidate.length} entries by tags`,
         {
           tags,
@@ -354,7 +353,7 @@ class QueryCacheClass {
         },
       );
     } catch (error) {
-      logger.error("cache", "Error invalidating by tags:", error);
+      logger.category('storage').error("Error invalidating by tags:", error);
     }
   }
 
@@ -389,8 +388,7 @@ class QueryCacheClass {
 
       await Promise.all(keysToInvalidate.map((key) => this.remove(key)));
 
-      logger.info(
-        "cache",
+      logger.category('storage').info(
         `Invalidated ${keysToInvalidate.length} entries by pattern`,
         {
           pattern: pattern.toString(),
@@ -398,7 +396,7 @@ class QueryCacheClass {
         },
       );
     } catch (error) {
-      logger.error("cache", "Error invalidating by pattern:", error);
+      logger.category('storage').error("Error invalidating by pattern:", error);
     }
   }
 
@@ -426,8 +424,7 @@ class QueryCacheClass {
 
       await Promise.all(keysToInvalidate.map((key) => this.remove(key)));
 
-      logger.info(
-        "cache",
+      logger.category('storage').info(
         `Invalidated ${keysToInvalidate.length} entries older than ${maxAgeMs}ms`,
         {
           maxAgeMs,
@@ -437,7 +434,7 @@ class QueryCacheClass {
 
       return keysToInvalidate.length;
     } catch (error) {
-      logger.error("cache", "Error invalidating old entries:", error);
+      logger.category('storage').error("Error invalidating old entries:", error);
       return 0;
     }
   }
@@ -492,9 +489,9 @@ class QueryCacheClass {
       await Promise.all(keys.map((key) => this.remove(key)));
       this.inMemoryCache.clear();
       this.subscribers.clear();
-      logger.info("cache", "Cleared all cache entries");
+      logger.category('storage').info("Cleared all cache entries");
     } catch (error) {
-      logger.error("cache", "Error clearing all cache:", error);
+        logger.category('storage').error("Error clearing all cache:", error);
     }
   }
 
@@ -519,7 +516,7 @@ class QueryCacheClass {
       await this.remove(keyToRemove);
     }
 
-    logger.debug("cache", `Evicted ${toRemove} oldest cache entries`);
+    logger.category('storage').debug(`Evicted ${toRemove} oldest cache entries`);
   }
 
   /**
@@ -554,10 +551,7 @@ class QueryCacheClass {
     await Promise.all(keysToRemove.map((key) => this.remove(key)));
 
     if (keysToRemove.length > 0) {
-      logger.info(
-        "cache",
-        `Cleaned up ${keysToRemove.length} expired cache entries`,
-      );
+      logger.category('storage').info(`Cleaned up ${keysToRemove.length} expired cache entries`);
     }
   }
 

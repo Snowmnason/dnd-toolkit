@@ -14,7 +14,7 @@
  * ```
  */
 
-import { ERROR_CODES_METADATA, type ErrorCodeType } from '../utils/ERROR_CODES';
+import { ERROR_CODES, ERROR_CODES_METADATA, type ErrorCodeType } from '../utils/ERROR_CODES';
 
 /**
  * Application Error with typed error code and metadata
@@ -107,14 +107,14 @@ export function toAppError(error: unknown): AppError {
 
   if (error instanceof Error) {
     return new AppError(
-      'UNKNOWN_UNCLASSIFIED' as any,
+      ERROR_CODES.UNKNOWN.UNCLASSIFIED,
       error.message,
       error
     );
   }
 
   return new AppError(
-    'UNKNOWN_UNCLASSIFIED' as any,
+    ERROR_CODES.UNKNOWN.UNCLASSIFIED,
     String(error),
     undefined
   );

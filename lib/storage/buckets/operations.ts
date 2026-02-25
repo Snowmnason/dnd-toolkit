@@ -14,6 +14,7 @@
 // TODO: import helpers from './helpers' when ready
 // TODO: import error handling utilities
 //import { executeBucketOperation, BUCKET_OPS } from './registry';
+import { logger } from '@/lib/utils/logger';
 
 /**
  * Upload a profile/avatar image for a user
@@ -36,7 +37,7 @@ export async function uploadProfileImage(
   // TODO: Generate image name via generateImageName(userId)
   // TODO: Call executeBucketOperation(BUCKET_OPS.UPLOAD_IMAGE, { bucket: 'avatars', file, name })
   // TODO: Handle errors and return normalized result
-  console.warn('[buckets.operations] uploadProfileImage not implemented');
+  logger.category('buckets').warn('[buckets.operations] uploadProfileImage not implemented');
   throw new Error('uploadProfileImage placeholder — implementation pending');
 }
 
@@ -62,7 +63,7 @@ export async function getImageUrl(
   // TODO: Call executeBucketOperation(BUCKET_OPS.GET_PUBLIC_URL, { bucket, path })
   // TODO: Apply normalizeImageUrl() with options
   // TODO: Return final URL
-  console.warn('[buckets.operations] getImageUrl not implemented');
+  logger.category('buckets').warn('[buckets.operations] getImageUrl not implemented');
   throw new Error('getImageUrl placeholder — implementation pending');
 }
 
@@ -84,7 +85,7 @@ export async function deleteImage(
 ): Promise<void> {
   // TODO: Call executeBucketOperation(BUCKET_OPS.DELETE_FILE, { bucket, path })
   // TODO: Log outcome, handle errors
-  console.warn('[buckets.operations] deleteImage not implemented');
+  logger.category('buckets').warn('[buckets.operations] deleteImage not implemented');
   throw new Error('deleteImage placeholder — implementation pending');
 }
 
@@ -107,6 +108,6 @@ export async function listFiles(
 ): Promise<{ name: string; path: string; size?: number; updatedAt?: string }[]> {
   // TODO: Call executeBucketOperation(BUCKET_OPS.LIST_FILES, { bucket, prefix })
   // TODO: Map response to typed ListFilesOutput
-  console.warn('[buckets.operations] listFiles not implemented');
+  logger.category('buckets').warn('[buckets.operations] listFiles not implemented');
   throw new Error('listFiles placeholder — implementation pending');
 }

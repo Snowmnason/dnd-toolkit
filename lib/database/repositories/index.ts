@@ -304,7 +304,7 @@ export function getEntitlementsRepository(): EntitlementsRepository {
  *
  * @example
  * if (!areRepositoriesReady()) {
- *   logger.warn('bootstrap', 'Some repositories not registered yet');
+ *   logger.category('bootstrap').warn('Some repositories not registered yet');
  * }
  */
 export function areRepositoriesReady(): boolean {

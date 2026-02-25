@@ -14,6 +14,7 @@ import Constants from 'expo-constants';
 
 import { AnalyticsConsent } from '@/lib/analytics/consent';
 import { getAppConfig, isDevelopment } from '@/lib/config';
+import { logger } from '@/lib/utils/logger';
 import {
   ErrorCaptureOptions,
   ErrorTrackerProvider,
@@ -72,7 +73,7 @@ export class SentryErrorTracker implements ErrorTrackerProvider {
       });
     } catch (sentryError) {
       if (isDevelopment()) {
-        console.error('[SentryErrorTracker] Failed to capture exception:', sentryError);
+        logger.category('error').error('[SentryErrorTracker] Failed to capture exception:', sentryError);
       }
     }
   }
@@ -86,7 +87,7 @@ export class SentryErrorTracker implements ErrorTrackerProvider {
       Sentry.captureMessage(message, level as Sentry.SeverityLevel | undefined);
     } catch (sentryError) {
       if (isDevelopment()) {
-        console.error('[SentryErrorTracker] Failed to capture message:', sentryError);
+        logger.category('error').error('[SentryErrorTracker] Failed to capture message:', sentryError);
       }
     }
   }
@@ -106,7 +107,7 @@ export class SentryErrorTracker implements ErrorTrackerProvider {
       });
     } catch (sentryError) {
       if (isDevelopment()) {
-        console.error('[SentryErrorTracker] Failed to add breadcrumb:', sentryError);
+        logger.category('error').error('[SentryErrorTracker] Failed to add breadcrumb:', sentryError);
       }
     }
   }
@@ -122,7 +123,7 @@ export class SentryErrorTracker implements ErrorTrackerProvider {
     const consentLevel = AnalyticsConsent.getLevel();
     if (consentLevel === 'none' && user !== null) {
       if (isDevelopment()) {
-        console.debug('[SentryErrorTracker] setUser suppressed: consent level is "none"');
+        logger.category('error').debug('[SentryErrorTracker] setUser suppressed: consent level is "none"');
       }
       return;
     }
@@ -136,7 +137,7 @@ export class SentryErrorTracker implements ErrorTrackerProvider {
       }
     } catch (sentryError) {
       if (isDevelopment()) {
-        console.error('[SentryErrorTracker] Failed to set user:', sentryError);
+        logger.category('error').error('[SentryErrorTracker] Failed to set user:', sentryError);
       }
     }
   }
@@ -155,7 +156,7 @@ export class SentryErrorTracker implements ErrorTrackerProvider {
       return await Sentry.flush(timeoutMs);
     } catch (err) {
       if (isDevelopment()) {
-        console.warn('[SentryErrorTracker] flush failed', err);
+        logger.category('error').warn('[SentryErrorTracker] flush failed', err);
       }
       return false;
     }

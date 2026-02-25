@@ -83,7 +83,7 @@ function TopBar({
       onBackPress();
       return;
     }
-    logger.warn("TopBar back press with no handler; ignoring");
+    logger.category("navigation").warn("TopBar back press with no handler; ignoring");
     setShowErrorToast(true);
   };
 
@@ -192,10 +192,7 @@ function TopBar({
 
             router.push(target as any);
           } catch (err) {
-            logger.warn(
-              "TopBar: failed to resolve username route, falling back",
-              err,
-            );
+            logger.category("navigation").warn("TopBar: failed to resolve username route, falling back", err);
             setShowErrorToast(true);
           }
         }}

@@ -49,7 +49,7 @@ export default function SettingsPage() {
   // Listen for sign-outs and redirect
   useAuthStateListener((session) => {
     if (!session) {
-      logger.debug("settings", "Auth state changed: user signed out");
+      logger.category("auth").debug("Auth state changed: user signed out");
       const target = buildNavigationTarget('/', {}, []);
       router.replace(target as any);
     }
@@ -60,7 +60,7 @@ export default function SettingsPage() {
     getCurrentSession()
       .then((session) => {
         if (!isEmailConfirmed(session)) {
-          logger.debug("settings", "No confirmed user session, redirecting");
+          logger.category("auth").debug("No confirmed user session, redirecting");
           const target = buildNavigationTarget('/', {}, []);
           router.replace(target as any);
           return;
@@ -69,7 +69,7 @@ export default function SettingsPage() {
         setLoading(false);
       })
       .catch((err: unknown) => {
-        logger.error("settings", "Error checking session:", err);
+        logger.category("auth").error("Error checking session:", err);
         const target = buildNavigationTarget('/', {}, []);
         router.replace(target as any);
         setLoading(false);
@@ -81,8 +81,7 @@ export default function SettingsPage() {
         setProfile(profile ?? null);
       })
       .catch((err: unknown) => {
-        logger.error(
-          "settings",
+        logger.category("ui").error(
           "Error fetching profile on settings mount:",
           err
         );
@@ -103,7 +102,7 @@ export default function SettingsPage() {
         const target = buildNavigationTarget('/', {}, []);
         router.replace(target as any);
       } catch (error) {
-        logger.error("settings", "Sign out error:", error);
+        logger.category("other").error("Sign out error:", error);
         Alert.alert("Error", "Failed to sign out. Please try again.");
         setSigningOut(false);
         setButtonDisabled(false);
@@ -138,7 +137,7 @@ export default function SettingsPage() {
       const target = buildNavigationTarget('/', {}, []);
       router.replace(target as any);
     } catch (error: any) {
-      logger.error("settings", "Delete account error:", error);
+      logger.category("other").error("Delete account error:", error);
       setDeleteError(
         error?.message || "Failed to delete account. Please try again."
       );

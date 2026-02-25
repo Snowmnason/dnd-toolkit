@@ -34,10 +34,10 @@ The logger system has been enhanced with category-based filtering to provide bet
 ```typescript
 import { logger } from '@/lib/utils/logger';
 
-// Old style still works
-logger.info('auth', 'User logged in');
-logger.warn('api', 'Slow request detected');
-logger.error('security', 'Permission denied');
+// Use the category-based API
+logger.category('auth').info('User logged in');
+logger.category('api').warn('Slow request detected');
+logger.category('security').error('Permission denied');
 ```
 
 ### Category-Specific Logger (Recommended)
@@ -50,24 +50,24 @@ const authLogger = logger.category('auth');
 const apiLogger = logger.category('api');
 
 // Cleaner API
-authLogger.info('User logged in successfully');
-authLogger.warn('Session expired');
+logger.category("auth").info('User logged in successfully');
+logger.category("auth").warn('Session expired');
 
-apiLogger.error('Request failed', { status: 500, url: '/api/users' });
+logger.category("api").error('Request failed', { status: 500, url: '/api/users' });
 ```
 
 ### Structured Logging
 
 ```typescript
 // With context and structured data
-logger.info('api', 'User fetch completed', {
+logger.category('api').info('User fetch completed', {
   userId: '123',
   duration: 150,
   cacheHit: true
 });
 
 // Performance monitoring
-logger.category('performance').warn('Slow render detected', {
+logger.category('performance').perf('Slow render detected', {
   component: 'UserList',
   renderTime: 2500,
   itemCount: 100
@@ -145,42 +145,6 @@ To focus on specific issues, disable categories you're not interested in:
   }
 }
 ```
-
-## Migration Guide
-
-### Existing Code
-
-No changes required - existing logger calls continue to work:
-
-```typescript
-// This still works
-logger.info('old-context', 'Message');
-```
-
-### Recommended Migration
-
-Update to use categories:
-
-```typescript
-// Before
-logger.info('request-manager', 'Slow request detected');
-
-// After
-logger.info('api', 'Slow request detected');
-// or
-logger.category('api').info('Slow request detected');
-```
-
-### Batch Migration
-
-Use find/replace to update common patterns:
-
-- `'request-manager'` → `'api'`
-- `'auth-state'` → `'auth'`
-- `'performance'` (already correct)
-- `'usersDB'` → `'storage'`
-- `'worlds'` → `'storage'`
-
 ## Best Practices
 
 1. **Use categories consistently**: Choose the most appropriate category for each log

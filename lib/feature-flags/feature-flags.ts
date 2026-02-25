@@ -168,8 +168,7 @@ class FeatureFlagsManager {
       }
     }
     if (changed) {
-      logger.info(
-        "bootstrap",
+      logger.category('bootstrap').info(
         "[FeatureFlags] Synced from server-synced flags",
       );
       // null = all flags changed, triggers re-render in all useFeatureFlag consumers
@@ -185,9 +184,9 @@ class FeatureFlagsManager {
     try {
       const backend = getPrivacyStorageBackend("feature_flags:v1");
       await backend.setJSON("feature_flags:v1", flags);
-      logger.debug("feature-flags", "Persisted feature flags");
+      logger.category('feature_flags').debug("Persisted feature flags");
     } catch (error) {
-      logger.error("feature-flags", "Failed to persist feature flags:", error);
+      logger.category('feature_flags').error("Failed to persist feature flags:", error);
     }
   }
 
@@ -201,15 +200,11 @@ class FeatureFlagsManager {
       const cached =
         await backend.getJSON<Record<string, FeatureFlag>>("feature_flags:v1");
       if (cached) {
-        logger.debug("feature-flags", "Loaded feature flags from cache");
+        logger.category('feature_flags').debug("Loaded feature flags from cache");
         return cached;
       }
     } catch (error) {
-      logger.warn(
-        "feature-flags",
-        "Failed to load feature flags from cache:",
-        error,
-      );
+      logger.category('feature_flags').warn("Failed to load feature flags from cache:",error, "Falling back to defaults");
     }
     return this.getAllFlags();
   }
@@ -222,9 +217,9 @@ class FeatureFlagsManager {
     try {
       const backend = getPrivacyStorageBackend("secure:entitlements");
       await backend.setJSON("secure:entitlements", entitlements);
-      logger.debug("feature-flags", "Persisted user entitlements");
+      logger.category('feature_flags').debug("Persisted user entitlements");
     } catch (error) {
-      logger.error("feature-flags", "Failed to persist entitlements:", error);
+      logger.category('feature_flags').error("Failed to persist entitlements:", error);
     }
   }
 
@@ -239,7 +234,7 @@ class FeatureFlagsManager {
       );
       return entitlements ?? null;
     } catch (error) {
-      logger.warn("feature-flags", "Failed to retrieve entitlements:", error);
+      logger.category('feature_flags').warn("Failed to retrieve entitlements:", error);
       return null;
     }
   }

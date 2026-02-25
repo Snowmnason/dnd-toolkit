@@ -48,7 +48,7 @@ export function Notification({
   const { theme } = UseTheme();
   const { isMobile } = usePlatform();
   const insets = useSafeAreaInsets();
-  logger.debug(`[Notification] visible: ${visible}, id=${id}`);
+  logger.category("ui").debug(`[Notification] visible: ${visible}, id=${id}`);
 
   // Icon based on type
   const iconName =
@@ -92,7 +92,7 @@ export function Notification({
   const stackOffset = index * (isMobile ? 90 : 100);
   const baseTop = isMobile ? insets.top + 12 : 80;
 
-  logger.debug("ui", "Rendering id:", id, "type:", type);
+  logger.category("ui").debug("Rendering id:", id, "type:", type);
 
   return (
     <Animated.View

@@ -12,7 +12,7 @@ export function useAuthStatus() {
         const session = await (await getAuthProvider()).getSession();
         setIsUserLoggedIn(session !== null);
       } catch (error) {
-        logger.error('auth', 'Error checking auth status:', error);
+        logger.category('auth').error('Error checking auth status:', error);
         setIsUserLoggedIn(false);
       }
     };

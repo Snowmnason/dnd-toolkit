@@ -52,7 +52,7 @@ export class SentryExporter implements AnalyticsExporter {
       // Create and initialize Sentry adapter for breadcrumb queue
       const adapter = new SentryAdapter();
       await breadcrumbQueue.initialize(adapter);
-      logger.category('analytics').debug(
+      logger.category('analytics').info(
         'SentryExporter',
         'Initialized breadcrumb queue with Sentry adapter'
       );
@@ -174,7 +174,7 @@ export class SentryExporter implements AnalyticsExporter {
 
     const queued = await breadcrumbQueue.enqueue(breadcrumb);
     if (queued) {
-      logger.category('analytics').debug(
+      logger.category('analytics').analytics(
         'SentryExporter',
         `Queued error event: ${event.name}`
       );
@@ -213,7 +213,7 @@ export class SentryExporter implements AnalyticsExporter {
 
     const queued = await breadcrumbQueue.enqueue(breadcrumb);
     if (queued) {
-      logger.category('analytics').debug(
+      logger.category('analytics').analytics(
         'SentryExporter',
         `Queued breadcrumb: ${event.name}`
       );

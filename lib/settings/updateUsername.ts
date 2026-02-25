@@ -18,9 +18,9 @@ export async function updateUsername(newUsername: string): Promise<UpdateUsernam
   const usernameValidation = validateUsername(newUsername);
   
   try {
-    logger.info('other', 'Starting username update');
+    logger.category('other').info('Starting username update');
 
-    logger.debug('other', 'Username validation:', {
+    logger.category('other').debug('Username validation', {
       isValid: usernameValidation.isValid,
       sanitized: usernameValidation.sanitized
     });
@@ -42,16 +42,16 @@ export async function updateUsername(newUsername: string): Promise<UpdateUsernam
     }
 
     // Update username in database
-    logger.debug('other', 'Updating username in database');
+    logger.category('database').debug('Updating username in database');
     await usersDB.updateCurrentUser({
       username: usernameValidation.sanitized
     });
 
-    logger.info('other', 'Username updated successfully');
+    logger.category('database').info('Username updated successfully');
     return { success: true };
 
   } catch (error: any) {
-    logger.error('other', 'Username update error:', error);
+    logger.category('database').error('Username update error', error);
     
     // Handle specific errors
     if (error.message?.includes('duplicate') || error.code === '23505') {

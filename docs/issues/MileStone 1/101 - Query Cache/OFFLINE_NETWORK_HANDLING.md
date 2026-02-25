@@ -230,7 +230,44 @@ function WorldsList() {
     {
       tags: ['worlds'],
       onError: (error) => {
-        logger.warn('Failed to load worlds:', error);
+### Example 2: Graceful Query Error Handling
+
+```typescript
+function WorldsList() {
+  const { data: worlds, error } = useQuery(
+    'worlds:list',
+    () => worldsDB.getMyWorlds(),
+    {
+      tags: ['worlds'],
+      onError: (error) => {
+        logger.category('network').warn('Failed to load worlds:', error);
+        // Component still shows old data if offline
+      }
+    }
+  );
+
+  return (
+    <div>
+      {error && <div className="error-banner">Connection issue</div>}
+      <WorldsList data={worlds} />
+    </div>
+  );
+}
+```
+        ### Error Handling Flow
+
+        ```
+        Request fails
+          ↓
+        Catch error in useQuery/RequestManager
+          ↓
+        isNetworkError(error)?
+          ├─ YES: Check if offline
+          │       ├─ YES: Try to serve stale cache
+          │       └─ NO: Still try stale cache (network unreliable)
+          │
+          └─ NO: Throw error (client error, not network)
+        ```
         // Component still shows old data if offline
       }
     }

@@ -21,7 +21,7 @@ import { logger } from '../utils/logger';
  *   // safe to use
  * }
  * if (isValidErrorCode('UNKNOWN_ERROR_CODE')) { // false
- *   logger.warn('Invalid error code used');
+ *   logger.category('error').warn('Invalid error code used');
  * }
  */
 export function isValidErrorCode(code: unknown): code is ErrorCodeType {
@@ -70,8 +70,7 @@ export function validateErrorCodeDev(code: unknown, context?: string): void {
 
   if (!isValidErrorCode(code)) {
     const ctxStr = context ? ` in ${context}` : '';
-    logger.warn(
-      'error-code-validation',
+    logger.category('error').warn(
       `Unrecognized error code used${ctxStr}: "${code}"\n` +
       `This error code is not registered in ERROR_CODES_METADATA. ` +
       `Add it to lib/utils/ERROR_CODES.ts to make it discoverable.`
