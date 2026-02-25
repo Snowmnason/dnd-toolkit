@@ -16,7 +16,7 @@
  */
 
 import { getAppConfig } from "@/lib/config/loader";
-import { redactPII, RedactionManager } from "@/lib/utils/redaction-manager";
+import { RedactionManager, redactPII } from "@/lib/utils/redaction-manager";
 
 // Lazy imports to break circular dependency
 // These are required only inside functions, not at module load time
@@ -598,7 +598,7 @@ function getConsoleMethod(level: LogLevel): typeof console.log {
  * - Browser: window is defined → no ANSI support
  * - TTY terminal: process.stdout.isTTY is true → ANSI support
  * - Otherwise: no ANSI support
- */
+ 
 function supportsAnsiColors(): boolean {
   // Browser-like environments (web, RN web, Electron renderer)
   if (typeof window !== 'undefined') {
@@ -611,15 +611,15 @@ function supportsAnsiColors(): boolean {
   // Default: no ANSI support (file output, log aggregators, etc.)
   return false;
 }
-
+*/
 /**
  * Get fancy text color for category tags (for terminal/web console)
  */
 function getCategoryColor(category: LogCategory): string {
   // Only apply ANSI colors in TTY terminals; disable in browser/web to avoid raw escape sequences
-  if (!supportsAnsiColors()) {
-    return '';
-  }
+//**if (!supportsAnsiColors()) {
+/*    return '';
+  }**/
   switch (category) {
     case "auth":
       return COLORS.cyan;
@@ -689,6 +689,6 @@ function redactMetadata(obj: Record<string, any>): Record<string, any> {
 }
 
 // Export types for external use
-export type { CategoryLogger, LogCategory, LogLevel, LogMetadata, LogSchema, PerfTimer };
 export { LOG_SCHEMAS };
+export type { CategoryLogger, LogCategory, LogLevel, LogMetadata, LogSchema, PerfTimer };
 
