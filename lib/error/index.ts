@@ -7,7 +7,7 @@ export {
     isEnrichedError,
     type EnrichedError
 } from "./error-enrichment";
-export { AppErrorBoundary } from "./ErrorBoundary";
+
 export {
     checkFeatureGating,
     getFeatureGatingReason,

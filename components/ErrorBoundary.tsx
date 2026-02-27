@@ -1,9 +1,7 @@
+import { AnalyticsConsent, getCrashReportPayload, sessionManager } from '@/lib/analytics';
+import { getErrorTracker } from '@/lib/services';
+import { logger } from '@/lib/utils/logger';
 import { Component, ErrorInfo, ReactNode } from 'react';
-import { AnalyticsConsent } from '../analytics/consent';
-import { getCrashReportPayload } from '../analytics/consent-error-payload';
-import { sessionManager } from '../analytics/session';
-import { getErrorTracker } from '../services';
-import { logger } from '../utils/logger';
 
 interface Props {
   children: ReactNode;
