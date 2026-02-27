@@ -1,9 +1,9 @@
+import { signInUser, } from '@/lib/auth';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { signInUser } from './authService';
-import { signInSchema, type SignInFormData } from '../schemas/auth.schema';
+import { signInSchema, type SignInFormData } from '../../lib/schemas/auth.schema';
 
 export const useSignInForm = () => {
   const router = useRouter();

@@ -1,15 +1,15 @@
 import { EntitlementExpiredModal } from "@/components/modals";
 import { OfflineSyncNotificationLayer } from "@/components/offline";
 import { AppToastLayer, NotificationContainer, TopBar } from "@/components/ui";
+import { AppToastProvider, NotificationProvider } from "@/contexts";
 import { useEntitlementExpiredModal } from "@/hooks";
+import { AppKernelProvider, useAppKernel } from "@/hooks/kernel";
 import { useAnalyticsNavigation } from "@/hooks/navigation";
 import { useSplashScreen } from "@/hooks/ui";
-import { NotificationProvider } from "@/hooks/utils";
 import {
   Analytics,
   AppErrorBoundary,
   AppKernel,
-  AppKernelProvider,
   buildNavigationTarget,
   executeRecoveryAction,
   getRouteConfig,
@@ -17,11 +17,9 @@ import {
   resolveBackTarget,
   resolveTitle,
   sessionManager,
-  useAppKernel,
 } from "@/lib";
 import type { AccessRole } from "@/lib/database/worlds";
 import { SafeModeReason } from "@/lib/error/safe-mode";
-import { AppToastProvider } from "@/lib/toast/app-toast-context";
 import { ScaleProvider } from "@/providers/ScaleProvider";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ThemeProvider, UseTheme } from "@/providers/ThemeProvider";

@@ -29,7 +29,7 @@
 
 import type { Href } from "expo-router";
 import { Router } from "expo-router";
-import { useAppKernel } from "../kernel/use-app-kernel";
+import { useAppKernel } from "../../hooks/kernel/use-app-kernel";
 import { getAllRouteConfigs } from "../navigation/navigation-config";
 import { logger } from "../utils/logger";
 import { checkFeatureGating } from "./feature-gating";

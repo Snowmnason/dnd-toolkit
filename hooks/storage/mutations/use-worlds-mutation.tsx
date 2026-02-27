@@ -1,4 +1,4 @@
-import { useMutation } from '@/lib/cache';
+import { useMutation } from '@/hooks/storage';
 import { CreateWorldData, World, worldsDB } from '@/lib/database/worlds';
 
 /**

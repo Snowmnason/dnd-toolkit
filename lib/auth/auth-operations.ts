@@ -68,10 +68,11 @@ export interface SignUpOperationResult extends AuthOperationResult {
 }
 
 /**
- * Extended result for signin with optional redirect hint.
+ * Extended result for signin with optional redirect hint and validation warning.
  */
 export interface SignInOperationResult extends AuthOperationResult {
   redirectTo?: string;
+  validationWarning?: string;
 }
 
 /**

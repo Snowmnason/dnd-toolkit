@@ -1,3 +1,4 @@
+```ts
 /**
  * Example: useWorldsQuery with Adaptive Payload Integration
  * 
@@ -234,3 +235,4 @@ export function useWorldsQueryAdaptive_ComponentLevel(
  * - Only the internal caching behavior changes (now quality-aware)
  * - External API is fully backward compatible
  */
+```

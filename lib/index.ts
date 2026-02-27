@@ -57,9 +57,6 @@ export * from "./config";
 // ===== Database (Supabase & Queries) =====
 export * from "./database";
 
-// ===== Edge Functions (Supabase Edge Function URLs & Helpers) =====
-export * from "./edge-functions";
-
 // ===== Error Handling =====
 export * from "./error";
 
@@ -76,8 +73,6 @@ export * from "./navigation";
 export * from "./network";
 
 // ===== Offline Support =====
-// Note: Both api and offline modules export OfflineQueueStats.
-// Export offline's version (Phase 4 enhancements) to take precedence.
 export * from "./offline";
 
 // ===== Premium Features & Subscriptions =====

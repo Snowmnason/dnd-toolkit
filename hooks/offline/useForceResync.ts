@@ -1,5 +1,5 @@
+import { useAppToast } from '@/contexts/app-toast-context';
 import { OnlineSyncManager } from '@/lib/offline/sync-manager';
-import { useAppToast } from '@/lib/toast/app-toast-context';
 import { logger } from '@/lib/utils/logger';
 import { useCallback, useEffect, useRef, useState } from 'react';
 

@@ -1,4 +1,4 @@
-import { useMutation } from '@/lib/cache';
+import { useMutation } from '@/hooks/storage';
 import { createInviteLink, validateInviteToken } from '@/lib/database/invites';
 
 export interface InviteLink {

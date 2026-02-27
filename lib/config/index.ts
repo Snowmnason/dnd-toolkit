@@ -15,17 +15,13 @@ export type { ConfigValidationResult } from "./config-validator";
 
 // Hot-Reload: Runtime config updates for development (no-op in production)
 export {
-    ConfigHotReload, getHotReload, initializeHotReload, isHotReloadAvailable
+  ConfigHotReload, getHotReload, initializeHotReload, isHotReloadAvailable
 } from "./hot-reload";
 
 // Dev-Only: Safe dev utilities with no-op production versions
-export {
-    createDevTimer, devAssert, isDevBypassEnabled, useDevConsole
-} from "./dev-only";
+export { createDevConsole, createDevTimer, devAssert, isDevBypassEnabled } from "./dev-only";
 
 // Tools: Schema drift detection and config comparison
-export {
-    validateConfigSchema, getConfigDiff, mapExpectedDifferences
-} from "./tools/config-diff";
-export type { SchemaIssue, DiffEntry } from "./tools/config-diff";
+export { getConfigDiff, mapExpectedDifferences, validateConfigSchema } from "./tools/config-diff";
+export type { DiffEntry, SchemaIssue } from "./tools/config-diff";
 

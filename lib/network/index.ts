@@ -12,7 +12,7 @@
 
 export {
   ConnectionQuality,
-  NetworkDetection, qualityToNetworkState, useNetworkStatus
+  NetworkDetection, qualityToNetworkState
 } from "./network-detection";
 export type { NetworkStatus, NetworkStatusCallback } from "./network-detection";
 

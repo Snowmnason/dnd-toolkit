@@ -1,7 +1,7 @@
 import { ConfirmLeaveModal, EditWorldModal } from "@/components/modals";
 import { AppLoading, AppPage, AppSplit, Body, Button } from "@/components/ui";
 import { usePanelNavigation } from "@/hooks/navigation/use-panel-navigation";
-import { useWorlds } from "@/hooks/queries/use-worlds";
+import { useWorlds } from "@/hooks/storage";
 import { useWorldModal } from "@/hooks/utils/use-world-modal";
 import {
   useAppParamsStable,

@@ -1,5 +1,5 @@
 import { Notification } from "@/components/ui/Notification";
-import { useNotifications } from "@/hooks/utils/use-notifications";
+import { useNotifications } from "@/contexts/notifications-context";
 import { logger } from "@/lib/utils/logger";
 import { memo, useEffect } from "react";
 

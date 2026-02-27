@@ -12,8 +12,8 @@ import {
   useEffect,
   useState,
 } from "react";
-import { logger } from "../utils/logger";
-import { AppKernel, AppKernelState } from "./app-kernel";
+import { AppKernel, AppKernelState } from "../../lib/kernel/app-kernel";
+import { logger } from "../../lib/utils/logger";
 
 // Module-level diagnostic (gated by debugLogs feature flag)
 if (typeof window !== "undefined") {

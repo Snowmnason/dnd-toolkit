@@ -1,5 +1,6 @@
 import { AppLoading, AppPage } from '@/components/ui';
-import { useAppKernel, useAuthGuard } from '@/lib';
+import { useAuthGuard } from '@/hooks/auth';
+import { useAppKernel } from '@/hooks/kernel';
 import { Stack } from 'expo-router';
 
 export default function SettingsLayout() {

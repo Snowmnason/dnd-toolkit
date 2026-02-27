@@ -1,9 +1,9 @@
+import { AuthStateManager } from '@/lib/auth';
+import { logger } from '@/lib/utils';
 import { useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { useAppKernel } from '../kernel';
-import { AUTH_CONFIG } from '../routing/route-config';
-import { logger } from '../utils/logger';
-import { AuthStateManager } from './auth-state';
+import { AUTH_CONFIG } from '../../lib/routing/route-config';
+import { useAppKernel } from '../kernel/use-app-kernel';
 
 export type AuthLevel = 'account-only' | 'world-required';
 export type AuthGuardState = 'loading' | 'authenticated' | 'unauthenticated';

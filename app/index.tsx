@@ -1,4 +1,5 @@
-import { logger, useAppKernel } from "@/lib";
+import { useAppKernel } from "@/hooks/kernel";
+import { logger } from "@/lib";
 import { STORAGE_KEYS, getPrivacyStorageBackend } from "@/lib/storage";
 import { useRouter } from "expo-router";
 import React from "react";

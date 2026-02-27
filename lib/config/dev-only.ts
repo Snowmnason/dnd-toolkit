@@ -6,18 +6,18 @@
  * The functions remain in the bundle but are safe to call—they simply return early.
  *
  * Usage:
- *   import { useDevConsole } from '@/lib/config/dev-only';
- *   const logger = useDevConsole('MyModule');
+ *   import { createDevConsole } from '@/lib/config/dev-only';
+ *   const logger = createDevConsole('MyModule');
  *   logger.log('This only logs in dev'); // No-op in production
  */
 
 import { getAppConfig, isDevelopment } from './loader';
 
 /**
- * Dev-only console logger.
+ * Dev-only console logger factory.
  * In production, returns an object with no-op methods (minimal overhead).
  */
-export function useDevConsole(scope: string) {
+export function createDevConsole(scope: string) {
   if (!isDevelopment()) {
     return {
       log: () => {},

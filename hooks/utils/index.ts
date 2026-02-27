@@ -5,6 +5,5 @@ export {
     useGatedFeatures,
     useIsFeatureGated
 } from "./use-feature-gating";
-export { NotificationProvider, useNotifications } from "./use-notifications";
 export { useVariantTracking } from "./use-variant-tracking";
 

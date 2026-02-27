@@ -1,12 +1,12 @@
+import { updatePassword } from '@/lib/auth';
+import { getAuthProvider } from '@/lib/services';
+import { logger } from '@/lib/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Platform } from 'react-native';
-import { resetPasswordSchema, type ResetPasswordFormData } from '../schemas/auth.schema';
-import { getAuthProvider } from '@/lib/services';
-import { logger } from '../utils/logger';
-import { updatePassword } from './authService';
+import { resetPasswordSchema, type ResetPasswordFormData } from '../../lib/schemas/auth.schema';
 
 export const useResetPasswordConfirm = () => {
   const router = useRouter();

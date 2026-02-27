@@ -1,5 +1,6 @@
 import { AppLoading } from "@/components/ui";
-import { useAppKernel, useAuthGuard } from "@/lib";
+import { useAuthGuard } from "@/hooks/auth";
+import { useAppKernel } from "@/hooks/kernel";
 import { buildRoute } from "@/lib/navigation/uri-helpers";
 import { logger } from "@/lib/utils/logger";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";

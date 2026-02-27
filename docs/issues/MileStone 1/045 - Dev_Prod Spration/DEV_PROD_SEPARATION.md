@@ -44,13 +44,13 @@ This selection happens at bundle time, so the unused appsettings file and all de
 ### Dev Console Logging
 
 ```typescript
-import { useDevConsole } from '@/lib/config/dev-only';
+import { createDevConsole } from '@/lib/config/dev-only';
 
-const devLog = useDevConsole('MyComponent');
+const devLog = createDevConsole('MyComponent');
 devLog.log('This only appears in dev'); // Controlled by config.devTools.enableConsoleLogger
 ```
 
-In production, `useDevConsole()` returns a no-op logger that's completely optimized away.
+In production, `createDevConsole()` returns a no-op logger that's completely optimized away.
 
 ### Dev Bypass (Testing)
 

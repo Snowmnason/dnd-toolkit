@@ -38,7 +38,7 @@ Return AppSettings
 
 DEV UTILITIES
   isDevelopment() → true/false (static per build)
-  useDevConsole(), createDevTimer(), isDevBypassEnabled()
+  createDevConsole(), createDevTimer(), isDevBypassEnabled()
         → Real implementations in dev
         → No-ops in production (O(1), nil overhead)
 ```
@@ -155,12 +155,12 @@ if (!result.valid) {
 
 ### Dev-Only Utilities
 
-#### `useDevConsole(scope: string): DevLogger`
+#### `createDevConsole(scope: string): DevLogger`
 
-Scoped logger. No-op in production.
+Factory function for scoped logger. No-op in production.
 
 ```typescript
-const logger = useDevConsole("MyModule");
+const logger = createDevConsole("MyModule");
 logger.log("Debug"); // Only in dev + enableConsoleLogger true
 ```
 
@@ -267,7 +267,7 @@ Polls every 1000ms, applies full pipeline (load → migrate → validate), updat
 
 ### Dev Utilities
 
-- In production: `useDevConsole()`, `createDevTimer()`, `isDevBypassEnabled()` are no-op functions with O(1), nil overhead
+- In production: `createDevConsole()`, `createDevTimer()`, `isDevBypassEnabled()` are no-op functions with O(1), nil overhead
 - Safe to call anywhere; return early in production
 
 ### Validation

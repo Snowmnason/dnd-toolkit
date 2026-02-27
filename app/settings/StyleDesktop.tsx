@@ -32,7 +32,7 @@ import {
   ToggleGroup,
 } from "@/components/ui";
 import { AppSplit } from "@/components/ui/AppView";
-import { useNotifications } from "@/hooks/utils/use-notifications";
+import { useNotifications } from "@/contexts/notifications-context";
 
 import { $, UseTheme, useScale } from "@/theme";
 import { useRef, useState } from "react";

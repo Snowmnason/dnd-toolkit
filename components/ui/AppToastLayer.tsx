@@ -4,7 +4,7 @@
  * Mount this in app/_layout.tsx to display toasts app-wide
  */
 
-import { useAppToast } from '@/lib/toast/app-toast-context'
+import { useAppToast } from '@/contexts/app-toast-context'
 import { AppToast } from './AppToast'
 
 export function AppToastLayer() {

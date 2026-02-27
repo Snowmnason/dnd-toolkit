@@ -1,19 +1,19 @@
+import { checkPendingInvites, signUpUser } from "@/lib/auth";
+import { usersDB } from "@/lib/database";
+import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
+import { logger } from "@/lib/utils/logger";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { usersDB } from "../database/users";
-import { buildRoute } from "../navigation/uri-helpers";
+import { buildRoute } from "../../lib/navigation/uri-helpers";
 import {
   type CompleteProfileFormData,
   completeProfileSchema,
   getPasswordRequirementsForUI,
   type SignUpFormData,
   signUpSchema,
-} from "../schemas/auth.schema";
-import { SecureStorage, STORAGE_KEYS } from "../storage";
-import { logger } from "../utils/logger";
-import { checkPendingInvites, signUpUser } from "./authService";
+} from '../../lib/schemas/auth.schema';
 
 type SignUpMode = "signup" | "complete-profile";
 // Use conditional type to properly type form values based on mode

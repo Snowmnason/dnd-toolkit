@@ -1,18 +1,18 @@
 import {
-    AuthActionGroup,
-    AuthBody,
-    AuthBodyFooter,
-    AuthButton,
-    AuthCaption,
-    AuthError,
-    AuthForm,
-    AuthRoot,
-    AuthSubTitle,
-    AuthSuccess,
-    AuthTitle,
-    FormAuthInput,
+  AuthActionGroup,
+  AuthBody,
+  AuthBodyFooter,
+  AuthButton,
+  AuthCaption,
+  AuthError,
+  AuthForm,
+  AuthRoot,
+  AuthSubTitle,
+  AuthSuccess,
+  AuthTitle,
+  FormAuthInput,
 } from "@/components/auth_components";
-import { useResetPasswordConfirm } from "@/lib";
+import { useResetPasswordConfirm } from "@/hooks/auth";
 import { getPasswordRequirementsForUI } from "@/lib/schemas/auth.schema";
 import { useScale } from "@/theme";
 import { useRef } from "react";

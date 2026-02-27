@@ -13,7 +13,8 @@ import {
   FormAuthInput,
 } from "@/components/auth_components";
 import { Body } from "@/components/ui";
-import { getCurrentSession, logger, usersDB, useSignUpForm } from "@/lib";
+import { useSignUpForm } from "@/hooks/auth";
+import { getCurrentSession, logger, usersDB } from "@/lib";
 import { useScale } from "@/theme";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
