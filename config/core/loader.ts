@@ -21,6 +21,9 @@ import { CURRENT_CONFIG_VERSION, migrateConfig } from './migrations';
 // Import only platform detection here; apply merging locally so tests can mock
 // platform detection without having to provide a merge helper export.
 import { getPlatformName } from './platform-config';
+// Validation dependencies (co-located here to avoid separate config-validator.ts)
+import { logger } from "@/lib/utils/logger";
+import Constants from "expo-constants";
 
 export interface AppSettings {
   version: number;
@@ -462,4 +465,299 @@ export function isProduction(): boolean {
  */
 export function resetCachedConfig(): void {
   cachedConfig = null;
+}
+
+// =============================================================================
+// Configuration Validation
+// (Previously config-validator.ts — merged here as validation is tightly coupled
+//  with loading and runs immediately after getAppConfig())
+// =============================================================================
+
+/**
+ * Result of config validation
+ */
+export interface ConfigValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+/**
+ * DND-Toolkit required environment variables
+ */
+const REQUIRED_ENV_VARS: Record<"production" | "development", string[]> = {
+  production: [
+    "EXPO_PUBLIC_SUPABASE_URL",
+    "EXPO_PUBLIC_SUPABASE_ANON_KEY",
+  ],
+  development: [],
+};
+
+const REQUIRED_FEATURES: (keyof AppSettings["features"])[] = [
+  "consoleLogging",
+  "devBypass",
+  "mockData",
+  "performanceMonitoring",
+];
+
+const REQUIRED_OVERRIDES: (keyof AppSettings["overrides"])[] = [
+  "mockSupabase",
+  "verboseErrorMessages",
+];
+
+const REQUIRED_DEV_TOOLS: (keyof AppSettings["devTools"])[] = [
+  "enableConsoleLogger",
+  "enableNetworkLogger",
+  "enablePerformanceLogger",
+  "enableReduxDevTools",
+  "enableReactDevTools",
+];
+
+const REQUIRED_FEATURE_FLAGS = [
+  "splashScreen",
+  "debugLogs",
+  "loggerCategories",
+];
+
+function validateEnvironmentVariables(
+  environment: "development" | "production",
+): ConfigValidationResult {
+  const result: ConfigValidationResult = { valid: true, errors: [], warnings: [] };
+  const required = REQUIRED_ENV_VARS[environment as "production" | "development"] || [];
+  const expoExtra = Constants.expoConfig?.extra || {};
+
+  for (const envVar of required) {
+     
+    const envValue = (process.env as Record<string, string | undefined>)[envVar];
+    let hasValue = !!envValue;
+    if (!hasValue && envVar === "EXPO_PUBLIC_SUPABASE_URL") {
+      hasValue = !!(expoExtra.supabaseUrl && expoExtra.supabaseUrl.length > 0);
+    }
+    if (!hasValue && envVar === "EXPO_PUBLIC_SUPABASE_ANON_KEY") {
+      hasValue = !!(expoExtra.supabaseAnonKey && expoExtra.supabaseAnonKey.length > 0);
+    }
+    if (!hasValue) {
+      result.valid = false;
+      result.errors.push(
+        `Missing required environment variable: ${envVar}. ` +
+          `This is critical for DND-Toolkit to function in ${environment} mode.`,
+      );
+    }
+  }
+
+  if (environment === "production" && !process.env.EXPO_PUBLIC_SENTRY_DSN) {
+    result.warnings.push(
+      "EXPO_PUBLIC_SENTRY_DSN is not set. Error tracking will not work. " +
+        "Set it in your deployment environment if you want production error monitoring.",
+    );
+  }
+
+  return result;
+}
+
+/**
+ * Validates app settings structure and values
+ */
+export function validateAppSettings(config: AppSettings): ConfigValidationResult {
+  const result: ConfigValidationResult = { valid: true, errors: [], warnings: [] };
+
+  const requiredFields: (keyof AppSettings)[] = [
+    "environment", "features", "overrides", "devTools", "featureFlags", "thresholds",
+  ];
+  for (const field of requiredFields) {
+     
+    const value = config[field];
+    if (value === undefined || value === null) {
+      result.valid = false;
+      result.errors.push(`Missing required config field: ${field}`);
+    }
+  }
+
+  if (config.environment !== "production" && config.environment !== "development") {
+    result.valid = false;
+    result.errors.push(
+      `Invalid environment: ${config.environment}. Must be either "production" or "development".`,
+    );
+  }
+
+  const envFromVar = process.env.EXPO_PUBLIC_ENVIRONMENT || "production";
+  if (process.env.EXPO_PUBLIC_ENVIRONMENT && config.environment !== envFromVar) {
+    result.valid = false;
+    result.errors.push(
+      `Config environment mismatch: env variable is "${envFromVar}" but config says "${config.environment}". ` +
+        "Ensure you are loading the correct config file (appsettings.dev.json vs appsettings.json).",
+    );
+  }
+
+  if (typeof config.features !== "object" || config.features === null) {
+    result.valid = false;
+    result.errors.push("features must be an object");
+  } else {
+    for (const feature of REQUIRED_FEATURES) {
+      if (!(feature in config.features)) {
+        result.valid = false;
+        result.errors.push(`Missing required feature: features.${feature}`);
+      }
+    }
+  }
+
+  if (typeof config.overrides !== "object" || config.overrides === null) {
+    result.valid = false;
+    result.errors.push("overrides must be an object");
+  } else {
+    for (const override of REQUIRED_OVERRIDES) {
+      if (!(override in config.overrides)) {
+        result.valid = false;
+        result.errors.push(`Missing required override: overrides.${override}`);
+      }
+    }
+  }
+
+  if (typeof config.devTools !== "object" || config.devTools === null) {
+    result.valid = false;
+    result.errors.push("devTools must be an object");
+  } else {
+    for (const tool of REQUIRED_DEV_TOOLS) {
+      if (!(tool in config.devTools)) {
+        result.valid = false;
+        result.errors.push(`Missing required dev tool: devTools.${tool}`);
+      }
+    }
+  }
+
+  if (typeof config.featureFlags !== "object" || config.featureFlags === null) {
+    result.valid = false;
+    result.errors.push("featureFlags must be an object");
+  } else {
+    for (const flagName of REQUIRED_FEATURE_FLAGS) {
+      if (!(flagName in config.featureFlags)) {
+        result.valid = false;
+        result.errors.push(`Missing required feature flag: featureFlags.${flagName}`);
+      }
+    }
+    for (const [flagName, flagConfig] of Object.entries(config.featureFlags)) {
+      if (typeof flagConfig !== "object" || flagConfig === null) {
+        result.valid = false;
+        result.errors.push(`Invalid feature flag "${flagName}": must be an object`);
+      } else if (!("enabled" in flagConfig)) {
+        result.valid = false;
+        result.errors.push(`Feature flag "${flagName}" missing required "enabled" field`);
+      }
+      if (flagName === "loggerCategories" && flagConfig && typeof flagConfig === "object") {
+        const categories = (flagConfig as any).categories;
+        if (categories && typeof categories === "object") {
+          const requiredCategories = [
+            "auth", "navigation", "api", "performance", "storage", "ui",
+            "analytics", "security", "bootstrap", "error", "feature_flags",
+            "database", "offline", "jobs", "buckets", "realtime", "other",
+          ];
+          for (const cat of requiredCategories) {
+            if (!(cat in categories)) {
+              result.valid = false;
+              result.errors.push(`Feature flag "loggerCategories" missing required category: ${cat}`);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (config.thresholds && typeof config.thresholds !== "object") {
+    result.valid = false;
+    result.errors.push("thresholds must be an object");
+  }
+
+  const VALID_PLATFORM_NAMES = ["web", "ios", "android", "desktop"];
+  if (config.platforms) {
+    if (typeof config.platforms !== "object") {
+      result.valid = false;
+      result.errors.push("platforms must be an object");
+    } else {
+      for (const platformName of Object.keys(config.platforms)) {
+        if (!VALID_PLATFORM_NAMES.includes(platformName)) {
+          result.valid = false;
+          result.errors.push(
+            `Invalid platform name: "${platformName}". Valid platforms are: ${VALID_PLATFORM_NAMES.join(", ")}.`
+          );
+        }
+         
+        const platformConfig = (config.platforms as any)[platformName];
+        if (platformConfig !== undefined && typeof platformConfig !== "object") {
+          result.valid = false;
+          result.errors.push(`platforms.${platformName} must be an object (Partial<AppSettings>)`);
+        }
+      }
+    }
+  }
+
+  if (config.environment === "production") {
+    if (config.features.devBypass) {
+      result.warnings.push(
+        "⚠️ devBypass is ENABLED in production - this is a critical security risk! " +
+          "Users can bypass authentication. This should NEVER be true in production.",
+      );
+      result.valid = false;
+    }
+    if (config.features.mockData) {
+      result.warnings.push(
+        "⚠️ mockData is ENABLED in production - this will serve incorrect game data! " +
+          "Players will see mock worlds and campaigns instead of real data.",
+      );
+      result.valid = false;
+    }
+    if (config.overrides.verboseErrorMessages) {
+      result.warnings.push(
+        "⚠️ verboseErrorMessages is ENABLED in production - " +
+          "this may expose sensitive information to end users.",
+      );
+    }
+    if (config.devTools.enableConsoleLogger) {
+      result.warnings.push(
+        "Development console logging is enabled in production config. " +
+          "This is usually fine but review for any PII that might be logged.",
+      );
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Validate the complete app configuration for DND-Toolkit.
+ * Called during kernel initialization (Phase 0, before preload).
+ */
+export function validateConfig(config: AppSettings): ConfigValidationResult {
+  const result: ConfigValidationResult = { valid: true, errors: [], warnings: [] };
+  const envResult = validateEnvironmentVariables(config.environment);
+  const settingsResult = validateAppSettings(config);
+  result.errors.push(...envResult.errors, ...settingsResult.errors);
+  result.warnings.push(...envResult.warnings, ...settingsResult.warnings);
+  result.valid = envResult.valid && settingsResult.valid;
+  return result;
+}
+
+/**
+ * Log validation results using the logger system.
+ * Errors prevent app startup; warnings are logged but don't block.
+ */
+export function logValidationResults(result: ConfigValidationResult): void {
+  if (result.errors.length > 0) {
+    logger.category("bootstrap").error(
+      `Configuration validation FAILED with ${result.errors.length} error(s):`,
+    );
+    for (const error of result.errors) {
+      logger.category("bootstrap").error(`  ❌ ${error}`);
+    }
+  }
+  if (result.warnings.length > 0) {
+    logger.category("bootstrap").warn(
+      `Configuration validation has ${result.warnings.length} warning(s):`,
+    );
+    for (const warning of result.warnings) {
+      logger.category("bootstrap").warn(`  ⚠️ ${warning}`);
+    }
+  }
+  if (result.valid && result.errors.length === 0) {
+    logger.category("bootstrap").info("✅ Configuration validated successfully");
+  }
 }

@@ -8,7 +8,7 @@
  *   // Render: <AppToast {...offlineToastProps} />
  */
 
-import { getAppConfig } from "@/lib/config";
+import { getAppConfig } from "@/config";
 import { NetworkDetection, NetworkStatus } from "@/lib/network";
 import { useEffect, useRef, useState } from "react";
 

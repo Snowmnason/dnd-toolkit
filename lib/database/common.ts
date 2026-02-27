@@ -1,4 +1,4 @@
-import { isDevelopment } from "@/lib/config/loader";
+import { isDevelopment } from '@/config';
 
 import { getAuthProvider } from "../services";
 import { logger } from "../utils/logger";

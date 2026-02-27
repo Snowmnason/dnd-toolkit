@@ -3,9 +3,9 @@
  * Provides pluggable exporter architecture for multi-backend analytics
  */
 
+import { getAppConfig } from '@/config';
 import { AnalyticsConsent } from '@/lib/analytics/consent';
 import { getConsentCategoryForEvent, shouldEmitEvent } from '@/lib/analytics/consent-gating';
-import { getAppConfig } from '@/lib/config/loader';
 import { logger } from '@/lib/utils/logger';
 
 /**

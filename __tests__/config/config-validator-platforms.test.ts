@@ -1,11 +1,10 @@
 /**
- * Tests for lib/config/config-validator.ts platform validation
+ * Tests for config validation (platform validation)
  *
  * Tests that the validator properly handles the new platforms section.
  */
 
-import { validateAppSettings } from "@/lib/config/config-validator";
-import type { AppSettings } from "@/lib/config/loader";
+import { type AppSettings, validateAppSettings } from "@/config";
 import { describe, expect, it } from "vitest";
 
 describe("validateAppSettings - platforms section", () => {

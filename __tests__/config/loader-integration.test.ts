@@ -4,22 +4,18 @@
  * Tests that getAppConfig() properly applies platform-specific overrides.
  */
 
-import type { AppSettings } from "@/lib/config/loader";
-import { getAppConfig, resetCachedConfig } from "@/lib/config/loader";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { type AppSettings, getAppConfig, getPlatformName, mergeConfigForPlatform, resetCachedConfig } from "@/config";
 
-import { mergeConfigForPlatform } from "@/lib/config/platform-config";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the platform detection
 vi.mock("@/lib/config/platform-config", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/config/platform-config")>();
+  const actual = await importOriginal<typeof import("@/config")>();
   return {
     ...actual,
     getPlatformName: vi.fn(),
   };
 });
-
-import { getPlatformName } from "@/lib/config/platform-config";
 
 // Mock getAppConfig to return our test config
 vi.mock("@/lib/config/loader", () => ({

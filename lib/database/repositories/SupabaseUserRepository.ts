@@ -1,15 +1,15 @@
+import { dbRequestOptions } from "@/config";
 import { RequestManager } from "@/lib/api/request-manager";
 import { getCurrentSession } from "@/lib/auth/auth-operations";
 import { validateUsername } from "@/lib/auth/validation";
 import { getDatabaseProvider } from "@/lib/services";
 import { logger } from "@/lib/utils/logger";
-import { dbRequestOptions } from "./request-config";
 import type {
-    CacheOptions,
-    CreateUserData,
-    UpdateUserData,
-    User,
-    UserRepository,
+  CacheOptions,
+  CreateUserData,
+  UpdateUserData,
+  User,
+  UserRepository,
 } from "./types";
 
 /**

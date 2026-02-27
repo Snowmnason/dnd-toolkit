@@ -9,9 +9,9 @@
 
 import * as Crypto from 'expo-crypto';
 
+import { ANALYTICS_RETRY_DEFAULTS, getAppConfig } from '@/config';
 import { AnalyticsConsent } from '@/lib/analytics/consent';
 import { shouldEmitEvent, type ConsentCategory } from '@/lib/analytics/consent-gating';
-import { getAppConfig } from '@/lib/config';
 import { BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '@/lib/services';
 import { STORAGE_KEYS, SecureStorage } from '@/lib/storage';
 import { logger } from '@/lib/utils';
@@ -62,23 +62,23 @@ class BreadcrumbQueueService {
 
       this.maxBreadcrumbs = breadcrumbsConfig?.maxBreadcrumbs ?? 500;
       this.retentionDays = breadcrumbsConfig?.breadcrumbRetentionDays ?? 14;
-      this.maxRetries = breadcrumbsConfig?.maxRetries ?? 5;
+      this.maxRetries = breadcrumbsConfig?.maxRetries ?? ANALYTICS_RETRY_DEFAULTS.maxRetries;
       this.batchSize = breadcrumbsConfig?.batchSize ?? 10;
-      this.retryBaseMs = breadcrumbsConfig?.retryBaseMs ?? 1000;
+      this.retryBaseMs = breadcrumbsConfig?.retryBaseMs ?? ANALYTICS_RETRY_DEFAULTS.retryBaseMs;
       this.deduplicationTTL = 24 * 60 * 60 * 1000; // 24h in ms (hardcoded, not configurable)
       this.batchSpacingMs = 1500; // Space batches by 1.5s if 100+ pending (hardcoded, not configurable)
-      this.debounceMs = breadcrumbsConfig?.debounceMs ?? 5000; // Debounce flush: once per 5s
+      this.debounceMs = breadcrumbsConfig?.debounceMs ?? ANALYTICS_RETRY_DEFAULTS.debounceMs; // Debounce flush: once per 5s
     } catch (error) {
       // Config loading failed; fall back to safe defaults
       logger.category('analytics').error('BreadcrumbQueue', `Failed to load config: ${error}, using defaults`);
       this.maxBreadcrumbs = 500;
       this.retentionDays = 14;
-      this.maxRetries = 5;
+      this.maxRetries = ANALYTICS_RETRY_DEFAULTS.maxRetries;
       this.batchSize = 10;
-      this.retryBaseMs = 1000;
+      this.retryBaseMs = ANALYTICS_RETRY_DEFAULTS.retryBaseMs;
       this.deduplicationTTL = 24 * 60 * 60 * 1000;
       this.batchSpacingMs = 1500;
-      this.debounceMs = 5000;
+      this.debounceMs = ANALYTICS_RETRY_DEFAULTS.debounceMs;
     }
   }
 

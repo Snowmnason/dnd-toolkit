@@ -22,7 +22,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { getConfigDiff, validateConfigSchema } from './config-diff';
+import { getConfigDiff, validateConfigSchema } from '../config/dev/tools/config-diff';
 
 // Parse and validate CLI flags
 const useLoader = process.argv.includes('--use-loader');

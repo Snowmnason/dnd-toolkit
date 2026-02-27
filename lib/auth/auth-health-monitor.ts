@@ -9,7 +9,7 @@
  * - UI routing layer detects this and redirects to login
  */
 
-import { getAppConfig } from "@/lib/config/loader";
+import { getAppConfig } from '@/config';
 import { createSafeModeState, SafeModeReason } from "@/lib/error/safe-mode";
 import { getJobQueue } from "@/lib/jobs";
 import { AppKernel } from "@/lib/kernel";

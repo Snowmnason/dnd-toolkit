@@ -130,5 +130,6 @@ export function logValidationResult(
     ? 'Service will not initialize'
     : 'Service will degrade gracefully';
 
+  // eslint-disable-next-line security/detect-object-injection
   logger[level]('bootstrap', `[${service}] Misconfiguration: ${message} ${context}`);
 }

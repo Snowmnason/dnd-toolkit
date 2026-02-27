@@ -9,13 +9,13 @@
  * - Error detection and routing (errors → Sentry errors, events → breadcrumbs)
  */
 
+import { getAppConfig } from '@/config';
 import { breadcrumbQueue } from '@/lib/analytics/breadcrumb-queue';
 import {
-  AnalyticsEvent,
-  AnalyticsExporter,
-  ExportContext,
+    AnalyticsEvent,
+    AnalyticsExporter,
+    ExportContext,
 } from '@/lib/analytics/exporters/exporter-registry';
-import { getAppConfig } from '@/lib/config';
 import { SentryAdapter } from '@/lib/services/sentry/sentry-adapter';
 import { logger } from '@/lib/utils/logger';
 

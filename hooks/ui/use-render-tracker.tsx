@@ -1,4 +1,4 @@
-import { getAppConfig } from '@/lib/config/loader';
+import { getAppConfig } from '@/config';
 import { useMemo, useRef } from 'react';
 
 export function useRenderTracker(componentName: string) {

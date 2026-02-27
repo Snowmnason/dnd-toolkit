@@ -71,7 +71,7 @@ export {
   type StorageOperation,
   type StorageOperationOptions
 } from "./cache/storage-error-handling";
-export { STORAGE_BACKEND_CONFIG, type StorageBackend } from "./storage-config";
+
 export { updateStorageCache } from "./update-storage-cache";
 
 /**

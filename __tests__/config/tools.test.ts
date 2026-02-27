@@ -2,7 +2,7 @@
  * Unit tests for config-diff tool
  */
 
-import { getConfigDiff, mapExpectedDifferences, validateConfigSchema } from '@/lib/config/tools/config-diff';
+import { getConfigDiff, mapExpectedDifferences, validateConfigSchema } from "@/config";
 import { describe, expect, it } from 'vitest';
 
 describe('config-diff', () => {

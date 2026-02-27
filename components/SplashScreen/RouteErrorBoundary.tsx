@@ -1,6 +1,6 @@
-import { logger } from '@/lib';
-import { getAppConfig } from '@/lib/config/loader';
+import { getAppConfig } from '@/config';
 import { NavigationContext, RouteConfig } from '@/lib/navigation/navigation-config';
+import { logger } from '@/lib/utils';
 import { useRouter } from 'expo-router';
 import React, { ReactNode } from 'react';
 import { ErrorFallbackShell } from './ErrorFallbackShell';

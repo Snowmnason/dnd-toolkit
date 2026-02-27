@@ -15,23 +15,23 @@
  * Kernel and health checks can call getServiceStatus() to understand app capability.
  */
 
+import { getAppConfig } from '@/config';
 import { AnalyticsExporter, exporterRegistry } from '@/lib/analytics/exporters';
 import { performanceBaselineService } from '@/lib/analytics/performance/performance-baseline';
-import { getAppConfig } from '@/lib/config/loader';
 import { logger } from '@/lib/utils/logger';
 import { createValidatedAuthProvider, registerAuthProvider, type AuthProvider } from './auth-provider';
 import { NoOpErrorTracker, registerErrorTracker } from './error-tracker';
 import { initializeSentryErrorTracker } from './sentry/sentry-service-initializer';
+import {
+  updateServiceStatus
+} from './service-status';
 import {
   logValidationResult,
   validateSentryAnalyticsConfig,
   validateSentryErrorConfig,
   validateSupabaseAuthConfig,
   validateSupabaseDatabaseConfig,
-} from './service-config-validation';
-import {
-  updateServiceStatus
-} from './service-status';
+} from './service-validation';
 import { SupabaseAuthProvider } from './supabase/supabase-auth-provider';
 
 /**

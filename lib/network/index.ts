@@ -32,15 +32,6 @@ export {
 export type { GracefulErrorOptions } from "./error-handling";
 
 export {
-  getSupabaseHealthEndpoint,
-  getWebPingInterval,
-  getWebPingTimeout,
-  LATENCY_THRESHOLD,
-  LOW_BATTERY_THRESHOLD,
-  SUPABASE_HEALTH_ENDPOINT
-} from "./network-config";
-
-export {
   buildAdaptiveQueryParams,
   getAdaptivePayloadOptions,
   getCacheKeyQualityComponent

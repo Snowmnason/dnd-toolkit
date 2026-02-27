@@ -316,7 +316,7 @@ describe("Phase 3: Cohorts Integration", () => {
       );
 
       // Mock app config with cohort requirement
-      const { getAppConfig } = await import("@/lib/config/loader");
+      const { getAppConfig } = await import("@/config");
       vi.mocked(getAppConfig).mockReturnValue({
         featureFlags: {
           betaFeature: {
@@ -372,7 +372,7 @@ describe("Phase 3: Cohorts Integration", () => {
         }),
       );
 
-      const { getAppConfig } = await import("@/lib/config/loader");
+      const { getAppConfig } = await import("@/config");
       vi.mocked(getAppConfig).mockReturnValue({
         featureFlags: {
           betaFeature: {
@@ -445,7 +445,7 @@ describe("Phase 3: Cohorts Integration", () => {
         }),
       );
 
-      const { getAppConfig } = await import("@/lib/config/loader");
+      const { getAppConfig } = await import("@/config");
       vi.mocked(getAppConfig).mockReturnValue({
         featureFlags: {
           disabledFeature: {
@@ -514,7 +514,7 @@ describe("Phase 3: Cohorts Integration", () => {
         }),
       );
 
-      const { getAppConfig } = await import("@/lib/config/loader");
+      const { getAppConfig } = await import("@/config");
       vi.mocked(getAppConfig).mockReturnValue({
         featureFlags: {
           enterpriseOnly: {
@@ -559,7 +559,7 @@ describe("Phase 3: Cohorts Integration", () => {
         }),
       );
 
-      const { getAppConfig } = await import("@/lib/config/loader");
+      const { getAppConfig } = await import("@/config");
       vi.mocked(getAppConfig).mockReturnValue({
         featureFlags: {
           simpleFlag: {
@@ -598,7 +598,7 @@ describe("Phase 3: Cohorts Integration", () => {
         }),
       );
 
-      const { getAppConfig } = await import("@/lib/config/loader");
+      const { getAppConfig } = await import("@/config");
       vi.mocked(getAppConfig).mockReturnValue({
         featureFlags: {
           badFlag: {

@@ -2,8 +2,7 @@
  * Session & User Retention Tracking
  * Tracks user sessions, duration, and engagement metrics
  */
-
-import { getAppConfig } from '../config/loader';
+import { getAppConfig } from '@/config';
 import { getErrorTracker } from '../services';
 import { logger } from '../utils/logger';
 import { AnalyticsConsent } from './consent';

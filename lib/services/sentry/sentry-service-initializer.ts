@@ -9,7 +9,7 @@
  * Single responsibility: "If Sentry is on, initialize it here."
  */
 
-import { isDevelopment } from '@/lib/config/loader';
+import { isDevelopment } from '@/config';
 import { logger } from '@/lib/utils/logger';
 import { APP_VERSION } from '@/lib/utils/version';
 import Constants from 'expo-constants';

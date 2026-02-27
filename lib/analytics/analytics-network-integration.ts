@@ -11,12 +11,11 @@
  * - Consent-aware flushing (no flush if consent withdrawn)
  */
 
+import { getAppConfig } from '@/config';
 import { _setAnalyticsBufferFlushing } from "@/hooks/analytics/use-analytics-buffer-status";
-import { getAppConfig } from "@/lib/config/loader";
 import { NetworkDetection, type NetworkStatus } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
 import { analyticsBufferService } from "./analytics-buffer";
-import { AnalyticsConsent } from "./consent";
 
 /**
  * Prevent concurrent flushes

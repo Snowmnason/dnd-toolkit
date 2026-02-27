@@ -1,5 +1,5 @@
+import { getAppConfig } from '@/config';
 import { useCrashConsentReport } from '@/hooks/analytics/use-crash-consent-report';
-import { getAppConfig } from '@/lib/config/loader';
 import { View } from 'react-native';
 import VersionDisplay from '../VersionDisplay';
 import { ErrorFallbackShell } from './ErrorFallbackShell';

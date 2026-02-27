@@ -9,7 +9,7 @@
  * 2. If recovery fails, triggers RECOVERY safe mode
  */
 
-import { getAppConfig } from "@/lib/config/loader";
+import { getAppConfig } from '@/config';
 import { createSafeModeState, SafeModeReason } from "@/lib/error/safe-mode";
 import { getJobQueue } from "@/lib/jobs";
 import { AppKernel } from "@/lib/kernel";

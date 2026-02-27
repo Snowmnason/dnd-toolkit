@@ -168,9 +168,8 @@ class AppKernelClass {
       logger.category("bootstrap").info("AppKernel initializing...");
 
       // Validate configuration before proceeding
-      const { getAppConfig } = await import("@/lib/config/loader");
-      const { validateConfig, logValidationResults } =
-        await import("@/lib/config/config-validator");
+      const { getAppConfig, validateConfig, logValidationResults } =
+        await import('@/config');
       const config = getAppConfig();
       const configValidation = validateConfig(config);
       logValidationResults(configValidation);

@@ -12,7 +12,7 @@
  * - PII safe: TrackerUser excludes email by default; callers shape payloads
  */
 
-import { isDevelopment } from '@/lib/config/loader';
+import { isDevelopment } from '@/config';
 import { logger } from '@/lib/utils/logger';
 
 /**

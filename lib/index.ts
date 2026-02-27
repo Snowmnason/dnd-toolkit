@@ -52,7 +52,7 @@ export * from "./auth";
 export * from "./cache";
 
 // ===== Config (App Configuration) =====
-export * from "./config";
+export * from "../config";
 
 // ===== Database (Supabase & Queries) =====
 export * from "./database";
@@ -77,9 +77,6 @@ export * from "./offline";
 
 // ===== Premium Features & Subscriptions =====
 export * from "./premium";
-
-// ===== Routing (Route Authentication) =====
-export * from "./routing";
 
 // ===== Schemas (Validation & Type Definitions) =====
 export * from "./schemas";

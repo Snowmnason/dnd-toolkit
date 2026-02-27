@@ -17,11 +17,9 @@
  * - Real-time verification
  * - Offline: Use last known values
  */
-
 // App-level imports (absolute)
+import { getAppConfig, getPlatformName, isDevelopment } from '@/config';
 import { trackVariantAssignment } from "@/lib/analytics/variant-tracking";
-import { getAppConfig, isDevelopment } from "@/lib/config/loader";
-import { getPlatformName } from "@/lib/config/platform-config";
 import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
 import { FeatureFlagOverrideRow } from "@/lib/database/feature-flag-overrides";
 import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";

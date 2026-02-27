@@ -3,7 +3,7 @@
  * Shared helper functions for analytics modules
  */
 
-import { getAppConfig } from '../config/loader';
+import { getAppConfig } from '@/config';
 
 /**
  * Get performance threshold from config with fallback

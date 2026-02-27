@@ -18,8 +18,7 @@
  * It tracks dropped events during the current session to help identify capacity issues.
  * Use getAndResetOverflowCount() to inspect and optionally reset the counter during a session.
  */
-
-import { getAppConfig } from "@/lib/config/loader";
+import { ANALYTICS_RETRY_DEFAULTS, getAppConfig } from '@/config';
 import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 
@@ -61,10 +60,10 @@ export interface AnalyticsBufferConfig {
 const SAFE_DEFAULTS: AnalyticsBufferConfig = {
   enabled: true,
   maxSize: 100,
-  maxRetries: 5,
+  maxRetries: ANALYTICS_RETRY_DEFAULTS.maxRetries,
   batchSize: 25,
-  retryBaseMs: 1000,
-  debounceMs: 5000,
+  retryBaseMs: ANALYTICS_RETRY_DEFAULTS.retryBaseMs,
+  debounceMs: ANALYTICS_RETRY_DEFAULTS.debounceMs,
   batchDelayMs: 1000,
 };
 

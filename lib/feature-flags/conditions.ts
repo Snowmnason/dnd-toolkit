@@ -6,8 +6,7 @@
  * based on the current runtime context.
  */
 
-import { getAppConfig } from "../config/loader";
-import { getPlatformName } from "../config/platform-config";
+import { getAppConfig, getPlatformName } from '@/config';
 
 // ==========================================
 // Types

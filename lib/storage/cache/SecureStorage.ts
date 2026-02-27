@@ -1,3 +1,4 @@
+import { getStorageBackend, type StorageBackend } from "@/config";
 import { Platform } from "react-native";
 import {
   CacheSchema,
@@ -5,7 +6,6 @@ import {
   validateCacheEntry,
   VersionedCacheEntry,
 } from "../cache-versioning";
-import { getStorageBackend, type StorageBackend } from "../storage-config";
 
 // Lazy-load logger to avoid circular dependency with storage
 let loggerCache: any = null;

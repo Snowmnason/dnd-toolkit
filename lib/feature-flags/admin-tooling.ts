@@ -8,7 +8,7 @@
  * - Flag impact analysis
  */
 
-import { getAppConfig } from "@/lib/config/loader";
+import { getAppConfig } from '@/config';
 import { validateAdvancedCondition } from "./advanced-conditions";
 import type { FlagContext } from "./conditions";
 import { FeatureFlagsManager } from "./server-sync";

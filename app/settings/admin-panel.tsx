@@ -72,7 +72,7 @@ export default function AdminPanelScreen() {
 
         // Load all settings from config (features, overrides, devTools, featureFlags)
         try {
-          const { getAppConfig } = await import("@/lib/config/loader");
+          const { getAppConfig } = await import("@/config");
           const { FeatureFlags } = await import("@/lib/feature-flags");
           const config = getAppConfig();
 

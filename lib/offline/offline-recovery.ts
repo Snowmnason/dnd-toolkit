@@ -16,13 +16,14 @@
  * - BackoffScheduler: Manages scheduled retry timing with jitter
  */
 
+import { OFFLINE_SYNC_DEFAULTS } from "@/config";
 import type { AuthContext } from "@/lib/api/auth-layer";
 import { logger, RedactionManager } from "@/lib/utils";
 import type {
-  AuthReplayMetadata,
-  NetworkErrorContract,
-  OfflineQueueStats,
-  QueuedMutation,
+    AuthReplayMetadata,
+    NetworkErrorContract,
+    OfflineQueueStats,
+    QueuedMutation,
 } from "./types";
 
 // Re-export QueuedMutation for test imports
@@ -284,13 +285,13 @@ export const BackoffScheduler = {
    */
   calculateNextAttemptAt(
     mutation: QueuedMutation,
-    baseMs: number = 2000,
+    baseMs: number = OFFLINE_SYNC_DEFAULTS.retryBaseMs,
   ): number {
     const multiplier = Math.pow(2, mutation.retryCount);
     const jitter = 0.9 + Math.random() * 0.2; // ±10% random factor
 
     const backoffMs = Math.floor(baseMs * multiplier * jitter);
-    const cappedBackoffMs = Math.min(backoffMs, 300000); // Cap at 5 minutes
+    const cappedBackoffMs = Math.min(backoffMs, OFFLINE_SYNC_DEFAULTS.backoffCapMs); // Cap at 5 minutes
 
     const nextAttemptAt = Date.now() + cappedBackoffMs;
 

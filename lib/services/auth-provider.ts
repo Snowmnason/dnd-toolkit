@@ -15,8 +15,8 @@
  * - `getAuthProvider()` throws if called before registration
  */
 
+import { isDevelopment } from '@/config';
 import { validateEmail, validatePassword } from '@/lib/auth/validation';
-import { isDevelopment } from '@/lib/config/loader';
 import { logger, RedactionManager } from '@/lib/utils';
 
 /**

@@ -14,20 +14,21 @@
  * - Graceful degradation across all platforms
  */
 
-import {
-  LATENCY_THRESHOLD,
-  LOW_BATTERY_THRESHOLD,
-  getDebounceStatusChangeMs,
-  getSupabaseHealthEndpoint,
-  getWebPingInterval,
-  getWebPingTimeout,
-} from "@/lib/network/network-config";
+import { getAppConfig } from "@/config";
+import { getHealthEndpointUrl } from "@/lib/database/edge/constants";
 import {
   NetworkStateManager,
   type NetworkState,
 } from "@/lib/network/state-machine";
 import { logger } from "@/lib/utils/logger";
 import { Platform } from "react-native";
+
+/**
+ * Network Detection Constants
+ * (Previously in network-config.ts; inlined here for transparency)
+ */
+const LATENCY_THRESHOLD = 500; // 500ms latency marks connection as BAD
+const LOW_BATTERY_THRESHOLD = 0.2; // 20% battery marks connection as expensive
 
 /**
  * Connection quality states for implementing degraded/safe modes
@@ -427,7 +428,7 @@ class NetworkDetectionClass {
     // Start ping timer
     this.webPingTimer = setInterval(() => {
       this.performWebPing();
-    }, getWebPingInterval());
+    }, getAppConfig().network?.pingIntervalMs ?? 10 * 60 * 1000);
 
     // Do initial ping
     this.performWebPing();
@@ -439,13 +440,12 @@ class NetworkDetectionClass {
   private async performWebPing(): Promise<void> {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), getWebPingTimeout());
+      const timeout = setTimeout(() => controller.abort(), getAppConfig().network?.pingTimeoutMs ?? 5000);
       const startTime = performance.now();
 
       // Use Supabase health endpoint instead of Cloudflare for CSP compliance
       // Supabase is already whitelisted in CSP for API calls
-      // Endpoint is configured in network-config.ts
-      const response = await fetch(getSupabaseHealthEndpoint(), {
+      const response = await fetch(getHealthEndpointUrl(), {
         method: "HEAD",
         signal: controller.signal,
       });
@@ -727,7 +727,7 @@ class NetworkDetectionClass {
     }
 
     // Schedule status update after debounce delay
-    const debounceMs = getDebounceStatusChangeMs();
+    const debounceMs = getAppConfig().network?.debounceStatusChangeMs ?? 500;
     this.statusChangeTimer = setTimeout(() => {
       if (this.pendingStatusUpdate) {
         this.applyDebouncedStatusUpdate(this.pendingStatusUpdate);

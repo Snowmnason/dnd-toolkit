@@ -2,7 +2,7 @@ import { AuthStateManager } from '@/lib/auth';
 import { logger } from '@/lib/utils';
 import { useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { AUTH_CONFIG } from '../../lib/routing/route-config';
+import { AUTH_CONFIG } from '../../config/routing-auth-config';
 import { useAppKernel } from '../kernel/use-app-kernel';
 
 export type AuthLevel = 'account-only' | 'world-required';

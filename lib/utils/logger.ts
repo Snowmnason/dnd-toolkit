@@ -15,7 +15,7 @@
  * - Feature-flag controlled logging (debugLogs flag)
  */
 
-import { getAppConfig } from "@/lib/config/loader";
+import { getAppConfig } from '@/config';
 import { RedactionManager, redactPII } from "@/lib/utils/redaction-manager";
 
 // Lazy imports to break circular dependency

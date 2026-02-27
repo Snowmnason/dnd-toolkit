@@ -1,11 +1,11 @@
+import { dbRequestOptions } from "@/config";
 import { RequestManager } from "@/lib/api/request-manager";
 import { getDatabaseProvider } from "@/lib/services";
 import { logger } from "@/lib/utils/logger";
-import { dbRequestOptions } from "./request-config";
 import type {
-    EntitlementOverrideRow,
-    EntitlementRow,
-    EntitlementsRepository,
+  EntitlementOverrideRow,
+  EntitlementRow,
+  EntitlementsRepository,
 } from "./types";
 
 /**

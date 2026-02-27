@@ -10,7 +10,7 @@
  * - RECOVERY: Critical failure, user must take explicit recovery action
  */
 
-import { getAppConfig } from "../config/loader";
+import { getAppConfig } from '@/config';
 
 /**
  * Safe mode levels representing app health states

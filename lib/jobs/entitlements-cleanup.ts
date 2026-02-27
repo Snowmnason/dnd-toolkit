@@ -8,10 +8,10 @@
  * This is a foundation-level implementation; reminder notifications are deferred.
  */
 
-import { getAppConfig } from '../config';
+import { getAppConfig } from '../../config';
 import {
-  deactivateEntitlements,
-  fetchExpiredEntitlements,
+    deactivateEntitlements,
+    fetchExpiredEntitlements,
 } from '../database/entitlements';
 import { logger } from '../utils/logger';
 

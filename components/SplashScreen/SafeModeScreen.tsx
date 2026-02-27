@@ -1,5 +1,5 @@
+import { getAppConfig } from '@/config';
 import { Analytics, Performance } from "@/lib/analytics";
-import { getAppConfig } from "@/lib/config/loader";
 import {
   RecoveryAction,
   SafeModeLevel,

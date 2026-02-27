@@ -22,6 +22,7 @@
  * ```
  */
 
+import { CONSENT_SYNC_DEFAULTS } from '@/config';
 import { SecureStorage, STORAGE_KEYS } from '@/lib/storage';
 import { logger } from '@/lib/utils/logger';
 import type { ConsentLevel } from './consent';
@@ -38,14 +39,7 @@ interface PendingConsentSync {
   lastError?: string;
 }
 
-/**
- * Configuration for retry behavior
- */
-const RETRY_CONFIG = {
-  maxRetries: 3,
-  baseRetryDelayMs: 2000,
-  maxRetryDelayMs: 30000,
-};
+
 
 /**
  * Generate a simple UUID-like string
@@ -59,8 +53,8 @@ function generateId(): string {
  */
 function calculateNextRetry(retryCount: number): number {
   const delayMs = Math.min(
-    RETRY_CONFIG.baseRetryDelayMs * Math.pow(2, retryCount),
-    RETRY_CONFIG.maxRetryDelayMs,
+    CONSENT_SYNC_DEFAULTS.baseRetryDelayMs * Math.pow(2, retryCount),
+    CONSENT_SYNC_DEFAULTS.maxRetryDelayMs,
   );
   return Date.now() + delayMs;
 }
@@ -275,7 +269,7 @@ class ConsentSyncQueueService {
   ): Promise<void> {
     const errorMsg = error instanceof Error ? error.message : String(error);
 
-    if (item.retryCount < RETRY_CONFIG.maxRetries) {
+    if (item.retryCount < CONSENT_SYNC_DEFAULTS.maxRetries) {
       // Schedule retry
       item.retryCount += 1;
       item.nextRetryAt = calculateNextRetry(item.retryCount);
@@ -283,7 +277,7 @@ class ConsentSyncQueueService {
 
       logger
         .category('analytics')
-        .warn(`Consent sync failed, scheduled retry ${item.retryCount}/${RETRY_CONFIG.maxRetries}`, {
+        .warn(`Consent sync failed, scheduled retry ${item.retryCount}/${CONSENT_SYNC_DEFAULTS.maxRetries}`, {
           id: item.id,
           error: errorMsg,
           nextRetryAt: new Date(item.nextRetryAt).toISOString(),

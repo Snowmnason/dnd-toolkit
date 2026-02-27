@@ -13,7 +13,7 @@
  * Initialize early during app bootstrap via initialize().
  */
 
-import { getAppConfig } from '@/lib/config/loader';
+import { getAppConfig } from '@/config';
 import { SecureStorage, STORAGE_KEYS } from '@/lib/storage';
 import { logger } from '@/lib/utils/logger';
 

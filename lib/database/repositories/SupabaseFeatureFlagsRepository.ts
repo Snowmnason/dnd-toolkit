@@ -1,11 +1,11 @@
+import { dbRequestOptions } from "@/config";
 import { RequestManager } from "@/lib/api/request-manager";
 import { getDatabaseProvider } from "@/lib/services";
 import { logger } from "@/lib/utils/logger";
-import { dbRequestOptions } from "./request-config";
 import type {
-    FeatureFlagOverrideRow,
-    FeatureFlagRow,
-    FeatureFlagsRepository,
+  FeatureFlagOverrideRow,
+  FeatureFlagRow,
+  FeatureFlagsRepository,
 } from "./types";
 
 /**
