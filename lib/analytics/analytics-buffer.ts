@@ -278,7 +278,7 @@ class AnalyticsBufferService {
         (async () => {
           try {
             const { flushAnalyticsQueue } = await import(
-              "./analytics-network-integration"
+              "./exporters/analytics-network-integration"
             );
             await flushAnalyticsQueue();
           } catch (error) {

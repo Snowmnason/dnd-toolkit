@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AnalyticsConsent, ConsentLevel } from '@/lib/analytics/consent';
+import { AnalyticsConsent, ConsentLevel } from '@/lib/analytics/consent/consent';
 import { SecureStorage } from '@/lib/storage';
 
 // Provide a test-local mock for storage so we can reliably observe calls

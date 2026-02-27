@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthStateManager } from "@/lib/auth/auth-state";
 import { getPrivacyStorageBackend } from "@/lib/storage";
-import * as updateCache from "@/lib/storage/update-storage-cache";
+import * as updateCache from "@/lib/storage/sync/update-storage-cache";
 
 // Mock storage backend helper
 vi.mock("@/lib/storage", () => ({

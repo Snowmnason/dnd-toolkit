@@ -13,14 +13,14 @@ import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
 
 import { getAppConfig, isDevelopment } from '@/config';
-import { AnalyticsConsent } from '@/lib/analytics/consent';
+import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
 import { logger } from '@/lib/utils/logger';
 import {
-    ErrorCaptureOptions,
-    ErrorTrackerProvider,
-    SeverityLevel,
-    TrackerBreadcrumb,
-    TrackerUser,
+  ErrorCaptureOptions,
+  ErrorTrackerProvider,
+  SeverityLevel,
+  TrackerBreadcrumb,
+  TrackerUser,
 } from '../error-tracker';
 
 /**

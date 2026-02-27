@@ -4,7 +4,7 @@ import {
   isSupabaseUrl,
   optimizeSupabaseImage,
   supportsWebP,
-} from "@/lib/utils/image-optimization";
+} from "@/lib/utils/images/image-optimization";
 import { $ } from "@/theme";
 import { Image, ImageProps } from "expo-image";
 import type { RefObject } from "react";

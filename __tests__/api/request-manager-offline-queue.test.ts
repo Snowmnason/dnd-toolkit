@@ -1,17 +1,17 @@
 // Mock react-native to prevent Rollup errors
-import { CircuitBreakerManager } from "@/lib/api/circuit-breaker";
-import { OfflineQueueManager } from "@/lib/api/offline-queue";
 import { RequestManager } from "@/lib/api/request-manager";
+import { CircuitBreakerManager } from "@/lib/api/resilience/circuit-breaker";
+import { OfflineQueueManager } from "@/lib/api/resilience/offline-queue";
 import { ConnectionQuality, NetworkDetection } from "@/lib/network";
 import { SecureStorage } from "@/lib/storage";
 import {
-    afterEach,
-    beforeEach,
-    describe,
-    expect,
-    it,
-    vi,
-    type MockedFunction,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockedFunction,
 } from "vitest";
 
 vi.mock("react-native", () => ({

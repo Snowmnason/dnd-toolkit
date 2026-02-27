@@ -1,6 +1,6 @@
 import { getErrorTracker } from "../services";
 import { logger } from "../utils/logger";
-import { AnalyticsConsent } from "./consent";
+import { AnalyticsConsent } from "./consent/consent";
 import { createExportContext, dispatchEvent } from "./exporters/exporter-registry";
 
 import { getThreshold, sanitizeError } from "./utils";

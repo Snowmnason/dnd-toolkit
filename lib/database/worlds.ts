@@ -1,7 +1,7 @@
 import { STORAGE_KEYS } from "@/maps";
 import { CACHE_TAGS } from "../../maps/cache-keys";
 import { QueryCache, SecureStorage } from "../storage";
-import { worldAccessCache } from "../storage/world-access-cache";
+import { worldAccessCache } from "../storage/sync/world-access-cache";
 import { logger } from "../utils/logger";
 import { getCurrentUserProfile } from "./common";
 import { getInviteRepository, getWorldAccessRepository, getWorldRepository } from "./repositories";

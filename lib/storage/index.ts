@@ -65,9 +65,9 @@ export {
   type StorageGracefulResult,
   type StorageOperation,
   type StorageOperationOptions
-} from "./cache/storage-error-handling";
+} from "./utilites/storage-error-handling";
 
-export { updateStorageCache } from "./update-storage-cache";
+export { updateStorageCache } from "./sync/update-storage-cache";
 
 /**
  * Bucket Storage Module - Barrel Export

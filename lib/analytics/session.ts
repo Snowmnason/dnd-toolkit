@@ -5,8 +5,8 @@
 import { getAppConfig } from '@/config';
 import { getErrorTracker } from '../services';
 import { logger } from '../utils/logger';
-import { AnalyticsConsent } from './consent';
-import { shouldEmitEvent } from './consent-gating';
+import { AnalyticsConsent } from './consent/consent';
+import { shouldEmitEvent } from './consent/consent-gating';
 
 interface SessionData {
   startedAt: number;

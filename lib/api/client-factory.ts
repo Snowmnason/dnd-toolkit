@@ -21,9 +21,9 @@ import { QueryCache } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import type { ZodType } from "zod";
 import { AuthLayer } from "./auth-layer";
-import { CircuitBreakerManager } from "./circuit-breaker";
 import { type RequestInterceptor } from "./interceptor";
 import { RequestManager, type RequestOptions } from "./request-manager";
+import { CircuitBreakerManager } from "./resilience/circuit-breaker";
 
 /**
  * Error transformation result

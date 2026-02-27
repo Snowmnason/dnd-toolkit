@@ -4,8 +4,8 @@
  */
 
 import { getAppConfig } from '@/config';
-import { AnalyticsConsent } from '@/lib/analytics/consent';
-import { getConsentCategoryForEvent, shouldEmitEvent } from '@/lib/analytics/consent-gating';
+import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
+import { getConsentCategoryForEvent, shouldEmitEvent } from '@/lib/analytics/consent/consent-gating';
 import { logger } from '@/lib/utils/logger';
 
 /**

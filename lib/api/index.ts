@@ -1,12 +1,5 @@
 export { AuthLayer, type AuthContext, type AuthStrategy } from "./auth-layer";
 export {
-    CircuitBreakerManager,
-    CircuitBreakerOpenError,
-    DEFAULT_THRESHOLDS,
-    type CircuitStats,
-    type CircuitThresholds
-} from "./circuit-breaker";
-export {
     APIClient,
     type APIClientConfig,
     type ApiErrorType,
@@ -36,25 +29,32 @@ export {
     parseEndpoint,
     type RequestInterceptor
 } from "./interceptor";
+export {
+    CircuitBreakerManager,
+    CircuitBreakerOpenError,
+    DEFAULT_THRESHOLDS,
+    type CircuitStats,
+    type CircuitThresholds
+} from "./resilience/circuit-breaker";
 
 export {
     NetworkRecoveryManager,
     registerNetworkRecoveryHooks,
     type NotificationCallback,
     type RecoveryState
-} from "./network-recovery";
+} from "./resilience/network-recovery";
 export {
     NetworkRecoveryRetryJobManager,
     type NetworkRecoveryRetryJobConfig
-} from "./network-recovery-retry-job";
+} from "./resilience/network-recovery-retry-job";
 export {
     OfflineQueueManager,
     type OfflineQueueConfig,
     type OfflineQueueStats,
     type QueuedRequestEntry
-} from "./offline-queue";
+} from "./resilience/offline-queue";
 export {
     cleanupOfflineQueueReplay,
     initializeOfflineQueueReplay
-} from "./offline-queue-replay";
+} from "./resilience/offline-queue-replay";
 

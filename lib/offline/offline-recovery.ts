@@ -498,7 +498,7 @@ export const CircuitBreakerReplayManager = {
   ): Promise<void> {
     try {
       const { CircuitBreakerManager: CBM } =
-        await import("@/lib/api/circuit-breaker");
+        await import("@/lib/api/resilience/circuit-breaker");
       const cbManager = CBM;
       const key = this.getCircuitBreakerKey(mutation);
 
@@ -537,7 +537,7 @@ export const CircuitBreakerReplayManager = {
   async recordReplaySuccess(mutation: QueuedMutation): Promise<void> {
     try {
       const { CircuitBreakerManager: CBM } =
-        await import("@/lib/api/circuit-breaker");
+        await import("@/lib/api/resilience/circuit-breaker");
       const cbManager = CBM;
       const key = this.getCircuitBreakerKey(mutation);
 
@@ -567,7 +567,7 @@ export const CircuitBreakerReplayManager = {
   async isCircuitOpen(mutation: QueuedMutation): Promise<boolean> {
     try {
       const { CircuitBreakerManager: CBM } =
-        await import("@/lib/api/circuit-breaker");
+        await import("@/lib/api/resilience/circuit-breaker");
       const cbManager = CBM;
       const key = this.getCircuitBreakerKey(mutation);
       const state = cbManager.getState(key);

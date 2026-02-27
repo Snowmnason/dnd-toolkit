@@ -9,24 +9,24 @@
  */
 
 import {
-    analyzeFlagImpact,
-    generateDependencyGraph,
-    simulateContexts,
-    validateFlagConfig,
-    visualizeDependencyGraph,
-} from "@/lib/feature-flags/admin-tooling";
+  analyzeFlagImpact,
+  generateDependencyGraph,
+  simulateContexts,
+  validateFlagConfig,
+  visualizeDependencyGraph,
+} from "@/lib/feature-flags/admin/admin-tooling";
 import {
-    evaluateAdvancedCondition,
-    pluginRegistry,
-    validateAdvancedCondition,
-    type ConditionNode,
-    type LogicalExpression,
-    type NotExpression,
+  evaluateAdvancedCondition,
+  pluginRegistry,
+  validateAdvancedCondition,
+  type ConditionNode,
+  type LogicalExpression,
+  type NotExpression,
 } from "@/lib/feature-flags/advanced-conditions";
 import type { FlagContext } from "@/lib/feature-flags/conditions";
 import {
-    featureFlagsTelemetry,
-    performHealthCheck,
+  featureFlagsTelemetry,
+  performHealthCheck,
 } from "@/lib/feature-flags/telemetry";
 import { beforeEach, describe, expect, it } from "vitest";
 

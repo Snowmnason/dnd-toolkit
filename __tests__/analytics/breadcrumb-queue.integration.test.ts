@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { breadcrumbQueue } from '@/lib/analytics/breadcrumb-queue';
+import { breadcrumbQueue } from '@/lib/analytics/exporters/breadcrumb-queue';
 
 describe('BreadcrumbQueue - Integration', () => {
   beforeEach(async () => {

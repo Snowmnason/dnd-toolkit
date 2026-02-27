@@ -18,7 +18,7 @@ vi.mock('@/lib/services', async (importOriginal) => {
 vi.mock('@/lib/config/loader', () => ({ getAppConfig: () => ({ features: {} }), isDevelopment: () => false }));
 
 import { Analytics } from '@/lib/analytics';
-import { AnalyticsConsent } from '@/lib/analytics/consent';
+import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
 
 beforeEach(async () => {
   // Reset consent to default (basic) before each test

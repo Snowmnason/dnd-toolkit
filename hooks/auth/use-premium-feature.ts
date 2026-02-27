@@ -1,5 +1,5 @@
 import { trackFeatureBlocked } from '@/lib/analytics';
-import { SubscriptionManager } from '@/lib/premium/subscription-manager';
+import { SubscriptionManager } from '@/lib/premium';
 import { logger } from '@/lib/utils/logger';
 import { useEffect, useRef, useState } from 'react';
 

@@ -1,11 +1,12 @@
 import {
-    getCurrentSession,
-    listenToAuthStateChanges,
-    mapAuthErrorToCode,
-    resendConfirmationEmail
+  getCurrentSession,
+  listenToAuthStateChanges,
+  mapAuthErrorToCode,
+  resendConfirmationEmail,
+  signOutUser
 } from "@/lib/auth";
+
 import type { Session } from "@/lib/services";
-import { signOutUser } from "@/lib/settings";
 
 import { type AuthErrorCode } from "@/maps/ERROR_CODES";
 import { useCallback, useEffect, useRef, useState } from "react";

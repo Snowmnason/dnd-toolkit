@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { breadcrumbQueue } from '@/lib/analytics/breadcrumb-queue';
-import { AnalyticsConsent } from '@/lib/analytics/consent';
+import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
+import { breadcrumbQueue } from '@/lib/analytics/exporters/breadcrumb-queue';
 
 const mockProvider = {
   name: 'mock-provider',

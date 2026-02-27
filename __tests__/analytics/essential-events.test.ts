@@ -1,4 +1,4 @@
-import { getConsentCategoryForEvent, shouldEmitEvent } from '@/lib/analytics/consent-gating';
+import { getConsentCategoryForEvent, shouldEmitEvent } from '@/lib/analytics/consent/consent-gating';
 import { describe, expect, it } from 'vitest';
 
 describe('Essential event mappings', () => {

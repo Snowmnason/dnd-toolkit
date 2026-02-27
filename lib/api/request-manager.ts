@@ -20,17 +20,17 @@ import { QueryCache } from "../storage/cache/query-cache";
 import { logger, type LogCategory, type PerfTimer } from "../utils/logger";
 import { AuthLayer, type AuthContext } from "./auth-layer";
 import {
-  CircuitBreakerManager,
-  CircuitBreakerOpenError,
-  DEFAULT_THRESHOLDS,
-  type CircuitThresholds,
-} from "./circuit-breaker";
-import {
   InterceptorManager,
   parseEndpoint,
   type RequestInterceptor,
 } from "./interceptor";
-import { OfflineQueueManager, type QueuedRequestEntry } from "./offline-queue";
+import {
+  CircuitBreakerManager,
+  CircuitBreakerOpenError,
+  DEFAULT_THRESHOLDS,
+  type CircuitThresholds,
+} from "./resilience/circuit-breaker";
+import { OfflineQueueManager, type QueuedRequestEntry } from "./resilience/offline-queue";
 
 /**
  * Request Manager: Centralized API request layer with:

@@ -75,9 +75,6 @@ export * from "./offline";
 // ===== Premium Features & Subscriptions =====
 export * from "./premium";
 
-// ===== Settings (User Settings & Account) =====
-export * from "./settings";
-
 // ===== Storage (Secure Storage & Encryption) =====
 export * from "./storage";
 

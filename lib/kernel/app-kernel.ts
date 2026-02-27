@@ -19,7 +19,7 @@
 import {
   cleanupAnalyticsNetworkIntegration,
   initializeAnalyticsNetworkIntegration,
-} from "@/lib/analytics/analytics-network-integration";
+} from "@/lib/analytics/exporters/analytics-network-integration";
 import { NetworkCascadeDetector } from "@/lib/error/network-cascade-detector";
 import type { SafeModeState } from "@/lib/error/safe-mode";
 import {
@@ -265,7 +265,7 @@ class AppKernelClass {
           const { Platform } = await import("react-native");
           const { preloadThemes } = await import("@/theme");
           const { injectWebFonts } =
-            await import("@/lib/utils/web-font-loader");
+            await import("@/lib/utils/web/web-font-loader");
 
           if (Platform.OS === "web") {
             await injectWebFonts();
@@ -423,7 +423,7 @@ class AppKernelClass {
 
           // Initialize storage health monitoring (validates storage + starts polling)
           const { initializeStorageHealthMonitoring } =
-            await import("@/lib/storage/cache/storage-health-monitor");
+            await import("@/lib/storage/utilites/storage-health-monitor");
           await initializeStorageHealthMonitoring();
 
           // Initialize all storage keys with safe defaults on startup
@@ -536,7 +536,7 @@ class AppKernelClass {
 
           // Initialize auth health monitoring (validates auth + starts polling)
           const { initializeAuthHealthMonitoring } =
-            await import("@/lib/auth/auth-health-monitor");
+            await import("@/lib/auth/health/auth-health-monitor");
           await initializeAuthHealthMonitoring();
 
           // Track auth completion time
@@ -556,9 +556,9 @@ class AppKernelClass {
           // Initialize offline queue system
           try {
             const { OfflineQueueManager } =
-              await import("@/lib/api/offline-queue");
+              await import("@/lib/api/resilience/offline-queue");
             const { initializeOfflineQueueReplay } =
-              await import("@/lib/api/offline-queue-replay");
+              await import("@/lib/api/resilience/offline-queue-replay");
 
             // Load persisted queue from storage
             await OfflineQueueManager.initialize();
@@ -598,7 +598,7 @@ class AppKernelClass {
 
           // Initialize consent sync queue and set up network hook for auto-processing
           try {
-            const { ConsentSyncQueue } = await import("@/lib/analytics/consent-sync-queue");
+            const { ConsentSyncQueue } = await import("@/lib/analytics/consent/consent-sync-queue");
             
             // Load persisted consent sync items from storage
             await ConsentSyncQueue.initialize();

@@ -590,7 +590,7 @@ export const AuthStateManager = {
 
         // Refresh all worlds cache (if one is stale, all are stale)
         const { updateStorageCache } =
-          await import("../storage/update-storage-cache");
+          await import("../storage/sync/update-storage-cache");
         await updateStorageCache.refreshAllWorldsCache();
 
         // Now check cache - it's been refreshed
@@ -631,7 +631,7 @@ export const AuthStateManager = {
 
       // Refresh all worlds cache (userId from SecureStorage never stale)
       const { updateStorageCache } =
-        await import("../storage/update-storage-cache");
+        await import("../storage/sync/update-storage-cache");
       await updateStorageCache.refreshAllWorldsCache();
 
       // Now check cache again - it's been refreshed
@@ -648,7 +648,7 @@ export const AuthStateManager = {
       // Fallback: refresh all worlds cache and try again
       try {
         const { updateStorageCache } =
-          await import("../storage/update-storage-cache");
+          await import("../storage/sync/update-storage-cache");
         await updateStorageCache.refreshAllWorldsCache();
 
         const freshCached = await SecureStorage.getJSON<boolean>(cacheKey);
@@ -686,7 +686,7 @@ export const AuthStateManager = {
 
     // Do ONE bulk refresh to get all world access flags at once
     const { updateStorageCache } =
-      await import("../storage/update-storage-cache");
+      await import("../storage/sync/update-storage-cache");
     let refreshResult: any = null;
     try {
       refreshResult = await updateStorageCache.refreshAllWorldsCache();

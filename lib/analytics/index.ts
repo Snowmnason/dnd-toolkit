@@ -11,20 +11,20 @@
 // Core analytics APIs
 export { Analytics } from "./analytics-manager";
 export { trackFeatureBlocked, type FeatureBlockedReason } from "./feature-tracking";
-export { Performance, withTiming } from "./performance-manager";
+export { Performance, withTiming } from "./performance/performance-manager";
 
 // Consent and event management
-export { AnalyticsConsent, type ConsentLevel } from "./consent";
+export { AnalyticsConsent, type ConsentLevel } from "./consent/consent";
 export {
   DEFAULT_EVENT_CONSENT_MAPPING,
   getConsentCategoryForEvent,
   registerEventConsentMapping,
   shouldEmitEvent,
   type ConsentCategory
-} from "./consent-gating";
+} from "./consent/consent-gating";
 
 // Error and consent payload handling
-export { getCrashReportPayload } from "./consent-error-payload";
+export { getCrashReportPayload } from "./consent/consent-error-payload";
 
 // Performance monitoring
 export {
@@ -44,7 +44,7 @@ export {
   type AnalyticsBufferConfig,
   type AnalyticsBufferStats,
   type QueuedAnalyticsEvent
-} from "./analytics-buffer";
+} from "./exporters/analytics-buffer";
 
 // Analytics network integration
 export {
@@ -52,13 +52,13 @@ export {
   flushAnalyticsQueue,
   handleAnalyticsConsentWithdrawal,
   initializeAnalyticsNetworkIntegration
-} from "./analytics-network-integration";
+} from "./exporters/analytics-network-integration";
 
 // Breadcrumb queue (Phase 1a - offline persistence)
-export { breadcrumbQueue, type BreadcrumbQueueStats } from "./breadcrumb-queue";
+export { breadcrumbQueue, type BreadcrumbQueueStats } from "./exporters/breadcrumb-queue";
 
 // Consent sync management
-export { ConsentSyncQueue, type PendingConsentSync } from "./consent-sync-queue";
+export { ConsentSyncQueue, type PendingConsentSync } from "./consent/consent-sync-queue";
 
 // Session manager
 export { sessionManager } from "./session";
