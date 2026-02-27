@@ -26,7 +26,7 @@
  * });
  */
 
-import { ERROR_CODES } from '../utils/ERROR_CODES';
+import { ERROR_CODES } from './ERROR_CODES';
 
 export interface ErrorCodeReference {
   /** Display name (e.g., "Invalid Credentials") */

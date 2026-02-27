@@ -13,8 +13,8 @@ import {
   FormAuthInput,
 } from "@/components/auth_components";
 import { useResetPasswordConfirm } from "@/hooks/auth";
-import { getPasswordRequirementsForUI } from "@/lib/schemas/auth.schema";
 import { useScale } from "@/theme";
+import { getPasswordRequirementsForUI } from "@/validation/auth.schema";
 import { useRef } from "react";
 import { TextInput } from "react-native";
 

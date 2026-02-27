@@ -11,7 +11,7 @@ import type {
   World,
   WorldRepository,
   WorldWithAccess
-} from "./types";
+} from "./repo-types";
 
 /**
  * Supabase implementation of WorldRepository.

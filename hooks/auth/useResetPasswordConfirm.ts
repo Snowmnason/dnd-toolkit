@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Platform } from 'react-native';
-import { resetPasswordSchema, type ResetPasswordFormData } from '../../lib/schemas/auth.schema';
+import { resetPasswordSchema, type ResetPasswordFormData } from '../../validation/auth.schema';
 
 export const useResetPasswordConfirm = () => {
   const router = useRouter();

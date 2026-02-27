@@ -18,7 +18,7 @@
  * ```
  */
 
-import { ERROR_CODES, type HttpStatusCode } from '../utils/ERROR_CODES';
+import { ERROR_CODES, type HttpStatusCode } from './ERROR_CODES';
 
 /**
  * Map HTTP status code (number) to canonical HTTP error code (number from ERROR_CODES.HTTP)

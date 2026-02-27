@@ -1,5 +1,5 @@
 import { Alert, Linking, Platform } from 'react-native';
-import { logger } from '../utils/logger';
+import { logger } from '../lib/utils/logger';
 
 // Get email domain from email address
 export const getEmailDomain = (email: string) => {

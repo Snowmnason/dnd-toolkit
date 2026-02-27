@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { QueryCache } from '../../lib/cache/query-cache';
 import { NetworkDetection } from '../../lib/network';
+import { QueryCache } from '../../lib/storage/cache/query-cache';
 import { logger } from '../../lib/utils/logger';
 
 /**

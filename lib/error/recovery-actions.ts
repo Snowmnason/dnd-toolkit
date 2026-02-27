@@ -12,12 +12,13 @@
  * - REINSTALL: Guides user to uninstall and reinstall app
  */
 
+import { STORAGE_KEYS } from "@/maps";
 import { Router } from "expo-router";
 import { Analytics, Performance } from "../analytics";
 import { AuthStateManager } from "../auth/auth-state";
-import { QueryCache } from "../cache/query-cache";
 import { getAllRouteConfigs } from "../navigation/navigation-config";
-import { SecureStorage, STORAGE_KEYS } from "../storage";
+import { SecureStorage } from "../storage";
+import { QueryCache } from "../storage/cache/query-cache";
 import { logger } from "../utils/logger";
 import { RecoveryAction, SafeModeState } from "./safe-mode";
 

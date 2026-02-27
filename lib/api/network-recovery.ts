@@ -7,11 +7,10 @@
  *
  * Phase 2 of APIClient factory: automatic network recovery coordination
  */
-
-import { QueryCache } from "@/lib/cache";
 import type { NetworkState } from "@/lib/network/state-machine";
-import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
+import { QueryCache, SecureStorage } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
+import { STORAGE_KEYS } from "@/maps";
 import { OfflineQueueManager } from "./offline-queue";
 import { RequestManager } from "./request-manager";
 

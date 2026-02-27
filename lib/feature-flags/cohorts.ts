@@ -11,7 +11,7 @@
  * @module lib/feature-flags/cohorts
  */
 
-import { isInRollout } from "./rollout";
+import { isInRollout } from "../../pure-algo-immutables/rollout";
 
 /**
  * Cohort Definition (TypeScript interface)

@@ -22,10 +22,12 @@ import { getAppConfig, getPlatformName, isDevelopment } from '@/config';
 import { trackVariantAssignment } from "@/lib/analytics/variant-tracking";
 import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
 import { FeatureFlagOverrideRow } from "@/lib/database/feature-flag-overrides";
-import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
+import { SecureStorage } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
+import { STORAGE_KEYS } from "@/maps";
 
 // Relative module imports (local)
+import { isInRolloutMemoized } from "../../pure-algo-immutables/rollout";
 import {
   evaluateAdvancedCondition,
   validateAdvancedCondition,
@@ -33,7 +35,6 @@ import {
 import { FlagEvaluationCache } from "./cache";
 import { isUserInCohort } from "./cohorts";
 import { evaluateConditions, type FlagContext } from "./conditions";
-import { isInRolloutMemoized } from "./rollout";
 
 // ==========================================
 // Types

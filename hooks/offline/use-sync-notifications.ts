@@ -13,7 +13,7 @@
 import { getAppConfig } from "@/config";
 import { useEffect, useMemo, useState } from "react";
 import { OnlineSyncManager } from "../../lib/offline/sync-manager";
-import { OfflineSyncStatus } from "../../lib/offline/types";
+import { OfflineSyncStatus } from "../../type-definitions/mutation-queue-types";
 
 interface ToastState {
   visible: boolean;

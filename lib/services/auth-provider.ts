@@ -16,8 +16,9 @@
  */
 
 import { isDevelopment } from '@/config';
-import { validateEmail, validatePassword } from '@/lib/auth/validation';
-import { logger, RedactionManager } from '@/lib/utils';
+import { logger } from '@/lib/utils';
+import { RedactionManager } from "@/pure-algo-immutables";
+import { validateEmail, validatePassword } from '@/validation/validation';
 
 /**
  * Session data returned by auth provider.

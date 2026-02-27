@@ -1,4 +1,4 @@
-import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
+import { SecureStorage } from "@/lib/storage";
 import {
   handleCacheMigration,
   validateCacheEntry,
@@ -6,6 +6,7 @@ import {
   type VersionedCacheEntry,
 } from "@/lib/storage/cache-versioning";
 import { logger } from "@/lib/utils/logger";
+import { STORAGE_KEYS } from "@/maps";
 import type { RequestOptions } from "./request-manager";
 
 /**

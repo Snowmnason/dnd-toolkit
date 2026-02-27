@@ -1,6 +1,7 @@
 import { AuthStateManager } from "@/lib/auth/auth-state";
-import { getPrivacyStorageBackend, STORAGE_KEYS } from "@/lib/storage";
+import { getPrivacyStorageBackend } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
+import { STORAGE_KEYS } from "@/maps";
 import React, {
   createContext as createReactContext,
   ReactNode,

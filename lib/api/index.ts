@@ -36,14 +36,7 @@ export {
     parseEndpoint,
     type RequestInterceptor
 } from "./interceptor";
-export {
-    getStatusMessage,
-    isClientError,
-    isPermanentError,
-    isServerError,
-    isTransientError,
-    statusToErrorCode,
-} from "./http-error-mapper";
+
 export {
     NetworkRecoveryManager,
     registerNetworkRecoveryHooks,

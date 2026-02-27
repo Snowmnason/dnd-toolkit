@@ -26,7 +26,6 @@
 
 
 import { getAppConfig, OFFLINE_SYNC_DEFAULTS } from "@/config";
-import { QueryCache } from "@/lib/cache/query-cache";
 import {
   createSafeModeState,
   NetworkCascadeDetector,
@@ -37,7 +36,14 @@ import {
   NetworkDetection,
   type NetworkStatus,
 } from "@/lib/network/network-detection";
+import { QueryCache } from "@/lib/storage/cache/query-cache";
 import { logger } from "@/lib/utils/logger";
+import type {
+  OfflineSyncConfig,
+  OfflineSyncStatus,
+  QueuedMutation,
+  SyncResult,
+} from "../../type-definitions/mutation-queue-types";
 import { getConflictQueueManager } from "./conflict-queue-manager";
 import { executeConflictResolution } from "./conflict-resolution";
 import { OfflineMutationQueue } from "./mutation-queue";
@@ -46,12 +52,6 @@ import {
   NetworkErrorClassifier,
 } from "./offline-recovery";
 import { executeSyncHandler } from "./sync-handlers";
-import type {
-  OfflineSyncConfig,
-  OfflineSyncStatus,
-  QueuedMutation,
-  SyncResult,
-} from "./types";
 
 /**
  * Get default sync configuration from appsettings

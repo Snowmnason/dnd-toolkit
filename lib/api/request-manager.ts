@@ -1,34 +1,34 @@
 import { getAppConfig } from "../../config";
+import { ERROR_CODES, type ErrorCodeType } from "../../maps/ERROR_CODES";
 import {
-    Analytics,
-    AnalyticsConsent,
-    getCrashReportPayload,
-    sanitizeError as sanitizeErrorForAnalytics,
+  Analytics,
+  AnalyticsConsent,
+  getCrashReportPayload,
+  sanitizeError as sanitizeErrorForAnalytics,
 } from "../analytics";
-import { QueryCache } from "../cache";
 import { enrichError, extractErrorCode } from "../error";
 import {
-    buildAdaptiveQueryParams,
-    captureErrorCorrelation,
-    ErrorType,
-    getAdaptivePayloadOptions,
-    NetworkDetection,
-    type PayloadQuality,
+  buildAdaptiveQueryParams,
+  captureErrorCorrelation,
+  ErrorType,
+  getAdaptivePayloadOptions,
+  NetworkDetection,
+  type PayloadQuality,
 } from "../network";
 import { getErrorTracker } from "../services";
-import { ERROR_CODES, type ErrorCodeType } from "../utils/ERROR_CODES";
+import { QueryCache } from "../storage/cache/query-cache";
 import { logger, type LogCategory, type PerfTimer } from "../utils/logger";
 import { AuthLayer, type AuthContext } from "./auth-layer";
 import {
-    CircuitBreakerManager,
-    CircuitBreakerOpenError,
-    DEFAULT_THRESHOLDS,
-    type CircuitThresholds,
+  CircuitBreakerManager,
+  CircuitBreakerOpenError,
+  DEFAULT_THRESHOLDS,
+  type CircuitThresholds,
 } from "./circuit-breaker";
 import {
-    InterceptorManager,
-    parseEndpoint,
-    type RequestInterceptor,
+  InterceptorManager,
+  parseEndpoint,
+  type RequestInterceptor,
 } from "./interceptor";
 import { OfflineQueueManager, type QueuedRequestEntry } from "./offline-queue";
 

@@ -15,8 +15,8 @@
  *   logger.category(enriched.category as any).error(enriched.message, enriched.toLogMetadata());
  */
 
-import { isAppError } from '@/lib/error/app-error';
-import { ERROR_CODES_METADATA, type ErrorCodeType } from '@/lib/utils/ERROR_CODES';
+import { ERROR_CODES_METADATA, type ErrorCodeType } from '@/maps/ERROR_CODES';
+import { isAppError } from '@/pure-algo-immutables/app-error';
 
 /**
  * Structured error enrichment with metadata from ERROR_CODES registry

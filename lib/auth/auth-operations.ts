@@ -36,14 +36,14 @@ import {
     type Session,
     UserNotFoundError,
 } from "@/lib/services";
-import { mapAuthErrorToCode, ERROR_CODES, RetryErrorCode } from "../utils/ERROR_CODES";
+import { validateEmail, validatePassword } from "@/validation/";
+import { type AuthErrorCode, ERROR_CODES, RetryErrorCode } from "../../maps/ERROR_CODES";
 import { logger } from "../utils/logger";
 import {
     checkAuthGuard,
     recordAuthFailure,
     recordAuthSuccess,
 } from "./auth-attempt-guard";
-import { validateEmail, validatePassword } from "./validation";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -141,6 +141,18 @@ function classifyErrorRetryStrategy(error: unknown): ErrorRetryStrategy {
     shouldAutoRetry: false,
     reason: ERROR_CODES.RETRY.UNKNOWN,
   };
+}
+
+/**
+ * Map a normalized AuthError instance to a canonical `AuthErrorCode`.
+ */
+export function mapAuthErrorToCode(error: unknown): AuthErrorCode {
+  if (error instanceof InvalidCredentialsError) return ERROR_CODES.AUTH.INVALID_CREDENTIALS;
+  if (error instanceof EmailAlreadyExistsError)  return ERROR_CODES.AUTH.EMAIL_ALREADY_EXISTS;
+  if (error instanceof UserNotFoundError)        return ERROR_CODES.AUTH.USER_NOT_FOUND;
+  if (error instanceof NetworkError)             return ERROR_CODES.AUTH.UNKNOWN;
+  if (error instanceof RateLimitError)           return ERROR_CODES.AUTH.RATE_LIMIT;
+  return ERROR_CODES.AUTH.UNKNOWN;
 }
 
 // ============================================================================
@@ -692,11 +704,7 @@ export const listenToAuthStateChanges = async (
 // EXPORTS
 // ============================================================================
 
-/**
- * Re-export existing operations from authService for backward compatibility.
- * These will be migrated here in future refactors.
- * @deprecated Use functions defined in this module instead.
- */
+// Re-export from authService (these are still used by hooks)
 export {
     checkPendingInvites,
     generateWorldInviteLink,

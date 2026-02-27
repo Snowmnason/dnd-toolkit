@@ -48,9 +48,6 @@ export {
 // ===== Auth (Authentication & Authorization) =====
 export * from "./auth";
 
-// ===== Cache (Query & Data Caching) =====
-export * from "./cache";
-
 // ===== Config (App Configuration) =====
 export * from "../config";
 
@@ -77,9 +74,6 @@ export * from "./offline";
 
 // ===== Premium Features & Subscriptions =====
 export * from "./premium";
-
-// ===== Schemas (Validation & Type Definitions) =====
-export * from "./schemas";
 
 // ===== Settings (User Settings & Account) =====
 export * from "./settings";

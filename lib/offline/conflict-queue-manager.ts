@@ -9,7 +9,7 @@
  * and called from non-React code (like sync-manager).
  */
 
-import { QueuedMutation, SyncConflict } from "./types";
+import { QueuedMutation, SyncConflict } from "../../type-definitions/mutation-queue-types";
 //import { ConflictResolutionResult } from "./conflict-resolution";
 
 export interface ConflictQueueItem {

@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { signInSchema, type SignInFormData } from '../../lib/schemas/auth.schema';
+import { signInSchema, type SignInFormData } from '../../validation/auth.schema';
 
 export const useSignInForm = () => {
   const router = useRouter();

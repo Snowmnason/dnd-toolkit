@@ -8,7 +8,7 @@
  * Rule: App code must NEVER see raw Supabase codes. All translation happens here.
  */
 
-import { AuthErrorCode, DatabaseErrorCode, ERROR_CODES } from '../../utils/ERROR_CODES';
+import { AuthErrorCode, DatabaseErrorCode, ERROR_CODES } from '../../../maps/ERROR_CODES';
 
 // ============================================================================
 // DATABASE ERROR TRANSLATION

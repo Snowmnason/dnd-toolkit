@@ -17,7 +17,7 @@
  * Phase 4: Auth-on-replay, redaction, scheduled retries
  */
 
-import { QueryCache } from "@/lib/cache";
+import { QueryCache } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import type { ZodType } from "zod";
 import { AuthLayer } from "./auth-layer";

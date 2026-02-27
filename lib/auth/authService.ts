@@ -5,16 +5,17 @@ import {
   NetworkError,
   RateLimitError
 } from "@/lib/services";
+import { ERROR_CODES, STORAGE_KEYS } from "@/maps";
+import { RetryErrorCode } from "../../maps/ERROR_CODES";
+import { validateEmail, validatePassword } from "../../validation/validation";
 import { usersDB } from "../database/users";
-import { SecureStorage, STORAGE_KEYS } from "../storage";
-import { ERROR_CODES, RetryErrorCode } from "../utils/ERROR_CODES";
+import { SecureStorage } from "../storage";
 import { logger } from "../utils/logger";
 import {
   checkAuthGuard,
   recordAuthFailure,
   recordAuthSuccess,
 } from "./auth-attempt-guard";
-import { validateEmail, validatePassword } from "./validation";
 
 export interface SignUpResult {
   success: boolean;
@@ -309,7 +310,8 @@ export const signInUser = async (
       await AuthStateManager.setHasAccount(true);
 
       // Record successful login timestamp (for welcome screen skip - valid for 7 days)
-      const { SecureStorage, STORAGE_KEYS } = await import("@/lib/storage");
+      const { SecureStorage } = await import("@/lib/storage");
+      const { STORAGE_KEYS } = await import("@/maps") ;
       await SecureStorage.setItem(
         STORAGE_KEYS.LAST_LOGGED_IN,
         Date.now().toString(),

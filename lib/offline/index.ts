@@ -38,19 +38,6 @@ export {
     createOptimisticUpdate, enqueueIfOffline, getCacheKeyPatternForMutation, isQueuedMutation, reducePayloadByPersistence, rollbackOptimisticUpdate
 } from "./utils";
 
-export type {
-    AuthReplayMetadata, MutationOperation,
-    MutationPersistence,
-    // Phase 4 types
-    NetworkErrorContract,
-    OfflineQueueStats, OfflineSyncConfig,
-    OfflineSyncStatus,
-    QueuedMutation, SyncConflict,
-    SyncResult
-} from "./types";
-
-export { SyncStatus } from "./types";
-
 // Phase 4 Enhancements
 export {
     AuthReplayManager, BackoffScheduler, CircuitBreakerReplayManager,

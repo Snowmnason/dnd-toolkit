@@ -1,7 +1,8 @@
 import { checkPendingInvites, signUpUser } from "@/lib/auth";
 import { usersDB } from "@/lib/database";
-import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
+import { SecureStorage } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
+import { STORAGE_KEYS } from "@/maps";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -13,7 +14,7 @@ import {
   getPasswordRequirementsForUI,
   type SignUpFormData,
   signUpSchema,
-} from '../../lib/schemas/auth.schema';
+} from '../../validation/auth.schema';
 
 type SignUpMode = "signup" | "complete-profile";
 // Use conditional type to properly type form values based on mode

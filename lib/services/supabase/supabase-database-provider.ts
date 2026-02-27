@@ -10,7 +10,7 @@
  * Error mapping converts Supabase `PostgrestError` to `QueryError`.
  */
 
-import { ERROR_CODES } from '../../utils/ERROR_CODES';
+import { ERROR_CODES } from '../../../maps/ERROR_CODES';
 import {
   DatabaseProvider,
   QueryBuilder,

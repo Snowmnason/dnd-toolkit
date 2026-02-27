@@ -21,8 +21,8 @@ import {
   Session,
   UserNotFoundError,
 } from '@/lib/services/auth-provider';
-import { ERROR_CODES } from '@/lib/utils/ERROR_CODES';
 import { logger } from '@/lib/utils/logger';
+import { ERROR_CODES } from '@/maps/ERROR_CODES';
 import { mapSupabaseAuthCode } from './supabase-error-translation';
 
 /**

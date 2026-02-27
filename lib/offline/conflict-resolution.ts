@@ -7,7 +7,7 @@
  * Future: Support for field-level merging and multi-device sync in later phases.
  */
 
-import { QueuedMutation, SyncConflict } from "./types";
+import { QueuedMutation, SyncConflict } from "../../type-definitions/mutation-queue-types";
 
 /**
  * Represents the result of applying a conflict resolution strategy

@@ -13,14 +13,15 @@
  */
 
 import { OFFLINE_SYNC_DEFAULTS } from "@/config";
-import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
+import { SecureStorage } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
+import { STORAGE_KEYS } from "@/maps";
+import type { QueuedMutation } from "../../type-definitions/mutation-queue-types";
 import {
-    BackoffScheduler,
-    OfflineQueueStatsCollector,
-    Phase4Enhancements,
+  BackoffScheduler,
+  OfflineQueueStatsCollector,
+  Phase4Enhancements,
 } from "./offline-recovery";
-import type { QueuedMutation } from "./types";
 
 /**
  * Generate a UUID v4

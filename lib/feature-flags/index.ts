@@ -13,11 +13,7 @@ export {
 } from "./server-sync";
 
 export {
-    bucketPercent, clearBucketCache, getBucketMemoized, isInRollout, isInRolloutMemoized, type RolloutConfig
-} from "./rollout";
-
-export {
-    RECOMMENDED_COHORTS, isUserInCohort, type CohortDef,
+    isUserInCohort, RECOMMENDED_COHORTS, type CohortDef,
     type CohortFlagAssignmentRow,
     type CohortRow,
     type UserCohortMembershipRow

@@ -1,3 +1,4 @@
+```ts
 /**
  * Type Inference Guide for APIClient with Zod
  *

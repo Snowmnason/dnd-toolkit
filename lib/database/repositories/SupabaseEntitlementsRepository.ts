@@ -6,7 +6,7 @@ import type {
   EntitlementOverrideRow,
   EntitlementRow,
   EntitlementsRepository,
-} from "./types";
+} from "./repo-types";
 
 /**
  * Supabase implementation of EntitlementsRepository.

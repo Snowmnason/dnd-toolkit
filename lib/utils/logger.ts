@@ -16,7 +16,7 @@
  */
 
 import { getAppConfig } from '@/config';
-import { RedactionManager, redactPII } from "@/lib/utils/redaction-manager";
+import { RedactionManager, redactPII } from "@/pure-algo-immutables/redaction-manager";
 
 // Lazy imports to break circular dependency
 // These are required only inside functions, not at module load time

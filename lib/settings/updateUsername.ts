@@ -1,4 +1,4 @@
-import { validateUsername } from '../auth/validation';
+import { validateUsername } from '../../validation/validation';
 import { usersDB } from '../database/users';
 import { logger } from '../utils/logger';
 

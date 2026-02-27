@@ -11,7 +11,7 @@
  * - Platform-specific storage failures
  */
 
-import { ERROR_CODES, StorageErrorCode } from '../../utils/ERROR_CODES';
+import { ERROR_CODES, StorageErrorCode } from '../../../maps/ERROR_CODES';
 import { logger } from '../../utils/logger';
 
 // ==========================================

@@ -6,7 +6,7 @@ import type {
   FeatureFlagOverrideRow,
   FeatureFlagRow,
   FeatureFlagsRepository,
-} from "./types";
+} from "./repo-types";
 
 /**
  * Supabase implementation of FeatureFlagsRepository.

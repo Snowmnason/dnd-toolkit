@@ -17,8 +17,9 @@
 /* eslint-disable security/detect-object-injection */
 
 import { getAppConfig } from '@/config';
-import { SecureStorage, STORAGE_KEYS } from '@/lib/storage';
+import { SecureStorage } from '@/lib/storage';
 import { logger } from '@/lib/utils/logger';
+import { STORAGE_KEYS } from "@/maps";
 
 /**
  * Single operation's baseline statistics

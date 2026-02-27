@@ -1,7 +1,7 @@
 'use client';
 
-import { QueryCache } from '@/lib/cache';
 import { UpdateUserData, User, usersDB } from '@/lib/database/users';
+import { QueryCache } from '@/lib/storage';
 import { logger } from '@/lib/utils/logger';
 import { useCallback, useState } from 'react';
 

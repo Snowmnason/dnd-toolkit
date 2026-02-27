@@ -1,5 +1,5 @@
-import { FastCache } from "../storage";
-import { logger } from "../utils/logger";
+import { FastCache } from "..";
+import { logger } from "../../utils/logger";
 
 /**
  * Query Cache: Centralized cache with invalidation patterns

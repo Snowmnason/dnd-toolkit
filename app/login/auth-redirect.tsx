@@ -1,8 +1,9 @@
 import { AuthModal } from "@/components/auth_components";
 import { Caption } from "@/components/ui";
-import { AuthStateManager, ERROR_CODES, getCurrentSession, logger, usersDB, worldsDB } from "@/lib";
+import { AuthStateManager, getCurrentSession, logger, usersDB, worldsDB } from "@/lib";
 import { getAuthProvider } from "@/lib/auth";
-import { getPrivacyStorageBackend, STORAGE_KEYS } from "@/lib/storage";
+import { getPrivacyStorageBackend } from "@/lib/storage";
+import { ERROR_CODES, STORAGE_KEYS } from "@/maps";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";

@@ -6,12 +6,12 @@
  */
 
 import {
-    bucketPercent,
-    clearBucketCache,
-    getBucketMemoized,
-    isInRollout,
-    isInRolloutMemoized,
-} from "@/lib/feature-flags/rollout";
+  bucketPercent,
+  clearBucketCache,
+  getBucketMemoized,
+  isInRollout,
+  isInRolloutMemoized,
+} from "@/pure-algo-immutables/rollout";
 import { beforeEach, describe, expect, it } from "vitest";
 
 describe("bucketPercent", () => {

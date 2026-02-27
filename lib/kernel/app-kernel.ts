@@ -33,8 +33,8 @@ import {
   NetworkDetection,
   NetworkStatus,
 } from "@/lib/network/network-detection";
-import { validateClassifications } from "@/lib/storage/cache/data-classification";
 import { logger } from "@/lib/utils/logger";
+import { validateClassifications } from "@/type-definitions/data-classification";
 
 // FUTURE ENHANCEMENT: Phase Progress Callbacks
 // To add progress tracking for phases (e.g., "Loading fonts... 50%"):

@@ -8,8 +8,8 @@
 import { AppModal } from "@/components/ui/AppModal";
 import { Body } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/BaseButton";
-import { QueuedMutation, SyncConflict } from "@/lib/offline/types";
 import { useScale } from "@/theme";
+import { QueuedMutation, SyncConflict } from "@/type-definitions/mutation-queue-types";
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 

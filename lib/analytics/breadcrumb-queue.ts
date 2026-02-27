@@ -13,8 +13,9 @@ import { ANALYTICS_RETRY_DEFAULTS, getAppConfig } from '@/config';
 import { AnalyticsConsent } from '@/lib/analytics/consent';
 import { shouldEmitEvent, type ConsentCategory } from '@/lib/analytics/consent-gating';
 import { BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '@/lib/services';
-import { STORAGE_KEYS, SecureStorage } from '@/lib/storage';
+import { SecureStorage } from '@/lib/storage';
 import { logger } from '@/lib/utils';
+import { STORAGE_KEYS } from "@/maps";
 
 /**
  * In-memory queue statistics (not persisted)

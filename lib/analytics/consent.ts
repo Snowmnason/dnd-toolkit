@@ -14,8 +14,9 @@
  */
 
 import { getAppConfig } from '@/config';
-import { SecureStorage, STORAGE_KEYS } from '@/lib/storage';
+import { SecureStorage } from '@/lib/storage';
 import { logger } from '@/lib/utils/logger';
+import { STORAGE_KEYS } from "@/maps";
 
 export type ConsentLevel = 'none' | 'basic' | 'full';
 

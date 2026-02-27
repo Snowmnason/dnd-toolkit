@@ -23,7 +23,7 @@
  * calculateBackoffDelay(2, 1000) // ~4000ms ±800ms
  * calculateBackoffDelay(5, 1000) // ~32000ms ±6400ms (capped)
  */
-import { ERROR_CODES } from '../utils/ERROR_CODES';
+import { ERROR_CODES } from '../maps/ERROR_CODES';
 
 export function calculateBackoffDelay(
   retryCount: number,

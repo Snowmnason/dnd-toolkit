@@ -1,10 +1,10 @@
+import { STORAGE_KEYS } from "@/maps";
 import { getUserRepository, getWorldAccessRepository } from "../database/repositories";
 import { type AuthProvider } from "../services";
 import {
   clearAllUserData,
   getPrivacyStorageBackend,
   SecureStorage,
-  STORAGE_KEYS,
 } from "../storage";
 import { logger } from "../utils/logger";
 
@@ -290,7 +290,7 @@ export const AuthStateManager = {
       await this.clearAuthSession();
 
       // Clear query cache (all user-specific cached queries)
-      const { QueryCache } = await import("../cache/query-cache");
+      const { QueryCache } = await import("../storage/cache/query-cache");
       await QueryCache.clearAll();
 
       // CRITICAL: Set hasAccount to FALSE (not remove it)

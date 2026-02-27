@@ -9,7 +9,7 @@ import type {
   InviteLink,
   InviteRepository,
   OperationResult,
-} from "./types";
+} from "./repo-types";
 
 /**
  * Supabase implementation of InviteRepository.

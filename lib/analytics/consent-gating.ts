@@ -18,11 +18,11 @@
  */
 
 import type { ConsentLevel } from '@/lib/analytics/consent';
+import { logger } from '@/lib/utils/logger';
 import {
   ConsentCategory,
   DEFAULT_EVENT_CONSENT_MAPPING,
-} from '@/lib/analytics/event-consent-mapping';
-import { logger } from '@/lib/utils/logger';
+} from '@/maps/event-consent-mapping';
 
 // Re-export for convenience
 export { ConsentCategory, DEFAULT_EVENT_CONSENT_MAPPING };

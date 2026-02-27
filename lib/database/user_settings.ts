@@ -22,7 +22,8 @@ export const userSettingsDB = {
     // First, try to get from local storage (unless forced refresh)
     if (!forceRefresh) {
       try {
-        const { SecureStorage, STORAGE_KEYS } = await import("../storage");
+        const { SecureStorage } = await import("../storage");
+        const { STORAGE_KEYS } = await import("@/maps");
 
         const cachedSettings = await SecureStorage.getJSON<UserSettings>(
           STORAGE_KEYS.USER_SETTINGS,
@@ -76,7 +77,8 @@ export const userSettingsDB = {
 
     // Save user settings to local storage + metadata with fresh timestamp
     try {
-      const { SecureStorage, STORAGE_KEYS } = await import("../storage");
+      const { SecureStorage } = await import("../storage");
+      const { STORAGE_KEYS } = await import("@/maps");
 
       await SecureStorage.setJSON(STORAGE_KEYS.USER_SETTINGS, data);
       await SecureStorage.setJSON(STORAGE_KEYS.USER_SETTINGS_META, {
@@ -108,7 +110,8 @@ export const userSettingsDB = {
 
     // Update cached settings with new consent level
     try {
-      const { SecureStorage, STORAGE_KEYS } = await import("../storage");
+      const { SecureStorage } = await import("../storage");
+      const { STORAGE_KEYS } = await import("@/maps");
       const cachedSettings = await SecureStorage.getJSON<UserSettings>(
         STORAGE_KEYS.USER_SETTINGS,
       );

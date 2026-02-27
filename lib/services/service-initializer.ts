@@ -16,7 +16,7 @@
  */
 
 import { getAppConfig } from '@/config';
-import { AnalyticsExporter, exporterRegistry } from '@/lib/analytics/exporters';
+import { AnalyticsExporter, exporterRegistry } from '@/lib/analytics/';
 import { performanceBaselineService } from '@/lib/analytics/performance/performance-baseline';
 import { logger } from '@/lib/utils/logger';
 import { createValidatedAuthProvider, registerAuthProvider, type AuthProvider } from './auth-provider';

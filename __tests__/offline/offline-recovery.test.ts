@@ -9,11 +9,11 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
-    BackoffScheduler,
-    NetworkErrorClassifier,
-    type QueuedMutation,
+  BackoffScheduler,
+  NetworkErrorClassifier,
+  type QueuedMutation,
 } from "../../lib/offline/offline-recovery";
-import { RedactionManager } from "../../lib/utils/redaction-manager";
+import { RedactionManager } from "../../pure-algo-immutables/redaction-manager";
 
 // Mock logger to avoid noise in tests
 vi.mock("../../lib/utils/logger", () => ({

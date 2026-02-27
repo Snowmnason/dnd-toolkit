@@ -1,8 +1,8 @@
+import { STORAGE_KEYS } from "@/maps";
 import { AnalyticsConsent } from "../analytics/consent";
 import { shouldEmitEvent } from "../analytics/consent-gating";
 import { getErrorTracker } from "../services";
 import { getStorageBackend } from "../storage/cache/privacy";
-import { STORAGE_KEYS } from "../storage/index";
 import { logger } from "../utils/logger";
 
 export type AuthGuardScope = "signin" | "signup" | "reset";

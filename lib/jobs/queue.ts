@@ -38,8 +38,7 @@
 
 import { NetworkDetection } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
-import { FastCacheAdapter } from "./adapters/fastcache-adapter";
-import { calculateNextRetryTime, formatDelay, isRetryable } from "./backoff";
+import { calculateNextRetryTime, formatDelay, isRetryable } from "../../pure-algo-immutables/backoff";
 import {
   EnqueueOptions,
   JobCompletedEvent,
@@ -50,7 +49,8 @@ import {
   JobQueueConfig,
   JobRecord,
   StorageAdapter,
-} from "./types";
+} from "../../type-definitions/job-queue-types";
+import { FastCacheAdapter } from "./adapters/fastcache-adapter";
 
 // ==========================================
 // UUID Generation

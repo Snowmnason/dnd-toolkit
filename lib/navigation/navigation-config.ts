@@ -347,7 +347,7 @@ export async function evaluateRouteVariant(
 
   try {
     // Import bucketPercent for pure deterministic bucketing
-    const { bucketPercent } = await import("../feature-flags/rollout");
+    const { bucketPercent } = await import("../../pure-algo-immutables/rollout");
 
     // Calculate a single bucket for this route (0-99)
     const bucket = bucketPercent(userId, config.path);

@@ -30,13 +30,6 @@ export {
 export { SupabaseAuthProvider } from './supabase/supabase-auth-provider';
 
 export {
-    createExportContext,
-    dispatchEvent, ExporterRegistry, exporterRegistry, type AnalyticsEvent,
-    type AnalyticsExporter,
-    type ExportContext
-} from '@/lib/analytics/exporters';
-
-export {
     BreadcrumbProvider,
     BreadcrumbSendResult,
     getAdapter,
@@ -89,3 +82,4 @@ export {
     type ServiceStatus,
     type ServiceStatusDetail
 } from './service-status';
+

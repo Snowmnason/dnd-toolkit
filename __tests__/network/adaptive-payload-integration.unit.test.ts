@@ -1,8 +1,8 @@
 import { invalidateAdaptivePayloadCache } from "@/hooks/network/useAdaptivePayloadCacheInvalidation";
-import { QueryCache } from "@/lib/cache/query-cache";
 import { getAdaptivePayloadOptions } from "@/lib/network/adaptive-payload";
 import { getAdaptiveQueryParams, getQualityAwareCacheKey, getStaleTimeForQuality } from "@/lib/network/adaptive-payload-integration";
 import { NetworkDetection } from "@/lib/network/network-detection";
+import { QueryCache } from "@/lib/storage/cache/query-cache";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/network/network-detection", () => ({

@@ -12,7 +12,8 @@
  */
 
 import { FeatureFlagsManager } from "@/lib/feature-flags/server-sync";
-import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
+import { SecureStorage } from "@/lib/storage";
+import { STORAGE_KEYS } from "@/maps";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";

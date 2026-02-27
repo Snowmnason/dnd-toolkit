@@ -7,7 +7,7 @@
  * See docs/issues/MileStone 2/168 - Privacy PII Data/PRIVACY.md for policy documentation.
  */
 
-import { DATA_CLASSIFICATIONS, DataSensitivity } from "./data-classification";
+import { DATA_CLASSIFICATIONS, DataSensitivity } from "../../../type-definitions/data-classification";
 
 export interface PrivacyStorageBackend {
   getItem(key: string): Promise<string | null>;

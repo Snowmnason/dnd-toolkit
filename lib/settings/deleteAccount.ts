@@ -1,6 +1,6 @@
 import { getAuthProvider } from '@/lib/services';
+import { validatePassword } from '../../validation/validation';
 import { AuthStateManager } from '../auth/auth-state';
-import { validatePassword } from '../auth/validation';
 import { validateCurrentUser } from '../database/common';
 import { usersDB } from '../database/users';
 import { logger } from '../utils/logger';

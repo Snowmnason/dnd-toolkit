@@ -1,7 +1,7 @@
 import { AppModal, Body, Button, FormTextInput } from "@/components/ui";
-import { editWorldNameSchema, type EditWorldNameFormData } from "@/lib/schemas";
 import { logger } from "@/lib/utils/logger";
 import { $, useScale, UseTheme } from "@/theme";
+import { editWorldNameSchema, type EditWorldNameFormData } from "@/validation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";

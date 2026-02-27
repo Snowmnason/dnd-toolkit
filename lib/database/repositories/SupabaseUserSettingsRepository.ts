@@ -10,7 +10,7 @@ import type {
   CacheOptions,
   UserSettings,
   UserSettingsRepository,
-} from "./types";
+} from "./repo-types";
 
 /**
  * Supabase implementation of UserSettingsRepository.

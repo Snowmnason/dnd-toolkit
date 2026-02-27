@@ -1,10 +1,10 @@
-import { QueryCache } from "../cache";
-import { CACHE_TAGS } from "../cache/keys";
-import { SecureStorage, STORAGE_KEYS } from "../storage";
+import { STORAGE_KEYS } from "@/maps";
+import { CACHE_TAGS } from "../../maps/cache-keys";
+import { QueryCache, SecureStorage } from "../storage";
 import { worldAccessCache } from "../storage/world-access-cache";
 import { logger } from "../utils/logger";
 import { getCurrentUserProfile } from "./common";
-import { getWorldAccessRepository, getWorldRepository } from "./repositories";
+import { getInviteRepository, getWorldAccessRepository, getWorldRepository } from "./repositories";
 
 // Access role types for better type safety and maintainability
 // 'dm' (dungeon master) is the only role with owner-level access to worlds
@@ -45,6 +45,20 @@ export interface WorldAccess {
 export interface WorldWithAccess extends World {
   world_access?: WorldAccess;
   user_role: AccessRole; // Role of the current user in this world
+}
+
+export interface InviteLink {
+  id?: string;
+  world_id: string;
+  created_by?: string;
+  token: string;
+  expires_at: string;
+  created_at: string;
+}
+
+interface CreateInviteLinkParams {
+  worldId: string;
+  hoursValid?: number;
 }
 
 export interface CreateWorldData {
@@ -216,5 +230,47 @@ export const worldsDB = {
   // Get a specific world by ID
   async getById(worldId: string): Promise<World | null> {
     return getWorldRepository().getById(worldId);
+  },
+
+  // Create an invite link for a world
+  async createInviteLink(
+    params: CreateInviteLinkParams,
+  ): Promise<{ success: boolean; inviteLink?: InviteLink; error?: string }> {
+    const result = await getInviteRepository().create(params);
+    if (result.success && result.data) {
+      await QueryCache.invalidate(`world:${params.worldId}:invites`);
+      return { success: true, inviteLink: result.data };
+    }
+    return { success: false, error: result.error };
+  },
+
+  // Validate an invite token and get the associated world
+  async validateInviteToken(
+    token: string,
+  ): Promise<{ success: boolean; worldId?: string; error?: string }> {
+    const result = await getInviteRepository().validate(token);
+    if (result.success && result.data) {
+      return { success: true, worldId: result.data };
+    }
+    return { success: false, error: result.error };
+  },
+
+  // Delete an invite link
+  async deleteInviteLink(
+    token: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    const result = await getInviteRepository().delete(token);
+    return { success: result.success, error: result.error };
+  },
+
+  // Get all active invite links for a world
+  async getWorldInviteLinks(
+    worldId: string,
+  ): Promise<{ success: boolean; invites?: InviteLink[]; error?: string }> {
+    const result = await getInviteRepository().listByWorld(worldId);
+    if (result.success) {
+      return { success: true, invites: result.data ?? [] };
+    }
+    return { success: false, error: result.error };
   },
 };

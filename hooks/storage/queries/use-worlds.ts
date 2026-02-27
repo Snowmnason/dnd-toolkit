@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
-import { CACHE_CONFIG, CACHE_KEYS, CACHE_TAGS } from "../../../lib/cache/keys";
 import { worldsDB, WorldWithAccess } from "../../../lib/database/worlds";
 import { getQualityAwareCacheKey } from "../../../lib/network/adaptive-payload-integration";
 import { worldAccessCache } from "../../../lib/storage/world-access-cache";
 import { logger } from "../../../lib/utils/logger";
+import { CACHE_CONFIG, CACHE_KEYS, CACHE_TAGS } from "../../../maps/cache-keys";
 import { useAdaptivePayloadCacheInvalidation } from "../../network/useAdaptivePayloadCacheInvalidation";
 import { useQuery } from "../use-query";
 

@@ -285,7 +285,7 @@ export interface OfflineQueueStats {
  * Defines which fields should be stripped before persisting mutations
  * RedactionRule type is imported from centralized redaction manager
  */
-export type { RedactionRule } from "@/lib/utils/redaction-manager";
+export type { RedactionRule } from "@/pure-algo-immutables/redaction-manager";
 
 /**
  * Phase 4: Auth Retry Metadata

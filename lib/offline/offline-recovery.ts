@@ -18,13 +18,15 @@
 
 import { OFFLINE_SYNC_DEFAULTS } from "@/config";
 import type { AuthContext } from "@/lib/api/auth-layer";
-import { logger, RedactionManager } from "@/lib/utils";
+import { logger } from "@/lib/utils";
+
+import { RedactionManager } from "@/pure-algo-immutables";
 import type {
-    AuthReplayMetadata,
-    NetworkErrorContract,
-    OfflineQueueStats,
-    QueuedMutation,
-} from "./types";
+  AuthReplayMetadata,
+  NetworkErrorContract,
+  OfflineQueueStats,
+  QueuedMutation,
+} from "@/type-definitions/mutation-queue-types";
 
 // Re-export QueuedMutation for test imports
 export type { QueuedMutation };

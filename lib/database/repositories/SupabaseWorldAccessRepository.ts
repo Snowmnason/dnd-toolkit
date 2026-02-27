@@ -7,7 +7,7 @@ import type {
   AccessRole,
   WorldAccess,
   WorldAccessRepository
-} from "./types";
+} from "./repo-types";
 
 /**
  * Supabase implementation of WorldAccessRepository.

@@ -8,7 +8,7 @@ import { useAnalyticsNavigation } from "@/hooks/navigation";
 import { useSplashScreen } from "@/hooks/ui";
 import {
   Analytics,
-  AppErrorBoundary,
+
   AppKernel,
   buildNavigationTarget,
   executeRecoveryAction,
@@ -31,6 +31,7 @@ import {
 } from "expo-router";
 import { useEffect } from "react";
 import { View } from "react-native";
+import { AppErrorBoundary } from "../components/ErrorBoundary";
 import LoadingOverlay from "../components/LoadingOverlay";
 import {
   CrashFallBack,
