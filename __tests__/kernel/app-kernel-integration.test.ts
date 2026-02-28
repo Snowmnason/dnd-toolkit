@@ -14,7 +14,7 @@ import {
     SafeModeLevel,
     SafeModeReason,
     createSafeModeState,
-} from "@/lib/error/safe-mode";
+} from "@/lib/error";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock config loader to prevent real config loading during tests

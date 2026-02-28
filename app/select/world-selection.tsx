@@ -6,7 +6,7 @@ import { useWorldModal } from "@/hooks/utils/use-world-modal";
 import {
   useAppParamsStable,
   useUserId,
-} from "@/providers/AppParamsStableProvider";
+} from "@/providers";
 import { WorldListPanel } from "@/Screens/select/world-selection/WorldListPanel";
 import { WorldRightPanel } from "@/Screens/select/world-selection/WorldRightPanel";
 import { useScale } from "@/theme";

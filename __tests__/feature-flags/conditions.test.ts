@@ -13,7 +13,7 @@ import {
   matchUserRole,
   type FlagConditions,
   type FlagContext,
-} from "@/lib/feature-flags/conditions";
+} from "@/lib/feature-flags";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock config and platform modules

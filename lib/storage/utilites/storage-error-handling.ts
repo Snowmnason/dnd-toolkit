@@ -12,7 +12,7 @@
  */
 
 import { ERROR_CODES, StorageErrorCode } from '../../../maps/ERROR_CODES';
-import { logger } from '../../utils/logger';
+import { logger } from '@/lib/utils';
 
 // ==========================================
 // Types

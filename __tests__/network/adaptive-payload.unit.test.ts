@@ -1,12 +1,13 @@
 import {
   buildAdaptiveQueryParams,
+  ConnectionQuality,
   getAdaptivePayloadOptions,
   getCacheKeyQualityComponent,
+  NetworkStatus,
   type AdaptivePayloadOptions,
-  type PayloadQuality,
-} from "@/lib/network/adaptive-payload";
-import type { NetworkStatus } from "@/lib/network/network-detection";
-import { ConnectionQuality } from "@/lib/network/network-detection";
+  type PayloadQuality
+} from "@/lib/network";
+
 import { describe, expect, it } from "vitest";
 
 describe("Adaptive Payload Sizing (lib/network/adaptive-payload)", () => {

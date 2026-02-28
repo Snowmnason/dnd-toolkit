@@ -35,18 +35,26 @@ export {
   buildAdaptiveQueryParams,
   getAdaptivePayloadOptions,
   getCacheKeyQualityComponent
-} from "./adaptive-payload";
+} from "./adaptive-payload/adaptive-payload";
 
 export type {
   AdaptivePayloadOptions,
   PayloadQuality
-} from "./adaptive-payload";
+} from "./adaptive-payload/adaptive-payload";
 
 export {
   appendAdaptiveParams,
   getAdaptiveQueryString,
   shouldDowngradeResource
-} from "./adaptive-payload-request";
+} from "./adaptive-payload/adaptive-payload-request";
+
+export {
+  getAdaptiveQueryParams,
+  getQualityAwareCacheKey,
+  getStaleTimeForQuality,
+  integrateAdaptivePayloads,
+  type AdaptiveQueryConfig
+} from "./adaptive-payload/adaptive-payload-integration";
 
 export {
   composeNetworkContext, deriveConnectionType

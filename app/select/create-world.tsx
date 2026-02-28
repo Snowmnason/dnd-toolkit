@@ -8,7 +8,7 @@ import { AppSplit, Button } from "@/components/ui";
 import { useAuthStatus } from "@/hooks/auth/use-auth-status";
 import { useSuccessNavigation } from "@/hooks/navigation/use-success-navigation";
 import { useWorldCreation } from "@/hooks/utils/use-world-creation";
-import { usePlatform } from "@/providers/PlatformProvider";
+import { usePlatform } from "@/providers";
 import { CreateLeftPanel } from "@/Screens/select/create-world/CreateLeftPanel";
 import MapCanvas from "@/Screens/select/create-world/MapCanvas";
 import { useScale } from "@/theme";

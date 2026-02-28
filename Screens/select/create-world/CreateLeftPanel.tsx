@@ -6,7 +6,7 @@ import {
   Heading,
 } from "@/components/ui";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
-import { usePlatform } from "@/providers/PlatformProvider";
+import { usePlatform } from "@/providers";
 import { useScale } from "@/theme";
 import type { WorldFormData } from "@/validation";
 import { useRouter } from "expo-router";

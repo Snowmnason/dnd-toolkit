@@ -1,4 +1,4 @@
-import { logger } from "../utils/logger";
+import { logger } from "@/lib/utils";
 import { getUserSettingsRepository } from "./repositories";
 
 export interface UserSettings {

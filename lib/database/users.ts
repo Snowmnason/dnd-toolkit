@@ -1,6 +1,6 @@
 import { validateUsername } from "../../validation/validation";
-import { QueryCache } from "../storage";
-import { logger } from "../utils/logger";
+import { QueryCache } from "@/lib/storage";
+import { logger } from "@/lib/utils";
 import { getUserRepository } from "./repositories";
 
 export interface User {

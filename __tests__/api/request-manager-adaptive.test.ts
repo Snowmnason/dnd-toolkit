@@ -1,12 +1,12 @@
 // Prevent importing flow-typed react-native entry during tests
-import { NetworkDetection } from "@/lib/network/network-detection";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-    appendAdaptiveParams,
-    getAdaptiveQueryString,
-    shouldDowngradeResource,
-} from "@/lib/network/adaptive-payload-request";
+  appendAdaptiveParams,
+  getAdaptiveQueryString,
+  NetworkDetection,
+  shouldDowngradeResource
+} from "@/lib/network";
 vi.mock("react-native", () => ({ Platform: { OS: "ios" }, NativeModules: {} }));
 // Mock expo-constants (used by RequestManager via getAppConfig)
 vi.mock("expo-constants", () => ({ default: { expoConfig: { extra: { sentryDsn: null } } } }));

@@ -13,7 +13,7 @@ import {
     createSafeModeState,
     getSafeModeDefinition,
     getSafeModeMessage,
-} from "@/lib/error/safe-mode";
+} from "@/lib/error";
 import { describe, expect, it, vi } from "vitest";
 
 // Mock modules

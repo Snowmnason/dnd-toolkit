@@ -45,8 +45,8 @@ export {
   getSensitiveKeys,
   isSensitiveData,
   shouldUseSecureStorage
-} from "./cache/privacy";
-export { SecureStorage } from "./cache/SecureStorage";
+} from "./privacy";
+export { SecureStorage } from "./SecureStorage";
 export {
   batchStorageOperation,
   checkStorageHealth,
@@ -68,6 +68,7 @@ export {
 } from "./utilites/storage-error-handling";
 
 export { updateStorageCache } from "./sync/update-storage-cache";
+export { worldAccessCache } from "./sync/world-access-cache";
 
 /**
  * Bucket Storage Module - Barrel Export

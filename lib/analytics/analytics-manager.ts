@@ -1,5 +1,5 @@
-import { getErrorTracker } from "../services";
-import { logger } from "../utils/logger";
+import { getErrorTracker } from "@/lib/services";
+import { logger } from "@/lib/utils";
 import { AnalyticsConsent } from "./consent/consent";
 import { createExportContext, dispatchEvent } from "./exporters/exporter-registry";
 

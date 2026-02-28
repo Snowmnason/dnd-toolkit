@@ -2,7 +2,7 @@ import * as aes from "aes-js";
 import * as Crypto from "expo-crypto";
 import { Platform } from "react-native";
 import "react-native-get-random-values";
-import { logger } from "../utils/logger";
+import { logger } from "@/lib/utils";
 
 // Type-safe imports for platform-specific storage
 let AsyncStorage: any;

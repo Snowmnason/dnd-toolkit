@@ -26,10 +26,10 @@
  */
 
 import {
-    trackVariantEngagement,
-    trackVariantPerformance,
-} from "@/lib/analytics/variant-tracking";
-import { useUserId } from "@/providers/AppParamsStableProvider";
+  trackVariantEngagement,
+  trackVariantPerformance,
+} from "@/lib/analytics";
+import { useUserId } from "@/providers";
 import { useCallback } from "react";
 
 interface UseVariantTrackingOptions {

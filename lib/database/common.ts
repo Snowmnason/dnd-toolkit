@@ -1,7 +1,7 @@
 import { isDevelopment } from '@/config';
 
-import { getAuthProvider } from "../services";
-import { logger } from "../utils/logger";
+import { getAuthProvider } from "@/lib/services";
+import { logger } from "@/lib/utils";
 import { getUserRepository } from "./repositories";
 import type { User } from "./users";
 

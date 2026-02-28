@@ -11,7 +11,7 @@
  * Hooks are NOT called for 401 errors (AuthLayer handles those).
  */
 
-import { logger } from "../utils/logger";
+import { logger } from "@/lib/utils";
 
 export interface RequestInterceptor {
   /** Optional name for debugging/logging */

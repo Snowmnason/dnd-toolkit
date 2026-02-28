@@ -1,12 +1,12 @@
 import { STORAGE_KEYS } from "@/maps";
-import { getUserRepository, getWorldAccessRepository } from "../database/repositories";
-import { type AuthProvider } from "../services";
+import { getUserRepository, getWorldAccessRepository } from "@/lib/database";
+import { type AuthProvider } from "@/lib/services";
 import {
   clearAllUserData,
   getPrivacyStorageBackend,
   SecureStorage,
-} from "../storage";
-import { logger } from "../utils/logger";
+} from "@/lib/storage";
+import { logger } from "@/lib/utils";
 
 // Session schema version for future migrations
 const AUTH_SESSION_VERSION = 1;

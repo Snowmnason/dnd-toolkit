@@ -2,8 +2,8 @@
  * Safety mechanisms to prevent infinite redirects in authentication flow
  */
 
-import { SecureStorage } from '../../storage';
-import { logger } from '../../utils/logger';
+import { SecureStorage } from '@/lib/storage';
+import { logger } from '@/lib/utils';
 
 const REDIRECT_SAFETY_KEY = 'dnd_redirect_attempts';
 const MAX_REDIRECT_ATTEMPTS = 3;

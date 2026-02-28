@@ -5,7 +5,7 @@ import {
   SafeModeLevel,
   SafeModeReason,
   SafeModeState,
-} from "@/lib/error/safe-mode";
+} from "@/lib/error";
 import { useEffect } from "react";
 import VersionDisplay from "../VersionDisplay";
 import { ErrorFallbackShell } from "./ErrorFallbackShell";

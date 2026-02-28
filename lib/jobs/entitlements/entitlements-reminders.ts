@@ -11,8 +11,8 @@
  * - Track reminder delivery and user actions (renewal, dismiss, etc.)
  */
 
-import { getAppConfig } from '../../../config';
-import { logger } from '../../utils/logger';
+import { getAppConfig } from '@/config';
+import { logger } from '@/lib/utils';
 
 export interface EntitlementsRemindersPayload {
   daysBeforeExpiry?: number; // Window to look ahead (default: from app config)

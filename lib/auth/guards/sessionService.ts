@@ -1,6 +1,6 @@
 import { getAuthProvider } from '@/lib/services';
-import { usersDB } from '../../database/users';
-import { logger } from '../../utils/logger';
+import { usersDB } from '@/lib/database';
+import { logger } from '@/lib/utils';
 import { AuthStateManager } from '../auth-state';
 
 export interface SessionCheckResult {

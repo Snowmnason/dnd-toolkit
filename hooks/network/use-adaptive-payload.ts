@@ -26,8 +26,7 @@
  * @see useAdaptivePayloadCacheInvalidation for cache invalidation
  */
 
-import { getAdaptivePayloadOptions } from '@/lib/network/adaptive-payload';
-import { NetworkDetection } from '@/lib/network/network-detection';
+import { getAdaptivePayloadOptions, NetworkDetection } from '@/lib/network';
 import { useEffect, useMemo, useState } from 'react';
 
 export interface UseAdaptivePayloadResult {

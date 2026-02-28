@@ -1,8 +1,7 @@
+import { usersDB, validateCurrentUser } from '@/lib/database';
 import { getAuthProvider } from '@/lib/services';
-import { validatePassword } from '../../../validation/validation';
-import { validateCurrentUser } from '../../database/common';
-import { usersDB } from '../../database/users';
-import { logger } from '../../utils/logger';
+import { logger } from '@/lib/utils';
+import { validatePassword } from '@/validation';
 import { AuthStateManager } from '../auth-state';
 
 export interface DeleteAccountResult {

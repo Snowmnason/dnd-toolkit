@@ -1,5 +1,5 @@
 import { logger } from "@/lib/utils/logger";
-import { usePlatform } from "@/providers/PlatformProvider";
+import { usePlatform } from "@/providers";
 import { $, S, UseTheme } from "@/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo } from "react";

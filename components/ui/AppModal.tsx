@@ -1,4 +1,4 @@
-import { usePlatform } from "@/providers/PlatformProvider";
+import { usePlatform } from "@/providers";
 import { $, tone, useScale, UseTheme } from "@/theme";
 import * as Haptics from "expo-haptics";
 import React, { useEffect, useMemo } from "react";

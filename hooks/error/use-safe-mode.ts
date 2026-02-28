@@ -8,7 +8,7 @@ import {
     SafeModeReason,
     SafeModeState,
     createSafeModeState,
-} from "@/lib/error/safe-mode";
+} from "@/lib/error";
 import { AppKernel } from "@/lib/kernel";
 import { useCallback, useEffect, useState } from "react";
 
@@ -104,5 +104,5 @@ export function useSafeModeLevel(): SafeModeLevel | null {
  */
 export function useIsFeatureAffected(featureName: string): boolean {
   const safeMode = useSafeMode();
-  return safeMode?.affectedFeatures.some((f) => f === featureName) ?? false;
+  return safeMode?.affectedFeatures.some((f: string) => f === featureName) ?? false;
 }

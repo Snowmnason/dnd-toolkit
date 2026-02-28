@@ -7,7 +7,7 @@
  */
 
 import { buildAdaptiveQueryParams, getAdaptivePayloadOptions, type PayloadQuality } from './adaptive-payload';
-import { NetworkDetection } from './network-detection';
+import { NetworkDetection } from '../network-detection';
 
 /**
  * Append adaptive payload parameters to a URL/key

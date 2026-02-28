@@ -9,8 +9,8 @@
  */
 
 import { getAppConfig } from '@/config';
-import { validateAdvancedCondition } from "../advanced-conditions";
-import type { FlagContext } from "../conditions";
+import { validateAdvancedCondition } from "../evaluation/advanced-conditions";
+import type { FlagContext } from "../evaluation/conditions";
 import { FeatureFlagsManager } from "../server-sync";
 
 // ==========================================

@@ -5,7 +5,7 @@ import {
   handleCacheMigration,
   validateCacheEntry,
   VersionedCacheEntry,
-} from "../cache-versioning";
+} from "./versioning/cache-versioning";
 
 // Lazy-load logger to avoid circular dependency with storage
 let loggerCache: any = null;
@@ -80,7 +80,7 @@ class SecureStorageService {
     }
 
     try {
-      const module = await import("../../auth/encrypted-storage");
+      const module = await import("../auth/encrypted-storage");
       this.encryptedStorage = module.EncryptedStorage;
       this.initialized = true;
       return this.encryptedStorage;

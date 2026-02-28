@@ -14,12 +14,11 @@
 
 import { STORAGE_KEYS } from "@/maps";
 import { Router } from "expo-router";
-import { Analytics, Performance } from "../analytics";
-import { AuthStateManager } from "../auth/auth-state";
-import { getAllRouteConfigs } from "../navigation/navigation-config";
-import { SecureStorage } from "../storage";
-import { QueryCache } from "../storage/cache/query-cache";
-import { logger } from "../utils/logger";
+import { Analytics, Performance } from "@/lib/analytics";
+import { AuthStateManager } from "@/lib/auth";
+import { getAllRouteConfigs } from "@/lib/navigation";
+import { QueryCache, SecureStorage } from "@/lib/storage";
+import { logger } from "@/lib/utils";
 import { RecoveryAction, SafeModeState } from "./safe-mode";
 
 /**

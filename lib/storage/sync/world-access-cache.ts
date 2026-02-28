@@ -1,5 +1,5 @@
-import { logger } from '../../utils/logger';
-import { getPrivacyStorageBackend } from '../index';
+import { logger } from '@/lib/utils';
+import { getStorageBackend as getPrivacyStorageBackend, } from '../privacy';
 
 /**
  * World Access Cache Helper

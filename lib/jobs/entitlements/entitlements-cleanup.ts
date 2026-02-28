@@ -8,12 +8,12 @@
  * This is a foundation-level implementation; reminder notifications are deferred.
  */
 
-import { getAppConfig } from '../../../config';
+import { getAppConfig } from '@/config';
 import {
   deactivateEntitlements,
   fetchExpiredEntitlements,
-} from '../../database/entitlements';
-import { logger } from '../../utils/logger';
+} from '@/lib/database';
+import { logger } from '@/lib/utils';
 
 export interface EntitlementsCleanupPayload {
   gracePeriodDays?: number; // Days to wait after expiry before marking inactive (default: from app config)

@@ -27,14 +27,14 @@ import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
 
 // Relative module imports (local)
-import { isInRolloutMemoized } from "../../pure-algo-immutables/rollout";
+import { isInRolloutMemoized } from "@/pure-algo-immutables";
+import { FlagEvaluationCache } from "./cache";
+import { isUserInCohort } from "./cohorts";
 import {
   evaluateAdvancedCondition,
   validateAdvancedCondition,
-} from "./advanced-conditions";
-import { FlagEvaluationCache } from "./cache";
-import { isUserInCohort } from "./cohorts";
-import { evaluateConditions, type FlagContext } from "./conditions";
+} from "./evaluation/advanced-conditions";
+import { evaluateConditions, type FlagContext } from "./evaluation/conditions";
 
 // ==========================================
 // Types

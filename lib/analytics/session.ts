@@ -3,8 +3,8 @@
  * Tracks user sessions, duration, and engagement metrics
  */
 import { getAppConfig } from '@/config';
-import { getErrorTracker } from '../services';
-import { logger } from '../utils/logger';
+import { getErrorTracker } from '@/lib/services';
+import { logger } from '@/lib/utils';
 import { AnalyticsConsent } from './consent/consent';
 import { shouldEmitEvent } from './consent/consent-gating';
 

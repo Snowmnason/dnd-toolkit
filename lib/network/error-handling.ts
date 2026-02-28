@@ -6,8 +6,8 @@
  * Future (Milestone 3+): Queue mutations, sync when online
  */
 
-import { ERROR_CODES } from '../../maps/ERROR_CODES';
-import { logger } from '../utils/logger';
+import { logger } from '@/lib/utils';
+import { ERROR_CODES } from '@/maps';
 import { NetworkDetection } from './network-detection';
 
 /**

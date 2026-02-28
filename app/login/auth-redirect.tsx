@@ -8,7 +8,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import CustomLoad from "../../components/ui/CustomLoad";
-import { useAppParamsStable } from "../../providers/AppParamsStableProvider";
+import { useAppParamsStable } from "@/providers";
 
 interface PendingInvite {
   token: string;

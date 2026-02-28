@@ -9,8 +9,8 @@ import {
   buildAdaptiveQueryParams,
   getAdaptivePayloadOptions,
   getCacheKeyQualityComponent,
-} from "@/lib/network";
-import { NetworkDetection } from "@/lib/network/network-detection";
+} from "./adaptive-payload";
+import { NetworkDetection } from "../network-detection";
 
 /**
  * Configuration for adaptive query integration

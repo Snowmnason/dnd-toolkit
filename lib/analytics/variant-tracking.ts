@@ -11,7 +11,7 @@
  * The tracking is lightweight and async to avoid blocking user interactions.
  */
 
-import { logger } from "../utils/logger";
+import { logger } from "@/lib/utils";
 
 // Lazy import to avoid circular dependency with index.ts
 let AnalyticsModule: any = null;

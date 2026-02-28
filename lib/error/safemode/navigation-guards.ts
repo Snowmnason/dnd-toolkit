@@ -29,9 +29,9 @@
 
 import type { Href } from "expo-router";
 import { Router } from "expo-router";
-import { useAppKernel } from "../../hooks/kernel/use-app-kernel";
-import { getAllRouteConfigs } from "../navigation/navigation-config";
-import { logger } from "../utils/logger";
+import { useAppKernel } from "@/hooks/kernel";
+import { getAllRouteConfigs } from "@/lib/navigation";
+import { logger } from "@/lib/utils";
 import { checkFeatureGating } from "./feature-gating";
 import { AffectedFeature } from "./safe-mode";
 

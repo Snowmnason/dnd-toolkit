@@ -2,7 +2,7 @@ import { panelConfigs } from "@/Screens/main-panels/PanelData";
 import { PanelView } from "@/Screens/main-panels/PanelView";
 import { AppPage } from "@/components/ui";
 import type { AccessRole } from "@/lib/database/worlds";
-import { usePlatform } from "@/providers/PlatformProvider";
+import { usePlatform } from "@/providers";
 import { useLocalSearchParams } from "expo-router";
 import { View } from "react-native";
 

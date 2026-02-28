@@ -19,8 +19,8 @@
  * Idempotent: safe to call multiple times — initialization only runs once per process.
  */
 
-import { logger } from '@/lib/utils/logger';
-import { registerEdgeFunction } from '../../database/edge';
+import { logger } from '@/lib/utils';
+import { registerEdgeFunction } from '@/lib/database';
 import { NoOpDatabaseProvider, registerDatabaseProvider } from '../database-adapter';
 import { SupabaseDatabaseProvider } from './supabase-database-provider';
 import { createSupabaseRpcAdapter } from './supabase-rpc-adapter';

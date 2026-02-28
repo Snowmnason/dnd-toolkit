@@ -38,7 +38,7 @@ import {
 } from "@/lib/services";
 import { validateEmail, validatePassword } from "@/validation/";
 import { type AuthErrorCode, ERROR_CODES, RetryErrorCode } from "../../maps/ERROR_CODES";
-import { logger } from "../utils/logger";
+import { logger } from "@/lib/utils";
 import {
     checkAuthGuard,
     recordAuthFailure,

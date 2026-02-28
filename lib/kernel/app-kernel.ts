@@ -20,21 +20,21 @@ import {
   cleanupAnalyticsNetworkIntegration,
   initializeAnalyticsNetworkIntegration,
 } from "@/lib/analytics/exporters/analytics-network-integration";
-import { NetworkCascadeDetector } from "@/lib/error/network-cascade-detector";
-import type { SafeModeState } from "@/lib/error/safe-mode";
 import {
   createSafeModeState,
   DEFAULT_SAFE_MODE_CONFIG,
+  NetworkCascadeDetector,
   SafeModeLevel,
   SafeModeReason,
-} from "@/lib/error/safe-mode";
-import { getStorageDefaults } from "@/lib/kernel/storage-defaults";
+  type SafeModeState,
+} from "@/lib/error";
 import {
   NetworkDetection,
   NetworkStatus,
-} from "@/lib/network/network-detection";
-import { logger } from "@/lib/utils/logger";
-import { validateClassifications } from "@/type-definitions/data-classification";
+} from "@/lib/network";
+import { logger } from "@/lib/utils";
+import { validateClassifications } from "@/type-definitions";
+import { getStorageDefaults } from "./storage-defaults";
 
 // FUTURE ENHANCEMENT: Phase Progress Callbacks
 // To add progress tracking for phases (e.g., "Loading fonts... 50%"):

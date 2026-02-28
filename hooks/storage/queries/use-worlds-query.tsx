@@ -1,7 +1,7 @@
 import { useAdaptivePayloadCacheInvalidation } from '@/hooks/network/useAdaptivePayloadCacheInvalidation';
 import { useQuery } from '@/hooks/storage';
 import { worldsDB } from '@/lib/database/worlds';
-import { getAdaptiveQueryParams, getQualityAwareCacheKey } from '@/lib/network/adaptive-payload-integration';
+import { getAdaptiveQueryParams, getQualityAwareCacheKey } from '@/lib/network';
 
 /**
  * Hook for fetching worlds with SWR pattern
@@ -50,6 +50,7 @@ export function useWorldsQuery(options: { page?: number; limit?: number } = {}) 
 
   // Get adaptive params for this quality level
   // Note: Currently worldsDB methods don't use params, but this prepares for future API integration
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const adaptiveParams = getAdaptiveQueryParams();
 
   const queryFn = isPaginated

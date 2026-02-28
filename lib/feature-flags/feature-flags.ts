@@ -9,8 +9,8 @@
  */
 import { getAppConfig, isProduction } from '@/config';
 import appSettingsProd from "../../config/appsettings.json";
-import { SecureStorage, getPrivacyStorageBackend } from "../storage";
-import { logger } from "../utils/logger";
+import { SecureStorage, getPrivacyStorageBackend } from "@/lib/storage";
+import { logger } from "@/lib/utils";
 
 export interface Entitlements {
   tier: "free" | "premium";

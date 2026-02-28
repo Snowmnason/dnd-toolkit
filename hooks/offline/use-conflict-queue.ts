@@ -9,12 +9,11 @@
  */
 
 import {
-    getConflictQueueManager,
-    type ConflictQueueItem,
-} from "@/lib/offline/conflict-queue-manager";
-import { OfflineMutationQueue } from "@/lib/offline/mutation-queue";
-import { OnlineSyncManager } from "@/lib/offline/sync-manager";
-import { logger } from "@/lib/utils/logger";
+  getConflictQueueManager,
+  OfflineMutationQueue, OnlineSyncManager,
+  type ConflictQueueItem,
+} from "@/lib/offline";
+import { logger } from "@/lib/utils";
 import { useEffect, useState } from "react";
 
 interface UseConflictQueueReturn {
@@ -51,7 +50,7 @@ export function useConflictQueue(): UseConflictQueueReturn {
     setQueue(manager.getQueue());
 
     // Subscribe to updates
-    const unsubscribe = manager.subscribe((updatedQueue) => {
+    const unsubscribe = manager.subscribe((updatedQueue: ConflictQueueItem[]) => {
       setQueue([...updatedQueue]);
     });
 

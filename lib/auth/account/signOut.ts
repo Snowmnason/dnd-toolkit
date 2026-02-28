@@ -1,7 +1,7 @@
 import { getAuthProvider } from "@/lib/services";
 import { STORAGE_KEYS } from "@/maps";
-import { getPrivacyStorageBackend } from "../../storage";
-import { logger } from "../../utils/logger";
+import { getPrivacyStorageBackend } from "@/lib/storage";
+import { logger } from "@/lib/utils";
 import { AuthStateManager } from "../auth-state";
 
 /**

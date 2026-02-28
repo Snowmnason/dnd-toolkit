@@ -1,12 +1,12 @@
 import { buildNavigationTarget, logger } from "@/lib";
 import { useRouter } from "expo-router";
 import { useCallback } from "react";
-import { useUserId } from "../../providers/AppParamsStableProvider";
 import {
   useAppParamsVolatile,
+  useUserId,
   useUserRole,
   useWorldId,
-} from "../../providers/AppParamsVolatileProvider";
+} from "@/providers";
 
 /**
  * Custom hook for navigation that automatically manages the centralized params context

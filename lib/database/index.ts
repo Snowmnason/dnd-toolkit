@@ -16,8 +16,17 @@ export { getDatabaseProvider } from "@/lib/services";
 export {
     executeParallelQueries,
     getCurrentUserProfile,
+    validateCurrentUser,
     validateUserForWrite
 } from "./common";
+
+// Repository pattern
+export {
+    getUserRepository,
+    getWorldAccessRepository,
+    getWorldRepository,
+    getInviteRepository
+} from "./repositories";
 
 // User operations
 export { usersDB } from "./users";
@@ -48,8 +57,10 @@ export {
 
 // Entitlements operations
 export {
+    deactivateEntitlements,
     fetchEntitlementOverridesByUserId,
     fetchEntitlementsByUserId,
+    fetchExpiredEntitlements,
     hasEntitlement,
     type EntitlementOverrideRow,
     type EntitlementRow
@@ -63,4 +74,13 @@ export type {
     FeatureFlagOverrideRow,
     OverrideTargetType
 } from "./feature-flag-overrides";
+
+// Edge function registry
+export {
+    executeEdgeFunction,
+    getRegisteredEdgeFunctions,
+    isEdgeFunctionRegistered,
+    registerEdgeFunction,
+    type EdgeFunctionImplementation
+} from "./edge";
 

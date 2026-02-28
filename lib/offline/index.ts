@@ -17,12 +17,12 @@
 export {
     getConflictQueueManager,
     type ConflictQueueItem
-} from "./conflict-queue-manager";
+} from "./conflict/conflict-queue-manager";
 export {
     executeConflictResolution,
     resolveLastWriteWins,
     type ConflictResolutionResult
-} from "./conflict-resolution";
+} from "./conflict/conflict-resolution";
 export { OfflineMutationQueue } from "./mutation-queue";
 export {
     clearAllHandlers,

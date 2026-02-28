@@ -10,9 +10,9 @@
  * from quality-aware payloads without requiring client-side changes.
  */
 
-import { logger } from "@/lib/utils/logger";
-import { deriveConnectionType } from "./helpers";
-import { NetworkStatus } from "./network-detection";
+import { logger } from "@/lib/utils";
+import { deriveConnectionType } from "../helpers";
+import { NetworkStatus } from "../network-detection";
 
 /**
  * Quality tier for images and media

@@ -10,10 +10,10 @@
  */
 
 import { getAppConfig } from '@/config';
-import { createSafeModeState, SafeModeReason } from "@/lib/error/safe-mode";
+import { createSafeModeState, SafeModeReason } from "@/lib/error";
 import { getJobQueue } from "@/lib/jobs";
 import { AppKernel } from "@/lib/kernel";
-import { logger } from "@/lib/utils/logger";
+import { logger } from "@/lib/utils";
 
 const AUTH_HEALTH_CHECK_JOB_TYPE = "auth_health_check";
 // Default to 4 hours if not configured

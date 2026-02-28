@@ -15,8 +15,8 @@
  */
 
 import { Router } from "expo-router";
-import { trackVariantAssignment } from "../analytics/variant-tracking";
-import { logger } from "../utils/logger";
+import { trackVariantAssignment } from "@/lib/analytics";
+import { logger } from "@/lib/utils";
 import { LOGIN_ROUTES } from "./routes/login-routes";
 import { MAIN_ROUTES } from "./routes/main-routes";
 import { SELECT_ROUTES } from "./routes/select-routes";

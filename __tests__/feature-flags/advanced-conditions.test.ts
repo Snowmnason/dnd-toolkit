@@ -10,20 +10,18 @@
 
 import {
   analyzeFlagImpact,
+  evaluateAdvancedCondition,
   generateDependencyGraph,
+  pluginRegistry,
   simulateContexts,
+  validateAdvancedCondition,
   validateFlagConfig,
   visualizeDependencyGraph,
-} from "@/lib/feature-flags/admin/admin-tooling";
-import {
-  evaluateAdvancedCondition,
-  pluginRegistry,
-  validateAdvancedCondition,
   type ConditionNode,
+  type FlagContext,
   type LogicalExpression,
   type NotExpression,
-} from "@/lib/feature-flags/advanced-conditions";
-import type { FlagContext } from "@/lib/feature-flags/conditions";
+} from "@/lib/feature-flags";
 import {
   featureFlagsTelemetry,
   performHealthCheck,
@@ -334,7 +332,7 @@ describe("Advanced Condition Logic (Phase 3)", () => {
     it("should register and use custom plugin", () => {
       pluginRegistry.register({
         name: "testPlugin",
-        matcher: (type, evaluator) => type === "custom" && evaluator === "test",
+        matcher: (type: string, evaluator: string) => type === "custom" && evaluator === "test",
         evaluate: () => true,
       });
 
@@ -349,7 +347,7 @@ describe("Advanced Condition Logic (Phase 3)", () => {
     it("should handle plugin unable to evaluate", () => {
       pluginRegistry.register({
         name: "limitedPlugin",
-        matcher: (type) => type === "custom",
+        matcher: (type: string) => type === "custom",
         evaluate: () => undefined,
       });
 

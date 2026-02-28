@@ -29,8 +29,8 @@
  * This provides automatic network cascade resilience without requiring app restart.
  */
 
-import { logger } from "@/lib/utils/logger";
-import { DEFAULT_SAFE_MODE_CONFIG } from "./safe-mode";
+import { logger } from "@/lib/utils";
+import { DEFAULT_SAFE_MODE_CONFIG } from "./safemode/safe-mode";
 
 class NetworkCascadeDetectorService {
   private consecutiveFailures = 0;

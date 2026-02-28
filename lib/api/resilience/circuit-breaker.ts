@@ -1,5 +1,5 @@
 import { getAppConfig } from "../../../config";
-import { logger } from "../../utils/logger";
+import { logger } from "@/lib/utils";
 
 /**
  * Circuit Breaker: Fails fast for unhealthy endpoints, allows controlled recovery

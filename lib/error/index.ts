@@ -11,17 +11,18 @@ export {
     getFeatureGatingReason,
     getGatedFeatures,
     type FeatureGatingStatus
-} from "./feature-gating";
-export { createFeatureGatingGuard } from "./navigation-guards";
+} from "./safemode/feature-gating";
+export { createFeatureGatingGuard } from "./safemode/navigation-guards";
 export { NetworkCascadeDetector } from "./network-cascade-detector";
 export {
     executeRecoveryAction,
     isRecoveryActionAvailable,
     type RecoveryResult
-} from "./recovery-actions";
+} from "./safemode/recovery-actions";
 export {
     AffectedFeature,
     createSafeModeState,
+    DEFAULT_SAFE_MODE_CONFIG,
     getSafeModeDefinition,
     getSafeModeMessage,
     RecoveryAction,
@@ -31,7 +32,7 @@ export {
     SafeModeReason,
     type SafeModeConfig,
     type SafeModeState
-} from "./safe-mode";
+} from "./safemode/safe-mode";
 export {
     assertValidErrorCode,
     getAllErrorCodes,

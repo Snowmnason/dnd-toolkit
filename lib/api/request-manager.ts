@@ -1,12 +1,12 @@
-import { getAppConfig } from "../../config";
-import { ERROR_CODES, type ErrorCodeType } from "../../maps/ERROR_CODES";
+import { getAppConfig } from "@/config";
+import { ERROR_CODES, type ErrorCodeType } from "@/maps/ERROR_CODES";
 import {
   Analytics,
   AnalyticsConsent,
   getCrashReportPayload,
   sanitizeError as sanitizeErrorForAnalytics,
-} from "../analytics";
-import { enrichError, extractErrorCode } from "../error";
+} from "@/lib/analytics";
+import { enrichError, extractErrorCode } from "@/lib/error";
 import {
   buildAdaptiveQueryParams,
   captureErrorCorrelation,
@@ -14,10 +14,10 @@ import {
   getAdaptivePayloadOptions,
   NetworkDetection,
   type PayloadQuality,
-} from "../network";
-import { getErrorTracker } from "../services";
-import { QueryCache } from "../storage/cache/query-cache";
-import { logger, type LogCategory, type PerfTimer } from "../utils/logger";
+} from "@/lib/network";
+import { getErrorTracker } from "@/lib/services";
+import { QueryCache } from "@/lib/storage";
+import { logger, type LogCategory, type PerfTimer } from "@/lib/utils";
 import { AuthLayer, type AuthContext } from "./auth-layer";
 import {
   InterceptorManager,

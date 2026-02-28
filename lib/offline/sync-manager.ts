@@ -31,21 +31,21 @@ import {
   NetworkCascadeDetector,
   SafeModeReason,
 } from "@/lib/error";
-import { AppKernel } from "@/lib/kernel/app-kernel";
+import { AppKernel } from "@/lib/kernel";
 import {
   NetworkDetection,
   type NetworkStatus,
-} from "@/lib/network/network-detection";
-import { QueryCache } from "@/lib/storage/cache/query-cache";
-import { logger } from "@/lib/utils/logger";
+} from "@/lib/network";
+import { QueryCache } from "@/lib/storage";
+import { logger } from "@/lib/utils";
 import type {
   OfflineSyncConfig,
   OfflineSyncStatus,
   QueuedMutation,
   SyncResult,
-} from "../../type-definitions/mutation-queue-types";
-import { getConflictQueueManager } from "./conflict-queue-manager";
-import { executeConflictResolution } from "./conflict-resolution";
+} from "@/type-definitions";
+import { getConflictQueueManager } from "./conflict/conflict-queue-manager";
+import { executeConflictResolution } from "./conflict/conflict-resolution";
 import { OfflineMutationQueue } from "./mutation-queue";
 import {
   CircuitBreakerReplayManager,

@@ -1,15 +1,27 @@
+import {
+  AppErrorBoundary,
+  LoadingOverlay,
+  TopBar
+} from "@/components";
 import { EntitlementExpiredModal } from "@/components/modals";
 import { OfflineSyncNotificationLayer } from "@/components/offline";
-import { AppToastLayer, NotificationContainer, TopBar } from "@/components/ui";
+import {
+  CrashFallBack,
+  RouteErrorBoundary,
+  SafeModeErrorBoundary,
+  SafeModeScreen,
+  SplashScreen,
+} from "@/components/SplashScreen";
+import { AppToastLayer, NotificationContainer } from "@/components/ui";
 import { AppToastProvider, NotificationProvider } from "@/contexts";
-import { useEntitlementExpiredModal } from "@/hooks";
+import { useEntitlementExpiredModal, } from "@/hooks/entitlements";
 import { AppKernelProvider, useAppKernel } from "@/hooks/kernel";
 import { useAnalyticsNavigation } from "@/hooks/navigation";
 import { useSplashScreen } from "@/hooks/ui";
 import {
   Analytics,
-
   AppKernel,
+  SafeModeReason,
   buildNavigationTarget,
   executeRecoveryAction,
   getRouteConfig,
@@ -17,12 +29,23 @@ import {
   resolveBackTarget,
   resolveTitle,
   sessionManager,
+  type AccessRole,
 } from "@/lib";
-import type { AccessRole } from "@/lib/database/worlds";
-import { SafeModeReason } from "@/lib/error/safe-mode";
-import { ScaleProvider } from "@/providers/ScaleProvider";
-import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
-import { ThemeProvider, UseTheme } from "@/providers/ThemeProvider";
+import {
+  AppParamsStableProvider,
+  AppParamsVolatileProvider,
+  PlatformProvider,
+  ScaleProvider,
+  SubscriptionProvider,
+  ThemeProvider,
+  UseTheme,
+  useAppParamsStable,
+  useAppParamsVolatile,
+  usePlatform,
+  useUserId,
+  useUserRole,
+  useWorldId,
+} from "@/providers";
 import {
   Stack,
   useLocalSearchParams,
@@ -31,27 +54,6 @@ import {
 } from "expo-router";
 import { useEffect } from "react";
 import { View } from "react-native";
-import { AppErrorBoundary } from "../components/ErrorBoundary";
-import LoadingOverlay from "../components/LoadingOverlay";
-import {
-  CrashFallBack,
-  RouteErrorBoundary,
-  SafeModeErrorBoundary,
-  SafeModeScreen,
-  SplashScreen,
-} from "../components/SplashScreen";
-import {
-  AppParamsStableProvider,
-  useAppParamsStable,
-  useUserId,
-} from "../providers/AppParamsStableProvider";
-import {
-  AppParamsVolatileProvider,
-  useAppParamsVolatile,
-  useUserRole,
-  useWorldId,
-} from "../providers/AppParamsVolatileProvider";
-import { PlatformProvider, usePlatform } from "../providers/PlatformProvider";
 
 // Suppress known benign warning from React Navigation / Expo Router
 // "Blocked aria-hidden on an element because its descendant retained focus"
@@ -416,7 +418,7 @@ export default function RootLayout() {
                   <NotificationProvider>
                     <AppToastProvider>
                       <AppErrorBoundary
-                        renderFallback={(error, onRetry) => (
+                        renderFallback={(error: Error | null, onRetry: () => void) => (
                           <CrashFallBack error={error} onRetry={onRetry} />
                         )}
                       >

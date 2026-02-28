@@ -1,3 +1,4 @@
+import { usersDB } from "@/lib/database";
 import {
   EmailAlreadyExistsError,
   getAuthProvider,
@@ -5,12 +6,10 @@ import {
   NetworkError,
   RateLimitError
 } from "@/lib/services";
-import { ERROR_CODES, STORAGE_KEYS } from "@/maps";
-import { RetryErrorCode } from "../../maps/ERROR_CODES";
-import { validateEmail, validatePassword } from "../../validation/validation";
-import { usersDB } from "../database/users";
-import { SecureStorage } from "../storage";
-import { logger } from "../utils/logger";
+import { SecureStorage } from "@/lib/storage";
+import { logger } from "@/lib/utils";
+import { ERROR_CODES, RetryErrorCode, STORAGE_KEYS } from "@/maps";
+import { validateEmail, validatePassword } from "@/validation";
 import {
   checkAuthGuard,
   recordAuthFailure,

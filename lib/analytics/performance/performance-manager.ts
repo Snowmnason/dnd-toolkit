@@ -1,8 +1,8 @@
+import { isAppIdle } from "@/hooks/utils/use-app-state";
+import { logger } from "@/lib/utils";
 import Constants from "expo-constants";
 import { useEffect } from "react";
 import { Platform } from "react-native";
-import { isAppIdle } from "../../../hooks/utils/use-app-state";
-import { logger } from "../../utils/logger";
 import { Analytics } from "../analytics-manager";
 import { createExportContext, dispatchEvent } from "../exporters/exporter-registry";
 import { getThreshold, sanitizeError } from "../utils";
