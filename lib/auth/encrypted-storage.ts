@@ -4,6 +4,21 @@ import { Platform } from "react-native";
 import "react-native-get-random-values";
 import { logger } from "@/lib/utils";
 
+/**
+ * Low-level encrypted storage backend for sensitive data (auth tokens, encryption keys).
+ *
+ * ARCHITECTURAL NOTE: This module uses raw localStorage/sessionStorage directly (not SecureStorage)
+ * because THIS MODULE IS THE LOWEST-LEVEL encryption foundation that SecureStorage depends on.
+ * It handles AES-CTR encryption, key generation, and secure storage of encryption keys themselves.
+ *
+ * The architecture is:
+ * - EncryptedStorage (this module): Provides AES-CTR encryption + platform-specific key storage
+ * - SecureStorage: Wraps EncryptedStorage for symmetric JSON serialization
+ * - AppCode (hooks/screens/lib): Uses SecureStorage for all persistent data
+ *
+ * Direct localStorage usage here is intentional and correct design.
+ */
+
 // Type-safe imports for platform-specific storage
 let AsyncStorage: any;
 let SecureStore: any;

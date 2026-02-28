@@ -688,7 +688,7 @@ export const FetcherRegistryFallback = {
         const response = await fetcher(url, { method: "GET" });
         if (!response.ok) {
           const error = new Error(`GET ${url} failed: ${response.status}`);
-          (error as any).statusCode = response.status;
+          Object.assign(error, { statusCode: response.status });
           throw error;
         }
         return response.json();
@@ -705,7 +705,7 @@ export const FetcherRegistryFallback = {
         });
         if (!response.ok) {
           const error = new Error(`POST ${url} failed: ${response.status}`);
-          (error as any).statusCode = response.status;
+          Object.assign(error, { statusCode: response.status });
           throw error;
         }
         return response.json();
@@ -722,7 +722,7 @@ export const FetcherRegistryFallback = {
         });
         if (!response.ok) {
           const error = new Error(`PATCH ${url} failed: ${response.status}`);
-          (error as any).statusCode = response.status;
+          Object.assign(error, { statusCode: response.status });
           throw error;
         }
         return response.json();
@@ -735,7 +735,7 @@ export const FetcherRegistryFallback = {
         const response = await fetcher(url, { method: "DELETE" });
         if (!response.ok) {
           const error = new Error(`DELETE ${url} failed: ${response.status}`);
-          (error as any).statusCode = response.status;
+          Object.assign(error, { statusCode: response.status });
           throw error;
         }
         return response.json();

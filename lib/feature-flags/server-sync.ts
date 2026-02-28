@@ -1496,13 +1496,14 @@ class FeatureFlagsManagerClass {
     const flags: Map<string, FeatureFlagState> = new Map();
     for (const [key, value] of Object.entries(hardcodedFlags)) {
       if (typeof value === "object" && value !== null && "enabled" in value) {
+        const flagValue = value as Record<string, unknown>;
         flags.set(key, {
-          enabled: !!value.enabled,
-          kind: value.kind,
-          description: value.description,
-          depends_on: (value as any).dependsOn || null,
-          condition_logic: (value as any).conditionLogic || null,
-          metadata: (value as any).metadata || null,
+          enabled: !!flagValue.enabled,
+          kind: flagValue.kind as string | undefined,
+          description: flagValue.description as string | undefined,
+          depends_on: (flagValue.dependsOn as string[] | null | undefined) || null,
+          condition_logic: (flagValue.conditionLogic as Record<string, any> | null | undefined) || null,
+          metadata: (flagValue.metadata as Record<string, any> | null | undefined) || null,
           source: "hardcoded",
         });
       }

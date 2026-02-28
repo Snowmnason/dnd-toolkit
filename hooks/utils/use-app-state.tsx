@@ -1,3 +1,4 @@
+import { logger } from '@/lib/utils';
 import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus, Platform } from 'react-native';
 
@@ -60,7 +61,7 @@ function initializeAppStateListener(): void {
     isInitialized = true;
   } catch (error) {
     // Gracefully handle if AppState is unavailable
-    console.warn('Failed to initialize AppState listener:', error);
+    logger.category('bootstrap').warn('Failed to initialize AppState listener:', error);
     isInitialized = true;
   }
 }

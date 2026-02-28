@@ -94,7 +94,7 @@ export function createFeatureGatingGuard(
       if (options.showToast) {
         // TODO: Trigger toast notification
         // This would require AppToast context or similar
-        console.info("[FeatureGating]", message);
+        logger.category('navigation').info(`[FeatureGating] ${message}`);
       }
 
       // Validate route exists in centralized navigation config

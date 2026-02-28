@@ -1,4 +1,5 @@
 import { getAppConfig } from '@/config';
+import { logger } from '@/lib/utils';
 import { useMemo, useRef } from 'react';
 
 export function useRenderTracker(componentName: string) {
@@ -10,7 +11,7 @@ export function useRenderTracker(componentName: string) {
 
   // Log render count if performance logger is enabled (development tool)
   if (config.devTools.enablePerformanceLogger) {
-    console.log(`${componentName} rendered ${renderCount.current} times`);
+    logger.category('performance').debug(`${componentName} rendered ${renderCount.current} times`);
   }
 
   return renderCount.current;
