@@ -1,7 +1,7 @@
 import { useAdaptivePayloadCacheInvalidation } from '@/hooks/network/useAdaptivePayloadCacheInvalidation';
-import { useQuery } from '@/hooks/storage';
 import { worldsDB } from '@/lib/database/worlds';
 import { getAdaptiveQueryParams, getQualityAwareCacheKey } from '@/lib/network';
+import { useQuery } from '../use-query';
 
 /**
  * Hook for fetching worlds with SWR pattern

@@ -1,9 +1,18 @@
-import { getErrorTracker } from "@/lib/services";
 import { logger } from "@/lib/utils";
 import { AnalyticsConsent } from "./consent/consent";
 import { createExportContext, dispatchEvent } from "./exporters/exporter-registry";
 
 import { getThreshold, sanitizeError } from "./utils";
+
+// Lazy import to break circular dependency with lib/services/index.ts
+let cachedErrorTracker: any = null;
+function getErrorTrackerLazy() {
+  if (!cachedErrorTracker) {
+    const { getErrorTracker } = require('@/lib/services');
+    cachedErrorTracker = getErrorTracker();
+  }
+  return cachedErrorTracker;
+}
 
 type AnalyticsEventProps = Record<string, any>;
 
@@ -54,7 +63,7 @@ const sanitizeProps = (
  */
 function isAnalyticsEnabled(): boolean {
   // Analytics is enabled if error tracker is available
-  if (getErrorTracker().isEnabled()) return true;
+  if (getErrorTrackerLazy().isEnabled()) return true;
 
   // For exporters: default to enabled so dispatch attempt runs
   // (exporters will check their own enabled status during dispatch)
@@ -76,7 +85,7 @@ export const Analytics = {
   identify(user: { id?: string; username?: string } | null): void {
     // Only send user identification to error tracker if enabled
     // (exporters don't use this method, they get context from dispatch)
-    if (getErrorTracker().isEnabled()) {
+    if (getErrorTrackerLazy().isEnabled()) {
       try {
         const consentLevel = AnalyticsConsent.getLevel();
         if (user?.id) {
@@ -86,15 +95,15 @@ export const Analytics = {
           // - 'full': complete payload with user context (user id, username, breadcrumbs)
           if (consentLevel === 'full') {
             // Consent=full: send complete user context (both id and username)
-            getErrorTracker().setUser({ id: user.id, username: user.username });
+            getErrorTrackerLazy().setUser({ id: user.id, username: user.username });
             logger.category("analytics").debug("User identified in error tracker (full, consent=full)", { userId: user.id, username: user.username });
           } else {
             // Consent=none or basic: clear user context (both tiers exclude user info)
-            getErrorTracker().setUser(null);
+            getErrorTrackerLazy().setUser(null);
             logger.category("analytics").debug("User context cleared from error tracker (consent=none|basic)");
           }
         } else {
-          getErrorTracker().setUser(null);
+          getErrorTrackerLazy().setUser(null);
           logger.category("analytics").debug("User cleared from error tracker");
         }
       } catch (e) {

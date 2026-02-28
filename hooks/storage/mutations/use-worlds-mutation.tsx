@@ -1,5 +1,5 @@
-import { useMutation } from '@/hooks/storage';
 import { CreateWorldData, World, worldsDB } from '@/lib/database/worlds';
+import { useMutation } from '../use-mutation';
 
 /**
  * Hook for creating a new world with cache invalidation and optimistic updates

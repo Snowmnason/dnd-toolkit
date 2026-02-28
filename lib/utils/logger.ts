@@ -23,7 +23,7 @@ import { RedactionManager, redactPII } from "@/pure-algo-immutables/redaction-ma
 let cachedErrorCodesMetadata: any = null;
 function getErrorCodesMetadata() {
   if (!cachedErrorCodesMetadata) {
-    cachedErrorCodesMetadata = require("@/lib/utils/ERROR_CODES").ERROR_CODES_METADATA;
+    cachedErrorCodesMetadata = require("@/maps/ERROR_CODES").ERROR_CODES_METADATA;
   }
   return cachedErrorCodesMetadata;
 }

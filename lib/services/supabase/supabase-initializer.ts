@@ -20,10 +20,18 @@
  */
 
 import { logger } from '@/lib/utils';
-import { registerEdgeFunction } from '@/lib/database';
 import { NoOpDatabaseProvider, registerDatabaseProvider } from '../database-adapter';
 import { SupabaseDatabaseProvider } from './supabase-database-provider';
 import { createSupabaseRpcAdapter } from './supabase-rpc-adapter';
+
+// Lazy import to break circular dependency with lib/database/index.ts
+let cachedRegisterEdgeFunction: any = null;
+function getRegisterEdgeFunction() {
+  if (!cachedRegisterEdgeFunction) {
+    cachedRegisterEdgeFunction = require('@/lib/database').registerEdgeFunction;
+  }
+  return cachedRegisterEdgeFunction;
+}
 
 /** Module-scope guard — prevents double initialization */
 let _initialized = false;
@@ -107,7 +115,7 @@ export async function initializeSupabaseDatabaseProvider(): Promise<boolean> {
 
   rpcFunctionNames.forEach((functionName) => {
     const adapter = createSupabaseRpcAdapter(functionName);
-    registerEdgeFunction(functionName, adapter);
+    getRegisterEdgeFunction()(functionName, adapter);
   });
 
   logger.category('bootstrap').debug(`[Supabase Initializer] Registered ${rpcFunctionNames.length} RPC edge functions`);

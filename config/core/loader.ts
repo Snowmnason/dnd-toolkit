@@ -20,10 +20,17 @@
 import { CURRENT_CONFIG_VERSION, migrateConfig } from './migrations';
 // Import only platform detection here; apply merging locally so tests can mock
 // platform detection without having to provide a merge helper export.
-import { getPlatformName } from './platform-config';
-// Validation dependencies (co-located here to avoid separate config-validator.ts)
-import { logger } from "@/lib/utils/logger";
 import Constants from "expo-constants";
+import { getPlatformName } from './platform-config';
+
+// Lazy import logger to avoid circular dependency with lib/utils/logger
+let cachedLogger: any = null;
+function getLogger() {
+  if (!cachedLogger) {
+    cachedLogger = require('@/lib/utils/logger').logger;
+  }
+  return cachedLogger;
+}
 
 export interface AppSettings {
   version: number;
@@ -742,22 +749,22 @@ export function validateConfig(config: AppSettings): ConfigValidationResult {
  */
 export function logValidationResults(result: ConfigValidationResult): void {
   if (result.errors.length > 0) {
-    logger.category("bootstrap").error(
+    getLogger().category("bootstrap").error(
       `Configuration validation FAILED with ${result.errors.length} error(s):`,
     );
     for (const error of result.errors) {
-      logger.category("bootstrap").error(`  ❌ ${error}`);
+      getLogger().category("bootstrap").error(`  ❌ ${error}`);
     }
   }
   if (result.warnings.length > 0) {
-    logger.category("bootstrap").warn(
+    getLogger().category("bootstrap").warn(
       `Configuration validation has ${result.warnings.length} warning(s):`,
     );
     for (const warning of result.warnings) {
-      logger.category("bootstrap").warn(`  ⚠️ ${warning}`);
+      getLogger().category("bootstrap").warn(`  ⚠️ ${warning}`);
     }
   }
   if (result.valid && result.errors.length === 0) {
-    logger.category("bootstrap").info("✅ Configuration validated successfully");
+    getLogger().category("bootstrap").info("✅ Configuration validated successfully");
   }
 }

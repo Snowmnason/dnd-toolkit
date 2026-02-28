@@ -1,7 +1,7 @@
 import { useAdaptivePayloadCacheInvalidation } from '@/hooks/network/useAdaptivePayloadCacheInvalidation';
-import { useQuery } from '@/hooks/storage';
 import { usersDB } from '@/lib/database/users';
 import { getQualityAwareCacheKey } from '@/lib/network';
+import { useQuery } from '../use-query';
 
 /**
  * Hook for fetching current user profile with SWR pattern

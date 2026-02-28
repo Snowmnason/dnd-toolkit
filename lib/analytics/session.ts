@@ -3,10 +3,19 @@
  * Tracks user sessions, duration, and engagement metrics
  */
 import { getAppConfig } from '@/config';
-import { getErrorTracker } from '@/lib/services';
 import { logger } from '@/lib/utils';
 import { AnalyticsConsent } from './consent/consent';
 import { shouldEmitEvent } from './consent/consent-gating';
+
+// Lazy import to break circular dependency with lib/services/index.ts
+let cachedErrorTracker: any = null;
+function getErrorTrackerLazy() {
+  if (!cachedErrorTracker) {
+    const { getErrorTracker } = require('@/lib/services');
+    cachedErrorTracker = getErrorTracker();
+  }
+  return cachedErrorTracker;
+}
 
 interface SessionData {
   startedAt: number;
@@ -119,13 +128,13 @@ class SessionManager {
   private trackEvent(event: string, data?: Record<string, any>): void {
     try {
       const perfFlag = getAppConfig().features?.performanceMonitoring;
-      if (!getErrorTracker().isEnabled() || !perfFlag) return;
+      if (!getErrorTrackerLazy().isEnabled() || !perfFlag) return;
 
       // Session lifecycle events are usage-level data (behavioral: when sessions start/end)
       // Require 'full' consent before sending to error tracker
       if (!shouldEmitEvent('usage', AnalyticsConsent.getLevel())) return;
 
-      getErrorTracker().addBreadcrumb({
+      getErrorTrackerLazy().addBreadcrumb({
         category: 'analytics',
         message: event,
         data,

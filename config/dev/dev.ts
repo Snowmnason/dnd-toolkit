@@ -18,11 +18,19 @@
  *   await hotReload.start();
  */
 
-import { logger } from '@/lib/utils/logger';
 import type { AppSettings } from '../core/loader';
 import { getAppConfig, isDevelopment, validateAppSettings } from '../core/loader';
 import { CURRENT_CONFIG_VERSION, migrateConfig } from '../core/migrations';
 import { mergeConfigForPlatform } from '../core/platform-config';
+
+// Lazy import logger to avoid circular dependency with lib/utils/logger
+let cachedLogger: any = null;
+function getLogger() {
+  if (!cachedLogger) {
+    cachedLogger = require('@/lib/utils/logger').logger;
+  }
+  return cachedLogger;
+}
 
 // =============================================================================
 // Dev-Only Utilities
@@ -194,15 +202,15 @@ export class ConfigHotReload {
 
   async start(options: HotReloadOptions = {}): Promise<void> {
     if (!this.isDevelopmentMode()) {
-      logger.category('bootstrap').info('Hot-reload skipped (production mode)');
+      getLogger().category('bootstrap').info('Hot-reload skipped (production mode)');
       return;
     }
     if (this.isWatching) {
-      logger.category('bootstrap').info('Hot-reload already running');
+      getLogger().category('bootstrap').info('Hot-reload already running');
       return;
     }
     this.isWatching = true;
-    logger.category('bootstrap').debug('Config hot-reload started');
+    getLogger().category('bootstrap').debug('Config hot-reload started');
     const interval = options.pollInterval || 2000;
     const debounceInterval = options.debounceInterval || 300;
     this.startPolling(interval, debounceInterval, options.onReload);
@@ -212,7 +220,7 @@ export class ConfigHotReload {
     this.isWatching = false;
     if (this.pollTimeout) { clearTimeout(this.pollTimeout); this.pollTimeout = null; }
     if (this.debounceTimeout) { clearTimeout(this.debounceTimeout); this.debounceTimeout = null; }
-    logger.category('bootstrap').debug('Config hot-reload stopped');
+    getLogger().category('bootstrap').debug('Config hot-reload stopped');
   }
 
   subscribe(listener: (config: AppSettings) => void): () => void {
@@ -257,27 +265,27 @@ export class ConfigHotReload {
                 if (!deepEqual(this.currentConfig, newConfig)) {
                   const oldConfig = this.currentConfig;
                   this.currentConfig = newConfig;
-                  logger.category('other').debug('Config hot-reloaded');
+                  getLogger().category('other').debug('Config hot-reloaded');
                   this.notifyListeners(newConfig);
                   if (onReload) {
                     try { await onReload(oldConfig, newConfig); }
                     catch (callbackError) {
-                      logger.category('other').error(`onReload callback failed: ${callbackError}`);
+                      getLogger().category('other').error(`onReload callback failed: ${callbackError}`);
                     }
                   }
                 }
               } catch (validationError) {
-                logger.category('other').warn(
+                getLogger().category('other').warn(
                   `Config validation failed, keeping previous config: ${validationError}`,
                 );
               }
             } catch (error) {
-              logger.category('other').debug(`Hot-reload processing failed: ${error}`);
+              getLogger().category('other').debug(`Hot-reload processing failed: ${error}`);
             }
           }, debounceInterval);
         }
       } catch (error) {
-        logger.category('other').debug(`Hot-reload check failed: ${error}`);
+        getLogger().category('other').debug(`Hot-reload check failed: ${error}`);
       }
 
       if (this.isWatching) {
@@ -365,7 +373,7 @@ export class ConfigHotReload {
   private notifyListeners(config: AppSettings): void {
     for (const listener of this.listeners) {
       try { listener(config); }
-      catch (error) { logger.category('other').error(`Listener error: ${error}`); }
+      catch (error) { getLogger().category('other').error(`Listener error: ${error}`); }
     }
   }
 
@@ -389,7 +397,7 @@ let hotReloadInstance: ConfigHotReload | null = null;
  */
 export function initializeHotReload(initialConfig: AppSettings): ConfigHotReload {
   if (hotReloadInstance) {
-    logger.category('bootstrap').warn('Hot-reload already initialized');
+    getLogger().category('bootstrap').warn('Hot-reload already initialized');
     return hotReloadInstance;
   }
   hotReloadInstance = new ConfigHotReload(initialConfig);

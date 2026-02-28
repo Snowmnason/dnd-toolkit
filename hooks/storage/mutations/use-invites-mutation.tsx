@@ -1,5 +1,5 @@
-import { useMutation } from '@/hooks/storage';
 import { createInviteLink, validateInviteToken } from '@/lib/database/invites';
+import { useMutation } from '../use-mutation';
 
 export interface InviteLink {
   id?: string;

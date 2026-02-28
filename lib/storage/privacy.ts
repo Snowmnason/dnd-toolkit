@@ -27,7 +27,7 @@ let SecureStorageCache: PrivacyStorageBackend | null = null;
 
 const getFastCache = () => {
   if (!FastCacheCache) {
-    FastCacheCache = require("./FastCache").FastCache as PrivacyStorageBackend;
+    FastCacheCache = require("./cache/FastCache").FastCache as PrivacyStorageBackend;
   }
   return FastCacheCache;
 };

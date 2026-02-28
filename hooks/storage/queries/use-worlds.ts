@@ -1,11 +1,11 @@
 import { useAdaptivePayloadCacheInvalidation } from "@/hooks/network";
-import { useQuery } from "@/hooks/storage";
 import { worldsDB, WorldWithAccess } from "@/lib/database";
 import { getQualityAwareCacheKey } from "@/lib/network";
 import { worldAccessCache } from "@/lib/storage";
 import { logger } from "@/lib/utils";
 import { CACHE_CONFIG, CACHE_KEYS, CACHE_TAGS } from "@/maps";
 import { useCallback, useMemo, useState } from "react";
+import { useQuery } from '../use-query';
 
 /**
  * Hook for managing world data with SWR (Stale-While-Revalidate) pattern
