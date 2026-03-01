@@ -17,7 +17,7 @@
  */
 
 import { OFFLINE_SYNC_DEFAULTS } from "@/config";
-import type { AuthContext } from "@/lib/api/auth-layer";
+import type { AuthContext } from "@/lib/auth/auth-layer";
 import { logger } from "@/lib/utils";
 
 import { RedactionManager } from "@/pure-algo-immutables";

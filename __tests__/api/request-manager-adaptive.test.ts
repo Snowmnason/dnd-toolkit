@@ -29,7 +29,7 @@ vi.mock("@/lib/utils/logger", () => ({
 
 vi.mock("@/lib/config", () => ({ getAppConfig: vi.fn(() => ({ api: { retryDelayMs: 10, requestTimeoutMs: 500 } })) }));
 vi.mock("@/lib/api/interceptor", () => ({ InterceptorManager: { executeBeforeRequestHooks: vi.fn(), executeAfterResponseHooks: vi.fn(), executeErrorHooks: vi.fn() }, parseEndpoint: vi.fn().mockReturnValue("test") }));
-vi.mock("@/lib/api/auth-layer", () => ({ AuthLayer: { injectAuthHeader: vi.fn(), handle401Response: vi.fn() } }));
+vi.mock("@/lib/auth/auth-layer", () => ({ AuthLayer: { injectAuthHeader: vi.fn(), handle401Response: vi.fn() } }));
 vi.mock("@/lib/analytics", () => ({ Analytics: { track: vi.fn(), enabled: vi.fn().mockReturnValue(false), getThreshold: vi.fn() }, sanitizeError: vi.fn() }));
 
 // Mock QueryCache and NetworkDetection selectively in tests below

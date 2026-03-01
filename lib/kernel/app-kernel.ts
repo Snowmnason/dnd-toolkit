@@ -458,42 +458,9 @@ class AppKernelClass {
           .category("bootstrap")
           .info("✅ Services initialized successfully");
 
-        // Configure AuthStateManager with the registered auth provider (if available)
-        // initializeServices() may not have registered a provider if Supabase is not configured
-        const { getAuthProviderSync } = await import("@/lib/services");
-        const { AuthStateManager } = await import("@/lib/auth/auth-state");
-
-        const provider = getAuthProviderSync();
-
-        if (!provider) {
-          // Auth not available (e.g., no Supabase env vars)
-          // Skip wiring and log warning; auth-guarded routes will fail gracefully
-          logger
-            .category("bootstrap")
-            .warn("No auth provider registered — auth features unavailable. Public routes only.");
-        } else {
-          try {
-            AuthStateManager.configure(provider);
-            logger
-              .category("bootstrap")
-              .info("AuthStateManager configured with registered provider");
-          } catch (error) {
-            logger
-              .category("bootstrap")
-              .error("Failed to configure AuthStateManager with provider", {
-                error: (error as Error).message,
-              });
-            const safeMode = createSafeModeState(
-              SafeModeReason.KERNEL_CONFIG_FAILED,
-              {
-                details: "Auth provider configuration failed",
-                originalError: error instanceof Error ? error : new Error(String(error)),
-              }
-            );
-            this.setSafeMode(safeMode);
-            throw error; // Let runPhase propagate — services are critical
-          }
-        }
+        // AuthStateManager is now standalone state management (non-blocking)
+        // It doesn't need configuration — it works with the provider registered in initializeServices()
+        // If auth provider is not available (no Supabase), routes will handle gracefully
       });
 
       // Phase 5: Auth (restore session - non-blocking, services already registered)
@@ -519,12 +486,12 @@ class AppKernelClass {
           logger.category("bootstrap").debug("Auth state loaded");
 
           // Initialize AuthLayer with default strategies
-          const { AuthLayer } = await import("@/lib/api/auth-layer");
+          const { AuthLayer } = await import("@/lib/auth/auth-layer");
           const {
             createUserAuthStrategy,
             createPublicAuthStrategy,
             createInviteAuthStrategy,
-          } = await import("@/lib/api/default-strategies");
+          } = await import("@/lib/auth/default-strategies");
           AuthLayer.registerAuthStrategy("user", createUserAuthStrategy());
           AuthLayer.registerAuthStrategy("public", createPublicAuthStrategy());
           AuthLayer.registerAuthStrategy("invite", createInviteAuthStrategy());
@@ -678,8 +645,8 @@ class AppKernelClass {
         try {
           const { FeatureFlagsManager } =
             await import("@/lib/feature-flags/server-sync");
-          const { getDatabaseProvider } = await import("@/lib/services");
-          const { getSupabaseClient } = await import("@/lib/services/supabase/supabase-client");
+          const { getDatabaseProvider } = await import("@/system/Services");
+          const { getSupabaseClient } = await import("@/system/Services/supabase/supabase-client");
 
           if (!getDatabaseProvider().isConfigured()) {
             logger
@@ -806,7 +773,7 @@ class AppKernelClass {
           import("react-native"),
           import("@/lib/storage"),
           import("@/lib/analytics"),
-          import("@/lib/services/supabase/supabase-client"),
+          import("@/system/Services/supabase/supabase-client"),
         ]);
 
       // Platform detection

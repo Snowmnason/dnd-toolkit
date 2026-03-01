@@ -39,10 +39,9 @@ export default function UserProfile({ profile }: UserProfileProps) {
   useEffect(() => {
     const fetchSessionUser = async () => {
       try {
-        const { getAuthProvider } = await import("@/lib/services");
-        const authProvider = await getAuthProvider();
+        const { getCurrentSession } = await import("@/lib/auth");
         // Use cached session instead of making network call
-        const authSession = await authProvider.getSession();
+        const authSession = await getCurrentSession();
         setSessionUser(authSession?.raw?.user ?? null);
       } catch (error) {
         logger.category('storage').error("Error fetching session user:", error);

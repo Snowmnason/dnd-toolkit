@@ -29,7 +29,7 @@ vi.mock("expo-constants", () => ({
 }));
 
 // Mock problematic dependencies
-vi.mock("@/lib/api/auth-layer", () => ({
+vi.mock("@/lib/auth/auth-layer", () => ({
   AuthLayer: {
     injectAuthHeader: vi.fn(),
     handle401Response: vi.fn(),

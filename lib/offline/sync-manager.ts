@@ -51,7 +51,6 @@ import {
   CircuitBreakerReplayManager,
   NetworkErrorClassifier,
 } from "./offline-recovery";
-import { executeSyncHandler } from "./sync-handlers";
 
 /**
  * Get default sync configuration from appsettings
@@ -381,11 +380,9 @@ class OnlineSyncManagerService {
           `Syncing mutation ${mutation.id} (${mutation.operation} on ${mutation.table})`,
         );
 
-      // Dynamically import Supabase client
-      const { supabase } = await import("@/lib/services/supabase/supabase-client");
-
-      // Execute via registered handler for this table
-      const handlerResult = await executeSyncHandler(mutation, supabase);
+      // Execute sync handler via domain wrapper (hides supabase client details)
+      const { executeSyncMutationHandler } = await import("@/lib/database");
+      const handlerResult = await executeSyncMutationHandler(mutation);
 
       if (!handlerResult.success) {
         const isConflict = handlerResult.conflict || false;

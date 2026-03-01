@@ -233,11 +233,11 @@ class ConsentSyncQueueService {
    * @throws If the database update fails
    */
   private async syncToDatabase(item: PendingConsentSync): Promise<void> {
-    // Dynamically import to avoid circular depends and database config checks
-    const { getDatabaseProvider } = await import('@/lib/services');
+    // Check if database is configured via domain wrapper
+    const { isDatabaseConfigured } = await import('@/lib/database');
     const { userSettingsDB } = await import('@/lib/database');
 
-    if (!getDatabaseProvider().isConfigured()) {
+    if (!isDatabaseConfigured()) {
       // No-op if database not configured (e.g., GitHub Pages deployment)
       logger
         .category('analytics')

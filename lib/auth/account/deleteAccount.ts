@@ -1,7 +1,7 @@
 import { usersDB, validateCurrentUser } from '@/lib/database';
-import { getAuthProvider } from '@/lib/services';
 import { logger } from '@/lib/utils';
 import { validatePassword } from '@/validation';
+import { verifyCredentials, signOutUser } from '../auth-manager';
 import { AuthStateManager } from '../auth-state';
 
 export interface DeleteAccountResult {
@@ -38,8 +38,7 @@ export async function deleteUserAccount(password: string): Promise<DeleteAccount
 
     // Re-authenticate with password before deletion for security
     logger.category('auth').debug('Re-authenticating user before account deletion');
-    const authProvider = await getAuthProvider();
-    const reAuthResult = await authProvider.signIn(authUser.email, password);
+    const reAuthResult = await verifyCredentials(authUser.email, password);
 
     if (!reAuthResult.success) {
       const reAuthError = reAuthResult.error;
@@ -62,7 +61,7 @@ export async function deleteUserAccount(password: string): Promise<DeleteAccount
     logger.category('auth').debug('Clearing local auth state');
     await AuthStateManager.clearAuthState();
     try {
-      await (await getAuthProvider()).signOut();
+      await signOutUser();
     } catch {
       // Ignore signout errors during account deletion cleanup
     }

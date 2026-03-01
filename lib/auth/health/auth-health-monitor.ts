@@ -69,13 +69,12 @@ async function validateAuthHealth(): Promise<void> {
   try {
     logger.category("auth").debug("Running auth health check");
 
-    // Lazy-import to avoid circular dependency
-    const { isSupabaseConfiguredLazy } =
-      await import("@/lib/services/supabase/supabase-lazy");
-    if (!(await isSupabaseConfiguredLazy())) {
+    // Check if auth backend is configured via middleware
+    const { isAuthConfigured } = await import("@/lib/services");
+    if (!isAuthConfigured()) {
       logger
         .category("auth")
-        .debug("Supabase not configured, skipping auth health check");
+        .debug("Auth not configured, skipping auth health check");
       return;
     }
 

@@ -80,7 +80,7 @@ class SecureStorageService {
     }
 
     try {
-      const module = await import("../auth/encrypted-storage");
+      const module = await import("./encrypted-storage");
       this.encryptedStorage = module.EncryptedStorage;
       this.initialized = true;
       return this.encryptedStorage;

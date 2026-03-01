@@ -1,5 +1,5 @@
 import { AnalyticsConsent, getCrashReportPayload, sessionManager } from '@/lib/analytics';
-import { getErrorTracker } from '@/lib/services';
+import { reportError } from '@/lib/error';
 import { logger } from '@/lib/utils/logger';
 import { Component, ErrorInfo, ReactNode } from 'react';
 
@@ -47,7 +47,7 @@ export class AppErrorBoundary extends Component<Props, State> {
         AnalyticsConsent.getLevel()
       );
       if (captureOptions !== null) {
-        getErrorTracker().captureException(error, captureOptions);
+        reportError(error, captureOptions);
       } else {
         logger.category('ui').warn('Error not sent to error tracker (consent=none; awaiting user opt-in via dialog)');
         // TODO: Show crash consent dialog here (out of scope Phase 1)

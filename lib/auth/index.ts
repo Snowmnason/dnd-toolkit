@@ -1,54 +1,57 @@
-
-// Re-export auth provider types from services for convenience
-export type {
-  AuthProvider,
-  AuthResult,
-  Session
-} from '@/lib/services';
-
 export {
-  AuthError, createValidatedAuthProvider, EmailAlreadyExistsError, getAuthProvider,
-  getAuthProviderSync, InvalidCredentialsError,
-  NetworkError,
-  ProviderInitializationError,
-  RateLimitError, registerAuthProvider, UserNotFoundError
-} from '@/lib/services';
-
-export {
-  checkAuthGuard,
-  recordAuthFailure,
-  recordAuthSuccess,
-  type AuthGuardScope
+    checkAuthGuard,
+    recordAuthFailure,
+    recordAuthSuccess,
+    type AuthGuardScope
 } from "./auth-attempt-guard";
 export {
-  AuthStateManager,
-  isEmailConfirmed,
-  type AuthState,
-  type CacheMetadata
+    AuthStateManager,
+    isEmailConfirmed,
+    type AuthState,
+    type CacheMetadata
 } from "./auth-state";
-// High-level semantic auth operations (primary exports)
+// Pure domain helpers (error mapping, types)
 export {
-  // Re-exported from authService
-  checkPendingInvites,
-  generateWorldInviteLink, getCurrentSession,
-  listenToAuthStateChanges, mapAuthErrorToCode, resendConfirmationEmail,
-  sendPasswordReset,
-  signInUser,
-  signOutSessionOnly,
-  signUpUser,
-  updatePassword,
-  type AuthOperationResult,
-  type ResendOperationResult,
-  type ResetPasswordOperationResult, type ResetPasswordResult, type SignInOperationResult, type SignInResult, type SignUpOperationResult, type SignUpResult
+    mapAuthErrorToCode,
+    type AuthOperationResult,
+    type ResendResult,
+    type ResetPasswordResult,
+    type Session,
+    type SignInResult,
+    type SignUpResult
 } from "./auth-operations";
+// Auth manager — single public API for all auth operations
+export {
+    checkPendingInvites,
+    generateWorldInviteLink,
+    getCurrentSession,
+    getUser,
+    isAuthSessionReady,
+    listenToAuthStateChanges,
+    resendConfirmationEmail,
+    restoreSession,
+    sendPasswordReset,
+    signInUser,
+    signInWithIdToken,
+    signInWithOAuth,
+    signOutUser,
+    signUpUser,
+    updatePassword,
+    verifyCredentials
+} from "./auth-manager";
 
 export { deleteUserAccount, type DeleteAccountResult } from "./account/deleteAccount";
-export { signOutUser } from "./account/signOut";
 export { updateUsername, type UpdateUsernameResult } from "./account/updateUsername";
+export { AuthLayer, type AuthContext, type AuthStrategy } from "./auth-layer";
+export {
+    createInviteAuthStrategy,
+    createPublicAuthStrategy,
+    createUserAuthStrategy
+} from "./default-strategies";
 export { isSafeToRedirect } from "./guards/redirectSafety";
 export {
-  checkUserSession,
-  prepareAuthNavigation,
-  type SessionCheckResult
+    checkUserSession,
+    prepareAuthNavigation,
+    type SessionCheckResult
 } from "./guards/sessionService";
 

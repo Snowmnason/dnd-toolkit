@@ -1,6 +1,6 @@
 import { dbRequestOptions } from "@/config";
 import { RequestManager } from "@/lib/api/request-manager";
-import { getDatabaseProvider } from "@/lib/services";
+import { getDatabase } from "@/lib/services";
 import { logger } from "@/lib/utils/logger";
 import type {
   EntitlementOverrideRow,
@@ -22,7 +22,7 @@ export class SupabaseEntitlementsRepository implements EntitlementsRepository {
     const result = await RequestManager.fetch(
       `entitlements:user:${userId}`,
       async () => {
-        const { data, error } = await getDatabaseProvider()
+        const { data, error } = await getDatabase()
           .from("entitlements", "feature_flags")
           .select("id, user_id, key, is_active, remind_user, created_at, updated_at, expires_at")
           .eq("user_id", userId)
@@ -49,7 +49,7 @@ export class SupabaseEntitlementsRepository implements EntitlementsRepository {
     const result = await RequestManager.fetch(
       `entitlements:user:${userId}:${entitlementKey}`,
       async () => {
-        const { data, error } = await getDatabaseProvider()
+        const { data, error } = await getDatabase()
           .from("entitlements", "feature_flags")
           .select("is_active, expires_at")
           .eq("user_id", userId)
@@ -80,7 +80,7 @@ export class SupabaseEntitlementsRepository implements EntitlementsRepository {
       async () => {
         const now = new Date().toISOString();
 
-        const { data, error } = await getDatabaseProvider()
+        const { data, error } = await getDatabase()
           .from("entitlements_overrides", "feature_flags")
           .select("id, user_id, entitlement_key, is_active, expires_at, reason, created_by, created_at, updated_at, revoked")
           .eq("user_id", userId)
@@ -108,7 +108,7 @@ export class SupabaseEntitlementsRepository implements EntitlementsRepository {
     await RequestManager.fetch(
       `entitlements:remind:${entitlementId}`,
       async () => {
-        const { error } = await getDatabaseProvider()
+        const { error } = await getDatabase()
           .from("entitlements", "feature_flags")
           .update({ remind_user: remind, updated_at: new Date().toISOString() })
           .eq("id", entitlementId)
@@ -132,7 +132,7 @@ export class SupabaseEntitlementsRepository implements EntitlementsRepository {
     const result = await RequestManager.fetch(
       `entitlements:remindable:${userId}`,
       async () => {
-        const { data, error } = await getDatabaseProvider()
+        const { data, error } = await getDatabase()
           .from("entitlements", "feature_flags")
           .select("id, user_id, key, is_active, remind_user, created_at, updated_at, expires_at")
           .eq("user_id", userId)
@@ -163,7 +163,7 @@ export class SupabaseEntitlementsRepository implements EntitlementsRepository {
       async () => {
         const now = new Date().toISOString();
 
-        const { data, error } = await getDatabaseProvider()
+        const { data, error } = await getDatabase()
           .from("entitlements", "feature_flags")
           .select("id, user_id, key, is_active, remind_user, created_at, updated_at, expires_at")
           .eq("user_id", userId)
@@ -191,7 +191,7 @@ export class SupabaseEntitlementsRepository implements EntitlementsRepository {
     const result = await RequestManager.fetch(
       `entitlements:expired-before:${cutoffDate}`,
       async () => {
-        const { data, error } = await getDatabaseProvider()
+        const { data, error } = await getDatabase()
           .from("entitlements", "feature_flags")
           .select("id, user_id, key, is_active, remind_user, created_at, updated_at, expires_at")
           .eq("is_active", true)
@@ -220,7 +220,7 @@ export class SupabaseEntitlementsRepository implements EntitlementsRepository {
     await RequestManager.fetch(
       `entitlements:deactivate:${entitlementIds.join(",")}`,
       async () => {
-        const { error } = await getDatabaseProvider()
+        const { error } = await getDatabase()
           .from("entitlements", "feature_flags")
           .update({ is_active: false, updated_at: new Date().toISOString() })
           .in("id", entitlementIds)

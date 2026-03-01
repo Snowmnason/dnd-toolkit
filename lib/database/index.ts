@@ -5,27 +5,27 @@
  * See README.md for comprehensive API documentation and schema overview.
  *
  * Note: Direct Supabase client access (supabase, getSupabaseClient, isSupabaseConfigured)
- * is no longer re-exported here. Use getDatabaseProvider() for all database queries,
+ * is no longer re-exported here. Use getDatabase() from @/lib/services for all database queries,
  * or import from @/lib/services/supabase/supabase-initializer for bootstrap-level access.
  */
 
-// Database provider — use this for all entity queries
-export { getDatabaseProvider } from "@/lib/services";
-
 // Common utilities
 export {
-    executeParallelQueries,
-    getCurrentUserProfile,
-    validateCurrentUser,
-    validateUserForWrite
-} from "./common";
+  executeParallelQueries,
+  executeSyncMutationHandler,
+  getCurrentAuthId,
+  getCurrentUserProfile,
+  isDatabaseConfigured,
+  requireUserProfile,
+  validateCurrentUser,
+  validateUserForWrite
+} from "./database-manger";
 
 // Repository pattern
 export {
-    getUserRepository,
-    getWorldAccessRepository,
-    getWorldRepository,
-    getInviteRepository
+  getInviteRepository, getUserRepository,
+  getWorldAccessRepository,
+  getWorldRepository
 } from "./repositories";
 
 // User operations
@@ -39,31 +39,31 @@ export type { UserSettings } from "./user_settings";
 // World operations
 export { worldsDB } from "./worlds";
 export type {
-    AccessRole,
-    CreateWorldData,
-    World,
-    WorldAccess,
-    WorldWithAccess
+  AccessRole,
+  CreateWorldData,
+  World,
+  WorldAccess,
+  WorldWithAccess
 } from "./worlds";
 
 // Invite operations
 export {
-    createInviteLink,
-    deleteInviteLink,
-    getWorldInviteLinks,
-    invitesDB,
-    validateInviteToken
+  createInviteLink,
+  deleteInviteLink,
+  getWorldInviteLinks,
+  invitesDB,
+  validateInviteToken
 } from "./invites";
 
 // Entitlements operations
 export {
-    deactivateEntitlements,
-    fetchEntitlementOverridesByUserId,
-    fetchEntitlementsByUserId,
-    fetchExpiredEntitlements,
-    hasEntitlement,
-    type EntitlementOverrideRow,
-    type EntitlementRow
+  deactivateEntitlements,
+  fetchEntitlementOverridesByUserId,
+  fetchEntitlementsByUserId,
+  fetchExpiredEntitlements,
+  hasEntitlement,
+  type EntitlementOverrideRow,
+  type EntitlementRow
 } from "./entitlements";
 
 // Feature flags operations
@@ -71,16 +71,16 @@ export type { FeatureFlagRow } from "./feature-flags";
 
 // Feature flag overrides operations
 export type {
-    FeatureFlagOverrideRow,
-    OverrideTargetType
+  FeatureFlagOverrideRow,
+  OverrideTargetType
 } from "./feature-flag-overrides";
 
 // Edge function registry
 export {
-    executeEdgeFunction,
-    getRegisteredEdgeFunctions,
-    isEdgeFunctionRegistered,
-    registerEdgeFunction,
-    type EdgeFunctionImplementation
+  executeEdgeFunction,
+  getRegisteredEdgeFunctions,
+  isEdgeFunctionRegistered,
+  registerEdgeFunction,
+  type EdgeFunctionImplementation
 } from "./edge";
 

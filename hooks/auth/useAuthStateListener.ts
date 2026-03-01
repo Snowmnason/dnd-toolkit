@@ -109,7 +109,7 @@ export function useAuthStateListener(
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
 
-    listenToAuthStateChanges((s) => {
+    unsubscribe = listenToAuthStateChanges((s) => {
       // Debounce state updates to prevent UI flicker on rapid auth events (token refresh, etc.)
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
@@ -120,8 +120,6 @@ export function useAuthStateListener(
         callbackRef.current?.(s);
         setErrorCode(null); // Clear error on successful state update
       }, 100); // 100ms debounce window
-    }).then((cleanup) => {
-      unsubscribe = cleanup;
     });
 
     return () => {

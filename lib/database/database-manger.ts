@@ -1,6 +1,5 @@
 import { isDevelopment } from '@/config';
 
-import { getAuthProvider } from "@/lib/services";
 import { logger } from "@/lib/utils";
 import { getUserRepository } from "./repositories";
 import type { User } from "./users";
@@ -60,7 +59,8 @@ export async function requireUserProfile(): Promise<User> {
  */
 export async function getCurrentAuthId(): Promise<string | null> {
   // Check cached session (no network call)
-  const session = await (await getAuthProvider()).getSession();
+  const { getCurrentSession } = await import("@/lib/auth");
+  const session = await getCurrentSession();
   return session?.userId || null;
 }
 
@@ -90,7 +90,8 @@ export async function validateCurrentUser(): Promise<{
 } | null> {
   // getUser() makes a live server round-trip to validate the JWT — not a cached read.
   // This preserves the original supabase.auth.getUser() semantics for security-critical callers.
-  const session = await (await getAuthProvider()).getUser();
+  const { getUser } = await import("@/lib/auth");
+  const session = await getUser();
 
   if (!session) {
     logger.category("database").debug("User validation failed: token rejected by server");
@@ -204,4 +205,40 @@ export function extractData<T>(
   }
 
   return result.data;
+}
+
+/**
+ * Check if database is configured and available
+ * Used by analytics/consent and other modules to conditionally execute database operations.
+ * 
+ * This is a domain-specific wrapper that hides middleware/infrastructure concerns.
+ * Modules in lib/analytics, lib/storage, etc. should call this instead of
+ * importing isDatabaseConfigured from lib/services.
+ *
+ * @returns true if database is configured, false if not (e.g., GitHub Pages deployment)
+ */
+export function isDatabaseConfigured(): boolean {
+  const { isDatabaseConfigured: isDatabaseConfiguredMiddleware } = require("@/lib/services/database-service");
+  return isDatabaseConfiguredMiddleware();
+}
+
+/**
+ * Execute a sync handler for a queued offline mutation
+ * Handles getting the database provider through middleware — offline/sync-manager
+ * doesn't need to know about infrastructure details.
+ *
+ * This is the domain-specific wrapper that hides middleware/infrastructure concerns.
+ *
+ * @param mutation - Queued mutation to sync
+ * @returns Handler result with success flag and data/error
+ */
+export async function executeSyncMutationHandler(mutation: any) {
+  // Get Supabase client through middleware (precondition checks: network, auth, provider readiness)
+  const { getDatabase } = await import("@/lib/services/database-service");
+  const supabase = getDatabase();
+
+  // Import and execute the sync handler
+  const { executeSyncHandler } = await import("../offline/sync-handlers");
+  
+  return executeSyncHandler(mutation, supabase);
 }

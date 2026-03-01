@@ -12,13 +12,9 @@
  * Low-level token management stays provider-specific to avoid over-abstraction.
  */
 
-import { ERROR_CODES } from "@/maps/ERROR_CODES";
-import { getAuthProviderSync } from "@/lib/services";
-import {
-  getSupabaseClientLazy,
-  isSupabaseConfiguredLazy,
-} from "@/lib/services/supabase/supabase-lazy";
+import { getAuthProviderSync, getSupabaseClientLazy, isSupabaseConfiguredLazy } from "@/lib/services";
 import { logger } from "@/lib/utils";
+import { ERROR_CODES } from "@/maps/ERROR_CODES";
 import { AuthStrategy, type AuthContext } from "./auth-layer";
 
 /**
@@ -145,7 +141,7 @@ export function createUserAuthStrategy(): AuthStrategy {
           }
 
           // Clear app auth state (hasAccount: false)
-          const { AuthStateManager } = await import("../auth/auth-state");
+          const { AuthStateManager } = await import("./auth-state");
           await AuthStateManager.clearAuthState();
 
           logger.category("auth").info("User logged out due to failed token refresh");

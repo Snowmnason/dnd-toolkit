@@ -1,7 +1,7 @@
 import { dbRequestOptions } from "@/config";
 import { RequestManager } from "@/lib/api/request-manager";
 import { executeEdgeFunction } from "@/lib/database/edge";
-import { getDatabaseProvider } from "@/lib/services";
+import { getDatabase } from "@/lib/services";
 import { logger } from "@/lib/utils/logger";
 import type {
   AccessRole,
@@ -24,7 +24,7 @@ export class SupabaseWorldAccessRepository implements WorldAccessRepository {
     const result = await RequestManager.fetch(
       `world:${worldId}:access:${userId}`,
       async () => {
-        const { data, error } = await getDatabaseProvider()
+        const { data, error } = await getDatabase()
           .from("world_access", "worlds")
           .select("id")
           .eq("world_id", worldId)
@@ -103,7 +103,7 @@ export class SupabaseWorldAccessRepository implements WorldAccessRepository {
     return RequestManager.fetch(
       `world:${worldId}:members`,
       async () => {
-        const { data, error } = await getDatabaseProvider()
+        const { data, error } = await getDatabase()
           .from("world_access", "worlds")
           .select(`
             *,

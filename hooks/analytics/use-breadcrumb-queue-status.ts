@@ -17,7 +17,7 @@ export interface BreadcrumbQueueStatus {
   oldestBreadcrumbTime?: number; // ms since epoch
   lastFlushTime?: number;
   overflowCount: number; // Session-only counter
-  providerName: string;
+  providerName: string | null;
   isFlushing: boolean;
 }
 

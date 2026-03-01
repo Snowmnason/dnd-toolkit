@@ -1,8 +1,8 @@
-import { STORAGE_KEYS } from "@/maps";
 import { AnalyticsConsent, shouldEmitEvent } from "@/lib/analytics";
-import { getErrorTracker } from "@/lib/services";
+import { reportError } from "@/lib/error";
 import { getPrivacyStorageBackend } from "@/lib/storage";
 import { logger } from "@/lib/utils";
+import { STORAGE_KEYS } from "@/maps";
 
 export type AuthGuardScope = "signin" | "signup" | "reset";
 
@@ -115,7 +115,7 @@ export const recordAuthFailure = async (
     try {
       if (shouldEmitEvent('performance', AnalyticsConsent.getLevel())) {
         const emailDomain = email.split('@')[1] || 'unknown';
-        getErrorTracker().captureException(
+        reportError(
           new Error('auth.lockout'),
           {
             level: 'warning',

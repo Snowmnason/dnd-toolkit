@@ -7,7 +7,7 @@ describe("Database Provider Abstraction - basic unit tests", () => {
   });
 
   it("getDatabaseProvider returns NoOp before registration", async () => {
-    const mod = await import("@/lib/services/database-adapter");
+    const mod = await import("@/system/Services/database-adapter");
     const provider = mod.getDatabaseProvider();
     // NoOp should be the initial fallback
     expect(provider).toBeDefined();
@@ -19,7 +19,7 @@ describe("Database Provider Abstraction - basic unit tests", () => {
   });
 
   it("registerDatabaseProvider replaces the default provider and QueryBuilder chains return this", async () => {
-    const mod = await import("@/lib/services/database-adapter");
+    const mod = await import("@/system/Services/database-adapter");
 
     // Create a mock QueryBuilder with chained methods returning `this`
     const mockQueryBuilder = {
@@ -48,7 +48,7 @@ describe("Database Provider Abstraction - basic unit tests", () => {
   });
 
   it("NoOpDatabaseProvider throws on query methods when instantiated", async () => {
-    const mod = await import("@/lib/services/database-adapter");
+    const mod = await import("@/system/Services/database-adapter");
     if (mod.NoOpDatabaseProvider) {
       const noop = new mod.NoOpDatabaseProvider();
       expect(() => noop.from()).toThrow();

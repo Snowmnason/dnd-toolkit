@@ -1,12 +1,11 @@
 import { getAppConfig } from "@/config";
-import { ERROR_CODES, type ErrorCodeType } from "@/maps/ERROR_CODES";
 import {
   Analytics,
   AnalyticsConsent,
   getCrashReportPayload,
   sanitizeError as sanitizeErrorForAnalytics,
 } from "@/lib/analytics";
-import { enrichError, extractErrorCode } from "@/lib/error";
+import { enrichError, extractErrorCode, reportError } from "@/lib/error";
 import {
   buildAdaptiveQueryParams,
   captureErrorCorrelation,
@@ -15,10 +14,10 @@ import {
   NetworkDetection,
   type PayloadQuality,
 } from "@/lib/network";
-import { getErrorTracker } from "@/lib/services";
 import { QueryCache } from "@/lib/storage";
 import { logger, type LogCategory, type PerfTimer } from "@/lib/utils";
-import { AuthLayer, type AuthContext } from "./auth-layer";
+import { ERROR_CODES, type ErrorCodeType } from "@/maps/ERROR_CODES";
+import { AuthLayer, type AuthContext } from "../auth/auth-layer";
 import {
   InterceptorManager,
   parseEndpoint,
@@ -1837,7 +1836,7 @@ class RequestManagerClass {
             : undefined,
         };
 
-        getErrorTracker().captureException(errorObj, mergedOptions);
+        reportError(errorObj, mergedOptions);
       } else {
         logger.category('api').warn("Error not sent to error tracker (consent=none; awaiting user opt-in)");
       }

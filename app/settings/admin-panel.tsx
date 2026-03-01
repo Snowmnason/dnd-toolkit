@@ -3,15 +3,15 @@ import { useEffect, useState } from "react";
 import { View } from "react-native";
 
 import {
-  AppPage,
-  Body,
-  Button,
-  CustomLoad,
-  SubTitle,
-  Switch,
-  Title,
+    AppPage,
+    Body,
+    Button,
+    CustomLoad,
+    SubTitle,
+    Switch,
+    Title,
 } from "@/components/ui";
-import { getCurrentUserProfile } from "@/lib/database/common";
+import { getCurrentUserProfile } from "@/lib/database";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
 import { logger } from "@/lib/utils/logger";
 import { useScale } from "@/theme";

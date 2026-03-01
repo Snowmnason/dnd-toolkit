@@ -88,7 +88,7 @@ export interface RemoveWorldAccessOutput {
 /**
  * Union type for all RPC inputs and outputs
  */
-type EdgeFunctionInput =
+export type EdgeFunctionInput =
   | LeaveWorldInput
   | JoinWorldWithInviteInput
   | CreateInviteLinkInput
@@ -96,7 +96,7 @@ type EdgeFunctionInput =
   | DeleteInviteLinkInput
   | RemoveWorldAccessInput;
 
-type EdgeFunctionOutput =
+export type EdgeFunctionOutput =
   | LeaveWorldOutput
   | JoinWorldWithInviteOutput
   | CreateInviteLinkOutput
@@ -132,7 +132,7 @@ export async function runEdgeFunction<T extends EdgeFunctionOutput = any>(
 ): Promise<T> {
   // Dynamically import the services barrel at runtime to avoid top-level
   // circular imports while allowing tests to mock `@/lib/services`.
-  const { getDatabaseProvider } = await import('@/lib/services');
+  const { getDatabaseProvider } = await import('@/system/Services');
   if (!getDatabaseProvider().isConfigured()) {
     throw new Error(
       "Edge functions require Supabase configuration to be initialized"
@@ -182,6 +182,9 @@ export async function runEdgeFunction<T extends EdgeFunctionOutput = any>(
 /**
  * Create an RPC adapter implementation (for registry pattern)
  *
+ * Uses the middleware version of runEdgeFunction from lib/services to ensure
+ * precondition checks (network, database readiness) are applied.
+ *
  * @param functionName semantic name
  * @returns EdgeFunctionImplementation that can be registered
  */
@@ -190,6 +193,11 @@ export function createSupabaseRpcAdapter<
   Output extends EdgeFunctionOutput = any
 >(functionName: string): EdgeFunctionImplementation<Input, Output> {
   return {
-    handler: (input: Input) => runEdgeFunction<Output>(functionName, input),
+    handler: async (input: Input) => {
+      // Dynamically import the middleware version to avoid circular dependencies.
+      // The middleware wraps the raw runEdgeFunction with precondition checks.
+      const { runEdgeFunction: middlewareRunEdgeFunction } = await import('@/lib/services');
+      return middlewareRunEdgeFunction<Output>(functionName, input);
+    },
   };
 }

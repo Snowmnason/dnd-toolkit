@@ -1,5 +1,4 @@
-import { updatePassword } from '@/lib/auth';
-import { getAuthProvider } from '@/lib/services';
+import { getUser, restoreSession, updatePassword } from '@/lib/auth';
 import { logger } from '@/lib/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
@@ -40,8 +39,6 @@ export const useResetPasswordConfirm = () => {
   useEffect(() => {
     const getUserInfo = async () => {
       try {
-        const authProvider = await getAuthProvider();
-        
         // Check if we have URL parameters for the reset token
         if (Platform.OS === 'web') {
           const urlParams = new URLSearchParams(window.location.search);
@@ -50,10 +47,10 @@ export const useResetPasswordConfirm = () => {
           
           if (accessToken && refreshToken) {
             // Restore the session with tokens from the URL
-            const restored = await authProvider.restoreSession({ access_token: accessToken, refresh_token: refreshToken });
+            const restored = await restoreSession({ access_token: accessToken, refresh_token: refreshToken });
             
             if (restored) {
-              const userSession = await authProvider.getUser();
+              const userSession = await getUser();
               if (userSession) {
                 setUserEmail(userSession.email || userSession.raw?.user?.email || '');
                 logger.category('auth').info('Reset session established for:', userSession.email);
@@ -66,7 +63,7 @@ export const useResetPasswordConfirm = () => {
         }
         
         // Fallback: try to get current user if already in session
-        const existingSession = await authProvider.getUser();
+        const existingSession = await getUser();
         if (existingSession && existingSession.email && !userEmail) {
           setUserEmail(existingSession.email);
         }

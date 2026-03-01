@@ -1,8 +1,12 @@
 /**
- * Provider Adapter Interface & Factory
+ * Breadcrumb Queue Type Definitions
  *
- * Enables breadcrumb queue to work with any analytics provider (Sentry, Datadog, custom).
- * No provider-specific logic here — purely generic interfaces.
+ * Immutable contracts for queuing and delivering breadcrumbs to analytics providers.
+ * Used by:
+ * - lib/analytics/exporters/breadcrumb-queue.ts (producer)
+ * - lib/services/analytics-service.ts (middleware)
+ * - system/Services/analytics-adapter.ts (adapter interface)
+ * - Any breadcrumb provider implementation (consumer)
  */
 
 /**
@@ -64,42 +68,4 @@ export interface BreadcrumbProvider {
    * Enables provider-specific header parsing (e.g., Sentry's Retry-After)
    */
   parseHttpResponse(response: Response): BatchSendDecision;
-}
-
-/**
- * Factory for creating provider adapters
- * Maps provider name to adapter implementation
- */
-const adapterRegistry = new Map<string, () => BreadcrumbProvider>();
-
-/**
- * Register a provider adapter
- * Usage: registerAdapter('sentry', () => new SentryAdapter())
- */
-export function registerAdapter(
-  name: string,
-  factory: () => BreadcrumbProvider
-): void {
-  adapterRegistry.set(name.toLowerCase(), factory);
-}
-
-/**
- * Get a provider adapter by name
- * Throws if provider not registered
- */
-export function getAdapter(providerName: string): BreadcrumbProvider {
-  const factory = adapterRegistry.get(providerName.toLowerCase());
-  if (!factory) {
-    throw new Error(
-      `Provider adapter '${providerName}' not registered. Available: ${Array.from(adapterRegistry.keys()).join(', ')}`
-    );
-  }
-  return factory();
-}
-
-/**
- * List all registered provider adapters
- */
-export function listAdapters(): string[] {
-  return Array.from(adapterRegistry.keys());
 }

@@ -1,8 +1,12 @@
-import { AuthStateManager } from '@/lib/auth';
+import { AUTH_CONFIG } from '@/config/routing-auth-config';
+import {
+  AuthStateManager,
+  listenToAuthStateChanges,
+  type Session,
+} from '@/lib/auth';
 import { logger } from '@/lib/utils';
 import { useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { AUTH_CONFIG } from '../../config/routing-auth-config';
 import { useAppKernel } from '../kernel/use-app-kernel';
 
 export type AuthLevel = 'account-only' | 'world-required';
@@ -52,14 +56,12 @@ export function useAuthGuard(
     let unsubscribe: (() => void) | null = null;
     let mounted = true;
 
-    logger.category('security').info(`[GUARD:${instanceId}] 🟢 Setting up auth state subscription via provider`);
+    logger.category('security').info(`[GUARD:${instanceId}] 🟢 Setting up auth state subscription via auth-manager`);
 
     const setup = async () => {
       try {
-        const provider = AuthStateManager.getProvider();
-        
-        // Subscribe to provider's auth state changes
-        unsubscribe = provider.onAuthStateChange(async (session) => {
+        // Subscribe to auth state changes via auth-manager
+        unsubscribe = listenToAuthStateChanges(async (session: Session | null) => {
           if (!mounted) {
             logger.category('security').debug(`[GUARD:${instanceId}] 🔇 Subscription event received after unmount, ignoring`);
             return;

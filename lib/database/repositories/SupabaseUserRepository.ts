@@ -1,7 +1,7 @@
 import { dbRequestOptions } from "@/config";
 import { RequestManager } from "@/lib/api/request-manager";
-import { getCurrentSession } from "@/lib/auth/auth-operations";
-import { getDatabaseProvider } from "@/lib/services";
+import { getCurrentSession } from "@/lib/auth";
+import { getDatabase } from "@/lib/services";
 import { logger } from "@/lib/utils/logger";
 import { validateUsername } from "@/validation/validation";
 import type {
@@ -47,7 +47,7 @@ export class SupabaseUserRepository implements UserRepository {
 
         logger.category("database").debug("Inserting user data into database:", userData);
 
-        const { data, error } = await getDatabaseProvider()
+        const { data, error } = await getDatabase()
           .from("users", "public")
           .insert(userData)
           .select()
@@ -99,7 +99,7 @@ export class SupabaseUserRepository implements UserRepository {
           return null;
         }
 
-        const { data, error } = await getDatabaseProvider()
+        const { data, error } = await getDatabase()
           .from("users", "public")
           .select("*")
           .eq("auth_id", session.userId)
@@ -159,7 +159,7 @@ export class SupabaseUserRepository implements UserRepository {
     return RequestManager.fetch(
       `user:update:${currentUser.id}`,
       async () => {
-        const { data, error } = await getDatabaseProvider()
+        const { data, error } = await getDatabase()
           .from("users", "public")
           .update(updates)
           .eq("id", currentUser.id)
@@ -199,7 +199,7 @@ export class SupabaseUserRepository implements UserRepository {
         // deletes, audit logging, and auth account removal atomically.
         // getRawClient() is the intentional escape hatch for Supabase-only APIs
         // (edge functions, realtime) that are not covered by DatabaseProvider.
-        const rawClient = getDatabaseProvider().getRawClient?.();
+        const rawClient = getDatabase().getRawClient?.();
         if (!rawClient) {
           throw new Error(
             "deleteCurrentUser requires a configured Supabase client (edge function call)",

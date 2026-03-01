@@ -14,36 +14,7 @@
 export * from "./analytics";
 
 // ===== API =====
-// Re-export everything except OfflineQueueStats (use offline's version instead)
-export {
-    APIClient,
-    AuthLayer,
-    CACHE_DEFAULTS,
-    CircuitBreakerManager,
-    CircuitBreakerOpenError, cleanupOfflineQueueReplay,
-    createInviteAuthStrategy,
-    createPublicAuthStrategy,
-    createUserAuthStrategy, DEFAULT_THRESHOLDS, initializeOfflineQueueReplay, InterceptorManager,
-    NetworkRecoveryManager,
-    NetworkRecoveryRetryJobManager, parseEndpoint,
-    registerNetworkRecoveryHooks, UsersAPI,
-    WorldsAPI, type APIClientConfig, type ApiErrorType, type APIUser,
-    type APIWorld, type AuthContext,
-    type AuthStrategy,
-    type CircuitStats,
-    type CircuitThresholds,
-    type MutationOptions,
-    type NetworkRecoveryRetryJobConfig,
-    type NotificationCallback,
-    type QueryOptions,
-    // Omit OfflineQueueStats and OfflineQueueConfig (see offline module instead)
-    type QueuedRequestEntry,
-    type RecoveryState,
-    type RequestInterceptor,
-    type UpdateUserRequest,
-    type UpdateWorldRequest,
-    type WorldMember
-} from "./api";
+export * from "./api";
 
 // ===== Auth (Authentication & Authorization) =====
 export * from "./auth";

@@ -10,6 +10,8 @@
  *   await registerAuthProvider(provider);
  */
 
+import { logger } from '@/lib/utils/logger';
+import { ERROR_CODES } from '@/maps/ERROR_CODES';
 import {
   AuthError,
   AuthProvider,
@@ -20,9 +22,7 @@ import {
   RateLimitError,
   Session,
   UserNotFoundError,
-} from '@/lib/services/auth-provider';
-import { logger } from '@/lib/utils/logger';
-import { ERROR_CODES } from '@/maps/ERROR_CODES';
+} from '@/system/Services/auth-adapter';
 import { mapSupabaseAuthCode } from './supabase-error-translation';
 
 /**

@@ -108,9 +108,9 @@ class AnalyticsConsentManager {
       // Step 2: Try database if authenticated and cache is stale/missing
       try {
         const { userSettingsDB } = await import('@/lib/database');
-        const { getDatabaseProvider } = await import('@/lib/services');
+        const { isDatabaseConfigured } = await import('@/lib/database');
 
-        if (getDatabaseProvider().isConfigured()) {
+        if (isDatabaseConfigured()) {
           // Attempt to fetch user settings from database
           const settings = await userSettingsDB.fetchCurrentUserSettings({ forceRefresh: true });
           if (settings && settings.analytics_consent_level && this.isValidConsentLevel(settings.analytics_consent_level)) {

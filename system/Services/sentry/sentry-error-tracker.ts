@@ -16,12 +16,12 @@ import { getAppConfig, isDevelopment } from '@/config';
 import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
 import { logger } from '@/lib/utils/logger';
 import {
-  ErrorCaptureOptions,
-  ErrorTrackerProvider,
-  SeverityLevel,
-  TrackerBreadcrumb,
-  TrackerUser,
-} from '../error-tracker';
+    ErrorCaptureOptions,
+    ErrorTrackerProvider,
+    SeverityLevel,
+    TrackerBreadcrumb,
+    TrackerUser,
+} from '../error-adapter';
 
 /**
  * Check if Sentry SDK should be active for error tracking or analytics

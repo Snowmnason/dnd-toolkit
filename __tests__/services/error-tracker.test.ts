@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  ErrorCaptureOptions,
+  getErrorTracker,
+  NoOpErrorTracker,
+  registerErrorTracker,
+  resetErrorTracker,
+} from '@/system/Services/error-adapter';
+
 // Top-level mocks to avoid pulling in react-native/expo during module imports
 const captureException = vi.fn();
 const captureMessage = vi.fn();
@@ -21,14 +29,6 @@ vi.mock('@/lib/config', () => ({
   getAppConfig: () => ({ services: { errorProvider: { enabled: true } } }),
   isDevelopment: () => false,
 }));
-
-import {
-  ErrorCaptureOptions,
-  getErrorTracker,
-  NoOpErrorTracker,
-  registerErrorTracker,
-  resetErrorTracker,
-} from '@/lib/services/error-tracker';
 
 describe('ErrorTrackerProvider', () => {
   beforeEach(() => {
@@ -80,7 +80,7 @@ describe('ErrorTrackerProvider', () => {
 
   it('SentryErrorTracker calls Sentry SDK with mapped options', async () => {
     // Import SentryErrorTracker after top-level mocks
-    const { SentryErrorTracker: Tracker } = await import('@/lib/services/sentry/sentry-error-tracker');
+    const { SentryErrorTracker: Tracker } = await import('@/system/Services/sentry/sentry-error-tracker');
     const tracker = new Tracker();
 
     // captureException mapping

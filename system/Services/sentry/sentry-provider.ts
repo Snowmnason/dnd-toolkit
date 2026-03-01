@@ -8,8 +8,8 @@
  */
 
 import { logger } from '@/lib/utils/logger';
+import type { BatchSendDecision, BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '@/types/breadcrumb-queue-types';
 import * as Sentry from '@sentry/react-native';
-import { BatchSendDecision, BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '../breadcrumb-adapter';
 
 /**
  * Sentry Breadcrumb Provider Adapter

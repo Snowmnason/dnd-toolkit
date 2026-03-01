@@ -1,14 +1,14 @@
 import { AuthModal } from "@/components/auth_components";
 import { Caption } from "@/components/ui";
 import { AuthStateManager, getCurrentSession, logger, usersDB, worldsDB } from "@/lib";
-import { getAuthProvider } from "@/lib/auth";
+import { restoreSession } from "@/lib/auth";
 import { getPrivacyStorageBackend } from "@/lib/storage";
 import { ERROR_CODES, STORAGE_KEYS } from "@/maps";
+import { useAppParamsStable } from "@/providers";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import CustomLoad from "../../components/ui/CustomLoad";
-import { useAppParamsStable } from "@/providers";
 
 interface PendingInvite {
   token: string;
@@ -102,8 +102,7 @@ export default function AuthRedirect() {
 
         // First, handle any auth tokens from the URL
         let hasValidSession = false;
-        const provider = await getAuthProvider();
-        
+
         if (typeof window !== "undefined") {
           const hash = window.location.hash;
           if (hash) {
@@ -114,7 +113,7 @@ export default function AuthRedirect() {
             if (accessToken && refreshToken) {
               logger.category("auth").debug("Setting session from email link...");
 
-              const restored = await provider.restoreSession({
+              const restored = await restoreSession({
                 access_token: accessToken,
                 refresh_token: refreshToken,
               });

@@ -13,7 +13,7 @@ import { isDevelopment } from '@/config';
 import { logger } from '@/lib/utils/logger';
 import { APP_VERSION } from '@/lib/utils/version';
 import Constants from 'expo-constants';
-import { registerErrorTracker } from '../error-tracker';
+import { registerErrorTracker } from '../error-adapter';
 import { SentryErrorTracker } from './sentry-error-tracker';
 
 /**

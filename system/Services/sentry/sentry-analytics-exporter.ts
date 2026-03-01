@@ -16,7 +16,6 @@ import {
   AnalyticsExporter,
   ExportContext,
 } from '@/lib/analytics/exporters/exporter-registry';
-import { SentryAdapter } from '@/lib/services/sentry/sentry-adapter';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -29,32 +28,19 @@ export class SentryExporter implements AnalyticsExporter {
   requiredEvents = ['error']; // Always handle errors
   optionalEvents = ['event', 'pageview', 'performance', 'custom']; // Optional breadcrumbs
 
-  private sentryAdapter: SentryAdapter | null = null;
-
-  constructor() {
-    try {
-      this.sentryAdapter = new SentryAdapter();
-    } catch (error) {
-      logger.category('analytics').warn(
-        'SentryExporter',
-        `Failed to initialize Sentry adapter: ${error}`
-      );
-    }
-  }
-
   /**
    * Initialize the Sentry exporter
-   * Sets up breadcrumb queue with Sentry adapter for offline persistence
+   * Sets up breadcrumb queue (middleware-based) for offline persistence
    * Called during service initialization before exporter registration
    */
   async initialize(): Promise<void> {
     try {
-      // Create and initialize Sentry adapter for breadcrumb queue
-      const adapter = new SentryAdapter();
-      await breadcrumbQueue.initialize(adapter);
+      // Initialize breadcrumb queue with provider name
+      // The queue will call lib/services/analytics-service middleware when flushing
+      await breadcrumbQueue.initialize('sentry');
       logger.category('analytics').info(
         'SentryExporter',
-        'Initialized breadcrumb queue with Sentry adapter'
+        'Initialized breadcrumb queue (middleware-based)'
       );
     } catch (error) {
       logger.category('analytics').warn(

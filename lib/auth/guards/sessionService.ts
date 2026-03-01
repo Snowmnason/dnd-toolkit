@@ -1,6 +1,6 @@
-import { getAuthProvider } from '@/lib/services';
 import { usersDB } from '@/lib/database';
 import { logger } from '@/lib/utils';
+import { getCurrentSession } from '../auth-manager';
 import { AuthStateManager } from '../auth-state';
 
 export interface SessionCheckResult {
@@ -15,10 +15,8 @@ export interface SessionCheckResult {
  */
 export const checkUserSession = async (): Promise<SessionCheckResult> => {
   try {
-    const authProvider = await getAuthProvider();
-
     // First, check if user already has valid session
-    const session = await authProvider.getSession();
+    const session = await getCurrentSession();
 
     if (!session) {
       return {

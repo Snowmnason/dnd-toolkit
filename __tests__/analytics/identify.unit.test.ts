@@ -10,8 +10,8 @@ const mockTracker = {
   isEnabled: vi.fn().mockReturnValue(true),
 };
 
-vi.mock('@/lib/services', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/services')>();
+vi.mock('@/system/services', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/system/Services')>();
   return { ...actual, getErrorTracker: () => mockTracker };
 });
 

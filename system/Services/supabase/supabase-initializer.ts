@@ -22,7 +22,7 @@
 import { logger } from '@/lib/utils';
 import { NoOpDatabaseProvider, registerDatabaseProvider } from '../database-adapter';
 import { SupabaseDatabaseProvider } from './supabase-database-provider';
-import { createSupabaseRpcAdapter } from './supabase-rpc-adapter';
+import { createSupabaseRpcAdapter } from './supabase-rpc-provider';
 
 // Lazy import to break circular dependency with lib/database/index.ts
 let cachedRegisterEdgeFunction: any = null;

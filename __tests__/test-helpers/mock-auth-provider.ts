@@ -1,5 +1,5 @@
-import type { AuthProvider, AuthResult, Session } from '@/lib/services/auth-provider';
-import { InvalidCredentialsError } from '@/lib/services/auth-provider';
+import type { AuthProvider, AuthResult, Session } from '@/system/Services/auth-adapter';
+import { InvalidCredentialsError } from '@/system/Services/auth-adapter';
 
 export function createMockAuthProvider(overrides?: Partial<AuthProvider>): AuthProvider {
   const defaultProvider: AuthProvider = {

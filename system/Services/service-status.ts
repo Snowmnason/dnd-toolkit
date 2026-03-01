@@ -108,6 +108,7 @@ export function resetServiceStatus(): void {
 export function getAllServiceStatuses(): Record<string, ServiceStatusDetail> {
   const result: Record<string, ServiceStatusDetail> = {};
   statusRegistry.forEach((detail, service) => {
+    // eslint-disable-next-line security/detect-object-injection
     result[service] = detail;
   });
   return result;

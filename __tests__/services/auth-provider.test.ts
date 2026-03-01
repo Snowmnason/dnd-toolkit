@@ -8,12 +8,12 @@ describe('Auth Provider Registration', () => {
   });
 
   it('getAuthProvider() rejects when not registered', async () => {
-    const { getAuthProvider, ProviderInitializationError } = await import('@/lib/services');
+    const { getAuthProvider, ProviderInitializationError } = await import('@/system/Services');
     await expect(getAuthProvider()).rejects.toBeInstanceOf(ProviderInitializationError);
   });
 
   it('registerAuthProvider(instance) registers and getAuthProvider resolves', async () => {
-    const { registerAuthProvider, getAuthProvider, getAuthProviderSync } = await import('@/lib/services');
+    const { registerAuthProvider, getAuthProvider, getAuthProviderSync } = await import('@/system/Services');
     const mock = createMockAuthProvider();
     await registerAuthProvider(mock as any);
     const p = await getAuthProvider();
@@ -23,7 +23,7 @@ describe('Auth Provider Registration', () => {
   });
 
   it('registerAuthProvider(factory) instantiates provider on first get', async () => {
-    const { registerAuthProvider, getAuthProvider } = await import('@/lib/services');
+    const { registerAuthProvider, getAuthProvider } = await import('@/system/Services');
     const factory = async () => createMockAuthProvider();
     await registerAuthProvider(factory as any);
     const p1 = await getAuthProvider();

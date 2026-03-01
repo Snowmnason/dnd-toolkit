@@ -12,10 +12,10 @@ import * as Crypto from 'expo-crypto';
 import { ANALYTICS_RETRY_DEFAULTS, getAppConfig } from '@/config';
 import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
 import { shouldEmitEvent, type ConsentCategory } from '@/lib/analytics/consent/consent-gating';
-import { BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '@/lib/services';
 import { SecureStorage } from '@/lib/storage';
 import { logger } from '@/lib/utils';
 import { STORAGE_KEYS } from "@/maps";
+import type { QueuedBreadcrumb } from '@/types/breadcrumb-queue-types';
 
 /**
  * In-memory queue statistics (not persisted)
@@ -25,7 +25,7 @@ export interface BreadcrumbQueueStats {
   oldestBreadcrumbTime?: number; // ms since epoch
   lastFlushTime?: number;
   overflowCount: number; // Session-only counter
-  providerName: string;
+  providerName: string | null;
   isFlushing: boolean;
 }
 
@@ -35,7 +35,7 @@ export interface BreadcrumbQueueStats {
  */
 class BreadcrumbQueueService {
   private queue: QueuedBreadcrumb[] = [];
-  private provider: BreadcrumbProvider | null = null;
+  private providerName: string | null = null;
   private overflowCount = 0; // Session-only
   private lastFlushTime: number | undefined = undefined;
   private lastFlushAttemptTime = 0; // Track when we last tried to flush
@@ -89,13 +89,13 @@ class BreadcrumbQueueService {
   /**
    * Initialize queue from SecureStorage and set active provider
    */
-  async initialize(provider: BreadcrumbProvider): Promise<void> {
-    if (!provider) {
-      throw new Error('BreadcrumbQueue: provider is required');
+  async initialize(providerName: string): Promise<void> {
+    if (!providerName) {
+      throw new Error('BreadcrumbQueue: providerName is required');
     }
 
-    this.provider = provider;
-    logger.category('analytics').analytics('BreadcrumbQueue', `Initializing with provider: ${provider.name}`);
+    this.providerName = providerName;
+    logger.category('analytics').analytics('BreadcrumbQueue', `Initializing with provider: ${providerName}`);
 
     try {
       // Load queue from storage
@@ -135,7 +135,7 @@ class BreadcrumbQueueService {
    * Returns the queued breadcrumb or null if filtered by dedup
    */
   async enqueue(breadcrumb: Omit<QueuedBreadcrumb, 'id' | 'fingerprint' | 'retryCount' | 'maxRetries'>): Promise<QueuedBreadcrumb | null> {
-    if (!this.provider) {
+    if (!this.providerName) {
       logger.category('analytics').analytics('BreadcrumbQueue', 'enqueue called before initialization');
       return null;
     }
@@ -287,7 +287,7 @@ class BreadcrumbQueueService {
       oldestBreadcrumbTime: this.queue.length > 0 ? this.queue[0].timestamp : undefined,
       lastFlushTime: this.lastFlushTime,
       overflowCount: this.overflowCount,
-      providerName: this.provider?.name || 'unknown',
+      providerName: this.providerName || 'unknown',
       isFlushing: this.isFlushing,
     };
   }
@@ -306,7 +306,7 @@ class BreadcrumbQueueService {
    * Implements Phase 1c: batch spacing, rate limit backoff, dedup-on-flush
    */
   async flush(): Promise<void> {
-    if (this.isFlushing || !this.provider || this.queue.length === 0) {
+    if (this.isFlushing || !this.providerName || this.queue.length === 0) {
       return;
     }
 
@@ -359,10 +359,17 @@ class BreadcrumbQueueService {
 
       logger.category('analytics').analytics(
         'BreadcrumbQueue',
-        `Flushing batch of ${batch.length} breadcrumbs via ${this.provider.name}`
+        `Flushing batch of ${batch.length} breadcrumbs via ${this.providerName}`
       );
 
-      const result: BreadcrumbSendResult = await this.provider.sendBatch(batch);
+      // Lazy import to break circular dependency: analytics → breadcrumb-queue → analytics-service → analytics
+      const { sendBreadcrumbs } = require('@/lib/services/analytics-service');
+      const result = await sendBreadcrumbs(this.providerName, batch);
+      if (result === null) {
+        logger.category('analytics').warn('BreadcrumbQueue', 'Middleware returned null (preconditions not met)');
+        this.isFlushing = false;
+        return;
+      }
 
       // Process successes
       if (result.sent.length > 0) {

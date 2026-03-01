@@ -1,85 +1,61 @@
 /**
- * Services Initialization Barrel
- * Re-exports all service initialization, auth provider, and exporter utilities
+ * Services Barrel — lib/services
+ *
+ * Middleware layer between lib modules and System/Services adapters.
+ * Each *-service file is the ONLY entry point to its corresponding adapter.
+ *
+ * Import from here (or from individual service files) instead of @/system/Services.
+ *
+ * Architecture:
+ *   lib modules → lib/services/*-service → system/Services/adapters → providers
  */
 
-export { initializeServices } from './service-initializer';
+// ─── Bootstrap ─────────────────────────────────────────────────────
+// initializeServices is a bootstrap-only function; only kernel should call it.
+export { initializeServices } from '@/system/Services';
 
-export { SentryErrorTracker } from './sentry/sentry-error-tracker';
-
-// Auth Provider Interface & Registration API
+// ─── Error Service ─────────────────────────────────────────────────
 export {
-    AuthError,
-    createValidatedAuthProvider,
-    EmailAlreadyExistsError,
-    getAuthProvider,
-    getAuthProviderSync,
-    getProviderDebugInfo,
-    InvalidCredentialsError,
-    NetworkError,
-    ProviderInitializationError,
-    RateLimitError,
-    registerAuthProvider,
-    UserNotFoundError,
-    type AuthProvider,
-    type AuthResult,
+    addErrorBreadcrumb,
+    flushErrors,
+    getErrorTrackerInstance,
+    isErrorTrackingEnabled,
+    reportError,
+    reportMessage,
+    setErrorUser
+} from './error-service';
+
+// ─── Auth Service ──────────────────────────────────────────────────
+export {
+    authGetSession,
+    authGetUser,
+    authOnStateChange,
+    authResendConfirmation, authResetPassword, authRestoreSession, authSignIn,
+    authSignInWithIdToken,
+    authSignInWithOAuth,
+    authSignOut,
+    authSignUp,
+    authUpdatePassword,
+    getAuth,
+    getAuthProvider, getAuthProviderSync, getAuthSync,
+    getSupabaseClientLazy,
+    isAuthConfigured,
+    isSupabaseConfiguredLazy,
     type Session
-} from './auth-provider';
+} from './auth-service';
 
-// Supabase Auth Provider Implementation
-export { SupabaseAuthProvider } from './supabase/supabase-auth-provider';
-
+// ─── Database Service ──────────────────────────────────────────────
 export {
-    BreadcrumbProvider,
-    BreadcrumbSendResult,
-    getAdapter,
-    listAdapters,
-    QueuedBreadcrumb,
-    registerAdapter
-} from './breadcrumb-adapter';
+    getDatabase,
+    getDatabaseWithAuth,
+    isDatabaseConfigured,
+    runEdgeFunction
+} from './database-service';
 
-// Error Tracker Provider (Sentry/DataDog abstraction)
+// ─── Analytics Service ─────────────────────────────────────────────
 export {
-    ErrorCaptureOptions,
-    ErrorTrackerProvider,
-    getErrorTracker,
-    NoOpErrorTracker,
-    registerErrorTracker,
-    resetErrorTracker,
-    SeverityLevel,
-    TrackerBreadcrumb,
-    TrackerUser,
-    type SeverityLevel as ErrorSeverityLevel
-} from './error-tracker';
-
-// Database Provider (Supabase/PostgreSQL/Firebase abstraction)
-export {
-    DatabaseProvider,
-    getDatabaseProvider,
-    NoOpDatabaseProvider,
-    QueryBuilder,
-    QueryError,
-    QueryResult,
-    registerDatabaseProvider,
-    resetDatabaseProvider
-} from './database-adapter';
-
-// Supabase Database Provider Implementation
-export { SupabaseDatabaseProvider } from './supabase/supabase-database-provider';
-
-// Supabase Initializer — database bootstrap (env vars, client, provider registration)
-export { initializeSupabaseDatabaseProvider, resetSupabaseInitializer } from './supabase/supabase-initializer';
-// Service Status Tracking — visibility into service readiness
-export {
-    areCriticalServicesReady,
-    getAllServiceStatuses,
-    getServiceStatus,
-    getServiceStatusDetail,
-    isServiceReady,
-    resetServiceStatus,
-    updateServiceStatus,
-    type ServiceReadiness,
-    type ServiceStatus,
-    type ServiceStatusDetail
-} from './service-status';
+    getBreadcrumbProvider,
+    listBreadcrumbProviders,
+    sendBreadcrumbs
+} from './analytics-service';
 
