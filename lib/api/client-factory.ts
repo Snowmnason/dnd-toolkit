@@ -17,12 +17,12 @@
  * Phase 4: Auth-on-replay, redaction, scheduled retries
  */
 
+import { AuthLayer } from "@/lib/auth/auth-layer";
 import { QueryCache } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
+import { RequestManager, type RequestOptions } from "@/system/API/request-manager";
 import type { ZodType } from "zod";
-import { AuthLayer } from "../auth/auth-layer";
 import { type RequestInterceptor } from "./interceptor";
-import { RequestManager, type RequestOptions } from "./request-manager";
 import { CircuitBreakerManager } from "./resilience/circuit-breaker";
 
 /**

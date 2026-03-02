@@ -1,8 +1,8 @@
 import { checkPendingInvites, signUpUser } from "@/lib/auth";
 import { usersDB } from "@/lib/database";
-import { SecureStorage } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
+import { SecureStorage } from "@/system/Storage";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "expo-router";
 import { useState } from "react";

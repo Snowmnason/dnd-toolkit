@@ -1,12 +1,12 @@
 import { dbRequestOptions } from "@/config";
-import { RequestManager } from "@/lib/api/request-manager";
 import { executeEdgeFunction } from "@/lib/database/edge";
 import { getDatabase } from "@/lib/services";
 import { logger } from "@/lib/utils/logger";
+import { RequestManager } from "@/system/API/request-manager";
 import type {
-  AccessRole,
-  WorldAccess,
-  WorldAccessRepository
+    AccessRole,
+    WorldAccess,
+    WorldAccessRepository
 } from "./repo-types";
 
 /**

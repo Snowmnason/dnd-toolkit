@@ -1,8 +1,6 @@
 import { clearErrorUser, isTrackingEnabled, setErrorUser } from "@/lib/error";
 import { logger } from "@/lib/utils";
 import { AnalyticsConsent } from "./consent/consent";
-import { createExportContext, dispatchEvent } from "./exporters/exporter-registry";
-
 import { getThreshold, sanitizeError } from "./utils";
 
 type AnalyticsEventProps = Record<string, any>;
@@ -123,6 +121,9 @@ export const Analytics = {
     // Fire-and-forget: don't await, don't block
     Promise.resolve().then(() => {
       try {
+        // Lazy require to break circular dependency: analytics → analytics-manager → analytics-service
+        const { dispatchAnalyticsEvent, createAnalyticsExportContext } = require("@/lib/services/analytics-service");
+        
         // Create analytics event for exporter system
         const analyticsEvent = {
           id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Simple UUID
@@ -133,12 +134,13 @@ export const Analytics = {
         };
 
         // Create context with current network status
-        const context = createExportContext(); // NetworkDetection auto-detects offline status
+        const context = createAnalyticsExportContext(); // NetworkDetection auto-detects offline status
+        if (!context) return; // Preconditions not met
 
         // Dispatch to all registered exporters (fire-and-forget)
         // dispatchEvent uses Promise.allSettled internally, so it never rejects
         // due to exporter failures; errors are logged within dispatchEvent
-        dispatchEvent(analyticsEvent, context);
+        dispatchAnalyticsEvent(analyticsEvent, context);
         // Don't await or .catch() — exporter failures are isolated and logged internally
       } catch (error) {
         logger.category('analytics').debug(`Failed to dispatch to exporters: ${error}`);

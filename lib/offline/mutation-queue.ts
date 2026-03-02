@@ -13,9 +13,9 @@
  */
 
 import { OFFLINE_SYNC_DEFAULTS } from "@/config";
-import { SecureStorage } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
+import { SecureStorage } from "@/system/Storage";
 import type { QueuedMutation } from "../../type-definitions/mutation-queue-types";
 import {
   BackoffScheduler,

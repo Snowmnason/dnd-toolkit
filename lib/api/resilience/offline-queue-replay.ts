@@ -5,9 +5,9 @@
  * when connectivity is restored.
  */
 
-import { RequestManager } from "@/lib/api/request-manager";
-import { NetworkDetection, type NetworkStatus } from "@/lib/network";
 import { logger } from "@/lib/utils/logger";
+import { RequestManager } from "@/system/API/request-manager";
+import { NetworkDetection, type NetworkStatus } from "@/system/Network";
 
 let statusChangeUnsubscribe: (() => void) | null = null;
 

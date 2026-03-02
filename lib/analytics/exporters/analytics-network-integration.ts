@@ -13,8 +13,8 @@
 
 import { getAppConfig } from '@/config';
 import { _setAnalyticsBufferFlushing } from "@/hooks/analytics/use-analytics-buffer-status";
-import { NetworkDetection, type NetworkStatus } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
+import { NetworkDetection, type NetworkStatus } from "@/system/Network/network-detection";
 import { analyticsBufferService } from "./analytics-buffer";
 
 /**

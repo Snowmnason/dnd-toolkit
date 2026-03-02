@@ -36,8 +36,9 @@
  * ```
  */
 
-import { NetworkDetection } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
+import { NetworkDetection } from "@/system/Network/network-detection";
+import { FastCacheAdapter } from "../../lib/jobs/adapters/fastcache-adapter";
 import { calculateNextRetryTime, formatDelay, isRetryable } from "../../pure-algo-immutables/backoff";
 import {
   EnqueueOptions,
@@ -50,7 +51,6 @@ import {
   JobRecord,
   StorageAdapter,
 } from "../../type-definitions/job-queue-types";
-import { FastCacheAdapter } from "./adapters/fastcache-adapter";
 
 // ==========================================
 // UUID Generation
@@ -131,7 +131,7 @@ export class BackgroundJobQueue {
       try {
         // Lazy-load SecureStorageAdapter on first use
         const { SecureStorageAdapter } =
-          await import("./adapters/secure-storage-adapter");
+          await import("../../lib/jobs/adapters/secure-storage-adapter");
         this.secureStorageAdapter = new SecureStorageAdapter();
         logger
           .category("jobs")

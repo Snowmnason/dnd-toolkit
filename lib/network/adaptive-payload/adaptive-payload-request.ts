@@ -6,8 +6,8 @@
  * Use these when making query requests through RequestManager.
  */
 
+import { NetworkDetection } from '../../../system/Network/network-detection';
 import { buildAdaptiveQueryParams, getAdaptivePayloadOptions, type PayloadQuality } from './adaptive-payload';
-import { NetworkDetection } from '../network-detection';
 
 /**
  * Append adaptive payload parameters to a URL/key

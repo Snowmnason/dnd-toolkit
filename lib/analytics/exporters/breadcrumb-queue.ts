@@ -12,10 +12,10 @@ import * as Crypto from 'expo-crypto';
 import { ANALYTICS_RETRY_DEFAULTS, getAppConfig } from '@/config';
 import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
 import { shouldEmitEvent, type ConsentCategory } from '@/lib/analytics/consent/consent-gating';
-import { SecureStorage } from '@/lib/storage';
 import { logger } from '@/lib/utils';
 import { STORAGE_KEYS } from "@/maps";
-import type { QueuedBreadcrumb } from '@/types/breadcrumb-queue-types';
+import { SecureStorage } from '@/system/Storage';
+import type { QueuedBreadcrumb } from '@/type-definitions/breadcrumb-queue-types.ts';
 
 /**
  * In-memory queue statistics (not persisted)

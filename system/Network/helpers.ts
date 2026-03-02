@@ -11,8 +11,8 @@
  * - NetworkState (type): state-machine state literal
  */
 
-import type { NetworkStatus } from "@/lib/network/network-detection";
-import { ConnectionQuality, qualityToNetworkState } from "@/lib/network/network-detection";
+import type { NetworkStatus } from "@/system/Network/network-detection";
+import { ConnectionQuality, qualityToNetworkState } from "@/system/Network/network-detection";
 
 /**
  * Connection type: what network medium we're connected to

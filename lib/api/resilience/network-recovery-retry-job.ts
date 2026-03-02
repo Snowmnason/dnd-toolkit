@@ -11,9 +11,9 @@
  * - NetworkDetection for reachability checks
  */
 
-import { NetworkDetection } from "@/lib/network/network-detection";
-import { NetworkStateManager } from "@/lib/network/state-machine";
 import { logger } from "@/lib/utils/logger";
+import { NetworkDetection } from "@/system/Network/network-detection";
+import { NetworkStateManager } from "@/system/Network/state-machine";
 import { NetworkRecoveryManager } from "./network-recovery";
 
 type NetworkStateMachine = typeof NetworkStateManager;

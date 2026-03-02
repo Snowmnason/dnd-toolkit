@@ -1,16 +1,16 @@
 import {
-    AppErrorBoundary,
-    LoadingOverlay,
-    TopBar
+  AppErrorBoundary,
+  LoadingOverlay,
+  TopBar
 } from "@/components";
 import { EntitlementExpiredModal } from "@/components/modals";
 import { OfflineSyncNotificationLayer } from "@/components/offline";
 import {
-    CrashFallBack,
-    RouteErrorBoundary,
-    SafeModeErrorBoundary,
-    SafeModeScreen,
-    SplashScreen,
+  CrashFallBack,
+  RouteErrorBoundary,
+  SafeModeErrorBoundary,
+  SafeModeScreen,
+  SplashScreen,
 } from "@/components/SplashScreen";
 import { AppToastLayer, NotificationContainer } from "@/components/ui";
 import { AppToastProvider, NotificationProvider } from "@/contexts";
@@ -19,38 +19,38 @@ import { AppKernelProvider, useAppKernel } from "@/hooks/kernel";
 import { useAnalyticsNavigation } from "@/hooks/navigation";
 import { useSplashScreen } from "@/hooks/ui";
 import {
-    Analytics,
-    AppKernel,
-    SafeModeReason,
-    buildNavigationTarget,
-    getRouteConfig,
-    logger,
-    resolveBackTarget,
-    resolveTitle,
-    sessionManager,
-    type AccessRole,
+  Analytics,
+  SafeModeReason,
+  buildNavigationTarget,
+  getRouteConfig,
+  logger,
+  resolveBackTarget,
+  resolveTitle,
+  sessionManager,
+  type AccessRole,
 } from "@/lib";
 import { executeRecoveryAction } from "@/lib/error/safemode/recovery-actions";
 import {
-    AppParamsStableProvider,
-    AppParamsVolatileProvider,
-    PlatformProvider,
-    ScaleProvider,
-    SubscriptionProvider,
-    ThemeProvider,
-    UseTheme,
-    useAppParamsStable,
-    useAppParamsVolatile,
-    usePlatform,
-    useUserId,
-    useUserRole,
-    useWorldId,
+  AppParamsStableProvider,
+  AppParamsVolatileProvider,
+  PlatformProvider,
+  ScaleProvider,
+  SubscriptionProvider,
+  ThemeProvider,
+  UseTheme,
+  useAppParamsStable,
+  useAppParamsVolatile,
+  usePlatform,
+  useUserId,
+  useUserRole,
+  useWorldId,
 } from "@/providers";
+import { AppKernel } from "@/system/Kernel";
 import {
-    Stack,
-    useLocalSearchParams,
-    useRouter,
-    useSegments,
+  Stack,
+  useLocalSearchParams,
+  useRouter,
+  useSegments,
 } from "expo-router";
 import { useEffect } from "react";
 import { View } from "react-native";

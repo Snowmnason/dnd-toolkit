@@ -22,9 +22,9 @@ import { getAppConfig, getPlatformName, isDevelopment } from '@/config';
 import { trackVariantAssignment } from "@/lib/analytics/variant-tracking";
 import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
 import { FeatureFlagOverrideRow } from "@/lib/database/feature-flag-overrides";
-import { SecureStorage } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
+import { SecureStorage } from "@/system/Storage";
 
 // Relative module imports (local)
 import { isInRolloutMemoized } from "@/pure-algo-immutables";

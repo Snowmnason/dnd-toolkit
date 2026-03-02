@@ -34,7 +34,6 @@
  * Add new keys to DATA_CLASSIFICATIONS when extending storage.
  */
 
-
 export { FastCache } from "./cache/FastCache";
 export {
   classifyKey,
@@ -46,7 +45,6 @@ export {
   isSensitiveData,
   shouldUseSecureStorage
 } from "./privacy";
-export { SecureStorage } from "./SecureStorage";
 export {
   batchStorageOperation,
   checkStorageHealth,

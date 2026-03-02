@@ -12,8 +12,8 @@
 import { getAppConfig } from '@/config';
 import { createSafeModeState, SafeModeReason } from "@/lib/error";
 import { getJobQueue } from "@/lib/jobs";
-import { AppKernel } from "@/lib/kernel";
 import { logger } from "@/lib/utils/logger";
+import { AppKernel } from "@/system/Kernel";
 
 const STORAGE_HEALTH_CHECK_JOB_TYPE = "storage_health_check";
 // Default to 5 minutes if not configured
@@ -60,7 +60,7 @@ async function validateStorageHealth(): Promise<void> {
     logger.category("storage").debug("Running storage health check");
 
     // Lazy-import to avoid circular dependency
-    const { SecureStorage } = await import("../SecureStorage");
+    const { SecureStorage } = await import("../../../system/Storage/SecureStorage");
     const { QueryCache } = await import("@/lib/storage/cache/query-cache");
 
     // Test write to SecureStorage (critical for functionality)

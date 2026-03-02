@@ -4,14 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   appendAdaptiveParams,
   getAdaptiveQueryString,
-  NetworkDetection,
   shouldDowngradeResource
 } from "@/lib/network";
+import { NetworkDetection } from "@/system/Network";
 vi.mock("react-native", () => ({ Platform: { OS: "ios" }, NativeModules: {} }));
 // Mock expo-constants (used by RequestManager via getAppConfig)
 vi.mock("expo-constants", () => ({ default: { expoConfig: { extra: { sentryDsn: null } } } }));
 
-let RequestManager: typeof import("@/lib/api/request-manager").RequestManager;
+let RequestManager: typeof import("@/system/API/request-manager").RequestManager;
 
 // Ensure network-detection module is mocked (appendAdaptiveParams imports it directly)
 vi.mock("@/lib/network/network-detection", () => ({ NetworkDetection: { getStatus: vi.fn(), subscribe: vi.fn() } }));

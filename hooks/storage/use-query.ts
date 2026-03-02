@@ -1,9 +1,9 @@
 'use client';
 
+import { QueryCache } from '@/lib/storage/';
+import { logger } from '@/lib/utils';
+import { NetworkDetection } from '@/system/Network';
 import { useEffect, useRef, useState } from 'react';
-import { NetworkDetection } from '../../lib/network';
-import { QueryCache } from '../../lib/storage/cache/query-cache';
-import { logger } from '../../lib/utils/logger';
 
 /**
  * Options for useQuery hook

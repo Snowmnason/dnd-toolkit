@@ -5,12 +5,12 @@
  * Use these patterns when creating or updating query hooks.
  */
 
+import { NetworkDetection } from "../../../system/Network/network-detection";
 import {
   buildAdaptiveQueryParams,
   getAdaptivePayloadOptions,
   getCacheKeyQualityComponent,
 } from "./adaptive-payload";
-import { NetworkDetection } from "../network-detection";
 
 /**
  * Configuration for adaptive query integration

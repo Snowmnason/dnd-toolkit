@@ -15,8 +15,8 @@
  * - Manage auth state (that stays in lib/auth/auth-state.ts)
  */
 
-import { ConnectionQuality, NetworkDetection } from '@/lib/network';
 import { logger } from '@/lib/utils/logger';
+import { ConnectionQuality, NetworkDetection } from '@/system/Network';
 import {
     isServiceReady,
     getAuthProvider as rawGetAuthProvider,

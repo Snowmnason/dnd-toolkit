@@ -15,7 +15,7 @@ import {
   NetworkStateManager,
   VALID_TRANSITIONS,
   type NetworkState,
-} from "@/lib/network/state-machine";
+} from "@/system/Network/state-machine";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("NetworkStateManager", () => {

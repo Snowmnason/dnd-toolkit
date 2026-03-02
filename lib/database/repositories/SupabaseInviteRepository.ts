@@ -1,14 +1,14 @@
 import { dbRequestOptions } from "@/config";
-import { RequestManager } from "@/lib/api/request-manager";
 import { validateUserForWrite } from "@/lib/database/database-manger";
 import { executeEdgeFunction } from "@/lib/database/edge";
 import { getDatabase } from "@/lib/services";
 import { logger } from "@/lib/utils/logger";
+import { RequestManager } from "@/system/API/request-manager";
 import type {
-  CreateInviteLinkParams,
-  InviteLink,
-  InviteRepository,
-  OperationResult,
+    CreateInviteLinkParams,
+    InviteLink,
+    InviteRepository,
+    OperationResult,
 } from "./repo-types";
 
 /**

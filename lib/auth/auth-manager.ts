@@ -1,43 +1,44 @@
 import { usersDB } from "@/lib/database";
 import {
-    authGetSession,
-    authGetUser,
-    authOnStateChange,
-    authResendConfirmation,
-    authResetPassword,
-    authRestoreSession,
-    authSignIn,
-    authSignInWithIdToken,
-    authSignInWithOAuth,
-    authSignOut,
-    authSignUp,
-    authUpdatePassword,
+  authGetSession,
+  authGetUser,
+  authOnStateChange,
+  authResendConfirmation,
+  authResetPassword,
+  authRestoreSession,
+  authSignIn,
+  authSignInWithIdToken,
+  authSignInWithOAuth,
+  authSignOut,
+  authSignUp,
+  authUpdatePassword,
 } from "@/lib/services";
-import { getPrivacyStorageBackend, SecureStorage } from "@/lib/storage";
+import { getPrivacyStorageBackend } from "@/lib/storage";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
+import { SecureStorage } from "@/system/Storage";
 import {
-    mapSignInError,
-    mapSignUpError,
-    prepareResendConfirmation,
-    prepareResetPassword,
-    prepareSignIn,
-    prepareSignUp,
-    prepareUpdatePassword,
-    recordAuthAttempt,
-    type AuthOperationResult,
-    type ResendResult,
-    type ResetPasswordResult,
-    type Session,
-    type SignInResult,
-    type SignUpResult,
+  mapSignInError,
+  mapSignUpError,
+  prepareResendConfirmation,
+  prepareResetPassword,
+  prepareSignIn,
+  prepareSignUp,
+  prepareUpdatePassword,
+  recordAuthAttempt,
+  type AuthOperationResult,
+  type ResendResult,
+  type ResetPasswordResult,
+  type Session,
+  type SignInResult,
+  type SignUpResult,
 } from "./auth-operations";
 
 // Re-export types so consumers only need @/lib/auth
 export type {
-    AuthOperationResult, ResendResult, ResetPasswordResult, Session,
-    SignInResult,
-    SignUpResult
+  AuthOperationResult, ResendResult, ResetPasswordResult, Session,
+  SignInResult,
+  SignUpResult
 };
 
 

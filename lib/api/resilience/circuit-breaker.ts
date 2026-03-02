@@ -1,4 +1,4 @@
-import { getAppConfig } from "../../../config";
+import { getAppConfig } from "@/config";
 import { logger } from "@/lib/utils";
 
 /**

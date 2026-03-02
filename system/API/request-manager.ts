@@ -5,31 +5,31 @@ import {
   getCrashReportPayload,
   sanitizeError as sanitizeErrorForAnalytics,
 } from "@/lib/analytics";
+import {
+  InterceptorManager,
+  parseEndpoint,
+  type RequestInterceptor,
+} from "@/lib/api/interceptor";
+import {
+  CircuitBreakerManager,
+  CircuitBreakerOpenError,
+  DEFAULT_THRESHOLDS,
+  type CircuitThresholds,
+} from "@/lib/api/resilience/circuit-breaker";
+import { OfflineQueueManager, type QueuedRequestEntry } from "@/lib/api/resilience/offline-queue";
+import { AuthLayer, type AuthContext } from "@/lib/auth/auth-layer";
 import { enrichError, extractErrorCode, reportError } from "@/lib/error";
 import {
   buildAdaptiveQueryParams,
   captureErrorCorrelation,
   ErrorType,
   getAdaptivePayloadOptions,
-  NetworkDetection,
   type PayloadQuality,
 } from "@/lib/network";
 import { QueryCache } from "@/lib/storage";
 import { logger, type LogCategory, type PerfTimer } from "@/lib/utils";
 import { ERROR_CODES, type ErrorCodeType } from "@/maps/ERROR_CODES";
-import { AuthLayer, type AuthContext } from "../auth/auth-layer";
-import {
-  InterceptorManager,
-  parseEndpoint,
-  type RequestInterceptor,
-} from "./interceptor";
-import {
-  CircuitBreakerManager,
-  CircuitBreakerOpenError,
-  DEFAULT_THRESHOLDS,
-  type CircuitThresholds,
-} from "./resilience/circuit-breaker";
-import { OfflineQueueManager, type QueuedRequestEntry } from "./resilience/offline-queue";
+import { NetworkDetection } from "@/system/Network";
 
 /**
  * Request Manager: Centralized API request layer with:
@@ -715,7 +715,7 @@ class RequestManagerClass {
    * );
    *
    * // With adaptive payloads (automatically adjusts quality based on network)
-   * import { appendAdaptiveParams } from '@/lib/network';
+   * import { appendAdaptiveParams } from '@/system/Network';
    * const key = appendAdaptiveParams('worlds:list'); // Adds ?imageQuality=hd&...
    * const data = await RequestManager.fetch(key, () => fetcher());
    *
@@ -1398,7 +1398,7 @@ class RequestManagerClass {
         try {
           // OPTIMIZATION: Skip token refresh if offline (no point, will fail anyway)
           // Let offline mode queue the request for retry when connection restored
-          const { NetworkDetection } = await import("@/lib/network");
+          const { NetworkDetection } = await import("@/system/Network");
           if (!NetworkDetection.getStatus().isOnline) {
             logger.category('api').debug(
               "Offline detected—skipping token refresh, letting offline queue handle retry",

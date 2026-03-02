@@ -17,10 +17,10 @@
  */
 
 import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
-import { ConnectionQuality, NetworkDetection } from '@/lib/network';
 import { logger } from '@/lib/utils/logger';
+import { ConnectionQuality, NetworkDetection } from '@/system/Network';
 import { getAdapter, isServiceReady, listAdapters } from '@/system/Services';
-import type { BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '@/types/breadcrumb-queue-types';
+import type { BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '@/type-definitions/breadcrumb-queue-types.ts';
 
 // ─── Precondition Checks ───────────────────────────────────────────
 
@@ -107,5 +107,52 @@ export async function sendBreadcrumbs(
  */
 export function listBreadcrumbProviders(): string[] {
     return listAdapters();
+}
+
+// ─── Event Dispatch Operations ─────────────────────────────────────
+
+/**
+ * Dispatch an analytics event to all registered exporters.
+ * Checks all preconditions before dispatching.
+ * Fire-and-forget: doesn't block caller.
+ *
+ * @param event - The analytics event to dispatch
+ * @param context - Export context with network status, consent level, etc.
+ */
+export async function dispatchAnalyticsEvent(
+    event: any,
+    context: any
+): Promise<void> {
+    if (!canSendAnalytics()) return;
+
+    try {
+        // Lazy require to break circular dependency
+        const { dispatchEvent } = require('@/lib/analytics/exporters/exporter-registry');
+        // Fire-and-forget: don't await or block
+        Promise.resolve().then(() => {
+            try {
+                dispatchEvent(event, context);
+            } catch (error) {
+                logger.category('analytics').debug(`Failed to dispatch event: ${error}`);
+            }
+        });
+    } catch (error) {
+        logger.category('analytics').warn('[analytics-service] Failed to dispatch analytics event', error);
+    }
+}
+
+/**
+ * Create a context object for analytics event export.
+ * Includes current network status and consent level.
+ */
+export function createAnalyticsExportContext(): any {
+    try {
+        // Lazy require to break circular dependency
+        const { createExportContext } = require('@/lib/analytics/exporters/exporter-registry');
+        return createExportContext();
+    } catch (error) {
+        logger.category('analytics').warn('[analytics-service] Failed to create export context', error);
+        return null;
+    }
 }
 

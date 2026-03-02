@@ -16,10 +16,10 @@
  * Consider batch operations to amortize overhead.
  */
 
-import { SecureStorage } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
+import { SecureStorage } from "@/system/Storage";
 
-import type { JobRecord, StorageAdapter } from "../../../type-definitions/job-queue-types";
+import type { JobRecord, StorageAdapter } from "@/type-definitions/job-queue-types";
 
 /**
  * Storage namespace for secure job queue

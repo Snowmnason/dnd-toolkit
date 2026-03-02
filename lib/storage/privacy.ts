@@ -34,7 +34,7 @@ const getFastCache = () => {
 
 const getSecureStorageInstance = () => {
   if (!SecureStorageCache) {
-    SecureStorageCache = require("./SecureStorage")
+    SecureStorageCache = require("@/system/Storage")
       .SecureStorage as PrivacyStorageBackend;
   }
   return SecureStorageCache;

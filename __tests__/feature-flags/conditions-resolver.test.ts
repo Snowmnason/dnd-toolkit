@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as platformModule from "@/config/";
 import * as configModule from "@/config/core/loader";
 import { FeatureFlagsManager } from "@/lib/feature-flags/server-sync";
-import { SecureStorage } from "@/lib/storage";
+import { SecureStorage } from "@/system/Storage";
 
 // Hoist and provide safe mocks before importing modules that read config at import-time
 vi.mock("@/config/core/loader", () => ({
@@ -19,7 +19,7 @@ vi.mock("@/config/core/loader", () => ({
   isDevelopment: vi.fn(() => false),
 }));
 vi.mock("@/config/core/platform-config", () => ({ getPlatformName: vi.fn(() => "web") }));
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/system/Storage", () => ({
   SecureStorage: {
     setJSON: vi.fn(),
     getJSON: vi.fn(),

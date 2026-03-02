@@ -9,7 +9,7 @@
  */
 
 import { getAppConfig } from "@/config";
-import { NetworkDetection, NetworkStatus } from "@/lib/network";
+import { NetworkDetection, NetworkStatus } from "@/system/Network";
 import { useEffect, useRef, useState } from "react";
 
 interface OfflineToastState {

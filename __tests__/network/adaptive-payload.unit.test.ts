@@ -1,12 +1,11 @@
 import {
   buildAdaptiveQueryParams,
-  ConnectionQuality,
   getAdaptivePayloadOptions,
   getCacheKeyQualityComponent,
-  NetworkStatus,
   type AdaptivePayloadOptions,
   type PayloadQuality
 } from "@/lib/network";
+import { ConnectionQuality, NetworkStatus } from "@/system/Network";
 
 import { describe, expect, it } from "vitest";
 

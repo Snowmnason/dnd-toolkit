@@ -9,11 +9,11 @@
  */
 
 import { FeatureFlagsManager } from "@/lib/feature-flags/server-sync";
-import { SecureStorage } from "@/lib/storage";
+import { SecureStorage } from "@/system/Storage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock Supabase and storage
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/system/Storage", () => ({
   SecureStorage: {
     setJSON: vi.fn().mockResolvedValue(undefined),
     getJSON: vi.fn().mockResolvedValue(null),

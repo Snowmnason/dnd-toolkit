@@ -16,8 +16,8 @@
  * - Transform entities (modules do that)
  */
 
-import { ConnectionQuality, NetworkDetection } from '@/lib/network';
 import { logger } from '@/lib/utils/logger';
+import { ConnectionQuality, NetworkDetection } from '@/system/Network';
 import {
     getDatabaseProvider,
     isServiceReady,

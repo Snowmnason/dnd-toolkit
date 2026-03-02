@@ -8,7 +8,7 @@ vi.mock("@/system/Services/supabase/supabase-rpc-provider", () => ({
   runEdgeFunction: vi.fn(),
 }));
 
-vi.mock("@/lib/network", () => ({
+vi.mock("@/system/Network", () => ({
   ConnectionQuality: { OFFLINE: "offline", GOOD: "good" },
   NetworkDetection: {
     getStatus: vi.fn(() => ({ connectionQuality: "good" })),
@@ -38,7 +38,7 @@ describe("RPC Middleware / runEdgeFunction", () => {
   });
 
   it("throws when network offline", async () => {
-    const { NetworkDetection } = await import("@/lib/network");
+    const { NetworkDetection } = await import("@/system/Network");
     (NetworkDetection.getStatus as any).mockReturnValue({ connectionQuality: "offline" });
     
     await expect(runEdgeFunction("leaveWorld", { world_id: "1" })).rejects.toThrow(

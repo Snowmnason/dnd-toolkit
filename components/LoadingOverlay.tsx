@@ -1,7 +1,7 @@
-import { KernelError } from '@/lib/kernel'
-import { UseTheme } from '@/theme'
-import { View } from 'react-native'
-import CustomLoad from './ui/CustomLoad'
+import { KernelError } from "@/system/Kernel";
+import { UseTheme } from '@/theme';
+import { View } from 'react-native';
+import CustomLoad from './ui/CustomLoad';
 
 interface LoadingOverlayProps {
   message?: string

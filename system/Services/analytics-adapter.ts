@@ -7,7 +7,7 @@
  * Type contracts are defined in @/types/breadcrumb-queue-types.ts
  */
 
-import type { BatchSendDecision, BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '@/types/breadcrumb-queue-types';
+import type { BatchSendDecision, BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '@/type-definitions/breadcrumb-queue-types.ts';
 
 // Re-export for backward compatibility with @/system/Services barrel
 export type { BatchSendDecision, BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb };

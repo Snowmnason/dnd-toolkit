@@ -12,8 +12,8 @@
  */
 
 import { FeatureFlagsManager } from "@/lib/feature-flags/server-sync";
-import { SecureStorage } from "@/lib/storage";
 import { STORAGE_KEYS } from "@/maps";
+import { SecureStorage } from "@/system/Storage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
@@ -45,7 +45,7 @@ const createMockSupabase = (invokeFn?: any) => ({
 });
 
 // Mock SecureStorage
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/system/Storage", () => ({
   SecureStorage: {
     setJSON: vi.fn(),
     getJSON: vi.fn(),

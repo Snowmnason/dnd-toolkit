@@ -1,8 +1,9 @@
-import { QueryCache, SecureStorage } from "@/lib/storage";
+import { QueryCache, } from "@/lib/storage";
 import { worldAccessCache } from "@/lib/storage/sync/world-access-cache";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
 import { CACHE_TAGS } from "@/maps/cache-keys";
+import { SecureStorage } from "@/system/Storage";
 import { getCurrentUserProfile } from "./database-manger";
 import { getInviteRepository, getWorldAccessRepository, getWorldRepository } from "./repositories";
 

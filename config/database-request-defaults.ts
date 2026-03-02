@@ -1,4 +1,4 @@
-import type { RequestOptions } from "@/lib/api/request-manager";
+import type { RequestOptions } from "@/system/API/request-manager";
 
 export type DbOperation = "read" | "list" | "create" | "update" | "delete" | "rpc";
 

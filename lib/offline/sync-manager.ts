@@ -31,13 +31,13 @@ import {
   NetworkCascadeDetector,
   SafeModeReason,
 } from "@/lib/error";
-import { AppKernel } from "@/lib/kernel";
+import { QueryCache } from "@/lib/storage";
+import { logger } from "@/lib/utils";
+import { AppKernel } from "@/system/Kernel";
 import {
   NetworkDetection,
   type NetworkStatus,
-} from "@/lib/network";
-import { QueryCache } from "@/lib/storage";
-import { logger } from "@/lib/utils";
+} from "@/system/Network";
 import type {
   OfflineSyncConfig,
   OfflineSyncStatus,

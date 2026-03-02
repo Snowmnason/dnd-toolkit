@@ -19,9 +19,9 @@
  * Use getAndResetOverflowCount() to inspect and optionally reset the counter during a session.
  */
 import { ANALYTICS_RETRY_DEFAULTS, getAppConfig } from '@/config';
-import { SecureStorage } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
+import { SecureStorage } from "@/system/Storage";
 
 /**
  * An analytics event queued for offline delivery

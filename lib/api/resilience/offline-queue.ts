@@ -1,13 +1,13 @@
-import { SecureStorage } from "@/lib/storage";
+import { logger } from "@/lib/utils/logger";
+import { STORAGE_KEYS } from "@/maps";
+import type { RequestOptions } from "@/system/API/request-manager";
+import { SecureStorage } from "@/system/Storage";
 import {
   handleCacheMigration,
   validateCacheEntry,
   type CacheSchema,
   type VersionedCacheEntry,
-} from "@/lib/storage/versioning/cache-versioning";
-import { logger } from "@/lib/utils/logger";
-import { STORAGE_KEYS } from "@/maps";
-import type { RequestOptions } from "../request-manager";
+} from "@/system/Storage/versioning/cache-versioning";
 
 /**
  * Offline Queue System

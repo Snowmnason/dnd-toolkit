@@ -2,10 +2,10 @@ import { getUserRepository, getWorldAccessRepository } from "@/lib/database";
 import {
   clearAllUserData,
   getPrivacyStorageBackend,
-  SecureStorage,
 } from "@/lib/storage";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
+import { SecureStorage } from "@/system/Storage";
 import { type Session } from "./auth-operations";
 
 // Session schema version for future migrations

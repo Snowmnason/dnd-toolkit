@@ -1,7 +1,7 @@
 import { OfflineQueueManager } from "@/lib/api/resilience/offline-queue";
-import { NetworkDetection } from "@/lib/network";
-import { SecureStorage } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
+import { NetworkDetection } from "@/system/Network";
+import { SecureStorage } from "@/system/Storage";
 import {
   afterEach,
   beforeEach,
@@ -13,14 +13,14 @@ import {
 } from "vitest";
 
 // Mock dependencies
-vi.mock("@/lib/network", () => ({
+vi.mock("@/system/Network", () => ({
   NetworkDetection: {
     getStatus: vi.fn(),
     subscribe: vi.fn(),
   },
 }));
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/system/Storage", () => ({
   SecureStorage: {
     getJSON: vi.fn(),
     setJSON: vi.fn(),

@@ -7,6 +7,6 @@
 export { FastCacheAdapter } from "./adapters/fastcache-adapter";
 export { SecureStorageAdapter } from "./adapters/secure-storage-adapter";
 
-export { BackgroundJobQueue, getJobQueue } from "./queue";
+export { BackgroundJobQueue, getJobQueue } from "../../system/Jobs/queue";
 
 

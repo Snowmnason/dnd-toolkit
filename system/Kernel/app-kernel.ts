@@ -28,13 +28,13 @@ import {
   SafeModeReason,
   type SafeModeState,
 } from "@/lib/error";
+import { getStorageDefaults } from "@/lib/kernel/storage-defaults";
+import { logger } from "@/lib/utils";
 import {
   NetworkDetection,
   NetworkStatus,
-} from "@/lib/network";
-import { logger } from "@/lib/utils";
+} from "@/system/Network";
 import { validateClassifications } from "@/type-definitions";
-import { getStorageDefaults } from "./storage-defaults";
 
 // FUTURE ENHANCEMENT: Phase Progress Callbacks
 // To add progress tracking for phases (e.g., "Loading fonts... 50%"):
@@ -1115,7 +1115,7 @@ class AppKernelClass {
         return;
       }
 
-      const { SecureStorage } = await import("@/lib/storage");
+      const { SecureStorage } = await import("@/system/Storage");
 
       // Check each key and collect those that need initialization
       const defaults = getStorageDefaults();
@@ -1128,6 +1128,7 @@ class AppKernelClass {
 
       await Promise.all(
         entries
+          // eslint-disable-next-line security/detect-object-injection
           .filter((_, i) => existingValues[i] === null)
           .map(async ([key, defaultValue]) => {
             await SecureStorage.setItem(key, defaultValue);

@@ -16,8 +16,8 @@
  */
 
 import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
-import { ConnectionQuality, NetworkDetection } from '@/lib/network';
 import { logger } from '@/lib/utils/logger';
+import { ConnectionQuality, NetworkDetection } from '@/system/Network';
 import {
     getErrorTracker,
     isServiceReady,

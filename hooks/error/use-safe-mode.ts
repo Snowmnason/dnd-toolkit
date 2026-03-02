@@ -4,12 +4,12 @@
  */
 
 import {
-    SafeModeLevel,
-    SafeModeReason,
-    SafeModeState,
-    createSafeModeState,
+  SafeModeLevel,
+  SafeModeReason,
+  SafeModeState,
+  createSafeModeState,
 } from "@/lib/error";
-import { AppKernel } from "@/lib/kernel";
+import { AppKernel } from "@/system/Kernel";
 import { useCallback, useEffect, useState } from "react";
 
 /**

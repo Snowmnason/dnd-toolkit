@@ -8,7 +8,7 @@
 
 import { logger } from '@/lib/utils';
 import { ERROR_CODES } from '@/maps';
-import { NetworkDetection } from './network-detection';
+import { NetworkDetection } from '../../system/Network/network-detection';
 
 /**
  * Check if an error is network-related

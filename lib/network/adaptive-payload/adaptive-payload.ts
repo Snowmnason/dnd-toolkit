@@ -11,8 +11,8 @@
  */
 
 import { logger } from "@/lib/utils";
-import { deriveConnectionType } from "../helpers";
-import { NetworkStatus } from "../network-detection";
+import { deriveConnectionType } from "../../../system/Network/helpers";
+import { NetworkStatus } from "../../../system/Network/network-detection";
 
 /**
  * Quality tier for images and media

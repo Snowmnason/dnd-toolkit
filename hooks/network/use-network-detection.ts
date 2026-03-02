@@ -1,4 +1,4 @@
-import { NetworkDetection, NetworkStatus } from '@/lib/network/network-detection';
+import { NetworkDetection, NetworkStatus } from '@/system/Network/network-detection';
 import React from 'react';
 
 /**

@@ -4,9 +4,9 @@
  * Helper functions for offline mutation handling
  */
 
-import { NetworkDetection } from "@/lib/network/network-detection";
 import { QueryCache } from "@/lib/storage/cache/query-cache";
 import { logger } from "@/lib/utils/logger";
+import { NetworkDetection } from "@/system/Network/network-detection";
 import type { MutationOperation, MutationPersistence, QueuedMutation } from "../../type-definitions/mutation-queue-types";
 import { OfflineMutationQueue } from "./mutation-queue";
 

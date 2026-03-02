@@ -8,9 +8,10 @@
  *   See lib/storage/data-classification.ts for the privacy policy.
  */
 import { getAppConfig, isProduction } from '@/config';
-import appSettingsProd from "../../config/appsettings.json";
-import { SecureStorage, getPrivacyStorageBackend } from "@/lib/storage";
+import { getPrivacyStorageBackend } from "@/lib/storage";
 import { logger } from "@/lib/utils";
+import { SecureStorage } from "@/system/Storage";
+import appSettingsProd from "../../config/appsettings.json";
 
 export interface Entitlements {
   tier: "free" | "premium";

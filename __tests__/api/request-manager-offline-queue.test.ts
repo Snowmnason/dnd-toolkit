@@ -1,9 +1,9 @@
 // Mock react-native to prevent Rollup errors
-import { RequestManager } from "@/lib/api/request-manager";
 import { CircuitBreakerManager } from "@/lib/api/resilience/circuit-breaker";
 import { OfflineQueueManager } from "@/lib/api/resilience/offline-queue";
-import { ConnectionQuality, NetworkDetection } from "@/lib/network";
-import { SecureStorage } from "@/lib/storage";
+import { RequestManager } from "@/system/API/request-manager";
+import { ConnectionQuality, NetworkDetection } from "@/system/Network";
+import { SecureStorage } from "@/system/Storage";
 import {
   afterEach,
   beforeEach,
@@ -87,7 +87,7 @@ vi.mock("@/lib/utils/logger", () => ({
 }));
 
 // Mock dependencies
-vi.mock("@/lib/network", () => ({
+vi.mock("@/system/Network", () => ({
   NetworkDetection: {
     getStatus: vi.fn(),
     subscribe: vi.fn(),
@@ -110,7 +110,7 @@ vi.mock("@/lib/api/circuit-breaker", () => ({
   },
 }));
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/system/Storage", () => ({
   SecureStorage: {
     getJSON: vi.fn(),
     setJSON: vi.fn(),
