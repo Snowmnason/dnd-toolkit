@@ -1,9 +1,9 @@
-import { RequestManager } from "@/lib/api/request-manager";
-import { getCurrentSession } from "@/lib/auth/auth-operations";
+import { dbRequestOptions } from "@/config";
+import { getCurrentSession } from "@/lib/auth";
 import type { AccessRole } from "@/lib/database/worlds";
-import { getDatabaseProvider } from "@/lib/services";
+import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
-import { dbRequestOptions } from "./request-config";
+import { RequestManager } from "@/system/API/request-manager";
 import type {
     CreateWorldData,
     PaginatedResult,
@@ -11,7 +11,7 @@ import type {
     World,
     WorldRepository,
     WorldWithAccess
-} from "./types";
+} from "./repo-types";
 
 /**
  * Supabase implementation of WorldRepository.
@@ -44,7 +44,7 @@ export class SupabaseWorldRepository implements WorldRepository {
           owner_id: session.userId,
         };
 
-        const { data, error } = await getDatabaseProvider()
+        const { data, error } = await getDatabase()
           .from("worlds", "worlds")
           .insert(insertData)
           .select()
@@ -75,7 +75,7 @@ export class SupabaseWorldRepository implements WorldRepository {
     return RequestManager.fetch(
       `world:${worldId}`,
       async () => {
-        const { data, error } = await getDatabaseProvider()
+        const { data, error } = await getDatabase()
           .from("worlds", "worlds")
           .select("*")
           .eq("world_id", worldId)
@@ -129,7 +129,7 @@ export class SupabaseWorldRepository implements WorldRepository {
         });
 
         // Get all world IDs and roles the user has access to
-        const { data: accessData, error: accessError } = await getDatabaseProvider()
+        const { data: accessData, error: accessError } = await getDatabase()
           .from("world_access", "worlds")
           .select("world_id, user_role, permissions")
           .eq("user_id", currentUserId)
@@ -152,7 +152,7 @@ export class SupabaseWorldRepository implements WorldRepository {
 
         // Get world details for each accessible world
         const worldIds = accessData.map((a: { world_id: string; user_role: AccessRole; permissions: any }) => a.world_id);
-        const { data: worldsData, error: worldsError } = await getDatabaseProvider()
+        const { data: worldsData, error: worldsError } = await getDatabase()
           .from("worlds", "worlds")
           .select("*")
           .in("world_id", worldIds)
@@ -215,7 +215,7 @@ export class SupabaseWorldRepository implements WorldRepository {
     return RequestManager.fetch(
       `world:update:${worldId}`,
       async () => {
-        const { data, error } = await getDatabaseProvider()
+        const { data, error } = await getDatabase()
           .from("worlds", "worlds")
           .update(updates)
           .eq("world_id", worldId)
@@ -254,7 +254,7 @@ export class SupabaseWorldRepository implements WorldRepository {
     await RequestManager.fetch(
       `world:delete:${worldId}`,
       async () => {
-        const { error } = await getDatabaseProvider()
+        const { error } = await getDatabase()
           .from("worlds", "worlds")
           .update({ deleted_at: new Date().toISOString() })
           .eq("world_id", worldId)

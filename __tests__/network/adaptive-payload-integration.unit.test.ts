@@ -1,11 +1,10 @@
 import { invalidateAdaptivePayloadCache } from "@/hooks/network/useAdaptivePayloadCacheInvalidation";
-import { QueryCache } from "@/lib/cache/query-cache";
-import { getAdaptivePayloadOptions } from "@/lib/network/adaptive-payload";
-import { getAdaptiveQueryParams, getQualityAwareCacheKey, getStaleTimeForQuality } from "@/lib/network/adaptive-payload-integration";
-import { NetworkDetection } from "@/lib/network/network-detection";
+import { getAdaptivePayloadOptions, getAdaptiveQueryParams, getQualityAwareCacheKey, getStaleTimeForQuality } from "@/lib/network";
+import { QueryCache } from "@/lib/storage";
+import { NetworkDetection } from "@/system/Network";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/network/network-detection", () => ({
+vi.mock("@/system/Network/network-detection", () => ({
   NetworkDetection: { getStatus: vi.fn(), subscribe: vi.fn() },
   ConnectionQuality: {
     GOOD: "good",

@@ -1,17 +1,17 @@
 // Mock react-native to prevent Rollup errors
-import { CircuitBreakerManager } from "@/lib/api/circuit-breaker";
-import { OfflineQueueManager } from "@/lib/api/offline-queue";
-import { RequestManager } from "@/lib/api/request-manager";
-import { ConnectionQuality, NetworkDetection } from "@/lib/network";
-import { SecureStorage } from "@/lib/storage";
+import { CircuitBreakerManager } from "@/lib/api/resilience/circuit-breaker";
+import { OfflineQueueManager } from "@/lib/api/resilience/offline-queue";
+import { RequestManager } from "@/system/API/request-manager";
+import { ConnectionQuality, NetworkDetection } from "@/system/Network";
+import { SecureStorage } from "@/system/Storage";
 import {
-    afterEach,
-    beforeEach,
-    describe,
-    expect,
-    it,
-    vi,
-    type MockedFunction,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockedFunction,
 } from "vitest";
 
 vi.mock("react-native", () => ({
@@ -29,7 +29,7 @@ vi.mock("expo-constants", () => ({
 }));
 
 // Mock problematic dependencies
-vi.mock("@/lib/api/auth-layer", () => ({
+vi.mock("@/lib/auth/auth-layer", () => ({
   AuthLayer: {
     injectAuthHeader: vi.fn(),
     handle401Response: vi.fn(),
@@ -87,7 +87,7 @@ vi.mock("@/lib/utils/logger", () => ({
 }));
 
 // Mock dependencies
-vi.mock("@/lib/network", () => ({
+vi.mock("@/system/Network", () => ({
   NetworkDetection: {
     getStatus: vi.fn(),
     subscribe: vi.fn(),
@@ -110,7 +110,7 @@ vi.mock("@/lib/api/circuit-breaker", () => ({
   },
 }));
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/system/Storage", () => ({
   SecureStorage: {
     getJSON: vi.fn(),
     setJSON: vi.fn(),

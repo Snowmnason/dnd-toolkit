@@ -12,7 +12,7 @@ import {
   AuthTitle,
   FormAuthInput
 } from '@/components/auth_components';
-import { useSignInForm } from '@/lib';
+import { useSignInForm } from "@/hooks/auth";
 import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
 

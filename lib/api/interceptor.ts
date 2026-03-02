@@ -11,7 +11,7 @@
  * Hooks are NOT called for 401 errors (AuthLayer handles those).
  */
 
-import { logger } from "../utils/logger";
+import { logger } from "@/lib/utils";
 
 export interface RequestInterceptor {
   /** Optional name for debugging/logging */
@@ -283,7 +283,7 @@ class InterceptorManagerClass {
     if (hooks.length === 0) return;
 
     // Lazy import to avoid circular dependency issues in tests
-    const { NetworkDetection } = await import("../network");
+    const { NetworkDetection } = await import("@/system/Network");
     const isOffline = !NetworkDetection.getStatus().isOnline;
 
     // Explicitly construct context with known properties only (prevents object injection warning)

@@ -1,67 +1,54 @@
-export { AuthLayer, type AuthContext, type AuthStrategy } from "./auth-layer";
 export {
-    CircuitBreakerManager,
-    CircuitBreakerOpenError,
-    DEFAULT_THRESHOLDS,
-    type CircuitStats,
-    type CircuitThresholds
-} from "./circuit-breaker";
-export {
-    APIClient,
-    type APIClientConfig,
-    type ApiErrorType,
-    type MutationOptions,
-    type QueryOptions
+  APIClient,
+  type APIClientConfig,
+  type ApiErrorType,
+  type MutationOptions,
+  type QueryOptions
 } from "./client-factory";
 export { CACHE_DEFAULTS } from "./clients/defaults";
 export {
-    UsersAPI,
-    type User as APIUser,
-    type UpdateUserRequest
+  UsersAPI,
+  type User as APIUser,
+  type UpdateUserRequest
 } from "./clients/users";
 export {
-    WorldsAPI,
-    type World as APIWorld,
-    type CreateWorldRequest,
-    type UpdateWorldRequest,
-    type WorldMember
+  WorldsAPI,
+  type World as APIWorld,
+  type CreateWorldRequest,
+  type UpdateWorldRequest,
+  type WorldMember
 } from "./clients/worlds";
 export {
-    createInviteAuthStrategy,
-    createPublicAuthStrategy,
-    createUserAuthStrategy
-} from "./default-strategies";
-export {
-    InterceptorManager,
-    parseEndpoint,
-    type RequestInterceptor
+  InterceptorManager,
+  parseEndpoint,
+  type RequestInterceptor
 } from "./interceptor";
 export {
-    getStatusMessage,
-    isClientError,
-    isPermanentError,
-    isServerError,
-    isTransientError,
-    statusToErrorCode,
-} from "./http-error-mapper";
+  CircuitBreakerManager,
+  CircuitBreakerOpenError,
+  DEFAULT_THRESHOLDS,
+  type CircuitStats,
+  type CircuitThresholds
+} from "./resilience/circuit-breaker";
+
 export {
-    NetworkRecoveryManager,
-    registerNetworkRecoveryHooks,
-    type NotificationCallback,
-    type RecoveryState
-} from "./network-recovery";
+  NetworkRecoveryManager,
+  registerNetworkRecoveryHooks,
+  type NotificationCallback,
+  type RecoveryState
+} from "./resilience/network-recovery";
 export {
-    NetworkRecoveryRetryJobManager,
-    type NetworkRecoveryRetryJobConfig
-} from "./network-recovery-retry-job";
+  NetworkRecoveryRetryJobManager,
+  type NetworkRecoveryRetryJobConfig
+} from "./resilience/network-recovery-retry-job";
 export {
-    OfflineQueueManager,
-    type OfflineQueueConfig,
-    type OfflineQueueStats,
-    type QueuedRequestEntry
-} from "./offline-queue";
+  OfflineQueueManager,
+  type OfflineQueueConfig,
+  type OfflineQueueStats,
+  type QueuedRequestEntry
+} from "./resilience/offline-queue";
 export {
-    cleanupOfflineQueueReplay,
-    initializeOfflineQueueReplay
-} from "./offline-queue-replay";
+  cleanupOfflineQueueReplay,
+  initializeOfflineQueueReplay
+} from "./resilience/offline-queue-replay";
 

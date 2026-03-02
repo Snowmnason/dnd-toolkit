@@ -11,7 +11,8 @@ import {
 } from '@/components/auth_components';
 import { Body } from '@/components/ui';
 import { useAuthStateListener } from '@/hooks/auth';
-import { logger, openEmailApp } from '@/lib';
+import { logger } from '@/lib';
+import { openEmailApp } from '@/validation';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';

@@ -4,12 +4,12 @@
  */
 
 import {
-    SafeModeLevel,
-    SafeModeReason,
-    SafeModeState,
-    createSafeModeState,
-} from "@/lib/error/safe-mode";
-import { AppKernel } from "@/lib/kernel";
+  SafeModeLevel,
+  SafeModeReason,
+  SafeModeState,
+  createSafeModeState,
+} from "@/lib/error";
+import { AppKernel } from "@/system/Kernel";
 import { useCallback, useEffect, useState } from "react";
 
 /**
@@ -104,5 +104,5 @@ export function useSafeModeLevel(): SafeModeLevel | null {
  */
 export function useIsFeatureAffected(featureName: string): boolean {
   const safeMode = useSafeMode();
-  return safeMode?.affectedFeatures.some((f) => f === featureName) ?? false;
+  return safeMode?.affectedFeatures.some((f: string) => f === featureName) ?? false;
 }

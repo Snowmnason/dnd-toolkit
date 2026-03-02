@@ -1,5 +1,5 @@
 import { ThemeTokens } from "@/theme/tokens";
-import { UseTheme } from "../../providers/ThemeProvider";
+import { UseTheme } from "@/providers";
 import { $ as cssVarDollar } from "./cssVars";
 import { S } from "./sizing";
 

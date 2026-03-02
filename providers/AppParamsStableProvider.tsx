@@ -1,6 +1,7 @@
 import { AuthStateManager } from "@/lib/auth/auth-state";
-import { getPrivacyStorageBackend, STORAGE_KEYS } from "@/lib/storage";
+import { getPrivacyStorageBackend } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
+import { STORAGE_KEYS } from "@/maps";
 import React, {
   createContext as createReactContext,
   ReactNode,
@@ -423,12 +424,11 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     const setupAuthWatcher = async (attempt = 1, token = ++watcherToken) => {
       const localToken = token;
       try {
-        const { getAuthProvider } = await import("@/lib/services");
-        const authProvider = await getAuthProvider();
+        const { listenToAuthStateChanges } = await import("@/lib/auth");
         // Re-check staleness after the async await — a newer watcher may have been
         // started while we were waiting for the auth provider to become available.
         if (localToken !== watcherToken) return;
-        const unsubscribe = authProvider.onAuthStateChange(async (session) => {
+        const unsubscribe = listenToAuthStateChanges(async (session) => {
           if (localToken !== watcherToken) return; // stale watcher
           if (mounted && session !== null) {
             logger.category('auth').debug(

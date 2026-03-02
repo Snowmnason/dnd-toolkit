@@ -1,9 +1,9 @@
 import {
   OfflineQueueManager,
   type QueuedRequestEntry,
-} from "@/lib/api/offline-queue";
-import { SecureStorage } from "@/lib/storage";
+} from "@/lib/api/resilience/offline-queue";
 import { logger } from "@/lib/utils/logger";
+import { SecureStorage } from "@/system/Storage";
 import {
   afterEach,
   beforeEach,
@@ -15,7 +15,7 @@ import {
 } from "vitest";
 
 // Mock dependencies
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/system/Storage", () => ({
   SecureStorage: {
     getJSON: vi.fn(),
     setJSON: vi.fn(),

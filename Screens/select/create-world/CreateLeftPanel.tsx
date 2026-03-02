@@ -6,9 +6,9 @@ import {
   Heading,
 } from "@/components/ui";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
-import type { WorldFormData } from "@/lib/schemas";
-import { usePlatform } from "@/providers/PlatformProvider";
+import { usePlatform } from "@/providers";
 import { useScale } from "@/theme";
+import type { WorldFormData } from "@/validation";
 import { useRouter } from "expo-router";
 import { Controller, type Control } from "react-hook-form";
 import { ScrollView, View } from "react-native";

@@ -485,18 +485,14 @@ NetworkStateManager.onSpecificTransition('RECOVERING', 'GOOD', async () => {
 - **`EXPO_PUBLIC_SUPABASE_URL`** — Used to construct health endpoint for periodic pings
 - **`EXPO_PUBLIC_SUPABASE_HEALTH_ENDPOINT`** (optional) — Override health endpoint explicitly
 
-### Constants (network-config.ts)
+### Constants (inline in network-detection.ts)
 
 ```ts
-WEB_PING_INTERVAL = 5 * 60 * 1000; // 5 minutes (ping interval when visible)
-WEB_PING_TIMEOUT = 5000; // 5 seconds (ping timeout)
 LATENCY_THRESHOLD = 500; // 500ms (marks as BAD connection)
 LOW_BATTERY_THRESHOLD = 0.2; // 20% (marks connection as expensive)
-RECOVERY_BACKOFF_CAP = 30000; // 30 seconds (max backoff delay)
-DEBOUNCE_STATUS_CHANGE = 500; // 500ms (debounce rapid flapping)
 ```
 
-Adjust for different network conditions, battery strategies, or recovery preferences.
+Configuration values (ping interval, ping timeout, debounce delay) are read from `appConfig` with fallback defaults at call sites.
 
 ## Dependencies
 
@@ -518,7 +514,6 @@ Adjust for different network conditions, battery strategies, or recovery prefere
 | ---------------------------------- | ------------------------------------------------------------ | ----- |
 | network-detection.ts               | Core detection, status tracking, platform abstraction        | 1018  |
 | state-machine.ts                   | State transitions, recovery backoff, hooks, valid transitions | 291   |
-| network-config.ts                  | Constants, Supabase health endpoint resolution               | 90    |
 | error-handling.ts                  | Network error classification, stale cache decision logic     | 192   |
 | adaptive-payload.ts                | Quality → payload options mapping, tier definitions           | 240   |
 | adaptive-payload-request.ts        | RequestManager integration, quality-aware cache keys         | 146   |
@@ -526,7 +521,7 @@ Adjust for different network conditions, battery strategies, or recovery prefere
 | network-telemetry.ts               | Event emission, sampling, logging, consent integration       | 593   |
 | helpers.ts                         | Utility functions (isOnline, hasGoodConnection, etc.)        | 97    |
 | index.ts                           | Barrel export                                                | 77    |
-| **Total**                          | **All network module files combined**                        | **3107** |
+| **Total**                          | **All network module files combined**                        | **3017** |
 
 ## Known Limitations
 

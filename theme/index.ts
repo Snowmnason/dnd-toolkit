@@ -6,7 +6,7 @@ import { allThemes, ThemeFamilyName } from "./themeRegistry";
 export { allThemes, ThemeFamilyName } from "./themeRegistry";
 
 // 🔁 Public exports
-export * from "../providers/ThemeProvider";
+export * from "@/providers/ThemeProvider";
 export * from "./families/Classic";
 export * from "./families/Cyberpunk";
 export * from "./tokens";
@@ -15,7 +15,7 @@ export * from "./ultils/sizing";
 export * from "./ultils/tokens";
 
 // 🎯 Dynamic sizing hook (re-export from provider)
-export { useScale } from "@/providers/ScaleProvider";
+export { useScale } from "@/providers";
 
 /**
  * ⚡ Preload all theme assets (fonts, async color maps, etc.)

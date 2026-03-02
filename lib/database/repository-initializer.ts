@@ -12,7 +12,7 @@
  * Swapping to a different backend means updating this file and service-initializer.ts.
  */
 
-import { getDatabaseProvider } from "@/lib/services";
+import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
 import { registerRepositories, type RepositoryBundle } from "./repositories";
 import { SupabaseEntitlementsRepository } from "./repositories/SupabaseEntitlementsRepository";
@@ -34,7 +34,7 @@ let _initialized = false;
  * 2. Instantiate all Supabase repository implementations
  * 3. Register them as the active repositories
  *
- * Called after DatabaseProvider is ready, so repositories can call getDatabaseProvider() immediately.
+ * Called after DatabaseProvider is ready via getDatabase() middleware, so repositories can call getDatabase() immediately.
  *
  * @returns true if repositories were initialized and registered;
  *          false if DatabaseProvider is not configured (repositories cannot be instantiated)
@@ -48,7 +48,7 @@ export async function initializeRepositories(): Promise<boolean> {
   _initialized = true;
 
   // Check that DatabaseProvider is ready
-  const databaseProvider = getDatabaseProvider();
+  const databaseProvider = getDatabase();
   if (!databaseProvider.isConfigured()) {
     logger.category('bootstrap').warn(
       "[Repository Initializer] DatabaseProvider not configured — skipping repository initialization. " +

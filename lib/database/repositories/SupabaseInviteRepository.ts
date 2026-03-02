@@ -1,15 +1,15 @@
-import { RequestManager } from "@/lib/api/request-manager";
-import { validateUserForWrite } from "@/lib/database/common";
+import { dbRequestOptions } from "@/config";
+import { validateUserForWrite } from "@/lib/database/database-manger";
 import { executeEdgeFunction } from "@/lib/database/edge";
-import { getDatabaseProvider } from "@/lib/services";
+import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
-import { dbRequestOptions } from "./request-config";
+import { RequestManager } from "@/system/API/request-manager";
 import type {
     CreateInviteLinkParams,
     InviteLink,
     InviteRepository,
     OperationResult,
-} from "./types";
+} from "./repo-types";
 
 /**
  * Supabase implementation of InviteRepository.
@@ -157,7 +157,7 @@ export class SupabaseInviteRepository implements InviteRepository {
       const result = await RequestManager.fetch(
         `world:${worldId}:invites`,
         async () => {
-          const { data, error } = await getDatabaseProvider()
+          const { data, error } = await getDatabase()
             .from("invite_links", "worlds")
             .select("*")
             .eq("world_id", worldId)

@@ -10,15 +10,15 @@ const mockTracker = {
   isEnabled: vi.fn().mockReturnValue(true),
 };
 
-vi.mock('@/lib/services', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/services')>();
+vi.mock('@/system/services', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/system/Services')>();
   return { ...actual, getErrorTracker: () => mockTracker };
 });
 
 vi.mock('@/lib/config/loader', () => ({ getAppConfig: () => ({ features: {} }), isDevelopment: () => false }));
 
 import { Analytics } from '@/lib/analytics';
-import { AnalyticsConsent } from '@/lib/analytics/consent';
+import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
 
 beforeEach(async () => {
   // Reset consent to default (basic) before each test

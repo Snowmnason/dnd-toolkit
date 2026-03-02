@@ -1,11 +1,14 @@
 import {
     getCurrentSession,
     listenToAuthStateChanges,
+    mapAuthErrorToCode,
     resendConfirmationEmail,
+    signOutUser
 } from "@/lib/auth";
-import type { Session } from "@/lib/services";
-import { signOutUser } from "@/lib/settings";
-import { mapAuthErrorToCode, type AuthErrorCode } from "@/lib/utils/ERROR_CODES";
+
+import type { Session } from "@/lib/middleware/services";
+
+import { type AuthErrorCode } from "@/maps/ERROR_CODES";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
@@ -106,7 +109,7 @@ export function useAuthStateListener(
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
 
-    listenToAuthStateChanges((s) => {
+    unsubscribe = listenToAuthStateChanges((s) => {
       // Debounce state updates to prevent UI flicker on rapid auth events (token refresh, etc.)
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
@@ -117,8 +120,6 @@ export function useAuthStateListener(
         callbackRef.current?.(s);
         setErrorCode(null); // Clear error on successful state update
       }, 100); // 100ms debounce window
-    }).then((cleanup) => {
-      unsubscribe = cleanup;
     });
 
     return () => {

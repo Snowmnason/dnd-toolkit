@@ -1,9 +1,7 @@
 import { Body, Button } from "@/components/ui";
 import { WorldWithAccess } from "@/lib/database/worlds";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
-import { useUserId } from "@/providers/AppParamsStableProvider";
-import { useAppParamsVolatile } from "@/providers/AppParamsVolatileProvider";
-import { usePlatform } from "@/providers/PlatformProvider";
+import { useAppParamsVolatile, usePlatform, useUserId } from "@/providers";
 import { useScale } from "@/theme";
 import { useRouter } from "expo-router";
 import React from "react";

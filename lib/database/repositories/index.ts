@@ -54,14 +54,14 @@
 
 import { logger } from "@/lib/utils/logger";
 import type {
-    EntitlementsRepository,
-    FeatureFlagsRepository,
-    InviteRepository,
-    UserRepository,
-    UserSettingsRepository,
-    WorldAccessRepository,
-    WorldRepository,
-} from "./types";
+  EntitlementsRepository,
+  FeatureFlagsRepository,
+  InviteRepository,
+  UserRepository,
+  UserSettingsRepository,
+  WorldAccessRepository,
+  WorldRepository,
+} from "./repo-types";
 
 // ============================================================================
 // REGISTRY
@@ -358,30 +358,30 @@ export function _resetRepositories(): void {
 // ============================================================================
 
 export type {
-    CacheOptions,
-    CreateInviteLinkParams,
-    CreateUserData,
-    CreateWorldData,
-    EntitlementRow,
-    EntitlementsRepository,
-    FeatureFlagOverrideRow,
-    FeatureFlagRow,
-    FeatureFlagsRepository,
-    InviteLink,
-    InviteRepository,
-    OperationResult,
-    PaginatedResult,
-    PaginationOptions,
-    UpdateUserData,
-    User,
-    UserRepository,
-    UserSettings,
-    UserSettingsRepository,
-    WorldAccess,
-    WorldAccessRepository,
-    WorldRepository,
-    WorldWithAccess
-} from "./types";
+  CacheOptions,
+  CreateInviteLinkParams,
+  CreateUserData,
+  CreateWorldData,
+  EntitlementRow,
+  EntitlementsRepository,
+  FeatureFlagOverrideRow,
+  FeatureFlagRow,
+  FeatureFlagsRepository,
+  InviteLink,
+  InviteRepository,
+  OperationResult,
+  PaginatedResult,
+  PaginationOptions,
+  UpdateUserData,
+  User,
+  UserRepository,
+  UserSettings,
+  UserSettingsRepository,
+  WorldAccess,
+  WorldAccessRepository,
+  WorldRepository,
+  WorldWithAccess
+} from "./repo-types";
 
-export type { AccessRole, World } from "./types";
+export type { AccessRole, World } from "./repo-types";
 

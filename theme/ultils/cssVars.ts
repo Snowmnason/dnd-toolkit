@@ -1,5 +1,5 @@
 import { Platform } from "react-native";
-import { UseTheme } from "../../providers/ThemeProvider";
+import { UseTheme } from "@/providers";
 import { ThemeTokens, TokenName } from "../tokens";
 
 /**

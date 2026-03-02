@@ -1,9 +1,9 @@
 import { AppModal, Body, Button, FormTextInput } from '@/components/ui'
 import { $, useScale, UseTheme } from '@/theme'
-import React, { useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { updateUsernameSchema, type UpdateUsernameFormData } from '@/validation/auth.schema'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { updateUsernameSchema, type UpdateUsernameFormData } from '@/lib/schemas/auth.schema'
+import { useEffect } from 'react'
+import { useForm } from 'react-hook-form'
 import { View } from 'react-native'
 
 interface UpdateUsernameModalProps {

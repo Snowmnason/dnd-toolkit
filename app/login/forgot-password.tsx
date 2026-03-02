@@ -1,18 +1,18 @@
 import {
-    AuthActionGroup,
-    AuthBody,
-    AuthBodyFooter,
-    AuthButton, AuthButtonBack,
-    AuthCaption, AuthError, AuthForm,
-    AuthModal,
-    AuthRoot,
-    AuthSubTitle,
-    AuthSuccess,
-    AuthTitle,
-    FormAuthInput,
+  AuthActionGroup,
+  AuthBody,
+  AuthBodyFooter,
+  AuthButton, AuthButtonBack,
+  AuthCaption, AuthError, AuthForm,
+  AuthModal,
+  AuthRoot,
+  AuthSubTitle,
+  AuthSuccess,
+  AuthTitle,
+  FormAuthInput,
 } from '@/components/auth_components';
 import { sendPasswordReset } from '@/lib';
-import { forgotPasswordSchema, type ForgotPasswordFormData } from '@/lib/schemas/auth.schema';
+import { forgotPasswordSchema, type ForgotPasswordFormData } from '@/validation/auth.schema';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';

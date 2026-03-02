@@ -5,14 +5,14 @@
  * lazy loading, PII/field redaction, web font handling, and error code management.
  */
 
-export * from "./entitlements";
-export * from "./ERROR_CODES";
-export * from "./image-optimization";
-export * from "./image-proxy";
-export * from "./lazy-imports";
+export * from "./images/image-optimization";
+export * from "./images/image-proxy";
 export { default as Logger, logger } from "./logger";
-export * from "./redaction-manager";
-export * from "./startup-time";
+export type { CategoryLogger, LogCategory, LogLevel, LogMetadata, LogSchema, PerfTimer } from "./logger";
+export * from "./performance/lazy-imports";
+
+export * from "./performance/startup-time";
 export * from "./version";
-export * from "./web-font-loader";
+export * from "./web/web-font-loader";
+
 

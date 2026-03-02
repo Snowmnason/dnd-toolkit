@@ -1,43 +1,70 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock getDatabaseProvider to control rpc behavior
-vi.mock("@/lib/services", () => ({
-  getDatabaseProvider: vi.fn(),
+import { runEdgeFunction } from "@/lib/middleware/services";
+import * as rawRpcModule from "@/system/Services/supabase/supabase-rpc-provider";
+
+// Mock the raw RPC adapter and network/service readiness checks
+vi.mock("@/system/Services/supabase/supabase-rpc-provider", () => ({
+  runEdgeFunction: vi.fn(),
 }));
 
-import { getDatabaseProvider } from "@/lib/services";
-import * as rpcModule from "@/lib/services/supabase/supabase-rpc-adapter";
+vi.mock("@/system/Network", () => ({
+  ConnectionQuality: { OFFLINE: "offline", GOOD: "good" },
+  NetworkDetection: {
+    getStatus: vi.fn(() => ({ connectionQuality: "good" })),
+  },
+}));
 
-describe("Supabase RPC Adapter / runEdgeFunction", () => {
+vi.mock("@/system/Services", async () => {
+  const actual = await vi.importActual("@/system/Services");
+  return {
+    ...actual,
+    isServiceReady: vi.fn((service) => service !== "database" || true), // Default: all services ready
+  };
+});
+
+describe("RPC Middleware / runEdgeFunction", () => {
   beforeEach(() => {
     vi.resetAllMocks();
   });
 
-  it("throws when database provider not configured", async () => {
-    (getDatabaseProvider as any).mockReturnValue({ isConfigured: () => false });
-    await expect(rpcModule.runEdgeFunction("leaveWorld", { world_id: "1" })).rejects.toThrow(
-      /require Supabase configuration/i
+  it("throws when database provider not ready", async () => {
+    const { isServiceReady } = await import("@/system/Services");
+    (isServiceReady as any).mockImplementation((service: string) => service !== "database");
+    
+    await expect(runEdgeFunction("leaveWorld", { world_id: "1" })).rejects.toThrow(
+      /database provider not ready/i
+    );
+  });
+
+  it("throws when network offline", async () => {
+    const { NetworkDetection } = await import("@/system/Network");
+    (NetworkDetection.getStatus as any).mockReturnValue({ connectionQuality: "offline" });
+    
+    await expect(runEdgeFunction("leaveWorld", { world_id: "1" })).rejects.toThrow(
+      /network offline/i
     );
   });
 
   it("throws for unknown function name", async () => {
-    (getDatabaseProvider as any).mockReturnValue({ isConfigured: () => true, rpc: vi.fn() });
-    await expect(rpcModule.runEdgeFunction("unknownFn", {} as any)).rejects.toThrow(/Unknown edge function/);
+    (rawRpcModule.runEdgeFunction as any).mockRejectedValue(
+      new Error('Unknown edge function: "unknownFn"')
+    );
+    await expect(runEdgeFunction("unknownFn", {} as any)).rejects.toThrow(/Unknown edge function/);
   });
 
   it("throws when rpc returns error", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: null, error: { message: "boom" } });
-    (getDatabaseProvider as any).mockReturnValue({ isConfigured: () => true, rpc });
-    await expect(rpcModule.runEdgeFunction("leaveWorld", { world_id: "1" })).rejects.toThrow(/RPC call/);
-    expect(rpc).toHaveBeenCalledWith("leave_world", { world_id: "1" });
+    (rawRpcModule.runEdgeFunction as any).mockRejectedValue(
+      new Error('RPC call "leave_world" failed: boom')
+    );
+    await expect(runEdgeFunction("leaveWorld", { world_id: "1" })).rejects.toThrow(/RPC call/);
   });
 
   it("returns data when rpc succeeds", async () => {
     const expected = { success: true };
-    const rpc = vi.fn().mockResolvedValue({ data: expected, error: null });
-    (getDatabaseProvider as any).mockReturnValue({ isConfigured: () => true, rpc });
-    const res = await rpcModule.runEdgeFunction("leaveWorld", { world_id: "1" });
+    (rawRpcModule.runEdgeFunction as any).mockResolvedValue(expected);
+    const res = await runEdgeFunction("leaveWorld", { world_id: "1" });
     expect(res).toEqual(expected);
-    expect(rpc).toHaveBeenCalledWith("leave_world", { world_id: "1" });
+    expect(rawRpcModule.runEdgeFunction).toHaveBeenCalledWith("leaveWorld", { world_id: "1" });
   });
 });

@@ -7,10 +7,11 @@
  * - User-specific entitlements (premium features) → SecureStorage (SENSITIVE)
  *   See lib/storage/data-classification.ts for the privacy policy.
  */
+import { getAppConfig, isProduction } from '@/config';
+import { getPrivacyStorageBackend } from "@/lib/storage";
+import { logger } from "@/lib/utils";
+import { SecureStorage } from "@/system/Storage";
 import appSettingsProd from "../../config/appsettings.json";
-import { getAppConfig, isProduction } from "../config/loader";
-import { SecureStorage, getPrivacyStorageBackend } from "../storage";
-import { logger } from "../utils/logger";
 
 export interface Entitlements {
   tier: "free" | "premium";

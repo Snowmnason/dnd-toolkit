@@ -1,7 +1,7 @@
-import { OfflineQueueManager } from "@/lib/api/offline-queue";
-import { NetworkDetection } from "@/lib/network";
-import { SecureStorage } from "@/lib/storage";
+import { OfflineQueueManager } from "@/lib/api/resilience/offline-queue";
 import { logger } from "@/lib/utils/logger";
+import { NetworkDetection } from "@/system/Network";
+import { SecureStorage } from "@/system/Storage";
 import {
   afterEach,
   beforeEach,
@@ -13,14 +13,14 @@ import {
 } from "vitest";
 
 // Mock dependencies
-vi.mock("@/lib/network", () => ({
+vi.mock("@/system/Network", () => ({
   NetworkDetection: {
     getStatus: vi.fn(),
     subscribe: vi.fn(),
   },
 }));
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/system/Storage", () => ({
   SecureStorage: {
     getJSON: vi.fn(),
     setJSON: vi.fn(),
@@ -84,7 +84,7 @@ describe("Offline Queue Replay", () => {
   describe("initializeOfflineQueueReplay", () => {
     it("should subscribe to network status changes via NetworkDetection", async () => {
       const { initializeOfflineQueueReplay } =
-        await import("@/lib/api/offline-queue-replay");
+        await import("@/lib/api/resilience/offline-queue-replay");
 
       initializeOfflineQueueReplay();
 
@@ -95,7 +95,7 @@ describe("Offline Queue Replay", () => {
   describe("cleanupOfflineQueueReplay", () => {
     it("should clean up replay listener", async () => {
       const { initializeOfflineQueueReplay, cleanupOfflineQueueReplay } =
-        await import("@/lib/api/offline-queue-replay");
+        await import("@/lib/api/resilience/offline-queue-replay");
 
       // Set up the unsubscribe mock before initializing
       const unsubscribeMock = vi.fn();

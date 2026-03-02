@@ -4,24 +4,24 @@
  * Tests the condition evaluators and flag evaluation logic
  */
 
-import * as configModule from "@/lib/config/loader";
-import * as platformModule from "@/lib/config/platform-config";
+import * as platformModule from "@/config/";
+import * as configModule from "@/config/core/loader";
 import {
-    evaluateConditions,
-    matchEnvironment,
-    matchPlatform,
-    matchUserRole,
-    type FlagConditions,
-    type FlagContext,
-} from "@/lib/feature-flags/conditions";
+  evaluateConditions,
+  matchEnvironment,
+  matchPlatform,
+  matchUserRole,
+  type FlagConditions,
+  type FlagContext,
+} from "@/lib/feature-flags";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock config and platform modules
-vi.mock("@/lib/config/loader", () => ({
+vi.mock("@/config/core/loader", () => ({
   getAppConfig: vi.fn(),
 }));
 
-vi.mock("@/lib/config/platform-config", () => ({
+vi.mock("@/config/core/platform-config", () => ({
   getPlatformName: vi.fn(),
 }));
 

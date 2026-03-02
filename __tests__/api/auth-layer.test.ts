@@ -7,10 +7,10 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-    AuthLayer,
-    type AuthContext,
-    type AuthStrategy,
-} from "../../lib/api/auth-layer";
+  AuthLayer,
+  type AuthContext,
+  type AuthStrategy,
+} from "../../lib/auth/auth-layer";
 
 // Mock logger to avoid noise in tests
 vi.mock("../../lib/utils/logger", () => ({

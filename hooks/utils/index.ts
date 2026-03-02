@@ -1,10 +1,9 @@
 // Barrel export for utility hooks
-export { useFeatureFlag } from "./use-feature-flag";
+export { useFeatureFlag } from "./use-feature-config";
 export {
     useFeatureGatingStatus,
     useGatedFeatures,
     useIsFeatureGated
 } from "./use-feature-gating";
-export { NotificationProvider, useNotifications } from "./use-notifications";
 export { useVariantTracking } from "./use-variant-tracking";
 

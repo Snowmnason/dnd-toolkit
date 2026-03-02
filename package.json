@@ -44,7 +44,7 @@
     "clean:cache": "node ./scripts/clean.js cache",
     "version:bump": "node ./scripts/bump-version.js",
     "test": "vitest",
-    "config:validate": "node --import tsx lib/config/tools/run-config-validate.ts"
+    "config:validate": "node --import tsx scripts/run-config-validate.ts"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

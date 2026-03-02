@@ -1,5 +1,28 @@
-export { AppError, isAppError, toAppError } from "./app-error";
-export { ERROR_CODE_REFERENCE, type ErrorCodeReference } from "./error-code-reference";
+// Error Manager — domain wrapper for all error tracking operations
+export {
+    addBreadcrumb,
+    clearErrorUser,
+    flushPendingErrors,
+    isTrackingEnabled,
+    reportError,
+    reportMessage,
+    setErrorUser,
+    type ErrorBreadcrumb,
+    type ErrorReportOptions,
+    type ErrorUser
+} from "./error-manager";
+
+// Auth-specific errors — used by lib/auth module
+export {
+    AuthError,
+    EmailAlreadyExistsError,
+    InvalidCredentialsError,
+    NetworkError,
+    ProviderInitializationError,
+    RateLimitError,
+    UserNotFoundError
+} from "./auth-errors";
+
 export {
     enrichError,
     enrichErrors,
@@ -7,23 +30,18 @@ export {
     isEnrichedError,
     type EnrichedError
 } from "./error-enrichment";
-export { AppErrorBoundary } from "./ErrorBoundary";
+
+export { NetworkCascadeDetector } from "./network-cascade-detector";
 export {
     checkFeatureGating,
     getFeatureGatingReason,
     getGatedFeatures,
     type FeatureGatingStatus
-} from "./feature-gating";
-export { createFeatureGatingGuard } from "./navigation-guards";
-export { NetworkCascadeDetector } from "./network-cascade-detector";
-export {
-    executeRecoveryAction,
-    isRecoveryActionAvailable,
-    type RecoveryResult
-} from "./recovery-actions";
+} from "./safemode/feature-gating";
 export {
     AffectedFeature,
     createSafeModeState,
+    DEFAULT_SAFE_MODE_CONFIG,
     getSafeModeDefinition,
     getSafeModeMessage,
     RecoveryAction,
@@ -33,7 +51,7 @@ export {
     SafeModeReason,
     type SafeModeConfig,
     type SafeModeState
-} from "./safe-mode";
+} from "./safemode/safe-mode";
 export {
     assertValidErrorCode,
     getAllErrorCodes,

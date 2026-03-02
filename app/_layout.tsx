@@ -1,30 +1,51 @@
+import {
+  AppErrorBoundary,
+  LoadingOverlay,
+  TopBar
+} from "@/components";
 import { EntitlementExpiredModal } from "@/components/modals";
 import { OfflineSyncNotificationLayer } from "@/components/offline";
-import { AppToastLayer, NotificationContainer, TopBar } from "@/components/ui";
-import { useEntitlementExpiredModal } from "@/hooks";
+import {
+  CrashFallBack,
+  RouteErrorBoundary,
+  SafeModeErrorBoundary,
+  SafeModeScreen,
+  SplashScreen,
+} from "@/components/SplashScreen";
+import { AppToastLayer, NotificationContainer } from "@/components/ui";
+import { AppToastProvider, NotificationProvider } from "@/contexts";
+import { useEntitlementExpiredModal, } from "@/hooks/entitlements";
+import { AppKernelProvider, useAppKernel } from "@/hooks/kernel";
 import { useAnalyticsNavigation } from "@/hooks/navigation";
 import { useSplashScreen } from "@/hooks/ui";
-import { NotificationProvider } from "@/hooks/utils";
 import {
   Analytics,
-  AppErrorBoundary,
-  AppKernel,
-  AppKernelProvider,
+  SafeModeReason,
   buildNavigationTarget,
-  executeRecoveryAction,
   getRouteConfig,
   logger,
   resolveBackTarget,
   resolveTitle,
   sessionManager,
-  useAppKernel,
+  type AccessRole,
 } from "@/lib";
-import type { AccessRole } from "@/lib/database/worlds";
-import { SafeModeReason } from "@/lib/error/safe-mode";
-import { AppToastProvider } from "@/lib/toast/app-toast-context";
-import { ScaleProvider } from "@/providers/ScaleProvider";
-import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
-import { ThemeProvider, UseTheme } from "@/providers/ThemeProvider";
+import { executeRecoveryAction } from "@/lib/error/safemode/recovery-actions";
+import {
+  AppParamsStableProvider,
+  AppParamsVolatileProvider,
+  PlatformProvider,
+  ScaleProvider,
+  SubscriptionProvider,
+  ThemeProvider,
+  UseTheme,
+  useAppParamsStable,
+  useAppParamsVolatile,
+  usePlatform,
+  useUserId,
+  useUserRole,
+  useWorldId,
+} from "@/providers";
+import { AppKernel } from "@/system/Kernel";
 import {
   Stack,
   useLocalSearchParams,
@@ -33,26 +54,6 @@ import {
 } from "expo-router";
 import { useEffect } from "react";
 import { View } from "react-native";
-import LoadingOverlay from "../components/LoadingOverlay";
-import {
-  CrashFallBack,
-  RouteErrorBoundary,
-  SafeModeErrorBoundary,
-  SafeModeScreen,
-  SplashScreen,
-} from "../components/SplashScreen";
-import {
-  AppParamsStableProvider,
-  useAppParamsStable,
-  useUserId,
-} from "../providers/AppParamsStableProvider";
-import {
-  AppParamsVolatileProvider,
-  useAppParamsVolatile,
-  useUserRole,
-  useWorldId,
-} from "../providers/AppParamsVolatileProvider";
-import { PlatformProvider, usePlatform } from "../providers/PlatformProvider";
 
 // Suppress known benign warning from React Navigation / Expo Router
 // "Blocked aria-hidden on an element because its descendant retained focus"
@@ -417,7 +418,7 @@ export default function RootLayout() {
                   <NotificationProvider>
                     <AppToastProvider>
                       <AppErrorBoundary
-                        renderFallback={(error, onRetry) => (
+                        renderFallback={(error: Error | null, onRetry: () => void) => (
                           <CrashFallBack error={error} onRetry={onRetry} />
                         )}
                       >

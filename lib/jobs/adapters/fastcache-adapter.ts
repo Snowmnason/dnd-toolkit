@@ -13,7 +13,7 @@
 
 import { FastCache } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
-import { JobRecord, StorageAdapter } from "../types";
+import { JobRecord, StorageAdapter } from "../../../type-definitions/job-queue-types";
 
 const JOB_QUEUE_KEY_PREFIX = "job_queue:";
 const JOBS_INDEX_KEY = "job_queue:index";

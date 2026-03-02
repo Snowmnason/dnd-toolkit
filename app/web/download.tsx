@@ -7,7 +7,7 @@ import {
   Surface,
   Title,
 } from "@/components/ui";
-import { usePlatform } from "@/providers/PlatformProvider";
+import { usePlatform } from "@/providers";
 import { useScale } from "@/theme";
 import { useEffect, useState } from "react";
 import { Platform, ScrollView, View } from "react-native";

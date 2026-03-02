@@ -1,11 +1,11 @@
+import { getAppConfig } from '@/config';
 import { Analytics, Performance } from "@/lib/analytics";
-import { getAppConfig } from "@/lib/config/loader";
 import {
   RecoveryAction,
   SafeModeLevel,
   SafeModeReason,
   SafeModeState,
-} from "@/lib/error/safe-mode";
+} from "@/lib/error";
 import { useEffect } from "react";
 import VersionDisplay from "../VersionDisplay";
 import { ErrorFallbackShell } from "./ErrorFallbackShell";

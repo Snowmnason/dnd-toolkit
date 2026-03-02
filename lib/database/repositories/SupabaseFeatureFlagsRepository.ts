@@ -1,12 +1,12 @@
-import { RequestManager } from "@/lib/api/request-manager";
-import { getDatabaseProvider } from "@/lib/services";
+import { dbRequestOptions } from "@/config";
+import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
-import { dbRequestOptions } from "./request-config";
+import { RequestManager } from "@/system/API/request-manager";
 import type {
     FeatureFlagOverrideRow,
     FeatureFlagRow,
     FeatureFlagsRepository,
-} from "./types";
+} from "./repo-types";
 
 /**
  * Supabase implementation of FeatureFlagsRepository.
@@ -21,7 +21,7 @@ export class SupabaseFeatureFlagsRepository implements FeatureFlagsRepository {
       (await RequestManager.fetch(
         "featureFlags:all",
         async () => {
-          const { data, error } = await getDatabaseProvider()
+          const { data, error } = await getDatabase()
             .from("feature_flags", "feature_flags")
             .select("*")
             .eq("is_active", true)
@@ -50,7 +50,7 @@ export class SupabaseFeatureFlagsRepository implements FeatureFlagsRepository {
     return RequestManager.fetch(
       `featureFlag:${flagName}`,
       async () => {
-        const { data, error } = await getDatabaseProvider()
+        const { data, error } = await getDatabase()
           .from("feature_flags", "feature_flags")
           .select("*")
           .eq("name", flagName)
@@ -79,7 +79,7 @@ export class SupabaseFeatureFlagsRepository implements FeatureFlagsRepository {
         async () => {
           const now = new Date().toISOString();
 
-          const { data, error } = await getDatabaseProvider()
+          const { data, error } = await getDatabase()
             .from("feature_flag_overrides", "feature_flags")
             .select("*")
             .eq("user_id", userId)

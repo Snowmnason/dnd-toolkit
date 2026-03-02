@@ -17,7 +17,7 @@
 
 import { Button, ButtonText } from '@/components/ui';
 import { AuthStateManager, logger } from '@/lib';
-import { getAuthProvider } from '@/lib/auth';
+import { restoreSession, signInWithIdToken, signInWithOAuth } from '@/lib/auth';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
@@ -72,8 +72,7 @@ async function onGoogleButtonPressMobile() {
     }
 
     // Start OAuth flow with custom redirect
-    const provider = await getAuthProvider();
-    const oauthResult = await provider.signInWithOAuth("google", {
+    const oauthResult = await signInWithOAuth("google", {
       redirectTo: `dnd-toolkit://google-auth`,
       queryParams: { prompt: "consent" },
       skipBrowserRedirect: true,
@@ -105,7 +104,7 @@ async function onGoogleButtonPressMobile() {
 
       if (params.access_token && params.refresh_token) {
         logger.category('auth').debug('onGoogleButtonPressMobile - restoring session');
-        const restored = await provider.restoreSession({
+        const restored = await restoreSession({
           access_token: params.access_token,
           refresh_token: params.refresh_token,
         });
@@ -142,8 +141,7 @@ async function onGoogleButtonSuccessWeb(authRequestResponse: any) {
     logger.category('auth').debug('Google sign in successful:', { authRequestResponse });
     
     if (authRequestResponse.clientId && authRequestResponse.credential) {
-      const provider = await getAuthProvider();
-      const result = await provider.signInWithIdToken('google', authRequestResponse.credential);
+      const result = await signInWithIdToken('google', authRequestResponse.credential);
 
       if (!result.success) {
         logger.category('auth').error('Error signing in with Google:', result.error?.message);

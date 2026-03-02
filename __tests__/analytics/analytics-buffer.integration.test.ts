@@ -5,7 +5,7 @@ let AnalyticsBufferService: any;
 let NetworkDetection: any;
 
 try {
-  NetworkDetection = require('@/lib/network/network-detection');
+  NetworkDetection = require('@/system/Network/network-detection');
 } catch (e) {
   NetworkDetection = null;
 }
@@ -19,7 +19,7 @@ try {
 if (!AnalyticsBufferService || !NetworkDetection) {
   describe.skip('AnalyticsBufferService — integration (skipped; missing dependencies)', () => {});
 } else {
-  vi.mock('@/lib/network/network-detection');
+  vi.mock('@/system/Network/network-detection');
 
   describe('AnalyticsBufferService — integration (flush)', () => {
     beforeEach(() => {

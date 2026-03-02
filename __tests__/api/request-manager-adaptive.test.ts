@@ -1,20 +1,20 @@
 // Prevent importing flow-typed react-native entry during tests
-import { NetworkDetection } from "@/lib/network/network-detection";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-    appendAdaptiveParams,
-    getAdaptiveQueryString,
-    shouldDowngradeResource,
-} from "@/lib/network/adaptive-payload-request";
+  appendAdaptiveParams,
+  getAdaptiveQueryString,
+  shouldDowngradeResource
+} from "@/lib/network";
+import { NetworkDetection } from "@/system/Network";
 vi.mock("react-native", () => ({ Platform: { OS: "ios" }, NativeModules: {} }));
 // Mock expo-constants (used by RequestManager via getAppConfig)
 vi.mock("expo-constants", () => ({ default: { expoConfig: { extra: { sentryDsn: null } } } }));
 
-let RequestManager: typeof import("@/lib/api/request-manager").RequestManager;
+let RequestManager: typeof import("@/system/API/request-manager").RequestManager;
 
 // Ensure network-detection module is mocked (appendAdaptiveParams imports it directly)
-vi.mock("@/lib/network/network-detection", () => ({ NetworkDetection: { getStatus: vi.fn(), subscribe: vi.fn() } }));
+vi.mock("@/system/Network/network-detection", () => ({ NetworkDetection: { getStatus: vi.fn(), subscribe: vi.fn() } }));
 
 // Minimal mocks to isolate RequestManager behaviour
 vi.mock("@/lib/utils/logger", () => ({
@@ -29,7 +29,7 @@ vi.mock("@/lib/utils/logger", () => ({
 
 vi.mock("@/lib/config", () => ({ getAppConfig: vi.fn(() => ({ api: { retryDelayMs: 10, requestTimeoutMs: 500 } })) }));
 vi.mock("@/lib/api/interceptor", () => ({ InterceptorManager: { executeBeforeRequestHooks: vi.fn(), executeAfterResponseHooks: vi.fn(), executeErrorHooks: vi.fn() }, parseEndpoint: vi.fn().mockReturnValue("test") }));
-vi.mock("@/lib/api/auth-layer", () => ({ AuthLayer: { injectAuthHeader: vi.fn(), handle401Response: vi.fn() } }));
+vi.mock("@/lib/auth/auth-layer", () => ({ AuthLayer: { injectAuthHeader: vi.fn(), handle401Response: vi.fn() } }));
 vi.mock("@/lib/analytics", () => ({ Analytics: { track: vi.fn(), enabled: vi.fn().mockReturnValue(false), getThreshold: vi.fn() }, sanitizeError: vi.fn() }));
 
 // Mock QueryCache and NetworkDetection selectively in tests below

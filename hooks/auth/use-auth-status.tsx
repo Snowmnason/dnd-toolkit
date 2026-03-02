@@ -1,4 +1,4 @@
-import { getAuthProvider } from '@/lib/auth';
+import { getCurrentSession } from '@/lib/auth';
 import { logger } from '@/lib/utils/logger';
 import { useEffect, useState } from 'react';
 
@@ -8,8 +8,7 @@ export function useAuthStatus() {
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        // Use cached session instead of making network call
-        const session = await (await getAuthProvider()).getSession();
+        const session = await getCurrentSession();
         setIsUserLoggedIn(session !== null);
       } catch (error) {
         logger.category('auth').error('Error checking auth status:', error);

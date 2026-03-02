@@ -131,7 +131,7 @@ vi.mock("@/lib/storage", () => ({
 }));
 
 // Mock NetworkDetection - return online status by default
-vi.mock("@/lib/network/network-detection", () => ({
+vi.mock("@/system/Network/network-detection", () => ({
   NetworkDetection: {
     isOnline: true,
     getStatus: vi.fn(() => ({ isOnline: true })),

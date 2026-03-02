@@ -1,12 +1,12 @@
 /* eslint-disable security/detect-object-injection */
 import { describe, expect, it } from 'vitest';
 
-import { ConsentLevel } from '@/lib/analytics/consent';
+import { ConsentLevel } from '@/lib/analytics/consent/consent';
 import {
   DEFAULT_EVENT_CONSENT_MAPPING,
   getConsentCategoryForEvent,
   shouldEmitEvent,
-} from '@/lib/analytics/consent-gating';
+} from '@/lib/analytics/consent/consent-gating';
 
 describe('Consent Gating — unit', () => {
   it('resolves every mapping key via getConsentCategoryForEvent()', () => {

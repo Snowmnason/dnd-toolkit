@@ -12,14 +12,16 @@
  * - Cache invalidation tags
  */
 
-import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
+import { OFFLINE_SYNC_DEFAULTS } from "@/config";
 import { logger } from "@/lib/utils/logger";
+import { STORAGE_KEYS } from "@/maps";
+import { SecureStorage } from "@/system/Storage";
+import type { QueuedMutation } from "../../type-definitions/mutation-queue-types";
 import {
   BackoffScheduler,
   OfflineQueueStatsCollector,
   Phase4Enhancements,
 } from "./offline-recovery";
-import type { QueuedMutation } from "./types";
 
 /**
  * Generate a UUID v4
@@ -42,10 +44,10 @@ function generateUUID(): string {
  * Default configuration for offline sync
  */
 const DEFAULT_CONFIG = {
-  batchSize: 5,
-  debounceMs: 5000,
-  maxRetries: 5,
-  retryBaseMs: 2000,
+  batchSize: OFFLINE_SYNC_DEFAULTS.batchSize,
+  debounceMs: OFFLINE_SYNC_DEFAULTS.debounceMs,
+  maxRetries: OFFLINE_SYNC_DEFAULTS.maxRetries,
+  retryBaseMs: OFFLINE_SYNC_DEFAULTS.retryBaseMs,
 };
 
 class OfflineMutationQueueService {

@@ -11,19 +11,6 @@
  */
 
 export {
-  ConnectionQuality,
-  NetworkDetection, qualityToNetworkState, useNetworkStatus
-} from "./network-detection";
-export type { NetworkStatus, NetworkStatusCallback } from "./network-detection";
-
-export { NetworkStateManager, VALID_TRANSITIONS } from "./state-machine";
-export type {
-  NetworkState,
-  SpecificTransitionHook,
-  TransitionHook
-} from "./state-machine";
-
-export {
   handleErrorGracefully,
   isNetworkError,
   logNetworkError,
@@ -32,35 +19,29 @@ export {
 export type { GracefulErrorOptions } from "./error-handling";
 
 export {
-  getSupabaseHealthEndpoint,
-  getWebPingInterval,
-  getWebPingTimeout,
-  LATENCY_THRESHOLD,
-  LOW_BATTERY_THRESHOLD,
-  SUPABASE_HEALTH_ENDPOINT
-} from "./network-config";
-
-export {
   buildAdaptiveQueryParams,
   getAdaptivePayloadOptions,
   getCacheKeyQualityComponent
-} from "./adaptive-payload";
+} from "./adaptive-payload/adaptive-payload";
 
 export type {
   AdaptivePayloadOptions,
   PayloadQuality
-} from "./adaptive-payload";
+} from "./adaptive-payload/adaptive-payload";
 
 export {
   appendAdaptiveParams,
   getAdaptiveQueryString,
   shouldDowngradeResource
-} from "./adaptive-payload-request";
+} from "./adaptive-payload/adaptive-payload-request";
 
 export {
-  composeNetworkContext, deriveConnectionType
-} from "./helpers";
-export type { ConnectionType, NetworkContext } from "./helpers";
+  getAdaptiveQueryParams,
+  getQualityAwareCacheKey,
+  getStaleTimeForQuality,
+  integrateAdaptivePayloads,
+  type AdaptiveQueryConfig
+} from "./adaptive-payload/adaptive-payload-integration";
 
 export {
   captureErrorCorrelation, cleanupTelemetry,

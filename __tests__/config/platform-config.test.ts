@@ -6,11 +6,10 @@
  * which tests the actual getPlatformName() function with mocked environment.
  */
 
-import type { AppSettings } from "@/lib/config/loader";
+import { type AppSettings, mergeConfigForPlatform } from "@/config";
 import { describe, expect, it } from "vitest";
 
 // Import the module under test
-import { mergeConfigForPlatform } from "../../lib/config/platform-config";
 
 describe("mergeConfigForPlatform", () => {
   const baseConfig: AppSettings = {

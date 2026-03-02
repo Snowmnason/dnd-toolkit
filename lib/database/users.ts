@@ -1,6 +1,6 @@
-import { validateUsername } from "../auth/validation";
-import { QueryCache } from "../cache";
-import { logger } from "../utils/logger";
+import { QueryCache } from "@/lib/storage";
+import { logger } from "@/lib/utils";
+import { validateUsername } from "../../validation/validation";
 import { getUserRepository } from "./repositories";
 
 export interface User {
@@ -71,7 +71,8 @@ export const usersDB = {
     if (!forceRefresh) {
       try {
         const { AuthStateManager } = await import("../auth/auth-state");
-        const { SecureStorage, STORAGE_KEYS } = await import("../storage");
+        const { SecureStorage } = await import("@/system/Storage");
+        const { STORAGE_KEYS } = await import("@/maps");
 
         const cachedUser = await AuthStateManager.getUserData();
         const cacheMeta = await SecureStorage.getJSON<{ timestamp: number }>(
@@ -116,7 +117,8 @@ export const usersDB = {
     // Save user data to local storage + metadata with fresh timestamp
     try {
       const { AuthStateManager } = await import("../auth/auth-state");
-      const { SecureStorage, STORAGE_KEYS } = await import("../storage");
+      const { SecureStorage } = await import("@/system/Storage");
+      const { STORAGE_KEYS } = await import("@/maps");
 
       await AuthStateManager.saveUserData(data);
       await SecureStorage.setJSON(`${STORAGE_KEYS.USER_DATA}_meta`, {

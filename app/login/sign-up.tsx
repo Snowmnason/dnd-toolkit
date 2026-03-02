@@ -15,7 +15,7 @@ import {
   FormAuthInput,
 } from "@/components/auth_components";
 import { AppToast } from "@/components/ui";
-import { useSignUpForm } from "@/lib";
+import { useSignUpForm } from "@/hooks/auth";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { TextInput } from "react-native";

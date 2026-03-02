@@ -1,7 +1,7 @@
+import { worldsDB } from "@/lib/database/worlds";
+import { logger } from "@/lib/utils/logger";
 import { useState } from "react";
 import { Alert } from "react-native";
-import { worldsDB } from "../../lib/database/worlds";
-import { logger } from "../../lib/utils/logger";
 
 interface WorldFormData {
   name: string;

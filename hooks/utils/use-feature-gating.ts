@@ -27,12 +27,12 @@
  * ```
  */
 
+import { useAppKernel } from "@/hooks/kernel";
 import {
-    AffectedFeature,
-    checkFeatureGating,
-    getGatedFeatures,
+  AffectedFeature,
+  checkFeatureGating,
+  getGatedFeatures,
 } from "@/lib/error";
-import { useAppKernel } from "@/lib/kernel/use-app-kernel";
 import { useMemo } from "react";
 
 /**

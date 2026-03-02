@@ -3,15 +3,15 @@ import { useEffect, useState } from "react";
 import { View } from "react-native";
 
 import {
-  AppPage,
-  Body,
-  Button,
-  CustomLoad,
-  SubTitle,
-  Switch,
-  Title,
+    AppPage,
+    Body,
+    Button,
+    CustomLoad,
+    SubTitle,
+    Switch,
+    Title,
 } from "@/components/ui";
-import { getCurrentUserProfile } from "@/lib/database/common";
+import { getCurrentUserProfile } from "@/lib/database";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
 import { logger } from "@/lib/utils/logger";
 import { useScale } from "@/theme";
@@ -72,7 +72,7 @@ export default function AdminPanelScreen() {
 
         // Load all settings from config (features, overrides, devTools, featureFlags)
         try {
-          const { getAppConfig } = await import("@/lib/config/loader");
+          const { getAppConfig } = await import("@/config");
           const { FeatureFlags } = await import("@/lib/feature-flags");
           const config = getAppConfig();
 

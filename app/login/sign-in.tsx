@@ -6,7 +6,8 @@ import {
   FormAuthInput
 } from '@/components/auth_components';
 import { AppToast } from '@/components/ui';
-import { AuthStateManager, buildRoute, getCurrentSession, logger, resendConfirmationEmail, useSignInForm } from '@/lib';
+import { useSignInForm } from "@/hooks/auth";
+import { AuthStateManager, buildRoute, getCurrentSession, logger, resendConfirmationEmail } from '@/lib';
 import { useScale } from '@/theme';
 import type { Href } from 'expo-router';
 import { useRouter } from 'expo-router';

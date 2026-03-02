@@ -9,24 +9,22 @@
  */
 
 import {
-    analyzeFlagImpact,
-    generateDependencyGraph,
-    simulateContexts,
-    validateFlagConfig,
-    visualizeDependencyGraph,
-} from "@/lib/feature-flags/admin-tooling";
+  analyzeFlagImpact,
+  evaluateAdvancedCondition,
+  generateDependencyGraph,
+  pluginRegistry,
+  simulateContexts,
+  validateAdvancedCondition,
+  validateFlagConfig,
+  visualizeDependencyGraph,
+  type ConditionNode,
+  type FlagContext,
+  type LogicalExpression,
+  type NotExpression,
+} from "@/lib/feature-flags";
 import {
-    evaluateAdvancedCondition,
-    pluginRegistry,
-    validateAdvancedCondition,
-    type ConditionNode,
-    type LogicalExpression,
-    type NotExpression,
-} from "@/lib/feature-flags/advanced-conditions";
-import type { FlagContext } from "@/lib/feature-flags/conditions";
-import {
-    featureFlagsTelemetry,
-    performHealthCheck,
+  featureFlagsTelemetry,
+  performHealthCheck,
 } from "@/lib/feature-flags/telemetry";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -334,7 +332,7 @@ describe("Advanced Condition Logic (Phase 3)", () => {
     it("should register and use custom plugin", () => {
       pluginRegistry.register({
         name: "testPlugin",
-        matcher: (type, evaluator) => type === "custom" && evaluator === "test",
+        matcher: (type: string, evaluator: string) => type === "custom" && evaluator === "test",
         evaluate: () => true,
       });
 
@@ -349,7 +347,7 @@ describe("Advanced Condition Logic (Phase 3)", () => {
     it("should handle plugin unable to evaluate", () => {
       pluginRegistry.register({
         name: "limitedPlugin",
-        matcher: (type) => type === "custom",
+        matcher: (type: string) => type === "custom",
         evaluate: () => undefined,
       });
 

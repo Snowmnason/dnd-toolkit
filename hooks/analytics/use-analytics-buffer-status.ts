@@ -5,7 +5,7 @@
  * Uses subscription-based updates (not polling) to avoid redundant work.
  */
 
-import { analyticsBufferService, notifyBufferStateChange } from "@/lib/analytics/analytics-buffer";
+import { analyticsBufferService, notifyBufferStateChange } from "@/lib/analytics/exporters/analytics-buffer";
 import { logger } from "@/lib/utils/logger";
 import { useEffect, useState } from "react";
 

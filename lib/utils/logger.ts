@@ -15,15 +15,15 @@
  * - Feature-flag controlled logging (debugLogs flag)
  */
 
-import { getAppConfig } from "@/lib/config/loader";
-import { RedactionManager, redactPII } from "@/lib/utils/redaction-manager";
+import { getAppConfig } from '@/config';
+import { RedactionManager, redactPII } from "@/pure-algo-immutables/redaction-manager";
 
 // Lazy imports to break circular dependency
 // These are required only inside functions, not at module load time
 let cachedErrorCodesMetadata: any = null;
 function getErrorCodesMetadata() {
   if (!cachedErrorCodesMetadata) {
-    cachedErrorCodesMetadata = require("@/lib/utils/ERROR_CODES").ERROR_CODES_METADATA;
+    cachedErrorCodesMetadata = require("@/maps/ERROR_CODES").ERROR_CODES_METADATA;
   }
   return cachedErrorCodesMetadata;
 }

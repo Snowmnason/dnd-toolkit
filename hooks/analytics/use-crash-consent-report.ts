@@ -1,5 +1,5 @@
 import { AnalyticsConsent, getCrashReportPayload } from '@/lib/analytics';
-import { getErrorTracker } from '@/lib/services';
+import { flushPendingErrors as flushErrors, reportError } from '@/lib/error';
 import { logger } from '@/lib/utils/logger';
 import { useCallback } from 'react';
 
@@ -43,18 +43,13 @@ export function useCrashConsentReport() {
         const payload = getCrashReportPayload(error, componentStack, 'full');
 
         if (payload) {
-          const tracker = getErrorTracker();
-          tracker.captureException(error, payload);
+          reportError(error, payload);
 
           // Attempt to flush pending events to the tracker (Sentry supports flush with timeout)
           try {
-            if (typeof tracker.flush === 'function') {
-              const flushed = await tracker.flush(2000);
-              if (!flushed) {
-                logger.category('analytics').warn('Crash report flush did not complete within timeout');
-              }
-            } else {
-              // No flush available on tracker - best-effort only
+            const flushed = await flushErrors(2000);
+            if (!flushed) {
+              logger.category('analytics').warn('Crash report flush did not complete within timeout');
             }
           } catch (flushErr) {
             logger.category('analytics').warn('Crash report flush failed', { error: flushErr });

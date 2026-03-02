@@ -1,706 +1,276 @@
 /**
- * Semantic Auth Operations Layer
+ * Auth Operations — pure domain logic
  *
- * This module provides high-level, semantic auth operations that wrap the AuthProvider abstraction.
- * Each operation:
- * - Validates inputs (email format, password strength, etc.)
- * - Handles errors and maps them to normalized AuthError types
- * - Logs operation results with appropriate categories (auth, security)
- * - Manages rate limiting and attempt tracking via AuthGuard
- * - Returns structured result objects with success/error/message fields
+ * Provides:
+ * - Unified result types for all auth operations
+ * - Pre-flight helpers: validate inputs + check rate limits
+ * - Record helpers: track success/failure for rate limiting
+ * - Error mappers: convert adapter errors to user-facing results
  *
- * When to Use:
- * - UI components and hooks should call functions from this module, NOT getAuthProvider() directly
- * - For signup/signin workflows, use signUpUser/signInUser
- * - For password recovery, use sendPasswordReset
- * - For profile updates, use updatePassword
- * - For email confirmation, use resendConfirmationEmail
- *
- * Architecture:
- * - All functions delegate to AuthProvider via getAuthProvider()
- * - Input validation happens before calling the provider
- * - Error mapping normalizes Supabase errors to app-level AuthError types
- * - Results always follow the pattern: { success, error?, message?, data? }
- *
- * @see AuthProvider - The underlying provider abstraction
- * @see auth-state.ts - AuthStateManager for session management
- * @see lib/services/auth-provider.ts - Provider interface definition
+ * Has NO knowledge of auth-service or system/Services adapters.
+ * auth-manager is the only consumer of these helpers and the only
+ * file that calls auth-service.
  */
 
 import {
     EmailAlreadyExistsError,
-    getAuthProvider,
     InvalidCredentialsError,
     NetworkError,
     RateLimitError,
-    type Session,
     UserNotFoundError,
-} from "@/lib/services";
-import { mapAuthErrorToCode, ERROR_CODES, RetryErrorCode } from "../utils/ERROR_CODES";
-import { logger } from "../utils/logger";
+} from "@/lib/error";
+import type { Session } from "@/lib/middleware/services";
+import { logger } from "@/lib/utils";
+import { type AuthErrorCode, ERROR_CODES } from "@/maps";
+import { validateEmail, validatePassword } from "@/validation/";
 import {
     checkAuthGuard,
     recordAuthFailure,
     recordAuthSuccess,
 } from "./auth-attempt-guard";
-import { validateEmail, validatePassword } from "./validation";
 
 // ============================================================================
-// TYPE DEFINITIONS
+// TYPES — single source of truth for all auth result shapes
 // ============================================================================
 
-/**
- * Standard result format for auth operations.
- * Used by all public operations in this module.
- */
 export interface AuthOperationResult {
   success: boolean;
   error?: string;
   message?: string;
 }
 
-/**
- * Extended result for signup with optional email-exists modal hint.
- */
-export interface SignUpOperationResult extends AuthOperationResult {
+export interface SignUpResult extends AuthOperationResult {
   showEmailExistsModal?: boolean;
   redirectTo?: string;
+  validationWarning?: string;
 }
 
-/**
- * Extended result for signin with optional redirect hint.
- */
-export interface SignInOperationResult extends AuthOperationResult {
+export interface SignInResult extends AuthOperationResult {
   redirectTo?: string;
+  validationWarning?: string;
 }
 
-/**
- * Extended result for password reset with optional email-not-found modal hint.
- */
-export interface ResetPasswordOperationResult extends AuthOperationResult {
+export interface ResetPasswordResult extends AuthOperationResult {
   showEmailNotFoundModal?: boolean;
 }
 
-/**
- * Extended result for resend confirmation email.
- */
-export interface ResendOperationResult extends AuthOperationResult {
+export interface ResendResult extends AuthOperationResult {
   retryAfterMs?: number;
 }
 
+// Re-export for consumers that import from @/lib/auth
+export type { Session };
+
+// ============================================================================
+// ERROR MAPPING
+// ============================================================================
+
 /**
- * Error retry strategy classification.
- * Determines whether an error should auto-retry or require user action.
+ * Map a normalized adapter error to a canonical AuthErrorCode.
+ * Exported for hooks/components that need to branch on error type.
  */
-interface ErrorRetryStrategy {
-  shouldAutoRetry: boolean;
-  suggestRetryAfterMs?: number;
-  reason: RetryErrorCode;
+export function mapAuthErrorToCode(error: unknown): AuthErrorCode {
+  if (error instanceof InvalidCredentialsError) return ERROR_CODES.AUTH.INVALID_CREDENTIALS;
+  if (error instanceof EmailAlreadyExistsError)  return ERROR_CODES.AUTH.EMAIL_ALREADY_EXISTS;
+  if (error instanceof UserNotFoundError)        return ERROR_CODES.AUTH.USER_NOT_FOUND;
+  if (error instanceof RateLimitError)           return ERROR_CODES.AUTH.RATE_LIMIT;
+  return ERROR_CODES.AUTH.UNKNOWN;
+}
+
+/** Map a sign-up service failure to a user-facing SignUpResult. */
+export function mapSignUpError(error: unknown): SignUpResult {
+  if (error instanceof EmailAlreadyExistsError) {
+    return { success: false, showEmailExistsModal: true };
+  }
+  const msg = (error as any)?.message ?? "";
+  if (msg.includes("Password")) {
+    return { success: false, error: "Password does not meet requirements. Please check and try again." };
+  }
+  return { success: false, error: msg || "Account creation failed. Please try again." };
+}
+
+/** Map a sign-in service failure to a user-facing SignInResult. */
+export function mapSignInError(error: unknown): SignInResult {
+  if (error instanceof InvalidCredentialsError) {
+    return { success: false, error: "Invalid email or password. Please try again." };
+  }
+  if (error instanceof UserNotFoundError) {
+    return { success: false, error: "No account found with this email. Please sign up first." };
+  }
+  const msg = (error as any)?.message ?? "";
+  return { success: false, error: msg || "Sign in failed. Please try again." };
 }
 
 // ============================================================================
-// HELPER FUNCTIONS
+// PRE-FLIGHT HELPERS — validate inputs + check rate limits
+//
+// Pattern: returns { ready: true, sanitizedEmail } on pass, or
+//          { ready: false, result } for early-exit with a user-facing result.
+// auth-manager calls these before touching auth-service.
 // ============================================================================
 
-/**
- * Map normalized AuthError types returned by AuthProvider to human-friendly messages.
- * Provides consistent error classification across all auth operations.
- *
- * @param error - The AuthError from AuthProvider
- * @returns ErrorRetryStrategy with classification
- */
-function classifyErrorRetryStrategy(error: unknown): ErrorRetryStrategy {
-  if (error instanceof NetworkError) {
-    return {
-      shouldAutoRetry: true,
-      suggestRetryAfterMs: 2000,
-      reason: ERROR_CODES.RETRY.TRANSIENT_NETWORK_FAILURE,
-    };
-  }
+type PrepOk      = { ready: true; sanitizedEmail: string };
+type PrepFail<T> = { ready: false; result: T };
 
-  if (error instanceof RateLimitError) {
-    return {
-      shouldAutoRetry: false,
-      suggestRetryAfterMs: (error.retryAfterSeconds || 60) * 1000,
-      reason: ERROR_CODES.RETRY.RATE_LIMIT_EXCEEDED,
-    };
-  }
-
-  if (
-    error instanceof InvalidCredentialsError ||
-    error instanceof EmailAlreadyExistsError
-  ) {
-    return {
-      shouldAutoRetry: false,
-      reason: ERROR_CODES.RETRY.PERMANENT_FAILURE,
-    };
-  }
-
-  return {
-    shouldAutoRetry: false,
-    reason: ERROR_CODES.RETRY.UNKNOWN,
-  };
-}
-
-// ============================================================================
-// SIGNUP OPERATION
-// ============================================================================
-
-/**
- * Sign up a new user with email and password.
- *
- * Flow:
- * 1. Validate email format and password strength (client-side)
- * 2. Check rate limiting via AuthGuard
- * 3. Call AuthProvider.signUp() with base64-encoded redirect URL
- * 4. Record success/failure for rate limiting
- * 5. Return structured result with optional email-exists modal hint
- *
- * @param email - User's email address
- * @param password - User's password (will be validated against requirements)
- * @returns SignUpOperationResult with success flag, error message, and optional redirect
- *
- * @example
- * const result = await signUpUser('user@example.com', 'SecurePassword123!');
- * if (result.success) {
- *   router.push(result.redirectTo); // Navigate to email confirmation
- * } else if (result.showEmailExistsModal) {
- *   // Show modal: "Email already in use"
- * }
- */
-export const signUpUser = async (
+export async function prepareSignUp(
   email: string,
   password: string,
-): Promise<SignUpOperationResult> => {
-  try {
-    const emailValidation = validateEmail(email);
-    const passwordValidation = validatePassword(password);
+): Promise<PrepOk | PrepFail<SignUpResult>> {
+  const emailValidation = validateEmail(email);
+  if (!emailValidation.isValid) {
+    return { ready: false, result: { success: false, error: "Please enter a valid email address." } };
+  }
 
-    if (!emailValidation.isValid) {
-      return {
-        success: false,
-        error: "Please enter a valid email address.",
-      };
-    }
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.isValid) {
+    return { ready: false, result: { success: false, error: "Password does not meet security requirements." } };
+  }
 
-    if (!passwordValidation.isValid) {
-      return {
-        success: false,
-        error: "Password does not meet security requirements.",
-      };
-    }
-
-    const sanitizedEmail = emailValidation.sanitized;
-
-    // Rate limiting check
-    const guard = await checkAuthGuard(sanitizedEmail, "signup");
-    if (!guard.allowed) {
-      const retrySeconds = guard.retryAfterMs
-        ? Math.ceil(guard.retryAfterMs / 1000)
-        : undefined;
-      return {
+  const sanitizedEmail = emailValidation.sanitized;
+  const guard = await checkAuthGuard(sanitizedEmail, "signup");
+  if (!guard.allowed) {
+    const retrySeconds = guard.retryAfterMs ? Math.ceil(guard.retryAfterMs / 1000) : undefined;
+    return {
+      ready: false,
+      result: {
         success: false,
         error: retrySeconds
           ? `Too many sign up attempts. Try again in ${retrySeconds} seconds.`
           : "Too many sign up attempts. Please wait before trying again.",
-      };
-    }
-
-    const baseUrl =
-      typeof window !== "undefined"
-        ? window.location.origin
-        : "https://dnd-tool.thesnowpost.com";
-
-    const authProvider = await getAuthProvider();
-    const signupResult = await authProvider.signUp(sanitizedEmail, password, {
-      emailRedirectTo: `${baseUrl}/login/auth-redirect?action=signup-confirm`,
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    if (!signupResult.success) {
-      await recordAuthFailure(sanitizedEmail, "signup");
-
-      const error = signupResult.error;
-      const retryStrategy = classifyErrorRetryStrategy(error);
-      const errorCode = mapAuthErrorToCode(error);
-
-      logger.category('auth').debug(`Signup error classified: ${retryStrategy.reason}`, {
-        shouldAutoRetry: retryStrategy.shouldAutoRetry,
-        suggestRetryAfterMs: retryStrategy.suggestRetryAfterMs,
-        errorCode,
-      });
-
-      if (error instanceof EmailAlreadyExistsError) {
-        return { success: false, showEmailExistsModal: true };
-      }
-
-      if (error.message.includes("Password")) {
-        return {
-          success: false,
-          error:
-            "Password does not meet requirements. Please check and try again.",
-        };
-      } else {
-        return {
-          success: false,
-          error: error.message || "Account creation failed. Please try again.",
-        };
-      }
-    }
-
-    await recordAuthSuccess(sanitizedEmail, "signup");
-
-    return {
-      success: true,
-      redirectTo: `/login/email-confirmation?email=${encodeURIComponent(
-        sanitizedEmail
-      )}`,
+      },
     };
-  } catch (error) {
-    logger.category('auth').error("Sign up error:", error);
-    const message = (error as Error)?.message?.includes("Request timeout")
-      ? "The server took too long to respond. Please try again."
-      : "An unexpected error occurred. Please try again.";
-    return { success: false, error: message };
   }
-};
 
-// ============================================================================
-// SIGNIN OPERATION
-// ============================================================================
+  return { ready: true, sanitizedEmail };
+}
 
-/**
- * Sign in an existing user with email and password.
- *
- * Flow:
- * 1. Validate email format (basic syntax check)
- * 2. Check rate limiting via AuthGuard
- * 3. Call AuthProvider.signIn() with user credentials
- * 4. Record success/failure for rate limiting
- * 5. Return structured result with optional redirect
- *
- * @param email - User's email address
- * @param password - User's password
- * @returns SignInOperationResult with success flag and error message
- *
- * @example
- * const result = await signInUser('user@example.com', 'password');
- * if (result.success) {
- *   // AuthProvider manages session state, navigate to main app
- * }
- */
-export const signInUser = async (
+export async function prepareSignIn(
   email: string,
-  password: string,
-): Promise<SignInOperationResult> => {
-  try {
-    const emailValidation = validateEmail(email);
+): Promise<PrepOk | PrepFail<SignInResult>> {
+  const emailValidation = validateEmail(email);
+  if (!emailValidation.isValid) {
+    return { ready: false, result: { success: false, error: "Please enter a valid email address." } };
+  }
 
-    if (!emailValidation.isValid) {
-      return { success: false, error: "Please enter a valid email address." };
-    }
-
-    const sanitizedEmail = emailValidation.sanitized;
-
-    // Rate limiting check
-    const guard = await checkAuthGuard(sanitizedEmail, "signin");
-    if (!guard.allowed) {
-      const retrySeconds = guard.retryAfterMs
-        ? Math.ceil(guard.retryAfterMs / 1000)
-        : undefined;
-      return {
+  const sanitizedEmail = emailValidation.sanitized;
+  const guard = await checkAuthGuard(sanitizedEmail, "signin");
+  if (!guard.allowed) {
+    const retrySeconds = guard.retryAfterMs ? Math.ceil(guard.retryAfterMs / 1000) : undefined;
+    return {
+      ready: false,
+      result: {
         success: false,
         error: retrySeconds
           ? `Too many sign in attempts. Try again in ${retrySeconds} seconds.`
           : "Too many sign in attempts. Please wait before trying again.",
-      };
-    }
-
-    const authProvider = await getAuthProvider();
-    const signinResult = await authProvider.signIn(
-      sanitizedEmail,
-      password,
-    );
-
-    if (!signinResult.success) {
-      await recordAuthFailure(sanitizedEmail, "signin");
-
-      const error = signinResult.error;
-      const retryStrategy = classifyErrorRetryStrategy(error);
-      const errorCode = mapAuthErrorToCode(error);
-
-      logger.category('auth').debug(`Sign in error classified: ${retryStrategy.reason}`, {
-        shouldAutoRetry: retryStrategy.shouldAutoRetry,
-        suggestRetryAfterMs: retryStrategy.suggestRetryAfterMs,
-        errorCode,
-      });
-
-      if (error instanceof InvalidCredentialsError) {
-        return {
-          success: false,
-          error: "Invalid email or password. Please try again.",
-        };
-      } else if (error instanceof UserNotFoundError) {
-        return {
-          success: false,
-          error: "No account found with this email. Please sign up first.",
-        };
-      } else {
-        return {
-          success: false,
-          error: error.message || "Sign in failed. Please try again.",
-        };
-      }
-    }
-
-    await recordAuthSuccess(sanitizedEmail, "signin");
-
-    return {
-      success: true,
+      },
     };
-  } catch (error) {
-    logger.category('auth').error("Sign in error:", error);
-    const message = (error as Error)?.message?.includes("Request timeout")
-      ? "The server took too long to respond. Please try again."
-      : "An unexpected error occurred. Please try again.";
-    return { success: false, error: message };
   }
-};
 
-// ============================================================================
-// PASSWORD RESET OPERATION
-// ============================================================================
+  return { ready: true, sanitizedEmail };
+}
 
-/**
- * Send a password reset email to a user's email address.
- *
- * Flow:
- * 1. Validate email format
- * 2. Call AuthProvider.resetPassword()
- * 3. Return structured result with optional email-not-found modal hint
- *
- * @param email - User's email address to send reset link
- * @returns ResetPasswordOperationResult with success flag and error message
- *
- * @example
- * const result = await sendPasswordReset('user@example.com');
- * if (result.success) {
- *   // Show message: "Check your email for reset link"
- * }
- */
-export const sendPasswordReset = async (
+export async function prepareResetPassword(
   email: string,
-): Promise<ResetPasswordOperationResult> => {
-  try {
-    const emailValidation = validateEmail(email);
+): Promise<PrepOk | PrepFail<ResetPasswordResult>> {
+  const emailValidation = validateEmail(email);
+  if (!emailValidation.isValid) {
+    return { ready: false, result: { success: false, error: "Please enter a valid email address." } };
+  }
 
-    if (!emailValidation.isValid) {
-      return {
+  const sanitizedEmail = emailValidation.sanitized;
+  const guard = await checkAuthGuard(sanitizedEmail, "reset");
+  if (!guard.allowed) {
+    const retrySeconds = guard.retryAfterMs ? Math.ceil(guard.retryAfterMs / 1000) : undefined;
+    return {
+      ready: false,
+      result: {
         success: false,
-        error: "Please enter a valid email address.",
-      };
-    }
-
-    const sanitizedEmail = emailValidation.sanitized;
-
-    const authProvider = await getAuthProvider();
-    const resetResult = await authProvider.resetPassword(sanitizedEmail);
-
-    if (!resetResult.success) {
-      logger.category('auth').warn("Reset password failed for email:", {
-        email: sanitizedEmail,
-        message: resetResult.message,
-      });
-      // For security, don't reveal whether email exists
-      // Still show success message to prevent email enumeration attacks
-      return {
-        success: true,
-        message: "If an account exists with this email, you will receive a reset link.",
-        showEmailNotFoundModal: false, // Security: don't reveal non-existent emails
-      };
-    }
-
-    logger.category('auth').info("Password reset email sent", { email: sanitizedEmail });
-    return {
-      success: true,
-      message: "Check your email for a password reset link.",
-    };
-  } catch (error) {
-    logger.category('auth').error("Password reset error:", error);
-    return {
-      success: false,
-      error: "An unexpected error occurred. Please try again.",
+        error: retrySeconds
+          ? `Too many reset attempts. Try again in ${retrySeconds} seconds.`
+          : "Too many reset attempts. Please wait before trying again.",
+      },
     };
   }
-};
 
-// ============================================================================
-// UPDATE PASSWORD OPERATION
-// ============================================================================
+  return { ready: true, sanitizedEmail };
+}
 
-/**
- * Update the current user's password (authenticated operation).
- *
- * Flow:
- * 1. Validate new password strength
- * 2. Require authentication (user must have valid session)
- * 3. Call AuthProvider.updatePassword()
- * 4. Return structured result
- *
- * @param newPassword - The new password to set
- * @returns AuthOperationResult with success flag and error message
- *
- * @example
- * const result = await updatePassword('NewSecurePassword123!');
- * if (result.success) {
- *   // Password updated, may need to re-authenticate
- * }
- */
-export const updatePassword = async (
-  newPassword: string,
-): Promise<AuthOperationResult> => {
-  try {
-    const passwordValidation = validatePassword(newPassword);
-
-    if (!passwordValidation.isValid) {
-      return {
-        success: false,
-        error: "Password does not meet security requirements.",
-      };
-    }
-
-    const authProvider = await getAuthProvider();
-
-    // Guard: must be authenticated before updating password
-    const currentSession = await authProvider.getSession();
-    if (!currentSession) {
-      return {
-        success: false,
-        error: "You must be signed in to change your password.",
-      };
-    }
-
-    const updateResult = await authProvider.updatePassword(newPassword);
-
-    if (!updateResult.success) {
-      logger.category('auth').error("Update password error:", updateResult.error);
-      return {
-        success: false,
-        error: updateResult.error || "Failed to update password. Please try again.",
-      };
-    }
-
-    logger.category('auth').info("Password updated successfully");
-    return {
-      success: true,
-      message: "Password updated successfully.",
-    };
-  } catch (error) {
-    logger.category('auth').error("Update password error:", error);
-    return {
-      success: false,
-      error: "An unexpected error occurred. Please try again.",
-    };
+export async function prepareUpdatePassword(
+  password: string,
+): Promise<{ ready: true } | PrepFail<AuthOperationResult>> {
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.isValid) {
+    return { ready: false, result: { success: false, error: "Password does not meet security requirements." } };
   }
-};
+  return { ready: true };
+}
 
-// ============================================================================
-// RESEND CONFIRMATION EMAIL OPERATION
-// ============================================================================
-
-/**
- * Resend the email confirmation link to a user's email address.
- *
- * This is called when a user didn't receive the initial confirmation email
- * or accidentally dismissed it. Includes rate limiting to prevent abuse.
- *
- * Flow:
- * 1. Validate email format
- * 2. Check rate limiting (prevent rapid resend attempts)
- * 3. Call AuthProvider.resend()
- * 4. Return structured result with retry hint on rate limit
- *
- * @param email - The email address to send confirmation to
- * @returns ResendOperationResult with success flag and optional retry timing
- *
- * @example
- * const result = await resendConfirmationEmail('user@example.com');
- * if (result.success) {
- *   // Show message: "Confirmation email sent"
- *   // Disable button for result.retryAfterMs milliseconds
- * }
- */
-export const resendConfirmationEmail = async (
+export async function prepareResendConfirmation(
   email: string,
-): Promise<ResendOperationResult> => {
-  try {
-    const emailValidation = validateEmail(email);
+): Promise<PrepOk | PrepFail<ResendResult>> {
+  const emailValidation = validateEmail(email);
+  if (!emailValidation.isValid) {
+    return { ready: false, result: { success: false, error: "Please enter a valid email address." } };
+  }
 
-    if (!emailValidation.isValid) {
-      return {
-        success: false,
-        error: "Please enter a valid email address.",
-      };
-    }
-
-    const sanitizedEmail = emailValidation.sanitized;
-
-    // Resend uses "reset" scope for rate limiting (both are transient operations)
-    const guard = await checkAuthGuard(sanitizedEmail, "reset");
-    if (!guard.allowed) {
-      // For resend, we want to inform the user when they can try again
-      const retryAfterMs = guard.retryAfterMs || 60000; // Default 60s if not specified
-      return {
+  const sanitizedEmail = emailValidation.sanitized;
+  const guard = await checkAuthGuard(sanitizedEmail, "reset");
+  if (!guard.allowed) {
+    const retryAfterMs = guard.retryAfterMs ?? 60_000;
+    return {
+      ready: false,
+      result: {
         success: false,
         error: "Please wait before requesting another confirmation email.",
         retryAfterMs,
-      };
+      },
+    };
+  }
+
+  return { ready: true, sanitizedEmail };
+}
+
+// ============================================================================
+// RECORD OUTCOME — track success/failure for rate limiting
+// ============================================================================
+
+export async function recordAuthAttempt(
+  email: string,
+  scope: "signup" | "signin" | "reset",
+  success: boolean,
+): Promise<void> {
+  try {
+    if (success) {
+      await recordAuthSuccess(email, scope);
+    } else {
+      await recordAuthFailure(email, scope);
     }
-
-    const authProvider = await getAuthProvider();
-    const resendResult = await authProvider.resend(sanitizedEmail);
-
-    if (!resendResult.success) {
-      logger.category('auth').warn("Resend confirmation failed:", {
-        email: sanitizedEmail,
-        message: resendResult.message,
-      });
-      return {
-        success: false,
-        error:
-          resendResult.message ||
-          "Failed to resend confirmation email. Please try again.",
-      };
-    }
-
-    logger.category('auth').info("Confirmation email resent", { email: sanitizedEmail });
-    return {
-      success: true,
-      message: resendResult.message || "Confirmation email sent.",
-      retryAfterMs: 30000, // Suggest 30 second cooldown for UI
-    };
   } catch (error) {
-    logger.category('auth').error("Resend confirmation error:", error);
-    return {
-      success: false,
-      error: "An unexpected error occurred. Please try again.",
-    };
+    logger.category("auth").warn("Failed to record auth attempt:", error);
   }
-};
-
-/**
- * Sign out the current user and clear session state.
- *
- * For a comprehensive sign-out that also clears caches and user data,
- * use `signOutUser` from lib/settings instead.
- *
- * This is a simple wrapper over AuthProvider.signOut() for symmetry
- * with other auth operations. Use this only if you need minimal logout without cache cleanup.
- *
- * @returns AuthOperationResult with success flag
- * @deprecated Use `signOutUser` from lib/settings for comprehensive sign-out with cache cleanup
- *
- * @example
- * // For comprehensive sign-out with cache cleanup:
- * import { signOutUser } from '@/lib/settings';
- * await signOutUser();
- *
- * // For minimal sign-out (provider only):
- * const result = await signOutSessionOnly();
- * if(result.success) router.replace('/login/sign-in');
- */
-export const signOutSessionOnly = async (): Promise<AuthOperationResult> => {
-  try {
-    const authProvider = await getAuthProvider();
-    await authProvider.signOut();
-
-    logger.category('auth').info("User signed out from session");
-    return {
-      success: true,
-      message: "Signed out successfully.",
-    };
-  } catch (error) {
-    logger.category('auth').error("Sign out error:", error);
-    return {
-      success: false,
-      error: "An unexpected error occurred during sign out.",
-    };
-  }
-};
+}
 
 // ============================================================================
-// CONVENIENCE WRAPPERS
+// CREDENTIAL VALIDATION — lightweight input check (no service call)
 // ============================================================================
 
 /**
- * Get the current auth session.
- *
- * Thin wrapper over `getAuthProvider().getSession()` for use in components and
- * hooks that don't need the full provider. Returns null safely if the provider
- * is not yet initialized or no session exists.
- *
- * @returns The current Session, or null if unauthenticated
- *
- * @example
- * const session = await getCurrentSession();
- * if (!session) { router.replace('/login/sign-in'); }
+ * Validate email + password format only (no rate limit, no service call).
+ * Used by account operations needing to verify inputs before calling auth-manager.
  */
-export const getCurrentSession = async (): Promise<Session | null> => {
-  try {
-    const provider = await getAuthProvider();
-    return await provider.getSession();
-    } catch (error) {
-    logger.category('auth').error("Failed to get current session:", error);
-    return null;
-  }
-};
+export function validateCredentialInputs(
+  email: string,
+  password: string,
+): { valid: true } | { valid: false; error: string } {
+  const emailValidation = validateEmail(email);
+  if (!emailValidation.isValid) return { valid: false, error: "Please enter a valid email address." };
 
-/**
- * Subscribe to auth state changes.
- *
- * Wraps `provider.onAuthStateChange()` so components don't need to call
- * `getAuthProvider()` directly. Returns an unsubscribe function.
- *
- * For React components, prefer the `useAuthStateListener` hook which manages
- * the subscription lifecycle automatically.
- *
- * @param callback - Called whenever the session changes (login, logout, refresh)
- * @returns Cleanup function — call it to unsubscribe
- *
- * @example
- * const unsubscribe = await listenToAuthStateChanges((session) => {
- *   if (!session) redirectToLogin();
- * });
- * // Later:
- * unsubscribe();
- */
-export const listenToAuthStateChanges = async (
-  callback: (session: Session | null) => void,
-): Promise<() => void> => {
-  try {
-    const provider = await getAuthProvider();
-    return provider.onAuthStateChange(callback);
-  } catch (error) {
-    logger.category('auth').error("Failed to set up auth state listener:", error);
-    return () => {}; // No-op cleanup on failure
-  }
-};
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.isValid) return { valid: false, error: "Password is invalid." };
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
+  return { valid: true };
+}
 
-/**
- * Re-export existing operations from authService for backward compatibility.
- * These will be migrated here in future refactors.
- * @deprecated Use functions defined in this module instead.
- */
-export {
-    checkPendingInvites,
-    generateWorldInviteLink,
-    type ResetPasswordResult,
-    type SignInResult,
-    type SignUpResult
-} from "./authService";
-
+// Suppress unused import warning — NetworkError kept for completeness of error class imports
+void NetworkError;

@@ -13,18 +13,55 @@ export {
 } from "./server-sync";
 
 export {
-    bucketPercent, clearBucketCache, getBucketMemoized, isInRollout, isInRolloutMemoized, type RolloutConfig
-} from "./rollout";
-
-export {
-    RECOMMENDED_COHORTS, isUserInCohort, type CohortDef,
+    isUserInCohort, RECOMMENDED_COHORTS, type CohortDef,
     type CohortFlagAssignmentRow,
     type CohortRow,
     type UserCohortMembershipRow
 } from "./cohorts";
 
+// Evaluation
+export {
+    evaluateConditions,
+    matchEnvironment,
+    matchPlatform,
+    matchUserRole,
+    type FlagConditions,
+    type FlagContext
+} from "./evaluation/conditions";
+
+export {
+    evaluateAdvancedCondition,
+    pluginRegistry,
+    validateAdvancedCondition,
+    type BuiltInCondition,
+    type ConditionEvaluator,
+    type ConditionNode,
+    type ConditionPlugin,
+    type ConditionType,
+    type CustomCondition,
+    type LogicalExpression,
+    type LogicalOperator,
+    type NotExpression,
+    type SingleCondition
+} from "./evaluation/advanced-conditions";
+
 // NOTE: useFeatureFlags is NOT exported here to avoid circular dependency
 // Import directly from hooks/feature/use-feature-flags instead
 // NOTE: useEntitlement is NOT exported here to avoid circular dependency
 // Import directly from hooks/feature/use-entitlements instead
+
+// Admin Tooling
+export {
+    analyzeFlagImpact,
+    describeEvaluation,
+    generateDependencyGraph,
+    simulateContexts,
+    validateFlagConfig,
+    visualizeDependencyGraph,
+    type DependencyGraph,
+    type DependencyNode,
+    type FlagImpactAnalysis,
+    type SimulationResult,
+    type ValidationIssue
+} from "./admin/admin-tooling";
 

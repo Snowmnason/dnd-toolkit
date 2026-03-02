@@ -1,16 +1,16 @@
-import { RequestManager } from "@/lib/api/request-manager";
+import { dbRequestOptions } from "@/config";
 import {
     getCurrentUserProfile,
     validateUserForWrite,
-} from "@/lib/database/common";
-import { getDatabaseProvider } from "@/lib/services";
+} from "@/lib/database/database-manger";
+import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
-import { dbRequestOptions } from "./request-config";
+import { RequestManager } from "@/system/API/request-manager";
 import type {
     CacheOptions,
     UserSettings,
     UserSettingsRepository,
-} from "./types";
+} from "./repo-types";
 
 /**
  * Supabase implementation of UserSettingsRepository.
@@ -35,7 +35,7 @@ export class SupabaseUserSettingsRepository implements UserSettingsRepository {
     return RequestManager.fetch(
       `user:settings:${currentUser.id}`,
       async () => {
-        const { data, error } = await getDatabaseProvider()
+        const { data, error } = await getDatabase()
           .from("user_settings", "public")
           .select("*")
           .eq("user_id", currentUser.id)
@@ -85,7 +85,7 @@ export class SupabaseUserSettingsRepository implements UserSettingsRepository {
     const result = await RequestManager.fetch(
       `user:settings:analytics:${currentUser.id}`,
       async () => {
-        const { error } = await getDatabaseProvider()
+        const { error } = await getDatabase()
           .from("user_settings", "public")
           .update({ analytics_consent_level: level, updated_at: new Date().toISOString() })
           .eq("user_id", currentUser.id)

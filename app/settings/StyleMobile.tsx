@@ -32,7 +32,7 @@ import {
 } from "@/components/ui";
 // CrashTester removed
 
-import { useNotifications } from "@/hooks/utils/use-notifications";
+import { useNotifications } from "@/contexts/notifications-context";
 import { $, useScale } from "@/theme";
 import React, { useState } from "react";
 import { ScrollView, Text, View } from "react-native";

@@ -1,5 +1,5 @@
 import { AuthActionGroup, AuthBody, AuthBodyFooter, AuthButton, AuthButtonSecondary, AuthCaption, AuthLink, AuthRoot, AuthSubTitle, AuthTitle } from '@/components/auth_components';
-import { useWelcomeScreen } from '@/lib';
+import { useWelcomeScreen } from '@/hooks/auth';
 import { buildNavigationTarget } from '@/lib/navigation/uri-helpers';
 import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';

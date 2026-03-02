@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { parseEndpoint } from "../../lib/api/interceptor";
 import {
   CircuitBreakerManager,
   type CircuitThresholds,
-} from "../../lib/api/circuit-breaker";
-import { parseEndpoint } from "../../lib/api/interceptor";
+} from "../../lib/api/resilience/circuit-breaker";
 
 // Mock logger
 vi.mock("../../lib/utils/logger", () => ({

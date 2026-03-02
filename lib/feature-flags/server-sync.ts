@@ -17,25 +17,24 @@
  * - Real-time verification
  * - Offline: Use last known values
  */
-
 // App-level imports (absolute)
+import { getAppConfig, getPlatformName, isDevelopment } from '@/config';
 import { trackVariantAssignment } from "@/lib/analytics/variant-tracking";
-import { getAppConfig, isDevelopment } from "@/lib/config/loader";
-import { getPlatformName } from "@/lib/config/platform-config";
 import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
 import { FeatureFlagOverrideRow } from "@/lib/database/feature-flag-overrides";
-import { SecureStorage, STORAGE_KEYS } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
+import { STORAGE_KEYS } from "@/maps";
+import { SecureStorage } from "@/system/Storage";
 
 // Relative module imports (local)
+import { isInRolloutMemoized } from "@/pure-algo-immutables";
+import { FlagEvaluationCache } from "./cache";
+import { isUserInCohort } from "./cohorts";
 import {
   evaluateAdvancedCondition,
   validateAdvancedCondition,
-} from "./advanced-conditions";
-import { FlagEvaluationCache } from "./cache";
-import { isUserInCohort } from "./cohorts";
-import { evaluateConditions, type FlagContext } from "./conditions";
-import { isInRolloutMemoized } from "./rollout";
+} from "./evaluation/advanced-conditions";
+import { evaluateConditions, type FlagContext } from "./evaluation/conditions";
 
 // ==========================================
 // Types
@@ -1497,13 +1496,14 @@ class FeatureFlagsManagerClass {
     const flags: Map<string, FeatureFlagState> = new Map();
     for (const [key, value] of Object.entries(hardcodedFlags)) {
       if (typeof value === "object" && value !== null && "enabled" in value) {
+        const flagValue = value as Record<string, unknown>;
         flags.set(key, {
-          enabled: !!value.enabled,
-          kind: value.kind,
-          description: value.description,
-          depends_on: (value as any).dependsOn || null,
-          condition_logic: (value as any).conditionLogic || null,
-          metadata: (value as any).metadata || null,
+          enabled: !!flagValue.enabled,
+          kind: flagValue.kind as string | undefined,
+          description: flagValue.description as string | undefined,
+          depends_on: (flagValue.dependsOn as string[] | null | undefined) || null,
+          condition_logic: (flagValue.conditionLogic as Record<string, any> | null | undefined) || null,
+          metadata: (flagValue.metadata as Record<string, any> | null | undefined) || null,
           source: "hardcoded",
         });
       }

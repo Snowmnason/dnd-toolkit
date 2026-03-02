@@ -13,7 +13,7 @@ import {
     createSafeModeState,
     getSafeModeDefinition,
     getSafeModeMessage,
-} from "@/lib/error/safe-mode";
+} from "@/lib/error";
 import { describe, expect, it, vi } from "vitest";
 
 // Mock modules
@@ -66,7 +66,7 @@ vi.mock("expo-constants", () => ({
   },
 }));
 
-vi.mock("@/lib/network/network-detection", () => ({
+vi.mock("@/system/Network/network-detection", () => ({
   NetworkDetection: {
     start: vi.fn(),
     isOnline: vi.fn(() => true),

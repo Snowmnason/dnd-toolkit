@@ -50,11 +50,11 @@
  * Sampling and privacy controls are handled in Phase 1c.
  */
 
+import { getPlatformName } from '@/config';
 import { AnalyticsConsent, shouldEmitEvent } from "@/lib/analytics";
-import { getPlatformName } from "@/lib/config/platform-config";
-import { composeNetworkContext, type ConnectionType, type NetworkContext } from "@/lib/network/helpers";
-import { NetworkDetection, type NetworkStatus } from "@/lib/network/network-detection";
 import { logger } from "@/lib/utils/logger";
+import { composeNetworkContext, type ConnectionType, type NetworkContext } from "@/system/Network/helpers";
+import { NetworkDetection, type NetworkStatus } from "@/system/Network/network-detection";
 
 /**
  * Quality tier for telemetry events

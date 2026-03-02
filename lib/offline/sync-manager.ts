@@ -25,33 +25,32 @@
 // Keep this file import-safe in all environments.
 
 
-import { QueryCache } from "@/lib/cache/query-cache";
-import { getAppConfig } from "@/lib/config";
+import { getAppConfig, OFFLINE_SYNC_DEFAULTS } from "@/config";
 import {
-    createSafeModeState,
-    NetworkCascadeDetector,
-    SafeModeReason,
+  createSafeModeState,
+  NetworkCascadeDetector,
+  SafeModeReason,
 } from "@/lib/error";
-import { AppKernel } from "@/lib/kernel/app-kernel";
+import { QueryCache } from "@/lib/storage";
+import { logger } from "@/lib/utils";
+import { AppKernel } from "@/system/Kernel";
 import {
-    NetworkDetection,
-    type NetworkStatus,
-} from "@/lib/network/network-detection";
-import { logger } from "@/lib/utils/logger";
-import { getConflictQueueManager } from "./conflict-queue-manager";
-import { executeConflictResolution } from "./conflict-resolution";
+  NetworkDetection,
+  type NetworkStatus,
+} from "@/system/Network";
+import type {
+  OfflineSyncConfig,
+  OfflineSyncStatus,
+  QueuedMutation,
+  SyncResult,
+} from "@/type-definitions";
+import { getConflictQueueManager } from "./conflict/conflict-queue-manager";
+import { executeConflictResolution } from "./conflict/conflict-resolution";
 import { OfflineMutationQueue } from "./mutation-queue";
 import {
-    CircuitBreakerReplayManager,
-    NetworkErrorClassifier,
+  CircuitBreakerReplayManager,
+  NetworkErrorClassifier,
 } from "./offline-recovery";
-import { executeSyncHandler } from "./sync-handlers";
-import type {
-    OfflineSyncConfig,
-    OfflineSyncStatus,
-    QueuedMutation,
-    SyncResult,
-} from "./types";
 
 /**
  * Get default sync configuration from appsettings
@@ -59,11 +58,11 @@ import type {
 function getDefaultConfig(): Required<OfflineSyncConfig> {
   const config = getAppConfig();
   return {
-    batchSize: 5,
-    debounceMs: config.sync?.debounceMs ?? 5000,
-    maxRetries: 5,
-    retryBaseMs: config.sync?.retryBaseMs ?? 2000,
-    conflictStrategy: "client_wins",
+    batchSize: OFFLINE_SYNC_DEFAULTS.batchSize,
+    debounceMs: config.sync?.debounceMs ?? OFFLINE_SYNC_DEFAULTS.debounceMs,
+    maxRetries: OFFLINE_SYNC_DEFAULTS.maxRetries,
+    retryBaseMs: config.sync?.retryBaseMs ?? OFFLINE_SYNC_DEFAULTS.retryBaseMs,
+    conflictStrategy: OFFLINE_SYNC_DEFAULTS.conflictStrategy,
   };
 }
 
@@ -381,11 +380,9 @@ class OnlineSyncManagerService {
           `Syncing mutation ${mutation.id} (${mutation.operation} on ${mutation.table})`,
         );
 
-      // Dynamically import Supabase client
-      const { supabase } = await import("@/lib/services/supabase/supabase-client");
-
-      // Execute via registered handler for this table
-      const handlerResult = await executeSyncHandler(mutation, supabase);
+      // Execute sync handler via domain wrapper (hides supabase client details)
+      const { executeSyncMutationHandler } = await import("@/lib/database");
+      const handlerResult = await executeSyncMutationHandler(mutation);
 
       if (!handlerResult.success) {
         const isConflict = handlerResult.conflict || false;

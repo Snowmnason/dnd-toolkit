@@ -1,5 +1,5 @@
 import { Platform } from "react-native";
-import { getAppConfig } from "../../config";
+import { getAppConfig } from "../../../config";
 
 // Lazy import logger to avoid circular dependency with config
 let loggerCache: any = null;

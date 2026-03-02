@@ -17,7 +17,7 @@
 
 import { Button, ButtonText } from '@/components/ui';
 import { AuthStateManager, logger } from '@/lib';
-import { getAuthProvider } from '@/lib/auth';
+import { signInWithIdToken } from '@/lib/auth';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -61,8 +61,7 @@ async function onAppleButtonPressIOS() {
     logger.category('auth').info('Apple credential:', credential);
 
     if (credential.identityToken) {
-      const provider = await getAuthProvider();
-      const result = await provider.signInWithIdToken('apple', credential.identityToken);
+      const result = await signInWithIdToken('apple', credential.identityToken);
 
       if (!result.success) {
         logger.category('auth').error('Error signing in with Apple:', result.error?.message);
@@ -94,8 +93,7 @@ async function onAppleButtonSuccessWeb(appleAuthRequestResponse: any) {
         appleAuthRequestResponse.authorization.id_token && 
         appleAuthRequestResponse.authorization.code) {
       
-      const provider = await getAuthProvider();
-      const result = await provider.signInWithIdToken('apple', appleAuthRequestResponse.authorization.id_token, {
+      const result = await signInWithIdToken('apple', appleAuthRequestResponse.authorization.id_token, {
         access_token: appleAuthRequestResponse.authorization.code,
       });
 

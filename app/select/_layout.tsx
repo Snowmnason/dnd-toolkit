@@ -1,5 +1,7 @@
 import { AppLoading, AppPage } from '@/components/ui';
-import { logger, useAppKernel, useAuthGuard } from '@/lib';
+import { useAuthGuard } from '@/hooks/auth';
+import { useAppKernel } from '@/hooks/kernel';
+import { logger } from '@/lib';
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 

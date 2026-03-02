@@ -4,11 +4,11 @@
  * Helper functions for offline mutation handling
  */
 
-import { QueryCache } from "@/lib/cache/query-cache";
-import { NetworkDetection } from "@/lib/network/network-detection";
+import { QueryCache } from "@/lib/storage/cache/query-cache";
 import { logger } from "@/lib/utils/logger";
+import { NetworkDetection } from "@/system/Network/network-detection";
+import type { MutationOperation, MutationPersistence, QueuedMutation } from "../../type-definitions/mutation-queue-types";
 import { OfflineMutationQueue } from "./mutation-queue";
-import type { MutationOperation, MutationPersistence, QueuedMutation } from "./types";
 
 /**
  * Reduce payload based on persistence strategy (Phase 1b: Adaptive Payloads)

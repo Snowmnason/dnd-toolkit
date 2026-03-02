@@ -3,9 +3,9 @@
  * Provides pluggable exporter architecture for multi-backend analytics
  */
 
-import { AnalyticsConsent } from '@/lib/analytics/consent';
-import { getConsentCategoryForEvent, shouldEmitEvent } from '@/lib/analytics/consent-gating';
-import { getAppConfig } from '@/lib/config/loader';
+import { getAppConfig } from '@/config';
+import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
+import { getConsentCategoryForEvent, shouldEmitEvent } from '@/lib/analytics/consent/consent-gating';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -232,7 +232,7 @@ export function createExportContext(
   if (offline === undefined) {
     try {
       // Dynamically import to avoid circular dependencies
-      const { NetworkDetection } = require('@/lib/network/network-detection');
+      const { NetworkDetection } = require('@/system/Network/network-detection');
       const status = NetworkDetection.getStatus();
       isOffline = !status.isOnline;
       logger.category('analytics').debug(

@@ -14,7 +14,7 @@
  */
 
 import { AppToast, SnackBar } from "@/components/ui";
-import { useOfflineNotifications, useSyncNotifications } from "@/lib/offline";
+import { useOfflineNotifications, useSyncNotifications } from "@/hooks/offline";
 import { useEffect, useState } from "react";
 
 interface ActiveToastState {

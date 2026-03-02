@@ -3,7 +3,7 @@ import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
 import {
   ConnectionQuality,
   NetworkDetection,
-} from "@/lib/network/network-detection";
+} from "@/system/Network/network-detection";
 import { S, UseTheme } from "@/theme";
 import { useRouter, useSegments } from "expo-router";
 import { memo, useEffect, useRef, useState } from "react";

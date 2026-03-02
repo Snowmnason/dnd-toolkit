@@ -1,20 +1,20 @@
 import {
-    AuthActionGroup,
-    AuthBody,
-    AuthBodyFooter,
-    AuthButton,
-    AuthCaption,
-    AuthError,
-    AuthForm,
-    AuthRoot,
-    AuthSubTitle,
-    AuthSuccess,
-    AuthTitle,
-    FormAuthInput,
+  AuthActionGroup,
+  AuthBody,
+  AuthBodyFooter,
+  AuthButton,
+  AuthCaption,
+  AuthError,
+  AuthForm,
+  AuthRoot,
+  AuthSubTitle,
+  AuthSuccess,
+  AuthTitle,
+  FormAuthInput,
 } from "@/components/auth_components";
-import { useResetPasswordConfirm } from "@/lib";
-import { getPasswordRequirementsForUI } from "@/lib/schemas/auth.schema";
+import { useResetPasswordConfirm } from "@/hooks/auth";
 import { useScale } from "@/theme";
+import { getPasswordRequirementsForUI } from "@/validation/auth.schema";
 import { useRef } from "react";
 import { TextInput } from "react-native";
 

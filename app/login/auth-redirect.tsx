@@ -1,13 +1,14 @@
 import { AuthModal } from "@/components/auth_components";
 import { Caption } from "@/components/ui";
-import { AuthStateManager, ERROR_CODES, getCurrentSession, logger, usersDB, worldsDB } from "@/lib";
-import { getAuthProvider } from "@/lib/auth";
-import { getPrivacyStorageBackend, STORAGE_KEYS } from "@/lib/storage";
+import { AuthStateManager, getCurrentSession, logger, usersDB, worldsDB } from "@/lib";
+import { restoreSession } from "@/lib/auth";
+import { getPrivacyStorageBackend } from "@/lib/storage";
+import { ERROR_CODES, STORAGE_KEYS } from "@/maps";
+import { useAppParamsStable } from "@/providers";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import CustomLoad from "../../components/ui/CustomLoad";
-import { useAppParamsStable } from "../../providers/AppParamsStableProvider";
 
 interface PendingInvite {
   token: string;
@@ -101,8 +102,7 @@ export default function AuthRedirect() {
 
         // First, handle any auth tokens from the URL
         let hasValidSession = false;
-        const provider = await getAuthProvider();
-        
+
         if (typeof window !== "undefined") {
           const hash = window.location.hash;
           if (hash) {
@@ -113,7 +113,7 @@ export default function AuthRedirect() {
             if (accessToken && refreshToken) {
               logger.category("auth").debug("Setting session from email link...");
 
-              const restored = await provider.restoreSession({
+              const restored = await restoreSession({
                 access_token: accessToken,
                 refresh_token: refreshToken,
               });
@@ -239,7 +239,7 @@ export default function AuthRedirect() {
       const decodedWorldName = decodeURIComponent(inviteWorldName);
 
       // Import invitesDB dynamically to avoid circular dependencies
-      const { invitesDB } = await import("../../lib/database/invites");
+      const { invitesDB } = await import("@/lib/database/invites");
 
       // Validate the invite token first
       logger.category('auth').debug("Validating invite token...");
@@ -334,7 +334,7 @@ export default function AuthRedirect() {
 
           try {
             // Import invitesDB dynamically
-            const { invitesDB } = await import("../../lib/database/invites");
+            const { invitesDB } = await import("@/lib/database/invites");
 
             // Validate the token and get worldId
             logger.category("other").debug("Validating pending invite token...");

@@ -9,7 +9,8 @@
  * - Complex job workflows
  */
 
-import { BackgroundJobQueue, JobRecord, StorageAdapter } from "@/lib/jobs";
+import { BackgroundJobQueue } from "@/lib/jobs";
+import type { JobRecord, StorageAdapter } from "@/type-definitions";
 import { beforeEach, describe, expect, it } from "vitest";
 
 // ==========================================

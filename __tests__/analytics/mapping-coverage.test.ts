@@ -1,5 +1,5 @@
 /* eslint-disable security/detect-non-literal-fs-filename */
-import { getConsentCategoryForEvent } from '@/lib/analytics/consent-gating';
+import { getConsentCategoryForEvent } from '@/lib/analytics/consent/consent-gating';
 import fs from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';

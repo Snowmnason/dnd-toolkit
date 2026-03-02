@@ -13,7 +13,7 @@
 import { isUserInCohort } from "@/lib/feature-flags/cohorts";
 import type { CachedCohort, CachedUserCohortMembership } from "@/lib/feature-flags/server-sync";
 import { FeatureFlagsManager } from "@/lib/feature-flags/server-sync";
-import { SecureStorage } from "@/lib/storage";
+import { SecureStorage } from "@/system/Storage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock Supabase
@@ -46,7 +46,7 @@ const createMockSupabase = (invokeFn?: any) => ({
 });
 
 // Mock SecureStorage
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/system/Storage", () => ({
   SecureStorage: {
     setJSON: vi.fn(),
     getJSON: vi.fn(),
@@ -316,7 +316,7 @@ describe("Phase 3: Cohorts Integration", () => {
       );
 
       // Mock app config with cohort requirement
-      const { getAppConfig } = await import("@/lib/config/loader");
+      const { getAppConfig } = await import("@/config");
       vi.mocked(getAppConfig).mockReturnValue({
         featureFlags: {
           betaFeature: {
@@ -372,7 +372,7 @@ describe("Phase 3: Cohorts Integration", () => {
         }),
       );
 
-      const { getAppConfig } = await import("@/lib/config/loader");
+      const { getAppConfig } = await import("@/config");
       vi.mocked(getAppConfig).mockReturnValue({
         featureFlags: {
           betaFeature: {
@@ -445,7 +445,7 @@ describe("Phase 3: Cohorts Integration", () => {
         }),
       );
 
-      const { getAppConfig } = await import("@/lib/config/loader");
+      const { getAppConfig } = await import("@/config");
       vi.mocked(getAppConfig).mockReturnValue({
         featureFlags: {
           disabledFeature: {
@@ -514,7 +514,7 @@ describe("Phase 3: Cohorts Integration", () => {
         }),
       );
 
-      const { getAppConfig } = await import("@/lib/config/loader");
+      const { getAppConfig } = await import("@/config");
       vi.mocked(getAppConfig).mockReturnValue({
         featureFlags: {
           enterpriseOnly: {
@@ -559,7 +559,7 @@ describe("Phase 3: Cohorts Integration", () => {
         }),
       );
 
-      const { getAppConfig } = await import("@/lib/config/loader");
+      const { getAppConfig } = await import("@/config");
       vi.mocked(getAppConfig).mockReturnValue({
         featureFlags: {
           simpleFlag: {
@@ -598,7 +598,7 @@ describe("Phase 3: Cohorts Integration", () => {
         }),
       );
 
-      const { getAppConfig } = await import("@/lib/config/loader");
+      const { getAppConfig } = await import("@/config");
       vi.mocked(getAppConfig).mockReturnValue({
         featureFlags: {
           badFlag: {

@@ -8,8 +8,8 @@
  * discover issues early before they reach production.
  */
 
-import { ERROR_CODES, ERROR_CODES_METADATA, type ErrorCodeType } from '../utils/ERROR_CODES';
-import { logger } from '../utils/logger';
+import { ERROR_CODES, ERROR_CODES_METADATA, type ErrorCodeType } from '../../maps/ERROR_CODES';
+import { logger } from '@/lib/utils';
 
 /**
  * Check if a string is a valid error code

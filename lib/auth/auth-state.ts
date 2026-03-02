@@ -1,12 +1,12 @@
-import { getUserRepository, getWorldAccessRepository } from "../database/repositories";
-import { type AuthProvider } from "../services";
+import { getUserRepository, getWorldAccessRepository } from "@/lib/database";
 import {
   clearAllUserData,
   getPrivacyStorageBackend,
-  SecureStorage,
-  STORAGE_KEYS,
-} from "../storage";
-import { logger } from "../utils/logger";
+} from "@/lib/storage";
+import { logger } from "@/lib/utils";
+import { STORAGE_KEYS } from "@/maps";
+import { SecureStorage } from "@/system/Storage";
+import { type Session } from "./auth-operations";
 
 // Session schema version for future migrations
 const AUTH_SESSION_VERSION = 1;
@@ -24,12 +24,30 @@ export function isEmailConfirmed(session: any | null): boolean {
   return Boolean(user.email_confirmed_at ?? user.confirmed_at);
 }
 
-// Injected auth provider (set via configure())
-let authProvider: AuthProvider | null = null;
-
 // Cache dynamic imports to prevent re-importing modules on every auth check
-let supabaseCache: any = null;
-let isSupabaseConfiguredCache: any = null;
+let authManagerCache: any = null;
+
+/**
+ * Lazy-load auth-manager and cache it to avoid repeated dynamic imports.
+ * Auth-state uses auth-manager for all auth operations (restoreSession, getCurrentSession, signOut).
+ */
+async function getAuthManager() {
+  if (!authManagerCache) {
+    authManagerCache = await import("./auth-manager");
+  }
+  return authManagerCache;
+}
+
+/**
+ * Check if auth backend is configured and available.
+ * Uses the middleware (lib/services) — never imports adapter directly.
+ */
+function isBackendConfigured(): boolean {
+  // Dynamic import cached at module level to avoid repeated imports
+  // Uses isAuthConfigured from middleware which checks isServiceReady('auth')
+  const { isAuthConfigured } = require("@/lib/middleware/services/auth-service");
+  return isAuthConfigured();
+}
 
 /**
  * Application-level auth state (provider-agnostic).
@@ -45,38 +63,6 @@ export interface CacheMetadata {
 }
 
 export const AuthStateManager = {
-  /**
-   * Configure the auth provider to use for auth operations.
-   * Call this once during app bootstrap before any auth methods are invoked.
-   *
-   * @param provider - The AuthProvider instance to use (Supabase by default)
-   * @param options - Optional configuration (reserved for future use)
-   */
-  configure(provider: AuthProvider, options?: any): void {
-    if (!provider) {
-      logger.category('auth').error('AuthStateManager.configure: provider is null/undefined');
-      throw new Error('AuthStateManager.configure: provider is required');
-    }
-    authProvider = provider;
-    logger.category('auth').info('AuthStateManager configured with provider', {
-      providerType: provider.constructor.name,
-    });
-  },
-
-  /**
-   * Get the configured auth provider.
-   * Throws if configure() has not been called yet.
-   * @internal
-   */
-  getProvider(): AuthProvider {
-    if (!authProvider) {
-      logger.category('auth').error('AuthStateManager.getProvider: provider not configured');
-      throw new Error(
-        'Auth provider not configured. Call AuthStateManager.configure() during app bootstrap.'
-      );
-    }
-    return authProvider;
-  },
 
   // Save the Supabase session to encrypted storage (web platform workaround)
   // Since web has persistSession=false for security, we manually save/restore the session
@@ -170,9 +156,9 @@ export const AuthStateManager = {
         return;
       }
 
-      // Get the configured auth provider and attempt to restore session
-      const provider = this.getProvider();
-      const success = await provider.restoreSession(sessionData);
+      // Get the configured auth manager and attempt to restore session
+      const { restoreSession } = await import("./auth-manager");
+      const success = await restoreSession(sessionData);
 
       if (!success) {
         logger.category('auth').warn(
@@ -290,7 +276,7 @@ export const AuthStateManager = {
       await this.clearAuthSession();
 
       // Clear query cache (all user-specific cached queries)
-      const { QueryCache } = await import("../cache/query-cache");
+      const { QueryCache } = await import("../storage/cache/query-cache");
       await QueryCache.clearAll();
 
       // CRITICAL: Set hasAccount to FALSE (not remove it)
@@ -438,17 +424,9 @@ export const AuthStateManager = {
         return false;
       }
 
-      // Use cached supabase import to avoid re-loading modules
-      if (!supabaseCache) {
-        const imported = await import("../services/supabase/supabase-client");
-        supabaseCache = imported.supabase;
-        isSupabaseConfiguredCache = imported.isSupabaseConfigured;
-      }
-
-      // If Supabase isn't configured (like on GitHub Pages without env vars),
-      // fall back to local auth state
-      if (!isSupabaseConfiguredCache()) {
-        logger.category('auth').warn("Supabase not configured, using local auth state");
+      // Check if auth backend is available (middleware check, not direct adapter)
+      if (!isBackendConfigured()) {
+        logger.category('auth').warn("Auth not configured, using local auth state");
         return authState.hasAccount;
       }
 
@@ -457,19 +435,18 @@ export const AuthStateManager = {
       try {
         let timeoutId: ReturnType<typeof setTimeout>;
 
-        const sessionPromise = supabaseCache.auth.getSession();
-        const timeoutPromise = new Promise<{ data: { session: null } }>(
+        const manager = await getAuthManager();
+        const sessionPromise = manager.getCurrentSession();
+        const timeoutPromise = new Promise<Session | null>(
           (resolve) => {
             timeoutId = setTimeout(
-              () => resolve({ data: { session: null } }),
+              () => resolve(null),
               2000,
             ); // 2 second timeout
           },
         );
 
-        const {
-          data: { session },
-        } = await Promise.race([sessionPromise, timeoutPromise]);
+        const session = await Promise.race([sessionPromise, timeoutPromise]);
         clearTimeout(timeoutId!); // ✅ Clean up the timer
 
         // If we got a session, verify it's confirmed
@@ -503,20 +480,14 @@ export const AuthStateManager = {
     try {
       logger.category('auth').info("🔓 Logging out...");
 
-      // Use cached supabase import
-      if (!supabaseCache) {
-        const imported = await import("../services/supabase/supabase-client");
-        supabaseCache = imported.supabase;
-        isSupabaseConfiguredCache = imported.isSupabaseConfigured;
-      }
-
-      // Sign out from Supabase if configured
-      if (isSupabaseConfiguredCache()) {
+      // Sign out from auth-service if configured
+      if (isBackendConfigured()) {
         try {
-          await supabaseCache.auth.signOut();
-          logger.category('auth').info("✅ Signed out from Supabase");
+          const manager = await getAuthManager();
+          await manager.signOutUser();
+          logger.category('auth').info("✅ Signed out from auth service");
         } catch (error) {
-          logger.category('auth').error("Error signing out from Supabase:", error);
+          logger.category('auth').error("Error signing out:", error);
         }
       }
 
@@ -590,7 +561,7 @@ export const AuthStateManager = {
 
         // Refresh all worlds cache (if one is stale, all are stale)
         const { updateStorageCache } =
-          await import("../storage/update-storage-cache");
+          await import("../storage/sync/update-storage-cache");
         await updateStorageCache.refreshAllWorldsCache();
 
         // Now check cache - it's been refreshed
@@ -631,7 +602,7 @@ export const AuthStateManager = {
 
       // Refresh all worlds cache (userId from SecureStorage never stale)
       const { updateStorageCache } =
-        await import("../storage/update-storage-cache");
+        await import("../storage/sync/update-storage-cache");
       await updateStorageCache.refreshAllWorldsCache();
 
       // Now check cache again - it's been refreshed
@@ -648,7 +619,7 @@ export const AuthStateManager = {
       // Fallback: refresh all worlds cache and try again
       try {
         const { updateStorageCache } =
-          await import("../storage/update-storage-cache");
+          await import("../storage/sync/update-storage-cache");
         await updateStorageCache.refreshAllWorldsCache();
 
         const freshCached = await SecureStorage.getJSON<boolean>(cacheKey);
@@ -686,7 +657,7 @@ export const AuthStateManager = {
 
     // Do ONE bulk refresh to get all world access flags at once
     const { updateStorageCache } =
-      await import("../storage/update-storage-cache");
+      await import("../storage/sync/update-storage-cache");
     let refreshResult: any = null;
     try {
       refreshResult = await updateStorageCache.refreshAllWorldsCache();
@@ -750,14 +721,8 @@ export const AuthStateManager = {
     worldId: string,
   ): Promise<{ hasAccess: boolean; reason?: string }> {
     try {
-      if (!isSupabaseConfiguredCache) {
-        const imported = await import("../services/supabase/supabase-client");
-        isSupabaseConfiguredCache = imported.isSupabaseConfigured;
-        supabaseCache = imported.supabase;
-      }
-
-      if (!isSupabaseConfiguredCache()) {
-        logger.category('auth').warn("[VERIFY] Supabase not configured, allowing access");
+      if (!isBackendConfigured()) {
+        logger.category('auth').warn("[VERIFY] Auth not configured, allowing access");
         return { hasAccess: true };
       }
 
@@ -804,26 +769,18 @@ export const AuthStateManager = {
         .category("security")
         .debug("Local auth state", { hasAccount: authState.hasAccount });
 
-      // Use cached supabase import to avoid re-loading modules
-      if (!supabaseCache) {
-        const imported = await import("../services/supabase/supabase-client");
-        supabaseCache = imported.supabase;
-        isSupabaseConfiguredCache = imported.isSupabaseConfigured;
-      }
-
-      // If Supabase isn't configured, fall back to local state
-      if (!isSupabaseConfiguredCache()) {
-        logger.category('auth').warn("Supabase not configured - defaulting to welcome");
+      // If auth backend isn't configured, fall back to local state
+      if (!isBackendConfigured()) {
+        logger.category('auth').warn("Auth not configured - defaulting to welcome");
         // If no account flag, go to welcome (covers undefined, null, false)
         if (!authState.hasAccount) {
           return { routingDecision: "welcome", profileId: null };
         }
       }
 
-      // Ask Supabase for an active session
-      const {
-        data: { session },
-      } = await supabaseCache.auth.getSession();
+      // Ask auth-manager for current session
+      const manager = await getAuthManager();
+      const session = await manager.getCurrentSession();
 
       // If there's a Supabase session, ensure local auth state is synced
       if (session && !authState.hasAccount) {

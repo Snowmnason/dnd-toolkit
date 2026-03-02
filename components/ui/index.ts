@@ -44,5 +44,3 @@ export * from './groups/ToggleGroup';
 // Gates
 export * from './FeatureGate';
 
-export { default as TopBar } from '../TopBar';
-

@@ -1,9 +1,8 @@
-import { AnalyticsConsent } from "../analytics/consent";
-import { shouldEmitEvent } from "../analytics/consent-gating";
-import { getErrorTracker } from "../services";
-import { getStorageBackend } from "../storage/cache/privacy";
-import { STORAGE_KEYS } from "../storage/index";
-import { logger } from "../utils/logger";
+import { AnalyticsConsent, shouldEmitEvent } from "@/lib/analytics";
+import { reportError } from "@/lib/error";
+import { getPrivacyStorageBackend } from "@/lib/storage";
+import { logger } from "@/lib/utils";
+import { STORAGE_KEYS } from "@/maps";
 
 export type AuthGuardScope = "signin" | "signup" | "reset";
 
@@ -28,7 +27,7 @@ const normalizeKey = (email: string, scope: AuthGuardScope) =>
 
 const loadStore = async (): Promise<Record<string, AttemptRecord>> => {
   try {
-    const backend = getStorageBackend(STORAGE_KEYS.AUTH_ATTEMPTS);
+    const backend = getPrivacyStorageBackend(STORAGE_KEYS.AUTH_ATTEMPTS);
     const raw = await backend.getItem(STORAGE_KEYS.AUTH_ATTEMPTS);
     if (!raw) return {};
     return JSON.parse(raw);
@@ -40,7 +39,7 @@ const loadStore = async (): Promise<Record<string, AttemptRecord>> => {
 
 const persistStore = async (store: Record<string, AttemptRecord>) => {
   try {
-    const backend = getStorageBackend(STORAGE_KEYS.AUTH_ATTEMPTS);
+    const backend = getPrivacyStorageBackend(STORAGE_KEYS.AUTH_ATTEMPTS);
     await backend.setJSON(STORAGE_KEYS.AUTH_ATTEMPTS, store);
   } catch (error) {
     logger.category('security').error("Failed to persist auth attempt store", error);
@@ -116,7 +115,7 @@ export const recordAuthFailure = async (
     try {
       if (shouldEmitEvent('performance', AnalyticsConsent.getLevel())) {
         const emailDomain = email.split('@')[1] || 'unknown';
-        getErrorTracker().captureException(
+        reportError(
           new Error('auth.lockout'),
           {
             level: 'warning',

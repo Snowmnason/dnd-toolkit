@@ -1,6 +1,6 @@
 import { Button, SubTitle, Switch } from '@/components/ui'
-import { useAnalyticsConsent, useForceResync, useRefreshStorageCache } from '@/hooks'
-import { useNetworkStatus } from '@/lib/network'
+import { useAnalyticsConsent, useForceResync, useNetworkStatus, useRefreshStorageCache } from '@/hooks'
+import { logger } from '@/lib/utils'
 import { useScale } from '@/theme'
 import { View } from 'react-native'
 
@@ -64,7 +64,7 @@ export function AppSettings() {
             const newLevel = isFullConsent ? 'full' : 'basic'
             void setConsentLevel(newLevel).catch((error) => {
               // Silently log errors; toast shown by useAnalyticsConsent hook if needed
-              console.error('[Analytics] Failed to set consent level:', error)
+              logger.category('analytics').error('[Analytics] Failed to set consent level:', error)
             })
           }}
           disabled={consentLoading}

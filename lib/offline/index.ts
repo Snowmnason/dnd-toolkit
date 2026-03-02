@@ -13,15 +13,16 @@
  * 3. Wrap mutations with `enqueueIfOffline()` to queue them when offline
  */
 
+
 export {
     getConflictQueueManager,
     type ConflictQueueItem
-} from "./conflict-queue-manager";
+} from "./conflict/conflict-queue-manager";
 export {
     executeConflictResolution,
     resolveLastWriteWins,
     type ConflictResolutionResult
-} from "./conflict-resolution";
+} from "./conflict/conflict-resolution";
 export { OfflineMutationQueue } from "./mutation-queue";
 export {
     clearAllHandlers,
@@ -33,25 +34,9 @@ export {
     type SyncHandlerResult
 } from "./sync-handlers";
 export { OnlineSyncManager } from "./sync-manager";
-export { useConflictQueue } from "./use-conflict-queue";
-export { useOfflineNotifications } from "./use-offline-notifications";
-export { useSyncNotifications } from "./use-sync-notifications";
 export {
     createOptimisticUpdate, enqueueIfOffline, getCacheKeyPatternForMutation, isQueuedMutation, reducePayloadByPersistence, rollbackOptimisticUpdate
 } from "./utils";
-
-export type {
-    AuthReplayMetadata, MutationOperation,
-    MutationPersistence,
-    // Phase 4 types
-    NetworkErrorContract,
-    OfflineQueueStats, OfflineSyncConfig,
-    OfflineSyncStatus,
-    QueuedMutation, RedactionRule, SyncConflict,
-    SyncResult
-} from "./types";
-
-export { SyncStatus } from "./types";
 
 // Phase 4 Enhancements
 export {

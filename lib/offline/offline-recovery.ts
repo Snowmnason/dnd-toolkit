@@ -16,14 +16,17 @@
  * - BackoffScheduler: Manages scheduled retry timing with jitter
  */
 
-import type { AuthContext } from "@/lib/api/auth-layer";
-import { logger, RedactionManager } from "@/lib/utils";
+import { OFFLINE_SYNC_DEFAULTS } from "@/config";
+import type { AuthContext } from "@/lib/auth/auth-layer";
+import { logger } from "@/lib/utils";
+
+import { RedactionManager } from "@/pure-algo-immutables";
 import type {
   AuthReplayMetadata,
   NetworkErrorContract,
   OfflineQueueStats,
   QueuedMutation,
-} from "./types";
+} from "@/type-definitions/mutation-queue-types";
 
 // Re-export QueuedMutation for test imports
 export type { QueuedMutation };
@@ -284,13 +287,13 @@ export const BackoffScheduler = {
    */
   calculateNextAttemptAt(
     mutation: QueuedMutation,
-    baseMs: number = 2000,
+    baseMs: number = OFFLINE_SYNC_DEFAULTS.retryBaseMs,
   ): number {
     const multiplier = Math.pow(2, mutation.retryCount);
     const jitter = 0.9 + Math.random() * 0.2; // ±10% random factor
 
     const backoffMs = Math.floor(baseMs * multiplier * jitter);
-    const cappedBackoffMs = Math.min(backoffMs, 300000); // Cap at 5 minutes
+    const cappedBackoffMs = Math.min(backoffMs, OFFLINE_SYNC_DEFAULTS.backoffCapMs); // Cap at 5 minutes
 
     const nextAttemptAt = Date.now() + cappedBackoffMs;
 
@@ -495,7 +498,7 @@ export const CircuitBreakerReplayManager = {
   ): Promise<void> {
     try {
       const { CircuitBreakerManager: CBM } =
-        await import("@/lib/api/circuit-breaker");
+        await import("@/lib/api/resilience/circuit-breaker");
       const cbManager = CBM;
       const key = this.getCircuitBreakerKey(mutation);
 
@@ -534,7 +537,7 @@ export const CircuitBreakerReplayManager = {
   async recordReplaySuccess(mutation: QueuedMutation): Promise<void> {
     try {
       const { CircuitBreakerManager: CBM } =
-        await import("@/lib/api/circuit-breaker");
+        await import("@/lib/api/resilience/circuit-breaker");
       const cbManager = CBM;
       const key = this.getCircuitBreakerKey(mutation);
 
@@ -564,7 +567,7 @@ export const CircuitBreakerReplayManager = {
   async isCircuitOpen(mutation: QueuedMutation): Promise<boolean> {
     try {
       const { CircuitBreakerManager: CBM } =
-        await import("@/lib/api/circuit-breaker");
+        await import("@/lib/api/resilience/circuit-breaker");
       const cbManager = CBM;
       const key = this.getCircuitBreakerKey(mutation);
       const state = cbManager.getState(key);
@@ -685,7 +688,7 @@ export const FetcherRegistryFallback = {
         const response = await fetcher(url, { method: "GET" });
         if (!response.ok) {
           const error = new Error(`GET ${url} failed: ${response.status}`);
-          (error as any).statusCode = response.status;
+          Object.assign(error, { statusCode: response.status });
           throw error;
         }
         return response.json();
@@ -702,7 +705,7 @@ export const FetcherRegistryFallback = {
         });
         if (!response.ok) {
           const error = new Error(`POST ${url} failed: ${response.status}`);
-          (error as any).statusCode = response.status;
+          Object.assign(error, { statusCode: response.status });
           throw error;
         }
         return response.json();
@@ -719,7 +722,7 @@ export const FetcherRegistryFallback = {
         });
         if (!response.ok) {
           const error = new Error(`PATCH ${url} failed: ${response.status}`);
-          (error as any).statusCode = response.status;
+          Object.assign(error, { statusCode: response.status });
           throw error;
         }
         return response.json();
@@ -732,7 +735,7 @@ export const FetcherRegistryFallback = {
         const response = await fetcher(url, { method: "DELETE" });
         if (!response.ok) {
           const error = new Error(`DELETE ${url} failed: ${response.status}`);
-          (error as any).statusCode = response.status;
+          Object.assign(error, { statusCode: response.status });
           throw error;
         }
         return response.json();

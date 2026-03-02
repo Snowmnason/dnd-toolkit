@@ -1,5 +1,7 @@
-import { logger, useAppKernel } from "@/lib";
-import { STORAGE_KEYS, getPrivacyStorageBackend } from "@/lib/storage";
+import { useAppKernel } from "@/hooks/kernel";
+import { logger } from "@/lib";
+import { getPrivacyStorageBackend } from "@/lib/storage";
+import { STORAGE_KEYS } from "@/maps";
 import { useRouter } from "expo-router";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";

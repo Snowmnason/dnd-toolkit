@@ -1,5 +1,5 @@
 import type { NavigationContext, RouteConfig } from '../navigation-config'
-import { logger } from '../../utils/logger'
+import { logger } from '@/lib/utils'
 
 // Main app routes (world-dependent)
 export const MAIN_ROUTES: RouteConfig[] = [

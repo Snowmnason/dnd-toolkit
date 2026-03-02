@@ -2,12 +2,11 @@
  * Session & User Retention Tracking
  * Tracks user sessions, duration, and engagement metrics
  */
-
-import { getAppConfig } from '../config/loader';
-import { getErrorTracker } from '../services';
-import { logger } from '../utils/logger';
-import { AnalyticsConsent } from './consent';
-import { shouldEmitEvent } from './consent-gating';
+import { getAppConfig } from '@/config';
+import { addBreadcrumb, isTrackingEnabled } from '@/lib/error';
+import { logger } from '@/lib/utils';
+import { AnalyticsConsent } from './consent/consent';
+import { shouldEmitEvent } from './consent/consent-gating';
 
 interface SessionData {
   startedAt: number;
@@ -120,13 +119,13 @@ class SessionManager {
   private trackEvent(event: string, data?: Record<string, any>): void {
     try {
       const perfFlag = getAppConfig().features?.performanceMonitoring;
-      if (!getErrorTracker().isEnabled() || !perfFlag) return;
+      if (!isTrackingEnabled() || !perfFlag) return;
 
       // Session lifecycle events are usage-level data (behavioral: when sessions start/end)
       // Require 'full' consent before sending to error tracker
       if (!shouldEmitEvent('usage', AnalyticsConsent.getLevel())) return;
 
-      getErrorTracker().addBreadcrumb({
+      addBreadcrumb({
         category: 'analytics',
         message: event,
         data,

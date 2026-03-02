@@ -1,5 +1,5 @@
+import { getAppConfig } from '@/config';
 import { FeatureFlagsManager } from "@/lib/feature-flags";
-import { getAppConfig } from "@/lib/config/loader";
 import { logger } from "@/lib/utils/logger";
 import { useEffect, useState } from "react";
 

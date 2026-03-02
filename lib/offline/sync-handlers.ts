@@ -32,8 +32,8 @@
  * ```
  */
 
-import { logger } from '../utils/logger';
-import type { QueuedMutation } from "./types";
+import type { QueuedMutation } from "../../type-definitions/mutation-queue-types";
+import { logger } from '@/lib/utils';
 
 /**
  * Result of executing a sync handler

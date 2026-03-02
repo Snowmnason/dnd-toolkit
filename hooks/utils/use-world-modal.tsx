@@ -2,9 +2,9 @@ import {
   generateWorldInviteLink,
   logger,
   usersDB,
-  validateWorldName,
   worldsDB,
 } from "@/lib/";
+import { validateWorldName } from "@/validation";
 import { useState } from "react";
 
 interface UseWorldModalOptions {
