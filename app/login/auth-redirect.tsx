@@ -239,7 +239,7 @@ export default function AuthRedirect() {
       const decodedWorldName = decodeURIComponent(inviteWorldName);
 
       // Import invitesDB dynamically to avoid circular dependencies
-      const { invitesDB } = await import("../../lib/database/invites");
+      const { invitesDB } = await import("@/lib/database/invites");
 
       // Validate the invite token first
       logger.category('auth').debug("Validating invite token...");
@@ -334,7 +334,7 @@ export default function AuthRedirect() {
 
           try {
             // Import invitesDB dynamically
-            const { invitesDB } = await import("../../lib/database/invites");
+            const { invitesDB } = await import("@/lib/database/invites");
 
             // Validate the token and get worldId
             logger.category("other").debug("Validating pending invite token...");

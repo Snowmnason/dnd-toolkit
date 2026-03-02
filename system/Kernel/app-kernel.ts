@@ -17,22 +17,22 @@
  */
 
 import {
-  cleanupAnalyticsNetworkIntegration,
-  initializeAnalyticsNetworkIntegration,
+    cleanupAnalyticsNetworkIntegration,
+    initializeAnalyticsNetworkIntegration,
 } from "@/lib/analytics/exporters/analytics-network-integration";
 import {
-  createSafeModeState,
-  DEFAULT_SAFE_MODE_CONFIG,
-  NetworkCascadeDetector,
-  SafeModeLevel,
-  SafeModeReason,
-  type SafeModeState,
+    createSafeModeState,
+    DEFAULT_SAFE_MODE_CONFIG,
+    NetworkCascadeDetector,
+    SafeModeLevel,
+    SafeModeReason,
+    type SafeModeState,
 } from "@/lib/error";
 import { getStorageDefaults } from "@/lib/kernel/storage-defaults";
 import { logger } from "@/lib/utils";
 import {
-  NetworkDetection,
-  NetworkStatus,
+    NetworkDetection,
+    NetworkStatus,
 } from "@/system/Network";
 import { validateClassifications } from "@/type-definitions";
 
@@ -452,7 +452,7 @@ class AppKernelClass {
       // Phase 4: Services (register auth provider, error tracker, analytics exporter)
       // MUST be before AUTH so AuthStateManager can use the registered provider
       await this.runPhase("services", async () => {
-        const { initializeServices } = await import("@/lib/services");
+        const { initializeServices } = await import("@/lib/middleware/services");
         await initializeServices();
         logger
           .category("bootstrap")

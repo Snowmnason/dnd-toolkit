@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { runEdgeFunction } from "@/lib/services";
+import { runEdgeFunction } from "@/lib/middleware/services";
 import * as rawRpcModule from "@/system/Services/supabase/supabase-rpc-provider";
 
 // Mock the raw RPC adapter and network/service readiness checks

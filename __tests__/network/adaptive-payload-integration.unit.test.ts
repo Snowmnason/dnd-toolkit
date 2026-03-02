@@ -4,7 +4,7 @@ import { QueryCache } from "@/lib/storage";
 import { NetworkDetection } from "@/system/Network";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/network/network-detection", () => ({
+vi.mock("@/system/Network/network-detection", () => ({
   NetworkDetection: { getStatus: vi.fn(), subscribe: vi.fn() },
   ConnectionQuality: {
     GOOD: "good",

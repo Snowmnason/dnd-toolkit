@@ -40,7 +40,7 @@ describe("network-telemetry unit tests", () => {
     vi.spyOn(loggerMod, "logger", "get").mockReturnValue({ category: () => ({ info: infoSpy, warn: vi.fn(), debug: debugSpy }) } as any);
 
     // Provide a minimal NetworkStatus shape for the call
-    vi.mock("@/lib/network/network-detection", () => ({ NetworkDetection: { getStatus: () => ({ isOnline: true, effectiveType: "4g", isExpensive: false }) } }));
+    vi.mock("@/system/Network/network-detection", () => ({ NetworkDetection: { getStatus: () => ({ isOnline: true, effectiveType: "4g", isExpensive: false }) } }));
 
     const mod = await import("@/lib/network/network-telemetry");
     const { emitHealthCheckEvent, cleanupTelemetry } = mod;
@@ -68,7 +68,7 @@ describe("network-telemetry unit tests", () => {
   it("captureErrorCorrelation queues events and getErrorQueue returns them", async () => {
     // Mock necessary modules
     vi.mock("@/lib/network/helpers", () => ({ composeNetworkContext: () => ({ effectiveType: "3g", connectionType: "cellular" }) }));
-    vi.mock("@/lib/network/network-detection", () => ({ NetworkDetection: { getStatus: () => ({ isOnline: true, effectiveType: "3g", isExpensive: true }) } }));
+    vi.mock("@/system/Network/network-detection", () => ({ NetworkDetection: { getStatus: () => ({ isOnline: true, effectiveType: "3g", isExpensive: true }) } }));
     const debugSpy = vi.fn();
     vi.mock("@/lib/utils/logger", () => ({ logger: { category: () => ({ debug: debugSpy, info: vi.fn(), warn: vi.fn() }) } }));
 

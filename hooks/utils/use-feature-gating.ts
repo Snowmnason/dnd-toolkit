@@ -27,7 +27,7 @@
  * ```
  */
 
-import { useAppKernel } from "@/hooks/kernel/use-app-kernel";
+import { useAppKernel } from "@/hooks/kernel";
 import {
   AffectedFeature,
   checkFeatureGating,

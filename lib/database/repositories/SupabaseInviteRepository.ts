@@ -1,7 +1,7 @@
 import { dbRequestOptions } from "@/config";
 import { validateUserForWrite } from "@/lib/database/database-manger";
 import { executeEdgeFunction } from "@/lib/database/edge";
-import { getDatabase } from "@/lib/services";
+import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
 import { RequestManager } from "@/system/API/request-manager";
 import type {

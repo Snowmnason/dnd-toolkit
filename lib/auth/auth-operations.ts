@@ -12,21 +12,21 @@
  * file that calls auth-service.
  */
 
+import {
+    EmailAlreadyExistsError,
+    InvalidCredentialsError,
+    NetworkError,
+    RateLimitError,
+    UserNotFoundError,
+} from "@/lib/error";
+import type { Session } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils";
 import { type AuthErrorCode, ERROR_CODES } from "@/maps";
-import {
-  EmailAlreadyExistsError,
-  InvalidCredentialsError,
-  NetworkError,
-  RateLimitError,
-  UserNotFoundError,
-} from "@/lib/error";
-import type { Session } from "@/lib/services";
 import { validateEmail, validatePassword } from "@/validation/";
 import {
-  checkAuthGuard,
-  recordAuthFailure,
-  recordAuthSuccess,
+    checkAuthGuard,
+    recordAuthFailure,
+    recordAuthSuccess,
 } from "./auth-attempt-guard";
 
 // ============================================================================

@@ -36,10 +36,10 @@
  * ```
  */
 
+import { FastCacheAdapter } from "@/lib/jobs/adapters/fastcache-adapter";
 import { logger } from "@/lib/utils/logger";
+import { calculateNextRetryTime, formatDelay, isRetryable } from "@/pure-algo-immutables/backoff";
 import { NetworkDetection } from "@/system/Network/network-detection";
-import { FastCacheAdapter } from "../../lib/jobs/adapters/fastcache-adapter";
-import { calculateNextRetryTime, formatDelay, isRetryable } from "../../pure-algo-immutables/backoff";
 import {
   EnqueueOptions,
   JobCompletedEvent,
@@ -131,7 +131,7 @@ export class BackgroundJobQueue {
       try {
         // Lazy-load SecureStorageAdapter on first use
         const { SecureStorageAdapter } =
-          await import("../../lib/jobs/adapters/secure-storage-adapter");
+          await import("@/lib/jobs/adapters/secure-storage-adapter");
         this.secureStorageAdapter = new SecureStorageAdapter();
         logger
           .category("jobs")

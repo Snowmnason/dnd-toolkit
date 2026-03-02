@@ -1,8 +1,8 @@
 import { useAppKernel } from "@/hooks/kernel";
 import { FeatureFlags } from "@/lib/feature-flags";
+import { logger } from "@/lib/utils/logger";
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
-import { logger } from "../../lib/utils/logger";
 
 /**
  * Manages splash screen visibility

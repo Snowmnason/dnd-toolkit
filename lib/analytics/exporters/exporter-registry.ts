@@ -232,7 +232,7 @@ export function createExportContext(
   if (offline === undefined) {
     try {
       // Dynamically import to avoid circular dependencies
-      const { NetworkDetection } = require('@/lib/network/network-detection');
+      const { NetworkDetection } = require('@/system/Network/network-detection');
       const status = NetworkDetection.getStatus();
       isOffline = !status.isOnline;
       logger.category('analytics').debug(

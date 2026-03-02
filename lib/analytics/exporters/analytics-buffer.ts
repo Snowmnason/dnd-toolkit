@@ -257,7 +257,7 @@ class AnalyticsBufferService {
   private scheduleReadyEventsFlushIfOnline(): void {
     // Lazy import to avoid circular deps
     try {
-      const { NetworkDetection } = require("@/lib/network/network-detection");
+      const { NetworkDetection } = require("@/system/Network/network-detection");
       if (!NetworkDetection.isOnline()) {
         return; // Offline, no-op
       }

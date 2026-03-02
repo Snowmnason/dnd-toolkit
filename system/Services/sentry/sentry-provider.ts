@@ -297,6 +297,22 @@ export function registerSentryAdapter(dsn?: string): SentryAdapter {
 }
 
 /**
+ * Maps a Sentry SeverityLevel to a QueuedBreadcrumb level.
+ * Sentry includes 'log' which has no direct equivalent — falls back to 'info'.
+ */
+function mapSentryLevelToQueueLevel(level: Sentry.SeverityLevel | undefined): QueuedBreadcrumb['level'] {
+  switch (level) {
+    case 'fatal':   return 'fatal';
+    case 'error':   return 'error';
+    case 'warning': return 'warning';
+    case 'debug':   return 'debug';
+    case 'log':
+    case 'info':
+    default:        return 'info';
+  }
+}
+
+/**
  * Hook Sentry.addBreadcrumb() to enqueue when offline
  * Call after both breadcrumbQueue and SentryAdapter are initialized
  *
@@ -320,7 +336,7 @@ export function hookSentryAddBreadcrumb(
       const queuedBreadcrumb = {
         timestamp: Date.now(),
         category: breadcrumb.category || 'default',
-        level: (breadcrumb.level || 'info') as any,
+        level: mapSentryLevelToQueueLevel(breadcrumb.level),
         message: breadcrumb.message || JSON.stringify(breadcrumb),
         data: breadcrumb.data,
         metadata: {

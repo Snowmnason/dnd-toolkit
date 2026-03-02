@@ -1,5 +1,6 @@
 import { checkPendingInvites, signUpUser } from "@/lib/auth";
 import { usersDB } from "@/lib/database";
+import { buildRoute } from "@/lib/navigation/uri-helpers";
 import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
 import { SecureStorage } from "@/system/Storage";
@@ -7,7 +8,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { buildRoute } from "../../lib/navigation/uri-helpers";
 import {
   type CompleteProfileFormData,
   completeProfileSchema,

@@ -14,7 +14,7 @@ vi.mock("expo-constants", () => ({ default: { expoConfig: { extra: { sentryDsn: 
 let RequestManager: typeof import("@/system/API/request-manager").RequestManager;
 
 // Ensure network-detection module is mocked (appendAdaptiveParams imports it directly)
-vi.mock("@/lib/network/network-detection", () => ({ NetworkDetection: { getStatus: vi.fn(), subscribe: vi.fn() } }));
+vi.mock("@/system/Network/network-detection", () => ({ NetworkDetection: { getStatus: vi.fn(), subscribe: vi.fn() } }));
 
 // Minimal mocks to isolate RequestManager behaviour
 vi.mock("@/lib/utils/logger", () => ({

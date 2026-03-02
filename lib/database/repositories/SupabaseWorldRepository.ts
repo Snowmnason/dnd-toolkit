@@ -1,7 +1,7 @@
 import { dbRequestOptions } from "@/config";
 import { getCurrentSession } from "@/lib/auth";
 import type { AccessRole } from "@/lib/database/worlds";
-import { getDatabase } from "@/lib/services";
+import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
 import { RequestManager } from "@/system/API/request-manager";
 import type {

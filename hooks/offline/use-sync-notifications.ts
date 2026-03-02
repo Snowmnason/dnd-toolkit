@@ -11,9 +11,9 @@
  */
 
 import { getAppConfig } from "@/config";
+import { OnlineSyncManager } from "@/lib/offline/sync-manager";
+import { OfflineSyncStatus } from "@/type-definitions/mutation-queue-types";
 import { useEffect, useMemo, useState } from "react";
-import { OnlineSyncManager } from "../../lib/offline/sync-manager";
-import { OfflineSyncStatus } from "../../type-definitions/mutation-queue-types";
 
 interface ToastState {
   visible: boolean;

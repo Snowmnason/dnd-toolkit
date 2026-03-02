@@ -76,7 +76,7 @@ export interface ErrorBreadcrumb {
 // Use sync require to break circular dependency (same pattern as other managers)
 
 function getErrorService() {
-  return require("@/lib/services/error-service") as typeof import("@/lib/services/error-service");
+  return require("@/lib/middleware/services/error-service") as typeof import("@/lib/middleware/services/error-service");
 }
 
 // ─── Error Reporting ───────────────────────────────────────────────

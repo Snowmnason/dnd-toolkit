@@ -12,7 +12,7 @@
  * Low-level token management stays provider-specific to avoid over-abstraction.
  */
 
-import { getAuthProviderSync, getSupabaseClientLazy, isSupabaseConfiguredLazy } from "@/lib/services";
+import { getAuthProviderSync, getSupabaseClientLazy, isSupabaseConfiguredLazy } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils";
 import { ERROR_CODES } from "@/maps/ERROR_CODES";
 import { AuthStrategy, type AuthContext } from "./auth-layer";

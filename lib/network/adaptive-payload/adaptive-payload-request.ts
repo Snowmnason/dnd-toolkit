@@ -6,7 +6,7 @@
  * Use these when making query requests through RequestManager.
  */
 
-import { NetworkDetection } from '../../../system/Network/network-detection';
+import { NetworkDetection } from '@/system/Network/network-detection';
 import { buildAdaptiveQueryParams, getAdaptivePayloadOptions, type PayloadQuality } from './adaptive-payload';
 
 /**
@@ -119,7 +119,9 @@ export function shouldDowngradeResource(
     'text-only': 1,
   };
 
+  // eslint-disable-next-line security/detect-object-injection
   const previousRank = qualityRank[previousQuality];
+  // eslint-disable-next-line security/detect-object-injection
   const currentRank = qualityRank[currentQuality];
 
   // If already loaded, default is to NOT downgrade (good UX)

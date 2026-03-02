@@ -363,7 +363,7 @@ class BreadcrumbQueueService {
       );
 
       // Lazy import to break circular dependency: analytics → breadcrumb-queue → analytics-service → analytics
-      const { sendBreadcrumbs } = require('@/lib/services/analytics-service');
+      const { sendBreadcrumbs } = require('@/lib/middleware/services/analytics-service');
       const result = await sendBreadcrumbs(this.providerName, batch);
       if (result === null) {
         logger.category('analytics').warn('BreadcrumbQueue', 'Middleware returned null (preconditions not met)');

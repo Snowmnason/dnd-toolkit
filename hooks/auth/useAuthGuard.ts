@@ -1,4 +1,5 @@
 import { AUTH_CONFIG } from '@/config/routing-auth-config';
+import { useAppKernel } from '@/hooks/kernel';
 import {
   AuthStateManager,
   listenToAuthStateChanges,
@@ -7,7 +8,6 @@ import {
 import { logger } from '@/lib/utils';
 import { useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { useAppKernel } from '../kernel/use-app-kernel';
 
 export type AuthLevel = 'account-only' | 'world-required';
 export type AuthGuardState = 'loading' | 'authenticated' | 'unauthenticated';

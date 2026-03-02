@@ -1,6 +1,6 @@
 import { dbRequestOptions } from "@/config";
 import { getCurrentSession } from "@/lib/auth";
-import { getDatabase } from "@/lib/services";
+import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
 import { RequestManager } from "@/system/API/request-manager";
 import { validateUsername } from "@/validation/validation";

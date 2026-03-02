@@ -122,7 +122,7 @@ export const Analytics = {
     Promise.resolve().then(() => {
       try {
         // Lazy require to break circular dependency: analytics → analytics-manager → analytics-service
-        const { dispatchAnalyticsEvent, createAnalyticsExportContext } = require("@/lib/services/analytics-service");
+        const { dispatchAnalyticsEvent, createAnalyticsExportContext } = require("@/lib/middleware/services/analytics-service");
         
         // Create analytics event for exporter system
         const analyticsEvent = {

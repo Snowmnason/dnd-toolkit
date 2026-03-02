@@ -5,15 +5,15 @@
  * Must wrap the app at the root level for all consumers to work.
  */
 
+import { logger } from "@/lib/utils/logger";
+import { AppKernel, AppKernelState } from "@/system/Kernel";
 import {
-    createContext,
-    ReactNode,
-    useContext,
-    useEffect,
-    useState,
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useState,
 } from "react";
-import { logger } from "../../lib/utils/logger";
-import { AppKernel, AppKernelState } from "../../system/Kernel/app-kernel";
 
 // Module-level diagnostic (gated by debugLogs feature flag)
 if (typeof window !== "undefined") {

@@ -66,7 +66,7 @@ vi.mock("expo-constants", () => ({
   },
 }));
 
-vi.mock("@/lib/network/network-detection", () => ({
+vi.mock("@/system/Network/network-detection", () => ({
   NetworkDetection: {
     start: vi.fn(),
     isOnline: vi.fn(() => true),

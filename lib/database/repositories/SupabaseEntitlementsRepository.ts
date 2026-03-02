@@ -1,5 +1,5 @@
 import { dbRequestOptions } from "@/config";
-import { getDatabase } from "@/lib/services";
+import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
 import { RequestManager } from "@/system/API/request-manager";
 import type {

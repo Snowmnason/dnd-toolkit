@@ -14,9 +14,9 @@
  * Use `getTransitionAnimation()` helper for future integration.
  */
 
-import { Router } from "expo-router";
 import { trackVariantAssignment } from "@/lib/analytics";
 import { logger } from "@/lib/utils";
+import { Router } from "expo-router";
 import { LOGIN_ROUTES } from "./routes/login-routes";
 import { MAIN_ROUTES } from "./routes/main-routes";
 import { SELECT_ROUTES } from "./routes/select-routes";
@@ -347,7 +347,7 @@ export async function evaluateRouteVariant(
 
   try {
     // Import bucketPercent for pure deterministic bucketing
-    const { bucketPercent } = await import("../../pure-algo-immutables/rollout");
+    const { bucketPercent } = await import("@/pure-algo-immutables/rollout");
 
     // Calculate a single bucket for this route (0-99)
     const bucket = bucketPercent(userId, config.path);

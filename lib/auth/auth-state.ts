@@ -45,7 +45,7 @@ async function getAuthManager() {
 function isBackendConfigured(): boolean {
   // Dynamic import cached at module level to avoid repeated imports
   // Uses isAuthConfigured from middleware which checks isServiceReady('auth')
-  const { isAuthConfigured } = require("@/lib/services");
+  const { isAuthConfigured } = require("@/lib/middleware/services/auth-service");
   return isAuthConfigured();
 }
 
