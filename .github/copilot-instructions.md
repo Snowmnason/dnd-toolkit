@@ -2,14 +2,70 @@
 
 Purpose: Make high-quality, end-to-end edits quickly by following the repo’s real architecture, workflows, and conventions. Keep changes minimal, typed, and consistent with existing patterns.
 
+## Architecture Overview
+
+Clean 6-layer architecture separating concerns and dependencies:
+
+```
+system/[Category]/          System adapters (app-agnostic, reusable: auth, storage, network, jobs, API, Kernel)
+    ↓
+lib/middleware/services/    Middleware layer (preconditions, consent, network, provider readiness checks)
+    ↓
+lib/[domain]-manager.ts     Domain managers (lazily load middleware, provide clean API to hooks)
+    ↓
+lib/[domain]/               Business logic & operations (auth-operations, repositories, exporters, etc.)
+    ↓
+hooks/                      UI export layer (format data for UI, call managers, handle loading/errors for display)
+    ↓
+screens/                    Presentation only (NEVER call lib directly, only hooks)
+```
+
+**Key Rule:** Screens → Hooks only. Hooks → Managers only. Managers → Middleware only. Middleware → System only.
+
 ## Big picture
 
 - App type: React Native + Expo Router (web, iOS, Android). Entry at `index.tsx`; routing/layout in `app/_layout.tsx`.
 - Root providers: `AppKernelProvider` → `ThemeProvider` → `ScaleProvider` → `PlatformProvider` → `SubscriptionProvider` → `AppParamsStableProvider` + `AppParamsVolatileProvider` (see `app/_layout.tsx`). Don't move or reorder these casually.
 - Kernel flow: `lib/kernel/use-app-kernel.tsx` preloads fonts/images/themes, initializes network, and restores Supabase session where appropriate. UI waits on `kernel.phases.appReady` or specific phase flags.
-- Auth: `lib/auth/auth-state.ts` (`AuthStateManager`) provides authentication checks and world access verification. `lib/auth/useAuthGuard.ts` is the primary hook for protecting routes with tiered levels ('account-only', 'world-required'). Supabase is dynamically imported and guarded by `isSupabaseConfigured()` to support GH Pages/no-env scenarios. See `docs/implem guide.md` **Phase 6** for complete auth architecture.
-- Navigation: Centralized in `lib/navigation/navigation-config.ts`. Each route's TopBar, back button, params, modals, and redirects are defined declaratively. Use `getRouteConfig(context)` instead of inline switch/case. See `docs/issues/MileStone 1/107 - Updated Nav/NAVIGATION_CONFIG.md`.
+- Auth: `lib/auth/auth-manager.ts` provides the domain wrapper; `lib/auth/auth-state.ts` (`AuthStateManager`) handles authentication checks and world access verification. `lib/auth/useAuthGuard.ts` is the primary hook for protecting routes with tiered levels ('account-only', 'world-required'). Supabase is dynamically imported and guarded by `isSupabaseConfigured()` to support GH Pages/no-env scenarios.
+- Navigation: Centralized in `lib/navigation/navigation-config.ts`. Each route's TopBar, back button, params, modals, and redirects are defined declaratively. Use `getRouteConfig(context)` instead of inline switch/case.
 - Route params: Expo Router segments (`useSegments()`) + URL params merged into split contexts (`AppParamsStableContext` for userId/connectedWorlds, `AppParamsVolatileContext` for worldId/userRole). Use selector hooks (`useWorldId()`, `useUserId()`, `useConnectedWorlds()`, `useUserRole()`) instead of full context consumers to minimize re-renders.
+
+## Data Organization
+
+Root-level directories organize cross-cutting concerns that multiple lib modules depend on:
+
+- **`/maps`** — Static mappings and reference data (error code lookups, cache key registries, storage key constants, HTTP status mappers, event-to-consent mappings). Used by lib modules for data transformation & classification.
+- **`/type-definitions`** — Shared type definitions for global systems (job queue types, mutation types, breadcrumb types, data classification enums). Avoids circular dependencies by centralizing types.
+- **`/config`** — App configuration (appsettings.dev.json, appsettings.json). Read by kernel/managers during bootstrap. Environment-specific feature flags, logger categories, and runtime options.
+- **`/validation`** — Schema validators and helper functions (auth schemas, world schemas, email validators). Used by lib modules to validate data before operations.
+- **`/pure-algo-immutables`** — Pure algorithms and rarely-changing implementations (redaction-manager, rollout logic, app-error types). Isolated to keep `lib/[module]` clean and focused on domain logic.
+
+## Managers & Middleware Pattern
+
+Each major lib module should have:
+1. **`lib/[module]-manager.ts`** — Domain wrapper that coordinates with middleware and hooks to provides clean API
+2. **`lib/middleware/services/[module]-service.ts`** — Middleware that checks preconditions (network, consent, provider readiness) before delegating to System
+
+Example flow:
+```typescript
+// Screen calls hook
+const { login } = useAuth();
+
+// Hook calls manager (formatted for UI)
+const result = await AuthManager.login(email, password);
+
+// Manager calls middleware
+// (via lazy require: require("@/lib/middleware/services/auth-service"))
+
+// Middleware checks preconditions, calls System
+// (isSupabaseConfigured, network check, consent validation)
+
+// System calls adapter
+// (Supabase auth module)
+```
+
+Managers use lazy `require()` for middleware to break circular dependencies (synchronous at module level, not at call time).
 
 ## UI system
 
@@ -37,11 +93,14 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 ## Data and services
 
 - Supabase client/config under `lib/database/`. Always guard usage with `isSupabaseConfigured()` and prefer dynamic imports to avoid circular deps and to keep web fallback working.
-- **Auth/Guards**: Use `useAuthGuard(kernel.phases.appReady, level)` in protected `_layout.tsx` files with level='account-only' (needs auth) or 'world-required' (needs auth + world access). Use `AuthStateManager.isAuthenticated()` for runtime checks. See `docs/implem guide.md` Phase 3 for guard patterns.
-- **World Access Verification**: `verifyWorldAccessWithDatabase(worldId)` implements cache-first verification (fresh <2h = instant, stale 2-4h = Supabase check). Use `forceVerification: true` option for sensitive pages (settings). See `docs/implem guide.md` Phase 4 for verification flow.
-- **Storage**: Use `SecureStorage` from `@/lib/storage` for all persistent app data. All data is encrypted via AES-CTR on all platforms (web, iOS, Android, desktop). Never use direct `localStorage`, `sessionStorage`, or `EncryptedStorage`—always go through `SecureStorage`. Use `STORAGE_KEYS` constants, never hardcode keys. See `docs/issues/MileStone 1/082 - Central Storage/` for API docs and patterns.
-- **Query Cache**: Use `QueryCache` from `@/lib/cache` for in-memory caching of API responses. Follow hierarchical key naming (`domain:entity:action:identifier`). Use tags for invalidation. See `docs/issues/MileStone 1/101 - Query Cache/CACHE_STRATEGY.md`.
-- **Context Optimization**: Use granular selector hooks (`useWorldId()`, `useUserId()`, etc.) instead of consuming full contexts. This prevents unnecessary re-renders. See `docs/issues/MileStone 1/100 - Context Optimization/USAGE_GUIDE.md`.
+- **Auth**: Call `lib/auth/auth-manager.ts` (not direct operations). Use `useAuthGuard(kernel.phases.appReady, level)` in protected layouts with level='account-only' (needs auth) or 'world-required' (needs auth + world access).
+- **Database**: Call `lib/database/database-manager.ts` for coordinated database operations. Direct repository calls for low-level queries.
+- **Analytics**: Call `lib/analytics/analytics-manager.ts` for event dispatch and tracking (respects consent via middleware).
+- **Error Tracking**: Call `lib/error/error-manager.ts` for reporting errors (respects consent via middleware).
+- **World Access Verification**: Use `verifyWorldAccessWithDatabase(worldId)` which implements cache-first verification (fresh <2h = instant, stale 2-4h = Supabase check). Use `forceVerification: true` option for sensitive pages (settings).
+- **Storage**: Use `SecureStorage` from `@/system/Storage` for all persistent app data. All data is encrypted via AES-CTR on all platforms (web, iOS, Android, desktop). Never use direct `localStorage`, `sessionStorage`, or `EncryptedStorage`—always go through `SecureStorage`. Use `STORAGE_KEYS` constants from `/maps/storage-keys.ts`, never hardcode keys.
+- **Query Cache**: Use `QueryCache` from `@/lib/cache` for in-memory caching of API responses. Follow hierarchical key naming (`domain:entity:action:identifier`). Use tags for invalidation. Cache keys are in `/maps/cache-keys.ts`.
+- **Context Optimization**: Use granular selector hooks (`useWorldId()`, `useUserId()`, etc.) instead of consuming full contexts. This prevents unnecessary re-renders.
 
 ## Cache Versioning
 
@@ -188,17 +247,21 @@ We are nowhere near release. Building backwards compatibility now adds:
 
 ## Where to look
 
+- **Architecture**: System → Middleware → Manager → Module → Hook → Screen (see Architecture Overview above)
 - Layout/routing: `app/_layout.tsx`
-- **Kernel/Bootstrap**: `lib/kernel/app-kernel.ts` (AppKernel singleton), `lib/kernel/use-app-kernel.tsx` (AppKernelProvider + hooks). See **`lib/kernel/README.md`** for full documentation.
-- Splash screen: `hooks/use-splash-screen.tsx`
-- **Feature Flags System (Tier 3)**: `lib/feature-flags/` (core system), `supabase/migrations/003_feature_flags_schema.sql` (schema), `supabase/functions/get_feature_flags/` (edge funtion). See **`lib/feature-flags/README.md`** for full architecture and integration guide.
-- **Auth system**: `lib/auth/auth-state.ts` (AuthStateManager), `lib/auth/useAuthGuard.ts` (route guards), `lib/auth/useWorldRole.ts` (FUTURE: role checking)
-- **Storage**: `lib/storage/SecureStorage.ts` (implementation), `lib/storage/index.ts` (exports + keys)
-- **Image optimization**: `components/ui/LazyImage.tsx`, `hooks/use-viewport-tracking.tsx`, `hooks/use-image-cache.tsx`, `lib/utils/image-optimization.ts`. See `docs/issues/MileStone 1/030 - Optimize Image Loading/` for full guide.
+- **Managers** (domain wrappers): `lib/[domain]-manager.ts` (auth-manager, analytics-manager, error-manager, database-manager, etc.)
+- **Middleware/Services** (preconditions & gating): `lib/middleware/services/` (*-service.ts)
+- **System Layer** (app-agnostic): `system/Services/`, `system/API/`, `system/Kernel/`, `system/Network/`, `system/Storage/`, `system/Jobs/`
+- **Kernel/Bootstrap**: `lib/kernel/use-app-kernel.tsx` (AppKernelProvider + hooks). See **`lib/kernel/README.md`** for phases.
+- **Auth system**: `lib/auth/auth-manager.ts` (manager), `lib/auth/auth-state.ts` (AuthStateManager), `lib/auth/useAuthGuard.ts` (route guard hook)
+- **Database**: `lib/database/database-manager.ts` (manager), `lib/database/repositories/` (direct queries)
+- **Storage**: `system/Storage/` (encrypted storage), `/maps/storage-keys.ts` (storage key constants), `/maps/cache-keys.ts` (cache key registry)
+- **Configuration**: `/config/appsettings.*.json` (feature flags, logger categories, runtime options)
+- **Data Organization**: `/maps/`, `/type-definitions/`, `/validation/`, `/pure-algo-immutables/` (see Data Organization above)
+- **Feature Flags**: `lib/feature-flags/` (core system), `/config/appsettings.*.json` (config), `supabase/migrations/003_feature_flags_schema.sql` (schema)
+- **Navigation**: `lib/navigation/navigation-config.ts` (route config), `lib/navigation/routes/` (area-specific configs)
 - UI barrel: `components/ui/index.ts`
-- Theme root: `theme/index.ts` (families, tokens, provider)
-- **Navigation**: `lib/navigation/README.md` (central reference), `lib/navigation/navigation-config.ts` (route matching), `lib/navigation/routes/` (app-specific configs by area), `lib/navigation/uri-helpers.ts` (URL building)
-- Docs: `docs/COMPONENTS.md`, `docs/SCREENS.md`, `docs/FEATURE_FLAGS.md`, `docs/NOTIFICATIONS_USAGE.md`, **`lib/navigation/README.md`** (route config, TopBar, back button), **`lib/navigation/routes/README.md`** (how to add routes), **`docs/issues/MileStone 1/082 - Central Storage/SECURE_STORAGE.md`**, **`docs/issues/MileStone 1/030 - Optimize Image Loading/IMAGE_OPTIMIZATION_GUIDE.md`**, **`lib/kernel/README.md`** (app bootstrap phases, app readiness gating)
+- Theme root: `theme/index.ts`
 
 ## Documentation Rule
 

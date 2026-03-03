@@ -13,6 +13,5 @@ export * from "./performance/lazy-imports";
 
 export * from "./performance/startup-time";
 export * from "./version";
-export * from "./web/web-font-loader";
 
 

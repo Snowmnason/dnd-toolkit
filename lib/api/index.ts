@@ -30,7 +30,6 @@ export {
   type CircuitStats,
   type CircuitThresholds
 } from "./resilience/circuit-breaker";
-
 export {
   NetworkRecoveryManager,
   registerNetworkRecoveryHooks,
@@ -41,14 +40,4 @@ export {
   NetworkRecoveryRetryJobManager,
   type NetworkRecoveryRetryJobConfig
 } from "./resilience/network-recovery-retry-job";
-export {
-  OfflineQueueManager,
-  type OfflineQueueConfig,
-  type OfflineQueueStats,
-  type QueuedRequestEntry
-} from "./resilience/offline-queue";
-export {
-  cleanupOfflineQueueReplay,
-  initializeOfflineQueueReplay
-} from "./resilience/offline-queue-replay";
 

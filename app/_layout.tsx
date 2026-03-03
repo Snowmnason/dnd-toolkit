@@ -15,6 +15,7 @@ import {
 import { AppToastLayer, NotificationContainer } from "@/components/ui";
 import { AppToastProvider, NotificationProvider } from "@/contexts";
 import { useEntitlementExpiredModal, } from "@/hooks/entitlements";
+import { useClearSafeMode } from "@/hooks/error/use-safe-mode";
 import { AppKernelProvider, useAppKernel } from "@/hooks/kernel";
 import { useAnalyticsNavigation } from "@/hooks/navigation";
 import { useSplashScreen } from "@/hooks/ui";
@@ -45,7 +46,6 @@ import {
   useUserRole,
   useWorldId,
 } from "@/providers";
-import { AppKernel } from "@/system/Kernel";
 import {
   Stack,
   useLocalSearchParams,
@@ -98,6 +98,7 @@ function RootLayoutContent() {
 
   // Data loading hooks
   const kernel = useAppKernel();
+  const clearKernelSafeMode = useClearSafeMode();
   const splash = useSplashScreen();
   const entitlementModal = useEntitlementExpiredModal();
 
@@ -273,7 +274,7 @@ function RootLayoutContent() {
                   logger
                     .category("bootstrap")
                     .info(`[SafeMode] Recovery action succeeded: ${action}`);
-                  AppKernel.setSafeMode(null);
+                  clearKernelSafeMode();
                 },
               );
 

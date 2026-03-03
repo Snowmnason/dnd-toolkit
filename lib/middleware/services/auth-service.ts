@@ -22,6 +22,7 @@ import {
     getAuthProvider as rawGetAuthProvider,
     getAuthProviderSync as rawGetAuthProviderSync,
     getDatabaseProvider as rawGetDatabaseProvider,
+    SessionAdapter,
     type AuthProvider,
     type DatabaseProvider,
     type Session,
@@ -149,7 +150,16 @@ export async function authSignIn(
 ): Promise<ReturnType<AuthProvider['signIn']>> {
     ensureAuthReady();
     const provider = await rawGetAuthProvider();
-    return provider.signIn(email, password);
+    const result = await provider.signIn(email, password);
+
+    // Persist session on successful sign-in (system-level)
+    if (result.success && result.data) {
+        await SessionAdapter.saveSession(result.data).catch((err: unknown) => {
+            logger.category('auth').warn('[auth-service] Failed to persist session after sign-in', { error: err });
+        });
+    }
+
+    return result;
 }
 
 export async function authResetPassword(
@@ -179,7 +189,14 @@ export async function authResendConfirmation(
 export async function authSignOut(): Promise<ReturnType<AuthProvider['signOut']>> {
     ensureAuthReady();
     const provider = await rawGetAuthProvider();
-    return provider.signOut();
+    const result = await provider.signOut();
+
+    // Clear persisted session on sign-out (system-level)
+    await SessionAdapter.clearSession().catch((err: unknown) => {
+        logger.category('auth').warn('[auth-service] Failed to clear session on sign-out', { error: err });
+    });
+
+    return result;
 }
 
 export async function authGetSession(): Promise<Session | null> {
@@ -215,7 +232,16 @@ export async function authRestoreSession(
 ): Promise<boolean> {
     ensureAuthReady();
     const provider = await rawGetAuthProvider();
-    return provider.restoreSession(tokens);
+    const success = await provider.restoreSession(tokens);
+
+    // If restoration failed, clear stale persisted session
+    if (!success) {
+        await SessionAdapter.clearSession().catch((err: unknown) => {
+            logger.category('auth').warn('[auth-service] Failed to clear session after failed restore', { error: err });
+        });
+    }
+
+    return success;
 }
 
 /**

@@ -1,6 +1,6 @@
 /**
  * Hooks for accessing and managing safe mode state
- * These hooks subscribe to AppKernel safe mode changes
+ * These hooks subscribe to kernel state changes via kernel-manager
  */
 
 import {
@@ -9,7 +9,12 @@ import {
   SafeModeState,
   createSafeModeState,
 } from "@/lib/error";
-import { AppKernel } from "@/system/Kernel";
+import {
+  clearSafeMode,
+  getSafeMode,
+  onKernelStateChange,
+  setSafeMode,
+} from "@/lib/kernel/kernel-manager";
 import { useCallback, useEffect, useState } from "react";
 
 /**
@@ -17,15 +22,15 @@ import { useCallback, useEffect, useState } from "react";
  * Returns null if app is in NORMAL state
  */
 export function useSafeMode(): SafeModeState | null {
-  const [safeMode, setSafeMode] = useState<SafeModeState | null>(null);
+  const [safeMode, setSafeModeState] = useState<SafeModeState | null>(null);
 
   useEffect(() => {
     // Get initial state
-    setSafeMode(AppKernel.getSafeMode());
+    setSafeModeState(getSafeMode());
 
     // Subscribe to kernel updates
-    const unsubscribe = AppKernel.subscribe((state) => {
-      setSafeMode(state.safeMode);
+    const unsubscribe = onKernelStateChange((state) => {
+      setSafeModeState(state.safeMode);
     });
 
     return unsubscribe;
@@ -75,7 +80,7 @@ export function useIsInRecovery(): boolean {
 export function useSetSafeMode() {
   return useCallback((reason: SafeModeReason, details?: string) => {
     const safeMode = createSafeModeState(reason, { details });
-    AppKernel.setSafeMode(safeMode);
+    setSafeMode(safeMode);
   }, []);
 }
 
@@ -85,7 +90,7 @@ export function useSetSafeMode() {
  */
 export function useClearSafeMode() {
   return useCallback(() => {
-    AppKernel.setSafeMode(null);
+    clearSafeMode();
   }, []);
 }
 

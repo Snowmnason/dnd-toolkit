@@ -20,3 +20,5 @@ export {
 } from "./http-error-mapper";
 export { STORAGE_KEYS } from './storage-keys';
 
+export { getStorageDefaults } from './storage-defaults';
+

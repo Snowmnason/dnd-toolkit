@@ -1,8 +1,8 @@
+import { logger } from "@/lib/utils/logger";
 import {
   OfflineQueueManager,
   type QueuedRequestEntry,
-} from "@/lib/api/resilience/offline-queue";
-import { logger } from "@/lib/utils/logger";
+} from "@/system/API/resilience/offline-queue";
 import { SecureStorage } from "@/system/Storage";
 import {
   afterEach,

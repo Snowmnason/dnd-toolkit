@@ -24,6 +24,33 @@
 // caused runtime failures under Metro (process.memoryUsage not available).
 // Keep this file import-safe in all environments.
 
+// TODO: SYNC HANDLER REGISTRATION
+// ════════════════════════════════════════════════════════════════════════════════
+// CRITICAL: This sync manager requires sync handlers to be registered before
+// mutations are synced. Without handlers, all sync attempts will fail with:
+// "No sync handler registered for table: <tableName>"
+//
+// Handlers are registered via:
+//   registerSyncHandler(tableName, handler)
+//
+// Each domain module (notes, characters, shops, etc.) must call registerSyncHandler()
+// during initialization to define HOW that table's mutations are synced to the database.
+//
+// Example handler for notes table:
+//   registerSyncHandler('notes', async (payload, operation, supabase) => {
+//     if (operation === 'create') {
+//       return await supabase.from('notes').insert(payload).select().single();
+//     }
+//     if (operation === 'update') {
+//       return await supabase.from('notes').update(payload).eq('id', payload.id).select().single();
+//     }
+//     if (operation === 'delete') {
+//       return await supabase.from('notes').delete().eq('id', payload.id);
+//     }
+//   });
+//
+// See: lib/offline/sync-handlers.ts & docs/issues/MileStone 2/Tier 2/SYNC_HANDLER_EXAMPLES.ts
+// ════════════════════════════════════════════════════════════════════════════════
 
 import { getAppConfig, OFFLINE_SYNC_DEFAULTS } from "@/config";
 import {
@@ -31,9 +58,9 @@ import {
   NetworkCascadeDetector,
   SafeModeReason,
 } from "@/lib/error";
+import { setSafeMode } from "@/lib/kernel/kernel-manager";
 import { QueryCache } from "@/lib/storage";
 import { logger } from "@/lib/utils";
-import { AppKernel } from "@/system/Kernel";
 import {
   NetworkDetection,
   type NetworkStatus,
@@ -257,7 +284,7 @@ class OnlineSyncManagerService {
             consecutiveFailures:
               NetworkCascadeDetector.getConsecutiveFailures(),
           });
-        AppKernel.setSafeMode(
+        setSafeMode(
           createSafeModeState(SafeModeReason.NETWORK_CASCADE, {
             details: `Consecutive sync failures: ${NetworkCascadeDetector.getConsecutiveFailures()}`,
           }),

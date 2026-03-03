@@ -69,6 +69,12 @@ export { SupabaseDatabaseProvider } from './supabase/supabase-database-provider'
 
 // Supabase Initializer — database bootstrap (env vars, client, provider registration)
 export { initializeSupabaseDatabaseProvider, resetSupabaseInitializer } from './supabase/supabase-initializer';
+// Session Adapter — system-level session persistence (save/restore/clear)
+export {
+  SessionAdapter,
+  type PersistedSessionData
+} from './session-adapter';
+
 // Service Status Tracking — visibility into service readiness
 export {
   areCriticalServicesReady,

@@ -1,4 +1,4 @@
-import { KernelError } from "@/system/Kernel";
+import { KernelError } from "@/lib/kernel/kernel-manager";
 import { UseTheme } from '@/theme';
 import { View } from 'react-native';
 import CustomLoad from './ui/CustomLoad';
