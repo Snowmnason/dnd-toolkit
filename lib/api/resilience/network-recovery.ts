@@ -10,10 +10,9 @@
 import { QueryCache } from "@/lib/storage";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
-import { RequestManager } from "@/system/API/request-manager";
+import { OfflineQueueManager, RequestManager } from "@/system/API";
 import type { NetworkState } from "@/system/Network";
 import { SecureStorage } from "@/system/Storage";
-import { OfflineQueueManager } from "../../../system/API/resilience/offline-queue";
 
 /**
  * Recovery state persistence

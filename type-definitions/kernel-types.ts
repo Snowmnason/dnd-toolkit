@@ -5,6 +5,9 @@
  * Used by system/Kernel/app-kernel.ts and lib/kernel/kernel-manager.ts.
  */
 
+import type { SafeModeState } from "@/lib/error";
+import type { NetworkStatus } from "@/system/Network";
+
 /**
  * Phase lifecycle stages
  */
@@ -81,8 +84,8 @@ export interface AppKernelState {
   error: KernelError | null;
   timing: Record<string, number>; // Phase timing in milliseconds
   capabilities: KernelCapabilities;
-  networkStatus: any; // NetworkStatus type from system/Network
-  safeMode: any; // SafeModeState type from lib/error
+  networkStatus: NetworkStatus | null;
+  safeMode: SafeModeState | null;
 }
 
 /**

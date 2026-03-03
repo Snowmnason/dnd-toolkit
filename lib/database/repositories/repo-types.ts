@@ -373,6 +373,12 @@ export interface UserSettingsRepository {
   fetchCurrentUserSettings(options?: CacheOptions): Promise<UserSettings | null>;
 
   /**
+   * Fetch user settings for a specific user by ID.
+   * Returns null if user not found or no settings record exists.
+   */
+  fetchUserSettingsById(userId: string, options?: CacheOptions): Promise<UserSettings | null>;
+
+  /**
    * Update the analytics consent level for the current user.
    * Returns the updated level string.
    */

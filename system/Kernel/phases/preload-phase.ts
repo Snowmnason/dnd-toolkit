@@ -1,5 +1,4 @@
 /**
-/**
  * Phase 1: Preload Phase (NON-CRITICAL)
  * 
  * Responsibility: Load critical fonts and platform assets

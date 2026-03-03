@@ -36,10 +36,10 @@
  * Execute sync phase
  *
  * Initializes offline mutation queue and automatic synchronization.
- * Blocking: failures won't prevent initialization, but must complete before appReady.
- * Runs as a post-ready background task.
+ * BLOCKING: Must complete before appReady to prevent read/write race conditions.
+ * Failures are non-critical (logged as warning) and don't prevent initialization.
  */
-export async function offlinePhase(): Promise<void> {
+export async function syncPhase(): Promise<void> {
   const { logger } = await import("@/lib/utils");
 
   try {

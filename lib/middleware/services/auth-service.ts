@@ -150,16 +150,7 @@ export async function authSignIn(
 ): Promise<ReturnType<AuthProvider['signIn']>> {
     ensureAuthReady();
     const provider = await rawGetAuthProvider();
-    const result = await provider.signIn(email, password);
-
-    // Persist session on successful sign-in (system-level)
-    if (result.success && result.data) {
-        await SessionAdapter.saveSession(result.data).catch((err: unknown) => {
-            logger.category('auth').warn('[auth-service] Failed to persist session after sign-in', { error: err });
-        });
-    }
-
-    return result;
+    return await provider.signIn(email, password);
 }
 
 export async function authResetPassword(
@@ -189,14 +180,7 @@ export async function authResendConfirmation(
 export async function authSignOut(): Promise<ReturnType<AuthProvider['signOut']>> {
     ensureAuthReady();
     const provider = await rawGetAuthProvider();
-    const result = await provider.signOut();
-
-    // Clear persisted session on sign-out (system-level)
-    await SessionAdapter.clearSession().catch((err: unknown) => {
-        logger.category('auth').warn('[auth-service] Failed to clear session on sign-out', { error: err });
-    });
-
-    return result;
+    return await provider.signOut();
 }
 
 export async function authGetSession(): Promise<Session | null> {

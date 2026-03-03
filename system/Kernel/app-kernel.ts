@@ -17,29 +17,29 @@
  */
 
 import {
-  cleanupAnalyticsNetworkIntegration,
-  initializeAnalyticsNetworkIntegration,
+    cleanupAnalyticsNetworkIntegration,
+    initializeAnalyticsNetworkIntegration,
 } from "@/lib/analytics/exporters/analytics-network-integration";
 import {
-  createSafeModeState,
-  DEFAULT_SAFE_MODE_CONFIG,
-  NetworkCascadeDetector,
-  SafeModeLevel,
-  SafeModeReason,
-  type SafeModeState,
+    createSafeModeState,
+    DEFAULT_SAFE_MODE_CONFIG,
+    NetworkCascadeDetector,
+    SafeModeLevel,
+    SafeModeReason,
+    type SafeModeState,
 } from "@/lib/error";
 import { logger } from "@/lib/utils";
 import {
-  NetworkDetection,
-  NetworkStatus,
+    NetworkDetection,
+    NetworkStatus,
 } from "@/system/Network";
 import {
-  KernelErrorCode,
-  KernelPhase,
-  type AppKernelState,
-  type KernelCapabilities,
-  type KernelError,
-  type KernelListener,
+    KernelErrorCode,
+    KernelPhase,
+    type AppKernelState,
+    type KernelCapabilities,
+    type KernelError,
+    type KernelListener,
 } from "@/type-definitions/kernel-types";
 import { authPhase } from "./phases/auth-phase";
 import { configPhase } from "./phases/config-phase";
@@ -47,7 +47,7 @@ import { networkPhase } from "./phases/network-phase";
 import { preloadPhase } from "./phases/preload-phase";
 import { servicesPhase } from "./phases/services-phase";
 import { storagePhase } from "./phases/storage-phase";
-import { offlinePhase } from "./phases/sync-phase";
+import { syncPhase } from "./phases/sync-phase";
 import { userPhase } from "./phases/user-phase";
 
 // FUTURE ENHANCEMENT: Phase Progress Callbacks
@@ -63,11 +63,11 @@ import { userPhase } from "./phases/user-phase";
  * These exports prevent breaking external imports from system/Kernel
  */
 export {
-  KernelErrorCode,
-  KernelPhase, type AppKernelState,
-  type KernelCapabilities,
-  type KernelError,
-  type KernelListener
+    KernelErrorCode,
+    KernelPhase, type AppKernelState,
+    type KernelCapabilities,
+    type KernelError,
+    type KernelListener
 } from "@/type-definitions/kernel-types";
 
 class AppKernelClass {
@@ -153,7 +153,7 @@ class AppKernelClass {
       await this.runPhase("auth", () => authPhase());
 
       // Phase 6: SYNC — offline queue + sync manager (prevents read/write race conditions)
-      await this.runPhase("sync", () => offlinePhase());
+      await this.runPhase("sync", () => syncPhase());
 
       // ═══════════════════════════════════════════════════════════════
       // APP READY — all phases complete, UI can render
@@ -722,7 +722,7 @@ class AppKernelClass {
         break;
 
       case "sync":
-        await this.runPhase("sync", () => offlinePhase());
+        await this.runPhase("sync", () => syncPhase());
         break;
 
       case "network":

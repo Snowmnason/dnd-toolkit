@@ -14,6 +14,7 @@ import {
   getSafeMode,
   onKernelStateChange,
   setSafeMode,
+  type AppKernelState,
 } from "@/lib/kernel/kernel-manager";
 import { useCallback, useEffect, useState } from "react";
 
@@ -29,7 +30,7 @@ export function useSafeMode(): SafeModeState | null {
     setSafeModeState(getSafeMode());
 
     // Subscribe to kernel updates
-    const unsubscribe = onKernelStateChange((state) => {
+    const unsubscribe = onKernelStateChange((state: AppKernelState) => {
       setSafeModeState(state.safeMode);
     });
 

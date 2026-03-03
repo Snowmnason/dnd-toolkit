@@ -23,15 +23,24 @@
 // Type Re-exports (so consumers never import from system/Kernel)
 // ═══════════════════════════════════════════════════════════════════
 
+import type { SafeModeState } from "@/lib/error";
+import type {
+  AppKernelState,
+  KernelListener
+} from "@/type-definitions/kernel-types";
+import {
+  KernelPhase
+} from "@/type-definitions/kernel-types";
+
 export {
-    KernelErrorCode,
-    KernelPhase
+  KernelErrorCode,
+  KernelPhase
 } from "@/type-definitions/kernel-types";
 export type {
-    AppKernelState,
-    KernelCapabilities,
-    KernelError,
-    KernelListener
+  AppKernelState,
+  KernelCapabilities,
+  KernelError,
+  KernelListener
 } from "@/type-definitions/kernel-types";
 
 /**
@@ -66,18 +75,17 @@ export async function getUserId(): Promise<string | undefined> {
 }
 
 /**
- * Load user settings and preferences
- * Called by user-phase to load theme, language, timezone
+ * Load user settings by user ID
+ * Called by user-phase after obtaining userId
  *
- * @param userId - Authenticated user ID
+ * @param userId - Authenticated user ID to load settings for
  * @returns User settings or null if not found
  */
 export async function loadUserSettings(userId: string): Promise<any> {
   const { userSettingsDB } = await import("@/lib/database/user_settings");
-  const settings = await userSettingsDB.fetchCurrentUserSettings({
+  return await userSettingsDB.fetchUserSettingsById(userId, {
     maxAgeMs: 4 * 60 * 60 * 1000, // 4 hours cache
   });
-  return settings;
 }
 
 /**
@@ -124,14 +132,14 @@ export function isAppReady(): boolean {
  */
 export function isKernelIdle(): boolean {
   const { AppKernel } = require("@/system/Kernel");
-  return AppKernel.getState().currentPhase === "idle";
+  return AppKernel.getState().currentPhase === KernelPhase.IDLE;
 }
 
 /**
  * Get full kernel state snapshot
  * Includes current phase, phase completion status, timing, capabilities, network status
  */
-export function getKernelState() {
+export function getKernelState(): AppKernelState {
   const { AppKernel } = require("@/system/Kernel");
   return AppKernel.getState();
 }
@@ -145,7 +153,7 @@ export function getKernelState() {
  * @returns Unsubscribe function
  */
 export function onKernelStateChange(
-  callback: (state: any) => void,
+  callback: KernelListener,
 ): () => void {
   const { AppKernel } = require("@/system/Kernel");
   return AppKernel.subscribe(callback);
@@ -163,7 +171,7 @@ export function onAppReady(callback: () => void): () => void {
   const { AppKernel } = require("@/system/Kernel");
   let fired = false;
 
-  return AppKernel.subscribe((state: any) => {
+  return AppKernel.subscribe((state: AppKernelState) => {
     if (!fired && state.phases.appReady) {
       fired = true;
       callback();
@@ -179,7 +187,7 @@ export function onAppReady(callback: () => void): () => void {
  * Get current safe mode state
  * Returns null if app is in NORMAL state (no safe mode active)
  */
-export function getSafeMode() {
+export function getSafeMode(): SafeModeState | null {
   const { AppKernel } = require("@/system/Kernel");
   return AppKernel.getSafeMode();
 }
@@ -189,7 +197,7 @@ export function getSafeMode() {
  * Called when critical systems fail or recovery is needed
  * Pass a SafeModeState object to enter safe mode
  */
-export function setSafeMode(safeMode: any): void {
+export function setSafeMode(safeMode: SafeModeState | null): void {
   const { AppKernel } = require("@/system/Kernel");
   AppKernel.setSafeMode(safeMode);
 }
