@@ -1,4 +1,5 @@
 import { logger } from '@/lib/utils/logger';
+import { SessionAdapter } from '@/system/Services/session-adapter';
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
@@ -119,27 +120,18 @@ export const getSupabaseClient = () => {
             auth_id: session.user?.id,
             hasAccessToken: !!session.access_token,
           });
-          // Dynamically import to avoid circular dependency
-          import('@/lib/auth/auth-state').then(({ AuthStateManager }) => {
-            AuthStateManager.saveAuthSession(session).catch((err) => {
-              logger.category('storage').error('Failed to save auth session:', err);
-            });
+          SessionAdapter.saveSession(session).catch((err) => {
+            logger.category('storage').error('Failed to save auth session:', err);
           });
         } else if (event === 'SIGNED_OUT') {
           logger.category('storage').info('🔓 User signed out');
-          // Clear the saved session
-          import('@/lib/auth/auth-state').then(({ AuthStateManager }) => {
-            AuthStateManager.clearAuthSession().catch((err) => {
-              logger.category('storage').error('Failed to clear auth session:', err);
-            });
+          SessionAdapter.clearSession().catch((err) => {
+            logger.category('storage').error('Failed to clear auth session:', err);
           });
         } else if (event === 'TOKEN_REFRESHED' && session) {
           logger.category('storage').debug('🔄 Token refreshed, updating saved session');
-          // Update the saved session with new tokens
-          import('@/lib/auth/auth-state').then(({ AuthStateManager }) => {
-            AuthStateManager.saveAuthSession(session).catch((err) => {
-              logger.category('storage').error('Failed to update auth session:', err);
-            });
+          SessionAdapter.saveSession(session).catch((err) => {
+            logger.category('storage').error('Failed to update auth session:', err);
           });
         }
       });

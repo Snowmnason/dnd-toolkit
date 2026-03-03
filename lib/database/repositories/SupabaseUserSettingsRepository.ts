@@ -1,15 +1,15 @@
 import { dbRequestOptions } from "@/config";
 import {
-    getCurrentUserProfile,
-    validateUserForWrite,
+  getCurrentUserProfile,
+  validateUserForWrite,
 } from "@/lib/database/database-manger";
 import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
 import { RequestManager } from "@/system/API/request-manager";
 import type {
-    CacheOptions,
-    UserSettings,
-    UserSettingsRepository,
+  CacheOptions,
+  UserSettings,
+  UserSettingsRepository,
 } from "./repo-types";
 
 /**
@@ -54,6 +54,52 @@ export class SupabaseUserSettingsRepository implements UserSettingsRepository {
 
           // Only log as error for unexpected database issues
           logger.category("database").error("Failed to fetch user settings:", {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+          });
+          throw new Error(error.message || "Failed to fetch user settings");
+        }
+
+        logger.category("database").info("User settings fetched from database:", {
+          userId: data.user_id,
+          theme: data.theme,
+          language: data.language,
+        });
+
+        return data;
+      },
+      dbRequestOptions("read", "user"),
+    ) ?? null;
+  }
+
+  async fetchUserSettingsById(userId: string, _options?: CacheOptions): Promise<UserSettings | null> {
+    logger.category("database").debug("Starting fetchUserSettingsById", { userId });
+
+    return RequestManager.fetch(
+      `user:settings:${userId}`,
+      async () => {
+        const { data, error } = await getDatabase()
+          .from("user_settings", "public")
+          .select("*")
+          .eq("user_id", userId)
+          .single();
+
+        if (error) {
+          if (error.code === "PGRST116") {
+            // Settings don't exist for this user
+            logger
+              .category("database")
+              .debug(
+                "No settings exist for user",
+                { userId },
+              );
+            return null;
+          }
+
+          // Only log as error for unexpected database issues
+          logger.category("database").error("Failed to fetch user settings:", {
+            userId,
             message: error.message,
             code: error.code,
             details: error.details,

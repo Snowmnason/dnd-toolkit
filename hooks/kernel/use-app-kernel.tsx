@@ -3,10 +3,17 @@
  *
  * Provides centralized access to kernel state throughout the app.
  * Must wrap the app at the root level for all consumers to work.
+ *
+ * All kernel access goes through lib/kernel/kernel-manager (never system/Kernel directly).
  */
 
+import {
+  getKernelState,
+  initializeKernel,
+  onKernelStateChange,
+  type AppKernelState,
+} from "@/lib/kernel/kernel-manager";
 import { logger } from "@/lib/utils/logger";
-import { AppKernel, AppKernelState } from "@/system/Kernel";
 import {
   createContext,
   ReactNode,
@@ -14,14 +21,6 @@ import {
   useEffect,
   useState,
 } from "react";
-
-// Module-level diagnostic (gated by debugLogs feature flag)
-if (typeof window !== "undefined") {
-  logger.category("bootstrap").debug(
-    "[KERNEL_PROVIDER] Module loaded, typeof window:",
-    typeof window,
-  );
-}
 
 /**
  * React context for kernel state
@@ -37,33 +36,22 @@ interface AppKernelProviderProps {
  * Initializes the kernel and provides state to all consumers
  */
 export function AppKernelProvider({ children }: AppKernelProviderProps) {
-  logger
-    .category("bootstrap")
-    .debug("[KERNEL_PROVIDER] Render: Provider component mounted");
-  const [state, setState] = useState<AppKernelState>(AppKernel.getState());
+  const [state, setState] = useState<AppKernelState>(getKernelState());
 
   useEffect(() => {
     logger
       .category("bootstrap")
-      .debug(
-        "[KERNEL_PROVIDER] useEffect: Hook fired, calling AppKernel.initialize()",
-      );
+      .debug("[KERNEL_PROVIDER] Initializing kernel");
 
     // Initialize kernel once on mount
-    AppKernel.initialize().catch((error: unknown) => {
+    initializeKernel().catch((error: unknown) => {
       logger
         .category("bootstrap")
         .error("[AppKernelProvider] Kernel initialization failed:", error);
     });
 
-    logger
-      .category("bootstrap")
-      .debug(
-        "[KERNEL_PROVIDER] useEffect: AppKernel.initialize() called (async), subscribing to state",
-      );
-
     // Subscribe to kernel state changes
-    const unsubscribe = AppKernel.subscribe((newState: AppKernelState) => {
+    const unsubscribe = onKernelStateChange((newState: AppKernelState) => {
       setState(newState);
     });
 
@@ -105,5 +93,6 @@ export function useAppReady(): boolean {
  */
 export function usePhaseReady(phase: keyof AppKernelState["phases"]): boolean {
   const kernel = useAppKernel();
-  return kernel.phases[phase as keyof AppKernelState["phases"]];
+  // eslint-disable-next-line security/detect-object-injection
+  return kernel.phases[phase];
 }

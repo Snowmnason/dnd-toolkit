@@ -22,6 +22,7 @@ import {
     getAuthProvider as rawGetAuthProvider,
     getAuthProviderSync as rawGetAuthProviderSync,
     getDatabaseProvider as rawGetDatabaseProvider,
+    SessionAdapter,
     type AuthProvider,
     type DatabaseProvider,
     type Session,
@@ -149,7 +150,7 @@ export async function authSignIn(
 ): Promise<ReturnType<AuthProvider['signIn']>> {
     ensureAuthReady();
     const provider = await rawGetAuthProvider();
-    return provider.signIn(email, password);
+    return await provider.signIn(email, password);
 }
 
 export async function authResetPassword(
@@ -179,7 +180,7 @@ export async function authResendConfirmation(
 export async function authSignOut(): Promise<ReturnType<AuthProvider['signOut']>> {
     ensureAuthReady();
     const provider = await rawGetAuthProvider();
-    return provider.signOut();
+    return await provider.signOut();
 }
 
 export async function authGetSession(): Promise<Session | null> {
@@ -215,7 +216,16 @@ export async function authRestoreSession(
 ): Promise<boolean> {
     ensureAuthReady();
     const provider = await rawGetAuthProvider();
-    return provider.restoreSession(tokens);
+    const success = await provider.restoreSession(tokens);
+
+    // If restoration failed, clear stale persisted session
+    if (!success) {
+        await SessionAdapter.clearSession().catch((err: unknown) => {
+            logger.category('auth').warn('[auth-service] Failed to clear session after failed restore', { error: err });
+        });
+    }
+
+    return success;
 }
 
 /**

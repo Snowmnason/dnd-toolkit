@@ -8,9 +8,6 @@ import { STORAGE_KEYS } from "@/maps";
 import { SecureStorage } from "@/system/Storage";
 import { type Session } from "./auth-operations";
 
-// Session schema version for future migrations
-const AUTH_SESSION_VERSION = 1;
-
 /**
  * Helper: determine whether a session indicates an email-confirmed user.
  * Centralizes provider-specific checks (Supabase or other providers' shapes).
@@ -64,139 +61,6 @@ export interface CacheMetadata {
 
 export const AuthStateManager = {
 
-  // Save the Supabase session to encrypted storage (web platform workaround)
-  // Since web has persistSession=false for security, we manually save/restore the session
-  async saveAuthSession(session: any): Promise<void> {
-    try {
-      if (!session) {
-        logger.category('auth').debug("saveAuthSession: null session, clearing");
-        await this.clearAuthSession();
-        return;
-      }
-
-      logger.category('auth').info("Saving auth session (SIGNED_IN event)", {
-        auth_id: session.user?.id,
-        hasAccessToken: !!session.access_token,
-        hasRefreshToken: !!session.refresh_token,
-        email: session.user?.email,
-      });
-
-      const key = STORAGE_KEYS.AUTH_SESSION;
-      logger.category('auth').debug("Getting storage backend for key", { key });
-      
-      const backend = getPrivacyStorageBackend(key);
-      if (!backend) {
-        logger.category('auth').error("Failed to get storage backend - returned null");
-        return;
-      }
-      
-      // Save only the essential session data needed to restore
-      const sessionData = {
-        version: AUTH_SESSION_VERSION,
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-        expires_at: session.expires_at,
-        expires_in: session.expires_in,
-        token_type: session.token_type,
-        user: {
-          id: session.user?.id,
-          email: session.user?.email,
-        },
-      };
-      
-      logger.category('auth').debug("Calling backend.setJSON...", { keyLength: key.length, dataSize: JSON.stringify(sessionData).length });
-      await backend.setJSON(key, sessionData);
-      
-      logger.category('auth').info(
-        "Successfully saved AUTH_SESSION to encrypted storage",
-        { auth_id: session.user?.id },
-      );
-    } catch (error) {
-      logger.category('auth').error("ERROR in saveAuthSession:", {
-        errorMessage: error instanceof Error ? error.message : String(error),
-        errorStack: error instanceof Error ? error.stack : undefined,
-      });
-    }
-  },
-
-  // Restore the session from encrypted storage via the auth provider (provider-agnostic)
-  async restoreAuthSession(): Promise<void> {
-    try {
-      const key = STORAGE_KEYS.AUTH_SESSION;
-      const backend = getPrivacyStorageBackend(key);
-      const sessionData = await backend.getJSON<any>(key);
-
-      if (!sessionData) {
-        logger.category('auth').debug("🔍 No AUTH_SESSION key in storage to restore");
-        return;
-      }
-
-      // Check session schema version for future migrations
-      const sessionVersion = sessionData.version || 0;
-      if (sessionVersion !== AUTH_SESSION_VERSION) {
-        logger.category('auth').warn(
-          `Session schema version mismatch (stored: ${sessionVersion}, current: ${AUTH_SESSION_VERSION}). Clearing stale session.`
-        );
-        // Clear incompatible session; user will need to re-authenticate
-        await this.clearAuthSession();
-        return;
-      }
-
-      logger.category('auth').info("Restoring auth session from storage", {
-        auth_id: sessionData.user?.id,
-        hasAccessToken: !!sessionData.access_token,
-        version: sessionVersion,
-      });
-
-      // Only restore on web platform (mobile uses provider's built-in async storage)
-      if (typeof window === "undefined") {
-        logger.category('auth').debug(
-          "Skipping manual session restore on mobile (uses platform-native storage)"
-        );
-        return;
-      }
-
-      // Get the configured auth manager and attempt to restore session
-      const { restoreSession } = await import("./auth-manager");
-      const success = await restoreSession(sessionData);
-
-      if (!success) {
-        logger.category('auth').warn(
-          "Auth provider failed to restore session (likely expired or invalid)"
-        );
-        // If restoration fails (e.g., token expired), clear the stale session
-        await this.clearAuthSession();
-        return;
-      }
-
-      logger.category('auth').info(
-        "AUTH_SESSION restored! User should now be authenticated",
-        { auth_id: sessionData.user?.id }
-      );
-    } catch (error) {
-      logger.category('auth').error("Error restoring auth session:", error);
-      // Clear stale session on error
-      try {
-        await this.clearAuthSession();
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (_) {
-        // Ignore errors during cleanup
-      }
-    }
-  },
-
-  // Clear the saved auth session
-  async clearAuthSession(): Promise<void> {
-    try {
-      const key = STORAGE_KEYS.AUTH_SESSION;
-      const backend = getPrivacyStorageBackend(key);
-      await backend.removeItem(key);
-      logger.category('auth').debug("Cleared auth session from storage");
-    } catch (error) {
-      logger.category('auth').error("Error clearing auth session:", error);
-    }
-  },
-
   // Get current auth state
   // IMPORTANT: Always returns an object with hasAccount as a boolean (never null/undefined)
   // - undefined/first init → hasAccount: false (go to welcome)
@@ -249,9 +113,9 @@ export const AuthStateManager = {
       // Update auth state
       await this.setHasAccount(true);
 
-      // Save the actual Supabase session (critical for web platform!)
-      // This ensures the session persists across app restarts
-      await this.saveAuthSession(session);
+      // Save the actual session to encrypted storage via system adapter
+      const { SessionAdapter } = await import("@/system/Services");
+      await SessionAdapter.saveSession(session);
 
       // Optionally cache minimal session info (privacy-routed)
       if (session?.user?.email) {
@@ -273,7 +137,8 @@ export const AuthStateManager = {
     try {
       // Clear the saved auth session first
       // This ensures Supabase and storage are in sync
-      await this.clearAuthSession();
+      const { SessionAdapter } = await import("@/system/Services");
+      await SessionAdapter.clearSession();
 
       // Clear query cache (all user-specific cached queries)
       const { QueryCache } = await import("../storage/cache/query-cache");

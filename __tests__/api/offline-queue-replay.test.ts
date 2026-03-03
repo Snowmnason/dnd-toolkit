@@ -1,5 +1,5 @@
-import { OfflineQueueManager } from "@/lib/api/resilience/offline-queue";
 import { logger } from "@/lib/utils/logger";
+import { OfflineQueueManager } from "@/system/API/resilience/offline-queue";
 import { NetworkDetection } from "@/system/Network";
 import { SecureStorage } from "@/system/Storage";
 import {
@@ -84,7 +84,7 @@ describe("Offline Queue Replay", () => {
   describe("initializeOfflineQueueReplay", () => {
     it("should subscribe to network status changes via NetworkDetection", async () => {
       const { initializeOfflineQueueReplay } =
-        await import("@/lib/api/resilience/offline-queue-replay");
+        await import("@/system/API/resilience/offline-queue-replay");
 
       initializeOfflineQueueReplay();
 
@@ -95,7 +95,7 @@ describe("Offline Queue Replay", () => {
   describe("cleanupOfflineQueueReplay", () => {
     it("should clean up replay listener", async () => {
       const { initializeOfflineQueueReplay, cleanupOfflineQueueReplay } =
-        await import("@/lib/api/resilience/offline-queue-replay");
+        await import("@/system/API/resilience/offline-queue-replay");
 
       // Set up the unsubscribe mock before initializing
       const unsubscribeMock = vi.fn();

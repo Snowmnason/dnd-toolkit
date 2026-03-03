@@ -12,8 +12,8 @@
 import { getAppConfig } from '@/config';
 import { createSafeModeState, SafeModeReason } from "@/lib/error";
 import { getJobQueue } from "@/lib/jobs";
+import { isKernelIdle, setSafeMode } from "@/lib/kernel/kernel-manager";
 import { logger } from "@/lib/utils";
-import { AppKernel } from "@/system/Kernel";
 
 const AUTH_HEALTH_CHECK_JOB_TYPE = "auth_health_check";
 // Default to 4 hours if not configured
@@ -103,7 +103,7 @@ async function validateAuthHealth(): Promise<void> {
           details:
             "User session was valid but has expired. Please log in again.",
         });
-        AppKernel.setSafeMode(safeMode);
+        setSafeMode(safeMode);
       } else {
         logger
           .category("auth")
@@ -133,8 +133,7 @@ async function handleAuthHealthCheck(): Promise<{ nextCheckAt: number }> {
 
   // Bounds check: only reschedule if app kernel is still active
   // If kernel was reset (e.g., app destroyed, testing scenario), don't reschedule
-  const kernelState = AppKernel.getState();
-  if (kernelState.currentPhase === "idle") {
+  if (isKernelIdle()) {
     logger
       .category("auth")
       .debug("Auth health check not rescheduling - kernel is idle");

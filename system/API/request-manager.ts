@@ -16,7 +16,6 @@ import {
   DEFAULT_THRESHOLDS,
   type CircuitThresholds,
 } from "@/lib/api/resilience/circuit-breaker";
-import { OfflineQueueManager, type QueuedRequestEntry } from "@/lib/api/resilience/offline-queue";
 import { AuthLayer, type AuthContext } from "@/lib/auth/auth-layer";
 import { enrichError, extractErrorCode, reportError } from "@/lib/error";
 import {
@@ -29,6 +28,7 @@ import {
 import { QueryCache } from "@/lib/storage";
 import { logger, type LogCategory, type PerfTimer } from "@/lib/utils";
 import { ERROR_CODES, type ErrorCodeType } from "@/maps/ERROR_CODES";
+import { OfflineQueueManager, type QueuedRequestEntry } from "@/system/API/resilience/offline-queue";
 import { NetworkDetection } from "@/system/Network";
 
 /**
