@@ -22,9 +22,49 @@ import type {
  * performs database operations only.
  */
 export class SupabaseUserSettingsRepository implements UserSettingsRepository {
-  fetchUserSettingsById(userId: string, options?: CacheOptions): Promise<UserSettings | null> {
-    throw new Error("Method not implemented.");
+  async fetchUserSettingsById(userId: string, _options?: CacheOptions): Promise<UserSettings | null> {
+    logger.category("database").debug("Starting fetchUserSettingsById", { userId });
+
+    return fetchRequest(
+      `user:settings:${userId}`,
+      async () => {
+        const { data, error } = await getDatabase()
+          .from("user_settings", "public")
+          .select("*")
+          .eq("user_id", userId)
+          .single();
+
+        if (error) {
+          if (error.code === "PGRST116") {
+            // Settings don't exist for this user
+            logger
+              .category("database")
+              .debug("No settings exist for user", { userId });
+            return null;
+          }
+
+          // Log unexpected database issues
+          logger.category("database").error("Failed to fetch user settings by ID:", {
+            userId,
+            message: error.message,
+            code: error.code,
+            details: error.details,
+          });
+          throw new Error(error.message || "Failed to fetch user settings");
+        }
+
+        logger.category("database").info("User settings fetched by ID:", {
+          userId: data.user_id,
+          theme: data.theme,
+          language: data.language,
+        });
+
+        return data;
+      },
+      dbRequestOptions("read", "user"),
+    ) ?? null;
   }
+
   async fetchCurrentUserSettings(_options?: CacheOptions): Promise<UserSettings | null> {
     logger.category("database").debug("Starting fetchCurrentUserSettings");
 

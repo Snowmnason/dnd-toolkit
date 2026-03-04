@@ -47,7 +47,9 @@ function canSendAnalytics(): boolean {
     
     // 3. Provider initialized?
     if (!isServiceReady('analytics')) {
-        // TODO: Queue for retry after initialization?
+        // Service temporarily down (still initializing).
+        // FUTURE: Queue for retry after initialization.
+        // Current behavior: silently drop (acceptable since consent check already filters disabled services).
         logger.category('analytics').debug('[analytics-service] Analytics provider not ready — dropping data');
         return false;
     }

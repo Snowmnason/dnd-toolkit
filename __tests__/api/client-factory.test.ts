@@ -82,7 +82,7 @@ class TestUsersAPI extends APIClient {
       circuitBreakerKey: "users",
       defaultTags: ["users"],
       queryCache: mockQueryCache as any,
-      requestManager: mockRequestManager as any,
+      requestManager: mockRequestManager as any, // LEGACY: requestManager is deprecated, will be removed in test rework
       authLayer: mockAuthLayer as any,
       ...config,
     });

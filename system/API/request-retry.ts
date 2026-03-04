@@ -1,14 +1,14 @@
 import {
-    captureErrorCorrelation,
-    ErrorType,
-    type PayloadQuality,
+  captureErrorCorrelation,
+  ErrorType,
+  type PayloadQuality,
 } from "@/lib/network";
 import { logger, type PerfTimer } from "@/lib/utils";
 import { NetworkDetection } from "@/system/Network";
 import { deriveConnectionType } from "@/system/Network/helpers";
 import {
-    InterceptorManager,
-    type RequestInterceptor,
+  InterceptorManager,
+  type RequestInterceptor,
 } from "./interceptor";
 
 /**
@@ -459,9 +459,12 @@ export async function executeWithRetry<T>(
       // Only call error interceptors when retries are exhausted
       // (not for 401 — that's handled by the auth layer)
       const statusCode = (error as any)?.status || (error as any)?.code;
+      
+      // Safely derive error message (handles non-Error types: strings, objects, etc.)
+      const errorMsg = error instanceof Error ? error.message : String((error as any)?.message ?? error);
       const isNetworkError =
         !(error as any)?.status &&
-        (error as Error).message.includes("network");
+        errorMsg.toLowerCase().includes("network");
 
       if (statusCode !== 401 && requestContext) {
         await InterceptorManager.executeErrorHooks(
@@ -478,7 +481,6 @@ export async function executeWithRetry<T>(
       }
 
       // ── Telemetry: capture error-network correlation ──
-      const errorMsg = (error as Error)?.message || String(error);
       const mappedErrorType = classifyErrorType(error, statusCode);
       captureErrorCorrelation(mappedErrorType, errorMsg, statusCode);
 
