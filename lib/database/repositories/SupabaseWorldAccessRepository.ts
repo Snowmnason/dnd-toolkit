@@ -1,12 +1,12 @@
 import { dbRequestOptions } from "@/config";
+import { fetchRequest } from "@/lib/api";
 import { executeEdgeFunction } from "@/lib/database/edge";
 import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
-import { RequestManager } from "@/system/API/request-manager";
 import type {
-    AccessRole,
-    WorldAccess,
-    WorldAccessRepository
+  AccessRole,
+  WorldAccess,
+  WorldAccessRepository
 } from "./repo-types";
 
 /**
@@ -21,7 +21,7 @@ import type {
  */
 export class SupabaseWorldAccessRepository implements WorldAccessRepository {
   async isUserInWorld(worldId: string, userId: string): Promise<boolean> {
-    const result = await RequestManager.fetch(
+    const result = await fetchRequest(
       `world:${worldId}:access:${userId}`,
       async () => {
         const { data, error } = await getDatabase()
@@ -53,7 +53,7 @@ export class SupabaseWorldAccessRepository implements WorldAccessRepository {
     inviteToken: string,
     userRole: AccessRole = "player",
   ): Promise<WorldAccess> {
-    return RequestManager.fetch(
+    return fetchRequest(
       `world:${worldId}:addUser:${userId}`,
       async () => {
         // Use semantic edge function to handle invite validation and access addition atomically
@@ -78,7 +78,7 @@ export class SupabaseWorldAccessRepository implements WorldAccessRepository {
   }
 
   async removeUser(worldId: string, userId: string): Promise<void> {
-    await RequestManager.fetch(
+    await fetchRequest(
       `world:${worldId}:removeUser:${userId}`,
       async () => {
         // Use semantic edge function to handle access control and cascading deletes
@@ -100,7 +100,7 @@ export class SupabaseWorldAccessRepository implements WorldAccessRepository {
   async getMembers(
     worldId: string,
   ): Promise<(WorldAccess & { user: any })[] | null> {
-    return RequestManager.fetch(
+    return fetchRequest(
       `world:${worldId}:members`,
       async () => {
         const { data, error } = await getDatabase()

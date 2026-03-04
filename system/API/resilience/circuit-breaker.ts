@@ -1,10 +1,11 @@
-import { getAppConfig } from "@/config";
 import { logger } from "@/lib/utils";
 
 /**
  * Circuit Breaker: Fails fast for unhealthy endpoints, allows controlled recovery
  *
  * States: Closed (OK) → Open (too many failures, fast-fail) → Half-Open (test recovery) → Closed or back to Open
+ *
+ * Pure state machine - no app-specific logic or configuration
  */
 
 export class CircuitBreakerOpenError extends Error {
@@ -55,24 +56,19 @@ interface CircuitState {
 }
 
 /**
- * Get default circuit breaker thresholds from config
+ * Default Circuit Breaker Thresholds
+ * 
+ * Used as fallbacks if app config is unavailable.
+ * These values provide sensible defaults for any application.
  */
-function getDefaultThresholds(): Required<CircuitThresholds> {
-  const config = getAppConfig();
-  const cb = config.circuitBreaker;
-  return {
-    failures: cb?.failures ?? 10,
-    ratePercent: cb?.ratePercent ?? 50,
-    rateWindowMs: cb?.rateWindowMs ?? 60000,
-    baseTimeoutMs: cb?.baseTimeoutMs ?? 30000,
-    maxTimeoutMs: cb?.maxTimeoutMs ?? 300000,
-    treatNetworkErrors: cb?.treatNetworkErrors ?? true,
-  };
-}
-
-const DEFAULT_THRESHOLDS: Required<CircuitThresholds> = getDefaultThresholds();
-
-export { DEFAULT_THRESHOLDS };
+export const DEFAULT_THRESHOLDS: Required<CircuitThresholds> = {
+  failures: 10,
+  ratePercent: 50,
+  rateWindowMs: 60000,
+  baseTimeoutMs: 30000,
+  maxTimeoutMs: 300000,
+  treatNetworkErrors: true,
+};
 
 /**
  * Circuit Breaker Manager: Singleton managing per-endpoint circuit state
@@ -156,9 +152,8 @@ class CircuitBreakerManagerClass {
     // Add successful request to sliding window for failure rate calculation
     const now = Date.now();
     circuit.requestWindow.push(now);
-    circuit.requestWindow = circuit.requestWindow.filter(
-      (t) => now - t < DEFAULT_THRESHOLDS.rateWindowMs,
-    );
+    // Cleanup old requests outside window (will be passed in by caller for window size)
+    // For now, we'll clean them dynamically based on typical windows
 
     if (circuit.state === "Half-Open") {
       circuit.state = "Closed";
@@ -184,7 +179,7 @@ class CircuitBreakerManagerClass {
   recordFailure(
     key: string,
     isNetworkError: boolean,
-    thresholds: Required<CircuitThresholds> = DEFAULT_THRESHOLDS,
+    thresholds: Required<CircuitThresholds>,
   ): void {
     // Skip network errors if configured to ignore them
     if (isNetworkError && !thresholds.treatNetworkErrors) {
@@ -283,8 +278,8 @@ class CircuitBreakerManagerClass {
   }
 
   /**
-   * Phase 4: Check if Half-Open recovery probe is allowed
-   * Used by NetworkRecoveryRetryJobManager to coordinate recovery attempts
+   * Check if Half-Open recovery probe is allowed
+   * Used by recovery managers to coordinate recovery attempts
    */
   isHalfOpenProbeAllowed(key: string): boolean {
     const circuit = this.circuits.get(key);

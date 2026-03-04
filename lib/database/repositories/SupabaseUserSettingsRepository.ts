@@ -1,11 +1,11 @@
 import { dbRequestOptions } from "@/config";
+import { fetchRequest } from "@/lib/api";
 import {
   getCurrentUserProfile,
   validateUserForWrite,
 } from "@/lib/database/database-manger";
 import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
-import { RequestManager } from "@/system/API/request-manager";
 import type {
   CacheOptions,
   UserSettings,
@@ -22,6 +22,9 @@ import type {
  * performs database operations only.
  */
 export class SupabaseUserSettingsRepository implements UserSettingsRepository {
+  fetchUserSettingsById(userId: string, options?: CacheOptions): Promise<UserSettings | null> {
+    throw new Error("Method not implemented.");
+  }
   async fetchCurrentUserSettings(_options?: CacheOptions): Promise<UserSettings | null> {
     logger.category("database").debug("Starting fetchCurrentUserSettings");
 
@@ -32,7 +35,7 @@ export class SupabaseUserSettingsRepository implements UserSettingsRepository {
       return null;
     }
 
-    return RequestManager.fetch(
+    return fetchRequest(
       `user:settings:${currentUser.id}`,
       async () => {
         const { data, error } = await getDatabase()
@@ -73,52 +76,6 @@ export class SupabaseUserSettingsRepository implements UserSettingsRepository {
     ) ?? null;
   }
 
-  async fetchUserSettingsById(userId: string, _options?: CacheOptions): Promise<UserSettings | null> {
-    logger.category("database").debug("Starting fetchUserSettingsById", { userId });
-
-    return RequestManager.fetch(
-      `user:settings:${userId}`,
-      async () => {
-        const { data, error } = await getDatabase()
-          .from("user_settings", "public")
-          .select("*")
-          .eq("user_id", userId)
-          .single();
-
-        if (error) {
-          if (error.code === "PGRST116") {
-            // Settings don't exist for this user
-            logger
-              .category("database")
-              .debug(
-                "No settings exist for user",
-                { userId },
-              );
-            return null;
-          }
-
-          // Only log as error for unexpected database issues
-          logger.category("database").error("Failed to fetch user settings:", {
-            userId,
-            message: error.message,
-            code: error.code,
-            details: error.details,
-          });
-          throw new Error(error.message || "Failed to fetch user settings");
-        }
-
-        logger.category("database").info("User settings fetched from database:", {
-          userId: data.user_id,
-          theme: data.theme,
-          language: data.language,
-        });
-
-        return data;
-      },
-      dbRequestOptions("read", "user"),
-    ) ?? null;
-  }
-
   async updateAnalyticsConsentLevel(level: string): Promise<string> {
     // Verify user has write access
     await validateUserForWrite();
@@ -128,7 +85,7 @@ export class SupabaseUserSettingsRepository implements UserSettingsRepository {
       throw new Error("No authenticated user found");
     }
 
-    const result = await RequestManager.fetch(
+    const result = await fetchRequest(
       `user:settings:analytics:${currentUser.id}`,
       async () => {
         const { error } = await getDatabase()

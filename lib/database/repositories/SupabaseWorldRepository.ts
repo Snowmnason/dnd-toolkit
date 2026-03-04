@@ -1,16 +1,16 @@
 import { dbRequestOptions } from "@/config";
+import { fetchRequest } from "@/lib/api";
 import { getCurrentSession } from "@/lib/auth";
 import type { AccessRole } from "@/lib/database/worlds";
 import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
-import { RequestManager } from "@/system/API/request-manager";
 import type {
-    CreateWorldData,
-    PaginatedResult,
-    PaginationOptions,
-    World,
-    WorldRepository,
-    WorldWithAccess
+  CreateWorldData,
+  PaginatedResult,
+  PaginationOptions,
+  World,
+  WorldRepository,
+  WorldWithAccess
 } from "./repo-types";
 
 /**
@@ -25,7 +25,7 @@ import type {
  */
 export class SupabaseWorldRepository implements WorldRepository {
   async create(worldData: CreateWorldData): Promise<World> {
-    return RequestManager.fetch(
+    return fetchRequest(
       `world:create:${worldData.name}:${Date.now()}`,
       async () => {
         const session = await getCurrentSession();
@@ -72,7 +72,7 @@ export class SupabaseWorldRepository implements WorldRepository {
   }
 
   async getById(worldId: string): Promise<World | null> {
-    return RequestManager.fetch(
+    return fetchRequest(
       `world:${worldId}`,
       async () => {
         const { data, error } = await getDatabase()
@@ -110,7 +110,7 @@ export class SupabaseWorldRepository implements WorldRepository {
     userId?: string,
     _options?: PaginationOptions,
   ): Promise<PaginatedResult<WorldWithAccess>> {
-    const result = await RequestManager.fetch(
+    const result = await fetchRequest(
       `worlds:my:${userId || "current"}`,
       async () => {
         // Get current user if not provided
@@ -212,7 +212,7 @@ export class SupabaseWorldRepository implements WorldRepository {
       updatedFields: Object.keys(updates),
     });
 
-    return RequestManager.fetch(
+    return fetchRequest(
       `world:update:${worldId}`,
       async () => {
         const { data, error } = await getDatabase()
@@ -251,7 +251,7 @@ export class SupabaseWorldRepository implements WorldRepository {
 
     logger.category("database").debug("Starting world deletion", { worldId });
 
-    await RequestManager.fetch(
+    await fetchRequest(
       `world:delete:${worldId}`,
       async () => {
         const { error } = await getDatabase()

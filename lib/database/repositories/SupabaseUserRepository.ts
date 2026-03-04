@@ -1,15 +1,15 @@
 import { dbRequestOptions } from "@/config";
+import { fetchRequest } from "@/lib/api";
 import { getCurrentSession } from "@/lib/auth";
 import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
-import { RequestManager } from "@/system/API/request-manager";
 import { validateUsername } from "@/validation/validation";
 import type {
-    CacheOptions,
-    CreateUserData,
-    UpdateUserData,
-    User,
-    UserRepository,
+  CacheOptions,
+  CreateUserData,
+  UpdateUserData,
+  User,
+  UserRepository,
 } from "./repo-types";
 
 /**
@@ -20,7 +20,7 @@ import type {
  */
 export class SupabaseUserRepository implements UserRepository {
   async create(userData: CreateUserData): Promise<User> {
-    return RequestManager.fetch(
+    return fetchRequest(
       `user:create:${userData.auth_id}`,
       async () => {
         logger.category("database").info("Starting user profile creation", {
@@ -90,7 +90,7 @@ export class SupabaseUserRepository implements UserRepository {
   // responsibility of the caller (lib/database/users.ts). This implementation always
   // fetches from the database.
   async getCurrentUser(_options?: CacheOptions): Promise<User | null> {
-    const user = await RequestManager.fetch(
+    const user = await fetchRequest(
       `user:current`,
       async () => {
         const session = await getCurrentSession();
@@ -156,7 +156,7 @@ export class SupabaseUserRepository implements UserRepository {
       updates.username = usernameValidation.sanitized;
     }
 
-    return RequestManager.fetch(
+    return fetchRequest(
       `user:update:${currentUser.id}`,
       async () => {
         const { data, error } = await getDatabase()
@@ -191,7 +191,7 @@ export class SupabaseUserRepository implements UserRepository {
   async deleteCurrentUser(): Promise<boolean> {
     logger.category("database").debug("Starting deleteCurrentUser");
 
-    const result = await RequestManager.fetch(
+    const result = await fetchRequest(
       `user:delete:${Date.now()}`,
       async () => {
         // SECURITY-CRITICAL: Account deletion requires server-side validation.

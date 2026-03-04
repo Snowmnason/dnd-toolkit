@@ -18,12 +18,11 @@
  */
 
 import { AuthLayer } from "@/lib/auth/auth-layer";
+import { getCircuitBreakerState } from "@/lib/middleware/api";
 import { QueryCache } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
-import { RequestManager, type RequestOptions } from "@/system/API/request-manager";
 import type { ZodType } from "zod";
-import { type RequestInterceptor } from "./interceptor";
-import { CircuitBreakerManager } from "./resilience/circuit-breaker";
+import { fetchRequest, type RequestInterceptor, type RequestOptions } from "./api-manager";
 
 /**
  * Error transformation result
@@ -210,8 +209,8 @@ export interface APIClientConfig {
   /** Default cache time for queries (ms) */
   defaultCacheTime?: number;
 
-  /** Override RequestManager instance (for testing) */
-  requestManager?: typeof RequestManager;
+  /** Override fetch function (for testing) */
+  fetchFn?: typeof fetchRequest;
 
   /** Override QueryCache instance (for testing) */
   queryCache?: typeof QueryCache;
@@ -268,7 +267,7 @@ export abstract class APIClient {
       defaultTags: config.defaultTags || [this.clientName],
       defaultStaleTime: config.defaultStaleTime ?? 2 * 60 * 60 * 1000, // 2 hours
       defaultCacheTime: config.defaultCacheTime ?? 4 * 60 * 60 * 1000, // 4 hours
-      requestManager: config.requestManager || RequestManager,
+      fetchFn: config.fetchFn || fetchRequest,
       queryCache: config.queryCache || QueryCache,
       authLayer: config.authLayer || AuthLayer,
     };
@@ -335,7 +334,7 @@ export abstract class APIClient {
     // Check circuit breaker state (fail-fast if open)
     if (
       circuitBreakerKey &&
-      CircuitBreakerManager.getState(circuitBreakerKey) === "Open"
+      getCircuitBreakerState(circuitBreakerKey) === "Open"
     ) {
       logger.category('api').debug(`Circuit breaker open for ${methodName}`, {
         cacheKey,
@@ -399,7 +398,7 @@ export abstract class APIClient {
         return await response.json();
       };
 
-      const data = await this.config.requestManager.fetch(cacheKey, fetcher, {
+      const data = await this.config.fetchFn(cacheKey, fetcher, {
         dedupe: true,
         retries: 2,
         failOpen: false,
@@ -532,7 +531,7 @@ export abstract class APIClient {
     // Check circuit breaker state (fail-fast if open)
     if (
       circuitBreakerKey &&
-      CircuitBreakerManager.getState(circuitBreakerKey) === "Open"
+      getCircuitBreakerState(circuitBreakerKey) === "Open"
     ) {
       logger.category('api').debug(`Circuit breaker open for ${methodName}`, {
         cacheKey,
@@ -578,7 +577,7 @@ export abstract class APIClient {
         return await response.json();
       };
 
-      const data = await this.config.requestManager.fetch(cacheKey, fetcher, {
+      const data = await this.config.fetchFn(cacheKey, fetcher, {
         dedupe: false, // Mutations typically shouldn't dedupe
         retries: 1,
         failOpen: false,
@@ -892,7 +891,7 @@ export abstract class APIClient {
       options?.circuitBreakerKey || this.config.circuitBreakerKey;
 
     try {
-      const data = await this.config.requestManager.fetch(cacheKey, fetcher, {
+      const data = await this.config.fetchFn(cacheKey, fetcher, {
         dedupe: true,
         retries: 1,
         failOpen: false,
@@ -1017,7 +1016,7 @@ export abstract class APIClient {
         return await response.json();
       };
 
-      const data = await this.config.requestManager.fetch(cacheKey, fetcher, {
+      const data = await this.config.fetchFn(cacheKey, fetcher, {
         dedupe: true,
         retries: 2,
         failOpen: true, // Don't throw on revalidation failure
