@@ -18,6 +18,11 @@
 
 import { OFFLINE_SYNC_DEFAULTS } from "@/config";
 import type { AuthContext } from "@/lib/auth/auth-layer";
+import {
+  isCircuitBreakerOpen,
+  recordCircuitBreakerFailure,
+  recordCircuitBreakerSuccess,
+} from "@/lib/middleware/api";
 import { logger } from "@/lib/utils";
 
 import { RedactionManager } from "@/pure-algo-immutables";
@@ -497,27 +502,24 @@ export const CircuitBreakerReplayManager = {
     isNetworkError: boolean = false,
   ): Promise<void> {
     try {
-      const { CircuitBreakerManager: CBM } =
-        await import("@/lib/api/resilience/circuit-breaker");
-      const cbManager = CBM;
       const key = this.getCircuitBreakerKey(mutation);
 
-      // Record failure in circuit breaker
-      cbManager.recordFailure(key, isNetworkError);
+      // Record failure in circuit breaker via middleware
+      recordCircuitBreakerFailure(key, isNetworkError);
 
-      const state = cbManager.getState(key);
-      if (state === "Open") {
+      if (isCircuitBreakerOpen(key)) {
         logger
           .category("storage")
           .warn(`Circuit breaker OPEN for ${key} after replay failure`, {
             mutationId: mutation.id,
             error: error?.message,
           });
-      } else if (state === "Half-Open") {
+      } else {
         logger
           .category("storage")
-          .info(`Circuit breaker Half-Open for ${key} - testing recovery`, {
+          .debug(`Circuit breaker failure recorded for ${key}`, {
             mutationId: mutation.id,
+            isNetworkError,
           });
       }
     } catch (err) {
@@ -536,21 +538,16 @@ export const CircuitBreakerReplayManager = {
    */
   async recordReplaySuccess(mutation: QueuedMutation): Promise<void> {
     try {
-      const { CircuitBreakerManager: CBM } =
-        await import("@/lib/api/resilience/circuit-breaker");
-      const cbManager = CBM;
       const key = this.getCircuitBreakerKey(mutation);
 
-      cbManager.recordSuccess(key);
+      // Record success in circuit breaker via middleware
+      recordCircuitBreakerSuccess(key);
 
-      const state = cbManager.getState(key);
-      if (state === "Closed") {
-        logger
-          .category("storage")
-          .debug(`Circuit breaker Closed for ${key} after replay success`, {
-            mutationId: mutation.id,
-          });
-      }
+      logger
+        .category("storage")
+        .debug(`Circuit breaker success recorded for ${key}`, {
+          mutationId: mutation.id,
+        });
     } catch (err) {
       logger
         .category("error")
@@ -566,12 +563,9 @@ export const CircuitBreakerReplayManager = {
    */
   async isCircuitOpen(mutation: QueuedMutation): Promise<boolean> {
     try {
-      const { CircuitBreakerManager: CBM } =
-        await import("@/lib/api/resilience/circuit-breaker");
-      const cbManager = CBM;
       const key = this.getCircuitBreakerKey(mutation);
-      const state = cbManager.getState(key);
-      return state === "Open";
+      // Check circuit breaker state via middleware
+      return isCircuitBreakerOpen(key);
     } catch {
       return false; // If CB check fails, allow retry
     }

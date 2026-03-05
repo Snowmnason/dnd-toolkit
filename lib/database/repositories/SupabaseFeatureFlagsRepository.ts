@@ -1,11 +1,11 @@
 import { dbRequestOptions } from "@/config";
+import { fetchRequest } from "@/lib/api";
 import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
-import { RequestManager } from "@/system/API/request-manager";
 import type {
-    FeatureFlagOverrideRow,
-    FeatureFlagRow,
-    FeatureFlagsRepository,
+  FeatureFlagOverrideRow,
+  FeatureFlagRow,
+  FeatureFlagsRepository,
 } from "./repo-types";
 
 /**
@@ -18,7 +18,7 @@ import type {
 export class SupabaseFeatureFlagsRepository implements FeatureFlagsRepository {
   async getAll(): Promise<FeatureFlagRow[]> {
     return (
-      (await RequestManager.fetch(
+      (await fetchRequest(
         "featureFlags:all",
         async () => {
           const { data, error } = await getDatabase()
@@ -47,7 +47,7 @@ export class SupabaseFeatureFlagsRepository implements FeatureFlagsRepository {
   }
 
   async getByName(flagName: string): Promise<FeatureFlagRow | null> {
-    return RequestManager.fetch(
+    return fetchRequest(
       `featureFlag:${flagName}`,
       async () => {
         const { data, error } = await getDatabase()
@@ -74,7 +74,7 @@ export class SupabaseFeatureFlagsRepository implements FeatureFlagsRepository {
 
   async getOverridesForUser(userId: string): Promise<FeatureFlagOverrideRow[]> {
     return (
-      (await RequestManager.fetch(
+      (await fetchRequest(
         `featureFlagOverrides:${userId}`,
         async () => {
           const now = new Date().toISOString();

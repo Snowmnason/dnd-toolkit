@@ -43,27 +43,132 @@ Root-level directories organize cross-cutting concerns that multiple lib modules
 
 ## Managers & Middleware Pattern
 
-Each major lib module should have:
-1. **`lib/[module]-manager.ts`** — Domain wrapper that coordinates with middleware and hooks to provides clean API
-2. **`lib/middleware/services/[module]-service.ts`** — Middleware that checks preconditions (network, consent, provider readiness) before delegating to System
+**Every major lib module has this 3-layer structure:**
 
-Example flow:
-```typescript
-// Screen calls hook
-const { login } = useAuth();
-
-// Hook calls manager (formatted for UI)
-const result = await AuthManager.login(email, password);
-
-// Manager calls middleware
-// (via lazy require: require("@/lib/middleware/services/auth-service"))
-
-// Middleware checks preconditions, calls System
-// (isSupabaseConfigured, network check, consent validation)
-
-// System calls adapter
-// (Supabase auth module)
 ```
+lib modules (business logic, no validation)
+    ↓
+lib/[domain]-manager.ts (ORCHESTRATION HUB: validation + hooks + coordination)
+    ↓
+lib/middleware/api/request-service.ts (SERVICE CHECKS: network readiness, normalization)
+    ↓
+system/API/RequestManager (PURE TRANSPORT: executes validated, normalized requests)
+```
+
+### Layer Responsibilities
+
+**1. lib modules (business logic only)**
+- Pure business logic — no validation, no HTTP handling
+- Call the manager with raw data
+- Example: `lib/auth/auth-operations.ts` (email/password handling), `lib/database/repositories/` (data queries)
+
+**2. lib/[domain]-manager.ts (Orchestration Hub)**
+- **Validation** — Check data format + security (password strength, email validity, detect malicious input)
+- **Pre-operation hooks** — Call registered listeners before operation
+- **Call middleware** — Pass validated data to `lib/middleware/api/request-service.ts`
+- **Receive results** — Get clean response from system
+- **Post-operation hooks** — Feed results to listeners  
+- **Distribute results** — Send data to proper lib files/consumers
+- **Return to caller** — Final result back to hooks/screens
+
+Example: `lib/auth/auth-manager.ts`
+```typescript
+export const signInUser = async (email: string, password: string) => {
+  // Validation (format + security)
+  const prep = await prepareSignIn(email); // Validates & checks rate limits
+  if (!prep.ready) return prep.result;
+
+  // Pre-operation hooks
+  await AuthStateManager.beforeLogin?.();
+
+  try {
+    // Call middleware → system (via authSignIn from middleware)
+    const result = await authSignIn(prep.sanitizedEmail, password);
+    
+    // Post-operation hooks
+    await AuthStateManager.onLoginSuccess(result);
+    
+    // Distribute results to lib files
+    const session = await authGetSession();
+    await AuthStateManager.setSession(session);
+    
+    // Return
+    return { success: true, ...result };
+  } catch (error) {
+    // Post-operation hook (error)
+    await AuthStateManager.onLoginError(error);
+    return mapSignInError(error);
+  }
+};
+```
+
+**3. lib/middleware/api/request-service.ts (Service Checks)**
+- **Network readiness** — Check if system is ready (network online, provider initialized)
+- **Data normalization** — Transform validated data to system format
+- **Logging/tracing** — Record request details
+- **Call system** — Delegate to `system/API/RequestManager`
+- **Error handling** — Catch system errors and provide meaningful feedback
+
+**4. system/API/RequestManager (Pure Transport)**
+- No validation (manager handled it)
+- No normalization (middleware handled it)
+- Pure HTTP transport — retries, caching, deduplication, rate limiting, circuit breaker
+- Expects clean, validated, normalized data
+
+### Data Flow Example
+
+```typescript
+// 1. lib module calls manager with raw data
+const result = await AuthManager.signInUser("user@example.com", "password123");
+
+// 2. Manager validates
+//    - Email format valid? Password non-empty?
+//    - Rate limiting check (not too many attempts)?
+//    - Malicious input detection?
+
+// 3. Manager calls pre-operation hooks
+//    - onBeforeSignIn listeners
+
+// 4. Manager calls middleware with validated data
+//    const response = await executeRequest(key, fetcher, options);
+//    - Middleware checks: network online? Provider ready?
+//    - Middleware normalizes: email → sanitized email, password → hashed
+//    - Middleware logs request
+
+// 5. Middleware calls system (RequestManager)
+//    - RequestManager.fetch() executes HTTP call
+//    - Handles retries, caching, dedup, rate limiting
+
+// 6. Manager receives results, calls post-operation hooks
+//    - onSignInSuccess listeners
+//    - Save session to AuthStateManager
+//    - Update connected worlds
+
+// 7. Manager distributes results to lib files
+//    - usersDB.getCurrentUser()
+//    - AuthStateManager.setSession()
+
+// 8. Manager returns final result to hook/screen
+//    return { success: true, user, session }
+```
+
+### Why This Pattern?
+
+- **Separation of concerns** — Each layer has one job
+- **Testability** — Mock each layer independently
+- **Reusability** — Managers can be called from multiple hooks/screens
+- **Maintainability** — A bug is isolated to its layer
+- **Hook lifecycle** — Pre/post operation hooks enable side-effects and tracking
+- **Security** — Validation + malicious input detection happens consistently
+
+### Manager Responsibilities Summary
+
+1. ✅ Validate data (format + security)
+2. ✅ Call pre-operation hooks
+3. ✅ Call middleware → system
+4. ✅ Call post-operation hooks
+5. ✅ Distribute results to lib files
+6. ✅ Return final result
 
 Managers use lazy `require()` for middleware to break circular dependencies (synchronous at module level, not at call time).
 

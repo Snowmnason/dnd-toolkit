@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CircuitBreakerManager,
   type CircuitThresholds,
-} from "../../lib/api/resilience/circuit-breaker";
+} from "../../system/API/resilience/circuit-breaker";
 
 // Mock logger
 vi.mock("../../lib/utils/logger", () => ({

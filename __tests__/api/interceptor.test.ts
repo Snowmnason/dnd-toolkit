@@ -2,7 +2,7 @@ import {
     InterceptorManager,
     type RequestInterceptor,
     parseEndpoint,
-} from "@/lib/api/interceptor";
+} from "@/system/API/interceptor";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("Interceptor System", () => {

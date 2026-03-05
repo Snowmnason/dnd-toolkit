@@ -1,11 +1,11 @@
 import { dbRequestOptions } from "@/config";
+import { fetchRequest } from "@/lib/api";
 import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
-import { RequestManager } from "@/system/API/request-manager";
 import type {
-    EntitlementOverrideRow,
-    EntitlementRow,
-    EntitlementsRepository,
+  EntitlementOverrideRow,
+  EntitlementRow,
+  EntitlementsRepository,
 } from "./repo-types";
 
 /**
@@ -19,7 +19,7 @@ import type {
  */
 export class SupabaseEntitlementsRepository implements EntitlementsRepository {
   async getByUserId(userId: string): Promise<EntitlementRow[]> {
-    const result = await RequestManager.fetch(
+    const result = await fetchRequest(
       `entitlements:user:${userId}`,
       async () => {
         const { data, error } = await getDatabase()
@@ -46,7 +46,7 @@ export class SupabaseEntitlementsRepository implements EntitlementsRepository {
   }
 
   async hasEntitlement(userId: string, entitlementKey: string): Promise<boolean> {
-    const result = await RequestManager.fetch(
+    const result = await fetchRequest(
       `entitlements:user:${userId}:${entitlementKey}`,
       async () => {
         const { data, error } = await getDatabase()
@@ -75,7 +75,7 @@ export class SupabaseEntitlementsRepository implements EntitlementsRepository {
   }
 
   async getOverridesByUserId(userId: string): Promise<EntitlementOverrideRow[]> {
-    const result = await RequestManager.fetch(
+    const result = await fetchRequest(
       `entitlements:overrides:${userId}`,
       async () => {
         const now = new Date().toISOString();
@@ -105,7 +105,7 @@ export class SupabaseEntitlementsRepository implements EntitlementsRepository {
   }
 
   async setReminderFlag(entitlementId: string, remind: boolean): Promise<void> {
-    await RequestManager.fetch(
+    await fetchRequest(
       `entitlements:remind:${entitlementId}`,
       async () => {
         const { error } = await getDatabase()
@@ -129,7 +129,7 @@ export class SupabaseEntitlementsRepository implements EntitlementsRepository {
   }
 
   async getRemindable(userId: string): Promise<EntitlementRow[]> {
-    const result = await RequestManager.fetch(
+    const result = await fetchRequest(
       `entitlements:remindable:${userId}`,
       async () => {
         const { data, error } = await getDatabase()
@@ -158,7 +158,7 @@ export class SupabaseEntitlementsRepository implements EntitlementsRepository {
   }
 
   async getExpired(userId: string): Promise<EntitlementRow[]> {
-    const result = await RequestManager.fetch(
+    const result = await fetchRequest(
       `entitlements:expired:${userId}`,
       async () => {
         const now = new Date().toISOString();
@@ -188,7 +188,7 @@ export class SupabaseEntitlementsRepository implements EntitlementsRepository {
   }
 
   async getExpiredBeforeDate(cutoffDate: string): Promise<EntitlementRow[]> {
-    const result = await RequestManager.fetch(
+    const result = await fetchRequest(
       `entitlements:expired-before:${cutoffDate}`,
       async () => {
         const { data, error } = await getDatabase()
@@ -217,7 +217,7 @@ export class SupabaseEntitlementsRepository implements EntitlementsRepository {
   async deactivate(entitlementIds: string[]): Promise<void> {
     if (entitlementIds.length === 0) return;
 
-    await RequestManager.fetch(
+    await fetchRequest(
       `entitlements:deactivate:${entitlementIds.join(",")}`,
       async () => {
         const { error } = await getDatabase()

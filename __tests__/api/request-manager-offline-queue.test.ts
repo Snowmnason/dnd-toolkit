@@ -1,6 +1,6 @@
 // Mock react-native to prevent Rollup errors
-import { CircuitBreakerManager } from "@/lib/api/resilience/circuit-breaker";
 import { RequestManager } from "@/system/API/request-manager";
+import { CircuitBreakerManager } from "@/system/API/resilience/circuit-breaker";
 import { OfflineQueueManager } from "@/system/API/resilience/offline-queue";
 import { ConnectionQuality, NetworkDetection } from "@/system/Network";
 import { SecureStorage } from "@/system/Storage";

@@ -1,14 +1,14 @@
 import { dbRequestOptions } from "@/config";
+import { fetchRequest } from "@/lib/api";
 import { validateUserForWrite } from "@/lib/database/database-manger";
 import { executeEdgeFunction } from "@/lib/database/edge";
 import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
-import { RequestManager } from "@/system/API/request-manager";
 import type {
-    CreateInviteLinkParams,
-    InviteLink,
-    InviteRepository,
-    OperationResult,
+  CreateInviteLinkParams,
+  InviteLink,
+  InviteRepository,
+  OperationResult,
 } from "./repo-types";
 
 /**
@@ -70,7 +70,7 @@ export class SupabaseInviteRepository implements InviteRepository {
     try {
       logger.category("database").info(`Validating invite token: ${token}`);
 
-      const result = await RequestManager.fetch(
+      const result = await fetchRequest(
         `invite:validate:${token}`,
         async () => {
           const invite = await executeEdgeFunction("resolveInviteToken", {
@@ -154,7 +154,7 @@ export class SupabaseInviteRepository implements InviteRepository {
     try {
       logger.category("database").info(`Listing invite links for world ${worldId}`);
 
-      const result = await RequestManager.fetch(
+      const result = await fetchRequest(
         `world:${worldId}:invites`,
         async () => {
           const { data, error } = await getDatabase()

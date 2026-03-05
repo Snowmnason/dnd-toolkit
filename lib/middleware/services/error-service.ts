@@ -53,7 +53,9 @@ function canReport(): boolean {
 
     // 3. Provider initialized?
     if (!isServiceReady('errorTracker')) {
-        // TODO: Queue error for retry after initialization? For now, silently drop.
+        // Service temporarily down (still initializing). 
+        // FUTURE: Queue error for retry after initialization.
+        // Current behavior: silently drop (acceptable since consent check already filters disabled services).
         logger.category('error').debug('[error-service] Error tracker not ready — dropping report');
         return false;
     }
