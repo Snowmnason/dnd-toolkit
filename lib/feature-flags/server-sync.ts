@@ -22,9 +22,10 @@ import { getAppConfig, getPlatformName, isDevelopment } from '@/config';
 import { trackVariantAssignment } from "@/lib/analytics/variant-tracking";
 import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
 import { FeatureFlagOverrideRow } from "@/lib/database/feature-flag-overrides";
+import { getAllSecureStorageKeys } from "@/lib/middleware/storage";
+import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
-import { SecureStorage } from "@/system/Storage";
 
 // Relative module imports (local)
 import { isInRolloutMemoized } from "@/pure-algo-immutables";
@@ -422,7 +423,7 @@ class FeatureFlagsManagerClass {
           );
 
           // Cache entitlements for offline use (keyed per-user)
-          await SecureStorage.setJSON(
+          await StorageManager.set(
             `${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`,
             Object.fromEntries(this.cachedEntitlements),
           );
@@ -467,13 +468,13 @@ class FeatureFlagsManagerClass {
           );
 
           // Cache flag overrides for offline use
-          await SecureStorage.setJSON(
+          await StorageManager.set(
             `${STORAGE_KEYS.FEATURE_FLAGS}:${OVERRIDE_CACHE_KEY_PREFIX}${this.userId}`,
             Object.fromEntries(this.remoteOverrides),
           );
 
           // Cache entitlement overrides for offline use (user-scoped)
-          await SecureStorage.setJSON(
+          await StorageManager.set(
             `${STORAGE_KEYS.ENTITLEMENTS}:${ENTITLEMENT_OVERRIDE_CACHE_KEY_PREFIX}${this.userId}`,
             Object.fromEntries(this.remoteEntitlementOverrides),
           );
@@ -506,7 +507,7 @@ class FeatureFlagsManagerClass {
           this.cachedRollouts = new Map(Object.entries(allRollouts));
 
           // Cache rollouts for offline use (non-sensitive, same key prefix as flags)
-          await SecureStorage.setJSON(
+          await StorageManager.set(
             `${STORAGE_KEYS.FEATURE_FLAGS}:rollouts`,
             Object.fromEntries(this.cachedRollouts),
           );
@@ -526,7 +527,7 @@ class FeatureFlagsManagerClass {
         // Clear cached rollouts to prevent stale configs from applying
         this.cachedRollouts = new Map();
         try {
-          await SecureStorage.removeItem(
+          await StorageManager.remove(
             `${STORAGE_KEYS.FEATURE_FLAGS}:rollouts`,
           );
           logger.category('feature_flags').debug("Cleared rollout config (server disabled)");
@@ -553,7 +554,7 @@ class FeatureFlagsManagerClass {
           );
 
           // Cache cohorts for offline use
-          await SecureStorage.setJSON(
+          await StorageManager.set(
             `${STORAGE_KEYS.FEATURE_FLAGS}:cohorts`,
             Object.fromEntries(this.cachedCohorts),
           );
@@ -569,7 +570,7 @@ class FeatureFlagsManagerClass {
         // Server explicitly returned empty array (intentional disable of cohorts)
         this.cachedCohorts = new Map();
         try {
-          await SecureStorage.removeItem(
+          await StorageManager.remove(
             `${STORAGE_KEYS.FEATURE_FLAGS}:cohorts`,
           );
           logger.category('feature_flags').debug("Cleared cohorts (server disabled)");
@@ -617,7 +618,7 @@ class FeatureFlagsManagerClass {
           });
 
           // Cache memberships for offline use
-          await SecureStorage.setJSON(
+          await StorageManager.set(
             `${STORAGE_KEYS.FEATURE_FLAGS}:user_cohort_memberships:${this.userId}`,
             this.cachedUserCohortMemberships,
           );
@@ -643,7 +644,7 @@ class FeatureFlagsManagerClass {
         // Server explicitly returned empty array (user in no cohorts)
         this.cachedUserCohortMemberships = [];
         try {
-          await SecureStorage.removeItem(
+          await StorageManager.remove(
             `${STORAGE_KEYS.FEATURE_FLAGS}:user_cohort_memberships:${this.userId}`,
           );
           logger.category('feature_flags').warn(
@@ -704,7 +705,7 @@ class FeatureFlagsManagerClass {
             persistedAssignments[flagName] = Array.from(cohortSlugs);
           }
 
-          await SecureStorage.setJSON(
+          await StorageManager.set(
             `${STORAGE_KEYS.FEATURE_FLAGS}:cohort_assignments`,
             persistedAssignments,
           );
@@ -727,7 +728,7 @@ class FeatureFlagsManagerClass {
         // Server explicitly returned empty array (no flags require cohorts)
         this.cachedCohortAssignments = new Map();
         try {
-          await SecureStorage.removeItem(
+          await StorageManager.remove(
             `${STORAGE_KEYS.FEATURE_FLAGS}:cohort_assignments`,
           );
           logger.category('feature_flags').debug("Cleared cohort assignments (disabled)");
@@ -771,7 +772,7 @@ class FeatureFlagsManagerClass {
       this.bootstrapped = true;
 
       // Persist for offline use (convert Map to object for storage)
-      await SecureStorage.setJSON(STORAGE_KEYS.FEATURE_FLAGS, {
+      await StorageManager.set(STORAGE_KEYS.FEATURE_FLAGS, {
         flags: Object.fromEntries(newFlags),
         fetchedAt: Date.now(),
       });
@@ -791,7 +792,7 @@ class FeatureFlagsManagerClass {
 
       // Try to load last known values
       try {
-        const cached = await SecureStorage.getJSON<{
+        const cached = await StorageManager.get<{
           flags: Record<string, FeatureFlagState>;
           fetchedAt: number;
         }>(STORAGE_KEYS.FEATURE_FLAGS);
@@ -839,7 +840,7 @@ class FeatureFlagsManagerClass {
   private async loadCachedRemoteOverrides(): Promise<void> {
     if (!this.userId) return;
     try {
-      const cached = await SecureStorage.getJSON<
+      const cached = await StorageManager.get<
         Record<string, FeatureFlagOverrideRow>
       >(
         `${STORAGE_KEYS.FEATURE_FLAGS}:${OVERRIDE_CACHE_KEY_PREFIX}${this.userId}`,
@@ -864,7 +865,7 @@ class FeatureFlagsManagerClass {
   private async loadCachedRemoteEntitlementOverrides(): Promise<void> {
     if (!this.userId) return;
     try {
-      const cached = await SecureStorage.getJSON<
+      const cached = await StorageManager.get<
         Record<string, EdgeEntitlementOverrideRow>
       >(
         `${STORAGE_KEYS.ENTITLEMENTS}:${ENTITLEMENT_OVERRIDE_CACHE_KEY_PREFIX}${this.userId}`,
@@ -892,7 +893,7 @@ class FeatureFlagsManagerClass {
   private async loadCachedEntitlements(): Promise<void> {
     if (!this.userId) return;
     try {
-      const cached = await SecureStorage.getJSON<
+      const cached = await StorageManager.get<
         Record<string, CachedEntitlement>
       >(`${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`);
       if (cached) {
@@ -911,7 +912,7 @@ class FeatureFlagsManagerClass {
    */
   private async loadCachedRollouts(): Promise<void> {
     try {
-      const cached = await SecureStorage.getJSON<
+      const cached = await StorageManager.get<
         Record<string, CachedRolloutConfig>
       >(`${STORAGE_KEYS.FEATURE_FLAGS}:rollouts`);
       if (cached) {
@@ -930,7 +931,7 @@ class FeatureFlagsManagerClass {
    */
   private async loadCachedCohorts(): Promise<void> {
     try {
-      const cached = await SecureStorage.getJSON<Record<string, CachedCohort>>(
+      const cached = await StorageManager.get<Record<string, CachedCohort>>(
         `${STORAGE_KEYS.FEATURE_FLAGS}:cohorts`,
       );
       if (cached) {
@@ -949,7 +950,7 @@ class FeatureFlagsManagerClass {
    */
   private async loadCachedUserCohortMemberships(): Promise<void> {
     try {
-      const cached = await SecureStorage.getJSON<
+      const cached = await StorageManager.get<
         CachedUserCohortMembership[]
       >(
         `${STORAGE_KEYS.FEATURE_FLAGS}:user_cohort_memberships:${this.userId}`,
@@ -998,7 +999,7 @@ class FeatureFlagsManagerClass {
    */
   private async loadCachedCohortAssignments(): Promise<void> {
     try {
-      const cached = await SecureStorage.getJSON<Record<string, string[]>>(
+      const cached = await StorageManager.get<Record<string, string[]>>(
         `${STORAGE_KEYS.FEATURE_FLAGS}:cohort_assignments`,
       );
       if (cached) {
@@ -1232,7 +1233,7 @@ class FeatureFlagsManagerClass {
       }
 
       // Cache updated flags to storage
-      await SecureStorage.setJSON(STORAGE_KEYS.FEATURE_FLAGS, {
+      await StorageManager.set(STORAGE_KEYS.FEATURE_FLAGS, {
         flags: Object.fromEntries(this.currentFlags),
         fetchedAt: Date.now(),
       });
@@ -1281,7 +1282,7 @@ class FeatureFlagsManagerClass {
       }
 
       // Cache updated entitlements to storage
-      await SecureStorage.setJSON(
+      await StorageManager.set(
         `${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`,
         Object.fromEntries(this.cachedEntitlements),
       );
@@ -1321,7 +1322,7 @@ class FeatureFlagsManagerClass {
       }
 
       // Cache updated overrides
-      await SecureStorage.setJSON(
+      await StorageManager.set(
         `${STORAGE_KEYS.FEATURE_FLAGS}:${OVERRIDE_CACHE_KEY_PREFIX}${this.userId}`,
         Object.fromEntries(this.remoteOverrides),
       );
@@ -1361,7 +1362,7 @@ class FeatureFlagsManagerClass {
         );
       }
 
-      await SecureStorage.setJSON(
+      await StorageManager.set(
         `${STORAGE_KEYS.ENTITLEMENTS}:${ENTITLEMENT_OVERRIDE_CACHE_KEY_PREFIX}${this.userId}`,
         Object.fromEntries(this.remoteEntitlementOverrides),
       );
@@ -1397,7 +1398,7 @@ class FeatureFlagsManagerClass {
         logger.category('feature_flags').debug(`Rollout ${eventType}: ${flagName}`);
       }
 
-      await SecureStorage.setJSON(
+      await StorageManager.set(
         `${STORAGE_KEYS.FEATURE_FLAGS}:rollouts`,
         Object.fromEntries(this.cachedRollouts),
       );
@@ -1424,7 +1425,7 @@ class FeatureFlagsManagerClass {
         logger.category('feature_flags').debug(`Cohort ${eventType}: ${slug}`);
       }
 
-      await SecureStorage.setJSON(
+      await StorageManager.set(
         `${STORAGE_KEYS.FEATURE_FLAGS}:cohorts`,
         Object.fromEntries(this.cachedCohorts),
       );
@@ -1471,7 +1472,7 @@ class FeatureFlagsManagerClass {
         logger.category('feature_flags').debug(`User cohort membership ${eventType}: ${enriched.id}`);
       }
 
-      await SecureStorage.setJSON(
+      await StorageManager.set(
         `${STORAGE_KEYS.FEATURE_FLAGS}:user_cohort_memberships:${this.userId}`,
         this.cachedUserCohortMemberships,
       );
@@ -1697,7 +1698,7 @@ class FeatureFlagsManagerClass {
         // Update cache with fresh data (only if userId is set)
         if (fresh && this.userId) {
           this.cachedEntitlements.set(name, fresh);
-          await SecureStorage.setJSON(
+          await StorageManager.set(
             `${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`,
             Object.fromEntries(this.cachedEntitlements),
           );
@@ -1745,7 +1746,7 @@ class FeatureFlagsManagerClass {
         // Cache for future use (only if userId is set)
         this.cachedEntitlements.set(name, entitlement);
         if (this.userId) {
-          await SecureStorage.setJSON(
+          await StorageManager.set(
             `${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`,
             Object.fromEntries(this.cachedEntitlements),
           );
@@ -1778,7 +1779,7 @@ class FeatureFlagsManagerClass {
    */
   private async checkClockValidity(): Promise<boolean> {
     try {
-      const clockInvalid = await SecureStorage.getJSON<{
+      const clockInvalid = await StorageManager.get<{
         detected: number;
         skew: number;
       }>(STORAGE_KEYS.CLOCK_INVALID);
@@ -1794,13 +1795,13 @@ class FeatureFlagsManagerClass {
    */
   async verifyDeviceClock(): Promise<boolean> {
     try {
-      const lastCheck = await SecureStorage.getJSON<{ timestamp: number }>(
+      const lastCheck = await StorageManager.get<{ timestamp: number }>(
         "dnd:last_clock_check",
       );
 
       if (!lastCheck?.timestamp) {
         // First run, record baseline
-        await SecureStorage.setJSON("dnd:last_clock_check", {
+        await StorageManager.set("dnd:last_clock_check", {
           timestamp: Date.now(),
         });
         return true;
@@ -1817,7 +1818,7 @@ class FeatureFlagsManagerClass {
           tolerance,
         });
 
-        await SecureStorage.setJSON(STORAGE_KEYS.CLOCK_INVALID, {
+        await StorageManager.set(STORAGE_KEYS.CLOCK_INVALID, {
           detected: now,
           skew,
         });
@@ -1826,7 +1827,7 @@ class FeatureFlagsManagerClass {
       }
 
       // Update baseline
-      await SecureStorage.setJSON("dnd:last_clock_check", { timestamp: now });
+      await StorageManager.set("dnd:last_clock_check", { timestamp: now });
       return true;
     } catch (error) {
       logger.category('feature_flags').error("Clock verification failed", error);
@@ -1924,17 +1925,17 @@ class FeatureFlagsManagerClass {
       }
 
       // Clear core flag caches
-      await SecureStorage.removeItem(STORAGE_KEYS.FEATURE_FLAGS);
-      await SecureStorage.removeItem(STORAGE_KEYS.CLOCK_INVALID);
-      await SecureStorage.removeItem("dnd:last_clock_check");
+      await StorageManager.remove(STORAGE_KEYS.FEATURE_FLAGS);
+      await StorageManager.remove(STORAGE_KEYS.CLOCK_INVALID);
+      await StorageManager.remove("dnd:last_clock_check");
 
       // Clear rollout cache (persisted and in-memory)
-      await SecureStorage.removeItem(`${STORAGE_KEYS.FEATURE_FLAGS}:rollouts`);
+      await StorageManager.remove(`${STORAGE_KEYS.FEATURE_FLAGS}:rollouts`);
 
       // Clear persisted cohorts cache and any cohort assignment map
       try {
-        await SecureStorage.removeItem(`${STORAGE_KEYS.FEATURE_FLAGS}:cohorts`);
-        await SecureStorage.removeItem(`${STORAGE_KEYS.FEATURE_FLAGS}:cohort_assignments`);
+        await StorageManager.remove(`${STORAGE_KEYS.FEATURE_FLAGS}:cohorts`);
+        await StorageManager.remove(`${STORAGE_KEYS.FEATURE_FLAGS}:cohort_assignments`);
       } catch (error) {
         logger.category('feature_flags').warn(
           "Failed to clear persisted cohorts or cohort assignments",
@@ -1944,21 +1945,21 @@ class FeatureFlagsManagerClass {
 
       // Clear entitlements cache
       if (this.userId) {
-        await SecureStorage.removeItem(
+        await StorageManager.remove(
           `${STORAGE_KEYS.ENTITLEMENTS}:${this.userId}`,
         );
       }
 
       // Clear entitlement override cache (user-scoped)
       if (this.userId) {
-        await SecureStorage.removeItem(
+        await StorageManager.remove(
           `${STORAGE_KEYS.ENTITLEMENTS}:${ENTITLEMENT_OVERRIDE_CACHE_KEY_PREFIX}${this.userId}`,
         );
       }
 
       // Clear user cohort memberships cache (user-scoped)
       if (this.userId) {
-        await SecureStorage.removeItem(
+        await StorageManager.remove(
           `${STORAGE_KEYS.FEATURE_FLAGS}:user_cohort_memberships:${this.userId}`,
         );
         this.cachedUserCohortMemberships = [];
@@ -1966,14 +1967,14 @@ class FeatureFlagsManagerClass {
 
       // Clear all override cache entries by pattern
       try {
-        const allKeys = await SecureStorage.getAllKeys();
+        const allKeys = await getAllSecureStorageKeys();
         const overridePattern = `${STORAGE_KEYS.FEATURE_FLAGS}:${OVERRIDE_CACHE_KEY_PREFIX}`;
-        const keysToRemove = allKeys.filter((key) =>
+        const keysToRemove = allKeys.filter((key: string) =>
           key.startsWith(overridePattern),
         );
 
         for (const key of keysToRemove) {
-          await SecureStorage.removeItem(key);
+          await StorageManager.remove(key);
         }
 
         if (keysToRemove.length > 0) {

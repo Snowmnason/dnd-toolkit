@@ -16,8 +16,7 @@
  * - @link https://supabase.com/docs/reference/javascript/storage-getpublicurl
  */
 
-import type { BucketOperation } from '@/lib/storage';
-import { BUCKET_OPS } from '@/lib/storage';
+import { BUCKET_OPS, type BucketOperation } from '@/system/Storage/buckets/registry';
 import { logger } from '@/lib/utils/logger';
 
 /**

@@ -1,9 +1,9 @@
-import { QueryCache, } from "@/lib/storage";
+import { QueryCache } from "@/lib/middleware/storage/helpers/query-cache";
+import { StorageManager } from "@/lib/storage";
 import { worldAccessCache } from "@/lib/storage/sync/world-access-cache";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
 import { CACHE_TAGS } from "@/maps/cache-keys";
-import { SecureStorage } from "@/system/Storage";
 import { getCurrentUserProfile } from "./database-manger";
 import { getInviteRepository, getWorldAccessRepository, getWorldRepository } from "./repositories";
 
@@ -136,7 +136,7 @@ export const worldsDB = {
 
     // Update persistent connected_worlds for fast startup (next session seed)
     const worldIds = result.items.map((w) => w.world_id);
-    await SecureStorage.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, worldIds).catch((err) => {
+    await StorageManager.set(STORAGE_KEYS.CONNECTED_WORLDS, worldIds).catch((err) => {
       logger.category("database").warn("Failed to update connected_worlds (non-critical):", err);
     });
 

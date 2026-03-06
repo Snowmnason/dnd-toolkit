@@ -1,5 +1,5 @@
 import { logger } from "@/lib/utils";
-import { FastCache } from "./FastCache";
+import { FastCache } from "@/system/Storage/";
 
 /**
  * Query Cache: Centralized cache with invalidation patterns

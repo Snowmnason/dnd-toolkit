@@ -1,4 +1,5 @@
 import { logger } from "@/lib/utils";
+import { StorageManager } from "@/lib/storage";
 import { getUserSettingsRepository } from "./repositories";
 
 export interface UserSettings {
@@ -22,13 +23,12 @@ export const userSettingsDB = {
     // First, try to get from local storage (unless forced refresh)
     if (!forceRefresh) {
       try {
-        const { SecureStorage } = await import("@/system/Storage");
         const { STORAGE_KEYS } = await import("@/maps");
 
-        const cachedSettings = await SecureStorage.getJSON<UserSettings>(
+        const cachedSettings = await StorageManager.get<UserSettings>(
           STORAGE_KEYS.USER_SETTINGS,
         );
-        const cacheMeta = await SecureStorage.getJSON<{ timestamp: number }>(
+        const cacheMeta = await StorageManager.get<{ timestamp: number }>(
           STORAGE_KEYS.USER_SETTINGS_META,
         );
 
@@ -77,11 +77,10 @@ export const userSettingsDB = {
 
     // Save user settings to local storage + metadata with fresh timestamp
     try {
-      const { SecureStorage } = await import("@/system/Storage");
       const { STORAGE_KEYS } = await import("@/maps");
 
-      await SecureStorage.setJSON(STORAGE_KEYS.USER_SETTINGS, data);
-      await SecureStorage.setJSON(STORAGE_KEYS.USER_SETTINGS_META, {
+      await StorageManager.set(STORAGE_KEYS.USER_SETTINGS, data);
+      await StorageManager.set(STORAGE_KEYS.USER_SETTINGS_META, {
         timestamp: Date.now(),
         source: "supabase",
       });
@@ -105,13 +104,12 @@ export const userSettingsDB = {
     // First, try to get from local storage (unless forced refresh)
     if (!forceRefresh) {
       try {
-        const { SecureStorage } = await import("@/system/Storage");
         const { STORAGE_KEYS } = await import("@/maps");
 
-        const cachedSettings = await SecureStorage.getJSON<UserSettings>(
+        const cachedSettings = await StorageManager.get<UserSettings>(
           STORAGE_KEYS.USER_SETTINGS,
         );
-        const cacheMeta = await SecureStorage.getJSON<{ timestamp: number; userId: string }>(
+        const cacheMeta = await StorageManager.get<{ timestamp: number; userId: string }>(
           STORAGE_KEYS.USER_SETTINGS_META,
         );
 
@@ -162,11 +160,10 @@ export const userSettingsDB = {
 
     // Save user settings to local storage + metadata with fresh timestamp
     try {
-      const { SecureStorage } = await import("@/system/Storage");
       const { STORAGE_KEYS } = await import("@/maps");
 
-      await SecureStorage.setJSON(STORAGE_KEYS.USER_SETTINGS, data);
-      await SecureStorage.setJSON(STORAGE_KEYS.USER_SETTINGS_META, {
+      await StorageManager.set(STORAGE_KEYS.USER_SETTINGS, data);
+      await StorageManager.set(STORAGE_KEYS.USER_SETTINGS_META, {
         timestamp: Date.now(),
         userId,
         source: "supabase",
@@ -196,14 +193,13 @@ export const userSettingsDB = {
 
     // Update cached settings with new consent level
     try {
-      const { SecureStorage } = await import("@/system/Storage");
       const { STORAGE_KEYS } = await import("@/maps");
-      const cachedSettings = await SecureStorage.getJSON<UserSettings>(
+      const cachedSettings = await StorageManager.get<UserSettings>(
         STORAGE_KEYS.USER_SETTINGS,
       );
       if (cachedSettings) {
         cachedSettings.analytics_consent_level = level;
-        await SecureStorage.setJSON(STORAGE_KEYS.USER_SETTINGS, cachedSettings);
+        await StorageManager.set(STORAGE_KEYS.USER_SETTINGS, cachedSettings);
       }
     } catch (storageError) {
       logger.category("database").warn(

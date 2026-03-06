@@ -12,9 +12,9 @@ import * as Crypto from 'expo-crypto';
 import { ANALYTICS_RETRY_DEFAULTS, getAppConfig } from '@/config';
 import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
 import { shouldEmitEvent, type ConsentCategory } from '@/lib/analytics/consent/consent-gating';
+import { clearAnalyticsQueue, loadAnalyticsQueue, persistAnalyticsQueue } from "@/lib/middleware/storage";
 import { logger } from '@/lib/utils';
 import { STORAGE_KEYS } from "@/maps";
-import { SecureStorage } from '@/system/Storage';
 import type { QueuedBreadcrumb } from '@/type-definitions/breadcrumb-queue-types.ts';
 
 /**
@@ -99,14 +99,14 @@ class BreadcrumbQueueService {
 
     try {
       // Load queue from storage
-      const stored = await SecureStorage.getItem(STORAGE_KEYS.BREADCRUMB_QUEUE);
+      const stored = await loadAnalyticsQueue(STORAGE_KEYS.BREADCRUMB_QUEUE);
       if (stored) {
         this.queue = JSON.parse(stored) as QueuedBreadcrumb[];
         logger.category('analytics').analytics('BreadcrumbQueue', `Loaded ${this.queue.length} breadcrumbs from storage`);
       }
 
       // Load deduplication cache
-      const dedupCached = await SecureStorage.getItem(STORAGE_KEYS.BREADCRUMB_DEDUP_CACHE);
+      const dedupCached = await loadAnalyticsQueue(STORAGE_KEYS.BREADCRUMB_DEDUP_CACHE);
       if (dedupCached) {
         const parsed = JSON.parse(dedupCached) as Record<string, number>;
         this.deduplicationCache = new Map(Object.entries(parsed));
@@ -121,8 +121,8 @@ class BreadcrumbQueueService {
       
       // Remove corrupted persisted data so we don't fail on next startup
       try {
-        await SecureStorage.removeItem(STORAGE_KEYS.BREADCRUMB_QUEUE);
-        await SecureStorage.removeItem(STORAGE_KEYS.BREADCRUMB_DEDUP_CACHE);
+        await clearAnalyticsQueue(STORAGE_KEYS.BREADCRUMB_QUEUE);
+        await clearAnalyticsQueue(STORAGE_KEYS.BREADCRUMB_DEDUP_CACHE);
         logger.category('analytics').analytics('BreadcrumbQueue', 'Removed corrupted persisted queue data');
       } catch (cleanupError) {
         logger.category('analytics').warn('BreadcrumbQueue', `Failed to clean up corrupted data: ${cleanupError}`);
@@ -432,8 +432,8 @@ class BreadcrumbQueueService {
     this.queue = [];
     this.deduplicationCache.clear();
     this.overflowCount = 0;
-    await SecureStorage.removeItem(STORAGE_KEYS.BREADCRUMB_QUEUE);
-    await SecureStorage.removeItem(STORAGE_KEYS.BREADCRUMB_DEDUP_CACHE);
+    await clearAnalyticsQueue(STORAGE_KEYS.BREADCRUMB_QUEUE);
+    await clearAnalyticsQueue(STORAGE_KEYS.BREADCRUMB_DEDUP_CACHE);
     logger.category('analytics').analytics('BreadcrumbQueue', 'Queue cleared');
   }
 
@@ -540,7 +540,7 @@ class BreadcrumbQueueService {
    */
   private async _persist(): Promise<void> {
     try {
-      await SecureStorage.setItem(STORAGE_KEYS.BREADCRUMB_QUEUE, JSON.stringify(this.queue));
+      await persistAnalyticsQueue(STORAGE_KEYS.BREADCRUMB_QUEUE, JSON.stringify(this.queue));
     } catch (error) {
       logger.category('analytics').error('BreadcrumbQueue', `Failed to persist queue: ${error}`);
     }
@@ -552,7 +552,7 @@ class BreadcrumbQueueService {
   private async _persistDedupCache(): Promise<void> {
     try {
       const cacheObj = Object.fromEntries(this.deduplicationCache);
-      await SecureStorage.setItem(STORAGE_KEYS.BREADCRUMB_DEDUP_CACHE, JSON.stringify(cacheObj));
+      await persistAnalyticsQueue(STORAGE_KEYS.BREADCRUMB_DEDUP_CACHE, JSON.stringify(cacheObj));
     } catch (error) {
       logger.category('analytics').error('BreadcrumbQueue', `Failed to persist dedup cache: ${error}`);
     }

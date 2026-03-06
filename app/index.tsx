@@ -1,6 +1,6 @@
 import { useAppKernel } from "@/hooks/kernel";
 import { logger } from "@/lib";
-import { getPrivacyStorageBackend } from "@/lib/storage";
+import { StorageManager } from "@/lib/storage";
 import { STORAGE_KEYS } from "@/maps";
 import { useRouter } from "expo-router";
 import React from "react";
@@ -72,10 +72,7 @@ export default function HomePage() {
       try {
         // CRITICAL: Check hasAccount first - if user logged out, don't use cached login time
         // This prevents the redirect loop after logout
-        const hasAccountBackend = getPrivacyStorageBackend(
-          STORAGE_KEYS.HAS_ACCOUNT,
-        );
-        const authState = await hasAccountBackend.getJSON<{
+        const authState = await StorageManager.get<{
           hasAccount: boolean;
         }>(STORAGE_KEYS.HAS_ACCOUNT);
         const hasAccount = authState?.hasAccount === true;
@@ -91,10 +88,7 @@ export default function HomePage() {
         }
 
         // User is logged in, check if their last login is recent
-        const lastLoggedInBackend = getPrivacyStorageBackend(
-          STORAGE_KEYS.LAST_LOGGED_IN,
-        );
-        const lastLoggedInStr = await lastLoggedInBackend.getItem(
+        const lastLoggedInStr = await StorageManager.getRaw(
           STORAGE_KEYS.LAST_LOGGED_IN,
         );
 

@@ -1,20 +1,20 @@
 import { checkPendingInvites, signUpUser } from "@/lib/auth";
 import { usersDB } from "@/lib/database";
 import { buildRoute } from "@/lib/navigation/uri-helpers";
+import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
-import { SecureStorage } from "@/system/Storage";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "expo-router";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
 import {
   type CompleteProfileFormData,
   completeProfileSchema,
   getPasswordRequirementsForUI,
   type SignUpFormData,
   signUpSchema,
-} from '../../validation/auth.schema';
+} from '@/validation/auth.schema';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
 
 type SignUpMode = "signup" | "complete-profile";
 // Use conditional type to properly type form values based on mode
@@ -95,7 +95,7 @@ export const useSignUpForm = (mode: SignUpMode = "signup", user?: any) => {
             pendingInvite,
           );
           // Clear the pending invite from storage since we're processing it
-          await SecureStorage.removeItem(STORAGE_KEYS.PENDING_INVITE);
+          await StorageManager.remove(STORAGE_KEYS.PENDING_INVITE);
 
           // Redirect to auth-redirect to process the invite using centralized route building
           const authRedirectRoute = buildRoute("/login/auth-redirect", {

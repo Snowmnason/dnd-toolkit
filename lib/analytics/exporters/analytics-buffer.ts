@@ -19,9 +19,10 @@
  * Use getAndResetOverflowCount() to inspect and optionally reset the counter during a session.
  */
 import { ANALYTICS_RETRY_DEFAULTS, getAppConfig } from '@/config';
+import { isNetworkOnline } from "@/lib/middleware/network";
+import { clearAnalyticsQueue, loadAnalyticsQueueJSON, persistAnalyticsQueueJSON } from "@/lib/middleware/storage";
 import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
-import { SecureStorage } from "@/system/Storage";
 
 /**
  * An analytics event queued for offline delivery
@@ -215,7 +216,7 @@ class AnalyticsBufferService {
     }
 
     try {
-      const stored = await SecureStorage.getJSON<QueuedAnalyticsEvent[]>(
+      const stored = await loadAnalyticsQueueJSON<QueuedAnalyticsEvent[]>(
         STORAGE_KEYS.ANALYTICS_OFFLINE_QUEUE,
       );
 
@@ -255,10 +256,9 @@ class AnalyticsBufferService {
    * This ensures events queued during offline period flush as soon as app starts online
    */
   private scheduleReadyEventsFlushIfOnline(): void {
-    // Lazy import to avoid circular deps
+    // Check if device is online
     try {
-      const { NetworkDetection } = require("@/system/Network/network-detection");
-      if (!NetworkDetection.isOnline()) {
+      if (!isNetworkOnline()) {
         return; // Offline, no-op
       }
 
@@ -521,7 +521,7 @@ class AnalyticsBufferService {
   async clear(): Promise<void> {
     this.queue = [];
     this.overflowCount = 0;
-    await SecureStorage.removeItem(STORAGE_KEYS.ANALYTICS_OFFLINE_QUEUE);
+    await clearAnalyticsQueue(STORAGE_KEYS.ANALYTICS_OFFLINE_QUEUE);
     this.notifySubscribers();
     logger.category("analytics").warn("Cleared analytics buffer queue");
   }
@@ -598,7 +598,7 @@ class AnalyticsBufferService {
    */
   private async persist(): Promise<void> {
     try {
-      await SecureStorage.setJSON(
+      await persistAnalyticsQueueJSON(
         STORAGE_KEYS.ANALYTICS_OFFLINE_QUEUE,
         this.queue,
       );

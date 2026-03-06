@@ -9,7 +9,7 @@
  * when you want to force-refresh without waiting for quality change.
  */
 
-import { QueryCache } from "@/lib/storage/cache/query-cache";
+import { QueryCache } from "@/lib/middleware/storage/helpers/query-cache";
 import { logger } from "@/lib/utils/logger";
 import { NetworkDetection } from "@/system/Network/network-detection";
 import { useEffect } from "react";

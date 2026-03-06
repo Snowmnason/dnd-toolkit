@@ -59,12 +59,9 @@ import {
   SafeModeReason,
 } from "@/lib/error";
 import { setSafeMode } from "@/lib/kernel/kernel-manager";
-import { QueryCache } from "@/lib/storage";
+import { getNetworkStatus, subscribeToNetworkStatus, type NetworkStatus } from "@/lib/middleware/network";
+import { QueryCache } from "@/lib/middleware/storage/helpers/query-cache";
 import { logger } from "@/lib/utils";
-import {
-  NetworkDetection,
-  type NetworkStatus,
-} from "@/system/Network";
 import type {
   OfflineSyncConfig,
   OfflineSyncStatus,
@@ -127,14 +124,14 @@ class OnlineSyncManagerService {
       await OfflineMutationQueue.initialize();
 
       // Subscribe to network status changes
-      this.networkUnsubscribe = NetworkDetection.subscribe(
+      this.networkUnsubscribe = subscribeToNetworkStatus(
         (status: NetworkStatus) => {
           this.onNetworkStatusChanged(status);
         },
       );
 
       // Check initial network status
-      const initialStatus = NetworkDetection.getStatus();
+      const initialStatus = getNetworkStatus();
       this.onNetworkStatusChanged(initialStatus);
     } catch (error) {
       logger
@@ -148,7 +145,7 @@ class OnlineSyncManagerService {
    */
   private onNetworkStatusChanged(status: NetworkStatus): void {
     const wasOnline = this.isOnline;
-    this.isOnline = status.isOnline && (status.isInternetReachable ?? true);
+    this.isOnline = status.isOnline;
 
     logger.category("network").debug(`Network status: online=${this.isOnline}`);
 

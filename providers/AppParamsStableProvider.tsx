@@ -1,5 +1,5 @@
 import { AuthStateManager } from "@/lib/auth/auth-state";
-import { getPrivacyStorageBackend } from "@/lib/storage";
+import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
 import React, {
@@ -90,18 +90,12 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         }
 
         // Load richer cache structure with role breakdown
-        const backend = getPrivacyStorageBackend(
-          STORAGE_KEYS.CONNECTED_WORLDS,
-        );
-        const worldIds = await backend.getJSON<string[]>(
+        const worldIds = await StorageManager.get<string[]>(
           STORAGE_KEYS.CONNECTED_WORLDS,
         );
 
         // Load rich cache metadata for staleness check and verification
-        const metadataBackend = getPrivacyStorageBackend(
-          CONNECTED_WORLDS_METADATA,
-        );
-        const richCache = await metadataBackend.getJSON<ConnectedWorldsCache>(
+        const richCache = await StorageManager.get<ConnectedWorldsCache>(
           CONNECTED_WORLDS_METADATA,
         );
 
@@ -310,10 +304,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
             }));
 
             // Update persistent cache
-            const verifyBackend = getPrivacyStorageBackend(
-              STORAGE_KEYS.CONNECTED_WORLDS,
-            );
-            await verifyBackend.setJSON(
+            await StorageManager.set(
               STORAGE_KEYS.CONNECTED_WORLDS,
               verifiedWorldIds,
             );
@@ -342,10 +333,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
             connectedWorldIds: [],
           }));
 
-          const verifyBackend = getPrivacyStorageBackend(
-            STORAGE_KEYS.CONNECTED_WORLDS,
-          );
-          await verifyBackend.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, []);
+          await StorageManager.set(STORAGE_KEYS.CONNECTED_WORLDS, []);
           return;
         }
 
@@ -389,10 +377,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         }));
 
         // Update persistent cache
-        const verifyBackend = getPrivacyStorageBackend(
-          STORAGE_KEYS.CONNECTED_WORLDS,
-        );
-        await verifyBackend.setJSON(
+        await StorageManager.set(
           STORAGE_KEYS.CONNECTED_WORLDS,
           verifiedWorldIds,
         );
@@ -445,14 +430,9 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
             );
             // Clear everything including metadata to force fresh verification on next sign-in
             setStableParams({ userId: undefined, connectedWorldIds: [] });
-            const backend = getPrivacyStorageBackend(
-              STORAGE_KEYS.CONNECTED_WORLDS,
-            );
             void Promise.all([
-              backend.removeItem(STORAGE_KEYS.CONNECTED_WORLDS),
-              getPrivacyStorageBackend(CONNECTED_WORLDS_METADATA).removeItem(
-                CONNECTED_WORLDS_METADATA,
-              ),
+              StorageManager.remove(STORAGE_KEYS.CONNECTED_WORLDS),
+              StorageManager.remove(CONNECTED_WORLDS_METADATA),
             ]).catch(() => {
               /* silently ignore cleanup errors on logout */
             });
@@ -522,8 +502,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
 
   const setConnectedWorldIds = useCallback((worldIds: string[]) => {
     setStableParams((prev) => ({ ...prev, connectedWorldIds: worldIds }));
-    const backend = getPrivacyStorageBackend(STORAGE_KEYS.CONNECTED_WORLDS);
-    void backend.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, worldIds).catch(
+    void StorageManager.set(STORAGE_KEYS.CONNECTED_WORLDS, worldIds).catch(
       (error) => {
         logger.category('storage').error(
           "Failed to persist connected worlds cache",
@@ -537,8 +516,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     setStableParams((prev) => {
       if (prev.connectedWorldIds.includes(worldId)) return prev;
       const updated = [...prev.connectedWorldIds, worldId];
-      const backend = getPrivacyStorageBackend(STORAGE_KEYS.CONNECTED_WORLDS);
-      void backend.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, updated);
+      void StorageManager.set(STORAGE_KEYS.CONNECTED_WORLDS, updated);
       return { ...prev, connectedWorldIds: updated };
     });
   }, []);
@@ -547,8 +525,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     setStableParams((prev) => {
       if (!prev.connectedWorldIds.includes(worldId)) return prev;
       const updated = prev.connectedWorldIds.filter((id) => id !== worldId);
-      const backend = getPrivacyStorageBackend(STORAGE_KEYS.CONNECTED_WORLDS);
-      void backend.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, updated);
+      void StorageManager.set(STORAGE_KEYS.CONNECTED_WORLDS, updated);
       return { ...prev, connectedWorldIds: updated };
     });
   }, []);
@@ -558,15 +535,12 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     setStableParams({ userId: undefined, connectedWorldIds: [] });
 
     // Always clear storage, regardless of state (prevents stale data if storage/state mismatch occurs)
-    const backend = getPrivacyStorageBackend(STORAGE_KEYS.CONNECTED_WORLDS);
     void Promise.all([
-      backend.removeItem(STORAGE_KEYS.CONNECTED_WORLDS),
+      StorageManager.remove(STORAGE_KEYS.CONNECTED_WORLDS),
       // CRITICAL: Also clear metadata to avoid cache stale-ness bug on sign-in
       // If metadata remains, next user's loadFromStorage() sees old lastVerifiedAt
       // and thinks "confirmed empty state" instead of doing fresh verification
-      getPrivacyStorageBackend(CONNECTED_WORLDS_METADATA).removeItem(
-        CONNECTED_WORLDS_METADATA,
-      ),
+      StorageManager.remove(CONNECTED_WORLDS_METADATA),
     ]).catch((error) => {
       logger.category('storage').error("Failed to clear connected worlds cache/metadata", error);
     });

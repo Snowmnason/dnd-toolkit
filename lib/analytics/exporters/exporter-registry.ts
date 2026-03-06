@@ -6,6 +6,7 @@
 import { getAppConfig } from '@/config';
 import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
 import { getConsentCategoryForEvent, shouldEmitEvent } from '@/lib/analytics/consent/consent-gating';
+import { getNetworkStatus } from "@/lib/middleware/network";
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -231,17 +232,15 @@ export function createExportContext(
   let isOffline = offline;
   if (offline === undefined) {
     try {
-      // Dynamically import to avoid circular dependencies
-      const { NetworkDetection } = require('@/system/Network/network-detection');
-      const status = NetworkDetection.getStatus();
+      const status = getNetworkStatus();
       isOffline = !status.isOnline;
       logger.category('analytics').debug(
         `createExportContext: Network status=${status.isOnline ? 'online' : 'offline'}, quality=${status.connectionQuality}`
       );
     } catch (error) {
-      // If dynamic import fails, default to online and log for diagnostics
+      // If network detection fails, default to online and log for diagnostics
       logger.category('analytics').debug(
-        'createExportContext: NetworkDetection import failed, defaulting to online',
+        'createExportContext: Network status check failed, defaulting to online',
         { error: String(error) },
       );
       isOffline = false; // Default to online

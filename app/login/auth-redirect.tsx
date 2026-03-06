@@ -2,7 +2,7 @@ import { AuthModal } from "@/components/auth_components";
 import { Caption } from "@/components/ui";
 import { AuthStateManager, getCurrentSession, logger, usersDB, worldsDB } from "@/lib";
 import { restoreSession } from "@/lib/auth";
-import { getPrivacyStorageBackend } from "@/lib/storage";
+import { StorageManager } from "@/lib/storage";
 import { ERROR_CODES, STORAGE_KEYS } from "@/maps";
 import { useAppParamsStable } from "@/providers";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -23,30 +23,27 @@ const savePendingInvite = async (token: string, worldName: string) => {
     worldName,
     timestamp: Date.now(),
   };
-  const backend = getPrivacyStorageBackend(STORAGE_KEYS.PENDING_INVITE);
-  await backend.setJSON(STORAGE_KEYS.PENDING_INVITE, inviteData);
+  await StorageManager.set(STORAGE_KEYS.PENDING_INVITE, inviteData);
 };
 
 const getPendingInvite = async (): Promise<PendingInvite | null> => {
-  const backend = getPrivacyStorageBackend(STORAGE_KEYS.PENDING_INVITE);
-  const inviteData = (await backend.getJSON(
+  const inviteData = await StorageManager.get<PendingInvite>(
     STORAGE_KEYS.PENDING_INVITE,
-  )) as PendingInvite | null;
+  );
   if (inviteData) {
     // Check if invite is less than 24 hours old
     if (Date.now() - inviteData.timestamp < 24 * 60 * 60 * 1000) {
       return inviteData;
     } else {
       // Clean up expired invite
-      await backend.removeItem(STORAGE_KEYS.PENDING_INVITE);
+      await StorageManager.remove(STORAGE_KEYS.PENDING_INVITE);
     }
   }
   return null;
 };
 
 const clearPendingInvite = async () => {
-  const backend = getPrivacyStorageBackend(STORAGE_KEYS.PENDING_INVITE);
-  await backend.removeItem(STORAGE_KEYS.PENDING_INVITE);
+  await StorageManager.remove(STORAGE_KEYS.PENDING_INVITE);
 };
 
 export default function AuthRedirect() {

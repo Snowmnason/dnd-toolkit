@@ -1,4 +1,4 @@
-import { QueryCache } from "@/lib/storage";
+import { QueryCache } from "@/lib/middleware/storage/helpers/query-cache";
 import { getInviteRepository } from "./repositories";
 
 /**

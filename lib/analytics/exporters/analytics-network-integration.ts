@@ -13,8 +13,8 @@
 
 import { getAppConfig } from '@/config';
 import { _setAnalyticsBufferFlushing } from "@/hooks/analytics/use-analytics-buffer-status";
+import { isNetworkOnline, subscribeToNetworkStatus, type NetworkStatus } from "@/lib/middleware/network";
 import { logger } from "@/lib/utils/logger";
-import { NetworkDetection, type NetworkStatus } from "@/system/Network/network-detection";
 import { analyticsBufferService } from "./analytics-buffer";
 
 /**
@@ -337,8 +337,8 @@ export function initializeAnalyticsNetworkIntegration(): void {
     const debounceMs = config.analytics?.buffer?.debounceMs ?? 5000;
 
     // Subscribe to network status changes
-    unsubscribeFromNetwork = NetworkDetection.subscribe(
-      (status: NetworkStatus) => {
+    unsubscribeFromNetwork = subscribeToNetworkStatus(
+      (status) => {
         handleNetworkStatusChange(status, debounceMs);
       },
     );
@@ -407,7 +407,7 @@ async function rescheduleRetryTimeout(): Promise<void> {
   }
 
   // Don't schedule if offline
-  if (!NetworkDetection.isOnline()) {
+  if (!isNetworkOnline()) {
     return;
   }
 
@@ -437,7 +437,7 @@ async function rescheduleRetryTimeout(): Promise<void> {
 async function scheduleReadyRetries(): Promise<void> {
   try {
     // Don't retry if we're offline
-    if (!NetworkDetection.isOnline()) {
+    if (!isNetworkOnline()) {
       return;
     }
 

@@ -17,9 +17,9 @@
 /* eslint-disable security/detect-object-injection */
 
 import { getAppConfig } from '@/config';
+import { loadPerformanceMetrics, persistPerformanceMetrics } from '@/lib/middleware/storage';
 import { logger } from '@/lib/utils/logger';
 import { STORAGE_KEYS } from "@/maps";
-import { SecureStorage } from '@/system/Storage';
 
 /**
  * Single operation's baseline statistics
@@ -138,7 +138,7 @@ export class PerformanceBaselineService {
     if (this.isInitialized) return;
 
     try {
-      const stored = await SecureStorage.getItem(STORAGE_KEYS.PERF_BASELINES);
+      const stored = await loadPerformanceMetrics(STORAGE_KEYS.PERF_BASELINES);
       if (stored) {
         try {
           this.data = JSON.parse(stored);
@@ -257,7 +257,7 @@ export class PerformanceBaselineService {
     try {
       this.data.lastUpdated = Date.now();
       const serialized = JSON.stringify(this.data);
-      await SecureStorage.setItem(STORAGE_KEYS.PERF_BASELINES, serialized);
+      await persistPerformanceMetrics(STORAGE_KEYS.PERF_BASELINES, serialized);
     } catch (error) {
       logger.category('performance').error(`Failed to persist baselines: ${error}`);
     }

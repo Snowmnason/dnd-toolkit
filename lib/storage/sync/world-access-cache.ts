@@ -1,5 +1,5 @@
+import { getPrivacyStorageBackend } from '@/lib/middleware/storage/helpers/privacy';
 import { logger } from '@/lib/utils';
-import { getStorageBackend as getPrivacyStorageBackend, } from '../privacy';
 
 /**
  * World Access Cache Helper
