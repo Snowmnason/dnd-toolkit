@@ -26,8 +26,7 @@
  * @see useAdaptivePayloadCacheInvalidation for cache invalidation
  */
 
-import { getAdaptivePayloadOptions } from '@/lib/network';
-import { NetworkDetection } from "@/system/Network";
+import { NetworkManager, type AdaptivePayloadOptions } from '@/lib/network/network-manager';
 import { useEffect, useMemo, useState } from 'react';
 
 export interface UseAdaptivePayloadResult {
@@ -43,7 +42,7 @@ export interface UseAdaptivePayloadResult {
    * 
    * Use these in components/fetchers to adjust what data to load
    */
-  payloadOptions: ReturnType<typeof getAdaptivePayloadOptions>;
+  payloadOptions: AdaptivePayloadOptions;
 
   /**
    * Whether the device is currently offline
@@ -77,13 +76,13 @@ export function useAdaptivePayload(): UseAdaptivePayloadResult {
   // Get initial network status and subscribe to changes
   // Store in state so component re-renders when network quality changes
   const [networkStatus, setNetworkStatus] = useState(
-    () => NetworkDetection.getStatus()
+    () => NetworkManager.getStatus()
   );
 
   // Subscribe to network status changes
   useEffect(() => {
     // Unsubscribe returns the cleanup function
-    const unsubscribe = NetworkDetection.subscribe((newStatus) => {
+    const unsubscribe = NetworkManager.subscribe((newStatus) => {
       setNetworkStatus(newStatus);
     });
 
@@ -93,11 +92,11 @@ export function useAdaptivePayload(): UseAdaptivePayloadResult {
   // Memoize the payload options so we don't recalculate unnecessarily
   // Options change only when networkStatus.effectiveType changes
   const payloadOptions = useMemo(
-    () => getAdaptivePayloadOptions(networkStatus),
+    () => NetworkManager.getPayloadOptions(networkStatus || undefined),
     [networkStatus]
   );
 
-  const effectiveType = networkStatus.effectiveType || 'unknown';
+  const effectiveType = networkStatus?.effectiveType || 'unknown';
   const isOffline = effectiveType === 'offline';
   const isSlowNetwork = effectiveType === '2g' || effectiveType === 'slow-2g';
   const isExcellentNetwork = effectiveType === '4g';

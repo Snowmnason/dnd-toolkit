@@ -1,9 +1,6 @@
 import { logger } from "@/lib";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
-import {
-  ConnectionQuality,
-  NetworkDetection,
-} from "@/system/Network/network-detection";
+import { NetworkManager, ConnectionQuality } from "@/lib/network/network-manager";
 import { S, UseTheme } from "@/theme";
 import { useRouter, useSegments } from "expo-router";
 import { memo, useEffect, useRef, useState } from "react";
@@ -53,7 +50,7 @@ function TopBar({
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [networkStatus, setNetworkStatus] = useState(
-    NetworkDetection.getStatus(),
+    NetworkManager.getStatus(),
   );
   const { theme } = UseTheme();
   const insets = useSafeAreaInsets();
@@ -61,7 +58,7 @@ function TopBar({
 
   // Subscribe to network status changes
   useEffect(() => {
-    const unsubscribe = NetworkDetection.subscribe((status) => {
+    const unsubscribe = NetworkManager.subscribe((status) => {
       setNetworkStatus(status);
     });
     return () => unsubscribe();
@@ -93,7 +90,7 @@ function TopBar({
 
   // Get wifi indicator color based on connection quality
   const getWifiColor = () => {
-    if (!networkStatus.isOnline) {
+    if (!networkStatus?.isOnline) {
       return "#EF4444"; // Red - no connection
     }
     if (networkStatus.connectionQuality === ConnectionQuality.CELLULAR) {
@@ -152,7 +149,7 @@ function TopBar({
                 { backgroundColor: getWifiColor() },
               ]}
               accessible={true}
-              accessibilityLabel={`Network: ${networkStatus.isOnline ? (networkStatus.connectionQuality === ConnectionQuality.GOOD ? "Online" : "Weak connection") : "Offline"}`}
+              accessibilityLabel={`Network: ${networkStatus?.isOnline ? (networkStatus?.connectionQuality === ConnectionQuality.GOOD ? "Online" : "Weak connection") : "Offline"}`}
             />
           )}
         </View>

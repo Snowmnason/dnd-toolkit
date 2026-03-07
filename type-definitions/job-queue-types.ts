@@ -218,6 +218,13 @@ export interface JobQueueConfig {
    * (default: true)
    */
   enableAutoCleanup?: boolean;
+
+  /**
+   * Storage adapter for sensitive jobs (PII, auth tokens, secrets).
+   * Injected by lib/middleware/jobs/job-service.ts during bootstrap.
+   * If omitted, sensitive jobs fall back to the default storageAdapter.
+   */
+  secureAdapter?: StorageAdapter;
 }
 
 // ==========================================

@@ -11,7 +11,7 @@
 
 import { QueryCache } from "@/lib/middleware/storage/helpers/query-cache";
 import { logger } from "@/lib/utils/logger";
-import { NetworkDetection } from "@/system/Network/network-detection";
+import { NetworkManager } from "@/lib/network/network-manager";
 import { useEffect } from "react";
 
 /**
@@ -49,12 +49,12 @@ export function useAdaptivePayloadCacheInvalidation(options: {
   const tagsKey = tagsToInvalidate.join(',');
 
   useEffect(() => {
-    let previousEffectiveType: string | undefined = NetworkDetection.getStatus()
+    let previousEffectiveType: string | undefined = NetworkManager.getStatus()
       ?.effectiveType;
     let isFirstCheck = true;
 
     // Subscribe to network status changes
-    const unsubscribe = NetworkDetection.subscribe((status) => {
+    const unsubscribe = NetworkManager.subscribe((status) => {
       const currentEffectiveType = status?.effectiveType;
 
       // Skip check on first subscription if requested
