@@ -1,5 +1,5 @@
 import { getAppConfig } from '@/config';
-import { FeatureFlagsManager } from "@/lib/feature-flags";
+import { getEntitlement } from "@/lib/feature-flags";
 import { logger } from "@/lib/utils/logger";
 import { useEffect, useState } from "react";
 
@@ -90,7 +90,7 @@ export function useEntitlement(
         setStatus((prev) => ({ ...prev, loading: true }));
 
         // Make FRESH server check
-        const result = await FeatureFlagsManager.getEntitlement(
+        const result = await getEntitlement(
           entitlementName,
           userId,
         );

@@ -1,15 +1,16 @@
-import { FeatureFlagsManager } from "@/lib/feature-flags";
+import { getAllFlags, getFlag, subscribe } from "@/lib/feature-flags";
 import { logger } from "@/lib/utils/logger";
 import { useEffect, useState } from "react";
 
 /**
  * Hook to access a specific server-synced feature flag
  *
- * Subscribes to FeatureFlagsManager and re-renders when flags change.
+ * Subscribes to flag changes and re-renders when flags update.
  * Uses synchronous getFlag() method with proper priority:
  * 1. User override (admin testing)
  * 2. Server value (from startup bootstrap)
- * 3. Hardcoded fallback
+ * 3. Config-driven value (offline fallback)
+ * 4. Hardcoded fallback
  *
  * @param flagName - Name of the flag to check
  * @param fallback - Default value if flag not found (default: false)
@@ -43,10 +44,10 @@ export function useFeatureFlags(
   useEffect(() => {
     // Get initial value (synchronous)
     try {
-      const enabled = FeatureFlagsManager.getFlag(flagName, fallback);
-      const allFlags = FeatureFlagsManager.getAllFlags();
+      const enabled = getFlag(flagName, fallback);
+      const allFlags = getAllFlags();
       /* eslint-disable-next-line security/detect-object-injection */
-      const source = allFlags[flagName]?.source || "fallback";
+      const source = (allFlags[flagName] as any)?.source || "fallback";
 
       setState({ enabled, loading: false, error: null, source });
       logger.category('feature_flags').debug(`useFeatureFlags(${flagName}): initialized`, {
@@ -59,9 +60,9 @@ export function useFeatureFlags(
     }
 
     // Subscribe to updates
-    const unsubscribe = FeatureFlagsManager.subscribe((updatedFlags) => {
+    const unsubscribe = subscribe((updatedFlags: any) => {
       try {
-        const enabled = FeatureFlagsManager.getFlag(flagName, fallback);
+        const enabled = getFlag(flagName, fallback);
         /* eslint-disable-next-line security/detect-object-injection */
         const source = updatedFlags[flagName]?.source || "fallback";
         setState({ enabled, loading: false, error: null, source });

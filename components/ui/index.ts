@@ -42,5 +42,5 @@ export * from './groups/TextInputGroup';
 export * from './groups/ToggleGroup';
 
 // Gates
-export * from './FeatureGate';
+export * from '../FeatureGate';
 

@@ -73,7 +73,7 @@ export default function AdminPanelScreen() {
         // Load all settings from config (features, overrides, devTools, featureFlags)
         try {
           const { getAppConfig } = await import("@/config");
-          const { FeatureFlags } = await import("@/lib/feature-flags");
+          const { getAllFlags } = await import("@/lib/feature-flags");
           const config = getAppConfig();
 
           // Build all settings entries from all sections
@@ -121,7 +121,7 @@ export default function AdminPanelScreen() {
           setAllSettings(allEntries);
 
           // Load feature flags from bundled config
-          const ff = FeatureFlags.getAllFlags();
+          const ff = getAllFlags();
           const entries = Object.entries(ff || {}).map(([key, val]: any) => ({
             key,
             title: val.title || key,
@@ -174,11 +174,11 @@ export default function AdminPanelScreen() {
 
   async function toggleKind(kind: string, enabled: boolean) {
     try {
-      const { FeatureFlags } = await import("@/lib/feature-flags");
-      FeatureFlags.toggleKind(kind as any, enabled);
+      const { toggleKind: toggleKindManager, getAllFlags } = await import("@/lib/feature-flags");
+      toggleKindManager(kind as any, enabled);
       setKindToggles((prev) => ({ ...prev, [kind]: enabled }));
       // Refresh the flag list from manager
-      const ff = FeatureFlags.getAllFlags();
+      const ff = getAllFlags();
       const entries = Object.entries(ff || {}).map(([key, val]: any) => ({
         key,
         title: val.title || key,

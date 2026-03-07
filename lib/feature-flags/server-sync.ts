@@ -2789,5 +2789,10 @@ class FeatureFlagsManagerClass {
 }
 
 // Export singleton instance
+/**
+ * @internal For server-driven flags only! Use feature-flags-manager instead.
+ * This singleton provides server-synced flags (conditions, cohorts, overrides).
+ * Access through the public manager API (feature-flags-manager.ts).
+ */
 export const FeatureFlagsManager = new FeatureFlagsManagerClass();
 export default FeatureFlagsManager;

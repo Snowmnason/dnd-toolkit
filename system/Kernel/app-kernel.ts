@@ -340,8 +340,8 @@ class AppKernelClass {
         const { getJobQueue } = await import("@/lib/jobs");
         const queue = getJobQueue();
         queue.registerHandler("feature_flags_refresh", async () => {
-          const { SubscriptionManager } = await import("@/lib/premium");
-          await SubscriptionManager.refresh();
+          const { refreshSubscription } = await import("@/lib/premium");
+          await refreshSubscription();
           logger.category("jobs").info("feature_flags_refresh job completed");
           return { updatedAt: Date.now() };
         });

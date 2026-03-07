@@ -243,7 +243,8 @@ class FeatureFlagsManager {
 
 export const FeatureFlags = new FeatureFlagsManager();
 
-// Expose to window for dev console access
-if (typeof window !== "undefined") {
-  (window as any).FeatureFlags = FeatureFlags;
-}
+/**
+ * @internal For offline fallback only! Use feature-flags-manager instead.
+ * This singleton provides config-driven flags for offline scenarios.
+ * Access through the public manager API (feature-flags-manager.ts).
+ */
