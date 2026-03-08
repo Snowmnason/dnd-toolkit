@@ -1,19 +1,19 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 
 import {
-    AppPage,
-    Body,
-    Button,
-    CustomLoad,
-    SubTitle,
-    Switch,
-    Title,
+  AppPage,
+  Body,
+  Button,
+  CustomLoad,
+  SubTitle,
+  Switch,
+  Title,
 } from "@/components/ui";
-import { getCurrentUserProfile } from "@/lib/database";
-import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
-import { logger } from "@/lib/utils/logger";
+import { useNavigate } from "@/hooks/navigation";
+import { getCurrentUserProfile } from "@/hooks/storage";
+import { logger } from "@/hooks/utils";
 import { useScale } from "@/theme";
 
 type FlagEntry = {
@@ -34,9 +34,9 @@ type SettingsEntry = {
 };
 
 export default function AdminPanelScreen() {
-  const router = useRouter();
   const routeParams = useLocalSearchParams();
   const S = useScale();
+  const { replace: navigateTo } = useNavigate();
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [flags, setFlags] = useState<FlagEntry[]>([]);
@@ -225,12 +225,11 @@ export default function AdminPanelScreen() {
       }
     }
 
-    const target = buildNavigationTarget(
+    navigateTo(
       `/settings/${username}`,
       sanitizedParams,
       ["worldId", "userRole"],
     );
-    router.replace(target as any);
   };
 
   if (loading) {

@@ -11,7 +11,7 @@ import {
   AuthTitle,
   FormAuthInput,
 } from '@/components/auth_components';
-import { sendPasswordReset } from '@/lib';
+import { useAuthActions } from '@/hooks/auth';
 import { forgotPasswordSchema, type ForgotPasswordFormData } from '@/validation/auth.schema';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
@@ -21,6 +21,7 @@ import { View } from 'react-native';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
+  const { resetPassword } = useAuthActions();
   
   const { control, handleSubmit, formState: { isValid }, watch } = useForm<ForgotPasswordFormData>({
     resolver: zodResolver(forgotPasswordSchema),
@@ -44,7 +45,7 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
     
     try {
-      const result = await sendPasswordReset(values.email);
+      const result = await resetPassword(values.email);
       
       if (result.success && result.message) {
         setSuccess(true);

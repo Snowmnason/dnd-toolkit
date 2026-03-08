@@ -6,10 +6,10 @@ import {
   FormAuthInput
 } from '@/components/auth_components';
 import { AppToast } from '@/components/ui';
-import { useSignInForm } from "@/hooks/auth";
-import { AuthStateManager, buildRoute, getCurrentSession, logger, resendConfirmationEmail } from '@/lib';
+import { AuthStateManager, getCurrentSession, useAuthActions, useSignInForm } from "@/hooks/auth";
+import { useNavigate } from "@/hooks/navigation";
+import { logger } from "@/hooks/utils";
 import { useScale } from '@/theme';
-import type { Href } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { TextInput } from 'react-native';
@@ -17,6 +17,8 @@ import { TextInput } from 'react-native';
 export default function SignInScreen() {
   const S = useScale();
   const router = useRouter();
+  const { replace, push } = useNavigate();
+  const { resendConfirmation } = useAuthActions();
   const [isResendingEmail, setIsResendingEmail] = useState(false);
   const [showValidationToast, setShowValidationToast] = useState(false);
   
@@ -86,7 +88,7 @@ export default function SignInScreen() {
   const handleResendConfirmationFromError = async (email: string) => {
     setIsResendingEmail(true);
     try {
-      const result = await resendConfirmationEmail(email);
+      const result = await resendConfirmation(email);
       
       if (!result.success) {
         logger.category('auth').error('Failed to resend email:', result.error);
@@ -113,7 +115,7 @@ export default function SignInScreen() {
       <AuthBackButtonContainer>
         <AuthButtonBack
           text="← Back"
-          onPress={() => router.replace(buildRoute('/') as Href)}
+          onPress={() => replace('/')}
           disabled={loading}
         />
       </AuthBackButtonContainer>
@@ -166,7 +168,7 @@ export default function SignInScreen() {
           color="#D4AF37"
           align="right"
           style={{ marginBottom: 4, marginTop: (S.space.sm*-1) }}
-          onPress={() => router.push(buildRoute('/login/forgot-password') as Href)}
+          onPress={() => push('/login/forgot-password')}
         >
           Forgot Password?
         </AuthSubTitle>
@@ -183,7 +185,7 @@ export default function SignInScreen() {
 
         <AuthButtonSecondary
           text="Need an account? Sign Up"
-          onPress={() => router.push(buildRoute('/login/sign-up') as Href)}
+          onPress={() => replace('/login/sign-up')}
           disabled={loading}
         />
       </AuthActionGroup>

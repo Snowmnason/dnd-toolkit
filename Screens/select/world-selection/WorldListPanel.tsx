@@ -1,9 +1,8 @@
 import { Body, Button } from "@/components/ui";
-import { WorldWithAccess } from "@/lib/database/worlds";
-import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
+import { useNavigate } from "@/hooks/navigation";
+import { WorldWithAccess } from "@/hooks/storage";
 import { useAppParamsVolatile, usePlatform, useUserId } from "@/providers";
 import { useScale } from "@/theme";
-import { useRouter } from "expo-router";
 import React from "react";
 import { ScrollView } from "react-native";
 
@@ -25,7 +24,9 @@ export function WorldListPanel({
   onMobileWorldSelect,
 }: WorldListPanelProps) {
   const S = useScale();
-  const router = useRouter();  const userId = useUserId();  const { updateVolatileParams } = useAppParamsVolatile();
+  const { replace: navigateTo } = useNavigate();
+  const userId = useUserId();
+  const { updateVolatileParams } = useAppParamsVolatile();
 
   // Centralized platform detection
   const { isDesktop } = usePlatform();
@@ -105,8 +106,7 @@ export function WorldListPanel({
         text="Create New World"
         variant="primary"
         onPress={() => {
-          const target = buildNavigationTarget("/select/create-world", {}, []);
-          router.push(target as any);
+          navigateTo("/select/create-world");
         }}
         style={{
           borderRadius: S.radius.lg,

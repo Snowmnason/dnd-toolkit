@@ -38,6 +38,14 @@
 
 // ─── Manager (primary API for lib modules) ──────────────────────────
 export { StorageManager } from './storage-manager';
+
+// ─── Query cache (in-memory SWR cache for API/database results) ─────
+export { QueryCache } from '@/lib/middleware/storage/helpers/query-cache';
+export type {
+  CacheEntry,
+  CacheOptions,
+  QueryCacheConfig,
+} from '@/lib/middleware/storage/helpers/query-cache';
 export type {
   CacheSchema, StorageGracefulResult,
   StorageHealthReport, StorageManagerReadOptions, StorageManagerWriteOptions

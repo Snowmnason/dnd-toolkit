@@ -12,7 +12,7 @@ import {
   initializeKernel,
   onKernelStateChange,
   type AppKernelState,
-} from "@/lib/kernel/kernel-manager";
+} from "@/lib/kernel";
 import { logger } from "@/lib/utils/logger";
 import {
   createContext,

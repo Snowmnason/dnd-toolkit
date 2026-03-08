@@ -1,15 +1,16 @@
 import { AppLoading } from "@/components/ui";
 import { useAuthGuard } from "@/hooks/auth";
 import { useAppKernel } from "@/hooks/kernel";
-import { buildRoute } from "@/lib/navigation/uri-helpers";
-import { logger } from "@/lib/utils/logger";
+import { useNavigate } from "@/hooks/navigation";
+import { logger } from "@/hooks/utils";
+import { BottomTabBar } from "@/Screens/main-panels/BottomTabBar";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Platform, useWindowDimensions, View } from "react-native";
-import { BottomTabBar } from "../../Screens/main-panels/BottomTabBar";
 
 export default function MainLayout() {
   const router = useRouter();
+  const { replace } = useNavigate();
   const kernel = useAppKernel();
   const authState = useAuthGuard(kernel.phases.appReady, "world-required");
   const params = useLocalSearchParams();
@@ -38,7 +39,7 @@ export default function MainLayout() {
       logger.category("navigation").warn(
         "[MainLayout] No worldId in URL, redirecting to world selection",
       );
-      router.replace(buildRoute("/select/world-selection") as any);
+      replace("/select/world-selection");
       return;
     }
 
@@ -47,7 +48,7 @@ export default function MainLayout() {
     logger.category("navigation").debug("[MainLayout] Auth guard passed, rendering world screen", {
       urlWorldId,
     });
-  }, [authState, params.worldId, router]);
+  }, [authState, params.worldId, replace, router]);
 
   // Update active tab from URL params
   useEffect(() => {

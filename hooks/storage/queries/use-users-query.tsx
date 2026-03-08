@@ -1,5 +1,5 @@
-import { useAdaptivePayloadCacheInvalidation } from '@/hooks/network/useAdaptivePayloadCacheInvalidation';
-import { usersDB } from '@/lib/database/users';
+import { useAdaptivePayloadCacheInvalidation } from '@/hooks/network';
+import { usersDB } from '@/lib/database';
 import { getQualityAwareCacheKey } from '@/lib/network';
 import { useQuery } from '../use-query';
 

@@ -1,8 +1,8 @@
 'use client';
 
+import { QueryCache } from '@/lib/storage';
+import { logger } from '@/lib/utils/logger';
 import React, { useCallback, useRef, useState } from 'react';
-import { QueryCache } from '../../lib/middleware/storage/helpers/query-cache';
-import { logger } from '../../lib/utils/logger';
 
 /**
  * Options for useMutation hook

@@ -1,6 +1,6 @@
 import { Button, SubTitle, Switch } from '@/components/ui'
 import { useAnalyticsConsent, useForceResync, useNetworkStatus, useRefreshStorageCache } from '@/hooks'
-import { logger } from '@/lib/utils'
+import { logger } from '@/hooks/utils'
 import { useScale } from '@/theme'
 import { View } from 'react-native'
 

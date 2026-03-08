@@ -1,7 +1,11 @@
 // Barrel export for query hooks
+export { getCurrentUserProfile, useCurrentUser } from "./queries/use-current-user";
 export { useCurrentUserQuery, useUserQuery } from "./queries/use-users-query";
 export { useWorlds } from "./queries/use-worlds";
 export { useWorldsQuery } from "./queries/use-worlds-query";
+
+// Database type re-exports (screen-safe path)
+export type { AccessRole, WorldWithAccess } from "@/lib/database";
 
 // Barrel export for mutation hooks
 export {

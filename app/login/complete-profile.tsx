@@ -13,8 +13,9 @@ import {
   FormAuthInput,
 } from "@/components/auth_components";
 import { Body } from "@/components/ui";
-import { useSignUpForm } from "@/hooks/auth";
-import { getCurrentSession, logger, usersDB } from "@/lib";
+import { getCurrentSession, useSignUpForm } from "@/hooks/auth";
+import { getCurrentUserProfile } from "@/hooks/storage";
+import { logger } from "@/hooks/utils";
 import { useScale } from "@/theme";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -49,7 +50,7 @@ export default function CompleteProfileScreen() {
 
         // Try to get existing profile (might not exist for new users)
         logger.category('auth').debug("Fetching user profile from database");
-        const existingProfile = await usersDB.getCurrentUser();
+        const existingProfile = await getCurrentUserProfile();
         logger.category('auth').info("Profile fetch result:", {
           hasProfile: !!existingProfile,
           profileId: existingProfile?.id,

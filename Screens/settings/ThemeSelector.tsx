@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui";
-import { useThemeSwitcher } from "@/hooks/ui";
-import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
+import { useNavigate } from "@/hooks/navigation";
 import { usePlatform } from "@/providers";
 import {
   $,
@@ -10,7 +9,7 @@ import {
   useScale,
   UseTheme,
 } from "@/theme";
-import { useRouter, useSegments } from "expo-router";
+import { useSegments } from "expo-router";
 import { Text, TouchableOpacity, View } from "react-native";
 
 /**
@@ -18,11 +17,13 @@ import { Text, TouchableOpacity, View } from "react-native";
  * Displays a grid of theme families with light/dark swatches.
  */
 export function ThemeSelector() {
-  const { activeTheme, mode, changeTheme, toggleMode } = useThemeSwitcher();
+  const { setTheme, mode, setMode, family: activeTheme } = UseTheme();
+  const changeTheme = (themeName: ThemeFamily) => setTheme(themeName, mode);
+  const toggleMode = () => setMode(mode === 'light' ? 'dark' : 'light');
   const { isMobile } = usePlatform();
   const { theme: currentTheme } = UseTheme();
   const S = useScale();
-  const router = useRouter();
+  const { push: navigatePush } = useNavigate();
   const segments = useSegments();
 
   // Check if we're already on the StyleMobile or StyleDesktop routes
@@ -121,8 +122,7 @@ export function ThemeSelector() {
             const targetPath = isMobile
               ? "/settings/StyleMobile"
               : "/settings/StyleDesktop";
-            const target = buildNavigationTarget(targetPath, {}, []);
-            router.push(target as any);
+            navigatePush(targetPath);
           }}
           style={{ alignSelf: "center" }}
         />

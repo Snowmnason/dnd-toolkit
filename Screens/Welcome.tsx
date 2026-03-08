@@ -1,11 +1,11 @@
 import { AuthActionGroup, AuthBody, AuthBodyFooter, AuthButton, AuthButtonSecondary, AuthCaption, AuthLink, AuthRoot, AuthSubTitle, AuthTitle } from '@/components/auth_components';
-import { useWelcomeScreen } from '@/hooks/auth';
-import { buildNavigationTarget } from '@/lib/navigation/uri-helpers';
+import CustomLoad from '@/components/ui/CustomLoad';
+import VersionDisplay from '@/components/VersionDisplay';
+import { useNavigate } from '@/hooks/navigation';
 import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
-import { Platform, useWindowDimensions, View } from 'react-native';
-import CustomLoad from '../components/ui/CustomLoad';
-import VersionDisplay from '../components/VersionDisplay';
+import { useState } from 'react';
+import { Alert, Platform, useWindowDimensions, View } from 'react-native';
 
 
 // TODO: Uncomment when ready to enable social authentication
@@ -22,11 +22,28 @@ export default function Welcome({ isLoading = false }: WelcomeScreenProps) {
   const isMobile = (Platform.OS === 'ios' || Platform.OS === 'android') || (Platform.OS === 'web' && width < 900);
   
   const router = useRouter();
-  const {
-    isLoading: authIsLoading,
-    handleSignIn,
-    handleSignUp,
-  } = useWelcomeScreen();
+  const { push: navigatePush } = useNavigate();
+  const [authIsLoading, setAuthIsLoading] = useState(false);
+
+  const handleSignIn = async () => {
+    setAuthIsLoading(true);
+    try {
+      router.push('/login/sign-in');
+    } catch {
+      Alert.alert('Error', 'Unable to navigate to sign-in');
+    } finally {
+      setAuthIsLoading(false);
+    }
+  };
+
+  const handleSignUp = async () => {
+    setAuthIsLoading(true);
+    try {
+      router.push('/login/sign-up');
+    } finally {
+      setAuthIsLoading(false);
+    }
+  };
 
   const loading = isLoading || authIsLoading;
 
@@ -112,8 +129,7 @@ export default function Welcome({ isLoading = false }: WelcomeScreenProps) {
               //do nothing for now
               return;
             } else {
-              const target = buildNavigationTarget('/StyleDesktop', {}, []);
-              router.push(target as any);
+              navigatePush('/StyleDesktop');
               return;
             }
             // TODO: Implement anonymous auth

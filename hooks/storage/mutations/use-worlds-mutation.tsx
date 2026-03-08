@@ -1,4 +1,4 @@
-import { CreateWorldData, World, worldsDB } from '@/lib/database/worlds';
+import { CreateWorldData, World, worldsDB } from '@/lib/database';
 import { useMutation } from '../use-mutation';
 
 /**

@@ -1,6 +1,6 @@
 'use client';
 
-import { QueryCache } from '@/lib/middleware/storage/helpers/query-cache';
+import { QueryCache } from '@/lib/storage';
 import { logger } from '@/lib/utils';
 import { NetworkDetection } from '@/system/Network';
 import { useEffect, useRef, useState } from 'react';

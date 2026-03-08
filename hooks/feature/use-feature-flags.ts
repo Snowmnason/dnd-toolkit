@@ -1,4 +1,4 @@
-import { getAllFlags, getFlag, subscribe } from "@/lib/feature-flags";
+import { getAllFlags, getFlag, subscribe, type FeatureFlagName } from "@/lib/feature-flags";
 import { logger } from "@/lib/utils/logger";
 import { useEffect, useState } from "react";
 
@@ -79,4 +79,27 @@ export function useFeatureFlags(
   }, [flagName, fallback]);
 
   return state;
+}
+
+/**
+ * Simple hook to read a feature flag as a plain boolean.
+ * Subscribes to flag changes so components re-render when flags are toggled.
+ *
+ * Use this when you only need `true`/`false` and don't need loading/error states.
+ * Use `useFeatureFlags` when you need the full `{ enabled, loading, error, source }` shape.
+ *
+ * @example
+ * ```tsx
+ * const showBetaUI = useFeatureFlag("betaUI");
+ * ```
+ */
+export function useFeatureFlag(flagName: FeatureFlagName): boolean {
+  const [, forceUpdate] = useState(0);
+
+  useEffect(() => {
+    const unsubscribe = subscribe(() => forceUpdate((n) => n + 1));
+    return unsubscribe;
+  }, [flagName]);
+
+  return getFlag(flagName as string, false);
 }

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 let HookModule: any;
 try {
-  HookModule = require('@/hooks/analytics/use-analytics-buffer-status');
+  HookModule = require('@/hooks/analytics/use-analytics-status');
 } catch (e) {
   HookModule = null;
 }

@@ -19,7 +19,7 @@ export {
   requireUserProfile,
   validateCurrentUser,
   validateUserForWrite
-} from "./database-manger";
+} from "./database-manager";
 
 // Repository pattern
 export {

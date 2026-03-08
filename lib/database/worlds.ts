@@ -4,7 +4,7 @@ import { worldAccessCache } from "@/lib/storage/sync/world-access-cache";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
 import { CACHE_TAGS } from "@/maps/cache-keys";
-import { getCurrentUserProfile } from "./database-manger";
+import { getCurrentUserProfile } from "./database-manager";
 import { getInviteRepository, getWorldAccessRepository, getWorldRepository } from "./repositories";
 
 // Access role types for better type safety and maintainability

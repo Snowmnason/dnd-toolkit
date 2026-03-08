@@ -1,7 +1,6 @@
 'use client';
 
-import { UpdateUserData, User, usersDB } from '@/lib/database/users';
-import { QueryCache } from '@/lib/middleware/storage/helpers/query-cache';
+import { UpdateUserData, User, usersDB } from '@/lib/database';
 import { logger } from '@/lib/utils/logger';
 import { useCallback, useState } from 'react';
 
@@ -37,9 +36,6 @@ export function useUpdateUserMutation() {
 
         const result = await usersDB.updateCurrentUser(userData);
         setData(result);
-
-        // Invalidate user cache
-        await QueryCache.invalidateByTags(['users']);
 
         return result;
       } catch (err) {

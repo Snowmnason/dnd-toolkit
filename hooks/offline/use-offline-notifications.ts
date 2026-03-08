@@ -1,16 +1,19 @@
 /**
- * useOfflineNotifications Hook
- * Subscribes to network state changes and displays Toast notifications
- * for offline/online status transitions.
+ * Offline & Sync Notification Hooks
+ *
+ * useOfflineNotifications — Toast for online/offline transitions.
+ * useSyncNotifications   — Toast/Snackbar for sync progress events.
  *
  * Usage:
  *   const offlineToastProps = useOfflineNotifications();
- *   // Render: <AppToast {...offlineToastProps} />
+ *   const { toastProps, snackbarProps } = useSyncNotifications();
  */
 
 import { getAppConfig } from "@/config";
+import { OnlineSyncManager } from "@/lib/offline";
 import { NetworkDetection, NetworkStatus } from "@/system/Network";
-import { useEffect, useRef, useState } from "react";
+import { OfflineSyncStatus } from "@/type-definitions/mutation-queue-types";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface OfflineToastState {
   visible: boolean;
@@ -92,4 +95,107 @@ export function useOfflineNotifications(): OfflineToastState {
   }, []);
 
   return toastState;
+}
+
+// ─── Sync Notifications ───────────────────────────────────────────────────────
+
+interface ToastState {
+  visible: boolean;
+  message: string;
+  type: "info" | "success";
+  duration: number;
+}
+
+interface SnackbarState {
+  visible: boolean;
+  message: string;
+  tone: "error" | "warning";
+  actionText: string;
+  onAction: () => void;
+  duration: number;
+}
+
+interface SyncNotificationsReturn {
+  toastProps: ToastState;
+  snackbarProps: SnackbarState;
+}
+
+/**
+ * Subscribe to sync manager status and surface Toast/Snackbar props for sync events
+ * (started, completed, failures).
+ */
+export function useSyncNotifications(): SyncNotificationsReturn {
+  const toastDuration = useMemo(() => getAppConfig().ui?.toastDurationMs ?? 2500, []);
+  const syncToastDuration = useMemo(() => getAppConfig().ui?.syncToastDurationMs ?? 3000, []);
+
+  const [toastState, setToastState] = useState<ToastState>({
+    visible: false,
+    message: "",
+    type: "info",
+    duration: toastDuration,
+  });
+
+  const [snackbarState, setSnackbarState] = useState<SnackbarState>({
+    visible: false,
+    message: "",
+    tone: "error",
+    actionText: "Retry",
+    onAction: () => {},
+    duration: 6000,
+  });
+
+  useEffect(() => {
+    const subscription = OnlineSyncManager.subscribe((status: OfflineSyncStatus) => {
+      if (status.isSyncing && status.syncedCount === 0) {
+        setToastState({
+          visible: true,
+          message: `Syncing ${status.totalQueued} change${status.totalQueued > 1 ? "s" : ""}...`,
+          type: "info",
+          duration: toastDuration,
+        });
+      }
+
+      if (!status.isSyncing && status.totalQueued === 0 && status.syncedCount > 0 && status.failedCount === 0) {
+        setToastState({
+          visible: true,
+          message: `${status.syncedCount} change${status.syncedCount > 1 ? "s" : ""} synced.`,
+          type: "success",
+          duration: syncToastDuration,
+        });
+      }
+
+      if (status.failedCount > 0) {
+        setSnackbarState({
+          visible: true,
+          message: `Failed to sync ${status.failedCount} item${status.failedCount > 1 ? "s" : ""}. Retrying...`,
+          tone: "error",
+          actionText: "Retry Now",
+          onAction: async () => {
+            await OnlineSyncManager.syncAll();
+            setSnackbarState((prev) => ({ ...prev, visible: false }));
+          },
+          duration: 6000,
+        });
+      }
+    });
+
+    return () => { subscription?.(); };
+  }, [toastDuration, syncToastDuration]);
+
+  return {
+    toastProps: {
+      visible: toastState.visible,
+      message: toastState.message,
+      type: toastState.type,
+      duration: toastState.duration,
+    },
+    snackbarProps: {
+      visible: snackbarState.visible,
+      message: snackbarState.message,
+      tone: snackbarState.tone,
+      actionText: snackbarState.actionText,
+      onAction: snackbarState.onAction,
+      duration: snackbarState.duration,
+    },
+  };
 }

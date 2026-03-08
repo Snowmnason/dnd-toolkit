@@ -1,4 +1,4 @@
-import { worldsDB } from "@/lib/database/worlds";
+import { worldsDB } from "@/lib/database";
 import { logger } from "@/lib/utils/logger";
 import { useState } from "react";
 import { Alert } from "react-native";

@@ -12,7 +12,7 @@
  */
 
 import { getAppConfig } from '@/config';
-import { _setAnalyticsBufferFlushing } from "@/hooks/analytics/use-analytics-buffer-status";
+import { _setAnalyticsBufferFlushing } from "@/hooks/analytics/use-analytics-status";
 import { isNetworkOnline, subscribeToNetworkStatus, type NetworkStatus } from "@/lib/middleware/network";
 import { logger } from "@/lib/utils/logger";
 import { analyticsBufferService } from "./analytics-buffer";
