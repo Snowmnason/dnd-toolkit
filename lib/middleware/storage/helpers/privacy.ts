@@ -27,7 +27,7 @@ let SecureStorageCache: PrivacyStorageBackend | null = null;
 
 const getFastCache = () => {
   if (!FastCacheCache) {
-    FastCacheCache = require("./cache/FastCache").FastCache as PrivacyStorageBackend;
+    FastCacheCache = require("@/system/Storage/cache/FastCache").FastCache as PrivacyStorageBackend;
   }
   return FastCacheCache;
 };
@@ -90,7 +90,7 @@ export function shouldUseSecureStorage(key: string): boolean {
 /**
  * Get the appropriate storage backend for a key based on classification.
  */
-export function getStorageBackend(
+export function getPrivacyStorageBackend(
   key: string,
 ): PrivacyStorageBackend {
   if (shouldUseSecureStorage(key)) {

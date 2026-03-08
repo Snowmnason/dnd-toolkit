@@ -3,7 +3,7 @@
  */
 
 import { logger } from '@/lib/utils';
-import { SecureStorage } from '@/system/Storage';
+import { StorageManager } from '@/lib/storage';
 
 const REDIRECT_SAFETY_KEY = 'dnd_redirect_attempts';
 const MAX_REDIRECT_ATTEMPTS = 3;
@@ -15,12 +15,12 @@ interface RedirectAttempt {
   targetRoute: string;
 }
 
-// Storage interface using SecureStorage for consistency
+// Storage interface using StorageManager (via getRaw/setRaw for string data)
 const getStorage = () => {
   return {
-    getItem: (key: string) => SecureStorage.getItem(key),
-    setItem: (key: string, value: string) => SecureStorage.setItem(key, value),
-    removeItem: (key: string) => SecureStorage.removeItem(key)
+    getItem: (key: string) => StorageManager.getRaw(key),
+    setItem: (key: string, value: string) => StorageManager.setRaw(key, value),
+    removeItem: (key: string) => StorageManager.remove(key)
   };
 };
 

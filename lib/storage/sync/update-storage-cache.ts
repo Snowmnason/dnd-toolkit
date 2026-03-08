@@ -1,7 +1,7 @@
 import { logger } from "@/lib/utils";
 // Import directly from storage modules to avoid circular dependency with index.ts
 // index.ts exports updateStorageCache, and this file needs storage functions
-import { getStorageBackend } from "../privacy";
+import { getPrivacyStorageBackend } from "@/lib/middleware/storage/helpers/privacy";
 
 // Import STORAGE_KEYS consistently
 // Note: We import directly from storage-config to avoid circular dependency
@@ -113,7 +113,7 @@ export const updateStorageCache = {
         }
 
         // Get userId from SecureStorage (never stale)
-        const backend = getStorageBackend(STORAGE_KEYS.USER_DATA);
+        const backend = getPrivacyStorageBackend(STORAGE_KEYS.USER_DATA);
         const userData = await backend.getJSON<{ id: string }>(
           STORAGE_KEYS.USER_DATA,
         );
@@ -171,7 +171,7 @@ export const updateStorageCache = {
         };
 
         // Write rich cache to storage
-        const cacheBackend = getStorageBackend(
+        const cacheBackend = getPrivacyStorageBackend(
           STORAGE_KEYS.CONNECTED_WORLDS_METADATA,
         );
         await cacheBackend.setJSON(
@@ -180,7 +180,7 @@ export const updateStorageCache = {
         );
 
         // Also write flattened list to CONNECTED_WORLDS for backward compatibility
-        const listBackend = getStorageBackend(STORAGE_KEYS.CONNECTED_WORLDS);
+        const listBackend = getPrivacyStorageBackend(STORAGE_KEYS.CONNECTED_WORLDS);
         await listBackend.setJSON(STORAGE_KEYS.CONNECTED_WORLDS, worldList);
 
         // Update per-world session cache entries
@@ -189,7 +189,7 @@ export const updateStorageCache = {
             const cacheKey = `world_access_${world.world_id}`;
             const metaKey = `world_access_meta_${world.world_id}`;
 
-            const worldBackend = getStorageBackend(cacheKey);
+            const worldBackend = getPrivacyStorageBackend(cacheKey);
             await worldBackend.setJSON(cacheKey, true);
             await worldBackend.setJSON(metaKey, {
               timestamp,
@@ -246,12 +246,12 @@ export const updateStorageCache = {
       }
 
       // Update SecureStorage cache with fresh profile
-      const userDataBackend = getStorageBackend(STORAGE_KEYS.USER_DATA);
+      const userDataBackend = getPrivacyStorageBackend(STORAGE_KEYS.USER_DATA);
       await userDataBackend.setJSON(STORAGE_KEYS.USER_DATA, userProfile);
 
       // Update metadata with fresh timestamp
       const userDataMetaKey = `${STORAGE_KEYS.USER_DATA}_meta`;
-      const metaBackend = getStorageBackend(userDataMetaKey);
+      const metaBackend = getPrivacyStorageBackend(userDataMetaKey);
       await metaBackend.setJSON(userDataMetaKey, {
         timestamp: Date.now(),
         source: "db_refresh",

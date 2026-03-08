@@ -13,10 +13,9 @@ import {
     authSignUp,
     authUpdatePassword,
 } from "@/lib/middleware/services";
-import { getPrivacyStorageBackend } from "@/lib/storage";
+import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
-import { SecureStorage } from "@/system/Storage";
 import {
     mapSignInError,
     mapSignUpError,
@@ -72,7 +71,7 @@ export const signInUser = async (
       await AuthStateManager.setSession((session as any).raw);
     }
     await AuthStateManager.setHasAccount(true);
-    await SecureStorage.setItem(STORAGE_KEYS.LAST_LOGGED_IN, Date.now().toString());
+    await StorageManager.setRaw(STORAGE_KEYS.LAST_LOGGED_IN, Date.now().toString());
 
     // Profile check + redirect determination
     try {
@@ -83,7 +82,7 @@ export const signInUser = async (
 
       if (hasValidProfile) {
         if (pendingInvite) {
-          await SecureStorage.removeItem(STORAGE_KEYS.PENDING_INVITE);
+          await StorageManager.remove(STORAGE_KEYS.PENDING_INVITE);
           return {
             success: true,
             redirectTo: `/login/auth-redirect?action=world-invite&token=${pendingInvite.token}&worldName=${encodeURIComponent(pendingInvite.worldName)}`,
@@ -268,11 +267,9 @@ export const signOutUser = async (): Promise<void> => {
     await AuthStateManager.clearAuthState();
 
     // Reset theme to defaults for next user
-    const themeBackend = getPrivacyStorageBackend(STORAGE_KEYS.THEME_PREFERENCE);
-    const modeBackend = getPrivacyStorageBackend(STORAGE_KEYS.THEME_MODE);
     await Promise.all([
-      themeBackend.setItem(STORAGE_KEYS.THEME_PREFERENCE, "classic"),
-      modeBackend.setItem(STORAGE_KEYS.THEME_MODE, "dark"),
+      StorageManager.setRaw(STORAGE_KEYS.THEME_PREFERENCE, "classic"),
+      StorageManager.setRaw(STORAGE_KEYS.THEME_MODE, "dark"),
     ]);
   } catch (error) {
     logger.category("auth").error("Sign out error", error);
@@ -422,7 +419,7 @@ export const checkPendingInvites = async (): Promise<{
   worldName: string;
 } | null> => {
   if (typeof window !== "undefined") {
-    const stored = await SecureStorage.getItem(STORAGE_KEYS.PENDING_INVITE);
+    const stored = await StorageManager.getRaw(STORAGE_KEYS.PENDING_INVITE);
     if (stored) {
       try {
         const inviteData = JSON.parse(stored);
@@ -431,11 +428,11 @@ export const checkPendingInvites = async (): Promise<{
           return { token: inviteData.token, worldName: inviteData.worldName };
         } else {
           // Clean up expired invite
-          await SecureStorage.removeItem(STORAGE_KEYS.PENDING_INVITE);
+          await StorageManager.remove(STORAGE_KEYS.PENDING_INVITE);
         }
       } catch (error) {
         logger.category('auth').error("Error parsing pending invite:", error);
-        await SecureStorage.removeItem(STORAGE_KEYS.PENDING_INVITE);
+        await StorageManager.remove(STORAGE_KEYS.PENDING_INVITE);
       }
     }
   }

@@ -23,9 +23,9 @@
  */
 
 import { CONSENT_SYNC_DEFAULTS } from '@/config';
+import { loadAnalyticsQueueJSON, persistAnalyticsQueueJSON } from "@/lib/middleware/storage";
 import { logger } from '@/lib/utils/logger';
 import { STORAGE_KEYS } from "@/maps";
-import { SecureStorage } from '@/system/Storage';
 import type { ConsentLevel } from './consent';
 
 /**
@@ -92,7 +92,7 @@ class ConsentSyncQueueService {
     }
 
     try {
-      const stored = await SecureStorage.getJSON<PendingConsentSync[]>(
+      const stored = await loadAnalyticsQueueJSON<PendingConsentSync[]>(
         STORAGE_KEYS.CONSENT_SYNC_QUEUE,
       );
 
@@ -303,7 +303,7 @@ class ConsentSyncQueueService {
    */
   private async persist(): Promise<void> {
     try {
-      await SecureStorage.setJSON(STORAGE_KEYS.CONSENT_SYNC_QUEUE, this.queue);
+      await persistAnalyticsQueueJSON(STORAGE_KEYS.CONSENT_SYNC_QUEUE, this.queue);
     } catch (error) {
       logger
         .category('analytics')

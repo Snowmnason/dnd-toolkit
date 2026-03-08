@@ -14,8 +14,8 @@
 
 import { OFFLINE_SYNC_DEFAULTS } from "@/config";
 import { logger } from "@/lib/utils/logger";
+import { StorageManager } from "@/lib/storage";
 import { STORAGE_KEYS } from "@/maps";
-import { SecureStorage } from "@/system/Storage";
 import type { QueuedMutation } from "@/type-definitions/mutation-queue-types";
 import {
   BackoffScheduler,
@@ -64,7 +64,7 @@ class OfflineMutationQueueService {
     }
 
     try {
-      const stored = await SecureStorage.getJSON<QueuedMutation[]>(
+      const stored = await StorageManager.get<QueuedMutation[]>(
         STORAGE_KEYS.OFFLINE_MUTATION_QUEUE,
       );
 
@@ -213,7 +213,7 @@ class OfflineMutationQueueService {
    */
   async clear(): Promise<void> {
     this.queue = [];
-    await SecureStorage.removeItem(STORAGE_KEYS.OFFLINE_MUTATION_QUEUE);
+    await StorageManager.remove(STORAGE_KEYS.OFFLINE_MUTATION_QUEUE);
     logger.category("storage").warn("Cleared offline mutation queue");
   }
 
@@ -222,7 +222,7 @@ class OfflineMutationQueueService {
    */
   private async persist(): Promise<void> {
     try {
-      await SecureStorage.setJSON(STORAGE_KEYS.OFFLINE_MUTATION_QUEUE, this.queue);
+      await StorageManager.set(STORAGE_KEYS.OFFLINE_MUTATION_QUEUE, this.queue);
     } catch (error) {
       logger
         .category("error")

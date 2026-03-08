@@ -12,7 +12,7 @@
  * See docs: Entitlements-and-subscription-provider.md
  */
 
-import { Subscription, SubscriptionManager } from '@/lib/premium';
+import { getSubscription, refreshSubscription, type Subscription } from '@/lib/premium';
 import { logger } from '@/lib/utils/logger';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
@@ -44,7 +44,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     const initSubscription = async () => {
       try {
         // TODO: Replace with real backend fetch when implemented
-        const sub = await SubscriptionManager.getSubscription();
+        const sub = await getSubscription();
         setSubscription(sub);
       } catch (error) {
         logger.category('analytics').error('SubscriptionProvider: failed to load subscription', { error: String(error) });
@@ -62,11 +62,11 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     setIsLoading(true);
     try {
       // TODO: Replace with real backend refresh when implemented
-      const sub = await SubscriptionManager.refresh();
-      logger.category('analytics').debug('SubscriptionProvider: subscription refreshed', { tier: sub?.tier });
+      const sub = await refreshSubscription();
+      logger.category('other').debug('SubscriptionProvider: subscription refreshed', { tier: sub?.tier });
       setSubscription(sub);
     } catch (error) {
-      logger.category('analytics').error('SubscriptionProvider: failed to refresh subscription', { error: String(error) });
+      logger.category('other').error('SubscriptionProvider: failed to refresh subscription', { error: String(error) });
       // TODO: Handle error state
     } finally {
       setIsLoading(false);

@@ -1,5 +1,5 @@
 import { useAppKernel } from "@/hooks/kernel";
-import { FeatureFlags } from "@/lib/feature-flags";
+import { getFlag } from "@/lib/feature-flags";
 import { logger } from "@/lib/utils/logger";
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
@@ -22,7 +22,7 @@ export function useSplashScreen() {
 
   useEffect(() => {
     // Check if splash screen feature is enabled
-    const splashEnabled = FeatureFlags.isEnabled("splashScreen");
+    const splashEnabled = getFlag("splashScreen");
 
     if (!splashEnabled) {
       logger.category('ui').debug("🎬 Splash screen disabled via feature flag");

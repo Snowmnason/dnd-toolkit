@@ -5,7 +5,7 @@ import { getAppConfig } from "../../../config";
 let loggerCache: any = null;
 const getLogger = () => {
   if (!loggerCache) {
-    loggerCache = require("../../utils/logger").logger;
+    loggerCache = require("@/lib/utils/logger").logger;
   }
   return loggerCache;
 };

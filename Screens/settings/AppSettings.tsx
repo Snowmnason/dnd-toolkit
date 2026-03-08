@@ -15,8 +15,8 @@ import { View } from 'react-native'
  */
 export function AppSettings() {
   const S = useScale()
-  const { isOnline } = useNetworkStatus()
-  const isOffline = !isOnline
+  const networkStatus = useNetworkStatus()
+  const isOffline = !networkStatus?.isOnline
 
   const { isResyncing, handleForceResync } = useForceResync({ isOffline })
 

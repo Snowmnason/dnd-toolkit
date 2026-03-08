@@ -7,12 +7,12 @@
  *
  * Phase 2 of APIClient factory: automatic network recovery coordination
  */
-import { QueryCache } from "@/lib/storage";
+import { QueryCache } from "@/lib/middleware/storage/helpers/query-cache";
+import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
 import { OfflineQueueManager, RequestManager } from "@/system/API";
 import type { NetworkState } from "@/system/Network";
-import { SecureStorage } from "@/system/Storage";
 
 /**
  * Recovery state persistence
@@ -74,7 +74,7 @@ export const NetworkRecoveryManager = {
     if (this._isInitialized) return;
 
     try {
-      const stored = await SecureStorage.getJSON<RecoveryState>(
+      const stored = await StorageManager.get<RecoveryState>(
         STORAGE_KEYS.NETWORK_RECOVERY_STATE,
       );
 
@@ -158,7 +158,7 @@ export const NetworkRecoveryManager = {
    */
   async _persistRecoveryState(): Promise<void> {
     try {
-      await SecureStorage.setJSON(
+      await StorageManager.set(
         STORAGE_KEYS.NETWORK_RECOVERY_STATE,
         this._recoveryState,
       );

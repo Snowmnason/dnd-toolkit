@@ -8,10 +8,11 @@
  *   See lib/storage/data-classification.ts for the privacy policy.
  */
 import { getAppConfig, isProduction } from '@/config';
-import { getPrivacyStorageBackend } from "@/lib/storage";
+import appSettingsProd from "@/config/appsettings.json";
+import { getPrivacyStorageBackend } from "@/lib/middleware/storage";
+import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils";
-import { SecureStorage } from "@/system/Storage";
-import appSettingsProd from "../../config/appsettings.json";
+import { STORAGE_KEYS } from "@/maps";
 
 export interface Entitlements {
   tier: "free" | "premium";
@@ -224,13 +225,13 @@ class FeatureFlagsManager {
   }
 
   /**
-   * Get user entitlements from SecureStorage per privacy policy.
-   * Always reads from SecureStorage (encrypted backend) for security.
+   * Get user entitlements from storage per privacy policy.
+   * Uses StorageManager which routes to appropriate backend (SecureStorage).
    */
   async getEntitlements(): Promise<Entitlements | null> {
     try {
-      const entitlements = await SecureStorage.getJSON<Entitlements>(
-        "secure:entitlements",
+      const entitlements = await StorageManager.get<Entitlements>(
+        STORAGE_KEYS.ENTITLEMENTS,
       );
       return entitlements ?? null;
     } catch (error) {
@@ -242,7 +243,8 @@ class FeatureFlagsManager {
 
 export const FeatureFlags = new FeatureFlagsManager();
 
-// Expose to window for dev console access
-if (typeof window !== "undefined") {
-  (window as any).FeatureFlags = FeatureFlags;
-}
+/**
+ * @internal For offline fallback only! Use feature-flags-manager instead.
+ * This singleton provides config-driven flags for offline scenarios.
+ * Access through the public manager API (feature-flags-manager.ts).
+ */

@@ -1,15 +1,33 @@
+/**
+ * Feature Flags Module Barrel Export
+ *
+ * Public API: Use manager functions (getFlag, isEnabledWithContext, etc.)
+ * Internal: FeatureFlags and FeatureFlagsManager singletons are private
+ *
+ * The manager wraps both config-driven and server-driven flags with fallback logic:
+ * - Online: Server flags (with conditions, cohorts, overrides)
+ * - Offline: Config flags (simple enabled/disabled)
+ */
+
+// Manager API (primary entry point for hooks/managers)
 export {
-    FeatureFlags,
-    type FeatureFlag,
-    type FeatureFlagKind,
-    type FeatureFlagName
+    bootstrapFlags, clearAllOverrides, clearOverride, getAllFlags, getByKind,
+    getEntitlement, getFlag, getKind, initialize, isEnabledWithContext, setOverride, subscribe,
+    syncFromServer, toggle,
+    toggleKind, verifyDeviceClock
+} from './feature-flags-manager';
+
+// Types (needed for type annotations)
+export type {
+    FeatureFlag,
+    FeatureFlagKind,
+    FeatureFlagName
 } from "./feature-flags";
 
-export {
-    FeatureFlagsManager,
-    type EntitlementState,
-    type FeatureFlagState,
-    type FlagsSubscriber
+export type {
+    EntitlementState,
+    FeatureFlagState,
+    FlagsSubscriber
 } from "./server-sync";
 
 export {
@@ -19,7 +37,7 @@ export {
     type UserCohortMembershipRow
 } from "./cohorts";
 
-// Evaluation
+// Evaluation (used by manager internally, also available for advanced use)
 export {
     evaluateConditions,
     matchEnvironment,

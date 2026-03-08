@@ -12,8 +12,8 @@
  */
 
 import { NetworkRecoveryManager } from "@/lib/middleware/api";
+import { isNetworkOnline } from "@/lib/middleware/network";
 import { logger } from "@/lib/utils/logger";
-import { NetworkDetection } from "@/system/Network/network-detection";
 import { NetworkStateManager } from "@/system/Network/state-machine";
 
 type NetworkStateMachine = typeof NetworkStateManager;
@@ -204,9 +204,9 @@ export const NetworkRecoveryRetryJobManager = {
 
       // Check network reachability
       logger.category('network').debug("Checking network reachability");
-      const status = NetworkDetection.getStatus();
+      const isOnline = isNetworkOnline();
 
-      if (status.isOnline) {
+      if (isOnline) {
         logger.category('network').info("Network reachable! Transitioning to GOOD");
         await this._networkStateMachine.transitionTo(
           "GOOD",

@@ -1,5 +1,5 @@
 import { usePremiumFeature } from "@/hooks/auth/use-premium-feature";
-import { FeatureFlagName, FeatureFlags } from "@/lib/feature-flags";
+import { type FeatureFlagName, getFlag } from "@/lib/feature-flags";
 import React from "react";
 
 export type FeatureGateProps = {
@@ -34,7 +34,7 @@ export function FeatureGate({
     );
   }
 
-  const flagAllowed = flag ? FeatureFlags.isEnabled(flag) : true;
+  const flagAllowed = flag ? getFlag(flag) : true;
 
   // Only check premium if explicitly required
   const premiumCheck = usePremiumFeature(

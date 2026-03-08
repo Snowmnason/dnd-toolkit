@@ -45,7 +45,7 @@ export async function storagePhase(): Promise<void> {
 
     // Initialize storage health monitoring (validates storage + starts polling)
     const { initializeStorageHealthMonitoring } = await import(
-      "@/system/Storage/utilites/storage-health-monitor"
+      "@/lib/middleware/storage/helpers/storage-health-monitor"
     );
     await initializeStorageHealthMonitoring();
 

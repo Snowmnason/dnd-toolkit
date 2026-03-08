@@ -14,9 +14,9 @@
  */
 
 import { getAppConfig } from '@/config';
+import { loadAnalyticsQueue, loadAnalyticsQueueJSON, persistAnalyticsQueue, persistAnalyticsQueueJSON } from "@/lib/middleware/storage";
 import { logger } from '@/lib/utils/logger';
 import { STORAGE_KEYS } from "@/maps";
-import { SecureStorage } from '@/system/Storage';
 
 export type ConsentLevel = 'none' | 'basic' | 'full';
 
@@ -78,8 +78,8 @@ class AnalyticsConsentManager {
 
       // Step 1: Try SecureStorage cache first (source of truth after initial load)
       if (!forceRefresh) {
-        const stored = await SecureStorage.getItem(STORAGE_KEYS.ANALYTICS_CONSENT);
-        const cacheMeta = await SecureStorage.getJSON<{ timestamp: number }>(
+        const stored = await loadAnalyticsQueue(STORAGE_KEYS.ANALYTICS_CONSENT);
+        const cacheMeta = await loadAnalyticsQueueJSON<{ timestamp: number }>(
           STORAGE_KEYS.ANALYTICS_CONSENT_META,
         );
 
@@ -121,8 +121,8 @@ class AnalyticsConsentManager {
 
             // Cache the database result back to SecureStorage for next time
             try {
-              await SecureStorage.setItem(STORAGE_KEYS.ANALYTICS_CONSENT, sourceOfTruth);
-              await SecureStorage.setJSON(STORAGE_KEYS.ANALYTICS_CONSENT_META, {
+              await persistAnalyticsQueue(STORAGE_KEYS.ANALYTICS_CONSENT, sourceOfTruth);
+              await persistAnalyticsQueueJSON(STORAGE_KEYS.ANALYTICS_CONSENT_META, {
                 timestamp: Date.now(),
                 source: 'database',
               });
@@ -146,7 +146,7 @@ class AnalyticsConsentManager {
       }
 
       // Step 3: Fall back to stale SecureStorage cache if available
-      const stored = await SecureStorage.getItem(STORAGE_KEYS.ANALYTICS_CONSENT);
+      const stored = await loadAnalyticsQueue(STORAGE_KEYS.ANALYTICS_CONSENT);
       if (stored && this.isValidConsentLevel(stored)) {
         sourceOfTruth = stored as ConsentLevel;
         logger.category('analytics').analytics('consent_initialized', 'Using stale SecureStorage cache as fallback', {
@@ -194,9 +194,9 @@ class AnalyticsConsentManager {
     this.consentLevel = level;
 
     try {
-      await SecureStorage.setItem(STORAGE_KEYS.ANALYTICS_CONSENT, level);
+      await persistAnalyticsQueue(STORAGE_KEYS.ANALYTICS_CONSENT, level);
       // Update meta timestamp so next app start treats cache as fresh
-      await SecureStorage.setJSON(STORAGE_KEYS.ANALYTICS_CONSENT_META, {
+      await persistAnalyticsQueueJSON(STORAGE_KEYS.ANALYTICS_CONSENT_META, {
         timestamp: Date.now(),
         source: 'user',
       });
@@ -247,7 +247,7 @@ class AnalyticsConsentManager {
    */
   async getStoredConsent(): Promise<ConsentLevel> {
     try {
-      const stored = await SecureStorage.getItem(STORAGE_KEYS.ANALYTICS_CONSENT);
+      const stored = await loadAnalyticsQueue(STORAGE_KEYS.ANALYTICS_CONSENT);
       if (stored && this.isValidConsentLevel(stored)) {
         return stored as ConsentLevel;
       }

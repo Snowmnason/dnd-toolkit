@@ -4,9 +4,9 @@
  * Helper functions for offline mutation handling
  */
 
-import { QueryCache } from "@/lib/storage/cache/query-cache";
+import { QueryCache } from "@/lib/middleware/storage/helpers/query-cache";
+import { getNetworkStatus } from "@/lib/middleware/network";
 import { logger } from "@/lib/utils/logger";
-import { NetworkDetection } from "@/system/Network/network-detection";
 import type { MutationOperation, MutationPersistence, QueuedMutation } from "../../type-definitions/mutation-queue-types";
 import { OfflineMutationQueue } from "./mutation-queue";
 
@@ -136,8 +136,8 @@ export async function enqueueIfOffline<T>(
   onlineFn: () => Promise<T>,
   mutation: Omit<QueuedMutation, "id" | "timestamp" | "retryCount">,
 ): Promise<T | { queued: true; mutationId: string }> {
-  const status = NetworkDetection.getStatus();
-  const isOnline = status.isOnline && (status.isInternetReachable ?? true);
+  const status = getNetworkStatus();
+  const isOnline = status.isOnline;
 
   if (isOnline) {
     try {

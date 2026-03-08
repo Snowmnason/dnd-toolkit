@@ -27,7 +27,8 @@
  * ```
  */
 
-import { getJobQueue } from "@/lib/jobs";
+import { JobsManager } from "@/lib/jobs";
+import type { EnqueueOptions, JobRecord } from "@/type-definitions/job-queue-types";
 import { useCallback } from "react";
 
 /**
@@ -39,30 +40,26 @@ import { useCallback } from "react";
  *   - Helper methods for common operations
  */
 export function useJobQueueManager() {
-  const queue = getJobQueue();
-  // Note: isInitialized is private on BackgroundJobQueue; assume initialized during app bootstrap
-  const isInitialized = !!queue;
+  const isInitialized = true; // Initialized during sync-phase bootstrap
 
   /**
    * Enqueue a new job
    */
   const enqueue = useCallback(
-    async (options: Parameters<typeof queue.enqueue>[0]): Promise<string> => {
-      if (!queue) throw new Error("Job queue not available");
-      return queue.enqueue(options);
+    async (options: EnqueueOptions): Promise<string> => {
+      return JobsManager.enqueue(options);
     },
-    [queue],
+    [],
   );
 
   /**
    * Get status of a specific job
    */
   const getStatus = useCallback(
-    async (jobId: string): Promise<ReturnType<typeof queue.getStatus>> => {
-      if (!queue) throw new Error("Job queue not available");
-      return queue.getStatus(jobId);
+    async (jobId: string): Promise<JobRecord | null> => {
+      return JobsManager.getJob(jobId);
     },
-    [queue],
+    [],
   );
 
   /**
@@ -70,21 +67,19 @@ export function useJobQueueManager() {
    */
   const cancel = useCallback(
     async (jobId: string): Promise<boolean> => {
-      if (!queue) throw new Error("Job queue not available");
-      return queue.cancel(jobId);
+      return JobsManager.cancel(jobId);
     },
-    [queue],
+    [],
   );
 
   /**
    * Get all jobs of a specific type
    */
   const getJobs = useCallback(
-    async (type: string): Promise<ReturnType<typeof queue.getJobs>> => {
-      if (!queue) throw new Error("Job queue not available");
-      return queue.getJobs(type);
+    async (type: string): Promise<JobRecord[]> => {
+      return JobsManager.getJobs(type);
     },
-    [queue],
+    [],
   );
 
   /**
@@ -92,13 +87,11 @@ export function useJobQueueManager() {
    * If status is omitted, returns total count of all jobs
    */
   const getJobCount = useCallback(
-    async (status?: Parameters<typeof queue.getJobs>[1]): Promise<number> => {
-      if (!queue) throw new Error("Job queue not available");
-      // Query all jobs (no type filter) and optionally filter by status
-      const jobs = await queue.getJobs(undefined, status);
+    async (status?: JobRecord['status']): Promise<number> => {
+      const jobs = await JobsManager.getJobs(undefined, status);
       return jobs.length;
     },
-    [queue],
+    [],
   );
 
   /**
@@ -106,22 +99,19 @@ export function useJobQueueManager() {
    */
   const clearByType = useCallback(
     async (type: string): Promise<number> => {
-      if (!queue) throw new Error("Job queue not available");
-      return queue.clearByType(type);
+      return JobsManager.clearByType(type);
     },
-    [queue],
+    [],
   );
 
   /**
-   * Run the next batch of jobs
+   * Subscribe to job events
    */
-  const runNext = useCallback(async (): Promise<number> => {
-    if (!queue) throw new Error("Job queue not available");
-    return queue.runNext();
-  }, [queue]);
+  const subscribe = useCallback((callback: any) => {
+    return JobsManager.subscribe(callback);
+  }, []);
 
   return {
-    queue,
     isInitialized,
     enqueue,
     getStatus,
@@ -129,6 +119,6 @@ export function useJobQueueManager() {
     getJobs,
     getJobCount,
     clearByType,
-    runNext,
+    subscribe,
   };
 }

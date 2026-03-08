@@ -2,8 +2,9 @@
  * Phase 6: Sync Phase (BLOCKING)
  *
  * Responsibility:
- * Initialize offline mutation queue and automatic synchronization manager.
- * Loads queued mutations from storage and prepares automatic sync on reconnect.
+ * Initialize all async queue systems:
+ * 1. Offline mutation queue + sync manager (persisted DB mutations)
+ * 2. Background job queue + all job handlers (persisted background jobs)
  *
  * Input: Network status from Phase 2, Storage from Phase 3, Services from Phase 4
  * Output: void (does not throw; failure is non-critical)
@@ -19,17 +20,22 @@
  * - Network cascade detector (tracks sync failures for safe mode)
  * - Conflict queue (tracks conflicts during sync attempts)
  * - Backoff scheduler (schedules retries with exponential backoff + jitter)
+ * - BackgroundJobQueue singleton (loads persisted jobs, subscribes to network)
+ * - Job handlers: network_recovery_retry (registered via NetworkRecoveryRetryJobManager)
  *
  * Why blocking:
  * - If app starts while sync is in-progress, race conditions can occur
  * - User expects mutations to eventually sync; blocking ensures queue is ready
  * - Prevents duplicate mutations if app is restarted mid-sync
+ * - Job handlers must be registered before the queue fires on reconnect,
+ *   otherwise persisted jobs fail with "No handler registered"
  *
  * Depends on: NETWORK_PHASE, STORAGE_PHASE (loads queue), SERVICES_PHASE (DB access)
  * Enables: Offline mutations work immediately when online, auto-sync on reconnect
  *
  * Used by: system/Kernel/app-kernel.ts (Phase 6, blocking)
  * Also: lib/offline/sync-manager, lib/offline/mutation-queue, lib/offline/sync-handlers
+ *       lib/jobs, system/Jobs/background-job-queue
  */
 
 /**
@@ -42,6 +48,7 @@
 export async function syncPhase(): Promise<void> {
   const { logger } = await import("@/lib/utils");
 
+  // ── Offline Mutation Queue ──────────────────────────────────────────────
   try {
     const { OfflineQueueManager } = await import(
       "@/system/API/resilience/offline-queue"
@@ -51,13 +58,8 @@ export async function syncPhase(): Promise<void> {
     );
     const { initializeSync } = await import("@/lib/kernel/kernel-manager");
 
-    // Load persisted queue from storage
     await OfflineQueueManager.initialize();
-
-    // Initialize OnlineSyncManager for syncing offline data to database
     await initializeSync();
-
-    // Set up network listener for automatic replay on reconnect
     await initializeOfflineQueueReplay();
 
     logger.category("bootstrap").info("✅ Offline queue system initialized");
@@ -67,6 +69,27 @@ export async function syncPhase(): Promise<void> {
       .warn("Failed to initialize offline queue system (non-critical)", {
         error: (error as Error).message,
       });
-    // Non-critical: app continues without offline queue
+  }
+
+  // ── Background Job Queue ────────────────────────────────────────────────
+  // Must register all handlers BEFORE the queue can fire on network reconnect.
+  // Persisted jobs from a previous session must resolve to a registered handler.
+  try {
+    const { initializeJobInfrastructure } = await import("@/lib/middleware/jobs/job-service");
+    const { getJobQueue, NetworkRecoveryRetryJobManager } = await import("@/lib/jobs");
+    const { NetworkStateManager } = await import("@/system/Network/state-machine");
+
+    await initializeJobInfrastructure();
+
+    const queue = getJobQueue();
+    await NetworkRecoveryRetryJobManager.initialize(NetworkStateManager, queue);
+
+    logger.category("bootstrap").info("✅ Background job queue initialized");
+  } catch (error) {
+    logger
+      .category("bootstrap")
+      .warn("Failed to initialize background job queue (non-critical)", {
+        error: (error as Error).message,
+      });
   }
 }

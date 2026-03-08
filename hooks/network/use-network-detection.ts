@@ -1,4 +1,4 @@
-import { NetworkDetection, NetworkStatus } from '@/system/Network/network-detection';
+import { NetworkManager, type NetworkStatus } from '@/lib/network/network-manager';
 import React from 'react';
 
 /**
@@ -7,28 +7,28 @@ import React from 'react';
  * @example
  * ```tsx
  * function MyComponent() {
- *   const { isOnline, connectionQuality } = useNetworkStatus();
- *
- *   if (connectionQuality === ConnectionQuality.OFFLINE) {
- *     return <div>Offline - showing cached data</div>;
+ *   const status = useNetworkStatus();
+ *   
+ *   if (!status) {
+ *     return <div>Network detection not ready</div>;
  *   }
  *
- *   if (connectionQuality === ConnectionQuality.BAD) {
- *     return <div>Poor connection - reduced features</div>;
+ *   if (status?.isOnline === false) {
+ *     return <div>Offline - showing cached data</div>;
  *   }
  *
  *   return <div>Online</div>;
  * }
  * ```
  */
-export function useNetworkStatus(): NetworkStatus {
-  const [status, setStatus] = React.useState<NetworkStatus>(
-    NetworkDetection.getStatus(),
+export function useNetworkStatus(): NetworkStatus | undefined {
+  const [status, setStatus] = React.useState<NetworkStatus | undefined>(
+    NetworkManager.getStatus(),
   );
 
   React.useEffect(() => {
     // Subscribe to changes
-    const unsubscribe = NetworkDetection.subscribe(setStatus);
+    const unsubscribe = NetworkManager.subscribe(setStatus);
     return unsubscribe;
   }, []);
 

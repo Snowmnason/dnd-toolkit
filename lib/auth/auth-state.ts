@@ -1,12 +1,9 @@
 import { getUserRepository, getWorldAccessRepository } from "@/lib/database";
-import {
-  clearAllUserData,
-  getPrivacyStorageBackend,
-} from "@/lib/storage";
+import { clearAllUserData, getAllSecureStorageKeys, getPrivacyStorageBackend } from "@/lib/middleware/storage";
+import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
-import { SecureStorage } from "@/system/Storage";
-import { type Session } from "./auth-operations";
+import type { Session } from "./auth-operations";
 
 /**
  * Helper: determine whether a session indicates an email-confirmed user.
@@ -71,7 +68,7 @@ export const AuthStateManager = {
     try {
       const storageKey = STORAGE_KEYS.HAS_ACCOUNT;
       const authState =
-        await SecureStorage.getJSON<AuthState>(storageKey);
+        await StorageManager.get<AuthState>(storageKey);
       // Explicitly handle all falsy cases: null, undefined, or false
       // All of these should result in hasAccount: false for consistent auth routing
       return { hasAccount: authState?.hasAccount === true };
@@ -86,8 +83,7 @@ export const AuthStateManager = {
     try {
       const newState: AuthState = { hasAccount };
       const storageKey = STORAGE_KEYS.HAS_ACCOUNT;
-      const backend = getPrivacyStorageBackend(storageKey);
-      await backend.setJSON(storageKey, newState);
+      await StorageManager.set(storageKey, newState);
     } catch (error) {
       logger.category('auth').error("Error setting hasAccount:", error);
     }
@@ -141,7 +137,7 @@ export const AuthStateManager = {
       await SessionAdapter.clearSession();
 
       // Clear query cache (all user-specific cached queries)
-      const { QueryCache } = await import("../storage/cache/query-cache");
+      const { QueryCache } = await import("../middleware/storage/helpers/query-cache");
       await QueryCache.clearAll();
 
       // CRITICAL: Set hasAccount to FALSE (not remove it)
@@ -177,14 +173,14 @@ export const AuthStateManager = {
       // Clear world access cache entries (pattern-based)
       // These keys follow patterns: world_access_* and world_access_meta_*
       try {
-        const allStorageKeys = await SecureStorage.getAllKeys();
+        const allStorageKeys = await getAllSecureStorageKeys();
         const worldAccessKeys = allStorageKeys.filter(
           (key) =>
             key.startsWith("world_access_") ||
             key.startsWith("world_access_meta_"),
         );
         await Promise.all(
-          worldAccessKeys.map((key) => SecureStorage.removeItem(key)),
+          worldAccessKeys.map((key) => StorageManager.remove(key)),
         );
 
         if (worldAccessKeys.length > 0) {
@@ -487,7 +483,7 @@ export const AuthStateManager = {
           await import("../storage/sync/update-storage-cache");
         await updateStorageCache.refreshAllWorldsCache();
 
-        const freshCached = await SecureStorage.getJSON<boolean>(cacheKey);
+        const freshCached = await StorageManager.get<boolean>(cacheKey);
         return {
           hasAccess: freshCached === true,
           fromCache: false,

@@ -1,6 +1,6 @@
 import { AnalyticsConsent, shouldEmitEvent } from "@/lib/analytics";
 import { reportError } from "@/lib/error";
-import { getPrivacyStorageBackend } from "@/lib/storage";
+import { getPrivacyStorageBackend } from "@/lib/middleware/storage";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
 

@@ -4,10 +4,8 @@
  * Exports for public API
  */
 
-export { FastCacheAdapter } from "./adapters/fastcache-adapter";
-export { SecureStorageAdapter } from "./adapters/secure-storage-adapter";
-
-export { BackgroundJobQueue, getJobQueue } from "@/system/Jobs/queue";
+export { BackgroundJobQueue, getJobQueue } from "@/system/Jobs/background-job-queue";
+export { JobsManager } from "./jobs-manager";
 export {
     NetworkRecoveryRetryJobManager,
     type NetworkRecoveryRetryJobConfig

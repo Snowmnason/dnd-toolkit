@@ -1,6 +1,6 @@
 import { invalidateAdaptivePayloadCache } from "@/hooks/network/useAdaptivePayloadCacheInvalidation";
+import { QueryCache } from "@/lib/middleware/storage/helpers/query-cache";
 import { getAdaptivePayloadOptions, getAdaptiveQueryParams, getQualityAwareCacheKey, getStaleTimeForQuality } from "@/lib/network";
-import { QueryCache } from "@/lib/storage";
 import { NetworkDetection } from "@/system/Network";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

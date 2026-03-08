@@ -1,5 +1,5 @@
 import { trackFeatureBlocked } from '@/lib/analytics';
-import { SubscriptionManager } from '@/lib/premium';
+import { hasFeature as checkHasFeature, isPremium as checkIsPremium } from '@/lib/premium';
 import { logger } from '@/lib/utils/logger';
 import { useEffect, useRef, useState } from 'react';
 
@@ -15,7 +15,7 @@ export interface UsePremiumFeatureState {
  * 
  * When called with undefined featureKey, returns a check-free result (no async operation).
  * 
- * Note: Uses cached subscription data from SubscriptionManager.
+ * Note: Uses cached subscription data from the PremiumManager.
  * Currently does not auto-refresh after TTL expires. When implementing the real
  * subscription backend, consider adding:
  * - A refresh mechanism (e.g., interval polling or manual refresh prop)
@@ -38,8 +38,8 @@ export function usePremiumFeature(featureKey?: string): UsePremiumFeatureState {
     
     let cancelled = false;
     (async () => {
-      const isPremium = await SubscriptionManager.isPremium();
-      const isAvailable = await SubscriptionManager.hasFeature(featureKey);
+      const isPremium = await checkIsPremium();
+      const isAvailable = await checkHasFeature(featureKey);
       if (!cancelled) setState({ isPremium, isAvailable, loading: false });
     })();
     return () => {
