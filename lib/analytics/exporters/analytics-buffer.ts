@@ -707,3 +707,27 @@ export const analyticsBufferService = new AnalyticsBufferService();
 export function notifyBufferStateChange(): void {
   (analyticsBufferService as any).notifySubscribers?.();
 }
+
+// ─── Module-level flushing state (shared with network integration) ────
+let _isFlushing = false;
+let _lastFlushTime: number | null = null;
+
+/**
+ * Set analytics buffer flushing state
+ * @internal
+ */
+export function _setAnalyticsBufferFlushing(value: boolean, timestamp?: number): void {
+  _isFlushing = value;
+  if (timestamp !== undefined) {
+    _lastFlushTime = timestamp;
+  }
+  notifyBufferStateChange();
+}
+
+/**
+ * Get analytics buffer flushing state
+ * @internal
+ */
+export function _getAnalyticsBufferFlushing(): { isFlushing: boolean; lastFlushTime: number | null } {
+  return { isFlushing: _isFlushing, lastFlushTime: _lastFlushTime };
+}

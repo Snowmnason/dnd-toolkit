@@ -278,6 +278,36 @@ if (!result.success) {
 
 - None (schemas are pure, no app dependencies)
 
+## Error Handling & Edge Cases
+
+### Invalid Input Types
+
+Zod schemas handle type coercion gracefully; unexpected types throw descriptive errors.
+
+### SQL Injection Attempts
+
+All string fields validated against injection patterns; malicious input blocked with clear error messages.
+
+### Schema Version Mismatch
+
+Schemas are versioned with the app; breaking changes require migration planning.
+
+### Large Input Payloads
+
+Schemas don't validate size limits (use API limits instead); focus on format/type validation.
+
+## Performance Notes
+
+- **Validation Speed**: Zod is fast (<1ms for typical forms); no network calls
+- **Type Safety**: Compile-time type checking prevents runtime errors
+- **Memory Usage**: Minimal; schemas are lightweight and reusable
+- **Bundle Size**: Zod adds ~50KB but enables type safety across the app
+
+## Related Modules
+
+- **lib/auth** – Authentication flows, credential handling
+- **lib/database** – Data persistence, runtime validation of responses
+
 ## File Breakdown
 
 | File              | Purpose                                               | Lines |
@@ -285,8 +315,3 @@ if (!result.success) {
 | `auth.schema.ts`  | Auth form schemas (sign-up, sign-in, password reset) | ~80   |
 | `world.schema.ts` | World creation/editing schemas with system selection | ~60   |
 | `index.ts`        | Barrel export for public API                          | 2     |
-
-## Related Modules
-
-- **lib/auth** – Authentication flows, credential handling
-- **lib/database** – Data persistence, runtime validation of responses

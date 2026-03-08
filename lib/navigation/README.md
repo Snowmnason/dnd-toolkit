@@ -1,6 +1,6 @@
 # Navigation Module
 
-Centralized declarative navigation system. Manages TopBar appearance, back button behavior, modals, redirects, and accessibility for all routes. Single source of truth for route configuration.
+Centralized declarative navigation system managing TopBar appearance, back button behavior, modals, redirects, and accessibility for all routes.
 
 ## When to Use This Module
 
@@ -24,29 +24,21 @@ Centralized declarative navigation system. Manages TopBar appearance, back butto
 ## Architecture & Data Flow
 
 ```
-Current route segments
-        ↓
-getRouteConfig(context) matches against ROUTE_CONFIGS
-        ├─ Strategy: exact path → aliases → parent segment → default fallback
-        ↓
-Returns RouteConfig with:
-  - TopBar title (static or dynamic function)
-  - Back button target
-  - Conditional redirects
-  - A11y focus, analytics, animations
-        ↓
-evaluateRouteVariant() if A/B testing configured
-        ↓
-Renderer uses config to display TopBar + screen
+Route segments + params
+    ↓
+getRouteConfig() matches against ROUTE_CONFIGS
+    ↓
+Returns RouteConfig with title/back/redirects
+    ↓
+Renderer displays TopBar + handles navigation
 ```
 
 **Key Principles:**
 
-- **Declarative**: All route config in one place (no switch statements)
-- **Composable**: Routes organized by screen area (login, main, settings)
-- **Type-Safe**: TypeScript enforces valid route properties
-- **Dynamic**: Titles/back-buttons can be functions (access context)
-- **Smart Matching**: Exact paths, aliases, parent segments, fallbacks
+- **Declarative**: All route configuration in one place, no switch statements
+- **Type-safe**: TypeScript enforces valid route properties and parameters
+- **Dynamic**: Titles and back buttons can be functions accessing context
+- **Smart matching**: Exact paths, aliases, parent segments, and fallbacks
 
 ## API Reference
 
@@ -234,24 +226,24 @@ Each route can specify a tracking name sent to analytics system:
 
 ## Dependencies
 
-### External
+### External Packages
 
-- **`expo-router`** – Router instance for navigation
+- **`expo-router`** – Router instance for navigation and route management
 
-### Internal
+### Internal Dependencies
 
-- **`lib/routing/AUTH_CONFIG`** – Determines protected routes
-- **`lib/auth/useAuthGuard`** – Enforces authentication
-- **`lib/analytics`** – Tracks navigation via `analyticsName`
-- **`lib/utils/logger`** – Navigation logging
+- **`lib/routing/AUTH_CONFIG`** – Route protection configuration
+- **`lib/auth/useAuthGuard`** – Authentication enforcement for routes
+- **`lib/analytics`** – Navigation event tracking
+- **`lib/utils/logger`** – Navigation logging and debugging
 
 ## Related Modules
 
-- **`lib/navigation/routes/`** – App-specific route definitions
-- **`lib/routing/AUTH_CONFIG`** – Which routes are protected
-- **`lib/auth/useAuthGuard`** – Route protection enforcement
-- **`lib/analytics`** – Navigation event tracking
-- **`app/_layout.tsx`** – Root layout using route config
+- **`lib/navigation/routes/`** – App-specific route definitions organized by screen area
+- **`lib/routing/AUTH_CONFIG`** – Authentication configuration for protected routes
+- **`lib/auth/useAuthGuard`** – Route protection hook that uses navigation config
+- **`lib/analytics`** – Tracks navigation events and user flow analytics
+- **`app/_layout.tsx`** – Root layout that applies navigation configuration
 
 ## File Breakdown
 

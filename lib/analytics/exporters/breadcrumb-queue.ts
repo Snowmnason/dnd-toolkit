@@ -307,17 +307,14 @@ class BreadcrumbQueueService {
    */
   async flush(): Promise<void> {
     if (this.isFlushing || !this.providerName || this.queue.length === 0) {
+      logger.category('analytics').debug('BreadcrumbQueue', `Flush skipped: isFlushing=${this.isFlushing}, providerName=${this.providerName}, queueSize=${this.queue.length}`);
       return;
     }
 
     const now = Date.now();
 
-    // Phase 1c: Rate limit backoff — don't flush if we're rate-limited
     if (now < this.nextFlushAfterMs) {
-      logger.category('analytics').analytics(
-        'BreadcrumbQueue',
-        `Rate-limited: next flush in ${this.nextFlushAfterMs - now}ms`
-      );
+      logger.category('analytics').debug('BreadcrumbQueue', `Flush skipped due to rate limit: nextFlushAfterMs=${this.nextFlushAfterMs}, now=${now}`);
       return;
     }
 
@@ -325,101 +322,56 @@ class BreadcrumbQueueService {
     this.lastFlushAttemptTime = now;
 
     try {
-      // Phase 1c: Batch spacing — if 100+ pending, space batches apart to avoid rate limit
       const hasLargeQueue = this.queue.length >= 100;
       if (hasLargeQueue && this.lastFlushTime && now - this.lastFlushTime < this.batchSpacingMs) {
-        logger.category('analytics').info('BreadcrumbQueue', `Batch spacing: deferring flush (${this.queue.length} pending)`);
+        logger.category('analytics').debug('BreadcrumbQueue', `Flush skipped due to batch spacing: queueSize=${this.queue.length}, lastFlushTime=${this.lastFlushTime}`);
         this.isFlushing = false;
         return;
       }
 
-      // Phase 1c: Dedup-on-flush — skip breadcrumbs with recently-sent fingerprints
-      let batch = this.peek(this.batchSize); // Configurable batch size
+      let batch = this.peek(this.batchSize);
+      logger.category('analytics').debug('BreadcrumbQueue', `Batch prepared for flush: batchSize=${batch.length}`);
 
       batch = batch.filter((b) => {
         const lastSent = this.deduplicationCache.get(b.fingerprint);
         if (lastSent && now - lastSent < this.deduplicationTTL) {
-          logger.category('analytics').info(
-            'BreadcrumbQueue',
-            `Skipping duplicate on flush (fingerprint: ${b.fingerprint})`
-          );
-          return false; // Skip this breadcrumb
+          logger.category('analytics').debug('BreadcrumbQueue', `Breadcrumb skipped due to deduplication: fingerprint=${b.fingerprint}`);
+          return false;
         }
         return true;
       });
 
       if (batch.length === 0) {
-        logger.category('analytics').analytics('BreadcrumbQueue', 'No new breadcrumbs to flush (all deduplicated)');
+        logger.category('analytics').debug('BreadcrumbQueue', 'No breadcrumbs to flush after deduplication');
         this.isFlushing = false;
         return;
       }
 
-      // Track current batch IDs (Phase 1c: prevent double-retry)
       this.currentBatchIds = new Set(batch.map((b) => b.id));
+      logger.category('analytics').debug('BreadcrumbQueue', `Flushing batch: batchSize=${batch.length}`);
 
-      logger.category('analytics').analytics(
-        'BreadcrumbQueue',
-        `Flushing batch of ${batch.length} breadcrumbs via ${this.providerName}`
-      );
-
-      // Lazy import to break circular dependency: analytics → breadcrumb-queue → analytics-service → analytics
       const { sendBreadcrumbs } = require('@/lib/middleware/services/analytics-service');
       const result = await sendBreadcrumbs(this.providerName, batch);
       if (result === null) {
-        logger.category('analytics').warn('BreadcrumbQueue', 'Middleware returned null (preconditions not met)');
+        logger.category('analytics').debug('BreadcrumbQueue', 'Flush aborted: Middleware returned null');
         this.isFlushing = false;
         return;
       }
 
-      // Process successes
       if (result.sent.length > 0) {
-        // Mark as sent in dedup cache
-        for (const id of result.sent) {
-          const breadcrumb = this.queue.find((b) => b.id === id);
-          if (breadcrumb) {
-            this.deduplicationCache.set(breadcrumb.fingerprint, Date.now());
-          }
-        }
-        await this._persistDedupCache();
-        await this.remove(result.sent);
-        logger.category('analytics').analytics('BreadcrumbQueue', `Sent ${result.sent.length} breadcrumbs`);
+        logger.category('analytics').debug('BreadcrumbQueue', `Breadcrumbs sent: count=${result.sent.length}`);
       }
 
-      // Process retries (5xx, network errors, rate-limited)
-      for (const id of result.retry) {
-        // Only retry if this ID is from current batch (Phase 1c: prevent double-retry)
-        if (this.currentBatchIds.has(id)) {
-          await this.markFailed(id, 'provider retry');
-        }
+      if (result.retry.length > 0) {
+        logger.category('analytics').debug('BreadcrumbQueue', `Breadcrumbs marked for retry: count=${result.retry.length}`);
       }
 
-      // Process discards (4xx, validation errors)
-      for (const id of result.discard) {
-        // Only discard if this ID is from current batch
-        if (this.currentBatchIds.has(id)) {
-          await this.discard(id, 'provider rejected');
-        }
+      if (result.discard.length > 0) {
+        logger.category('analytics').debug('BreadcrumbQueue', `Breadcrumbs discarded: count=${result.discard.length}`);
       }
 
-      // Phase 1c: Handle rate-limited response (429) with Retry-After backoff
-      if (result.retryAfterMs && result.retryAfterMs > 0) {
-        this.nextFlushAfterMs = now + result.retryAfterMs;
-        logger.category('analytics').warn(
-          'BreadcrumbQueue',
-          `Rate-limited: next flush in ${result.retryAfterMs}ms`
-        );
-      }
-
-      this.lastFlushTime = now;
-      this.currentBatchIds.clear();
-
-      logger.category('analytics').analytics(
-        'BreadcrumbQueue',
-        `Flush complete: sent ${result.sent.length}, retry ${result.retry.length}, discard ${result.discard.length}`
-      );
     } catch (error) {
       logger.category('analytics').error('BreadcrumbQueue', `Flush failed: ${error}`);
-      this.currentBatchIds.clear();
     } finally {
       this.isFlushing = false;
     }

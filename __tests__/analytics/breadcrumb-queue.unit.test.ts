@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
 import { breadcrumbQueue } from '@/lib/analytics/exporters/breadcrumb-queue';
@@ -8,6 +8,22 @@ const mockProvider = {
   name: 'mock-provider',
   sendBatch: async (batch: any) => ({ sent: batch.map((b: any) => b.id), retry: [], discard: [] }),
 };
+
+vi.mock('@/lib/utils/logger', () => ({
+  logger: {
+    category: vi.fn(() => ({
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      analytics: vi.fn(), // Added analytics method
+    })),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
 
 describe('BreadcrumbQueue - Unit', () => {
   beforeEach(async () => {

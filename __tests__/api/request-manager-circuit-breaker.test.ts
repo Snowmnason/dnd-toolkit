@@ -290,8 +290,11 @@ describe("Circuit Breaker RequestManager Integration", () => {
       CircuitBreakerManager.recordFailure(cbKey, false, thresholds);
       expect(CircuitBreakerManager.getState(cbKey)).toBe("Open");
 
-      // Wait for recovery timeout
+      // Verify nextRecoveryAt is set
       const stats1 = CircuitBreakerManager.getStats(cbKey);
+      expect(stats1.nextRecoveryAt).toBeGreaterThan(0);
+
+      // Wait for recovery timeout
       vi.useFakeTimers();
       vi.setSystemTime(stats1.nextRecoveryAt! + 1);
 
@@ -306,6 +309,7 @@ describe("Circuit Breaker RequestManager Integration", () => {
       const finalStats = CircuitBreakerManager.getStats(cbKey);
       expect(finalStats.failureCount).toBe(0);
       expect(finalStats.consecutiveHalfOpenFailures).toBe(0);
+      expect(finalStats.nextRecoveryAt).toBe(0); // Reset after closing
 
       vi.useRealTimers();
     });

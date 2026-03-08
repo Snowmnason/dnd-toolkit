@@ -123,7 +123,7 @@ vi.mock("@/lib/storage", () => ({
   SecureStorage: {
     getItem: vi.fn(),
     setItem: vi.fn(),
-    getJSON: vi.fn(),
+    getJSON: vi.fn().mockResolvedValueOnce(undefined),
     setJSON: vi.fn(),
     removeItem: vi.fn(),
     hasItem: vi.fn(),
@@ -144,22 +144,7 @@ vi.mock("@/system/Network/network-detection", () => ({
     CELLULAR: "cellular",
     OFFLINE: "offline",
   },
-}));
-
-// Mock logger
-vi.mock("@/lib/utils/logger", () => ({
-  logger: {
-    category: vi.fn(() => ({
-      debug: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-    })),
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  },
+  qualityToNetworkState: vi.fn(() => 'online'),
 }));
 
 // Mock Sentry to avoid pulling react-native internals during tests
@@ -171,6 +156,7 @@ vi.mock("@sentry/react-native", () => ({
   withScope: (cb: Function) => cb({ setExtras: () => {}, setTag: () => {} }),
 }));
 
+// Ensure debug logs are visible by default
 // Fail tests on unhandled promise rejections or uncaught exceptions so
 // Vitest surfaces the actual error/stack instead of worker exits.
 // Log worker id and initial memory so we can trace OOMs to a worker.

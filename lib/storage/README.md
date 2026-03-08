@@ -1,4 +1,4 @@
-# lib/storage
+# Storage Module
 
 Enterprise-grade, cross-platform, encrypted storage and cache system for all persistent and ephemeral app data.
 
@@ -41,29 +41,22 @@ Full policy: [docs/issues/MileStone 2/168 - Privacy PII Data/PRIVACY_POLICY.md](
 
 ```
 App Code
-  ↓
-SecureStorage (API)
-  ↓
-STORAGE_BACKEND_CONFIG (routes key)
-  ↓
-[EncryptedStorage | FastCache | AsyncStorage | localStorage | sessionStorage]
-  ↓
-Physical Storage (platform-specific)
+    ↓
+SecureStorage API
+    ↓
+Backend Routing
+    ↓
+[EncryptedStorage | FastCache | Platform Storage]
+    ↓
+Physical Storage
 ```
 
-**Key Components:**
-- **SecureStorage**: Main async API for persistent and sensitive data. Handles backend routing, encryption, validation, error handling.
-- **FastCache**: In-memory/session cache for ephemeral, high-frequency data (query cache, world access flags). TTL and prefix support.
-- **EncryptedStorage**: Underlying encryption layer (AES-256-CTR + HMAC-SHA256).
-- **STORAGE_BACKEND_CONFIG**: Central routing table for all keys.
-- **cache-versioning.ts**: Schema validation and migration for stored data.
-- **storage-error-handling.ts**: Category-based error handling with graceful fallback.
-- **world-access-cache.ts**: Centralizes world access flag sync.
+**Key Principles:**
 
-**Platform Abstraction:**
-- **Web**: localStorage/sessionStorage with selective encryption
-- **Native (iOS/Android)**: expo-secure-store + AsyncStorage, always encrypted
-- **Desktop (Electron)**: Same as web (localStorage/sessionStorage, encrypted)
+- **Automatic encryption**: All sensitive data encrypted with AES-256-CTR + HMAC-SHA256 across all platforms
+- **Backend abstraction**: Single API routes to appropriate storage backend based on data classification
+- **Graceful degradation**: Storage failures never crash the app, always provide fallbacks
+- **Schema versioning**: Automatic migration and validation of stored data across app updates
 
 ## API Reference
 
@@ -294,6 +287,19 @@ await worldAccessCache.updateAccessFlag(worldId, false, "remove");
 
 Clear all access flags and metadata for a world. Never throws.
 
+## Dependencies
+
+### External Packages
+
+- **`expo-secure-store`** – Encrypted storage on iOS/Android
+- **`@react-native-async-storage/async-storage`** – Fallback storage on native platforms
+
+### Internal Dependencies
+
+- **`lib/auth`** – Encrypted storage implementation for sensitive auth data
+- **`lib/cache`** – FastCache integration for ephemeral data storage
+- **`lib/network`** – Network error handling patterns
+
 ## Error Handling & Edge Cases
 
 ### Quota Exceeded
@@ -395,25 +401,24 @@ const data = await SecureStorage.getValidatedJSON(key, schema);
 
 **Recommendation:** Run during initialization or batch operations, not in hot paths.
 
-## Related Modules & Integration Points
+## Related Modules
 
-- `lib/auth/encrypted-storage` – Encryption implementation
-- `lib/cache` – QueryCache (uses FastCache for ephemeral data)
-- `lib/network` – Network error handling (complements storage errors)
-- `lib/database` – Uses SecureStorage for persistent user/world data
-- `lib/offline` – Uses SecureStorage for offline mutation queue
+- **`lib/auth`** – Uses SecureStorage for encrypted auth tokens and session data
+- **`lib/cache`** – Integrates FastCache for query result caching
+- **`lib/database`** – Stores persistent user and world data through SecureStorage
+- **`lib/offline`** – Uses SecureStorage for offline mutation queue persistence
 
 ## File Breakdown
 
-| File                      | Purpose                                       | Lines |
-| ------------------------- | --------------------------------------------- | ----- |
-| SecureStorage.ts          | Main API, backend routing, encryption         | ~400  |
-| FastCache.ts              | In-memory/session cache                       | ~100  |
-| cache-versioning.ts       | Versioning, migration, schema validation      | ~200  |
-| storage-config.ts         | Key routing, backend configuration            | ~140  |
-| storage-error-handling.ts | Error handling, graceful fallback             | ~500  |
-| world-access-cache.ts     | World access flag sync, non-throwing helpers  | ~80   |
-| update-storage-cache.ts   | Cache update orchestration                    | ~50   |
-| storage-health-monitor.ts | Periodic health checks via background jobs    | ~130  |
-| data-classification.ts    | Data sensitivity levels, classification rules | ~60   |
-| index.ts                  | Barrel export, key constants                  | ~100  |
+| File | Purpose |
+|------|---------|
+| `SecureStorage.ts` | Main API for encrypted persistent storage with backend routing |
+| `FastCache.ts` | In-memory session cache for ephemeral high-frequency data |
+| `cache-versioning.ts` | Schema validation and automatic migration for stored data |
+| `storage-config.ts` | Key routing configuration and backend selection logic |
+| `storage-error-handling.ts` | Graceful error handling and fallback mechanisms |
+| `world-access-cache.ts` | World access flag synchronization and caching |
+| `update-storage-cache.ts` | Cache update orchestration and coordination |
+| `storage-health-monitor.ts` | Background health checks and monitoring |
+| `data-classification.ts` | Data sensitivity levels and privacy classification |
+| `index.ts` | Barrel exports and storage key constants |

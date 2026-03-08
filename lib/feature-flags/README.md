@@ -224,6 +224,36 @@ const enabled = isInRollout(userId, "newFeature", 20, "v1");
 - **`lib/config`** – Hardcoded config defaults (appsettings.json)
 - **`lib/utils/logger`** – Bootstrap logging
 
+## Error Handling & Edge Cases
+
+### Server Unavailable
+
+Bootstrap fails gracefully; falls back to hardcoded defaults. Logs warning, continues with local config.
+
+### Clock Manipulation
+
+`verifyDeviceClock()` detects tampering (±60s tolerance). Entitlements denied if clock invalid. User prompted to fix system time.
+
+### Entitlement Expiry
+
+Expired entitlements return false immediately. No caching of expired values.
+
+### Network Failures
+
+Entitlement checks fail open (return false) on network errors. Feature disabled rather than crash.
+
+### Invalid Flag Names
+
+Unknown flags return false (disabled). Logged as warning in development.
+
+## Performance Notes
+
+- **Bootstrap once at startup** – Flags fetched once, cached in memory + SecureStorage
+- **Synchronous checks** – `getFlag()`, `isEnabledWithContext()` are instant (cached)
+- **Lazy entitlement fetches** – Premium checks hit server only when needed
+- **Deterministic hashing** – Rollout calculations are fast (no network, no storage)
+- **Minimal re-renders** – Hooks use stable references, avoid unnecessary updates
+
 ## Related Modules
 
 - **`lib/config`** – Hardcoded feature flag defaults (appsettings.json/dev.json)

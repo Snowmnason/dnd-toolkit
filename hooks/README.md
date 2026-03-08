@@ -1,85 +1,171 @@
-# Hooks
+# Hooks Layer
 
-**Reusable React hooks for navigation, data fetching, mutations, UI state, and feature checks.**
+React hooks providing UI-focused data formatting, error handling, and state management. Acts as the boundary between presentation components and business logic, ensuring clean separation of concerns.
 
-Concise reference for the project's hook categories, import patterns, common usage, and file layout. Follow React rules of hooks and prefer the barrel exports in `@/hooks`.
+## When to Use This Module
 
-## Quick Start
+**Use this module if you need:**
 
-### Import
+- Data fetching with loading states and error handling for UI
+- Mutation operations with optimistic updates and rollback
+- Navigation helpers and route state management
+- UI state management (theme, scale, notifications)
+- Feature flag checks in components
+- Asset loading and caching for images
+- Authentication guards and user state
+- Real-time subscriptions and updates
 
-Prefer the single barrel export:
+**Do NOT use this module for:**
 
-```tsx
-import { useWorldsQuery, useCreateWorldMutation, useAppNavigation } from "@/hooks";
+- Business logic operations (use lib/ managers)
+- Low-level data transformations (keep in components)
+- Side effects without UI updates (use lib/ services)
+- Platform-specific code (use system/ modules)
+
+## Architecture & Data Flow
+
+```
+Screens/Components
+    ↓ (call hooks)
+Hooks Layer (this module)
+    ↓ (call managers)
+Lib Managers (business logic)
+    ↓ (call middleware)
+System Layer (transport)
 ```
 
-Category barrels are available (e.g., `@/hooks/queries`) when you need to tree-shake or import a single hook.
+**Data Flow Pattern:**
 
-## Hook Categories (short)
+1. **Hooks** - Format data for UI, handle loading/errors, call managers
+2. **Managers** - Orchestrate operations, validate data, coordinate services
+3. **Middleware** - Network checks, data normalization, logging
+4. **System** - Pure HTTP transport, caching, retries
 
-- **Navigation**: `useAppNavigation`, `usePanelNavigation`, `useAnalyticsNavigation`
-- **Auth / Entitlements**: `useAuthStatus`, `usePremiumFeature`, `useEntitlement`
-- **Queries**: `useWorldsQuery`, `useCurrentUserQuery`, `useUserQuery`
-- **Mutations**: `useCreateWorldMutation`, `useUpdateWorldMutation`, `useDeleteWorldMutation`
-- **UI / Layout**: `useScale`, `useThemeSwitcher`, `useSplashScreen`, `useRenderTracker` (dev)
-- **Assets**: `useImageCache`, `usePrefetchImage`, `useViewportTracking`
-- **Feature Flags / A/B**: `useFeatureFlag`, `useVariantTracking`
-- **Notifications**: `useNotifications`
+**Hook Lifecycle:**
+- Pre-operation: Call manager with validated data
+- During operation: Handle loading states, optimistic updates
+- Post-operation: Update UI state, handle errors, trigger side effects
 
-## Common Patterns
+## API Reference
 
-Fetching example (React Query-style hooks):
+### Navigation Hooks
 
-```tsx
-const { data: worlds, isLoading, error } = useWorldsQuery({ page: 1, limit: 10 });
+```typescript
+useAppNavigation(): {
+  navigate: (route: RouteName, params?: RouteParams) => void;
+  goBack: () => void;
+  reset: (route: RouteName) => void;
+}
 ```
 
-Mutations with optimistic updates:
+### Query Hooks
 
-```tsx
-const mutation = useUpdateWorldMutation();
-mutation.mutate({ worldId, name }, { onSuccess: () => {} });
+```typescript
+useWorldsQuery(options?: QueryOptions): {
+  data: World[];
+  isLoading: boolean;
+  error: Error | null;
+  refetch: () => void;
+}
 ```
 
-Feature flag example:
+### Mutation Hooks
 
-```tsx
-const enabled = useFeatureFlag("newUI");
-return enabled ? <NewUI/> : <OldUI/>;
+```typescript
+useCreateWorldMutation(): {
+  mutate: (data: CreateWorldData) => void;
+  isLoading: boolean;
+  error: Error | null;
+  reset: () => void;
+}
 ```
 
-## Best Practices
+### UI Hooks
 
-- Use the barrel exports from `@/hooks`.
-- Always handle `isLoading` and `error` states.
-- Don't call hooks conditionally; keep them at component top-level.
-- Prefer React Query / mutation hooks for server state and optimistic updates.
-- Use `useRenderTracker()` in development to find unnecessary re-renders.
-
-## File Structure
-
-```text
-hooks/
-├── index.ts             # barrel
-├── queries/             # data fetching hooks
-├── mutations/           # create/update/delete hooks
-├── navigation/          # navigation helpers
-├── auth/                # auth & entitlement helpers
-├── ui/                  # scale, theme, splash hooks
-├── assets/              # image caching & viewport tracking
-└── utils/               # notifications, feature-flag helpers
+```typescript
+useTheme(): ThemeTokens;
+useScale(): ScaleValues;
+useToast(): ToastActions;
 ```
 
-## Important Notes
+## Dependencies
 
-- `useImageCache()` defaults: 50MB limit, 1-hour TTL.
-- Entitlement hooks may return cached values; call with `force`/refresh when needed.
-- Mutations follow `{ mutate, isLoading, error, data }` shape and accept `onSuccess` / `onError` options.
+**External packages:**
+- `react` - React hooks and state management
+- `@tanstack/react-query` - Data fetching and caching
+- `react-native-reanimated` - Animations (where used)
 
-## Related
+**Internal lib dependencies:**
+- `@/lib/auth` - Authentication state
+- `@/lib/navigation` - Route configuration
+- `@/lib/feature-flags` - Feature flag evaluation
+- `@/lib/analytics` - Event tracking
+- `@/lib/error` - Error reporting
 
-- [providers/](../providers/) — Auth, Theme, Scale providers used by hooks
-- [lib/navigation/](../lib/navigation/) — Route definitions and helpers
-- [lib/premium/](../lib/premium/) — Subscription & entitlement logic
+## Error Handling & Edge Cases
+
+**Network errors:** Hooks automatically handle network failures and provide user-friendly error messages through the `error` property.
+
+**Authentication errors:** Auth hooks redirect to login on session expiry. Use `useAuthGuard()` to protect routes.
+
+**Loading states:** All async hooks provide `isLoading` state. Use loading overlays for better UX.
+
+**Edge cases:**
+- Offline mode: Queries return cached data when available
+- Rate limiting: Mutations handle 429 responses with retry logic
+- Data conflicts: Optimistic updates rollback on failure
+
+## Performance Notes
+
+**Caching:** Query hooks use React Query for intelligent caching and background refetching.
+
+**Re-renders:** Hooks minimize re-renders through selector patterns and memoization.
+
+**Bundle size:** Tree-shake unused hooks by importing from category barrels (e.g., `@/hooks/queries`).
+
+**Memory:** Asset hooks implement viewport tracking to avoid loading off-screen images.
+
+## Related Modules
+
+- **lib/auth/** - Authentication operations called by auth hooks
+- **lib/navigation/** - Route management called by navigation hooks  
+- **lib/feature-flags/** - Feature evaluation called by feature hooks
+- **components/ui/** - UI components that consume these hooks
+- **system/Storage/** - Storage layer used by persistence hooks
+
+## File Breakdown
+
+| File | Purpose |
+|------|---------|
+| `index.ts` | Barrel exports for all hooks |
+| `queries/` | Data fetching hooks (React Query integration) |
+| `mutations/` | Data modification hooks (optimistic updates) |
+| `navigation/` | Route management and navigation helpers |
+| `auth/` | Authentication state and route guards |
+| `ui/` | Theme, scale, and UI state management |
+| `feature/` | Feature flag evaluation hooks |
+| `assets/` | Image loading and caching hooks |
+| `analytics/` | Event tracking hooks |
+| `error/` | Error boundary and reporting hooks |
+| `storage/` | Local storage persistence hooks |
+| `utils/` | Utility hooks (debounce, throttle, etc.) |
+
+## Testing
+
+**Unit tests:** Each hook has corresponding test files in `__tests__/hooks/`. Tests mock lib managers and verify UI behavior.
+
+**Integration tests:** Test hook-to-manager integration in `e2e/` tests.
+
+**Manual testing:** Use React DevTools Profiler to verify re-render behavior and performance.
+
+## Future Enhancements
+
+- Real-time subscription hooks for live data updates
+- Advanced caching strategies for offline-first apps
+- Hook composition utilities for complex state management
+- Performance monitoring and analytics integration
+
+---
+
+*This module follows the canonical README structure defined in `docs/README_STYLE_GUIDE.md`.*
 

@@ -8,7 +8,7 @@
  */
 
 import { breadcrumbQueue } from "@/lib/analytics";
-import { analyticsBufferService, notifyBufferStateChange } from "@/lib/analytics/exporters/analytics-buffer";
+import { _getAnalyticsBufferFlushing, analyticsBufferService } from "@/lib/analytics/exporters/analytics-buffer";
 import { logger } from "@/lib/utils/logger";
 import { useEffect, useState } from "react";
 
@@ -23,9 +23,7 @@ export interface AnalyticsBufferStatus {
   oldestEventAge: number | null;
 }
 
-// Module-level flushing state (shared with network integration)
-let isFlushing = false;
-let lastFlushTime: number | null = null;
+// Flushing state moved to lib/analytics/exporters/analytics-buffer.ts
 
 /**
  * Hook to get analytics buffer (event queue) status.
@@ -34,6 +32,7 @@ let lastFlushTime: number | null = null;
 export function useAnalyticsBufferStatus(): AnalyticsBufferStatus {
   const [status, setStatus] = useState<AnalyticsBufferStatus>(() => {
     const stats = analyticsBufferService.getStats();
+    const { isFlushing, lastFlushTime } = _getAnalyticsBufferFlushing();
     return {
       queueSize: stats.queueSize,
       isFlushing,
@@ -49,6 +48,7 @@ export function useAnalyticsBufferStatus(): AnalyticsBufferStatus {
       const stats = analyticsBufferService.getStats();
       const allEvents = await analyticsBufferService.getAll();
       const eventTypes = Array.from(new Set(allEvents.map((e) => e.eventType)));
+      const { isFlushing, lastFlushTime } = _getAnalyticsBufferFlushing();
       setStatus({
         queueSize: stats.queueSize,
         isFlushing,
@@ -71,17 +71,10 @@ export function useAnalyticsBufferStatus(): AnalyticsBufferStatus {
 }
 
 /**
- * Update flushing state — called from network integration.
- * Notifies all buffer subscribers when flushing state changes.
+ * Re-export from analytics-buffer for backwards compatibility
  * @internal
  */
-export function _setAnalyticsBufferFlushing(value: boolean, timestamp?: number): void {
-  isFlushing = value;
-  if (value === false && timestamp) {
-    lastFlushTime = timestamp;
-  }
-  notifyBufferStateChange();
-}
+export { _getAnalyticsBufferFlushing, _setAnalyticsBufferFlushing } from "@/lib/analytics/exporters/analytics-buffer";
 
 // ─── Breadcrumb Queue ─────────────────────────────────────────────────────────
 

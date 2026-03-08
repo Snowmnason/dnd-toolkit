@@ -1,6 +1,6 @@
 # Analytics Module
 
-Consent-aware analytics and performance monitoring. Handles event tracking, user identification, screen/session measurement, and offline event queuing with automatic retry.
+Consent-aware analytics and performance monitoring system handling event tracking, user identification, and offline event queuing.
 
 ## When to Use This Module
 
@@ -25,29 +25,24 @@ Consent-aware analytics and performance monitoring. Handles event tracking, user
 
 ```
 User Action / Runtime Event
+    ↓
+Check Consent Level
+    ↓
+Sanitize Data
+    ↓
+Network Online?
+    ├─ Yes → Send to ErrorTracker
+    └─ No → Queue to AnalyticsBuffer
         ↓
-    Check Consent Level (AnalyticsConsent)
-        ↓
-    Sanitize Data (strip message, stack, raw error fields)
-        ↓
-    Is Network Online? (works with lib/network)
-        ├─ YES ─→ Send to ErrorTracker (via getErrorTracker().addBreadcrumb())
-        └─ NO  ─→ Queue to AnalyticsBuffer (encrypted via lib/storage)
-                        ↓
-                  [Online transition detected]
-                        ↓
-                  [Flush in batches with exponential backoff retry]
-        ↓
-    Log to Logger (analytics / performance category)
+    [Online] → Flush with retry
 ```
 
 **Key Principles:**
 
-- **Privacy-first**: Defaults to `'basic'` consent (GDPR compliant); no usage or performance events sent without opt-in
-- **Offline-aware**: Events persist to encrypted storage and flush automatically when reconnected (works with lib/network)
-- **Resilient retries**: Failed sends retry with exponential backoff (1s → 2s → 4s → 8s → 16s, capped at 16s)
-- **Sanitization**: Strips `message`, `stack`, and raw error strings before sending; only `error_name` and `error_code` are kept
-- **Graceful degradation**: If error tracking is disabled or the tracker is NoOp, all calls are silent no-ops
+- **Privacy-first**: Defaults to basic consent level for GDPR compliance
+- **Offline-aware**: Events persist encrypted and flush automatically when reconnected
+- **Resilient**: Failed sends retry with exponential backoff
+- **Graceful degradation**: Silent no-ops when tracking is disabled
 
 ## API Reference
 

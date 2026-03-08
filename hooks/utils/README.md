@@ -1,6 +1,6 @@
-# Utils
+# Utils Hooks
 
-General-purpose hooks (feature flags, notifications, A/B tracking, and world creation modal flow). Keep UI-agnostic logic here.
+General-purpose React hooks providing feature flags, notifications, A/B tracking, and world creation modal flow.
 
 ## When to Use This Module
 
@@ -18,19 +18,19 @@ General-purpose hooks (feature flags, notifications, A/B tracking, and world cre
 
 ```
 Component
-        ↓
+    ↓
 useFeatureFlag / useNotifications
-        ↓
-feature flags manager / notification queue
-        ↓
-re-render / toast display
+    ↓
+Feature flags manager / notification queue
+    ↓
+Re-render / toast display
 ```
 
 **Key Principles:**
 
-- **Small, testable units**: Each hook solves one concern and is easy to mock.
-- **Non-blocking**: Tracking and notification calls do not block the UI.
-- **Composable**: Hooks can be combined (feature gating + notifications) in components.
+- **Small, testable units**: Each hook solves one concern and is easy to mock
+- **Non-blocking**: Tracking and notification calls do not block the UI
+- **Composable**: Hooks can be combined for complex UI logic
 
 ## API Reference
 
@@ -60,12 +60,12 @@ Client-side flow helpers for multi-step world creation and modal state.
 
 ### External Packages
 
-- None specific; relies on internal analytics and UI to render notifications
+None specific; relies on internal analytics and UI to render notifications
 
 ### Internal Dependencies
 
-- **`lib/feature-flags`** – authoritative feature data
-- **`lib/analytics`** – telemetry targets for tracking
+- **`lib/feature-flags`** – Authoritative feature data
+- **`lib/analytics`** – Telemetry targets for tracking
 
 ## Error Handling & Edge Cases
 
@@ -83,8 +83,8 @@ Feature checks should be cheap (cached) and avoid synchronous network calls duri
 
 ## Related Modules
 
-- **`lib/feature-flags`** – feature evaluation and server sync
-- **`components/ui`** – the visual toast/snackbar components
+- **`lib/feature-flags`** – Feature evaluation and server sync
+- **`components/ui`** – Visual toast/snackbar components
 
 ## File Breakdown
 
