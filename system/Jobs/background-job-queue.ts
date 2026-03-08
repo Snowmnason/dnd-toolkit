@@ -132,7 +132,6 @@ export class BackgroundJobQueue {
       concurrency: this.config.concurrency,
       concurrencyPerType: this.config.concurrencyPerType,
       enableAutoCleanup: this.config.enableAutoCleanup,
-      storageAdapter: this.config.storageAdapter,
     });
   }
 
@@ -268,7 +267,7 @@ export class BackgroundJobQueue {
    * Get status of a specific job
    */
   async getStatus(jobId: string): Promise<JobRecord | null> {
-    return this.config.storageAdapter.get(jobId);
+    return this.router.getJob(jobId);
   }
 
   /**
@@ -317,7 +316,7 @@ export class BackgroundJobQueue {
    * @returns true if cancelled, false if job not found or not cancelable
    */
   async cancel(jobId: string): Promise<boolean> {
-    const job = await this.config.storageAdapter.get(jobId);
+    const job = await this.router.getJob(jobId);
 
     if (!job) {
       logger.category("jobs").warn(`Job not found: ${jobId}`);
@@ -333,7 +332,8 @@ export class BackgroundJobQueue {
       return false;
     }
 
-    await this.config.storageAdapter.delete(jobId);
+    const adapter = await this.router.getAdapterForJob(job.sensitive);
+    await adapter.delete(jobId);
     logger.category("jobs").info(`Cancelled job ${jobId}`);
 
     return true;
@@ -345,7 +345,7 @@ export class BackgroundJobQueue {
   async clearByType(type: string): Promise<number> {
     const jobs = await this.getJobs(type);
 
-    await this.config.storageAdapter.deleteByType(type);
+    await this.router.deleteByType(type);
 
     logger.category("jobs").info(`Cleared ${jobs.length} jobs of type ${type}`);
 

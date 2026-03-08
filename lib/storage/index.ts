@@ -12,11 +12,12 @@
  * import { STORAGE_KEYS } from '@/maps/storage-keys';
  *
  * // Store data (backend routing is automatic via privacy middleware)
- * await StorageManager.set(STORAGE_KEYS.USER_DATA, userData);
+ * const setResult = await StorageManager.set(STORAGE_KEYS.USER_DATA, userData);
+ * if (!setResult.success) { console.error('Write failed'); }
  *
- * // Retrieve data
- * const result = await StorageManager.get(STORAGE_KEYS.USER_DATA);
- * if (result.success) { ... }
+ * // Retrieve data (returns T | null, not a result wrapper)
+ * const data = await StorageManager.get(STORAGE_KEYS.USER_DATA);
+ * if (data) { console.log('Got data:', data); }
  *
  * // With cache invalidation on write
  * await StorageManager.set(STORAGE_KEYS.CONNECTED_WORLDS, worlds, {
@@ -24,7 +25,9 @@
  * });
  *
  * // Subscribe to changes
- * const unsub = StorageManager.onKeyChange(STORAGE_KEYS.USER_DATA, (key, value) => { ... });
+ * const unsub = StorageManager.onKeyChange(STORAGE_KEYS.USER_DATA, (key, value) => {
+ *   console.log('Storage changed:', key, value);
+ * });
  * ```
  *
  * Architecture:

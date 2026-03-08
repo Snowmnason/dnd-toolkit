@@ -26,18 +26,18 @@
 
 import { logger } from '@/lib/utils/logger';
 import {
-    type CacheSchema,
+  type CacheSchema,
 } from '@/system/Storage/versioning/cache-versioning';
 import {
-    classifyKey,
-    getPrivacyStorageBackend,
-    shouldUseSecureStorage,
-    type PrivacyStorageBackend,
+  classifyKey,
+  getPrivacyStorageBackend,
+  shouldUseSecureStorage,
+  type PrivacyStorageBackend,
 } from './helpers/privacy';
 import {
-    handleStorageErrorGracefully,
-    type StorageErrorInfo,
-    type StorageGracefulResult,
+  handleStorageErrorGracefully,
+  type StorageErrorInfo,
+  type StorageGracefulResult,
 } from './helpers/storage-error-handling';
 
 // Re-export types for manager convenience
@@ -136,9 +136,10 @@ export async function persistValue<T = any>(
 
   try {
     const backend = resolveBackend(key, options.backend);
+    const isSecureBackend = backend === getSecureStorage();
 
-    // If schema provided AND using SecureStorage, delegate to setVersionedJSON
-    if (options.schema && shouldUseSecureStorage(key)) {
+    // If schema provided AND resolved backend is SecureStorage, delegate to setVersionedJSON
+    if (options.schema && isSecureBackend) {
       const secureStorage = getSecureStorage();
       // SecureStorage has setVersionedJSON method that handles versioning
       await (secureStorage as any).setVersionedJSON(key, value, options.schema.version);
@@ -186,8 +187,11 @@ export async function retrieveValue<T = any>(
   const backendLabel = getBackendLabel(key, options.backend);
 
   try {
-    // If schema provided AND using SecureStorage, delegate to getValidatedJSON
-    if (options.schema && shouldUseSecureStorage(key)) {
+    const backend = resolveBackend(key, options.backend);
+    const isSecureBackend = backend === getSecureStorage();
+
+    // If schema provided AND resolved backend is SecureStorage, delegate to getValidatedJSON
+    if (options.schema && isSecureBackend) {
       const secureStorage = getSecureStorage();
       // SecureStorage.getValidatedJSON handles validation, migration, and storage updates
       const data = await secureStorage.getValidatedJSON(key, options.schema) as T | null;
@@ -206,7 +210,6 @@ export async function retrieveValue<T = any>(
     }
 
     // Raw read (no versioning)
-    const backend = resolveBackend(key, options.backend);
     const raw = await backend.getJSON<T>(key);
 
     if (raw === null || raw === undefined) {
@@ -382,10 +385,13 @@ export async function checkStorageServiceHealth(): Promise<StorageHealthReport> 
  * Get the classification info for a storage key (for debugging/logging).
  */
 export function getKeyInfo(key: string) {
+  const isSecure = shouldUseSecureStorage(key);
   return {
     key,
     classification: classifyKey(key),
-    usesSecureStorage: shouldUseSecureStorage(key),
-    backend: shouldUseSecureStorage(key) ? 'SecureStorage' : 'FastCache',
+    usesSecureStorage: isSecure,
+    // NOTE: Reports default auto-routing for this key. Callers may override
+    // via backend option at call time, which is not reflected here.
+    backend: isSecure ? 'SecureStorage' : 'FastCache',
   };
 }

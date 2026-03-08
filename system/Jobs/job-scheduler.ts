@@ -23,7 +23,7 @@
 import { logger } from '@/lib/utils/logger';
 import { formatDelay } from '@/pure-algo-immutables/backoff';
 import { NetworkDetection } from '@/system/Network/network-detection';
-import type { JobRecord, StorageAdapter } from '@/type-definitions/job-queue-types';
+import type { JobRecord } from '@/type-definitions/job-queue-types';
 import type { JobExecutor } from './job-executor';
 import type { StorageAdapterRouter } from './storage-adapter-router';
 
@@ -32,7 +32,6 @@ export interface SchedulerConfig {
   concurrency: number;
   concurrencyPerType: Record<string, number>;
   enableAutoCleanup: boolean;
-  storageAdapter: StorageAdapter;
 }
 
 export class JobScheduler {
@@ -105,7 +104,8 @@ export class JobScheduler {
       // Reschedule deferred jobs (+5s to avoid tight retry loops while offline)
       for (const job of toDefer) {
         job.runAt = Date.now() + 5000;
-        await this.config.storageAdapter.set(job);
+        const adapter = await this.router.getAdapterForJob(job.sensitive);
+        await adapter.set(job);
         logger.category('jobs').debug(
           `Job ${job.id} deferred (${job.requiresNetwork === true ? 'requires-network' : 'hybrid'}, offline)`,
         );

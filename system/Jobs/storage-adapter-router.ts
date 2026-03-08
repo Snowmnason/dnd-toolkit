@@ -48,4 +48,32 @@ export class StorageAdapterRouter {
 
     return Array.from(jobMap.values());
   }
+
+  /**
+   * Get a job by ID from either adapter (searches both).
+   * Returns the first match found, prioritizing the adapter that contains it.
+   */
+  async getJob(jobId: string): Promise<JobRecord | null> {
+    // Try default adapter first
+    const job = await this.defaultAdapter.get(jobId);
+    if (job) return job;
+
+    // If not found and we have a secure adapter, try that
+    if (this.secureAdapter) {
+      return await this.secureAdapter.get(jobId);
+    }
+
+    return null;
+  }
+
+  /**
+   * Delete all jobs of a given type from both adapters.
+   * Clears the type from the default adapter and secure adapter (if present).
+   */
+  async deleteByType(type: string): Promise<void> {
+    await this.defaultAdapter.deleteByType(type);
+    if (this.secureAdapter) {
+      await this.secureAdapter.deleteByType(type);
+    }
+  }
 }
