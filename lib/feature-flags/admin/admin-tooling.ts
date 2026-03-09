@@ -11,7 +11,7 @@
 import { getAppConfig } from '@/config';
 import { validateAdvancedCondition } from "../evaluation/advanced-conditions";
 import type { FlagContext } from "../evaluation/conditions";
-import { FeatureFlagsManager } from "../server-sync";
+import { FeatureFlagsManager } from "../server-sync/orchestrator";
 
 // ==========================================
 // Config Validation

@@ -1,6 +1,12 @@
 /**
- * Feature flags system for development and testing
- * Allows toggling features without code changes via appsettings.*.json
+ * Local Feature Flags System (Config-Driven, Offline-Safe)
+ *
+ * Provides feature flag toggles from appsettings.*.json.
+ * No network needed - always available for offline scenarios.
+ *
+ * This is Phase 1 (config-driven). Server-synced flags (Phase 2+)
+ * are managed in lib/feature-flags/server-sync/ and coordinated by
+ * feature-flags-manager.ts.
  *
  * PRIVACY & DATA CLASSIFICATION NOTE:
  * - Non-user-specific feature flags → FastCache (PUBLIC/NON_SENSITIVE)

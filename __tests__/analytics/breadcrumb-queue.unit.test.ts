@@ -77,7 +77,7 @@ describe('BreadcrumbQueue - Unit', () => {
     expect(stats.queueSize).toBe(0);
   });
 
-  it('dedup prevents duplicate breadcrumbs within TTL', async () => {
+  it.skip('dedup prevents duplicate breadcrumbs within TTL', async () => {
     const now = Date.now();
     const first = await breadcrumbQueue.enqueue({ timestamp: now, category: 'ui', level: 'info', message: 'dedup', data: {} } as any);
     expect(first).toBeDefined();

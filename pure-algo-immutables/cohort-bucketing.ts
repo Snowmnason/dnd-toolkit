@@ -1,14 +1,17 @@
 /**
- * Feature Flag Cohorts
+ * Deterministic Cohort Bucketing
  *
- * Deterministic user grouping for feature targeting and gradual rollouts.
- * Cohorts enable safe, staged feature deployment without redeployment.
+ * Pure algorithm for evaluating user cohort membership using deterministic hashing.
+ * This module is app-agnostic and reusable across projects.
  *
- * **Phase 1 (Current):** TypeScript types + deterministic client-side bucketing
- * **Phase 2:** Database-backed explicit memberships + edge function updates
- * **Phase 3:** Condition-based cohort evaluation and dependency resolution
+ * **Phases:**
+ * - Phase 1 (Current): Deterministic client-side bucketing
+ * - Phase 2: Database-backed explicit memberships (consumed elsewhere)
+ * - Phase 3+: Condition-based evaluation (consumed elsewhere)
  *
- * @module lib/feature-flags/cohorts
+ * This file focuses on Phase 1: the pure bucketing algorithm.
+ *
+ * @module pure-algo-immutables/cohort-bucketing
  */
 
 import { isInRollout } from "@/pure-algo-immutables/rollout";
@@ -173,41 +176,7 @@ export interface UserCohortMembershipRow {
 }
 
 /**
- * Evaluate if user is in a cohort
- *
- * **Resolution order (highest to lowest priority):**
- * 1. Explicit membership → user is in cohort (admin override)
- * 2. Deterministic bucketing → use FNV-1a hash to check membership
- * 3. Not in cohort → false
- *
- * **Phase 1:** Uses deterministic bucketing only (client-side).
- * **Phase 2:** Adds explicit membership check via edge function.
- *
- * @param userId - User ID for bucketing
- * @param cohortId - Cohort ID to check
- * @param cohortDef - Cohort definition with percentage and seed
- * @param explicitMemberships - List of explicit membership cohort IDs (Phase 2)
- * @returns true if user is in cohort, false otherwise
- *
- * @example
- * ```ts
- * // Phase 1: Deterministic bucketing
- * const betaTesters: CohortDef = {
- *   slug: "beta_testers",
- *   percentage: 20,
- * };
- * if (isUserInCohort(userId, betaTesters)) {
- *   // ~20% of users reach here
- * }
- *
- * // Phase 2: With explicit membership override
- * const explicitMemberships = ["qa_testers"]; // Admin assigned this user
- * if (isUserInCohort(userId, qaTesters, explicitMemberships)) {
- *   // User is explicitly in qa_testers (has highest priority)
- * }
- *
- * // Rebalancing pattern
- * Check if a user is in a cohort (PHASE 1-3: Main evaluation function)
+ * Evaluate if user is in a cohort (PHASE 1-3: Main evaluation function)
  *
  * Evaluates cohort membership using two mechanisms:
  * 1. **Explicit membership** (Phase 2+, highest priority): Direct assignment from database
@@ -296,9 +265,6 @@ export interface UserCohortMembershipRow {
  * // If user was in day 1 (10%), guaranteed to be in day 2 (50%)
  * // Seed ensures consistent bucketing across percentage changes
  * ```
- *
- * @see {@link https://github.com/Snowmnason/dnd-toolkit/blob/main/lib/feature-flags/rollout.ts} for FNV hash implementation
- * @see {@link lib/feature-flags/README.md} for decision guide on "Cohorts vs. Conditions vs. Rollouts"
  */
 export function isUserInCohort(
   userId: string,
@@ -323,6 +289,8 @@ export function isUserInCohort(
  *
  * These cohorts are suitable for most feature rollout scenarios.
  * Modify or add additional cohorts as needed.
+ *
+ * Uses deterministic bucketing for consistent, repeatable user grouping.
  */
 export const RECOMMENDED_COHORTS: Record<string, CohortDef> = {
   beta_testers: {

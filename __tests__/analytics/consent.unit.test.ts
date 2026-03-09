@@ -3,14 +3,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnalyticsConsent, ConsentLevel } from '@/lib/analytics/consent/consent';
 import { SecureStorage } from '@/system/Storage';
 
-// Provide a test-local mock for storage so we can reliably observe calls
-vi.mock('@/lib/storage', () => {
+// Mock SecureStorage from @/system/Storage
+vi.mock('@/system/Storage', () => {
   return {
     SecureStorage: {
       getItem: vi.fn(),
       setItem: vi.fn(),
       getJSON: vi.fn(),
       setJSON: vi.fn(),
+      removeItem: vi.fn(),
     },
     STORAGE_KEYS: { ANALYTICS_CONSENT: 'dnd:analytics:consent', ANALYTICS_CONSENT_META: 'dnd:analytics:consent_meta' },
   };

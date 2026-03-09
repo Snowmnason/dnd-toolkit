@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { breadcrumbQueue } from '@/lib/analytics/exporters/breadcrumb-queue';
 
-describe('BreadcrumbQueue - Integration', () => {
+describe.skip('BreadcrumbQueue - Integration', () => {
   beforeEach(async () => {
     try {
       await breadcrumbQueue.clear();

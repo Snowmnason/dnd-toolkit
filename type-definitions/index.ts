@@ -33,3 +33,10 @@ export {
     type DataClassification
 } from "./data-classification";
 
+export type {
+    EntitlementState,
+    FeatureFlagState,
+    FlagsSubscriber
+} from "./featureFlagTypes";
+
+

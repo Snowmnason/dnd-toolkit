@@ -147,6 +147,74 @@ vi.mock("@/system/Network/network-detection", () => ({
   qualityToNetworkState: vi.fn(() => 'online'),
 }));
 
+// Mock logger to provide startTiming and category methods
+vi.mock("@/lib/utils/logger", () => {
+  const loggerMock = {
+    category: vi.fn(() => ({
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      analytics: vi.fn(),
+      perf: vi.fn(),
+      batch: vi.fn(),
+    })),
+    startTiming: vi.fn(() => ({
+      end: vi.fn(),
+      getElapsed: vi.fn(() => 0),
+    })),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    analytics: vi.fn(),
+    perf: vi.fn(),
+    setContext: vi.fn(),
+    clearContext: vi.fn(),
+    getContext: vi.fn(() => ({})),
+    reconfigure: vi.fn(),
+    success: vi.fn(),
+  };
+  return {
+    logger: loggerMock,
+    default: loggerMock,
+  };
+});
+
+// Mock with relative path for tests that don't use absolute paths
+vi.mock("lib/utils/logger", () => {
+  const loggerMock = {
+    category: vi.fn(() => ({
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      analytics: vi.fn(),
+      perf: vi.fn(),
+      batch: vi.fn(),
+    })),
+    startTiming: vi.fn(() => ({
+      end: vi.fn(),
+      getElapsed: vi.fn(() => 0),
+    })),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    analytics: vi.fn(),
+    perf: vi.fn(),
+    setContext: vi.fn(),
+    clearContext: vi.fn(),
+    getContext: vi.fn(() => ({})),
+    reconfigure: vi.fn(),
+    success: vi.fn(),
+  };
+  return {
+    logger: loggerMock,
+    default: loggerMock,
+  };
+});
+
 // Mock Sentry to avoid pulling react-native internals during tests
 vi.mock("@sentry/react-native", () => ({
   init: vi.fn(),

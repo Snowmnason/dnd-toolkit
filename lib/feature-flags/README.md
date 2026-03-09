@@ -40,7 +40,7 @@ Components check: isEnabled(), getKind(), toggle()
 ```
 AppKernel Startup
         ↓
-FeatureFlagsManager.initialize(supabaseClient, userId)
+FeatureFlagsManager.initialize(userId)
         ↓
 verifyDeviceClock() [detect manipulation]
         ↓
@@ -122,14 +122,15 @@ Bulk-update from server. Called automatically by AppKernel after bootstrap.
 
 ### FeatureFlagsManager (Server-Driven, Production)
 
-Fetches flags once at startup; entitlements fetched fresh on each call. Server values override hardcoded defaults. Expired entitlements automatically denied. Clock manipulation detected.
+Fetches flags once at startup; entitlements fetched fresh on each call. Server values override hardcoded defaults. Expired entitlements automatically denied. Clock manipulation detected. Supabase client is obtained lazily—no provider parameter needed.
 
-#### `async initialize(supabaseClient, userId?: string): Promise<void>`
+#### `async initialize(userId?: string): Promise<void>`
 
-Initialize manager with Supabase client and optional user ID. Called automatically by AppKernel.
+Initialize manager with optional user ID. Called automatically by AppKernel.
+Supabase client (if configured) is obtained lazily only when setting up Realtime subscriptions.
 
 ```typescript
-await FeatureFlagsManager.initialize(getSupabaseClient(), userId);
+await FeatureFlagsManager.initialize(userId);
 ```
 
 #### `async bootstrapFlags(): Promise<void>`

@@ -23,11 +23,19 @@ import {
     isServiceReady,
     type DatabaseProvider
 } from '@/system/Services';
-import {
-    runEdgeFunction as rawRunEdgeFunction,
-    type EdgeFunctionInput,
-    type EdgeFunctionOutput,
-} from '@/system/Services/supabase/supabase-rpc-provider';
+
+// ─── RPC Procedure Map ────────────────────────────────────────────
+// Maps semantic edge function names to their Supabase PostgreSQL RPC procedure names.
+// All calls go through getDatabaseProvider().rpc() — no direct Supabase dependency.
+
+const RPC_PROCEDURE_MAP: Record<string, string> = {
+    leaveWorld: 'leave_world',
+    joinWorldWithInvite: 'join_world_with_invite',
+    createInviteLink: 'create_invite_link',
+    resolveInviteToken: 'resolve_invite_token',
+    deleteInviteLink: 'delete_invite_link',
+    removeWorldAccess: 'remove_world_access',
+};
 
 // ─── Precondition Checks ───────────────────────────────────────────
 
@@ -105,22 +113,16 @@ export function isDatabaseConfigured(): boolean {
 // ─── Edge Functions (RPC) ──────────────────────────────────────────
 
 /**
- * Run an edge function via RPC with precondition checks.
- * Checks network availability and database provider readiness before executing.
- *
- * @param functionName semantic name (e.g., 'leaveWorld')
- * @param input parameters to pass to the RPC call
- * @returns result from the RPC call
+ * Run a PostgreSQL stored procedure via the database provider.
+ * Maps semantic names → procedure names via RPC_PROCEDURE_MAP.
  *
  * Preconditions:
- * - Network must be available (database operations require connectivity)
- * - Database provider must be ready (initialized)
- *
- * If preconditions fail, throws with descriptive error.
+ * - Network must be available
+ * - Database provider must be ready
  */
-export async function runEdgeFunction<T extends EdgeFunctionOutput = any>(
+export async function runEdgeFunction<T = any>(
     functionName: string,
-    input: EdgeFunctionInput
+    input: Record<string, any>
 ): Promise<T> {
     if (!isNetworkAvailable()) {
         throw new Error('[edge-function] Network offline — RPC calls require connectivity');
@@ -130,21 +132,70 @@ export async function runEdgeFunction<T extends EdgeFunctionOutput = any>(
         throw new Error('[edge-function] Database provider not ready — cannot execute RPC call');
     }
 
-    logger.category('database').debug('[edge-function] Executing RPC call', {
-        functionName,
-    });
+    // eslint-disable-next-line security/detect-object-injection
+    const rpcProcedure = RPC_PROCEDURE_MAP[functionName];
+    if (!rpcProcedure) {
+        throw new Error(
+            `Unknown edge function: "${functionName}". Supported: ${Object.keys(RPC_PROCEDURE_MAP).join(', ')}`
+        );
+    }
+
+    logger.category('database').debug('[edge-function] Executing RPC call', { functionName });
 
     try {
-        const result = await rawRunEdgeFunction<T>(functionName, input);
-        logger.category('database').debug('[edge-function] RPC call succeeded', {
-            functionName,
-        });
-        return result;
+        const { data, error } = await getDatabaseProvider().rpc(rpcProcedure, input);
+        if (error) {
+            logger.category('database').error('[edge-function] RPC call failed', { functionName, error: error.message });
+            throw new Error(`RPC call "${rpcProcedure}" failed: ${error.message}`);
+        }
+        logger.category('database').debug('[edge-function] RPC call succeeded', { functionName });
+        return data as T;
     } catch (error) {
-        logger.category('database').error('[edge-function] RPC call failed', {
-            functionName,
-            error,
+        logger.category('database').error('[edge-function] RPC call failed', { functionName, error });
+        throw error;
+    }
+}
+
+/**
+ * Invoke a Supabase Edge Function by name.
+ * Uses the raw client escape hatch on the database provider for Edge Function calls,
+ * which cannot be expressed through the standard DatabaseProvider RPC interface.
+ *
+ * Preconditions:
+ * - Network must be available
+ * - Database provider must be ready and have a raw client
+ */
+export async function invokeEdgeFunction<T = any>(
+    functionName: string,
+    input?: Record<string, any>
+): Promise<T> {
+    if (!isNetworkAvailable()) {
+        throw new Error('[invoke-edge-function] Network offline — Edge Function calls require connectivity');
+    }
+
+    if (!isDatabaseReady()) {
+        throw new Error('[invoke-edge-function] Database provider not ready');
+    }
+
+    const rawClient = getDatabaseProvider().getRawClient?.();
+    if (!rawClient) {
+        throw new Error('[invoke-edge-function] Database provider does not expose a raw client');
+    }
+
+    logger.category('database').debug('[invoke-edge-function] Invoking Edge Function', { functionName });
+
+    try {
+        const { data, error } = await rawClient.functions.invoke(functionName, {
+            body: input,
         });
+        if (error) {
+            logger.category('database').error('[invoke-edge-function] Edge Function failed', { functionName, error: error.message });
+            throw new Error(`Edge Function "${functionName}" failed: ${error.message}`);
+        }
+        logger.category('database').debug('[invoke-edge-function] Edge Function succeeded', { functionName });
+        return data as T;
+    } catch (error) {
+        logger.category('database').error('[invoke-edge-function] Edge Function threw', { functionName, error });
         throw error;
     }
 }

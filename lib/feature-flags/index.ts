@@ -22,20 +22,7 @@ export type {
     FeatureFlag,
     FeatureFlagKind,
     FeatureFlagName
-} from "./feature-flags";
-
-export type {
-    EntitlementState,
-    FeatureFlagState,
-    FlagsSubscriber
-} from "./server-sync";
-
-export {
-    isUserInCohort, RECOMMENDED_COHORTS, type CohortDef,
-    type CohortFlagAssignmentRow,
-    type CohortRow,
-    type UserCohortMembershipRow
-} from "./cohorts";
+} from "./local-flags";
 
 // Evaluation (used by manager internally, also available for advanced use)
 export {

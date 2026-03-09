@@ -27,10 +27,9 @@ import {
     type DatabaseProvider,
     type Session,
 } from '@/system/Services';
-import {
-    getSupabaseClientLazy as rawGetSupabaseClientLazy,
-    isSupabaseConfiguredLazy as rawIsSupabaseConfiguredLazy,
-} from '@/system/Services/supabase/supabase-lazy';
+// Note: Supabase-specific lazy loading is now handled via the DatabaseProvider adapter.
+// Use rawGetDatabaseProvider().isConfigured() instead of isSupabaseConfiguredLazy.
+// Use rawGetDatabaseProvider().getRawClient() instead of getSupabaseClientLazy.
 
 // ─── Precondition Checks ───────────────────────────────────────────
 
@@ -246,21 +245,28 @@ export async function authGetUser(): Promise<ReturnType<AuthProvider['getUser']>
 // direct client access but don't go through the standard auth provider flow.
 
 /**
- * Check if Supabase is configured without importing the client.
- * Useful for conditional auth flows that need to run before full client init.
+ * Check if the database (Supabase) provider is configured and ready.
+ * Drop-in replacement for the old isSupabaseConfiguredLazy — no direct Supabase import needed.
  */
-export async function isSupabaseConfiguredLazy(): Promise<boolean> {
-    return await rawIsSupabaseConfiguredLazy();
+export function isSupabaseConfiguredLazy(): boolean {
+    return rawGetDatabaseProvider().isConfigured();
 }
 
 /**
- * Get the lazy-loaded Supabase client.
- * Checks configuration before returning.
+ * Get the raw database client (Supabase SupabaseClient instance).
+ * Uses the DatabaseProvider escape hatch — no direct Supabase import needed.
  *
- * @throws Error if Supabase is not configured
+ * @throws Error if the provider is not configured or has no raw client
  */
-export async function getSupabaseClientLazy() {
-    return await rawGetSupabaseClientLazy();
+export function getSupabaseClientLazy() {
+    const client = rawGetDatabaseProvider().getRawClient?.();
+    if (!client) {
+        throw new Error(
+            'Database provider is not configured or does not expose a raw client. ' +
+            'Ensure Supabase credentials are set before calling getSupabaseClientLazy.'
+        );
+    }
+    return client;
 }
 
 /**

@@ -17,29 +17,29 @@
  */
 
 import {
-    cleanupAnalyticsNetworkIntegration,
-    initializeAnalyticsNetworkIntegration,
+  cleanupAnalyticsNetworkIntegration,
+  initializeAnalyticsNetworkIntegration,
 } from "@/lib/analytics/exporters/analytics-network-integration";
 import {
-    createSafeModeState,
-    DEFAULT_SAFE_MODE_CONFIG,
-    NetworkCascadeDetector,
-    SafeModeLevel,
-    SafeModeReason,
-    type SafeModeState,
+  createSafeModeState,
+  DEFAULT_SAFE_MODE_CONFIG,
+  NetworkCascadeDetector,
+  SafeModeLevel,
+  SafeModeReason,
+  type SafeModeState,
 } from "@/lib/error";
 import { logger } from "@/lib/utils";
 import {
-    NetworkDetection,
-    NetworkStatus,
+  NetworkDetection,
+  NetworkStatus,
 } from "@/system/Network";
 import {
-    KernelErrorCode,
-    KernelPhase,
-    type AppKernelState,
-    type KernelCapabilities,
-    type KernelError,
-    type KernelListener,
+  KernelErrorCode,
+  KernelPhase,
+  type AppKernelState,
+  type KernelCapabilities,
+  type KernelError,
+  type KernelListener,
 } from "@/type-definitions/kernel-types";
 import { authPhase } from "./phases/auth-phase";
 import { configPhase } from "./phases/config-phase";
@@ -63,11 +63,11 @@ import { userPhase } from "./phases/user-phase";
  * These exports prevent breaking external imports from system/Kernel
  */
 export {
-    KernelErrorCode,
-    KernelPhase, type AppKernelState,
-    type KernelCapabilities,
-    type KernelError,
-    type KernelListener
+  KernelErrorCode,
+  KernelPhase, type AppKernelState,
+  type KernelCapabilities,
+  type KernelError,
+  type KernelListener
 } from "@/type-definitions/kernel-types";
 
 class AppKernelClass {
@@ -357,18 +357,14 @@ class AppKernelClass {
       // ─── Feature Flags Bootstrap ──────────────────────────────────
       try {
         const { FeatureFlagsManager } =
-          await import("@/lib/feature-flags/server-sync");
+          await import("@/lib/feature-flags/server-sync/orchestrator");
         const { getDatabaseProvider } = await import("@/system/Services");
-        const { getSupabaseClient } = await import(
-          "@/system/Services/supabase/supabase-client"
-        );
 
         if (!getDatabaseProvider().isConfigured()) {
           logger
             .category("bootstrap")
             .warn("Database not configured — skipping feature flags bootstrap");
         } else {
-          const supClient = getSupabaseClient();
           let userId: string | undefined;
           try {
             const { AuthStateManager } = await import("@/lib/auth/auth-state");
@@ -376,7 +372,7 @@ class AppKernelClass {
           } catch {
             // userId unavailable — remote per-user overrides won't load
           }
-          await FeatureFlagsManager.initialize(supClient, userId);
+          await FeatureFlagsManager.initialize(userId);
 
           const clockValid = await FeatureFlagsManager.verifyDeviceClock();
           if (!clockValid) {
@@ -395,7 +391,7 @@ class AppKernelClass {
           // Bridge server-synced flags to the legacy FeatureFlags system
           try {
             const { FeatureFlags } = await import(
-              "@/lib/feature-flags/feature-flags"
+              "@/lib/feature-flags/local-flags"
             );
             const serverFlags = FeatureFlagsManager.getAllFlags();
             FeatureFlags.syncFromServer(serverFlags);
