@@ -56,7 +56,6 @@ export interface AppSplitViewProps extends AppViewProps {
 
 export interface AppLoadingViewProps extends ViewProps {
   loadMessage?: string;
-  error?: Error | null;
   assetsLoaded?: boolean;
 }
 
@@ -347,14 +346,12 @@ export function AppSplit({
 */
 export function AppLoading({
   loadMessage = "Loading...",
-  error = null,
   assetsLoaded = false,
   ...rest
 }: AppLoadingViewProps) {
   return (
     <LoadingOverlay
       message={loadMessage}
-      error={error}
       assetsLoaded={assetsLoaded}
       {...rest}
     />

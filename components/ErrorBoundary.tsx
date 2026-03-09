@@ -1,6 +1,4 @@
-import { AnalyticsConsent, getCrashReportPayload, sessionManager } from '@/lib/analytics';
-import { reportError } from '@/lib/error';
-import { logger } from '@/lib/utils/logger';
+import { handleErrorReport } from '@/hooks/analytics';
 import { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {
@@ -17,7 +15,7 @@ interface State {
  * Global Error Boundary Component
  *
  * Catches unhandled errors in the React component tree
- * Logs errors to console and error tracking service
+ * Delegates error reporting to useErrorReporting.handleErrorReport()
  * Displays a user-friendly crash fallback screen via renderFallback prop
  */
 export class AppErrorBoundary extends Component<Props, State> {
@@ -29,33 +27,8 @@ export class AppErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error details for debugging
-    logger.category('ui').error('Uncaught error:', error, errorInfo);
-
-    // Track error in session
-    try {
-      sessionManager.trackError();
-    } catch (sessionError) {
-      logger.category('ui').warn('Could not track error in session:', sessionError);
-    }
-
-    // Send to error tracking service
-    try {
-      const captureOptions = getCrashReportPayload(
-        error,
-        errorInfo.componentStack || undefined,
-        AnalyticsConsent.getLevel()
-      );
-      if (captureOptions !== null) {
-        reportError(error, captureOptions);
-      } else {
-        logger.category('ui').warn('Error not sent to error tracker (consent=none; awaiting user opt-in via dialog)');
-        // TODO: Show crash consent dialog here (out of scope Phase 1)
-      }
-    } catch (trackerError) {
-      // Error tracker might not be available (e.g., on web in some cases)
-      logger.category('ui').warn('Could not send error to error tracker:', trackerError);
-    }
+    // Delegate all error handling to utility function
+    handleErrorReport(error, errorInfo);
   }
 
   handleRetry = () => {

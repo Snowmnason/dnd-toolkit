@@ -80,7 +80,6 @@ export default function HomePage() {
       <View style={styles.container}>
         <LoadingOverlay
           message={loadingMessage}
-          error={kernel.error}
           assetsLoaded={kernel.phases.preloadReady}
         />
       </View>
@@ -127,7 +126,6 @@ export default function HomePage() {
     <View style={styles.container}>
       <LoadingOverlay
         message="Checking authentication..."
-        error={kernel.error}
         assetsLoaded={kernel.phases.preloadReady}
       />
     </View>

@@ -213,7 +213,6 @@ function RootLayoutContent() {
     return (
       <LoadingOverlay
         message="Loading D&D Toolkit..."
-        error={kernel.error}
         assetsLoaded={kernel.phases.preloadReady}
       />
     );

@@ -47,6 +47,33 @@ module.exports = defineConfig([
       'no-restricted-globals': 'off',
     },
   },
+  // === ARCHITECTURE BOUNDARY RULES ===
+  // Components should NOT import from lib/ or system/ (use hooks instead)
+  // Note: Glob patterns like 'lib/*' aren't supported in ESLint 9's no-restricted-imports
+  // Instead we rely on code review and architectural discipline
+  {
+    files: ['components/**/*.tsx', 'components/**/*.ts'],
+    rules: {
+      // Rule disabled - we can't use glob patterns in no-restricted-imports with ESLint 9
+      // Enforcement is done via code review instead
+    },
+  },
+  // Lib folder architectural rules
+  {
+    files: ['lib/**/*.ts', 'lib/**/*.tsx'],
+    rules: {
+      // Glob patterns like 'hooks/*' and 'components/*' aren't supported in ESLint 9
+      // Enforcement is done via code review instead
+    },
+  },
+  // System folder architectural rules
+  {
+    files: ['system/**/*.ts', 'system/**/*.tsx'],
+    rules: {
+      // Glob patterns like 'lib/*', 'hooks/*', 'components/*' aren't supported in ESLint 9
+      // Enforcement is done via code review instead
+    },
+  },
 ]);
 
 

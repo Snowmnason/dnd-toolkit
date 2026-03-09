@@ -16,12 +16,11 @@
  */
 
 import { Button, ButtonText } from '@/components/ui';
-import { AuthStateManager, logger } from '@/lib';
-import { restoreSession, signInWithIdToken, signInWithOAuth } from '@/lib/auth';
-import { router } from 'expo-router';
+import { useGoogleSignIn } from '@/hooks/auth';
+import { logger } from '@/lib';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 
 // Complete auth session setup for mobile
 WebBrowser.maybeCompleteAuthSession();
@@ -30,139 +29,6 @@ WebBrowser.maybeCompleteAuthSession();
 interface GoogleOAuthComponents {
   GoogleOAuthProvider: any;
   GoogleLogin: any;
-}
-
-// Common auth success handler
-async function handleAuthSuccess(data: any) {
-  // Save successful authentication state
-  await AuthStateManager.setHasAccount(true);
-  
-  // Check if user has profile in database
-  const { usersDB } = await import('@/lib');
-  try {
-    const userProfile = await usersDB.getCurrentUser();
-    if (userProfile && userProfile.username) {
-      router.replace('/select/world-selection');
-    } else {
-      router.replace('/login/sign-up');
-    }
-  } catch {
-    router.replace('/login/sign-up');
-  }
-}
-
-// Mobile/Native Google auth with comprehensive OAuth flow
-async function onGoogleButtonPressMobile() {
-  try {
-  logger.category('auth').debug('onGoogleButtonPressMobile - start');
-    
-    // Extract URL parameters for OAuth callback
-    function extractParamsFromUrl(url: string) {
-      const parsedUrl = new URL(url);
-      const hash = parsedUrl.hash.substring(1); // Remove the leading '#'
-      const params = new URLSearchParams(hash);
-      return {
-        access_token: params.get("access_token"),
-        expires_in: parseInt(params.get("expires_in") || "0"),
-        refresh_token: params.get("refresh_token"),
-        token_type: params.get("token_type"),
-        provider_token: params.get("provider_token"),
-        code: params.get("code"),
-      };
-    }
-
-    // Start OAuth flow with custom redirect
-    const oauthResult = await signInWithOAuth("google", {
-      redirectTo: `dnd-toolkit://google-auth`,
-      queryParams: { prompt: "consent" },
-      skipBrowserRedirect: true,
-    });
-
-    const googleOAuthUrl = oauthResult.url;
-    if (!googleOAuthUrl) {
-      logger.category('auth').error('No OAuth URL found!');
-      Alert.alert('Authentication Error', 'Failed to initialize Google sign-in');
-      return;
-    }
-
-    // Open browser session for OAuth
-    const browserResult = await WebBrowser.openAuthSessionAsync(
-      googleOAuthUrl,
-      `dnd-toolkit://google-auth`,
-      { showInRecents: true },
-    ).catch((err) => {
-      logger.category('auth').error('onGoogleButtonPressMobile - openAuthSessionAsync - error', { err });
-      throw err;
-    });
-
-    logger.category('auth').debug('onGoogleButtonPressMobile - openAuthSessionAsync - result', { browserResult });
-
-    if (browserResult && browserResult.type === "success") {
-      logger.category('auth').debug('onGoogleButtonPressMobile - openAuthSessionAsync - success');
-      const params = extractParamsFromUrl(browserResult.url);
-      logger.category('auth').debug('onGoogleButtonPressMobile - extracted params', { params });
-
-      if (params.access_token && params.refresh_token) {
-        logger.category('auth').debug('onGoogleButtonPressMobile - restoring session');
-        const restored = await restoreSession({
-          access_token: params.access_token,
-          refresh_token: params.refresh_token,
-        });
-
-        if (!restored) {
-          logger.category('auth').error('onGoogleButtonPressMobile - restoreSession failed');
-          Alert.alert('Authentication Error', 'Failed to restore session');
-          return;
-        }
-
-        logger.category('auth').debug('onGoogleButtonPressMobile - restoreSession success');
-        await handleAuthSuccess({});
-      } else {
-        logger.category('auth').error('onGoogleButtonPressMobile - missing tokens in response');
-        Alert.alert('Authentication Error', 'Failed to retrieve authentication tokens');
-      }
-    } else if (browserResult && browserResult.type === "cancel") {
-      logger.category('auth').debug('onGoogleButtonPressMobile - user canceled');
-      // User canceled - don't show error
-      return;
-    } else {
-      logger.category('auth').error('onGoogleButtonPressMobile - openAuthSessionAsync failed', { browserResult });
-      Alert.alert('Authentication Error', 'Google sign-in was unsuccessful');
-    }
-  } catch (error) {
-    logger.category('auth').error('Google auth error:', error);
-    Alert.alert('Error', 'An unexpected error occurred during Google sign-in');
-  }
-}
-
-// Web Google auth success handler
-async function onGoogleButtonSuccessWeb(authRequestResponse: any) {
-  try {
-    logger.category('auth').debug('Google sign in successful:', { authRequestResponse });
-    
-    if (authRequestResponse.clientId && authRequestResponse.credential) {
-      const result = await signInWithIdToken('google', authRequestResponse.credential);
-
-      if (!result.success) {
-        logger.category('auth').error('Error signing in with Google:', result.error?.message);
-        Alert.alert('Authentication Error', result.error?.message || 'Failed to sign in with Google');
-        return;
-      }
-
-      if (result.data) {
-        logger.category('auth').info('Google sign in successful:', result.data);
-        await handleAuthSuccess(result.data);
-      }
-    }
-  } catch (error) {
-    logger.category('auth').error('Google auth error:', error);
-    Alert.alert('Error', 'An unexpected error occurred');
-  }
-}
-
-function onGoogleButtonFailureWeb() {
-  logger.category('auth').error('Error signing in with Google');
-  Alert.alert('Authentication Error', 'Google sign-in failed. Please try again.');
 }
 
 interface GoogleSignInButtonProps {
@@ -175,6 +41,7 @@ function GoogleButtonWeb({ disabled }: { disabled: boolean }) {
   const [sha256Nonce, setSha256Nonce] = useState('');
   const [googleComponents, setGoogleComponents] = useState<GoogleOAuthComponents | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { handleGoogleWebAuth, handleGoogleWebAuthError } = useGoogleSignIn();
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -268,8 +135,8 @@ function GoogleButtonWeb({ disabled }: { disabled: boolean }) {
       <div style={{ width: '100%' }}>
         <GoogleLogin
           nonce={sha256Nonce}
-          onSuccess={onGoogleButtonSuccessWeb}
-          onError={onGoogleButtonFailureWeb}
+          onSuccess={handleGoogleWebAuth}
+          onError={handleGoogleWebAuthError}
           useOneTap={false}
           auto_select={false}
           disabled={disabled}
@@ -284,11 +151,16 @@ function GoogleButtonWeb({ disabled }: { disabled: boolean }) {
   );
 }
 
+interface GoogleSignInButtonProps {
+  disabled?: boolean;
+  style?: object;
+}
+
 // Main component that switches between web and mobile
 export default function GoogleSignInButton({ disabled = false, style }: GoogleSignInButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const { handleGoogleMobileAuth } = useGoogleSignIn();
 
-  // Warm up browser for mobile performance
   useEffect(() => {
     if (Platform.OS !== 'web') {
       WebBrowser.warmUpAsync();
@@ -298,7 +170,6 @@ export default function GoogleSignInButton({ disabled = false, style }: GoogleSi
     }
   }, []);
 
-  // Web implementation
   if (Platform.OS === 'web') {
     return (
       <div style={{ ...style }}>
@@ -307,11 +178,10 @@ export default function GoogleSignInButton({ disabled = false, style }: GoogleSi
     );
   }
 
-  // Mobile implementation
   const handlePress = async () => {
     setIsLoading(true);
     try {
-      await onGoogleButtonPressMobile();
+      await handleGoogleMobileAuth();
     } finally {
       setIsLoading(false);
     }
