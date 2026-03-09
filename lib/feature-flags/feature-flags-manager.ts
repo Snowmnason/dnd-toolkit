@@ -14,19 +14,22 @@
 
 import { logger } from '@/lib/utils/logger';
 import { type FlagContext } from './evaluation/conditions';
-import type { FeatureFlagKind, FeatureFlagName } from './feature-flags';
-import { FeatureFlags } from './feature-flags';
-import { FeatureFlagsManager } from './server-sync';
+import type { FeatureFlagKind, FeatureFlagName } from './local-flags';
+import { FeatureFlags } from './local-flags';
+import { FeatureFlagsManager } from './server-sync/orchestrator';
 
 // ─── Initialization ──────────────────────────────────────────────────────────
 
 /**
  * Initialize the feature flags system.
  * Called by AppKernel during bootstrap.
+ * 
+ * Does NOT require Supabase client — realtime subscriptions will lazily
+ * obtain the provider internally if available.
  */
-export async function initialize(supabaseClient: any, userId?: string): Promise<void> {
+export async function initialize(userId?: string): Promise<void> {
   try {
-    await FeatureFlagsManager.initialize(supabaseClient, userId);
+    await FeatureFlagsManager.initialize(userId);
     logger.category('bootstrap').info('Feature flags initialized (server-driven + config fallback)');
   } catch (error) {
     logger.category('feature_flags').warn('Server-driven flags failed to initialize; using config fallback', error);

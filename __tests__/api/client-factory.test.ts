@@ -15,45 +15,10 @@ import { z } from "zod";
 
 // Now import the client factory after mocking
 import type {
-    MutationOptions,
-    QueryOptions,
+  MutationOptions,
+  QueryOptions,
 } from "../../lib/api/client-factory";
 import { APIClient } from "../../lib/api/client-factory";
-
-// Mock logger first to prevent any downstream react-native imports
-vi.mock("../../lib/utils/logger", () => ({
-  logger: {
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    category: vi.fn(() => ({
-      debug: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-    })),
-  },
-}));
-
-// Mock CircuitBreakerManager
-vi.mock("../../lib/api/circuit-breaker", () => ({
-  CircuitBreakerManager: {
-    getState: vi.fn(),
-    recordSuccess: vi.fn(),
-    recordFailure: vi.fn(),
-  },
-}));
-
-// Mock AuthLayer
-vi.mock("../../lib/api/auth-layer", () => ({
-  AuthLayer: vi.fn(),
-}));
-
-// Mock RequestManager
-vi.mock("../../lib/api/request-manager", () => ({
-  RequestManager: vi.fn(),
-}));
 
 // ==========================================
 // Test Fixtures & Mocks
@@ -71,7 +36,82 @@ const mockRequestManager = {
   fetch: vi.fn(),
 };
 
+// Mock logger first to prevent any downstream react-native imports
+vi.mock("../../lib/utils/logger", () => ({
+  logger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    category: vi.fn(() => ({
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      perf: vi.fn(),
+    })),
+    startTiming: vi.fn(() => ({
+      end: vi.fn(),
+      getElapsed: vi.fn(() => 0),
+    })),
+  },
+}));
+
+// Mock api-manager to use mockRequestManager directly
+vi.mock("../../lib/api/api-manager", () => ({
+  fetchRequest: vi.fn(async (key, fetcher, options) => {
+    // Call mockRequestManager.fetch which will use fetcher or return mocked response
+    return mockRequestManager.fetch(key, fetcher, options);
+  }),
+}));
+
+// Mock request-service to override getCircuitBreakerState for all code paths
+vi.mock("../../lib/middleware/api/request-service", async () => {
+  const actual = await vi.importActual("../../lib/middleware/api/request-service");
+  return {
+    ...actual,
+    getCircuitBreakerState: vi.fn(() => "Closed"),
+  };
+});
+
+// Mock CircuitBreakerManager
+vi.mock("../../lib/api/circuit-breaker", () => ({
+  CircuitBreakerManager: {
+    getState: vi.fn(() => "Closed"),
+    recordSuccess: vi.fn(),
+    recordFailure: vi.fn(),
+  },
+}));
+
+// Mock AuthLayer
+vi.mock("../../lib/api/auth-layer", () => ({
+  AuthLayer: vi.fn(),
+}));
+
 const mockAuthLayer = {};
+
+// Mock global fetch
+global.fetch = vi.fn();
+
+// Helper: Make mockRequestManager.fetch actually call the fetcher by default
+function setupMockRequestManager() {
+  mockRequestManager.fetch.mockImplementation(
+    async (key, fetcher, options) => {
+      // By default, call the fetcher to get the response
+      return fetcher();
+    },
+  );
+}
+
+// Helper: Setup global fetch mock to return a test response
+function setupGlobalFetch(responseData?: any, responseStatus: number = 200) {
+  (global.fetch as any).mockResolvedValue({
+    ok: responseStatus >= 200 && responseStatus < 300,
+    status: responseStatus,
+    headers: new Map(),
+    json: async () => responseData || { id: "123", name: "John" },
+  });
+}
 
 // Test API client
 class TestUsersAPI extends APIClient {
@@ -115,10 +155,14 @@ class TestUsersAPI extends APIClient {
 describe("APIClient Factory", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockQueryCache.get.mockResolvedValue(null);
-    mockQueryCache.set.mockResolvedValue(undefined);
-    mockQueryCache.invalidateByTags.mockResolvedValue(undefined);
-    mockRequestManager.fetch.mockResolvedValue({ id: "123", name: "John" });
+    setupMockRequestManager();
+    setupGlobalFetch({ id: "123", name: "John" }, 200);
+    mockQueryCache.get.mockReset();
+    mockQueryCache.set.mockReset();
+    mockQueryCache.isStale.mockReset();
+    mockQueryCache.invalidateByTags.mockReset();
+    mockRequestManager.fetch.mockReset();
+    setupMockRequestManager();
   });
 
   // ===== Cache Key Generation (Determinism) =====
@@ -682,11 +726,15 @@ describe("APIClient Factory", () => {
   describe("Client Mockability (Dependency Injection)", () => {
     it("should allow injecting custom RequestManager", async () => {
       const customRequestManager = {
-        fetch: vi.fn().mockResolvedValue({ id: "123" }),
+        fetch: vi.fn(async (key: string, fetcher: () => Promise<any>, options: any) => {
+          return fetcher();
+        }),
       };
 
+      // Pass a custom fetchFn that uses the custom RequestManager
       const api = new TestUsersAPI({
-        requestManager: customRequestManager as any,
+        fetchFn: async (key: string, fetcher: () => Promise<any>, options: any) =>
+          customRequestManager.fetch(key, fetcher, options),
       });
 
       mockQueryCache.get.mockResolvedValue(null);

@@ -24,41 +24,25 @@ Email/password authentication system with brute-force protection, secure session
 ## Architecture & Data Flow
 
 ```
-User Action (SignUp / SignIn / PasswordReset)
-        ↓
-Validate Input (email, password, username)
-        ├─ ReDoS-safe regex, sanitization, length checks
-        ↓
-Check Auth Attempt Guard (brute-force protection)
-        ├─ 5 attempts / 10 min window per email+scope
-        ├─ 15 min lockout after exceeding threshold
-        ├─ Tracked in encrypted storage
-        ↓
-Call Auth Provider (injected from lib/services)
-        ├─ Provider-agnostic interface (Supabase, Firebase, custom)
-        ├─ Made via lib/api RequestManager (retry, dedup)
-        ↓
-Persist Session to SecureStorage
-        ├─ Saves access_token, refresh_token, user metadata
-        ├─ Encrypted; survives app restarts
-        ↓
-Update Auth State (hasAccount: true)
-        ├─ Stored in SecureStorage
-        ↓
-Return Result (success/error/redirectTo)
-        ↓
-UI Triggers Redirect (route guards, navigation)
+User Action
+    ↓
+Input Validation
+    ↓
+Rate Limiting Check
+    ↓
+Auth Provider Call
+    ↓
+Session Persistence
+    ↓
+State Update
 ```
 
 **Key Principles:**
 
-- **Secure by default**: All credentials and session data encrypted via encrypted storage (works with lib/storage)
-- **Brute-force protected**: Rate limiting per email per operation type (signin, signup, reset)
-- **Validated inputs**: Email/password/username validated (ReDoS-safe) before reaching auth provider
-- **Session recovery**: Auth state persists; app recovers session on restart via SecureStorage
-- **Provider-agnostic**: Core logic independent of auth provider (injected from lib/services)
-- **Graceful degradation**: Offline support via SecureStorage; no external call required for auth checks
-- **Observable**: All state changes logged; integrates with analytics (works with lib/analytics)
+- **Secure by default**: All credentials encrypted and rate-limited against brute force attacks
+- **Provider agnostic**: Core logic independent of auth backend through dependency injection
+- **Session persistence**: Auth state survives app restarts via encrypted storage
+- **Input validation**: ReDoS-safe regex validation before provider calls
 
 ## Provider Injection
 
@@ -435,31 +419,33 @@ On app launch, a single `checkUserSession()` call. If session valid and profile 
 
 ## Related Modules
 
-- **`lib/services`** – Auth provider abstraction and dependency injection
-- **`lib/database`** – Database operations (used by auth providers)
-- **`lib/storage` (SecureStorage)** – Encrypts and stores auth state, attempt history, sensitive user data
-- **`lib/cache` (QueryCache)** – Cleared on logout to prevent stale data leaks; coordinates with auth lifecycle
-- **`lib/api` (RequestManager)** – Makes auth API calls; provides retry/rate limit for signup/signin
-- **`lib/utils/logger`** – Auth event logging (security category for auth state changes)
-- **`lib/analytics`** – Tracks auth flows (signup success/failure, signin success/failure)
-- **`lib/kernel`** – App bootstrap; coordinates kernel phase readiness with route guards
+- **`lib/services`** – Auth provider abstraction and dependency injection for backend flexibility
+- **`lib/storage`** – SecureStorage for encrypted auth state and session persistence
+- **`lib/api`** – RequestManager for auth API calls with retry and rate limiting
+- **`lib/cache`** – QueryCache cleared on logout to prevent stale user data
+- **`lib/database`** – Database operations used by auth providers
+- **`lib/analytics`** – Auth flow tracking and security event logging
+- **`lib/kernel`** – App bootstrap coordination with auth state initialization
 
 ---
 
 ## File Breakdown
 
-| File                                                                                        | Purpose                                                                                                                                                                      |
-| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `auth-state.ts`                                                                             | Manages persistent auth state in SecureStorage. Tracks `hasAccount` flag, user ID/data, session info. Implements logout cleanup (cache invalidation, data removal).          |
-| `authService.ts`                                                                            | Core auth operations: `signUpUser()`, `signInUser()`, `resetPassword()`, and `checkUserSession()`. Orchestrates validation, provider calls, and state persistence.           |
-| `useAuthGuard.ts`                                                                           | React hook for route protection. Subscribes to auth state changes, handles redirects, supports auth levels ('account-only', 'world-required').                               |
-| `sessionService.ts`                                                                         | Session lifecycle helpers: `checkUserSession()`, `prepareAuthNavigation()`. Used during bootstrap to determine routing.                                                      |
-| `auth-attempt-guard.ts`                                                                     | Brute-force protection: tracks failed auth attempts per email, enforces 5-attempt/10-min limit, 15-min lockout.                                                              |
-| `auth-health-monitor.ts`                                                                    | Periodic session health checks via background jobs. Verifies session validity every 4 hours (prod) or 1 minute (dev). Triggers SAFE safe mode on expiration.                 |
-| `validation.ts`                                                                             | Input validation functions: `validateEmail()`, `validatePassword()`, `validateUsername()`. Includes sanitization and security checks (ReDoS-safe, SQL injection protection). |
-| `emailUtils.ts`                                                                             | Email helpers: `getEmailDomain()`, `getEmailProvider()`, `openEmailApp()`. Enables user-friendly email verification flows.                                                   |
-| `redirectSafety.ts`                                                                         | Redirect safety utilities (not detailed here; likely prevents open redirects).                                                                                               |
-| `encrypted-storage.ts`                                                                      | Legacy file (likely deprecated in favor of `lib/storage/SecureStorage`).                                                                                                     |
-| `useSignInForm.ts`, `useSignUpForm.ts`, `useResetPasswordConfirm.ts`, `useWelcomeScreen.ts` | React hooks for form state management and auth flows. UI-specific (app-layer), not core auth logic.                                                                          |
+| File | Purpose |
+|------|---------|
+| `auth-state.ts` | Persistent auth state management and session storage |
+| `authService.ts` | Core auth operations (signup, signin, password reset) |
+| `useAuthGuard.ts` | React hook for route protection and auth state subscription |
+| `sessionService.ts` | Session lifecycle helpers and bootstrap routing logic |
+| `auth-attempt-guard.ts` | Brute-force protection and rate limiting |
+| `auth-health-monitor.ts` | Background session health checks and validation |
+| `validation.ts` | Input validation functions for email, password, username |
+| `emailUtils.ts` | Email domain detection and provider utilities |
+| `redirectSafety.ts` | Redirect safety and validation utilities |
+| `encrypted-storage.ts` | Legacy encrypted storage implementation |
+| `useSignInForm.ts` | Sign-in form state management hook |
+| `useSignUpForm.ts` | Sign-up form state management hook |
+| `useResetPasswordConfirm.ts` | Password reset confirmation hook |
+| `useWelcomeScreen.ts` | Welcome screen auth flow hook |
 
 **Note**: Auth provider implementations (e.g., SupabaseAuthProvider) are now located in `lib/services/` for better separation of concerns and reusability across projects.

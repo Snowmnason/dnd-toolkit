@@ -17,20 +17,14 @@ import { AppToastProvider, NotificationProvider } from "@/contexts";
 import { useEntitlementExpiredModal, } from "@/hooks/entitlements";
 import { useClearSafeMode } from "@/hooks/error/use-safe-mode";
 import { AppKernelProvider, useAppKernel } from "@/hooks/kernel";
-import { useAnalyticsNavigation } from "@/hooks/navigation";
+import { useAnalyticsNavigation, useNavigate, useRouteConfig } from "@/hooks/navigation";
 import { useSplashScreen } from "@/hooks/ui";
+import { Analytics, sessionManager } from "@/hooks/analytics";
 import {
-  Analytics,
-  SafeModeReason,
-  buildNavigationTarget,
-  getRouteConfig,
-  logger,
-  resolveBackTarget,
-  resolveTitle,
-  sessionManager,
   type AccessRole,
-} from "@/lib";
-import { executeRecoveryAction } from "@/lib/error/safemode/recovery-actions";
+} from "@/hooks/storage";
+import { logger } from "@/hooks/utils";
+import { SafeModeReason, executeRecoveryAction } from "@/hooks/error";
 import {
   AppParamsStableProvider,
   AppParamsVolatileProvider,
@@ -114,6 +108,22 @@ function RootLayoutContent() {
   // }, [sessionId, segments]);
   // Analytics hook (must be called unconditionally)
   useAnalyticsNavigation();
+
+  // Navigation hooks (must be called unconditionally before any early returns)
+  const navContext = {
+    segments,
+    params: {
+      worldId: worldId as string | undefined,
+      userRole: userRole as string | undefined,
+    },
+    router,
+    worldId: worldId as string | undefined,
+    userRole: userRole as string | undefined,
+    isMobile,
+  };
+
+  const { config: routeConfig, title: resolvedTitle, backTarget: topBarBackTarget } = useRouteConfig(navContext);
+  const { replace: navigateTo } = useNavigate();
 
   // ==================== EFFECT HOOKS SECTION ====================
   // All effects that depend on above hooks
@@ -301,49 +311,26 @@ function RootLayoutContent() {
   const hideTopBar =
     isRootRoute || firstSegment === "login" || firstSegment === "web";
 
-  // Build navigation context for route config
-  const navContext = {
-    segments,
-    params: {
-      worldId: worldId as string | undefined,
-      userRole: userRole as string | undefined,
-    },
-    router,
-    worldId: worldId as string | undefined,
-    userRole: userRole as string | undefined,
-    isMobile,
-  };
-
-  // Get route config for centralized TopBar, back behavior, and a11y
-  const routeConfig = getRouteConfig(navContext);
-  const topBarTitle = !hideTopBar
-    ? resolveTitle(routeConfig, navContext)
-    : undefined;
-  const topBarBackTarget = !hideTopBar
-    ? resolveBackTarget(routeConfig, navContext)
-    : undefined;
+  const topBarTitle = !hideTopBar ? resolvedTitle : undefined;
 
   // Build back press handler using config
   const handleTopBarBack = () => {
     if (topBarBackTarget) {
-      // Check if back target has params to preserve
       if (routeConfig.preserveParamsOnBack && (worldId || userRole)) {
-        const target = buildNavigationTarget(
+        navigateTo(
           topBarBackTarget,
           { worldId, userRole },
           routeConfig.preserveParamsOnBack || [],
         );
-        router.replace(target as any);
       } else {
         router.replace(topBarBackTarget as any);
       }
     } else {
-      const fallbackTarget = buildNavigationTarget(
+      navigateTo(
         "/select/world-selection",
         { worldId, userRole },
         ["worldId", "userRole"],
       );
-      router.replace(fallbackTarget as any);
     }
   };
 

@@ -11,7 +11,7 @@ import {
 } from '@/components/auth_components';
 import { Body } from '@/components/ui';
 import { useAuthStateListener } from '@/hooks/auth';
-import { logger } from '@/lib';
+import { logger } from '@/hooks/utils';
 import { openEmailApp } from '@/validation';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';

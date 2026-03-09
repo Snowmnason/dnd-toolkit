@@ -1,6 +1,6 @@
-# lib/utils
+# Utils Module
 
-Foundational utilities for logging, image optimization, entitlements, lazy imports, startup timing, versioning, web font loading, and error codes. Provides cross-platform, production-ready tools for common app needs.
+Foundational utilities providing logging, image optimization, entitlements, lazy imports, startup timing, versioning, web font loading, and error codes for cross-platform app development.
 
 ## When to Use This Module
 
@@ -28,25 +28,20 @@ Foundational utilities for logging, image optimization, entitlements, lazy impor
 
 ```
 App Code
-  ↓
+    ↓
 Import from lib/utils
-  ↓
-[Logger | Image Optimization | Entitlements | Lazy Imports | Startup Time | Version | Web Font Loader | Error Codes]
-  ↓
-Platform-specific or cross-platform implementation
+    ↓
+Utility Functions
+    ↓
+Cross-platform Implementation
 ```
 
-**Components:**
-- **logger.ts**: Category-based, environment-aware logging with feature-flag control
-- **pii-redaction.ts**: PII pattern detection and redaction
-- **image-optimization.ts**: Supabase image URL optimization and responsive sizing
-- **image-proxy.ts**: CORS-safe image loading for external URLs
-- **entitlements.ts**: Centralized stub for premium feature limits and quotas
-- **lazy-imports.ts**: Lazy-loading of heavy modules/components with error handling
-- **startup-time.ts**: Native startup time measurement (0 on web/desktop)
-- **version.ts**: Current app version constant
-- **web-font-loader.ts**: Custom font injection for web/Electron
-- **ERROR_CODES.ts**: Centralized registry of type-safe error codes and metadata
+**Key Principles:**
+
+- **Zero production overhead**: Logging and utilities have minimal runtime cost in production builds
+- **Cross-platform compatibility**: All utilities work consistently across web, iOS, Android, and desktop
+- **Type safety**: Full TypeScript support with strict typing for error codes and parameters
+- **Lazy loading**: Heavy utilities load on-demand to reduce initial bundle size
 
 ## API Reference
 
@@ -378,6 +373,19 @@ await injectWebFonts();
 // Logs: ✅ Web fonts stylesheet injected (/fonts.css)
 ```
 
+## Dependencies
+
+### External Packages
+
+- **`react`** – React component lazy loading utilities
+- **`@supabase/storage-js`** – Image optimization URL generation
+
+### Internal Dependencies
+
+- **`lib/config`** – Logger categories and feature flag configuration
+- **`lib/analytics`** – Performance tracking integration
+- **`lib/storage`** – Storage quota and file size limits
+
 ## Error Handling & Edge Cases
 
 ### Logger
@@ -434,12 +442,12 @@ try {
 - **Startup Time:** Single validation check (~100ns). Web/Desktop returns immediately.
 - **Web Font Loader:** DOM operations ~1-5ms. Stylesheet parsing asynchronous (non-blocking).
 
-## Related Modules & Integration Points
+## Related Modules
 
-- `lib/config` – Logger config, feature flags
-- `lib/storage` – Logger, entitlements, image optimization
-- `lib/analytics` – Logger and startup time for performance tracking
-- `lib/database` – Entitlements for quota enforcement
+- **`lib/config`** – Logger categories and feature flag configuration for utils
+- **`lib/storage`** – Storage quota limits and file size validation for entitlements
+- **`lib/analytics`** – Performance tracking integration for startup time and lazy loading metrics
+- **`lib/database`** – Quota enforcement and premium feature validation
 
 ## File Breakdown
 

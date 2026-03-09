@@ -23,10 +23,11 @@
  * ```
  * 
  * @see AdaptivePayload for quality mapping logic
- * @see useAdaptivePayloadCacheInvalidation for cache invalidation
  */
 
+import { QueryCache } from "@/lib/storage";
 import { NetworkManager, type AdaptivePayloadOptions } from '@/lib/network/network-manager';
+import { logger } from "@/lib/utils/logger";
 import { useEffect, useMemo, useState } from 'react';
 
 export interface UseAdaptivePayloadResult {
@@ -108,4 +109,61 @@ export function useAdaptivePayload(): UseAdaptivePayloadResult {
     isSlowNetwork,
     isExcellentNetwork,
   };
+}
+
+// ─── Cache Invalidation ───────────────────────────────────────────────────────
+
+/**
+ * Hook that watches network quality changes and invalidates cache for
+ * queries that depend on adaptive payloads. Call once at app level.
+ *
+ * @param options.tagsToInvalidate Tags to invalidate when quality changes
+ * @param options.skipInitialCheck Skip invalidation on first mount (default: true)
+ */
+export function useAdaptivePayloadCacheInvalidation(options: {
+  tagsToInvalidate: string[];
+  skipInitialCheck?: boolean;
+}): void {
+  const { tagsToInvalidate, skipInitialCheck = true } = options;
+  const tagsKey = tagsToInvalidate.join(',');
+
+  useEffect(() => {
+    let previousEffectiveType: string | undefined = NetworkManager.getStatus()?.effectiveType;
+    let isFirstCheck = true;
+
+    const unsubscribe = NetworkManager.subscribe((status) => {
+      const currentEffectiveType = status?.effectiveType;
+
+      if (isFirstCheck && skipInitialCheck) {
+        previousEffectiveType = currentEffectiveType;
+        isFirstCheck = false;
+        return;
+      }
+      isFirstCheck = false;
+
+      if (previousEffectiveType !== currentEffectiveType) {
+        logger.category("network").info("Network quality changed, invalidating adaptive payload cache", {
+          from: previousEffectiveType,
+          to: currentEffectiveType,
+          tagsInvalidated: tagsToInvalidate,
+        });
+        QueryCache.invalidateByTags(tagsToInvalidate).catch((err) => {
+          logger.category("error").warn("Failed to invalidate adaptive payload cache", err);
+        });
+        previousEffectiveType = currentEffectiveType;
+      }
+    });
+
+    return () => unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tagsKey, skipInitialCheck]);
+}
+
+/**
+ * Manually invalidate cache for quality-aware queries.
+ * Use when you want to force a refetch without waiting for network quality to change.
+ */
+export async function invalidateAdaptivePayloadCache(tagsToInvalidate: string[]): Promise<void> {
+  logger.category("network").debug("Manually invalidating adaptive payload cache", { tagsToInvalidate });
+  await QueryCache.invalidateByTags(tagsToInvalidate);
 }

@@ -1,10 +1,9 @@
 import { AppPage, Button, Heading } from "@/components/ui";
 import { getShadowStyle } from "@/components/ui/Resuables/shadows";
-import type { AccessRole } from "@/lib/database/worlds";
-import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
+import type { AccessRole } from "@/hooks/storage";
+import { useNavigate } from "@/hooks/navigation";
 import { useAppParamsVolatile, usePlatform } from "@/providers";
 import { $, useScale } from "@/theme";
-import { useRouter } from "expo-router";
 import { View } from "react-native";
 import { PanelConfig } from "./PanelData";
 
@@ -26,21 +25,18 @@ export function PanelView({
   image,
   showRightBorder = true,
 }: PanelViewProps) {
-  const router = useRouter();
   const S = useScale();
+  const { push: navigatePush } = useNavigate();
   const { updateVolatileParams } = useAppParamsVolatile();
-  // Centralized platform detection
   const { isDesktop } = usePlatform();
 
   const navigateToFeature = (featurePath: string) => {
     updateVolatileParams({ worldId, userRole });
-
-    const target = buildNavigationTarget(
+    navigatePush(
       `/main/${featurePath}`,
       { worldId, userRole },
       ["worldId", "userRole"],
     );
-    router.push(target as any);
   };
 
   const backgroundImage = image ? { uri: image } : undefined;

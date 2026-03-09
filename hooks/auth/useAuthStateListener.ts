@@ -6,7 +6,7 @@ import {
     signOutUser
 } from "@/lib/auth";
 
-import type { Session } from "@/lib/middleware/services";
+import type { Session } from "@/lib/auth";
 
 import { type AuthErrorCode } from "@/maps/ERROR_CODES";
 import { useCallback, useEffect, useRef, useState } from "react";

@@ -15,7 +15,7 @@ import {
   onKernelStateChange,
   setSafeMode,
   type AppKernelState,
-} from "@/lib/kernel/kernel-manager";
+} from "@/lib/kernel";
 import { useCallback, useEffect, useState } from "react";
 
 /**

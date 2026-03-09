@@ -3,7 +3,7 @@ import { fetchRequest } from "@/lib/api";
 import {
   getCurrentUserProfile,
   validateUserForWrite,
-} from "@/lib/database/database-manger";
+} from "@/lib/database/database-manager";
 import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
 import type {

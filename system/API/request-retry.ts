@@ -402,12 +402,15 @@ export async function executeWithRetry<T>(
   retriesLeft: number,
   delay: number,
   timeout: number,
-  totalRetries: number = retriesLeft,
+  totalRetries?: number,
   requestContext?: RetryRequestContext,
   timer?: PerfTimer,
 ): Promise<T> {
+  // Use provided totalRetries or default to retriesLeft if not provided
+  const _totalRetries = totalRetries ?? retriesLeft;
+  
   // Calculate current attempt number (0-indexed)
-  const attemptNumber = totalRetries - retriesLeft;
+  const attemptNumber = _totalRetries - retriesLeft;
 
   // Performance timing: start timer on first attempt only
   if (attemptNumber === 0 && !timer) {
@@ -540,7 +543,7 @@ export async function executeWithRetry<T>(
       retriesLeft - 1,
       delay * 2,
       timeout,
-      totalRetries,
+      _totalRetries,
       requestContext,
       timer, // Pass timer through recursive calls
     );

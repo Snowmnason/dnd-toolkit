@@ -1,4 +1,4 @@
-import { createInviteLink, validateInviteToken } from '@/lib/database/invites';
+import { createInviteLink, validateInviteToken } from '@/lib/database';
 import { useMutation } from '../use-mutation';
 
 export interface InviteLink {

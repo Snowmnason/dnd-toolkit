@@ -7,6 +7,16 @@ import { OfflineMutationQueue } from "@/lib/offline/mutation-queue";
 vi.mock("@/lib/storage", () => {
   const store: Record<string, any> = {};
   return {
+    StorageManager: {
+      get: vi.fn(async (key: string) => store[key] ?? null),
+      set: vi.fn(async (key: string, value: any) => {
+        store[key] = value;
+        return { success: true };
+      }),
+      remove: vi.fn(async (key: string) => {
+        delete store[key];
+      }),
+    },
     SecureStorage: {
       getJSON: vi.fn(async (key: string) => store[key] ?? null),
       setJSON: vi.fn(async (key: string, value: any) => {

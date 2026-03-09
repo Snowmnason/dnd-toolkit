@@ -15,7 +15,6 @@
  * - Contain domain logic (that stays in lib/error/)
  */
 
-import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
 import { logger } from '@/lib/utils/logger';
 import { ConnectionQuality, NetworkDetection } from '@/system/Network';
 import {
@@ -44,11 +43,19 @@ function canReport(): boolean {
     }
 
     // 2. Analytics consent? (error tracking requires at least 'basic' consent)
-    const consentLevel = AnalyticsConsent.getLevel();
-    if (consentLevel === 'none') {
-        // User has explicitly opted out of all analytics — respect that
-        logger.category('error').debug('[error-service] Consent level is "none" — dropping error report');
-        return false;
+    // Lazy import to break circular dependency between analytics and error services
+    try {
+        const { AnalyticsConsent } = require('@/lib/analytics/consent/consent') as typeof import('@/lib/analytics/consent/consent');
+        const consentLevel = AnalyticsConsent.getLevel();
+        if (consentLevel === 'none') {
+            // User has explicitly opted out of all analytics — respect that
+            logger.category('error').debug('[error-service] Consent level is "none" — dropping error report');
+            return false;
+        }
+    } catch (e) {
+        // Consent module failed to load (shouldn't happen, but safer to report than silently fail)
+        logger.category('error').warn('[error-service] Failed to check consent', e);
+        // Default to allowing report — don't block on consent check failure
     }    
 
     // 3. Provider initialized?
@@ -68,7 +75,15 @@ function canReport(): boolean {
  * Requires 'full' consent since it includes PII (user ID, email).
  */
 function canSetUserContext(): boolean {
-    return AnalyticsConsent.getLevel() === 'full';
+    try {
+         
+        const { AnalyticsConsent } = require('@/lib/analytics/consent/consent') as typeof import('@/lib/analytics/consent/consent');
+        return AnalyticsConsent.getLevel() === 'full';
+    } catch (e) {
+        // Consent module failed to load — default to no user context for safety
+        logger.category('error').warn('[error-service] Failed to check user context consent', e);
+        return false;
+    }
 }
 
 // ─── Error Reporting ───────────────────────────────────────────────

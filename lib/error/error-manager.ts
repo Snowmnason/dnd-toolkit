@@ -8,7 +8,7 @@
  * - Network awareness (offline buffering)
  *
  * Architecture:
- *   lib modules → lib/error/error-manager → lib/services/error-service → system/Services/error-adapter
+ *   lib modules → lib/error/error-manager → lib/middleware/services/error-service → system/Services/error-adapter
  *
  * What this provides:
  * - reportError / reportMessage — report errors/messages through middleware
@@ -23,6 +23,11 @@
  * - Error aggregation and deduplication
  * - Structured error context propagation across modules
  */
+
+// Lazy import to break circular dependency with analytics
+function getErrorService() {
+  return require("@/lib/middleware/services/error-service") as typeof import("@/lib/middleware/services/error-service");
+}
 
 // ─── Types ─────────────────────────────────────────────────────────
 
@@ -70,13 +75,6 @@ export interface ErrorBreadcrumb {
   level?: 'fatal' | 'error' | 'warning' | 'info';
   data?: Record<string, any>;
   timestamp?: number;
-}
-
-// ─── Lazy middleware import ─────────────────────────────────────────
-// Use sync require to break circular dependency (same pattern as other managers)
-
-function getErrorService() {
-  return require("@/lib/middleware/services/error-service") as typeof import("@/lib/middleware/services/error-service");
 }
 
 // ─── Error Reporting ───────────────────────────────────────────────

@@ -8,8 +8,9 @@ import {
   SubTitle,
   Surface,
 } from "@/components/ui";
-import { logger, updateUsername } from "@/lib";
-import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
+import { useAuthActions } from "@/hooks/auth";
+import { useNavigate } from "@/hooks/navigation";
+import { logger } from "@/hooks/utils";
 import { $, useScale } from "@/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -26,6 +27,8 @@ interface UserProfileProps {
 export default function UserProfile({ profile }: UserProfileProps) {
   const router = useRouter();
   const S = useScale();
+  const { changeUsername } = useAuthActions();
+  const { replace: navigateTo } = useNavigate();
   const [sessionUser, setSessionUser] = useState<any>(null);
   const [loadingSession, setLoadingSession] = useState(true);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
@@ -65,7 +68,7 @@ export default function UserProfile({ profile }: UserProfileProps) {
     setUpdatingUsername(true);
 
     try {
-      const result = await updateUsername(newUsername);
+      const result = await changeUsername(newUsername);
       if (!result.success) {
         if (result.validationWarning) {
           setUsernameValidationWarning(result.validationWarning);
@@ -109,8 +112,7 @@ export default function UserProfile({ profile }: UserProfileProps) {
           text="Return to Login"
           variant="primary"
           onPress={() => {
-            const target = buildNavigationTarget("/login/welcome", {}, []);
-            router.replace(target as any);
+            navigateTo("/login/welcome");
           }}
           style={{ alignSelf: "center", minWidth: 140 }}
         />

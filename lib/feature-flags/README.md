@@ -40,7 +40,7 @@ Components check: isEnabled(), getKind(), toggle()
 ```
 AppKernel Startup
         ↓
-FeatureFlagsManager.initialize(supabaseClient, userId)
+FeatureFlagsManager.initialize(userId)
         ↓
 verifyDeviceClock() [detect manipulation]
         ↓
@@ -122,14 +122,15 @@ Bulk-update from server. Called automatically by AppKernel after bootstrap.
 
 ### FeatureFlagsManager (Server-Driven, Production)
 
-Fetches flags once at startup; entitlements fetched fresh on each call. Server values override hardcoded defaults. Expired entitlements automatically denied. Clock manipulation detected.
+Fetches flags once at startup; entitlements fetched fresh on each call. Server values override hardcoded defaults. Expired entitlements automatically denied. Clock manipulation detected. Supabase client is obtained lazily—no provider parameter needed.
 
-#### `async initialize(supabaseClient, userId?: string): Promise<void>`
+#### `async initialize(userId?: string): Promise<void>`
 
-Initialize manager with Supabase client and optional user ID. Called automatically by AppKernel.
+Initialize manager with optional user ID. Called automatically by AppKernel.
+Supabase client (if configured) is obtained lazily only when setting up Realtime subscriptions.
 
 ```typescript
-await FeatureFlagsManager.initialize(getSupabaseClient(), userId);
+await FeatureFlagsManager.initialize(userId);
 ```
 
 #### `async bootstrapFlags(): Promise<void>`
@@ -223,6 +224,36 @@ const enabled = isInRollout(userId, "newFeature", 20, "v1");
 - **`lib/storage` (SecureStorage)** – Encrypted flag and entitlement caching
 - **`lib/config`** – Hardcoded config defaults (appsettings.json)
 - **`lib/utils/logger`** – Bootstrap logging
+
+## Error Handling & Edge Cases
+
+### Server Unavailable
+
+Bootstrap fails gracefully; falls back to hardcoded defaults. Logs warning, continues with local config.
+
+### Clock Manipulation
+
+`verifyDeviceClock()` detects tampering (±60s tolerance). Entitlements denied if clock invalid. User prompted to fix system time.
+
+### Entitlement Expiry
+
+Expired entitlements return false immediately. No caching of expired values.
+
+### Network Failures
+
+Entitlement checks fail open (return false) on network errors. Feature disabled rather than crash.
+
+### Invalid Flag Names
+
+Unknown flags return false (disabled). Logged as warning in development.
+
+## Performance Notes
+
+- **Bootstrap once at startup** – Flags fetched once, cached in memory + SecureStorage
+- **Synchronous checks** – `getFlag()`, `isEnabledWithContext()` are instant (cached)
+- **Lazy entitlement fetches** – Premium checks hit server only when needed
+- **Deterministic hashing** – Rollout calculations are fast (no network, no storage)
+- **Minimal re-renders** – Hooks use stable references, avoid unnecessary updates
 
 ## Related Modules
 

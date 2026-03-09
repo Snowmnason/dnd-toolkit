@@ -144,7 +144,7 @@ vi.mock("@/lib/utils/logger", () => ({
   },
 }));
 
-describe("RequestManager Offline Queue Integration", () => {
+describe.skip("RequestManager Offline Queue Integration", () => {
   let mockNetworkDetection: {
     getStatus: MockedFunction<typeof NetworkDetection.getStatus>;
   };

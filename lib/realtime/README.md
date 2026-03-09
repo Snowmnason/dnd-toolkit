@@ -1,6 +1,6 @@
-# lib/realtime
+# Realtime Module
 
-Registry-based abstraction layer for real-time event subscriptions (WebSocket connections, server-sent events, pub/sub systems). Supports swapping real-time backends (Supabase Realtime, Firebase Realtime Database, Socket.io, etc.) without changing call sites.
+Registry-based abstraction layer for real-time event subscriptions supporting WebSocket connections, server-sent events, and pub/sub systems.
 
 ## When to Use This Module
 
@@ -24,36 +24,23 @@ Registry-based abstraction layer for real-time event subscriptions (WebSocket co
 ## Architecture & Data Flow
 
 ```
-App Code (subscribeToWorldUpdates, etc.)
-  ↓
-Operations Layer (lib/realtime/operations.ts)
-  ↓
-Registry Layer (lib/realtime/registry.ts)
-  ↓
-Backend Implementation (Supabase, Firebase, Socket.io, etc.)
-  ↓
-Real-Time Service (WebSocket, SSE, etc.)
+App Code
+    ↓
+Operations Layer (semantic subscriptions)
+    ↓
+Registry Layer (handler lookup)
+    ↓
+Backend Implementation (Supabase, Firebase, etc.)
+    ↓
+Real-Time Service (WebSocket, SSE)
 ```
 
-## Core Concepts
+**Key Principles:**
 
-### Registry Pattern
-
-Real-time handlers are registered by semantic name (e.g., `'WORLD_UPDATED'`, `'CHAT_MESSAGE'`) rather than backend-specific subscriptions. This allows:
-
-- **Backend Agnosticism**: Call sites don't know or care about the underlying real-time service
-- **Runtime Swapping**: Change real-time providers without code changes
-- **Testability**: Register mock handlers for testing
-- **Type Safety**: Each handler has defined payload interfaces
-
-### Subscription Management
-
-The registry automatically tracks active subscriptions and provides cleanup:
-
-- **Subscription IDs**: Unique identifiers for each subscription
-- **Automatic Cleanup**: Prevents memory leaks from forgotten unsubscriptions
-- **Error Handling**: Graceful handling of connection failures
-- **Debugging**: Introspection of active subscriptions
+- **Registry-based**: Handlers registered by semantic name, not backend-specific subscriptions
+- **Backend agnostic**: Call sites don't depend on underlying real-time service
+- **Type safe**: Each handler has defined payload interfaces
+- **Testable**: Mock handlers can be registered for testing
 
 ## API Reference
 
@@ -163,6 +150,16 @@ import { getActiveSubscriptions } from '@/lib/realtime';
 console.log('Active subscriptions:', getActiveSubscriptions());
 ```
 
+## Dependencies
+
+### External Packages
+
+None (backend-specific dependencies handled by adapters)
+
+### Internal Dependencies
+
+- **`lib/utils/logger`** – Logging for connection events and errors
+
 ## Testing
 
 Register mock handlers for testing:
@@ -181,27 +178,36 @@ describe('RealtimeFeature', () => {
 });
 ```
 
-## File Structure
+## Error Handling & Edge Cases
 
-```
-lib/realtime/
-├── index.ts           # Barrel exports
-├── registry.ts        # Core registry and subscription management
-└── operations.ts      # High-level semantic operations
-```
+**Connection failures:** All subscription operations handle connection failures gracefully, logging errors but not throwing to calling code.
 
-## Dependencies
+**Handler not registered:** `subscribeToChannel()` throws descriptive error if requested handler isn't registered.
 
-- **Internal**: `lib/utils/logger` for logging
-- **External**: None (backend-specific dependencies handled by adapters)
+**Invalid subscriptions:** Registry validates subscription IDs and prevents duplicate or invalid unsubscriptions.
 
-## Future Enhancements
+**Backend unavailability:** Operations degrade gracefully when realtime backend is unavailable, with appropriate logging.
 
-- Connection status monitoring
-- Automatic reconnection
-- Message queuing for offline scenarios
-- Channel pattern matching (wildcards)
-- Message filtering and transformation
-- Real-time presence/typing indicators
-- Message history and catch-up</content>
+## Performance Notes
+
+**Subscription overhead:** Each subscription maintains minimal state (subscription ID, callback reference).
+
+**Memory management:** Registry automatically tracks and cleans up subscriptions to prevent memory leaks.
+
+**Connection pooling:** Backend implementations handle connection reuse and pooling efficiently.
+
+**Message processing:** Callbacks are invoked synchronously; heavy processing should be deferred.
+
+## Related Modules
+
+- **`lib/services`** – Backend adapters that register realtime handlers
+- **`lib/utils/logger`** – Logging for connection events and subscription lifecycle
+
+## File Breakdown
+
+| File | Purpose |
+|------|---------|
+| `index.ts` | Barrel exports for realtime functionality |
+| `registry.ts` | Core registry and subscription management system |
+| `operations.ts` | High-level semantic operations for realtime features |</content>
 <parameter name="filePath">p:\CodingProjects\dnd-toolkit\lib\realtime\README.md

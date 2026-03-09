@@ -1,10 +1,9 @@
 import { Button, Card, Heading, LazyImage } from "@/components/ui";
-import { WorldWithAccess } from "@/lib/database/worlds";
-import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
-import { logger } from "@/lib/utils/logger";
+import { WorldWithAccess } from "@/hooks/storage";
+import { useNavigate } from "@/hooks/navigation";
+import { logger } from "@/hooks/utils";
 import { useAppParamsStable, useAppParamsVolatile, usePlatform, useUserId } from "@/providers";
 import { $, useScale, UseTheme } from "@/theme";
-import { useRouter } from "expo-router";
 import { View } from "react-native";
 
 interface WorldRightPanelProps {
@@ -22,7 +21,7 @@ export function WorldRightPanel({
 }: WorldRightPanelProps) {
   const S = useScale();
   const { theme } = UseTheme();
-  const router = useRouter();
+  const { push: navigatePush } = useNavigate();
   const userId = useUserId();
   const { updateVolatileParams } = useAppParamsVolatile();
   const { addConnectedWorld } = useAppParamsStable();
@@ -120,7 +119,7 @@ export function WorldRightPanel({
                 });
 
                 // Navigate using centralized navigation helper
-                const target = buildNavigationTarget(
+                navigatePush(
                   "/main/main-landing",
                   {
                     worldId: selectedWorld.world_id,
@@ -128,7 +127,6 @@ export function WorldRightPanel({
                   },
                   ["worldId", "userRole"],
                 );
-                router.push(target as any);
               }}
               style={{ width: 160 }}
             />

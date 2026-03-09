@@ -1,13 +1,7 @@
-import { useAuthStateListener } from "@/hooks/auth";
-import {
-  deleteUserAccount,
-  getCurrentSession,
-  isEmailConfirmed,
-  logger,
-  signOutUser,
-  usersDB,
-} from "@/lib";
-import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
+import { getCurrentSession, isEmailConfirmed, useAuthActions, useAuthStateListener } from "@/hooks/auth";
+import { useNavigate } from "@/hooks/navigation";
+import { getCurrentUserProfile } from "@/hooks/storage";
+import { logger } from "@/hooks/utils";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, View } from "react-native";
@@ -32,6 +26,8 @@ import { useScale } from "@/theme";
 export default function SettingsPage() {
   const router = useRouter();
   const S = useScale();
+  const { signOut, deleteAccount } = useAuthActions();
+  const { replace: navigateTo } = useNavigate();
   
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -50,8 +46,7 @@ export default function SettingsPage() {
   useAuthStateListener((session) => {
     if (!session) {
       logger.category("auth").debug("Auth state changed: user signed out");
-      const target = buildNavigationTarget('/', {}, []);
-      router.replace(target as any);
+      navigateTo('/');
     }
   });
 
@@ -61,8 +56,7 @@ export default function SettingsPage() {
       .then((session) => {
         if (!isEmailConfirmed(session)) {
           logger.category("auth").debug("No confirmed user session, redirecting");
-          const target = buildNavigationTarget('/', {}, []);
-          router.replace(target as any);
+          navigateTo('/');
           return;
         }
         setSecureReady(true);
@@ -70,13 +64,11 @@ export default function SettingsPage() {
       })
       .catch((err: unknown) => {
         logger.category("auth").error("Error checking session:", err);
-        const target = buildNavigationTarget('/', {}, []);
-        router.replace(target as any);
+        navigateTo('/');
         setLoading(false);
       });
 
-    usersDB
-      .getCurrentUser()
+    getCurrentUserProfile()
       .then((profile) => {
         setProfile(profile ?? null);
       })
@@ -86,7 +78,7 @@ export default function SettingsPage() {
           err
         );
       });
-  }, [router]);
+  }, [navigateTo, router]);
 
   const handleSignOutConfirm = async () => {
     if (buttonDisabled) return;
@@ -98,9 +90,8 @@ export default function SettingsPage() {
     } else {
       setButtonDisabled(true);
       try {
-        await signOutUser();
-        const target = buildNavigationTarget('/', {}, []);
-        router.replace(target as any);
+        await signOut();
+        navigateTo('/');
       } catch (error) {
         logger.category("other").error("Sign out error:", error);
         Alert.alert("Error", "Failed to sign out. Please try again.");
@@ -129,13 +120,12 @@ export default function SettingsPage() {
     setDeleting(true);
 
     try {
-      const result = await deleteUserAccount(password);
+      const result = await deleteAccount(password);
       if (!result.success)
         throw new Error(result.error || "Failed to delete account");
 
       setShowDeleteModal(false);
-      const target = buildNavigationTarget('/', {}, []);
-      router.replace(target as any);
+      navigateTo('/');
     } catch (error: any) {
       logger.category("other").error("Delete account error:", error);
       setDeleteError(

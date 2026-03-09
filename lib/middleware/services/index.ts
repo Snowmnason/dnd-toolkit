@@ -46,6 +46,7 @@ export {
 export {
     getDatabase,
     getDatabaseWithAuth,
+    invokeEdgeFunction,
     isDatabaseConfigured,
     runEdgeFunction
 } from './database-service';

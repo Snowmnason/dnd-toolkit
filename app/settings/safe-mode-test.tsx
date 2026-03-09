@@ -5,7 +5,7 @@ import {
     RecoveryAction,
     SafeModeLevel,
     SafeModeReason,
-} from "@/lib/error";
+} from "@/hooks/error";
 import { useScale, UseTheme } from "@/theme";
 import { useRouter } from "expo-router";
 import { useState } from "react";

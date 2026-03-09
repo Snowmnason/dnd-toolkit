@@ -8,3 +8,17 @@ export {
     type LazyFontName
 } from './lazy-fonts';
 
+export {
+    clearSafeMode,
+    getKernelState,
+    getSafeMode,
+    initializeKernel,
+    isAppReady,
+    isKernelIdle,
+    onAppReady,
+    onKernelStateChange,
+    setSafeMode,
+    type AppKernelState,
+    type KernelListener,
+} from './kernel-manager';
+

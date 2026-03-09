@@ -5,11 +5,10 @@ import {
   FormTextInput,
   Heading,
 } from "@/components/ui";
-import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
+import { useNavigate } from "@/hooks/navigation";
 import { usePlatform } from "@/providers";
 import { useScale } from "@/theme";
 import type { WorldFormData } from "@/validation";
-import { useRouter } from "expo-router";
 import { Controller, type Control } from "react-hook-form";
 import { ScrollView, View } from "react-native";
 
@@ -29,7 +28,7 @@ export function CreateLeftPanel({
   isFormValid,
 }: CreateLeftPanelProps) {
   const S = useScale();
-  const router = useRouter();
+  const { replace: navigateTo } = useNavigate();
 
   // Centralized platform detection
   const { isDesktop } = usePlatform();
@@ -109,12 +108,7 @@ export function CreateLeftPanel({
           text="Cancel"
           variant="outlined"
           onPress={() => {
-            const target = buildNavigationTarget(
-              "/select/world-selection",
-              {},
-              [],
-            );
-            router.replace(target as any);
+            navigateTo("/select/world-selection");
           }}
           style={{ flex: 1, marginRight: S.space.sm }}
         />

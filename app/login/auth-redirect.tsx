@@ -1,50 +1,14 @@
 import { AuthModal } from "@/components/auth_components";
 import { Caption } from "@/components/ui";
-import { AuthStateManager, getCurrentSession, logger, usersDB, worldsDB } from "@/lib";
-import { restoreSession } from "@/lib/auth";
-import { StorageManager } from "@/lib/storage";
-import { ERROR_CODES, STORAGE_KEYS } from "@/maps";
+import CustomLoad from "@/components/ui/CustomLoad";
+import { AuthStateManager, getCurrentSession, pendingInviteStorage, preloadWorlds, processInviteForUser, restoreSession } from "@/hooks/auth";
+import { getCurrentUserProfile } from "@/hooks/storage";
+import { logger } from "@/hooks/utils";
+import { ERROR_CODES } from "@/maps";
 import { useAppParamsStable } from "@/providers";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
-import CustomLoad from "../../components/ui/CustomLoad";
-
-interface PendingInvite {
-  token: string;
-  worldName: string;
-  timestamp: number;
-}
-
-// Helper functions for invite storage (privacy-routed)
-const savePendingInvite = async (token: string, worldName: string) => {
-  const inviteData: PendingInvite = {
-    token,
-    worldName,
-    timestamp: Date.now(),
-  };
-  await StorageManager.set(STORAGE_KEYS.PENDING_INVITE, inviteData);
-};
-
-const getPendingInvite = async (): Promise<PendingInvite | null> => {
-  const inviteData = await StorageManager.get<PendingInvite>(
-    STORAGE_KEYS.PENDING_INVITE,
-  );
-  if (inviteData) {
-    // Check if invite is less than 24 hours old
-    if (Date.now() - inviteData.timestamp < 24 * 60 * 60 * 1000) {
-      return inviteData;
-    } else {
-      // Clean up expired invite
-      await StorageManager.remove(STORAGE_KEYS.PENDING_INVITE);
-    }
-  }
-  return null;
-};
-
-const clearPendingInvite = async () => {
-  await StorageManager.remove(STORAGE_KEYS.PENDING_INVITE);
-};
 
 export default function AuthRedirect() {
   const router = useRouter();
@@ -65,15 +29,12 @@ export default function AuthRedirect() {
   // Helper function to get current user ID (checks storage first)
   const getCurrentUserId = async (): Promise<string | undefined> => {
     try {
-      // Try storage first
       const userId = await AuthStateManager.getUserId();
       if (userId) {
         logger.category('auth').debug('User ID loaded from storage', { userId });
         return userId;
       }
-
-      // Fallback to database
-      const userProfile = await usersDB.getCurrentUser();
+      const userProfile = await getCurrentUserProfile();
       return userProfile?.id || undefined;
     } catch (error) {
       logger.category('auth').error('Error fetching user ID', { code: ERROR_CODES.AUTH.UNKNOWN, error });
@@ -146,7 +107,7 @@ export default function AuthRedirect() {
             logger.category('auth').debug("User profile loaded from storage");
           } else {
             // Not in storage, fetch from database
-            userProfile = await usersDB.getCurrentUser();
+            userProfile = await getCurrentUserProfile();
           }
 
           if (userProfile) {
@@ -155,13 +116,7 @@ export default function AuthRedirect() {
             // Check if user has completed profile
             if (userProfile.username) {
               // Profile complete - preload worlds before navigating to world selection
-              // This ensures the cache is warm when the page mounts, avoiding the loading race condition
-              try {
-                await worldsDB.getMyWorlds(userProfile.id);
-              } catch (preloadError) {
-                logger.category('auth').warn("Failed to preload worlds (non-critical)", { error: preloadError });
-                // Non-critical: app works even if preload fails, just shows loading screen longer
-              }
+              await preloadWorlds(userProfile.id);
               
               // Now navigate to world selection with warm cache
               router.replace("/select/world-selection");
@@ -235,28 +190,10 @@ export default function AuthRedirect() {
 
       const decodedWorldName = decodeURIComponent(inviteWorldName);
 
-      // Import invitesDB dynamically to avoid circular dependencies
-      const { invitesDB } = await import("@/lib/database/invites");
-
-      // Validate the invite token first
-      logger.category('auth').debug("Validating invite token...");
-      const validationResult = await invitesDB.validateInviteToken(inviteToken);
-
-      if (!validationResult.success || !validationResult.worldId) {
-        setErrorMessage(
-          validationResult.error ||
-            "This invite link is invalid or has expired. Please ask for a new invitation.",
-        );
-        setShowErrorModal(true);
-        return;
-      }
-
-      const inviteWorldId = validationResult.worldId;
-
       if (!hasValidSession) {
         // User not logged in - save invite token and redirect to sign in
         logger.category('auth').debug("Saving pending invite for after login...");
-        await savePendingInvite(inviteToken, decodedWorldName);
+        await pendingInviteStorage.save(inviteToken, decodedWorldName);
 
         setWorldName(decodedWorldName);
         setShowInviteModal(true);
@@ -267,133 +204,69 @@ export default function AuthRedirect() {
       logger.category('auth').info("User logged in, processing invite...");
 
       try {
-        // Get user's profile
-        const userProfile = await usersDB.getCurrentUser();
-        if (!userProfile) {
-          throw new Error("User profile not found");
+        const result = await processInviteForUser(inviteToken);
+        if (!result.success) {
+          setErrorMessage(result.error || "Failed to join world. Please try again or contact the world owner.");
+          setShowErrorModal(true);
+          return;
         }
-        // Store the userId for navigation
-        setCurrentUserId(userProfile.id);
-
-        // Check if user is already in the world
-        const isAlreadyMember = await worldsDB.isUserInWorld(
-          inviteWorldId,
-          userProfile.id,
-        );
-
-        if (isAlreadyMember) {
+        const userProfile = await getCurrentUserProfile();
+        if (userProfile) setCurrentUserId(userProfile.id);
+        if (result.alreadyMember) {
           logger.category('auth').info("User is already a member of this world");
           setWorldName(decodedWorldName);
           setShowAlreadyMemberModal(true);
-          return;
+        } else {
+          logger.category('auth').info("User successfully added to world");
+          setWorldName(decodedWorldName);
+          setShowWelcomeModal(true);
         }
-
-        // Add user to world in database
-        logger.category('auth').info("Adding user to world", { worldId: inviteWorldId });
-        await worldsDB.addUserToWorld(
-          inviteWorldId,
-          userProfile.id,
-          inviteToken,
-          "player",
-        );
-        logger.category('auth').info("User successfully added to world");
-
-        setWorldName(decodedWorldName);
-        setShowWelcomeModal(true);
       } catch (error) {
         logger.category("other").error("Failed to add user to world:", error);
-
-        // Check if user is already in the world (database constraint error)
         if (error instanceof Error && error.message.includes("duplicate")) {
           logger.category("other").info("User already in world (duplicate key), showing already member modal");
           setWorldName(decodedWorldName);
           setShowAlreadyMemberModal(true);
         } else {
-          // Other error - show error message
-          setErrorMessage(
-            "Failed to join world. Please try again or contact the world owner.",
-          );
+          setErrorMessage("Failed to join world. Please try again or contact the world owner.");
           setShowErrorModal(true);
         }
       }
     };
 
     const checkForPendingInvites = async () => {
-      const pendingInvite = await getPendingInvite();
+      const pendingInvite = await pendingInviteStorage.get();
       if (pendingInvite) {
         logger.category("other").debug("Found pending invite:", pendingInvite);
 
-        // Check if user is now logged in
         const session = await getCurrentSession();
         if (session) {
           logger.category("other").info("User logged in, processing pending invite...");
-          await clearPendingInvite();
+          await pendingInviteStorage.clear();
 
           try {
-            // Import invitesDB dynamically
-            const { invitesDB } = await import("@/lib/database/invites");
-
-            // Validate the token and get worldId
-            logger.category("other").debug("Validating pending invite token...");
-            const validationResult = await invitesDB.validateInviteToken(
-              pendingInvite.token,
-            );
-
-            if (!validationResult.success || !validationResult.worldId) {
-              throw new Error(
-                validationResult.error || "Invalid or expired invite token",
-              );
-            }
-
-            // Get user's profile
-            const userProfile = await usersDB.getCurrentUser();
-            if (!userProfile) {
-              throw new Error("User profile not found");
-            }
-            // Check if user is already in the world
-            logger.category("other").debug("Checking if user is already in world...");
-            const isAlreadyMember = await worldsDB.isUserInWorld(
-              validationResult.worldId,
-              userProfile.id,
-            );
-            if (isAlreadyMember) {
+            const result = await processInviteForUser(pendingInvite.token);
+            if (result.alreadyMember) {
               logger.category("other").info("User is already a member of this world (pending invite)");
               setWorldName(pendingInvite.worldName);
               setShowAlreadyMemberModal(true);
-              return;
+            } else if (result.success) {
+              logger.category("other").info("User successfully added to world from pending invite");
+              setWorldName(pendingInvite.worldName);
+              setShowWelcomeModal(true);
+            } else {
+              throw new Error(result.error || "Failed to process invite");
             }
-            // Add user to world in database
-            logger.category("other").info("Adding user to world from pending invite:", validationResult.worldId);
-            await worldsDB.addUserToWorld(
-              validationResult.worldId,
-              userProfile.id,
-              pendingInvite.token,
-              "player",
-            );
-            logger.category("other").info("User successfully added to world from pending invite");
-            setWorldName(pendingInvite.worldName);
-            setShowWelcomeModal(true);
           } catch (error) {
             logger.category("other").error("Failed to add user to world from pending invite:", error);
-
-            // Check if user is already in the world (database constraint error)
             if (error instanceof Error && error.message.includes("duplicate")) {
-              logger.category("other").info("User already in world from pending invite (duplicate key), showing already member modal");
+              logger.category("other").info("User already in world from pending invite (duplicate key)");
               setWorldName(pendingInvite.worldName);
               setShowAlreadyMemberModal(true);
             } else {
-              // Other error - show error message but don't completely fail
               logger.category("other").error("Failed to process pending invite, but continuing...");
-
-              // Don't show success modal if invite was invalid/expired
-              if (
-                error instanceof Error &&
-                (error.message.includes("Invalid") ||
-                  error.message.includes("expired"))
-              ) {
-                setErrorMessage(
-                  "This invite link has expired. Please ask for a new invitation.",
-                );
+              if (error instanceof Error && (error.message.includes("Invalid") || error.message.includes("expired"))) {
+                setErrorMessage("This invite link has expired. Please ask for a new invitation.");
                 setShowErrorModal(true);
               }
             }
@@ -408,20 +281,11 @@ export default function AuthRedirect() {
   const handleWelcomeModalClose = async () => {
     setShowWelcomeModal(false);
 
-    // Get userId and update context
     const userId = currentUserId || (await getCurrentUserId());
-
     if (userId) {
-      // Update centralized params context
       setUserId(userId);
-      
-      // Preload worlds before navigating to ensure cache is warm
-      try {
-        logger.category("ui").debug("Preloading worlds after invite welcome");
-        await worldsDB.getMyWorlds(userId);
-      } catch (preloadError) {
-        logger.category("ui").warn("Failed to preload worlds (non-critical):", preloadError);
-      }
+      logger.category("ui").debug("Preloading worlds after invite welcome");
+      await preloadWorlds(userId);
     }
 
     router.replace("/select/world-selection");
@@ -492,7 +356,7 @@ export default function AuthRedirect() {
           {
             text: "Maybe Later",
             onPress: () => {
-              clearPendingInvite();
+              pendingInviteStorage.clear();
               setShowInviteModal(false);
               router.replace("/");
             },
@@ -515,12 +379,7 @@ export default function AuthRedirect() {
             setUserId(userId);
             
             // Preload worlds before navigating to ensure cache is warm
-            try {
-              logger.category("ui").debug("Preloading worlds after already member");
-              await worldsDB.getMyWorlds(userId);
-            } catch (preloadError) {
-              logger.category("ui").warn("Failed to preload worlds (non-critical):", preloadError);
-            }
+            await preloadWorlds(userId);
           }
 
           router.replace("/select/world-selection");
@@ -534,15 +393,8 @@ export default function AuthRedirect() {
               setShowAlreadyMemberModal(false);
               
               // Preload worlds before navigating to ensure cache is warm
-              try {
-                const userId = currentUserId || (await getCurrentUserId());
-                if (userId) {
-                  logger.category("other").debug("Preloading worlds before navigate to world selection");
-                  await worldsDB.getMyWorlds(userId);
-                }
-                } catch (preloadError) {
-                logger.category("other").warn("Failed to preload worlds (non-critical):", preloadError);
-              }
+              const userId = currentUserId || (await getCurrentUserId());
+              if (userId) await preloadWorlds(userId);
               
               router.replace("/select/world-selection");
             },

@@ -17,8 +17,7 @@
  *   }
  */
 
-import { OfflineMutationQueue } from "@/lib/offline/mutation-queue";
-import { OnlineSyncManager } from "@/lib/offline/sync-manager";
+import { OfflineMutationQueue, OnlineSyncManager } from "@/lib/offline";
 import { useEffect, useState } from "react";
 
 export interface UseOfflineQueueReturn {

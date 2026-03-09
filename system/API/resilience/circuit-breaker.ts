@@ -160,6 +160,7 @@ class CircuitBreakerManagerClass {
       circuit.consecutiveFailures = 0;
       circuit.failureWindow = [];
       circuit.consecutiveHalfOpenFailures = 0;
+      circuit.nextRecoveryAt = 0; // Reset recovery time after closing
       circuit.lastTransitionAt = Date.now();
       logger.category('api').debug(`Circuit breaker Closed (recovery successful): ${key}`, {
         endpoint: key,

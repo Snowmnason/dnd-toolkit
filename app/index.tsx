@@ -1,12 +1,11 @@
+import Welcome from "@/Screens/Welcome";
+import LoadingOverlay from "@/components/LoadingOverlay";
+import { useBootstrapAuth } from "@/hooks/auth";
 import { useAppKernel } from "@/hooks/kernel";
-import { logger } from "@/lib";
-import { StorageManager } from "@/lib/storage";
-import { STORAGE_KEYS } from "@/maps";
+import { logger } from "@/hooks/utils";
 import { useRouter } from "expo-router";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import Welcome from "../Screens/Welcome";
-import LoadingOverlay from "../components/LoadingOverlay";
 
 const FAILSAFE_TIMEOUT = 8000; // Show failsafe button after 8 seconds
 
@@ -24,8 +23,6 @@ const TAVERN_LOCATIONS = [
 export default function HomePage() {
   const router = useRouter();
   const [showFailsafe, setShowFailsafe] = React.useState(false);
-  const [isAuthChecked, setIsAuthChecked] = React.useState(false);
-  const [hasAccount, setHasAccount] = React.useState(false);
 
   // Pick a random location on mount
   const randomLocation = React.useMemo(() => {
@@ -43,6 +40,9 @@ export default function HomePage() {
   // Wait for kernel to complete before routing
   const kernel = useAppKernel();
 
+  // Check storage for a recent login to skip the welcome screen
+  const { checked: isAuthChecked, hasAccount } = useBootstrapAuth(kernel.phases.appReady);
+
   // Show failsafe button after timeout, but only if we haven't completed auth check
   React.useEffect(() => {
     const timer = setTimeout(() => {
@@ -58,85 +58,13 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, [isAuthChecked]);
 
-  // Simple time-based check: if user logged in within 7 days, redirect (skip welcome)
+  // Redirect to world selection when the hook confirms a recent login
   React.useEffect(() => {
-    // Don't proceed until kernel is complete
-    if (!kernel.phases.appReady) {
-      logger.category("bootstrap").debug("⏸️ Waiting for kernel to complete");
-      return;
-    }
-
-    logger.category("bootstrap").info("🚀 Kernel ready! Checking login recency...");
-
-    const checkLoginRecency = async () => {
-      try {
-        // CRITICAL: Check hasAccount first - if user logged out, don't use cached login time
-        // This prevents the redirect loop after logout
-        const authState = await StorageManager.get<{
-          hasAccount: boolean;
-        }>(STORAGE_KEYS.HAS_ACCOUNT);
-        const hasAccount = authState?.hasAccount === true;
-
-        // If user explicitly logged out (hasAccount is false/null/undefined), show welcome
-        if (!hasAccount) {  
-          logger.category("bootstrap").debug(
-            "⏭️ User not logged in (hasAccount=false), showing welcome",
-          );
-          setIsAuthChecked(true);
-          setHasAccount(false);
-          return;
-        }
-
-        // User is logged in, check if their last login is recent
-        const lastLoggedInStr = await StorageManager.getRaw(
-          STORAGE_KEYS.LAST_LOGGED_IN,
-        );
-
-        if (!lastLoggedInStr) {
-          logger.category("bootstrap").debug(
-              "⏭️ No recent login found, showing welcome",
-            );
-          setIsAuthChecked(true);
-          setHasAccount(false);
-          return;
-        }
-
-        const lastLoggedInMs = parseInt(lastLoggedInStr, 10);
-        const now = Date.now();
-        const sevenDaysMs = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
-        const isWithinSevenDays = now - lastLoggedInMs < sevenDaysMs;
-
-        if (isWithinSevenDays) {
-          logger.category("bootstrap").info(
-            `✅ Recent login detected (${Math.floor((now - lastLoggedInMs) / (1000 * 60 * 60))} hours ago), redirecting to world selection`
-          );
-          setIsAuthChecked(true);
-          setHasAccount(true);
-          // Redirect to world selection after a brief moment to ensure state is set
-          setTimeout(() => {
-            router.replace("/select/world-selection");
-          }, 100);
-          return;
-        }
-
-        logger.category("bootstrap").debug(
-          "⏭️ Login is stale (>7 days), showing welcome",
-        );
-        setIsAuthChecked(true);
-        setHasAccount(false);
-      } catch (error) {
-        // If check fails, just show welcome - no harm done
-        logger.category("bootstrap").debug(
-          "⚠️ Login recency check failed, showing welcome:",
-          error,
-        );
-        setIsAuthChecked(true);
-        setHasAccount(false);
-      }
-    };
-
-    checkLoginRecency();
-  }, [kernel.phases.appReady, router]);
+    if (!isAuthChecked || !hasAccount) return;
+    logger.category("bootstrap").info("✅ Recent login detected, redirecting to world selection");
+    const t = setTimeout(() => router.replace("/select/world-selection"), 100);
+    return () => clearTimeout(t);
+  }, [isAuthChecked, hasAccount, router]);
 
   // Show loading spinner while kernel is initializing
   if (!kernel.phases.appReady) {
