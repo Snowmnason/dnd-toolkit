@@ -1,11 +1,12 @@
 import { AuthActionGroup, AuthBody, AuthBodyFooter, AuthButton, AuthButtonSecondary, AuthCaption, AuthLink, AuthRoot, AuthSubTitle, AuthTitle } from '@/components/auth_components';
 import CustomLoad from '@/components/ui/CustomLoad';
 import VersionDisplay from '@/components/VersionDisplay';
+import { useAppToast } from '@/contexts';
 import { useNavigate } from '@/hooks/navigation';
 import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Platform, useWindowDimensions, View } from 'react-native';
+import { Platform, useWindowDimensions, View } from 'react-native';
 
 
 // TODO: Uncomment when ready to enable social authentication
@@ -23,6 +24,7 @@ export default function Welcome({ isLoading = false }: WelcomeScreenProps) {
   
   const router = useRouter();
   const { push: navigatePush } = useNavigate();
+  const { show: showToast } = useAppToast();
   const [authIsLoading, setAuthIsLoading] = useState(false);
 
   const handleSignIn = async () => {
@@ -30,7 +32,7 @@ export default function Welcome({ isLoading = false }: WelcomeScreenProps) {
     try {
       router.push('/login/sign-in');
     } catch {
-      Alert.alert('Error', 'Unable to navigate to sign-in');
+      showToast('Unable to navigate to sign-in', 'error');
     } finally {
       setAuthIsLoading(false);
     }
@@ -40,6 +42,8 @@ export default function Welcome({ isLoading = false }: WelcomeScreenProps) {
     setAuthIsLoading(true);
     try {
       router.push('/login/sign-up');
+    } catch {
+      showToast('Unable to navigate to sign-up', 'error');
     } finally {
       setAuthIsLoading(false);
     }

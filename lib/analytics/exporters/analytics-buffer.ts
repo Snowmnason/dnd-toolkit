@@ -718,7 +718,9 @@ let _lastFlushTime: number | null = null;
  */
 export function _setAnalyticsBufferFlushing(value: boolean, timestamp?: number): void {
   _isFlushing = value;
-  if (timestamp !== undefined) {
+  // Only update lastFlushTime when flush completes (value === false)
+  // This prevents accidental updates during flush start
+  if (value === false && timestamp !== undefined) {
     _lastFlushTime = timestamp;
   }
   notifyBufferStateChange();

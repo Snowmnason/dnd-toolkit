@@ -1,8 +1,7 @@
 'use client';
 
 import { UpdateUserData, User, usersDB } from '@/lib/database';
-import { logger } from '@/lib/utils/logger';
-import { useCallback, useState } from 'react';
+import { useMutation } from '../use-mutation';
 
 /**
  * Hook for updating current user profile with cache invalidation
@@ -24,37 +23,18 @@ import { useCallback, useState } from 'react';
  * ```
  */
 export function useUpdateUserMutation() {
-  const [data, setData] = useState<User | undefined>(undefined);
-  const [updateError, setUpdateError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const mutate = useCallback(
-    async (userData: UpdateUserData): Promise<User> => {
-      try {
-        setIsLoading(true);
-        setUpdateError(null);
-
-        const result = await usersDB.updateCurrentUser(userData);
-        setData(result);
-
-        return result;
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        logger.category('other').error('Failed to update user:', err);
-        setUpdateError(errorMsg);
-        throw err;
-      } finally {
-        setIsLoading(false);
-      }
+  const { mutate, data, error, isLoading } = useMutation<User, UpdateUserData>(
+    (variables: any) => usersDB.updateCurrentUser(variables as UpdateUserData),
+    {
+      invalidateTags: ['users'],
     },
-    [],
   );
 
   return {
     mutate,
     user: data ?? null,
     isLoading,
-    error: updateError,
+    error: (error as any)?.message ?? null,
   };
 }
 
@@ -71,33 +51,16 @@ export function useUpdateUserMutation() {
  * ```
  */
 export function useDeleteAccountMutation() {
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const mutate = useCallback(
-    async (): Promise<boolean> => {
-      try {
-        setIsLoading(true);
-        setDeleteError(null);
-
-        const result = await usersDB.deleteCurrentUser();
-
-        return result;
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        logger.category('other').error('Failed to delete account:', err);
-        setDeleteError(errorMsg);
-        throw err;
-      } finally {
-        setIsLoading(false);
-      }
+  const { mutate, error, isLoading } = useMutation<boolean, void>(
+    () => usersDB.deleteCurrentUser(),
+    {
+      invalidateTags: ['users'],
     },
-    [],
   );
 
   return {
     mutate,
     isLoading,
-    error: deleteError,
+    error: (error as any)?.message ?? null,
   };
 }

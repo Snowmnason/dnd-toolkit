@@ -360,18 +360,54 @@ class BreadcrumbQueueService {
 
       if (result.sent.length > 0) {
         logger.category('analytics').debug('BreadcrumbQueue', `Breadcrumbs sent: count=${result.sent.length}`);
+
+        // Update deduplication cache with sent breadcrumbs
+        batch
+          .filter((b) => result.sent.includes(b.id))
+          .forEach((b) => {
+            this.deduplicationCache.set(b.fingerprint, Date.now());
+          });
+
+        await this._persistDedupCache();
+
+        // Remove sent breadcrumbs from queue
+        await this.remove(result.sent);
       }
 
       if (result.retry.length > 0) {
         logger.category('analytics').debug('BreadcrumbQueue', `Breadcrumbs marked for retry: count=${result.retry.length}`);
+
+        // Mark failed breadcrumbs for retry
+        for (const id of result.retry) {
+          await this.markFailed(id, 'provider retry');
+        }
       }
 
       if (result.discard.length > 0) {
         logger.category('analytics').debug('BreadcrumbQueue', `Breadcrumbs discarded: count=${result.discard.length}`);
+
+        // Discard rejected breadcrumbs
+        for (const id of result.discard) {
+          await this.discard(id, 'provider rejected');
+        }
       }
+
+      // Apply rate limit backoff if provided
+      if (result.retryAfterMs && result.retryAfterMs > 0) {
+        this.nextFlushAfterMs = Date.now() + result.retryAfterMs;
+        logger.category('analytics').debug('BreadcrumbQueue', `Rate limit applied: nextFlushAfterMs=${this.nextFlushAfterMs}`);
+      }
+
+      // Update last flush time for batch spacing logic
+      this.lastFlushTime = Date.now();
+
+      // Clear current batch
+      this.currentBatchIds.clear();
 
     } catch (error) {
       logger.category('analytics').error('BreadcrumbQueue', `Flush failed: ${error}`);
+      // Clear batch IDs even on error
+      this.currentBatchIds.clear();
     } finally {
       this.isFlushing = false;
     }
