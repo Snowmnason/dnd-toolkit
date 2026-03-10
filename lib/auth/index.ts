@@ -41,6 +41,14 @@ export {
 } from "./auth-manager";
 
 export { deleteUserAccount, type DeleteAccountResult } from "./account/deleteAccount";
+export {
+    performSignOut,
+    registerSignOutHook,
+    type ISignOutHook,
+    type SignOutPhase,
+    type SignOutResult,
+    type SignOutSource
+} from "./account/sign-out-system";
 export { updateUsername, type UpdateUsernameResult } from "./account/updateUsername";
 export { AuthLayer, type AuthContext, type AuthStrategy } from "./auth-layer";
 export {
