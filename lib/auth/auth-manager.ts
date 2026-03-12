@@ -1,51 +1,88 @@
-import { usersDB } from "@/lib/database";
+import { EmailAlreadyExistsError } from "@/lib/error";
 import {
-    authGetSession,
-    authGetUser,
-    authOnStateChange,
-    authResendConfirmation,
-    authResetPassword,
-    authRestoreSession,
-    authSignIn,
-    authSignInWithIdToken,
-    authSignInWithOAuth,
-    authSignOut,
-    authSignUp,
-    authUpdatePassword,
+  authGetSession,
+  authGetUser,
+  authOnStateChange,
+  authResendConfirmation,
+  authResetPassword,
+  authRestoreSession,
+  authSignIn,
+  authSignInWithOAuth,
+  authUpdatePassword,
 } from "@/lib/middleware/services";
-import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils";
-import { STORAGE_KEYS } from "@/maps";
+import type {
+  Phase1VerifyResult,
+  Phase2UpdatePasswordResult,
+  Phase2UpdateUsernameResult,
+} from "./account/update-creds-system";
+import type {
+  DeletePhase1Result,
+  DeletePhase2Result,
+} from "./account/delete-account-system";
 import {
-    mapSignInError,
-    mapSignUpError,
-    prepareResendConfirmation,
-    prepareResetPassword,
-    prepareSignIn,
-    prepareSignUp,
-    prepareUpdatePassword,
-    recordAuthAttempt,
-    type AuthOperationResult,
-    type ResendResult,
-    type ResetPasswordResult,
-    type Session,
-    type SignInResult,
-    type SignUpResult,
+  prepareResendConfirmation,
+  prepareResetPassword,
+  prepareSignIn,
+  prepareSignUp,
+  prepareUpdatePassword,
+  recordAuthAttempt,
+  type AuthOperationResult,
+  type ResendResult,
+  type ResetPasswordResult,
+  type Session,
+  type SignInResult,
+  type SignUpResult,
 } from "./auth-operations";
 
 // Re-export types so consumers only need @/lib/auth
 export type {
-    AuthOperationResult, ResendResult, ResetPasswordResult, Session,
-    SignInResult,
-    SignUpResult
+  AuthOperationResult, ResendResult, ResetPasswordResult, Session,
+  SignInResult,
+  SignUpResult
 };
 
+// ============================================================================
+// SHARED VERIFICATION HELPERS
+// ============================================================================
+
+/**
+ * Verify the current user is logged in with a valid server-verified session.
+ * Centralized so systems don't duplicate validateCurrentUser() + error handling.
+ *
+ * @returns User's auth_id and email, or throws with a user-facing message.
+ */
+export async function ensureUserLoggedIn(): Promise<{ authId: string; email: string }> {
+  const { validateCurrentUser } = await import('@/lib/database');
+  const authUser = await validateCurrentUser();
+  if (!authUser?.auth_id) {
+    throw new Error('Unable to verify current user. Please ensure you are logged in.');
+  }
+  return { authId: authUser.auth_id, email: authUser.email };
+}
+
+/**
+ * Verify the auth provider is initialized and network is available.
+ * Centralized so systems don't duplicate isAuthConfigured() + error handling.
+ *
+ * @throws Error with user-facing message if provider is not ready.
+ */
+export async function ensureAuthProviderReady(): Promise<void> {
+  const { isAuthConfigured } = await import('@/lib/middleware/services/auth-service');
+  if (!isAuthConfigured()) {
+    throw new Error('Auth provider is not available. Please check your network connection and try again.');
+  }
+}
 
 
+// ============================================================================
+// SIGN IN
+// ============================================================================
 /**
  * Sign in orchestrator.
  * Pre-flight (validation, rate limiting) via auth-operations,
- * service call via auth-service, then post-login side effects.
+ * delegation to sign-in-system for all auth + session + DB sync logic,
+ * then maps system result back to the public SignInResult shape.
  */
 export const signInUser = async (
   email: string,
@@ -55,93 +92,25 @@ export const signInUser = async (
   if (!prep.ready) return prep.result;
 
   try {
-    const signinResult = await authSignIn(prep.sanitizedEmail, password);
+    const { performSignIn } = await import('./account/sign-in-system');
+    const systemResult = await performSignIn(prep.sanitizedEmail, password);
 
-    if (!signinResult.success) {
-      await recordAuthAttempt(prep.sanitizedEmail, "signin", false);
-      return mapSignInError(signinResult.error);
+    if (systemResult.success) {
+      await recordAuthAttempt(prep.sanitizedEmail, 'signin', true);
+      return { success: true, redirectTo: systemResult.redirect };
     }
 
-    await recordAuthAttempt(prep.sanitizedEmail, "signin", true);
-
-    // Post-login state setup
-    const { AuthStateManager } = await import("./auth-state");
-    const session = await authGetSession();
-    if (session && (session as any).raw) {
-      await AuthStateManager.setSession((session as any).raw);
-    }
-    await AuthStateManager.setHasAccount(true);
-    await StorageManager.setRaw(STORAGE_KEYS.LAST_LOGGED_IN, Date.now().toString());
-
-    // Profile check + redirect determination
-    try {
-      const userProfile = await usersDB.getCurrentUser();
-      await AuthStateManager.saveUserData(userProfile);
-      const hasValidProfile = (userProfile?.username?.trim() ?? '').length > 0;
-      const pendingInvite = await checkPendingInvites();
-
-      if (hasValidProfile) {
-        if (pendingInvite) {
-          await StorageManager.remove(STORAGE_KEYS.PENDING_INVITE);
-          return {
-            success: true,
-            redirectTo: `/login/auth-redirect?action=world-invite&token=${pendingInvite.token}&worldName=${encodeURIComponent(pendingInvite.worldName)}`,
-          };
-        }
-        return { success: true, redirectTo: "/select/world-selection" };
-      }
-      return { success: true, redirectTo: "/login/complete-profile" };
-    } catch (profileError) {
-      logger.category('auth').error("Profile check error during sign-in:", profileError);
-      return { success: true, redirectTo: "/select/world-selection" };
-    }
-  } catch (error) {
-    logger.category('auth').error("Sign in error:", error);
-    const message = (error as Error)?.message?.includes("Request timeout")
-      ? "The server took too long to respond. Please try again."
-      : (error as Error)?.message?.includes("fetch")
-        ? "Connection error. Please check your internet and try again."
-        : "Sign in failed. Please try again.";
+    await recordAuthAttempt(prep.sanitizedEmail, 'signin', false);
+    const message = systemResult.errors?.[0]?.message ?? 'Sign in failed. Please try again.';
     return { success: false, error: message };
-  }
-};
-
-// ============================================================================
-// SIGN UP
-// ============================================================================
-
-export const signUpUser = async (
-  email: string,
-  password: string,
-): Promise<SignUpResult> => {
-  const prep = await prepareSignUp(email, password);
-  if (!prep.ready) return prep.result;
-
-  try {
-    const baseUrl =
-      typeof window !== "undefined"
-        ? window.location.origin
-        : "https://dnd-tool.thesnowpost.com";
-
-    const signupResult = await authSignUp(prep.sanitizedEmail, password, {
-      emailRedirectTo: `${baseUrl}/login/auth-redirect?action=signup-confirm`,
-    });
-
-    await new Promise((r) => setTimeout(r, 500));
-
-    if (!signupResult.success) {
-      await recordAuthAttempt(prep.sanitizedEmail, "signup", false);
-      return mapSignUpError(signupResult.error);
-    }
-
-    await recordAuthAttempt(prep.sanitizedEmail, "signup", true);
-    return {
-      success: true,
-      redirectTo: `/login/email-confirmation?email=${encodeURIComponent(prep.sanitizedEmail)}`,
-    };
   } catch (error) {
-    logger.category("auth").error("Sign up error:", error);
-    return { success: false, error: "An unexpected error occurred. Please try again." };
+    logger.category('auth').error('Sign in error:', error);
+    const message = (error as Error)?.message?.includes('Request timeout')
+      ? 'The server took too long to respond. Please try again.'
+      : (error as Error)?.message?.includes('fetch')
+        ? 'Connection error. Please check your internet and try again.'
+        : 'Sign in failed. Please try again.';
+    return { success: false, error: message };
   }
 };
 
@@ -162,6 +131,44 @@ export const verifyCredentials = async (
   } catch (error) {
     logger.category("auth").error("Credential verification error:", error);
     return { success: false, error: "An unexpected error occurred. Please try again." };
+  }
+};
+
+// ============================================================================
+// SIGN UP
+// ============================================================================
+
+export const signUpUser = async (
+  email: string,
+  password: string,
+): Promise<SignUpResult> => {
+  const prep = await prepareSignUp(email, password);
+  if (!prep.ready) return prep.result;
+
+  try {
+    const { performSignUp } = await import('./account/sign-up-system');
+    const systemResult = await performSignUp(prep.sanitizedEmail, password);
+
+    if (systemResult.success) {
+      await recordAuthAttempt(prep.sanitizedEmail, 'signup', true);
+      return { success: true, redirectTo: systemResult.redirect };
+    }
+
+    await recordAuthAttempt(prep.sanitizedEmail, 'signup', false);
+    const firstError = systemResult.errors[0];
+
+    // Map email-already-exists to the modal flag using the preserved error instance
+    if (firstError?.error instanceof EmailAlreadyExistsError) {
+      return { success: false, showEmailExistsModal: true };
+    }
+    const msg = firstError?.message ?? '';
+    if (msg.includes('Password')) {
+      return { success: false, error: 'Password does not meet requirements. Please check and try again.' };
+    }
+    return { success: false, error: msg || 'Account creation failed. Please try again.' };
+  } catch (error) {
+    logger.category('auth').error('Sign up error:', error);
+    return { success: false, error: 'An unexpected error occurred. Please try again.' };
   }
 };
 
@@ -222,6 +229,74 @@ export const updatePassword = async (
 };
 
 // ============================================================================
+// UPDATE CREDENTIALS (username / password — logged-in settings flow)
+// ============================================================================
+
+/**
+ * Phase 1: Verify the user's identity before showing credential update modal.
+ * Runs ensureUserLoggedIn + ensureAuthProviderReady guards.
+ */
+export const verifyIdentityForCredentialUpdate = async (): Promise<Phase1VerifyResult> => {
+  try {
+    await ensureUserLoggedIn();
+    await ensureAuthProviderReady();
+    return { success: true, errors: [] };
+  } catch (error) {
+    return {
+      success: false,
+      errors: [{ phase: 'verification', message: error instanceof Error ? error.message : 'Verification failed', error: error instanceof Error ? error : undefined }],
+    };
+  }
+};
+
+/**
+ * Phase 2: Update the user's username.
+ * Runs ensureUserLoggedIn guard, then delegates.
+ */
+export const updateUsernameUser = async (
+  newUsername: string,
+): Promise<Phase2UpdateUsernameResult> => {
+  try {
+    await ensureUserLoggedIn();
+  } catch (error) {
+    return {
+      success: false,
+      errors: [{ phase: 'verification', message: error instanceof Error ? error.message : 'Verification failed', error: error instanceof Error ? error : undefined }],
+    };
+  }
+  const { performPhase2_UpdateUsername } = await import('./account/update-creds-system');
+  return performPhase2_UpdateUsername(newUsername, 'user-initiated');
+};
+
+/**
+ * Phase 2: Update the user's password while logged in (settings flow).
+ * Validates password format + ensureUserLoggedIn guard before delegating.
+ * Distinct from `updatePassword` which handles the token-based reset flow.
+ */
+export const updatePasswordLoggedIn = async (
+  currentPassword: string,
+  newPassword: string,
+): Promise<Phase2UpdatePasswordResult> => {
+  const prep = await prepareUpdatePassword(newPassword);
+  if (!prep.ready) {
+    return {
+      success: false,
+      errors: [{ phase: 'validation', message: prep.result.error ?? 'Invalid password format.' }],
+    };
+  }
+  try {
+    await ensureUserLoggedIn();
+  } catch (error) {
+    return {
+      success: false,
+      errors: [{ phase: 'verification', message: error instanceof Error ? error.message : 'Verification failed', error: error instanceof Error ? error : undefined }],
+    };
+  }
+  const { performPhase2_UpdatePasswordLoggedIn } = await import('./account/update-creds-system');
+  return performPhase2_UpdatePasswordLoggedIn(currentPassword, newPassword, 'user-initiated');
+};
+
+// ============================================================================
 // RESEND CONFIRMATION EMAIL
 // ============================================================================
 
@@ -256,25 +331,57 @@ export const resendConfirmationEmail = async (
 // ============================================================================
 
 export const signOutUser = async (): Promise<void> => {
-  try {
-    try {
-      await authSignOut();
-    } catch (error) {
-      logger.category("auth").error("Error signing out from auth provider", error);
-    }
-
-    const { AuthStateManager } = await import("./auth-state");
-    await AuthStateManager.clearAuthState();
-
-    // Reset theme to defaults for next user
-    await Promise.all([
-      StorageManager.setRaw(STORAGE_KEYS.THEME_PREFERENCE, "classic"),
-      StorageManager.setRaw(STORAGE_KEYS.THEME_MODE, "dark"),
-    ]);
-  } catch (error) {
-    logger.category("auth").error("Sign out error", error);
-    throw new Error("Failed to sign out. Please try again.");
+  const { performSignOutPhase2_ClearAndSignOut } = await import('./account/sign-out-system');
+  const result = await performSignOutPhase2_ClearAndSignOut('user-initiated');
+  if (!result.success) {
+    logger.category('auth').error('Sign out completed with errors', result.errors);
   }
+};
+
+// ============================================================================
+// DELETE ACCOUNT (two-phase with auth-manager guards)
+// ============================================================================
+
+/**
+ * Phase 1: Verify that account deletion is allowed.
+ * Runs ensureUserLoggedIn + ensureAuthProviderReady guards.
+ */
+export const verifyDeletion = async (): Promise<DeletePhase1Result> => {
+  try {
+    await ensureUserLoggedIn();
+    await ensureAuthProviderReady();
+    return { success: true, message: 'Account can be deleted. Please enter your password to confirm.', errors: [] };
+  } catch (error) {
+    return {
+      success: false,
+      errors: [{ phase: 'verification', message: error instanceof Error ? error.message : 'Verification failed', error: error instanceof Error ? error : undefined }],
+    };
+  }
+};
+
+/**
+ * Phase 2: Delete account and sign out.
+ * Runs ensureUserLoggedIn guard + verifyCredentials before delegating to system.
+ */
+export const deleteAccountUser = async (password: string): Promise<DeletePhase2Result> => {
+  let user: { authId: string; email: string };
+  try {
+    user = await ensureUserLoggedIn();
+  } catch (error) {
+    return {
+      success: false,
+      errors: [{ phase: 'verification', message: error instanceof Error ? error.message : 'Verification failed', error: error instanceof Error ? error : undefined }],
+    };
+  }
+  const credResult = await verifyCredentials(user.email, password);
+  if (!credResult.success) {
+    return {
+      success: false,
+      errors: [{ phase: 'auth', message: credResult.error ?? 'Password verification failed.' }],
+    };
+  }
+  const { performDeletePhase2_DeleteAndSignOut } = await import('./account/delete-account-system');
+  return performDeletePhase2_DeleteAndSignOut(password, 'user-initiated');
 };
 
 // ============================================================================
@@ -322,6 +429,7 @@ export const signInWithOAuth = async (
 
 /**
  * Sign in with an ID token from a native OAuth flow (Apple, Google native).
+ * Delegates to sign-in-system for full post-login orchestration (DB sync, redirect).
  *
  * @param provider - Provider name ('apple', 'google')
  * @param token - ID token from the native authentication library
@@ -334,7 +442,8 @@ export const signInWithIdToken = async (
   options?: Record<string, any>
 ): Promise<{ success: boolean; data?: any; error?: any }> => {
   try {
-    return await authSignInWithIdToken(provider, token, options);
+    const { performSignInWithIdToken } = await import('./account/sign-in-system');
+    return await performSignInWithIdToken(provider, token, options);
   } catch (error) {
     logger.category('auth').error(`ID token sign-in error for ${provider}:`, error);
     return { success: false, error };
@@ -345,98 +454,21 @@ export const signInWithIdToken = async (
 // INVITE UTILITIES
 // ============================================================================
 
-// Generate world invite link with Supabase-generated token
 export const generateWorldInviteLink = async (
   worldId: string,
   worldName: string,
   hoursValid = 24,
 ): Promise<{ success: boolean; inviteLink?: string; error?: string }> => {
-  try {
-    if (!worldId || !worldName) {
-      return {
-        success: false,
-        error: "World ID and name are required",
-      };
-    }
-
-    // Import invitesDB here to avoid circular dependencies
-    const { invitesDB } = await import("../database/invites");
-
-    // Create invite link in database with Supabase-generated token
-    const result = await invitesDB.createInviteLink({
-      worldId,
-      hoursValid,
-    });
-
-    if (!result.success || !result.inviteLink) {
-      return {
-        success: false,
-        error: result.error || "Failed to create invite link",
-      };
-    }
-
-    // Build the full invite URL using the token
-    const baseUrl =
-      typeof window !== "undefined"
-        ? window.location.origin
-        : "https://dnd-tool.thesnowpost.com";
-
-    const inviteLink = `${baseUrl}/login/auth-redirect?action=world-invite&token=${result.inviteLink.token}&worldName=${encodeURIComponent(worldName)}`;
-
-    // Try to copy to clipboard
-    if (typeof window !== "undefined" && window.navigator?.clipboard) {
-      try {
-        await window.navigator.clipboard.writeText(inviteLink);
-        logger.category('auth').debug("Invite link copied to clipboard!");
-      } catch {
-        logger.category('auth').debug("Could not copy to clipboard automatically");
-      }
-    }
-
-    logger.category('auth').info("World Invite Link Generated:", {
-      world: worldName,
-      token: result.inviteLink.token,
-      expires: result.inviteLink.expires_at,
-      link: inviteLink,
-    });
-
-    return {
-      success: true,
-      inviteLink,
-    };
-  } catch (error) {
-    logger.category('auth').error("Failed to generate invite link:", error);
-    return {
-      success: false,
-      error: "Failed to generate invite link",
-    };
-  }
+  const { performGenerateInviteLink } = await import('./account/invite-system');
+  return performGenerateInviteLink(worldId, worldName, hoursValid);
 };
 
-// Helper function to check for pending invites
 export const checkPendingInvites = async (): Promise<{
   token: string;
   worldName: string;
 } | null> => {
-  if (typeof window !== "undefined") {
-    const stored = await StorageManager.getRaw(STORAGE_KEYS.PENDING_INVITE);
-    if (stored) {
-      try {
-        const inviteData = JSON.parse(stored);
-        // Check if invite is less than 24 hours old
-        if (Date.now() - inviteData.timestamp < 24 * 60 * 60 * 1000) {
-          return { token: inviteData.token, worldName: inviteData.worldName };
-        } else {
-          // Clean up expired invite
-          await StorageManager.remove(STORAGE_KEYS.PENDING_INVITE);
-        }
-      } catch (error) {
-        logger.category('auth').error("Error parsing pending invite:", error);
-        await StorageManager.remove(STORAGE_KEYS.PENDING_INVITE);
-      }
-    }
-  }
-  return null;
+  const { performCheckPendingInvites } = await import('./account/invite-system');
+  return performCheckPendingInvites();
 };
 
 /**

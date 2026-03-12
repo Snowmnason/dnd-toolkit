@@ -1,14 +1,15 @@
 /**
  * Sign-In System
  *
- * Centralizes user login orchestration with post-login DB sync.
+ * Centralizes user login orchestration with post-login data sync.
  *
  * Flow:
  * 1. Validate email + password format
  * 2. Call auth provider via middleware
  * 3. Store session + metadata (HAS_ACCOUNT, LAST_LOGGED_IN timestamp)
- * 4. Call performDBSync() to sync profile + worlds + offline queue
- * 5. Determine redirect based on profile completeness + staleness
+ * 4. Sync data (profile + worlds, download from server)
+ * 5. Drain offline mutation queue (upload pending changes)
+ * 6. Determine redirect based on profile completeness
  *
  * Usage:
  *   const result = await performSignIn('user@example.com', 'password123');
@@ -19,7 +20,7 @@
  *   }
  */
 
-import { performDBSync } from '@/lib/database/sync/DB-sync';
+import { JobsManager } from '@/lib/jobs';
 import { determineEnterErrorRedirect, determineEnterRedirect } from '@/lib/navigation';
 import { logger } from '@/lib/utils/logger';
 import { STORAGE_KEYS } from '@/maps';
@@ -156,27 +157,10 @@ export async function performSignIn(
     }
 
     // =====================================================================
-    // STEP 3: PERFORM DB SYNC
+    // STEP 3: SYNC DATA (via JobsManager orchestration)
     // =====================================================================
-    logger.category('auth').debug('Sign-in: Performing centralized DB sync');
-
-    const dbSyncResult = await performDBSync('signin');
-
-    if (!dbSyncResult.success && dbSyncResult.errors && dbSyncResult.errors.length > 0) {
-      // DB sync had errors, but allow sign-in to proceed
-      for (const err of dbSyncResult.errors) {
-        result.errors?.push({
-          phase: 'db-sync',
-          message: err.message,
-          error: err.error,
-        });
-      }
-      logger
-        .category('auth')
-        .warn(`Sign-in: DB sync had ${dbSyncResult.errors.length} error(s), continuing...`);
-    } else {
-      logger.category('auth').info('Sign-in: DB sync completed successfully');
-    }
+    const syncResult = await JobsManager.performSync({ mode: 'automatic', direction: 'download' });
+    const worldIds = syncResult.worlds?.worldIds || [];
 
     // =====================================================================
     // STEP 4: DETERMINE REDIRECT
@@ -186,7 +170,7 @@ export async function performSignIn(
     try {
       const { usersDB } = await import('@/lib/database');
       const user = await usersDB.getCurrentUser();
-      const navDecision = determineEnterRedirect('signin', user, dbSyncResult.worldIds || []);
+      const navDecision = determineEnterRedirect('signin', user, worldIds);
       result.redirect = navDecision.redirect;
       logger.category('auth').info(`Sign-in: ${navDecision.reason}`);
     } catch (error) {
@@ -211,5 +195,64 @@ export async function performSignIn(
     });
     logger.category('auth').error('Sign-in: Unexpected error', error);
     return result;
+  }
+}
+
+// ============================================================================
+// ID TOKEN SIGN-IN (Google / Apple native)
+// ============================================================================
+
+/**
+ * Performs sign-in via ID token from a native auth provider (Google, Apple).
+ *
+ * Same post-login flow as performSignIn: store session, DB sync, determine redirect.
+ *
+ * @param provider - Provider name ('google', 'apple')
+ * @param token - ID token from the native authentication library
+ * @param options - Optional provider-specific options (e.g., access_token for Apple web)
+ * @returns Result with success flag, optional data/error
+ */
+export async function performSignInWithIdToken(
+  provider: string,
+  token: string,
+  options?: Record<string, any>
+): Promise<{ success: boolean; data?: any; error?: any }> {
+  logger.category('auth').info(`Sign-in: Starting ID token flow for ${provider}`);
+
+  try {
+    // STEP 1: Call auth provider with ID token
+    const { authSignInWithIdToken } = await import('@/lib/middleware/services/auth-service');
+    const authResult = await authSignInWithIdToken(provider, token, options);
+
+    if (!authResult.success) {
+      logger.category('auth').warn(`Sign-in: ID token auth failed for ${provider}`);
+      return { success: false, error: authResult.error };
+    }
+
+    const session = authResult.data;
+    if (!session) {
+      logger.category('auth').warn(`Sign-in: No session returned for ${provider}`);
+      return { success: false, error: { message: 'No session returned from auth provider' } };
+    }
+
+    // STEP 2: Store session + metadata
+    try {
+      await AuthStateManager.setSession(session);
+      const { StorageManager } = await import('@/lib/storage');
+      await StorageManager.set(STORAGE_KEYS.HAS_ACCOUNT, true);
+      logger.category('auth').info(`Sign-in: Session stored for ${provider} user ${session.userId}`);
+    } catch (error) {
+      logger.category('auth').warn(`Sign-in: Failed to store session for ${provider}`, error);
+      return { success: false, error: { message: 'Failed to store session' } };
+    }
+
+    // STEP 3: Sync data (via JobsManager orchestration)
+    await JobsManager.performSync({ mode: 'automatic', direction: 'download' });
+
+    logger.category('auth').info(`Sign-in: ID token flow complete for ${provider}`);
+    return { success: true, data: session };
+  } catch (error) {
+    logger.category('auth').error(`Sign-in: Unexpected error in ID token flow for ${provider}`, error);
+    return { success: false, error };
   }
 }

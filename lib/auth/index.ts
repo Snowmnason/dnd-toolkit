@@ -23,6 +23,9 @@ export {
 // Auth manager — single public API for all auth operations
 export {
     checkPendingInvites,
+    deleteAccountUser,
+    ensureAuthProviderReady,
+    ensureUserLoggedIn,
     generateWorldInviteLink,
     getCurrentSession,
     getUser,
@@ -37,19 +40,38 @@ export {
     signOutUser,
     signUpUser,
     updatePassword,
-    verifyCredentials
+    updatePasswordLoggedIn,
+    updateUsernameUser,
+    verifyCredentials,
+    verifyDeletion,
+    verifyIdentityForCredentialUpdate
 } from "./auth-manager";
 
-export { deleteUserAccount, type DeleteAccountResult } from "./account/deleteAccount";
 export {
-    performSignOut,
-    registerSignOutHook,
-    type ISignOutHook,
-    type SignOutPhase,
-    type SignOutResult,
+    type DeleteAccountError,
+    type DeleteAccountSource,
+    type DeletePhase1Result,
+    type DeletePhase2Result
+} from "./account/delete-account-system";
+export {
+    performCheckPendingInvites,
+    performGenerateInviteLink
+} from "./account/invite-system";
+export { performReAuth, type AuthTokens, type ReAuthContext, type ReAuthError, type ReAuthResult } from "./account/re-auth-system";
+export { type SignInError } from "./account/sign-in-system";
+export {
+    performSignOutPhase1_DBSync,
+    performSignOutPhase2_ClearAndSignOut,
+    type SignOutError,
+    type SignOutPhase1Result,
+    type SignOutPhase2Result,
     type SignOutSource
 } from "./account/sign-out-system";
-export { updateUsername, type UpdateUsernameResult } from "./account/updateUsername";
+export { type SignUpError } from "./account/sign-up-system";
+export {
+    type Phase1VerifyResult, type Phase2UpdatePasswordResult, type Phase2UpdateUsernameResult, type UpdateCredsError, type UpdateCredsSource,
+    type UpdateCredsType
+} from "./account/update-creds-system";
 export { AuthLayer, type AuthContext, type AuthStrategy } from "./auth-layer";
 export {
     createInviteAuthStrategy,

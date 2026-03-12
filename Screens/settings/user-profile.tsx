@@ -70,10 +70,8 @@ export default function UserProfile({ profile }: UserProfileProps) {
     try {
       const result = await changeUsername(newUsername);
       if (!result.success) {
-        if (result.validationWarning) {
-          setUsernameValidationWarning(result.validationWarning);
-        }
-        setUsernameError(result.error || "Failed to update username");
+        const errorMsg = result.errors?.[0]?.message || "Failed to update username";
+        setUsernameError(errorMsg);
         return;
       }
 

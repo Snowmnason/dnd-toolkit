@@ -1,22 +1,26 @@
 /**
  * Re-Auth System
  *
- * Centralizes session restoration orchestration with DB sync + staleness evaluation.
+ * Centralizes session restoration with data sync + offline queue drain.
  *
  * Flow:
  * 1. Restore session via auth provider using provided tokens
  * 2. Store session + metadata (HAS_ACCOUNT, LAST_LOGGED_IN timestamp)
- * 3. Call performDBSync() to sync profile + worlds + offline queue
- * 4. Evaluate data staleness (Fresh < 7d, Stale 7-30d, Dead > 30d)
- * 5. Determine redirect based on staleness phase + context
+ * 3. Sync data (profile + worlds, download from server)
+ * 4. Drain offline mutation queue (upload pending changes)
+ * 5. Determine redirect based on profile (not staleness)
  *
- * Consolidated Entry Points:
- * - Bootstrap (app startup): context='bootstrap'
+ * NOTE: Staleness evaluation happens EARLY in kernel auth-phase (not here).
+ * This system is purely for restoring session + syncing data after login commitment.
+ *
+ * Entry Points:
  * - Email confirmation link: context='email-link'
  * - OAuth exchange: context='oauth'
  * - Password reset: context='password-reset'
+ * - Manual sign-in: context='recovery'
+ * - Bootstrap auto-login: context='bootstrap'
  *
- * Replaces 8+ direct restoreSession() calls with unified, orchestrated flow.
+ * Replaces direct restoreSession() calls with unified, orchestrated sync flow.
  *
  * Usage:
  *   const result = await performReAuth(
@@ -26,13 +30,11 @@
  *   if (result.success) {
  *     navigate(result.redirect);
  *   } else {
- *     if (result.stalenessPhase === 'dead') {
- *       navigate('/login');
- *     }
+ *     show error toast;
  *   }
  */
 
-import { performDBSync } from '@/lib/database/sync/DB-sync';
+import { JobsManager } from '@/lib/jobs';
 import { determineEnterErrorRedirect, determineEnterRedirect } from '@/lib/navigation';
 import { logger } from '@/lib/utils/logger';
 import { STORAGE_KEYS } from '@/maps';
@@ -55,7 +57,6 @@ export interface ReAuthResult {
   redirect?: string; // Where to navigate after restoration
   userId?: string;
   worldIds?: string[];
-  stalenessPhase?: 'fresh' | 'stale' | 'dead'; // Data age phase
   errors?: ReAuthError[];
 }
 
@@ -63,7 +64,7 @@ export interface ReAuthResult {
  * Re-auth error with phase and context.
  */
 export interface ReAuthError {
-  phase: 'restore' | 'db-sync' | 'staleness' | 'redirect';
+  phase: 'restore' | 'db-sync' | 'redirect';
   message: string;
   error?: Error;
 }
@@ -81,30 +82,23 @@ export interface AuthTokens {
 // ============================================================================
 
 /**
- * Performs complete session restoration with DB sync + staleness evaluation.
+ * Performs complete session restoration with DB sync + offline queue drain.
  *
  * Steps:
  * 1. Restore session via auth provider using provided tokens
  * 2. Store session + HAS_ACCOUNT flag + LAST_LOGGED_IN timestamp
- * 3. Call performDBSync() to fetch profile, refresh worlds, drain offline queue
- * 4. Evaluate data staleness based on LAST_LOGGED_IN timestamp age
- * 5. Determine redirect based on staleness phase + context
- *
- * Staleness Phases:
- * - Fresh (< 7 days): Data is recent → Auto-restore silently
- * - Stale (7-30 days): Data is old but usable → Auto-restore, redirect to welcome screen
- * - Dead (> 30 days): Data is too old → Deny restore, require manual sign-in
+ * 3. Sync database (fetch profile, refresh worlds, drain offline queue)
+ * 4. Determine redirect based on profile completeness
  *
  * @param tokens - Authentication tokens { access_token, refresh_token? }
  * @param context - Calling context (used for logging + redirect determination)
- * @returns ReAuthResult with success status, redirect URL, staleness phase, and any errors
+ * @returns ReAuthResult with success status, redirect URL, and any errors
  *
  * @remarks
- * - Consolidates all direct restoreSession() calls (bootstrap, OAuth, email links, etc.)
- * - LAST_LOGGED_IN is set to Date.now() during DB sync
- * - Non-blocking on individual DB sync failures; continues with redirect based on staleness
- * - Staleness phase is determined by age of LAST_LOGGED_IN timestamp from DB sync result
- * - No UI feedback for staleness phases (silent redirects based on phase)
+ * - Staleness evaluation happens early in bootstrap auth-phase (not here)
+ * - This is purely a data sync mechanism called after login commitment
+ * - LAST_LOGGED_IN is updated to Date.now() (sets data to fresh)
+ * - Non-blocking on individual DB sync failures; continues with redirect
  *
  * @example
  * // Bootstrap recovery: check staleness
@@ -200,47 +194,18 @@ export async function performReAuth(
     }
 
     // =====================================================================
-    // STEP 3: PERFORM DB SYNC
+    // STEP 3: SYNC DATA (via JobsManager orchestration)
     // =====================================================================
-    logger.category('auth').debug(`[${context}] Re-auth: Performing centralized DB sync`);
-
-    const dbSyncResult = await performDBSync('reauth');
-
-    if (!dbSyncResult.success && dbSyncResult.errors && dbSyncResult.errors.length > 0) {
-      // DB sync had errors, but allow re-auth to proceed
-      for (const err of dbSyncResult.errors) {
-        result.errors?.push({
-          phase: 'db-sync',
-          message: err.message,
-          error: err.error,
-        });
-      }
-      logger
-        .category('auth')
-        .warn(
-          `[${context}] Re-auth: DB sync had ${dbSyncResult.errors.length} error(s), continuing...`
-        );
-    } else {
-      logger.category('auth').info(`[${context}] Re-auth: DB sync completed successfully`);
-    }
-
-    // Copy world IDs from DB sync
-    result.worldIds = dbSyncResult.worldIds || [];
+    const syncResult = await JobsManager.performSync({ mode: 'automatic', direction: 'download' });
+    result.worldIds = syncResult.worlds?.worldIds || [];
 
     // =====================================================================
-    // STEP 4: EVALUATE STALENESS PHASE
+    // STEP 4: DETERMINE REDIRECT
     // =====================================================================
-    logger.category('auth').debug(`[${context}] Re-auth: Evaluating data staleness`);
-
-    const stalenessPhase = dbSyncResult.stalenessPhase || 'fresh';
-    result.stalenessPhase = stalenessPhase;
-
-    logger.category('auth').info(`[${context}] Re-auth: Staleness phase = ${stalenessPhase}`);
-
-    // =====================================================================
-    // STEP 5: DETERMINE REDIRECT
-    // =====================================================================
-    logger.category('auth').debug(`[${context}] Re-auth: Determining redirect (staleness=${stalenessPhase})`);
+    // NOTE: For bootstrap context, staleness phase comes from evaluateStalenessPhase()
+    // which is called EARLY in bootstrap (before this re-auth flow).
+    // performDBSync() only updates LAST_LOGGED_IN; it doesn't evaluate staleness.
+    logger.category('auth').debug(`[${context}] Re-auth: Determining redirect`);
 
     try {
       let user: any = null;
@@ -250,11 +215,13 @@ export async function performReAuth(
         user = await usersDB.getCurrentUser();
       }
 
+      // For bootstrap, staleness phase would be passed separately if needed
+      // For non-bootstrap (oauth, email-link, password-reset), use profile-based routing
       const navDecision = determineEnterRedirect(
         'reauth',
         user,
         result.worldIds || [],
-        stalenessPhase,
+        undefined, // No staleness phase here - it's determined early in bootstrap
         context
       );
       result.redirect = navDecision.redirect;
@@ -271,7 +238,7 @@ export async function performReAuth(
     }
 
     logger.category('auth').info(
-      `[${context}] Re-auth: Complete. Redirect: ${result.redirect}, Staleness: ${result.stalenessPhase}`
+      `[${context}] Re-auth: Complete. Redirect: ${result.redirect}`
     );
     return result;
   } catch (error) {

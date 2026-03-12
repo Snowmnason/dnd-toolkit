@@ -26,6 +26,7 @@
  */
 
 import { jobService } from '@/lib/middleware/jobs/job-service';
+import { executeSyncOperation, type SyncMode, type SyncDirection } from '@/lib/jobs/core/sync/sync-orchestrator';
 import { logger } from '@/lib/utils/logger';
 import type { EnqueueOptions, JobEventSubscriber, JobRecord } from '@/type-definitions/job-queue-types';
 
@@ -204,6 +205,49 @@ export const JobsManager = {
     } catch (error) {
       logger.category('jobs').error(`Failed to peek next job: ${error}`);
       return null;
+    }
+  },
+
+  /**
+   * Perform a synchronization operation (central orchestration hub).
+   *
+   * Synchronous entry point for all sync operations:
+   * - Auth systems (sign-in, re-auth, sign-out)
+   * - Manual sync button (useForceResync)
+   * - Background job handlers (queue execution)
+   *
+   * Delegates to the registered sync handler logic (executeSyncOperation).
+   *
+   * @param payload - Sync operation parameters (mode, direction, target)
+   * @returns Results from the sync operation
+   * @throws If sync fails
+   *
+   * @example
+   * // From auth system:
+   * const result = await JobsManager.performSync({ mode: 'automatic', direction: 'download' });
+   * const worldIds = result.worlds?.worldIds || [];
+   *
+   * // From manual sync button:
+   * await JobsManager.performSync({ mode: 'manual', direction: 'download' });
+   * await JobsManager.performSync({ mode: 'manual', target: 'queue', direction: 'upload' });
+   */
+  async performSync(payload: {
+    mode?: SyncMode;
+    direction?: SyncDirection;
+    target?: 'profile' | 'worlds' | 'queue';
+  }): Promise<{ profile?: any; worlds?: any; queue?: any }> {
+    try {
+      logger.category('jobs').info(
+        `Sync operation starting [${payload.mode || 'automatic'}/${payload.direction || 'download'}${payload.target ? `/${payload.target}` : ''}]`
+      );
+
+      const result = await executeSyncOperation(payload);
+
+      logger.category('jobs').info('Sync operation completed successfully');
+      return result;
+    } catch (error) {
+      logger.category('jobs').error('Sync operation failed:', error);
+      throw error;
     }
   },
 };

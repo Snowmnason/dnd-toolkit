@@ -3,12 +3,12 @@ import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
 import React, {
-  createContext as createReactContext,
-  ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
+    createContext as createReactContext,
+    ReactNode,
+    useCallback,
+    useContext,
+    useEffect,
+    useState,
 } from "react";
 import { createContext, useContextSelector } from "use-context-selector";
 
@@ -409,7 +409,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     const setupAuthWatcher = async (attempt = 1, token = ++watcherToken) => {
       const localToken = token;
       try {
-        const { listenToAuthStateChanges } = await import("@/lib/auth");
+        const { listenToAuthStateChanges, performSignOutPhase2_ClearAndSignOut } = await import("@/lib/auth");
         // Re-check staleness after the async await — a newer watcher may have been
         // started while we were waiting for the auth provider to become available.
         if (localToken !== watcherToken) return;
@@ -426,15 +426,13 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
             }
           } else if (mounted && session === null) {
             logger.category('auth').debug(
-              "AppParamsStableProvider: Auth state changed (signed out), clearing params and cache metadata...",
+              "AppParamsStableProvider: Auth state changed (signed out), running sign-out cleanup...",
             );
-            // Clear everything including metadata to force fresh verification on next sign-in
+            // Reset in-memory React state immediately
             setStableParams({ userId: undefined, connectedWorldIds: [] });
-            void Promise.all([
-              StorageManager.remove(STORAGE_KEYS.CONNECTED_WORLDS),
-              StorageManager.remove(CONNECTED_WORLDS_METADATA),
-            ]).catch(() => {
-              /* silently ignore cleanup errors on logout */
+            // Delegate full storage + auth cleanup to sign-out-system
+            void performSignOutPhase2_ClearAndSignOut('auth-state-change').catch(() => {
+              /* sign-out cleanup errors are non-fatal when session is already gone */
             });
           }
         });

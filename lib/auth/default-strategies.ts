@@ -129,20 +129,8 @@ export function createUserAuthStrategy(): AuthStrategy {
           });
 
           // Log out user since refresh is no longer possible
-          try {
-            const provider = getAuthProviderSync();
-            if (provider) {
-              await provider.signOut();
-            }
-          } catch (signOutError) {
-            logger.category("auth").error("Failed to sign out after refresh failure", {
-              signOutError,
-            });
-          }
-
-          // Clear app auth state (hasAccount: false)
-          const { AuthStateManager } = await import("./auth-state");
-          await AuthStateManager.clearAuthState();
+          const { performSignOutPhase2_ClearAndSignOut } = await import('./account/sign-out-system');
+          await performSignOutPhase2_ClearAndSignOut('auth-state-change');
 
           logger.category("auth").info("User logged out due to failed token refresh");
 

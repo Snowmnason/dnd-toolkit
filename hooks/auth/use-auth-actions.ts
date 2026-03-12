@@ -6,17 +6,17 @@
  */
 
 import {
-    deleteUserAccount,
+    deleteAccountUser,
     isEmailConfirmed,
     resendConfirmationEmail,
     sendPasswordReset,
     signOutUser,
-    updateUsername,
-    type DeleteAccountResult,
+    updateUsernameUser,
+    type DeletePhase2Result,
+    type Phase2UpdateUsernameResult,
     type ResendResult,
     type ResetPasswordResult,
     type Session,
-    type UpdateUsernameResult,
 } from "@/lib/auth";
 import { useCallback } from "react";
 
@@ -24,7 +24,8 @@ export function useAuthActions() {
   const signOut = useCallback(() => signOutUser(), []);
 
   const deleteAccount = useCallback(
-    (password: string): Promise<DeleteAccountResult> => deleteUserAccount(password),
+    (password: string): Promise<DeletePhase2Result> =>
+      deleteAccountUser(password),
     [],
   );
 
@@ -44,7 +45,7 @@ export function useAuthActions() {
   );
 
   const changeUsername = useCallback(
-    (newUsername: string): Promise<UpdateUsernameResult> => updateUsername(newUsername),
+    (newUsername: string): Promise<Phase2UpdateUsernameResult> => updateUsernameUser(newUsername),
     [],
   );
 

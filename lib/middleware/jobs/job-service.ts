@@ -13,7 +13,6 @@
  *
  * Does NOT:
  * - Execute jobs (that's system/Jobs/background-job-queue.ts)
- * - Register handlers (that's sync-phase bootstrap)
  * - Expose UI state (that's JobsManager → hooks)
  *
  * Architecture:
@@ -51,6 +50,28 @@ export async function initializeJobInfrastructure(): Promise<void> {
   await queue.initialize();
 
   logger.category('jobs').info('✅ Job infrastructure initialized (fastcache + secure adapters)');
+}
+
+/**
+ * Register all background job handlers with the queue.
+ * Called once from registration-phase during kernel bootstrap, after initializeJobInfrastructure.
+ */
+export async function registerJobHandlers(): Promise<void> {
+  const queue = getJobQueue();
+
+  // Sync orchestrator
+  const { createSyncJobHandler } = await import('@/lib/jobs');
+  const syncHandler = createSyncJobHandler();
+  queue.registerHandler(syncHandler.name, (async (payload: any) => {
+    await syncHandler.execute(payload);
+  }) as any); // JobHandler expects (payload, context), but we only need payload
+
+  // Network recovery — full init: registers handler + wires state-machine transition listeners
+  const { NetworkRecoveryRetryJobManager } = await import('@/lib/jobs/core/network-recovery-retry-job');
+  const { NetworkStateManager } = await import('@/system/Network/state-machine');
+  await NetworkRecoveryRetryJobManager.initialize(NetworkStateManager, queue);
+
+  logger.category('jobs').info('Job handlers registered (sync-orchestrator, network-recovery-retry)');
 }
 
 // ─── Precondition Checks ────────────────────────────────────────────────────

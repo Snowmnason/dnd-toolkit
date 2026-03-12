@@ -29,7 +29,7 @@ export {
  */
 
 export { determineEnterErrorRedirect, determineEnterRedirect } from './account/enter-navigation';
-export type { EntryFlowType, NavigationDecision, NavigationUser, ReAuthContext } from './account/enter-navigation';
+export type { EntryFlowType, NavigationDecision, NavigationUser } from './account/enter-navigation';
 
 export { determineExitErrorRedirect, determineExitRedirect } from './account/exit-navigation';
 export type { ExitFlowType } from './account/exit-navigation';

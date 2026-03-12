@@ -1,5 +1,5 @@
 import { useAppToast } from '@/contexts/app-toast-context';
-import { OnlineSyncManager } from '@/lib/offline/sync-manager';
+import { JobsManager } from '@/lib/jobs';
 import { logger } from '@/lib/utils/logger';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -10,7 +10,8 @@ export interface UseForceResyncReturn {
 
 /**
  * Hook for forcing an offline queue sync with integrated toast notifications.
- * Encapsulates all sync logic and displays toasts via global AppToastLayer.
+ * Uses JobsManager.performSync() for orchestrated sync of latest data + pending mutations.
+ * Displays toasts via global AppToastLayer.
  */
 export function useForceResync({ isOffline }: { isOffline: boolean }): UseForceResyncReturn {
   const [isResyncing, setIsResyncing] = useState(false);
@@ -37,7 +38,9 @@ export function useForceResync({ isOffline }: { isOffline: boolean }): UseForceR
     const startTime = Date.now();
 
     try {
-      await OnlineSyncManager.syncAll();
+      // Use JobsManager orchestration: download latest, then upload pending mutations
+      await JobsManager.performSync({ mode: 'manual', direction: 'download' });
+      await JobsManager.performSync({ mode: 'manual', target: 'queue', direction: 'upload' });
 
       const elapsedTime = Date.now() - startTime;
       const minDisplayTime = 2000;

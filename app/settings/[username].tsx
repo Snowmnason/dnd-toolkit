@@ -121,8 +121,10 @@ export default function SettingsPage() {
 
     try {
       const result = await deleteAccount(password);
-      if (!result.success)
-        throw new Error(result.error || "Failed to delete account");
+      if (!result.success) {
+        const errorMsg = result.errors?.[0]?.message || "Failed to delete account";
+        throw new Error(errorMsg);
+      }
 
       setShowDeleteModal(false);
       navigateTo('/');

@@ -46,9 +46,8 @@ import { configPhase } from "./phases/config-phase";
 import { networkPhase } from "./phases/network-phase";
 import { preloadPhase } from "./phases/preload-phase";
 import { servicesPhase } from "./phases/services-phase";
+import { registrationPhase } from "./phases/registration-phase";
 import { storagePhase } from "./phases/storage-phase";
-import { syncPhase } from "./phases/sync-phase";
-import { userPhase } from "./phases/user-phase";
 
 // FUTURE ENHANCEMENT: Phase Progress Callbacks
 // To add progress tracking for phases (e.g., "Loading fonts... 50%"):
@@ -149,11 +148,11 @@ class AppKernelClass {
       // Phase 4: SERVICES — register auth/error/analytics providers (critical, throws on failure)
       await this.runPhase("services", () => servicesPhase());
 
-      // Phase 5: AUTH — restore persisted session (non-critical, guest mode on failure)
-      await this.runPhase("auth", () => authPhase());
+      // Phase 5: REGISTRATION — register background job handlers with the queue
+      await this.runPhase("registration", () => registrationPhase());
 
-      // Phase 6: SYNC — offline queue + sync manager (prevents read/write race conditions)
-      await this.runPhase("sync", () => syncPhase());
+      // Phase 6: AUTH — restore persisted session + evaluate staleness (non-critical, guest mode on failure)
+      await this.runPhase("auth", () => authPhase());
 
       // ═══════════════════════════════════════════════════════════════
       // APP READY — all phases complete, UI can render
@@ -308,20 +307,13 @@ class AppKernelClass {
    * Non-critical: failures don't affect app functionality
    *
    * These run AFTER the user has access to the app — network subscriptions,
-   * user settings, feature flags, analytics. None affect core functionality.
+   * feature flags, analytics. None affect core functionality.
+   * 
+   * NOTE: User settings are now loaded as part of performDataSync during re-auth/sign-in,
+   * so they don't need separate loading here.
    */
   private runPostReadyTasks(): void {
     ;(async () => {
-      // ─── User Settings ────────────────────────────────────────────
-      // Load user settings + persist preferences to storage for next launch
-      try {
-        await userPhase();
-      } catch (error) {
-        logger.category("bootstrap").warn("User settings phase failed (non-critical)", {
-          error: (error as Error).message,
-        });
-      }
-
       // ─── Analytics Network Integration ────────────────────────────
       // Auto-flush analytics buffer on network reconnect
       try {
@@ -715,10 +707,6 @@ class AppKernelClass {
     switch (phase) {
       case "auth":
         await this.runPhase("auth", () => authPhase());
-        break;
-
-      case "sync":
-        await this.runPhase("sync", () => syncPhase());
         break;
 
       case "network":

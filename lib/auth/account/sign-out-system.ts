@@ -4,17 +4,15 @@
  * Centralized orchestration of complete user logout with ordered cleanup.
  *
  * Flow:
- * 1. DB Sync (BEFORE confirmation): Try to sync offline mutations. Returns to auth-manager.
+ * 1. Data Sync + Queue Drain (BEFORE confirmation): Ensure pending changes are uploaded. Returns to auth-manager.
  * 2. User Confirmation: Auth-manager shows modal. User confirms/cancels.
  * 3. If confirmed → Phase 2-4:
  *    - Clear Storage: Remove all auth/user/world/theme keys
  *    - Validate Cleared: Spot-check storage is empty
  *    - Sign Out from Provider: Call authSignOut() middleware
  *
- * Hook Registry: Available for future extensions at different phases.
- *
  * Usage:
- *   // Phase 1: Check if offline mutations can sync
+ *   // Phase 1: Check if pending changes can sync
  *   const syncResult = await performSignOutPhase1_DBSync('user-initiated');
  *   if (!syncResult.success) {
  *     // Show error to user: "Failed to sync data. Continue anyway?"
@@ -29,7 +27,7 @@
  *   }
  */
 
-import { performDBSync } from '@/lib/database/sync/DB-sync';
+import { JobsManager } from '@/lib/jobs';
 import { determineExitErrorRedirect, determineExitRedirect } from '@/lib/navigation';
 import { logger } from '@/lib/utils/logger';
 import { STORAGE_KEYS } from '@/maps';
@@ -43,11 +41,6 @@ import { AuthStateManager } from '../auth-state';
  * Source of sign-out trigger.
  */
 export type SignOutSource = 'user-initiated' | 'auth-state-change';
-
-/**
- * Hook phase identifier for future extensions.
- */
-export type SignOutHookPhase = 'post-db-sync' | 'post-storage-clear' | 'post-provider-signout';
 
 /**
  * Hook error with phase and context.
@@ -78,203 +71,59 @@ export interface SignOutPhase2Result {
   errors: SignOutError[];
 }
 
+// ============================================================================
+// SIGN-OUT PHASE 1: Sync before confirmation
+// ============================================================================
+
 /**
- * Hook interface for participating in sign-out (for future extensions).
+ * PHASE 1: Attempt to upload pending changes BEFORE showing confirmation modal.
  *
- * Hooks are executed serially after specific phases.
+ * Returns to auth-manager for user confirmation.
+ * If sync fails, user is asked: "Continue sign-out anyway?"
  */
-export interface ISignOutHook {
-  /**
-   * Name of the hook (for logging and deduplication).
-   */
-  name: string;
+export async function performSignOutPhase1_DBSync(source: SignOutSource): Promise<SignOutPhase1Result> {
+  const result: SignOutPhase1Result = {
+    success: true,
+    syncQueueSize: 0,
+    errors: [],
+  };
 
-  /**
-   * Phase after which to execute this hook.
-   */
-  phase: SignOutHookPhase;
+  logger.category('security').info(`[${source}] Sign-out Phase 1: Syncing before confirmation`);
 
-  /**
-   * Execution priority (higher = earlier). Defaults to 0.
-   */
-  priority?: number;
+  try {
+    const syncResult = await JobsManager.performSync({ mode: 'automatic', direction: 'upload' });
+    result.syncQueueSize = syncResult.queue?.totalQueued ?? 0;
+    // If operation completes without throwing, it succeeded
+    result.success = true;
+  } catch (error) {
+    result.success = false;
+    result.errors.push({
+      phase: 'db-sync',
+      message: error instanceof Error ? error.message : 'Data sync failed',
+      error: error instanceof Error ? error : undefined,
+    });
+  }
 
-  /**
-   * Async function to execute.
-   */
-  execute: () => Promise<void>;
+  return result;
 }
 
 // ============================================================================
-// SIGN-OUT SYSTEM SINGLETON
+// SIGN-OUT PHASE 2-4: Clear storage and sign out (after confirmation)
 // ============================================================================
 
 /**
- * Manages sign-out orchestration with hook registry.
+ * PHASE 2-4: Clear storage and sign out from provider (AFTER confirmation).
+ *
+ * Called after user confirms sign-out in modal.
  */
-class SignOutSystemImpl {
-  /**
-   * Hook registry: Map<phase, ISignOutHook[]>
-   */
-  private hooks: Map<SignOutHookPhase, ISignOutHook[]> = new Map([
-    ['post-db-sync', []],
-    ['post-storage-clear', []],
-    ['post-provider-signout', []],
-  ]);
+export async function performSignOutPhase2_ClearAndSignOut(source: SignOutSource): Promise<SignOutPhase2Result> {
+  const result: SignOutPhase2Result = {
+    success: true,
+    clearedKeys: [],
+    errors: [],
+  };
 
-  /**
-   * Track registered hook names to prevent duplicates.
-   */
-  private registeredNames: Set<string> = new Set();
-
-  /**
-   * Register a sign-out hook for a specific phase.
-   *
-   * Hooks with the same name will not be registered twice (idempotent).
-   *
-   * @param hook The hook to register
-   */
-  registerSignOutHook(hook: ISignOutHook): void {
-    if (!hook.name) {
-      throw new Error('Hook name is required');
-    }
-    if (!hook.execute || typeof hook.execute !== 'function') {
-      throw new Error(`Hook "${hook.name}" must have an execute function`);
-    }
-
-    const validPhases: SignOutHookPhase[] = ['post-db-sync', 'post-storage-clear', 'post-provider-signout'];
-    if (!validPhases.includes(hook.phase)) {
-      throw new Error(
-        `Hook "${hook.name}" has invalid phase "${hook.phase}". Must be: ${validPhases.join(', ')}`
-      );
-    }
-
-    if (this.registeredNames.has(hook.name)) {
-      logger.category('security').debug(`Hook "${hook.name}" already registered, skipping`);
-      return;
-    }
-
-    this.registeredNames.add(hook.name);
-    const phaseHooks = this.hooks.get(hook.phase)!;
-    phaseHooks.push(hook);
-
-    // Sort by priority (descending) then insertion order
-    phaseHooks.sort((a, b) => {
-      const priorityA = a.priority ?? 0;
-      const priorityB = b.priority ?? 0;
-      return priorityB - priorityA;
-    });
-
-    logger
-      .category('security')
-      .debug(`Registered sign-out hook: "${hook.name}" (phase=${hook.phase}, priority=${hook.priority ?? 0})`);
-  }
-
-  /**
-   * PHASE 1: Try to sync offline mutations (BEFORE confirmation)
-   *
-   * Returns to auth-manager for user confirmation.
-   * If this fails, user is asked: "Continue sign-out anyway?"
-   *
-   * @param source The source of the sign-out trigger
-   * @returns Result with sync queue size and any errors
-   */
-  async performSignOutPhase1_DBSync(source: SignOutSource): Promise<SignOutPhase1Result> {
-    const result: SignOutPhase1Result = {
-      success: true,
-      syncQueueSize: 0,
-      errors: [],
-    };
-
-    logger.category('security').info(`[${source}] Sign-out Phase 1: DB Sync started`);
-
-    try {
-      // =====================================================================
-      // PHASE 1a: PERFORM CENTRALIZED DB SYNC
-      // =====================================================================
-      // Sync user profile, worlds, offline queue, and update LAST_LOGGED_IN timestamp
-      const dbSyncResult = await performDBSync('signout');
-
-      if (!dbSyncResult.success && dbSyncResult.errors && dbSyncResult.errors.length > 0) {
-        // DB sync failed; collect errors but continue
-        for (const err of dbSyncResult.errors) {
-          result.errors.push({
-            phase: 'db-sync',
-            message: err.message,
-            error: err.error,
-          });
-        }
-        result.success = false;
-        logger
-          .category('security')
-          .warn(
-            `[${source}] Phase 1a: DB sync had ${dbSyncResult.errors.length} error(s), continuing...`
-          );
-      } else {
-        logger.category('security').info(`[${source}] Phase 1a: DB sync completed successfully`);
-      }
-
-      // =====================================================================
-      // PHASE 1b: CHECK OFFLINE SYNC STATUS
-      // =====================================================================
-      // Lazy import OnlineSyncManager to sync offline mutations
-      // TODO: In the future, we could have more granular control over which mutations to sync or a "fast sync" mode for sign-out to speed this up. For now, we just call syncAll().
-      // TODO: We could also consider adding a timeout to the sync operation, so it doesn't block indefinitely 
-      // if there are network issues. For now, we rely on the sync manager's internal handling of timeouts and errors.
-      const { OnlineSyncManager } = await import('@/lib/offline/sync-manager');
-
-      // Try to sync all queued mutations
-      const syncStatus = await OnlineSyncManager.syncAll();
-
-      result.syncQueueSize = syncStatus.totalQueued;
-
-      if (!syncStatus.isSyncing && syncStatus.syncedCount === syncStatus.totalQueued) {
-        // All synced successfully
-        logger.category('security').info(`[${source}] Phase 1b: Synced ${syncStatus.syncedCount} mutations`);
-      } else if (syncStatus.failedCount > 0) {
-        // Some mutations failed
-        result.success = false;
-        result.errors.push({
-          phase: 'db-sync',
-          message: `Failed to sync ${syncStatus.failedCount} mutations. Data may be lost.`,
-        });
-        logger
-          .category('security')
-          .warn(`[${source}] Phase 1b: ${syncStatus.failedCount} mutations failed to sync`);
-      }
-    } catch (error) {
-      // Network error or sync manager error
-      result.success = false;
-      result.errors.push({
-        phase: 'db-sync',
-        message: error instanceof Error ? error.message : 'DB sync failed',
-        error: error instanceof Error ? error : undefined,
-      });
-      logger.category('security').warn(`[${source}] Phase 1: DB sync failed:`, error);
-    }
-
-    // Execute post-db-sync hooks
-    await this.executeHooks('post-db-sync', result.errors, source);
-
-    return result;
-  }
-
-  /**
-   * PHASE 2-4: Clear storage and sign out from provider (AFTER confirmation)
-   *
-   * Called after user confirms sign-out in modal.
-   *
-   * @param source The source of the sign-out trigger
-   * @returns Result with cleared keys and any errors
-   */
-  async performSignOutPhase2_ClearAndSignOut(source: SignOutSource): Promise<SignOutPhase2Result> {
-    const result: SignOutPhase2Result = {
-      success: true,
-      clearedKeys: [],
-      errors: [],
-    };
-
-    logger.category('security').info(`[${source}] Sign-out Phase 2: Clear storage started`);
+  logger.category('security').info(`[${source}] Sign-out Phase 2: Clear storage started`);
 
     try {
       // =====================================================================
@@ -288,6 +137,7 @@ class SignOutSystemImpl {
         // User keys
         STORAGE_KEYS.USER_DATA,
         STORAGE_KEYS.CONNECTED_WORLDS,
+        STORAGE_KEYS.CONNECTED_WORLDS_METADATA,
         // Entitlements
         STORAGE_KEYS.ENTITLEMENTS,
       ];
@@ -397,9 +247,6 @@ class SignOutSystemImpl {
         logger.category('security').warn('Storage validation error:', err);
       }
 
-      // Execute post-storage-clear hooks
-      await this.executeHooks('post-storage-clear', result.errors, source);
-
       // =====================================================================
       // PHASE 4: SIGN OUT FROM PROVIDER
       // =====================================================================
@@ -437,9 +284,6 @@ class SignOutSystemImpl {
         });
         logger.category('security').warn('Failed to clear auth state manager:', err);
       }
-
-      // Execute post-provider-signout hooks
-      await this.executeHooks('post-provider-signout', result.errors, source);
 
       // =====================================================================
       // DETERMINE REDIRECT
@@ -481,89 +325,4 @@ class SignOutSystemImpl {
 
       return result;
     }
-  }
-
-  /**
-   * Execute all hooks for a specific phase.
-   * Hooks run serially; errors are caught and collected.
-   *
-   * @private
-   * @param phase The phase to execute hooks for
-   * @param errors Errors array to append to
-   * @param source The sign-out source (for logging)
-   */
-  private async executeHooks(phase: SignOutHookPhase, errors: SignOutError[], source: SignOutSource): Promise<void> {
-    const phaseHooks = this.hooks.get(phase) ?? [];
-
-    if (phaseHooks.length === 0) {
-      return;
-    }
-
-    logger.category('security').debug(`[${source}] Executing ${phaseHooks.length} hook(s) for phase: ${phase}`);
-
-    for (const hook of phaseHooks) {
-      try {
-        logger.category('security').debug(`[${source}] Executing hook: "${hook.name}"`);
-        await hook.execute();
-        logger.category('security').debug(`[${source}] Hook "${hook.name}" completed`);
-      } catch (err) {
-        errors.push({
-          phase: 'hook',
-          message: `Hook "${hook.name}" failed: ${err instanceof Error ? err.message : String(err)}`,
-          error: err instanceof Error ? err : undefined,
-        });
-        logger.category('security').warn(`[${source}] Hook "${hook.name}" failed:`, err);
-        // Continue to next hook
-      }
-    }
-  }
-}
-
-// ============================================================================
-// SINGLETON EXPORT & PUBLIC API
-// ============================================================================
-
-const signOutSystem = new SignOutSystemImpl();
-
-/**
- * Register a hook to participate in sign-out orchestration.
- *
- * @param hook The hook to register
- */
-export function registerSignOutHook(hook: ISignOutHook): void {
-  signOutSystem.registerSignOutHook(hook);
-}
-
-/**
- * PHASE 1: Attempt to sync offline mutations (BEFORE confirmation).
- *
- * Returns to auth-manager for user confirmation.
- * If sync fails, user is asked: "Continue sign-out anyway?"
- *
- * @param source The source of the sign-out trigger
- * @returns Promise<SignOutPhase1Result>
- */
-export async function performSignOutPhase1_DBSync(source: SignOutSource): Promise<SignOutPhase1Result> {
-  return signOutSystem.performSignOutPhase1_DBSync(source);
-}
-
-/**
- * PHASE 2-4: Clear storage and sign out from provider (AFTER confirmation).
- *
- * Called after user confirms sign-out in modal.
- *
- * @param source The source of the sign-out trigger
- * @returns Promise<SignOutPhase2Result>
- */
-export async function performSignOutPhase2_ClearAndSignOut(source: SignOutSource): Promise<SignOutPhase2Result> {
-  return signOutSystem.performSignOutPhase2_ClearAndSignOut(source);
-}
-
-/**
- * Get the hook registry (mainly for testing/debugging).
- *
- * @internal
- */
-export function getSignOutHookRegistry(): Map<SignOutHookPhase, ISignOutHook[]> {
-  return new Map(signOutSystem['hooks']);
 }
