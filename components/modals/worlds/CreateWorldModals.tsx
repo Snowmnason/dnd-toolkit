@@ -1,6 +1,6 @@
 import { AppModal, Body, Button } from '@/components/ui'
+import { registerModal } from '@/contexts'
 import { $, useScale, UseTheme } from '@/theme'
-import React from 'react'
 import { View } from 'react-native'
 
 interface CreateWorldModalsProps {
@@ -108,3 +108,6 @@ export function CreateWorldModals({
     </>
   )
 }
+
+// Register modal for centralized management
+registerModal('create-world', CreateWorldModals)

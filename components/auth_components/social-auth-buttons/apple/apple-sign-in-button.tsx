@@ -16,7 +16,7 @@
  */
 
 import { Button, ButtonText } from '@/components/ui';
-import { useAppleSignIn } from '@/hooks/auth';
+import { useAuthFlow } from '@/hooks/auth';
 import { logger } from '@/lib';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useEffect, useState } from 'react';
@@ -37,7 +37,7 @@ function AppleButtonWeb({ disabled }: { disabled: boolean }) {
   const [sha256Nonce, setSha256Nonce] = useState('');
   const [appleComponents, setAppleComponents] = useState<AppleWebComponents | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { handleAppleWebAuth, handleAppleWebAuthError } = useAppleSignIn();
+  const { apple } = useAuthFlow();
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -129,8 +129,8 @@ function AppleButtonWeb({ disabled }: { disabled: boolean }) {
           nonce: sha256Nonce,
           usePopup: true,
         }}
-        onSuccess={handleAppleWebAuth}
-        onError={handleAppleWebAuthError}
+        onSuccess={apple.web}
+        onError={apple.webError}
         skipScript={false}
         render={(renderProps: any) => (
           <button
@@ -165,7 +165,7 @@ function AppleButtonWeb({ disabled }: { disabled: boolean }) {
 export default function AppleSignInButton({ disabled = false, style }: AppleSignInButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isAvailable, setIsAvailable] = useState(false);
-  const { handleAppleIosAuth } = useAppleSignIn();
+  const { apple } = useAuthFlow();
 
   useEffect(() => {
     if (Platform.OS === 'ios') {
@@ -189,7 +189,7 @@ export default function AppleSignInButton({ disabled = false, style }: AppleSign
     const handlePress = async () => {
       setIsLoading(true);
       try {
-        await handleAppleIosAuth();
+        await apple.ios();
       } finally {
         setIsLoading(false);
       }

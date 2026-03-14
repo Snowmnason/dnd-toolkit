@@ -1,7 +1,8 @@
 import { AuthModal } from "@/components/auth_components";
 import { Caption } from "@/components/ui";
 import CustomLoad from "@/components/ui/CustomLoad";
-import { AuthStateManager, getCurrentSession, pendingInviteStorage, preloadWorlds, processInviteForUser, restoreSession } from "@/hooks/auth";
+import { AuthStateManager, getCurrentSession, restoreSession } from "@/lib/auth";
+import { pendingInviteStorage, preloadWorlds, processInviteForUser } from "@/hooks/auth";
 import { getCurrentUserProfile } from "@/hooks/storage";
 import { logger } from "@/hooks/utils";
 import { ERROR_CODES } from "@/maps";

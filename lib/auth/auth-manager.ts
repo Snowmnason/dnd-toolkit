@@ -12,14 +12,19 @@ import {
 } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils";
 import type {
+  DeletePhase1Result,
+  DeletePhase2Result,
+} from "./account/delete-account-system";
+import type {
+  SignOutPhase1Result,
+  SignOutPhase2Result,
+  SignOutSource,
+} from "./account/sign-out-system";
+import type {
   Phase1VerifyResult,
   Phase2UpdatePasswordResult,
   Phase2UpdateUsernameResult,
 } from "./account/update-creds-system";
-import type {
-  DeletePhase1Result,
-  DeletePhase2Result,
-} from "./account/delete-account-system";
 import {
   prepareResendConfirmation,
   prepareResetPassword,
@@ -327,15 +332,36 @@ export const resendConfirmationEmail = async (
 };
 
 // ============================================================================
-// SIGN OUT (comprehensive — clears session, caches, and resets preferences)
+// SIGN OUT
 // ============================================================================
 
-export const signOutUser = async (): Promise<void> => {
-  const { performSignOutPhase2_ClearAndSignOut } = await import('./account/sign-out-system');
-  const result = await performSignOutPhase2_ClearAndSignOut('user-initiated');
-  if (!result.success) {
-    logger.category('auth').error('Sign out completed with errors', result.errors);
+/**
+ * Phase 1: Sync pending changes before showing the confirmation modal.
+ * Guards: ensureUserLoggedIn
+ * Called by useSignOutFlow.initiate().
+ */
+export const initiateSignOut = async (source: SignOutSource): Promise<SignOutPhase1Result> => {
+  try {
+    await ensureUserLoggedIn();
+  } catch (error) {
+    return {
+      success: false,
+      syncQueueSize: 0,
+      errors: [{ phase: 'db-sync', message: error instanceof Error ? error.message : 'User not logged in' }],
+    };
   }
+  const { performSignOutPhase1_DBSync } = await import('./account/sign-out-system');
+  return performSignOutPhase1_DBSync(source);
+};
+
+/**
+ * Phase 2: Clear storage and sign out from provider (after user confirms modal).
+ * No additional guards — user already confirmed in modal.
+ * Called by useSignOutFlow.confirm() and useSignOutFlow.forceAction().
+ */
+export const confirmSignOut = async (source: SignOutSource): Promise<SignOutPhase2Result> => {
+  const { performSignOutPhase2_ClearAndSignOut } = await import('./account/sign-out-system');
+  return performSignOutPhase2_ClearAndSignOut(source);
 };
 
 // ============================================================================

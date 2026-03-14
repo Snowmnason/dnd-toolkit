@@ -28,6 +28,7 @@
  */
 
 import { AppModal, Body, Button } from "@/components/ui";
+import { registerModal } from "@/contexts";
 import { useFeatureGatingStatus } from "@/hooks/feature/use-feature-gating";
 import { AffectedFeature } from "@/lib/error";
 import { useScale } from "@/theme";
@@ -76,3 +77,6 @@ export function FeatureGatedModal({
     </AppModal>
   );
 }
+
+// Register modal for centralized management
+registerModal('feature-gated', FeatureGatedModal)

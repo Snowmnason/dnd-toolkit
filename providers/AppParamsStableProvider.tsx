@@ -1,14 +1,15 @@
 import { AuthStateManager } from "@/lib/auth/auth-state";
+import { isAuthConfigured } from "@/lib/middleware/services/auth-service";
 import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
 import React, {
-    createContext as createReactContext,
-    ReactNode,
-    useCallback,
-    useContext,
-    useEffect,
-    useState,
+  createContext as createReactContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
 } from "react";
 import { createContext, useContextSelector } from "use-context-selector";
 
@@ -237,6 +238,17 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
       if (isVerifyingRef.current) {
         return;
       }
+
+      // Gate: Don't attempt verification until the auth provider is registered.
+      // During early bootstrap, the services phase hasn't completed yet.
+      // Verification will be retried when auth state changes (authStateVersion bumps).
+      if (!isAuthConfigured()) {
+        logger.category('storage').debug(
+          'AppParamsStableProvider: Auth provider not ready yet, deferring world verification',
+        );
+        return;
+      }
+
       try {
         // Set inside try so the finally block always resets the flag,
         // even if an exception is thrown anywhere in the verification body.
@@ -405,6 +417,8 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     let subscription: { unsubscribe: () => void } | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let watcherToken = 0;
+    let isRunningSignOut = false; // Guard against recursive sign-out calls
+    let previousSessionState: 'authenticated' | 'unauthenticated' | 'initial' = 'initial'; // Track session state to detect transitions
 
     const setupAuthWatcher = async (attempt = 1, token = ++watcherToken) => {
       const localToken = token;
@@ -416,6 +430,8 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         const unsubscribe = listenToAuthStateChanges(async (session) => {
           if (localToken !== watcherToken) return; // stale watcher
           if (mounted && session !== null) {
+            // Transition to authenticated state
+            previousSessionState = 'authenticated';
             logger.category('auth').debug(
               "AppParamsStableProvider: Auth state changed (signed in), reloading userId...",
             );
@@ -424,21 +440,41 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
             if (mounted) {
               setAuthStateVersion((v) => v + 1);
             }
-          } else if (mounted && session === null) {
+          } else if (mounted && session === null && previousSessionState === 'authenticated' && !isRunningSignOut) {
+            // Only trigger sign-out cleanup on transition FROM authenticated TO unauthenticated
+            // This prevents infinite loops where listener keeps firing with null session
+            previousSessionState = 'unauthenticated';
+            isRunningSignOut = true;
             logger.category('auth').debug(
               "AppParamsStableProvider: Auth state changed (signed out), running sign-out cleanup...",
             );
             // Reset in-memory React state immediately
             setStableParams({ userId: undefined, connectedWorldIds: [] });
             // Delegate full storage + auth cleanup to sign-out-system
-            void performSignOutPhase2_ClearAndSignOut('auth-state-change').catch(() => {
+            try {
+              await performSignOutPhase2_ClearAndSignOut('auth-state-change');
+            } catch (err) {
               /* sign-out cleanup errors are non-fatal when session is already gone */
-            });
+            } finally {
+              isRunningSignOut = false; // Reset guard after sign-out completes
+            }
+          } else if (mounted && session === null && previousSessionState === 'initial') {
+            // First time seeing null session (e.g., user never logged in or cleared cache)
+            // This is normal, don't trigger sign-out cleanup
+            previousSessionState = 'unauthenticated';
+            logger.category('auth').debug(
+              "AppParamsStableProvider: Initial auth state is unauthenticated",
+            );
           }
         });
         subscription = { unsubscribe };
       } catch (error) {
         // Auth provider may not be registered yet during early bootstrap.
+        // Clean up any old subscription before retrying
+        if (subscription) {
+          subscription.unsubscribe();
+          subscription = null;
+        }
         // Retry with exponential backoff (500ms, 1s, 2s) until services phase completes.
         const MAX_RETRIES = 5;
         if (attempt < MAX_RETRIES && mounted) {

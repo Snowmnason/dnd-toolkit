@@ -2,6 +2,8 @@ import { AUTH_CONFIG } from '@/config/routing-auth-config';
 import { useAppKernel } from '@/hooks/kernel';
 import {
   AuthStateManager,
+  AuthSubscriptionManager,
+  isSigningOut,
   listenToAuthStateChanges,
   type Session,
 } from '@/lib/auth';
@@ -66,6 +68,9 @@ export function useAuthGuard(
             logger.category('security').debug(`[GUARD:${instanceId}] 🔇 Subscription event received after unmount, ignoring`);
             return;
           }
+
+          // Skip processing if sign-out is in progress — guards should not act on stale state
+          if (isSigningOut()) return;
           
           logger.category('security').debug(`[GUARD:${instanceId}] 🔔 onAuthStateChange: hasSession=${!!session}`);
           
@@ -91,6 +96,9 @@ export function useAuthGuard(
             setAuthState('unauthenticated');
           }
         });
+
+        // Register with centralized subscription manager so sign-out can clean up
+        AuthSubscriptionManager.register(instanceId, unsubscribe);
         
         logger.category('security').info(`[GUARD:${instanceId}] 🔗 Subscription listener registered`);
       } catch (error) {
@@ -102,10 +110,8 @@ export function useAuthGuard(
     setup();
     return () => {
       mounted = false;
-      if (unsubscribe) {
-        logger.category('security').info(`[GUARD:${instanceId}] 🔴 Cleaning up subscription`);
-        unsubscribe();
-      }
+      // Unregister from centralized manager (also calls unsubscribe)
+      AuthSubscriptionManager.unregister(instanceId);
     };
   }, [instanceId]); // Only run once on mount
 
@@ -114,6 +120,9 @@ export function useAuthGuard(
    */
   useEffect(() => {
     if (!appReady) return;
+
+    // Skip auth checks if sign-out is in progress
+    if (isSigningOut()) return;
     
     // For protected routes, wait for subscription to establish before checking auth
     if (isProtectedRoute && !subscriptionReady) {

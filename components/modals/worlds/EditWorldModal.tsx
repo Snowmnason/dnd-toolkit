@@ -1,4 +1,5 @@
 import { AppModal, Body, Button, FormTextInput } from "@/components/ui";
+import { registerModal } from "@/contexts";
 import { logger } from "@/lib/utils/logger";
 import { $, useScale, UseTheme } from "@/theme";
 import { editWorldNameSchema, type EditWorldNameFormData } from "@/validation";
@@ -200,3 +201,6 @@ export function EditWorldModal({
     </AppModal>
   );
 }
+
+// Register modal for centralized management
+registerModal('edit-world', EditWorldModal)

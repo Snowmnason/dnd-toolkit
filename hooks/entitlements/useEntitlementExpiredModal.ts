@@ -2,40 +2,33 @@
  * Hook: useEntitlementExpiredModal
  *
  * Manages visibility and interactions for the entitlement expired modal.
- * Simple state management for showing/hiding the modal.
+ * Uses centralized modal context to open/close the modal via registry.
  *
  * Future: Check for expired entitlements and auto-show the modal.
  */
 
-import { useCallback, useState } from 'react';
+import { useModal } from '@/contexts';
+import { useCallback } from 'react';
 
 export interface UseEntitlementExpiredModalReturn {
-  isVisible: boolean;
-  entitlementName: string;
   show: (name?: string) => void;
   hide: () => void;
-  setEntitlementName: (name: string) => void;
 }
 
 export function useEntitlementExpiredModal(): UseEntitlementExpiredModalReturn {
-  const [isVisible, setIsVisible] = useState(false);
-  const [entitlementName, setEntitlementName] = useState('Entitlement');
+  const { openModal, closeModal } = useModal();
 
-  const show = useCallback((name?: string) => {
-    if (name) setEntitlementName(name);
-    setIsVisible(true);
-  }, []);
+  const show = useCallback((entitlementName: string = 'Entitlement') => {
+    openModal('entitlement-expired', { entitlementName });
+  }, [openModal]);
 
   const hide = useCallback(() => {
-    setIsVisible(false);
-  }, []);
+    closeModal();
+  }, [closeModal]);
 
   return {
-    isVisible,
-    entitlementName,
     show,
     hide,
-    setEntitlementName,
   };
 }
 

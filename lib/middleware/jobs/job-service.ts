@@ -30,7 +30,7 @@ import { SecureStorageAdapter } from './adapters/secure-storage-adapter';
 
 /**
  * Initialize the job queue with the correct storage adapters.
- * Called once from sync-phase during kernel bootstrap.
+ * Called once from job-phase during kernel bootstrap.
  *
  * Injects:
  * - FastCacheAdapter  → default (non-sensitive jobs)

@@ -14,40 +14,19 @@ import {
   AuthTitle,
   FormAuthInput,
 } from "@/components/auth_components";
-import { AppToast } from "@/components/ui";
-import { useSignUpForm } from "@/hooks/auth";
+import { useSignUpFlow } from "@/hooks/auth";
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { TextInput } from "react-native";
 
 export default function SignUpScreen() {
   const router = useRouter();
-  const [showValidationToast, setShowValidationToast] = useState(false);
 
   // Refs for keyboard navigation
   const passwordInputRef = useRef<TextInput>(null);
   const confirmPasswordInputRef = useRef<TextInput>(null);
-  const {
-    control,
-    isValid,
-    email,
-    loading,
-    authError,
-    validationWarning,
-    showPassword,
-    showEmailExistsModal,
-    handleSignUp,
-    setShowPassword,
-    setShowEmailExistsModal,
-    
-  } = useSignUpForm();
 
-  // Show toast when validation warning occurs
-  useEffect(() => {
-    if (validationWarning) {
-      setShowValidationToast(true);
-    }
-  }, [validationWarning]);
+  const { state, form, handlers } = useSignUpFlow();
 
   return (
     <AuthRoot>
@@ -56,7 +35,7 @@ export default function SignUpScreen() {
         <AuthButtonBack
           text="← Back"
           onPress={() => router.replace("/")}
-          disabled={loading}
+          disabled={state.loading}
         />
       </AuthBackButtonContainer>
 
@@ -70,67 +49,67 @@ export default function SignUpScreen() {
       {/* Form Inputs */}
       <AuthForm>
         <FormAuthInput
-          control={control}
+          control={form.control}
           name="email"
           placeholder="Email"
           keyboardType="email-address"
           autoCapitalize="none"
-          editable={!loading}
+          editable={!state.loading}
           returnKeyType="next"
           onSubmitEditing={() => passwordInputRef.current?.focus()}
         />
 
         <FormAuthInput
-          control={control}
+          control={form.control}
           name="password"
           ref={passwordInputRef}
           placeholder="Password"
           secureTextEntry={true}
           autoCapitalize="none"
-          editable={!loading}
+          editable={!state.loading}
           showPasswordToggle={true}
-          onTogglePassword={() => setShowPassword(!showPassword)}
-          showPassword={showPassword}
+          onTogglePassword={() => form.setShowPassword(!form.showPassword)}
+          showPassword={form.showPassword}
           returnKeyType="next"
           onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
         />
 
         <FormAuthInput
-          control={control}
+          control={form.control}
           name="confirmPassword"
           ref={confirmPasswordInputRef}
           placeholder="Confirm Password"
           secureTextEntry={true}
           autoCapitalize="none"
-          showPassword={showPassword}
-          editable={!loading}
+          showPassword={form.showPassword}
+          editable={!state.loading}
           returnKeyType="go"
-          onSubmitEditing={handleSignUp}
+          onSubmitEditing={form.handleSubmit}
         />
 
         {/* Authentication Error Display */}
-        <AuthError error={authError} />
+        {state.error && <AuthError error={state.error} />}
       </AuthForm>
 
       {/* Action Buttons */}
       <AuthActionGroup>
         <AuthButton
           text="Create Account"
-          onPress={handleSignUp}
-          disabled={!isValid}
-          loading={loading}
+          onPress={form.handleSubmit}
+          disabled={!form.isValid}
+          loading={state.loading}
         />
 
         <AuthButtonSecondary
           text="Already have an account? Sign In"
           onPress={() => router.push("/login/sign-in")}
-          disabled={loading}
+          disabled={state.loading}
         />
       </AuthActionGroup>
 
       {/* Info / Footer */}
       <AuthBodyFooter>
-        After confirming your email, you’ll choose a username to complete your
+        After confirming your email, you&apos;ll choose a username to complete your
         account setup.
       </AuthBodyFooter>
 
@@ -140,34 +119,28 @@ export default function SignUpScreen() {
 
       {/* Email Already Exists Modal */}
       <AuthModal
-        visible={showEmailExistsModal}
-        onClose={() => setShowEmailExistsModal(false)}
+        visible={state.modal === 'email-exists'}
+        onClose={handlers.dismissModal}
         title="Account Already Exists! 🤔"
-        message={`An account with ${email} already exists. Would you like to sign in instead?`}
+        message={`An account with ${form.email} already exists. Would you like to sign in instead?`}
         buttons={[
           {
             text: "Cancel",
-            onPress: () => setShowEmailExistsModal(false),
+            onPress: handlers.dismissModal,
             variant: "cancel",
           },
           {
             text: "Sign In",
             onPress: () => {
-              setShowEmailExistsModal(false);
+              handlers.dismissModal();
               router.push("/login/sign-in");
             },
             variant: "primary",
           },
         ]}
       />
-
-      <AppToast
-        message={validationWarning}
-        type="warning"
-        visible={showValidationToast}
-        duration={4000}
-        onHide={() => setShowValidationToast(false)}
-      />
     </AuthRoot>
   );
 }
+
+

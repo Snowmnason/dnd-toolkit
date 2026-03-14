@@ -12,23 +12,15 @@ import {
   AuthTitle,
   FormAuthInput
 } from '@/components/auth_components';
-import { useSignInForm } from "@/hooks/auth";
+import { useAuthFlow } from "@/hooks/auth";
 import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
 
 export default function SignInScreen() {
   const S = useScale();
   const router = useRouter();
-  
-  const {
-    control,
-    isValid,
-    loading,
-    authError,
-    showPassword,
-    handleSignIn,
-    setShowPassword,
-  } = useSignInForm();
+
+  const { state, form } = useAuthFlow();
 
   return (
     <AuthRoot>
@@ -37,7 +29,7 @@ export default function SignInScreen() {
         <AuthButtonBack
           text="← Back"
           onPress={() => router.replace('/')}
-          disabled={loading}
+          disabled={state.loading}
         />
       </AuthBackButtonContainer>
 
@@ -49,28 +41,28 @@ export default function SignInScreen() {
       </AuthSubTitle>
 
       {/* 🧾 Form Inputs */}
-      <AuthForm style={{ marginBottom: authError ? S.space.md : S.space.xxl }}>
+      <AuthForm style={{ marginBottom: state.error ? S.space.md : S.space.xxl }}>
         <FormAuthInput
-          control={control}
+          control={form.control}
           name="email"
           placeholder="Email"
           keyboardType="email-address"
           autoCapitalize="none"
-          editable={!loading}
+          editable={!state.loading}
           returnKeyType="next"
         />
 
         <FormAuthInput
-          control={control}
+          control={form.control}
           name="password"
           placeholder="Password"
           secureTextEntry={true}
-          editable={!loading}
+          editable={!state.loading}
           showPasswordToggle={true}
-          onTogglePassword={() => setShowPassword(!showPassword)}
-          showPassword={showPassword}
+          onTogglePassword={() => form.setShowPassword(!form.showPassword)}
+          showPassword={form.showPassword}
           returnKeyType="go"
-          onSubmitEditing={handleSignIn}
+          onSubmitEditing={form.handleSubmit}
         />
 
         {/* Forgot Password Link */}
@@ -87,17 +79,19 @@ export default function SignInScreen() {
       </AuthForm>
 
       {/* ❌ Error Display */}
-      <AuthForm style={{ marginBottom: authError ? S.space.md : 0 }}>
-        <AuthError error={authError} />
-      </AuthForm>
+      {state.error && (
+        <AuthForm style={{ marginBottom: S.space.md }}>
+          <AuthError error={state.error} />
+        </AuthForm>
+      )}
 
       {/* 🔘 Action Buttons */}
       <AuthActionGroup>
         <AuthButton
           text="Sign In"
-          onPress={handleSignIn}
-          disabled={!isValid}
-          loading={loading}
+          onPress={form.handleSubmit}
+          disabled={!form.isValid}
+          loading={state.loading}
         />
 
         <AuthBody

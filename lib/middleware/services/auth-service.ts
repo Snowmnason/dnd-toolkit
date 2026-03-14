@@ -51,7 +51,13 @@ function ensureAuthReady(): void {
     }
 
     // 2. Provider initialized?
-    if (!isServiceReady('auth')) {
+    // Check both the service status AND the actual provider instance
+    // to handle cases where the registry might be stale or not populated.
+    // If either check says "not ready", we accept that (provider might be ready but status not updated yet).
+    const providerExists = rawGetAuthProviderSync() !== null;
+    const isReady = isServiceReady('auth') || providerExists;
+    
+    if (!isReady) {
         // TODO: Should we retry after a delay? Or throw immediately?
         throw new Error('[auth-service] Auth provider not initialized — cannot perform auth operation');
     }
@@ -65,8 +71,10 @@ function ensureAuthReady(): void {
  * Useful for guard checks where we need to know if auth backend is available
  * (e.g. GitHub Pages deployments without env vars).
  */
-export function isAuthConfigured(): boolean {
-    return isServiceReady('auth');
+export function isAuthConfigured():  boolean {
+    // Accept either service registry saying "ready" OR the provider actually existing
+    // This handles cases where the registry might not be fully populated yet
+    return isServiceReady('auth') || rawGetAuthProviderSync() !== null;
 }
 
 /**

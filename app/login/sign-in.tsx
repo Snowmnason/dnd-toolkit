@@ -5,13 +5,13 @@ import {
   AuthButtonSecondary, AuthCaption, AuthError, AuthForm, AuthRoot, AuthSubTitle, AuthTitle,
   FormAuthInput
 } from '@/components/auth_components';
-import { AppToast } from '@/components/ui';
-import { AuthStateManager, getCurrentSession, useAuthActions, useSignInForm } from "@/hooks/auth";
+import { useAuthActions, useAuthFlow } from "@/hooks/auth";
+import { AuthStateManager, getCurrentSession } from "@/lib/auth";
 import { useNavigate } from "@/hooks/navigation";
 import { logger } from "@/hooks/utils";
 import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { TextInput } from 'react-native';
 
 export default function SignInScreen() {
@@ -20,27 +20,11 @@ export default function SignInScreen() {
   const { replace, push } = useNavigate();
   const { resendConfirmation } = useAuthActions();
   const [isResendingEmail, setIsResendingEmail] = useState(false);
-  const [showValidationToast, setShowValidationToast] = useState(false);
-  
+
   // Refs for keyboard navigation
   const passwordInputRef = useRef<TextInput>(null);
-  
-  const {
-    // Form
-    control,
-    isValid,
-    email,
-    
-    // State
-    loading,
-    authError,
-    validationWarning,
-    showPassword,
-    
-    // Handlers
-    handleSignIn,
-    setShowPassword,
-  } = useSignInForm();
+
+  const { state, form } = useAuthFlow();
 
   // Heavy-duty auth check: verify with Supabase and ensure all data exists
   // Use a callback instead of useEffect to avoid running on every render
@@ -102,13 +86,6 @@ export default function SignInScreen() {
     }
   };
 
-  // Show toast when validation warning occurs
-  useEffect(() => {
-    if (validationWarning) {
-      setShowValidationToast(true);
-    }
-  }, [validationWarning]);
-
   return (
     <AuthRoot>
       {/* 🧭 Back Button*/}
@@ -116,7 +93,7 @@ export default function SignInScreen() {
         <AuthButtonBack
           text="← Back"
           onPress={() => replace('/')}
-          disabled={loading}
+          disabled={state.loading}
         />
       </AuthBackButtonContainer>
 
@@ -128,40 +105,42 @@ export default function SignInScreen() {
       {/* 🧾 Form*/}
       <AuthForm>
         <FormAuthInput
-          control={control}
+          control={form.control}
           name="email"
           placeholder="Email"
           keyboardType="email-address"
           autoCapitalize="none"
-          editable={!loading}
+          editable={!state.loading}
           returnKeyType="next"
           onSubmitEditing={() => passwordInputRef.current?.focus()}
         />
 
         <FormAuthInput
-          control={control}
+          control={form.control}
           name="password"
           placeholder="Password"
           secureTextEntry={true}
           autoCapitalize="none"
-          editable={!loading}
+          editable={!state.loading}
           showPasswordToggle={true}
-          onTogglePassword={() => setShowPassword(!showPassword)}
-          showPassword={showPassword}
+          onTogglePassword={() => form.setShowPassword(!form.showPassword)}
+          showPassword={form.showPassword}
           returnKeyType="go"
-          onSubmitEditing={handleSignIn}
+          onSubmitEditing={form.handleSubmit}
         />
 
         {/* Error Display (with resend option) */}
-        <AuthError
-          error={authError}
-          onResendEmail={
-            authError === 'RESEND_EMAIL'
-              ? () => handleResendConfirmationFromError(email)
-              : undefined
-          }
-          isResending={isResendingEmail}
-        />
+        {state.error && (
+          <AuthError
+            error={state.error}
+            onResendEmail={
+              state.error === 'RESEND_EMAIL'
+                ? () => handleResendConfirmationFromError(form.email)
+                : undefined
+            }
+            isResending={isResendingEmail}
+          />
+        )}
 
         {/* Forgot Password */}
         <AuthSubTitle
@@ -178,15 +157,15 @@ export default function SignInScreen() {
       <AuthActionGroup>
         <AuthButton
           text="Sign In"
-          onPress={handleSignIn}
-          disabled={!isValid}
-          loading={loading}
+          onPress={form.handleSubmit}
+          disabled={!form.isValid}
+          loading={state.loading}
         />
 
         <AuthButtonSecondary
           text="Need an account? Sign Up"
           onPress={() => replace('/login/sign-up')}
-          disabled={loading}
+          disabled={state.loading}
         />
       </AuthActionGroup>
 
@@ -199,13 +178,6 @@ export default function SignInScreen() {
         © 2025 The Snow Post · Forged for storytellers & adventurers
       </AuthCaption>
 
-      <AppToast
-        message={validationWarning}
-        type="warning"
-        visible={showValidationToast}
-        duration={4000}
-        onHide={() => setShowValidationToast(false)}
-      />
     </AuthRoot>
   )
 }

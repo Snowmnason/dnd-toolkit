@@ -64,7 +64,7 @@ export function determineExitRedirect(flowType: ExitFlowType): NavigationDecisio
   }
 
   const decision = {
-    redirect: '/login',
+    redirect: '/',
     reason,
   };
 
@@ -90,7 +90,7 @@ export function determineExitRedirect(flowType: ExitFlowType): NavigationDecisio
  */
 export function determineExitErrorRedirect(flowType: ExitFlowType): NavigationDecision {
   const decision = {
-    redirect: '/login',
+    redirect: '/',
     reason: `Error during ${flowType}, logout anyway`,
   };
 

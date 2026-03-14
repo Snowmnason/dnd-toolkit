@@ -1,94 +1,69 @@
-import { UpdateUsernameModal } from "@/components/modals";
 import {
-  AppToast,
   Body,
   Button,
   Heading,
   IconButton,
   SubTitle,
   Surface,
-} from "@/components/ui";
-import { useAuthActions } from "@/hooks/auth";
-import { useNavigate } from "@/hooks/navigation";
-import { logger } from "@/hooks/utils";
-import { $, useScale } from "@/theme";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { View } from "react-native";
+} from "@/components/ui"
+import { useChangeCredsFlow } from "@/hooks/auth"
+import { useAppToast } from "@/contexts"
+import { useNavigate } from "@/hooks/navigation"
+import { logger } from "@/hooks/utils"
+import { $, useScale } from "@/theme"
+import { Ionicons } from "@expo/vector-icons"
+import { useEffect, useState } from "react"
+import { View } from "react-native"
 
 interface UserProfileProps {
   profile?: {
-    id?: string;
-    username?: string;
-  } | null;
+    id?: string
+    username?: string
+  } | null
 }
 
 export default function UserProfile({ profile }: UserProfileProps) {
-  const router = useRouter();
-  const S = useScale();
-  const { changeUsername } = useAuthActions();
-  const { replace: navigateTo } = useNavigate();
-  const [sessionUser, setSessionUser] = useState<any>(null);
-  const [loadingSession, setLoadingSession] = useState(true);
-  const [showUsernameModal, setShowUsernameModal] = useState(false);
-  const [updatingUsername, setUpdatingUsername] = useState(false);
-  const [usernameError, setUsernameError] = useState("");
-  const [usernameValidationWarning, setUsernameValidationWarning] =
-    useState("");
-  const [showValidationToast, setShowValidationToast] = useState(false);
-  const [isEmailVisible, setIsEmailVisible] = useState(false);
+  const S = useScale()
+  const { replace: navigateTo } = useNavigate()
+  const { show: showToast } = useAppToast()
+  const [sessionUser, setSessionUser] = useState<any>(null)
+  const [loadingSession, setLoadingSession] = useState(true)
+  const [isEmailVisible, setIsEmailVisible] = useState(false)
 
+  // Credential update hook
+  const {
+    state: credsState,
+    passwordForm,
+    usernameForm,
+    handlers: credsHandlers,
+  } = useChangeCredsFlow(profile?.username)
+
+  // Fetch session user on mount
   useEffect(() => {
     const fetchSessionUser = async () => {
       try {
-        const { getCurrentSession } = await import("@/lib/auth");
-        // Use cached session instead of making network call
-        const authSession = await getCurrentSession();
-        setSessionUser(authSession?.raw?.user ?? null);
+        const { getCurrentSession } = await import("@/lib/auth")
+        const authSession = await getCurrentSession()
+        setSessionUser(authSession?.raw?.user ?? null)
       } catch (error) {
-        logger.category('storage').error("Error fetching session user:", error);
+        logger.category('storage').error("Error fetching session user:", error)
       } finally {
-        setLoadingSession(false);
+        setLoadingSession(false)
       }
-    };
-    fetchSessionUser();
-  }, []);
+    }
+    fetchSessionUser()
+  }, [])
 
-  // Show toast when validation warning occurs
+  // Show toast on success
   useEffect(() => {
-    if (usernameValidationWarning) {
-      setShowValidationToast(true);
+    if (credsState.phase === 'success' && credsState.successMessage) {
+      showToast(credsState.successMessage, 'success', 2000)
+      // Auto-close modal after brief delay
+      setTimeout(() => {
+        credsHandlers.cancelModal()
+      }, 1500)
     }
-  }, [usernameValidationWarning]);
-
-  const handleUpdateUsername = async (newUsername: string) => {
-    setUsernameError("");
-    setUsernameValidationWarning("");
-    setUpdatingUsername(true);
-
-    try {
-      const result = await changeUsername(newUsername);
-      if (!result.success) {
-        const errorMsg = result.errors?.[0]?.message || "Failed to update username";
-        setUsernameError(errorMsg);
-        return;
-      }
-
-      setShowUsernameModal(false);
-      logger.category('other').info("Username updated successfully");
-
-      // Refresh the page to reflect the new username
-      if (typeof window !== "undefined") {
-        window.location.reload();
-      }
-    } catch (error: any) {
-      logger.category('other').error("Username update error:", error);
-      setUsernameError(error?.message || "Failed to update username");
-    } finally {
-      setUpdatingUsername(false);
-    }
-  };
+  }, [credsState.phase, credsState.successMessage, showToast, credsHandlers])
 
   // Fallback when profile missing
   if (!profile && !loadingSession) {
@@ -110,12 +85,12 @@ export default function UserProfile({ profile }: UserProfileProps) {
           text="Return to Login"
           variant="primary"
           onPress={() => {
-            navigateTo("/login/welcome");
+            navigateTo("/login/welcome")
           }}
           style={{ alignSelf: "center", minWidth: 140 }}
         />
       </Surface>
-    );
+    )
   }
 
   // ✅ Main Profile Panel
@@ -163,7 +138,7 @@ export default function UserProfile({ profile }: UserProfileProps) {
                 />
               }
               variant="icon"
-              onPress={() => setShowUsernameModal(true)}
+              onPress={() => credsHandlers.initiateUsernameChange()}
               size="sm"
             />
           </View>
@@ -181,29 +156,6 @@ export default function UserProfile({ profile }: UserProfileProps) {
           Loading profile...
         </Body>
       )}
-
-      {/* Username Update Modal */}
-      {profile?.username && (
-        <UpdateUsernameModal
-          visible={showUsernameModal}
-          currentUsername={profile.username}
-          onCancel={() => {
-            setShowUsernameModal(false);
-            setUsernameError("");
-          }}
-          onConfirm={handleUpdateUsername}
-          loading={updatingUsername}
-          errorText={usernameError}
-        />
-      )}
-
-      <AppToast
-        message={usernameValidationWarning}
-        type="warning"
-        visible={showValidationToast}
-        duration={4000}
-        onHide={() => setShowValidationToast(false)}
-      />
     </View>
-  );
+  )
 }

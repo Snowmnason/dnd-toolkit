@@ -54,8 +54,8 @@ export interface NavigationUser {
  * Logic varies by flow type:
  *
  * **Sign-In**:
- * - No profile → /login/complete-profile
- * - Incomplete username → /login/complete-profile
+ * - Profile incomplete (profileCompleted === false) → /login/complete-profile
+ * - No profile or incomplete username → /login/complete-profile
  * - Complete profile → /select/world-selection
  *
  * **Sign-Up**:
@@ -63,36 +63,33 @@ export interface NavigationUser {
  *
  * **Re-Auth**:
  * - Bootstrap context: staleness-based routing (fresh → world-selection, stale → welcome, dead → login)
- * - Other contexts: profile-based routing (same as sign-in)
+ * - Other contexts: check profileCompleted first, then profile-based routing (same as sign-in)
  *
  * @param flowType - Type of entry flow (signin, signup, reauth)
  * @param user - User profile (null if doesn't exist)
  * @param worldIds - Array of world IDs user has access to
  * @param stalenessPhase - Data staleness phase (only for reauth, optional)
  * @param reAuthContext - Re-auth context (only for reauth, optional)
+ * @param profileCompleted - Profile completion flag (null/undefined = normal logged-in, false = needs completion, true = completed)
  * @returns Navigation decision with redirect path and reason
  *
  * @example
  * // Sign-in with complete profile
- * const decision = determineEnterRedirect('signin', user, ['world-1']);
+ * const decision = determineEnterRedirect('signin', user, ['world-1'], undefined, undefined, true);
  * // Returns: { redirect: '/select/world-selection', reason: 'Profile complete with 1 world' }
  *
  * @example
  * // Sign-up (always redirect to profile completion)
- * const decision = determineEnterRedirect('signup', null, []);
+ * const decision = determineEnterRedirect('signup', null, [], undefined, undefined, false);
  * // Returns: { redirect: '/login/complete-profile', reason: 'New account, continue onboarding' }
- *
- * @example
- * // Re-auth bootstrap with stale data
- * const decision = determineEnterRedirect('reauth', user, [], 'stale', 'bootstrap');
- * // Returns: { redirect: '/welcome', reason: 'Stale data restored (7-30 days old)' }
  */
 export function determineEnterRedirect(
   flowType: EntryFlowType,
   user: NavigationUser | null,
   worldIds: string[] = [],
   stalenessPhase?: 'fresh' | 'stale' | 'dead',
-  reAuthContext?: ReAuthContext
+  reAuthContext?: ReAuthContext,
+  profileCompleted?: boolean | null
 ): NavigationDecision {
   // =========================================================================
   // SIGN-UP FLOW: Always redirect to profile completion
@@ -151,6 +148,17 @@ export function determineEnterRedirect(
   // =========================================================================
   // SIGN-IN & RE-AUTH (NON-BOOTSTRAP): Profile-based routing
   // =========================================================================
+
+  // Check profile completion flag first (only set to false during signup)
+  if (profileCompleted === false) {
+    const decision = {
+      redirect: '/login/complete-profile',
+      reason: 'Profile completion in progress (flag: false)',
+    };
+    logger.category('auth').debug(`Enter nav (${flowType}): Profile incomplete flag, redirecting to completion`, decision);
+    return decision;
+  }
+
   if (!user) {
     const decision = {
       redirect: '/login/complete-profile',

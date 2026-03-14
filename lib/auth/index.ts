@@ -17,28 +17,23 @@ export {
     type ResendResult,
     type ResetPasswordResult,
     type Session,
-    type SignInResult,
     type SignUpResult
 } from "./auth-operations";
 // Auth manager — single public API for all auth operations
 export {
-    checkPendingInvites,
-    deleteAccountUser,
+    checkPendingInvites, confirmSignOut, deleteAccountUser,
     ensureAuthProviderReady,
     ensureUserLoggedIn,
     generateWorldInviteLink,
     getCurrentSession,
-    getUser,
-    isAuthSessionReady,
+    getUser, initiateSignOut, isAuthSessionReady,
     listenToAuthStateChanges,
     resendConfirmationEmail,
     restoreSession,
     sendPasswordReset,
     signInUser,
     signInWithIdToken,
-    signInWithOAuth,
-    signOutUser,
-    signUpUser,
+    signInWithOAuth, signUpUser,
     updatePassword,
     updatePasswordLoggedIn,
     updateUsernameUser,
@@ -48,6 +43,7 @@ export {
 } from "./auth-manager";
 
 export {
+    performDeletePhase2_DeleteAndSignOut,
     type DeleteAccountError,
     type DeleteAccountSource,
     type DeletePhase1Result,
@@ -57,8 +53,16 @@ export {
     performCheckPendingInvites,
     performGenerateInviteLink
 } from "./account/invite-system";
-export { performReAuth, type AuthTokens, type ReAuthContext, type ReAuthError, type ReAuthResult } from "./account/re-auth-system";
-export { type SignInError } from "./account/sign-in-system";
+export {
+    performReAuth,
+    performSignIn,
+    performSignInWithIdToken,
+    type AuthTokens,
+    type ReAuthContext,
+    type ReAuthError,
+    type ReAuthResult,
+    type SignInError
+} from "./account/sign-in-system";
 export {
     performSignOutPhase1_DBSync,
     performSignOutPhase2_ClearAndSignOut,
@@ -72,7 +76,7 @@ export {
     type Phase1VerifyResult, type Phase2UpdatePasswordResult, type Phase2UpdateUsernameResult, type UpdateCredsError, type UpdateCredsSource,
     type UpdateCredsType
 } from "./account/update-creds-system";
-export { AuthLayer, type AuthContext, type AuthStrategy } from "./auth-layer";
+export { AuthLayer, type AuthStrategy } from "./auth-layer";
 export {
     createInviteAuthStrategy,
     createPublicAuthStrategy,
@@ -84,4 +88,10 @@ export {
     prepareAuthNavigation,
     type SessionCheckResult
 } from "./guards/sessionService";
+export {
+    AuthSubscriptionManager,
+    beginSignOut,
+    endSignOut,
+    isSigningOut,
+} from "./auth-subscription-manager";
 

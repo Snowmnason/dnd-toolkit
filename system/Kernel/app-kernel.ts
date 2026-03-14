@@ -1,7 +1,7 @@
 /**
  * AppKernel - Centralized app bootstrap and lifecycle management
  *
- * Consolidates all bootstrapping phases (config, preload, network, storage, services, auth, app ready)
+ * Consolidates all bootstrapping phases (config, preload, network, storage, services, jobs, registration, auth, app ready)
  * into a single, explicit contract. Ensures all consumers subscribe to one source of truth.
  *
  * Phases (in order):
@@ -11,7 +11,9 @@
  * - NETWORK: Network detection initialization (before storage for offline awareness)
  * - STORAGE: Cache validation & migrations (knows network status)
  * - SERVICES: Register auth provider, error tracker, analytics exporters (must be before AUTH)
- * - AUTH: Session restoration (non-blocking, fires in background after services ready)
+ * - JOBS: Initialize background job queue infrastructure with adapters (before REGISTRATION)
+ * - REGISTRATION: Register job handlers with queue (before AUTH, which may trigger jobs)
+ * - AUTH: Session restoration (non-blocking, fires in background after registration ready)
  * - READY: App is ready to render main UI
  * - ERROR: A critical phase failed
  */
@@ -43,10 +45,11 @@ import {
 } from "@/type-definitions/kernel-types";
 import { authPhase } from "./phases/auth-phase";
 import { configPhase } from "./phases/config-phase";
+import { jobPhase } from "./phases/job-phase";
 import { networkPhase } from "./phases/network-phase";
 import { preloadPhase } from "./phases/preload-phase";
-import { servicesPhase } from "./phases/services-phase";
 import { registrationPhase } from "./phases/registration-phase";
+import { servicesPhase } from "./phases/services-phase";
 import { storagePhase } from "./phases/storage-phase";
 
 // FUTURE ENHANCEMENT: Phase Progress Callbacks
@@ -148,10 +151,13 @@ class AppKernelClass {
       // Phase 4: SERVICES — register auth/error/analytics providers (critical, throws on failure)
       await this.runPhase("services", () => servicesPhase());
 
-      // Phase 5: REGISTRATION — register background job handlers with the queue
+      // Phase 5: JOBS — initialize background job queue infrastructure (non-critical)
+      await this.runPhase("jobs", () => jobPhase());
+
+      // Phase 6: REGISTRATION — register background job handlers with the queue (after jobs)
       await this.runPhase("registration", () => registrationPhase());
 
-      // Phase 6: AUTH — restore persisted session + evaluate staleness (non-critical, guest mode on failure)
+      // Phase 7: AUTH — restore persisted session + evaluate staleness (non-critical, guest mode on failure)
       await this.runPhase("auth", () => authPhase());
 
       // ═══════════════════════════════════════════════════════════════

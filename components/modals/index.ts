@@ -1,9 +1,20 @@
 // Central barrel for modals
-export { ConfirmLeaveModal } from './ConfrirmLeaveModal'
-export { CreateWorldModals } from './CreateWorldModals'
-export { CredentialConfirmModal } from './CredentialConfirmModal'
-export { EditWorldModal } from './EditWorldModal'
+
+// Auth modals
+export { ConfirmDeleteAccountModal } from './auth/ConfirmDeleteAccountModal'
+export { ConfirmSignOutModal } from './auth/ConfirmSignOutModal'
+export { UpdatePasswordModal } from './auth/UpdatePasswordModal'
+export { UpdateUsernameModal } from './auth/UpdateUsernameModal'
+
+// World modals
+export { ConfirmLeaveModal } from './worlds/ConfrirmLeaveModal'
+export { CreateWorldModals } from './worlds/CreateWorldModals'
+export { CreateWorldSignInModal } from './worlds/CreateWorldSignInModal'
+export { CreateWorldSuccessModal } from './worlds/CreateWorldSuccessModal'
+export { CreateWorldValidationModal } from './worlds/CreateWorldValidationModal'
+export { EditWorldModal } from './worlds/EditWorldModal'
+
+// Other modals
 export { EntitlementExpiredModal } from './EntitlementExpiredModal'
 export { SuccessModal } from './SuccessModal'
-export { UpdateUsernameModal } from './UpdateUsernameModal'
 

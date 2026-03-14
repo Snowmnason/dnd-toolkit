@@ -1,13 +1,12 @@
-import { getCurrentSession, isEmailConfirmed, useAuthActions, useAuthStateListener } from "@/hooks/auth";
+import { useAuthStateListener, useSignOutFlow } from "@/hooks/auth";
 import { useNavigate } from "@/hooks/navigation";
 import { getCurrentUserProfile } from "@/hooks/storage";
 import { logger } from "@/hooks/utils";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, View } from "react-native";
+import { View } from "react-native";
 
 // 🧱 New UI Components
-import { CredentialConfirmModal } from "@/components/modals";
 import {
   AppLoading,
   AppPage,
@@ -26,21 +25,15 @@ import { useScale } from "@/theme";
 export default function SettingsPage() {
   const router = useRouter();
   const S = useScale();
-  const { signOut, deleteAccount } = useAuthActions();
   const { replace: navigateTo } = useNavigate();
   
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [secureReady, setSecureReady] = useState(false);
 
-  // Sign-out + delete state
-  const [signingOut, setSigningOut] = useState(false);
-  const [buttonDisabled, setButtonDisabled] = useState(false);
-  const [buttonDeleteDisabled, setButtonDeleteDisabled] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
-  const [deleting, setDeleting] = useState(false);
+  // Sign-out and delete flows managed by hook state machines
+  const signOutFlow = useSignOutFlow('sign-out');
+  const deleteFlow = useSignOutFlow('delete-account');
 
   // Listen for sign-outs and redirect
   useAuthStateListener((session) => {
@@ -51,101 +44,21 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    // Double-check: require confirmed authenticated session before proceeding
-    getCurrentSession()
-      .then((session) => {
-        if (!isEmailConfirmed(session)) {
-          logger.category("auth").debug("No confirmed user session, redirecting");
-          navigateTo('/');
-          return;
-        }
-        setSecureReady(true);
-        setLoading(false);
-      })
-      .catch((err: unknown) => {
-        logger.category("auth").error("Error checking session:", err);
-        navigateTo('/');
-        setLoading(false);
-      });
-
+    // Fetch user profile
     getCurrentUserProfile()
       .then((profile) => {
-        setProfile(profile ?? null);
+        setProfile(profile ?? null)
+        setSecureReady(true)
+        setLoading(false)
       })
       .catch((err: unknown) => {
-        logger.category("ui").error(
-          "Error fetching profile on settings mount:",
-          err
-        );
-      });
-  }, [navigateTo, router]);
+        logger.category('ui').error('Error fetching profile on settings mount:', err)
+        setLoading(false)
+      })
+  }, [navigateTo, router])
 
-  const handleSignOutConfirm = async () => {
-    if (buttonDisabled) return;
-
-    if (!signingOut) {
-      setSigningOut(true);
-      setButtonDisabled(true);
-      setTimeout(() => setButtonDisabled(false), 1500);
-    } else {
-      setButtonDisabled(true);
-      try {
-        await signOut();
-        navigateTo('/');
-      } catch (error) {
-        logger.category("other").error("Sign out error:", error);
-        Alert.alert("Error", "Failed to sign out. Please try again.");
-        setSigningOut(false);
-        setButtonDisabled(false);
-      }
-    }
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (buttonDeleteDisabled) return;
-
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      setButtonDeleteDisabled(true);
-      setTimeout(() => setButtonDeleteDisabled(false), 1500);
-      return;
-    }
-
-    setButtonDeleteDisabled(true);
-    setShowDeleteModal(true);
-  };
-
-  const handleDeleteAccount = async (password: string) => {
-    setDeleteError("");
-    setDeleting(true);
-
-    try {
-      const result = await deleteAccount(password);
-      if (!result.success) {
-        const errorMsg = result.errors?.[0]?.message || "Failed to delete account";
-        throw new Error(errorMsg);
-      }
-
-      setShowDeleteModal(false);
-      navigateTo('/');
-    } catch (error: any) {
-      logger.category("other").error("Delete account error:", error);
-      setDeleteError(
-        error?.message || "Failed to delete account. Please try again."
-      );
-      setButtonDeleteDisabled(false);
-      setConfirmDelete(false);
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const handleCloseDeleteModal = () => {
-    setShowDeleteModal(false);
-    setConfirmDelete(false);
-    setButtonDeleteDisabled(false);
-    setDeleteError("");
-  };
+  // NOTE: Modal visibility and error states are now managed by hook state machines.
+  // See signOutFlow.state.modal and deleteFlow.state.modal for which modal to show.
 
   if (loading) {
     return <AppLoading loadMessage="Loading Settings..." />;
@@ -182,8 +95,6 @@ export default function SettingsPage() {
         <AppSettings />
       </Surface>
 
-      {/* Account Actions */}
-
       <Heading
         align="center"
         style={{ marginBottom: S.space.md, marginTop: S.space.md }}
@@ -194,20 +105,20 @@ export default function SettingsPage() {
         <View style={{ gap: S.space.sm, alignItems: "center" }}>
           {/* Sign Out Button */}
           <Button
-            text={signingOut ? "Confirm Sign Out" : "Sign Out"}
+            text={signOutFlow.state.phase === 'syncing' ? 'Syncing...' : 'Sign Out'}
             variant="destructive"
-            onPress={handleSignOutConfirm}
-            disabled={buttonDisabled}
-            loading={false}
+            onPress={signOutFlow.handlers.initiate}
+            disabled={signOutFlow.state.loading}
+            loading={signOutFlow.state.phase === 'syncing'}
             style={{ minWidth: 200 }}
           />
 
           {/* Delete Account Button */}
           <Button
-            text={confirmDelete ? "Confirm Delete" : "Delete Account"}
+            text="Delete Account"
             variant="destructive"
-            onPress={handleDeleteConfirm}
-            disabled={buttonDeleteDisabled}
+            onPress={deleteFlow.handlers.initiate}
+            disabled={deleteFlow.state.loading}
             style={{ minWidth: 200 }}
           />
         </View>
@@ -217,19 +128,6 @@ export default function SettingsPage() {
       <View style={{ alignItems: "center", marginTop: S.space.md }}>
         <VersionDisplay />
       </View>
-
-      {/* Delete Confirmation Modal */}
-      <CredentialConfirmModal
-        visible={showDeleteModal}
-        title="Confirm Account Deletion"
-        message="This action is permanent. Please enter your password to confirm."
-        confirmLabel="Delete Account"
-        destructive
-        loading={deleting}
-        errorText={deleteError}
-        onCancel={handleCloseDeleteModal}
-        onConfirm={handleDeleteAccount}
-      />
     </AppPage>
   );
 }

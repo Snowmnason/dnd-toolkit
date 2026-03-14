@@ -11,6 +11,7 @@
  */
 
 import { AppModal, Button } from '@/components/ui';
+import { registerModal } from '@/contexts';
 import { useScale } from '@/theme';
 import { View } from 'react-native';
 
@@ -58,3 +59,6 @@ export function EntitlementExpiredModal({
     </AppModal>
   );
 }
+
+// Register modal for centralized management
+registerModal('entitlement-expired', EntitlementExpiredModal)

@@ -16,7 +16,7 @@
  */
 
 import { Button, ButtonText } from '@/components/ui';
-import { useGoogleSignIn } from '@/hooks/auth';
+import { useAuthFlow } from '@/hooks/auth';
 import { logger } from '@/lib';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
@@ -41,7 +41,7 @@ function GoogleButtonWeb({ disabled }: { disabled: boolean }) {
   const [sha256Nonce, setSha256Nonce] = useState('');
   const [googleComponents, setGoogleComponents] = useState<GoogleOAuthComponents | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { handleGoogleWebAuth, handleGoogleWebAuthError } = useGoogleSignIn();
+  const { google } = useAuthFlow();
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -135,8 +135,8 @@ function GoogleButtonWeb({ disabled }: { disabled: boolean }) {
       <div style={{ width: '100%' }}>
         <GoogleLogin
           nonce={sha256Nonce}
-          onSuccess={handleGoogleWebAuth}
-          onError={handleGoogleWebAuthError}
+          onSuccess={google.web}
+          onError={google.webError}
           useOneTap={false}
           auto_select={false}
           disabled={disabled}
@@ -158,8 +158,7 @@ interface GoogleSignInButtonProps {
 
 // Main component that switches between web and mobile
 export default function GoogleSignInButton({ disabled = false, style }: GoogleSignInButtonProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const { handleGoogleMobileAuth } = useGoogleSignIn();
+  const { google, state } = useAuthFlow();
 
   useEffect(() => {
     if (Platform.OS !== 'web') {
@@ -173,18 +172,13 @@ export default function GoogleSignInButton({ disabled = false, style }: GoogleSi
   if (Platform.OS === 'web') {
     return (
       <div style={{ ...style }}>
-        <GoogleButtonWeb disabled={disabled || isLoading} />
+        <GoogleButtonWeb disabled={disabled || state.loading} />
       </div>
     );
   }
 
   const handlePress = async () => {
-    setIsLoading(true);
-    try {
-      await handleGoogleMobileAuth();
-    } finally {
-      setIsLoading(false);
-    }
+    await google.mobile();
   };
 
   return (
@@ -199,7 +193,7 @@ export default function GoogleSignInButton({ disabled = false, style }: GoogleSi
         ...style
       }}
       onPress={handlePress}
-      disabled={disabled || isLoading}
+      disabled={disabled || state.loading}
     >
       <ButtonText style={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}>
         🔵 Google

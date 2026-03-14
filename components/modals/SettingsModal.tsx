@@ -1,5 +1,6 @@
 import { AppModal } from "@/components/ui/AppModal";
 import { Button } from "@/components/ui/BaseButton";
+import { registerModal } from "@/contexts";
 import { useScale } from "@/theme";
 import { View } from "react-native";
 
@@ -51,3 +52,6 @@ export default function SettingsModal({
     </AppModal>
   );
 }
+
+// Register modal for centralized management
+registerModal('settings', SettingsModal)

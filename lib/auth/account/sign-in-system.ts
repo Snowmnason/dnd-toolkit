@@ -1,27 +1,27 @@
 /**
  * Sign-In System
  *
- * Centralizes user login orchestration with post-login data sync.
+ * Unified auth entry system — handles all forms of session establishment:
+ * - Email/password sign-in (user-triggered)
+ * - Token restore / re-auth (bootstrap, email-link, oauth, password-reset)
+ * - Native ID token sign-in (Google, Apple)
+ *
+ * All three share the same post-auth setup (Steps 2-4). Only Step 1 differs.
  *
  * Flow:
- * 1. Validate email + password format
- * 2. Call auth provider via middleware
- * 3. Store session + metadata (HAS_ACCOUNT, LAST_LOGGED_IN timestamp)
- * 4. Sync data (profile + worlds, download from server)
- * 5. Drain offline mutation queue (upload pending changes)
- * 6. Determine redirect based on profile completeness
+ * 1. Establish session (varies by entry point)
+ * 2. Store HAS_ACCOUNT flag
+ * 3. Sync data (profile + worlds) + update LAST_LOGGED_IN timestamp
+ * 4. Determine redirect based on profile completeness + context
  *
- * Usage:
- *   const result = await performSignIn('user@example.com', 'password123');
- *   if (result.success) {
- *     navigate(result.redirect);
- *   } else {
- *     showError(result.errors);
- *   }
+ * Entry points:
+ *   performSignIn(email, password)         — user typed credentials
+ *   performReAuth(tokens, context)         — automatic restore (bootstrap, oauth, etc.)
+ *   performSignInWithIdToken(provider, t)  — Google/Apple native
  */
 
 import { JobsManager } from '@/lib/jobs';
-import { determineEnterErrorRedirect, determineEnterRedirect } from '@/lib/navigation';
+import { buildRoute, determineEnterErrorRedirect, determineEnterRedirect } from '@/lib/navigation';
 import { logger } from '@/lib/utils/logger';
 import { STORAGE_KEYS } from '@/maps';
 import { AuthStateManager } from '../auth-state';
@@ -30,188 +30,278 @@ import { AuthStateManager } from '../auth-state';
 // TYPES
 // ============================================================================
 
-/**
- * Result of attempted sign-in.
- */
+export type ReAuthContext = 'bootstrap' | 'email-link' | 'oauth' | 'password-reset' | 'recovery';
+
+/** Combined auth context — signin is user-triggered, others are automatic restores */
+export type AuthContext = 'signin' | ReAuthContext;
+
+export interface AuthTokens {
+  access_token: string;
+  refresh_token?: string;
+}
+
 export interface SignInResult {
   success: boolean;
-  redirect?: string; // Where to navigate after successful sign-in
+  redirect?: string;
   userId?: string;
   errors?: SignInError[];
 }
 
-/**
- * Sign-in error with phase and context.
- */
 export interface SignInError {
   phase: 'validation' | 'auth' | 'db-sync' | 'redirect';
   message: string;
   error?: Error;
 }
 
+/** Same shape as SignInResult — separate type for callers that import ReAuthResult */
+export interface ReAuthResult {
+  success: boolean;
+  redirect?: string;
+  userId?: string;
+  worldIds?: string[];
+  errors?: ReAuthError[];
+}
+
+export interface ReAuthError {
+  phase: 'restore' | 'db-sync' | 'redirect';
+  message: string;
+  error?: Error;
+}
+
 // ============================================================================
-// SIGN-IN SYSTEM
+// SHARED POST-AUTH SETUP (Steps 2-4 — identical for all entry points)
 // ============================================================================
 
 /**
- * Performs complete user login orchestration.
+ * Shared logic after session is established.
  *
  * Steps:
- * 1. Call auth provider via middleware
- * 2. Store session + HAS_ACCOUNT flag + LAST_LOGGED_IN timestamp
- * 3. Call performDBSync() to fetch profile, refresh worlds, drain offline queue
- * 4. Determine redirect based on profile completeness + worlds availability
+ * 2. Set HAS_ACCOUNT flag
+ * 3. Sync data (JobsManager) + update LAST_LOGGED_IN timestamp
+ * 4. Determine redirect (profile-based, with pending invite check)
  *
- * @param email - User's email address (pre-validated by auth-manager)
- * @param password - User's password (pre-validated by auth-manager)
- * @returns SignInResult with success status, redirect URL, and any errors
- *
- * @remarks
- * - Input validation is handled by auth-manager using signInSchema (Zod)
- * - Post-login setup is consolidated here (no duplicate logic in auth-redirect or OAuth hooks)
- * - LAST_LOGGED_IN is set to Date.now() during DB sync
- * - Non-blocking on individual DB sync failures; continues with redirect
- * - Redirect logic: incomplete profile → /login/complete-profile, has worlds → /select/world-selection
- *
- * @example
- * const result = await performSignIn('test@example.com', 'mypassword');
- * if (result.success) {
- *   navigate(result.redirect); // /select/world-selection or /login/complete-profile
- * } else {
- *   showErrorModal(result.errors);
- * }
+ * @param userId - Authenticated user ID
+ * @param context - What triggered auth (drives redirect logic for bootstrap)
  */
+async function performPostAuthSetup(
+  userId: string,
+  context: AuthContext
+): Promise<{ redirect?: string; worldIds: string[]; errors: { phase: string; message: string; error?: Error }[] }> {
+  const errors: { phase: string; message: string; error?: Error }[] = [];
+
+  // =====================================================================
+  // STEP 2: SET HAS_ACCOUNT FLAG
+  // =====================================================================
+  try {
+    await AuthStateManager.setHasAccount(true);
+    logger.category('auth').debug(`[${context}] Post-auth: HAS_ACCOUNT set`);
+  } catch (error) {
+    logger.category('auth').warn(`[${context}] Post-auth: Failed to set HAS_ACCOUNT`, error);
+    // Non-blocking
+  }
+
+  // =====================================================================
+  // STEP 3: SYNC DATA + UPDATE LAST_LOGGED_IN
+  // =====================================================================
+  let worldIds: string[] = [];
+
+  try {
+    const syncResult = await JobsManager.performSync({ mode: 'automatic', direction: 'download' });
+    worldIds = syncResult.worlds?.worldIds || [];
+    logger.category('auth').debug(`[${context}] Post-auth: Sync complete, worlds: ${worldIds.length}`);
+  } catch (error) {
+    logger.category('auth').warn(`[${context}] Post-auth: Sync failed`, error);
+    // Non-blocking
+  }
+
+  try {
+    const { StorageManager } = await import('@/lib/storage');
+    await StorageManager.setRaw(STORAGE_KEYS.LAST_LOGGED_IN, Date.now().toString());
+    logger.category('auth').debug(`[${context}] Post-auth: LAST_LOGGED_IN updated`);
+  } catch (error) {
+    logger.category('auth').warn(`[${context}] Post-auth: Failed to update LAST_LOGGED_IN`, error);
+    // Non-blocking
+  }
+
+  // =====================================================================
+  // STEP 4: DETERMINE REDIRECT
+  // =====================================================================
+  let redirect: string | undefined;
+
+  try {
+    const flowType = context === 'signin' ? 'signin' : 'reauth';
+    const reAuthContext = context !== 'signin' ? context : undefined;
+
+    if (context === 'bootstrap') {
+      // Bootstrap: staleness-based routing — staleness was decided upstream in auth-phase.ts
+      // determineEnterRedirect handles this via the 'bootstrap' reAuthContext
+      const navDecision = determineEnterRedirect('reauth', null, worldIds, undefined, 'bootstrap');
+      redirect = navDecision.redirect;
+      logger.category('auth').info(`[${context}] Post-auth: ${navDecision.reason}`);
+    } else {
+      // All other contexts: profile-based routing + pending invite check
+      const { usersDB } = await import('@/lib/database');
+      const { StorageManager } = await import('@/lib/storage');
+
+      const user = await usersDB.getCurrentUser();
+      const profileCompleted = await StorageManager.get(STORAGE_KEYS.PROFILE_COMPLETED);
+
+      const navDecision = determineEnterRedirect(
+        flowType,
+        user,
+        worldIds,
+        undefined,
+        reAuthContext,
+        profileCompleted
+      );
+
+      // If routing to world-selection, check for a pending invite first
+      if (navDecision.redirect === '/select/world-selection' && profileCompleted !== false) {
+        try {
+          const { checkPendingInvites } = await import('@/lib/auth');
+          const pendingInvite = await checkPendingInvites();
+
+          if (pendingInvite) {
+            redirect = buildRoute('/login/auth-redirect', {
+              action: 'world-invite',
+              token: pendingInvite.token,
+              worldName: pendingInvite.worldName,
+            }) as string;
+            logger.category('auth').info(`[${context}] Post-auth: Pending invite found, redirecting to invite flow`);
+          } else {
+            redirect = navDecision.redirect;
+            logger.category('auth').info(`[${context}] Post-auth: ${navDecision.reason}`);
+          }
+        } catch {
+          redirect = navDecision.redirect;
+        }
+      } else {
+        redirect = navDecision.redirect;
+        logger.category('auth').info(`[${context}] Post-auth: ${navDecision.reason}`);
+      }
+    }
+  } catch (error) {
+    const navDecision = determineEnterErrorRedirect(context === 'signin' ? 'signin' : 'reauth');
+    redirect = navDecision.redirect;
+    errors.push({ phase: 'redirect', message: navDecision.reason, error: error instanceof Error ? error : undefined });
+    logger.category('auth').warn(`[${context}] Post-auth: Failed to determine redirect`, error);
+  }
+
+  return { redirect, worldIds, errors };
+}
+
+// ============================================================================
+// EMAIL/PASSWORD SIGN-IN
+// ============================================================================
+
 export async function performSignIn(
   email: string,
   password: string
 ): Promise<SignInResult> {
-  const result: SignInResult = {
-    success: true,
-    errors: [],
-  };
+  const result: SignInResult = { success: true, errors: [] };
 
   logger.category('auth').info('Sign-in: Starting email/password flow');
 
   try {
-    // =====================================================================
     // STEP 1: CALL AUTH PROVIDER
-    // =====================================================================
-    // Note: Input validation happens in auth-manager via signInSchema
-    logger.category('auth').debug('Sign-in: Calling auth provider');
-
     let session;
     try {
       const { authSignIn } = await import('@/lib/middleware/services/auth-service');
       const authResult = await authSignIn(email, password);
-      
-      if (!authResult.success) {
-        throw new Error(authResult.error?.message || 'Authentication failed');
-      }
-      
+      if (!authResult.success) throw new Error(authResult.error?.message || 'Authentication failed');
       session = authResult.data;
     } catch (error) {
       result.success = false;
-      result.errors?.push({
-        phase: 'auth',
-        message: error instanceof Error ? error.message : 'Authentication failed',
-        error: error instanceof Error ? error : undefined,
-      });
+      result.errors?.push({ phase: 'auth', message: error instanceof Error ? error.message : 'Authentication failed', error: error instanceof Error ? error : undefined });
       logger.category('auth').warn('Sign-in: Auth provider failed', error);
       return result;
     }
 
     if (!session) {
       result.success = false;
-      result.errors?.push({
-        phase: 'auth',
-        message: 'No session returned from auth provider',
-      });
-      logger.category('auth').warn('Sign-in: No session returned');
+      result.errors?.push({ phase: 'auth', message: 'No session returned from auth provider' });
       return result;
     }
 
-    // =====================================================================
-    // STEP 2: STORE SESSION + METADATA
-    // =====================================================================
-    logger.category('auth').debug('Sign-in: Storing session + metadata');
-
+    // Store session
     try {
-      // Store session in auth state
       await AuthStateManager.setSession(session);
-
-      // Set account flag
-      const { StorageManager } = await import('@/lib/storage');
-      await StorageManager.set(STORAGE_KEYS.HAS_ACCOUNT, true);
-
       result.userId = session.userId;
-      logger.category('auth').info(`Sign-in: Session stored for user ${result.userId}`);
     } catch (error) {
       result.success = false;
-      result.errors?.push({
-        phase: 'auth',
-        message: 'Failed to store session',
-        error: error instanceof Error ? error : undefined,
-      });
-      logger.category('auth').warn('Sign-in: Failed to store session', error);
+      result.errors?.push({ phase: 'auth', message: 'Failed to store session', error: error instanceof Error ? error : undefined });
       return result;
     }
 
-    // =====================================================================
-    // STEP 3: SYNC DATA (via JobsManager orchestration)
-    // =====================================================================
-    const syncResult = await JobsManager.performSync({ mode: 'automatic', direction: 'download' });
-    const worldIds = syncResult.worlds?.worldIds || [];
-
-    // =====================================================================
-    // STEP 4: DETERMINE REDIRECT
-    // =====================================================================
-    logger.category('auth').debug('Sign-in: Determining post-login redirect');
-
-    try {
-      const { usersDB } = await import('@/lib/database');
-      const user = await usersDB.getCurrentUser();
-      const navDecision = determineEnterRedirect('signin', user, worldIds);
-      result.redirect = navDecision.redirect;
-      logger.category('auth').info(`Sign-in: ${navDecision.reason}`);
-    } catch (error) {
-      const navDecision = determineEnterErrorRedirect('signin');
-      result.redirect = navDecision.redirect;
-      result.errors?.push({
-        phase: 'redirect',
-        message: navDecision.reason,
-        error: error instanceof Error ? error : undefined,
-      });
-      logger.category('auth').warn('Sign-in: Failed to determine redirect', error);
-    }
+    // STEPS 2-4: Shared post-auth setup
+    const setup = await performPostAuthSetup(session.userId, 'signin');
+    result.redirect = setup.redirect;
+    if (setup.errors.length > 0) result.errors?.push(...(setup.errors as SignInError[]));
 
     logger.category('auth').info(`Sign-in: Complete. Redirect: ${result.redirect}`);
     return result;
   } catch (error) {
     result.success = false;
-    result.errors?.push({
-      phase: 'auth',
-      message: 'Unexpected error during sign-in',
-      error: error instanceof Error ? error : undefined,
-    });
+    result.errors?.push({ phase: 'auth', message: 'Unexpected error during sign-in', error: error instanceof Error ? error : undefined });
     logger.category('auth').error('Sign-in: Unexpected error', error);
     return result;
   }
 }
 
 // ============================================================================
-// ID TOKEN SIGN-IN (Google / Apple native)
+// TOKEN RESTORE / RE-AUTH (bootstrap, email-link, oauth, password-reset)
 // ============================================================================
 
-/**
- * Performs sign-in via ID token from a native auth provider (Google, Apple).
- *
- * Same post-login flow as performSignIn: store session, DB sync, determine redirect.
- *
- * @param provider - Provider name ('google', 'apple')
- * @param token - ID token from the native authentication library
- * @param options - Optional provider-specific options (e.g., access_token for Apple web)
- * @returns Result with success flag, optional data/error
- */
+export async function performReAuth(
+  tokens: AuthTokens,
+  context: ReAuthContext = 'bootstrap'
+): Promise<ReAuthResult> {
+  const result: ReAuthResult = { success: true, errors: [] };
+
+  logger.category('auth').info(`Re-auth: Starting [${context}] flow`);
+
+  try {
+    // STEP 1: RESTORE SESSION FROM TOKENS
+    try {
+      if (!tokens.access_token) throw new Error('access_token is required');
+      const { authRestoreSession } = await import('@/lib/middleware/services/auth-service');
+      const restored = await authRestoreSession(tokens);
+      if (!restored) throw new Error('Session restoration failed');
+    } catch (error) {
+      result.success = false;
+      result.errors?.push({ phase: 'restore', message: error instanceof Error ? error.message : 'Session restoration failed', error: error instanceof Error ? error : undefined });
+      logger.category('auth').warn(`[${context}] Re-auth: Session restoration failed`, error);
+      return result;
+    }
+
+    const userId = await AuthStateManager.getUserId();
+    if (!userId) {
+      result.success = false;
+      result.errors?.push({ phase: 'restore', message: 'No userId available after restore' });
+      return result;
+    }
+    result.userId = userId;
+
+    // STEPS 2-4: Shared post-auth setup
+    const setup = await performPostAuthSetup(userId, context);
+    result.redirect = setup.redirect;
+    result.worldIds = setup.worldIds;
+    if (setup.errors.length > 0) result.errors?.push(...(setup.errors as ReAuthError[]));
+
+    logger.category('auth').info(`[${context}] Re-auth: Complete. Redirect: ${result.redirect}`);
+    return result;
+  } catch (error) {
+    result.success = false;
+    result.errors?.push({ phase: 'restore', message: 'Unexpected error during re-auth', error: error instanceof Error ? error : undefined });
+    logger.category('auth').error(`[${context}] Re-auth: Unexpected error`, error);
+    return result;
+  }
+}
+
+// ============================================================================
+// NATIVE ID TOKEN SIGN-IN (Google / Apple)
+// ============================================================================
+
 export async function performSignInWithIdToken(
   provider: string,
   token: string,
@@ -220,7 +310,7 @@ export async function performSignInWithIdToken(
   logger.category('auth').info(`Sign-in: Starting ID token flow for ${provider}`);
 
   try {
-    // STEP 1: Call auth provider with ID token
+    // STEP 1: CALL AUTH PROVIDER WITH ID TOKEN
     const { authSignInWithIdToken } = await import('@/lib/middleware/services/auth-service');
     const authResult = await authSignInWithIdToken(provider, token, options);
 
@@ -231,23 +321,19 @@ export async function performSignInWithIdToken(
 
     const session = authResult.data;
     if (!session) {
-      logger.category('auth').warn(`Sign-in: No session returned for ${provider}`);
       return { success: false, error: { message: 'No session returned from auth provider' } };
     }
 
-    // STEP 2: Store session + metadata
+    // Store session
     try {
       await AuthStateManager.setSession(session);
-      const { StorageManager } = await import('@/lib/storage');
-      await StorageManager.set(STORAGE_KEYS.HAS_ACCOUNT, true);
-      logger.category('auth').info(`Sign-in: Session stored for ${provider} user ${session.userId}`);
     } catch (error) {
       logger.category('auth').warn(`Sign-in: Failed to store session for ${provider}`, error);
       return { success: false, error: { message: 'Failed to store session' } };
     }
 
-    // STEP 3: Sync data (via JobsManager orchestration)
-    await JobsManager.performSync({ mode: 'automatic', direction: 'download' });
+    // STEPS 2-4: Shared post-auth setup (using 'oauth' context for redirect logic)
+    await performPostAuthSetup(session.userId, 'oauth');
 
     logger.category('auth').info(`Sign-in: ID token flow complete for ${provider}`);
     return { success: true, data: session };

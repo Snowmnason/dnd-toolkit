@@ -282,6 +282,23 @@ export interface AuthProvider {
    * - Don't throw; return false for any restoration failures
    */
   restoreSession(rawSession: any): Promise<boolean>;
+
+  /**
+   * Refresh the current session's tokens.
+   *
+   * Called when the access token expires (e.g., after a 401 response).
+   * The provider should use its refresh token mechanism to obtain new tokens.
+   *
+   * **Returns:**
+   * - Updated Session with new tokens on success
+   * - null if refresh fails (token revoked, expired refresh token, etc.)
+   *
+   * **Provider Responsibilities:**
+   * - Use refresh token to obtain new access token from backend
+   * - Return null (don't throw) if refresh is not possible
+   * - Update internal session state with new tokens
+   */
+  refreshSession(): Promise<Session | null>;
 }
 
 /**
@@ -730,6 +747,10 @@ export function createValidatedAuthProvider(
       // No validation needed for restore - provider handles session schema validation
       // Just delegate to underlying provider
       return provider.restoreSession(rawSession);
+    },
+
+    async refreshSession(): Promise<Session | null> {
+      return provider.refreshSession();
     },
   };
 }

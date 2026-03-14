@@ -32,6 +32,7 @@ import { determineExitErrorRedirect, determineExitRedirect } from '@/lib/navigat
 import { logger } from '@/lib/utils/logger';
 import { STORAGE_KEYS } from '@/maps';
 import { AuthStateManager } from '../auth-state';
+import { beginSignOut } from '../auth-subscription-manager';
 
 // ============================================================================
 // TYPES
@@ -125,15 +126,23 @@ export async function performSignOutPhase2_ClearAndSignOut(source: SignOutSource
 
   logger.category('security').info(`[${source}] Sign-out Phase 2: Clear storage started`);
 
+    // CRITICAL: Kill all auth subscriptions FIRST, before clearing storage.
+    // This prevents zombie guard listeners from seeing half-cleared state and
+    // interfering with re-login by redirecting to login prematurely.
+    beginSignOut();
+
     try {
       // =====================================================================
       // PHASE 2: CLEAR STORAGE
       // =====================================================================
+      
+      // Import storage manager to delete keys
+      const { StorageManager } = await import('@/lib/storage');
+
+      // Keys to completely delete
       const keysToDelete = [
         // Auth keys
-        STORAGE_KEYS.HAS_ACCOUNT,
         STORAGE_KEYS.SESSION_USER_EMAIL,
-        STORAGE_KEYS.LAST_LOGGED_IN,
         // User keys
         STORAGE_KEYS.USER_DATA,
         STORAGE_KEYS.CONNECTED_WORLDS,
@@ -141,9 +150,6 @@ export async function performSignOutPhase2_ClearAndSignOut(source: SignOutSource
         // Entitlements
         STORAGE_KEYS.ENTITLEMENTS,
       ];
-
-      // Import storage manager to delete keys
-      const { StorageManager } = await import('@/lib/storage');
 
       for (const key of keysToDelete) {
         try {
@@ -159,6 +165,39 @@ export async function performSignOutPhase2_ClearAndSignOut(source: SignOutSource
           result.success = false;
           logger.category('security').warn(`Failed to clear key ${key}:`, err);
         }
+      }
+
+      // Keys to set to default/empty values (vs delete) for consistency with auth-state.ts
+      // CRITICAL: Setting to empty string makes bootstrap's staleness check skip (treats as "never logged in")
+      // This prevents bootstrap from entering DEAD path due to missing LAST_LOGGED_IN
+      try {
+        await StorageManager.set(STORAGE_KEYS.LAST_LOGGED_IN, '');
+        result.clearedKeys.push(STORAGE_KEYS.LAST_LOGGED_IN);
+        logger.category('security').debug(`Set LAST_LOGGED_IN to empty string`);
+      } catch (err) {
+        result.errors.push({
+          phase: 'storage-clear',
+          message: `Failed to clear LAST_LOGGED_IN`,
+          error: err instanceof Error ? err : undefined,
+        });
+        result.success = false;
+        logger.category('security').warn(`Failed to clear LAST_LOGGED_IN:`, err);
+      }
+
+      // Set HAS_ACCOUNT to false explicitly (not delete) so bootstrap knows user is logged out
+      // Uses AuthStateManager to ensure correct { hasAccount: false } format
+      try {
+        await AuthStateManager.setHasAccount(false);
+        result.clearedKeys.push(STORAGE_KEYS.HAS_ACCOUNT);
+        logger.category('security').debug(`Set HAS_ACCOUNT to false`);
+      } catch (err) {
+        result.errors.push({
+          phase: 'storage-clear',
+          message: `Failed to set HAS_ACCOUNT to false`,
+          error: err instanceof Error ? err : undefined,
+        });
+        result.success = false;
+        logger.category('security').warn(`Failed to set HAS_ACCOUNT to false:`, err);
       }
 
       // Clear world access pattern keys (world_access_*, world_access_meta_*)
@@ -197,6 +236,24 @@ export async function performSignOutPhase2_ClearAndSignOut(source: SignOutSource
         });
         result.success = false;
         logger.category('security').warn('Failed to clear query cache:', err);
+      }
+
+      // Clear FastCache (in-memory session cache)
+      // CRITICAL: FastCache holds temporary session data like user info, world metadata
+      // Must be cleared or next user will see stale data
+      try {
+        const { FastCache } = await import('@/system/Storage');
+        await FastCache.clear();
+        result.clearedKeys.push('FASTCACHE');
+        logger.category('security').debug('Cleared FastCache (in-memory cache)');
+      } catch (err) {
+        result.errors.push({
+          phase: 'storage-clear',
+          message: 'Failed to clear FastCache',
+          error: err instanceof Error ? err : undefined,
+        });
+        result.success = false;
+        logger.category('security').warn('Failed to clear FastCache:', err);
       }
 
       // Reset theme preferences to defaults
