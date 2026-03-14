@@ -1,48 +1,51 @@
 import {
-  AppErrorBoundary,
-  LoadingOverlay,
-  TopBar
+    AppErrorBoundary,
+    LoadingOverlay,
+    TopBar
 } from "@/components";
 import { OfflineSyncNotificationLayer } from "@/components/offline";
 import {
-  CrashFallBack,
-  RouteErrorBoundary,
-  SafeModeErrorBoundary,
-  SafeModeScreen,
-  SplashScreen,
+    CrashFallBack,
+    RouteErrorBoundary,
+    SafeModeErrorBoundary,
+    SafeModeScreen,
+    SplashScreen,
 } from "@/components/SplashScreen";
 import { AppToastLayer, NotificationContainer } from "@/components/ui";
 import { AppToastProvider, ModalProvider, NotificationProvider } from "@/contexts";
+// Trigger modal registration side effects — must run before any openModal() call.
+// Imported here (leaf module) instead of modal-context.tsx to avoid circular dependency.
+import "@/components/modals/register-all-modals";
 import { Analytics, sessionManager } from "@/hooks/analytics";
 import { SafeModeReason, executeRecoveryAction } from "@/hooks/error";
 import { useClearSafeMode } from "@/hooks/error/use-safe-mode";
 import { AppKernelProvider, useAppKernel } from "@/hooks/kernel";
 import { useAnalyticsNavigation, useNavigate, useRouteConfig } from "@/hooks/navigation";
 import {
-  type AccessRole,
+    type AccessRole,
 } from "@/hooks/storage";
 import { useSplashScreen } from "@/hooks/ui";
 import { logger } from "@/hooks/utils";
 import {
-  AppParamsStableProvider,
-  AppParamsVolatileProvider,
-  PlatformProvider,
-  ScaleProvider,
-  SubscriptionProvider,
-  ThemeProvider,
-  UseTheme,
-  useAppParamsStable,
-  useAppParamsVolatile,
-  usePlatform,
-  useUserId,
-  useUserRole,
-  useWorldId,
+    AppParamsStableProvider,
+    AppParamsVolatileProvider,
+    PlatformProvider,
+    ScaleProvider,
+    SubscriptionProvider,
+    ThemeProvider,
+    UseTheme,
+    useAppParamsStable,
+    useAppParamsVolatile,
+    usePlatform,
+    useUserId,
+    useUserRole,
+    useWorldId,
 } from "@/providers";
 import {
-  Stack,
-  useLocalSearchParams,
-  useRouter,
-  useSegments,
+    Stack,
+    useLocalSearchParams,
+    useRouter,
+    useSegments,
 } from "expo-router";
 import { useEffect } from "react";
 import { View } from "react-native";

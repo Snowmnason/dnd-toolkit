@@ -96,21 +96,19 @@ export async function performCheckPendingInvites(): Promise<{
   token: string;
   worldName: string;
 } | null> {
-  if (typeof window !== 'undefined') {
-    const stored = await StorageManager.getRaw(STORAGE_KEYS.PENDING_INVITE);
-    if (stored) {
-      try {
-        const inviteData = JSON.parse(stored);
-        // Check if invite is less than 24 hours old
-        if (Date.now() - inviteData.timestamp < 24 * 60 * 60 * 1000) {
-          return { token: inviteData.token, worldName: inviteData.worldName };
-        } else {
-          await StorageManager.remove(STORAGE_KEYS.PENDING_INVITE);
-        }
-      } catch (error) {
-        logger.category('auth').error('Error parsing pending invite:', error);
+  const stored = await StorageManager.getRaw(STORAGE_KEYS.PENDING_INVITE);
+  if (stored) {
+    try {
+      const inviteData = JSON.parse(stored);
+      // Check if invite is less than 24 hours old
+      if (Date.now() - inviteData.timestamp < 24 * 60 * 60 * 1000) {
+        return { token: inviteData.token, worldName: inviteData.worldName };
+      } else {
         await StorageManager.remove(STORAGE_KEYS.PENDING_INVITE);
       }
+    } catch (error) {
+      logger.category('auth').error('Error parsing pending invite:', error);
+      await StorageManager.remove(STORAGE_KEYS.PENDING_INVITE);
     }
   }
   return null;

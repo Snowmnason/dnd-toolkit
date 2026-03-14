@@ -1,8 +1,10 @@
 import AuthError from '@/components/auth_components/AuthError'
 import AuthInput from '@/components/auth_components/AuthInput'
 import { AppModal, Button } from '@/components/ui'
+import { Body } from '@/components/ui/AppText'
 import { registerModal } from '@/contexts'
 import { useScale } from '@/theme'
+import { deleteAccountPasswordSchema, getPasswordRequirementsForUI } from '@/validation/auth.schema'
 import { useState } from 'react'
 import { View } from 'react-native'
 
@@ -15,7 +17,8 @@ interface ConfirmDeleteAccountModalProps {
 
 /**
  * 💀 ConfirmDeleteAccountModal
- * Confirms permanent account deletion. Requires password entry.
+ * Confirms permanent account deletion. Requires password validation via passwordSchema.
+ * Shows real-time password requirements feedback using centralized validation.
  */
 export function ConfirmDeleteAccountModal({
   onCancel,
@@ -25,9 +28,10 @@ export function ConfirmDeleteAccountModal({
 }: ConfirmDeleteAccountModalProps) {
   const S = useScale()
   const [password, setPassword] = useState('')
-
-  const isPasswordStrong = (pwd: string): boolean =>
-    pwd.length >= 8 && /[a-zA-Z]/.test(pwd) && /[0-9]/.test(pwd)
+  
+  // Validate password using centralized schema
+  const passwordRequirementsText = getPasswordRequirementsForUI(password)
+  const isPasswordValid = password.length > 0 && deleteAccountPasswordSchema.safeParse({ password }).success
 
   return (
     <AppModal
@@ -45,6 +49,11 @@ export function ConfirmDeleteAccountModal({
           secureTextEntry
           editable={!loading}
         />
+
+        {/* Password requirements feedback */}
+        <Body fontSize={S.font.caption} opacity={0.7} style={{ marginTop: S.space.xs }}>
+          {passwordRequirementsText}
+        </Body>
 
         {!!errorText && <AuthError error={errorText} />}
 
@@ -66,7 +75,7 @@ export function ConfirmDeleteAccountModal({
             text={loading ? 'Processing...' : 'Delete Account'}
             variant="destructive"
             onPress={() => onConfirm(password.trim())}
-            disabled={loading || !isPasswordStrong(password)}
+            disabled={loading || !isPasswordValid}
           />
         </View>
       </View>

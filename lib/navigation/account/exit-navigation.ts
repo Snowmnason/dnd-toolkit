@@ -5,10 +5,10 @@
  * Determines where users go after leaving their account (authenticated → unauthenticated).
  *
  * Navigation Tree:
- * - SIGN-OUT: Always → /login
- * - DELETE-ACCOUNT: Always → /login
+ * - SIGN-OUT: Always → / (welcome screen)
+ * - DELETE-ACCOUNT: Always → / (welcome screen)
  *
- * Both exit flows redirect to the same destination (login screen) with different reasons.
+ * Both exit flows redirect to the same destination (welcome screen) with different reasons.
  *
  * @module lib/navigation/account/exit-navigation
  */
@@ -39,18 +39,18 @@ export type ExitFlowType = 'signout' | 'delete';
 /**
  * Determines where to send user after exit flow (sign-out, delete account).
  *
- * All exit flows redirect to login screen, but with different reasons for logging.
+ * All exit flows redirect to welcome screen, but with different reasons for logging.
  *
  * @param flowType - Type of exit flow (signout, delete)
  * @returns Navigation decision with redirect path and reason
  *
  * @example
  * const decision = determineExitRedirect('signout');
- * // Returns: { redirect: '/login', reason: 'User signed out' }
+ * // Returns: { redirect: '/', reason: 'User signed out' }
  *
  * @example
  * const decision = determineExitRedirect('delete');
- * // Returns: { redirect: '/login', reason: 'Account deleted' }
+ * // Returns: { redirect: '/', reason: 'Account deleted' }
  */
 export function determineExitRedirect(flowType: ExitFlowType): NavigationDecision {
   let reason: string;
@@ -68,7 +68,7 @@ export function determineExitRedirect(flowType: ExitFlowType): NavigationDecisio
     reason,
   };
 
-  logger.category('auth').info(`Exit nav (${flowType}): Redirecting to login`, decision);
+  logger.category('auth').info(`Exit nav (${flowType}): Redirecting to welcome`, decision);
   return decision;
 }
 
@@ -82,11 +82,11 @@ export function determineExitRedirect(flowType: ExitFlowType): NavigationDecisio
  * Even on error, redirects to login screen (safest state).
  *
  * @param flowType - The exit flow type where error occurred
- * @returns Navigation decision with /login fallback
+ * @returns Navigation decision with / fallback
  *
  * @example
  * const decision = determineExitErrorRedirect('signout');
- * // Returns: { redirect: '/login', reason: 'Error during sign-out, logout anyway' }
+ * // Returns: { redirect: '/', reason: 'Error during sign-out, logout anyway' }
  */
 export function determineExitErrorRedirect(flowType: ExitFlowType): NavigationDecision {
   const decision = {
@@ -94,6 +94,6 @@ export function determineExitErrorRedirect(flowType: ExitFlowType): NavigationDe
     reason: `Error during ${flowType}, logout anyway`,
   };
 
-  logger.category('auth').warn(`Exit nav error (${flowType}): Redirecting to login`, decision);
+  logger.category('auth').warn(`Exit nav error (${flowType}): Redirecting to welcome`, decision);
   return decision;
 }

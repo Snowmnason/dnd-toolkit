@@ -5,13 +5,12 @@ import {
   AuthButtonSecondary, AuthCaption, AuthError, AuthForm, AuthRoot, AuthSubTitle, AuthTitle,
   FormAuthInput
 } from '@/components/auth_components';
-import { useAuthActions, useAuthFlow } from "@/hooks/auth";
-import { AuthStateManager, getCurrentSession } from "@/lib/auth";
+import { useAuthActions, useAuthFlow, useBootstrapAuth, useCurrentSession } from "@/hooks/auth";
 import { useNavigate } from "@/hooks/navigation";
 import { logger } from "@/hooks/utils";
 import { useScale } from '@/theme';
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TextInput } from 'react-native';
 
 export default function SignInScreen() {
@@ -25,49 +24,24 @@ export default function SignInScreen() {
   const passwordInputRef = useRef<TextInput>(null);
 
   const { state, form } = useAuthFlow();
+  const { session, loading: sessionLoading } = useCurrentSession();
+  const { hasAccount, checked } = useBootstrapAuth(!sessionLoading);
 
-  // Heavy-duty auth check: verify with Supabase and ensure all data exists
-  // Use a callback instead of useEffect to avoid running on every render
-  const verifyAuthStatus = async () => {
-    try {
-      logger.category('auth').debug('Sign-in screen: Performing heavy-duty auth verification');
-      
-      // Check 1: Local storage has account flag
-      const authState = await AuthStateManager.getAuthState();
-      if (!authState.hasAccount) {
-        logger.category('auth').debug('Sign-in screen: No account flag in storage, showing login form');
-        return;
-      }
-      
-      // Check 2: Verify session is still valid using convenience function
-      const session = await getCurrentSession();
-      if (!session) {
-        logger.category('auth').warn('Sign-in screen: Session invalid or expired');
-        return;
-      }
-      
-      // Check 3: Verify user data exists in storage
-      const userData = await AuthStateManager.getUserData();
-      if (!userData || !userData.id) {
-        logger.category('auth').warn('Sign-in screen: User data missing from storage');
-        return;
-      }
-      
-      // All checks passed - user is authenticated
-      logger.category('auth').info('Sign-in screen: All checks passed, redirecting to world selection');
+  // Verify authentication status on mount using proper hook boundaries
+  useEffect(() => {
+    // Only run after bootstrap and session checks complete
+    if (!checked || sessionLoading) return;
+
+    logger.category('auth').debug('Sign-in screen: Verifying authentication status');
+
+    // If session exists, user is already authenticated
+    if (session) {
+      logger.category('auth').info('Sign-in screen: User authenticated, redirecting to world selection');
       router.replace('/select/world-selection');
-    } catch (error) {
-      logger.category('auth').error('Sign-in screen: Error during verification:', error);
-      // If verification fails, just show login form (no harm)
+    } else if (!hasAccount) {
+      logger.category('auth').debug('Sign-in screen: No account found, showing login form');
     }
-  };
-
-  // Run verification once on mount using a ref to prevent double-run in development
-  const verifyRef = useRef(false);
-  if (!verifyRef.current) {
-    verifyRef.current = true;
-    verifyAuthStatus();
-  }
+  }, [checked, sessionLoading, session, hasAccount, router]);
 
   const handleResendConfirmationFromError = async (email: string) => {
     setIsResendingEmail(true);

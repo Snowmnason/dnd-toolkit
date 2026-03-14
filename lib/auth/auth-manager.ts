@@ -11,6 +11,7 @@ import {
   authUpdatePassword,
 } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils";
+import { validatePassword } from "@/validation";
 import type {
   DeletePhase1Result,
   DeletePhase2Result,
@@ -387,7 +388,8 @@ export const verifyDeletion = async (): Promise<DeletePhase1Result> => {
 
 /**
  * Phase 2: Delete account and sign out.
- * Runs ensureUserLoggedIn guard + verifyCredentials before delegating to system.
+ * Runs ensureUserLoggedIn guard + secondary validatePassword check + verifyCredentials before delegating to system.
+ * The early validatePassword check fails fast if password format is obviously bad, before hitting the provider.
  */
 export const deleteAccountUser = async (password: string): Promise<DeletePhase2Result> => {
   let user: { authId: string; email: string };
@@ -399,6 +401,17 @@ export const deleteAccountUser = async (password: string): Promise<DeletePhase2R
       errors: [{ phase: 'verification', message: error instanceof Error ? error.message : 'Verification failed', error: error instanceof Error ? error : undefined }],
     };
   }
+
+  // Secondary validation: fail fast if password format is obviously bad
+  // This prevents unnecessary provider calls in case of client-side validation issues
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.isValid) {
+    return {
+      success: false,
+      errors: [{ phase: 'password-validation', message: 'Password format is invalid. Please check and try again.' }],
+    };
+  }
+
   const credResult = await verifyCredentials(user.email, password);
   if (!credResult.success) {
     return {

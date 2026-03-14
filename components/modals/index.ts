@@ -1,4 +1,6 @@
 // Central barrel for modals
+// All named exports are used as type imports by consuming code.
+// For runtime modal registration, import './register-all-modals' in ModalProvider.
 
 // Auth modals
 export { ConfirmDeleteAccountModal } from './auth/ConfirmDeleteAccountModal'
@@ -16,5 +18,7 @@ export { EditWorldModal } from './worlds/EditWorldModal'
 
 // Other modals
 export { EntitlementExpiredModal } from './EntitlementExpiredModal'
+export { FeatureGatedModal } from './FeatureGatedModal'
+export { default as SettingsModal } from './SettingsModal'
 export { SuccessModal } from './SuccessModal'
 

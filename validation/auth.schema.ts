@@ -150,6 +150,14 @@ export const changePasswordSchema = z
     path: ["newPassword"],
   });
 
+/**
+ * Delete account password schema
+ * Requires password validation (user must provide a valid account password)
+ */
+export const deleteAccountPasswordSchema = z.object({
+  password: passwordSchema,
+});
+
 // Infer TypeScript types from schemas
 export type SignInFormData = z.infer<typeof signInSchema>;
 export type SignUpFormData = z.infer<typeof signUpSchema>;
@@ -158,6 +166,7 @@ export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 export type CompleteProfileFormData = z.infer<typeof completeProfileSchema>;
 export type UpdateUsernameFormData = z.infer<typeof updateUsernameSchema>;
 export type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;
+export type DeleteAccountPasswordFormData = z.infer<typeof deleteAccountPasswordSchema>;
 
 // ============================================================================
 // PASSWORD UI HELPERS (for real-time feedback)

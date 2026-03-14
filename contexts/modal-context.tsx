@@ -18,7 +18,7 @@
  * closeModal()
  */
 
-import React, { createContext, useCallback, useContext, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 
 /**
  * Modal state — tracks which modal is open and its props
@@ -44,17 +44,23 @@ const ModalContext = createContext<ModalContextValue | undefined>(undefined)
 /**
  * 🗂️ Modal Registry
  * Maps modal type strings to their React components.
- * Modals auto-register by calling registerModal() at component definition.
+ * Modals auto-register by calling registerModal() at component definition,
+ * but only if their module is actually imported at runtime.
+ *
+ * CRITICAL: All modal modules are imported via 'register-all-modals.ts'
+ * which is imported in app/_layout.tsx (NOT here — to avoid circular deps).
  */
 const modalRegistry = new Map<string, React.ComponentType<any>>()
 
 /**
  * Register a modal component so it can be rendered by ModalLayer.
- * Call this at the bottom of your modal component file.
  *
- * Example:
- * export function UpdateCredsModal({ visible, ...props }) { ... }
- * registerModal('update-creds', UpdateCredsModal)
+ * USAGE (at the bottom of your modal file):
+ * export function MyModal({ visible, ...props }) { ... }
+ * registerModal('my-modal', MyModal)
+ *
+ * IMPORTANT: Your modal file must be imported in register-all-modals.ts
+ * for this registerModal() call to execute at runtime.
  */
 export function registerModal(type: string, Component: React.ComponentType<any>): void {
   if (modalRegistry.has(type)) {
@@ -68,6 +74,10 @@ export function registerModal(type: string, Component: React.ComponentType<any>)
  * Root-level provider for managing modal state and rendering.
  * Automatically renders active modals — no need to add a separate ModalLayer to RootLayout.
  *
+ * NOTE: Modal registration happens via 'register-all-modals.ts' imported in
+ * app/_layout.tsx. This avoids circular dependency (modal files import from
+ * @/contexts which re-exports this file).
+ *
  * Wrap this at the top of your app (in RootLayout).
  */
 export function ModalProvider({ children }: { children: React.ReactNode }) {
@@ -76,8 +86,17 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
     props: {},
     visible: false,
   })
+  
+  // Track timeout to prevent stale timeouts from clearing new modals
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const openModal = useCallback((type: string, props?: Record<string, any>) => {
+    // Cancel any pending close timeout from a previous modal
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current)
+      closeTimeoutRef.current = null
+    }
+    
     setModal({
       type,
       props: props || {},
@@ -92,12 +111,14 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
       // Keep type/props for transition animation, but mark as not visible
     }))
     // Clear after animation completes (optional — depends on your AppModal animation duration)
-    setTimeout(() => {
+    // Store timeout in ref so we can cancel it if a new modal opens
+    closeTimeoutRef.current = setTimeout(() => {
       setModal({
         type: null,
         props: {},
         visible: false,
       })
+      closeTimeoutRef.current = null
     }, 300)
   }, [])
 
@@ -105,6 +126,15 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
     if (!type) return modal.visible
     return modal.visible && modal.type === type
   }, [modal.visible, modal.type])
+
+  // Cleanup: cancel pending timeout when provider unmounts
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current)
+      }
+    }
+  }, [])
 
   return (
     <ModalContext.Provider value={{ modal, openModal, closeModal, isModalOpen }}>
@@ -148,11 +178,17 @@ export function useIsModalOpen(modalType: string): boolean {
  * Internal renderer for active modals.
  * Automatically used inside ModalProvider.
  * Looks up modal components in the registry by type.
+ *
+ * Renders while modal.type is set (keeps component mounted for exit animations).
+ * Passes visible={modal.visible} after props spread to ensure context controls visibility
+ * and prevents modal.props.visible from overriding it.
  */
 function ModalLayer() {
   const { modal } = useModal()
 
-  if (!modal.type || !modal.visible) return null
+  // Render while modal.type is set, regardless of visible state
+  // This allows exit animations to play while visible={false}
+  if (!modal.type) return null
 
   const ModalComponent = modalRegistry.get(modal.type)
   if (!ModalComponent) {
@@ -160,6 +196,8 @@ function ModalLayer() {
     return null
   }
 
-  return <ModalComponent visible={true} {...modal.props} />
+  // Pass visible after spread to ensure context controls visibility
+  // and prevents modal.props.visible from overriding it
+  return <ModalComponent {...modal.props} visible={modal.visible} />
 }
 

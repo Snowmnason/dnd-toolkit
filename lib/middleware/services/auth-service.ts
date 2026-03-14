@@ -16,6 +16,8 @@
  */
 
 import { logger } from '@/lib/utils/logger';
+import { ERROR_CODES } from '@/maps/ERROR_CODES';
+import { AppError } from '@/pure-algo-immutables/app-error';
 import { ConnectionQuality, NetworkDetection } from '@/system/Network';
 import {
     isServiceReady,
@@ -44,10 +46,12 @@ function ensureAuthReady(): void {
     // 1. Network available?
     const networkStatus = NetworkDetection.getStatus();
     if (networkStatus.connectionQuality === ConnectionQuality.OFFLINE) {
-        // TODO: Return a typed NetworkError? Queue for retry?
         // Auth ops cannot be queued (must complete synchronously or fail).
-        // Caller handles retry strategy.
-        throw new Error('[auth-service] Network offline — cannot perform auth operation');
+        // Throw typed error with recovery guidance for callers/UI.
+        throw new AppError(
+            ERROR_CODES.NETWORK.OFFLINE,
+            'Network offline — cannot perform auth operation. Please reconnect and try again.'
+        );
     }
 
     // 2. Provider initialized?
@@ -58,8 +62,10 @@ function ensureAuthReady(): void {
     const isReady = isServiceReady('auth') || providerExists;
     
     if (!isReady) {
-        // TODO: Should we retry after a delay? Or throw immediately?
-        throw new Error('[auth-service] Auth provider not initialized — cannot perform auth operation');
+        throw new AppError(
+            ERROR_CODES.AUTH.UNKNOWN,
+            'Auth provider not initialized — cannot perform auth operation. Please restart the app.'
+        );
     }
 
 }

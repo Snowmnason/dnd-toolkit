@@ -54,26 +54,26 @@
 
 import { getAppConfig, OFFLINE_SYNC_DEFAULTS } from "@/config";
 import {
-  createSafeModeState,
-  NetworkCascadeDetector,
-  SafeModeReason,
+    createSafeModeState,
+    NetworkCascadeDetector,
+    SafeModeReason,
 } from "@/lib/error";
 import { setSafeMode } from "@/lib/kernel/kernel-manager";
 import { getNetworkStatus, subscribeToNetworkStatus, type NetworkStatus } from "@/lib/middleware/network";
 import { QueryCache } from "@/lib/middleware/storage/helpers/query-cache";
 import { logger } from "@/lib/utils";
 import type {
-  OfflineSyncConfig,
-  OfflineSyncStatus,
-  QueuedMutation,
-  SyncResult,
+    OfflineSyncConfig,
+    OfflineSyncStatus,
+    QueuedMutation,
+    SyncResult,
 } from "@/type-definitions";
 import { getConflictQueueManager } from "./conflict/conflict-queue-manager";
 import { executeConflictResolution } from "./conflict/conflict-resolution";
 import { OfflineMutationQueue } from "./mutation-queue";
 import {
-  CircuitBreakerReplayManager,
-  NetworkErrorClassifier,
+    CircuitBreakerReplayManager,
+    NetworkErrorClassifier,
 } from "./offline-recovery";
 
 /**
@@ -122,6 +122,14 @@ class OnlineSyncManagerService {
 
       // Initialize offline queue from storage
       await OfflineMutationQueue.initialize();
+
+      // Validate sync handlers for any queued mutations
+      const queuedMutations = await OfflineMutationQueue.getAll();
+      if (queuedMutations.length > 0) {
+        const { validateHandlersForQueue } = await import("./sync-handlers");
+        const queuedTables = [...new Set(queuedMutations.map(m => m.table))];
+        validateHandlersForQueue(queuedTables);
+      }
 
       // Subscribe to network status changes
       this.networkUnsubscribe = subscribeToNetworkStatus(

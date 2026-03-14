@@ -1,10 +1,10 @@
 import { useImageCache } from "@/hooks/assets/use-image-cache";
 import { useViewportTracking } from "@/hooks/assets/use-viewport-tracking";
 import {
-  isSupabaseUrl,
-  optimizeSupabaseImage,
-  supportsWebP,
-} from "@/lib/utils/images/image-optimization";
+    isSupabaseUrl,
+    optimizeSupabaseImage,
+    supportsWebP,
+} from "@/pure-algo-immutables/image-optimization";
 import { $ } from "@/theme";
 import { Image, ImageProps } from "expo-image";
 import type { RefObject } from "react";
