@@ -23,26 +23,53 @@ Email/password authentication system with brute-force protection, secure session
 
 ## Architecture & Data Flow
 
+The auth module follows a layered architecture with clear separation of concerns:
+
 ```
 User Action
     ↓
-Input Validation
+Auth Manager (Gateway)
     ↓
-Rate Limiting Check
+Domain Systems (Business Logic)
     ↓
-Auth Provider Call
+Middleware (Network + Validation)
     ↓
-Session Persistence
-    ↓
-State Update
+System Infrastructure (Storage, API, Providers)
+```
+
+**Key Systems:**
+
+- **Auth Manager** (`auth-manager.ts`) – Single public API gateway for all auth operations. Handles validation, rate limiting, and delegates to domain systems.
+- **Sign-In System** (`account/sign-in-system.ts`) – Handles session establishment (sign-in, re-auth, OAuth) and post-login data synchronization.
+- **Sign-Out System** (`account/sign-out-system.ts`) – Orchestrates logout with extensible hook system for cleanup phases.
+- **Sign-Up System** (`account/sign-up-system.ts`) – Manages user registration with email verification.
+- **Delete Account System** (`account/delete-account-system.ts`) – Handles account deletion with server cleanup and sign-out.
+- **Auth State Manager** (`auth-state.ts`) – Persistent storage and retrieval of auth state.
+
+**Data Flow Examples:**
+
+**Sign In Flow:**
+```
+User Input → Auth Manager (validation) → Sign-In System (auth + DB sync) → State Update
+```
+
+**Sign Out Flow:**
+```
+User Action → Auth Manager → Sign-Out System (hook phases) → State Clear
+```
+
+**Re-Auth Flow:**
+```
+Bootstrap/OAuth → Sign-In System (token restore + DB sync) → State Update
 ```
 
 **Key Principles:**
 
-- **Secure by default**: All credentials encrypted and rate-limited against brute force attacks
-- **Provider agnostic**: Core logic independent of auth backend through dependency injection
-- **Session persistence**: Auth state survives app restarts via encrypted storage
-- **Input validation**: ReDoS-safe regex validation before provider calls
+- **Gateway Pattern**: All auth operations go through `auth-manager.ts` for consistent validation and error handling
+- **System Separation**: Business logic isolated in domain systems, middleware handles network concerns
+- **Hook-Based Cleanup**: Sign-out uses extensible hooks for modular cleanup phases
+- **Staleness-Aware Re-Auth**: Session restoration considers data age for security (fresh/stale/dead phases)
+- **Provider Agnostic**: Core logic independent of auth backend through dependency injection
 
 ## Provider Injection
 
@@ -58,278 +85,155 @@ This design allows swapping auth backends (Firebase, custom) without changing au
 
 ## API Reference
 
-### `AuthStateManager`
+### Public API (Auth Manager)
 
-Manages local auth state storage and retrieval.
+The auth module exposes a single public API through `auth-manager.ts`. All operations go through this gateway for consistent validation, rate limiting, and error handling.
 
-#### `AuthStateManager.getAuthState(): Promise<AuthState>`
+#### `signUpUser(email, password): Promise<SignUpResult>`
 
-Returns current authentication state (`{ hasAccount: boolean }`).
-
-Returns current authentication state (`{ hasAccount: boolean }`).
-
-```ts
-const state = await AuthStateManager.getAuthState();
-if (state.hasAccount) {
-  // User is authenticated
-}
-```
-
-#### `AuthStateManager.setHasAccount(hasAccount: boolean): Promise<void>`
-
-Marks user as authenticated or not. Called during signup, signin, and logout.
-
-```ts
-await AuthStateManager.setHasAccount(true); // After signin success
-await AuthStateManager.setHasAccount(false); // After logout
-```
-
-#### `AuthStateManager.setSession(session: any): Promise<void>`
-
-Persists session information after successful auth provider login. Updates `hasAccount: true` and caches optional user email.
-
-```ts
-await AuthStateManager.setSession(providerSession);
-```
-
-#### `AuthStateManager.clearAuthState(): Promise<void>`
-
-Clears all auth state and user-specific cached data on logout. Removes:
-
-- `hasAccount` flag
-- User data, connected worlds
-- World access cache
-- Query cache (to prevent stale user data from leaking)
-
-```ts
-await AuthStateManager.clearAuthState(); // On logout
-```
-
-#### `AuthStateManager.getUserId(): Promise<string | undefined>`
-
-Retrieves stored user ID from local auth state.
-
-```ts
-const userId = await AuthStateManager.getUserId();
-```
-
-#### `AuthStateManager.getUserData(): Promise<any>`
-
-Retrieves full stored user profile from local auth state.
-
-```ts
-const userData = await AuthStateManager.getUserData();
-```
-
----
-
-### `signUpUser(email, password): Promise<SignUpResult>`
-
-Creates a new user account.
+Creates a new user account with email verification.
 
 **Parameters:**
-
 - `email` (string) – Email address to register
-- `password` (string) – Password (6+ chars, must meet strength requirements)
+- `password` (string) – Password (6+ chars, meets strength requirements)
 
-**Returns:** `SignUpResult` object:
-
-```ts
-{
-  success: boolean;
-  error?: string;                    // User-facing error message
-  validationWarning?: string;        // Client validation passed but server validation failed
-  showEmailExistsModal?: boolean;    // Indicates email already exists
-  redirectTo?: string;               // Where to navigate on success
-}
-```
+**Returns:** `SignUpResult` object with success status, errors, and redirect information.
 
 **Example:**
-
 ```ts
 const result = await signUpUser("user@example.com", "SecurePass123!");
 if (result.success) {
-  router.push(result.redirectTo!); // → email confirmation screen
-} else if (result.showEmailExistsModal) {
-  // Show "email already exists" modal
-} else {
-  showError(result.error);
+  router.push(result.redirectTo!); // → email confirmation
 }
 ```
 
-**Process:**
+#### `signInUser(email, password): Promise<SignInResult>`
 
-1. Validates email format and password strength (client-side)
-2. Checks brute-force rate limit (5 attempts per 10 min)
-3. Calls auth provider (Supabase, custom API)
-4. Records success/failure for brute-force tracking
-5. Returns redirect URL on success (usually email confirmation screen)
-
----
-
-### `signInUser(email, password): Promise<SignInResult>`
-
-Authenticates an existing user.
+Authenticates an existing user and performs post-login setup.
 
 **Parameters:**
-
-- `email` (string) – Email address to sign in
+- `email` (string) – Email address
 - `password` (string) – User's password
 
-**Returns:** `SignInResult` object:
-
-```ts
-{
-  success: boolean;
-  error?: string;              // User-facing error message
-  validationWarning?: string;  // Client validation passed but server validation failed
-  redirectTo?: string;         // Where to navigate on success
-}
-```
+**Returns:** `SignInResult` object with success status and redirect destination.
 
 **Example:**
-
 ```ts
 const result = await signInUser("user@example.com", "SecurePass123!");
 if (result.success) {
-  await AuthStateManager.setHasAccount(true);
   router.push(result.redirectTo!); // → main app
-} else {
-  showError(result.error);
 }
 ```
 
----
+#### `initiateSignOut(source): Promise<SignOutPhase1Result>`
 
-### `resetPassword(email): Promise<ResetPasswordResult>`
-
-Initiates password reset flow via auth provider email.
+Initiates the sign-out process with cleanup phases.
 
 **Parameters:**
+- `source` (SignOutSource) – Context: `'user-initiated'` or `'auth-state-change'`
 
-- `email` (string) – Email address to reset password
+**Returns:** Result of the sign-out preparation phase.
 
-**Returns:** `ResetPasswordResult` object:
+#### `confirmSignOut(): Promise<SignOutPhase2Result>`
 
-```ts
-{
-  success: boolean;
-  error?: string;                    // User-facing error
-  message?: string;                  // Success message (e.g., "Check your email")
-  showEmailNotFoundModal?: boolean;  // Email doesn't exist
-}
-```
+Completes the sign-out process by clearing all auth state and user data.
 
----
+**Returns:** Result of the final cleanup phase.
 
-### `checkUserSession(): Promise<SessionCheckResult>`
+#### `restoreSession(tokens): Promise<Session>`
 
-Checks if user has valid session and complete profile.
-
-**Returns:** `SessionCheckResult` object:
-
-```ts
-{
-  hasValidSession: boolean;
-  hasCompleteProfile: boolean;
-  shouldRedirectTo?: string;  // Where to navigate based on auth state
-}
-```
-
-**Example:** Used during app bootstrap to determine where to redirect user.
-
-```ts
-const session = await checkUserSession();
-if (session.shouldRedirectTo) {
-  router.replace(session.shouldRedirectTo);
-}
-```
-
----
-
-### `useAuthGuard(bootstrapReady?, level?, options?): AuthState`
-
-React hook for protecting routes. Subscribes to auth state changes and redirects unauthenticated users.
+Restores a user session from tokens (used during bootstrap/re-auth).
 
 **Parameters:**
+- `tokens` (AuthTokens) – Access and refresh tokens
 
-- `bootstrapReady` (boolean?) – Optional override of app bootstrap state (typically from kernel)
-- `level` (AuthLevel?) – Auth requirement level: `'account-only'` (needs account) or `'world-required'` (needs account + world access)
-- `options` (AuthGuardOptions?) – `{ forceVerification?: boolean }` – Always check provider, ignore cache age
+**Returns:** Restored session object.
 
-**Returns:** `AuthState` – `'loading'`, `'authenticated'`, or `'unauthenticated'`
+#### `useAuthGuard(bootstrapReady?, level?, options?): AuthState`
+
+React hook for protecting routes based on auth state.
+
+**Parameters:**
+- `bootstrapReady` (boolean?) – App bootstrap completion status
+- `level` (AuthLevel?) – `'account-only'` or `'world-required'`
+- `options` (AuthGuardOptions?) – Additional options like force verification
+
+**Returns:** `'loading'`, `'authenticated'`, or `'unauthenticated'`
 
 **Example:**
-
 ```ts
-export default function ProtectedScreen() {
-  const authState = useAuthGuard(kernel.phases.appReady, 'account-only');
-
-  if (authState === 'loading') return <LoadingSpinner />;
-  if (authState === 'unauthenticated') return <Redirect href="/login" />;
-
-  return <ScreenContent />;
-}
+const authState = useAuthGuard(kernel.phases.appReady, 'account-only');
+if (authState === 'loading') return <LoadingSpinner />;
+if (authState === 'unauthenticated') return <Redirect href="/login" />;
+return <ProtectedContent />;
 ```
 
----
+### Domain Systems (Internal API)
 
-### `checkAuthGuard(email, scope): Promise<GuardResult>`
+These systems contain the core business logic and are called by the auth manager. They are not part of the public API.
 
-Checks brute-force protection for an email. Returns whether auth attempt is allowed.
+#### Sign-In System
+
+```ts
+// Establish session and sync data
+performSignIn(email, password): Promise<SignInResult>
+performReAuth(tokens, context): Promise<ReAuthResult>
+performSignInWithIdToken(provider, token): Promise<SignInResult>
+```
+
+#### Sign-Out System
+
+```ts
+// Orchestrated logout with hooks
+performSignOutPhase1_DBSync(source): Promise<SignOutPhase1Result>
+performSignOutPhase2_ClearAndSignOut(): Promise<SignOutPhase2Result>
+```
+
+#### Auth State Manager
+
+```ts
+// Persistent state management
+AuthStateManager.getAuthState(): Promise<AuthState>
+AuthStateManager.setHasAccount(hasAccount: boolean): Promise<void>
+AuthStateManager.clearAuthState(): Promise<void>
+```
+
+### Validation & Security
+
+#### `checkAuthGuard(email, scope): Promise<GuardResult>`
+
+Checks brute-force protection status for auth attempts.
 
 **Parameters:**
+- `email` (string) – Email to check
+- `scope` ('signin' | 'signup' | 'reset') – Operation type
 
-- `email` (string) – Email address to check
-- `scope` ('signin' | 'signup' | 'reset') – Auth operation type
+**Returns:** Whether attempt is allowed and retry timing.
 
-**Returns:** `GuardResult` object:
+#### Validation Functions
 
 ```ts
-{
-  allowed: boolean;        // Is the attempt allowed?
-  remaining: number;       // Attempts remaining in current window
-  retryAfterMs?: number;   // If locked out, milliseconds until retry allowed
-}
+validateEmail(email): { isValid: boolean; sanitized: string }
+validatePassword(password): { isValid: boolean; strength: string }
+validateUsername(username): { isValid: boolean; sanitized: string }
 ```
-
-**Thresholds:** 5 attempts per 10-minute window; 15-minute lockout after exceeding
-
----
-
-### Validation Functions
-
-#### `validateEmail(email): { isValid: boolean; sanitized: string; ... }`
-
-Validates email format and sanitizes input. Checks for SQL injection, control characters, valid length.
-
-#### `validatePassword(password): { isValid: boolean; strength: string; ... }`
-
-Validates password strength (6+ chars, uppercase, lowercase, number, special char). Returns breakdown by criteria.
-
-#### `validateUsername(username): { isValid: boolean; sanitized: string; ... }`
-
-Validates username format (3-20 chars, alphanumeric + underscore/hyphen).
-
----
-
 ### Utility Functions
 
 #### `getEmailDomain(email): string`
 
-Extracts domain from email (e.g., "gmail.com" from "user@gmail.com").
+Extracts domain from email address.
 
 #### `getEmailProvider(domain): { name: string; url: string }`
 
-Returns email provider info (name and web URL) for known providers (Gmail, Outlook, Yahoo, etc.).
+Returns email provider information for known services.
 
 #### `openEmailApp(email): Promise<void>`
 
-Opens user's email app or email provider website. Useful for directing users to check confirmation emails.
+Opens user's email app or provider website for email verification.
 
 #### `sanitizeInput(input): string`
 
-Sanitizes string input: removes null bytes, control characters, limits length to 1000 chars. Used before validation.
+Sanitizes string input for security.
 
 ---
 
@@ -338,16 +242,21 @@ Sanitizes string input: removes null bytes, control characters, limits length to
 ### External Packages
 
 - **`@supabase/supabase-js`** (optional) – Default auth provider implementation
-- **`expo-router`** – Routing and navigation (for route protection)
+- **`expo-router`** – Navigation and routing for auth redirects
 
 ### Internal Dependencies
 
-- **`lib/services`** – Injected auth provider (AuthProvider interface)
-- **`lib/storage` (SecureStorage)** – Encrypted storage for auth state and attempts
-- **`lib/cache` (QueryCache)** – Cleared on logout to prevent stale user data leaks
-- **`lib/api` (RequestManager)** – Makes auth API calls (signup, signin, reset password)
-- **`lib/database`** – Database operations (may be used by auth providers)
-- **`lib/utils/logger`** – Logs auth events and security incidents
+- **`lib/middleware/services`** – Auth provider abstraction and network calls
+- **`lib/storage`** (SecureStorage) – Encrypted persistence of auth state and sessions
+- **`lib/cache`** (QueryCache) – Cleared on logout to prevent stale user data
+- **`lib/database`** – User profile and world access data operations
+- **`lib/jobs`** – Background job management for auth-related tasks
+- **`lib/navigation`** – Route building and redirect logic
+- **`lib/analytics`** – Auth flow tracking and security event logging
+- **`lib/kernel`** – App bootstrap coordination and phase management
+- **`lib/utils/logger`** – Structured logging for auth operations
+- **`maps/storage-keys.ts`** – Centralized storage key constants
+- **`validation/`** – Input validation schemas and functions
 - **`lib/analytics`** – Tracks auth flows (signup, signin, failures)
 - **`lib/kernel`** – App bootstrap state for route guards
 
@@ -357,75 +266,118 @@ Sanitizes string input: removes null bytes, control characters, limits length to
 
 ### Auth Provider Not Available
 
-If no auth provider is configured or available (e.g., network issues, misconfiguration), the module degrades gracefully:
+If no auth provider is configured or network issues occur, operations degrade gracefully:
 
-- `signUpUser()` returns error: "Unable to connect to servers"
-- `useAuthGuard()` skips subscription setup
-- Auth state is still readable from local storage
+- Sign-in/sign-up return: "Unable to connect to servers"
+- Re-auth fails silently, user redirected to sign-in
+- Auth state remains readable from local storage
 
 ### Brute-Force Protection
 
-After 5 failed attempts in 10 minutes, further attempts fail with: `"Too many sign up attempts. Try again in XXX seconds."`
+Rate limiting prevents abuse with per-email tracking:
 
-- Tracked per email × scope (separate counters for signin vs. signup)
-- Resets on successful auth
-- Lockout persists across app restarts (stored in SecureStorage)
+- **Threshold**: 5 failed attempts per 10-minute window
+- **Lockout**: 15-minute cooldown after exceeding threshold
+- **Tracking**: Persists across app restarts via SecureStorage
+- **Reset**: Successful auth clears failure counter
 
-### Email Already Exists (Signup)
+### Session Staleness (Re-Auth Security)
 
-Auth provider returns `EmailAlreadyExistsError`, module sets `showEmailExistsModal: true` to trigger UI modal.
+Session restoration considers data age for security:
 
-### Invalid Password (Signup)
+- **Fresh** (< 7 days): Auto-restore, proceed to world selection
+- **Stale** (7-30 days): Auto-restore but redirect to welcome screen
+- **Dead** (> 30 days): Deny restore, require manual sign-in
 
-Server rejects weak passwords; module catches and returns friendly error: `"Password does not meet requirements."`
+Age calculated from `LAST_LOGGED_IN` timestamp updated during successful auth.
 
-### Session Recovery
+### Sign-Out Hook Failures
 
-On app restart, `AuthStateManager.getAuthState()` recovers previous session from SecureStorage. If missing/invalid, defaults to `{ hasAccount: false }`.
+Sign-out system continues despite individual hook failures:
 
-### Race Condition: Multiple SignIn Attempts
+- Each phase runs all hooks, collecting errors
+- Non-critical failures logged but don't block logout
+- Final result includes success status and error details
 
-If user taps "Sign In" twice rapidly, both requests go to RequestManager. Deduplication via cache key `'auth:signin:email'` coalesces requests (same promise returned).
+### Race Conditions
 
-### Logout with In-Flight Requests
+Multiple concurrent auth attempts are handled via:
 
-`AuthStateManager.clearAuthState()` is called on logout; it clears QueryCache to prevent stale data. In-flight auth requests may still complete but are ignored by UI.
+- Request deduplication in middleware layer
+- Atomic state updates in AuthStateManager
+- Serial execution of sign-out phases
+
+### Invalid Tokens (401 Responses)
+
+Automatic token refresh on 401 errors:
+
+- Middleware intercepts failed requests
+- Attempts silent token refresh
+- Retries original request with new token
+- Triggers sign-out if refresh fails
+
+### Email Verification Required
+
+Sign-up succeeds but requires email confirmation:
+
+- User redirected to confirmation screen
+- Auth state not set until email verified
+- Re-auth attempts blocked until confirmation
 
 ---
 
 ## Performance Notes
 
-### Auth State Check Cost
+### Auth State Operations
 
-`AuthStateManager.getAuthState()` is O(1): single SecureStorage read. No external calls.
+- **State Checks**: O(1) SecureStorage reads, no external calls
+- **State Updates**: Atomic writes with immediate persistence
+- **Session Recovery**: Single read on app launch, non-blocking
 
-### Validation Cost
+### Validation Performance
 
-Input validation (email, password) uses simple regex without backtracking (ReDoS-safe). O(n) where n = input length (typically < 1000 chars).
+- **Input Validation**: O(n) regex operations (n ≤ 1000 chars)
+- **ReDoS Safe**: No backtracking in regex patterns
+- **Sanitization**: Linear time string processing
 
-### Brute-Force Tracking
+### Rate Limiting
 
-Auth attempt guard loads/saves JSON from SecureStorage. O(1) per check (small JSON, not unbounded).
+- **Guard Checks**: O(1) JSON read from SecureStorage
+- **Counter Updates**: Atomic increments with persistence
+- **Memory Efficient**: Small JSON objects, bounded size
 
-### Route Guard Subscription
+### Sign-Out Orchestration
 
-`useAuthGuard()` sets up auth provider subscription once per mount. Listens to future auth state changes; no polling.
+- **Hook Execution**: Serial phases prevent race conditions
+- **Error Isolation**: Individual hook failures don't block others
+- **Cleanup Scope**: Targeted clearing prevents over-cleaning
 
-### Session Recovery
+### Re-Auth Efficiency
 
-On app launch, a single `checkUserSession()` call. If session valid and profile complete, determines routing destination. Non-blocking.
+- **Staleness Check**: Timestamp comparison (no I/O)
+- **Conditional Sync**: Only fetches data when needed
+- **Background Jobs**: Non-blocking offline queue processing
+
+### Network Operations
+
+- **Request Deduplication**: Prevents redundant auth calls
+- **Circuit Breaker**: Fast-fail on repeated provider failures
+- **Token Refresh**: Automatic retry with new credentials
 
 ---
 
 ## Related Modules
 
-- **`lib/services`** – Auth provider abstraction and dependency injection for backend flexibility
-- **`lib/storage`** – SecureStorage for encrypted auth state and session persistence
-- **`lib/api`** – RequestManager for auth API calls with retry and rate limiting
-- **`lib/cache`** – QueryCache cleared on logout to prevent stale user data
-- **`lib/database`** – Database operations used by auth providers
-- **`lib/analytics`** – Auth flow tracking and security event logging
-- **`lib/kernel`** – App bootstrap coordination with auth state initialization
+- **`lib/middleware/services`** – Auth provider abstraction and network request handling
+- **`lib/storage`** – SecureStorage for encrypted auth state persistence
+- **`lib/cache`** – QueryCache cleared during sign-out to prevent data leaks
+- **`lib/database`** – User profile and world access data synchronization
+- **`lib/jobs`** – Background job coordination for auth-related tasks
+- **`lib/navigation`** – Route determination and redirect logic
+- **`lib/analytics`** – Auth flow tracking and security monitoring
+- **`lib/kernel`** – App bootstrap phases and initialization coordination
+- **`lib/error`** – Error type definitions and mapping functions
+- **`validation/`** – Input validation schemas and security functions
 
 ---
 
@@ -433,19 +385,21 @@ On app launch, a single `checkUserSession()` call. If session valid and profile 
 
 | File | Purpose |
 |------|---------|
+| `auth-manager.ts` | Public API gateway for all auth operations with validation and delegation |
 | `auth-state.ts` | Persistent auth state management and session storage |
-| `authService.ts` | Core auth operations (signup, signin, password reset) |
-| `useAuthGuard.ts` | React hook for route protection and auth state subscription |
-| `sessionService.ts` | Session lifecycle helpers and bootstrap routing logic |
-| `auth-attempt-guard.ts` | Brute-force protection and rate limiting |
-| `auth-health-monitor.ts` | Background session health checks and validation |
-| `validation.ts` | Input validation functions for email, password, username |
+| `auth-operations.ts` | Core auth business logic and result type definitions |
+| `auth-attempt-guard.ts` | Brute-force protection and rate limiting per email/scope |
+| `auth-layer.ts` | Auth strategy abstractions and provider management |
+| `default-strategies.ts` | Default auth strategies for different operation types |
+| `guards/` | Route protection and session validation utilities |
+| `health/` | Background session health monitoring and validation |
+| `account/sign-in-system.ts` | Unified session establishment (sign-in, re-auth, OAuth) |
+| `account/sign-out-system.ts` | Orchestrated logout with extensible hook system |
+| `account/sign-up-system.ts` | User registration with email verification |
+| `account/delete-account-system.ts` | Account deletion with server cleanup |
+| `account/update-creds-system.ts` | Password/username update operations |
+| `account/invite-system.ts` | World invitation and access management |
+| `validation.ts` | Input validation functions for security |
 | `emailUtils.ts` | Email domain detection and provider utilities |
-| `redirectSafety.ts` | Redirect safety and validation utilities |
-| `encrypted-storage.ts` | Legacy encrypted storage implementation |
-| `useSignInForm.ts` | Sign-in form state management hook |
-| `useSignUpForm.ts` | Sign-up form state management hook |
-| `useResetPasswordConfirm.ts` | Password reset confirmation hook |
-| `useWelcomeScreen.ts` | Welcome screen auth flow hook |
 
 **Note**: Auth provider implementations (e.g., SupabaseAuthProvider) are now located in `lib/services/` for better separation of concerns and reusability across projects.

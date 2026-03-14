@@ -89,40 +89,20 @@ export const AuthStateManager = {
     }
   },
 
-  // Store session information or mark that user has an account when a session exists
+  // Mark that user has an account when a session exists.
+  // NOTE: Session persistence is handled by the system-level Supabase client
+  // onAuthStateChange listener (supabase-client.ts). Do NOT call SessionAdapter.saveSession()
+  // here — the normalized Session uses camelCase fields (accessToken, userId) while
+  // SessionAdapter expects snake_case (access_token, user.id), causing a corrupt overwrite.
   async setSession(session: any): Promise<void> {
     try {
-      logger.category('auth').info("🔐 setSession called with:", {
-        hasSession: !!session,
-        hasUser: !!session?.user,
-        hasAccessToken: !!session?.access_token,
-        hasRefreshToken: !!session?.refresh_token,
-        auth_id: session?.user?.id,
-        email: session?.user?.email,
-      });
-
       if (!session) {
         logger.category('auth').warn("⚠️ setSession received null/undefined session - not saving");
         return;
       }
 
-      // Update auth state
+      // Update auth state — session is already persisted by Supabase's onAuthStateChange
       await this.setHasAccount(true);
-
-      // Save the actual session to encrypted storage via system adapter
-      const { SessionAdapter } = await import("@/system/Services");
-      await SessionAdapter.saveSession(session);
-
-      // Optionally cache minimal session info (privacy-routed)
-      if (session?.user?.email) {
-        try {
-          const key = STORAGE_KEYS.SESSION_USER_EMAIL;
-          const backend = getPrivacyStorageBackend(key);
-          await backend.setItem(key, session.user.email);
-        } catch (error) {
-          logger.category('auth').error("Error caching session email:", error);
-        }
-      }
     } catch (error) {
       logger.category('auth').error("Error saving auth state:", error);
     }
@@ -139,6 +119,18 @@ export const AuthStateManager = {
       // Clear query cache (all user-specific cached queries)
       const { QueryCache } = await import("../middleware/storage/helpers/query-cache");
       await QueryCache.clearAll();
+
+      // Clear FastCache (in-memory session cache)
+      // CRITICAL: FastCache holds temporary session data like user info, world metadata
+      // Must be cleared or next user will see stale data
+      try {
+        const { FastCache } = await import("@/system/Storage");
+        await FastCache.clear();
+        logger.category('auth').debug("Cleared FastCache (in-memory cache)");
+      } catch (err) {
+        logger.category('auth').warn("Failed to clear FastCache:", err);
+        // Continue - FastCache clear is non-critical
+      }
 
       // CRITICAL: Set hasAccount to FALSE (not remove it)
       // If we remove it, the check becomes null which can be interpreted as "unknown"
@@ -345,7 +337,7 @@ export const AuthStateManager = {
       if (isBackendConfigured()) {
         try {
           const manager = await getAuthManager();
-          await manager.signOutUser();
+          await manager.confirmSignOut('auth-state-change');
           logger.category('auth').info("✅ Signed out from auth service");
         } catch (error) {
           logger.category('auth').error("Error signing out:", error);

@@ -12,7 +12,7 @@ import {
   AuthTitle,
   FormAuthInput,
 } from "@/components/auth_components";
-import { useResetPasswordConfirm } from "@/hooks/auth";
+import { usePasswordResetFlow } from "@/hooks/auth";
 import { useScale } from "@/theme";
 import { getPasswordRequirementsForUI } from "@/validation/auth.schema";
 import { useRef } from "react";
@@ -22,22 +22,11 @@ export default function ResetPasswordScreen() {
   const S = useScale();
   // Refs for keyboard navigation
   const confirmPasswordInputRef = useRef<TextInput>(null);
-  const {
-    control,
-    isValid,
-    password,
-    loading,
-    error,
-    success,
-    successMessage,
-    showPassword,
-    userEmail,
-    handleResetPassword,
-    setShowPassword,
-    goToSignIn,
-  } = useResetPasswordConfirm();
 
+  const { state, form, handlers } = usePasswordResetFlow();
 
+  const isSuccess = state.phase === 'success';
+  const isLoading = state.phase === 'loading';
 
   return (
     <AuthRoot>
@@ -45,27 +34,29 @@ export default function ResetPasswordScreen() {
       <AuthTitle>Reset Password</AuthTitle>
 
       <AuthSubTitle>
-        {userEmail
-          ? `${userEmail} is ready to reset your password. Please enter a new password below.`
-          : "Please enter a new password below."}
+        {state.userEmail
+          ? `${state.userEmail} is ready to reset your password. Please enter a new password below.`
+          : isLoading
+            ? "Verifying reset link..."
+            : "Please enter a new password below."}
       </AuthSubTitle>
 
       {/* 🧾 Form */}
       <AuthForm>
         {/* Success Message */}
-        {success && <AuthSuccess message={successMessage} />}
+        {isSuccess && state.successMessage && <AuthSuccess message={state.successMessage} />}
 
         {/* Password Input */}
         <FormAuthInput
-          control={control}
+          control={form.control}
           name="password"
           placeholder="Password"
-          secureTextEntry={!showPassword}
+          secureTextEntry={!form.showPassword}
           autoCapitalize="none"
-          editable={!loading && !success}
+          editable={!state.loading && !isSuccess}
           showPasswordToggle={true}
-          onTogglePassword={() => setShowPassword(!showPassword)}
-          showPassword={showPassword}
+          onTogglePassword={() => form.setShowPassword(!form.showPassword)}
+          showPassword={form.showPassword}
           returnKeyType="next"
           onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
         />
@@ -82,34 +73,34 @@ export default function ResetPasswordScreen() {
             opacity: 0.9,
           }}
         >
-          {getPasswordRequirementsForUI(password)}
+          {getPasswordRequirementsForUI(form.password)}
         </AuthSubTitle>
 
         {/* Confirm Password Input */}
         <FormAuthInput
-          control={control}
+          control={form.control}
           name="confirmPassword"
           ref={confirmPasswordInputRef}
           placeholder="Confirm Password"
-          secureTextEntry={!showPassword}
-          editable={!loading && !success}
+          secureTextEntry={!form.showPassword}
+          editable={!state.loading && !isSuccess}
           autoCapitalize="none"
           returnKeyType="go"
-          onSubmitEditing={handleResetPassword}
+          onSubmitEditing={form.handleSubmit}
         />
 
         {/* Authentication Error */}
-        <AuthError error={error} />
+        {state.error && <AuthError error={state.error} />}
       </AuthForm>
 
       {/* 🔘 Action Buttons */}
       <AuthActionGroup>
-        {!success && (
+        {!isSuccess && (
           <AuthButton
             text="Reset Password"
-            onPress={handleResetPassword}
-            disabled={!isValid}
-            loading={loading}
+            onPress={form.handleSubmit}
+            disabled={!form.isValid || isLoading}
+            loading={state.loading}
           />
         )}
 
@@ -117,16 +108,16 @@ export default function ResetPasswordScreen() {
           color="#D4AF37"
           align="center"
           deco="underline"
-          style={{ marginTop: success ? 0 : 8 }}
-          onPress={goToSignIn}
+          style={{ marginTop: isSuccess ? 0 : 8 }}
+          onPress={handlers.goToSignIn}
         >
-          {success ? "Continue to Sign In →" : "← Back to Sign In"}
+          {isSuccess ? "Continue to Sign In →" : "← Back to Sign In"}
         </AuthBody>
       </AuthActionGroup>
 
       {/* 🧩 Footer */}
       <AuthBodyFooter>
-        {success
+        {isSuccess
           ? "Your password has been updated successfully!"
           : "After changing your password, you'll be returned to the sign-in page."}
       </AuthBodyFooter>
@@ -137,3 +128,4 @@ export default function ResetPasswordScreen() {
     </AuthRoot>
   );
 }
+

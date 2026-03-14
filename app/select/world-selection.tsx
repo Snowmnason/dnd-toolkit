@@ -1,4 +1,3 @@
-import { ConfirmLeaveModal, EditWorldModal } from "@/components/modals";
 import { AppLoading, AppPage, AppSplit, Body, Button } from "@/components/ui";
 import { usePanelNavigation } from "@/hooks/navigation/use-panel-navigation";
 import { useWorlds } from "@/hooks/storage";
@@ -10,7 +9,7 @@ import {
 import { WorldListPanel } from "@/Screens/select/world-selection/WorldListPanel";
 import { WorldRightPanel } from "@/Screens/select/world-selection/WorldRightPanel";
 import { useScale } from "@/theme";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 // Fallback image
 const noImageSelected = require("../../assets/images/Miku.png");
@@ -36,41 +35,11 @@ export default function LandingPage() {
     refetch,
   } = useWorlds(userId, setConnectedWorldIds);
   const [mapImage, setMapImage] = useState<string | null>(null);
-  
-  // Race condition fix: Keep splash screen visible until worlds load or timeout expires
-  // This prevents empty world list UI during fresh login
-  const [loadingTimeoutExpired, setLoadingTimeoutExpired] = useState(false);
-  
-  useEffect(() => {
-    // Reset timeout when loading starts
-    if (isLoading) {
-      setLoadingTimeoutExpired(false);
-    }
-    
-    // Set timeout: wait up to 5 seconds for worlds to load
-    // After 5s, show the UI anyway (assumes fresh account with no worlds)
-    const timer = setTimeout(() => {
-      setLoadingTimeoutExpired(true);
-    }, 5000);
-    
-    return () => clearTimeout(timer);
-  }, [isLoading]);
 
   // Modal controls via hook
   const {
-    editModalVisible,
-    leaveModalVisible,
-    modalWorldName,
-    setModalWorldName,
     openEditModal,
-    closeEditModal,
     openLeaveModal,
-    closeLeaveModal,
-    handleConfirmWorldName,
-    createGenerateInviteLinkHandler,
-    createDeleteWorldHandler,
-    generatingLink,
-    createRemoveFromWorldHandler,
   } = useWorldModal({
     onWorldsChange: () => {
       setSelectedWorld(null);
@@ -80,8 +49,7 @@ export default function LandingPage() {
   });
 
   // Loading state (use your modern loader view)
-  // Show splash screen while loading, unless timeout expired (handles fresh account with 0 worlds)
-  if (isLoading && !loadingTimeoutExpired) {
+  if (isLoading) {
     return <AppLoading loadMessage="Loading your worlds..." />;
   }
 
@@ -130,57 +98,21 @@ export default function LandingPage() {
       noImageSelected={noImageSelected}
       onEditOrLeave={
         selectedWorld && (selectedWorld.user_role === "dm" || selectedWorld.owner_id === userId)
-          ? () => openEditModal(selectedWorld.name)
-          : () => openLeaveModal(selectedWorld?.name || "")
+          ? () => openEditModal(selectedWorld.name, selectedWorld.world_id)
+          : () => openLeaveModal(selectedWorld?.name || "", selectedWorld?.world_id)
       }
     />
   );
 
   return (
-    <>
-      <AppSplit
-        left={LeftPanel}
-        right={RightPanel}
-        animateRightSlide={!isDesktop}
-        rightVisible={showRightPanel}
-        onMobileRightPanelClose={
-          !isDesktop ? handleMobileBackToList : undefined
-        }
-      />
-
-      {/* Modals rendered unconditionally to avoid hook order issues */}
-      <EditWorldModal
-        visible={!!editModalVisible}
-        onClose={closeEditModal}
-        worldName={modalWorldName}
-        originalWorldName={selectedWorld?.name}
-        onWorldNameChange={setModalWorldName}
-        onConfirmWorldName={() =>
-          handleConfirmWorldName(
-            selectedWorld?.world_id,
-            modalWorldName,
-            userId,
-          )
-        }
-        onGenerateInviteLink={createGenerateInviteLinkHandler(
-          selectedWorld?.world_id,
-          selectedWorld?.name,
-        )}
-        onDeleteWorld={createDeleteWorldHandler(
-          selectedWorld?.world_id,
-          userId,
-        )}
-        generatingLink={generatingLink}
-      />
-      <ConfirmLeaveModal
-        visible={!!leaveModalVisible}
-        onClose={closeLeaveModal}
-        worldName={modalWorldName}
-        onConfirmLeave={createRemoveFromWorldHandler(
-          selectedWorld?.world_id,
-          userId,
-        )}
-      />
-    </>
+    <AppSplit
+      left={LeftPanel}
+      right={RightPanel}
+      animateRightSlide={!isDesktop}
+      rightVisible={showRightPanel}
+      onMobileRightPanelClose={
+        !isDesktop ? handleMobileBackToList : undefined
+      }
+    />
   );
 }

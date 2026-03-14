@@ -131,6 +131,33 @@ export const updateUsernameSchema = z
     path: ["username"],
   });
 
+/**
+ * Change password (logged-in settings flow).
+ * Requires the current password and a new password with confirmation.
+ */
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required"),
+    newPassword: passwordSchema,
+    confirmPassword: z.string().min(1, "Please confirm your new password"),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  })
+  .refine((data) => data.newPassword !== data.currentPassword, {
+    message: "New password must be different from your current password",
+    path: ["newPassword"],
+  });
+
+/**
+ * Delete account password schema
+ * Requires password validation (user must provide a valid account password)
+ */
+export const deleteAccountPasswordSchema = z.object({
+  password: passwordSchema,
+});
+
 // Infer TypeScript types from schemas
 export type SignInFormData = z.infer<typeof signInSchema>;
 export type SignUpFormData = z.infer<typeof signUpSchema>;
@@ -138,6 +165,8 @@ export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 export type CompleteProfileFormData = z.infer<typeof completeProfileSchema>;
 export type UpdateUsernameFormData = z.infer<typeof updateUsernameSchema>;
+export type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;
+export type DeleteAccountPasswordFormData = z.infer<typeof deleteAccountPasswordSchema>;
 
 // ============================================================================
 // PASSWORD UI HELPERS (for real-time feedback)

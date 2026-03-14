@@ -16,107 +16,15 @@
  */
 
 import { Button, ButtonText } from '@/components/ui';
-import { AuthStateManager, logger } from '@/lib';
-import { signInWithIdToken } from '@/lib/auth';
+import { useAuthFlow } from '@/hooks/auth';
+import { logger } from '@/lib';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Platform } from 'react-native';
-
+import { Platform } from 'react-native';
 
 // Web-specific components (loaded dynamically)
 interface AppleWebComponents {
   AppleSignin: any;
-}
-
-// Common auth success handler
-async function handleAuthSuccess(data?: any) {
-  // Save successful authentication state
-  await AuthStateManager.setHasAccount(true);
-  
-  // Check if user has profile in database
-  const { usersDB } = await import('@/lib');
-  try {
-    const userProfile = await usersDB.getCurrentUser();
-    if (userProfile && userProfile.username) {
-      router.replace('/select/world-selection');
-    } else {
-      router.replace('/login/sign-up');
-    }
-  } catch {
-    router.replace('/login/sign-up');
-  }
-}
-
-// iOS Apple auth
-async function onAppleButtonPressIOS() {
-  try {
-    const credential = await AppleAuthentication.signInAsync({
-      requestedScopes: [
-        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-        AppleAuthentication.AppleAuthenticationScope.EMAIL,
-      ],
-    });
-
-    logger.category('auth').info('Apple credential:', credential);
-
-    if (credential.identityToken) {
-      const result = await signInWithIdToken('apple', credential.identityToken);
-
-      if (!result.success) {
-        logger.category('auth').error('Error signing in with Apple:', result.error?.message);
-        Alert.alert('Authentication Error', result.error?.message || 'Failed to sign in with Apple');
-        return;
-      }
-
-      if (result.data) {
-        logger.category('auth').info('Apple sign in successful:', result.data);
-        await handleAuthSuccess(result.data);
-      }
-    }
-  } catch (error: any) {
-    if (error.code === 'ERR_REQUEST_CANCELED') {
-      // User canceled the sign-in flow
-      return;
-    }
-    logger.category('auth').error('Apple auth error:', error);
-    Alert.alert('Error', 'Apple sign-in failed. Please try again.');
-  }
-}
-
-// Web Apple auth success handler
-async function onAppleButtonSuccessWeb(appleAuthRequestResponse: any) {
-  try {
-    logger.category('auth').debug('Apple sign in successful:', { appleAuthRequestResponse });
-    
-    if (appleAuthRequestResponse.authorization && 
-        appleAuthRequestResponse.authorization.id_token && 
-        appleAuthRequestResponse.authorization.code) {
-      
-      const result = await signInWithIdToken('apple', appleAuthRequestResponse.authorization.id_token, {
-        access_token: appleAuthRequestResponse.authorization.code,
-      });
-
-      if (!result.success) {
-        logger.category('auth').error('Error signing in with Apple:', result.error?.message);
-        Alert.alert('Authentication Error', result.error?.message || 'Failed to sign in with Apple');
-        return;
-      }
-
-      if (result.data) {
-        logger.category('auth').info('Apple sign in successful:', result.data);
-        await handleAuthSuccess(result.data);
-      }
-    }
-  } catch (error) {
-    logger.category('auth').error('Apple auth error:', error);
-    Alert.alert('Error', 'An unexpected error occurred');
-  }
-}
-
-function onAppleButtonFailureWeb(error: any) {
-  logger.category('auth').error('Error signing in with Apple:', error);
-  Alert.alert('Authentication Error', 'Apple sign-in failed. Please try again.');
 }
 
 interface AppleSignInButtonProps {
@@ -129,6 +37,7 @@ function AppleButtonWeb({ disabled }: { disabled: boolean }) {
   const [sha256Nonce, setSha256Nonce] = useState('');
   const [appleComponents, setAppleComponents] = useState<AppleWebComponents | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { apple } = useAuthFlow();
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -220,8 +129,8 @@ function AppleButtonWeb({ disabled }: { disabled: boolean }) {
           nonce: sha256Nonce,
           usePopup: true,
         }}
-        onSuccess={onAppleButtonSuccessWeb}
-        onError={onAppleButtonFailureWeb}
+        onSuccess={apple.web}
+        onError={apple.webError}
         skipScript={false}
         render={(renderProps: any) => (
           <button
@@ -256,21 +165,18 @@ function AppleButtonWeb({ disabled }: { disabled: boolean }) {
 export default function AppleSignInButton({ disabled = false, style }: AppleSignInButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isAvailable, setIsAvailable] = useState(false);
+  const { apple } = useAuthFlow();
 
-  // Check if Apple Sign In is available on iOS
   useEffect(() => {
     if (Platform.OS === 'ios') {
       AppleAuthentication.isAvailableAsync().then(setIsAvailable);
     } else if (Platform.OS === 'web') {
-      // Apple auth is always "available" on web (library handles availability)
       setIsAvailable(true);
     } else {
-      // Android - not available but we'll show disabled button
       setIsAvailable(false);
     }
   }, []);
 
-  // Web implementation
   if (Platform.OS === 'web') {
     return (
       <div style={{ ...style }}>
@@ -279,12 +185,11 @@ export default function AppleSignInButton({ disabled = false, style }: AppleSign
     );
   }
 
-  // iOS implementation
   if (Platform.OS === 'ios' && isAvailable) {
     const handlePress = async () => {
       setIsLoading(true);
       try {
-        await onAppleButtonPressIOS();
+        await apple.ios();
       } finally {
         setIsLoading(false);
       }
@@ -299,10 +204,9 @@ export default function AppleSignInButton({ disabled = false, style }: AppleSign
           flexDirection: 'row', 
           alignItems: 'center', 
           justifyContent: 'center',
-          opacity: 0.7
         }}
         onPress={handlePress}
-        disabled={true}
+        disabled={disabled || isLoading}
       >
         <ButtonText style={{ color: '#FFF', fontSize: 14, fontWeight: '600' }}>
           🍎 Apple
@@ -311,7 +215,6 @@ export default function AppleSignInButton({ disabled = false, style }: AppleSign
     );
   }
 
-  // Android or iOS unavailable - show disabled button for consistent UI
   return (
     <Button
       style={{ 
@@ -321,7 +224,7 @@ export default function AppleSignInButton({ disabled = false, style }: AppleSign
         flexDirection: 'row', 
         alignItems: 'center', 
         justifyContent: 'center',
-        opacity: 0.3, // Clearly disabled appearance
+        opacity: 0.3,
         ...style
       }}
       onPress={() => {}}

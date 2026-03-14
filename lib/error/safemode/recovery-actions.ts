@@ -19,6 +19,7 @@ import { getAllRouteConfigs } from "@/lib/navigation";
 import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
+import { FastCache } from "@/system/Storage";
 import { Router } from "expo-router";
 import { RecoveryAction, SafeModeState } from "./safe-mode";
 
@@ -150,9 +151,12 @@ async function handleClearCache(
       .category("bootstrap")
       .info("[SafeMode] Starting CLEAR_CACHE recovery");
 
-    // Clear the query cache (all cached API responses)
+    // Clear both caches: query cache (API responses) and fast cache (session data)
     await QueryCache.clearAll();
     logger.category("bootstrap").info("[SafeMode] Query cache cleared");
+
+    await FastCache.clear();
+    logger.category("bootstrap").info("[SafeMode] Fast cache cleared");
 
     logger
       .category("bootstrap")

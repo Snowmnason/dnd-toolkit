@@ -3,8 +3,11 @@
  *
  * Encapsulates pending-invite storage and processing so auth-redirect.tsx
  * never imports StorageManager, invitesDB, worldsDB, or usersDB directly.
+ *
+ * Uses lib/auth/account/invite-system for pending invite checking and generation.
  */
 
+import { performCheckPendingInvites } from "@/lib/auth/account/invite-system";
 import { invitesDB, usersDB, worldsDB } from "@/lib/database";
 import { StorageManager } from "@/lib/storage";
 import { STORAGE_KEYS } from "@/maps";
@@ -15,8 +18,6 @@ interface PendingInvite {
   timestamp: number;
 }
 
-const INVITE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-
 export const pendingInviteStorage = {
   async save(token: string, worldName: string): Promise<void> {
     const inviteData: PendingInvite = { token, worldName, timestamp: Date.now() };
@@ -24,13 +25,16 @@ export const pendingInviteStorage = {
   },
 
   async get(): Promise<PendingInvite | null> {
-    const data = await StorageManager.get<PendingInvite>(STORAGE_KEYS.PENDING_INVITE);
-    if (!data) return null;
-    if (Date.now() - data.timestamp >= INVITE_TTL_MS) {
-      await StorageManager.remove(STORAGE_KEYS.PENDING_INVITE);
-      return null;
-    }
-    return data;
+    // Delegate to invite-system which handles TTL validation and cleanup
+    const pendingInvite = await performCheckPendingInvites();
+    if (!pendingInvite) return null;
+    
+    // Return with timestamp (needed by some callers)
+    return {
+      token: pendingInvite.token,
+      worldName: pendingInvite.worldName,
+      timestamp: Date.now(), // Current time since we just validated it exists
+    };
   },
 
   async clear(): Promise<void> {

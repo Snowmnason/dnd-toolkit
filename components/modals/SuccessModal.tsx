@@ -1,6 +1,6 @@
 import { AppModal, Button } from '@/components/ui'; // ✅ unified import
+import { registerModal } from '@/contexts';
 import { useScale } from '@/theme';
-import React from 'react';
 import { View } from 'react-native';
 
 interface SuccessModalProps {
@@ -52,3 +52,6 @@ export function SuccessModal({
     </AppModal>
   )
 }
+
+// Register modal for centralized management
+registerModal('success', SuccessModal)

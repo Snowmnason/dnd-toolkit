@@ -16,6 +16,8 @@
  */
 
 import { logger } from '@/lib/utils/logger';
+import { ERROR_CODES } from '@/maps/ERROR_CODES';
+import { AppError } from '@/pure-algo-immutables/app-error';
 import { ConnectionQuality, NetworkDetection } from '@/system/Network';
 import {
     isServiceReady,
@@ -44,16 +46,26 @@ function ensureAuthReady(): void {
     // 1. Network available?
     const networkStatus = NetworkDetection.getStatus();
     if (networkStatus.connectionQuality === ConnectionQuality.OFFLINE) {
-        // TODO: Return a typed NetworkError? Queue for retry?
         // Auth ops cannot be queued (must complete synchronously or fail).
-        // Caller handles retry strategy.
-        throw new Error('[auth-service] Network offline — cannot perform auth operation');
+        // Throw typed error with recovery guidance for callers/UI.
+        throw new AppError(
+            ERROR_CODES.NETWORK.OFFLINE,
+            'Network offline — cannot perform auth operation. Please reconnect and try again.'
+        );
     }
 
     // 2. Provider initialized?
-    if (!isServiceReady('auth')) {
-        // TODO: Should we retry after a delay? Or throw immediately?
-        throw new Error('[auth-service] Auth provider not initialized — cannot perform auth operation');
+    // Check both the service status AND the actual provider instance
+    // to handle cases where the registry might be stale or not populated.
+    // If either check says "not ready", we accept that (provider might be ready but status not updated yet).
+    const providerExists = rawGetAuthProviderSync() !== null;
+    const isReady = isServiceReady('auth') || providerExists;
+    
+    if (!isReady) {
+        throw new AppError(
+            ERROR_CODES.AUTH.UNKNOWN,
+            'Auth provider not initialized — cannot perform auth operation. Please restart the app.'
+        );
     }
 
 }
@@ -65,8 +77,10 @@ function ensureAuthReady(): void {
  * Useful for guard checks where we need to know if auth backend is available
  * (e.g. GitHub Pages deployments without env vars).
  */
-export function isAuthConfigured(): boolean {
-    return isServiceReady('auth');
+export function isAuthConfigured():  boolean {
+    // Accept either service registry saying "ready" OR the provider actually existing
+    // This handles cases where the registry might not be fully populated yet
+    return isServiceReady('auth') || rawGetAuthProviderSync() !== null;
 }
 
 /**

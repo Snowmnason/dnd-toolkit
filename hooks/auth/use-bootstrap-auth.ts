@@ -10,7 +10,7 @@ import { StorageManager } from "@/lib/storage";
 import { STORAGE_KEYS } from "@/maps";
 import { useEffect, useState } from "react";
 
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const FRESH_THRESHOLD_MS = 4 * 24 * 60 * 60 * 1000; // 4 days (1-day buffer before Supabase 5-day expiration)
 
 export interface BootstrapAuthState {
   checked: boolean;
@@ -43,8 +43,8 @@ export function useBootstrapAuth(ready: boolean): BootstrapAuthState {
         }
 
         const lastLoggedInMs = parseInt(lastLoggedInStr, 10);
-        const isWithinSevenDays = Date.now() - lastLoggedInMs < SEVEN_DAYS_MS;
-        setHasAccount(isWithinSevenDays);
+        const isWithinFreshThreshold = Date.now() - lastLoggedInMs < FRESH_THRESHOLD_MS;
+        setHasAccount(isWithinFreshThreshold);
         setChecked(true);
       } catch {
         setHasAccount(false);

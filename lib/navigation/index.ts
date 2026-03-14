@@ -20,3 +20,17 @@ export {
     WEB_ROUTES
 } from "./routes";
 
+/**
+ * Account Navigation Module
+ *
+ * Centralizes all navigation decisions for authentication flows.
+ * - Enter flows: sign-in, sign-up, re-auth
+ * - Exit flows: sign-out, delete account
+ */
+
+export { determineEnterErrorRedirect, determineEnterRedirect } from './account/enter-navigation';
+export type { EntryFlowType, NavigationDecision, NavigationUser } from './account/enter-navigation';
+
+export { determineExitErrorRedirect, determineExitRedirect } from './account/exit-navigation';
+export type { ExitFlowType } from './account/exit-navigation';
+

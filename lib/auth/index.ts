@@ -17,32 +17,66 @@ export {
     type ResendResult,
     type ResetPasswordResult,
     type Session,
-    type SignInResult,
     type SignUpResult
 } from "./auth-operations";
 // Auth manager — single public API for all auth operations
 export {
-    checkPendingInvites,
+    checkPendingInvites, confirmSignOut, deleteAccountUser,
+    ensureAuthProviderReady,
+    ensureUserLoggedIn,
     generateWorldInviteLink,
     getCurrentSession,
-    getUser,
-    isAuthSessionReady,
+    getUser, initiateSignOut, isAuthSessionReady,
     listenToAuthStateChanges,
     resendConfirmationEmail,
     restoreSession,
     sendPasswordReset,
     signInUser,
     signInWithIdToken,
-    signInWithOAuth,
-    signOutUser,
-    signUpUser,
+    signInWithOAuth, signUpUser,
     updatePassword,
-    verifyCredentials
+    updatePasswordLoggedIn,
+    updateUsernameUser,
+    verifyCredentials,
+    verifyDeletion,
+    verifyIdentityForCredentialUpdate
 } from "./auth-manager";
 
-export { deleteUserAccount, type DeleteAccountResult } from "./account/deleteAccount";
-export { updateUsername, type UpdateUsernameResult } from "./account/updateUsername";
-export { AuthLayer, type AuthContext, type AuthStrategy } from "./auth-layer";
+export {
+    performDeletePhase2_DeleteAndSignOut,
+    type DeleteAccountError,
+    type DeleteAccountSource,
+    type DeletePhase1Result,
+    type DeletePhase2Result
+} from "./account/delete-account-system";
+export {
+    performCheckPendingInvites,
+    performGenerateInviteLink
+} from "./account/invite-system";
+export {
+    performReAuth,
+    performSignIn,
+    performSignInWithIdToken,
+    type AuthTokens,
+    type ReAuthContext,
+    type ReAuthError,
+    type ReAuthResult,
+    type SignInError
+} from "./account/sign-in-system";
+export {
+    performSignOutPhase1_DBSync,
+    performSignOutPhase2_ClearAndSignOut,
+    type SignOutError,
+    type SignOutPhase1Result,
+    type SignOutPhase2Result,
+    type SignOutSource
+} from "./account/sign-out-system";
+export { type SignUpError } from "./account/sign-up-system";
+export {
+    type Phase1VerifyResult, type Phase2UpdatePasswordResult, type Phase2UpdateUsernameResult, type UpdateCredsError, type UpdateCredsSource,
+    type UpdateCredsType
+} from "./account/update-creds-system";
+export { AuthLayer, type AuthStrategy } from "./auth-layer";
 export {
     createInviteAuthStrategy,
     createPublicAuthStrategy,
@@ -54,4 +88,10 @@ export {
     prepareAuthNavigation,
     type SessionCheckResult
 } from "./guards/sessionService";
+export {
+    AuthSubscriptionManager,
+    beginSignOut,
+    endSignOut,
+    isSigningOut,
+} from "./auth-subscription-manager";
 

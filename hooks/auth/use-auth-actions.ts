@@ -1,33 +1,26 @@
 /**
  * useAuthActions
  *
- * Wraps imperative auth operations (sign out, delete account, password reset,
- * resend confirmation) so screens never need to import from @/lib/auth directly.
+ * Wraps imperative auth operations (password reset, resend confirmation, etc.)
+ * so screens never need to import from @/lib/auth directly.
+ *
+ * Sign-out and delete-account have moved to useSignOutFlow, which manages
+ * the full phase-based flow including modal state.
  */
 
 import {
-    deleteUserAccount,
-    isEmailConfirmed,
-    resendConfirmationEmail,
-    sendPasswordReset,
-    signOutUser,
-    updateUsername,
-    type DeleteAccountResult,
-    type ResendResult,
-    type ResetPasswordResult,
-    type Session,
-    type UpdateUsernameResult,
+  isEmailConfirmed,
+  resendConfirmationEmail,
+  sendPasswordReset,
+  updateUsernameUser,
+  type Phase2UpdateUsernameResult,
+  type ResendResult,
+  type ResetPasswordResult,
+  type Session,
 } from "@/lib/auth";
 import { useCallback } from "react";
 
 export function useAuthActions() {
-  const signOut = useCallback(() => signOutUser(), []);
-
-  const deleteAccount = useCallback(
-    (password: string): Promise<DeleteAccountResult> => deleteUserAccount(password),
-    [],
-  );
-
   const resetPassword = useCallback(
     (email: string): Promise<ResetPasswordResult> => sendPasswordReset(email),
     [],
@@ -44,13 +37,11 @@ export function useAuthActions() {
   );
 
   const changeUsername = useCallback(
-    (newUsername: string): Promise<UpdateUsernameResult> => updateUsername(newUsername),
+    (newUsername: string): Promise<Phase2UpdateUsernameResult> => updateUsernameUser(newUsername),
     [],
   );
 
   return {
-    signOut,
-    deleteAccount,
     resetPassword,
     resendConfirmation,
     checkEmailConfirmed,

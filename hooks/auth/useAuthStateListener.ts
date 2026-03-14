@@ -3,7 +3,6 @@ import {
     listenToAuthStateChanges,
     mapAuthErrorToCode,
     resendConfirmationEmail,
-    signOutUser
 } from "@/lib/auth";
 
 import type { Session } from "@/lib/auth";
@@ -26,10 +25,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
  *   - session: null = logged out, Session = logged in, undefined = not yet resolved
  *   - isLoading: true until the first auth state update is received
  *   - errorCode: Last error normalized to AuthErrorCode, or null on success
- *   - signOut(): Promise - Sign out current user
  *   - getCurrentSession(): Promise<Session | null> - Read current session immediately
  *   - resendConfirmation(email): Promise - Resend confirmation email
  *   - fetchSessionOnce(): Promise<Session | null> - One-shot session read
+ *
+ * Note: Sign-out has moved to useSignOutFlow, which manages the full phase-based
+ * flow including sync, modal confirmation, and navigation.
  *
  * @example
  * // Observe session and handle sign-out:
@@ -65,25 +66,6 @@ export function useAuthStateListener(
 
   // Debounce timer for rapid auth events (prevents UI flicker)
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Convenience action: Sign out current user (comprehensive - clears cache & storage)
-  const signOut = useCallback(async () => {
-    try {
-      await signOutUser();
-      setErrorCode(null);
-      return { success: true, message: "Signed out successfully." };
-    } catch (error) {
-      const code = mapAuthErrorToCode(error);
-      setErrorCode(code);
-      return {
-        success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to sign out. Please try again.",
-      };
-    }
-  }, []);
 
   // Convenience action: Get current session immediately
   const getCurrentSessionNow = useCallback(async () => {
@@ -135,7 +117,6 @@ export function useAuthStateListener(
     isLoading: session === undefined, // undefined = first update not yet received
     errorCode,
     // Convenience actions wired to auth-operations layer
-    signOut,
     getCurrentSession: getCurrentSessionNow,
     resendConfirmation,
     fetchSessionOnce,

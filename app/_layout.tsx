@@ -1,50 +1,51 @@
 import {
-  AppErrorBoundary,
-  LoadingOverlay,
-  TopBar
+    AppErrorBoundary,
+    LoadingOverlay,
+    TopBar
 } from "@/components";
-import { EntitlementExpiredModal } from "@/components/modals";
 import { OfflineSyncNotificationLayer } from "@/components/offline";
 import {
-  CrashFallBack,
-  RouteErrorBoundary,
-  SafeModeErrorBoundary,
-  SafeModeScreen,
-  SplashScreen,
+    CrashFallBack,
+    RouteErrorBoundary,
+    SafeModeErrorBoundary,
+    SafeModeScreen,
+    SplashScreen,
 } from "@/components/SplashScreen";
 import { AppToastLayer, NotificationContainer } from "@/components/ui";
-import { AppToastProvider, NotificationProvider } from "@/contexts";
-import { useEntitlementExpiredModal, } from "@/hooks/entitlements";
+import { AppToastProvider, ModalProvider, NotificationProvider } from "@/contexts";
+// Trigger modal registration side effects — must run before any openModal() call.
+// Imported here (leaf module) instead of modal-context.tsx to avoid circular dependency.
+import "@/components/modals/register-all-modals";
+import { Analytics, sessionManager } from "@/hooks/analytics";
+import { SafeModeReason, executeRecoveryAction } from "@/hooks/error";
 import { useClearSafeMode } from "@/hooks/error/use-safe-mode";
 import { AppKernelProvider, useAppKernel } from "@/hooks/kernel";
 import { useAnalyticsNavigation, useNavigate, useRouteConfig } from "@/hooks/navigation";
-import { useSplashScreen } from "@/hooks/ui";
-import { Analytics, sessionManager } from "@/hooks/analytics";
 import {
-  type AccessRole,
+    type AccessRole,
 } from "@/hooks/storage";
+import { useSplashScreen } from "@/hooks/ui";
 import { logger } from "@/hooks/utils";
-import { SafeModeReason, executeRecoveryAction } from "@/hooks/error";
 import {
-  AppParamsStableProvider,
-  AppParamsVolatileProvider,
-  PlatformProvider,
-  ScaleProvider,
-  SubscriptionProvider,
-  ThemeProvider,
-  UseTheme,
-  useAppParamsStable,
-  useAppParamsVolatile,
-  usePlatform,
-  useUserId,
-  useUserRole,
-  useWorldId,
+    AppParamsStableProvider,
+    AppParamsVolatileProvider,
+    PlatformProvider,
+    ScaleProvider,
+    SubscriptionProvider,
+    ThemeProvider,
+    UseTheme,
+    useAppParamsStable,
+    useAppParamsVolatile,
+    usePlatform,
+    useUserId,
+    useUserRole,
+    useWorldId,
 } from "@/providers";
 import {
-  Stack,
-  useLocalSearchParams,
-  useRouter,
-  useSegments,
+    Stack,
+    useLocalSearchParams,
+    useRouter,
+    useSegments,
 } from "expo-router";
 import { useEffect } from "react";
 import { View } from "react-native";
@@ -94,7 +95,6 @@ function RootLayoutContent() {
   const kernel = useAppKernel();
   const clearKernelSafeMode = useClearSafeMode();
   const splash = useSplashScreen();
-  const entitlementModal = useEntitlementExpiredModal();
 
   // FUTURE: Offline conflict resolution (disabled for v1 - LWW only)
   // v1 uses automatic Last-Write-Wins for all conflicts
@@ -213,7 +213,6 @@ function RootLayoutContent() {
     return (
       <LoadingOverlay
         message="Loading D&D Toolkit..."
-        error={kernel.error}
         assetsLoaded={kernel.phases.preloadReady}
       />
     );
@@ -379,13 +378,6 @@ function RootLayoutContent() {
         {/* Offline sync status and notifications */}
         <OfflineSyncNotificationLayer />
 
-        {/* Entitlement Expired Modal - placeholder for reminder/renewal flows */}
-        <EntitlementExpiredModal
-          visible={entitlementModal.isVisible}
-          entitlementName={entitlementModal.entitlementName}
-          onClose={entitlementModal.hide}
-        />
-
         {/* FUTURE: Conflict resolution modal (disabled for v1 - LWW only) */}
         {/* v1 uses automatic Last-Write-Wins for all conflicts */}
       </View>
@@ -403,17 +395,19 @@ export default function RootLayout() {
             <SubscriptionProvider>
               <AppParamsStableProvider>
                 <AppParamsVolatileProvider>
-                  <NotificationProvider>
-                    <AppToastProvider>
-                      <AppErrorBoundary
-                        renderFallback={(error: Error | null, onRetry: () => void) => (
-                          <CrashFallBack error={error} onRetry={onRetry} />
-                        )}
-                      >
-                        <RootLayoutContent />
-                      </AppErrorBoundary>
-                    </AppToastProvider>
-                  </NotificationProvider>
+                  <ModalProvider>
+                    <NotificationProvider>
+                      <AppToastProvider>
+                        <AppErrorBoundary
+                          renderFallback={(error: Error | null, onRetry: () => void) => (
+                            <CrashFallBack error={error} onRetry={onRetry} />
+                          )}
+                        >
+                          <RootLayoutContent />
+                        </AppErrorBoundary>
+                      </AppToastProvider>
+                    </NotificationProvider>
+                  </ModalProvider>
                 </AppParamsVolatileProvider>
               </AppParamsStableProvider>
             </SubscriptionProvider>

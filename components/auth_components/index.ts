@@ -13,8 +13,6 @@ export * from './AuthView';
 // Social auth buttons
 export { default as AppleSignInButton } from './social-auth-buttons/apple/apple-sign-in-button';
 export { default as GoogleSignInButton } from './social-auth-buttons/google/google-sign-in-button';
-export { default as SignOutButton } from './social-auth-buttons/sign-out-button';
-export { default as SignOutButtons } from './social-auth-buttons/sign-out-buttons';
 
 // Form wrappers
 export * from './forms/FormAuthInput';

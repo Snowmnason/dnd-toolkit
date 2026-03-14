@@ -1,6 +1,6 @@
 import { AppModal, Button } from '@/components/ui'
+import { registerModal } from '@/contexts'
 import { useScale } from '@/theme'
-import React from 'react'
 import { View } from 'react-native'
 
 interface ConfirmLeaveModalProps {
@@ -53,3 +53,6 @@ export function ConfirmLeaveModal({
     </AppModal>
   )
 }
+
+// Register modal for centralized management
+registerModal('confirm-leave', ConfirmLeaveModal)

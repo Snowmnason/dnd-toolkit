@@ -32,8 +32,8 @@
  * ```
  */
 
-import type { QueuedMutation } from "../../type-definitions/mutation-queue-types";
 import { logger } from '@/lib/utils';
+import type { QueuedMutation } from "../../type-definitions/mutation-queue-types";
 
 /**
  * Result of executing a sync handler
@@ -120,9 +120,13 @@ export async function executeSyncHandler(
   const handler = getSyncHandler(mutation.table);
 
   if (!handler) {
+    logger.category('offline').error(
+      `No sync handler registered for table '${mutation.table}'. ` +
+      `Mutation ${mutation.id} will be retried. Register a handler via registerSyncHandler().`
+    );
     return {
       success: false,
-      error: `No sync handler registered for table: ${mutation.table}`,
+      error: `No sync handler registered for table: ${mutation.table}. Register one via registerSyncHandler().`,
     };
   }
 
@@ -150,4 +154,30 @@ export function clearAllHandlers(): void {
  */
 export function getRegisteredTables(): string[] {
   return Array.from(handlerRegistry.keys());
+}
+
+/**
+ * Check if a handler is registered for a given table.
+ * Used for startup validation to warn about missing handlers.
+ */
+export function hasHandler(table: string): boolean {
+  return handlerRegistry.has(table);
+}
+
+/**
+ * Validate that queued mutations have matching handlers.
+ * Call during app initialization to catch missing registrations early.
+ *
+ * @param queuedTables - Set of table names from queued mutations
+ * @returns Array of table names missing handlers (empty = all good)
+ */
+export function validateHandlersForQueue(queuedTables: string[]): string[] {
+  const missing = queuedTables.filter(table => !handlerRegistry.has(table));
+  if (missing.length > 0) {
+    logger.category('offline').warn(
+      `Queued mutations exist for tables without sync handlers: [${missing.join(', ')}]. ` +
+      `These mutations will fail until handlers are registered via registerSyncHandler().`
+    );
+  }
+  return missing;
 }

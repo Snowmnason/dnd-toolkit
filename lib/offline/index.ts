@@ -29,7 +29,9 @@ export {
     executeSyncHandler,
     getRegisteredTables,
     getSyncHandler,
+    hasHandler,
     registerSyncHandler,
+    validateHandlersForQueue,
     type SyncHandler,
     type SyncHandlerResult
 } from "./sync-handlers";

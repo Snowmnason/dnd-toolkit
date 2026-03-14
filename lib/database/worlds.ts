@@ -190,10 +190,12 @@ export const worldsDB = {
   async removeUserFromWorld(worldId: string, userId: string): Promise<void> {
     await getWorldAccessRepository().removeUser(worldId, userId);
 
-    // Invalidate world members and user's worlds cache
+    // Invalidate world members, user's data, and world lists cache
+    // Must mirror addUserToWorld invalidation to prevent stale role/permission data
     await QueryCache.invalidateByTags([
       CACHE_TAGS.worldMembers(worldId),
       CACHE_TAGS.user(userId),
+      CACHE_TAGS.worlds,
     ]);
   },
 

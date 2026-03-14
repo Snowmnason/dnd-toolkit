@@ -4,23 +4,28 @@ Purpose: Make high-quality, end-to-end edits quickly by following the repo’s r
 
 ## Architecture Overview
 
-Clean 6-layer architecture separating concerns and dependencies:
+Clean 5-layer architecture with strong boundary enforcement:
 
 ```
-system/[Category]/          System adapters (app-agnostic, reusable: auth, storage, network, jobs, API, Kernel)
+app/ + Screens/             Presentation only (imports hooks + components only, NEVER lib/system)
     ↓
-lib/middleware/services/    Middleware layer (preconditions, consent, network, provider readiness checks)
+hooks/                      React bridge layer (wraps lib/ for React, handles loading/errors for display)
     ↓
-lib/[domain]-manager.ts     Domain managers (lazily load middleware, provide clean API to hooks)
+lib/                        Orchestration + domain logic (managers, operations, repos)
     ↓
-lib/[domain]/               Business logic & operations (auth-operations, repositories, exporters, etc.)
+system/                     Foundation layer (portable, reusable infrastructure: API, Storage, Network, Jobs, Kernel)
     ↓
-hooks/                      UI export layer (format data for UI, call managers, handle loading/errors for display)
-    ↓
-screens/                    Presentation only (NEVER call lib directly, only hooks)
+External packages           Third-party dependencies (React, Expo, Supabase, etc.)
 ```
 
-**Key Rule:** Screens → Hooks only. Hooks → Managers only. Managers → Middleware only. Middleware → System only.
+**Golden Rule:** Components can ONLY import from hooks and components. Never directly from lib/ or system/.
+
+**Dependency Flow:**
+- Screens/apps → hooks only
+- Hooks → lib/ + providers + contexts
+- lib/ → system/ + validation/ + type-definitions/ + maps/ + config/ + pure-algo-immutables/
+- system/ → external packages only (no lib/ or hooks/)
+- validation/, type-definitions/, maps/, pure-algo-immutables/ are importable everywhere
 
 ## Big picture
 
@@ -33,148 +38,188 @@ screens/                    Presentation only (NEVER call lib directly, only hoo
 
 ## Data Organization
 
-Root-level directories organize cross-cutting concerns that multiple lib modules depend on:
+Root-level directories organize cross-cutting concerns and foundation layer:
 
+**Foundation Layer (Portable Infrastructure):**
+- **`/system`** — Foundation infrastructure (API/, Storage/, Network/, Jobs/, Kernel/, Services/). App-agnostic, ideally portable to other projects. Contains no orchestration or domain logic.
+
+**Reusable Utilities & Types (Importable Everywhere):**
 - **`/maps`** — Static mappings and reference data (error code lookups, cache key registries, storage key constants, HTTP status mappers, event-to-consent mappings). Used by lib modules for data transformation & classification.
 - **`/type-definitions`** — Shared type definitions for global systems (job queue types, mutation types, breadcrumb types, data classification enums). Avoids circular dependencies by centralizing types.
-- **`/config`** — App configuration (appsettings.dev.json, appsettings.json). Read by kernel/managers during bootstrap. Environment-specific feature flags, logger categories, and runtime options.
-- **`/validation`** — Schema validators and helper functions (auth schemas, world schemas, email validators). Used by lib modules to validate data before operations.
-- **`/pure-algo-immutables`** — Pure algorithms and rarely-changing implementations (redaction-manager, rollout logic, app-error types). Isolated to keep `lib/[module]` clean and focused on domain logic.
+- **`/validation`** — Independent schemas and validators (auth schemas, world schemas, email validators). No orchestration logic; pure data validation.
+- **`/pure-algo-immutables`** — Pure algorithms and rarely-changing implementations (redaction-manager, rollout logic, app-error types, backoff). Isolated to keep `lib/[module]` clean.
+
+**Configuration:**
+- **`/config`** — App configuration (appsettings.dev.json, appsettings.json, storage-backends-config.ts, etc.). Read by kernel/managers during bootstrap. Environment-specific feature flags, logger categories, runtime options.
 
 ## Managers & Middleware Pattern
 
-**Every major lib module has this 3-layer structure:**
+**Every major lib module has this 4-layer structure:**
 
 ```
-lib modules (business logic, no validation)
+hooks/
     ↓
-lib/[domain]-manager.ts (ORCHESTRATION HUB: validation + hooks + coordination)
+lib/[domain]-manager.ts (ORCHESTRATION HUB: validation + hooks + coordination + system delegation)
     ↓
-lib/middleware/api/request-service.ts (SERVICE CHECKS: network readiness, normalization)
+lib/[domain]/[operation]-system.ts (DOMAIN SYSTEMS: business logic + owns middleware calls)
     ↓
-system/API/RequestManager (PURE TRANSPORT: executes validated, normalized requests)
+lib/middleware/services/*.ts (MIDDLEWARE: network checks, normalization, provider calls)
+    ↓
+system/* (PURE TRANSPORT: storage, API, network, jobs — portable infrastructure)
 ```
 
 ### Layer Responsibilities
 
-**1. lib modules (business logic only)**
-- Pure business logic — no validation, no HTTP handling
-- Call the manager with raw data
-- Example: `lib/auth/auth-operations.ts` (email/password handling), `lib/database/repositories/` (data queries)
+**1. hooks/ (React integration)**
+- React lifecycle bridge
+- Call manager functions
+- Handle loading/error states for UI display
+- Example: `hooks/auth/useSignOut.ts` calls `AuthManager.signOut()`
 
 **2. lib/[domain]-manager.ts (Orchestration Hub)**
 - **Validation** — Check data format + security (password strength, email validity, detect malicious input)
 - **Pre-operation hooks** — Call registered listeners before operation
-- **Call middleware** — Pass validated data to `lib/middleware/api/request-service.ts`
-- **Receive results** — Get clean response from system
+- **Delegation** — Pass control to domain-specific system (NOT direct middleware calls)
 - **Post-operation hooks** — Feed results to listeners  
 - **Distribute results** — Send data to proper lib files/consumers
-- **Return to caller** — Final result back to hooks/screens
+- **Return to caller** — Final result back to hooks
 
-Example: `lib/auth/auth-manager.ts`
+**3. lib/[domain]/[operation]-system.ts (Domain Systems)**
+- **Business logic** — Domain-specific orchestration (e.g., which phases to run, what cleanup to do)
+- **Own middleware calls** — This system calls its required middleware functions directly
+- **Hook registry** — Manages hooks for its operation (e.g., SignOutHook for sign-out-system)
+- **Error handling** — Collects errors per-phase and continues (non-fatal errors)
+- **Return structured result** — Returns typed result with success/errors/metadata
+
+Example: `lib/auth/account/sign-out-system.ts`
 ```typescript
-export const signInUser = async (email: string, password: string) => {
-  // Validation (format + security)
-  const prep = await prepareSignIn(email); // Validates & checks rate limits
-  if (!prep.ready) return prep.result;
+import { authSignOut } from '@/lib/middleware/services';
+import { AuthStateManager } from '@/lib/auth/auth-state';
+import { QueryCache } from '@/system/storage/cache';
 
-  // Pre-operation hooks
-  await AuthStateManager.beforeLogin?.();
+export async function performSignOut(source: SignOutSource): Promise<SignOutResult> {
+  const result = { success: true, clearedKeys: [], errors: [], durationMs: 0 };
 
+  // Phase 1: before-auth (e.g., drain offline queue)
+  await executePhase('before-auth', result);
+
+  // Phase 2: auth (THIS SYSTEM CALLS MIDDLEWARE)
   try {
-    // Call middleware → system (via authSignIn from middleware)
-    const result = await authSignIn(prep.sanitizedEmail, password);
-    
-    // Post-operation hooks
-    await AuthStateManager.onLoginSuccess(result);
-    
-    // Distribute results to lib files
-    const session = await authGetSession();
-    await AuthStateManager.setSession(session);
-    
-    // Return
-    return { success: true, ...result };
+    await authSignOut();  // ← System owns this call
+    await AuthStateManager.clearAuthState();  // ← System owns this call
+    await QueryCache.clearAll();  // ← System owns this call
   } catch (error) {
-    // Post-operation hook (error)
-    await AuthStateManager.onLoginError(error);
-    return mapSignInError(error);
+    result.success = false;
+    result.errors.push({ phase: 'auth', error });
   }
-};
+
+  // Phase 3: after-auth (UI cleanup, notifications)
+  await executePhase('after-auth', result);
+
+  return result;
+}
 ```
 
-**3. lib/middleware/api/request-service.ts (Service Checks)**
+**4. lib/middleware/services/*.ts (Middleware)**
 - **Network readiness** — Check if system is ready (network online, provider initialized)
 - **Data normalization** — Transform validated data to system format
 - **Logging/tracing** — Record request details
-- **Call system** — Delegate to `system/API/RequestManager`
+- **Call system** — Delegate to `system/` layer
 - **Error handling** — Catch system errors and provide meaningful feedback
 
-**4. system/API/RequestManager (Pure Transport)**
-- No validation (manager handled it)
+**5. system/* (Pure Transport)**
+- No validation (manager + system handled it)
 - No normalization (middleware handled it)
-- Pure HTTP transport — retries, caching, deduplication, rate limiting, circuit breaker
+- Pure HTTP/storage transport — retries, caching, deduplication, rate limiting, circuit breaker
 - Expects clean, validated, normalized data
 
 ### Data Flow Example
 
 ```typescript
-// 1. lib module calls manager with raw data
-const result = await AuthManager.signInUser("user@example.com", "password123");
+// 1. Hook calls manager with validated input
+const result = await AuthManager.signOut('user-initiated');
 
-// 2. Manager validates
-//    - Email format valid? Password non-empty?
-//    - Rate limiting check (not too many attempts)?
-//    - Malicious input detection?
+// 2. Manager validates source parameter
+//    - Is source one of: 'user-initiated' | 'auth-state-change'?
 
 // 3. Manager calls pre-operation hooks
-//    - onBeforeSignIn listeners
+//    await AuthStateManager.beforeSignOut?.();
 
-// 4. Manager calls middleware with validated data
-//    const response = await executeRequest(key, fetcher, options);
-//    - Middleware checks: network online? Provider ready?
-//    - Middleware normalizes: email → sanitized email, password → hashed
-//    - Middleware logs request
+// 4. Manager delegates to system (NOT calling middleware directly)
+//    const { performSignOut } = await import('./account/sign-out-system');
+//    const result = await performSignOut(source);
+//    ↓↓↓ System now controls the flow ↓↓↓
 
-// 5. Middleware calls system (RequestManager)
-//    - RequestManager.fetch() executes HTTP call
-//    - Handles retries, caching, dedup, rate limiting
+// 5. System executes phases:
+//    Phase 1 (before-auth): Run offline-queue drain, stop background jobs
+//    Phase 2 (auth): THIS SYSTEM CALLS MIDDLEWARE
+//      - authSignOut() — sign out from auth provider
+//      - AuthStateManager.clearAuthState() — clear local auth state
+//      - QueryCache.clearAll() — clear cached queries
+//    Phase 3 (after-auth): Reset UI state, notify listeners
 
-// 6. Manager receives results, calls post-operation hooks
-//    - onSignInSuccess listeners
-//    - Save session to AuthStateManager
-//    - Update connected worlds
+// 6. System returns structured result
+//    { success: true, clearedKeys: [...], errors: [], durationMs: 182 }
 
-// 7. Manager distributes results to lib files
-//    - usersDB.getCurrentUser()
-//    - AuthStateManager.setSession()
+// 7. Manager receives result and calls post-operation hooks
+//    await AuthStateManager.afterSignOut?.(result);
 
-// 8. Manager returns final result to hook/screen
-//    return { success: true, user, session }
+// 8. Manager distributes results (if any to other lib modules)
+//    // (in this case, result goes straight back)
+
+// 9. Manager returns final result to hook
+//    return result;
+
+// 10. Hook handles UI display
+//     if (result.success) { navigate to login }
+//     else { show error toast }
 ```
 
 ### Why This Pattern?
 
-- **Separation of concerns** — Each layer has one job
-- **Testability** — Mock each layer independently
-- **Reusability** — Managers can be called from multiple hooks/screens
+- **Separation of concerns** — Each layer has one clear job
+- **Testability** — Mock system layer independently from manager
+- **Reusability** — Systems are self-contained and can be isolated/tested without manager
+- **Modularity** — Systems can potentially be used in other contexts (e.g., `sign-out-system` is not auth-manager-dependent)
 - **Maintainability** — A bug is isolated to its layer
-- **Hook lifecycle** — Pre/post operation hooks enable side-effects and tracking
-- **Security** — Validation + malicious input detection happens consistently
+- **Scalability** — Easy to add new systems (sign-in-system, delete-account-system) without touching manager's core logic
+- **Security** — Validation happens in manager, but systems own their middleware calls for transparency
 
 ### Manager Responsibilities Summary
 
-1. ✅ Validate data (format + security)
+1. ✅ Validate input data (format + security)
 2. ✅ Call pre-operation hooks
-3. ✅ Call middleware → system
+3. ✅ Delegate to domain-specific system (passing validated data)
 4. ✅ Call post-operation hooks
-5. ✅ Distribute results to lib files
-6. ✅ Return final result
+5. ✅ Distribute results (if needed to other lib modules)
+6. ✅ Return final result to caller
 
-Managers use lazy `require()` for middleware to break circular dependencies (synchronous at module level, not at call time).
+### System Responsibilities Summary
+
+1. ✅ Execute domain-specific business logic
+2. ✅ Call own middleware functions (this system owns those calls)
+3. ✅ Manage hook registry for this operation
+4. ✅ Handle errors gracefully (collect errors, continue)
+5. ✅ Return typed, structured result
+
+## Boundary Layer Enforcement
+
+**CRITICAL:** The component → hook boundary is strictly enforced to prevent architectural creep.
+
+- **Screens/components** import from: `hooks/`, `components/`, `@/providers`, `@/theme`, `@/config` (types only)
+- **hooks/** import from: `lib/`, `@/contexts`, `@/theme`, `@/config`, `@/type-definitions`
+- **lib/** imports from: `system/`, `@/validation`, `@/type-definitions`, `@/maps`, `@/config`, `@/pure-algo-immutables`
+- **system/** imports from: external packages only (no lib/ or hooks/)
+- **Components that violate this rule:**
+  - ✅ `ErrorBoundary.tsx` — Exception: class component, cannot use hooks; lib imports are necessary
+  - ✅ `VersionDisplay.tsx` — Exception: simple constant read, no logic
+
+**Run ESLint to detect violations:** `npm run lint` will flag any cross-layer imports.
 
 ## UI system
 
 - Components live in `components/ui` and are exported via `components/ui/index.ts` (barrel). Import only from this barrel.
+- Components NEVER import from `lib/` or `system/` — always use hooks as intermediaries.
 - Theming/sizing: use `UseTheme()` and `useScale()`. Resolve tokens with `$()` (CSS vars on web, concrete values on native). Tokens and themes live in `theme/` (`theme/tokens.ts`, families, `theme/ThemeProvider.tsx`).
 - Animations: `react-native-reanimated` (v4.x). Haptics via `expo-haptics` in interactive components.
 - Notifications: The queue/provider is currently disabled in runtime. Prefer `AppToast` or `Snackbar` for transient feedback. Avoid reintroducing full-screen overlays that intercept pointer events on web.
@@ -203,17 +248,17 @@ Managers use lazy `require()` for middleware to break circular dependencies (syn
 - **Analytics**: Call `lib/analytics/analytics-manager.ts` for event dispatch and tracking (respects consent via middleware).
 - **Error Tracking**: Call `lib/error/error-manager.ts` for reporting errors (respects consent via middleware).
 - **World Access Verification**: Use `verifyWorldAccessWithDatabase(worldId)` which implements cache-first verification (fresh <2h = instant, stale 2-4h = Supabase check). Use `forceVerification: true` option for sensitive pages (settings).
-- **Storage**: Use `SecureStorage` from `@/system/Storage` for all persistent app data. All data is encrypted via AES-CTR on all platforms (web, iOS, Android, desktop). Never use direct `localStorage`, `sessionStorage`, or `EncryptedStorage`—always go through `SecureStorage`. Use `STORAGE_KEYS` constants from `/maps/storage-keys.ts`, never hardcode keys.
-- **Query Cache**: Use `QueryCache` from `@/lib/cache` for in-memory caching of API responses. Follow hierarchical key naming (`domain:entity:action:identifier`). Use tags for invalidation. Cache keys are in `/maps/cache-keys.ts`.
+- **Storage**: Use `SecureStorage` from `@/system/storage/cache/` for all persistent app data. All data is encrypted via AES-CTR on all platforms (web, iOS, Android, desktop). Never use direct `localStorage`, `sessionStorage`, or `EncryptedStorage`—always go through `SecureStorage`. Use `STORAGE_KEYS` constants from `/maps/storage-keys.ts`, never hardcode keys.
+- **Query Cache**: Use `QueryCache` from `@/system/storage/cache/` for in-memory caching of API responses. Follow hierarchical key naming (`domain:entity:action:identifier`). Use tags for invalidation. Cache keys are in `/maps/cache-keys.ts`.
 - **Context Optimization**: Use granular selector hooks (`useWorldId()`, `useUserId()`, etc.) instead of consuming full contexts. This prevents unnecessary re-renders.
 
 ## Cache Versioning
 
-- **Version Updates**: Increment `CURRENT_CACHE_VERSION` in `lib/storage/cache-versioning.ts` when making breaking changes to stored data structures
+- **Version Updates**: Increment `CURRENT_CACHE_VERSION` in `@/system/storage/cache/cache-versioning.ts` when making breaking changes to stored data structures
 - **Breaking Changes Include**: Schema changes (add/remove/rename fields), stricter validation rules, type changes, new required fields without defaults
 - **Non-Breaking**: Optional fields with defaults, performance improvements, bug fixes, cosmetic changes
 - **Process**: Update schema validation → update migration function → increment version → test migration
-- **Location**: `lib/storage/cache-versioning.ts` (core logic), `docs/issues/MileStone 1/098 - Cache Versioning/CACHE_VERSIONING.md` (docs)
+- **Location**: `@/system/storage/cache/cache-versioning.ts` (core logic), `docs/issues/MileStone 1/098 - Cache Versioning/CACHE_VERSIONING.md` (docs)
 
 ## Logger System
 
@@ -352,21 +397,33 @@ We are nowhere near release. Building backwards compatibility now adds:
 
 ## Where to look
 
-- **Architecture**: System → Middleware → Manager → Module → Hook → Screen (see Architecture Overview above)
-- Layout/routing: `app/_layout.tsx`
+**Component/Hook/Screen Navigation:**
+- **Screens/components**: `Screens/`, `app/`, `components/` — Import from hooks only
+- **Hooks**: `hooks/` — Organized by domain (auth/, navigation/, storage/, etc.)
+- **Context providers**: `providers/` — Root-level React context
+
+**Domain Logic (lib/):**
 - **Managers** (domain wrappers): `lib/[domain]-manager.ts` (auth-manager, analytics-manager, error-manager, database-manager, etc.)
-- **Middleware/Services** (preconditions & gating): `lib/middleware/services/` (*-service.ts)
-- **System Layer** (app-agnostic): `system/Services/`, `system/API/`, `system/Kernel/`, `system/Network/`, `system/Storage/`, `system/Jobs/`
-- **Kernel/Bootstrap**: `lib/kernel/use-app-kernel.tsx` (AppKernelProvider + hooks). See **`lib/kernel/README.md`** for phases.
-- **Auth system**: `lib/auth/auth-manager.ts` (manager), `lib/auth/auth-state.ts` (AuthStateManager), `lib/auth/useAuthGuard.ts` (route guard hook)
+- **Auth system**: `lib/auth/auth-manager.ts` (manager), `lib/auth/auth-state.ts` (AuthStateManager)
 - **Database**: `lib/database/database-manager.ts` (manager), `lib/database/repositories/` (direct queries)
-- **Storage**: `system/Storage/` (encrypted storage), `/maps/storage-keys.ts` (storage key constants), `/maps/cache-keys.ts` (cache key registry)
+- **Kernel/Bootstrap**: `lib/kernel/app-kernel.ts` (bootstrap logic). See **`hooks/kernel/useAppKernel.ts`** for hook.
+- **Feature Flags**: `lib/feature-flags/` (core system), `/config/appsettings.*.json` (config)
+- **Navigation**: `lib/navigation/navigation-config.ts` (route config)
+
+**Foundation Layer (system/):**
+- **Storage**: `system/storage/cache/` (SecureStorage, FastCache, QueryCache), `system/storage/buckets/` (cloud)
+- **Network**: `system/network/` (detection, state machine, configuration)
+- **Error**: `system/error/` (error types, safe mode)
+- **API**: `system/API/` (request management, circuit breaker)
+- **Jobs**: `system/jobs/` (queue, backoff algorithms)
+- **Services**: `system/services/` (Supabase, Sentry adapters)
+- **Kernel**: `system/kernel/` (bootstrap utilities)
+
+**Root-Level Utilities (Importable Everywhere):**
+- **Data Organization**: `/maps/` (static references), `/type-definitions/` (shared types), `/validation/` (schemas), `/pure-algo-immutables/` (algorithms)
 - **Configuration**: `/config/appsettings.*.json` (feature flags, logger categories, runtime options)
-- **Data Organization**: `/maps/`, `/type-definitions/`, `/validation/`, `/pure-algo-immutables/` (see Data Organization above)
-- **Feature Flags**: `lib/feature-flags/` (core system), `/config/appsettings.*.json` (config), `supabase/migrations/003_feature_flags_schema.sql` (schema)
-- **Navigation**: `lib/navigation/navigation-config.ts` (route config), `lib/navigation/routes/` (area-specific configs)
-- UI barrel: `components/ui/index.ts`
-- Theme root: `theme/index.ts`
+- **UI barrel**: `components/ui/index.ts`
+- **Theme root**: `theme/index.ts`
 
 ## Documentation Rule
 

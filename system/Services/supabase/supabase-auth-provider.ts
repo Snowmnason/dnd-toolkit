@@ -13,15 +13,15 @@
 import { logger } from '@/lib/utils/logger';
 import { ERROR_CODES } from '@/maps/ERROR_CODES';
 import {
-  AuthError,
-  AuthProvider,
-  AuthResult,
-  EmailAlreadyExistsError,
-  InvalidCredentialsError,
-  NetworkError,
-  RateLimitError,
-  Session,
-  UserNotFoundError,
+    AuthError,
+    AuthProvider,
+    AuthResult,
+    EmailAlreadyExistsError,
+    InvalidCredentialsError,
+    NetworkError,
+    RateLimitError,
+    Session,
+    UserNotFoundError,
 } from '@/system/Services/auth-adapter';
 import { mapSupabaseAuthCode } from './supabase-error-translation';
 
@@ -493,6 +493,34 @@ export class SupabaseAuthProvider implements AuthProvider {
     } catch (err) {
       logger.category('auth').error('Supabase: exception during session restore:', err);
       return false;
+    }
+  }
+
+  /**
+   * Refresh the current session's tokens.
+   * Uses Supabase's built-in refresh token mechanism (JWT refresh).
+   * Returns updated session or null if refresh fails.
+   */
+  async refreshSession(): Promise<Session | null> {
+    try {
+      logger.category('auth').debug('Supabase: refreshSession attempt');
+
+      const { data, error } = await this.supabaseClient.auth.refreshSession();
+
+      if (error || !data.session) {
+        logger.category('auth').warn('Supabase refreshSession failed', {
+          error: error?.message || 'No session after refresh',
+        });
+        return null;
+      }
+
+      logger.category('auth').info('Supabase refreshSession success', {
+        userId: data.session.user?.id,
+      });
+      return this.sessionFromSupabaseSession(data.session);
+    } catch (err) {
+      logger.category('auth').error('Supabase refreshSession exception:', err);
+      return null;
     }
   }
 

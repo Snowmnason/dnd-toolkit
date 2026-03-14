@@ -23,6 +23,7 @@ export const STORAGE_KEYS = {
   USER_DATA_META: "dnd:auth:user_data_meta",
   USER_DATA_TIMESTAMP: "dnd:auth:user_data_timestamp",
   LAST_LOGGED_IN: "dnd:auth:last_logged_in", // Timestamp of last successful sign-in
+  PROFILE_COMPLETED: "dnd:auth:profile_completed", // false after signup, true after profile created, null/undefined for normal users
 
   // Auth attempt rate limiting
   AUTH_ATTEMPTS: "dnd:auth:attempts",

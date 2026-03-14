@@ -108,22 +108,23 @@ export function ErrorFallbackShell({
           align="center"
           style={{
             color: theme.accent,
-            marginBottom: S.space.md,
+            marginBottom: S.space.lg,
           }}
         >
           🎲 {funMessage}
         </Title>
 
-        {/* User-friendly recovery message */}
+        {/* User-friendly recovery message FIX USERFRIENDLY MESSAGE */}
         <Body
           align="center"
           style={{
             marginBottom: S.space.lg,
+            marginTop: S.space.md,
             lineHeight: 1.6,
             opacity: 0.9,
           }}
         >
-          {recoveryMessage}
+          Dont worry - your adventure is safe! Try recovering or contact support if this keeps happening.
         </Body>
 
         {/* Error details (shown only when requested and error exists) */}

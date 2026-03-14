@@ -8,13 +8,7 @@
  * For ongoing subscription, use useAuthStateListener instead.
  */
 
-import {
-    AuthStateManager,
-    getCurrentSession,
-    isEmailConfirmed,
-    restoreSession,
-    type Session,
-} from "@/lib/auth";
+import { getCurrentSession, isEmailConfirmed, type Session } from "@/lib/auth";
 import { useEffect, useRef, useState } from "react";
 
 export interface CurrentSessionState {
@@ -40,10 +34,4 @@ export function useCurrentSession(): CurrentSessionState {
 
   return { session, loading, isConfirmed: isEmailConfirmed(session) };
 }
-
-/**
- * Imperative helper — returns current session without React state.
- * Useful for non-hook contexts inside callbacks.
- */
-export { AuthStateManager, getCurrentSession, isEmailConfirmed, restoreSession };
 

@@ -13,7 +13,8 @@ import {
   FormAuthInput,
 } from "@/components/auth_components";
 import { Body } from "@/components/ui";
-import { getCurrentSession, useSignUpForm } from "@/hooks/auth";
+import { useSignUpFlow } from "@/hooks/auth";
+import { getCurrentSession } from "@/lib/auth";
 import { getCurrentUserProfile } from "@/hooks/storage";
 import { logger } from "@/hooks/utils";
 import { useScale } from "@/theme";
@@ -106,17 +107,7 @@ export default function CompleteProfileScreen() {
   }, [router]);
 
   // Use the unified form hook in complete-profile mode
-  const {
-    // Only need username-related data in this mode
-    username,
-    control,
-    loading,
-    authError,
-    isValid,
-
-    // Handlers
-    handleSignUp: handleCompleteProfile,
-  } = useSignUpForm("complete-profile", user);
+  const { state, form } = useSignUpFlow("complete-profile", user);
 
   // Show loading while checking authentication
   if (initializing || !user) {
@@ -160,7 +151,7 @@ export default function CompleteProfileScreen() {
         }}
       >
         <AuthBody.InCard style={{ marginBottom: S.space.xs }}>
-          Welcome, {username ? username : "Adventurer"}!
+          Welcome, {form.username ? form.username : "Adventurer"}!
         </AuthBody.InCard>
 
         <AuthBody.InCard>
@@ -169,33 +160,33 @@ export default function CompleteProfileScreen() {
       </View>
 
       {/* 🧾 Form */}
-      <AuthForm style={{ marginBottom: authError ? S.space.md : S.space.xxl }}>
+      <AuthForm style={{ marginBottom: state.error ? S.space.md : S.space.xxl }}>
         <FormAuthInput
-          control={control}
+          control={form.control}
           name="username"
           placeholder="Username"
           autoCapitalize="none"
-          editable={!loading}
+          editable={!state.loading}
           returnKeyType="go"
-          onSubmitEditing={handleCompleteProfile}
+          onSubmitEditing={form.handleSubmit}
         />
 
-        <AuthError error={authError} />
+        {state.error && <AuthError error={state.error} />}
       </AuthForm>
 
       {/* 🔘 Actions */}
       <AuthActionGroup>
         <AuthButton
           text="Complete Profile"
-          onPress={handleCompleteProfile}
-          disabled={!isValid}
-          loading={loading}
+          onPress={form.handleSubmit}
+          disabled={!form.isValid}
+          loading={state.loading}
         />
 
         <AuthButtonSecondary
           text="Sign Out"
           onPress={() => router.push("/login/sign-up")}
-          disabled={loading}
+          disabled={state.loading}
         />
       </AuthActionGroup>
 

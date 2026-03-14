@@ -3,9 +3,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { View } from "react-native";
 
-import { CreateWorldModals } from "@/components/modals";
 import { AppSplit, Button } from "@/components/ui";
-import { useAuthStatus } from "@/hooks/auth/use-auth-status";
+import { useCurrentSession } from "@/hooks/auth";
 import { useSuccessNavigation } from "@/hooks/navigation/use-success-navigation";
 import { useWorldCreation } from "@/hooks/utils/use-world-creation";
 import { usePlatform } from "@/providers";
@@ -58,28 +57,32 @@ export default function CreateWorldScreen() {
   const [imageImported, setImageImported] = useState(false);
   const [mapIndex, setMapIndex] = useState(0);
 
-  // Modal state
-  const [showSignInModal, setShowSignInModal] = useState(false);
-  const [showValidationModal, setShowValidationModal] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-
   // Hooks
-  const { isUserLoggedIn } = useAuthStatus();
-  const { isCreating, successWorldName, successWorldId, createWorld } =
-    useWorldCreation();
+  const { session } = useCurrentSession();
+  const {
+    isCreating,
+    successWorldId,
+    createWorld,
+    showSignInModal,
+    showValidationModal,
+    registerSuccessNavigate,
+  } = useWorldCreation();
   const { navigateToWorld } = useSuccessNavigation({
-    showSuccessModal,
+    showSuccessModal: false, // Modal is managed by hook now
     successWorldId,
   });
 
+  // Register the navigation callback for the success modal
+  registerSuccessNavigate(() => navigateToWorld());
+
   // Logic
   const onSubmit = async (data: WorldFormData) => {
-    if (!isUserLoggedIn) {
-      setShowSignInModal(true);
+    if (!session) {
+      showSignInModal();
       return;
     }
 
-    const result = await createWorld({
+    await createWorld({
       name: data.name,
       description: data.description || "",
       system: data.system,
@@ -88,12 +91,6 @@ export default function CreateWorldScreen() {
         // eslint-disable-next-line security/detect-object-injection
         defaultMapImages.length > 0 ? defaultMapImages[mapIndex] : undefined,
     });
-
-    if (result.success) setShowSuccessModal(true);
-  };
-
-  const handleSuccessNavigate = () => {
-    navigateToWorld();
   };
 
   // Left Panel Component
@@ -104,7 +101,7 @@ export default function CreateWorldScreen() {
       isCreating={isCreating}
       isFormValid={isValid}
       handleCreateWorld={handleSubmit(onSubmit, () =>
-        setShowValidationModal(true),
+        showValidationModal(),
       )}
     />
   );
@@ -139,19 +136,5 @@ export default function CreateWorldScreen() {
     </View>
   ) : null;
 
-  return (
-    <AppSplit left={LeftPanel} right={RightPanel}>
-      {/* Modals */}
-      <CreateWorldModals
-        showSignInModal={showSignInModal}
-        setShowSignInModal={setShowSignInModal}
-        showValidationModal={showValidationModal}
-        setShowValidationModal={setShowValidationModal}
-        showSuccessModal={showSuccessModal}
-        setShowSuccessModal={setShowSuccessModal}
-        successWorldName={successWorldName}
-        onSuccessNavigate={handleSuccessNavigate}
-      />
-    </AppSplit>
-  );
+  return <AppSplit left={LeftPanel} right={RightPanel} />;
 }

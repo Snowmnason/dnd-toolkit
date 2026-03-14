@@ -5,8 +5,7 @@ import {
   AuthButtonSecondary, AuthCaption, AuthError, AuthForm, AuthRoot, AuthSubTitle, AuthTitle,
   FormAuthInput
 } from '@/components/auth_components';
-import { AppToast } from '@/components/ui';
-import { AuthStateManager, getCurrentSession, useAuthActions, useSignInForm } from "@/hooks/auth";
+import { useAuthActions, useAuthFlow, useBootstrapAuth, useCurrentSession } from "@/hooks/auth";
 import { useNavigate } from "@/hooks/navigation";
 import { logger } from "@/hooks/utils";
 import { useScale } from '@/theme';
@@ -20,70 +19,29 @@ export default function SignInScreen() {
   const { replace, push } = useNavigate();
   const { resendConfirmation } = useAuthActions();
   const [isResendingEmail, setIsResendingEmail] = useState(false);
-  const [showValidationToast, setShowValidationToast] = useState(false);
-  
+
   // Refs for keyboard navigation
   const passwordInputRef = useRef<TextInput>(null);
-  
-  const {
-    // Form
-    control,
-    isValid,
-    email,
-    
-    // State
-    loading,
-    authError,
-    validationWarning,
-    showPassword,
-    
-    // Handlers
-    handleSignIn,
-    setShowPassword,
-  } = useSignInForm();
 
-  // Heavy-duty auth check: verify with Supabase and ensure all data exists
-  // Use a callback instead of useEffect to avoid running on every render
-  const verifyAuthStatus = async () => {
-    try {
-      logger.category('auth').debug('Sign-in screen: Performing heavy-duty auth verification');
-      
-      // Check 1: Local storage has account flag
-      const authState = await AuthStateManager.getAuthState();
-      if (!authState.hasAccount) {
-        logger.category('auth').debug('Sign-in screen: No account flag in storage, showing login form');
-        return;
-      }
-      
-      // Check 2: Verify session is still valid using convenience function
-      const session = await getCurrentSession();
-      if (!session) {
-        logger.category('auth').warn('Sign-in screen: Session invalid or expired');
-        return;
-      }
-      
-      // Check 3: Verify user data exists in storage
-      const userData = await AuthStateManager.getUserData();
-      if (!userData || !userData.id) {
-        logger.category('auth').warn('Sign-in screen: User data missing from storage');
-        return;
-      }
-      
-      // All checks passed - user is authenticated
-      logger.category('auth').info('Sign-in screen: All checks passed, redirecting to world selection');
+  const { state, form } = useAuthFlow();
+  const { session, loading: sessionLoading } = useCurrentSession();
+  const { hasAccount, checked } = useBootstrapAuth(!sessionLoading);
+
+  // Verify authentication status on mount using proper hook boundaries
+  useEffect(() => {
+    // Only run after bootstrap and session checks complete
+    if (!checked || sessionLoading) return;
+
+    logger.category('auth').debug('Sign-in screen: Verifying authentication status');
+
+    // If session exists, user is already authenticated
+    if (session) {
+      logger.category('auth').info('Sign-in screen: User authenticated, redirecting to world selection');
       router.replace('/select/world-selection');
-    } catch (error) {
-      logger.category('auth').error('Sign-in screen: Error during verification:', error);
-      // If verification fails, just show login form (no harm)
+    } else if (!hasAccount) {
+      logger.category('auth').debug('Sign-in screen: No account found, showing login form');
     }
-  };
-
-  // Run verification once on mount using a ref to prevent double-run in development
-  const verifyRef = useRef(false);
-  if (!verifyRef.current) {
-    verifyRef.current = true;
-    verifyAuthStatus();
-  }
+  }, [checked, sessionLoading, session, hasAccount, router]);
 
   const handleResendConfirmationFromError = async (email: string) => {
     setIsResendingEmail(true);
@@ -102,13 +60,6 @@ export default function SignInScreen() {
     }
   };
 
-  // Show toast when validation warning occurs
-  useEffect(() => {
-    if (validationWarning) {
-      setShowValidationToast(true);
-    }
-  }, [validationWarning]);
-
   return (
     <AuthRoot>
       {/* 🧭 Back Button*/}
@@ -116,7 +67,7 @@ export default function SignInScreen() {
         <AuthButtonBack
           text="← Back"
           onPress={() => replace('/')}
-          disabled={loading}
+          disabled={state.loading}
         />
       </AuthBackButtonContainer>
 
@@ -128,40 +79,42 @@ export default function SignInScreen() {
       {/* 🧾 Form*/}
       <AuthForm>
         <FormAuthInput
-          control={control}
+          control={form.control}
           name="email"
           placeholder="Email"
           keyboardType="email-address"
           autoCapitalize="none"
-          editable={!loading}
+          editable={!state.loading}
           returnKeyType="next"
           onSubmitEditing={() => passwordInputRef.current?.focus()}
         />
 
         <FormAuthInput
-          control={control}
+          control={form.control}
           name="password"
           placeholder="Password"
           secureTextEntry={true}
           autoCapitalize="none"
-          editable={!loading}
+          editable={!state.loading}
           showPasswordToggle={true}
-          onTogglePassword={() => setShowPassword(!showPassword)}
-          showPassword={showPassword}
+          onTogglePassword={() => form.setShowPassword(!form.showPassword)}
+          showPassword={form.showPassword}
           returnKeyType="go"
-          onSubmitEditing={handleSignIn}
+          onSubmitEditing={form.handleSubmit}
         />
 
         {/* Error Display (with resend option) */}
-        <AuthError
-          error={authError}
-          onResendEmail={
-            authError === 'RESEND_EMAIL'
-              ? () => handleResendConfirmationFromError(email)
-              : undefined
-          }
-          isResending={isResendingEmail}
-        />
+        {state.error && (
+          <AuthError
+            error={state.error}
+            onResendEmail={
+              state.error === 'RESEND_EMAIL'
+                ? () => handleResendConfirmationFromError(form.email)
+                : undefined
+            }
+            isResending={isResendingEmail}
+          />
+        )}
 
         {/* Forgot Password */}
         <AuthSubTitle
@@ -178,15 +131,15 @@ export default function SignInScreen() {
       <AuthActionGroup>
         <AuthButton
           text="Sign In"
-          onPress={handleSignIn}
-          disabled={!isValid}
-          loading={loading}
+          onPress={form.handleSubmit}
+          disabled={!form.isValid}
+          loading={state.loading}
         />
 
         <AuthButtonSecondary
           text="Need an account? Sign Up"
           onPress={() => replace('/login/sign-up')}
-          disabled={loading}
+          disabled={state.loading}
         />
       </AuthActionGroup>
 
@@ -199,13 +152,6 @@ export default function SignInScreen() {
         © 2025 The Snow Post · Forged for storytellers & adventurers
       </AuthCaption>
 
-      <AppToast
-        message={validationWarning}
-        type="warning"
-        visible={showValidationToast}
-        duration={4000}
-        onHide={() => setShowValidationToast(false)}
-      />
     </AuthRoot>
   )
 }

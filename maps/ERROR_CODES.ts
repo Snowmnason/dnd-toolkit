@@ -243,24 +243,28 @@ export const ERROR_CODES_METADATA: Record<string, ErrorCodeMetadata> = {
     severity: 'warning',
     recoverable: true,
     retryStrategy: 'exponential-backoff',
+    userMessage: 'The request timed out. Please check your connection and try again.',
   },
   [ERROR_CODES.NETWORK.OFFLINE]: {
     category: 'network',
     severity: 'warning',
     recoverable: true,
     retryStrategy: 'none', // Queued until online
+    userMessage: 'You are currently offline. Please reconnect and try again.',
   },
   [ERROR_CODES.NETWORK.UNREACHABLE]: {
     category: 'network',
     severity: 'warning',
     recoverable: true,
     retryStrategy: 'exponential-backoff',
+    userMessage: 'Server is unreachable. Please check your connection and try again.',
   },
   [ERROR_CODES.NETWORK.FETCH_FAILED]: {
     category: 'network',
     severity: 'warning',
     recoverable: true,
     retryStrategy: 'exponential-backoff',
+    userMessage: 'Request failed. Please check your connection and try again.',
   },
   [ERROR_CODES.NETWORK.DNS_RESOLUTION_FAILED]: {
     category: 'network',

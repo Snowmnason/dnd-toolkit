@@ -17,6 +17,10 @@ export function createMockAuthProvider(overrides?: Partial<AuthProvider>): AuthP
       return { success: true, data: { userId: `user:${email}`, accessToken: 'tok' } };
     },
 
+    async refreshSession(): Promise<any> {
+      return { userId: 'user:test@example.com', accessToken: 'tok' };
+    },
+
     async signInWithOAuth(
       provider: string,
       options?: Record<string, any>

@@ -2,28 +2,21 @@
  * Default Auth Strategies for AuthLayer
  *
  * Concrete implementations of AuthStrategy for common auth patterns.
- *
- * NOTE: This file is intentionally kept coupled to Supabase for token refresh operations.
- * Token lifecycle (refreshSession, getSession) is infrastructure-level and varies wildly
- * between auth providers (Supabase uses 1-hour JWT with refresh tokens, Firebase has
- * different patterns, OAuth providers may not support refresh at all).
- * 
- * User-facing auth operations (signup, signin, logout) are abstracted via AuthProvider.
- * Low-level token management stays provider-specific to avoid over-abstraction.
+ * Token lifecycle is abstracted via AuthProvider.refreshSession() — provider-agnostic.
  */
 
-import { getAuthProviderSync, getSupabaseClientLazy, isSupabaseConfiguredLazy } from "@/lib/middleware/services";
+import { getAuthProviderSync } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils";
 import { ERROR_CODES } from "@/maps/ERROR_CODES";
 import { AuthStrategy, type AuthContext } from "./auth-layer";
 
 /**
- * User Auth Strategy: Manages Supabase user session tokens
+ * User Auth Strategy: Manages user session tokens
  *
  * Integrates with:
- * - Supabase: gets current session + access token via getSupabaseClientLazy()
+ * - AuthProvider: gets current session + access token
  * - AuthStateManager: clears app state on logout (401)
- * - Token caching: Caches token in memory to avoid redundant Supabase calls
+ * - Token caching: Caches token in memory to avoid redundant provider calls
  *
  * @example
  * ```typescript
@@ -37,14 +30,14 @@ import { AuthStrategy, type AuthContext } from "./auth-layer";
  */
 export function createUserAuthStrategy(): AuthStrategy {
   // Token cache: { token, expiresAt }
-  // Prevents hitting Supabase on every request if token is still valid
+  // Prevents hitting auth provider on every request if token is still valid
   let cachedToken: { token: string; expiresAt: number } | null = null;
 
   return {
     async getToken(context: AuthContext): Promise<string | null> {
       try {
         // OPTIMIZATION: Check cached token first
-        // Only call Supabase if cache is expired or doesn't exist
+        // Only call auth provider if cache is expired or doesn't exist
         if (cachedToken && Date.now() < cachedToken.expiresAt) {
           logger.category("auth").debug("Using cached token", {
             endpoint: context.endpoint,
@@ -80,7 +73,7 @@ export function createUserAuthStrategy(): AuthStrategy {
           expiresAt: Date.now() + refreshThreshold,
         };
 
-        logger.category("auth").debug("Fetched fresh token from Supabase", {
+        logger.category("auth").debug("Fetched fresh token from auth provider", {
           endpoint: context.endpoint,
           cacheExpiresIn: refreshThreshold,
         });
@@ -107,50 +100,34 @@ export function createUserAuthStrategy(): AuthStrategy {
         // Clear token cache to force fresh fetch after refresh
         cachedToken = null;
 
-        // Check if Supabase is configured
-        const configured = await isSupabaseConfiguredLazy();
-        if (!configured) {
-          logger.category("auth").warn("Supabase not configured, cannot refresh token", {
+        const provider = getAuthProviderSync();
+        if (!provider) {
+          logger.category("auth").warn("Auth provider not initialized, cannot refresh token", {
             code: ERROR_CODES.AUTH.UNKNOWN,
             endpoint: context.endpoint,
           });
-          throw new Error("Supabase not configured for token refresh");
+          throw new Error("Auth provider not initialized during token refresh");
         }
 
-        const supabase = await getSupabaseClientLazy();
-        const { data, error } = await supabase.auth.refreshSession();
+        const refreshedSession = await provider.refreshSession();
 
-        if (error || !data.session) {
+        if (!refreshedSession) {
           // Refresh failed - session is truly invalid
           logger.category("auth").warn("Token refresh failed, session invalid", {
             code: ERROR_CODES.AUTH.SESSION_EXPIRED,
-            error: error?.message || "No session after refresh",
             endpoint: context.endpoint,
           });
 
           // Log out user since refresh is no longer possible
-          try {
-            const provider = getAuthProviderSync();
-            if (provider) {
-              await provider.signOut();
-            }
-          } catch (signOutError) {
-            logger.category("auth").error("Failed to sign out after refresh failure", {
-              signOutError,
-            });
-          }
-
-          // Clear app auth state (hasAccount: false)
-          const { AuthStateManager } = await import("./auth-state");
-          await AuthStateManager.clearAuthState();
+          const { performSignOutPhase2_ClearAndSignOut } = await import('./account/sign-out-system');
+          await performSignOutPhase2_ClearAndSignOut('auth-state-change');
 
           logger.category("auth").info("User logged out due to failed token refresh");
 
           throw new Error("Token refresh failed and session is invalid");
         }
 
-        // Refresh succeeded - new token is now in Supabase session
-        // Next getToken() call will fetch it and cache it
+        // Refresh succeeded - next getToken() call will fetch the new token and cache it
         logger.category("auth").info("Token refresh succeeded", {
           endpoint: context.endpoint,
         });
