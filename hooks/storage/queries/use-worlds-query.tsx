@@ -60,7 +60,7 @@ export function useWorldsQuery(options: { page?: number; limit?: number } = {}) 
         return { items: worlds, total: worlds.length };
       };
 
-  const { data, error, isLoading, isValidating, refetch, invalidate } = useQuery(
+  const { data, error, isLoading, isRevalidating, refetch, invalidate } = useQuery(
     queryKey,
     queryFn,
     {
@@ -78,7 +78,7 @@ export function useWorldsQuery(options: { page?: number; limit?: number } = {}) 
     worlds,
     total,
     isLoading,
-    isValidating,
+    isRevalidating,
     error: error?.message ?? null,
     refetch,
     invalidate,

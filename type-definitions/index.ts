@@ -39,4 +39,16 @@ export type {
     FlagsSubscriber
 } from "./featureFlagTypes";
 
+export type {
+    CacheEntry,
+    CacheOptions,
+    CachePriority,
+    FetchFn,
+    InvalidateOptions,
+    QueryCacheConfig,
+    RevalidationStrategy,
+    UseQueryOptions,
+    UseQueryState
+} from "./storage-types";
+
 

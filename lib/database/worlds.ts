@@ -75,11 +75,11 @@ export const worldsDB = {
   async create(worldData: CreateWorldData): Promise<World> {
     const data = await getWorldRepository().create(worldData);
 
-    // Invalidate world lists cache
-    await QueryCache.invalidateByTags([
-      CACHE_TAGS.worlds,
-      CACHE_TAGS.user(data.owner_id),
-    ]);
+    // Invalidate world lists cache (user action; expect fresh data immediately)
+    await QueryCache.invalidateByTags(
+      [CACHE_TAGS.worlds, CACHE_TAGS.user(data.owner_id)],
+      { strategy: 'immediate' },
+    );
 
     // Update SecureStorage access flag for new world (owner has access)
     await worldAccessCache.updateAccessFlag(data.world_id, true, "create");
@@ -147,11 +147,11 @@ export const worldsDB = {
   async updateName(worldId: string, newName: string): Promise<World> {
     const data = await getWorldRepository().updateName(worldId, newName);
 
-    // Invalidate specific world and lists cache
-    await QueryCache.invalidateByTags([
-      CACHE_TAGS.worlds,
-      CACHE_TAGS.world(worldId),
-    ]);
+    // Invalidate specific world and lists cache (user action; expect fresh data immediately)
+    await QueryCache.invalidateByTags(
+      [CACHE_TAGS.worlds, CACHE_TAGS.world(worldId)],
+      { strategy: 'immediate' },
+    );
 
     return data;
   },
@@ -163,11 +163,11 @@ export const worldsDB = {
   ): Promise<World> {
     const data = await getWorldRepository().update(worldId, updates);
 
-    // Invalidate specific world and lists cache
-    await QueryCache.invalidateByTags([
-      CACHE_TAGS.worlds,
-      CACHE_TAGS.world(worldId),
-    ]);
+    // Invalidate specific world and lists cache (user action; expect fresh data immediately)
+    await QueryCache.invalidateByTags(
+      [CACHE_TAGS.worlds, CACHE_TAGS.world(worldId)],
+      { strategy: 'immediate' },
+    );
 
     return data;
   },
@@ -176,11 +176,11 @@ export const worldsDB = {
   async delete(worldId: string): Promise<void> {
     await getWorldRepository().delete(worldId);
 
-    // Invalidate specific world and lists cache
-    await QueryCache.invalidateByTags([
-      CACHE_TAGS.worlds,
-      CACHE_TAGS.world(worldId),
-    ]);
+    // Invalidate specific world and lists cache (user action; expect lists updated immediately)
+    await QueryCache.invalidateByTags(
+      [CACHE_TAGS.worlds, CACHE_TAGS.world(worldId)],
+      { strategy: 'immediate' },
+    );
 
     // Clear SecureStorage access flags for deleted world
     await worldAccessCache.clearWorldAccess(worldId);
@@ -190,13 +190,16 @@ export const worldsDB = {
   async removeUserFromWorld(worldId: string, userId: string): Promise<void> {
     await getWorldAccessRepository().removeUser(worldId, userId);
 
-    // Invalidate world members, user's data, and world lists cache
+    // Invalidate world members, user's data, and world lists cache (user action; critical for role/permission sync)
     // Must mirror addUserToWorld invalidation to prevent stale role/permission data
-    await QueryCache.invalidateByTags([
-      CACHE_TAGS.worldMembers(worldId),
-      CACHE_TAGS.user(userId),
-      CACHE_TAGS.worlds,
-    ]);
+    await QueryCache.invalidateByTags(
+      [
+        CACHE_TAGS.worldMembers(worldId),
+        CACHE_TAGS.user(userId),
+        CACHE_TAGS.worlds,
+      ],
+      { strategy: 'immediate' },
+    );
   },
 
   // Check if user is already in a world (either as owner or member)
@@ -213,12 +216,15 @@ export const worldsDB = {
   ): Promise<WorldAccess> {
     const data = await getWorldAccessRepository().addUser(worldId, userId, inviteToken, userRole);
 
-    // Invalidate world members and user's worlds cache
-    await QueryCache.invalidateByTags([
-      CACHE_TAGS.worldMembers(worldId),
-      CACHE_TAGS.user(userId),
-      CACHE_TAGS.worlds,
-    ]);
+    // Invalidate world members and user's worlds cache (user action; critical for role/permission sync)
+    await QueryCache.invalidateByTags(
+      [
+        CACHE_TAGS.worldMembers(worldId),
+        CACHE_TAGS.user(userId),
+        CACHE_TAGS.worlds,
+      ],
+      { strategy: 'immediate' },
+    );
 
     return data;
   },

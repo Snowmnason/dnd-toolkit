@@ -15,8 +15,8 @@ import { z } from "zod";
 
 // Now import the client factory after mocking
 import type {
-  MutationOptions,
-  QueryOptions,
+    MutationOptions,
+    QueryOptions,
 } from "../../lib/api/client-factory";
 import { APIClient } from "../../lib/api/client-factory";
 
@@ -445,10 +445,10 @@ describe("APIClient Factory", () => {
       const api = new TestUsersAPI();
       await api.updateUser("123", { name: "Updated" });
 
-      expect(mockQueryCache.invalidateByTags).toHaveBeenCalledWith([
-        "user:123",
-        "users",
-      ]);
+      expect(mockQueryCache.invalidateByTags).toHaveBeenCalledWith(
+        ["user:123", "users"],
+        { strategy: "immediate" },
+      );
     });
 
     it("should not invalidate tags on mutation failure", async () => {
@@ -525,11 +525,10 @@ describe("APIClient Factory", () => {
         },
       );
 
-      expect(mockQueryCache.invalidateByTags).toHaveBeenCalledWith([
-        "user:123",
-        "users",
-        "custom:tag",
-      ]);
+      expect(mockQueryCache.invalidateByTags).toHaveBeenCalledWith(
+        ["user:123", "users", "custom:tag"],
+        { strategy: "immediate" },
+      );
     });
 
     it("should not call invalidateByTags if no tags provided", async () => {

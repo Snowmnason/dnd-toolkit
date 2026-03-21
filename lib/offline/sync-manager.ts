@@ -525,10 +525,10 @@ class OnlineSyncManagerService {
         };
       }
 
-      // Success — invalidate cache tags if provided
+      // Success — invalidate cache tags if provided (background sync operation; show stale while refetching)
       if (mutation.invalidateTags && mutation.invalidateTags.length > 0) {
         try {
-          await QueryCache.invalidateByTags(mutation.invalidateTags);
+          await QueryCache.invalidateByTags(mutation.invalidateTags, { strategy: 'background' });
         } catch (err) {
           logger.category("error").warn("Failed to invalidate cache:", err);
         }

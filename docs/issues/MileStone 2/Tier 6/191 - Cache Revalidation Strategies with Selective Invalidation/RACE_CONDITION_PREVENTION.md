@@ -180,7 +180,7 @@ export function useQuery<T>(
     // ... rest of effect ...
   }, [key, disabled]);
 
-  return { data, isLoading, isValidating, error, refetch, invalidate };
+  return { data, isLoading, isRevalidating, error, refetch, invalidate };
 }
 ```
 

@@ -29,8 +29,8 @@ export async function createInviteLink(
   const result = await getInviteRepository().create(params);
 
   if (result.success && result.data) {
-    // Invalidate invite links cache for this world (caller cache responsibility)
-    await QueryCache.invalidate(`world:${params.worldId}:invites`);
+    // Invalidate invite links cache for this world (user action; expect fresh list immediately)
+    await QueryCache.invalidate(`world:${params.worldId}:invites`, { strategy: 'immediate' });
     return { success: true, inviteLink: result.data };
   }
 

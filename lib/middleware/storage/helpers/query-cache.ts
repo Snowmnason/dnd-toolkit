@@ -1,5 +1,11 @@
 import { logger } from "@/lib/utils";
 import { FastCache } from "@/system/Storage/";
+import type {
+    CacheEntry,
+    CacheOptions,
+    InvalidateOptions,
+    QueryCacheConfig
+} from "@/type-definitions";
 
 /**
  * Query Cache: Centralized cache with invalidation patterns
@@ -24,29 +30,8 @@ function escapeRegexChars(str: string): string {
 }
 
 // ==========================================
-// Types
+// Internal Types
 // ==========================================
-
-export interface CacheEntry<T = any> {
-  data: T;
-  timestamp: number;
-  staleTime: number; // How long until stale (ms)
-  cacheTime: number; // How long to keep in cache (ms)
-  tags?: string[]; // Tags for invalidation
-  version?: number; // Version number for race condition prevention
-}
-
-export interface CacheOptions {
-  staleTime?: number; // Default: 2 hours
-  cacheTime?: number; // Default: 4 hours
-  tags?: string[]; // Tags for invalidation
-}
-
-export interface QueryCacheConfig {
-  defaultStaleTime: number; // 2 hours
-  defaultCacheTime: number; // 4 hours
-  maxEntries: number; // Prevent unbounded growth
-}
 
 type CacheSubscriber = (key: string, data: any) => void;
 
@@ -327,10 +312,16 @@ class QueryCacheClass {
    * Invalidate cache entries by tags
    * Example: invalidateByTags(['worlds', 'user:123'])
    *
+   * @param tags - Tags to invalidate
+   * @param options - Optional configuration (strategy for revalidation intent)
+   *
    * Side effect: Increments global version to prevent stale writes
    * from in-flight requests
    */
-  async invalidateByTags(tags: string[]): Promise<void> {
+  async invalidateByTags(
+    tags: string[],
+    options?: InvalidateOptions,
+  ): Promise<void> {
     try {
       // Bump version to invalidate in-flight requests
       this.globalVersion++;
@@ -349,6 +340,7 @@ class QueryCacheClass {
         `Invalidated ${keysToInvalidate.length} entries by tags`,
         {
           tags,
+          strategy: options?.strategy || 'immediate',
           newVersion: this.globalVersion,
         },
       );
@@ -361,10 +353,16 @@ class QueryCacheClass {
    * Invalidate cache entries by pattern (regex or string)
    * Example: invalidate(/^worlds:/) or invalidate('worlds:user:123')
    *
+   * @param pattern - Pattern to match (string or regex)
+   * @param options - Optional configuration (strategy for revalidation intent)
+   *
    * Side effect: Increments global version to prevent stale writes
    * from in-flight requests
    */
-  async invalidate(pattern: string | RegExp): Promise<void> {
+  async invalidate(
+    pattern: string | RegExp,
+    options?: InvalidateOptions,
+  ): Promise<void> {
     try {
       // Bump version to invalidate in-flight requests
       this.globalVersion++;
@@ -392,6 +390,7 @@ class QueryCacheClass {
         `Invalidated ${keysToInvalidate.length} entries by pattern`,
         {
           pattern: pattern.toString(),
+          strategy: options?.strategy || 'immediate',
           newVersion: this.globalVersion,
         },
       );
@@ -435,6 +434,89 @@ class QueryCacheClass {
       return keysToInvalidate.length;
     } catch (error) {
       logger.category('storage').error("Error invalidating old entries:", error);
+      return 0;
+    }
+  }
+
+  /**
+   * Invalidate cache entries matching a predicate function
+   * Provides fine-grained control over which entries to invalidate
+   *
+   * Example: Invalidate only entries related to a specific world
+   * ```
+   * await QueryCache.selectiveInvalidate(
+   *   (key, entry) => key.includes(`world:${worldId}`),
+   *   { strategy: 'immediate' }
+   * );
+   * ```
+   *
+   * Example: Invalidate by tag AND key pattern
+   * ```
+   * await QueryCache.selectiveInvalidate(
+   *   (key, entry) => entry.tags?.includes('users') && key.startsWith('user:'),
+   *   { strategy: 'background' }
+   * );
+   * ```
+   *
+   * @param predicate - Function that returns true for entries to invalidate
+   * @param options - Optional configuration (strategy for revalidation intent)
+   * @returns Number of entries invalidated
+   *
+   * Side effect: Increments global version to prevent stale writes
+   * from in-flight requests. Version bump only happens after successful
+   * key determination and removal. Strategy option documents the revalidation
+   * intent and is logged; actual revalidation behavior is controlled by
+   * the revalidationStrategy option in useQuery hooks.
+   */
+  async selectiveInvalidate(
+    predicate: (key: string, entry: CacheEntry) => boolean,
+    options?: InvalidateOptions,
+  ): Promise<number> {
+    try {
+      const keysToInvalidate: string[] = [];
+
+      // Evaluate predicate for all entries (before bumping version)
+      for (const [key, entry] of this.inMemoryCache.entries()) {
+        try {
+          if (predicate(key, entry)) {
+            keysToInvalidate.push(key);
+          }
+        } catch (err) {
+          logger.category('storage').error(
+            `Error evaluating predicate for key "${key}":`,
+            err,
+          );
+        }
+      }
+
+      // Only proceed if entries found and removals will happen
+      if (keysToInvalidate.length === 0) {
+        logger.category('storage').debug('selectiveInvalidate: No entries matched predicate');
+        return 0;
+      }
+
+      // Remove entries from cache
+      await Promise.all(keysToInvalidate.map((key) => this.remove(key)));
+
+      // Only bump version AFTER successful removal
+      this.globalVersion++;
+
+      logger.category('storage').info(
+        `Invalidated ${keysToInvalidate.length} entries by predicate (v${this.globalVersion})`,
+        {
+          count: keysToInvalidate.length,
+          strategy: options?.strategy || 'immediate',
+          newVersion: this.globalVersion,
+        },
+      );
+
+      return keysToInvalidate.length;
+    } catch (error) {
+      // Version NOT bumped if removal fails
+      logger.category('storage').error(
+        'Error invalidating by predicate (version NOT bumped):',
+        error,
+      );
       return 0;
     }
   }

@@ -109,14 +109,14 @@ export function useMutation<TData = unknown, TError = Error>(
         setData(result);
         setError(undefined);
 
-        // Invalidate cache by tags
+        // Invalidate cache by tags (user mutation; expect fresh data immediately)
         if (invalidateTags.length > 0) {
-          await QueryCache.invalidateByTags(invalidateTags);
+          await QueryCache.invalidateByTags(invalidateTags, { strategy: 'immediate' });
         }
 
-        // Invalidate cache by patterns
+        // Invalidate cache by patterns (user mutation; expect fresh data immediately)
         for (const pattern of invalidatePatterns) {
-          await QueryCache.invalidate(pattern);
+          await QueryCache.invalidate(pattern, { strategy: 'immediate' });
         }
 
         onSuccess?.(result);

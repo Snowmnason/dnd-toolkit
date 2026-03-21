@@ -145,8 +145,8 @@ export const usersDB = {
 
     const data = await getUserRepository().updateCurrentUser(updates);
 
-    // Invalidate user profile cache (caller cache responsibility)
-    await QueryCache.invalidateByTags(["users", `user:${data.id}`]);
+    // Invalidate user profile cache (user action; expect fresh profile immediately)
+    await QueryCache.invalidateByTags(["users", `user:${data.id}`], { strategy: 'immediate' });
 
     // Save updated user data to local storage
     try {
@@ -162,9 +162,9 @@ export const usersDB = {
   async deleteCurrentUser(): Promise<boolean> {
     const result = await getUserRepository().deleteCurrentUser();
 
-    // Invalidate user profile cache on successful deletion
+    // Invalidate user profile cache on successful deletion (user action; critical operation)
     if (result) {
-      await QueryCache.invalidateByTags(["users"]);
+      await QueryCache.invalidateByTags(["users"], { strategy: 'immediate' });
     }
 
     return result;

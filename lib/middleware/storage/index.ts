@@ -28,7 +28,6 @@ export {
 
 // ─── Query Cache ────────────────────────────────────────────────────
 export { QueryCache } from './helpers/query-cache';
-export type { CacheEntry, CacheOptions, QueryCacheConfig } from './helpers/query-cache';
 
 // ─── Error Handling ─────────────────────────────────────────────────
 export {
