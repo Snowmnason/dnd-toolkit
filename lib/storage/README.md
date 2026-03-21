@@ -212,7 +212,7 @@ Store query result in cache with metadata.
 import { QueryCache } from "@/lib/storage";
 
 await QueryCache.set("worlds:user:123", worldsData, {
-  staleTime: 5 * 60 * 1000, // 5 minutes
+  staleTime: 5 * 60, // 5 minutes (seconds)
   tags: ["worlds", "user:123"]
 });
 ```
@@ -237,21 +237,24 @@ Invalidate all cache entries with matching tags.
 await QueryCache.invalidateByTags(["worlds"], { strategy: "background" });
 ```
 
-#### `QueryCache.selectiveInvalidate(predicate, options?): Promise<void>`
+#### `QueryCache.selectiveInvalidate(predicate, options?): Promise<number>`
 
-Invalidate cache entries matching a predicate function.
+Invalidate cache entries matching a predicate function and return the number of entries invalidated.
 
 **Parameters:**
 - `predicate`: `(key: string, entry: CacheEntry) => boolean` — Filter function
 - `options`: InvalidateOptions — Revalidation strategy
 
+**Returns:** `Promise<number>` — number of entries invalidated (0 if none matched).
+
 **Example:**
 ```ts
 // Invalidate only specific world, refetch immediately
-await QueryCache.selectiveInvalidate(
+const removed = await QueryCache.selectiveInvalidate(
   (key) => key.includes(`world:123`),
   { strategy: "immediate" }
 );
+console.log('invalidated entries', removed);
 ```
 
 #### `QueryCache.clear(): Promise<void>`

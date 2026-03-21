@@ -16,6 +16,7 @@ The cache revalidation system provides three strategies for controlling how cach
 
 ```typescript
 import { useQuery } from '@/hooks/storage';
+import { QueryCache } from '@/lib/storage';
 
 function WorldList() {
   // Page load: Show cached data immediately, refresh in background
@@ -24,8 +25,8 @@ function WorldList() {
     fetchWorlds,
     {
       revalidationStrategy: 'background',
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      cacheTime: 30 * 60 * 1000, // 30 minutes
+      staleTime: 5 * 60, // 5 minutes (seconds)
+      cacheTime: 30 * 60, // 30 minutes (seconds)
     }
   );
 
@@ -58,9 +59,9 @@ function CreateWorldForm() {
     // Invalidate and refetch immediately to show new world
     await QueryCache.invalidateByTags(['worlds'], { strategy: 'immediate' });
   };
-
-  return (
-    <form onSubmit={handleCreate}>
+  {
+      revalidationStrategy: 'background',
+    }
       {/* Form fields */}
       <button disabled={isLoading}>
         {isLoading ? 'Creating...' : 'Create World'}
@@ -278,7 +279,7 @@ function WorldList() {
     () => fetchWorlds(page),
     {
       revalidationStrategy: 'background',
-      staleTime: 2 * 60 * 1000, // 2 minutes
+      staleTime: 2 * 60, // 2 minutes (seconds)
     }
   );
 
@@ -301,7 +302,7 @@ function ChatMessages({ channelId }) {
     () => fetchMessages(channelId),
     {
       revalidationStrategy: 'keep-stale',
-      staleTime: 30 * 1000, // 30 seconds
+      staleTime: 30, // 30 seconds (seconds)
     }
   );
 
@@ -329,15 +330,15 @@ function ChatMessages({ channelId }) {
 ```typescript
 // Fast-changing data
 const { data } = useQuery('notifications', fetchNotifications, {
-  staleTime: 30 * 1000,     // Stale after 30s
-  cacheTime: 5 * 60 * 1000, // Keep in cache for 5min
+  staleTime: 30,     // Stale after 30s (seconds)
+  cacheTime: 5 * 60, // Keep in cache for 5min (seconds)
   revalidationStrategy: 'background'
 });
 
 // Slow-changing data
 const { data } = useQuery('user-profile', fetchProfile, {
-  staleTime: 10 * 60 * 1000, // Stale after 10min
-  cacheTime: 60 * 60 * 1000, // Keep for 1 hour
+  staleTime: 10 * 60, // Stale after 10min (seconds)
+  cacheTime: 60 * 60, // Keep for 1 hour (seconds)
   revalidationStrategy: 'keep-stale'
 });
 ```

@@ -20,7 +20,6 @@ export {
 } from "./mutations/use-worlds-mutation";
 
 export { useQuery } from './use-query';
-export type { RevalidationStrategy, UseQueryOptions, UseQueryState } from './use-query';
 
 export { useMutation } from './use-mutation';
 export type { UseMutationOptions, UseMutationState } from './use-mutation';

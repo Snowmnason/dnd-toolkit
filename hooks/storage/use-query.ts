@@ -3,82 +3,12 @@
 import { QueryCache } from '@/lib/storage';
 import { logger } from '@/lib/utils';
 import { NetworkDetection } from '@/system/Network';
+import type {
+    FetchFn,
+    UseQueryOptions,
+    UseQueryState
+} from '@/type-definitions';
 import { useEffect, useRef, useState } from 'react';
-
-/**
- * Revalidation strategy type for cache invalidation
- * - 'immediate': Show loading state, wait for fresh data (blocks UI during refetch)
- * - 'background': Return stale data immediately, refetch in background (SWR)
- * - 'keep-stale': Keep stale data without auto-refetch (manual refetch only)
- */
-export type RevalidationStrategy = 'immediate' | 'background' | 'keep-stale';
-
-/**
- * Options for useQuery hook
- */
-export interface UseQueryOptions {
-  /** Cache stale time in seconds (default: 7200s = 2 hours) */
-  staleTime?: number;
-  /** Cache time in seconds (default: 14400s = 4 hours) */
-  cacheTime?: number;
-  /** Whether to revalidate in background when stale (default: true) */
-  revalidateOnFocus?: boolean;
-  /** Manually disable this query (default: false) */
-  disabled?: boolean;
-  /** Tags for smart cache invalidation */
-  tags?: string[];
-  /** Called when data is fetched successfully */
-  onSuccess?: (data: unknown) => void;
-  /** Called when error occurs */
-  onError?: (error: Error) => void;
-  /**
-   * Cache priority strategy (default: 'balanced')
-   * - 'balanced': Use cache if exists, revalidate if stale (SWR)
-   * - 'cacheFirst': Strongly prefer cache; only revalidate on explicit refetch
-   * - 'networkFirst': Always try to fetch; use cache as fallback on error
-   * - 'offlineFirst': On offline, prefer cache even if very stale; don't force revalidation
-   */
-  cachePriority?: 'balanced' | 'cacheFirst' | 'networkFirst' | 'offlineFirst';
-  /**
-   * Revalidation strategy when cache is invalidated or becomes stale (default: 'immediate')
-   */
-  revalidationStrategy?: RevalidationStrategy;
-  /**
-   * Optional condition that must return true before auto-revalidation proceeds
-   * If condition returns false, revalidation is skipped (keep-stale behavior)
-   * Manual refetch() ignores this condition and always refetches
-   *
-   * @example
-   * ```typescript
-   * // Only auto-revalidate if network is online
-   * revalidationCondition: async () => NetworkDetection.isOnline()
-   * ```
-   */
-  revalidationCondition?: () => Promise<boolean>;
-}
-
-/**
- * State returned by useQuery hook
- */
-export interface UseQueryState<T> {
-  /** Current cached data (or undefined if not yet loaded) */
-  data: T | undefined;
-  /** Whether first load is in progress */
-  isLoading: boolean;
-  /** Whether background revalidation is in progress */
-  isRevalidating: boolean;
-  /** Current error, if any */
-  error: Error | undefined;
-  /** Manually refetch data */
-  refetch: () => Promise<void>;
-  /** Manually invalidate this query */
-  invalidate: () => Promise<void>;
-}
-
-/**
- * Fetch function type - takes a key and returns data
- */
-type FetchFn<T> = (key: string) => Promise<T>;
 
 /**
  * SWR (Stale-While-Revalidate) hook for data fetching with cache
@@ -212,9 +142,9 @@ export function useQuery<T>(
     // Condition passed (or no condition) - proceed with strategy
     switch (revalidationStrategy) {
       case 'immediate':
-        // Block UI until fresh data arrives
+        // Block UI until fresh data arrives (regardless of trigger: initial fetch or invalidation)
         setIsRevalidating(true);
-        setIsLoading(reason === 'fetch');
+        setIsLoading(true);
         await revalidate();
         break;
 

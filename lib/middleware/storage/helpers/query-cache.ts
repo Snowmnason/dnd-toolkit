@@ -1,5 +1,11 @@
 import { logger } from "@/lib/utils";
 import { FastCache } from "@/system/Storage/";
+import type {
+    CacheEntry,
+    CacheOptions,
+    InvalidateOptions,
+    QueryCacheConfig
+} from "@/type-definitions";
 
 /**
  * Query Cache: Centralized cache with invalidation patterns
@@ -24,45 +30,8 @@ function escapeRegexChars(str: string): string {
 }
 
 // ==========================================
-// Types
+// Internal Types
 // ==========================================
-
-/**
- * Revalidation strategy type for cache invalidation
- * - 'immediate': Show loading state, wait for fresh data (blocks UI during refetch)
- * - 'background': Return stale data immediately, refetch in background (SWR)
- * - 'keep-stale': Keep stale data without auto-refetch (manual refetch only)
- */
-export type RevalidationStrategy = 'immediate' | 'background' | 'keep-stale';
-
-/**
- * Options for cache invalidation operations
- */
-export interface InvalidateOptions {
-  /** Revalidation strategy (documents intent; actual behavior controlled by useQuery hooks) */
-  strategy?: RevalidationStrategy;
-}
-
-export interface CacheEntry<T = any> {
-  data: T;
-  timestamp: number;
-  staleTime: number; // How long until stale (ms)
-  cacheTime: number; // How long to keep in cache (ms)
-  tags?: string[]; // Tags for invalidation
-  version?: number; // Version number for race condition prevention
-}
-
-export interface CacheOptions {
-  staleTime?: number; // Default: 2 hours
-  cacheTime?: number; // Default: 4 hours
-  tags?: string[]; // Tags for invalidation
-}
-
-export interface QueryCacheConfig {
-  defaultStaleTime: number; // 2 hours
-  defaultCacheTime: number; // 4 hours
-  maxEntries: number; // Prevent unbounded growth
-}
 
 type CacheSubscriber = (key: string, data: any) => void;
 
@@ -494,7 +463,8 @@ class QueryCacheClass {
    * @returns Number of entries invalidated
    *
    * Side effect: Increments global version to prevent stale writes
-   * from in-flight requests. Strategy option documents the revalidation
+   * from in-flight requests. Version bump only happens after successful
+   * key determination and removal. Strategy option documents the revalidation
    * intent and is logged; actual revalidation behavior is controlled by
    * the revalidationStrategy option in useQuery hooks.
    */
@@ -503,11 +473,9 @@ class QueryCacheClass {
     options?: InvalidateOptions,
   ): Promise<number> {
     try {
-      // Bump version to invalidate in-flight requests
-      this.globalVersion++;
-
       const keysToInvalidate: string[] = [];
 
+      // Evaluate predicate for all entries (before bumping version)
       for (const [key, entry] of this.inMemoryCache.entries()) {
         try {
           if (predicate(key, entry)) {
@@ -521,10 +489,20 @@ class QueryCacheClass {
         }
       }
 
+      // Only proceed if entries found and removals will happen
+      if (keysToInvalidate.length === 0) {
+        logger.category('storage').debug('selectiveInvalidate: No entries matched predicate');
+        return 0;
+      }
+
+      // Remove entries from cache
       await Promise.all(keysToInvalidate.map((key) => this.remove(key)));
 
+      // Only bump version AFTER successful removal
+      this.globalVersion++;
+
       logger.category('storage').info(
-        `Invalidated ${keysToInvalidate.length} entries by predicate`,
+        `Invalidated ${keysToInvalidate.length} entries by predicate (v${this.globalVersion})`,
         {
           count: keysToInvalidate.length,
           strategy: options?.strategy || 'immediate',
@@ -534,7 +512,11 @@ class QueryCacheClass {
 
       return keysToInvalidate.length;
     } catch (error) {
-      logger.category('storage').error("Error invalidating by predicate:", error);
+      // Version NOT bumped if removal fails
+      logger.category('storage').error(
+        'Error invalidating by predicate (version NOT bumped):',
+        error,
+      );
       return 0;
     }
   }

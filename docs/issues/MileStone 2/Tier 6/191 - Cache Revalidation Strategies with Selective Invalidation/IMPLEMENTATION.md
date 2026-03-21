@@ -93,17 +93,32 @@ if (strategy === 'keep-stale') {
 async selectiveInvalidate(
   predicate: (key: string, entry: CacheEntry) => boolean,
   options?: InvalidateOptions
-): Promise<void> {
+): Promise<number> {
   const entries = await FastCache.getAllEntries();
-  const toInvalidate = entries.filter(([key, entry]) => predicate(key, entry));
+  const toInvalidate = entries.filter(([key, entry]) => {
+    try {
+      return predicate(key, entry);
+    } catch (err) {
+      // Predicate errors are logged and treated as non-matching
+      logger.category('storage').warn('selectiveInvalidate predicate threw', err, { key });
+      return false;
+    }
+  });
 
+  let removed = 0;
   for (const [key, entry] of toInvalidate) {
-    await FastCache.remove(key);
-    // Trigger revalidation based on strategy
+    try {
+      await FastCache.remove(key);
+      removed++;
+      // Trigger revalidation based on strategy
+    } catch (err) {
+      logger.category('storage').warn('Failed to remove cache entry during selectiveInvalidate', err, { key });
+    }
   }
 
-  // Increment global version for subscribers
-  globalVersion++;
+  // Increment global version for subscribers only after successful removals
+  if (removed > 0) globalVersion++;
+  return removed;
 }
 ```
 
