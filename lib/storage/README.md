@@ -194,6 +194,117 @@ const stats = await FastCache.getStats();
 }
 ```
 
+### QueryCache
+
+Centralized query result cache with invalidation strategies and selective revalidation.
+
+#### `QueryCache.set<T>(key, data, options?): Promise<void>`
+
+Store query result in cache with metadata.
+
+**Parameters:**
+- `key`: string — Unique cache key
+- `data`: T — Query result data
+- `options`: `{ staleTime?: number, cacheTime?: number, tags?: string[] }` — Cache options
+
+**Example:**
+```ts
+import { QueryCache } from "@/lib/storage";
+
+await QueryCache.set("worlds:user:123", worldsData, {
+  staleTime: 5 * 60 * 1000, // 5 minutes
+  tags: ["worlds", "user:123"]
+});
+```
+
+#### `QueryCache.get<T>(key): Promise<CacheEntry<T> | null>`
+
+Retrieve cached query result with metadata.
+
+**Returns:** CacheEntry with data, timestamp, and staleness info.
+
+#### `QueryCache.invalidateByTags(tags, options?): Promise<void>`
+
+Invalidate all cache entries with matching tags.
+
+**Parameters:**
+- `tags`: string[] — Tag array to match
+- `options`: InvalidateOptions — Revalidation strategy
+
+**Example:**
+```ts
+// Invalidate all world-related queries, refetch in background
+await QueryCache.invalidateByTags(["worlds"], { strategy: "background" });
+```
+
+#### `QueryCache.selectiveInvalidate(predicate, options?): Promise<void>`
+
+Invalidate cache entries matching a predicate function.
+
+**Parameters:**
+- `predicate`: `(key: string, entry: CacheEntry) => boolean` — Filter function
+- `options`: InvalidateOptions — Revalidation strategy
+
+**Example:**
+```ts
+// Invalidate only specific world, refetch immediately
+await QueryCache.selectiveInvalidate(
+  (key) => key.includes(`world:123`),
+  { strategy: "immediate" }
+);
+```
+
+#### `QueryCache.clear(): Promise<void>`
+
+Clear all cached query results.
+
+### Query Caching
+
+Integration with `hooks/storage/useQuery` for declarative data fetching with caching strategies.
+
+#### Revalidation Strategies
+
+Control how cached data behaves when invalidated:
+
+- **`'immediate'`**: Block UI, wait for fresh data (default for mutations)
+- **`'background'`**: Show stale data, refetch in background (SWR pattern)
+- **`'keep-stale'`**: Keep stale data without auto-refetch (manual control)
+
+**Example:**
+```ts
+import { useQuery } from "@/hooks/storage";
+
+// Page load: Show stale data while fetching fresh
+const { data, isLoading, isRevalidating } = useQuery(
+  "worlds",
+  fetchWorlds,
+  { revalidationStrategy: "background" }
+);
+
+// User action: Wait for confirmation
+const { data, refetch } = useQuery(
+  "world:new",
+  createWorld,
+  { revalidationStrategy: "immediate" }
+);
+```
+
+#### Conditional Revalidation
+
+Only refetch if conditions are met:
+
+```ts
+const { data } = useQuery("users", fetchUsers, {
+  revalidationCondition: async () => NetworkDetection.isOnline(),
+  revalidationStrategy: "background"
+});
+```
+
+#### State Tracking
+
+- **`isLoading`**: True during initial fetch (no cached data)
+- **`isRevalidating`**: True during background refresh (stale data shown)
+
 ### Cache Versioning
 
 #### `validateCacheEntry<T>(entry, schema): CacheValidationResult`
@@ -299,6 +410,8 @@ Clear all access flags and metadata for a world. Never throws.
 - **`lib/auth`** – Encrypted storage implementation for sensitive auth data
 - **`lib/cache`** – FastCache integration for ephemeral data storage
 - **`lib/network`** – Network error handling patterns
+- **`lib/middleware/storage/helpers`** – QueryCache implementation for query result caching
+- **`hooks/storage`** – useQuery hook integration with revalidation strategies
 
 ## Error Handling & Edge Cases
 
@@ -407,6 +520,8 @@ const data = await SecureStorage.getValidatedJSON(key, schema);
 - **`lib/cache`** – Integrates FastCache for query result caching
 - **`lib/database`** – Stores persistent user and world data through SecureStorage
 - **`lib/offline`** – Uses SecureStorage for offline mutation queue persistence
+- **`lib/middleware/storage/helpers`** – QueryCache for centralized query result management
+- **`hooks/storage`** – useQuery hook with revalidation strategies and conditional fetching
 
 ## File Breakdown
 

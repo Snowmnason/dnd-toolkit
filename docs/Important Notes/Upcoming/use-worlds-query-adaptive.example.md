@@ -54,7 +54,7 @@ export function useWorldsQueryAdaptive_BasicKeyOnly(
         return { items: worlds, total: worlds.length };
       };
 
-  const { data, error, isLoading, isValidating, refetch, invalidate } = useQuery(
+  const { data, error, isLoading, isRevalidating, refetch, invalidate } = useQuery(
     queryKey,
     queryFn,
     {
@@ -71,7 +71,7 @@ export function useWorldsQueryAdaptive_BasicKeyOnly(
     worlds,
     total,
     isLoading,
-    isValidating,
+    isRevalidating,
     error: error?.message ?? null,
     refetch,
     invalidate,
@@ -113,7 +113,7 @@ export function useWorldsQueryAdaptive_WithParams(
     skipInitialCheck: true,
   });
 
-  const { data, error, isLoading, isValidating, refetch, invalidate } = useQuery(
+  const { data, error, isLoading, isRevalidating, refetch, invalidate } = useQuery(
     queryKey,
     queryFn,
     {
@@ -132,7 +132,7 @@ export function useWorldsQueryAdaptive_WithParams(
     worlds,
     total,
     isLoading,
-    isValidating,
+    isRevalidating,
     error: error?.message ?? null,
     refetch,
     invalidate,
@@ -167,7 +167,7 @@ export function useWorldsQueryAdaptive_ComponentLevel(
 
   // NO useAdaptivePayloadCacheInvalidation here
 
-  const { data, error, isLoading, isValidating, refetch, invalidate } = useQuery(
+  const { data, error, isLoading, isRevalidating, refetch, invalidate } = useQuery(
     queryKey,
     queryFn,
     {
@@ -184,7 +184,7 @@ export function useWorldsQueryAdaptive_ComponentLevel(
     worlds,
     total,
     isLoading,
-    isValidating,
+    isRevalidating,
     error: error?.message ?? null,
     refetch,
     invalidate,

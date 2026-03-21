@@ -44,7 +44,9 @@ export { QueryCache } from '@/lib/middleware/storage/helpers/query-cache';
 export type {
   CacheEntry,
   CacheOptions,
+  InvalidateOptions,
   QueryCacheConfig,
+  RevalidationStrategy,
 } from '@/lib/middleware/storage/helpers/query-cache';
 export type {
   CacheSchema, StorageGracefulResult,

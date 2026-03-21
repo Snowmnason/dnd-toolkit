@@ -31,7 +31,7 @@ export function useCurrentUserQuery() {
     cacheTagsToInvalidate: ['users'],
   });
 
-  const { data, error, isLoading, isValidating, refetch, invalidate } = useQuery(
+  const { data, error, isLoading, isRevalidating, refetch, invalidate } = useQuery(
     queryKey,
     () => usersDB.getCurrentUser().then(user => {
       if (!user) throw new Error('Not authenticated');
@@ -47,7 +47,7 @@ export function useCurrentUserQuery() {
   return {
     user: data ?? null,
     isLoading,
-    isValidating,
+    isRevalidating,
     error: error?.message ?? null,
     refetch,
     invalidate,
@@ -77,7 +77,7 @@ export function useUserQuery(userId: string | null) {
     cacheTagsToInvalidate: ['users'],
   });
 
-  const { data, error, isLoading, isValidating, refetch, invalidate } = useQuery(
+  const { data, error, isLoading, isRevalidating, refetch, invalidate } = useQuery(
     queryKey,
     userId ? () => usersDB.getCurrentUser().then(user => {
       if (!user) throw new Error('User not found');
@@ -94,7 +94,7 @@ export function useUserQuery(userId: string | null) {
   return {
     user: data ?? null,
     isLoading,
-    isValidating,
+    isRevalidating,
     error: error?.message ?? null,
     refetch,
     invalidate,

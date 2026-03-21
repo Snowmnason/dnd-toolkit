@@ -6,6 +6,14 @@ import { NetworkDetection } from '@/system/Network';
 import { useEffect, useRef, useState } from 'react';
 
 /**
+ * Revalidation strategy type for cache invalidation
+ * - 'immediate': Show loading state, wait for fresh data (blocks UI during refetch)
+ * - 'background': Return stale data immediately, refetch in background (SWR)
+ * - 'keep-stale': Keep stale data without auto-refetch (manual refetch only)
+ */
+export type RevalidationStrategy = 'immediate' | 'background' | 'keep-stale';
+
+/**
  * Options for useQuery hook
  */
 export interface UseQueryOptions {
@@ -31,6 +39,22 @@ export interface UseQueryOptions {
    * - 'offlineFirst': On offline, prefer cache even if very stale; don't force revalidation
    */
   cachePriority?: 'balanced' | 'cacheFirst' | 'networkFirst' | 'offlineFirst';
+  /**
+   * Revalidation strategy when cache is invalidated or becomes stale (default: 'immediate')
+   */
+  revalidationStrategy?: RevalidationStrategy;
+  /**
+   * Optional condition that must return true before auto-revalidation proceeds
+   * If condition returns false, revalidation is skipped (keep-stale behavior)
+   * Manual refetch() ignores this condition and always refetches
+   *
+   * @example
+   * ```typescript
+   * // Only auto-revalidate if network is online
+   * revalidationCondition: async () => NetworkDetection.isOnline()
+   * ```
+   */
+  revalidationCondition?: () => Promise<boolean>;
 }
 
 /**
@@ -42,7 +66,7 @@ export interface UseQueryState<T> {
   /** Whether first load is in progress */
   isLoading: boolean;
   /** Whether background revalidation is in progress */
-  isValidating: boolean;
+  isRevalidating: boolean;
   /** Current error, if any */
   error: Error | undefined;
   /** Manually refetch data */
@@ -91,6 +115,8 @@ export function useQuery<T>(
     onSuccess,
     onError,
     cachePriority = 'balanced',
+    revalidationStrategy = 'immediate',
+    revalidationCondition,
   } = options;
 
   // Convert staleTime and cacheTime from seconds to milliseconds for QueryCache
@@ -99,7 +125,7 @@ export function useQuery<T>(
 
   const [data, setData] = useState<T | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
-  const [isValidating, setIsValidating] = useState(false);
+  const [isRevalidating, setIsRevalidating] = useState(false);
   const [error, setError] = useState<Error | undefined>(undefined);
 
   // Track if mounted to prevent memory leaks
@@ -117,7 +143,7 @@ export function useQuery<T>(
     if (disabled) return;
 
     try {
-      setIsValidating(true);
+      setIsRevalidating(true);
       // Capture version at start of request
       const versionAtStart = QueryCache.getCurrentVersion();
       
@@ -150,7 +176,7 @@ export function useQuery<T>(
       logger.category('storage').error(`[useQuery] Fetch failed for key "${key}":`, error);
     } finally {
       if (isMountedRef.current) {
-        setIsValidating(false);
+        setIsRevalidating(false);
       }
     }
   };
@@ -163,6 +189,52 @@ export function useQuery<T>(
   };
 
   const refetch = revalidate;
+
+  // Helper function to handle revalidation based on strategy
+  const handleRevalidationStrategy = async (reason: 'fetch' | 'invalidate') => {
+    // Check revalidation condition first (if provided)
+    if (revalidationCondition) {
+      try {
+        const shouldRevalidate = await revalidationCondition();
+        if (!shouldRevalidate) {
+          // Condition returned false - skip auto-revalidation (keep-stale behavior)
+          logger.category('storage').debug(`[useQuery] Revalidation condition returned false for key "${key}"; keeping stale data`);
+          setIsRevalidating(false);
+          setIsLoading(false);
+          return;
+        }
+      } catch (err) {
+        // If condition throws, log error but still proceed with revalidation
+        logger.category('storage').error(`[useQuery] Revalidation condition error for key "${key}":`, err);
+      }
+    }
+
+    // Condition passed (or no condition) - proceed with strategy
+    switch (revalidationStrategy) {
+      case 'immediate':
+        // Block UI until fresh data arrives
+        setIsRevalidating(true);
+        setIsLoading(reason === 'fetch');
+        await revalidate();
+        break;
+
+      case 'background':
+        // Show stale data immediately; fetch in background without blocking
+        setIsRevalidating(true);
+        setIsLoading(false);
+        // Fire and forget - don't await
+        revalidate().catch((err) => {
+          logger.category('storage').error(`[useQuery] Background revalidation failed for key "${key}":`, err);
+        });
+        break;
+
+      case 'keep-stale':
+        // Don't auto-revalidate; keep showing stale data
+        setIsRevalidating(false);
+        setIsLoading(false);
+        break;
+    }
+  };
 
   // Main effect: load data and setup cache subscription
   useEffect(() => {
@@ -194,28 +266,25 @@ export function useQuery<T>(
           switch (cachePriority) {
             case 'networkFirst':
               // networkFirst: Always attempt to fetch fresh data, use cached as fallback
-              setIsValidating(true);
-              setIsLoading(false);
-              await revalidate();
+              await handleRevalidationStrategy('fetch');
               break;
 
             case 'cacheFirst':
               // cacheFirst: Only revalidate on explicit refetch, not automatically
-              setIsValidating(false);
+              setIsRevalidating(false);
               setIsLoading(false);
               break;
 
             case 'offlineFirst':
               // offlineFirst: If offline, don't force revalidation even if stale
               if (isOfflineRef.current) {
-                setIsValidating(false);
+                setIsRevalidating(false);
                 setIsLoading(false);
               } else if (isStale && revalidateOnFocus) {
                 // Online: revalidate if stale (SWR)
-                setIsValidating(true);
-                await revalidate();
+                await handleRevalidationStrategy('fetch');
               } else {
-                setIsValidating(false);
+                setIsRevalidating(false);
                 setIsLoading(false);
               }
               break;
@@ -225,15 +294,14 @@ export function useQuery<T>(
               // balanced (default): Revalidate if stale (SWR)
               if (isStale) {
                 if (revalidateOnFocus) {
-                  setIsValidating(true);
-                  await revalidate();
+                  await handleRevalidationStrategy('fetch');
                 } else {
-                  setIsValidating(false);
+                  setIsRevalidating(false);
                   setIsLoading(false);
                 }
               } else {
                 // Not stale - use cache as-is
-                setIsValidating(false);
+                setIsRevalidating(false);
                 setIsLoading(false);
               }
               break;
@@ -246,7 +314,7 @@ export function useQuery<T>(
             case 'cacheFirst':
             default:
               // All modes: fetch immediately if no cache exists
-              setIsValidating(true);
+              setIsRevalidating(true);
               await revalidate();
               break;
 
@@ -254,10 +322,10 @@ export function useQuery<T>(
               // offlineFirst: If offline with no cache, keep showing loading/empty
               // until comes online or explicit refetch
               if (isOfflineRef.current) {
-                setIsValidating(false);
+                setIsRevalidating(false);
                 setIsLoading(false);
               } else {
-                setIsValidating(true);
+                setIsRevalidating(true);
                 await revalidate();
               }
               break;
@@ -330,7 +398,7 @@ export function useQuery<T>(
   return {
     data,
     isLoading,
-    isValidating,
+    isRevalidating,
     error,
     refetch,
     invalidate,

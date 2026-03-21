@@ -605,21 +605,25 @@ export abstract class APIClient {
         }
       }
 
-      // Invalidate related cache entries
+      // Invalidate related cache entries (user mutation; expect fresh data immediately)
       if (options?.invalidateTags && options.invalidateTags.length > 0) {
-        await this.config.queryCache.invalidateByTags(options.invalidateTags);
+        await this.config.queryCache.invalidateByTags(
+          options.invalidateTags,
+          { strategy: 'immediate' },
+        );
         logger.category('api').debug(`Invalidated tags for ${methodName}`, {
           tags: options.invalidateTags,
         });
       }
 
-      // Phase 3: Cascade invalidation with invalidateOtherTags
+      // Phase 3: Cascade invalidation with invalidateOtherTags (user mutation; expect fresh data immediately)
       if (
         options?.invalidateOtherTags &&
         options.invalidateOtherTags.length > 0
       ) {
         await this.config.queryCache.invalidateByTags(
           options.invalidateOtherTags,
+          { strategy: 'immediate' },
         );
         logger.category('api').debug(`Cascade invalidated tags for ${methodName}`, {
           tags: options.invalidateOtherTags,
@@ -823,9 +827,12 @@ export abstract class APIClient {
         requestVersion,
       );
 
-      // Invalidate related cache entries (Phase 3: added for consistency with mutation)
+      // Invalidate related cache entries (batch results; expect fresh data immediately)
       if (config.invalidateTags && config.invalidateTags.length > 0) {
-        await this.config.queryCache.invalidateByTags(config.invalidateTags);
+        await this.config.queryCache.invalidateByTags(
+          config.invalidateTags,
+          { strategy: 'immediate' },
+        );
         logger.category('api').debug(`Invalidated tags for batch ${methodName}`, {
           tags: config.invalidateTags,
         });

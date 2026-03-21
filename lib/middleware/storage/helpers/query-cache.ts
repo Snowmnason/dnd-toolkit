@@ -27,6 +27,22 @@ function escapeRegexChars(str: string): string {
 // Types
 // ==========================================
 
+/**
+ * Revalidation strategy type for cache invalidation
+ * - 'immediate': Show loading state, wait for fresh data (blocks UI during refetch)
+ * - 'background': Return stale data immediately, refetch in background (SWR)
+ * - 'keep-stale': Keep stale data without auto-refetch (manual refetch only)
+ */
+export type RevalidationStrategy = 'immediate' | 'background' | 'keep-stale';
+
+/**
+ * Options for cache invalidation operations
+ */
+export interface InvalidateOptions {
+  /** Revalidation strategy (documents intent; actual behavior controlled by useQuery hooks) */
+  strategy?: RevalidationStrategy;
+}
+
 export interface CacheEntry<T = any> {
   data: T;
   timestamp: number;
@@ -327,10 +343,16 @@ class QueryCacheClass {
    * Invalidate cache entries by tags
    * Example: invalidateByTags(['worlds', 'user:123'])
    *
+   * @param tags - Tags to invalidate
+   * @param options - Optional configuration (strategy for revalidation intent)
+   *
    * Side effect: Increments global version to prevent stale writes
    * from in-flight requests
    */
-  async invalidateByTags(tags: string[]): Promise<void> {
+  async invalidateByTags(
+    tags: string[],
+    options?: InvalidateOptions,
+  ): Promise<void> {
     try {
       // Bump version to invalidate in-flight requests
       this.globalVersion++;
@@ -349,6 +371,7 @@ class QueryCacheClass {
         `Invalidated ${keysToInvalidate.length} entries by tags`,
         {
           tags,
+          strategy: options?.strategy || 'immediate',
           newVersion: this.globalVersion,
         },
       );
@@ -361,10 +384,16 @@ class QueryCacheClass {
    * Invalidate cache entries by pattern (regex or string)
    * Example: invalidate(/^worlds:/) or invalidate('worlds:user:123')
    *
+   * @param pattern - Pattern to match (string or regex)
+   * @param options - Optional configuration (strategy for revalidation intent)
+   *
    * Side effect: Increments global version to prevent stale writes
    * from in-flight requests
    */
-  async invalidate(pattern: string | RegExp): Promise<void> {
+  async invalidate(
+    pattern: string | RegExp,
+    options?: InvalidateOptions,
+  ): Promise<void> {
     try {
       // Bump version to invalidate in-flight requests
       this.globalVersion++;
@@ -392,6 +421,7 @@ class QueryCacheClass {
         `Invalidated ${keysToInvalidate.length} entries by pattern`,
         {
           pattern: pattern.toString(),
+          strategy: options?.strategy || 'immediate',
           newVersion: this.globalVersion,
         },
       );
@@ -435,6 +465,76 @@ class QueryCacheClass {
       return keysToInvalidate.length;
     } catch (error) {
       logger.category('storage').error("Error invalidating old entries:", error);
+      return 0;
+    }
+  }
+
+  /**
+   * Invalidate cache entries matching a predicate function
+   * Provides fine-grained control over which entries to invalidate
+   *
+   * Example: Invalidate only entries related to a specific world
+   * ```
+   * await QueryCache.selectiveInvalidate(
+   *   (key, entry) => key.includes(`world:${worldId}`),
+   *   { strategy: 'immediate' }
+   * );
+   * ```
+   *
+   * Example: Invalidate by tag AND key pattern
+   * ```
+   * await QueryCache.selectiveInvalidate(
+   *   (key, entry) => entry.tags?.includes('users') && key.startsWith('user:'),
+   *   { strategy: 'background' }
+   * );
+   * ```
+   *
+   * @param predicate - Function that returns true for entries to invalidate
+   * @param options - Optional configuration (strategy for revalidation intent)
+   * @returns Number of entries invalidated
+   *
+   * Side effect: Increments global version to prevent stale writes
+   * from in-flight requests. Strategy option documents the revalidation
+   * intent and is logged; actual revalidation behavior is controlled by
+   * the revalidationStrategy option in useQuery hooks.
+   */
+  async selectiveInvalidate(
+    predicate: (key: string, entry: CacheEntry) => boolean,
+    options?: InvalidateOptions,
+  ): Promise<number> {
+    try {
+      // Bump version to invalidate in-flight requests
+      this.globalVersion++;
+
+      const keysToInvalidate: string[] = [];
+
+      for (const [key, entry] of this.inMemoryCache.entries()) {
+        try {
+          if (predicate(key, entry)) {
+            keysToInvalidate.push(key);
+          }
+        } catch (err) {
+          logger.category('storage').error(
+            `Error evaluating predicate for key "${key}":`,
+            err,
+          );
+        }
+      }
+
+      await Promise.all(keysToInvalidate.map((key) => this.remove(key)));
+
+      logger.category('storage').info(
+        `Invalidated ${keysToInvalidate.length} entries by predicate`,
+        {
+          count: keysToInvalidate.length,
+          strategy: options?.strategy || 'immediate',
+          newVersion: this.globalVersion,
+        },
+      );
+
+      return keysToInvalidate.length;
+    } catch (error) {
+      logger.category('storage').error("Error invalidating by predicate:", error);
       return 0;
     }
   }

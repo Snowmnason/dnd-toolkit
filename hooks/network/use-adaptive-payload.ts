@@ -25,8 +25,8 @@
  * @see AdaptivePayload for quality mapping logic
  */
 
-import { QueryCache } from "@/lib/storage";
 import { NetworkManager, type AdaptivePayloadOptions } from '@/lib/network/network-manager';
+import { QueryCache } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import { useEffect, useMemo, useState } from 'react';
 
@@ -147,7 +147,7 @@ export function useAdaptivePayloadCacheInvalidation(options: {
           to: currentEffectiveType,
           tagsInvalidated: tagsToInvalidate,
         });
-        QueryCache.invalidateByTags(tagsToInvalidate).catch((err) => {
+        QueryCache.invalidateByTags(tagsToInvalidate, { strategy: 'background' }).catch((err) => {
           logger.category("error").warn("Failed to invalidate adaptive payload cache", err);
         });
         previousEffectiveType = currentEffectiveType;
@@ -162,8 +162,9 @@ export function useAdaptivePayloadCacheInvalidation(options: {
 /**
  * Manually invalidate cache for quality-aware queries.
  * Use when you want to force a refetch without waiting for network quality to change.
+ * Background strategy allows stale data to display while refetching.
  */
 export async function invalidateAdaptivePayloadCache(tagsToInvalidate: string[]): Promise<void> {
   logger.category("network").debug("Manually invalidating adaptive payload cache", { tagsToInvalidate });
-  await QueryCache.invalidateByTags(tagsToInvalidate);
+  await QueryCache.invalidateByTags(tagsToInvalidate, { strategy: 'background' });
 }

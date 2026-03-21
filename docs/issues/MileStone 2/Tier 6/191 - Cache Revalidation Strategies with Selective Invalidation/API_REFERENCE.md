@@ -32,7 +32,7 @@ interface UseQueryOptions {
 interface UseQueryState<T> {
   data: T | undefined;            // Cached data
   isLoading: boolean;             // True during initial load
-  isValidating: boolean;          // True during background revalidation
+  isRevalidating: boolean;        // True during background revalidation
   error: Error | undefined;       // Current error
   refetch: () => Promise<void>;   // Manually refetch
   invalidate: () => Promise<void>; // Manually invalidate and refetch
@@ -50,7 +50,7 @@ const { data, isLoading, error } = useQuery(
 );
 
 // With options
-const { data, isValidating } = useQuery(
+const { data, isRevalidating } = useQuery(
   'users:current',
   () => usersDB.getCurrentUser(),
   {
@@ -329,7 +329,7 @@ interface UseWorldsQueryResult {
   worlds: WorldWithAccess[];
   total: number;
   isLoading: boolean;
-  isValidating: boolean;
+  isRevalidating: boolean;
   error: string | null;
   refetch: () => Promise<void>;
   invalidate: () => Promise<void>;
@@ -364,7 +364,7 @@ function useCurrentUserQuery()
 interface UseCurrentUserQueryResult {
   user: User | null;
   isLoading: boolean;
-  isValidating: boolean;
+  isRevalidating: boolean;
   error: string | null;
   refetch: () => Promise<void>;
   invalidate: () => Promise<void>;

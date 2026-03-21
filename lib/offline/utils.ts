@@ -4,8 +4,8 @@
  * Helper functions for offline mutation handling
  */
 
-import { QueryCache } from "@/lib/middleware/storage/helpers/query-cache";
 import { getNetworkStatus } from "@/lib/middleware/network";
+import { QueryCache } from "@/lib/middleware/storage/helpers/query-cache";
 import { logger } from "@/lib/utils/logger";
 import type { MutationOperation, MutationPersistence, QueuedMutation } from "../../type-definitions/mutation-queue-types";
 import { OfflineMutationQueue } from "./mutation-queue";
@@ -347,8 +347,8 @@ export async function rollbackOptimisticUpdate(
       });
 
     // Invalidate the cache tags to force refetch of fresh data from server
-    // This clears any cached data affected by the failed mutation
-    await QueryCache.invalidateByTags(invalidateTags);
+    // This clears any cached data affected by the failed mutation (error recovery; ensure consistency)
+    await QueryCache.invalidateByTags(invalidateTags, { strategy: 'immediate' });
 
     logger
       .category("storage")
