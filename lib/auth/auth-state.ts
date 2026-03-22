@@ -117,7 +117,7 @@ export const AuthStateManager = {
       await SessionAdapter.clearSession();
 
       // Clear query cache (all user-specific cached queries)
-      const { QueryCache } = await import("../middleware/storage/helpers/query-cache");
+      const { QueryCache } = await import("@/lib/middleware/storage");
       await QueryCache.clearAll();
 
       // Clear FastCache (in-memory session cache)
