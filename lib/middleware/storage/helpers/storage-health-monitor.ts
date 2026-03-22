@@ -61,7 +61,7 @@ async function validateStorageHealth(): Promise<void> {
 
     // Lazy-import to avoid circular dependency
     const { SecureStorage } = await import("@/system/Storage");
-    const { QueryCache } = await import("@/lib/middleware/storage/helpers/query-cache");
+    const { QueryCache } = await import("@/lib/middleware/storage");
 
     // Test write to SecureStorage (critical for functionality)
     try {

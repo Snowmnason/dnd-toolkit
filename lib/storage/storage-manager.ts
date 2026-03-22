@@ -43,7 +43,7 @@ import type { CacheSchema } from '@/system/Storage/versioning/cache-versioning';
 let _queryCache: any = null;
 function getQueryCache() {
   if (!_queryCache) {
-    _queryCache = require('@/lib/middleware/storage/helpers/query-cache').QueryCache;
+    _queryCache = require('@/lib/middleware/storage').QueryCache;
   }
   return _queryCache;
 }

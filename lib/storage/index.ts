@@ -40,10 +40,10 @@
 export { StorageManager } from './storage-manager';
 
 // ─── Query cache (in-memory SWR cache for API/database results) ─────
-export { QueryCache } from '@/lib/middleware/storage/helpers/query-cache';
+export { QueryCache } from '@/lib/middleware/storage';
 export type {
-  CacheSchema, StorageGracefulResult,
-  StorageHealthReport, StorageManagerReadOptions, StorageManagerWriteOptions
+    CacheSchema, StorageGracefulResult,
+    StorageHealthReport, StorageManagerReadOptions, StorageManagerWriteOptions
 } from './storage-manager';
 
 // ─── Domain-specific storage (app data structures) ──────────────────
@@ -64,9 +64,9 @@ export { worldAccessCache } from "./sync/world-access-cache";
 
 // Operations
 export {
-  deleteImage,
-  getImageUrl,
-  listFiles,
-  uploadProfileImage
+    deleteImage,
+    getImageUrl,
+    listFiles,
+    uploadProfileImage
 } from './buckets/operations';
 

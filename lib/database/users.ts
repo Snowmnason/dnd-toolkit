@@ -1,4 +1,4 @@
-import { QueryCache } from "@/lib/middleware/storage/helpers/query-cache";
+import { QueryCache } from "@/lib/middleware/storage";
 import { logger } from "@/lib/utils";
 import { validateUsername } from "../../validation/validation";
 import { getUserRepository } from "./repositories";

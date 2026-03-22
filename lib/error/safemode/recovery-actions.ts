@@ -14,7 +14,7 @@
 
 import { Analytics, Performance } from "@/lib/analytics";
 import { AuthStateManager } from "@/lib/auth";
-import { QueryCache } from "@/lib/middleware/storage/helpers/query-cache";
+import { QueryCache } from "@/lib/middleware/storage";
 import { getAllRouteConfigs } from "@/lib/navigation";
 import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils";

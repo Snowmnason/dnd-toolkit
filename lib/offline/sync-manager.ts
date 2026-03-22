@@ -60,7 +60,7 @@ import {
 } from "@/lib/error";
 import { setSafeMode } from "@/lib/kernel/kernel-manager";
 import { getNetworkStatus, subscribeToNetworkStatus, type NetworkStatus } from "@/lib/middleware/network";
-import { QueryCache } from "@/lib/middleware/storage/helpers/query-cache";
+import { QueryCache } from "@/lib/middleware/storage";
 import { logger } from "@/lib/utils";
 import type {
     OfflineSyncConfig,

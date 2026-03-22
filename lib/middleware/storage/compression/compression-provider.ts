@@ -1,0 +1,321 @@
+/**
+ * Compression Provider Abstraction
+ *
+ * Abstracts platform-specific compression implementations (Web, Native, NoOp).
+ * Loads configuration from appsettings and returns the appropriate provider
+ * for the current platform and configured algorithm.
+ *
+ * **Design Pattern:**
+ * - Provider interface is platform-agnostic
+ * - Implementations handle platform differences internally
+ * - All operations are async and non-blocking
+ * - Config loaded once at startup and cached
+ *
+ * **Usage:**
+ * ```typescript
+ * // Get provider for configured algorithm
+ * const provider = getCompressionProvider();
+ *
+ * // Compress data
+ * const compressed = await provider.compress(dataBuffer);
+ *
+ * // Check if algorithm is supported
+ * if (provider.supports('gzip')) {
+ *   // Use gzip
+ * }
+ * ```
+ */
+
+import { getAppConfig } from '@/config';
+import { logger } from '@/lib/utils/logger';
+import { Platform } from 'react-native';
+
+/**
+ * Platform-agnostic compression provider interface
+ */
+export interface CompressionProvider {
+  /** Compress data asynchronously (non-blocking) */
+  compress(data: Uint8Array): Promise<Uint8Array>;
+
+  /** Decompress data asynchronously (non-blocking) */
+  decompress(data: Uint8Array): Promise<Uint8Array>;
+
+  /** Check if this provider supports the given algorithm */
+  supports(algorithm: string): boolean;
+}
+
+/**
+ * Web-based compression using Web Compression API
+ * Supports: gzip, deflate
+ */
+class WebCompressionProvider implements CompressionProvider {
+  constructor(private algorithm: string) {
+    if (!['gzip', 'deflate'].includes(algorithm)) {
+      logger
+        .category('storage')
+        .warn(`Web compression: algorithm ${algorithm} not natively supported, will use gzip`);
+    }
+  }
+
+  async compress(data: Uint8Array): Promise<Uint8Array> {
+    try {
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(data);
+          controller.close();
+        },
+      });
+
+      const compressed = stream.pipeThrough(
+        new CompressionStream(this.algorithm as 'gzip' | 'deflate'),
+      );
+      const reader = compressed.getReader();
+      const chunks: Uint8Array[] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+
+      // Combine chunks into single Uint8Array
+      const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+      const result = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.length;
+      }
+      return result;
+    } catch (error) {
+      logger
+        .category('storage')
+        .error(`Web compression failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
+  }
+
+  async decompress(data: Uint8Array): Promise<Uint8Array> {
+    try {
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(data);
+          controller.close();
+        },
+      });
+
+      const decompressed = stream.pipeThrough(
+        new DecompressionStream(this.algorithm as 'gzip' | 'deflate'),
+      );
+      const reader = decompressed.getReader();
+      const chunks: Uint8Array[] = [];
+
+       
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+
+      // Combine chunks into single Uint8Array
+      const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+      const result = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.length;
+      }
+      return result;
+    } catch (error) {
+      logger
+        .category('storage')
+        .error(`Web decompression failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
+  }
+
+  supports(algorithm: string): boolean {
+    return ['gzip', 'deflate'].includes(algorithm);
+  }
+}
+
+/**
+ * Native compression using zlib or expo-compression
+ * Supports: gzip, deflate, zstd (if available)
+ */
+class NativeCompressionProvider implements CompressionProvider {
+  private zlib: any;
+
+  constructor(private algorithm: string) {
+    try {
+      // Try to load zlib from react-native or expo
+       
+      this.zlib = require('zlib') || require('expo-zlib');
+      logger.category('storage').debug(`Native compression provider initialized for ${algorithm}`);
+    } catch {
+      logger
+        .category('storage')
+        .warn(`Native zlib not available, will use no-op compression`);
+    }
+  }
+
+  async compress(data: Uint8Array): Promise<Uint8Array> {
+    if (!this.zlib) {
+      return data; // No-op fallback
+    }
+
+    try {
+      // Use zlib.gzip or zlib.deflate based on algorithm
+      const method = this.algorithm === 'gzip' ? 'gzip' : 'deflate';
+
+      return new Promise((resolve, reject) => {
+        // eslint-disable-next-line security/detect-object-injection
+        this.zlib[method](Buffer.from(data), (err: any, result: any) => {
+          if (err) reject(err);
+          else resolve(new Uint8Array(result));
+        });
+      });
+    } catch (error) {
+      logger
+        .category('storage')
+        .error(`Native compression failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
+  }
+
+  async decompress(data: Uint8Array): Promise<Uint8Array> {
+    if (!this.zlib) {
+      return data; // No-op fallback
+    }
+
+    try {
+      // Detect and decompress (zlib.gunzip auto-detects gzip)
+      return new Promise((resolve, reject) => {
+        this.zlib.gunzip(Buffer.from(data), (err: any, result: any) => {
+          if (err) {
+            // Fallback to inflate if gunzip fails
+            this.zlib.inflate(Buffer.from(data), (inflateErr: any, inflateResult: any) => {
+              if (inflateErr) reject(inflateErr);
+              else resolve(new Uint8Array(inflateResult));
+            });
+          } else {
+            resolve(new Uint8Array(result));
+          }
+        });
+      });
+    } catch (error) {
+      logger
+        .category('storage')
+        .error(`Native decompression failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
+  }
+
+  supports(algorithm: string): boolean {
+    return ['gzip', 'deflate', 'zstd'].includes(algorithm);
+  }
+}
+
+/**
+ * No-op compression provider (pass-through)
+ * Used when compression is disabled or no provider available
+ */
+class NoOpCompressionProvider implements CompressionProvider {
+  async compress(data: Uint8Array): Promise<Uint8Array> {
+    return data; // No compression
+  }
+
+  async decompress(data: Uint8Array): Promise<Uint8Array> {
+    return data; // No decompression
+  }
+
+  supports(_algorithm: string): boolean {
+    return true; // Supports any algorithm (by doing nothing)
+  }
+}
+
+let cachedProvider: CompressionProvider | null = null;
+
+/**
+ * Get the compression provider for the current platform and config
+ *
+ * **Platform Selection:**
+ * - Web: Uses Web Compression API (CompressionStream/DecompressionStream)
+ * - Native (iOS/Android): Uses zlib or expo-compression
+ * - Fallback: NoOp provider (pass-through, no compression)
+ *
+ * **Config Integration:**
+ * - Loads compression config from appsettings
+ * - If compression disabled (enabled: false), returns NoOp provider
+ * - Selects algorithm from config
+ * - Caches provider after first call
+ *
+ * @returns CompressionProvider for configured algorithm on current platform
+ */
+export function getCompressionProvider(): CompressionProvider {
+  if (cachedProvider) return cachedProvider;
+
+  const appConfig = getAppConfig();
+  const config = appConfig.compression || { enabled: true, algorithm: 'gzip' };
+
+  // If compression disabled, use no-op provider
+  if (!config.enabled) {
+    cachedProvider = new NoOpCompressionProvider();
+    logger.category('storage').info(`Compression disabled via config, using no-op provider`);
+    return cachedProvider;
+  }
+
+  const algorithm = config.algorithm || 'gzip';
+
+  // Platform detection and provider selection
+  if (Platform.OS === 'web') {
+    const provider = new WebCompressionProvider(algorithm);
+    if (!provider.supports(algorithm)) {
+      logger
+        .category('storage')
+        .warn(`Web platform: algorithm ${algorithm} not supported, falling back to best-fit`);
+    }
+    cachedProvider = provider;
+  } else if (Platform.OS === 'ios' || Platform.OS === 'android') {
+    cachedProvider = new NativeCompressionProvider(algorithm);
+  } else {
+    // Desktop or unknown platform
+    cachedProvider = new NativeCompressionProvider(algorithm);
+  }
+
+  logger
+    .category('storage')
+    .info(
+      `Compression provider selected: ${cachedProvider.constructor.name} for algorithm=${algorithm}`,
+    );
+
+  return cachedProvider;
+}
+
+/**
+ * Reset cached provider (for testing)
+ */
+export function resetCompressionProvider(): void {
+  cachedProvider = null;
+}
+
+/**
+ * Get detailed provider info for debugging/monitoring
+ */
+export function getCompressionProviderInfo(): {
+  type: string;
+  algorithm: string;
+  enabled: boolean;
+  platform: string;
+} {
+  const provider = getCompressionProvider();
+  const appConfig = getAppConfig();
+  const config = appConfig.compression || { enabled: true, algorithm: 'gzip' };
+
+  return {
+    type: provider.constructor.name,
+    algorithm: config.algorithm || 'gzip',
+    enabled: config.enabled ?? true,
+    platform: Platform.OS,
+  };
+}

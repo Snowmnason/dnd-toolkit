@@ -249,6 +249,24 @@ export interface AppSettings {
     android?: Partial<AppSettings>;
     desktop?: Partial<AppSettings>;
   };
+  compression?: {
+    enabled?: boolean;
+    algorithm?: string; // 'gzip' | 'brotli' | 'zstd'
+    threshold?: number; // Bytes; only compress if >= threshold
+    maxBytesPerEntry?: number; // Per-entry hard cap; reject if exceeded
+    stats?: {
+      enabled?: boolean;
+      sampleRate?: number; // 0.0-1.0; percentage of operations to track
+    };
+    description?: string;
+  };
+  cacheSecurityLimits?: {
+    hardMaxBytes?: number; // Absolute cache size limit before emergency eviction
+    hardMaxEntries?: number; // Absolute entry count limit
+    rejectOversizedEntries?: boolean; // true: reject, false: warn
+    description?: string;
+  };
+  cachePersistenceMap?: Record<string, 'persist' | 'volatile'>;
 }
 
 let cachedConfig: AppSettings | null = null;

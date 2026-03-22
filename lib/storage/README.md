@@ -37,12 +37,62 @@ All data stored here is classified by sensitivity level to determine encryption,
 
 Full policy: [docs/issues/MileStone 2/168 - Privacy PII Data/PRIVACY_POLICY.md](../../docs/issues/MileStone%202/168%20-%20Privacy%20PII%20Data/PRIVACY_POLICY.md)
 
+## Compression & Storage Optimization
+
+The storage system includes automatic compression for large cache entries to optimize memory usage and storage efficiency.
+
+### Compression Configuration
+
+Compression is configured globally in `appsettings.json`:
+
+```json
+{
+  "compressionSettings": {
+    "enabled": true,
+    "algorithm": "gzip",
+    "threshold": 1024,
+    "maxBytesPerEntry": 10485760
+  },
+  "cacheSecurityLimits": {
+    "hardMaxBytes": 524288000,
+    "hardMaxEntries": 5000,
+    "rejectOversizedEntries": false
+  }
+}
+```
+
+### Automatic Compression
+
+- **Threshold-based**: Only entries > 1KB are compressed by default
+- **Platform-aware**: Uses Web Compression API on web, zlib on native platforms
+- **Transparent**: Compression/decompression happens automatically
+- **Versioned**: Includes version flags for future algorithm changes
+
+### Storage Limits
+
+- **Hard limits**: 500MB total cache size, 5000 entries maximum
+- **Per-entry limits**: 10MB maximum per entry
+- **Graceful handling**: Oversized entries logged/warned but not rejected by default
+
+### Compression Statistics
+
+Track compression effectiveness:
+
+```typescript
+import { getCompressionStats } from '@/lib/middleware/storage/compression';
+
+const stats = getCompressionStats();
+// Returns: totalOperations, bytesCompressed, bytesSaved, avgCompressionRatio
+```
+
 ## Architecture & Data Flow
 
 ```
 App Code
     ↓
 SecureStorage API
+    ↓
+Compression Middleware (automatic)
     ↓
 Backend Routing
     ↓
@@ -261,6 +311,71 @@ console.log('invalidated entries', removed);
 
 Clear all cached query results.
 
+### Compression API
+
+Automatic compression utilities for storage optimization.
+
+#### `getCompressionStats(): CompressionStats`
+
+Get compression effectiveness statistics.
+
+**Returns:** Object with `totalOperations`, `bytesCompressed`, `bytesSaved`, `avgCompressionRatio`.
+
+**Example:**
+```ts
+import { getCompressionStats } from "@/lib/middleware/storage/compression";
+
+const stats = getCompressionStats();
+console.log(`Compressed ${stats.bytesCompressed} bytes, saved ${stats.bytesSaved} bytes`);
+```
+
+#### `compressData(data, options?): Promise<CompressedData>`
+
+Manually compress data for storage.
+
+**Parameters:**
+- `data`: string | Uint8Array — Data to compress
+- `options`: `{ algorithm?: 'gzip' | 'deflate', level?: number }` — Compression options
+
+**Returns:** CompressedData with `data`, `originalSize`, `compressedSize`, `algorithm`.
+
+**Example:**
+```ts
+import { compressData } from "@/lib/middleware/storage/compression";
+
+const compressed = await compressData(largeJsonString, { algorithm: 'gzip' });
+await SecureStorage.setItem(key, compressed.data);
+```
+
+#### `decompressData(compressedData, algorithm?): Promise<string | Uint8Array>`
+
+Manually decompress previously compressed data.
+
+**Parameters:**
+- `compressedData`: string | Uint8Array — Compressed data
+- `algorithm`: 'gzip' | 'deflate' — Compression algorithm used
+
+**Returns:** Original uncompressed data.
+
+**Example:**
+```ts
+const compressed = await SecureStorage.getItem(key);
+if (compressed) {
+  const original = await decompressData(compressed, 'gzip');
+}
+```
+
+#### `isCompressionEnabled(): boolean`
+
+Check if compression is enabled globally.
+
+**Example:**
+```ts
+if (isCompressionEnabled()) {
+  // Use compression-aware storage
+}
+```
+
 ### Query Caching
 
 Integration with `hooks/storage/useQuery` for declarative data fetching with caching strategies.
@@ -414,6 +529,7 @@ Clear all access flags and metadata for a world. Never throws.
 - **`lib/cache`** – FastCache integration for ephemeral data storage
 - **`lib/network`** – Network error handling patterns
 - **`lib/middleware/storage/helpers`** – QueryCache implementation for query result caching
+- **`lib/middleware/storage/compression`** – Automatic compression middleware for storage optimization
 - **`hooks/storage`** – useQuery hook integration with revalidation strategies
 
 ## Error Handling & Edge Cases
@@ -510,6 +626,16 @@ const data = await SecureStorage.getValidatedJSON(key, schema);
 - **Key derivation (one-time):** ~50-100ms (amortized on startup)
 - **Scalability:** For large objects (>1MB), consider splitting into multiple keys or using FastCache + lazy decryption
 
+### Compression Overhead
+
+- **Gzip compression:** ~5-20µs per KB (depends on data compressibility)
+- **Deflate compression:** ~3-15µs per KB (faster but less compression)
+- **Threshold check:** ~50ns (negligible)
+- **Memory impact:** 2-3x temporary memory during compression/decompression
+- **Typical savings:** 60-80% for JSON data, 20-40% for already-compressed data
+
+**Recommendation:** Enabled by default for entries >1KB. Disable for pre-compressed data (images, videos).
+
 ### Cache Versioning
 
 - **validateCacheEntry():** ~100ns (valid schema) or ~1-2ms (invalid schema with error handling)
@@ -524,6 +650,7 @@ const data = await SecureStorage.getValidatedJSON(key, schema);
 - **`lib/database`** – Stores persistent user and world data through SecureStorage
 - **`lib/offline`** – Uses SecureStorage for offline mutation queue persistence
 - **`lib/middleware/storage/helpers`** – QueryCache for centralized query result management
+- **`lib/middleware/storage/compression`** – Automatic compression middleware for storage optimization
 - **`hooks/storage`** – useQuery hook with revalidation strategies and conditional fetching
 
 ## File Breakdown
@@ -539,4 +666,5 @@ const data = await SecureStorage.getValidatedJSON(key, schema);
 | `update-storage-cache.ts` | Cache update orchestration and coordination |
 | `storage-health-monitor.ts` | Background health checks and monitoring |
 | `data-classification.ts` | Data sensitivity levels and privacy classification |
+| `compression.ts` | Automatic compression middleware for storage optimization |
 | `index.ts` | Barrel exports and storage key constants |

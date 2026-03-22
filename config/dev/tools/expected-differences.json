@@ -95,4 +95,7 @@
   ,"offline.description": "Offline queue configuration descriptions differ between dev and production"
   ,"image.loader.retryDelayMs": "Image loader retry/backoff delay; dev may use shorter delays for faster retries during testing, production should use longer backoff to avoid rapid retries on flaky networks"
   ,"image.loader.maxRetries": "Maximum number of retries for image loading; dev may reduce retries to speed up tests, production should use conservative retry counts to balance UX and network load"
+  ,"compression.threshold": "Compression threshold is lower in dev (512B) for aggressive testing; higher in production (1KB) to avoid compression overhead on small entries"
+  ,"compression.stats.sampleRate": "Compression stats sampling is 100% in dev for full instrumentation; reduced to 10% in production to minimize overhead"
+  ,"cacheSecurityLimits.rejectOversizedEntries": "Dev warns on oversized entries to enable broader testing; production rejects oversized entries to enforce strict size limits"
 }
