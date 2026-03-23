@@ -25,7 +25,7 @@ Compression is configured globally in `appsettings.json`:
 
 ```json
 {
-  "compressionSettings": {
+  "compression": {
     "enabled": true,
     "algorithm": "gzip",
     "threshold": 1024,
@@ -33,7 +33,7 @@ Compression is configured globally in `appsettings.json`:
   },
   "cacheSecurityLimits": {
     "hardMaxBytes": 524288000,
-    "hardMaxBytesPerEntry": 10485760,
+    "hardMaxEntries": 5000,
     "rejectOversizedEntries": false
   }
 }
@@ -44,7 +44,7 @@ Compression is configured globally in `appsettings.json`:
 - **`enabled`**: Enable/disable compression globally
 - **`algorithm`**: Compression algorithm (`"gzip"` or `"deflate"`)
 - **`threshold`**: Minimum size in bytes to trigger compression (default: 1024)
-- **`maxBytesPerEntry`**: Maximum size per entry before rejection
+- **`maxBytesPerEntry`**: Maximum size per entry; oversized entries are stored uncompressed with a warning
 
 ## Automatic Compression
 
@@ -68,7 +68,7 @@ await QueryCache.set("worlds:user:123", worldsData, {
 For special cases, you can manually compress/decompress data:
 
 ```typescript
-import { compressData, decompressData } from "@/lib/middleware/storage/compression";
+import { compressData, decompressData } from "@/lib/middleware/storage/compression/compression-middleware";
 
 // Manual compression
 const compressed = await compressData(largeJsonString, {
@@ -91,7 +91,7 @@ if (stored) {
 Track compression statistics to optimize your storage usage:
 
 ```typescript
-import { getCompressionStats } from "@/lib/middleware/storage/compression";
+import { getCompressionStats } from "@/lib/middleware/storage/compression/compression-middleware";
 
 const stats = getCompressionStats();
 console.log(`Compression Stats:

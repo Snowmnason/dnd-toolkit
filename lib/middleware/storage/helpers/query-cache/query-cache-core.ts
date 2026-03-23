@@ -1,9 +1,15 @@
 import { logger } from "@/lib/utils";
 import { FastCache } from "@/system/Storage/";
 import type {
-    CacheEntry,
-    CacheOptions,
+  CacheEntry,
+  CacheOptions,
 } from "@/type-definitions";
+import {
+  decode as decodeCompression,
+  encode as encodeCompression,
+  type CompressionEncodeOptions,
+} from "../../compression/compression-middleware";
+import { measureEntrySize } from "../lru-eviction";
 import type { CacheSubscriber, QueryCacheInternals } from "./internals";
 
 /**
@@ -27,10 +33,40 @@ export async function cacheGet<T>(
 
     if (!entry) {
       const storageKey = ctx.toCacheKey(key);
-      const retrieved = await FastCache.getJSON<CacheEntry<T>>(storageKey);
-      if (retrieved) {
-        entry = retrieved;
-        ctx.inMemoryCache.set(key, entry);
+      let rawData = await FastCache.getJSON<CacheEntry<T>>(storageKey);
+      
+      if (rawData) {
+        // **Decompression: Decompress data retrieved from persistent storage**
+        try {
+          const decompressed = await decodeCompression(rawData);
+          if (decompressed) {
+            rawData = decompressed;
+          }
+        } catch (compressionError) {
+          // If the entry looks compressed (has version/algorithm fields) but
+          // decompression failed, the raw data is a corrupted CompressedEntry
+          // wrapper — not the original data. Discard it instead of returning garbage.
+          if (rawData && typeof rawData === 'object' && 'version' in rawData && 'algorithm' in rawData) {
+            logger
+              .category('storage')
+              .warn(
+                `Compression decode failed for ${key}, discarding corrupted compressed entry: ${compressionError instanceof Error ? compressionError.message : String(compressionError)}`,
+              );
+            rawData = null;
+          } else {
+            // Not a compressed entry format — safe to use as-is
+            logger
+              .category('storage')
+              .warn(
+                `Compression decode failed for ${key}, using raw value: ${compressionError instanceof Error ? compressionError.message : String(compressionError)}`,
+              );
+          }
+        }
+        
+        if (rawData) {
+          entry = rawData;
+          ctx.inMemoryCache.set(key, entry);
+        }
       }
     }
 
@@ -85,10 +121,29 @@ export async function cacheSet<T>(
 
     ctx.inMemoryCache.set(key, entry);
 
-    const entrySize = ctx.trackEntrySize(key, entry);
+    // Measure once, pass to LRU tracker to avoid double-serialization
+    const entrySize = measureEntrySize(entry);
+    ctx.trackEntrySize(key, entry, entrySize);
 
     const storageKey = ctx.toCacheKey(key);
-    await FastCache.setJSON(storageKey, entry);
+    
+    // **Compression: Encode (compress) before persisting**
+    let valueToStore = entry;
+    try {
+      const compressionOptions: CompressionEncodeOptions = { key };
+      valueToStore = await encodeCompression(entry, compressionOptions);
+    } catch (compressionError) {
+      // Log warning but don't fail the operation; continue with uncompressed value
+      logger
+        .category('storage')
+        .warn(
+          `Compression encode failed for ${key}, persisting uncompressed: ${compressionError instanceof Error ? compressionError.message : String(compressionError)}`,
+        );
+      // Use original entry if compression fails
+      valueToStore = entry;
+    }
+    
+    await FastCache.setJSON(storageKey, valueToStore);
 
     if (ctx.isOverLimit()) {
       await ctx.evictLRU();

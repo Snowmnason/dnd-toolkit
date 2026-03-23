@@ -30,6 +30,16 @@ export function resolvePersistenceLevel(
 
   // Use Object.entries to avoid object injection sink warnings
   for (const [pattern, level] of Object.entries(map)) {
+    // Belt-and-suspenders: skip any entry whose value isn't a known persistence
+    // literal. The map was already sanitized at load time in loadQueryCacheConfig(),
+    // but a guard here protects against direct construction paths in tests/mocks.
+    if (level !== 'persist' && level !== 'volatile') {
+      logger.category('storage').debug(
+        `[resolvePersistenceLevel] Skipping entry with invalid level: pattern="${pattern}" level="${String(level)}"`,
+      );
+      continue;
+    }
+
     // Convert glob-style pattern to regex
     const regexPattern = pattern
       .replace(/\./g, '\\.')        // Escape dots

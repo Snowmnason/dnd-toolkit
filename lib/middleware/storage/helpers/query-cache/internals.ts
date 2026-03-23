@@ -2,8 +2,8 @@ import { getAppConfig } from "@/config";
 import { logger } from "@/lib/utils";
 import { FastCache } from "@/system/Storage/";
 import type {
-    CacheEntry,
-    QueryCacheConfig,
+  CacheEntry,
+  QueryCacheConfig,
 } from "@/type-definitions";
 import { LRUEvictionTracker, measureEntrySize } from "../lru-eviction";
 
@@ -29,7 +29,23 @@ function loadQueryCacheConfig(): QueryCacheConfig {
   try {
     const appConfig = getAppConfig();
     if (appConfig.cachePersistenceMap) {
-      config.persistenceLevelMap = appConfig.cachePersistenceMap;
+      // Sanitize: only keep entries whose values are the known persistence literals.
+      // Config files may include metadata keys (e.g. 'description') that are not
+      // valid persistence levels and would corrupt resolvePersistenceLevel() output.
+      const sanitized: Record<string, 'persist' | 'volatile'> = {};
+      for (const [k, v] of Object.entries(appConfig.cachePersistenceMap)) {
+        if (v === 'persist' || v === 'volatile') {
+          sanitized[k] = v;
+        } else {
+          logger.category('storage').warn(
+            `[QueryCache] Ignoring invalid cachePersistenceMap entry: "${k}" = "${String(v)}" (expected 'persist' | 'volatile')`,
+          );
+        }
+      }
+
+      if (Object.keys(sanitized).length > 0) {
+        config.persistenceLevelMap = sanitized;
+      }
     }
   } catch (error) {
     logger.category('storage').debug(
@@ -56,6 +72,7 @@ export class QueryCacheInternals {
   readonly pendingRequests: Map<string, Promise<any>> = new Map();
   globalVersion: number = 0;
   evictionsTotal: number = 0;
+  totalEntriesEvicted: number = 0;
   lastEvictionTime: number | null = null;
   lastEvictionCount: number = 0;
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
@@ -124,9 +141,14 @@ export class QueryCacheInternals {
     }
   }
 
-  /** Track an entry's size for LRU eviction */
-  trackEntrySize(key: string, entry: CacheEntry): number {
-    const sizeBytes = measureEntrySize(entry);
+  /**
+   * Track an entry's size for LRU eviction.
+   * @param key Cache key
+   * @param entry Cache entry (used for measurement if precomputedSize not provided)
+   * @param precomputedSize If the caller already measured the entry, pass it to avoid re-serializing
+   */
+  trackEntrySize(key: string, entry: CacheEntry, precomputedSize?: number): number {
+    const sizeBytes = precomputedSize ?? measureEntrySize(entry);
     this.lruTracker.trackEntry(key, sizeBytes);
     return sizeBytes;
   }
@@ -172,6 +194,7 @@ export class QueryCacheInternals {
     if (keysToEvict.length > 0) {
       await this.removeEntries(keysToEvict);
       this.evictionsTotal++;
+      this.totalEntriesEvicted += keysToEvict.length;
       this.lastEvictionTime = Date.now();
       this.lastEvictionCount = keysToEvict.length;
     }

@@ -47,7 +47,7 @@ Compression is configured globally in `appsettings.json`:
 
 ```json
 {
-  "compressionSettings": {
+  "compression": {
     "enabled": true,
     "algorithm": "gzip",
     "threshold": 1024,
@@ -71,15 +71,23 @@ Compression is configured globally in `appsettings.json`:
 ### Storage Limits
 
 - **Hard limits**: 500MB total cache size, 5000 entries maximum
-- **Per-entry limits**: 10MB maximum per entry
-- **Graceful handling**: Oversized entries logged/warned but not rejected by default
+- **Per-entry limits**: 10MB maximum per entry — oversized entries stored uncompressed with a warning
+- **Graceful handling**: Oversized entries are never rejected; compression is skipped gracefully
+
+### Compression Performance Notes
+
+- **Decompression cost**: Large entries (>1MB) may add 5-50ms decompression latency on mobile devices. For hot-path data accessed every render, consider shorter TTLs or in-memory caching to avoid repeated decompression.
+- **Base64 overhead**: Compressed data is stored as base64 (~33% size increase over raw bytes) for JSON round-trip safety. Stats report `totalStoredBytes` which includes this overhead, so `bytesSaved` reflects real savings.
+- **Memory during decompression**: Both the compressed and decompressed copies exist briefly in memory. For very large entries (>5MB), this could spike memory on constrained devices.
+- **Sampling**: Compression logs use probabilistic sampling (default 10%) to reduce noise. Tune via `compression.stats.sampleRate` in appsettings.
+- **Periodic stats reset**: Call `startPeriodicReset()` (default 24h) to prevent long-running averages from masking recent compression trends.
 
 ### Compression Statistics
 
 Track compression effectiveness:
 
 ```typescript
-import { getCompressionStats } from '@/lib/middleware/storage/compression';
+import { getCompressionStats } from '@/lib/middleware/storage/compression/compression-middleware';
 
 const stats = getCompressionStats();
 // Returns: totalOperations, bytesCompressed, bytesSaved, avgCompressionRatio
@@ -323,7 +331,7 @@ Get compression effectiveness statistics.
 
 **Example:**
 ```ts
-import { getCompressionStats } from "@/lib/middleware/storage/compression";
+import { getCompressionStats } from "@/lib/middleware/storage/compression/compression-middleware";
 
 const stats = getCompressionStats();
 console.log(`Compressed ${stats.bytesCompressed} bytes, saved ${stats.bytesSaved} bytes`);
@@ -341,7 +349,7 @@ Manually compress data for storage.
 
 **Example:**
 ```ts
-import { compressData } from "@/lib/middleware/storage/compression";
+import { compressData } from "@/lib/middleware/storage/compression/compression-middleware";
 
 const compressed = await compressData(largeJsonString, { algorithm: 'gzip' });
 await SecureStorage.setItem(key, compressed.data);

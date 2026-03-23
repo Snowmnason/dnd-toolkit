@@ -58,7 +58,7 @@ export function getEvictionStats(ctx: QueryCacheInternals): EvictionStatsSnapsho
     evictionsTotal: ctx.evictionsTotal,
     lastEviction,
     averageEntriesPerEviction:
-      ctx.evictionsTotal > 0 ? ctx.lastEvictionCount : 0,
+      ctx.evictionsTotal > 0 ? ctx.totalEntriesEvicted / ctx.evictionsTotal : 0,
   };
 }
 
@@ -106,6 +106,7 @@ export async function evictOldestN(
     await ctx.removeEntries(keysToEvict);
 
     ctx.evictionsTotal++;
+    ctx.totalEntriesEvicted += keysToEvict.length;
     ctx.lastEvictionTime = Date.now();
     ctx.lastEvictionCount = keysToEvict.length;
 

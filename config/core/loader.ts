@@ -444,6 +444,25 @@ export function getAppConfig(): AppSettings {
     throw new Error(validationMsg);
   }
 
+  // Warn about malformed cachePersistenceMap entries (non-persistence values like 'description').
+  // These are silently ignored at runtime but surfaced here in dev to help config authors.
+  if (environment === "development" && config.cachePersistenceMap) {
+    const invalidEntries = Object.entries(config.cachePersistenceMap as Record<string, unknown>)
+      .filter(([, v]) => v !== 'persist' && v !== 'volatile');
+    if (invalidEntries.length > 0) {
+      const configFile =
+        environment === "development"
+          ? "config/appsettings.dev.json"
+          : "config/appsettings.json";
+      console.warn(
+        `[AppConfig] ${configFile}: cachePersistenceMap contains ${invalidEntries.length} non-persistence ` +
+        `entr${invalidEntries.length === 1 ? 'y' : 'ies'} that will be ignored at runtime: ` +
+        invalidEntries.map(([k]) => `"${k}"`).join(', ') +
+        `. Move these out of the map (e.g. to "cachePersistenceMapDescription" at top level).`,
+      );
+    }
+  }
+
   cachedConfig = config as AppSettings;
   return cachedConfig;
 }

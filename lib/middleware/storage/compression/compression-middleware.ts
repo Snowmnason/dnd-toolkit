@@ -37,14 +37,19 @@
 
 import { getAppConfig } from '@/config';
 import { getCompressionProvider } from '@/lib/middleware/storage/compression/compression-provider';
-import { logger } from '@/lib/utils/logger';
 import {
-  recordEncode,
-  recordDecode,
+  getDecodeStats as getDecodeStatsInternal,
+  getLastPeriodicSnapshot as getLastPeriodicSnapshotInternal,
   getStats as getStatsInternal,
+  recordDecode,
+  recordEncode,
   resetStats as resetStatsInternal,
+  startPeriodicReset as startPeriodicResetInternal,
+  stopPeriodicReset as stopPeriodicResetInternal,
   type CompressionStatsSnapshot,
+  type DecodeStatsSnapshot,
 } from '@/lib/middleware/storage/compression/compression-stats';
+import { logger } from '@/lib/utils/logger';
 
 /**
  * Compressed entry wrapper with version and metadata
@@ -81,9 +86,9 @@ export interface CompressionEncodeOptions {
 }
 
 /**
- * Re-export CompressionStatsSnapshot from stats module
+ * Re-export stats types from stats module
  */
-export type { CompressionStatsSnapshot };
+export type { CompressionStatsSnapshot, DecodeStatsSnapshot };
 
 /**
  * Measure entry size in UTF-8 bytes (platform-consistent)
@@ -99,12 +104,14 @@ function measureSizeBytes(data: any): number {
     // Fallback for environments without Buffer (rare)
     return new TextEncoder().encode(serialized).length;
   } catch (error) {
+    // Circular refs / non-serializable objects: use 1KB default so the entry
+    // still counts toward cache limits rather than appearing as zero-size.
     logger
       .category('storage')
       .warn(
-        `Failed to measure entry size: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to measure entry size (using 1KB default): ${error instanceof Error ? error.message : String(error)}`,
       );
-    return 0;
+    return 1024;
   }
 }
 
@@ -132,6 +139,37 @@ function getCompressionRatio(original: number, compressed: number): number {
 }
 
 /**
+ * Convert Uint8Array to base64 string for JSON serialization
+ * JSON cannot preserve Uint8Array, so we encode to base64 before persistence
+ */
+function uint8ArrayToBase64(data: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < data.length; i++) {
+    // NOTE: String.fromCharCode is called with data[i] (a number 0-255 from Uint8Array).
+    // This is safe: data is internal/controlled, not user input. No injection vector.
+    // eslint-disable-next-line security/detect-object-injection
+    binary += String.fromCharCode(data[i]);
+  }
+  return btoa(binary);
+}
+
+/**
+ * Convert base64 string back to Uint8Array after JSON deserialization
+ * Called in decode() to restore Uint8Array from persisted base64 representation
+ */
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    // NOTE: bytes[i] assignment from charCodeAt() result (a number 0-255).
+    // This is safe: both values are internal/controlled. No injection vector.
+    // eslint-disable-next-line security/detect-object-injection
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+/**
  * Encode (compress) a value for storage
  *
  * Steps:
@@ -150,46 +188,32 @@ export async function encode(value: any, options: CompressionEncodeOptions = {})
   const startTime = performance.now();
   const appConfig = getAppConfig();
   const config = appConfig.compression || { enabled: true, algorithm: 'gzip', threshold: 1024 };
-  const limits = appConfig.cacheSecurityLimits || {
-    hardMaxBytes: 500 * 1024 * 1024,
-    hardMaxEntries: 5000,
-    rejectOversizedEntries: true,
-  };
 
   try {
     const sizeBytes = measureSizeBytes(value);
 
     // 1. Check hard per-entry size limit (from compression config)
+    // Future: throw based on importance (e.g. reject critical data, allow drafted notes)
     if (config.maxBytesPerEntry && sizeBytes > config.maxBytesPerEntry) {
-      if (limits.rejectOversizedEntries) {
-        const err = new Error(
-          `Entry exceeds max size: ${sizeBytes} > ${config.maxBytesPerEntry}`,
+      logger
+        .category('storage')
+        .warn(
+          `Compression encode: Oversized entry (${sizeBytes}B > ${config.maxBytesPerEntry}B) at key=${options.key}, storing uncompressed`,
         );
-        logger
-          .category('storage')
-          .error(
-            `Compression encode: Entry rejected (oversized: ${sizeBytes}B) at key=${options.key}`,
-          );
-        throw err;
-      } else {
-        logger
-          .category('storage')
-          .warn(
-            `Compression encode: Oversized entry allowed (${sizeBytes}B) at key=${options.key}, may skew cache stats`,
-          );
-      }
+      recordEncode(sizeBytes, sizeBytes, sizeBytes, false, 0);
+      return value;
     }
 
     // 2. If compression disabled, return as-is
     if (!config.enabled) {
-      recordEncode(sizeBytes, sizeBytes, false, 0);
+      recordEncode(sizeBytes, sizeBytes, sizeBytes, false, 0);
       return value;
     }
 
     // 3. Check compression threshold
     const threshold = config.threshold || 1024;
     if (sizeBytes < threshold) {
-      recordEncode(sizeBytes, sizeBytes, false, 0);
+      recordEncode(sizeBytes, sizeBytes, sizeBytes, false, 0);
       logger
         .category('storage')
         .debug(
@@ -208,6 +232,11 @@ export async function encode(value: any, options: CompressionEncodeOptions = {})
       isCompressed(options.previousValue) &&
       options.previousValue.algorithm === algorithm
     ) {
+      // Calculate previous compressed byte length (data might be base64 string or Uint8Array)
+      const previousCompressedBytes = typeof options.previousValue.data === 'string'
+        ? base64ToUint8Array(options.previousValue.data).length
+        : options.previousValue.data.length;
+      
       const sizeDelta = Math.abs(sizeBytes - options.previousValue.originalSize);
       const sizeDeltaPct = (sizeDelta / options.previousValue.originalSize) * 100;
       if (sizeDeltaPct < 20) {
@@ -217,7 +246,9 @@ export async function encode(value: any, options: CompressionEncodeOptions = {})
           .debug(
             `Compression encode: Recompression skipped (only ${sizeDeltaPct.toFixed(1)}% delta) at key=${options.key}`,
           );
-        recordEncode(sizeBytes, options.previousValue.data.length, true, 0);
+        // storedBytes: estimate base64 overhead (~4/3 of raw compressed)
+        const previousStoredBytes = Math.ceil(previousCompressedBytes * 4 / 3);
+        recordEncode(sizeBytes, previousCompressedBytes, previousStoredBytes, true, 0);
         return options.previousValue;
       }
     }
@@ -231,19 +262,23 @@ export async function encode(value: any, options: CompressionEncodeOptions = {})
     const ratio = getCompressionRatio(sizeBytes, compressedSize);
 
     // Create compressed entry
+    // NOTE: data is stored as base64 string for JSON serialization round-trip safety.
+    // Uint8Array does not survive JSON.stringify/parse, so we encode to base64 here.
     const entry: CompressedEntry = {
       version: 1,
       algorithm,
       originalSize: sizeBytes,
-      data: compressed,
+      data: uint8ArrayToBase64(compressed) as any, // Stored as base64 string for JSON safety
       timestamp: Date.now(),
       wasPreviouslyCompressed: isCompressed(options.previousValue),
     };
 
-    // Record compression stats
-    recordEncode(sizeBytes, compressedSize, true, performance.now() - startTime);
+    // Record compression stats (storedBytes = base64 size of compressed data, ~33% larger)
+    const base64StoredBytes = Math.ceil(compressedSize * 4 / 3);
+    recordEncode(sizeBytes, compressedSize, base64StoredBytes, true, performance.now() - startTime);
 
-    // Log compression result (if stats sampling enabled and within sample rate)
+    // Log compression result using probabilistic sampling to reduce log volume.
+    // 10% default balances visibility with noise; tune via config.stats.sampleRate.
     const shouldLogStats = (config.stats?.enabled ?? true) && (config.stats?.sampleRate ?? 0.1) > Math.random();
     if (shouldLogStats) {
       logger
@@ -309,22 +344,31 @@ export async function decode(value: any): Promise<any> {
     }
 
     // 4. Decompress
-    const decompressed = await provider.decompress(entry.data);
+    // NOTE: entry.data is stored as base64 string in JSON, so convert back to Uint8Array
+    const compressedBytes = typeof entry.data === 'string' 
+      ? base64ToUint8Array(entry.data)
+      : entry.data; // Fallback for direct Uint8Array (shouldn't happen with JSON persistence)
+    
+    const decompressed = await provider.decompress(compressedBytes);
 
     // 5. Parse JSON
     const decoded = JSON.parse(new TextDecoder().decode(decompressed));
 
     // Record decompression stats
-    recordDecode(entry.originalSize, entry.data.length, performance.now() - startTime);
+    const compressedByteLength = typeof entry.data === 'string'
+      ? base64ToUint8Array(entry.data).length
+      : entry.data.length;
+    
+    recordDecode(entry.originalSize, compressedByteLength, performance.now() - startTime);
 
     // Log decompression result (if stats sampling enabled)
     const shouldLogStats = (config.stats?.enabled ?? true) && (config.stats?.sampleRate ?? 0.1) > Math.random();
     if (shouldLogStats) {
-      const ratio = getCompressionRatio(entry.originalSize, entry.data.length);
+      const ratio = getCompressionRatio(entry.originalSize, compressedByteLength);
       logger
         .category('storage')
         .debug(
-          `Compression decode: Decompressed ${entry.data.length}B → ${entry.originalSize}B (${(ratio * 100).toFixed(1)}%) in ${(performance.now() - startTime).toFixed(2)}ms`,
+          `Compression decode: Decompressed ${compressedByteLength}B → ${entry.originalSize}B (${(ratio * 100).toFixed(1)}%) in ${(performance.now() - startTime).toFixed(2)}ms`,
         );
     }
 
@@ -340,7 +384,7 @@ export async function decode(value: any): Promise<any> {
 }
 
 /**
- * Get current compression statistics snapshot
+ * Get current compression statistics snapshot (encode-side)
  * Re-exported from compression-stats module
  * @returns Stats snapshot
  */
@@ -349,9 +393,40 @@ export function getStats(): CompressionStatsSnapshot {
 }
 
 /**
- * Reset statistics (for testing)
+ * Get decode-side statistics
+ * Re-exported from compression-stats module
+ */
+export function getDecodeStats(): DecodeStatsSnapshot {
+  return getDecodeStatsInternal();
+}
+
+/**
+ * Reset statistics (for testing or manual reset)
  * Re-exported from compression-stats module
  */
 export function resetStats(): void {
   resetStatsInternal();
+}
+
+/**
+ * Start periodic stats snapshot + reset (default: 24 hours).
+ * Prevents long-running averages from masking recent trends.
+ * The previous snapshot is available via getLastPeriodicSnapshot().
+ */
+export function startPeriodicReset(intervalMs?: number): void {
+  startPeriodicResetInternal(intervalMs);
+}
+
+/**
+ * Stop periodic stats reset
+ */
+export function stopPeriodicReset(): void {
+  stopPeriodicResetInternal();
+}
+
+/**
+ * Get the last snapshot taken by periodic reset (null until first reset fires)
+ */
+export function getLastPeriodicSnapshot(): CompressionStatsSnapshot | null {
+  return getLastPeriodicSnapshotInternal();
 }

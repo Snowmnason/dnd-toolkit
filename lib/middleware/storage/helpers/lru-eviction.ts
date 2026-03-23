@@ -15,6 +15,8 @@
  * - No external locking needed; intended to be locked by caller (QueryCache)
  */
 
+import { logger } from '@/lib/utils/logger';
+
 /**
  * LRU entry metadata
  */
@@ -172,7 +174,12 @@ export class LRUEvictionTracker {
 /**
  * Measure entry size in UTF-8 bytes (for consistent cross-platform sizing)
  * @param data Any object/value to measure
- * @returns Size in UTF-8 bytes
+ * @returns Size in UTF-8 bytes (0 if measurement fails)
+ *
+ * **Error Handling:**
+ * - If serialization fails (circular refs, non-serializable objects), returns 0
+ * - Safe fallback prevents double-throwing on circular/malformed data
+ * - Caller is responsible for handling zero-sized entries if needed
  */
 export function measureEntrySize(data: any): number {
   try {
@@ -182,8 +189,14 @@ export function measureEntrySize(data: any): number {
     }
     // Fallback for environments without Buffer
     return new TextEncoder().encode(serialized).length;
-  } catch {
-    // If serialization fails, estimate size
-    return JSON.stringify(data).length;
+  } catch (error) {
+    // Circular refs / non-serializable objects: use 1KB default so the entry
+    // still counts toward cache limits rather than appearing as zero-size.
+    logger
+      .category('storage')
+      .warn(
+        `measureEntrySize: Failed to serialize data (using 1KB default): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    return 1024;
   }
 }
