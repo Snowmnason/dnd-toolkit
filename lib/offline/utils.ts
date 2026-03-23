@@ -5,7 +5,7 @@
  */
 
 import { getNetworkStatus } from "@/lib/middleware/network";
-import { QueryCache } from "@/lib/middleware/storage/helpers/query-cache";
+import { QueryCache } from "@/lib/middleware/storage";
 import { logger } from "@/lib/utils/logger";
 import type { MutationOperation, MutationPersistence, QueuedMutation } from "../../type-definitions/mutation-queue-types";
 import { OfflineMutationQueue } from "./mutation-queue";

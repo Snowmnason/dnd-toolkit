@@ -52,6 +52,8 @@ export interface CacheEntry<T = any> {
   tags?: string[];
   /** Version number for race condition prevention during invalidation */
   version?: number;
+  /** Persistence level: 'persist' (survives logout) or 'volatile' (cleared on logout) */
+  persistenceLevel?: 'persist' | 'volatile';
 }
 
 /**
@@ -76,6 +78,10 @@ export interface QueryCacheConfig {
   defaultCacheTime: number;
   /** Maximum number of entries in cache before pruning (prevent unbounded growth) */
   maxEntries: number;
+  /** Maximum total cache size in bytes before LRU eviction (default: 100MB) */
+  maxBytes?: number;
+  /** Pattern-based persistence level mapping (key pattern → 'persist' | 'volatile') */
+  persistenceLevelMap?: Record<string, 'persist' | 'volatile'>;
 }
 
 // ======================================================

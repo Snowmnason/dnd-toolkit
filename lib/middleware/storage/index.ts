@@ -26,9 +26,6 @@ export {
     shouldUseSecureStorage
 } from "./helpers/privacy";
 
-// ─── Query Cache ────────────────────────────────────────────────────
-export { QueryCache } from './helpers/query-cache';
-
 // ─── Error Handling ─────────────────────────────────────────────────
 export {
     batchStorageOperation,
@@ -71,4 +68,8 @@ export {
     loadPerformanceMetrics,
     persistPerformanceMetrics
 } from "./performance-storage-service";
+
+// ─── Query Cache public surface ─────────────────────────────────────
+export { QueryCacheInternals } from "./helpers/query-cache/internals";
+export { QueryCache } from "./helpers/query-cache/query-cache";
 

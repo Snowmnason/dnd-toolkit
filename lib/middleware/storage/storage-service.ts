@@ -29,6 +29,11 @@ import {
   type CacheSchema,
 } from '@/system/Storage/versioning/cache-versioning';
 import {
+  decode as decodeCompression,
+  encode as encodeCompression,
+  type CompressionEncodeOptions,
+} from './compression/compression-middleware';
+import {
   classifyKey,
   getPrivacyStorageBackend,
   shouldUseSecureStorage,
@@ -126,6 +131,14 @@ function getBackendLabel(key: string, backendOverride?: StorageBackendType): str
  * If a schema is provided, delegates to SecureStorage.setVersionedJSON(),
  * which wraps the value with version metadata for validation on future reads.
  * For non-versioned writes, uses raw setJSON().
+ *
+ * **Compression Integration:**
+ * Before writing, the value is passed through the compression middleware (encode).
+ * The middleware will:
+ * - Measure size (UTF-8 bytes)
+ * - Check hard limits (reject or warn)
+ * - Apply compression if enabled and > threshold
+ * - Return the compressed entry (or original value if not compressed)
  */
 export async function persistValue<T = any>(
   key: string,
@@ -138,20 +151,41 @@ export async function persistValue<T = any>(
     const backend = resolveBackend(key, options.backend);
     const isSecureBackend = backend === getSecureStorage();
 
+    // **Compression: Encode (compress) before persisting**
+    let valueToStore = value;
+    if (typeof value !== 'string') {
+      // Only compress non-string JSON objects
+      try {
+        const compressionOptions: CompressionEncodeOptions = { key };
+        // Note: previous value would be read on updates, but for simplicity here we skip it
+        // A more sophisticated implementation could track previous values for recompression strategy
+        valueToStore = await encodeCompression(value, compressionOptions);
+      } catch (compressionError) {
+        // Log warning but don't fail the operation; continue with uncompressed value
+        logger
+          .category('storage')
+          .warn(
+            `Compression encode failed for ${key}, persisting uncompressed: ${compressionError instanceof Error ? compressionError.message : String(compressionError)}`,
+          );
+        // Use original value if compression fails
+        valueToStore = value;
+      }
+    }
+
     // If schema provided AND resolved backend is SecureStorage, delegate to setVersionedJSON
     if (options.schema && isSecureBackend) {
       const secureStorage = getSecureStorage();
       // SecureStorage has setVersionedJSON method that handles versioning
-      await (secureStorage as any).setVersionedJSON(key, value, options.schema.version);
+      await (secureStorage as any).setVersionedJSON(key, valueToStore, options.schema.version);
       logger.category('storage').debug(
         `Storage write (versioned): ${key} → ${backendLabel}`,
       );
     } else {
       // Raw write (no versioning)
-      if (typeof value === 'string') {
-        await backend.setItem(key, value);
+      if (typeof valueToStore === 'string') {
+        await backend.setItem(key, valueToStore);
       } else {
-        await backend.setJSON(key, value);
+        await backend.setJSON(key, valueToStore);
       }
       logger.category('storage').debug(
         `Storage write: ${key} → ${backendLabel}`,
@@ -179,6 +213,13 @@ export async function persistValue<T = any>(
  * If a schema is provided, delegates to SecureStorage.getValidatedJSON(),
  * which handles validation, migration, and automatic schema updates.
  * For non-versioned reads, uses raw getJSON().
+ *
+ * **Compression Integration:**
+ * After reading, the value is passed through the compression middleware (decode).
+ * The middleware will:
+ * - Check if the value is a CompressedEntry (has version tag)
+ * - If compressed: detect algorithm and decompress (async, non-blocking)
+ * - If not compressed: return as-is
  */
 export async function retrieveValue<T = any>(
   key: string,
@@ -190,36 +231,47 @@ export async function retrieveValue<T = any>(
     const backend = resolveBackend(key, options.backend);
     const isSecureBackend = backend === getSecureStorage();
 
+    let rawData: any;
+
     // If schema provided AND resolved backend is SecureStorage, delegate to getValidatedJSON
     if (options.schema && isSecureBackend) {
       const secureStorage = getSecureStorage();
       // SecureStorage.getValidatedJSON handles validation, migration, and storage updates
-      const data = await secureStorage.getValidatedJSON(key, options.schema) as T | null;
-      
-      if (data === null) {
-        logger.category('storage').debug(
-          `Storage read (versioned, not found): ${key} ← ${backendLabel}`,
-        );
-        return { success: true, data: options.fallback ?? null };
-      }
+      rawData = await secureStorage.getValidatedJSON(key, options.schema) as T | null;
+    } else {
+      // Raw read (no versioning)
+      rawData = await backend.getJSON<T>(key);
+    }
 
+    if (rawData === null || rawData === undefined) {
+      return { success: true, data: options.fallback ?? null };
+    }
+
+    // **Compression: Decode (decompress) after reading**
+    let data: T;
+    try {
+      data = await decodeCompression(rawData);
+    } catch (compressionError) {
+      // Log warning but don't fail; return raw data if decompression fails
+      logger
+        .category('storage')
+        .warn(
+          `Compression decode failed for ${key}, using raw value: ${compressionError instanceof Error ? compressionError.message : String(compressionError)}`,
+        );
+      data = rawData;
+    }
+
+    if (options.schema && isSecureBackend) {
       logger.category('storage').debug(
         `Storage read (versioned): ${key} ← ${backendLabel}`,
       );
-      return { success: true, data };
+    } else {
+      logger.category('storage').debug(
+        `Storage read: ${key} ← ${backendLabel}`,
+      );
     }
 
-    // Raw read (no versioning)
-    const raw = await backend.getJSON<T>(key);
-
-    if (raw === null || raw === undefined) {
-      return { success: true, data: null };
-    }
-
-    logger.category('storage').debug(
-      `Storage read: ${key} ← ${backendLabel}`,
-    );
-    return { success: true, data: raw };
+    return { success: true, data };
   } catch (error) {
     logger.category('storage').warn(
       `Storage read failed: ${key} ← ${backendLabel}`,

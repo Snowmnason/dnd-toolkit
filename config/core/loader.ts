@@ -249,6 +249,24 @@ export interface AppSettings {
     android?: Partial<AppSettings>;
     desktop?: Partial<AppSettings>;
   };
+  compression?: {
+    enabled?: boolean;
+    algorithm?: string; // 'gzip' | 'brotli' | 'zstd'
+    threshold?: number; // Bytes; only compress if >= threshold
+    maxBytesPerEntry?: number; // Per-entry hard cap; reject if exceeded
+    stats?: {
+      enabled?: boolean;
+      sampleRate?: number; // 0.0-1.0; percentage of operations to track
+    };
+    description?: string;
+  };
+  cacheSecurityLimits?: {
+    hardMaxBytes?: number; // Absolute cache size limit before emergency eviction
+    hardMaxEntries?: number; // Absolute entry count limit
+    rejectOversizedEntries?: boolean; // true: reject, false: warn
+    description?: string;
+  };
+  cachePersistenceMap?: Record<string, 'persist' | 'volatile'>;
 }
 
 let cachedConfig: AppSettings | null = null;
@@ -424,6 +442,25 @@ export function getAppConfig(): AppSettings {
 
     console.error(validationMsg);
     throw new Error(validationMsg);
+  }
+
+  // Warn about malformed cachePersistenceMap entries (non-persistence values like 'description').
+  // These are silently ignored at runtime but surfaced here in dev to help config authors.
+  if (environment === "development" && config.cachePersistenceMap) {
+    const invalidEntries = Object.entries(config.cachePersistenceMap as Record<string, unknown>)
+      .filter(([, v]) => v !== 'persist' && v !== 'volatile');
+    if (invalidEntries.length > 0) {
+      const configFile =
+        environment === "development"
+          ? "config/appsettings.dev.json"
+          : "config/appsettings.json";
+      console.warn(
+        `[AppConfig] ${configFile}: cachePersistenceMap contains ${invalidEntries.length} non-persistence ` +
+        `entr${invalidEntries.length === 1 ? 'y' : 'ies'} that will be ignored at runtime: ` +
+        invalidEntries.map(([k]) => `"${k}"`).join(', ') +
+        `. Move these out of the map (e.g. to "cachePersistenceMapDescription" at top level).`,
+      );
+    }
   }
 
   cachedConfig = config as AppSettings;
