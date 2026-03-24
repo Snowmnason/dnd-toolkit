@@ -61,6 +61,8 @@ import {
   getStats as statsGetStats,
 } from "./query-cache-stats";
 
+import { logger } from "@/lib/utils";
+
 // ==========================================
 // Cache Invalidation Orchestrator Integration
 // ==========================================
@@ -243,7 +245,7 @@ class QueryCacheClass {
     // Default: use QueryCache's own stats and invalidation
     const getCacheStats = () => {
       return {
-        entries: Array.from(this.ctx.inMemoryCache.keys()).map(key => ({ key }))
+        entries: Array.from(this.ctx.inMemoryCache.entries()).map(([key, entry]) => ({ key, entry }))
       };
     };
     
@@ -278,7 +280,7 @@ class QueryCacheClass {
     const defaultConfig = {
       getSnapshot: () => ({
         // Create a snapshot of current cache state
-        entries: new Map(this.ctx.inMemoryCache),
+        entries: Object.fromEntries(this.ctx.inMemoryCache),
         size: 0,
         timestamp: Date.now(),
       }),
@@ -298,7 +300,7 @@ class QueryCacheClass {
       restoreSnapshot: async (snapshot: CacheSnapshot) => {
         // Restore by clearing and re-setting entries
         await this.clearAll();
-        for (const [key, value] of snapshot.entries) {
+        for (const [key, value] of Object.entries(snapshot.entries)) {
           try {
             // Assuming value is CacheEntry<any>
             if (value && typeof value === 'object' && 'data' in value) {
@@ -311,7 +313,7 @@ class QueryCacheClass {
             }
           } catch (error) {
             // Log but don't throw - best effort restore
-            console.warn(`Failed to restore cache entry ${key}`, error);
+            logger.category('storage').warn(`Failed to restore cache entry ${key}`, error);
           }
         }
       },

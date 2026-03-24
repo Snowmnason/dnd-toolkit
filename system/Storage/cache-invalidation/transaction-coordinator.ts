@@ -4,7 +4,11 @@ import { logger } from '@/lib/utils/logger';
  * Represents a snapshot of cache state for rollback purposes.
  */
 export interface CacheSnapshot {
-  entries: Map<string, unknown>;
+  /**
+   * Snapshot entries as a plain object (JSON-serializable, unlike Map).
+   * Keys are cache keys; values are the raw stored entries.
+   */
+  entries: Record<string, unknown>;
   size: number;
   timestamp: number;
 }
@@ -101,7 +105,7 @@ class TransactionCoordinatorImpl {
       try {
         snapshot = config.getSnapshot();
         logger.category('storage').debug('Cache snapshot taken', {
-          entriesSnapshotted: snapshot.entries.size,
+          entriesSnapshotted: Object.keys(snapshot.entries).length,
           sizeBytes: snapshot.size,
         });
       } catch (snapshotError) {
@@ -140,13 +144,17 @@ class TransactionCoordinatorImpl {
           queuedInvalidations: queuedKeys.size,
         });
       } catch (operationError) {
+        // Operation error = transaction failed. Restore snapshot immediately,
+        // skip queued invalidations to preserve atomic semantics.
         const err = operationError instanceof Error ? operationError : new Error(String(operationError));
-        logger.category('storage').warn('Transaction operation threw error', {
+        logger.category('storage').warn('Transaction operation threw error, rolling back', {
           error: err.message,
           queuedInvalidations: queuedKeys.size,
         });
         result.message = `Operation failed: ${err.message}`;
-        // Continue to rollback
+        await this.restoreSnapshot(snapshot, config.restoreSnapshot, result);
+        result.durationMs = typeof performance !== 'undefined' ? performance.now() - startTime : Date.now() - startTime;
+        return result;
       }
 
       // Execute queued invalidations
@@ -214,7 +222,7 @@ class TransactionCoordinatorImpl {
       await restorer(snapshot);
       result.snapshotRestored = true;
       logger.category('storage').info('Cache snapshot restored after transaction failure', {
-        entriesRestored: snapshot.entries.size,
+        entriesRestored: Object.keys(snapshot.entries).length,
         sizeBytes: snapshot.size,
       });
     } catch (restoreError) {

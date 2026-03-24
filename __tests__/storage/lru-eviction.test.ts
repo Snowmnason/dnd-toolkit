@@ -22,7 +22,10 @@ describe('LRU Eviction Manager', () => {
       { key: 'k2', sizeBytes: 300, lastAccessTime: Date.now() - 500 },
     ];
 
-    lruEvictionManager.updateSize(entries as any);
+    // Track entries so totalSizeBytes reflects their sizes
+    for (const e of entries) {
+      lruEvictionManager.trackEntry(e.key, e.sizeBytes);
+    }
 
     const evictCalled: string[] = [];
     const evictEntries = async (keys: string[]) => { evictCalled.push(...keys); };

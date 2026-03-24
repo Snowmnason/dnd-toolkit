@@ -40,7 +40,7 @@ class ConditionalFilterImpl {
   async invalidateIfMatches(
     pattern: string,
     predicate: ConditionalPredicate,
-    getCacheStats: () => { entries: { key: string }[] },
+    getCacheStats: () => { entries: { key: string; entry: unknown }[] },
     invalidate: InvalidationDelegate
   ): Promise<ConditionalInvalidationResult> {
     const result: ConditionalInvalidationResult = {
@@ -69,10 +69,9 @@ class ConditionalFilterImpl {
           continue;
         }
 
-        // Apply predicate to entry
+        // Apply predicate to entry — pass the real cache entry data
         try {
-          // Caller provides entry data; predicate is stateless
-          const shouldInvalidate = predicate(key, entry);
+          const shouldInvalidate = predicate(key, entry.entry);
 
           if (shouldInvalidate) {
             keysToInvalidate.push(key);

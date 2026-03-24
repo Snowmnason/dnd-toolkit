@@ -42,6 +42,7 @@ import {
   getLastPeriodicSnapshot as getLastPeriodicSnapshotInternal,
   getStats as getStatsInternal,
   recordDecode,
+  recordDrop,
   recordEncode,
   resetStats as resetStatsInternal,
   startPeriodicReset as startPeriodicResetInternal,
@@ -181,9 +182,14 @@ function base64ToUint8Array(base64: string): Uint8Array {
  * 5. Add version + metadata
  * 6. Collect stats
  *
+ * **Failure Strategy:**
+ * - Small entries (<10KB) on compression failure: return value uncompressed (fallback)
+ * - Large entries (≥10KB) on compression failure: return null (skip persistence to prevent bloat)
+ * - Caller must check for null and skip storage if returned
+ *
  * @param value Data to encode
  * @param options Encoding options (key for logging, previous value for recompression)
- * @returns Encoded entry (compressed or as-is if below threshold)
+ * @returns Encoded entry (compressed or as-is if below threshold), or null if should skip storage
  */
 export async function encode(value: any, options: CompressionEncodeOptions = {}): Promise<any> {
   const startTime = performance.now();
@@ -307,16 +313,14 @@ export async function encode(value: any, options: CompressionEncodeOptions = {})
         recordEncode(sizeBytes, sizeBytes, sizeBytes, false, performance.now() - startTime);
         return value; // Return uncompressed value
       } else {
-        // Large entry: drop to prevent storage bloat
+        // Large entry: return null to signal skip storage (prevent bloat from failed compression)
         logger
           .category('storage')
           .warn(
             `Compression encode failed at key=${options.key}, dropping large entry (${sizeBytes}B >= ${FALLBACK_THRESHOLD}B): ${compressionError instanceof Error ? compressionError.message : String(compressionError)}`,
           );
-        recordEncode(sizeBytes, 0, 0, false, performance.now() - startTime);
-        // Return null to signal the caller to skip storage (if applicable)
-        // Otherwise return empty object to prevent null propagation errors
-        return {};
+        recordDrop(sizeBytes, performance.now() - startTime);
+        return null;
       }
     }
   } catch (error) {

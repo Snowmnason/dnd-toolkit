@@ -24,12 +24,24 @@ export interface ConditionalInvalidationResult {
   errors: { key: string; error: Error }[];
 }
 
+/**
+ * Predicate used to decide whether a cache entry should be invalidated.
+ *
+ * **Must be a pure function:**
+ * - No side effects, no mutations, no async — the callback is invoked synchronously.
+ * - Return value determines invalidation: `true` = invalidate, `false` = keep.
+ * - Do not read from external state that could change between calls.
+ */
 export type ConditionalPredicate = (key: string, entry: unknown) => boolean;
 
 // ===== Transactional Invalidation =====
 
 export interface CacheSnapshot {
-  entries: Map<string, unknown>;
+  /**
+   * Snapshot entries as a plain object (JSON-serializable, unlike Map).
+   * Keys are cache keys; values are the raw stored entries.
+   */
+  entries: Record<string, unknown>;
   size: number;
   timestamp: number;
 }
@@ -56,7 +68,7 @@ export interface DeferredScheduleResult {
   id: string;
   patterns: string[];
   delayMs: number;
-  cancelFn: () => void;
+  cancelFn: () => boolean;
 }
 
 export interface DeferredExecutionResult {

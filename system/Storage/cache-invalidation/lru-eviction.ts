@@ -58,7 +58,6 @@ export type EvictEntriesCallback = (keys: string[]) => Promise<void>;
  */
 export class LRUEviction {
   private config: LRUCapacityConfig | null = null;
-  private currentSize = 0;
   // Private tracker metadata
   private entries: Map<string, LRUEntryMetadata> = new Map();
   private totalSizeBytes: number = 0;
@@ -216,24 +215,11 @@ export class LRUEviction {
   // ===== Capacity Management Methods =====
 
   /**
-   * Update tracked cache size based on current entries.
-   * Call after major cache operations to keep size in sync.
-   *
-   * @param entries - Current cache entries with sizes
-   */
-  updateSize(entries: LRUEntry[]): void {
-    this.currentSize = entries.reduce((sum, entry) => sum + entry.sizeBytes, 0);
-    logger.category('storage').debug('Cache size updated', {
-      currentSize: this.currentSize,
-      entryCount: entries.length,
-    });
-  }
-
-  /**
    * Get current cache size in bytes.
+   * Uses totalSizeBytes maintained by trackEntry/untrackEntry.
    */
   getCurrentSize(): number {
-    return this.currentSize;
+    return this.totalSizeBytes;
   }
 
   /**
@@ -252,7 +238,7 @@ export class LRUEviction {
       return false;
     }
     const softThresholdBytes = this.config.hardMaxBytes * this.config.softThreshold;
-    return this.currentSize >= softThresholdBytes;
+    return this.totalSizeBytes >= softThresholdBytes;
   }
 
   /**
@@ -262,7 +248,7 @@ export class LRUEviction {
     if (!this.config) {
       return false;
     }
-    return this.currentSize > this.config.hardMaxBytes;
+    return this.totalSizeBytes > this.config.hardMaxBytes;
   }
 
   /**
@@ -279,7 +265,7 @@ export class LRUEviction {
     const result: EvictionResult = {
       evictedCount: 0,
       freedBytes: 0,
-      currentSize: this.currentSize,
+      currentSize: this.totalSizeBytes,
       durationMs: 0,
     };
 
@@ -292,17 +278,16 @@ export class LRUEviction {
     try {
       // Get current entries
       const entries = getEntries();
-      this.updateSize(entries);
 
       // Calculate target size
       const targetSize = this.config.hardMaxBytes * this.config.targetAfterEviction;
 
-      if (this.currentSize <= targetSize) {
+      if (this.totalSizeBytes <= targetSize) {
         logger.category('storage').debug('Cache size within target; no eviction needed', {
-          currentSize: this.currentSize,
+          currentSize: this.totalSizeBytes,
           targetSize,
         });
-        result.currentSize = this.currentSize;
+        result.currentSize = this.totalSizeBytes;
         result.durationMs = typeof performance !== 'undefined' ? performance.now() - startTime : Date.now() - startTime;
         return result;
       }
@@ -315,7 +300,7 @@ export class LRUEviction {
       let freedBytes = 0;
 
       for (const entry of sortedByLRU) {
-        if (this.currentSize - freedBytes <= targetSize) {
+        if (this.totalSizeBytes - freedBytes <= targetSize) {
           break;
         }
         entriesToEvict.push(entry);
@@ -327,15 +312,19 @@ export class LRUEviction {
         const keysToEvict = entriesToEvict.map((e) => e.key);
         await evictEntries(keysToEvict);
 
+        // Untrack evicted entries to keep totalSizeBytes in sync
+        for (const key of keysToEvict) {
+          this.untrackEntry(key);
+        }
+
         result.evictedCount = entriesToEvict.length;
         result.freedBytes = freedBytes;
-        this.currentSize -= freedBytes;
-        result.currentSize = this.currentSize;
+        result.currentSize = this.totalSizeBytes;
 
         logger.category('storage').info('Cache eviction completed', {
           evictedCount: result.evictedCount,
           freedBytes: result.freedBytes,
-          newSize: this.currentSize,
+          newSize: this.totalSizeBytes,
           targetSize,
         });
 
@@ -377,10 +366,10 @@ export class LRUEviction {
 
     const softThresholdBytes = this.config.hardMaxBytes * this.config.softThreshold;
     const targetBytes = this.config.hardMaxBytes * this.config.targetAfterEviction;
-    const utilizationPercent = (this.currentSize / this.config.hardMaxBytes) * 100;
+    const utilizationPercent = (this.totalSizeBytes / this.config.hardMaxBytes) * 100;
 
     return {
-      currentSize: this.currentSize,
+      currentSize: this.totalSizeBytes,
       hardMaxBytes: this.config.hardMaxBytes,
       softThresholdBytes,
       targetBytes,

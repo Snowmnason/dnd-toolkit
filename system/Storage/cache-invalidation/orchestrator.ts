@@ -1,24 +1,10 @@
 import { logger } from '@/lib/utils/logger';
+import { CacheInvalidationError } from '@/type-definitions/cache-invalidation';
 import { CascadeManager } from './cascade-manager';
 import { ConditionalFilter } from './conditional-filter';
 import { DeferredQueue } from './deferred-queue';
 import { lruEvictionManager } from './lru-eviction';
 import { TransactionCoordinator } from './transaction-coordinator';
-
-/**
- * Centralized validation error wrapper.
- * Standardizes parameter validation failures with consistent logging.
- */
-export class CacheInvalidationError extends Error {
-  constructor(
-    public readonly code: 'INVALID_PARAMS' | 'EXECUTION_FAILED' | 'VALIDATION_FAILED',
-    message: string,
-    public readonly details?: Record<string, unknown>
-  ) {
-    super(message);
-    this.name = 'CacheInvalidationError';
-  }
-}
 
 /**
  * Orchestrator for cache invalidation systems.
@@ -151,7 +137,7 @@ export class CacheInvalidationOrchestrator {
   async invalidateIfMatches(
     pattern: string,
     predicate: (key: string, entry: unknown) => boolean,
-    getCacheStats: () => { entries: { key: string }[] },
+    getCacheStats: () => { entries: { key: string; entry: unknown }[] },
     invalidate: (keys: string[]) => Promise<{ invalidatedCount: number; errors: { key: string; error: Error }[] }>
   ) {
     // Validate inputs
@@ -205,9 +191,9 @@ export class CacheInvalidationOrchestrator {
       isQueued: (key: string) => boolean;
     }) => Promise<void>,
     config: {
-      getSnapshot: () => { entries: Map<string, unknown>; size: number; timestamp: number };
+      getSnapshot: () => { entries: Record<string, unknown>; size: number; timestamp: number };
       executeInvalidations: (keys: string[]) => Promise<{ invalidatedCount: number; errors: { key: string; error: Error }[] }>;
-      restoreSnapshot: (snapshot: { entries: Map<string, unknown>; size: number; timestamp: number }) => Promise<void>;
+      restoreSnapshot: (snapshot: { entries: Record<string, unknown>; size: number; timestamp: number }) => Promise<void>;
     }
   ) {
     // Validate inputs

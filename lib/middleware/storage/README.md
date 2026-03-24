@@ -394,5 +394,4 @@ Integration tests validate end-to-end scenarios with realistic data patterns.
 - **Distributed invalidation**: Cross-device cache coordination
 - **Predictive prefetching**: ML-based cache warming
 - **Cache analytics**: Usage patterns and optimization suggestions
-- **Hierarchical caching**: Multi-level cache with different TTLs</content>
-<parameter name="filePath">p:\CodingProjects\dnd-toolkit\lib\middleware\storage\README.md
+- **Hierarchical caching**: Multi-level cache with different TTLs

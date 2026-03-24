@@ -37,6 +37,10 @@ export interface CompressionStatsSnapshot {
   totalTimeMs: number;
   averageRatio: number; // compressed / original
   bytesSaved: number; // totalOriginalBytes - totalStoredBytes (real savings after encoding)
+  /** Entries dropped due to large-entry compression failure (never persisted) */
+  droppedCount: number;
+  /** Total original bytes for dropped entries (excluded from bytesSaved so it is not inflated) */
+  droppedBytes: number;
 }
 
 /**
@@ -67,6 +71,10 @@ interface StatsAccumulator {
   decodedOriginalBytes: number;
   decodedCompressedBytes: number;
   decodeTimeMs: number;
+  // Dropped entries (large-entry compression failures — never stored)
+  droppedCount: number;
+  droppedBytes: number;
+  dropTimeMs: number;
 }
 
 let stats: StatsAccumulator = {
@@ -81,6 +89,9 @@ let stats: StatsAccumulator = {
   decodedOriginalBytes: 0,
   decodedCompressedBytes: 0,
   decodeTimeMs: 0,
+  droppedCount: 0,
+  droppedBytes: 0,
+  dropTimeMs: 0,
 };
 
 /** Last periodic snapshot (null until first periodic reset fires) */
@@ -116,6 +127,18 @@ export function recordEncode(
   } else {
     stats.uncompressedCount++;
   }
+}
+
+/**
+ * Record a large-entry drop: compression failed and the entry was NOT persisted.
+ * Tracked separately so `bytesSaved` is not inflated by bytes that were simply discarded.
+ * @param originalBytes Original size of the dropped entry
+ * @param timeMs Time spent before the drop decision
+ */
+export function recordDrop(originalBytes: number, timeMs: number): void {
+  stats.droppedCount++;
+  stats.droppedBytes += originalBytes;
+  stats.dropTimeMs += timeMs;
 }
 
 /**
@@ -155,8 +178,11 @@ export function getStats(): CompressionStatsSnapshot {
       stats.totalOriginalBytes > 0
         ? stats.totalStoredBytes / stats.totalOriginalBytes
         : 1.0,
-    // Real savings: original minus what we actually stored (base64 included)
+    // Real savings: original minus what we actually stored (base64 included).
+    // Dropped entries are excluded so this only reflects actual compression gains.
     bytesSaved: stats.totalOriginalBytes - stats.totalStoredBytes,
+    droppedCount: stats.droppedCount,
+    droppedBytes: stats.droppedBytes,
   };
 }
 
@@ -188,6 +214,9 @@ export function resetStats(): void {
     decodedOriginalBytes: 0,
     decodedCompressedBytes: 0,
     decodeTimeMs: 0,
+    droppedCount: 0,
+    droppedBytes: 0,
+    dropTimeMs: 0,
   };
 }
 

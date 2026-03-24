@@ -18,7 +18,7 @@ export interface DeferredScheduleResult {
   id: string;
   patterns: string[];
   delayMs: number;
-  cancelFn: () => void;
+  cancelFn: () => boolean;
 }
 
 /**

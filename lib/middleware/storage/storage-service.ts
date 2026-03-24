@@ -157,9 +157,25 @@ export async function persistValue<T = any>(
       // Only compress non-string JSON objects
       try {
         const compressionOptions: CompressionEncodeOptions = { key };
-        // Note: previous value would be read on updates, but for simplicity here we skip it
-        // A more sophisticated implementation could track previous values for recompression strategy
-        valueToStore = await encodeCompression(value, compressionOptions);
+        const encoded = await encodeCompression(value, compressionOptions);
+        
+        // Respect compression middleware's skip signal: null means don't store
+        if (encoded === null || encoded === undefined) {
+          logger
+            .category('storage')
+            .warn(
+              `Compression encode returned skip signal for ${key}, aborting storage`,
+            );
+          // Create an error for graceful handling
+          const error = new Error('Compression failed; entry too large to store safely');
+          return handleStorageErrorGracefully<T>(error, {
+            operation: 'set',
+            key,
+            fallbackValue: options.fallback,
+          });
+        }
+        
+        valueToStore = encoded;
       } catch (compressionError) {
         // Log warning but don't fail the operation; continue with uncompressed value
         logger
@@ -167,7 +183,7 @@ export async function persistValue<T = any>(
           .warn(
             `Compression encode failed for ${key}, persisting uncompressed: ${compressionError instanceof Error ? compressionError.message : String(compressionError)}`,
           );
-        // Use original value if compression fails
+        // Use original value if compression throws
         valueToStore = value;
       }
     }
