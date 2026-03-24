@@ -1,5 +1,6 @@
 import { logger } from "@/lib/utils";
 import { FastCache } from "@/system/Storage/";
+import { measureEntrySize } from "@/system/Storage/cache-invalidation/lru-eviction";
 import type {
   CacheEntry,
   CacheOptions,
@@ -9,7 +10,6 @@ import {
   encode as encodeCompression,
   type CompressionEncodeOptions,
 } from "../../compression/compression-middleware";
-import { measureEntrySize } from "../lru-eviction";
 import type { CacheSubscriber, QueryCacheInternals } from "./internals";
 
 /**

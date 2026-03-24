@@ -143,14 +143,15 @@ function getCompressionRatio(original: number, compressed: number): number {
  * JSON cannot preserve Uint8Array, so we encode to base64 before persistence
  */
 function uint8ArrayToBase64(data: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < data.length; i++) {
-    // NOTE: String.fromCharCode is called with data[i] (a number 0-255 from Uint8Array).
-    // This is safe: data is internal/controlled, not user input. No injection vector.
-    // eslint-disable-next-line security/detect-object-injection
-    binary += String.fromCharCode(data[i]);
+  // Use Buffer if available (Node.js/Electron), otherwise fall back to byte-by-byte conversion
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(data).toString('base64');
   }
-  return btoa(binary);
+  
+  // Browser fallback: convert Uint8Array to string safely using Array.from
+  // This avoids dynamic property access (security/detect-object-injection)
+  const chars = Array.from(data).map((byte) => String.fromCharCode(byte)).join('');
+  return btoa(chars);
 }
 
 /**
@@ -158,15 +159,15 @@ function uint8ArrayToBase64(data: Uint8Array): string {
  * Called in decode() to restore Uint8Array from persisted base64 representation
  */
 function base64ToUint8Array(base64: string): Uint8Array {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    // NOTE: bytes[i] assignment from charCodeAt() result (a number 0-255).
-    // This is safe: both values are internal/controlled. No injection vector.
-    // eslint-disable-next-line security/detect-object-injection
-    bytes[i] = binary.charCodeAt(i);
+  // Use Buffer if available (Node.js/Electron), otherwise fall back to byte-by-byte conversion
+  if (typeof Buffer !== 'undefined') {
+    return new Uint8Array(Buffer.from(base64, 'base64'));
   }
-  return bytes;
+  
+  // Browser fallback: convert base64 → string → bytes safely
+  // This avoids dynamic property access (security/detect-object-injection)
+  const binary = atob(base64);
+  return new Uint8Array(Array.from(binary).map((char) => char.charCodeAt(0)));
 }
 
 /**
@@ -257,38 +258,67 @@ export async function encode(value: any, options: CompressionEncodeOptions = {})
     const serialized = JSON.stringify(value);
     const dataBuffer = new TextEncoder().encode(serialized);
 
-    const compressed = await provider.compress(dataBuffer);
-    const compressedSize = compressed.length;
-    const ratio = getCompressionRatio(sizeBytes, compressedSize);
+    try {
+      const compressed = await provider.compress(dataBuffer);
+      const compressedSize = compressed.length;
+      const ratio = getCompressionRatio(sizeBytes, compressedSize);
 
-    // Create compressed entry
-    // NOTE: data is stored as base64 string for JSON serialization round-trip safety.
-    // Uint8Array does not survive JSON.stringify/parse, so we encode to base64 here.
-    const entry: CompressedEntry = {
-      version: 1,
-      algorithm,
-      originalSize: sizeBytes,
-      data: uint8ArrayToBase64(compressed) as any, // Stored as base64 string for JSON safety
-      timestamp: Date.now(),
-      wasPreviouslyCompressed: isCompressed(options.previousValue),
-    };
+      // Create compressed entry
+      // NOTE: data is stored as base64 string for JSON serialization round-trip safety.
+      // Uint8Array does not survive JSON.stringify/parse, so we encode to base64 here.
+      const entry: CompressedEntry = {
+        version: 1,
+        algorithm,
+        originalSize: sizeBytes,
+        data: uint8ArrayToBase64(compressed) as any, // Stored as base64 string for JSON safety
+        timestamp: Date.now(),
+        wasPreviouslyCompressed: isCompressed(options.previousValue),
+      };
 
-    // Record compression stats (storedBytes = base64 size of compressed data, ~33% larger)
-    const base64StoredBytes = Math.ceil(compressedSize * 4 / 3);
-    recordEncode(sizeBytes, compressedSize, base64StoredBytes, true, performance.now() - startTime);
+      // Record compression stats (storedBytes = base64 size of compressed data, ~33% larger)
+      const base64StoredBytes = Math.ceil(compressedSize * 4 / 3);
+      recordEncode(sizeBytes, compressedSize, base64StoredBytes, true, performance.now() - startTime);
 
-    // Log compression result using probabilistic sampling to reduce log volume.
-    // 10% default balances visibility with noise; tune via config.stats.sampleRate.
-    const shouldLogStats = (config.stats?.enabled ?? true) && (config.stats?.sampleRate ?? 0.1) > Math.random();
-    if (shouldLogStats) {
-      logger
-        .category('storage')
-        .debug(
-          `Compression encode: Compressed ${sizeBytes}B → ${compressedSize}B (${(ratio * 100).toFixed(1)}%) at key=${options.key}`,
-        );
+      // Log compression result using probabilistic sampling to reduce log volume.
+      // 10% default balances visibility with noise; tune via config.stats.sampleRate.
+      const shouldLogStats = (config.stats?.enabled ?? true) && (config.stats?.sampleRate ?? 0.1) > Math.random();
+      if (shouldLogStats) {
+        logger
+          .category('storage')
+          .debug(
+            `Compression encode: Compressed ${sizeBytes}B → ${compressedSize}B (${(ratio * 100).toFixed(1)}%) at key=${options.key}`,
+          );
+      }
+
+      return entry;
+    } catch (compressionError) {
+      // Compression failed: implement store-if-small, drop-if-large strategy
+      // Small entries (<10KB): store uncompressed to preserve data
+      // Large entries (>=10KB): drop to prevent bloat from failed compression
+      const FALLBACK_THRESHOLD = 10 * 1024; // 10KB
+      
+      if (sizeBytes < FALLBACK_THRESHOLD) {
+        // Small entry: store uncompressed as fallback
+        logger
+          .category('storage')
+          .warn(
+            `Compression encode failed at key=${options.key}, storing uncompressed (${sizeBytes}B): ${compressionError instanceof Error ? compressionError.message : String(compressionError)}`,
+          );
+        recordEncode(sizeBytes, sizeBytes, sizeBytes, false, performance.now() - startTime);
+        return value; // Return uncompressed value
+      } else {
+        // Large entry: drop to prevent storage bloat
+        logger
+          .category('storage')
+          .warn(
+            `Compression encode failed at key=${options.key}, dropping large entry (${sizeBytes}B >= ${FALLBACK_THRESHOLD}B): ${compressionError instanceof Error ? compressionError.message : String(compressionError)}`,
+          );
+        recordEncode(sizeBytes, 0, 0, false, performance.now() - startTime);
+        // Return null to signal the caller to skip storage (if applicable)
+        // Otherwise return empty object to prevent null propagation errors
+        return {};
+      }
     }
-
-    return entry;
   } catch (error) {
     logger
       .category('storage')

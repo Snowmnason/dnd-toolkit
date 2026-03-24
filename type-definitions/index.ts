@@ -51,4 +51,13 @@ export type {
     UseQueryState
 } from "./storage-types";
 
+export type {
+    CacheSnapshot, CascadeMapping,
+    ConditionalInvalidationResult,
+    ConditionalPredicate, DeferredExecutionResult, DeferredScheduleResult, EvictionResult, LRUCapacityConfig,
+    LRUEntry, TransactionContext,
+    TransactionResult
+} from "./cache-invalidation";
+
+export { CacheInvalidationError } from "./cache-invalidation";
 

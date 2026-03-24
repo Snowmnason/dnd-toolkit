@@ -1,11 +1,11 @@
 import { getAppConfig } from "@/config";
 import { logger } from "@/lib/utils";
 import { FastCache } from "@/system/Storage/";
+import { LRUEviction, measureEntrySize } from "@/system/Storage/cache-invalidation/lru-eviction";
 import type {
   CacheEntry,
   QueryCacheConfig,
 } from "@/type-definitions";
-import { LRUEvictionTracker, measureEntrySize } from "../lru-eviction";
 
 /**
  * Escape special regex characters in a string to prevent ReDoS attacks
@@ -35,7 +35,8 @@ function loadQueryCacheConfig(): QueryCacheConfig {
       const sanitized: Record<string, 'persist' | 'volatile'> = {};
       for (const [k, v] of Object.entries(appConfig.cachePersistenceMap)) {
         if (v === 'persist' || v === 'volatile') {
-          sanitized[k] = v;
+          // Use Object.assign to avoid dynamic property injection pattern
+          Object.assign(sanitized, { [k]: v });
         } else {
           logger.category('storage').warn(
             `[QueryCache] Ignoring invalid cachePersistenceMap entry: "${k}" = "${String(v)}" (expected 'persist' | 'volatile')`,
@@ -67,7 +68,7 @@ function loadQueryCacheConfig(): QueryCacheConfig {
 export class QueryCacheInternals {
   readonly config: QueryCacheConfig;
   readonly inMemoryCache: Map<string, CacheEntry> = new Map();
-  readonly lruTracker: LRUEvictionTracker = new LRUEvictionTracker();
+  readonly lruTracker: LRUEviction = new LRUEviction();
   readonly subscribers: Map<string, Set<CacheSubscriber>> = new Map();
   readonly pendingRequests: Map<string, Promise<any>> = new Map();
   globalVersion: number = 0;

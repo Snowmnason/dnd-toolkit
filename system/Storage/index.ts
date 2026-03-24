@@ -21,3 +21,10 @@ export {
     type UploadImageOutput
 } from './buckets/registry';
 
+export { CascadeManager } from './cache-invalidation/cascade-manager';
+export { ConditionalFilter } from './cache-invalidation/conditional-filter';
+export { DeferredQueue } from './cache-invalidation/deferred-queue';
+export { lruEvictionManager } from './cache-invalidation/lru-eviction';
+export { CacheInvalidationError, cacheInvalidationOrchestrator, CacheInvalidationOrchestrator } from './cache-invalidation/orchestrator';
+export { TransactionCoordinator } from './cache-invalidation/transaction-coordinator';
+
