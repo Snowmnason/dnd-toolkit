@@ -37,6 +37,7 @@ export async function storagePhase(): Promise<void> {
   try {
     const { logger } = await import("@/lib/utils");
     const { validateClassifications } = await import("@/type-definitions");
+    const { getAppConfig } = await import("@/config");
 
     // Validate data classification registry integrity early
     // Catch configuration errors (mismatched keys, invalid sensitivity, bad patterns) immediately
@@ -48,6 +49,29 @@ export async function storagePhase(): Promise<void> {
       "@/lib/middleware/storage/helpers/storage-health-monitor"
     );
     await initializeStorageHealthMonitoring();
+
+    // Initialize LRU cache capacity management (load config and initialize LRU eviction)
+    const appConfig = getAppConfig();
+    if (appConfig.cacheCapacity) {
+      const { cacheInvalidationOrchestrator } = await import("@/system/Storage/");
+      const cacheCapacity = appConfig.cacheCapacity;
+      
+      // Validate required properties exist
+      if (
+        typeof cacheCapacity.hardMaxBytes === 'number' &&
+        typeof cacheCapacity.softThreshold === 'number' &&
+        typeof cacheCapacity.targetAfterEviction === 'number'
+      ) {
+        cacheInvalidationOrchestrator.initialize({ cacheCapacity });
+        logger.category("bootstrap").debug("Cache invalidation orchestrator initialized", {
+          hardMaxBytes: cacheCapacity.hardMaxBytes,
+          softThreshold: cacheCapacity.softThreshold,
+          targetAfterEviction: cacheCapacity.targetAfterEviction,
+        });
+      } else {
+        logger.category("bootstrap").warn("Invalid cacheCapacity config: missing or invalid required properties");
+      }
+    }
 
     // Initialize all storage keys with safe defaults on startup
     await initializeStorageDefaultsInternal();

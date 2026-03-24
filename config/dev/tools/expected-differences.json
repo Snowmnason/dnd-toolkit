@@ -98,4 +98,8 @@
   ,"compression.threshold": "Compression threshold is lower in dev (512B) for aggressive testing; higher in production (1KB) to avoid compression overhead on small entries"
   ,"compression.stats.sampleRate": "Compression stats sampling is 100% in dev for full instrumentation; reduced to 10% in production to minimize overhead"
   ,"cacheSecurityLimits.rejectOversizedEntries": "Dev warns on oversized entries to enable broader testing; production rejects oversized entries to enforce strict size limits"
+  ,"cacheCapacity.hardMaxBytes": "Hard cache limit is 50MB in dev for generous testing; 10MB in production for mobile device constraints"
+  ,"cacheCapacity.softThreshold": "Soft threshold is 95% in dev for lenient eviction; 90% in production to evict more aggressively and maintain headroom"
+  ,"cacheCapacity.targetAfterEviction": "Target post-eviction size is 80% in dev for less aggressive cleanup; 70% in production to free more space and prevent thrashing"
+  ,"cacheCapacity.description": "LRU cache capacity description differs between dev (testing-focused) and production (mobile-optimized)"
 }

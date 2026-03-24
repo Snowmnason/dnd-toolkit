@@ -15,34 +15,36 @@
 3. [Problem Statement](#problem-statement)
 4. [Codebase Status](#codebase-status)
 5. [Solution & Phases](#solution--phases)
-6. [Phase 0: Discussion](#phase-0-discussion)
-7. [Phase 1: Tracks (Implementation)](#phase-1-tracks-implementation)
-8. [Acceptance Criteria](#acceptance-criteria)
-9. [Dependencies & Notes](#dependencies--notes)
-10. [Formatting Conventions](#formatting-conventions)
-11. [Quick Checklist](#quick-checklist)
+6. [Implementation Tracks](#implementation-tracks)
+7. [Acceptance Criteria](#acceptance-criteria)
+8. [Dependencies & Notes](#dependencies--notes)
+9. [Formatting Conventions](#formatting-conventions)
+10. [Quick Checklist](#quick-checklist)
 
 ---
 
 ## Overview
 
-### 2-Phase Methodology (+ Acceptance Criteria for Docs/Testing)
+### Track-Based Implementation Methodology
 
-Each comprehensive issue follows a 2-phase structure, with documentation and testing tracked separately:
+Each issue follows a **single implementation phase** broken into **focused tracks** (A, B, C, etc.), with documentation and testing tracked separately in Acceptance Criteria:
 
-| Phase | Purpose | Scope | Deliverable |
-|-------|---------|-------|-------------|
-| **Phase 0** | Understanding & Planning | Discussion, clarifying questions, draft PR body | Shared understanding of scope |
-| **Phase 1: Tracks** | Implementation | Isolated tracks (A+B Core, C Integration, D Adoption, E Hardening) — include what applies | Working code per track, each independently reviewable |
-| **Acceptance Criteria** | README, Guides, Tests | Tracked as checklists (not phase descriptions) | Docs/tests delegated to separate agent workflows |
+| Section | Purpose | Scope | Deliverable |
+|---------|---------|-------|-------------|
+| **Header + Problem + Status** | Context & understanding | Already discussed in conversation | Clear scope definition |
+| **Implementation Tracks** | Building the feature | Isolated tracks, each independently reviewable | Working code per track, zero regressions |
+| **Acceptance Criteria** | Code quality, docs, tests | Checklists (not phases) | Code quality checklist + mandatory docs + optional docs + tests |
 
 ### Why This Structure?
 
-- **Phase 0:** Ensures both developer and user understand scope before code starts (prevents rework)
-- **Phase 1 Tracks:** Isolates each concern (Core+Surface, Integration, Adoption, Hardening) so each track is reviewable independently — Track E keeps logging/warnings out of Track C reviews
-- **Acceptance Criteria — Docs/Tests:** Phase 1 stays focused on **writing code**. Documentation (README, guides) and testing are listed as checklists in Acceptance Criteria, and are handled by separate agent workflows so developers don't context-switch between coding and docs writing.
+- **Conversation replaces Phase 0** — You (as author) discuss scope upfront with the developer; the issue itself is ready to code
+- **Tracks are ordered, independent units** — Each track is a separate review unit (e.g., "Create cascade manager" is reviewable in isolation from "Add logging")
+- **Track order varies by issue type:**
+  - **New features:** Create files → Integrate → Optimize → Verify (checklist)
+  - **Refactors/updates:** Define intent → Create new → Delete old → Migrate call sites → Verify (checklist)
+- **Acceptance Criteria are checklists, not phases** — No "Phase 2 Docs" or "Phase 3 Tests"; instead, a final comprehensive checklist covering code quality, mandatory docs (USAGE_GUIDE.md + IMPLEMENTATION.md), optional docs (as needed), and tests (unit/integration + testing guide if visually testable)
 
-> **Key principle:** Phase 0 and Phase 1 are for **development** (no documentation writing). Phases 2-4 (README, guides, tests) are tracked as acceptance criteria and delegated to separate specialized workflows.
+> **Key principle:** Tracks are for **development** (writing code). Documentation and testing are tracked as acceptance criteria and can be handled by separate workflows once code is approved.
 
 ---
 
@@ -150,208 +152,71 @@ Result: [1-2 sentence summary of impact]
 ### Solution Tips
 
 - **Lead with big picture:** One sentence saying what architecture/pattern you're using
-- **Use Tracks:** Include only the tracks that apply — A+B (always), C (always), D (if migrating), E (recommended)
-- **Track isolation:** Each track is a separate review unit; don't mix concerns across tracks
-- **Track titles are commit titles:** "Create consent manager and barrel exports" NOT "Track A+B: Create..."
+- **Track titles are commit titles:** "Create cascade manager and shared types" NOT "Track A+B: Create..."
+- **Track order varies:** See section below for new features vs. updates/refactors
+- **Each track is independently reviewable** — do not mix concerns across tracks
 
 ---
 
-## Phase 0: Discussion
-
-**Goal:** Ensure developer and stakeholder agree on scope BEFORE any code is written.
-
-## Phase 0: Understand scope and draft PR body
-
-**Scope:**
-- [ ] Read the issue thoroughly (Problem, Solution, acceptance criteria, edge cases)
-- [ ] Discuss with author to confirm understanding:
-  - **Key Q1:** [Specific architectural decision question?]
-  - **Key Q2:** [API design decision?]
-  - **Key Q3:** [Performance/privacy trade-off?]
-  - **Key Q4:** [Integration with other system?]
-  - **Key Q5:** [Feature scope or minimal MVP?]
-- [ ] Clarify edge cases:
-  - [Edge case 1 and recovery strategy]
-  - [Edge case 2]
-  - [Platform-specific concern]
-  - [Error handling scenario]
-- [ ] Confirm acceptance criteria are clear
-- [ ] Draft PR body (copy into `docs/issues.md` for reference):
-- **Follow the style guide:** See `.github\PR_BODY_TEMPLATE.md` for detailed formatting requirements for all issue docs
-
-\`\`\`markdown
-## [Feature Name] #XXX
-
-[1-2 line summary]
-
-### Features
-- [Feature 1]
-- [Feature 2]
-
-### Key Decisions
-- [Design decision 1]
-- [Design decision 2]
-
-### Tracks
-- Track A+B: [Core files + barrel exports]
-- Track C: [Runtime integration]
-- Track D: [Adoption/migration, if applicable]
-- Track E: [Hardening — logging, warnings, edge cases]
-- Phase 2-4: [Docs, tests]
-
-### Success Criteria
-- [Criterion 1]
-- [Criterion 2]
-\`\`\`
-
-### Phase 0 Tips
-
-- **5 Key Questions:** Tailor each to the specific issue (not generic)
-- **Edge cases:** List 5-8 realistic edge cases (app crash, quota exceeded, platform differences, etc.)
-- **Draft PR body:** This is reference documentation (NOT a GitHub PR yet); it's a shared understanding
-- **Clear acceptance criteria:** Make sure 3-5 success criteria are non-ambiguous
-
-## Phase 1: Tracks (Implementation)
+## Implementation Tracks
 
 **Goal:** Build and wire the feature in isolated, reviewable increments.
 
-Phase 1 uses a **Tracks model** — include only the tracks that apply. Each track is a separate review unit.
+Tracks are the core of implementation. Each track is a separate commit-ready unit of work. **Track order, scope, and naming vary by issue type.**
 
-| Track | Name | Required? | Goal |
-|-------|------|-----------|------|
-| **A+B** | Core + Surface | Always (new system) | Build files in isolation, add barrel exports |
-| **C** | Integration | Always | Wire into runtime (providers, hooks, bootstrap) |
-| **D** | Adoption | Only if replacing something | Migrate call sites, remove old code |
-| **E** | Hardening | Recommended | Logging, warnings, edge cases, type polish |
-| **F** | Codebase Checklist | Always (before PR) | Final verification — PII, analytics gates, network resilience, safe mode |
+### Track Structure by Issue Type
 
-> **For update issues:** Add a **Track 0 — Intent + Impact** step before coding (format below).
+| Issue Type | Track Order | Example |
+|-----------|------------|---------|
+| **New Feature** | A (Create) → B (Create more/Integrate) → C (Integrate full) → D (Optimize) → [Final: Verify] | Create files, integrate into providers/hooks, optimize implementation, verify PII/analytics |
+| **Refactor/Update** | 0 (Intent) → A (Create new) → B (Delete old) → C (Migrate) → D (Optimize) → [Final: Verify] | Define what's changing, create new version, delete obsolete code, update call sites, verify |
+| **Simple Addition** | A (Create) → [Final: Verify] | Skip intermediate steps if uncomplicated |
 
----
+**Final Track (verification):** Always end with a verification track for:
+- PII safety, analytics consent gates
+- Centralized systems (Network, Storage, Cache, Jobs)
+- App practices (theming, navigation, error handling)
 
-### Track 0 — Intent + Impact (update issues only)
-
-Before writing any code on an update issue, define:
-
-- **What is changing?** — behavior, signature, data shape, side effects
-- **Is it breaking?** — yes/no + migration plan or feature flag scope
-- **Impacted modules list** — even if incomplete (prevents "forgot to update X" PR churn)
-- **Rollout plan** — flag / adapter / direct swap
-
-✅ Exit: reviewer can see exactly what's changing and which files will be touched before a line of code is written.
+Name it whatever makes sense (F, G, H, etc. — the name doesn't matter, you're just verifying best practices).
 
 ---
 
-### Track A+B — Core + Surface
+### Track Naming & Format
 
-**Goal:** The new system works in isolation and has a clean public API.
+**Track names should be descriptive commit titles**, not generic "Track A" labels:
+- ✅ `Track A: Create cascade manager and shared types`
+- ✅ `Track B: Integrate into QueryCache and bootstrap`
+- ✅ `Track C: Delete old invalidation logic and migrate call sites`
+- ❌ `Track A+B: Core + Surface`
+- ❌ `Track C: Integration`
+
+**Each track format:**
+
+## Track [Letter]: [Descriptive Title]
 
 **Scope:**
-- [ ] Create files, types, interfaces under `lib/module/`
-- [ ] Implement core logic + edge cases
-- [ ] Add internal validation (zod/guards), error types
-- [ ] Add barrel exports (`lib/module/index.ts`)
-- [ ] Define the one recommended import path
-- [ ] Hide internals — only expose the public surface
+- [ ] [Task 1 with details]
+- [ ] [Task 2 with details]
 
-✅ Exit: runs/unit-tests locally without touching app routing or UI. Reviewer can tell what's public vs private instantly.
+**Files Changed:**
+- `lib/module/file.ts` (new/updated)
+- `config/appsettings.json` (updated, if applicable)
 
----
-
-### Track C — Integration
-
-**Goal:** The app can actually use the system.
-
-**Scope:**
-- [ ] Add providers/hooks (if needed)
-- [ ] Connect to navigation, bootstrap, request-manager, storage, cache, etc.
-- [ ] Honor feature flags / dev-prod config (if relevant)
-- [ ] Update `appsettings.json`, `appsettings.dev.json`, config loader, `expected-differences.json` (if applicable)
-
-✅ Exit: feature is exercisable from the app (even if only in a dev screen or via logs).
+✅ Exit: [What to verify before moving to next track]
 
 ---
 
-### Track D — Adoption (only if migrating from old system)
+### When to Use Sub-Tracks
 
-**Goal:** Existing code stops doing the old thing.
+If a single track has **2+ independent concerns** that could be reviewed separately, break it into **Sub-tracks**:
 
-**Scope:**
-- [ ] Update impacted modules (list them explicitly)
-- [ ] Replace old utilities / patterns
-- [ ] Remove duplicated logic
-- [ ] Mark any temporary compat adapters with `// TODO: remove after #XXX`
-
-✅ Exit: no "half old / half new" behavior remains (or it's explicitly staged with a TODO).
-
----
-
-### Track E — Hardening
-
-**Goal:** Remove papercuts that cause PR churn. Keep isolated from Track C so logging/warnings don't pollute that review.
-
-**Scope:**
-- [ ] Fill edge cases discovered during Track C/D
-- [ ] Tighten types
-- [ ] Add runtime safety checks + clearer error messages
-- [ ] Add logger categories and consistent error handling
-- [ ] Fix any console warnings introduced
-
-✅ Exit: `npm run lint` passes, no TypeScript errors, no noisy console output.
-
----
-
-### Track F — Codebase Checklist
-
-**Goal:** Final verification pass before PR. Confirm the feature is coded safely and integrated correctly with the app's cross-cutting concerns. This is a copy-paste checklist — tick what applies, skip what doesn't.
-
-> ⚠️ This is a **coding checklist** only — testing and documentation have their own phases (2-4).
-
-**Scope:**
-- [ ] **PII Safety** — No user-identifiable data in logs, analytics events, or Sentry breadcrumbs; sanitized before leaving device
-- [ ] **Analytics Consent Gate** — All analytics events check consent level before emitting; respects `ConsentLevel` (#181)
-- [ ] **Safe Mode / Degradation** — Feature degrades gracefully; fallback UI exists; safe mode considered (#172)
-- [ ] **Network Resilience** — Works offline or queues operations; circuit breaker aware (#206, #217)
-- [ ] **Adaptive Payload** — Request payload sized for network quality where relevant (#205)
-- [ ] **Background Jobs** — Async operations use job queue, not fire-and-forget promises (#167)
-- [ ] **Feature Flag Gating** — Feature is gated if experimental; progressive rollout considered
-- [ ] **Navigation System** — Centralized Navigation System that helps allow proper routing and auth grauds
-- [ ] **Cache Invalidation** — Any data writes properly invalidate related cache tags; no orphaned stale data
-- [ ] **Performance Baseline** — Screen/request timing tracked where relevant; slow operation thresholds respected (#180)
-- [ ] **Config Support** — Behaviour is env-aware; feature toggles in `appsettings.json` if needed
-- [ ] **Error Handling** — Errors categorized, user-facing messages exist, recovery path defined
-
-✅ Exit: All applicable items checked. PR reviewer can see which items were skipped and why.
-
----
-
-### Format for Each Track
-
-## Track A+B: [Specific title]
-
-**Scope:**
-- [ ] Create `lib/module/file.ts`:
-  - [Interface/type definition]
-  - [Class with methods]
-  - [Error handling approach]
-- [ ] Barrel export in `lib/module/index.ts`
-
-✅ Exit: [What to verify before moving to Track C]
-
-### Optional: Sub-Tracks (when a track is large)
-
-If Track A+B (or any track) has multiple **independent concerns**, break it into **Sub-tracks** that can be reviewed/implemented in sequence:
-
- 
-## Track A+B: [Specific title with multiple concerns]
-
-**Goal:** [Overall goal]
+## Track A: [Main Goal]
 
 **Scope — Sub-track 1: [First independent concern]**
 - [ ] [Task 1]
 - [ ] [Task 2]
 
-✅ Exit: [Sub-track 1 specific exit criteria]
+✅ Exit: [Specific exit criteria for sub-track 1]
 
 ---
 
@@ -359,83 +224,108 @@ If Track A+B (or any track) has multiple **independent concerns**, break it into
 - [ ] [Task 3]
 - [ ] [Task 4]
 
-✅ Exit: [Sub-track 2 specific exit criteria]
+✅ Exit: [Specific exit criteria for sub-track 2 and full track]
+
+Use sub-tracks when:
+- Each concern is 3+ tasks
+- Each could be reviewed/tested independently
+- Overall track count stays manageable (5-7 tracks total)
+
+**Do NOT use sub-tracks when:**
+- Track is already small (3-5 tasks total) — avoid over-organizing
+- Tasks are sequential and depend on each other
 
 ---
 
-**Scope — Sub-track 3: [Third independent concern]**
-- [ ] [Task 5]
+### Track Patterns & Examples
 
-✅ Exit: [Sub-track 3 specific exit criteria and final track exit]
- 
+#### Example: New Feature Tracks (Create → Integrate → Optimize → Verify)
 
-**When to use sub-tracks:**
-- A single track is large enough that it has 2+ independent concerns (e.g., local storage + database persistence)
-- Each sub-track can be implemented/reviewed independently
-- Dependencies between sub-tracks are clear
+```
+Track A: Create cascade manager and shared types
+  - Create lib/storage/cache/cascade-manager.ts
+  - Create type-definitions/cache-invalidation.ts
+  - Barrel export
 
-**When NOT to use sub-tracks:**
-- Track is already small (A+B are usually 1-2 files, C is 1-2 changes). Avoid over-organizing.
-- Tasks are sequential and depend heavily on each other.
+Track B: Add transaction coordinator and filters
+  - Create lib/storage/cache/transaction-coordinator.ts
+  - Create lib/storage/cache/conditional-filter.ts
+  - Barrel export
+
+Track C: Integrate into QueryCache and bootstrap
+  - Update system/storage/cache/query-cache.ts (add methods)
+  - Update lib/kernel/bootstrap.ts (initialize capacity)
+  - Update config/appsettings.json
+
+Track D: Optimize and add deferred invalidation
+  - Create lib/storage/cache/lru-eviction.ts
+  - Create lib/storage/cache/deferred-queue.ts
+  - Performance validation
+
+Track F: Verify PII, Analytics, Centralized Systems
+  - Checklist: PII in logs? Analytics gates? Using Storage/Cache/Network correctly?
+```
+
+#### Example: Refactor Tracks (Define Intent → Create New → Delete Old → Migrate → Verify)
+
+```
+Track 0: Define Intent + Impact
+  - What is changing? (behavior, API, data shape)
+  - Breaking changes? Migration plan?
+  - List of modules to update
+
+Track A: Create new [system] alongside existing
+  - New files, new API
+  - Work independently of old system
+
+Track B: Delete old [system]
+  - Remove deprecated files
+  - Remove old utilities
+
+Track C: Migrate call sites
+  - Update all impacted modules to use new system
+  - Update tests
+  - Verify no regressions
+
+Track D: Optimize new implementation
+  - Performance tuning
+  - Edge case handling
+
+Track F: Verify PII, Analytics, Centralized Systems
+  - Final checklist
+```
 
 ---
 
-## Track C: [Integration title]
+### Track Tips
+
+- **Track isolation:** Each track should be independently reviewable and mergeable (with proper commit message context)
+- **Track order:** Follow the pattern for your issue type (new vs. refactor) — don't shuffle tasks randomly
+- **Final verification track:** Always include a final track (F, G, H, whatever) for PII/analytics/centralized systems checklist
+- **Config in one place:** All `appsettings.json`, `appsettings.dev.json`, config loader edits go in one track (usually Track C or its own early track)
+- **Sub-tracks for clarity:** If a single track has 2+ independent concerns (e.g., local storage + database persistence), break into sub-tracks
+- **Specific over vague:** Include TypeScript interfaces, method signatures, config JSON snippets
+- **Track titles are commit titles:** "Create cascade manager and shared types" is a good commit message; use it as your track title
+
+---
+
+### Track 0 — Intent + Impact (update/refactor issues only)
+
+If refactoring or updating an existing system, **start with Track 0** to define scope before coding:
+
+## Track 0: Define Intent + Impact
 
 **Scope:**
-- [ ] [Task with details]
-- [ ] Config: `appsettings.json`, `appsettings.dev.json`, loader, `expected-differences.json`
+- [ ] **What is changing?** — behavior, signature, data shape, side effects
+  - Example: "Auth flow now uses new OAuth provider + token refresh strategy"
+- [ ] **Is it breaking?** — yes/no + migration plan or feature flag scope
+  - Example: "Breaking API change; use feature flag 'useNewAuth' during transition"
+- [ ] **Impacted modules list** — even if incomplete (prevents "forgot to update X" PR churn)
+  - Example: "lib/auth, lib/network, hooks/auth, Screens/login, component/TopBar"
+- [ ] **Rollout plan** — feature flag / adapter / direct swap
+  - Example: "Feature flag 'useNewAuth' defaults to false; progressively roll out"
 
-✅ Exit: [What to verify]
-
----
-
-## Track E: Hardening
-
-**Scope:**
-- [ ] [Logging + warnings + edge cases]
-
-✅ Exit: lint passes, no TypeScript errors, no console noise
-
----
-
-## Track F: Codebase Checklist
-
-- [ ] **PII Safety** — [tick or note N/A]
-- [ ] **Analytics Consent Gate** — [tick or note N/A]
-- [ ] **Safe Mode / Degradation** — [tick or note N/A]
-- [ ] **Network Resilience** — [tick or note N/A]
-- [ ] **Adaptive Payload** — [tick or note N/A]
-- [ ] **Background Jobs** — [tick or note N/A]
-- [ ] **Feature Flag Gating** — [tick or note N/A]
-- [ ] **Cache Invalidation** — [tick or note N/A]
-- [ ] **Performance Baseline** — [tick or note N/A]
-- [ ] **Config Support** — [tick or note N/A]
-- [ ] **Error Handling** — [tick or note N/A]
-
-✅ Exit: All applicable items checked. Skipped items noted as N/A.
-
-### Tracks Tips
-
-- **Track isolation:** Do not mix A+B work into Track C — each track is its own review unit
-- **Track E is always separate:** Logging and warning fixes go here, not in C — keeps C reviews clean
-- **Config always in Track C:** All `appsettings.*` + `expected-differences.json` edits belong in Track C
-- **Sub-tracks for large tracks:** If a single track has 2+ independent concerns (e.g., local + database persistence), break into Sub-track 1, 2, 3 — each with its own exit criteria. Avoids single PRs being too large.
-- **Specific over vague:** Include TypeScript interfaces, method signatures, config JSON
-- **Track titles are commit titles:** e.g., "Create consent manager and barrel exports"
-
-### Example Track A+B Scope Item
-
- 
-- [ ] Create `lib/analytics/performance-baseline.ts`:
-  - `OperationBaseline` type: `{ label, p50, p95, p99, lastUpdated, version }`
-  - `PerformanceBaselineService` class:
-    - `initialize()` → Load from SecureStorage
-    - `recordSample(label, duration)` → Add + persist
-    - `getBaseline(label)` → Return p50/p95/p99
-  - Storage key: `dnd:performance:baselines` (use STORAGE_KEYS)
-  - Validation: Ensure p50 ≤ p95 ≤ p99
-- [ ] Export from `lib/analytics/index.ts`
+✅ Exit: Reviewer can see exactly what's changing and which modules will be touched before code is written.
 
 ---
 
@@ -575,24 +465,26 @@ Use this before submitting an issue:
 
 ### ⚠️ Critical Guidelines (Non-Negotiable)
 
-These 3 practices are MANDATORY for all new lib/[module] issues:
+For **all lib/[module] issues**, these are mandatory:
 
-- [ ] **Phase 2 (README):** One README.md at `lib/[module]/README.md` ONLY. No nested READMEs in subdirectories like `lib/[module]/sentry/README.md`.
-- [ ] **Phase 3 (Docs):** Exactly 2 mandatory files (`USAGE_GUIDE.md` + `IMPLEMENTATION_GUIDE.md`) + optional docs only when the issue genuinely warrants them. NO separate test guide files in Phase 3.
-- [ ] **Phase 4 (Tests):** ALL test files in `lib/[module]/__tests__/` folders ONLY. Never scatter tests like `lib/[module]/auth-provider.test.ts` or nest them deeper like `lib/[module]/sentry/__tests__/`.
+- [ ] **Module README:** One `lib/[module]/README.md` at module root ONLY. Includes all 10 required sections.
+- [ ] **Mandatory Docs:** Exactly 2 files in `docs/issues/...` → `USAGE_GUIDE.md` + `IMPLEMENTATION.md`
+- [ ] **Optional Docs:** Created ONLY if the feature genuinely warrants them (use the table above for guidance)
+- [ ] **Testing Guide:** Created ONLY for visually testable features (UI, navigation, real-time behavior)
+- [ ] **Test Files:** ALL tests in `lib/[module]/__tests__/` ONLY. Never scatter like `lib/[module]/auth.test.ts`.
 
 ### Issue Structure
-- [ ] Header present (Status, Impact, Depends on, Integrates with)
-- [ ] Config `Impacts` checkbox expanded — `appsettings.json`, `appsettings.dev.json`, loader, `expected-differences.json`
-- [ ] Problem statement has 3-4 bullet points
-- [ ] Codebase Status split into "Implemented" and "Gaps"
-- [ ] Solution lists Phase 0 + Phase 1 Tracks + Acceptance Criteria
-- [ ] Phase 0 has 5 Key Questions
-- [ ] Track 0 included if this is an update issue
-- [ ] Phase 1 tracks listed: A+B (always), C (always), D (if migrating), E (recommended), F (always before PR)
-- [ ] Track F completed — all applicable items checked or marked N/A
-- [ ] Each track has a clear ✅ Exit criteria
-- [ ] Acceptance Criteria lists Phase 2 (README), Phase 3 (Guides), Phase 4 (Tests) as checklists
+- [ ] Header present (Status, Impact, Depends on, Integrates with, Impacts checkboxes)
+- [ ] Problem statement has 3-4 specific bullet points + result summary
+- [ ] Codebase Status split into "Implemented" and "Gaps" (5-8 gaps is appropriate)
+- [ ] Solution describes architecture/pattern + lists out-of-scope items
+- [ ] Implementation Tracks section with A-[N] tracks (no Phase 0 in the issue itself)
+- [ ] Track 0 included if this is an update/refactor issue
+- [ ] Each track has 3-8 specific tasks
+- [ ] Each track has ✅ clear Exit criteria
+- [ ] Use sub-tracks for large tracks with 2+ independent concerns
+- [ ] Final track includes codebase checklist (PII, analytics, centralized systems, etc.)
+- [ ] Acceptance Criteria has 4 sections: Code / Docs Mandatory / Docs Optional / Testing
 
 ### Content Quality
 - [ ] All file paths use backticks (`lib/module/file.ts`)
@@ -659,155 +551,360 @@ Build [architecture/pattern description]:
 
 ---
 
-## Phase 0: Understand scope and draft PR body
+## Acceptance Criteria
 
-**Scope:**
-- [ ] Read issue thoroughly
-- [ ] Discuss with author:
-  - **Key Q1:** [Question?]
-  - **Key Q2:** [Question?]
-  - **Key Q3:** [Question?]
-  - **Key Q4:** [Question?]
-  - **Key Q5:** [Question?]
-- [ ] Clarify edge cases
-- [ ] Confirm acceptance criteria
-- [ ] Draft PR body:
+Acceptance criteria are organized into 4 sections: **Code Quality** (non-negotiable), **Mandatory Documentation** (required for all lib/[module] issues), **Optional Documentation** (as needed), and **Testing** (unit/integration tests + testing guides only if visually testable).
 
-\`\`\`markdown
-## [Feature] #XXX
-
-[Summary]
-
-### Features
-- [Feature 1]
-
-### Key Decisions
-- [Decision 1]
-
-### Tracks
-- Track A+B: [Core files + barrel exports]
-- Track C: [Runtime integration]
-- Track D: [Adoption/migration, if applicable]
-- Track E: [Hardening — logging, warnings, edge cases]
-- Phase 2-4: [Docs, tests]
-
-### Success Criteria
-- [Criterion 1]
-\`\`\`
+This is the final approval checklist for code review.
 
 ---
 
-## Track A+B: [Core + Surface title]
+### Code Quality Criteria
 
-**Scope:**
-- [ ] Create `lib/module/file.ts` — [types, class, logic]
-- [ ] Barrel export in `lib/module/index.ts`
+These apply to **all** issues before PR:
 
-✅ Exit: [What to verify before Track C]
-
----
-
-## Track C: [Integration title]
-
-**Scope:**
-- [ ] [Provider/hook/bootstrap task]
-- [ ] Config: `appsettings.json`, `appsettings.dev.json`, loader, `expected-differences.json` (if applicable)
-
-✅ Exit: [Feature exercisable from app]
-
----
-
-## Track D: [Adoption title] *(only if migrating)*
-
-**Scope:**
-- [ ] Update: [list impacted modules]
-- [ ] Remove old: [what to delete]
-
-✅ Exit: No half-old/half-new behavior remains
+- [ ] **TypeScript strict** — No `any` types without justification. All return types explicit.
+- [ ] **ESLint passes** — `npm run lint` returns no errors or warnings
+- [ ] **No console noise** — No console.log, console.warn, console.error unless intentional (debugging)
+- [ ] **Imports correct** — Validate architecture layers:
+  - `system/` imports external packages only (no `lib/`, no `hooks/`)
+  - `lib/` imports from `system/`, `/validation`, `/type-definitions`, `/maps`, `/config`, `/pure-algo-immutables` only
+  - `hooks/` imports from `lib/`, contexts, theme, config (types only)
+  - Components import from `hooks/`, components, theme, providers only
+- [ ] **No PII in logs** — User data, email, IDs sanitized before logging
+- [ ] **No hardcoded storage keys** — Always use `STORAGE_KEYS` from `/maps/storage-keys.ts`
+- [ ] **Documentation strings** — Complex functions/types have JSDoc comments explaining purpose + params
+- [ ] **Error handling complete** — Errors typed, user-visible messages defined, recovery path clear
 
 ---
 
-## Track E: Hardening
+### Mandatory Documentation for lib/[module] Issues
 
-**Scope:**
-- [ ] [Logging, warnings, edge cases]
+Every new issue that adds code to `lib/[module]` requires these 2 + 1 file structure:
 
-✅ Exit: `npm run lint` passes, no TypeScript errors, no console noise
+#### File 1: Module README
+
+**Location:** `lib/[module]/README.md` (one file, at module root only)
+
+**Required Sections:**
+- [ ] **When to Use This Module** — Suitable vs. unsuitable use cases (1-2 paragraphs)
+- [ ] **Architecture & Data Flow** — High-level description (1-2 paragraphs or diagram)
+- [ ] **API Reference** — All exports with type signatures + 1-2 usage examples per export
+- [ ] **Dependencies** — External packages and internal lib/ dependencies (list)
+- [ ] **Error Handling & Edge Cases** — Known limitations, error types, recovery strategies
+- [ ] **Performance Notes** — Caching, overhead, optimization tradeoffs
+- [ ] **Related Modules** — Links to connected lib/\* modules
+- [ ] **File Breakdown** — What each file does (table: Filename | Purpose)
+- [ ] **Testing** — Link to test guide if it exists or manual testing tips
+- [ ] **Future Enhancements** — Planned improvements or tech debt
+
+**Example location:** `lib/analytics/README.md` (NOT `lib/analytics/consent/README.md`)
+
+#### File 2 + 3: Issue Documentation
+
+**Location:** `docs/issues/MileStone X/Tier Y/NNN - Feature Name/`
+
+**Mandatory File 1: USAGE_GUIDE.md**
+- [ ] How to use the feature with 3-5 concrete examples
+- [ ] Common patterns and best practices
+- [ ] Troubleshooting section (common mistakes + fixes)
+- [ ] API reference (what each function/method does, parameters, return values)
+
+**Mandatory File 2: IMPLEMENTATION.md**
+- [ ] What files were created or modified (list + brief description)
+- [ ] Design decisions and why they were made
+- [ ] Architecture diagrams (if non-trivial)
+- [ ] Integration points (where code wires in)
+
+**Example issue folder:** `docs/issues/MileStone 2/Tier 6/189 - Advanced Cache Invalidation/`
 
 ---
 
-## Track F: Codebase Checklist
+### Optional Documentation
 
-- [ ] **PII Safety** — [tick or N/A]
-- [ ] **Analytics Consent Gate** — [tick or N/A]
-- [ ] **Safe Mode / Degradation** — [tick or N/A]
-- [ ] **Network Resilience** — [tick or N/A]
-- [ ] **Adaptive Payload** — [tick or N/A]
-- [ ] **Background Jobs** — [tick or N/A]
-- [ ] **Feature Flag Gating** — [tick or N/A]
-- [ ] **Cache Invalidation** — [tick or N/A]
-- [ ] **Performance Baseline** — [tick or N/A]
-- [ ] **Config Support** — [tick or N/A]
-- [ ] **Error Handling** — [tick or N/A]
+**Create these ONLY if the feature genuinely warrants them** (don't pad unnecessarily):
 
-✅ Exit: All applicable items checked. Skipped items noted as N/A.
+| File Name | When to Create |
+|-----------|----------------|
+| `ARCHITECTURE.md` | Feature has non-trivial data flow or system design worth separate explanation |
+| `EXAMPLES.md` | Usage Guide would get too long with all examples inline |
+| `LIMITS.md` | Feature has important constraints, quotas, or known boundaries |
+| `MISSING.md` or `GAPS.md` | Scope was intentionally cut; future dev needs to know what's not done |
+| `[FEATURE]_VARIANT_TRACKING.md` | Feature-specific A/B test variant tracking guide |
+| Custom guide | Any other module-specific doc that would reduce future developer confusion |
+
+**Rule:** Only create extra files when genuinely useful; never pad the folder.  
+**Rule:** Never name any file `README.md` inside an issue folder — that's reserved for module READMEs.
+
+---
+
+### Testing Criteria
+
+#### Unit & Integration Tests (All Issues)
+
+- [ ] Unit tests created for all new public functions/classes
+- [ ] Integration tests verify composed features (e.g., cascade + transaction together)
+- [ ] All tests pass: `npm run test` (or specific test suite)
+- [ ] Test files located in `lib/[module]/__tests__/` folder only
+  - ✅ `lib/analytics/__tests__/consent.test.ts`
+  - ❌ `lib/analytics/consent.test.ts`
+  - ❌ `lib/analytics/consent/__tests__/consent.test.ts`
+
+#### Testing Guide (Only if Visually Testable)
+
+**Create a testing guide ONLY if:**
+- Feature has UI components that need to be visually tested
+- Feature changes navigation or routing flow
+- Feature has real-time observable behavior (something a QA tester can verify by using the app)
+
+**Do NOT create a testing guide for:**
+- Pure backend/logic features (cache invalidation, offline queue, persistence logic)
+- Features tested entirely by unit/integration tests
+- Internal utilities and managers
+
+**If creating a testing guide:**
+
+**Location:** `docs/A Testing Guide/[Feature Name] Testing.md`
+
+**Required Format:**
+- [ ] **Test Environment** — Prerequisites, feature flags to enable, data setup
+- [ ] **Test Cases** — Minimum 14+ manual test cases (format: checkbox + description + expected behavior + optional screenshot note)
+- [ ] **Screenshots** — Mark in test cases where visual validation is needed
+- [ ] **Console Logs** — Note expected log output to validate logging is working
+- [ ] **Failure Scenarios** — Offline + low battery + high latency behavior
+
+**Example:** `docs/A Testing Guide/Sign In Flow Testing.md` (YES, visible behavior)  
+**Counter-example:** `docs/A Testing Guide/Advanced Cache Invalidation Testing.md` (NO, invisible backend logic)
+
+---
+
+### Acceptance Criteria Format
+
+When writing an issue, structure the Acceptance Criteria section like this:
+
+```markdown
+## Acceptance Criteria
+
+### Code Quality
+- [ ] TypeScript strict (no `any`), ESLint passes
+- [ ] No console noise, no hardcoded strings
+- [ ] All imports follow architecture boundaries
+- [ ] Error handling complete + typed
+
+### Documentation — Mandatory
+- [ ] `lib/[module]/README.md` with all required sections
+- [ ] `docs/issues/.../USAGE_GUIDE.md` with examples + troubleshooting
+- [ ] `docs/issues/.../IMPLEMENTATION.md` with files changed + design decisions
+
+### Documentation — Optional
+- [ ] `ARCHITECTURE.md` (if non-trivial data flow)
+- [ ] `LIMITS.md` (if constraints/quotas exist)
+
+### Testing
+- [ ] Unit tests for all new functions
+- [ ] Integration tests for composed features
+- [ ] No console errors or warnings
+- [ ] `docs/A Testing Guide/[Feature].md` (only if visually testable)
+```
+
+---
+
+## Formatting Conventions
+
+| Element | Format | Example |
+|---------|--------|---------|
+| **Filenames** | Backticks | `lib/analytics/consent.ts` |
+| **Class names** | Backticks | `AnalyticsConsentManager` |
+| **Function names** | Backticks | `recordSample(label, duration)` |
+| **Type names** | Backticks | `ConsentLevel` |
+| **Feature flags** | Single quotes | flag `'track-performance-baseline'` |
+| **Storage keys** | Backticks | `STORAGE_KEYS.ANALYTICS_CONSENT` |
+| **Issue references** | Hash + number | #206, #181 |
+| **Code blocks** | Triple backticks + language | \`\`\`typescript ... \`\`\` |
+| **Emphasis** | **bold** for important terms, *italics* for emphasis | `**critical**`, *non-blocking* |
+
+### Conventions
+
+- **Track/Phase headers** are commit titles: "Create queue structure" not "Track A+B: Create..."
+- **Checkboxes** for all task lists: `- [ ] Task name`
+- **Subheadings** use `##` for section-level, `###` for subsection-level
+- **Inline code** for all technical terms (files, types, flags)
+- **Specific over vague:** "Queue breadcrumbs to SecureStorage (max 500)" not "Add offline support"
+- **Active voice:** "The queue drops oldest events" not "Oldest events are dropped"
+
+---
+
+## Quick Checklist
+
+Use this before submitting an issue:
+
+### ⚠️ Critical Guidelines (Non-Negotiable)
+
+For **all lib/[module] issues**, these are mandatory:
+
+- [ ] **Module README:** One `lib/[module]/README.md` at module root ONLY. Includes all 10 required sections.
+- [ ] **Mandatory Docs:** Exactly 2 files in `docs/issues/...` → `USAGE_GUIDE.md` + `IMPLEMENTATION.md`
+- [ ] **Optional Docs:** Created ONLY if the feature genuinely warrants them (use the table above for guidance)
+- [ ] **Testing Guide:** Created ONLY for visually testable features (UI, navigation, real-time behavior)
+- [ ] **Test Files:** ALL tests in `lib/[module]/__tests__/` ONLY. Never scatter like `lib/[module]/auth.test.ts`.
+
+### Issue Structure
+- [ ] Header present (Status, Impact, Depends on, Integrates with, Impacts checkboxes)
+- [ ] Problem statement has 3-4 specific bullet points + result summary
+- [ ] Codebase Status split into "Implemented" and "Gaps" (5-8 gaps is appropriate)
+- [ ] Solution describes architecture/pattern + lists out-of-scope items
+- [ ] Implementation Tracks section with A-[N] tracks (no Phase 0 in the issue itself)
+- [ ] Track 0 included if this is an update/refactor issue
+- [ ] Each track has 3-8 specific tasks
+- [ ] Each track has ✅ clear Exit criteria
+- [ ] Use sub-tracks for large tracks with 2+ independent concerns
+- [ ] Final track includes codebase checklist (PII, analytics, centralized systems, etc.)
+- [ ] Acceptance Criteria has 4 sections: Code / Docs Mandatory / Docs Optional / Testing
+
+### Content Quality
+- [ ] All file paths use backticks (`lib/module/file.ts`)
+- [ ] All class/function names use backticks
+- [ ] Issue references use #XXX format
+- [ ] Code examples are TypeScript (or actual code, not pseudocode)
+- [ ] Each track has ✅ Exit criteria
+- [ ] Acceptance criteria are measurable and testable
+- [ ] Dependencies section explains WHY, not just lists
+- [ ] Notes section includes design principles + future work
+
+### Research
+- [ ] Read 3+ related source files (actual codebase, not docs)
+- [ ] Referenced actual issue numbers (#206, #179, etc.)
+- [ ] Checked for existing implementations (not reinventing)
+- [ ] Identified actual storage keys/constants used
+- [ ] Noted feature flags that might control this
+
+### Pre-Review
+- [ ] Searched for similar issues (avoid duplicates)
+- [ ] Issue is self-contained (not blocked by unclear dependencies)
+- [ ] Tracks are appropriately sized (not 20+ items per track)
+- [ ] No track is purely documentation or testing (those are Acceptance Criteria)
+
+---
+
+## Template (Copy-Paste Ready)
+
+```markdown
+# Issue #XXX: [Feature Name]
+
+**Type**: Feature Enhancement / Refactor / Bug Fix  
+**Milestone**: 2  
+**Tier**: 6 (Category)  
+**Priority**: Medium  
+**Status**: Specification  
+**Related**: #190 (Compression), #191 (Revalidation Strategies)
+
+---
+
+## Problem Statement
+
+### Current Gaps
+
+- ❌ [Gap 1]: [Why needed]
+- ❌ [Gap 2]: [Why needed]
+
+### User Impact
+
+**Scenario:** [Concrete example of user impact]
+
+**Solution needed:** [1-2 sentence summary of what will fix this]
+
+---
+
+## Solution Architecture
+
+### Pattern/Approach
+
+[1-2 paragraph description of the solution]
+
+### Out of Scope
+
+- [What is NOT being addressed]
+
+---
+
+## Implementation Tracks
+
+### Track A: [Descriptive Title — Commit Message]
+
+**Scope:**
+- [ ] [Task 1 with specifics]
+- [ ] [Task 2 with file names]
+
+**Files Changed:**
+- `lib/module/file.ts` (new)
+- `lib/module/index.ts` (updated)
+
+✅ Exit: [What to verify before next track]
+
+---
+
+### Track B+C: [Descriptive Title]
+
+**Scope:**
+- [ ] [Task]
+
+✅ Exit: [What to verify]
+
+---
+
+### Track [Final]: Verify PII, Analytics, Centralized Systems
+
+- [ ] **PII Safety** — [Check or N/A]
+- [ ] **Analytics Consent** — [Check or N/A]
+- [ ] **Storage/Cache Usage** — Using SecureStorage, QueryCache correctly
+- [ ] **Network/Jobs** — Using RequestManager, JobQueue as needed
+- [ ] **Logging** — Using proper logger categories
+- [ ] **Error Handling** — Errors typed, messages user-facing
+
+✅ Exit: All applicable items checked. Skipped items noted.
 
 ---
 
 ## Acceptance Criteria
 
-**Track A+B:**
-- [ ] [Criterion 1]
+### Code Quality
+- [ ] TypeScript strict, ESLint passes
+- [ ] No console noise, proper imports
+- [ ] Error handling complete
 
-**Track C:**
-- [ ] [Criterion 1]
+### Documentation — Mandatory
+- [ ] `lib/[module]/README.md` with 10 required sections
+- [ ] `docs/issues/...` folder with USAGE_GUIDE.md + IMPLEMENTATION.md
 
-**Track D:** *(if applicable)*
-- [ ] [Criterion 1]
+### Documentation — Optional
+- [ ] [Only if feature warrants — list specific files]
 
-**Track E:**
-- [ ] lint passes, no TypeScript errors
-
-**Track F (Codebase Checklist):**
-- [ ] All applicable items checked or marked N/A
-
-**Phase 2 (README):**
-- [ ] `lib/[module]/README.md` created with: When to Use, Architecture, API Reference, Dependencies, Error Handling, Performance Notes, File Breakdown, Testing, Future Enhancements
-*Reference .github\README_STYLE_GUIDE.md*
-
-**Phase 3 (Guides):**
-- [ ] `docs/issues/.../USAGE_GUIDE.md` with examples, troubleshooting, best practices
-- [ ] `docs/issues/.../IMPLEMENTATION.md` What files were added or edited and what each change does.
-- [ ] `docs/issues/.../*.md` any optional docs (if feature warrants)
-*Reference .github/ISSUE_DOC_STYLE_GUIDE.md*
-
-**Phase 4 (Tests):**
-- [ ] Unit tests pass
-- [ ] Integration tests pass
-- [ ] No console errors or warnings
-- [ ] `docs/A Testing Guide/[Feature] Testing.md` with 14+ manual test cases (if feature warrants)
+### Testing
+- [ ] Unit tests + integration tests
+- [ ] All tests pass
+- [ ] `docs/A Testing Guide/[Feature].md` (only if visually testable)
 
 ---
 
 ## Dependencies
 
-- `lib/module` — [Dependency explanation]
-- #XXX (Feature) — [Why needed first]
+- #XXX (Feature) — [Why needed]
 
 ---
 
 ## Notes
 
 - **Design principle:** [Why this approach]
-- **Important caveat:** [What to watch for]
 - **Pre-release:** [No backwards compatibility]
- 
+```
 
 ---
 
 ## Further Resources
 
-- **Reference issues:** #70, #179, #178, #180, #181 (all follow this pattern)
+- **Reference issues:** #189 (Advanced Cache Invalidation), #190 (Compression), #191 (Revalidation) — all follow this new pattern
+- **Architecture guide:** `.github/copilot-instructions.md`
+- **README style:** `.github/README_STYLE_GUIDE.md` (if exists; otherwise use module README template)
 - **Tier 3 pattern:** #054-#228 (smaller, feature-flag focused)
 - **Tier 2 issues:** Codebase docs, storage layer, auth (look for examples in `docs/issues/`)
 - **.github/copilot-instructions.md** — Repo philosophy and patterns

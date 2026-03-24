@@ -267,6 +267,12 @@ export interface AppSettings {
     description?: string;
   };
   cachePersistenceMap?: Record<string, 'persist' | 'volatile'>;
+  cacheCapacity?: {
+    hardMaxBytes?: number; // 10MB (prod) or 50MB (dev); hard capacity limit in bytes
+    softThreshold?: number; // 0.9 = evict when cache reaches 90% of hardMax
+    targetAfterEviction?: number; // 0.7 = evict until cache reaches 70% of hardMax
+    description?: string;
+  };
 }
 
 let cachedConfig: AppSettings | null = null;
