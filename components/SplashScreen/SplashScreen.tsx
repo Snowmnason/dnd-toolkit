@@ -15,7 +15,7 @@ import { Body, SubTitle, Title } from '../ui/AppText';
  *
  * Used for:
  * 1. Initial app splash (feature flag controlled)
- * 2. LoadingBlocker overlay when any system calls setLoading()
+ * 2. UIBlockerLayer overlay when any system calls setLoading()
  */
 
 interface SplashScreenProps {

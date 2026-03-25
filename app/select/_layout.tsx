@@ -20,7 +20,7 @@ export default function SelectLayout() {
     }
   }, [authState]);
 
-  // Always render content - LoadingBlocker at root handles loading overlay with splash screen
+  // Always render content - UIBlockerLayer handles loading overlay with splash screen
   return (
     <AppPage>
       <Stack screenOptions={{ headerShown: false }} />

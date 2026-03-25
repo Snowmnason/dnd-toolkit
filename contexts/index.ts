@@ -23,10 +23,6 @@ export type { ModalState } from './modal-context';
 export { ThemeContext, useTheme } from './ThemeContext';
 export type { ThemeContextType } from './ThemeContext';
 
-// Loading Context
-export { LoadingProvider, useLoadingContext } from './loading-context';
-export type { LoadingState } from './loading-context';
-
 // World Selection Context
 export { useWorldSelection, WorldSelectionProvider } from './single_screen/WorldSelectionContext';
 

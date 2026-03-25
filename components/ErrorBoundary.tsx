@@ -1,6 +1,5 @@
 import { handleErrorReport } from '@/hooks/analytics';
 import { Component, ErrorInfo, ReactNode } from 'react';
-import { View } from 'react-native';
 
 interface Props {
   children: ReactNode;
@@ -16,8 +15,12 @@ interface State {
  * Global Error Boundary Component
  *
  * Catches unhandled errors in the React component tree
- * Delegates error reporting to useErrorReporting.handleErrorReport()
+ * Delegates error reporting to useErrorReport.handleErrorReport()
  * Displays a user-friendly crash fallback screen via renderFallback prop
+ *
+ * NOTE: Positioned within UIBlockerLayer for overlay rendering.
+ * The UIBlockerLayer provides the `position: 'relative'` context that allows
+ * the error fallback screen to use `position: 'absolute'` for modal-like overlay.
  */
 export class AppErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, error: null };
@@ -46,12 +49,7 @@ export class AppErrorBoundary extends Component<Props, State> {
       return null;
     }
 
-    // Wrap children in a View with position: 'relative' to allow absolute positioning
-    // of overlay components like LoadingBlocker
-    return (
-      <View style={{ position: 'relative', flex: 1 }}>
-        {this.props.children}
-      </View>
-    );
+    // Return children directly — positioning is handled by UIBlockerLayer parent
+    return this.props.children;
   }
 }

@@ -199,7 +199,7 @@ The Loading Context provides a centralized way to show loading states and block 
 
 ### When to Use
 
-**Use Loading Context for:**
+**Use UIBlockerLayer for:**
 - Kernel initialization (bootstrap loading screen)
 - Navigation transitions (route changes)
 - Storage operations (large data saves/loads)
@@ -214,17 +214,18 @@ The Loading Context provides a centralized way to show loading states and block 
 ### API
 
 ```typescript
-import { useLoadingContext } from "@/contexts/LoadingContext";
+import { useUIBlocker } from "@/components";
 
 // Get current loading state
-const { isLoading, message, progress, decorativeElement } = useLoadingContext();
+const { isLoading, message, progress, title, subtitle } = useUIBlocker();
 
 // Set loading state (blocks UI)
 setLoading(true); // Simple loading
 setLoading({ 
   message: "Saving world data...",
-  progress: 0.5, // 0-1
-  decorativeElement: <CustomSpinner />
+  progress: 50, // 0-100
+  title: "Please wait",
+  subtitle: "Processing..."
 });
 
 // Clear loading state
@@ -233,14 +234,14 @@ setLoading(false);
 
 ### Integration with Kernel
 
-The Loading Context works alongside kernel phases:
+The UIBlockerLayer works alongside kernel phases:
 
 ```typescript
 // During kernel initialization
 if (!kernel.phases.appReady) {
   setLoading({
     message: "Initializing app...",
-    decorativeElement: <SplashScreen />
+    progress: 30
   });
 }
 
@@ -250,15 +251,17 @@ setLoading(false);
 
 ### Provider Setup
 
-LoadingProvider must wrap the app tree (before AppKernelProvider):
+UIBlockerLayer wraps the app tree (after ThemeProvider, before content):
 
 ```typescript
 // app/_layout.tsx
-<LoadingProvider>
-  <AppKernelProvider>
-    {/* App content */}
-  </AppKernelProvider>
-</LoadingProvider>
+<AppKernelProvider>
+  <ThemeProvider>
+    <UIBlockerLayer>
+      {/* App content */}
+    </UIBlockerLayer>
+  </ThemeProvider>
+</AppKernelProvider>
 ```
 
 ## Phase-Aware Provider Pattern

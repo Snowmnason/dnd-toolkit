@@ -341,16 +341,16 @@ export function AppSplit({
 
 /* ───── AppLoading ───── 
    Loading state overlay
-   DEPRECATED: Use useLoadingContext() from @/contexts/loading-context instead
+   DEPRECATED: Use useUIBlocker() from @/components/UIBlockerContext instead
    This component is kept for backward compatibility but should not be used.
-   LoadingBlocker is now rendered at root level and controlled via context.
+   UIBlockerLayer is now rendered at root level and controlled via context.
 */
 export function AppLoading({
   loadMessage = "Loading...",
   assetsLoaded = false,
   ...rest
 }: AppLoadingViewProps) {
-  // Deprecated: LoadingBlocker at root level handles all loading states
+  // Deprecated: UIBlockerLayer at root level handles all loading states
   // This function is kept as a stub for backward compatibility
   return null;
 }

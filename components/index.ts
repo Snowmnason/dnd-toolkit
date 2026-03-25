@@ -10,7 +10,7 @@
  *   AppModal,
  *   ConfirmModal,
  *   AppErrorBoundary,
- *   LoadingBlocker,
+ *   UIBlockerLayer,
  *   SplashScreen,
  * } from "@/components";
  * ```
@@ -18,9 +18,13 @@
 
 // Root-level components
 export { AppErrorBoundary } from "./ErrorBoundary";
-export { LoadingBlocker } from "./LoadingBlocker";
 export { SmartDownloadButton } from "./SmartDownloadButton";
 export { default as TopBar } from "./TopBar";
+export { UIBlockerLayer } from "./UIBlockerLayer";
+// UIBlockerContext is purposely a separate file (no SplashScreen/theme imports)
+// so hooks/kernel can import useUIBlocker without creating a require cycle.
+export { useUIBlocker } from "./UIBlockerContext";
+export type { UIBlockerState } from "./UIBlockerContext";
 export { default as VersionDisplay } from "./VersionDisplay";
 
 // UI Components (re-export barrel)

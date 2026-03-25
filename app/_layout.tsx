@@ -1,8 +1,8 @@
 import {
   AppErrorBoundary,
-  TopBar
+  TopBar,
+  UIBlockerLayer
 } from "@/components";
-import { LoadingBlocker } from "@/components/LoadingBlocker";
 import { OfflineSyncNotificationLayer } from "@/components/offline";
 import {
   CrashFallBack,
@@ -11,7 +11,7 @@ import {
   SafeModeScreen,
 } from "@/components/SplashScreen";
 import { AppToastLayer, NotificationContainer } from "@/components/ui";
-import { AppToastProvider, LoadingProvider, ModalProvider, NotificationProvider } from "@/contexts";
+import { AppToastProvider, ModalProvider, NotificationProvider } from "@/contexts";
 // Trigger modal registration side effects — must run before any openModal() call.
 // Imported here (leaf module) instead of modal-context.tsx to avoid circular dependency.
 import "@/components/modals/register-all-modals";
@@ -203,8 +203,8 @@ function RootLayoutContent() {
   ]);
 
   // ==================== RENDER LOGIC SECTION ====================
-  // Note: LoadingBlocker (mounted at root level in provider tree) now handles
-  // all loading states. Kernel and other systems call setLoading() via useLoadingContext().
+  // Note: UIBlockerLayer (outermost in provider tree) handles all loading overlays.
+  // Kernel and other systems call setLoading() via useUIBlocker().
 
   const firstSeg = typeof segments[0] === "string" ? segments[0] : "(root)";
   console.log(
@@ -396,20 +396,21 @@ function RootLayoutContent() {
 // Main export with provider wrapper and error boundary
 export default function RootLayout() {
   return (
-    <LoadingProvider>
-      <AppKernelProvider>
-        <ThemeProvider>
-          <ScaleProvider>
-            <PlatformProvider>
-              <SubscriptionProvider>
-                <AppParamsStableProvider>
-                  <AppParamsVolatileProvider>
-                    <ModalProvider>
-                      <NotificationProvider>
-                        <AppToastProvider>
-                          {/* LoadingBlocker positioned here so it has access to all theme/kernel contexts
-                              and renders immediately via LoadingContext state initialization */}
-                          <LoadingBlocker />
+    <AppKernelProvider>
+      <ThemeProvider>
+        <ScaleProvider>
+          <PlatformProvider>
+            <SubscriptionProvider>
+              <AppParamsStableProvider>
+                <AppParamsVolatileProvider>
+                  <ModalProvider>
+                    <NotificationProvider>
+                      <AppToastProvider>
+                        {/* UIBlockerLayer renders the splash overlay (isLoading: true by default)
+                            and provides the setLoading() context. Placed here — inside all theme
+                            providers (SplashScreen needs UseTheme) but above RootLayoutContent
+                            where useKernelLoadingSync() calls setLoading(false) on appReady. */}
+                        <UIBlockerLayer>
                           <AppErrorBoundary
                             renderFallback={(error: Error | null, onRetry: () => void) => (
                               <CrashFallBack error={error} onRetry={onRetry} />
@@ -417,16 +418,16 @@ export default function RootLayout() {
                           >
                             <RootLayoutContent />
                           </AppErrorBoundary>
-                        </AppToastProvider>
-                      </NotificationProvider>
-                    </ModalProvider>
-                  </AppParamsVolatileProvider>
-                </AppParamsStableProvider>
-              </SubscriptionProvider>
-            </PlatformProvider>
-          </ScaleProvider>
-        </ThemeProvider>
-      </AppKernelProvider>
-    </LoadingProvider>
+                        </UIBlockerLayer>
+                      </AppToastProvider>
+                    </NotificationProvider>
+                  </ModalProvider>
+                </AppParamsVolatileProvider>
+              </AppParamsStableProvider>
+            </SubscriptionProvider>
+          </PlatformProvider>
+        </ScaleProvider>
+      </ThemeProvider>
+    </AppKernelProvider>
   );
 }

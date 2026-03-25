@@ -51,9 +51,12 @@ export async function jobSetupPhase(): Promise<void> {
     // Step 2: Register all job handlers with the queue
     const { createSyncJobHandler } = await import("@/lib/jobs");
     const syncHandler = createSyncJobHandler();
-    queue.registerHandler(syncHandler.name, (async (payload: any) => {
-      await syncHandler.execute(payload);
-    }) as any); // JobHandler expects (payload, context), but we only need payload
+    queue.registerHandler(
+      syncHandler.name,
+      async (payload: any, _context: any) => {
+        await syncHandler.execute(payload);
+      },
+    ); // Handler signature: (payload, context) — context unused by sync handler
 
     // Network recovery — full init: registers handler + wires state-machine transition listeners
     const { NetworkRecoveryRetryJobManager } = await import(

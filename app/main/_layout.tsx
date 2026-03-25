@@ -75,7 +75,7 @@ export default function MainLayout() {
     router.replace(target as any);
   };
 
-  // Always render content - LoadingBlocker at root handles loading overlay with splash screen
+  // Always render content - UIBlockerLayer handles loading overlay with splash screen
   return (
     <View style={{ flex: 1 }}>
       {/* Stack for main routes and nested navigation */}

@@ -1,12 +1,12 @@
 # Provider Initialization Testing
 
-Purpose: describe manual and automated tests to validate kernel phase-aware providers, `usePhaseReady()` hook, and the `LoadingContext`/`LoadingBlocker` UX.
+Purpose: describe manual and automated tests to validate kernel phase-aware providers, `usePhaseReady()` hook, and the `UIBlockerLayer` UX.
 
 Scope
 - Kernel phase lifecycle and provider initialization ordering
 - `usePhaseReady()` behavior (unit)
 - `AppParamsStableProvider` / provider integration with kernel (integration)
-- `LoadingContext` and `LoadingBlocker` (unit + integration)
+- `UIBlockerLayer` and `useUIBlocker()` (unit + integration)
 
 Quick commands
 - Run unit & integration tests: `npm test`
@@ -31,10 +31,10 @@ Unit tests
   - Re-renders when kernel emits a state change.
   - Test file: `__tests__/kernel/usePhaseReady.test.tsx` (use `// @vitest-environment jsdom`).
 
-- `LoadingContext` / `LoadingBlocker`
-  - Unit: `useLoadingContext()` exposes `setLoading` which accepts `boolean` and partial state objects.
-  - Integration: mount `LoadingProvider` + `LoadingBlocker`, call `setLoading(true)`, verify DOM contains marker like `[data-testid=loading-blocker]` and message updates.
-  - Test file: `__tests__/contexts/loading-context.test.tsx` (jsdom env).
+- `UIBlockerLayer` / `useUIBlocker()`
+  - Unit: `useUIBlocker()` exposes `setLoading` which accepts `boolean` and partial state objects.
+  - Integration: mount `UIBlockerLayer` inside test tree, call `setLoading(true)`, verify DOM contains SplashScreen and state fields update (title, subtitle, message, progress).
+  - Test file: `__tests__/components/UIBlockerLayer.test.tsx` (jsdom env).
 
 Integration tests
 - `AppParamsStableProvider` + kernel lifecycle
@@ -51,7 +51,7 @@ Type-level tests
 
 Testing checklist (acceptance criteria)
 - Unit tests for `usePhaseReady()` pass.
-- Unit + integration tests for `LoadingContext`/`LoadingBlocker` pass.
+- Unit + integration tests for `UIBlockerLayer`/`useUIBlocker()` pass.
 - `AppParamsStableProvider` integration tests confirm it waits for `servicesReady`.
 - No console errors like "Auth provider not ready" during bootstrap integration runs.
 - `npm run lint` and `npm run typecheck` pass.

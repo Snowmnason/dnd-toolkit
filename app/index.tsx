@@ -70,8 +70,8 @@ export default function HomePage() {
     `[ui] [HomePage] render — appReady=${kernel.phases.appReady}, isAuthChecked=${isAuthChecked}, hasAccount=${hasAccount}`,
   );
 
-  // While kernel is initializing, LoadingBlocker (in _layout.tsx) shows the splash.
-  // Render a fallback SplashScreen here too in case LoadingBlocker is not yet mounted.
+  // While kernel is initializing, UIBlockerLayer (in _layout.tsx) shows the splash.
+  // Render a fallback SplashScreen here too in case UIBlockerLayer is not yet mounted.
   if (!kernel.phases.appReady) {
     console.log('[ui] [HomePage] → rendering SplashScreen (kernel not ready)');
     return <SplashScreen title="D&D Toolkit" subtitle="Loading App" message="Preparing your world..." />;
@@ -112,7 +112,7 @@ export default function HomePage() {
   }
 
   // Auth check in progress — show splash screen to avoid white flash.
-  // LoadingBlocker has already hidden (kernel is ready), so this route
+  // UIBlockerLayer has already hidden (kernel is ready), so this route
   // must render visible content during the async storage reads.
   console.log('[ui] [HomePage] → rendering SplashScreen (auth check in progress)');
   return <SplashScreen title="D&D Toolkit" subtitle="Authenticating" message="Checking your credentials..." />;

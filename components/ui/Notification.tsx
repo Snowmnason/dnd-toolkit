@@ -3,7 +3,7 @@ import { usePlatform } from "@/providers";
 import { $, S, UseTheme } from "@/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo } from "react";
-import { Pressable, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 import Animated, { FadeInDown, SlideOutUp } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Body, Caption } from "./AppText";
@@ -94,6 +94,21 @@ export function Notification({
 
   logger.category("ui").debug("Rendering id:", id, "type:", type);
 
+  // Platform-aware pointerEvents handling:
+  // - On web: include in style (RN Web requires it in style)
+  // - On native: pass as prop (native Views use pointerEvents as a prop)
+  const animatedViewStyle: any = {
+    position: "absolute",
+    top: baseTop + stackOffset,
+    left: isMobile ? S.space.lg : "5%",
+    right: isMobile ? S.space.lg : "5%",
+    zIndex: 9999 - index,
+  };
+
+  if (Platform.OS === 'web') {
+    animatedViewStyle.pointerEvents = "box-none";
+  }
+
   return (
     <Animated.View
       entering={FadeInDown.duration(500)
@@ -101,14 +116,8 @@ export function Notification({
         .damping(0.7)
         .delay(index * 80)}
       exiting={SlideOutUp.duration(300)}
-      style={{
-        pointerEvents: "box-none",
-        position: "absolute",
-        top: baseTop + stackOffset,
-        left: isMobile ? S.space.lg : "5%",
-        right: isMobile ? S.space.lg : "5%",
-        zIndex: 9999 - index,
-      }}
+      pointerEvents={Platform.OS !== 'web' ? "box-none" : undefined}
+      style={animatedViewStyle}
     >
       <Pressable onPress={handlePress} disabled={!onPress}>
         <View

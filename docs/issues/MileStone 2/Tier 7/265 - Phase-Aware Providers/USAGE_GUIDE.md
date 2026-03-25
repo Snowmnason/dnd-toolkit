@@ -30,6 +30,7 @@ Determine which kernel phases your provider needs:
 type KernelPhase =
   | 'configReady'      // App configuration loaded
   | 'preloadReady'     // Fonts/images preloaded
+  | 'jobSetupReady'    // Background job system initialized
   | 'networkReady'     // Network detection initialized
   | 'storageReady'     // SecureStorage initialized
   | 'servicesReady'    // Auth/Error/Database providers registered
@@ -112,24 +113,25 @@ Add your provider to the provider chain in `app/_layout.tsx`:
 export default function RootLayout() {
   return (
     <AppKernelProvider>
-      <LoadingProvider>           {/* Highest priority */}
-        <ThemeProvider>           {/* storageReady */}
-        <ScaleProvider>           {/* No gate needed */}
-        <PlatformProvider>        {/* No gate needed */}
-        <AppParamsStableProvider> {/* servicesReady */}
-        <AppParamsVolatileProvider>{/* storageReady */}
-        <SubscriptionProvider>    {/* TODO: servicesReady */}
+      <ThemeProvider>           {/* storageReady */}
+      <ScaleProvider>           {/* No gate needed */}
+      <PlatformProvider>        {/* No gate needed */}
+      <AppParamsStableProvider> {/* servicesReady */}
+      <AppParamsVolatileProvider>{/* storageReady */}
+      <SubscriptionProvider>    {/* TODO: servicesReady */}
+        {/* UIBlockerLayer provides splash screen + loading state */}
+        <UIBlockerLayer>
           {/* Add your provider here */}
           <MyProvider>            {/* servicesReady */}
             <Stack />
           </MyProvider>
-        </SubscriptionProvider>
-        </AppParamsVolatileProvider>
-        </AppParamsStableProvider>
-        </ScaleProvider>
-        </PlatformProvider>
-        </ThemeProvider>
-      </LoadingProvider>
+        </UIBlockerLayer>
+      </SubscriptionProvider>
+      </AppParamsVolatileProvider>
+      </AppParamsStableProvider>
+      </PlatformProvider>
+      </ScaleProvider>
+      </ThemeProvider>
     </AppKernelProvider>
   );
 }
@@ -206,18 +208,18 @@ function DataProvider({ children }) {
 
 ### Pattern 4: Provider with Loading States
 
-Combine with LoadingContext for better UX:
+Combine with UIBlockerLayer for better UX:
 
 ```typescript
-import { useLoadingContext } from '@/contexts/LoadingContext';
+import { useUIBlocker } from '@/components';
 
 function HeavyProvider({ children }) {
   const servicesReady = usePhaseReady('servicesReady');
-  const { setLoading } = useLoadingContext();
+  const { setLoading } = useUIBlocker();
 
   useEffect(() => {
     if (servicesReady) {
-      setLoading({ message: 'Loading heavy data...' });
+      setLoading({ message: 'Loading heavy data...', progress: 0 });
       loadHeavyData().finally(() => {
         setLoading(false);
       });
@@ -263,12 +265,12 @@ function AppParamsProvider({ children }) {
 ```typescript
 // app/_layout.tsx
 <AppKernelProvider>
-  <LoadingProvider>
-    <ThemeProvider />           {/* Needs: storageReady */}
-    <AppParamsStableProvider /> {/* Needs: servicesReady */}
-    <UserDataProvider />        {/* Needs: servicesReady + authReady */}
+  <ThemeProvider />           {/* Needs: storageReady */}
+  <AppParamsStableProvider /> {/* Needs: servicesReady */}
+  <UIBlockerLayer>            {/* Provides: splash screen + loading overlay */}
+    <UserDataProvider />      {/* Needs: servicesReady + authReady */}
     <App />
-  </LoadingProvider>
+  </UIBlockerLayer>
 </AppKernelProvider>
 ```
 

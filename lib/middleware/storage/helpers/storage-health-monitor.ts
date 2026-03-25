@@ -22,23 +22,6 @@ const STORAGE_HEALTH_CHECK_INTERVAL_MS =
 const STORAGE_HEALTH_TEST_KEY = "__storage_health_test__";
 
 /**
- * Initialize storage health monitoring.
- * MOVED TO jobSetupPhase: This entire function is deferred to Phase 5
- * after the job queue is initialized with storage adapters.
- * 
- * During storagePhase (Phase 3), we skip this because:
- * 1. Job queue is not yet initialized with adapters
- * 2. Initial validation is not critical - storage will fail if broken
- * 3. Deferred jobs require the queue to be ready
- * 
- * @deprecated - Call setupStorageHealthMonitoringAfterJobQueue() from jobSetupPhase instead
- */
-export async function initializeStorageHealthMonitoring(): Promise<void> {
-  // This function is now deferred - see setupStorageHealthMonitoringAfterJobQueue()
-  logger.category("bootstrap").debug("Storage health monitoring deferred to jobSetupPhase");
-}
-
-/**
  * Register storage health check recurring job with the job queue.
  * Called from jobSetupPhase after queue is initialized with adapters.
  */
