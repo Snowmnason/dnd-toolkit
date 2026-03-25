@@ -26,3 +26,8 @@ export type { ThemeContextType } from './ThemeContext';
 // World Selection Context
 export { useWorldSelection, WorldSelectionProvider } from './single_screen/WorldSelectionContext';
 
+// UIBlockerContext is purposely a separate file (no SplashScreen/theme imports)
+// so hooks/kernel can import useUIBlocker without creating a require cycle.
+export { useUIBlocker } from "./UIBlockerContext";
+export type { UIBlockerState } from "./UIBlockerContext";
+

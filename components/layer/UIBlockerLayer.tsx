@@ -1,12 +1,12 @@
 import { SplashScreen } from '@/components/SplashScreen';
-import { UIBlockerContext, UIBlockerContextValue, UIBlockerState } from '@/components/UIBlockerContext';
+import { UIBlockerContext, UIBlockerContextValue, UIBlockerState } from '@/contexts/UIBlockerContext';
 import { logger } from '@/lib/utils/logger';
 import React, { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 // Re-export so consumers can import useUIBlocker + UIBlockerState from either file.
-export { useUIBlocker } from '@/components/UIBlockerContext';
-export type { UIBlockerState } from '@/components/UIBlockerContext';
+export { useUIBlocker } from '@/contexts/UIBlockerContext';
+export type { UIBlockerState } from '@/contexts/UIBlockerContext';
 
 // ─── Provider + view + overlay ───────────────────────────────────────────────
 

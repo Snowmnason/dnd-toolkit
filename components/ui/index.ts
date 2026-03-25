@@ -21,6 +21,7 @@ export * from './ImageSkeleton';
 export * from './LazyImage';
 export * from './Notification';
 export * from './NotificationContainer';
+export * from './ProgressBar';
 export * from './RadioButton';
 export * from './Resuables/gradients';
 export * from './Resuables/shadows';

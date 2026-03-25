@@ -8,7 +8,7 @@
  * Used in app/_layout.tsx to coordinate kernel phases with the UI blocker
  */
 
-import { useUIBlocker } from '@/components/UIBlockerContext';
+import { useUIBlocker } from '@/contexts/UIBlockerContext';
 import { logger } from '@/lib/utils/logger';
 import { useEffect } from 'react';
 import { useAppKernel } from './use-app-kernel';
