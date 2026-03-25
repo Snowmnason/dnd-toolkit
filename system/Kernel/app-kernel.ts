@@ -11,44 +11,42 @@
  * - NETWORK: Network detection initialization (before storage for offline awareness)
  * - STORAGE: Cache validation & migrations (knows network status)
  * - SERVICES: Register auth provider, error tracker, analytics exporters (must be before AUTH)
- * - JOBS: Initialize background job queue infrastructure with adapters (before REGISTRATION)
- * - REGISTRATION: Register job handlers with queue (before AUTH, which may trigger jobs)
- * - AUTH: Session restoration (non-blocking, fires in background after registration ready)
+ * - JOB_SETUP: Initialize job queue + register handlers (non-critical, runs before AUTH)
+ * - AUTH: Session restoration (non-blocking, fires in background after job setup ready)
  * - READY: App is ready to render main UI
  * - ERROR: A critical phase failed
  */
 
 import {
-  cleanupAnalyticsNetworkIntegration,
-  initializeAnalyticsNetworkIntegration,
+    cleanupAnalyticsNetworkIntegration,
+    initializeAnalyticsNetworkIntegration,
 } from "@/lib/analytics/exporters/analytics-network-integration";
 import {
-  createSafeModeState,
-  DEFAULT_SAFE_MODE_CONFIG,
-  NetworkCascadeDetector,
-  SafeModeLevel,
-  SafeModeReason,
-  type SafeModeState,
+    createSafeModeState,
+    DEFAULT_SAFE_MODE_CONFIG,
+    NetworkCascadeDetector,
+    SafeModeLevel,
+    SafeModeReason,
+    type SafeModeState,
 } from "@/lib/error";
 import { logger } from "@/lib/utils";
 import {
-  NetworkDetection,
-  NetworkStatus,
+    NetworkDetection,
+    NetworkStatus,
 } from "@/system/Network";
 import {
-  KernelErrorCode,
-  KernelPhase,
-  type AppKernelState,
-  type KernelCapabilities,
-  type KernelError,
-  type KernelListener,
+    KernelErrorCode,
+    KernelPhase,
+    type AppKernelState,
+    type KernelCapabilities,
+    type KernelError,
+    type KernelListener,
 } from "@/type-definitions/kernel-types";
 import { authPhase } from "./phases/auth-phase";
 import { configPhase } from "./phases/config-phase";
-import { jobPhase } from "./phases/job-phase";
+import { jobSetupPhase } from "./phases/job-setup-phase";
 import { networkPhase } from "./phases/network-phase";
 import { preloadPhase } from "./phases/preload-phase";
-import { registrationPhase } from "./phases/registration-phase";
 import { servicesPhase } from "./phases/services-phase";
 import { storagePhase } from "./phases/storage-phase";
 
@@ -65,11 +63,11 @@ import { storagePhase } from "./phases/storage-phase";
  * These exports prevent breaking external imports from system/Kernel
  */
 export {
-  KernelErrorCode,
-  KernelPhase, type AppKernelState,
-  type KernelCapabilities,
-  type KernelError,
-  type KernelListener
+    KernelErrorCode,
+    KernelPhase, type AppKernelState,
+    type KernelCapabilities,
+    type KernelError,
+    type KernelListener
 } from "@/type-definitions/kernel-types";
 
 class AppKernelClass {
@@ -81,6 +79,7 @@ class AppKernelClass {
       networkReady: false,
       storageReady: false,
       servicesReady: false,
+      jobSetupReady: false,
       authReady: false,
       syncReady: false,
       appReady: false,
@@ -151,13 +150,10 @@ class AppKernelClass {
       // Phase 4: SERVICES — register auth/error/analytics providers (critical, throws on failure)
       await this.runPhase("services", () => servicesPhase());
 
-      // Phase 5: JOBS — initialize background job queue infrastructure (non-critical)
-      await this.runPhase("jobs", () => jobPhase());
+      // Phase 5: JOB_SETUP — initialize job queue + register handlers (non-critical)
+      await this.runPhase("jobSetup", () => jobSetupPhase());
 
-      // Phase 6: REGISTRATION — register background job handlers with the queue (after jobs)
-      await this.runPhase("registration", () => registrationPhase());
-
-      // Phase 7: AUTH — restore persisted session + evaluate staleness (non-critical, guest mode on failure)
+      // Phase 6: AUTH — restore persisted session + evaluate staleness (non-critical, guest mode on failure)
       await this.runPhase("auth", () => authPhase());
 
       // ═══════════════════════════════════════════════════════════════
@@ -253,6 +249,18 @@ class AppKernelClass {
             this.bootstrapTimeoutUnsubscribe();
             this.bootstrapTimeoutUnsubscribe = null;
           }
+        }
+
+        // Auto-clear KERNEL_TIMEOUT safe mode if bootstrap completed successfully
+        if (
+          state.phases.appReady &&
+          state.safeMode?.reason === SafeModeReason.KERNEL_TIMEOUT
+        ) {
+          console.log('[CRITICAL] Kernel completed after timeout — auto-clearing KERNEL_TIMEOUT safe mode');
+          logger
+            .category('bootstrap')
+            .info('Kernel completed after timeout — auto-clearing KERNEL_TIMEOUT safe mode');
+          this.setSafeMode(null);
         }
       },
     );
@@ -653,6 +661,7 @@ class AppKernelClass {
         preloadReady: false,
         networkReady: false,
         storageReady: false,
+        jobSetupReady: false,
         servicesReady: false,
         authReady: false,
         syncReady: false,

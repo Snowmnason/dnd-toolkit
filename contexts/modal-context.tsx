@@ -78,6 +78,10 @@ export function registerModal(type: string, Component: React.ComponentType<any>)
  * app/_layout.tsx. This avoids circular dependency (modal files import from
  * @/contexts which re-exports this file).
  *
+ * ✅ Gate-Free: ModalProvider does not depend on kernel phases.
+ * It only manages modal visibility state and registry with React hooks.
+ * No storage, services, or API access needed.
+ *
  * Wrap this at the top of your app (in RootLayout).
  */
 export function ModalProvider({ children }: { children: React.ReactNode }) {

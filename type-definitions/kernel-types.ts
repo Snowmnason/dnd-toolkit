@@ -18,6 +18,7 @@ export enum KernelPhase {
   NETWORK = "network",
   STORAGE = "storage",
   SERVICES = "services",
+  JOB_SETUP = "jobSetup",
   AUTH = "auth",
   SYNC = "sync",
   READY = "ready",
@@ -77,6 +78,7 @@ export interface AppKernelState {
     networkReady: boolean;
     storageReady: boolean;
     servicesReady: boolean;
+    jobSetupReady: boolean;
     authReady: boolean;
     syncReady: boolean;
     appReady: boolean;

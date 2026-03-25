@@ -40,10 +40,18 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const [isLoading, setIsLoading] = useState(true);
 
   // STUB: Warm cache on mount (currently does nothing since no backend)
+  // TODO: When real network code is added, gate this effect on kernel phases (e.g., `usePhaseReady("servicesReady")`)
+  // to ensure auth + storage are ready before fetching subscription data.
   useEffect(() => {
     const initSubscription = async () => {
       try {
-        // TODO: Replace with real backend fetch when implemented
+        // TODO (#265 Track D): When replacing this stub with real Supabase/Stripe calls,
+        // add phase gating at the top of this provider:
+        //   const servicesReady = usePhaseReady("servicesReady");
+        // and guard the effect:
+        //   if (!servicesReady) return;
+        // and wire [servicesReady] into the useEffect dependency array.
+        // Without this, the provider will attempt service calls before bootstrap completes.
         const sub = await getSubscription();
         setSubscription(sub);
       } catch (error) {

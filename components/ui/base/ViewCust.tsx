@@ -67,13 +67,22 @@ export function ViewCust({
   opacity,
   style,
   children,
+  pointerEvents,
   ...rest
 }: ViewCustProps) {
+  // Move pointerEvents from prop to style to avoid React Native Web deprecation warning
+  // (RN Web now requires pointerEvents to be in style, not as a direct prop)
+  const baseStyle: any = pointerEvents 
+    ? Array.isArray(style) 
+      ? [...style, { pointerEvents }]
+      : [style, { pointerEvents }]
+    : style;
+
   // Gradient wrapper - OUTSIDE ScrollView so it's static and doesn't scroll
   // This allows the gradient background to remain fixed while content scrolls
   if (gradient && gradientColor) {
     // Split style into wrapper styles (border, radius, shadow, dimensions) and inner styles (padding, margin, flex layout)
-    const flatStyle = Array.isArray(style) ? Object.assign({}, ...style.filter(Boolean)) : (style || {});
+    const flatStyle = Array.isArray(baseStyle) ? Object.assign({}, ...baseStyle.filter(Boolean)) : (baseStyle || {});
     
     const wrapperStyle: ViewStyle = {};
     const innerStyle: ViewStyle = {};
@@ -150,7 +159,7 @@ export function ViewCust({
   if (scroll) {
     return (
       <ScrollView
-        style={style}
+        style={baseStyle}
         contentContainerStyle={contentContainerStyle}
         showsVerticalScrollIndicator={showScrollIndicator}
         {...rest}
@@ -162,7 +171,7 @@ export function ViewCust({
 
   // Otherwise, just a View (without gradient, without scroll)
   return (
-    <View style={style} {...rest}>
+    <View style={baseStyle} {...rest}>
       {children}
     </View>
   );

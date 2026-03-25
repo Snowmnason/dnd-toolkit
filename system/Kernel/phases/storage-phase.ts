@@ -44,11 +44,10 @@ export async function storagePhase(): Promise<void> {
     validateClassifications();
     logger.category("bootstrap").debug("Data classification registry validated");
 
-    // Initialize storage health monitoring (validates storage + starts polling)
-    const { initializeStorageHealthMonitoring } = await import(
-      "@/lib/middleware/storage/helpers/storage-health-monitor"
-    );
-    await initializeStorageHealthMonitoring();
+    // DEFERRED: Storage health monitoring is deferred to jobSetupPhase (Phase 5)
+    // because it transitively uses the job queue singleton, which is not yet
+    // initialized with storage adapters until after this phase completes.
+    // See jobSetupPhase() which calls registerStorageHealthCheckJob() after queue is ready.
 
     // Initialize LRU cache capacity management (load config and initialize LRU eviction)
     const appConfig = getAppConfig();

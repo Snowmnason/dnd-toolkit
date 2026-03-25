@@ -101,8 +101,8 @@ export function Notification({
         .damping(0.7)
         .delay(index * 80)}
       exiting={SlideOutUp.duration(300)}
-      pointerEvents="box-none"
       style={{
+        pointerEvents: "box-none",
         position: "absolute",
         top: baseTop + stackOffset,
         left: isMobile ? S.space.lg : "5%",

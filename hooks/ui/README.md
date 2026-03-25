@@ -47,10 +47,6 @@ Manage theme family and mode.
 **Returns:**
 - `{ family, mode, setFamily, setMode }`
 
-### `useSplashScreen()`
-
-Control splash visibility during app bootstrap.
-
 ### `useRenderTracker(componentName)`
 
 Development helper to log render counts for a component.

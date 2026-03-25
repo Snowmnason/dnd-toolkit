@@ -1,3 +1,4 @@
+import { usePhaseReady } from "@/hooks/kernel";
 import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
@@ -37,9 +38,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [family, setFamilyState] = useState<ThemeFamily>("classic");
   const [mode, setModeState] = useState<ThemeMode>("dark");
   const [isLoading, setIsLoading] = useState(true);
+  const storageReady = usePhaseReady("storageReady");
 
-  // Load saved theme preferences on mount
+  // Load saved theme preferences after storage is initialized
   useEffect(() => {
+    if (!storageReady) return;
     const loadThemePreferences = async () => {
       try {
         const [savedFamily, savedMode] = await Promise.all([
@@ -91,7 +94,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     };
 
     loadThemePreferences();
-  }, []);
+  }, [storageReady]);
 
   // Resolve active theme tokens from family + mode
   const theme: ThemeTokens = useMemo(() => {

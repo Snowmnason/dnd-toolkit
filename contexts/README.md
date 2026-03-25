@@ -147,6 +147,81 @@ export function ConfirmButton() {
 
 ---
 
+### LoadingContext
+
+**File:** `loading-context.tsx`
+
+**Purpose:** Block UI during long-running operations with customizable loading screen (kernel bootstrap, navigation, storage operations).
+
+**Exports:** `useLoadingContext()` hook, `LoadingProvider` component
+
+**Usage:**
+
+```tsx
+import { useLoadingContext } from "@/contexts/loading-context";
+
+export function MyComponent() {
+  const { isLoading, message, progress, setLoading } = useLoadingContext();
+
+  const handleSave = async () => {
+    setLoading({
+      title: "Saving",
+      subtitle: "World Data",
+      message: "This may take a moment...",
+      progress: 0.5
+    });
+
+    try {
+      await saveWorldData();
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      // Handle error
+    }
+  };
+
+  return (
+    <Button onPress={handleSave} title="Save World" />
+  );
+}
+```
+
+**State shape:**
+
+```typescript
+{
+  isLoading: boolean;                    // Whether to show loading screen
+  title?: string;                        // Main title (e.g., "D&D Toolkit")
+  subtitle?: string;                     // Subtitle (e.g., "Loading App")
+  message?: string;                      // Bottom message (e.g., "Please wait...")
+  progress?: number;                     // Progress 0-1 (shows progress bar)
+  showProgress?: boolean;                // Toggle progress bar (default: true)
+  decorativeElement?: React.ReactNode;   // Custom loading animation
+  setLoading: (state: boolean | Partial<LoadingState>) => void; // Update loading state
+}
+```
+
+**When to use:**
+
+- Kernel initialization (bootstrap loading screen)
+- Navigation transitions (route changes)
+- Storage operations (large data saves/loads)
+- Service calls (analytics export, error reporting)
+- Any operation >500ms that needs user feedback
+
+**Provider setup:** Must wrap app tree before AppKernelProvider:
+
+```tsx
+// app/_layout.tsx
+<LoadingProvider>
+  <AppKernelProvider>
+    {/* App content */}
+  </AppKernelProvider>
+</LoadingProvider>
+```
+
+---
+
 ## Best Practices
 
 ### ✅ Do

@@ -10,7 +10,7 @@
  *   AppModal,
  *   ConfirmModal,
  *   AppErrorBoundary,
- *   LoadingOverlay,
+ *   LoadingBlocker,
  *   SplashScreen,
  * } from "@/components";
  * ```
@@ -18,7 +18,7 @@
 
 // Root-level components
 export { AppErrorBoundary } from "./ErrorBoundary";
-export { default as LoadingOverlay } from "./LoadingOverlay";
+export { LoadingBlocker } from "./LoadingBlocker";
 export { SmartDownloadButton } from "./SmartDownloadButton";
 export { default as TopBar } from "./TopBar";
 export { default as VersionDisplay } from "./VersionDisplay";
@@ -38,3 +38,4 @@ export * from "./offline";
 // Splash/Error Screens
 export * from "./SplashScreen";
 
+// Need, Nav Draw, progress bar, loading spinners, and other shared UI elements

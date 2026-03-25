@@ -1,8 +1,8 @@
 import { Button, Card, Heading, LazyImage } from "@/components/ui";
-import { WorldWithAccess } from "@/hooks/storage";
 import { useNavigate } from "@/hooks/navigation";
+import { WorldWithAccess } from "@/hooks/storage";
 import { logger } from "@/hooks/utils";
-import { useAppParamsStable, useAppParamsVolatile, usePlatform, useUserId } from "@/providers";
+import { useAppParamsStable, useAppParamsVolatile, useConnectedWorlds, usePlatform, useUserId } from "@/providers";
 import { $, useScale, UseTheme } from "@/theme";
 import { View } from "react-native";
 
@@ -24,7 +24,8 @@ export function WorldRightPanel({
   const { push: navigatePush } = useNavigate();
   const userId = useUserId();
   const { updateVolatileParams } = useAppParamsVolatile();
-  const { addConnectedWorld } = useAppParamsStable();
+  const connectedWorldIds = useConnectedWorlds();
+  const { setConnectedWorldIds } = useAppParamsStable();
   const { isDesktop } = usePlatform();
   // Optional flag to disable the large backdrop image if it's causing perf issues
   const DISABLE_BACKDROP =
@@ -110,7 +111,9 @@ export function WorldRightPanel({
                 });
 
                 // Immediately add to connected worlds so auth guard can verify access
-                addConnectedWorld(selectedWorld.world_id);
+                if (!connectedWorldIds.includes(selectedWorld.world_id)) {
+                  setConnectedWorldIds([...connectedWorldIds, selectedWorld.world_id]);
+                }
 
                 // Update context first
                 updateVolatileParams({

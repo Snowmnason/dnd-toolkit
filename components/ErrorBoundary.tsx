@@ -1,5 +1,6 @@
 import { handleErrorReport } from '@/hooks/analytics';
 import { Component, ErrorInfo, ReactNode } from 'react';
+import { View } from 'react-native';
 
 interface Props {
   children: ReactNode;
@@ -45,6 +46,12 @@ export class AppErrorBoundary extends Component<Props, State> {
       return null;
     }
 
-    return this.props.children;
+    // Wrap children in a View with position: 'relative' to allow absolute positioning
+    // of overlay components like LoadingBlocker
+    return (
+      <View style={{ position: 'relative', flex: 1 }}>
+        {this.props.children}
+      </View>
+    );
   }
 }

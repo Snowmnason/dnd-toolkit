@@ -1,16 +1,16 @@
 import { logger } from "@/lib";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
-import { NetworkManager, ConnectionQuality } from "@/lib/network/network-manager";
+import { ConnectionQuality, NetworkManager } from "@/lib/network/network-manager";
 import { S, UseTheme } from "@/theme";
 import { useRouter, useSegments } from "expo-router";
 import { memo, useEffect, useRef, useState } from "react";
 import {
-  AccessibilityInfo,
-  Platform,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
+    AccessibilityInfo,
+    Platform,
+    StyleSheet,
+    Text,
+    View,
+    useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SettingsMenu from "./modals/SettingsModal";
@@ -127,7 +127,7 @@ function TopBar({
         </View>
 
         {/* Center: Title + WiFi indicator */}
-        <View style={styles.centerSlot} pointerEvents="none">
+        <View style={styles.centerSlot}>
           <Text
             accessibilityLiveRegion="polite"
             style={[
@@ -249,6 +249,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    pointerEvents: "none" as const,
   },
   wifiIndicator: {
     width: 8,
