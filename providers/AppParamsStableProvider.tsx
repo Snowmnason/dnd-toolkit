@@ -1,5 +1,5 @@
+import { usePhaseReady } from "@/hooks/kernel";
 import { AuthStateManager } from "@/lib/auth/auth-state";
-import { isAuthConfigured } from "@/lib/middleware/services/auth-service";
 import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
@@ -50,15 +50,11 @@ interface AppParamsStableContextType {
   stableParams: AppParamsStable;
   setUserId: (userId: string | undefined) => void;
   setConnectedWorldIds: (worldIds: string[]) => void;
-  addConnectedWorld: (worldId: string) => void;
-  removeConnectedWorld: (worldId: string) => void;
   hasAccessToWorld: (worldId: string) => boolean;
   clearAllParams: () => void;
 }
 
-const AppParamsStableContext = createReactContext<
-  AppParamsStableContextType | undefined
->(undefined);
+const AppParamsStableContext = createReactContext<AppParamsStableContextType | undefined>(undefined);
 // Separate context for data to enable true selectors - using use-context-selector's createContext
 const AppParamsStableDataContext = createContext<AppParamsStable>({
   userId: undefined,
@@ -71,11 +67,16 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     connectedWorldIds: [],
   });
   const [authStateVersion, setAuthStateVersion] = useState(0);
-  const previousUserIdRef = React.useRef<string | undefined>(undefined);
   const isVerifyingRef = React.useRef(false);
+  // Explicit phase gate: This provider depends on services phase (auth, storage, etc.)
+  const servicesReady = usePhaseReady("servicesReady");
 
   // Load from storage on mount AND when auth state changes
+  // Gated on servicesReady phase: kernel must have initialized services before we access auth/storage
   useEffect(() => {
+    // Defer effect until services phase completes
+    if (!servicesReady) return;
+
     async function loadFromStorage() {
       try {
         logger.category('storage').debug(
@@ -239,15 +240,8 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Gate: Don't attempt verification until the auth provider is registered.
-      // During early bootstrap, the services phase hasn't completed yet.
-      // Verification will be retried when auth state changes (authStateVersion bumps).
-      if (!isAuthConfigured()) {
-        logger.category('storage').debug(
-          'AppParamsStableProvider: Auth provider not ready yet, deferring world verification',
-        );
-        return;
-      }
+      // No guard needed: servicesReady gate at effect level prevents this from running before services phase
+      // Auth provider is guaranteed to be available
 
       try {
         // Set inside try so the finally block always resets the flag,
@@ -409,26 +403,24 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
     }
 
     loadFromStorage();
-  }, [authStateVersion]);
+  }, [servicesReady, authStateVersion]);
 
   // Watch for auth state changes
+  // Gated on servicesReady phase: auth provider must be initialized before we can listen to changes
   useEffect(() => {
+    // Defer effect until services phase completes
+    if (!servicesReady) return;
+
     let mounted = true;
     let subscription: { unsubscribe: () => void } | null = null;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    let watcherToken = 0;
     let isRunningSignOut = false; // Guard against recursive sign-out calls
     let previousSessionState: 'authenticated' | 'unauthenticated' | 'initial' = 'initial'; // Track session state to detect transitions
 
-    const setupAuthWatcher = async (attempt = 1, token = ++watcherToken) => {
-      const localToken = token;
+    const setupAuthWatcher = async () => {
       try {
         const { listenToAuthStateChanges, performSignOutPhase2_ClearAndSignOut } = await import("@/lib/auth");
-        // Re-check staleness after the async await — a newer watcher may have been
-        // started while we were waiting for the auth provider to become available.
-        if (localToken !== watcherToken) return;
+        // No need for staleness check: servicesReady gate ensures auth provider is available
         const unsubscribe = listenToAuthStateChanges(async (session) => {
-          if (localToken !== watcherToken) return; // stale watcher
           if (mounted && session !== null) {
             // Transition to authenticated state
             previousSessionState = 'authenticated';
@@ -453,7 +445,7 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
             // Delegate full storage + auth cleanup to sign-out-system
             try {
               await performSignOutPhase2_ClearAndSignOut('auth-state-change');
-            } catch (err) {
+            } catch {
               /* sign-out cleanup errors are non-fatal when session is already gone */
             } finally {
               isRunningSignOut = false; // Reset guard after sign-out completes
@@ -469,30 +461,11 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         });
         subscription = { unsubscribe };
       } catch (error) {
-        // Auth provider may not be registered yet during early bootstrap.
-        // Clean up any old subscription before retrying
-        if (subscription) {
-          subscription.unsubscribe();
-          subscription = null;
-        }
-        // Retry with exponential backoff (500ms, 1s, 2s) until services phase completes.
-        const MAX_RETRIES = 5;
-        if (attempt < MAX_RETRIES && mounted) {
-          const delayMs = Math.min(500 * Math.pow(2, attempt - 1), 4000);
-          logger.category("storage").debug(
-            `AppParamsStableProvider: Auth provider not ready, retrying in ${delayMs}ms (attempt ${attempt}/${MAX_RETRIES})`,
-          );
-          retryTimer = setTimeout(() => {
-            if (mounted) {
-              setupAuthWatcher(attempt + 1, localToken);
-            }
-          }, delayMs);
-        } else {
-          logger.category("storage").warn(
-            `AppParamsStableProvider: Failed to set up auth watcher after ${attempt} attempts`,
-            error,
-          );
-        }
+        // Auth provider is guaranteed available (servicesReady gate ensures this)
+        logger.category("storage").error(
+          "AppParamsStableProvider: Unexpected error setting up auth watcher",
+          error,
+        );
       }
     };
 
@@ -500,35 +473,15 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false;
-      if (retryTimer) {
-        clearTimeout(retryTimer);
-      }
-      // Invalidate any in-flight watcher
-      watcherToken++;
       if (subscription) {
         subscription.unsubscribe();
       }
     };
-  }, []);
+  }, [servicesReady]);
 
-  // Force re-verification when userId transitions from undefined→defined (auth just completed)
-  // This catches the race condition where verification ran before auth was ready
-  useEffect(() => {
-    const hadNoUserId = previousUserIdRef.current === undefined;
-    const nowHasUserId = stableParams.userId !== undefined;
-
-    if (hadNoUserId && nowHasUserId && stableParams.connectedWorldIds.length === 0) {
-      logger.category("storage").info(
-        "AppParamsStableProvider: UserId just became available with empty worlds - forcing re-verification to catch auth race condition",
-      );
-      // Bump authStateVersion to trigger loadFromStorage again
-      // This time userId is available so verification will run properly
-      setAuthStateVersion((v) => v + 1);
-    }
-
-    // Update the ref for next comparison
-    previousUserIdRef.current = stableParams.userId;
-  }, [stableParams.userId, stableParams.connectedWorldIds]);
+  // Dead code removed: Race condition workaround (previousUserIdRef effect) no longer needed
+  // Reason: servicesReady gate on loadFromStorage effect prevents verification from running
+  // before auth is ready, eliminating the race condition entirely.
 
   const setUserId = useCallback((userId: string | undefined) => {
     setStableParams((prev) => ({ ...prev, userId }));
@@ -544,24 +497,6 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
         );
       },
     );
-  }, []);
-
-  const addConnectedWorld = useCallback((worldId: string) => {
-    setStableParams((prev) => {
-      if (prev.connectedWorldIds.includes(worldId)) return prev;
-      const updated = [...prev.connectedWorldIds, worldId];
-      void StorageManager.set(STORAGE_KEYS.CONNECTED_WORLDS, updated);
-      return { ...prev, connectedWorldIds: updated };
-    });
-  }, []);
-
-  const removeConnectedWorld = useCallback((worldId: string) => {
-    setStableParams((prev) => {
-      if (!prev.connectedWorldIds.includes(worldId)) return prev;
-      const updated = prev.connectedWorldIds.filter((id) => id !== worldId);
-      void StorageManager.set(STORAGE_KEYS.CONNECTED_WORLDS, updated);
-      return { ...prev, connectedWorldIds: updated };
-    });
   }, []);
 
   const clearAllParams = useCallback(() => {
@@ -592,8 +527,6 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
       stableParams,
       setUserId,
       setConnectedWorldIds,
-      addConnectedWorld,
-      removeConnectedWorld,
       hasAccessToWorld,
       clearAllParams,
     }),
@@ -601,8 +534,6 @@ export function AppParamsStableProvider({ children }: { children: ReactNode }) {
       stableParams,
       setUserId,
       setConnectedWorldIds,
-      addConnectedWorld,
-      removeConnectedWorld,
       hasAccessToWorld,
       clearAllParams,
     ],

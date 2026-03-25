@@ -147,6 +147,10 @@ export function ConfirmButton() {
 
 ---
 
+⚠️ **Note:** The `LoadingContext` and `LoadingProvider` have been consolidated into [`components/UIBlockerLayer`](../components/UIBlockerLayer.tsx). Use [`useUIBlocker()`](../components/UIBlockerContext.ts) instead. See [Tier 7 - Phase-Aware Providers](../docs/issues/MileStone%202/Tier%207/265%20-%20Phase-Aware%20Providers/) for details.
+
+---
+
 ## Best Practices
 
 ### ✅ Do

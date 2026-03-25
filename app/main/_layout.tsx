@@ -1,4 +1,3 @@
-import { AppLoading } from "@/components/ui";
 import { useAuthGuard } from "@/hooks/auth";
 import { useAppKernel } from "@/hooks/kernel";
 import { useNavigate } from "@/hooks/navigation";
@@ -76,11 +75,7 @@ export default function MainLayout() {
     router.replace(target as any);
   };
 
-  // Show loading while auth guard is resolving
-  if (authState === "loading") {
-    return <AppLoading />;
-  }
-
+  // Always render content - UIBlockerLayer handles loading overlay with splash screen
   return (
     <View style={{ flex: 1 }}>
       {/* Stack for main routes and nested navigation */}

@@ -28,6 +28,10 @@ const AppToastContext = createContext<AppToastContextValue | undefined>(undefine
  * 🍞 AppToastProvider
  * Manages global AppToast state with a queue system for displaying toasts sequentially.
  * Multiple toast requests are queued and displayed one at a time, preventing message loss.
+ * 
+ * ✅ Gate-Free: AppToastProvider does not depend on kernel phases.
+ * It only manages UI toast queue state with React hooks and timeouts.
+ * No storage, services, or API access needed.
  */
 export function AppToastProvider({ children }: { children: React.ReactNode }) {
   const [toast, setToast] = useState<AppToastState>({

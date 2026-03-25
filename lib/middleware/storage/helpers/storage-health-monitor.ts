@@ -22,17 +22,10 @@ const STORAGE_HEALTH_CHECK_INTERVAL_MS =
 const STORAGE_HEALTH_TEST_KEY = "__storage_health_test__";
 
 /**
- * Initialize storage health monitoring.
- * Performs initial health check and registers background job for periodic checks.
+ * Register storage health check recurring job with the job queue.
+ * Called from jobSetupPhase after queue is initialized with adapters.
  */
-export async function initializeStorageHealthMonitoring(): Promise<void> {
-  logger.category("bootstrap").info("Initializing storage health monitoring");
-
-  // Perform initial health check
-  await validateStorageHealth();
-
-  // Register job handler if not already registered
-  const queue = getJobQueue();
+export async function registerStorageHealthCheckJob(queue: any): Promise<void> {
   if (!queue.hasHandler(STORAGE_HEALTH_CHECK_JOB_TYPE)) {
     queue.registerHandler(
       STORAGE_HEALTH_CHECK_JOB_TYPE,
@@ -40,22 +33,22 @@ export async function initializeStorageHealthMonitoring(): Promise<void> {
     );
   }
 
-  // Enqueue recurring health check job
-  // Schedule for 5 minutes from now, will reschedule on completion
   await queue.enqueue({
     type: STORAGE_HEALTH_CHECK_JOB_TYPE,
     payload: {},
     runAt: Date.now() + STORAGE_HEALTH_CHECK_INTERVAL_MS,
-    maxRetries: 1, // Don't retry health checks, they're periodic anyway
-    idempotencyKey: `storage-health-check`, // Only one pending at a time
+    maxRetries: 1,
+    idempotencyKey: `storage-health-check`,
   });
 }
 
 /**
  * One-time storage health validation (run on app start).
  * Tests if SecureStorage is readable and writable, and attempts recovery if it fails.
+ * 
+ * Called during jobSetupPhase (Phase 5) after job queue is initialized.
  */
-async function validateStorageHealth(): Promise<void> {
+export async function validateStorageHealth(): Promise<void> {
   try {
     logger.category("storage").debug("Running storage health check");
 

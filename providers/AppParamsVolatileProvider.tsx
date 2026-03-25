@@ -1,3 +1,4 @@
+import { usePhaseReady } from "@/hooks/kernel";
 import type { AccessRole } from "@/lib/database/worlds";
 import { StorageManager } from "@/lib/storage";
 import { STORAGE_KEYS } from "@/maps";
@@ -41,6 +42,7 @@ export function AppParamsVolatileProvider({
     worldId: undefined,
     userRole: undefined,
   });
+  const storageReady = usePhaseReady("storageReady");
 
   // ✅ Define functions BEFORE useEffect
   const setWorldId = useCallback((worldId: string | undefined) => {
@@ -107,6 +109,8 @@ export function AppParamsVolatileProvider({
 
   // ✅ Now useEffect can safely call the functions
   useEffect(() => {
+    if (!storageReady) return;
+
     async function restoreSession() {
       const savedWorldId = await StorageManager.getRaw(
         STORAGE_KEYS.LAST_SELECTED_WORLD,
@@ -117,7 +121,7 @@ export function AppParamsVolatileProvider({
       if (savedRole) setUserRole(savedRole as AccessRole);
     }
     restoreSession();
-  }, [setWorldId, setUserRole]);
+  }, [setWorldId, setUserRole, storageReady]);
 
   // ✅ Only stable functions in memoization
   const contextValue = React.useMemo(

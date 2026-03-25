@@ -27,13 +27,8 @@ App Startup
 AppKernelProvider mounted
         ↓
 AppKernel.initialize() starts
-        ├─ CONFIG: Load env vars, init Supabase client (MUST run first)
-        ├─ PRELOAD: Load critical fonts/images (<500ms target)
-        ├─ NETWORK: Initialize network detection & online status (before storage for offline awareness)
-        ├─ STORAGE: Validate & migrate cache (knows network status)
-        ├─ SERVICES: Register auth provider, error tracker, analytics exporter (blocking, MUST be before AUTH)
-        ├─ AUTH: Restore session, initialize auth state (non-blocking, provider already registered)
-        └─ READY: Critical systems initialized, safe to render UI (auth completing in background)
+        ↓
+System bootstrap phases execute (see system/kernel for phase details)
         ↓
 Post-READY (non-critical, async):
         ├─ Feature Flags: Bootstrap from server, sync to legacy system
@@ -45,12 +40,9 @@ UI renders with kernel.phases.appReady = true
 **Key Principles:**
 
 - **Single Source of Truth**: One kernel instance; all consumers subscribe to same state
-- **Explicit Phases**: Clear progression; consumers know what's initialized
-- **Services Before Auth**: Services (auth provider, error tracker) registered synchronously before AUTH phase starts, eliminating the race condition
-- **Network Awareness**: Storage knows network status for intelligent offline fallback
-- **Non-Blocking Auth**: AUTH completes in background - appReady is set immediately after auth begins (but provider is guaranteed registered)
+- **Phase-Based Readiness**: UI waits for specific system readiness phases
+- **Orchestration Layer**: Coordinates between system bootstrap and React UI
 - **Error Recovery**: Critical failures accessible via `kernel.error`; retry via `AppKernel.retry()`
-- **Timing Tracking**: Each phase duration measured in `kernel.timing`
 - **Observable**: Kernel state broadcast to all subscribers on change
 
 ## API Reference
@@ -63,7 +55,7 @@ Initializes kernel. Safe to call multiple times—only initializes once (idempot
 
 ```typescript
 await AppKernel.initialize();
-// App now in CONFIG → PRELOAD → NETWORK → STORAGE → SERVICES → AUTH → READY or ERROR
+// System bootstrap phases execute, app becomes ready for UI rendering
 ```
 
 #### `AppKernel.getState(): AppKernelState`
@@ -167,26 +159,22 @@ useEffect(() => {
 
 ```typescript
 interface AppKernelState {
-  currentPhase: "idle" | "config" | "preload" | "storage" | "network" | "auth" | "ready" | "error";
+  currentPhase: KernelPhase;  // Current bootstrap phase
   
   phases: {
-    configReady: boolean;      // Supabase client initialized
-    preloadReady: boolean;     // Fonts/images preloaded
-    storageReady: boolean;     // Storage validated & migrated
-    networkReady: boolean;     // Network detection initialized
-    authReady: boolean;        // Session restored (non-blocking)
-    appReady: boolean;         // All critical phases done
+    configReady: boolean;     // Environment setup complete
+    preloadReady: boolean;    // Critical assets loaded
+    networkReady: boolean;    // Network detection initialized
+    storageReady: boolean;    // Storage system ready
+    servicesReady: boolean;   // Services registered
+    jobSetupReady: boolean;   // Job queue initialized
+    authReady: boolean;       // Auth session restored
+    appReady: boolean;        // All systems ready for UI
   };
   
-  error: KernelError | null;   // Phase failure details
-  timing: Record<string, number>; // Duration (ms) of each phase
-  capabilities: {             // Platform/feature availability
-    storage: boolean;
-    network: boolean;
-    auth: boolean;
-    backend: boolean;
-    platform: "web" | "ios" | "android" | "desktop" | "unknown";
-  };
+  error: KernelError | null;  // Bootstrap failure details
+  timing: Record<string, number>; // Phase duration tracking
+  capabilities: KernelCapabilities; // Platform capabilities
 }
 ```
 
@@ -205,9 +193,178 @@ interface KernelError {
 }
 ```
 
-## Dependencies
+## Loading Context for UI Blocking
 
-### External Packages
+The Loading Context provides a centralized way to show loading states and block UI during long-running operations. Unlike phase-based blocking (which waits for system initialization), this is for user-initiated operations that need visual feedback.
+
+### When to Use
+
+**Use UIBlockerLayer for:**
+- Kernel initialization (bootstrap loading screen)
+- Navigation transitions (route changes)
+- Storage operations (large data saves/loads)
+- Service calls (analytics export, error reporting)
+- Any operation >500ms that needs user feedback
+
+**Do NOT use for:**
+- Automatic system initialization (use phases instead)
+- Quick operations (<100ms)
+- Background tasks (no UI blocking needed)
+
+### API
+
+```typescript
+import { useUIBlocker } from "@/components";
+
+// Get current loading state
+const { isLoading, message, progress, title, subtitle } = useUIBlocker();
+
+// Set loading state (blocks UI)
+setLoading(true); // Simple loading
+setLoading({ 
+  message: "Saving world data...",
+  progress: 50, // 0-100
+  title: "Please wait",
+  subtitle: "Processing..."
+});
+
+// Clear loading state
+setLoading(false);
+```
+
+### Integration with Kernel
+
+The UIBlockerLayer works alongside kernel phases:
+
+```typescript
+// During kernel initialization
+if (!kernel.phases.appReady) {
+  setLoading({
+    message: "Initializing app...",
+    progress: 30
+  });
+}
+
+// After kernel ready, clear loading
+setLoading(false);
+```
+
+### Provider Setup
+
+UIBlockerLayer wraps the app tree (after ThemeProvider, before content):
+
+```typescript
+// app/_layout.tsx
+<AppKernelProvider>
+  <ThemeProvider>
+    <UIBlockerLayer>
+      {/* App content */}
+    </UIBlockerLayer>
+  </ThemeProvider>
+</AppKernelProvider>
+```
+
+## Phase-Aware Provider Pattern
+
+Context providers that depend on kernel phases should explicitly wait for those phases before initializing. This prevents race conditions and ensures providers have access to required systems.
+
+### When to Use vs. When to Skip
+
+**Use phase-aware pattern for providers that:**
+- Access storage, services, or auth systems
+- Need Supabase client, network status, or cached data
+- Have effects that run once on mount
+- Could cause errors if systems aren't ready
+
+**Skip phase-aware pattern for providers that:**
+- Only provide static configuration (colors, dimensions)
+- Have no effects or async operations
+- Don't depend on any external systems
+- Are pure React context (no side effects)
+
+### Decision Tree
+
+```
+Does provider access external systems?
+├── YES → Use phase-aware pattern
+│   ├── Storage access? → Wait for "storageReady"
+│   ├── Services/Auth access? → Wait for "servicesReady"
+│   └── Network-only? → Wait for "networkReady"
+└── NO → Skip phase-aware pattern
+    └── Pure config/theme? → No phase gate needed
+```
+
+### Available Phases
+
+- **`configReady`** – Environment variables loaded, Supabase client initialized
+- **`preloadReady`** – Critical fonts/images loaded
+- **`networkReady`** – Network detection initialized
+- **`storageReady`** – Storage validated and migrated
+- **`servicesReady`** – Auth provider, error tracker, analytics registered
+- **`jobSetupReady`** – Job queue initialized and handlers registered
+- **`authReady`** – Session restored (non-blocking)
+- **`appReady`** – All critical systems initialized
+
+### Before/After Examples
+
+**Before (implicit gate - race condition prone):**
+
+```typescript
+// ❌ Race condition: runs before storage ready
+useEffect(() => {
+  const theme = SecureStorage.get(THEME_KEY);
+  setTheme(theme);
+}, []); // No dependencies - runs immediately
+```
+
+**After (explicit phase gate):**
+
+```typescript
+// ✅ Explicit gate: waits for storage
+const storageReady = usePhaseReady("storageReady");
+
+useEffect(() => {
+  if (!storageReady) return; // Wait for phase
+  
+  const theme = SecureStorage.get(THEME_KEY);
+  setTheme(theme);
+}, [storageReady]); // Explicit dependency
+```
+
+### Concrete Provider Example
+
+```typescript
+export function ThemeProvider({ children }: PropsWithChildren) {
+  const [theme, setTheme] = useState<Theme>(defaultTheme);
+  const storageReady = usePhaseReady("storageReady");
+
+  useEffect(() => {
+    if (!storageReady) return; // Wait for storage phase
+
+    // Safe to access storage now
+    const savedTheme = SecureStorage.get(THEME_KEY);
+    if (savedTheme) {
+      setTheme(savedTheme);
+    }
+  }, [storageReady]); // Re-run when storage ready
+
+  return (
+    <ThemeContext.Provider value={theme}>
+      {children}
+    </ThemeContext.Provider>
+  );
+}
+```
+
+### Checklist for Adding Phase-Aware Provider
+
+- [ ] Identify required systems (storage? services? network?)
+- [ ] Map systems to kernel phases
+- [ ] Add `usePhaseReady(phase)` hook call
+- [ ] Gate all effects with phase check
+- [ ] Add phase to effect dependencies
+- [ ] Test provider initializes correctly after phase completes
+- [ ] Verify no race conditions during app startup
 
 - **`expo-font`** – Font loading (preload critical, lazy load others)
 - **`expo-network`** – Network detection (online/offline)
@@ -223,7 +380,7 @@ interface KernelError {
 - **`lib/utils/logger`** – Bootstrap logging
 - **`lib/analytics`** – Performance tracking
 
-## Error Handling & Edge Cases
+## Related Modules
 
 ### Config Phase Failure (Supabase Not Configured)
 
@@ -247,48 +404,6 @@ Auth phase is non-blocking; app ready even if auth timeout:
 // - phases.authReady = true (even if session not found)
 // - User redirected to login on first route guard
 ```
-
-### Preload Timeout (Fonts Take >500ms)
-
-Fonts load non-blockingly; app proceeds with fallback fonts:
-
-```typescript
-// After 500ms if fonts not ready:
-// - Preload phase completes (success)
-// - Fonts continue loading in background
-// - UI renders with fallback fonts initially
-```
-
-### Storage Migration Failure
-
-If cache migration fails, app can retry or reset:
-
-```typescript
-// Option 1: Retry migration
-await AppKernel.retry();
-
-// Option 2: Reset storage (user loses cached data)
-await SecureStorage.clear();
-```
-
-## Performance Notes
-
-### Initialization Timeline
-
-- **CONFIG**: 100-150ms (env var setup, Supabase init)
-- **PRELOAD**: 300-500ms (critical font loading)
-- **STORAGE**: 50-100ms (validation + migrations)
-- **NETWORK**: <10ms (event subscription)
-- **AUTH**: 500-1000ms (session restoration, runs in parallel)
-- **Total to READY**: ~500-600ms (AUTH overlaps other phases)
-
-### Optimization Tips
-
-- Load critical fonts in PRELOAD phase only
-- Use `loadLazyFont()` for specialty fonts (Cyberpunk, Eurostile)
-- Keep storage migrations fast (<50ms)
-- Don't block READY on AUTH phase (non-blocking by design)
-- Monitor `kernel.timing` for performance regressions
 
 ## Related Modules
 

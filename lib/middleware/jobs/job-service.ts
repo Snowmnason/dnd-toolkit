@@ -1,17 +1,17 @@
 /**
  * Job Service — Middleware
  *
- * Sits between JobsManager and system/Jobs. Owns all precondition checks,
- * adapter injection, and normalization so the queue itself stays pure.
+ * Sits between JobsManager and system/Jobs. Owns all precondition checks
+ * and normalization so the queue itself stays pure.
  *
  * Responsibilities:
- * - Bootstrap: create adapters and inject into the queue singleton
  * - Network precondition: warn/defer if job requires network and we're offline
  * - Storage routing: resolve which adapter a job should use
  * - Normalization: ensure sensible defaults before handing to system
  * - Logging: trace every enqueue with context
  *
  * Does NOT:
+ * - Bootstrap the queue (that's system/Kernel/phases/job-setup-phase.ts)
  * - Execute jobs (that's system/Jobs/background-job-queue.ts)
  * - Expose UI state (that's JobsManager → hooks)
  *
@@ -23,57 +23,6 @@ import { logger } from '@/lib/utils/logger';
 import { getJobQueue } from '@/system/Jobs/background-job-queue';
 import { NetworkDetection } from '@/system/Network/network-detection';
 import type { EnqueueOptions, JobEventSubscriber, JobRecord } from '@/type-definitions/job-queue-types';
-import { FastCacheAdapter } from './adapters/fastcache-adapter';
-import { SecureStorageAdapter } from './adapters/secure-storage-adapter';
-
-// ─── Bootstrap ──────────────────────────────────────────────────────────────
-
-/**
- * Initialize the job queue with the correct storage adapters.
- * Called once from job-phase during kernel bootstrap.
- *
- * Injects:
- * - FastCacheAdapter  → default (non-sensitive jobs)
- * - SecureStorageAdapter → secure (sensitive jobs, PII, auth tokens)
- *
- * After this call the queue singleton is ready and handlers can be registered.
- */
-export async function initializeJobInfrastructure(): Promise<void> {
-  const defaultAdapter = new FastCacheAdapter();
-  const secureAdapter = new SecureStorageAdapter();
-
-  const queue = getJobQueue({
-    storageAdapter: defaultAdapter,
-    secureAdapter,
-  });
-
-  await queue.initialize();
-
-  logger.category('jobs').info('✅ Job infrastructure initialized (fastcache + secure adapters)');
-}
-
-/**
- * Register all background job handlers with the queue.
- * Called once from registration-phase during kernel bootstrap, after initializeJobInfrastructure.
- */
-export async function registerJobHandlers(): Promise<void> {
-  const queue = getJobQueue();
-
-  // Sync orchestrator
-  const { createSyncJobHandler } = await import('@/lib/jobs');
-  const syncHandler = createSyncJobHandler();
-  queue.registerHandler(syncHandler.name, (async (payload: any) => {
-    await syncHandler.execute(payload);
-  }) as any); // JobHandler expects (payload, context), but we only need payload
-
-  // Network recovery — full init: registers handler + wires state-machine transition listeners
-  const { NetworkRecoveryRetryJobManager } = await import('@/lib/jobs/core/network-recovery-retry-job');
-  const { NetworkStateManager } = await import('@/system/Network/state-machine');
-  await NetworkRecoveryRetryJobManager.initialize(NetworkStateManager, queue);
-
-  logger.category('jobs').info('Job handlers registered (sync-orchestrator, network-recovery-retry)');
-}
-
 // ─── Precondition Checks ────────────────────────────────────────────────────
 
 /**

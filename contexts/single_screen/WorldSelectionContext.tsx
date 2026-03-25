@@ -8,6 +8,14 @@ interface WorldSelectionContextType {
 
 const WorldSelectionContext = createContext<WorldSelectionContextType | undefined>(undefined);
 
+/**
+ * WorldSelectionProvider
+ * Manages world selection UI state for the world selection screen.
+ * 
+ * ✅ Gate-Free: WorldSelectionProvider does not depend on kernel phases.
+ * It only tracks which world is currently selected in the UI.
+ * No storage, services, or API access needed.
+ */
 export function WorldSelectionProvider({ children }: { children: React.ReactNode }) {
   const [selectedWorld, setSelectedWorld] = useState<string | null>(null);
 

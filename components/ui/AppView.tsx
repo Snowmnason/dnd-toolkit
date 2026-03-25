@@ -1,4 +1,3 @@
-import LoadingOverlay from "@/components/LoadingOverlay";
 import { usePlatform } from "@/providers";
 import { $, Sizing, useScale } from "@/theme";
 import { ComponentType, ReactNode, useEffect, useMemo } from "react";
@@ -342,18 +341,16 @@ export function AppSplit({
 
 /* ───── AppLoading ───── 
    Loading state overlay
-   Shows LoadingOverlay component with message/error
+   DEPRECATED: Use useUIBlocker() from @/components/UIBlockerContext instead
+   This component is kept for backward compatibility but should not be used.
+   UIBlockerLayer is now rendered at root level and controlled via context.
 */
 export function AppLoading({
   loadMessage = "Loading...",
   assetsLoaded = false,
   ...rest
 }: AppLoadingViewProps) {
-  return (
-    <LoadingOverlay
-      message={loadMessage}
-      assetsLoaded={assetsLoaded}
-      {...rest}
-    />
-  );
+  // Deprecated: UIBlockerLayer at root level handles all loading states
+  // This function is kept as a stub for backward compatibility
+  return null;
 }

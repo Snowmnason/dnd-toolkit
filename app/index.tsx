@@ -1,5 +1,5 @@
 import Welcome from "@/Screens/Welcome";
-import LoadingOverlay from "@/components/LoadingOverlay";
+import { SplashScreen } from "@/components/SplashScreen";
 import { useBootstrapAuth } from "@/hooks/auth";
 import { useAppKernel } from "@/hooks/kernel";
 import { logger } from "@/hooks/utils";
@@ -66,32 +66,23 @@ export default function HomePage() {
     return () => clearTimeout(t);
   }, [isAuthChecked, hasAccount, router]);
 
-  // Show loading spinner while kernel is initializing
-  if (!kernel.phases.appReady) {
-    const loadingMessage = kernel.phases.preloadReady
-      ? "Restoring session..."
-      : "Loading assets...";
-    logger.category("bootstrap").debug(
-      "⏳ Rendering index loading overlay:",
-      loadingMessage,
-    );
+  console.log(
+    `[ui] [HomePage] render — appReady=${kernel.phases.appReady}, isAuthChecked=${isAuthChecked}, hasAccount=${hasAccount}`,
+  );
 
-    return (
-      <View style={styles.container}>
-        <LoadingOverlay
-          message={loadingMessage}
-          assetsLoaded={kernel.phases.preloadReady}
-        />
-      </View>
-    );
+  // While kernel is initializing, UIBlockerLayer (in _layout.tsx) shows the splash.
+  // Render a fallback SplashScreen here too in case UIBlockerLayer is not yet mounted.
+  if (!kernel.phases.appReady) {
+    console.log('[ui] [HomePage] → rendering SplashScreen (kernel not ready)');
+    return <SplashScreen title="D&D Toolkit" subtitle="Loading App" message="Preparing your world..." />;
   }
 
   // Show welcome screen once auth check is complete
   // For authenticated users: they'll see the welcome screen momentarily,
   // but the select route guard will pull them to /select/world-selection
   if (isAuthChecked) {
-    logger.category("bootstrap").debug(
-      `📋 Rendering welcome screen (hasAccount: ${hasAccount})`,
+    console.log(
+      `[ui] [HomePage] → rendering Welcome screen (hasAccount=${hasAccount})`,
     );
 
     return (
@@ -120,16 +111,11 @@ export default function HomePage() {
     );
   }
 
-  // Show loading while determining auth status
-  logger.category("bootstrap").debug("⏳ Checking auth status...");
-  return (
-    <View style={styles.container}>
-      <LoadingOverlay
-        message="Checking authentication..."
-        assetsLoaded={kernel.phases.preloadReady}
-      />
-    </View>
-  );
+  // Auth check in progress — show splash screen to avoid white flash.
+  // UIBlockerLayer has already hidden (kernel is ready), so this route
+  // must render visible content during the async storage reads.
+  console.log('[ui] [HomePage] → rendering SplashScreen (auth check in progress)');
+  return <SplashScreen title="D&D Toolkit" subtitle="Authenticating" message="Checking your credentials..." />;
 }
 // Using StyleSheet since this is a fail safe with a very specific style
 const styles = StyleSheet.create({

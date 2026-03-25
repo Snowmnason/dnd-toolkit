@@ -12,6 +12,11 @@ import { buildSizing, type Sizing } from "../theme/ultils/sizing";
 type ScaleContextValue = Sizing;
 const ScaleContext = createContext<ScaleContextValue>(buildSizing(getScale()));
 
+/**
+ * ✅ Gate-Free: ScaleProvider does not depend on kernel phases.
+ * It only listens to window resize events and provides responsive sizing.
+ * No initialization, services, or storage needed.
+ */
 export function ScaleProvider({ children }: { children: React.ReactNode }) {
   const [scale, setScale] = useState(getScale());
 

@@ -1,11 +1,11 @@
 import { logger } from "@/lib/utils/logger";
 import React, {
-    createContext,
-    ReactNode,
-    useContext,
-    useEffect,
-    useRef,
-    useState,
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
 } from "react";
 import { Platform, useWindowDimensions } from "react-native";
 
@@ -24,6 +24,11 @@ interface PlatformProviderProps {
   children: ReactNode;
 }
 
+/**
+ * ✅ Gate-Free: PlatformProvider does not depend on kernel phases.
+ * It only detects the current platform (iOS/Android/Web) and window dimensions.
+ * No initialization, services, or storage needed.
+ */
 export function PlatformProvider({ children }: PlatformProviderProps) {
   const { width, height } = useWindowDimensions();
   // Treat native iOS/Android as mobile always. On web, consider small viewport or mobile UA as mobile.
@@ -76,6 +81,7 @@ export function PlatformProvider({ children }: PlatformProviderProps) {
         lastWidthRef.current = width;
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [width, rawIsMobile, isMobileState]);
 
   const isMobile = isMobileState !== null ? isMobileState : rawIsMobile;

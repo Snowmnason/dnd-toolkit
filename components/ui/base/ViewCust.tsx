@@ -1,10 +1,11 @@
 import { ReactNode } from "react";
 import {
+  Platform,
   ScrollView,
   StyleProp,
   View,
   ViewProps,
-  ViewStyle
+  ViewStyle,
 } from "react-native";
 import { GradientView } from "../Resuables/gradients";
 
@@ -67,13 +68,28 @@ export function ViewCust({
   opacity,
   style,
   children,
+  pointerEvents,
   ...rest
 }: ViewCustProps) {
+  // Platform-aware pointerEvents handling:
+  // - On web: move to style (RN Web requires it in style, not as prop)
+  // - On native: keep as prop (native Views use pointerEvents as a prop, not style)
+  const baseStyle: any = Platform.OS === 'web' && pointerEvents
+    ? Array.isArray(style) 
+      ? [...style, { pointerEvents }]
+      : [style, { pointerEvents }]
+    : style;
+
+  // On native, pass pointerEvents as a prop; on web, it's already in baseStyle
+  const nativeProps = Platform.OS !== 'web' && pointerEvents
+    ? { ...rest, pointerEvents }
+    : rest;
+
   // Gradient wrapper - OUTSIDE ScrollView so it's static and doesn't scroll
   // This allows the gradient background to remain fixed while content scrolls
   if (gradient && gradientColor) {
     // Split style into wrapper styles (border, radius, shadow, dimensions) and inner styles (padding, margin, flex layout)
-    const flatStyle = Array.isArray(style) ? Object.assign({}, ...style.filter(Boolean)) : (style || {});
+    const flatStyle = Array.isArray(baseStyle) ? Object.assign({}, ...baseStyle.filter(Boolean)) : (baseStyle || {});
     
     const wrapperStyle: ViewStyle = {};
     const innerStyle: ViewStyle = {};
@@ -133,12 +149,12 @@ export function ViewCust({
             style={{ flex: 1, ...innerStyle }}
             contentContainerStyle={contentContainerStyle}
             showsVerticalScrollIndicator={showScrollIndicator}
-            {...rest}
+            {...nativeProps}
           >
             {children}
           </ScrollView>
         ) : (
-          <View style={{ backgroundColor: 'transparent', ...innerStyle }} {...rest}>
+          <View style={{ backgroundColor: 'transparent', ...innerStyle }} {...nativeProps}>
             {children}
           </View>
         )}
@@ -150,10 +166,10 @@ export function ViewCust({
   if (scroll) {
     return (
       <ScrollView
-        style={style}
+        style={baseStyle}
         contentContainerStyle={contentContainerStyle}
         showsVerticalScrollIndicator={showScrollIndicator}
-        {...rest}
+        {...nativeProps}
       >
         {children}
       </ScrollView>
@@ -162,7 +178,7 @@ export function ViewCust({
 
   // Otherwise, just a View (without gradient, without scroll)
   return (
-    <View style={style} {...rest}>
+    <View style={baseStyle} {...nativeProps}>
       {children}
     </View>
   );

@@ -8,11 +8,11 @@ import { View } from "react-native";
 
 // 🧱 New UI Components
 import {
-  AppLoading,
-  AppPage,
-  Button,
-  Heading,
-  Surface
+    AppPage,
+    Body,
+    Button,
+    Heading,
+    Surface
 } from "@/components/ui";
 import UserProfile from "../../Screens/settings/user-profile";
 import VersionDisplay from "../../components/VersionDisplay";
@@ -61,11 +61,19 @@ export default function SettingsPage() {
   // See signOutFlow.state.modal and deleteFlow.state.modal for which modal to show.
 
   if (loading) {
-    return <AppLoading loadMessage="Loading Settings..." />;
+    return (
+      <AppPage center gap="lg">
+        <Body align="center">Loading Settings...</Body>
+      </AppPage>
+    );
   }
 
   if (!secureReady) {
-    return <AppLoading loadMessage="Securing Settings..." />;
+    return (
+      <AppPage center gap="lg">
+        <Body align="center">Securing Settings...</Body>
+      </AppPage>
+    );
   }
 
   return (

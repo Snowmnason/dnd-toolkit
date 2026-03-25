@@ -1,10 +1,10 @@
-import { AppLoading, AppPage, AppSplit, Body, Button } from "@/components/ui";
+import { AppPage, AppSplit, Body, Button } from "@/components/ui";
 import { usePanelNavigation } from "@/hooks/navigation/use-panel-navigation";
 import { useWorlds } from "@/hooks/storage";
 import { useWorldModal } from "@/hooks/utils/use-world-modal";
 import {
-  useAppParamsStable,
-  useUserId,
+    useAppParamsStable,
+    useUserId,
 } from "@/providers";
 import { WorldListPanel } from "@/Screens/select/world-selection/WorldListPanel";
 import { WorldRightPanel } from "@/Screens/select/world-selection/WorldRightPanel";
@@ -48,9 +48,13 @@ export default function LandingPage() {
     },
   });
 
-  // Loading state (use your modern loader view)
+  // Loading state
   if (isLoading) {
-    return <AppLoading loadMessage="Loading your worlds..." />;
+    return (
+      <AppPage center gap="lg">
+        <Body align="center">Loading your worlds...</Body>
+      </AppPage>
+    );
   }
 
   // Error state

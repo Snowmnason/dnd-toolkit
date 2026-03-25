@@ -12,7 +12,11 @@ const NotificationContext = createContext<NotificationContextValue | undefined>(
 
 /**
  * 🔔 NotificationProvider
- * Manages notification queue and state
+ * Manages notification queue and state.
+ * 
+ * ✅ Gate-Free: NotificationProvider does not depend on kernel phases.
+ * It only manages notification list state with React hooks and auto-dismiss timeouts.
+ * No storage, services, or API access needed.
  */
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<NotificationData[]>([])

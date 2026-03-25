@@ -1,15 +1,14 @@
 import {
-    AppErrorBoundary,
-    LoadingOverlay,
-    TopBar
+  AppErrorBoundary,
+  TopBar,
+  UIBlockerLayer
 } from "@/components";
 import { OfflineSyncNotificationLayer } from "@/components/offline";
 import {
-    CrashFallBack,
-    RouteErrorBoundary,
-    SafeModeErrorBoundary,
-    SafeModeScreen,
-    SplashScreen,
+  CrashFallBack,
+  RouteErrorBoundary,
+  SafeModeErrorBoundary,
+  SafeModeScreen,
 } from "@/components/SplashScreen";
 import { AppToastLayer, NotificationContainer } from "@/components/ui";
 import { AppToastProvider, ModalProvider, NotificationProvider } from "@/contexts";
@@ -19,33 +18,32 @@ import "@/components/modals/register-all-modals";
 import { Analytics, sessionManager } from "@/hooks/analytics";
 import { SafeModeReason, executeRecoveryAction } from "@/hooks/error";
 import { useClearSafeMode } from "@/hooks/error/use-safe-mode";
-import { AppKernelProvider, useAppKernel } from "@/hooks/kernel";
+import { AppKernelProvider, useAppKernel, useKernelLoadingSync } from "@/hooks/kernel";
 import { useAnalyticsNavigation, useNavigate, useRouteConfig } from "@/hooks/navigation";
 import {
-    type AccessRole,
+  type AccessRole,
 } from "@/hooks/storage";
-import { useSplashScreen } from "@/hooks/ui";
 import { logger } from "@/hooks/utils";
 import {
-    AppParamsStableProvider,
-    AppParamsVolatileProvider,
-    PlatformProvider,
-    ScaleProvider,
-    SubscriptionProvider,
-    ThemeProvider,
-    UseTheme,
-    useAppParamsStable,
-    useAppParamsVolatile,
-    usePlatform,
-    useUserId,
-    useUserRole,
-    useWorldId,
+  AppParamsStableProvider,
+  AppParamsVolatileProvider,
+  PlatformProvider,
+  ScaleProvider,
+  SubscriptionProvider,
+  ThemeProvider,
+  UseTheme,
+  useAppParamsStable,
+  useAppParamsVolatile,
+  usePlatform,
+  useUserId,
+  useUserRole,
+  useWorldId,
 } from "@/providers";
 import {
-    Stack,
-    useLocalSearchParams,
-    useRouter,
-    useSegments,
+  Stack,
+  useLocalSearchParams,
+  useRouter,
+  useSegments,
 } from "expo-router";
 import { useEffect } from "react";
 import { View } from "react-native";
@@ -94,7 +92,10 @@ function RootLayoutContent() {
   // Data loading hooks
   const kernel = useAppKernel();
   const clearKernelSafeMode = useClearSafeMode();
-  const splash = useSplashScreen();
+
+  // Sync kernel bootstrap state with loading blocker
+  // Shows splash screen while kernel initializes, hides when appReady
+  useKernelLoadingSync();
 
   // FUTURE: Offline conflict resolution (disabled for v1 - LWW only)
   // v1 uses automatic Last-Write-Wins for all conflicts
@@ -202,21 +203,13 @@ function RootLayoutContent() {
   ]);
 
   // ==================== RENDER LOGIC SECTION ====================
-  // Show splash screen (if enabled via feature flag)
-  // Splash screen displays BEFORE any other content
-  if (splash.showSplash) {
-    return <SplashScreen />;
-  }
+  // Note: UIBlockerLayer (outermost in provider tree) handles all loading overlays.
+  // Kernel and other systems call setLoading() via useUIBlocker().
 
-  // Show loading while app kernel is initializing
-  if (!kernel.phases.appReady) {
-    return (
-      <LoadingOverlay
-        message="Loading D&D Toolkit..."
-        assetsLoaded={kernel.phases.preloadReady}
-      />
-    );
-  }
+  const firstSeg = typeof segments[0] === "string" ? segments[0] : "(root)";
+  console.log(
+    `[ui] [RootLayoutContent] render — route="${firstSeg}", safeMode=${!!kernel.safeMode}, appReady=${kernel.phases.appReady}`,
+  );
 
   // Helper to determine safe navigation target based on safe mode reason
   const getNavigationTarget = (reason?: string): string => {
@@ -253,6 +246,14 @@ function RootLayoutContent() {
     // Default/unknown → safest option is index (welcome/splash screen)
     return "/";
   };
+
+  // DEBUG: Log safe mode state
+  if (kernel.safeMode) {
+    console.log('[ui] [RootLayoutContent] → rendering SafeModeScreen', {
+      reason: kernel.safeMode?.reason,
+      level: kernel.safeMode?.level,
+    });
+  }
 
   // Show safe mode screen if app entered safe mode (takes priority over normal rendering)
   // CRITICAL: SafeModeScreen is wrapped in error boundary - if it crashes, we still have fallback UI
@@ -312,6 +313,10 @@ function RootLayoutContent() {
 
   const topBarTitle = !hideTopBar ? resolvedTitle : undefined;
 
+  console.log(
+    `[ui] [RootLayoutContent] TopBar decision — segment="${firstSegment}", isRoot=${isRootRoute}, hideTopBar=${hideTopBar}, topBarTitle="${topBarTitle}"`,
+  );
+
   // Build back press handler using config
   const handleTopBarBack = () => {
     if (topBarBackTarget) {
@@ -341,8 +346,8 @@ function RootLayoutContent() {
     >
       <View
         style={{
-          height: "100%",
-          width: "100%",
+          flex: 1,
+          flexDirection: 'column',
           backgroundColor: theme.background || "#2f353d",
         }}
       >
@@ -360,14 +365,17 @@ function RootLayoutContent() {
           />
         )}
 
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: {
-              backgroundColor: "$background",
-            },
-          }}
-        />
+        {/* Stack container - must flex to fill available space */}
+        <View style={{ flex: 1 }}>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: "$background",
+              },
+            }}
+          />
+        </View>
 
         {/* Notification Container - renders all queued notifications */}
         <NotificationContainer />
@@ -398,13 +406,19 @@ export default function RootLayout() {
                   <ModalProvider>
                     <NotificationProvider>
                       <AppToastProvider>
-                        <AppErrorBoundary
-                          renderFallback={(error: Error | null, onRetry: () => void) => (
-                            <CrashFallBack error={error} onRetry={onRetry} />
-                          )}
-                        >
-                          <RootLayoutContent />
-                        </AppErrorBoundary>
+                        {/* UIBlockerLayer renders the splash overlay (isLoading: true by default)
+                            and provides the setLoading() context. Placed here — inside all theme
+                            providers (SplashScreen needs UseTheme) but above RootLayoutContent
+                            where useKernelLoadingSync() calls setLoading(false) on appReady. */}
+                        <UIBlockerLayer>
+                          <AppErrorBoundary
+                            renderFallback={(error: Error | null, onRetry: () => void) => (
+                              <CrashFallBack error={error} onRetry={onRetry} />
+                            )}
+                          >
+                            <RootLayoutContent />
+                          </AppErrorBoundary>
+                        </UIBlockerLayer>
                       </AppToastProvider>
                     </NotificationProvider>
                   </ModalProvider>

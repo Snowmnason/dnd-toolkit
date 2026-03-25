@@ -1,6 +1,6 @@
 import { logger } from "@/lib";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
-import { NetworkManager, ConnectionQuality } from "@/lib/network/network-manager";
+import { ConnectionQuality, NetworkManager } from "@/lib/network/network-manager";
 import { S, UseTheme } from "@/theme";
 import { useRouter, useSegments } from "expo-router";
 import { memo, useEffect, useRef, useState } from "react";
@@ -127,7 +127,13 @@ function TopBar({
         </View>
 
         {/* Center: Title + WiFi indicator */}
-        <View style={styles.centerSlot} pointerEvents="none">
+        <View
+          style={[
+            styles.centerSlot,
+            Platform.OS === "web" && { pointerEvents: "none" as const },
+          ]}
+          pointerEvents={Platform.OS !== "web" ? "none" : undefined}
+        >
           <Text
             accessibilityLiveRegion="polite"
             style={[
