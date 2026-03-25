@@ -1,6 +1,6 @@
 {
   "name": "dnd-toolkit",
-  "version": "1.68.37",
+  "version": "1.69.37",
   "description": "D&D Toolkit Desktop App - Electron wrapper for the web build",
   "main": "dist/main.js",
   "author": {
