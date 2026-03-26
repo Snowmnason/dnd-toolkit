@@ -26,7 +26,7 @@
 import type { SafeModeState } from "@/lib/error";
 import type {
   AppKernelState,
-  KernelListener
+  KernelListener,
 } from "@/type-definitions/kernel-types";
 import {
   KernelPhase
@@ -40,7 +40,8 @@ export type {
   AppKernelState,
   KernelCapabilities,
   KernelError,
-  KernelListener
+  KernelListener,
+  PhaseProgress
 } from "@/type-definitions/kernel-types";
 
 /**

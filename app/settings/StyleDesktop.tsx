@@ -19,6 +19,7 @@ import {
   Link,
   ObjHeading,
   Paragraph,
+  ProgressBar,
   RadioButtonGroup,
   SnackBar,
   SubTitle,
@@ -29,7 +30,7 @@ import {
   TextInput,
   TextInputGroup,
   Title,
-  ToggleGroup,
+  ToggleGroup
 } from "@/components/ui";
 import { AppSplit } from "@/components/ui/AppView";
 import { useNotifications } from "@/contexts/notifications-context";
@@ -46,6 +47,7 @@ export default function StyleDesktop() {
   // Simple display states (not controlling components, just for right panel display)
   const [primaryClicks, setPrimaryClicks] = useState(0);
   const [iconButtonClicks, setIconButtonClicks] = useState("");
+  const [progressDisplay, setProgressDisplay] = useState(30);
   const [textInputValue, setTextInputValue] = useState("");
   const [descInputValue, setDescInputValue] = useState("");
   const [dropdownValue, setDropdownValue] = useState<string | null>(null);
@@ -73,6 +75,8 @@ export default function StyleDesktop() {
   const switchGroupMaxRef = useRef<any>(null);
   const radioGroupRef = useRef<any>(null);
   const toggleGroupRef = useRef<any>(null);
+  const progressBarControlledRef = useRef<any>(null);
+  const progressBarVariantRef = useRef<any>(null);
 
   // Modal/Toast/Snackbar states
   const [modalVisible, setModalVisible] = useState(false);
@@ -206,6 +210,54 @@ export default function StyleDesktop() {
             <Caption style={{ marginTop: S.space.sm }}>
               Last icon clicked: {iconButtonClicks || "None"}
             </Caption>
+          </Surface>
+
+          <Surface style={{ marginTop: S.space.lg }}>
+            <Heading>Progress Bar</Heading>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <ProgressBar
+                ref={progressBarControlledRef}
+                label={`Progress: ${progressDisplay}%`}
+                animated
+                initialProgress={30}
+              />
+              <View style={{ flexDirection: "row", gap: S.space.sm }}>
+                <Button
+                  variant="outlined"
+                  text="-10"
+                  onPress={() => {
+                    progressBarControlledRef.current?.decrement(10);
+                    progressBarVariantRef.current?.decrement(10);
+                    setProgressDisplay(progressBarControlledRef.current?.getProgress() || 0);
+                  }}
+                />
+                <Button
+                  variant="outlined"
+                  text="+10"
+                  onPress={() => {
+                    progressBarControlledRef.current?.increment(10);
+                    progressBarVariantRef.current?.increment(10);
+                    setProgressDisplay(progressBarControlledRef.current?.getProgress() || 0);
+                  }}
+                />
+                <Button
+                  variant="outlined"
+                  text="Reset"
+                  onPress={() => {
+                    progressBarControlledRef.current?.reset();
+                    progressBarVariantRef.current?.reset();
+                    setProgressDisplay(0);
+                  }}
+                />
+              </View>
+              <ProgressBar
+                ref={progressBarVariantRef}
+                animated={false}
+                highlightColor={theme.success}
+                initialProgress={progressDisplay}
+              />
+              <Caption>Current progress: {progressDisplay}%</Caption>
+            </View>
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg }}>

@@ -93,8 +93,9 @@ function RootLayoutContent() {
   const kernel = useAppKernel();
   const clearKernelSafeMode = useClearSafeMode();
 
-  // Sync kernel bootstrap state with loading blocker
-  // Shows splash screen while kernel initializes, hides when appReady
+  // Sync kernel bootstrap state with UIBlocker overlay.
+  // Shows splash screen while kernel initializes, updates phase progress,
+  // and hides automatically when appReady or on kernel error.
   useKernelLoadingSync();
 
   // FUTURE: Offline conflict resolution (disabled for v1 - LWW only)
@@ -206,11 +207,6 @@ function RootLayoutContent() {
   // Note: UIBlockerLayer (outermost in provider tree) handles all loading overlays.
   // Kernel and other systems call setLoading() via useUIBlocker().
 
-  const firstSeg = typeof segments[0] === "string" ? segments[0] : "(root)";
-  console.log(
-    `[ui] [RootLayoutContent] render — route="${firstSeg}", safeMode=${!!kernel.safeMode}, appReady=${kernel.phases.appReady}`,
-  );
-
   // Helper to determine safe navigation target based on safe mode reason
   const getNavigationTarget = (reason?: string): string => {
     // Auth failures → must go to login
@@ -312,10 +308,6 @@ function RootLayoutContent() {
     isRootRoute || firstSegment === "login" || firstSegment === "web";
 
   const topBarTitle = !hideTopBar ? resolvedTitle : undefined;
-
-  console.log(
-    `[ui] [RootLayoutContent] TopBar decision — segment="${firstSegment}", isRoot=${isRootRoute}, hideTopBar=${hideTopBar}, topBarTitle="${topBarTitle}"`,
-  );
 
   // Build back press handler using config
   const handleTopBarBack = () => {

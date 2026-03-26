@@ -1,17 +1,25 @@
 import { UseTheme } from '@/theme';
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { CustomLoad } from '../ui';
 import { Body, SubTitle, Title } from '../ui/AppText';
+import { ProgressBar, type ProgressBarRef } from '../ui/ProgressBar';
 
 /**
  * Custom Splash Screen / Loading Overlay
  *
  * Discord-style loading screen with clean layout:
- * - Optional title + subtitle at top (for bootstrap context)
+ * - Static title ("D&D Toolkit") + optional subtitle
  * - Centered decorative element (spinner/CustomLoad)
- * - Optional progress bar (can be hidden)
- * - Subtle fun message at bottom
+ * - Animated progress bar (uses ProgressBar component)
+ * - Subtle message at bottom
+ * - VersionDisplay footer
  *
  * Used for:
  * 1. Initial app splash (feature flag controlled)
@@ -19,8 +27,7 @@ import { Body, SubTitle, Title } from '../ui/AppText';
  */
 
 interface SplashScreenProps {
-  // Top section: context / branding
-  title?: string;
+  // Top section: phase label / context
   subtitle?: string;
 
   // Middle section: visual loading indicator
@@ -35,7 +42,6 @@ interface SplashScreenProps {
 }
 
 export function SplashScreen({
-  title,
   subtitle,
   decorativeElement,
   showProgress = true,
@@ -43,6 +49,41 @@ export function SplashScreen({
   message,
 }: SplashScreenProps = {}) {
   const { theme } = UseTheme();
+  const progressRef = useRef<ProgressBarRef>(null);
+  const [displayMessage, setDisplayMessage] = useState(message);
+  const shakeTranslate = useSharedValue(0);
+  const prevMessageRef = useRef(message);
+
+  // Sync progress prop to ProgressBar ref
+  useEffect(() => {
+    if (progress !== undefined) {
+      progressRef.current?.setProgress(progress);
+    }
+  }, [progress]);
+
+  // Trigger spin animation when message changes
+  // Animation rotates and changes text mid-spin for smooth effect
+  // Note: shakeTranslate is a reanimated shared value and should not be in dependency array
+  useEffect(() => {
+    if (message && message !== prevMessageRef.current) {
+      prevMessageRef.current = message;
+      shakeTranslate.value = withSequence(
+        withTiming(-10, { duration: 50 }),
+        withTiming(10, { duration: 50 }, () => {
+          // Change message mid-spin (at 100ms = midway through animation)
+          setDisplayMessage(message);
+        }),
+        withTiming(-10, { duration: 50 }),
+        withTiming(10, { duration: 50 }),
+        withTiming(0, { duration: 50 }),
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [message]);
+
+  const messageAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${shakeTranslate.value}deg` }],
+  }));
 
   return (
     <View
@@ -54,19 +95,17 @@ export function SplashScreen({
         paddingHorizontal: 20,
       }}
     >
-      {/* TOP: Optional Title + Subtitle (bootstrap context) */}
+      {/* TOP: Static Title + Optional Subtitle */}
       <View style={{ alignItems: 'center', marginBottom: 48, minHeight: 60 }}>
-        {title && (
-          <Title
-            style={{
-              color: theme.accent,
-              marginBottom: subtitle ? 8 : 0,
-              textAlign: 'center',
-            }}
-          >
-            {title}
-          </Title>
-        )}
+        <Title
+          style={{
+            color: theme.accent,
+            marginBottom: subtitle ? 8 : 0,
+            textAlign: 'center',
+          }}
+        >
+          D&D Toolkit
+        </Title>
         {subtitle && (
           <SubTitle
             style={{
@@ -84,41 +123,26 @@ export function SplashScreen({
         {decorativeElement ?? <CustomLoad size="large" />}
       </View>
 
-      {/* PROGRESS BAR: Optional, can be hidden */}
+      {/* PROGRESS BAR: Animated, uses ProgressBar component */}
       {showProgress && (
-        <View
-          style={{
-            width: '80%',
-            height: 4,
-            backgroundColor: theme.border,
-            borderRadius: 2,
-            marginBottom: 32,
-            overflow: 'hidden',
-          }}
-        >
-          <View
-            style={{
-              width: progress !== undefined ? `${Math.min(Math.max(progress, 0), 100)}%` : '30%',
-              height: '100%',
-              backgroundColor: theme.accent,
-              borderRadius: 2,
-            }}
-          />
+        <View style={{ width: '80%', marginBottom: 32 }}>
+          <ProgressBar ref={progressRef} animated initialProgress={progress ?? 0} />
         </View>
       )}
 
-      {/* BOTTOM: Subtle fun message */}
-      {message && (
-        <Body
-          style={{
-            color: theme.textSecondary,
-            textAlign: 'center',
-            fontSize: 13,
-            fontStyle: 'italic',
-          }}
-        >
-          {message}
-        </Body>
+      {/* Subtle status message with shake animation on change */}
+      {displayMessage && (
+        <Animated.View style={messageAnimatedStyle}>
+          <Body
+            style={{
+              color: theme.textSecondary,
+              textAlign: 'center',
+              fontStyle: 'italic',
+            }}
+          >
+            {displayMessage}
+          </Body>
+        </Animated.View>
       )}
     </View>
   );

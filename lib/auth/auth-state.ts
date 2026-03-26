@@ -3,7 +3,6 @@ import { clearAllUserData, getAllSecureStorageKeys, getPrivacyStorageBackend } f
 import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
-import type { Session } from "./auth-operations";
 
 /**
  * Helper: determine whether a session indicates an email-confirmed user.
@@ -286,30 +285,39 @@ export const AuthStateManager = {
       // Step 2: Try to get cached session with a short timeout
       // This prevents the auth guard from hanging on slow network
       try {
+        const TIMEOUT_SENTINEL = Symbol('timeout');
         let timeoutId: ReturnType<typeof setTimeout>;
 
         const manager = await getAuthManager();
         const sessionPromise = manager.getCurrentSession();
-        const timeoutPromise = new Promise<Session | null>(
+        const timeoutPromise = new Promise<typeof TIMEOUT_SENTINEL>(
           (resolve) => {
             timeoutId = setTimeout(
-              () => resolve(null),
+              () => resolve(TIMEOUT_SENTINEL),
               2000,
             ); // 2 second timeout
           },
         );
 
-        const session = await Promise.race([sessionPromise, timeoutPromise]);
+        const result = await Promise.race([sessionPromise, timeoutPromise]);
         clearTimeout(timeoutId!); // ✅ Clean up the timer
 
+        // If timed out, trust local storage — network may be slow
+        if (result === TIMEOUT_SENTINEL) {
+          logger.category('auth').warn("Session check timed out, trusting local auth state");
+          return authState.hasAccount;
+        }
+
         // If we got a session, verify it's confirmed
-        if (isEmailConfirmed(session)) {
+        if (isEmailConfirmed(result)) {
           return true;
         }
 
-        // If session check timed out or returned null, trust local storage
-        // The background session restore will update this later
-        return authState.hasAccount;
+        // Session returned null (no session in Supabase cache) — stale local data
+        // Clear the dead hasAccount flag so we don't keep bouncing around
+        logger.category('auth').warn("No valid session found but hasAccount=true — clearing stale auth state");
+        await this.setHasAccount(false);
+        return false;
       } catch {
         // On any error, trust local storage
         return authState.hasAccount;

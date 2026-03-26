@@ -18,29 +18,31 @@
  */
 
 import {
-    cleanupAnalyticsNetworkIntegration,
-    initializeAnalyticsNetworkIntegration,
+  cleanupAnalyticsNetworkIntegration,
+  initializeAnalyticsNetworkIntegration,
 } from "@/lib/analytics/exporters/analytics-network-integration";
 import {
-    createSafeModeState,
-    DEFAULT_SAFE_MODE_CONFIG,
-    NetworkCascadeDetector,
-    SafeModeLevel,
-    SafeModeReason,
-    type SafeModeState,
+  createSafeModeState,
+  DEFAULT_SAFE_MODE_CONFIG,
+  NetworkCascadeDetector,
+  SafeModeLevel,
+  SafeModeReason,
+  type SafeModeState,
 } from "@/lib/error";
+import { getPhaseMessage, type PhaseName } from "@/lib/localization/phase-messages";
 import { logger } from "@/lib/utils";
 import {
-    NetworkDetection,
-    NetworkStatus,
+  NetworkDetection,
+  NetworkStatus,
 } from "@/system/Network";
 import {
-    KernelErrorCode,
-    KernelPhase,
-    type AppKernelState,
-    type KernelCapabilities,
-    type KernelError,
-    type KernelListener,
+  KernelErrorCode,
+  KernelPhase,
+  type AppKernelState,
+  type KernelCapabilities,
+  type KernelError,
+  type KernelListener,
+  type PhaseProgress,
 } from "@/type-definitions/kernel-types";
 import { authPhase } from "./phases/auth-phase";
 import { configPhase } from "./phases/config-phase";
@@ -63,12 +65,54 @@ import { storagePhase } from "./phases/storage-phase";
  * These exports prevent breaking external imports from system/Kernel
  */
 export {
-    KernelErrorCode,
-    KernelPhase, type AppKernelState,
-    type KernelCapabilities,
-    type KernelError,
-    type KernelListener
+  KernelErrorCode,
+  KernelPhase, type AppKernelState,
+  type KernelCapabilities,
+  type KernelError,
+  type KernelListener,
+  type PhaseProgress,
 } from "@/type-definitions/kernel-types";
+
+/**
+ * Phase sequence for progress tracking
+ * These phases are executed sequentially during bootstrap
+ * Used to calculate progress percentage and phase index
+ */
+const PHASE_SEQUENCE = [
+  "config",
+  "preload",
+  "network",
+  "storage",
+  "services",
+  "jobSetup",
+  "auth",
+] as const;
+
+const INITIAL_PHASE_PROGRESS: PhaseProgress = {
+  currentPhaseIndex: 0, // Start at phase 0 (config) — the first incomplete phase in initial state
+  currentPhaseName: "config",
+  progressPercent: 0,
+  phaseLabel: "0/7 Initializing...",
+};
+
+/**
+ * Minimum display time per phase (milliseconds)
+ * UX readability only — ensures user has time to read messages even on fast phases
+ * NOT a performance optimization; adds small artificial delay on fast devices
+ *
+ * Configurable per-phase for future tuning (Issue #39)
+ * Example: Config takes 30ms, waits 70ms extra = 100ms total
+ *          Storage takes 500ms, no wait = 500ms total
+ */
+const PHASE_MIN_DISPLAY_MS = {
+  config:   50,
+  preload:  50,
+  network:  50,
+  storage:  50,
+  services: 50,
+  jobSetup: 50,
+  auth:     50,
+} as const;
 
 class AppKernelClass {
   private state: AppKernelState = {
@@ -96,6 +140,7 @@ class AppKernelClass {
     },
     networkStatus: null,
     safeMode: null, // NORMAL state (no safe mode active)
+    phaseProgress: INITIAL_PHASE_PROGRESS,
   };
 
   private listeners: Set<KernelListener> = new Set();
@@ -163,6 +208,12 @@ class AppKernelClass {
       this.updateState({
         currentPhase: KernelPhase.READY,
         phases: { ...this.state.phases, appReady: true },
+        phaseProgress: {
+          currentPhaseIndex: PHASE_SEQUENCE.length,
+          currentPhaseName: "ready",
+          progressPercent: 100,
+          phaseLabel: `${PHASE_SEQUENCE.length}/${PHASE_SEQUENCE.length} Ready!`,
+        },
       });
 
       this.logBootstrapSummary();
@@ -556,14 +607,105 @@ class AppKernelClass {
   }
 
   /**
+   * Calculate phase progress based on completed phases
+   * Returns updated PhaseProgress object
+   */
+  private calculatePhaseProgress(phases: AppKernelState["phases"]): void {
+    // Static phase checks — no dynamic indexing (avoids object injection sink)
+    const phaseChecks = [
+      { name: "config", completed: phases.configReady },
+      { name: "preload", completed: phases.preloadReady },
+      { name: "network", completed: phases.networkReady },
+      { name: "storage", completed: phases.storageReady },
+      { name: "services", completed: phases.servicesReady },
+      { name: "jobSetup", completed: phases.jobSetupReady },
+      { name: "auth", completed: phases.authReady },
+    ];
+
+    let completedCount = 0;
+    let currentPhaseIndex = -1; // -1 = sentinel for "not yet set" (unambiguous, unlike 0)
+    let currentPhaseName: PhaseName = "config"; // Explicitly typed to ensure type safety
+
+    for (const [i, phase] of phaseChecks.entries()) {
+      if (phase.completed) {
+        completedCount++;
+      } else if (currentPhaseIndex === -1) {
+        // First incomplete phase found - set it and stop looking
+        currentPhaseIndex = i;
+        currentPhaseName = phase.name as PhaseName; // Ensure phase.name conforms to PhaseName
+      }
+    }
+
+    // If all phases are complete (currentPhaseIndex still -1), set to sentinel beyond sequence
+    if (currentPhaseIndex === -1) {
+      currentPhaseIndex = PHASE_SEQUENCE.length;
+      currentPhaseName = "ready"; // All phases done, now ready
+    }
+
+    const progressPercent = Math.round(
+      (completedCount / PHASE_SEQUENCE.length) * 100,
+    );
+    const phaseLabel = `${completedCount}/${PHASE_SEQUENCE.length} ${currentPhaseName}...`;
+
+    this.state.phaseProgress = {
+      currentPhaseIndex,
+      currentPhaseName,
+      progressPercent,
+      phaseLabel,
+    };
+  }
+
+  /**
+   * Resolve phase name to its state key via static switch (avoids object injection sink)
+   */
+  private resolvePhaseKey(phaseName: typeof PHASE_SEQUENCE[number]): keyof AppKernelState["phases"] {
+    switch (phaseName) {
+      case "config": return "configReady";
+      case "preload": return "preloadReady";
+      case "network": return "networkReady";
+      case "storage": return "storageReady";
+      case "services": return "servicesReady";
+      case "jobSetup": return "jobSetupReady";
+      case "auth": return "authReady";
+    }
+  }
+
+  /**
    * Run a phase with timing and error handling
+   * Enforces minimum display time (UX readability) per phase
+   * 
+   * For phases > 50ms, polls every 250ms to update fake progress within phase range
+   * (UX theater only — makes long phases feel responsive, never pretends completion at 97% cap)
+   * 
+   * Fake progress math:
+   * - Real progress: 100/7 ≈ 14% per phase
+   * - Fake increment per tick: 0.5% of the phase's progress range (ensures smooth animation)
+   * - Display: currentRealProgress + (tickCount * increment), capped at nextPhaseRealProgress
    */
   private async runPhase(
-    phaseName: string,
+    phaseName: typeof PHASE_SEQUENCE[number],
     fn: () => Promise<void>,
   ): Promise<void> {
-    const phaseKey = `${phaseName}Ready` as keyof AppKernelState["phases"];
+    const phaseKey = this.resolvePhaseKey(phaseName);
     const startTime = Date.now();
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+    let pollTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+    let messageTickCount = 0;
+
+    // Calculate real progress for this phase
+    const phaseIndex = PHASE_SEQUENCE.indexOf(phaseName);
+    const realProgressPerPhase = Math.round(100 / PHASE_SEQUENCE.length);
+    const currentPhaseRealProgress = phaseIndex * realProgressPerPhase;
+    const nextPhaseRealProgress = Math.min(
+      (phaseIndex + 1) * realProgressPerPhase,
+      97, // Cap at 97% until phase actually completes
+    );
+    // Increment = 0.5% of phase's progress range. This ensures smooth animation for all phases:
+    // - Phase 0: (14 - 0) * 0.05 = 0.7% per tick
+    // - Phase 3: (42 - 28) * 0.05 = 0.7% per tick
+    // - Phase 6: (97 - 84) * 0.05 = 0.65% per tick
+    const phaseProgressRange = nextPhaseRealProgress - currentPhaseRealProgress;
+    const fakeIncrementPerTick = phaseProgressRange * 0.05;
 
     try {
       this.updateState({
@@ -571,21 +713,86 @@ class AppKernelClass {
           KernelPhase[phaseName.toUpperCase() as keyof typeof KernelPhase] ||
           KernelPhase.IDLE,
       });
+
+      // Schedule polling for long-running phases (UX theater)
+      // CRITICAL: Must capture the timeout handle to cancel if phase completes quickly
+      pollTimeoutHandle = setTimeout(() => {
+        // Only start polling if phase is still running (not already completed)
+        if (pollInterval === null) {
+          pollInterval = setInterval(() => {
+            messageTickCount++;
+            // Fake progress: increment from current phase, capped at next phase or 97%
+            const fakeProgress = Math.min(
+              currentPhaseRealProgress + messageTickCount * fakeIncrementPerTick,
+              nextPhaseRealProgress,
+            );
+
+            this.updateState({
+              phaseProgress: {
+                ...this.state.phaseProgress,
+                progressPercent: Math.round(fakeProgress),
+                phaseLabel: getPhaseMessage(phaseName),
+              },
+            });
+          }, 250); // Every 250ms = "TikTok brain" responsiveness
+        }
+      }, 50); // Wait 50ms before starting polling (phase might complete in <50ms)
+
       await fn();
-      const duration = Date.now() - startTime;
+      const actualDuration = Date.now() - startTime;
+
+      // Clean up both the timeout and polling interval (MUST do both)
+      if (pollTimeoutHandle) clearTimeout(pollTimeoutHandle);
+      if (pollInterval) clearInterval(pollInterval);
+
+      // Enforce minimum display time for UX readability
+      // Use static switch to avoid object injection sink warning
+      const minDisplay = (() => {
+        switch (phaseName) {
+          case "config": return PHASE_MIN_DISPLAY_MS.config;
+          case "preload": return PHASE_MIN_DISPLAY_MS.preload;
+          case "network": return PHASE_MIN_DISPLAY_MS.network;
+          case "storage": return PHASE_MIN_DISPLAY_MS.storage;
+          case "services": return PHASE_MIN_DISPLAY_MS.services;
+          case "jobSetup": return PHASE_MIN_DISPLAY_MS.jobSetup;
+          case "auth": return PHASE_MIN_DISPLAY_MS.auth;
+        }
+      })();
+      const enforceDelay = Math.max(0, minDisplay - actualDuration);
+      if (enforceDelay > 0) {
+        await new Promise((resolve) => setTimeout(resolve, enforceDelay));
+      }
+
+      // Mark phase complete first, then calculate progress with updated phases
+      const updatedPhases = { ...this.state.phases, [phaseKey]: true };
+      this.calculatePhaseProgress(updatedPhases);
       this.updateState({
-        phases: { ...this.state.phases, [phaseKey]: true },
-        timing: { ...this.state.timing, [phaseName]: duration },
+        phases: updatedPhases,
+        timing: { ...this.state.timing, [phaseName]: actualDuration },
+        phaseProgress: { ...this.state.phaseProgress },
       });
-      logger
-        .category("bootstrap")
-        .debug(`${phaseName} phase complete (${duration}ms)`);
+
+      if (enforceDelay > 0) {
+        logger
+          .category("bootstrap")
+          .debug(
+            `${phaseName} phase complete (${actualDuration}ms, +${enforceDelay}ms display delay)`,
+          );
+      } else {
+        logger
+          .category("bootstrap")
+          .debug(`${phaseName} phase complete (${actualDuration}ms)`);
+      }
     } catch (error) {
+      // Clean up both the timeout and polling interval on error
+      if (pollTimeoutHandle) clearTimeout(pollTimeoutHandle);
+      if (pollInterval) clearInterval(pollInterval);
+
       const err = error instanceof Error ? error : new Error(String(error));
-      const duration = Date.now() - startTime;
+      const actualDuration = Date.now() - startTime;
       logger.category("bootstrap").error(`${phaseName} phase failed`, {
         error: err.message,
-        durationMs: duration,
+        durationMs: actualDuration,
       });
       throw err;
     }
@@ -679,6 +886,7 @@ class AppKernelClass {
       },
       networkStatus: null,
       safeMode: null, // Reset safe mode to NORMAL
+      phaseProgress: INITIAL_PHASE_PROGRESS,
     };
     this.initPromise = null;
 

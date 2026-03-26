@@ -1,44 +1,37 @@
 import { SplashScreen } from '@/components/SplashScreen';
-import { UIBlockerContext, UIBlockerContextValue, UIBlockerState } from '@/components/UIBlockerContext';
-import { logger } from '@/lib/utils/logger';
-import React, { useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import { UIBlockerContext, UIBlockerContextValue, UIBlockerState } from '@/contexts/UIBlockerContext';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 // Re-export so consumers can import useUIBlocker + UIBlockerState from either file.
-export { useUIBlocker } from '@/components/UIBlockerContext';
-export type { UIBlockerState } from '@/components/UIBlockerContext';
+export { useUIBlocker } from '@/contexts/UIBlockerContext';
+export type { UIBlockerState } from '@/contexts/UIBlockerContext';
 
 // ─── Provider + view + overlay ───────────────────────────────────────────────
 
 /**
  * UIBlockerLayer
  *
- * Single root-level component that unifies three previously separate concerns:
+ * Thin shell — context provider + overlay renderer. Does not know about
+ * kernel phases. Kernel sync is handled by useKernelLoadingSync() called
+ * inside this layer (e.g. in RootLayoutContent).
  *
- * 1. **State provider** (was: LoadingProvider + loading-context.tsx)
- *    Manages isLoading, title, subtitle, message, progress, etc.
- *    Any system calls `useUIBlocker().setLoading(...)` to control the overlay.
+ * 1. **State provider** — provides UIBlockerContext (isLoading + setLoading).
+ *    Any descendant calls `useUIBlocker().setLoading(...)` to control the overlay.
  *
- * 2. **Positioning context** (was: UIBlockerLayer simple wrapper)
- *    Wraps children in a `position: 'relative'` View so absolute overlays
- *    (loading blocker, crash fallback) are bounded correctly.
+ * 2. **Positioning context** — wraps children in a `position: 'relative'` View
+ *    so absolute overlays are bounded correctly.
  *
- * 3. **Loading overlay** (was: LoadingBlocker component)
- *    Renders the SplashScreen as an absolute full-screen overlay when
+ * 3. **Overlay renderer** — shows SplashScreen as a full-screen overlay when
  *    isLoading is true. Zero runtime cost when hidden.
- *
- * Must be mounted ABOVE AppKernelProvider so the kernel can call
- * setLoading() during bootstrap before the app is ready.
- *
- * Starts with the splash visible — kernel calls setLoading(false)
- * via useKernelLoadingSync() when appReady becomes true.
  */
 export function UIBlockerLayer({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<UIBlockerState>({
     isLoading: true,
-    title: 'D&D Toolkit',
-    subtitle: 'Loading App',
-    message: 'Preparing your world...',
+    showProgress: true,
+    progress: 0,
+    subtitle: 'Initializing App',
+    message: 'Preparing systems...',
   });
 
   const setLoading = useCallback(
@@ -52,13 +45,6 @@ export function UIBlockerLayer({ children }: { children: React.ReactNode }) {
     },
     [],
   );
-
-  // Force an immediate DOM commit before the browser paints so the splash
-  // appears instantly rather than after async bootstrap tasks complete.
-  useLayoutEffect(() => {
-    logger.category('ui').debug('UIBlockerLayer mounted — splash rendering immediately');
-    setState(prev => ({ ...prev }));
-  }, []);
 
   const value = useMemo<UIBlockerContextValue>(
     () => ({ ...state, setLoading }),
@@ -82,7 +68,6 @@ export function UIBlockerLayer({ children }: { children: React.ReactNode }) {
             }}
           >
             <SplashScreen
-              title={state.title}
               subtitle={state.subtitle}
               message={state.message}
               progress={state.progress}
