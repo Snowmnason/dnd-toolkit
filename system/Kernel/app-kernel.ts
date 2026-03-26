@@ -18,29 +18,29 @@
  */
 
 import {
-    cleanupAnalyticsNetworkIntegration,
-    initializeAnalyticsNetworkIntegration,
+  cleanupAnalyticsNetworkIntegration,
+  initializeAnalyticsNetworkIntegration,
 } from "@/lib/analytics/exporters/analytics-network-integration";
 import {
-    createSafeModeState,
-    DEFAULT_SAFE_MODE_CONFIG,
-    NetworkCascadeDetector,
-    SafeModeLevel,
-    SafeModeReason,
-    type SafeModeState,
+  createSafeModeState,
+  DEFAULT_SAFE_MODE_CONFIG,
+  NetworkCascadeDetector,
+  SafeModeLevel,
+  SafeModeReason,
+  type SafeModeState,
 } from "@/lib/error";
 import { logger } from "@/lib/utils";
 import {
-    NetworkDetection,
-    NetworkStatus,
+  NetworkDetection,
+  NetworkStatus,
 } from "@/system/Network";
 import {
-    KernelErrorCode,
-    KernelPhase,
-    type AppKernelState,
-    type KernelCapabilities,
-    type KernelError,
-    type KernelListener,
+  KernelErrorCode,
+  KernelPhase,
+  type AppKernelState,
+  type KernelCapabilities,
+  type KernelError,
+  type KernelListener,
 } from "@/type-definitions/kernel-types";
 import { authPhase } from "./phases/auth-phase";
 import { configPhase } from "./phases/config-phase";
@@ -63,12 +63,34 @@ import { storagePhase } from "./phases/storage-phase";
  * These exports prevent breaking external imports from system/Kernel
  */
 export {
-    KernelErrorCode,
-    KernelPhase, type AppKernelState,
-    type KernelCapabilities,
-    type KernelError,
-    type KernelListener
+  KernelErrorCode,
+  KernelPhase, type AppKernelState,
+  type KernelCapabilities,
+  type KernelError,
+  type KernelListener
 } from "@/type-definitions/kernel-types";
+
+/**
+ * Phase sequence for progress tracking
+ * These phases are executed sequentially during bootstrap
+ * Used to calculate progress percentage and phase index
+ */
+const PHASE_SEQUENCE = [
+  "config",
+  "preload",
+  "network",
+  "storage",
+  "services",
+  "jobSetup",
+  "auth",
+] as const;
+
+const INITIAL_PHASE_PROGRESS = {
+  currentPhaseIndex: 0,
+  currentPhaseName: "config",
+  progressPercent: 0,
+  phaseLabel: "0/7 Initializing...",
+};
 
 class AppKernelClass {
   private state: AppKernelState = {
@@ -96,6 +118,7 @@ class AppKernelClass {
     },
     networkStatus: null,
     safeMode: null, // NORMAL state (no safe mode active)
+    phaseProgress: INITIAL_PHASE_PROGRESS,
   };
 
   private listeners: Set<KernelListener> = new Set();
@@ -163,6 +186,12 @@ class AppKernelClass {
       this.updateState({
         currentPhase: KernelPhase.READY,
         phases: { ...this.state.phases, appReady: true },
+        phaseProgress: {
+          currentPhaseIndex: PHASE_SEQUENCE.length,
+          currentPhaseName: "ready",
+          progressPercent: 100,
+          phaseLabel: `${PHASE_SEQUENCE.length}/${PHASE_SEQUENCE.length} Ready!`,
+        },
       });
 
       this.logBootstrapSummary();
@@ -556,13 +585,70 @@ class AppKernelClass {
   }
 
   /**
+   * Calculate phase progress based on completed phases
+   * Returns updated PhaseProgress object
+   */
+  private calculatePhaseProgress(phases: AppKernelState["phases"]): void {
+    // Static phase checks — no dynamic indexing (avoids object injection sink)
+    const phaseChecks = [
+      { name: "config", completed: phases.configReady },
+      { name: "preload", completed: phases.preloadReady },
+      { name: "network", completed: phases.networkReady },
+      { name: "storage", completed: phases.storageReady },
+      { name: "services", completed: phases.servicesReady },
+      { name: "jobSetup", completed: phases.jobSetupReady },
+      { name: "auth", completed: phases.authReady },
+    ];
+
+    let completedCount = 0;
+    let currentPhaseIndex = 0;
+    let currentPhaseName = "config";
+
+    for (const [i, phase] of phaseChecks.entries()) {
+      if (phase.completed) {
+        completedCount++;
+      } else if (currentPhaseIndex === 0) {
+        currentPhaseIndex = i;
+        currentPhaseName = phase.name;
+      }
+    }
+
+    const progressPercent = Math.round(
+      (completedCount / PHASE_SEQUENCE.length) * 100,
+    );
+    const phaseLabel = `${completedCount}/${PHASE_SEQUENCE.length} ${currentPhaseName}...`;
+
+    this.state.phaseProgress = {
+      currentPhaseIndex,
+      currentPhaseName,
+      progressPercent,
+      phaseLabel,
+    };
+  }
+
+  /**
+   * Resolve phase name to its state key via static switch (avoids object injection sink)
+   */
+  private resolvePhaseKey(phaseName: typeof PHASE_SEQUENCE[number]): keyof AppKernelState["phases"] {
+    switch (phaseName) {
+      case "config": return "configReady";
+      case "preload": return "preloadReady";
+      case "network": return "networkReady";
+      case "storage": return "storageReady";
+      case "services": return "servicesReady";
+      case "jobSetup": return "jobSetupReady";
+      case "auth": return "authReady";
+    }
+  }
+
+  /**
    * Run a phase with timing and error handling
    */
   private async runPhase(
-    phaseName: string,
+    phaseName: typeof PHASE_SEQUENCE[number],
     fn: () => Promise<void>,
   ): Promise<void> {
-    const phaseKey = `${phaseName}Ready` as keyof AppKernelState["phases"];
+    const phaseKey = this.resolvePhaseKey(phaseName);
     const startTime = Date.now();
 
     try {
@@ -573,10 +659,16 @@ class AppKernelClass {
       });
       await fn();
       const duration = Date.now() - startTime;
+
+      // Mark phase complete first, then calculate progress with updated phases
+      const updatedPhases = { ...this.state.phases, [phaseKey]: true };
+      this.calculatePhaseProgress(updatedPhases);
       this.updateState({
-        phases: { ...this.state.phases, [phaseKey]: true },
+        phases: updatedPhases,
         timing: { ...this.state.timing, [phaseName]: duration },
+        phaseProgress: { ...this.state.phaseProgress },
       });
+
       logger
         .category("bootstrap")
         .debug(`${phaseName} phase complete (${duration}ms)`);
@@ -679,6 +771,7 @@ class AppKernelClass {
       },
       networkStatus: null,
       safeMode: null, // Reset safe mode to NORMAL
+      phaseProgress: INITIAL_PHASE_PROGRESS,
     };
     this.initPromise = null;
 

@@ -16,6 +16,7 @@ export { Button as BaseButton } from './BaseButton';
 export { default as CustomLoad } from './CustomLoad';
 export { default as Dropdown } from './Dropdown';
 export * from './ElevatedView'; // Now exports ElevatedView, Card, Surface, and InteractiveCard
+export * from './ErrorFallbackShell';
 export * from './IconButton';
 export * from './ImageSkeleton';
 export * from './LazyImage';

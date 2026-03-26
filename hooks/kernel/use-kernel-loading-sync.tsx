@@ -1,41 +1,49 @@
-/**
- * Kernel Loading State Synchronization
- *
- * Syncs kernel bootstrap state with UIBlockerLayer
- * - Hides the loading overlay when appReady becomes true
- * - Also hides on kernel error so the crash screen can render
- *
- * Used in app/_layout.tsx to coordinate kernel phases with the UI blocker
- */
-
 import { useUIBlocker } from '@/contexts/UIBlockerContext';
+import type { PhaseProgress } from '@/lib/kernel/kernel-manager';
+import { getKernelState, onKernelStateChange } from '@/lib/kernel/kernel-manager';
 import { logger } from '@/lib/utils/logger';
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { useAppKernel } from './use-app-kernel';
 
+/**
+ * Single hook that owns all kernel → UI splash/loading sync.
+ *
+ * 1. Subscribes to kernel state for phase progress (index, label, %).
+ * 2. Pushes progress + subtitle into UIBlocker in real-time.
+ * 3. Hides the overlay when appReady or on kernel error.
+ *
+ * Must be called inside UIBlockerLayer (requires UIBlockerContext).
+ * Called once in RootLayoutContent.
+ */
 export function useKernelLoadingSync(): void {
-  const kernel = useAppKernel();
   const { setLoading } = useUIBlocker();
+  const kernel = useAppKernel();
+
+  // Phase progress subscription (inlined from former usePhaseProgress)
+  const [phaseProgress, setPhaseProgress] = useState<PhaseProgress>(
+    () => getKernelState().phaseProgress,
+  );
 
   useEffect(() => {
-    logger
-      .category('bootstrap')
-      .debug(`[KERNEL_LOADING_SYNC] Effect fired — appReady=${kernel.phases.appReady}, error=${!!kernel.error}`);
+    return onKernelStateChange((state) => {
+      setPhaseProgress(state.phaseProgress);
+    });
+  }, []);
 
-    // Primary goal: Hide loading blocker when kernel finishes (appReady = true)
+  // Sync progress into UIBlocker or hide on ready/error
+  useLayoutEffect(() => {
     if (kernel.phases.appReady) {
-      logger
-        .category('bootstrap')
-        .debug('[KERNEL_LOADING_SYNC] App ready — hiding loading blocker');
+      logger.category('bootstrap').debug('[KERNEL_BOOTSTRAP] App ready — hiding loading blocker');
       setLoading(false);
-    }
-    // If error occurs during bootstrap, also hide to let error screen show
-    else if (kernel.error) {
-      logger
-        .category('bootstrap')
-        .debug('[KERNEL_LOADING_SYNC] Kernel error - hiding loading blocker');
+    } else if (kernel.error) {
+      logger.category('bootstrap').debug('[KERNEL_BOOTSTRAP] Kernel error — hiding loading blocker');
       setLoading(false);
+    } else {
+      setLoading({
+        progress: phaseProgress.progressPercent,
+        subtitle: "Initializing App",
+        message: phaseProgress.phaseLabel, // D&D themed messages go in footer
+      });
     }
-    // Otherwise keep the initial splash screen showing (initialized in LoadingContext)
-  }, [kernel.phases.appReady, kernel.error, setLoading]);
+  }, [kernel.phases.appReady, kernel.error, phaseProgress.progressPercent, phaseProgress.phaseLabel, setLoading]);
 }

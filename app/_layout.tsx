@@ -93,8 +93,9 @@ function RootLayoutContent() {
   const kernel = useAppKernel();
   const clearKernelSafeMode = useClearSafeMode();
 
-  // Sync kernel bootstrap state with loading blocker
-  // Shows splash screen while kernel initializes, hides when appReady
+  // Sync kernel bootstrap state with UIBlocker overlay.
+  // Shows splash screen while kernel initializes, updates phase progress,
+  // and hides automatically when appReady or on kernel error.
   useKernelLoadingSync();
 
   // FUTURE: Offline conflict resolution (disabled for v1 - LWW only)

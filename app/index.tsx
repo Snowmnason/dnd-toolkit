@@ -74,7 +74,7 @@ export default function HomePage() {
   // Render a fallback SplashScreen here too in case UIBlockerLayer is not yet mounted.
   if (!kernel.phases.appReady) {
     console.log('[ui] [HomePage] → rendering SplashScreen (kernel not ready)');
-    return <SplashScreen title="D&D Toolkit" subtitle="Loading App" message="Preparing your world..." />;
+    return <SplashScreen subtitle="Loading App" message="Preparing your world..." />;
   }
 
   // Show welcome screen once auth check is complete
@@ -115,7 +115,7 @@ export default function HomePage() {
   // UIBlockerLayer has already hidden (kernel is ready), so this route
   // must render visible content during the async storage reads.
   console.log('[ui] [HomePage] → rendering SplashScreen (auth check in progress)');
-  return <SplashScreen title="D&D Toolkit" subtitle="Authenticating" message="Checking your credentials..." />;
+  return <SplashScreen subtitle="Authenticating" message="Checking your credentials..." />;
 }
 // Using StyleSheet since this is a fail safe with a very specific style
 const styles = StyleSheet.create({

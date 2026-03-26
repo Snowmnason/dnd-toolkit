@@ -1,6 +1,6 @@
 import { logger } from "@/lib";
 import React, { ReactNode } from "react";
-import { CrashFallBack } from "./CrashFallBack";
+import { CrashFallBack } from "../SplashScreen/CrashFallBack";
 
 interface SafeModeErrorBoundaryProps {
   children: ReactNode;

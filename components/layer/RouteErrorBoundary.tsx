@@ -1,9 +1,7 @@
-import { getAppConfig } from '@/config';
 import { NavigationContext, RouteConfig } from '@/lib/navigation/navigation-config';
 import { logger } from '@/lib/utils';
-import { useRouter } from 'expo-router';
 import React, { ReactNode } from 'react';
-import { ErrorFallbackShell } from './ErrorFallbackShell';
+import { NavigationErrorScreen } from '../SplashScreen/NavigationErrorScreen';
 
 interface RouteErrorBoundaryProps {
   children: ReactNode;
@@ -63,7 +61,7 @@ export class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps,
   render() {
     if (this.state.hasError) {
       return (
-        <ErrorFallback
+        <NavigationErrorScreen
           error={this.state.error}
           fallbackRoute={this.props.fallbackRoute || '/select/world-selection'}
         />
@@ -72,36 +70,4 @@ export class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps,
 
     return this.props.children;
   }
-}
-
-interface ErrorFallbackProps {
-  error?: Error;
-  fallbackRoute: string;
-}
-
-/**
- * Fallback UI for route errors
- * Uses ErrorFallbackShell for consistent error display
- */
-function ErrorFallback({ error, fallbackRoute }: ErrorFallbackProps) {
-  const router = useRouter();
-  const config = getAppConfig();
-  // Check override setting first, fall back to NODE_ENV if not explicitly set
-  // This allows showing detailed errors in production builds via appsettings.dev.json
-  const showDetailedErrors = config.overrides?.verboseErrorMessages ?? process.env.NODE_ENV === 'development';
-
-  const handleRecover = () => {
-    // Redirect to fallbackRoute (provided by parent or defaults to safe route)
-    router.replace(fallbackRoute as any);
-  };
-
-  return (
-    <ErrorFallbackShell
-      error={error}
-      showDetails={showDetailedErrors && !!error}
-      recoveryMessage="Don't worry - your adventure is safe! Try returning to continue your quest."
-      primaryButtonText="Return to The Safe Path"
-      onPrimaryAction={handleRecover}
-    />
-  );
 }

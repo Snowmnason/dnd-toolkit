@@ -3,12 +3,11 @@ import { Analytics, Performance } from "@/lib/analytics";
 import {
   RecoveryAction,
   SafeModeLevel,
-  SafeModeReason,
   SafeModeState,
 } from "@/lib/error";
+import { getRecoveryActionLabel, getSafeModeDescription } from "@/localization/ErrorMessages";
 import { useEffect } from "react";
-import VersionDisplay from "../VersionDisplay";
-import { ErrorFallbackShell } from "./ErrorFallbackShell";
+import { ErrorFallbackShell } from "../ui";
 
 /**
  * Safe Mode Screen
@@ -23,61 +22,6 @@ export interface SafeModeScreenProps {
   state: SafeModeState;
   onNavigateHome?: () => void;
   onRecoveryAction?: (action: RecoveryAction) => void;
-}
-
-// Human-readable safe mode reason descriptions
-function getSafeModeDescription(reason: SafeModeReason): string {
-  switch (reason) {
-    case SafeModeReason.STORAGE_UNREADABLE:
-      return "Your app data cannot be read right now. This is usually temporary.";
-    case SafeModeReason.STORAGE_CORRUPTED:
-      return "Your app data may be corrupted. You can clear the cache to recover.";
-    case SafeModeReason.STORAGE_QUOTA_EXCEEDED:
-      return "Your device is running out of storage space. Try clearing some space.";
-
-    case SafeModeReason.AUTH_EXPIRED:
-      return "Your session has expired. Please log in again to continue.";
-    case SafeModeReason.AUTH_INVALID:
-      return "Your authentication is invalid. Please try logging in again.";
-    case SafeModeReason.SESSION_LOST:
-      return "Your session was lost. Please log in again.";
-
-    case SafeModeReason.KERNEL_TIMEOUT:
-      return "The app took too long to start. Try restarting the app.";
-    case SafeModeReason.KERNEL_PRELOAD_FAILED:
-      return "Some app resources failed to load. Try restarting.";
-    case SafeModeReason.KERNEL_CONFIG_FAILED:
-      return "App configuration failed. Try restarting.";
-
-    case SafeModeReason.NETWORK_SYNC_FAILURES:
-      return "We're having trouble syncing your data. Check your internet connection.";
-    case SafeModeReason.NETWORK_CASCADE:
-      return "Multiple network failures detected. Check your connection and try again.";
-    case SafeModeReason.NETWORK_UNAVAILABLE:
-      return "No internet connection detected. Some features are unavailable.";
-
-    case SafeModeReason.UNKNOWN:
-    default:
-      return "Something went wrong. Your adventure is safe—we're working on it!";
-  }
-}
-
-// Get recovery action label for UI
-function getRecoveryActionLabel(action: RecoveryAction): string {
-  switch (action) {
-    case RecoveryAction.CLEAR_CACHE:
-      return "Clear Cache & Restart";
-    case RecoveryAction.RESET_AUTH:
-      return "Reset & Log In Again";
-    case RecoveryAction.RESTORE_BACKUP:
-      return "Restore from Backup";
-    case RecoveryAction.CONTACT_SUPPORT:
-      return "Contact Support";
-    case RecoveryAction.REINSTALL:
-      return "Reinstall App";
-    default:
-      return "Unknown Action";
-  }
 }
 
 export function SafeModeScreen({
@@ -183,14 +127,14 @@ export function SafeModeScreen({
   return (
     <ErrorFallbackShell
       messagePack="safe-mode"
+      errorTitle="Safe Mode Active"
+      explanation={recoveryMessage}
       error={error}
       showDetails={showDetailedErrors}
-      recoveryMessage={recoveryMessage}
       primaryButtonText={primaryButtonText}
       onPrimaryAction={onPrimaryAction}
       secondaryButtonText={secondaryButtonText}
       onSecondaryAction={onSecondaryAction}
-      footer={<VersionDisplay />}
     />
   );
 }
