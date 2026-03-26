@@ -7,6 +7,7 @@
 
 import type { SafeModeState } from "@/lib/error";
 import type { NetworkStatus } from "@/system/Network";
+import type { PhaseName } from "@/lib/localization/phase-messages";
 
 /**
  * Phase lifecycle stages
@@ -72,8 +73,8 @@ export interface KernelCapabilities {
  * Useful for progress bars and bootstrap status displays
  */
 export interface PhaseProgress {
-  currentPhaseIndex: number; // 0-7 for 8 core phases
-  currentPhaseName: string; // "config", "preload", "network", etc.
+  currentPhaseIndex: number; // 0-7 for 8 core phases, or PHASE_SEQUENCE.length when complete
+  currentPhaseName: PhaseName; // Narrowly typed to match PHASE_MESSAGES keys: "config", "preload", ..., "ready"
   progressPercent: number; // 0-100 based on phases completed
   phaseLabel: string; // e.g., "2/8 Loading fonts..."
 }

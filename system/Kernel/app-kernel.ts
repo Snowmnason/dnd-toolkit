@@ -29,7 +29,7 @@ import {
   SafeModeReason,
   type SafeModeState,
 } from "@/lib/error";
-import { getPhaseMessage } from "@/lib/localization/phase-messages";
+import { getPhaseMessage, type PhaseName } from "@/lib/localization/phase-messages";
 import { logger } from "@/lib/utils";
 import {
   NetworkDetection,
@@ -42,6 +42,7 @@ import {
   type KernelCapabilities,
   type KernelError,
   type KernelListener,
+  type PhaseProgress,
 } from "@/type-definitions/kernel-types";
 import { authPhase } from "./phases/auth-phase";
 import { configPhase } from "./phases/config-phase";
@@ -68,7 +69,8 @@ export {
   KernelPhase, type AppKernelState,
   type KernelCapabilities,
   type KernelError,
-  type KernelListener
+  type KernelListener,
+  type PhaseProgress,
 } from "@/type-definitions/kernel-types";
 
 /**
@@ -86,8 +88,8 @@ const PHASE_SEQUENCE = [
   "auth",
 ] as const;
 
-const INITIAL_PHASE_PROGRESS = {
-  currentPhaseIndex: 0,
+const INITIAL_PHASE_PROGRESS: PhaseProgress = {
+  currentPhaseIndex: 0, // Start at phase 0 (config) — the first incomplete phase in initial state
   currentPhaseName: "config",
   progressPercent: 0,
   phaseLabel: "0/7 Initializing...",
@@ -621,16 +623,23 @@ class AppKernelClass {
     ];
 
     let completedCount = 0;
-    let currentPhaseIndex = 0;
-    let currentPhaseName = "config";
+    let currentPhaseIndex = -1; // -1 = sentinel for "not yet set" (unambiguous, unlike 0)
+    let currentPhaseName: PhaseName = "config"; // Explicitly typed to ensure type safety
 
     for (const [i, phase] of phaseChecks.entries()) {
       if (phase.completed) {
         completedCount++;
-      } else if (currentPhaseIndex === 0) {
+      } else if (currentPhaseIndex === -1) {
+        // First incomplete phase found - set it and stop looking
         currentPhaseIndex = i;
-        currentPhaseName = phase.name;
+        currentPhaseName = phase.name as PhaseName; // Ensure phase.name conforms to PhaseName
       }
+    }
+
+    // If all phases are complete (currentPhaseIndex still -1), set to sentinel beyond sequence
+    if (currentPhaseIndex === -1) {
+      currentPhaseIndex = PHASE_SEQUENCE.length;
+      currentPhaseName = "ready"; // All phases done, now ready
     }
 
     const progressPercent = Math.round(
@@ -670,8 +679,8 @@ class AppKernelClass {
    * 
    * Fake progress math:
    * - Real progress: 100/7 ≈ 14% per phase
-   * - Fake increment per tick: currentRealProgress * 0.5%
-   * - Display: currentRealProgress + (tickCount * increment), capped at 97%
+   * - Fake increment per tick: 0.5% of the phase's progress range (ensures smooth animation)
+   * - Display: currentRealProgress + (tickCount * increment), capped at nextPhaseRealProgress
    */
   private async runPhase(
     phaseName: typeof PHASE_SEQUENCE[number],
@@ -691,7 +700,12 @@ class AppKernelClass {
       (phaseIndex + 1) * realProgressPerPhase,
       97, // Cap at 97% until phase actually completes
     );
-    const fakeIncrementPerTick = currentPhaseRealProgress * 0.5;
+    // Increment = 0.5% of phase's progress range. This ensures smooth animation for all phases:
+    // - Phase 0: (14 - 0) * 0.05 = 0.7% per tick
+    // - Phase 3: (42 - 28) * 0.05 = 0.7% per tick
+    // - Phase 6: (97 - 84) * 0.05 = 0.65% per tick
+    const phaseProgressRange = nextPhaseRealProgress - currentPhaseRealProgress;
+    const fakeIncrementPerTick = phaseProgressRange * 0.05;
 
     try {
       this.updateState({

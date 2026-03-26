@@ -65,17 +65,28 @@ export const PHASE_MESSAGES = {
     "Settling into the realm...",
     "The adventure awaits...",
   ],
+  ready: [
+    "Welcome, adventurer!",
+    "The realm is ready for you.",
+    "Your quest begins now...",
+    "All is prepared for your journey.",
+    "The expedition awaits!",
+  ],
 } as const;
+
+/**
+ * Type-safe phase name keys that match PHASE_MESSAGES entries.
+ * Use this type when accepting phase names to ensure only valid keys are passed.
+ */
+export type PhaseName = keyof typeof PHASE_MESSAGES;
 
 /**
  * Get random message for a phase.
  *
- * @param phaseName - Phase key (e.g., 'config', 'network', 'auth')
+ * @param phaseName - Phase key (e.g., 'config', 'network', 'auth', 'ready')
  * @returns Random message string from that phase
  */
-export function getPhaseMessage(
-  phaseName: keyof typeof PHASE_MESSAGES,
-): string {
+export function getPhaseMessage(phaseName: PhaseName): string {
   let messages: readonly string[];
 
   switch (phaseName) {
@@ -102,6 +113,9 @@ export function getPhaseMessage(
       break;
     case "sync":
       messages = PHASE_MESSAGES.sync;
+      break;
+    case "ready":
+      messages = PHASE_MESSAGES.ready;
       break;
   }
 

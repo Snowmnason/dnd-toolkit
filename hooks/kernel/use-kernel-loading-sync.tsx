@@ -55,7 +55,7 @@ export function useKernelLoadingSync(): void {
       setLoading({
         progress: phaseProgress.progressPercent,
         subtitle: "Initializing App",
-        message: getPhaseMessage(phaseProgress.currentPhaseName as any),
+        message: getPhaseMessage(phaseProgress.currentPhaseName),
       });
     }
   }, [kernel.phases.appReady, kernel.error, phaseProgress.progressPercent, phaseProgress.currentPhaseName, setLoading]);

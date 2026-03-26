@@ -20,13 +20,13 @@ Centralized message and text management for the app. Provides phase-specific mes
 
 ```
 Kernel Bootstrap
-        ↓
-Phase Completes (e.g., 'storageReady')
-        ↓
-useKernelLoadingSync() calls getPhaseMessage('storage')
-        ↓
-Random message selected from PHASE_MESSAGES.storage[]
-        ↓
+  ↓
+Phase Completes (e.g., 'storage')
+  ↓
+`useKernelLoadingSync()` calls `getPhaseMessage('storage')`
+  ↓
+Random message selected from `PHASE_MESSAGES.storage[]`
+  ↓
 Message displayed in LoadingBlocker
 ```
 
@@ -44,12 +44,13 @@ Message displayed in LoadingBlocker
 ```typescript
 import { getPhaseMessage } from '@/lib/localization/phase-messages';
 
-const message = getPhaseMessage('storageReady');
+// Use the phase keys used by the kernel (e.g. 'config', 'preload', 'network', 'storage', 'services', 'jobSetup', 'auth', 'sync', 'ready')
+const message = getPhaseMessage('storage');
 // Returns: "Securing the arcane vault..." (random from 5 options)
 ```
 
 **Parameters:**
-- `phaseName`: Kernel phase name ('configReady', 'storageReady', etc.)
+- `phaseName`: Kernel phase key (one of `'config' | 'preload' | 'network' | 'storage' | 'services' | 'jobSetup' | 'auth' | 'sync' | 'ready'`)
 
 **Returns:** Random message string for the phase
 
@@ -59,14 +60,15 @@ const message = getPhaseMessage('storageReady');
 
 | Phase | Description | Example Messages |
 | --- | --- | --- |
-| `configReady` | App configuration loaded | "Consulting the ancient tomes..." |
-| `preloadReady` | Fonts/images preloaded | "Sharpening the wizard's quill..." |
-| `networkReady` | Network detection initialized | "Scanning the ethereal plane..." |
-| `storageReady` | SecureStorage initialized | "Securing the arcane vault..." |
-| `servicesReady` | Auth/Error/Database providers registered | "Summoning the arcane guardians..." |
-| `authReady` | User auth state restored | "Verifying the adventurer's identity..." |
-| `syncReady` | Offline sync initialized | "Synchronizing with the crystal ball..." |
-| `appReady` | All phases complete | "The ritual is complete..." |
+| `config` | App configuration stage | "Consulting the ancient tomes..." |
+| `preload` | Fonts/images preloaded | "Sharpening the wizard's quill..." |
+| `network` | Network detection initialized | "Scanning the ethereal plane..." |
+| `storage` | SecureStorage initialized | "Securing the arcane vault..." |
+| `services` | Auth/Error/Database providers registered | "Summoning the arcane guardians..." |
+| `jobSetup` | Job queue and handlers registered | "Setting up the quest board..." |
+| `auth` | User auth state restored | "Verifying the adventurer's identity..." |
+| `sync` | Offline sync initialized | "Synchronizing with the crystal ball..." |
+| `ready` | All phases complete / app ready | "The ritual is complete..." |
 
 ### Adding New Messages
 
@@ -75,7 +77,7 @@ To add a new message to a phase:
 ```typescript
 // In lib/localization/phase-messages.ts
 export const PHASE_MESSAGES = {
-  storageReady: [
+  storage: [
     "Securing the arcane vault...",
     "Locking the treasure chest...",
     "Warding the storage runes...",
@@ -84,7 +86,7 @@ export const PHASE_MESSAGES = {
     // Add your new message here
     "Your new message...",
   ],
-  // ... other phases
+  // ... other phases (use keys like 'config', 'preload', 'network', 'services', 'jobSetup', 'auth', 'sync', 'ready')
 } as const;
 ```
 
