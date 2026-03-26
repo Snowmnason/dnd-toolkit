@@ -1,6 +1,7 @@
 import { useUIBlocker } from '@/contexts/UIBlockerContext';
 import type { PhaseProgress } from '@/lib/kernel/kernel-manager';
 import { getKernelState, onKernelStateChange } from '@/lib/kernel/kernel-manager';
+import { getPhaseMessage } from '@/lib/localization/phase-messages';
 import { logger } from '@/lib/utils/logger';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { useAppKernel } from './use-app-kernel';
@@ -42,8 +43,8 @@ export function useKernelLoadingSync(): void {
       setLoading({
         progress: phaseProgress.progressPercent,
         subtitle: "Initializing App",
-        message: phaseProgress.phaseLabel, // D&D themed messages go in footer
+        message: getPhaseMessage(phaseProgress.currentPhaseName as any),
       });
     }
-  }, [kernel.phases.appReady, kernel.error, phaseProgress.progressPercent, phaseProgress.phaseLabel, setLoading]);
+  }, [kernel.phases.appReady, kernel.error, phaseProgress.progressPercent, phaseProgress.currentPhaseName, setLoading]);
 }

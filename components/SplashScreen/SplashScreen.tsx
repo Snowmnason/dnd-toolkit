@@ -1,6 +1,12 @@
 import { UseTheme } from '@/theme';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { CustomLoad } from '../ui';
 import { Body, SubTitle, Title } from '../ui/AppText';
 import { ProgressBar, type ProgressBarRef } from '../ui/ProgressBar';
@@ -44,6 +50,9 @@ export function SplashScreen({
 }: SplashScreenProps = {}) {
   const { theme } = UseTheme();
   const progressRef = useRef<ProgressBarRef>(null);
+  const [displayMessage, setDisplayMessage] = useState(message);
+  const shakeTranslate = useSharedValue(0);
+  const prevMessageRef = useRef(message);
 
   // Sync progress prop to ProgressBar ref
   useEffect(() => {
@@ -51,6 +60,30 @@ export function SplashScreen({
       progressRef.current?.setProgress(progress);
     }
   }, [progress]);
+
+  // Trigger spin animation when message changes
+  // Animation rotates and changes text mid-spin for smooth effect
+  // Note: shakeTranslate is a reanimated shared value and should not be in dependency array
+  useEffect(() => {
+    if (message && message !== prevMessageRef.current) {
+      prevMessageRef.current = message;
+      shakeTranslate.value = withSequence(
+        withTiming(-10, { duration: 50 }),
+        withTiming(10, { duration: 50 }, () => {
+          // Change message mid-spin (at 100ms = midway through animation)
+          setDisplayMessage(message);
+        }),
+        withTiming(-10, { duration: 50 }),
+        withTiming(10, { duration: 50 }),
+        withTiming(0, { duration: 50 }),
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [message]);
+
+  const messageAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${shakeTranslate.value}deg` }],
+  }));
 
   return (
     <View
@@ -97,18 +130,19 @@ export function SplashScreen({
         </View>
       )}
 
-      {/* Subtle status message */}
-      {message && (
-        <Body
-          style={{
-            color: theme.textSecondary,
-            textAlign: 'center',
-            fontSize: 13,
-            fontStyle: 'italic',
-          }}
-        >
-          {message}
-        </Body>
+      {/* Subtle status message with shake animation on change */}
+      {displayMessage && (
+        <Animated.View style={messageAnimatedStyle}>
+          <Body
+            style={{
+              color: theme.textSecondary,
+              textAlign: 'center',
+              fontStyle: 'italic',
+            }}
+          >
+            {displayMessage}
+          </Body>
+        </Animated.View>
       )}
     </View>
   );

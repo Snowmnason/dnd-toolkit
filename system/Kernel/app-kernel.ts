@@ -29,6 +29,7 @@ import {
   SafeModeReason,
   type SafeModeState,
 } from "@/lib/error";
+import { getPhaseMessage } from "@/lib/localization/phase-messages";
 import { logger } from "@/lib/utils";
 import {
   NetworkDetection,
@@ -91,6 +92,25 @@ const INITIAL_PHASE_PROGRESS = {
   progressPercent: 0,
   phaseLabel: "0/7 Initializing...",
 };
+
+/**
+ * Minimum display time per phase (milliseconds)
+ * UX readability only — ensures user has time to read messages even on fast phases
+ * NOT a performance optimization; adds small artificial delay on fast devices
+ *
+ * Configurable per-phase for future tuning (Issue #39)
+ * Example: Config takes 30ms, waits 70ms extra = 100ms total
+ *          Storage takes 500ms, no wait = 500ms total
+ */
+const PHASE_MIN_DISPLAY_MS = {
+  config:   50,
+  preload:  50,
+  network:  50,
+  storage:  50,
+  services: 50,
+  jobSetup: 50,
+  auth:     50,
+} as const;
 
 class AppKernelClass {
   private state: AppKernelState = {
@@ -643,6 +663,15 @@ class AppKernelClass {
 
   /**
    * Run a phase with timing and error handling
+   * Enforces minimum display time (UX readability) per phase
+   * 
+   * For phases > 50ms, polls every 250ms to update fake progress within phase range
+   * (UX theater only — makes long phases feel responsive, never pretends completion at 97% cap)
+   * 
+   * Fake progress math:
+   * - Real progress: 100/7 ≈ 14% per phase
+   * - Fake increment per tick: currentRealProgress * 0.5%
+   * - Display: currentRealProgress + (tickCount * increment), capped at 97%
    */
   private async runPhase(
     phaseName: typeof PHASE_SEQUENCE[number],
@@ -650,6 +679,19 @@ class AppKernelClass {
   ): Promise<void> {
     const phaseKey = this.resolvePhaseKey(phaseName);
     const startTime = Date.now();
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+    let pollTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+    let messageTickCount = 0;
+
+    // Calculate real progress for this phase
+    const phaseIndex = PHASE_SEQUENCE.indexOf(phaseName);
+    const realProgressPerPhase = Math.round(100 / PHASE_SEQUENCE.length);
+    const currentPhaseRealProgress = phaseIndex * realProgressPerPhase;
+    const nextPhaseRealProgress = Math.min(
+      (phaseIndex + 1) * realProgressPerPhase,
+      97, // Cap at 97% until phase actually completes
+    );
+    const fakeIncrementPerTick = currentPhaseRealProgress * 0.5;
 
     try {
       this.updateState({
@@ -657,27 +699,86 @@ class AppKernelClass {
           KernelPhase[phaseName.toUpperCase() as keyof typeof KernelPhase] ||
           KernelPhase.IDLE,
       });
+
+      // Schedule polling for long-running phases (UX theater)
+      // CRITICAL: Must capture the timeout handle to cancel if phase completes quickly
+      pollTimeoutHandle = setTimeout(() => {
+        // Only start polling if phase is still running (not already completed)
+        if (pollInterval === null) {
+          pollInterval = setInterval(() => {
+            messageTickCount++;
+            // Fake progress: increment from current phase, capped at next phase or 97%
+            const fakeProgress = Math.min(
+              currentPhaseRealProgress + messageTickCount * fakeIncrementPerTick,
+              nextPhaseRealProgress,
+            );
+
+            this.updateState({
+              phaseProgress: {
+                ...this.state.phaseProgress,
+                progressPercent: Math.round(fakeProgress),
+                phaseLabel: getPhaseMessage(phaseName),
+              },
+            });
+          }, 250); // Every 250ms = "TikTok brain" responsiveness
+        }
+      }, 50); // Wait 50ms before starting polling (phase might complete in <50ms)
+
       await fn();
-      const duration = Date.now() - startTime;
+      const actualDuration = Date.now() - startTime;
+
+      // Clean up both the timeout and polling interval (MUST do both)
+      if (pollTimeoutHandle) clearTimeout(pollTimeoutHandle);
+      if (pollInterval) clearInterval(pollInterval);
+
+      // Enforce minimum display time for UX readability
+      // Use static switch to avoid object injection sink warning
+      const minDisplay = (() => {
+        switch (phaseName) {
+          case "config": return PHASE_MIN_DISPLAY_MS.config;
+          case "preload": return PHASE_MIN_DISPLAY_MS.preload;
+          case "network": return PHASE_MIN_DISPLAY_MS.network;
+          case "storage": return PHASE_MIN_DISPLAY_MS.storage;
+          case "services": return PHASE_MIN_DISPLAY_MS.services;
+          case "jobSetup": return PHASE_MIN_DISPLAY_MS.jobSetup;
+          case "auth": return PHASE_MIN_DISPLAY_MS.auth;
+        }
+      })();
+      const enforceDelay = Math.max(0, minDisplay - actualDuration);
+      if (enforceDelay > 0) {
+        await new Promise((resolve) => setTimeout(resolve, enforceDelay));
+      }
 
       // Mark phase complete first, then calculate progress with updated phases
       const updatedPhases = { ...this.state.phases, [phaseKey]: true };
       this.calculatePhaseProgress(updatedPhases);
       this.updateState({
         phases: updatedPhases,
-        timing: { ...this.state.timing, [phaseName]: duration },
+        timing: { ...this.state.timing, [phaseName]: actualDuration },
         phaseProgress: { ...this.state.phaseProgress },
       });
 
-      logger
-        .category("bootstrap")
-        .debug(`${phaseName} phase complete (${duration}ms)`);
+      if (enforceDelay > 0) {
+        logger
+          .category("bootstrap")
+          .debug(
+            `${phaseName} phase complete (${actualDuration}ms, +${enforceDelay}ms display delay)`,
+          );
+      } else {
+        logger
+          .category("bootstrap")
+          .debug(`${phaseName} phase complete (${actualDuration}ms)`);
+      }
     } catch (error) {
+      // Clean up both the timeout and polling interval on error
+      if (pollTimeoutHandle) clearTimeout(pollTimeoutHandle);
+      if (pollInterval) clearInterval(pollInterval);
+
       const err = error instanceof Error ? error : new Error(String(error));
-      const duration = Date.now() - startTime;
+      const actualDuration = Date.now() - startTime;
       logger.category("bootstrap").error(`${phaseName} phase failed`, {
         error: err.message,
-        durationMs: duration,
+        durationMs: actualDuration,
       });
       throw err;
     }
