@@ -30,6 +30,8 @@ export function UIBlockerLayer({ children }: { children: React.ReactNode }) {
     isLoading: true,
     showProgress: true,
     progress: 0,
+    subtitle: 'Initializing App',
+    message: 'Preparing systems...',
   });
 
   const setLoading = useCallback(

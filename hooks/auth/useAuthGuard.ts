@@ -1,11 +1,12 @@
 import { AUTH_CONFIG } from '@/config/routing-auth-config';
 import { useAppKernel } from '@/hooks/kernel';
 import {
-  AuthStateManager,
-  AuthSubscriptionManager,
-  isSigningOut,
-  listenToAuthStateChanges,
-  type Session,
+    AuthStateManager,
+    AuthSubscriptionManager,
+    isEmailConfirmed,
+    isSigningOut,
+    listenToAuthStateChanges,
+    type Session,
 } from '@/lib/auth';
 import { logger } from '@/lib/utils';
 import { useLocalSearchParams, useRouter, useSegments } from 'expo-router';
@@ -52,13 +53,25 @@ export function useAuthGuard(
 
   /**
    * Subscribe to auth state changes from the provider
-   * Only runs once on mount
+   * Waits for appReady to ensure auth provider is registered (services phase complete)
    */
   useEffect(() => {
+    if (!appReady) return;
+
     let unsubscribe: (() => void) | null = null;
     let mounted = true;
 
     logger.category('security').info(`[GUARD:${instanceId}] 🟢 Setting up auth state subscription via auth-manager`);
+
+    // Safety timeout: if subscription never fires an event (e.g. no session, provider issue),
+    // mark subscriptionReady after 2s so the core auth check isn't deadlocked.
+    const safetyTimeout = setTimeout(() => {
+      if (mounted && !subscriptionReadyRef.current) {
+        subscriptionReadyRef.current = true;
+        logger.category('security').warn(`[GUARD:${instanceId}] ⏰ Subscription safety timeout — marking ready without event`);
+        setSubscriptionReady(true);
+      }
+    }, 2000);
 
     const setup = async () => {
       try {
@@ -87,13 +100,25 @@ export function useAuthGuard(
             await AuthStateManager.setHasAccount(true);
           }
           
-          try {
-            const authenticated = await AuthStateManager.isAuthenticated();
-            logger.category('security').debug(`[GUARD:${instanceId}] ✓ Updated auth state to: ${authenticated ? 'authenticated' : 'unauthenticated'}`);
-            setAuthState(authenticated ? 'authenticated' : 'unauthenticated');
-          } catch (error) {
-            logger.category('security').error(`[GUARD:${instanceId}] Error in auth state change handler:`, error);
+          // Use the session directly when available — avoids dynamic import of auth-manager
+          // which can fail if Metro disconnects (dev) or in edge cases
+          if (session && isEmailConfirmed(session)) {
+            logger.category('security').debug(`[GUARD:${instanceId}] ✓ Session confirmed — authenticated`);
+            setAuthState('authenticated');
+          } else if (session) {
+            // Session exists but email not confirmed
+            logger.category('security').debug(`[GUARD:${instanceId}] ✓ Session exists but email not confirmed — unauthenticated`);
             setAuthState('unauthenticated');
+          } else {
+            // No session — fall back to full isAuthenticated check
+            try {
+              const authenticated = await AuthStateManager.isAuthenticated();
+              logger.category('security').debug(`[GUARD:${instanceId}] ✓ Updated auth state to: ${authenticated ? 'authenticated' : 'unauthenticated'}`);
+              setAuthState(authenticated ? 'authenticated' : 'unauthenticated');
+            } catch (error) {
+              logger.category('security').error(`[GUARD:${instanceId}] Error in auth state change handler:`, error);
+              setAuthState('unauthenticated');
+            }
           }
         });
 
@@ -110,10 +135,11 @@ export function useAuthGuard(
     setup();
     return () => {
       mounted = false;
+      clearTimeout(safetyTimeout);
       // Unregister from centralized manager (also calls unsubscribe)
       AuthSubscriptionManager.unregister(instanceId);
     };
-  }, [instanceId]); // Only run once on mount
+  }, [instanceId, appReady]); // Re-run when appReady becomes true
 
   /**
    * Core auth check - runs after subscription is ready and app is ready
@@ -141,7 +167,7 @@ export function useAuthGuard(
         if (mounted) {
           if (isProtectedRoute && !authenticated && !hasRedirectedRef.current) {
             hasRedirectedRef.current = true;
-            logger.category('security').warn(`[GUARD:${instanceId}] ❌ Protected route but not authenticated, redirecting to login`);
+            logger.category('security').warn(`[GUARD:${instanceId}] ❌ Protected route, not authenticated — redirecting to welcome`);
             router.replace(AUTH_CONFIG.redirectOnUnauthenticated);
             setAuthState('unauthenticated');
             return;

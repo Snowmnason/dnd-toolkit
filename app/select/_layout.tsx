@@ -9,10 +9,6 @@ export default function SelectLayout() {
   const kernel = useAppKernel();
   const authState = useAuthGuard(kernel.phases.appReady, 'account-only');
 
-  console.log(
-    `[ui] [SelectLayout] render — appReady=${kernel.phases.appReady}, authState="${authState}"`,
-  );
-
   // Show minimal loading while guard resolves
   useEffect(() => {
     if (authState === 'unauthenticated') {

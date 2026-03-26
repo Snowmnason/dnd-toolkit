@@ -19,10 +19,12 @@ import { useQuery } from '../use-query';
  *
  * @param userId - Optional user ID. If not provided, uses current auth user
  * @param onWorldsLoaded - Optional callback when worlds are loaded
+ * @param options.enabled - Whether to enable the query (default: true). Set to false to defer query until ready.
  */
 export function useWorlds(
   userId?: string,
   onWorldsLoaded?: (worldIds: string[]) => void,
+  options?: { enabled?: boolean },
 ) {
   // Set up cache invalidation on network quality changes
   useAdaptivePayloadCacheInvalidation({
@@ -78,7 +80,7 @@ export function useWorlds(
     {
       ...CACHE_CONFIG.metadata, // Default: staleTime 2h, cacheTime 4h
       tags: [CACHE_TAGS.worlds, CACHE_TAGS.user(userId || "current")],
-      // Query fires immediately, skipCache forces DB fetch on fresh sign-in
+      disabled: options?.enabled === false,
       onError: (err) => {
         logger.category('storage').error("Error loading worlds:", err);
       },

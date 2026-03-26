@@ -34,8 +34,20 @@ export function useKernelLoadingSync(): void {
   // Sync progress into UIBlocker or hide on ready/error
   useLayoutEffect(() => {
     if (kernel.phases.appReady) {
-      logger.category('bootstrap').debug('[KERNEL_BOOTSTRAP] App ready — hiding loading blocker');
-      setLoading(false);
+      // Show final "ready" state briefly at 100% before hiding
+      setLoading({
+        progress: 100,
+        subtitle: "Initializing App",
+        message: "All systems ready!",
+      });
+      
+      // Hide after 500ms so user sees 100% state
+      const hideTimer = setTimeout(() => {
+        logger.category('bootstrap').debug('[KERNEL_BOOTSTRAP] App ready — hiding loading blocker');
+        setLoading(false);
+      }, 500);
+      
+      return () => clearTimeout(hideTimer);
     } else if (kernel.error) {
       logger.category('bootstrap').debug('[KERNEL_BOOTSTRAP] Kernel error — hiding loading blocker');
       setLoading(false);

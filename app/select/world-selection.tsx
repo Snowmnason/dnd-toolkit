@@ -1,4 +1,5 @@
 import { AppPage, AppSplit, Body, Button } from "@/components/ui";
+import { useAppKernel } from "@/hooks/kernel";
 import { usePanelNavigation } from "@/hooks/navigation/use-panel-navigation";
 import { useWorlds } from "@/hooks/storage";
 import { useWorldModal } from "@/hooks/utils/use-world-modal";
@@ -16,6 +17,7 @@ const noImageSelected = require("../../assets/images/Miku.png");
 
 export default function LandingPage() {
   // Centralized params
+  const kernel = useAppKernel();
   const userId = useUserId();
   const { setConnectedWorldIds } = useAppParamsStable();
 
@@ -33,7 +35,7 @@ export default function LandingPage() {
     error,
     retry,
     refetch,
-  } = useWorlds(userId, setConnectedWorldIds);
+  } = useWorlds(userId, setConnectedWorldIds, { enabled: kernel.phases.appReady });
   const [mapImage, setMapImage] = useState<string | null>(null);
 
   // Modal controls via hook

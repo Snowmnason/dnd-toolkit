@@ -1,14 +1,14 @@
 import {
-  AppErrorBoundary,
-  TopBar,
-  UIBlockerLayer
+    AppErrorBoundary,
+    TopBar,
+    UIBlockerLayer
 } from "@/components";
 import { OfflineSyncNotificationLayer } from "@/components/offline";
 import {
-  CrashFallBack,
-  RouteErrorBoundary,
-  SafeModeErrorBoundary,
-  SafeModeScreen,
+    CrashFallBack,
+    RouteErrorBoundary,
+    SafeModeErrorBoundary,
+    SafeModeScreen,
 } from "@/components/SplashScreen";
 import { AppToastLayer, NotificationContainer } from "@/components/ui";
 import { AppToastProvider, ModalProvider, NotificationProvider } from "@/contexts";
@@ -21,29 +21,29 @@ import { useClearSafeMode } from "@/hooks/error/use-safe-mode";
 import { AppKernelProvider, useAppKernel, useKernelLoadingSync } from "@/hooks/kernel";
 import { useAnalyticsNavigation, useNavigate, useRouteConfig } from "@/hooks/navigation";
 import {
-  type AccessRole,
+    type AccessRole,
 } from "@/hooks/storage";
 import { logger } from "@/hooks/utils";
 import {
-  AppParamsStableProvider,
-  AppParamsVolatileProvider,
-  PlatformProvider,
-  ScaleProvider,
-  SubscriptionProvider,
-  ThemeProvider,
-  UseTheme,
-  useAppParamsStable,
-  useAppParamsVolatile,
-  usePlatform,
-  useUserId,
-  useUserRole,
-  useWorldId,
+    AppParamsStableProvider,
+    AppParamsVolatileProvider,
+    PlatformProvider,
+    ScaleProvider,
+    SubscriptionProvider,
+    ThemeProvider,
+    UseTheme,
+    useAppParamsStable,
+    useAppParamsVolatile,
+    usePlatform,
+    useUserId,
+    useUserRole,
+    useWorldId,
 } from "@/providers";
 import {
-  Stack,
-  useLocalSearchParams,
-  useRouter,
-  useSegments,
+    Stack,
+    useLocalSearchParams,
+    useRouter,
+    useSegments,
 } from "expo-router";
 import { useEffect } from "react";
 import { View } from "react-native";
@@ -208,9 +208,6 @@ function RootLayoutContent() {
   // Kernel and other systems call setLoading() via useUIBlocker().
 
   const firstSeg = typeof segments[0] === "string" ? segments[0] : "(root)";
-  console.log(
-    `[ui] [RootLayoutContent] render — route="${firstSeg}", safeMode=${!!kernel.safeMode}, appReady=${kernel.phases.appReady}`,
-  );
 
   // Helper to determine safe navigation target based on safe mode reason
   const getNavigationTarget = (reason?: string): string => {
@@ -313,10 +310,6 @@ function RootLayoutContent() {
     isRootRoute || firstSegment === "login" || firstSegment === "web";
 
   const topBarTitle = !hideTopBar ? resolvedTitle : undefined;
-
-  console.log(
-    `[ui] [RootLayoutContent] TopBar decision — segment="${firstSegment}", isRoot=${isRootRoute}, hideTopBar=${hideTopBar}, topBarTitle="${topBarTitle}"`,
-  );
 
   // Build back press handler using config
   const handleTopBarBack = () => {
