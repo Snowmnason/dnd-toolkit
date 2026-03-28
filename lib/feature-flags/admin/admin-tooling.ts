@@ -339,7 +339,7 @@ export function describeEvaluation(
   // eslint-disable-next-line security/detect-object-injection
   const flagConfig = config.featureFlags?.[flagName];
 
-  if (!flagConfig) {
+  if (!flagConfig || typeof flagConfig !== "object" || flagConfig === null) {
     return "Flag not found in config";
   }
 

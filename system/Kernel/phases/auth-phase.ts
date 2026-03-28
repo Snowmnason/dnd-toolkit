@@ -4,19 +4,23 @@
  * Responsibility:
  * 1. Evaluate data staleness (check LAST_LOGGED_IN timestamp age)
  * 2. If DEAD (> 30 days): Clear all storage and exit
- * 3. If FRESH/STALE: Perform session re-auth + DB sync
+ * 3. If FRESH (< 4 days): Load local auth state (skip expensive server check, token guaranteed valid)
+ * 4. If STALE (4-30 days): Perform server re-auth to verify token still valid
  *
  * Staleness Decision Logic:
  * - DEAD (> 30 days): Full storage clear, no session restore
- * - STALE (4-30 days): Attempt restore, redirect shows welcome (token may have expired after Supabase 5-day limit)
- * - FRESH (< 4 days): Attempt restore, normal flow (token definitely valid, 1-day safety buffer)
+ * - STALE (4-30 days): Perform server re-auth (token may have expired after Supabase 5-day limit)
+ * - FRESH (< 4 days): Load local state only (token definitely valid, 1-day safety buffer)
  *
  * Input: Storage initialization from Phase 3
  * Output: void (does not throw; failure is non-critical)
  *
- * Timing: 50-500ms expected (includes DB sync if not dead)
+ * Timing: 
+ *   - FRESH: 10-50ms expected (no network call)
+ *   - STALE: 50-500ms expected (includes server re-auth)
+ *   - DEAD: <500ms (quick cleanup, no restore)
  * Critical: BLOCKING — Blocks appReady to prevent race conditions
- * Failure mode: Logged as warning; app continues as guest
+ * Failure mode: Logged as warning; unauthenticated users redirected to login by useAuthGuard
  *
  * Deferred to Runtime:
  * - Complete sign-out flow (handled by auth-manager)
@@ -34,7 +38,8 @@
  *
  * 1. Evaluates LAST_LOGGED_IN timestamp to determine data staleness
  * 2. If DEAD (> 30 days): Clears all storage and exits
- * 3. If FRESH/STALE: Calls performReAuth to restore and sync
+ * 3. If FRESH (< 4 days): Loads local auth state (skips expensive server check)
+ * 4. If STALE (4-30 days): Calls performReAuth to verify token with server
  *
  * Non-critical: failures won't block app startup.
  * The orchestrator (app-kernel) marks authReady via runPhase.
@@ -136,47 +141,71 @@ export async function authPhase(): Promise<void> {
             return; // Exit early - don't attempt to restore session
           }
 
+          let isDataFresh = false;
           if (ageMs > STALE_THRESHOLD) {
-            // STALE: 7-30 days - allow restore
+            // STALE: 4-30 days - will attempt server re-auth to verify token still valid
             logger.category("bootstrap").info(
-              `Data is STALE (${(ageMs / 1000 / 60 / 60 / 24).toFixed(1)} days old) - attempting restore`
+              `Data is STALE (${(ageMs / 1000 / 60 / 60 / 24).toFixed(1)} days old) - attempting server re-auth`
             );
           } else {
-            // FRESH: < 7 days - allow restore
+            // FRESH: < 4 days - skip server re-auth (token definitely still valid, 1-day buffer before 5-day expiration)
+            isDataFresh = true;
             logger.category("bootstrap").info(
-              `Data is FRESH (${(ageMs / 1000 / 60 / 60).toFixed(1)} hours old) - attempting restore`
+              `Data is FRESH (${(ageMs / 1000 / 60 / 60).toFixed(1)} hours old) - skipping server re-auth`
             );
           }
 
-          // Attempt re-auth for FRESH/STALE data
-          const { SessionAdapter } = await import("@/system/Services");
-          const sessionData = await SessionAdapter.restoreSession();
-
-          if (sessionData) {
+          // Attempt re-auth only for STALE data (server check); FRESH data skips network
+          if (isDataFresh) {
+            // FRESH: Load local auth state, skip expensive server check
             try {
-              const { performReAuth } = await import(
-                "@/lib/auth/account/sign-in-system"
-              );
-              const reAuthResult = await performReAuth(sessionData, "bootstrap");
-
-              if (reAuthResult.success) {
+              const { AuthStateManager } = await import("@/lib/auth/auth-state");
+              const userId = await AuthStateManager.getUserId();
+              if (userId) {
                 logger
                   .category("bootstrap")
-                  .info("✅ Session re-auth completed successfully");
+                  .info("✅ Fresh session loaded from local state");
               } else {
                 logger
                   .category("bootstrap")
-                  .warn("Session re-auth had errors, continuing as guest");
+                  .debug("Fresh session found but no userId in local state");
               }
             } catch (err) {
               logger
                 .category("bootstrap")
-                .warn("Failed to perform re-auth:", err);
+                .warn("Failed to load fresh session state:", err);
             }
           } else {
-            logger
-              .category("bootstrap")
-              .debug("No session data to restore, continuing as guest");
+            // STALE: Perform server re-auth to verify token is still valid
+            const { SessionAdapter } = await import("@/system/Services");
+            const sessionData = await SessionAdapter.restoreSession();
+
+            if (sessionData) {
+              try {
+                const { performReAuth } = await import(
+                  "@/lib/auth/account/sign-in-system"
+                );
+                const reAuthResult = await performReAuth(sessionData, "bootstrap");
+
+                if (reAuthResult.success) {
+                  logger
+                    .category("bootstrap")
+                    .info("✅ Stale session re-auth completed successfully");
+                } else {
+                  logger
+                    .category("bootstrap")
+                    .warn("Stale session re-auth had errors, unauthenticated (will redirect to login)");
+                }
+              } catch (err) {
+                logger
+                  .category("bootstrap")
+                  .warn("Failed to perform stale session re-auth:", err);
+              }
+            } else {
+              logger
+                .category("bootstrap")
+                .debug("No session data to restore, unauthenticated (will redirect to login)");
+            }
           }
         } else {
           // Timestamp is invalid (before 2020 or in future) - treat as cleared
@@ -188,7 +217,7 @@ export async function authPhase(): Promise<void> {
         // No valid timestamp - first time user or cleared cache
         logger
           .category("bootstrap")
-          .debug("No previous login found, continuing as guest");
+          .debug("No previous login found, unauthenticated (will redirect to login)");
       }
     } catch (error) {
       logger.category("bootstrap").warn("Failed to evaluate staleness:", {

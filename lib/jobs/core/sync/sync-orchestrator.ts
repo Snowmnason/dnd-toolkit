@@ -49,6 +49,9 @@ import {
     performWorldsSync,
     WorldsSyncResult,
 } from "./worlds-sync-job";
+import type {
+    FeatureFlagsSyncResult,
+} from "./feature-flags-sync-job";
 
 // ============================================================================
 // TYPES
@@ -64,8 +67,9 @@ export interface DataSyncResult {
   success: boolean;
   profile?: ProfileSyncResult;
   worlds?: WorldsSyncResult;
+  featureFlags?: FeatureFlagsSyncResult;
   errors: {
-    target: "profile" | "worlds";
+    target: "profile" | "worlds" | "featureFlags";
     message: string;
     error?: Error;
   }[];
@@ -102,7 +106,7 @@ export interface ISyncJobHandler {
   execute: (payload: {
     mode: SyncMode;
     direction?: SyncDirection;
-    target?: "profile" | "worlds" | "queue";
+    target?: "profile" | "worlds" | "queue" | "featureFlags";
   }) => Promise<void>;
 }
 
@@ -187,6 +191,33 @@ export async function performDataSync(
       logger
         .category("auth")
         .warn("Worlds sync orchestration failed:", error);
+    }
+
+    // ─── SYNC FEATURE FLAGS (download only) ──────────────────────────────
+    if (direction === "download") {
+      try {
+        const { performFeatureFlagSync } = await import("./feature-flags-sync-job");
+        result.featureFlags = await performFeatureFlagSync();
+        if (!result.featureFlags.success) {
+          // Feature flags failure is non-critical — don't fail overall sync
+          result.featureFlags.errors.forEach((err) => {
+            result.errors.push({
+              target: "featureFlags",
+              message: err.message,
+              error: err.error,
+            });
+          });
+        }
+      } catch (error) {
+        result.errors.push({
+          target: "featureFlags",
+          message: error instanceof Error ? error.message : "Feature flags sync failed",
+          error: error instanceof Error ? error : undefined,
+        });
+        logger
+          .category("auth")
+          .warn("Feature flags sync orchestration failed:", error);
+      }
     }
 
     // ─── FINALIZE ───────────────────────────────────────────────────────
@@ -343,8 +374,8 @@ export async function performDataSyncAll(
 export async function executeSyncOperation(payload: {
   mode?: SyncMode;
   direction?: SyncDirection;
-  target?: "profile" | "worlds" | "queue";
-}): Promise<{ profile?: ProfileSyncResult; worlds?: WorldsSyncResult; queue?: QueueSyncResult }> {
+  target?: "profile" | "worlds" | "queue" | "featureFlags";
+}): Promise<{ profile?: ProfileSyncResult; worlds?: WorldsSyncResult; queue?: QueueSyncResult; featureFlags?: FeatureFlagsSyncResult }> {
   const { mode = "automatic", direction = "download", target } = payload;
   const results: any = {};
 
@@ -354,11 +385,18 @@ export async function executeSyncOperation(payload: {
     results.worlds = await performWorldsSync(mode, direction);
   } else if (target === "queue") {
     results.queue = await performQueueSync(mode, direction);
+  } else if (target === "featureFlags") {
+    const { performFeatureFlagSync } = await import("./feature-flags-sync-job");
+    results.featureFlags = await performFeatureFlagSync();
   } else {
     // Default: run all
     results.profile = await performProfileSync(mode, direction);
     results.worlds = await performWorldsSync(mode, direction);
     results.queue = await performQueueSync(mode, direction);
+    if (direction === "download") {
+      const { performFeatureFlagSync } = await import("./feature-flags-sync-job");
+      results.featureFlags = await performFeatureFlagSync();
+    }
   }
 
   return results;

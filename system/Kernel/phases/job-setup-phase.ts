@@ -84,6 +84,15 @@ export async function jobSetupPhase(): Promise<void> {
     
     // Register recurring job
     await registerStorageHealthCheckJob(queue);
+
+    // Register feature_flags_refresh handler (subscription refresh on app resume)
+    // OnlineSyncManager.triggerFeatureFlagRefresh() enqueues this job type
+    const { refreshSubscription } = await import("@/lib/premium");
+    queue.registerHandler("feature_flags_refresh", async () => {
+      await refreshSubscription();
+      logger.category("jobs").info("feature_flags_refresh job completed");
+      return { updatedAt: Date.now() };
+    });
   } catch (error) {
     const { logger } = await import("@/lib/utils");
     logger

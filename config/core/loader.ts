@@ -197,30 +197,45 @@ export interface AppSettings {
     debugLogging?: boolean;
     description?: string;
   };
-  featureFlags: Record<
-    string,
-    {
-      enabled: boolean;
+  featureFlags: {
+    /** Days before the remote snapshot is considered stale (triggers background refresh). */
+    freshnessDays?: number;
+    /** Days before the remote snapshot is considered dead (clears companion caches, uses hardcoded defaults). */
+    staleDays?: number;
+    [key: string]: (
+      | {
+          enabled: boolean;
+          description?: string;
+          kind?: "free" | "premium" | "beta";
+          dependsOn?: string[]; // Soft dependencies: array of flag names
+          // Phase 3: Cohort membership (allow-list, OR logic: user must be in at least ONE of the listed cohorts)
+          cohorts?: string[]; // E.g., ["beta_testers", "enterprise"] — flag enabled if user in ANY listed cohort; requires userId context
+          // Phase 1: Simple conditions (AND logic)
+          conditions?: {
+            platform?: string; // 'web' | 'ios' | 'android' | 'desktop'
+            environment?: string; // 'development' | 'production'
+            userRole?: string; // Role name (e.g., 'admin', 'moderator')
+          };
+          // Phase 3: Advanced condition logic (OR, NOT, nested, custom evaluators)
+          // Supports nested logical expressions with AND/OR/NOT operators
+          conditionLogic?: {
+            operator: "AND" | "OR" | "NOT";
+            conditions?: any[]; // Nested conditions (recursive structure)
+            condition?: any; // For NOT operator (unary)
+          };
+        } & Record<string, any>
+      | number
+      | undefined
+    );
+  };
+  kernel?: {
+    /** Kernel bootstrap phase configuration. */
+    featureFlags?: {
+      /** Max ms to wait for remote flag sync before continuing startup with a fallback. */
+      syncTimeoutMs?: number;
       description?: string;
-      kind?: "free" | "premium" | "beta";
-      dependsOn?: string[]; // Soft dependencies: array of flag names
-      // Phase 3: Cohort membership (allow-list, OR logic: user must be in at least ONE of the listed cohorts)
-      cohorts?: string[]; // E.g., ["beta_testers", "enterprise"] — flag enabled if user in ANY listed cohort; requires userId context
-      // Phase 1: Simple conditions (AND logic)
-      conditions?: {
-        platform?: string; // 'web' | 'ios' | 'android' | 'desktop'
-        environment?: string; // 'development' | 'production'
-        userRole?: string; // Role name (e.g., 'admin', 'moderator')
-      };
-      // Phase 3: Advanced condition logic (OR, NOT, nested, custom evaluators)
-      // Supports nested logical expressions with AND/OR/NOT operators
-      conditionLogic?: {
-        operator: "AND" | "OR" | "NOT";
-        conditions?: any[]; // Nested conditions (recursive structure)
-        condition?: any; // For NOT operator (unary)
-      };
-    } & Record<string, any> // Allow additional properties for specific flags
-  >;
+    };
+  };
   services?: {
     auth?: {
       provider?: string; // 'supabase' (default) | future providers
@@ -686,6 +701,11 @@ export function validateAppSettings(config: AppSettings): ConfigValidationResult
       }
     }
     for (const [flagName, flagConfig] of Object.entries(config.featureFlags)) {
+      // Skip numeric config properties (freshnessDays, staleDays) - they're not feature flags
+      if (typeof flagConfig === "number") {
+        continue;
+      }
+      
       if (typeof flagConfig !== "object" || flagConfig === null) {
         result.valid = false;
         result.errors.push(`Invalid feature flag "${flagName}": must be an object`);

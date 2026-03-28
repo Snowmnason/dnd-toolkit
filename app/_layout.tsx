@@ -18,7 +18,7 @@ import "@/components/modals/register-all-modals";
 import { Analytics, sessionManager } from "@/hooks/analytics";
 import { SafeModeReason, executeRecoveryAction } from "@/hooks/error";
 import { useClearSafeMode } from "@/hooks/error/use-safe-mode";
-import { AppKernelProvider, useAppKernel, useKernelLoadingSync } from "@/hooks/kernel";
+import { AppKernelProvider, useAppKernel, useKernelLoadingSync, useSyncSplash } from "@/hooks/kernel";
 import { useAnalyticsNavigation, useNavigate, useRouteConfig } from "@/hooks/navigation";
 import {
   type AccessRole,
@@ -97,6 +97,7 @@ function RootLayoutContent() {
   // Shows splash screen while kernel initializes, updates phase progress,
   // and hides automatically when appReady or on kernel error.
   useKernelLoadingSync();
+  useSyncSplash();
 
   // FUTURE: Offline conflict resolution (disabled for v1 - LWW only)
   // v1 uses automatic Last-Write-Wins for all conflicts

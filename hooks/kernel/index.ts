@@ -6,4 +6,5 @@ export {
 } from './use-app-kernel';
 export { useKernelLoadingSync } from './use-kernel-loading-sync';
 export { useKernelError } from './useKernelError';
+export { useSyncSplash } from './use-sync-splash';
 

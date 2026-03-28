@@ -27,3 +27,13 @@ export {
     type ImageOptimizationOptions
 } from "./image-optimization";
 
+export {
+    classifyCacheAge,
+    evaluateSnapshotFreshness,
+    getDeadThresholdMs,
+    getFreshThresholdMs,
+    type CacheFreshness,
+    type FreshnessThresholds,
+    type SnapshotFreshness
+} from "./cache-freshness";
+

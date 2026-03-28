@@ -116,7 +116,7 @@ export function Notification({
         .damping(0.7)
         .delay(index * 80)}
       exiting={SlideOutUp.duration(300)}
-      pointerEvents={Platform.OS !== 'web' ? "box-none" : undefined}
+      {...(Platform.OS !== 'web' && { pointerEvents: "box-none" })}
       style={animatedViewStyle}
     >
       <Pressable onPress={handlePress} disabled={!onPress}>

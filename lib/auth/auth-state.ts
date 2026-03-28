@@ -3,6 +3,11 @@ import { clearAllUserData, getAllSecureStorageKeys, getPrivacyStorageBackend } f
 import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
+import { classifyCacheAge } from "@/pure-algo-immutables";
+
+// In-memory flag: signals that data sync should run after appReady.
+// Set by performPostAuthSetup (login or stale re-auth). Not persisted — resets on launch.
+let _pendingSyncRequired = false;
 
 /**
  * Helper: determine whether a session indicates an email-confirmed user.
@@ -56,6 +61,14 @@ export interface CacheMetadata {
 }
 
 export const AuthStateManager = {
+
+  // ─── Post-auth sync signalling ─────────────────────────────────────────────
+  // markSyncRequired / isSyncRequired / clearSyncRequired coordinate the
+  // UIBlocker sync splash (useSyncSplash) that runs after appReady.
+  // Called from performPostAuthSetup on every login or stale re-auth.
+  markSyncRequired(): void { _pendingSyncRequired = true; },
+  isSyncRequired(): boolean { return _pendingSyncRequired; },
+  clearSyncRequired(): void { _pendingSyncRequired = false; },
 
   // Get current auth state
   // IMPORTANT: Always returns an object with hasAccount as a boolean (never null/undefined)
@@ -409,9 +422,10 @@ export const AuthStateManager = {
   }> {
     logger.category('auth').info(`[VERIFY:START] Verifying world ${worldId}, forceFresh=${options?.forceFresh}`);
 
-    // Cache freshness window: only trust cache younger than 4 hours
-    // After 4 hours, always refresh via updateStorageCache service to catch permission changes
-    const CACHE_FRESH_THRESHOLD = 4 * 60 * 60 * 1000; // 4 hours
+    // Cache freshness: uses shared classifyCacheAge for consistent freshness classification.
+    // Fresh (<4h): trust cache. Stale (≥4h): refresh via updateStorageCache service.
+    // Dead tier disabled (Infinity) — world access only needs fresh vs stale.
+    const WORLD_ACCESS_FRESH_MS = 4 * 60 * 60 * 1000; // 4 hours
     const cacheKey = `world_access_${worldId}`;
     const metaKey = `world_access_meta_${worldId}`;
 
@@ -443,12 +457,15 @@ export const AuthStateManager = {
       const cacheMeta = await backend.getJSON<CacheMetadata>(metaKey);
 
       const cacheAge = cacheMeta ? Date.now() - cacheMeta.timestamp : Infinity;
-      const isCacheFresh = cacheAge < CACHE_FRESH_THRESHOLD;
+      const freshness = classifyCacheAge(cacheAge, {
+        freshThresholdMs: WORLD_ACCESS_FRESH_MS,
+        deadThresholdMs: Infinity,
+      });
 
-      logger.category('auth').info(`[VERIFY:CACHE] world=${worldId}, hasCache=${cached !== null}, ageMs=${cacheAge}, isCacheFresh=${isCacheFresh}`);
+      logger.category('auth').info(`[VERIFY:CACHE] world=${worldId}, hasCache=${cached !== null}, ageMs=${cacheAge}, freshness=${freshness}`);
 
       // Step 2: If cache is fresh AND exists, trust it
-      if (isCacheFresh && cached !== null) {
+      if (freshness === "fresh" && cached !== null) {
         logger.category('auth').info(`[VERIFY:FRESH] Cache fresh for world ${worldId}, trusting cache, hasAccess=${cached}`);
         return {
           hasAccess: cached === true,

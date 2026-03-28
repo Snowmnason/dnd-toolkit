@@ -204,17 +204,17 @@ function resolveFlag(
   const hardcodedFlagConfig = appConfig.featureFlags?.[flagName];
 
   const flagConfig = {
-    depends_on: flagState.depends_on || hardcodedFlagConfig?.dependsOn,
+    depends_on: flagState.depends_on || (typeof hardcodedFlagConfig === "object" && hardcodedFlagConfig !== null ? hardcodedFlagConfig.dependsOn : undefined),
     condition_logic: flagState.condition_logic,
-    conditions: hardcodedFlagConfig?.conditions,
-    dependsOn: flagState.depends_on || hardcodedFlagConfig?.dependsOn,
-    conditionLogic: flagState.condition_logic || hardcodedFlagConfig?.conditionLogic,
+    conditions: typeof hardcodedFlagConfig === "object" && hardcodedFlagConfig !== null ? hardcodedFlagConfig.conditions : undefined,
+    dependsOn: flagState.depends_on || (typeof hardcodedFlagConfig === "object" && hardcodedFlagConfig !== null ? hardcodedFlagConfig.dependsOn : undefined),
+    conditionLogic: flagState.condition_logic || (typeof hardcodedFlagConfig === "object" && hardcodedFlagConfig !== null ? hardcodedFlagConfig.conditionLogic : undefined),
   };
 
   if (!flagConfig.conditionLogic && !flagConfig.conditions && hardcodedFlagConfig) {
     Object.assign(flagConfig, {
-      conditionLogic: hardcodedFlagConfig.conditionLogic,
-      conditions: hardcodedFlagConfig.conditions,
+      conditionLogic: typeof hardcodedFlagConfig === "object" && hardcodedFlagConfig !== null ? hardcodedFlagConfig.conditionLogic : undefined,
+      conditions: typeof hardcodedFlagConfig === "object" && hardcodedFlagConfig !== null ? hardcodedFlagConfig.conditions : undefined,
     });
   }
 
@@ -283,7 +283,7 @@ function checkCohorts(state: ServerSyncState, flagName: string): boolean {
     const appConfig = getAppConfig();
     // eslint-disable-next-line security/detect-object-injection
     const flagConfig = appConfig.featureFlags?.[flagName];
-    if (!flagConfig?.cohorts?.length) return true;
+    if (typeof flagConfig !== "object" || flagConfig === null || !flagConfig?.cohorts?.length) return true;
     requiredCohorts = flagConfig.cohorts;
     logger.category("feature_flags").debug(
       `Using app config cohorts for flag ${flagName}: ${requiredCohorts.join(", ")}`,

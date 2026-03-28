@@ -15,10 +15,7 @@
  */
 import { getAppConfig, isProduction } from '@/config';
 import appSettingsProd from "@/config/appsettings.json";
-import { getPrivacyStorageBackend } from "@/lib/middleware/storage";
-import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils";
-import { STORAGE_KEYS } from "@/maps";
 
 export interface Entitlements {
   tier: "free" | "premium";
@@ -29,10 +26,17 @@ export type FeatureFlagName = keyof typeof appSettingsProd.featureFlags;
 
 export type FeatureFlagKind = "free" | "premium" | "beta";
 
-export type FeatureFlag =
-  (typeof appSettingsProd.featureFlags)[FeatureFlagName] & {
-    kind?: FeatureFlagKind;
-  };
+/**
+ * FeatureFlag must have an 'enabled' property (boolean state).
+ * Other properties (description, kind, etc.) are optional.
+ * Filters out config-only values like 'freshnessDays' which are not flags.
+ */
+export type FeatureFlag = {
+  enabled: boolean;
+  description?: string;
+  kind?: FeatureFlagKind;
+  [key: string]: any;
+};
 
 /**
  * Event type for flag change notifications
@@ -48,8 +52,13 @@ class FeatureFlagsManager {
 
   constructor() {
     const featureFlags = getAppConfig().featureFlags || {};
+    // Filter to only include actual flags (must have 'enabled' property)
+    // Excludes config-only values like 'freshnessDays'
+    const flagEntries = Object.entries(featureFlags).filter(
+      ([, value]) => typeof value === "object" && value !== null && "enabled" in value,
+    );
     this.flags = new Map(
-      Object.entries(featureFlags) as [FeatureFlagName, FeatureFlag][],
+      flagEntries as [FeatureFlagName, FeatureFlag][],
     );
 
     // Warn if production build ships beta-enabled flags
@@ -152,99 +161,6 @@ class FeatureFlagsManager {
     }
   }
 
-  /**
-   * Sync legacy flags from server-synced FeatureFlagsManager values.
-   *
-   * Called after FeatureFlagsManager.bootstrapFlags() so that the legacy
-   * system (and hooks like useFeatureFlag) reflect server-resolved values.
-   *
-   * Updates all matching flags silently and notifies listeners once
-   * to trigger React re-renders.
-   */
-  syncFromServer(
-    serverFlags: Record<
-      string,
-      { enabled: boolean; kind?: string; description?: string }
-    >,
-  ): void {
-    let changed = false;
-    for (const [name, state] of Object.entries(serverFlags)) {
-      const flag = this.flags.get(name as FeatureFlagName);
-      if (flag && flag.enabled !== state.enabled) {
-        flag.enabled = state.enabled;
-        changed = true;
-      }
-    }
-    if (changed) {
-      logger.category('bootstrap').info(
-        "[FeatureFlags] Synced from server-synced flags",
-      );
-      // null = all flags changed, triggers re-render in all useFeatureFlag consumers
-      this.notifyListeners(null);
-    }
-  }
-
-  /**
-   * Persist feature flags to FastCache per privacy policy.
-   * Non-user-specific flags stay in FastCache (fast, unencrypted).
-   */
-  async persistFlags(flags: Record<string, FeatureFlag>): Promise<void> {
-    try {
-      const backend = getPrivacyStorageBackend("feature_flags:v1");
-      await backend.setJSON("feature_flags:v1", flags);
-      logger.category('feature_flags').debug("Persisted feature flags");
-    } catch (error) {
-      logger.category('feature_flags').error("Failed to persist feature flags:", error);
-    }
-  }
-
-  /**
-   * Load feature flags from FastCache if available.
-   * Fallback to config if cache miss.
-   */
-  async loadFlags(): Promise<Record<string, FeatureFlag>> {
-    try {
-      const backend = getPrivacyStorageBackend("feature_flags:v1");
-      const cached =
-        await backend.getJSON<Record<string, FeatureFlag>>("feature_flags:v1");
-      if (cached) {
-        return cached;
-      }
-    } catch (error) {
-      logger.category('feature_flags').warn("Failed to load feature flags from cache:",error, "Falling back to defaults");
-    }
-    return this.getAllFlags();
-  }
-
-  /**
-   * Persist user entitlements to SecureStorage per privacy policy.
-   * User-specific entitlements must be encrypted (SENSITIVE data).
-   */
-  async persistEntitlements(entitlements: Entitlements): Promise<void> {
-    try {
-      const backend = getPrivacyStorageBackend("secure:entitlements");
-      await backend.setJSON("secure:entitlements", entitlements);
-      logger.category('feature_flags').debug("Persisted user entitlements");
-    } catch (error) {
-      logger.category('feature_flags').error("Failed to persist entitlements:", error);
-    }
-  }
-
-  /**
-   * Get user entitlements from storage per privacy policy.
-   * Uses StorageManager which routes to appropriate backend (SecureStorage).
-   */
-  async getEntitlements(): Promise<Entitlements | null> {
-    try {
-      const entitlements = await StorageManager.get<Entitlements>(
-        STORAGE_KEYS.ENTITLEMENTS,
-      );
-      return entitlements ?? null;
-    } catch (error) {
-      logger.category('feature_flags').warn("Failed to retrieve entitlements:", error);
-      return null;
-    }
-  }
 }
 
 export const FeatureFlags = new FeatureFlagsManager();

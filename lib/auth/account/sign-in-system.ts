@@ -11,7 +11,7 @@
  * Flow:
  * 1. Establish session (varies by entry point)
  * 2. Store HAS_ACCOUNT flag
- * 3. Sync data (profile + worlds) + update LAST_LOGGED_IN timestamp
+ * 3. Mark sync required (runs post-appReady) + update LAST_LOGGED_IN timestamp
  * 4. Determine redirect based on profile completeness + context
  *
  * Entry points:
@@ -20,7 +20,6 @@
  *   performSignInWithIdToken(provider, t)  — Google/Apple native
  */
 
-import { JobsManager } from '@/lib/jobs';
 import { buildRoute, determineEnterErrorRedirect, determineEnterRedirect } from '@/lib/navigation';
 import { logger } from '@/lib/utils/logger';
 import { STORAGE_KEYS } from '@/maps';
@@ -77,7 +76,7 @@ export interface ReAuthError {
  *
  * Steps:
  * 2. Set HAS_ACCOUNT flag
- * 3. Sync data (JobsManager) + update LAST_LOGGED_IN timestamp
+ * 3. Mark sync required (deferred to post-appReady) + update LAST_LOGGED_IN timestamp
  * 4. Determine redirect (profile-based, with pending invite check)
  *
  * @param userId - Authenticated user ID
@@ -101,18 +100,12 @@ async function performPostAuthSetup(
   }
 
   // =====================================================================
-  // STEP 3: SYNC DATA + UPDATE LAST_LOGGED_IN
+  // STEP 3: MARK SYNC REQUIRED + UPDATE LAST_LOGGED_IN
   // =====================================================================
-  let worldIds: string[] = [];
-
-  try {
-    const syncResult = await JobsManager.performSync({ mode: 'automatic', direction: 'download' });
-    worldIds = syncResult.worlds?.worldIds || [];
-    logger.category('auth').debug(`[${context}] Post-auth: Sync complete, worlds: ${worldIds.length}`);
-  } catch (error) {
-    logger.category('auth').warn(`[${context}] Post-auth: Sync failed`, error);
-    // Non-blocking
-  }
+  // worldIds from sync are not used for routing — sync runs post-appReady via useSyncSplash
+  const worldIds: string[] = [];
+  AuthStateManager.markSyncRequired();
+  logger.category('auth').debug(`[${context}] Post-auth: Sync deferred to post-appReady`);
 
   try {
     const { StorageManager } = await import('@/lib/storage');

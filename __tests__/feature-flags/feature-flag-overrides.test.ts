@@ -4,11 +4,12 @@
  * Tests the merge logic, filtering, caching, and offline behavior of remote overrides.
  * Priority: override > entitlement > global flag
  *
- * NOTE: After Phase 1b refactoring, bootstrapFlags now invokes the get_feature_flags
+ * NOTE: After Phase 1b refactoring, performFeatureFlagSync now invokes the get_feature_flags
  * Edge Function instead of direct database queries. Tests mock the Edge Function response.
  */
 
 import { FeatureFlagsManager } from "@/lib/feature-flags/server-sync/orchestrator";
+import { performFeatureFlagSync } from "@/lib/jobs/core/sync/feature-flags-sync-job";
 import { SecureStorage } from "@/system/Storage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -101,8 +102,8 @@ describe.skip("Feature Flag Remote Overrides", () => {
       });
 
       // Execute
-      await FeatureFlagsManager.initialize(userId);
-      await FeatureFlagsManager.bootstrapFlags();
+      FeatureFlagsManager.state.userId = userId;
+      await performFeatureFlagSync();
 
       // Assert: remote override takes precedence
       expect(FeatureFlagsManager.getFlag("testFlag", false)).toBe(true);
@@ -139,8 +140,8 @@ describe.skip("Feature Flag Remote Overrides", () => {
       });
 
       // Execute
-      await FeatureFlagsManager.initialize(userId);
-      await FeatureFlagsManager.bootstrapFlags();
+      FeatureFlagsManager.state.userId = userId;
+      await performFeatureFlagSync();
 
       // Assert: remote override takes precedence
       expect(FeatureFlagsManager.getFlag("testFlag", true)).toBe(false);
@@ -165,8 +166,8 @@ describe.skip("Feature Flag Remote Overrides", () => {
       });
 
       // Execute
-      await FeatureFlagsManager.initialize(userId);
-      await FeatureFlagsManager.bootstrapFlags();
+      FeatureFlagsManager.state.userId = userId;
+      await performFeatureFlagSync();
 
       // Assert
       expect(FeatureFlagsManager.getFlag("testFlag", false)).toBe(true);
@@ -193,8 +194,8 @@ describe.skip("Feature Flag Remote Overrides", () => {
       });
 
       // Execute (Edge Function already filtered, so this won't have the revoked override)
-      await FeatureFlagsManager.initialize(userId);
-      await FeatureFlagsManager.bootstrapFlags();
+      FeatureFlagsManager.state.userId = userId;
+      await performFeatureFlagSync();
 
       // Assert: revoked override was filtered out server-side
       expect(FeatureFlagsManager.getFlag("testFlag", false)).toBe(false);
@@ -219,8 +220,8 @@ describe.skip("Feature Flag Remote Overrides", () => {
       });
 
       // Execute
-      await FeatureFlagsManager.initialize(userId);
-      await FeatureFlagsManager.bootstrapFlags();
+      FeatureFlagsManager.state.userId = userId;
+      await performFeatureFlagSync();
 
       // Assert: expired override was filtered out server-side
       expect(FeatureFlagsManager.getFlag("testFlag", false)).toBe(false);
@@ -258,8 +259,8 @@ describe.skip("Feature Flag Remote Overrides", () => {
       });
 
       // Execute
-      await FeatureFlagsManager.initialize(userId);
-      await FeatureFlagsManager.bootstrapFlags();
+      FeatureFlagsManager.state.userId = userId;
+      await performFeatureFlagSync();
 
       // Assert
       expect(FeatureFlagsManager.getFlag("testFlag", false)).toBe(true);
@@ -296,8 +297,8 @@ describe.skip("Feature Flag Remote Overrides", () => {
       });
 
       // Execute
-      await FeatureFlagsManager.initialize(userId);
-      await FeatureFlagsManager.bootstrapFlags();
+      FeatureFlagsManager.state.userId = userId;
+      await performFeatureFlagSync();
 
       // Assert
       expect(FeatureFlagsManager.getFlag("testFlag", false)).toBe(true);
@@ -336,8 +337,8 @@ describe.skip("Feature Flag Remote Overrides", () => {
       });
 
       // Execute
-      await FeatureFlagsManager.initialize(userId);
-      await FeatureFlagsManager.bootstrapFlags();
+      FeatureFlagsManager.state.userId = userId;
+      await performFeatureFlagSync();
 
       // Assert: overrides were cached
       expect(SecureStorage.setJSON).toHaveBeenCalledWith(
@@ -390,8 +391,8 @@ describe.skip("Feature Flag Remote Overrides", () => {
       });
 
       // Execute
-      await FeatureFlagsManager.initialize(userId);
-      await FeatureFlagsManager.bootstrapFlags();
+      FeatureFlagsManager.state.userId = userId;
+      await performFeatureFlagSync();
 
       // Assert: cached values loaded
       expect(SecureStorage.getJSON).toHaveBeenCalled();
@@ -432,12 +433,12 @@ describe.skip("Feature Flag Remote Overrides", () => {
       });
 
       // Execute
-      await FeatureFlagsManager.initialize(userId);
+      FeatureFlagsManager.state.userId = userId;
 
       // Set local override to false
       (FeatureFlagsManager as any).userOverrides.set("testFlag", false);
 
-      await FeatureFlagsManager.bootstrapFlags();
+      await performFeatureFlagSync();
 
       // Assert: remote override takes precedence
       expect(FeatureFlagsManager.getFlag("testFlag", false)).toBe(true);
@@ -476,8 +477,8 @@ describe.skip("Feature Flag Remote Overrides", () => {
       });
 
       // Bootstrap initially
-      await FeatureFlagsManager.initialize(userId);
-      await FeatureFlagsManager.bootstrapFlags();
+      FeatureFlagsManager.state.userId = userId;
+      await performFeatureFlagSync();
 
       // Verify override exists
       expect((FeatureFlagsManager as any).remoteOverrides.size).toBe(1);
@@ -510,63 +511,13 @@ describe.skip("Feature Flag Remote Overrides", () => {
         },
       });
 
-      await FeatureFlagsManager.initialize(userId);
-      await FeatureFlagsManager.bootstrapFlags();
+      FeatureFlagsManager.state.userId = userId;
+      await performFeatureFlagSync();
 
       // Assert: offline flag uses cached override
       expect(FeatureFlagsManager.getFlag("testFlag", false)).toBe(true);
     });
   });
 
-  describe("Cache Clearing", () => {
-    it("should clear overrides on logout", async () => {
-      // Setup
-      const mockSupabase = createMockSupabase({
-        flags: [
-          {
-            flag_name: "testFlag",
-            enabled: false,
-            kind: "free",
-            created_at: "2026-02-05T00:00:00Z",
-            updated_at: "2026-02-05T00:00:00Z",
-          },
-        ],
-        entitlements: [],
-        overrides: [
-          {
-            id: "override-1",
-            user_id: userId,
-            target_type: "flag",
-            target_name: "testFlag",
-            enabled: true,
-            expires_at: null,
-            revoked: false,
-            created_at: "2026-02-05T00:00:00Z",
-            updated_at: "2026-02-05T00:00:00Z",
-          },
-        ],
-        fetchedAt: Date.now(),
-        version: "v1",
-      });
-
-      // Bootstrap
-      await FeatureFlagsManager.initialize(userId);
-      await FeatureFlagsManager.bootstrapFlags();
-
-      // Verify override exists
-      expect((FeatureFlagsManager as any).remoteOverrides.size).toBe(1);
-
-      // Execute: clear cache (logout)
-      (SecureStorage.getAllKeys as any).mockResolvedValue([
-        `dnd:feature_flags:feature_flag_override:${userId}`,
-      ]);
-      await FeatureFlagsManager.clearCache();
-
-      // Assert: overrides cleared
-      expect((FeatureFlagsManager as any).remoteOverrides.size).toBe(0);
-      expect(SecureStorage.removeItem).toHaveBeenCalledWith(
-        expect.stringContaining("feature_flag_override:"),
-      );
-    });
-  });
 });
+

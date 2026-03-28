@@ -38,20 +38,24 @@ Components check: isEnabled(), getKind(), toggle()
 ### 2. Server-Driven Runtime (FeatureFlagsManager)
 
 ```
-AppKernel Startup
+Kernel FEATURE_FLAGS Phase
         ↓
 FeatureFlagsManager.initialize(userId)
         ↓
 verifyDeviceClock() [detect manipulation]
         ↓
-bootstrapFlags() [fetch once at startup, cache]
+bootstrapFlags() [fetch once at startup, cache with freshness]
         ↓
-SecureStorage: persist flags + overrides
+Timeout race: block briefly, continue in background if needed
+        ↓
+SecureStorage: persist flags + overrides + fetchedAt timestamp
         ↓
 Bridge: syncFromServer(flags) → FeatureFlags [so legacy hooks see server values]
         ↓
 Runtime checks: getFlag(), isEnabledWithContext()
 ```
+
+**Freshness Model:** `fetchedAt` timestamp drives cache validity (fresh <2h = instant, stale 2-4h = check, dead >4h = fallback to defaults + clear companion caches)
 
 **Merge Priority:** Per-User Override > Local Override > Server Flag > Hardcoded Default
 
