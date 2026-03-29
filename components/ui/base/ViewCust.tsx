@@ -1,11 +1,10 @@
 import { ReactNode } from "react";
 import {
-  Platform,
-  ScrollView,
-  StyleProp,
-  View,
-  ViewProps,
-  ViewStyle,
+    ScrollView,
+    StyleProp,
+    View,
+    ViewProps,
+    ViewStyle
 } from "react-native";
 import { GradientView } from "../Resuables/gradients";
 
@@ -71,19 +70,15 @@ export function ViewCust({
   pointerEvents,
   ...rest
 }: ViewCustProps) {
-  // Platform-aware pointerEvents handling:
-  // - On web: move to style (RN Web requires it in style, not as prop)
-  // - On native: keep as prop (native Views use pointerEvents as a prop, not style)
-  const baseStyle: any = Platform.OS === 'web' && pointerEvents
+  // pointerEvents always goes in style (not as prop) to avoid deprecation warning
+  const baseStyle: any = pointerEvents
     ? Array.isArray(style) 
       ? [...style, { pointerEvents }]
       : [style, { pointerEvents }]
     : style;
 
-  // On native, pass pointerEvents as a prop; on web, it's already in baseStyle
-  const nativeProps = Platform.OS !== 'web' && pointerEvents
-    ? { ...rest, pointerEvents }
-    : rest;
+  // Don't pass pointerEvents as a prop; it's now always in baseStyle
+  const nativeProps = rest;
 
   // Gradient wrapper - OUTSIDE ScrollView so it's static and doesn't scroll
   // This allows the gradient background to remain fixed while content scrolls

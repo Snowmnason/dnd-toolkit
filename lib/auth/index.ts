@@ -78,6 +78,12 @@ export {
 } from "./account/update-creds-system";
 export { AuthLayer, type AuthStrategy } from "./auth-layer";
 export {
+    AuthSubscriptionManager,
+    beginSignOut,
+    endSignOut,
+    isSigningOut
+} from "./auth-subscription-manager";
+export {
     createInviteAuthStrategy,
     createPublicAuthStrategy,
     createUserAuthStrategy
@@ -88,10 +94,4 @@ export {
     prepareAuthNavigation,
     type SessionCheckResult
 } from "./guards/sessionService";
-export {
-    AuthSubscriptionManager,
-    beginSignOut,
-    endSignOut,
-    isSigningOut,
-} from "./auth-subscription-manager";
 

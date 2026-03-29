@@ -2,15 +2,15 @@ import { Button } from "@/components/ui";
 import { useNavigate } from "@/hooks/navigation";
 import { usePlatform } from "@/providers";
 import {
-  $,
-  allThemes,
-  ThemeFamily,
-  ThemeMode,
-  useScale,
-  UseTheme,
+    $,
+    allThemes,
+    ThemeFamily,
+    ThemeMode,
+    useScale,
+    UseTheme,
 } from "@/theme";
 import { useSegments } from "expo-router";
-import { Text, TouchableOpacity, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 /**
  * 🎨 ThemeSelector
@@ -91,10 +91,9 @@ export function ThemeSelector() {
                       break;
                   }
                   return (
-                    <TouchableOpacity
+                    <Pressable
                       key={m}
                       onPress={() => handleSelect(themeKey, m)}
-                      activeOpacity={0.85}
                       style={{
                         width: 70,
                         height: 70,

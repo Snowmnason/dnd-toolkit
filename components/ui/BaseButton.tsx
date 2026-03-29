@@ -4,8 +4,8 @@ import React, { useMemo } from 'react'
 import {
     ActivityIndicator,
     Platform,
+    Pressable,
     StyleProp,
-    TouchableOpacity,
     View,
     ViewStyle,
 } from 'react-native'
@@ -268,13 +268,11 @@ export function Button(props: ButtonProps) {
   }
 
   const handleMouseEnter = () => {
-    if (disabled || loading || Platform.OS !== 'web' || variant === 'ghost') return
-    hoverOpacity.value = withTiming(0.45, { duration: 150 })
+    // Mouse enter effects now handled via onPressIn
   }
 
   const handleMouseLeave = () => {
-    if (disabled || loading || Platform.OS !== 'web' || variant === 'ghost') return
-    hoverOpacity.value = withTiming(1, { duration: 150 })
+    // Mouse leave effects now handled via onPressOut
   }
 
   // Update Reanimated values when loading changes
@@ -339,14 +337,11 @@ export function Button(props: ButtonProps) {
 
   return (
     <Animated.View style={[scaleStyle, hoverStyle, style]}>
-      <TouchableOpacity
-        activeOpacity={1}
+      <Pressable
         disabled={disabled || loading}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         onPress={handlePress}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
       >
         {isGhost ? (
           // Ghost variant: No gradient, simple centered container
@@ -383,7 +378,7 @@ export function Button(props: ButtonProps) {
             {contentView}
           </ButtonView>
         )}
-      </TouchableOpacity>
+      </Pressable>
     </Animated.View>
   )
 }

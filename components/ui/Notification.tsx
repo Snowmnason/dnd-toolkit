@@ -3,7 +3,7 @@ import { usePlatform } from "@/providers";
 import { $, S, UseTheme } from "@/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo } from "react";
-import { Platform, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import Animated, { FadeInDown, SlideOutUp } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Body, Caption } from "./AppText";
@@ -103,11 +103,8 @@ export function Notification({
     left: isMobile ? S.space.lg : "5%",
     right: isMobile ? S.space.lg : "5%",
     zIndex: 9999 - index,
+    pointerEvents: "box-none" as const,
   };
-
-  if (Platform.OS === 'web') {
-    animatedViewStyle.pointerEvents = "box-none";
-  }
 
   return (
     <Animated.View
@@ -116,7 +113,6 @@ export function Notification({
         .damping(0.7)
         .delay(index * 80)}
       exiting={SlideOutUp.duration(300)}
-      {...(Platform.OS !== 'web' && { pointerEvents: "box-none" })}
       style={animatedViewStyle}
     >
       <Pressable onPress={handlePress} disabled={!onPress}>

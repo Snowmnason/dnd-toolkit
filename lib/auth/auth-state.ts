@@ -9,6 +9,14 @@ import { classifyCacheAge } from "@/pure-algo-immutables";
 // Set by performPostAuthSetup (login or stale re-auth). Not persisted — resets on launch.
 let _pendingSyncRequired = false;
 
+// Post-bootstrap full sync flag: if true, run full sync immediately after bootstrap completes.
+// Used when we detect a reason to do a full sync (e.g., force refresh, cache validation failed).
+// Not persisted — resets on launch. Bootstrap splash → Sync splash (no flicker).
+let _postBootstrapFullSync = false;
+
+// Callbacks registered via onSyncRequired() — fired when markSyncRequired() is called
+let _syncRequiredCallbacks: (() => void)[] = [];
+
 /**
  * Helper: determine whether a session indicates an email-confirmed user.
  * Centralizes provider-specific checks (Supabase or other providers' shapes).
@@ -65,10 +73,63 @@ export const AuthStateManager = {
   // ─── Post-auth sync signalling ─────────────────────────────────────────────
   // markSyncRequired / isSyncRequired / clearSyncRequired coordinate the
   // UIBlocker sync splash (useSyncSplash) that runs after appReady.
-  // Called from performPostAuthSetup on every login or stale re-auth.
-  markSyncRequired(): void { _pendingSyncRequired = true; },
+  //
+  // Called from:
+  // - performPostAuthSetup (login or reauth at runtime)
+  // - authPhase (bootstrap) when STALE session is detected (defers re-auth to sync-splash)
+  //
+  // Flow:
+  // 1. authPhase detects STALE session → calls markSyncRequired()
+  // 2. Listener callbacks fire immediately → useSyncSplash React state updates
+  // 3. appReady fires → useSyncSplash checks isSyncRequired() (already true)
+  // 4. useSyncSplash calls performFullSync with progress callback
+  // 5. After jobs → clearSyncRequired()
+  markSyncRequired(): void {
+    _pendingSyncRequired = true;
+    // Fire all registered callbacks immediately when sync becomes required
+    _syncRequiredCallbacks.forEach((cb) => {
+      try {
+        cb();
+      } catch (error) {
+        logger.category('auth').warn("Error in sync required callback:", error);
+      }
+    });
+  },
   isSyncRequired(): boolean { return _pendingSyncRequired; },
   clearSyncRequired(): void { _pendingSyncRequired = false; },
+
+  // ─── Post-bootstrap full sync flag ─────────────────────────────────────────
+  // markPostBootstrapFullSync / isPostBootstrapFullSyncRequested / clearPostBootstrapFullSync
+  // coordinate an immediate full sync after bootstrap with no UI flicker.
+  //
+  // Usage:
+  // - Call markPostBootstrapFullSync() from auth-phase if conditions warrant a full sync
+  // - useSyncSplash will see this flag and start full sync immediately as appReady fires
+  // - Bootstrap splash → Sync splash transition is seamless (both UIBlocker calls)
+  //
+  // Example: Force full sync on specific conditions (cache validation, force refresh, etc.)
+  markPostBootstrapFullSync(): void {
+    _postBootstrapFullSync = true;
+    logger.category('auth').debug('[AuthStateManager] Post-bootstrap full sync marked');
+  },
+  isPostBootstrapFullSyncRequested(): boolean { return _postBootstrapFullSync; },
+  clearPostBootstrapFullSync(): void { _postBootstrapFullSync = false; },
+
+  /**
+   * Subscribe to sync required notifications.
+   * Called when markSyncRequired() is invoked (login, stale re-auth, etc.).
+   * Allows useSyncSplash to trigger without depending on appReady phase.
+   *
+   * @param callback - Function called when sync becomes required
+   * @returns Unsubscribe function
+   */
+  onSyncRequired(callback: () => void): () => void {
+    _syncRequiredCallbacks.push(callback);
+    // Return unsubscribe function
+    return () => {
+      _syncRequiredCallbacks = _syncRequiredCallbacks.filter((cb) => cb !== callback);
+    };
+  },
 
   // Get current auth state
   // IMPORTANT: Always returns an object with hasAccount as a boolean (never null/undefined)

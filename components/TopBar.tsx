@@ -130,9 +130,8 @@ function TopBar({
         <View
           style={[
             styles.centerSlot,
-            Platform.OS === "web" && { pointerEvents: "none" as const },
+            { pointerEvents: "none" as const },
           ]}
-          pointerEvents={Platform.OS !== "web" ? "none" : undefined}
         >
           <Text
             accessibilityLiveRegion="polite"

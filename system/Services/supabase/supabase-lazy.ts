@@ -7,8 +7,8 @@
  * and do not need this lazy loader.
  *
  * Usage:
- *   if (!await isSupabaseConfiguredLazy()) { return handleOfflineMode(); }
- *   const supabase = await getSupabaseClientLazy();
+ *   if (!await isDatabaseProviderConfigured()) { return handleOfflineMode(); }
+ *   const supabase = await getDatabaseProviderRawClient();
  *   const { data } = await supabase.from('table').select('*');
  */
 
@@ -16,13 +16,13 @@ export async function getSupabaseModule() {
   return await import('./supabase-client');
 }
 
-export async function isSupabaseConfiguredLazy() {
+export async function isDatabaseProviderConfigured() {
   const mod = await getSupabaseModule();
   return mod.isSupabaseConfigured();
 }
 
-export async function getSupabaseClientLazy() {
-  const configured = await isSupabaseConfiguredLazy();
+export async function getDatabaseProviderRawClient() {
+  const configured = await isDatabaseProviderConfigured();
   if (!configured) {
     throw new Error(
       'Supabase is not configured. Cannot initialize client without EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY environment variables.'

@@ -3,12 +3,11 @@ import { $, Sizing, useScale } from "@/theme";
 import { ComponentType, ReactNode, useEffect, useMemo } from "react";
 import {
   ImageBackground,
-  Platform,
   ScrollView,
   StyleProp,
   View,
   ViewProps,
-  ViewStyle,
+  ViewStyle
 } from "react-native";
 import Animated, {
   Easing,
@@ -119,6 +118,7 @@ export function AppPage({
   style,
   contentContainerStyle,
   children,
+  pointerEvents,
   ...rest
 }: AppViewProps) {
   const S = useScale();
@@ -164,6 +164,7 @@ export function AppPage({
             // Safe access: gap is constrained to SpaceKey
             padding: S.space[gap as SpaceKey],
             backgroundColor,
+            ...(pointerEvents ? { pointerEvents } : {}),
           },
           scrollViewStyle,
         ]}
@@ -199,6 +200,7 @@ export function AppSplit({
   animateRightSlide = false,
   rightVisible = true,
   onMobileRightPanelClose,
+  pointerEvents,
   verticalPadding = "none",
   horizontalPadding = "xs",
   ...rest
@@ -251,6 +253,7 @@ export function AppSplit({
           paddingBottom,
           paddingLeft,
           paddingRight,
+          ...(pointerEvents ? { pointerEvents } : {}),
         },
       ]}
       {...rest}
@@ -298,17 +301,11 @@ export function AppSplit({
                 backgroundColor: $("background"),
                 // Ensure it overlays the left content during slide
                 zIndex: 10,
+                // pointerEvents in style to avoid deprecation warning
+                pointerEvents: rightVisible ? "auto" : "none",
               },
               rightAnimatedStyle,
-              // On web, use style.pointerEvents to avoid deprecation
-              Platform.OS === "web"
-                ? { pointerEvents: rightVisible ? "auto" : "none" }
-                : {},
             ]}
-            // On native, keep prop pointerEvents; on web, omit to avoid deprecation warning
-            {...(Platform.OS !== "web"
-              ? { pointerEvents: (rightVisible ? "auto" : "none") as any }
-              : {})}
           >
             {/* Mobile close button in top-right corner */}
             {onMobileRightPanelClose && (
