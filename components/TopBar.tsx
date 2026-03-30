@@ -5,12 +5,12 @@ import { S, UseTheme } from "@/theme";
 import { useRouter, useSegments } from "expo-router";
 import { memo, useEffect, useRef, useState } from "react";
 import {
-  AccessibilityInfo,
-  Platform,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
+    AccessibilityInfo,
+    Platform,
+    StyleSheet,
+    Text,
+    View,
+    useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SettingsMenu from "./modals/SettingsModal";
@@ -130,8 +130,9 @@ function TopBar({
         <View
           style={[
             styles.centerSlot,
-            { pointerEvents: "none" as const },
+            Platform.OS === 'web' ? { pointerEvents: "none" as const } : {},
           ]}
+          pointerEvents={Platform.OS === 'web' ? undefined : 'none'}
         >
           <Text
             accessibilityLiveRegion="polite"

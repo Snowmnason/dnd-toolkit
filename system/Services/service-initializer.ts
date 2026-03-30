@@ -251,7 +251,7 @@ async function initializeAuthProvider(): Promise<void> {
     
     // Register auth strategies (done here via middleware to avoid circular deps in system/)
     const { initializeAuthStrategies } = await import('@/lib/middleware/services');
-    initializeAuthStrategies();
+    await initializeAuthStrategies();
 
     updateServiceStatus('auth', 'ready', providerName);
 

@@ -33,7 +33,6 @@ export {
     getDeadThresholdMs,
     getFreshThresholdMs,
     type CacheFreshness,
-    type FreshnessThresholds,
-    type SnapshotFreshness
+    type FreshnessThresholds
 } from "./cache-freshness";
 

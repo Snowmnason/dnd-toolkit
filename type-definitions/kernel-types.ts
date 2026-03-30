@@ -22,6 +22,7 @@ export enum KernelPhase {
   JOB_SETUP = "jobSetup",
   AUTH = "auth",
   FEATURE_FLAGS = "featureFlags",
+  REGISTRATION = "registration",
   READY = "ready",
   ERROR = "error",
 }
@@ -94,6 +95,7 @@ export interface AppKernelState {
     jobSetupReady: boolean;
     authReady: boolean;
     featureFlagsReady: boolean;
+    registrationReady: boolean;
     appReady: boolean;
   };
   error: KernelError | null;

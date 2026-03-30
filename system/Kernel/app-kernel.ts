@@ -11,16 +11,16 @@
  * - NETWORK: Network detection initialization (before storage for offline awareness)
  * - STORAGE: Cache validation & migrations (knows network status)
  * - SERVICES: Register auth provider, error tracker, analytics exporters (must be before AUTH)
- * - JOB_SETUP: Initialize job queue + register handlers (non-critical, runs before AUTH)
+ * - JOB_SETUP: Initialize job queue infrastructure (non-critical, runs before AUTH)
  * - AUTH: Session restoration (non-blocking, fires in background after job setup ready)
  * - FEATURE_FLAGS: Load and apply feature flags (non-critical, runs after AUTH)
+ * - REGISTRATION: Register job handlers + activate subscriptions (non-critical, runs after FEATURE_FLAGS)
  * - READY: App is ready to render main UI
  * - ERROR: A critical phase failed
  */
 
 import {
   cleanupAnalyticsNetworkIntegration,
-  initializeAnalyticsNetworkIntegration,
 } from "@/lib/analytics/exporters/analytics-network-integration";
 import {
   createSafeModeState,
@@ -51,6 +51,7 @@ import { featureFlagsPhase } from "./phases/feature-flags-phase";
 import { jobSetupPhase } from "./phases/job-setup-phase";
 import { networkPhase } from "./phases/network-phase";
 import { preloadPhase } from "./phases/preload-phase";
+import { registrationPhase } from "./phases/registration-phase";
 import { servicesPhase } from "./phases/services-phase";
 import { storagePhase } from "./phases/storage-phase";
 
@@ -89,13 +90,14 @@ const PHASE_SEQUENCE = [
   "jobSetup",
   "auth",
   "featureFlags",
+  "registration",
 ] as const;
 
 const INITIAL_PHASE_PROGRESS: PhaseProgress = {
   currentPhaseIndex: 0, // Start at phase 0 (config) — the first incomplete phase in initial state
   currentPhaseName: "config",
   progressPercent: 0,
-  phaseLabel: "0/8 Initializing...",
+  phaseLabel: "0/9 Initializing...",
 };
 
 /**
@@ -116,6 +118,7 @@ const PHASE_MIN_DISPLAY_MS = {
   jobSetup:     50,
   auth:         50,
   featureFlags: 50,
+  registration: 50,
 } as const;
 
 class AppKernelClass {
@@ -130,6 +133,7 @@ class AppKernelClass {
       jobSetupReady: false,
       authReady: false,
       featureFlagsReady: false,
+      registrationReady: false,
       appReady: false,
     },
     error: null,
@@ -199,7 +203,7 @@ class AppKernelClass {
       // Phase 4: SERVICES — register auth/error/analytics providers (critical, throws on failure)
       await this.runPhase("services", () => servicesPhase());
 
-      // Phase 5: JOB_SETUP — initialize job queue + register handlers (non-critical)
+      // Phase 5: JOB_SETUP — initialize job queue infrastructure (non-critical)
       await this.runPhase("jobSetup", () => jobSetupPhase());
 
       // Phase 6: AUTH — restore persisted session + evaluate staleness (non-critical, redirects to login on failure via useAuthGuard)
@@ -207,6 +211,9 @@ class AppKernelClass {
 
       // Phase 7: FEATURE_FLAGS — bootstrap feature flags from remote or cache (non-critical)
       await this.runPhase("featureFlags", () => featureFlagsPhase());
+
+      // Phase 8: REGISTRATION — register job handlers + activate subscriptions (non-critical)
+      await this.runPhase("registration", () => registrationPhase());
 
       // ═══════════════════════════════════════════════════════════════
       // APP READY — all phases complete, UI can render
@@ -363,14 +370,29 @@ class AppKernelClass {
    * Log bootstrap timing summary after appReady
    */
   private logBootstrapSummary(): void {
-    const totalBootstrapTime = Object.values(this.state.timing).reduce(
-      (a, b) => a + b,
-      0,
-    );
+    const t = this.state.timing;
+    // Static key access avoids Generic Object Injection Sink warning.
+    // Explicit ordering mirrors PHASE_SEQUENCE — all phases always present.
+    const orderedTiming = {
+      config:       t["config"]       ?? 0,
+      preload:      t["preload"]      ?? 0,
+      network:      t["network"]      ?? 0,
+      storage:      t["storage"]      ?? 0,
+      services:     t["services"]     ?? 0,
+      jobSetup:     t["jobSetup"]     ?? 0,
+      authPhase:    t["auth"]         ?? 0,  // keyed as "authPhase" — "auth" matches PII redaction rules
+      featureFlags: t["featureFlags"] ?? 0,
+      registration: t["registration"] ?? 0,
+    };
 
-    logger.category("bootstrap").info("AppKernel ready", {
-      timing: this.state.timing,
-      totalMs: totalBootstrapTime,
+    const totalMs =
+      orderedTiming.config + orderedTiming.preload + orderedTiming.network +
+      orderedTiming.storage + orderedTiming.services + orderedTiming.jobSetup +
+      orderedTiming.authPhase + orderedTiming.featureFlags + orderedTiming.registration;
+
+    logger.category("bootstrap").info(`✅ AppKernel ready — ${totalMs}ms end-to-end`, {
+      timing: orderedTiming,
+      totalMs,
     });
   }
 
@@ -386,19 +408,6 @@ class AppKernelClass {
    */
   private runPostReadyTasks(): void {
     ;(async () => {
-      // ─── Analytics Network Integration ────────────────────────────
-      // Auto-flush analytics buffer on network reconnect
-      try {
-        initializeAnalyticsNetworkIntegration();
-        logger.category("bootstrap").debug("Analytics network integration initialized");
-      } catch (error) {
-        logger
-          .category("bootstrap")
-          .warn("Analytics network integration initialization failed (non-critical)", {
-            error: (error as Error).message,
-          });
-      }
-
       // ─── Analytics Tracking ───────────────────────────────────────
       try {
         const totalBootstrapTime = Object.values(this.state.timing).reduce(
@@ -540,6 +549,7 @@ class AppKernelClass {
       { name: "jobSetup", completed: phases.jobSetupReady },
       { name: "auth", completed: phases.authReady },
       { name: "featureFlags", completed: phases.featureFlagsReady },
+      { name: "registration", completed: phases.registrationReady },
     ];
 
     let completedCount = 0;
@@ -588,6 +598,7 @@ class AppKernelClass {
       case "jobSetup": return "jobSetupReady";
       case "auth": return "authReady";
       case "featureFlags": return "featureFlagsReady";
+      case "registration": return "registrationReady";
     }
   }
 
@@ -678,6 +689,7 @@ class AppKernelClass {
           case "jobSetup": return PHASE_MIN_DISPLAY_MS.jobSetup;
           case "auth": return PHASE_MIN_DISPLAY_MS.auth;
           case "featureFlags": return PHASE_MIN_DISPLAY_MS.featureFlags;
+          case "registration": return PHASE_MIN_DISPLAY_MS.registration;
         }
       })();
       const enforceDelay = Math.max(0, minDisplay - actualDuration);
@@ -685,12 +697,17 @@ class AppKernelClass {
         await new Promise((resolve) => setTimeout(resolve, enforceDelay));
       }
 
+      // Wall-clock duration = actual fn time + forced display delay
+      // Ensures fast phases (e.g. auth on unauthenticated path) always record a non-zero value
+      const wallClockDuration = actualDuration + enforceDelay;
+
       // Mark phase complete first, then calculate progress with updated phases
       const updatedPhases = { ...this.state.phases, [phaseKey]: true };
       this.calculatePhaseProgress(updatedPhases);
       this.updateState({
         phases: updatedPhases,
-        timing: { ...this.state.timing, [phaseName]: actualDuration },
+         
+        timing: { ...this.state.timing, [phaseName]: wallClockDuration },
         phaseProgress: { ...this.state.phaseProgress },
       });
 
@@ -698,7 +715,7 @@ class AppKernelClass {
         logger
           .category("bootstrap")
           .debug(
-            `${phaseName} phase complete (${actualDuration}ms, +${enforceDelay}ms display delay)`,
+            `${phaseName} phase complete (${actualDuration}ms fn + ${enforceDelay}ms display = ${wallClockDuration}ms)`,
           );
       } else {
         logger
@@ -794,6 +811,7 @@ class AppKernelClass {
         servicesReady: false,
         authReady: false,
         featureFlagsReady: false,
+        registrationReady: false,
         appReady: false,
       },
       error: null,

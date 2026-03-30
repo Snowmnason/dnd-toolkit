@@ -65,6 +65,13 @@ export const PHASE_MESSAGES = {
     "Unlocking special powers...",
     "Preparing the arsenal...",
   ],
+  registration: [
+    "Assembling the party...",
+    "Briefing the guild members...",
+    "Registering with the adventurers' guild...",
+    "Signing the contracts...",
+    "Enlisting the companions...",
+  ],
   ready: [
     "Welcome, adventurer!",
     "The realm is ready for you.",
@@ -120,6 +127,9 @@ export function getPhaseMessage(phaseName: PhaseName): string {
       break;
     case "featureFlags":
       messages = PHASE_MESSAGES.featureFlags;
+      break;
+    case "registration":
+      messages = PHASE_MESSAGES.registration;
       break;
     case "ready":
       messages = PHASE_MESSAGES.ready;

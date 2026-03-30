@@ -120,11 +120,24 @@ export const AuthStateManager = {
    * Called when markSyncRequired() is invoked (login, stale re-auth, etc.).
    * Allows useSyncSplash to trigger without depending on appReady phase.
    *
+   * If sync is already required when subscribing (e.g., STALE bootstrap marked sync before
+   * this hook mounted), the callback fires immediately. This handles late subscribers.
+   *
    * @param callback - Function called when sync becomes required
    * @returns Unsubscribe function
    */
   onSyncRequired(callback: () => void): () => void {
     _syncRequiredCallbacks.push(callback);
+    
+    // If sync is already required, fire immediately (handles late subscribers, e.g., STALE bootstrap)
+    if (_pendingSyncRequired) {
+      try {
+        callback();
+      } catch (error) {
+        logger.category('auth').warn("Error in sync required callback:", error);
+      }
+    }
+    
     // Return unsubscribe function
     return () => {
       _syncRequiredCallbacks = _syncRequiredCallbacks.filter((cb) => cb !== callback);

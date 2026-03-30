@@ -268,11 +268,13 @@ export function Button(props: ButtonProps) {
   }
 
   const handleMouseEnter = () => {
-    // Mouse enter effects now handled via onPressIn
+    if (disabled || loading) return
+    hoverOpacity.value = withTiming(0.8, { duration: 100 })
   }
 
   const handleMouseLeave = () => {
-    // Mouse leave effects now handled via onPressOut
+    if (disabled || loading) return
+    hoverOpacity.value = withTiming(1, { duration: 100 })
   }
 
   // Update Reanimated values when loading changes
@@ -342,6 +344,8 @@ export function Button(props: ButtonProps) {
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         onPress={handlePress}
+        onHoverIn={Platform.OS === 'web' ? handleMouseEnter : undefined}
+        onHoverOut={Platform.OS === 'web' ? handleMouseLeave : undefined}
       >
         {isGhost ? (
           // Ghost variant: No gradient, simple centered container

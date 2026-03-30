@@ -55,7 +55,10 @@ Bridge: syncFromServer(flags) → FeatureFlags [so legacy hooks see server value
 Runtime checks: getFlag(), isEnabledWithContext()
 ```
 
-**Freshness Model:** `fetchedAt` timestamp drives cache validity (fresh <2h = instant, stale 2-4h = check, dead >4h = fallback to defaults + clear companion caches)
+**Freshness Model:** `fetchedAt` timestamp drives cache validity based on configured thresholds in `config/appsettings*.json` (`featureFlags.freshnessDays`, `featureFlags.staleDays`).
+- fresh: fetched within `freshnessDays` (default 4 days) → use cached flags without delay
+- stale: fetched between `freshnessDays` and `staleDays` (default 30 days) → attempt refresh, but continue with cached data if needed
+- dead: fetched older than `staleDays` → fallback to hardcoded defaults + clear companion caches
 
 **Merge Priority:** Per-User Override > Local Override > Server Flag > Hardcoded Default
 

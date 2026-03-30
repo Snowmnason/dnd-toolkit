@@ -18,6 +18,10 @@
 
 import { AuthStateManager } from "@/lib/auth/auth-state";
 import { beginSignOut } from "@/lib/auth/auth-subscription-manager";
+import {
+  ENTITLEMENT_OVERRIDE_CACHE_KEY_PREFIX,
+  OVERRIDE_CACHE_KEY_PREFIX,
+} from "@/lib/feature-flags/server-sync/state";
 import { determineExitErrorRedirect, determineExitRedirect } from "@/lib/navigation";
 import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
@@ -293,10 +297,7 @@ export async function performSignOutPhase2_ClearAndSignOut(
         await StorageManager.remove(`${STORAGE_KEYS.ENTITLEMENTS}:${userId}`);
         result.clearedKeys.push(`${STORAGE_KEYS.ENTITLEMENTS}:${userId}`);
 
-        // Entitlement overrides (per-user)
-        // Note: ENTITLEMENT_OVERRIDE_CACHE_KEY_PREFIX value needs to be inferred or imported
-        // For now, using the key pattern from the original code
-        const ENTITLEMENT_OVERRIDE_CACHE_KEY_PREFIX = "override:";
+        // Entitlement overrides (per-user) — use canonical prefix from feature-flags system
         await StorageManager.remove(
           `${STORAGE_KEYS.ENTITLEMENTS}:${ENTITLEMENT_OVERRIDE_CACHE_KEY_PREFIX}${userId}`
         );
@@ -332,9 +333,9 @@ export async function performSignOutPhase2_ClearAndSignOut(
       }
 
       // Clear feature flags override patterns (all user-specific override keys)
+      // Use canonical prefix from feature-flags system to ensure we match actual stored keys
       try {
         const { SecureStorage } = await import("@/system/Storage");
-        const OVERRIDE_CACHE_KEY_PREFIX = "flag_override:";
         const allKeys = await SecureStorage.getAllKeys();
         if (allKeys && Array.isArray(allKeys)) {
           const overridePattern = `${STORAGE_KEYS.FEATURE_FLAGS}:${OVERRIDE_CACHE_KEY_PREFIX}`;

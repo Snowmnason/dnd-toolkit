@@ -291,8 +291,9 @@ export default function Dropdown({
                 left: Math.max(anchor.x - SAFE_AREA, 0),
                 width: anchor.width + SAFE_AREA * 2,
                 padding: SAFE_AREA,
-                pointerEvents: 'box-none',
+                ...(Platform.OS === 'web' ? { pointerEvents: 'box-none' as const } : {}),
               }}
+              pointerEvents={Platform.OS === 'web' ? undefined : 'box-none'}
             >
               <Animated.View
                 style={[
@@ -304,10 +305,11 @@ export default function Dropdown({
                     borderRadius: S.radius.md,
                     maxHeight: computedMaxHeight,
                     transformOrigin: 'top center',
-                    pointerEvents: 'auto',
+                    ...(Platform.OS === 'web' ? { pointerEvents: 'auto' as const } : {}),
                   },
                   dropdownAnimStyle,
                 ]}
+                pointerEvents={Platform.OS === 'web' ? undefined : 'auto'}
               >
           {enableSearch && (
             <View

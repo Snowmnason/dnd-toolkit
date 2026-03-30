@@ -24,9 +24,6 @@ import { STORAGE_KEYS } from "@/maps";
 
 export type CacheFreshness = "fresh" | "stale" | "dead" | "none";
 
-/** @deprecated Use CacheFreshness directly; alias kept for backwards compatibility */
-export type SnapshotFreshness = CacheFreshness;
-
 export interface FreshnessThresholds {
   /** Cache younger than this (ms) is "fresh" — trust it, skip network */
   freshThresholdMs: number;
@@ -44,7 +41,8 @@ export interface FreshnessThresholds {
  *
  * Pure function: only depends on ageMs and thresholds. No side effects.
  *
- * @param ageMs      - Cache age in milliseconds (Date.now() - fetchedAt)
+ * @param ageMs      - Cache age in milliseconds (Date.now() - fetchedAt).
+ *                     Negative age (future timestamp) is treated as dead.
  * @param thresholds - Fresh and dead threshold boundaries
  * @returns Freshness tier: "fresh" | "stale" | "dead" | "none"
  */
@@ -52,6 +50,8 @@ export function classifyCacheAge(
   ageMs: number,
   thresholds: FreshnessThresholds,
 ): CacheFreshness {
+  // Clamp negative ages (future timestamps due to clock skew) as dead
+  if (ageMs < 0) return "dead";
   if (ageMs <= thresholds.freshThresholdMs) return "fresh";
   if (ageMs > thresholds.deadThresholdMs) return "dead";
   return "stale";
@@ -122,7 +122,7 @@ export function getDeadThresholdMs(): number {
  *   - otherwise           → "stale"
  *   - no data or error    → "none"
  */
-export async function evaluateSnapshotFreshness(): Promise<SnapshotFreshness> {
+export async function evaluateSnapshotFreshness(): Promise<CacheFreshness> {
   try {
     const snapshot = await StorageManager.get<{ fetchedAt?: number }>(
       STORAGE_KEYS.FEATURE_FLAGS,

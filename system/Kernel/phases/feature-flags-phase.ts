@@ -83,7 +83,13 @@ export async function featureFlagsPhase(): Promise<void> {
     //   none        → hardcoded defaults (first launch)
     if (freshness === "fresh") {
       const seeded = await seedManagerFromCache();
-      if (!seeded) {
+      if (seeded) {
+        state.bootstrapped = true;
+        notifySubscribers(state);
+        logger.category("bootstrap").debug(
+          "Feature flags: fresh snapshot seeded from cache and subscribers notified",
+        );
+      } else {
         logger.category("bootstrap").debug(
           "Fresh snapshot expected but cache read failed — using hardcoded fallback",
         );
@@ -131,8 +137,11 @@ export async function featureFlagsPhase(): Promise<void> {
       const { FeatureFlagsManager } = await import(
         "@/lib/feature-flags/server-sync/orchestrator"
       );
-      loadHardcodedFlags(FeatureFlagsManager.state);
-      FeatureFlagsManager.state.bootstrapped = true;
+      const fallbackState = FeatureFlagsManager.state;
+      loadHardcodedFlags(fallbackState);
+      fallbackState.bootstrapped = true;
+      notifySubscribers(fallbackState);
+      logger.category("bootstrap").debug("Feature flags phase fallback notified subscribers");
     } catch { /* Nothing more we can do */ }
   }
 }

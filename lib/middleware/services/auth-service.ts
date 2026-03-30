@@ -332,8 +332,8 @@ export async function authSignInWithIdToken(
  * - It's called during bootstrap by system/Services/service-initializer
  * - Keeps circular deps out of system/ layer
  */
-export function initializeAuthStrategies(): void {
-    const { AuthLayer, createUserAuthStrategy, createPublicAuthStrategy, createInviteAuthStrategy } = require('@/lib/auth');
+export async function initializeAuthStrategies(): Promise<void> {
+    const { AuthLayer, createUserAuthStrategy, createPublicAuthStrategy, createInviteAuthStrategy } = await import('@/lib/auth');
     
     AuthLayer.registerAuthStrategy('user', createUserAuthStrategy());
     AuthLayer.registerAuthStrategy('public', createPublicAuthStrategy());

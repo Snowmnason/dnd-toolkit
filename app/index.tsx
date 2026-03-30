@@ -66,9 +66,9 @@ export default function HomePage() {
     return () => clearTimeout(t);
   }, [isAuthChecked, hasAccount, router]);
 
-  console.log(
-    `[ui] [HomePage] render — appReady=${kernel.phases.appReady}, isAuthChecked=${isAuthChecked}, hasAccount=${hasAccount}`,
-  );
+  // console.log(
+  //   `[ui] [HomePage] render — appReady=${kernel.phases.appReady}, isAuthChecked=${isAuthChecked}, hasAccount=${hasAccount}`,
+  // );
 
   // While kernel is initializing, UIBlockerLayer (in _layout.tsx) shows the splash.
   // Render a fallback SplashScreen here too in case UIBlockerLayer is not yet mounted.
