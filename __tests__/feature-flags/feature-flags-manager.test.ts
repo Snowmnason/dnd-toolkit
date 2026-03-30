@@ -7,12 +7,15 @@
  * - Entitlement checks with expiry and clock skew
  * - Caching behavior
  *
- * NOTE: After Phase 1b refactoring, bootstrapFlags invokes the get_feature_flags
+ * NOTE: After Phase 1b refactoring, performFeatureFlagSync invokes the get_feature_flags
  * Edge Function instead of direct database queries.
  */
 
 import { FeatureFlagsManager } from "@/lib/feature-flags/server-sync/orchestrator";
+import { evaluateRollout } from "@/lib/feature-flags/server-sync/overrides";
 import { STORAGE_KEYS } from "@/maps";
+import { verifyDeviceClock } from "@/system/Kernel/clock-integrity";
+import { performFeatureFlagSync } from "@/lib/jobs/core/sync/feature-flags-sync-job";
 import { SecureStorage } from "@/system/Storage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -82,7 +85,6 @@ describe.skip("FeatureFlagsManager", () => {
     (SecureStorage.removeItem as any).mockResolvedValue(undefined);
 
     // Reset manager state
-    await FeatureFlagsManager.clearCache();
     FeatureFlagsManager.clearAllOverrides();
     (FeatureFlagsManager as any).bootstrapped = false;
     (FeatureFlagsManager as any).currentFlags = new Map();
@@ -92,7 +94,7 @@ describe.skip("FeatureFlagsManager", () => {
     vi.restoreAllMocks();
   });
 
-  describe("bootstrapFlags", () => {
+  describe("performFeatureFlagSync", () => {
     it("should fetch flags from server via Edge Function", async () => {
       const mockSupabase = createMockSupabase(
         vi.fn().mockResolvedValue({
@@ -115,8 +117,8 @@ describe.skip("FeatureFlagsManager", () => {
         }),
       );
 
-      await FeatureFlagsManager.initialize(mockSupabase as any);
-      await FeatureFlagsManager.bootstrapFlags();
+      FeatureFlagsManager.state.userId = "test-user";
+      await performFeatureFlagSync();
 
       expect(mockSupabase.functions.invoke).toHaveBeenCalledWith(
         "get_feature_flags",
@@ -138,8 +140,8 @@ describe.skip("FeatureFlagsManager", () => {
         fetchedAt: Date.now(),
       });
 
-      await FeatureFlagsManager.initialize(mockSupabase as any);
-      await FeatureFlagsManager.bootstrapFlags();
+      FeatureFlagsManager.state.userId = "test-user";
+      await performFeatureFlagSync();
 
       // Should not crash
       expect(FeatureFlagsManager.getFlag("testFlag", false)).toBe(false);
@@ -149,7 +151,7 @@ describe.skip("FeatureFlagsManager", () => {
   describe("getFlag", () => {
     beforeEach(async () => {
       const mockSupabase = createMockSupabase();
-      await FeatureFlagsManager.initialize(mockSupabase as any);
+      FeatureFlagsManager.state.userId = "test-user";
     });
 
     it("should return override value when set", () => {
@@ -199,7 +201,7 @@ describe.skip("FeatureFlagsManager", () => {
 
     beforeEach(async () => {
       mockSupabase = createMockSupabase();
-      await FeatureFlagsManager.initialize(mockSupabase as any);
+      FeatureFlagsManager.state.userId = "test-user";
     });
 
     it("should return override when set", async () => {
@@ -277,7 +279,7 @@ describe.skip("FeatureFlagsManager", () => {
 
   describe("verifyDeviceClock", () => {
     it("should return true when clock is valid", async () => {
-      const result = await FeatureFlagsManager.verifyDeviceClock();
+      const result = await verifyDeviceClock();
       expect(result).toBe(true);
     });
 
@@ -299,7 +301,7 @@ describe.skip("FeatureFlagsManager", () => {
 
     beforeEach(async () => {
       const mockSupabase = createMockSupabase();
-      await FeatureFlagsManager.initialize(mockSupabase as any);
+      FeatureFlagsManager.state.userId = "test-user";
     });
 
     describe("evaluateRollout precedence", () => {
@@ -318,7 +320,8 @@ describe.skip("FeatureFlagsManager", () => {
         // Setup rollout config (should be ignored)
         manager.cachedRollouts.set("testRollout", { percentage: 100 });
 
-        const result = await FeatureFlagsManager.evaluateRollout(
+        const result = await evaluateRollout(
+          FeatureFlagsManager.state,
           userId,
           "testRollout",
           false,
@@ -334,11 +337,7 @@ describe.skip("FeatureFlagsManager", () => {
         const manager = FeatureFlagsManager as any;
         manager.cachedRollouts.set("testRollout", { percentage: 0 });
 
-        const result = await FeatureFlagsManager.evaluateRollout(
-          userId,
-          "testRollout",
-          false,
-        );
+        const result = await evaluateRollout(FeatureFlagsManager.state, userId, "testRollout", false);
         expect(result).toBe(true); // Local override wins
       });
 
@@ -348,16 +347,12 @@ describe.skip("FeatureFlagsManager", () => {
         // Setup rollout config for 100% rollout
         manager.cachedRollouts.set("testRollout", { percentage: 100 });
 
-        const result = await FeatureFlagsManager.evaluateRollout(
-          userId,
-          "testRollout",
-          false,
-        );
+        const result = await evaluateRollout(FeatureFlagsManager.state, userId, "testRollout", false);
         expect(result).toBe(true); // Should be in 100% rollout
       });
 
       it("should return fallback when no rollout config exists", async () => {
-        const result = await FeatureFlagsManager.evaluateRollout(
+        const result = await evaluateRollout(FeatureFlagsManager.state, 
           userId,
           "unknownRollout",
           true,
@@ -372,17 +367,17 @@ describe.skip("FeatureFlagsManager", () => {
         manager.cachedRollouts.set("consistentFlag", { percentage: 50 });
 
         // Call multiple times - should be deterministic
-        const result1 = await FeatureFlagsManager.evaluateRollout(
+        const result1 = await evaluateRollout(FeatureFlagsManager.state, 
           userId,
           "consistentFlag",
           false,
         );
-        const result2 = await FeatureFlagsManager.evaluateRollout(
+        const result2 = await evaluateRollout(FeatureFlagsManager.state, 
           userId,
           "consistentFlag",
           false,
         );
-        const result3 = await FeatureFlagsManager.evaluateRollout(
+        const result3 = await evaluateRollout(FeatureFlagsManager.state, 
           userId,
           "consistentFlag",
           false,
@@ -397,7 +392,7 @@ describe.skip("FeatureFlagsManager", () => {
 
         // Test 0% rollout
         manager.cachedRollouts.set("zeroPercent", { percentage: 0 });
-        const zeroResult = await FeatureFlagsManager.evaluateRollout(
+        const zeroResult = await evaluateRollout(FeatureFlagsManager.state, 
           userId,
           "zeroPercent",
           false,
@@ -406,7 +401,7 @@ describe.skip("FeatureFlagsManager", () => {
 
         // Test 100% rollout
         manager.cachedRollouts.set("hundredPercent", { percentage: 100 });
-        const hundredResult = await FeatureFlagsManager.evaluateRollout(
+        const hundredResult = await evaluateRollout(FeatureFlagsManager.state, 
           userId,
           "hundredPercent",
           false,
@@ -427,19 +422,19 @@ describe.skip("FeatureFlagsManager", () => {
           seed: "seed2",
         });
 
-        const result1 = await FeatureFlagsManager.evaluateRollout(
+        const result1 = await evaluateRollout(FeatureFlagsManager.state, 
           userId,
           "seededFlag1",
           false,
         );
-        const result2 = await FeatureFlagsManager.evaluateRollout(
+        const result2 = await evaluateRollout(FeatureFlagsManager.state, 
           userId,
           "seededFlag2",
           false,
         );
 
         // Results may or may not differ, but should be consistent
-        const result1Again = await FeatureFlagsManager.evaluateRollout(
+        const result1Again = await evaluateRollout(FeatureFlagsManager.state, 
           userId,
           "seededFlag1",
           false,
@@ -466,8 +461,8 @@ describe.skip("FeatureFlagsManager", () => {
           }),
         );
 
-        await FeatureFlagsManager.initialize(mockSupabase as any);
-        await FeatureFlagsManager.bootstrapFlags();
+        FeatureFlagsManager.state.userId = "test-user";
+        await performFeatureFlagSync();
 
         const manager = FeatureFlagsManager as any;
         expect(manager.cachedRollouts.get("testFlag")).toEqual({
@@ -502,8 +497,8 @@ describe.skip("FeatureFlagsManager", () => {
           }),
         );
 
-        await FeatureFlagsManager.initialize(mockSupabase as any);
-        await FeatureFlagsManager.bootstrapFlags();
+        FeatureFlagsManager.state.userId = "test-user";
+        await performFeatureFlagSync();
 
         // Cache should be cleared
         expect(manager.cachedRollouts.size).toBe(0);
@@ -534,8 +529,8 @@ describe.skip("FeatureFlagsManager", () => {
           }),
         );
 
-        await FeatureFlagsManager.initialize(mockSupabase as any);
-        await FeatureFlagsManager.bootstrapFlags();
+        FeatureFlagsManager.state.userId = "test-user";
+        await performFeatureFlagSync();
 
         const manager = FeatureFlagsManager as any;
         expect(manager.cachedRollouts.get("cachedFlag")).toEqual({
@@ -543,13 +538,6 @@ describe.skip("FeatureFlagsManager", () => {
         });
       });
 
-      it("should clear persisted rollouts in clearCache", async () => {
-        await FeatureFlagsManager.clearCache();
-
-        expect(SecureStorage.removeItem).toHaveBeenCalledWith(
-          `${STORAGE_KEYS.FEATURE_FLAGS}:rollouts`,
-        );
-      });
     });
   });
 });

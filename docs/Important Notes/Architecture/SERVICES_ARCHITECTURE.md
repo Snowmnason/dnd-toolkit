@@ -135,7 +135,6 @@ System/Services/
     ├── supabase-realtime-adapter.ts (Provider) ✓
     ├── supabase-error-translation.ts (Utility)
     ├── supabase-client.ts (Utility)
-    ├── supabase-lazy.ts (Utility)
     └── supabase-initializer.ts (Initializer) ✓
 ```
 

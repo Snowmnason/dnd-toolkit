@@ -94,9 +94,11 @@ describe("mergeConfigForPlatform", () => {
     };
     const result = mergeConfigForPlatform(config, "ios");
 
-    expect(result.featureFlags?.testFlag?.enabled).toBe(false); // Overridden
-    expect(result.featureFlags?.testFlag?.description).toBe("Test flag"); // Preserved
-    expect(result.featureFlags?.anotherFlag?.enabled).toBe(false); // Unchanged
+    const testFlag = result.featureFlags?.testFlag;
+    const anotherFlag = result.featureFlags?.anotherFlag;
+    expect(typeof testFlag === "object" && testFlag !== null && testFlag.enabled).toBe(false); // Overridden
+    expect(typeof testFlag === "object" && testFlag !== null && testFlag.description).toBe("Test flag"); // Preserved
+    expect(typeof anotherFlag === "object" && anotherFlag !== null && anotherFlag.enabled).toBe(false); // Unchanged
   });
 
   it("replaces arrays entirely (no merge)", () => {

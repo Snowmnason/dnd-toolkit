@@ -60,7 +60,7 @@ User Action → Auth Manager → Sign-Out System (hook phases) → State Clear
 
 **Re-Auth Flow:**
 ```
-Bootstrap/OAuth → Sign-In System (token restore + DB sync) → State Update
+Bootstrap/OAuth → Freshness Check (skip if <4 days) → Sign-In System (token restore + DB sync) → State Update
 ```
 
 **Key Principles:**

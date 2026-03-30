@@ -11,9 +11,9 @@
 
 // Manager API (primary entry point for hooks/managers)
 export {
-    bootstrapFlags, clearAllOverrides, clearOverride, getAllFlags, getByKind,
-    getEntitlement, getFlag, getKind, initialize, isEnabledWithContext, setOverride, subscribe,
-    syncFromServer, toggle,
+    clearAllOverrides, clearOverride, getAllFlags, getByKind,
+    getEntitlement, getFlag, getKind, isEnabledWithContext, setOverride, subscribe,
+    toggle,
     toggleKind, verifyDeviceClock
 } from './feature-flags-manager';
 

@@ -5,7 +5,7 @@ import {
   StyleProp,
   View,
   ViewProps,
-  ViewStyle,
+  ViewStyle
 } from "react-native";
 import { GradientView } from "../Resuables/gradients";
 
@@ -72,24 +72,35 @@ export function ViewCust({
   ...rest
 }: ViewCustProps) {
   // Platform-aware pointerEvents handling:
-  // - On web: move to style (RN Web requires it in style, not as prop)
-  // - On native: keep as prop (native Views use pointerEvents as a prop, not style)
-  const baseStyle: any = Platform.OS === 'web' && pointerEvents
-    ? Array.isArray(style) 
-      ? [...style, { pointerEvents }]
-      : [style, { pointerEvents }]
-    : style;
+  // - Web: put in style (avoids deprecation warning)
+  // - Native: pass as prop (only way it works on iOS/Android)
+  const baseStyle: any = style;
+  
+  // Build platform-specific props
+  const platformProps = Platform.select({
+    web: {
+      // Web gets pointerEvents in style
+      style: pointerEvents
+        ? Array.isArray(baseStyle)
+          ? [...baseStyle, { pointerEvents }]
+          : [baseStyle, { pointerEvents }]
+        : baseStyle,
+      pointerEvents: undefined, // Don't pass as prop on web
+    },
+    default: {
+      // Native gets pointerEvents as prop
+      style: baseStyle,
+      pointerEvents, // Pass as prop on iOS/Android
+    },
+  });
 
-  // On native, pass pointerEvents as a prop; on web, it's already in baseStyle
-  const nativeProps = Platform.OS !== 'web' && pointerEvents
-    ? { ...rest, pointerEvents }
-    : rest;
+  const nativeProps = rest;
 
   // Gradient wrapper - OUTSIDE ScrollView so it's static and doesn't scroll
   // This allows the gradient background to remain fixed while content scrolls
   if (gradient && gradientColor) {
     // Split style into wrapper styles (border, radius, shadow, dimensions) and inner styles (padding, margin, flex layout)
-    const flatStyle = Array.isArray(baseStyle) ? Object.assign({}, ...baseStyle.filter(Boolean)) : (baseStyle || {});
+    const flatStyle = Array.isArray(platformProps.style) ? Object.assign({}, ...platformProps.style.filter(Boolean)) : (platformProps.style || {});
     
     const wrapperStyle: ViewStyle = {};
     const innerStyle: ViewStyle = {};
@@ -149,12 +160,17 @@ export function ViewCust({
             style={{ flex: 1, ...innerStyle }}
             contentContainerStyle={contentContainerStyle}
             showsVerticalScrollIndicator={showScrollIndicator}
+            {...(platformProps.pointerEvents !== undefined && { pointerEvents: platformProps.pointerEvents })}
             {...nativeProps}
           >
             {children}
           </ScrollView>
         ) : (
-          <View style={{ backgroundColor: 'transparent', ...innerStyle }} {...nativeProps}>
+          <View
+            style={{ backgroundColor: 'transparent', ...innerStyle }}
+            {...(platformProps.pointerEvents !== undefined && { pointerEvents: platformProps.pointerEvents })}
+            {...nativeProps}
+          >
             {children}
           </View>
         )}
@@ -166,9 +182,10 @@ export function ViewCust({
   if (scroll) {
     return (
       <ScrollView
-        style={baseStyle}
+        style={platformProps.style}
         contentContainerStyle={contentContainerStyle}
         showsVerticalScrollIndicator={showScrollIndicator}
+        {...(platformProps.pointerEvents !== undefined && { pointerEvents: platformProps.pointerEvents })}
         {...nativeProps}
       >
         {children}
@@ -178,7 +195,11 @@ export function ViewCust({
 
   // Otherwise, just a View (without gradient, without scroll)
   return (
-    <View style={baseStyle} {...nativeProps}>
+    <View
+      style={platformProps.style}
+      {...(platformProps.pointerEvents !== undefined && { pointerEvents: platformProps.pointerEvents })}
+      {...nativeProps}
+    >
       {children}
     </View>
   );

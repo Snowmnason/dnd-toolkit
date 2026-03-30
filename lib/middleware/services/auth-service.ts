@@ -29,9 +29,9 @@ import {
     type DatabaseProvider,
     type Session,
 } from '@/system/Services';
-// Note: Supabase-specific lazy loading is now handled via the DatabaseProvider adapter.
-// Use rawGetDatabaseProvider().isConfigured() instead of isSupabaseConfiguredLazy.
-// Use rawGetDatabaseProvider().getRawClient() instead of getSupabaseClientLazy.
+// Note: Low-level database provider access is now abstracted.
+// For raw client access, use isDatabaseProviderConfigured() + getDatabaseProviderRawClient().
+// These functions safely check provider readiness without triggering unnecessary initialization.
 
 // ─── Precondition Checks ───────────────────────────────────────────
 
@@ -259,25 +259,25 @@ export async function authGetUser(): Promise<ReturnType<AuthProvider['getUser']>
 // direct client access but don't go through the standard auth provider flow.
 
 /**
- * Check if the database (Supabase) provider is configured and ready.
- * Drop-in replacement for the old isSupabaseConfiguredLazy — no direct Supabase import needed.
+ * Check if the database provider is configured and ready.
+ * Provider-agnostic check (abstraction maintained, not Supabase-specific).
  */
-export function isSupabaseConfiguredLazy(): boolean {
+export function isDatabaseProviderConfigured(): boolean {
     return rawGetDatabaseProvider().isConfigured();
 }
 
 /**
- * Get the raw database client (Supabase SupabaseClient instance).
- * Uses the DatabaseProvider escape hatch — no direct Supabase import needed.
+ * Get the raw database client through the DatabaseProvider abstraction.
+ * Provider-agnostic (works with any database provider that exposes getRawClient).
  *
  * @throws Error if the provider is not configured or has no raw client
  */
-export function getSupabaseClientLazy() {
+export function getDatabaseProviderRawClient() {
     const client = rawGetDatabaseProvider().getRawClient?.();
     if (!client) {
         throw new Error(
             'Database provider is not configured or does not expose a raw client. ' +
-            'Ensure Supabase credentials are set before calling getSupabaseClientLazy.'
+            'Ensure provider credentials are set before calling getDatabaseProviderRawClient.'
         );
     }
     return client;
@@ -315,6 +315,31 @@ export async function authSignInWithIdToken(
     ensureAuthReady();
     const authProvider = await rawGetAuthProvider();
     return authProvider.signInWithIdToken(provider, token, options);
+}
+
+// ─── Bootstrap: Auth Strategies Registration ────────────────────────
+/**
+ * Register default auth strategies with AuthLayer.
+ * Called once during kernel bootstrap (after auth provider is initialized).
+ *
+ * Strategies:
+ * - 'user': Standard user session tokens
+ * - 'public': No token required (public endpoints)
+ * - 'invite': Invite-scoped tokens for unauthenticated access
+ *
+ * This is a middleware function because:
+ * - It bridges lib/auth strategies with the system-level AuthLayer
+ * - It's called during bootstrap by system/Services/service-initializer
+ * - Keeps circular deps out of system/ layer
+ */
+export async function initializeAuthStrategies(): Promise<void> {
+    const { AuthLayer, createUserAuthStrategy, createPublicAuthStrategy, createInviteAuthStrategy } = await import('@/lib/auth');
+    
+    AuthLayer.registerAuthStrategy('user', createUserAuthStrategy());
+    AuthLayer.registerAuthStrategy('public', createPublicAuthStrategy());
+    AuthLayer.registerAuthStrategy('invite', createInviteAuthStrategy());
+    
+    logger.category('bootstrap').info('Auth strategies registered: user, public, invite');
 }
 
 // Re-export Session type for consumers that import from @/lib/services

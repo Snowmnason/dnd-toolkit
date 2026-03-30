@@ -36,9 +36,10 @@ export {
     authUpdatePassword,
     getAuth,
     getAuthProvider, getAuthProviderSync, getAuthSync,
-    getSupabaseClientLazy,
+    getDatabaseProviderRawClient,
+    initializeAuthStrategies,
     isAuthConfigured,
-    isSupabaseConfiguredLazy,
+    isDatabaseProviderConfigured,
     type Session
 } from './auth-service';
 

@@ -6,8 +6,8 @@
  */
 
 import type { SafeModeState } from "@/lib/error";
+import type { PhaseName } from "@/localization";
 import type { NetworkStatus } from "@/system/Network";
-import type { PhaseName } from "@/lib/localization/phase-messages";
 
 /**
  * Phase lifecycle stages
@@ -21,7 +21,8 @@ export enum KernelPhase {
   SERVICES = "services",
   JOB_SETUP = "jobSetup",
   AUTH = "auth",
-  SYNC = "sync",
+  FEATURE_FLAGS = "featureFlags",
+  REGISTRATION = "registration",
   READY = "ready",
   ERROR = "error",
 }
@@ -93,7 +94,8 @@ export interface AppKernelState {
     servicesReady: boolean;
     jobSetupReady: boolean;
     authReady: boolean;
-    syncReady: boolean;
+    featureFlagsReady: boolean;
+    registrationReady: boolean;
     appReady: boolean;
   };
   error: KernelError | null;

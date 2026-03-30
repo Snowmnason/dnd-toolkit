@@ -4,8 +4,8 @@ import React, { useMemo } from 'react'
 import {
     ActivityIndicator,
     Platform,
+    Pressable,
     StyleProp,
-    TouchableOpacity,
     View,
     ViewStyle,
 } from 'react-native'
@@ -268,13 +268,13 @@ export function Button(props: ButtonProps) {
   }
 
   const handleMouseEnter = () => {
-    if (disabled || loading || Platform.OS !== 'web' || variant === 'ghost') return
-    hoverOpacity.value = withTiming(0.45, { duration: 150 })
+    if (disabled || loading) return
+    hoverOpacity.value = withTiming(0.8, { duration: 100 })
   }
 
   const handleMouseLeave = () => {
-    if (disabled || loading || Platform.OS !== 'web' || variant === 'ghost') return
-    hoverOpacity.value = withTiming(1, { duration: 150 })
+    if (disabled || loading) return
+    hoverOpacity.value = withTiming(1, { duration: 100 })
   }
 
   // Update Reanimated values when loading changes
@@ -339,14 +339,13 @@ export function Button(props: ButtonProps) {
 
   return (
     <Animated.View style={[scaleStyle, hoverStyle, style]}>
-      <TouchableOpacity
-        activeOpacity={1}
+      <Pressable
         disabled={disabled || loading}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         onPress={handlePress}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        onHoverIn={Platform.OS === 'web' ? handleMouseEnter : undefined}
+        onHoverOut={Platform.OS === 'web' ? handleMouseLeave : undefined}
       >
         {isGhost ? (
           // Ghost variant: No gradient, simple centered container
@@ -383,7 +382,7 @@ export function Button(props: ButtonProps) {
             {contentView}
           </ButtonView>
         )}
-      </TouchableOpacity>
+      </Pressable>
     </Animated.View>
   )
 }

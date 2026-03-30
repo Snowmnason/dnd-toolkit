@@ -7,7 +7,7 @@ import React, {
     useRef,
     useState,
 } from 'react'
-import { TouchableOpacity, View } from 'react-native'
+import { Pressable, View } from 'react-native'
 import { GroupView } from '../Resuables/SpecializedViews'
 
 interface ToggleItem {
@@ -156,9 +156,8 @@ export const ToggleGroup = forwardRef<ToggleGroupRef, ToggleGroupProps>(
             const borderColor = $('accent', theme)
 
             return (
-              <TouchableOpacity
+              <Pressable
                 key={item.key}
-                activeOpacity={0.85}
                 onPress={() => handleToggle(item.key)}
                 style={{
                   borderWidth: 1.5,
@@ -178,7 +177,7 @@ export const ToggleGroup = forwardRef<ToggleGroupRef, ToggleGroupProps>(
                 ) : (
                   item.icon
                 )}
-              </TouchableOpacity>
+              </Pressable>
             )
           })}
         </View>

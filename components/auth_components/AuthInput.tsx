@@ -1,6 +1,6 @@
 import { useScale } from '@/theme';
 import React from 'react';
-import { TextInput as RNTextInput, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, TextInput as RNTextInput, Text, View } from 'react-native';
 
 interface AuthInputProps {
   placeholder: string;
@@ -71,7 +71,7 @@ const AuthInput = React.forwardRef<RNTextInput, AuthInputProps>(({
       
       {/* Password Toggle Button */}
       {showPasswordToggle && onTogglePassword && (
-        <TouchableOpacity
+        <Pressable
           style={{
               position: 'absolute',
               right: S.space.xs,
@@ -85,10 +85,9 @@ const AuthInput = React.forwardRef<RNTextInput, AuthInputProps>(({
           }}
           onPress={onTogglePassword}
           disabled={!editable}
-          activeOpacity={0.7}
         >
           <Text style={{ fontSize: S.s(18) }}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
-        </TouchableOpacity>
+        </Pressable>
       )}
     </View>
   );

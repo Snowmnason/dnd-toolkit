@@ -43,6 +43,7 @@ export async function servicesPhase(): Promise<void> {
     const { getAllServiceStatuses } = await import("@/system/Services");
     
     await initializeServices();
+    // Auth strategies are registered within initializeServices by the middleware
 
     // Check service status after initialization
     const allStatusDetails = getAllServiceStatuses();

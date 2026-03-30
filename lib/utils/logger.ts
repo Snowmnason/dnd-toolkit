@@ -214,7 +214,8 @@ class Logger {
   constructor() {
     // Get app config to check debugLogs feature flag
     const appConfig = getAppConfig();
-    const debugLogsEnabled = appConfig.featureFlags.debugLogs?.enabled ?? false;
+    const debugLogs = appConfig.featureFlags.debugLogs;
+    const debugLogsEnabled = (typeof debugLogs === "object" && debugLogs !== null && debugLogs.enabled) ?? false;
 
     // Configure based on feature flag - allows production logging when enabled
     this.config = {
@@ -307,7 +308,7 @@ class Logger {
 
     const appConfig = getAppConfig();
     const categoryConfig = appConfig.featureFlags.loggerCategories;
-    if (!categoryConfig || !categoryConfig.categories) {
+    if (!categoryConfig || typeof categoryConfig !== "object" || categoryConfig === null || !categoryConfig.categories) {
       return [
         "auth",
         "navigation",
@@ -332,7 +333,7 @@ class Logger {
 
     // Build enabled categories from flags
     const enabled: LogCategory[] = [];
-    const categories = categoryConfig.categories;
+    const categories = typeof categoryConfig === "object" && categoryConfig !== null ? categoryConfig.categories : undefined;
     if (categories.auth !== false) enabled.push("auth");
     if (categories.navigation !== false) enabled.push("navigation");
     if (categories.api !== false) enabled.push("api");

@@ -1,5 +1,5 @@
 import { UseTheme } from '@/theme';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { panelConfigs } from './PanelData';
 
 interface BottomTabBarProps {
@@ -19,7 +19,7 @@ export function BottomTabBar({ activeTab, onTabChange }: BottomTabBarProps) {
   return (
     <View style={styles.container}>
       {panelConfigs.map((panel) => (
-        <TouchableOpacity
+        <Pressable
           key={panel.key}
           style={[
             styles.tab,
@@ -40,7 +40,7 @@ export function BottomTabBar({ activeTab, onTabChange }: BottomTabBarProps) {
           >
             {panel.title.split(' ')[0]}
           </Text>
-        </TouchableOpacity>
+        </Pressable>
       ))}
     </View>
   );

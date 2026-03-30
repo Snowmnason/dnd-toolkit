@@ -1,14 +1,14 @@
 import {
-  AppErrorBoundary,
-  TopBar,
-  UIBlockerLayer
+    AppErrorBoundary,
+    TopBar,
+    UIBlockerLayer
 } from "@/components";
 import { OfflineSyncNotificationLayer } from "@/components/offline";
 import {
-  CrashFallBack,
-  RouteErrorBoundary,
-  SafeModeErrorBoundary,
-  SafeModeScreen,
+    CrashFallBack,
+    RouteErrorBoundary,
+    SafeModeErrorBoundary,
+    SafeModeScreen,
 } from "@/components/SplashScreen";
 import { AppToastLayer, NotificationContainer } from "@/components/ui";
 import { AppToastProvider, ModalProvider, NotificationProvider } from "@/contexts";
@@ -18,39 +18,41 @@ import "@/components/modals/register-all-modals";
 import { Analytics, sessionManager } from "@/hooks/analytics";
 import { SafeModeReason, executeRecoveryAction } from "@/hooks/error";
 import { useClearSafeMode } from "@/hooks/error/use-safe-mode";
-import { AppKernelProvider, useAppKernel, useKernelLoadingSync } from "@/hooks/kernel";
+import { AppKernelProvider, useAppKernel, useKernelLoadingSync, useSyncSplash } from "@/hooks/kernel";
 import { useAnalyticsNavigation, useNavigate, useRouteConfig } from "@/hooks/navigation";
 import {
-  type AccessRole,
+    type AccessRole,
 } from "@/hooks/storage";
 import { logger } from "@/hooks/utils";
 import {
-  AppParamsStableProvider,
-  AppParamsVolatileProvider,
-  PlatformProvider,
-  ScaleProvider,
-  SubscriptionProvider,
-  ThemeProvider,
-  UseTheme,
-  useAppParamsStable,
-  useAppParamsVolatile,
-  usePlatform,
-  useUserId,
-  useUserRole,
-  useWorldId,
+    AppParamsStableProvider,
+    AppParamsVolatileProvider,
+    PlatformProvider,
+    ScaleProvider,
+    SubscriptionProvider,
+    ThemeProvider,
+    UseTheme,
+    useAppParamsStable,
+    useAppParamsVolatile,
+    usePlatform,
+    useUserId,
+    useUserRole,
+    useWorldId,
 } from "@/providers";
 import {
-  Stack,
-  useLocalSearchParams,
-  useRouter,
-  useSegments,
+    Stack,
+    useLocalSearchParams,
+    useRouter,
+    useSegments,
 } from "expo-router";
 import { useEffect } from "react";
 import { View } from "react-native";
 
-// Suppress known benign warning from React Navigation / Expo Router
-// "Blocked aria-hidden on an element because its descendant retained focus"
-// This is a focus management timing issue in the navigation library and doesn't affect functionality
+// Suppress known benign warnings from React Navigation / Expo Router / React Native Web
+// 1. "Blocked aria-hidden on an element because its descendant retained focus"
+//    - Focus management timing issue in navigation library (doesn't affect functionality)
+// 2. "props.pointerEvents is deprecated. Use style.pointerEvents"
+//    - Coming from third-party components during bootstrap; we're fixing this proactively in our codebase
 if (typeof window !== "undefined") {
   const originalWarn = console.warn;
 
@@ -58,10 +60,11 @@ if (typeof window !== "undefined") {
     try {
       const message = args[0]?.toString?.() || "";
       if (
-        message.includes("Blocked aria-hidden") &&
-        message.includes("descendant retained focus")
+        (message.includes("Blocked aria-hidden") &&
+          message.includes("descendant retained focus")) ||
+        message.includes("props.pointerEvents is deprecated")
       ) {
-        return; // Suppress this specific warning
+        return; // Suppress these specific warnings
       }
     } catch {
       // Ignore errors in filter logic, pass through to original warn
@@ -97,6 +100,7 @@ function RootLayoutContent() {
   // Shows splash screen while kernel initializes, updates phase progress,
   // and hides automatically when appReady or on kernel error.
   useKernelLoadingSync();
+  useSyncSplash();
 
   // FUTURE: Offline conflict resolution (disabled for v1 - LWW only)
   // v1 uses automatic Last-Write-Wins for all conflicts

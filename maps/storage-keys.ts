@@ -89,4 +89,7 @@ export const STORAGE_KEYS = {
   FEATURE_FLAGS: "dnd:feature_flags:v1",
   ENTITLEMENTS: "dnd:entitlements:v1",
   CLOCK_INVALID: "dnd:clock_invalid",
+
+  // Kernel clock integrity (device time-manipulation detection)
+  LAST_CLOCK_CHECK: "dnd:kernel:last_clock_check",
 } as const;

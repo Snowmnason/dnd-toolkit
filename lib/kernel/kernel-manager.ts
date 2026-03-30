@@ -57,15 +57,6 @@ export async function initializeNetworkTelemetry(): Promise<void> {
 }
 
 /**
- * Offline Sync Initialization
- * Called by sync-phase during bootstrap
- */
-export async function initializeSync(): Promise<void> {
-  const { OnlineSyncManager } = await import("@/lib/offline");
-  await OnlineSyncManager.initialize();
-}
-
-/**
  * Get authenticated user ID
  * Called by user-phase to determine if user is authenticated
  * Returns undefined if no authenticated user

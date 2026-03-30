@@ -102,4 +102,5 @@
   ,"cacheCapacity.softThreshold": "Soft threshold is 95% in dev for lenient eviction; 90% in production to evict more aggressively and maintain headroom"
   ,"cacheCapacity.targetAfterEviction": "Target post-eviction size is 80% in dev for less aggressive cleanup; 70% in production to free more space and prevent thrashing"
   ,"cacheCapacity.description": "LRU cache capacity description differs between dev (testing-focused) and production (mobile-optimized)"
+  ,"kernel.featureFlags.description": "Kernel feature-flag sync timeout description may differ between dev and production while preserving identical behavior"
 }

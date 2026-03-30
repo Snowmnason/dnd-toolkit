@@ -1,8 +1,9 @@
 import { useUIBlocker } from '@/contexts/UIBlockerContext';
+import { AuthStateManager } from '@/lib/auth/auth-state';
 import type { PhaseProgress } from '@/lib/kernel/kernel-manager';
 import { getKernelState, onKernelStateChange } from '@/lib/kernel/kernel-manager';
-import { getPhaseMessage } from '@/lib/localization/phase-messages';
 import { logger } from '@/lib/utils/logger';
+import { getPhaseMessage } from '@/localization';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { useAppKernel } from './use-app-kernel';
 
@@ -41,11 +42,15 @@ export function useKernelLoadingSync(): void {
         message: "All systems ready!",
       });
       
-      // Hide after 500ms so user sees 100% state
+      // Hide after 50ms — if sync is required, defer hide to useSyncSplash
       const hideTimer = setTimeout(() => {
+        if (AuthStateManager.isSyncRequired()) {
+          logger.category('bootstrap').debug('[KERNEL_BOOTSTRAP] Sync required — deferring hide to sync splash');
+          return;
+        }
         logger.category('bootstrap').debug('[KERNEL_BOOTSTRAP] App ready — hiding loading blocker');
         setLoading(false);
-      }, 500);
+      }, 50);
       
       return () => clearTimeout(hideTimer);
     } else if (kernel.error) {

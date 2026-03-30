@@ -12,6 +12,7 @@
 
 import { FeatureFlagsManager } from "@/lib/feature-flags/server-sync/orchestrator";
 import { isUserInCohort } from "@/pure-algo-immutables";
+import { performFeatureFlagSync } from "@/lib/jobs/core/sync/feature-flags-sync-job";
 import { SecureStorage } from "@/system/Storage";
 import type { CachedCohort, CachedUserCohortMembership } from "@/type-definitions/featureFlagTypes";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -85,7 +86,6 @@ describe.skip("Phase 3: Cohorts Integration", () => {
     (SecureStorage.setJSON as any).mockResolvedValue(undefined);
     (SecureStorage.removeItem as any).mockResolvedValue(undefined);
 
-    await FeatureFlagsManager.clearCache();
     FeatureFlagsManager.clearAllOverrides();
     (FeatureFlagsManager as any).bootstrapped = false;
     (FeatureFlagsManager as any).currentFlags = new Map();
@@ -135,8 +135,8 @@ describe.skip("Phase 3: Cohorts Integration", () => {
         }),
       );
 
-        await FeatureFlagsManager.initialize("user-123");
-      await FeatureFlagsManager.bootstrapFlags();
+        FeatureFlagsManager.state.userId = "user-123";
+      await performFeatureFlagSync();
 
       // Verify cohorts were cached to storage
       expect(SecureStorage.setJSON).toHaveBeenCalledWith(
@@ -173,10 +173,10 @@ describe.skip("Phase 3: Cohorts Integration", () => {
         vi.fn().mockRejectedValue(new Error("Network error")),
       );
 
-        await FeatureFlagsManager.initialize("user-123");
+        FeatureFlagsManager.state.userId = "user-123";
       // Should fail gracefully and load from cache
       try {
-        await FeatureFlagsManager.bootstrapFlags();
+        await performFeatureFlagSync();
       } catch {
         // Expected to fail
       }
@@ -212,8 +212,8 @@ describe.skip("Phase 3: Cohorts Integration", () => {
         }),
       );
 
-        await FeatureFlagsManager.initialize("user-123");
-      await FeatureFlagsManager.bootstrapFlags();
+        FeatureFlagsManager.state.userId = "user-123";
+      await performFeatureFlagSync();
 
       // Verify memberships were cached
       expect(SecureStorage.setJSON).toHaveBeenCalledWith(
@@ -248,8 +248,8 @@ describe.skip("Phase 3: Cohorts Integration", () => {
         }),
       );
 
-        await FeatureFlagsManager.initialize("user-123");
-      await FeatureFlagsManager.bootstrapFlags();
+        FeatureFlagsManager.state.userId = "user-123";
+      await performFeatureFlagSync();
 
       // Cohorts setJSON call should either not happen or use an empty object
       const cohortStoreCalls = (SecureStorage.setJSON as any).mock.calls.filter(
@@ -328,8 +328,8 @@ describe.skip("Phase 3: Cohorts Integration", () => {
         environment: "production",
       } as any;
 
-        await FeatureFlagsManager.initialize("user-123");
-      await FeatureFlagsManager.bootstrapFlags();
+        FeatureFlagsManager.state.userId = "user-123";
+      await performFeatureFlagSync();
 
       const enabled = FeatureFlagsManager.isEnabledWithContext("betaFeature");
       expect(enabled).toBe(true);
@@ -384,9 +384,9 @@ describe.skip("Phase 3: Cohorts Integration", () => {
         environment: "production",
       } as any;
 
-        await FeatureFlagsManager.initialize("user-123");
+        FeatureFlagsManager.state.userId = "user-123";
       // User is not bucketed (only 20% get in), so flag should be disabled
-      await FeatureFlagsManager.bootstrapFlags();
+      await performFeatureFlagSync();
 
       // Most likely user won't be bucketed into 20% cohort
       // This test verifies the disable path works
@@ -457,8 +457,8 @@ describe.skip("Phase 3: Cohorts Integration", () => {
         environment: "production",
       } as any;
 
-        await FeatureFlagsManager.initialize("user-123");
-      await FeatureFlagsManager.bootstrapFlags();
+        FeatureFlagsManager.state.userId = "user-123";
+      await performFeatureFlagSync();
 
       const enabled = FeatureFlagsManager.isEnabledWithContext("disabledFeature");
       expect(enabled).toBe(false); // Base flag disabled, so flag is disabled (cohort is irrelevant)
@@ -527,8 +527,8 @@ describe.skip("Phase 3: Cohorts Integration", () => {
         environment: "production",
       } as any;
 
-        await FeatureFlagsManager.initialize("user-123");
-      await FeatureFlagsManager.bootstrapFlags();
+        FeatureFlagsManager.state.userId = "user-123";
+      await performFeatureFlagSync();
 
       const enabled = FeatureFlagsManager.isEnabledWithContext("enterpriseOnly");
       expect(enabled).toBe(true);
@@ -570,8 +570,8 @@ describe.skip("Phase 3: Cohorts Integration", () => {
         environment: "production",
       };
 
-        await FeatureFlagsManager.initialize("user-123");
-      await FeatureFlagsManager.bootstrapFlags();
+        FeatureFlagsManager.state.userId = "user-123";
+      await performFeatureFlagSync();
 
       const enabled = FeatureFlagsManager.isEnabledWithContext("simpleFlag");
       expect(enabled).toBe(true);
@@ -608,8 +608,8 @@ describe.skip("Phase 3: Cohorts Integration", () => {
         environment: "production",
       } as any;
 
-      await FeatureFlagsManager.initialize("user-123");
-      await FeatureFlagsManager.bootstrapFlags();
+      FeatureFlagsManager.state.userId = "user-123";
+      await performFeatureFlagSync();
 
       // validateFlagDependencies should have logged warning
       // (This is called internally during bootstrap)

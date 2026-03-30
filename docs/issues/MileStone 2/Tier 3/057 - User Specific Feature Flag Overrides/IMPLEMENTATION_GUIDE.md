@@ -31,9 +31,7 @@
   - `getFlag()`: Priority-based flag resolution
   - `loadCachedRemoteOverrides()`: Offline override support
 
-#### 2. Legacy Bridge (`lib/feature-flags/feature-flags.ts`)
-- **Purpose**: Sync server values to legacy config system
-- **Key Method**: `syncFromServer()`: Bulk updates legacy flags + notifies listeners
+
 
 #### 3. Logger Integration (`lib/utils/logger.ts`)
 - **Purpose**: Runtime logging control via feature flags
@@ -80,10 +78,6 @@ FeatureFlagsManager.bootstrapFlags()
     ├── Fetch server flags (production only)
     ├── Fetch user overrides (production only)
     └── Load hardcoded config (dev only)
-    ↓
-Kernel Bridge Phase
-    ├── FeatureFlags.syncFromServer(serverFlags)
-    └── logger.reconfigure(debugLogsEnabled)
     ↓
 Runtime Ready
 ```
@@ -138,15 +132,6 @@ getFlag(name: string): boolean {
   // 4. Hardcoded fallback
   return this.getHardcodedFallback(name);
 }
-```
-
-### Bridge Pattern
-```typescript
-// In AppKernel after bootstrap
-const serverFlags = await FeatureFlagsManager.bootstrapFlags();
-FeatureFlags.syncFromServer(serverFlags);
-logger.reconfigure(FeatureFlagsManager.getFlag('debugLogs', false));
-```
 
 ### Defensive Filtering
 - **Expiry Checks**: Client-side validation of override expiration
@@ -164,7 +149,6 @@ logger.reconfigure(FeatureFlagsManager.getFlag('debugLogs', false));
 - Override precedence over server flags
 - Expired/revoked override filtering
 - Offline cached override usage
-- Bridge sync to legacy system
 - Logger reconfiguration after bootstrap
 
 ## Future Considerations

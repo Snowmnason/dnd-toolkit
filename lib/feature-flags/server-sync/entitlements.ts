@@ -1,67 +1,28 @@
 /**
  * Server Sync: Entitlement & Clock Verification
  *
- * Handles premium entitlement checks, device clock integrity verification,
- * and user role resolution from cached entitlements.
+ * Handles premium entitlement checks, user role resolution from cached
+ * entitlements, and delegates clock integrity to the kernel.
  *
  * Security policy: fail-secure (deny access if clock is invalid or server unavailable).
  */
-import { getAppConfig } from "@/config";
 import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
 import { getDatabase } from "@/lib/middleware/services/database-service";
 import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
+import { isClockInvalid } from "@/system/Kernel/clock-integrity";
 import { isOverrideActive } from "./overrides";
 import { type ServerSyncState } from "./state";
 
 // ==========================================
-// Clock Verification
+// Clock Verification (delegates to kernel)
 // ==========================================
 
-function getClockSkewToleranceMs(): number {
-  const config = getAppConfig();
-  return config.remoteConfig?.clockSkewToleranceMs || 60 * 1000;
-}
+export { verifyDeviceClock } from "@/system/Kernel/clock-integrity";
 
-export async function checkClockValidity(state: ServerSyncState): Promise<boolean> {
-  try {
-    const clockInvalid = await StorageManager.get<{ detected: number; skew: number }>(
-      STORAGE_KEYS.CLOCK_INVALID,
-    );
-    return !!clockInvalid;
-  } catch {
-    return false;
-  }
-}
-
-export async function verifyDeviceClock(_state: ServerSyncState): Promise<boolean> {
-  try {
-    const lastCheck = await StorageManager.get<{ timestamp: number }>(
-      "dnd:last_clock_check",
-    );
-
-    if (!lastCheck?.timestamp) {
-      await StorageManager.set("dnd:last_clock_check", { timestamp: Date.now() });
-      return true;
-    }
-
-    const now = Date.now();
-    const skew = lastCheck.timestamp - now;
-    const tolerance = getClockSkewToleranceMs();
-
-    if (skew > tolerance) {
-      logger.category("feature_flags").error("Clock manipulation detected", { skew, tolerance });
-      await StorageManager.set(STORAGE_KEYS.CLOCK_INVALID, { detected: now, skew });
-      return false;
-    }
-
-    await StorageManager.set("dnd:last_clock_check", { timestamp: now });
-    return true;
-  } catch (error) {
-    logger.category("feature_flags").error("Clock verification failed", error);
-    return true; // Default to valid (don't block on verification error)
-  }
+export async function checkClockValidity(_state: ServerSyncState): Promise<boolean> {
+  return isClockInvalid();
 }
 
 // ==========================================

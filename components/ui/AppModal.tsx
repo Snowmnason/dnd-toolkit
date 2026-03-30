@@ -3,19 +3,19 @@ import { $, tone, useScale, UseTheme } from "@/theme";
 import * as Haptics from "expo-haptics";
 import React, { useEffect, useMemo } from "react";
 import {
-  BackHandler,
-  Dimensions,
-  Modal,
-  Platform,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    BackHandler,
+    Dimensions,
+    Modal,
+    Platform,
+    Pressable,
+    StyleSheet,
+    View,
 } from "react-native";
 import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    Easing,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from "react-native-reanimated";
 import { Body, Heading } from "./AppText";
 import { Card } from "./ElevatedView";
@@ -276,14 +276,12 @@ export function AppModal({
 
   return (
     <Modal transparent visible={rendered} animationType="none">
-      <TouchableOpacity
-        activeOpacity={1}
+      <Pressable
         onPress={handleOutsidePress}
         style={[styles.backdrop, { backgroundColor: overlayColorValue }]}
       >
         <View style={styles.center}>
-          <TouchableOpacity
-            activeOpacity={1}
+          <Pressable
             onPress={(e) => e.stopPropagation()}
           >
             <Animated.View
@@ -295,8 +293,7 @@ export function AppModal({
                   : { width: modalWidth, height: height ?? "auto" },
               ]}
             >
-              <TouchableOpacity
-                activeOpacity={1}
+              <Pressable
                 onPress={(e) => e.stopPropagation()}
               >
                 {cardContainer ? (
@@ -380,11 +377,11 @@ export function AppModal({
                     {children}
                   </View>
                 )}
-              </TouchableOpacity>
+              </Pressable>
             </Animated.View>
-          </TouchableOpacity>
+          </Pressable>
         </View>
-      </TouchableOpacity>
+      </Pressable>
     </Modal>
   );
 }

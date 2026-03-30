@@ -3,6 +3,19 @@ import { clearAllUserData, getAllSecureStorageKeys, getPrivacyStorageBackend } f
 import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
+import { classifyCacheAge } from "@/pure-algo-immutables";
+
+// In-memory flag: signals that data sync should run after appReady.
+// Set by performPostAuthSetup (login or stale re-auth). Not persisted — resets on launch.
+let _pendingSyncRequired = false;
+
+// Post-bootstrap full sync flag: if true, run full sync immediately after bootstrap completes.
+// Used when we detect a reason to do a full sync (e.g., force refresh, cache validation failed).
+// Not persisted — resets on launch. Bootstrap splash → Sync splash (no flicker).
+let _postBootstrapFullSync = false;
+
+// Callbacks registered via onSyncRequired() — fired when markSyncRequired() is called
+let _syncRequiredCallbacks: (() => void)[] = [];
 
 /**
  * Helper: determine whether a session indicates an email-confirmed user.
@@ -56,6 +69,80 @@ export interface CacheMetadata {
 }
 
 export const AuthStateManager = {
+
+  // ─── Post-auth sync signalling ─────────────────────────────────────────────
+  // markSyncRequired / isSyncRequired / clearSyncRequired coordinate the
+  // UIBlocker sync splash (useSyncSplash) that runs after appReady.
+  //
+  // Called from:
+  // - performPostAuthSetup (login or reauth at runtime)
+  // - authPhase (bootstrap) when STALE session is detected (defers re-auth to sync-splash)
+  //
+  // Flow:
+  // 1. authPhase detects STALE session → calls markSyncRequired()
+  // 2. Listener callbacks fire immediately → useSyncSplash React state updates
+  // 3. appReady fires → useSyncSplash checks isSyncRequired() (already true)
+  // 4. useSyncSplash calls performFullSync with progress callback
+  // 5. After jobs → clearSyncRequired()
+  markSyncRequired(): void {
+    _pendingSyncRequired = true;
+    // Fire all registered callbacks immediately when sync becomes required
+    _syncRequiredCallbacks.forEach((cb) => {
+      try {
+        cb();
+      } catch (error) {
+        logger.category('auth').warn("Error in sync required callback:", error);
+      }
+    });
+  },
+  isSyncRequired(): boolean { return _pendingSyncRequired; },
+  clearSyncRequired(): void { _pendingSyncRequired = false; },
+
+  // ─── Post-bootstrap full sync flag ─────────────────────────────────────────
+  // markPostBootstrapFullSync / isPostBootstrapFullSyncRequested / clearPostBootstrapFullSync
+  // coordinate an immediate full sync after bootstrap with no UI flicker.
+  //
+  // Usage:
+  // - Call markPostBootstrapFullSync() from auth-phase if conditions warrant a full sync
+  // - useSyncSplash will see this flag and start full sync immediately as appReady fires
+  // - Bootstrap splash → Sync splash transition is seamless (both UIBlocker calls)
+  //
+  // Example: Force full sync on specific conditions (cache validation, force refresh, etc.)
+  markPostBootstrapFullSync(): void {
+    _postBootstrapFullSync = true;
+    logger.category('auth').debug('[AuthStateManager] Post-bootstrap full sync marked');
+  },
+  isPostBootstrapFullSyncRequested(): boolean { return _postBootstrapFullSync; },
+  clearPostBootstrapFullSync(): void { _postBootstrapFullSync = false; },
+
+  /**
+   * Subscribe to sync required notifications.
+   * Called when markSyncRequired() is invoked (login, stale re-auth, etc.).
+   * Allows useSyncSplash to trigger without depending on appReady phase.
+   *
+   * If sync is already required when subscribing (e.g., STALE bootstrap marked sync before
+   * this hook mounted), the callback fires immediately. This handles late subscribers.
+   *
+   * @param callback - Function called when sync becomes required
+   * @returns Unsubscribe function
+   */
+  onSyncRequired(callback: () => void): () => void {
+    _syncRequiredCallbacks.push(callback);
+    
+    // If sync is already required, fire immediately (handles late subscribers, e.g., STALE bootstrap)
+    if (_pendingSyncRequired) {
+      try {
+        callback();
+      } catch (error) {
+        logger.category('auth').warn("Error in sync required callback:", error);
+      }
+    }
+    
+    // Return unsubscribe function
+    return () => {
+      _syncRequiredCallbacks = _syncRequiredCallbacks.filter((cb) => cb !== callback);
+    };
+  },
 
   // Get current auth state
   // IMPORTANT: Always returns an object with hasAccount as a boolean (never null/undefined)
@@ -409,9 +496,10 @@ export const AuthStateManager = {
   }> {
     logger.category('auth').info(`[VERIFY:START] Verifying world ${worldId}, forceFresh=${options?.forceFresh}`);
 
-    // Cache freshness window: only trust cache younger than 4 hours
-    // After 4 hours, always refresh via updateStorageCache service to catch permission changes
-    const CACHE_FRESH_THRESHOLD = 4 * 60 * 60 * 1000; // 4 hours
+    // Cache freshness: uses shared classifyCacheAge for consistent freshness classification.
+    // Fresh (<4h): trust cache. Stale (≥4h): refresh via updateStorageCache service.
+    // Dead tier disabled (Infinity) — world access only needs fresh vs stale.
+    const WORLD_ACCESS_FRESH_MS = 4 * 60 * 60 * 1000; // 4 hours
     const cacheKey = `world_access_${worldId}`;
     const metaKey = `world_access_meta_${worldId}`;
 
@@ -443,12 +531,15 @@ export const AuthStateManager = {
       const cacheMeta = await backend.getJSON<CacheMetadata>(metaKey);
 
       const cacheAge = cacheMeta ? Date.now() - cacheMeta.timestamp : Infinity;
-      const isCacheFresh = cacheAge < CACHE_FRESH_THRESHOLD;
+      const freshness = classifyCacheAge(cacheAge, {
+        freshThresholdMs: WORLD_ACCESS_FRESH_MS,
+        deadThresholdMs: Infinity,
+      });
 
-      logger.category('auth').info(`[VERIFY:CACHE] world=${worldId}, hasCache=${cached !== null}, ageMs=${cacheAge}, isCacheFresh=${isCacheFresh}`);
+      logger.category('auth').info(`[VERIFY:CACHE] world=${worldId}, hasCache=${cached !== null}, ageMs=${cacheAge}, freshness=${freshness}`);
 
       // Step 2: If cache is fresh AND exists, trust it
-      if (isCacheFresh && cached !== null) {
+      if (freshness === "fresh" && cached !== null) {
         logger.category('auth').info(`[VERIFY:FRESH] Cache fresh for world ${worldId}, trusting cache, hasAccess=${cached}`);
         return {
           hasAccess: cached === true,

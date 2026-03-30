@@ -13,40 +13,13 @@
  */
 
 import { logger } from '@/lib/utils/logger';
+import { verifyDeviceClock as checkDeviceClock } from '@/system/Kernel/clock-integrity';
 import { type FlagContext } from './evaluation/conditions';
 import type { FeatureFlagKind, FeatureFlagName } from './local-flags';
 import { FeatureFlags } from './local-flags';
 import { FeatureFlagsManager } from './server-sync/orchestrator';
 
-// ─── Initialization ──────────────────────────────────────────────────────────
-
-/**
- * Initialize the feature flags system.
- * Called by AppKernel during bootstrap.
- * 
- * Does NOT require Supabase client — realtime subscriptions will lazily
- * obtain the provider internally if available.
- */
-export async function initialize(userId?: string): Promise<void> {
-  try {
-    await FeatureFlagsManager.initialize(userId);
-    logger.category('bootstrap').info('Feature flags initialized (server-driven + config fallback)');
-  } catch (error) {
-    logger.category('feature_flags').warn('Server-driven flags failed to initialize; using config fallback', error);
-  }
-}
-
-/**
- * Bootstrap flags from server (fetch once at startup).
- * Non-blocking; logs errors, never throws.
- */
-export async function bootstrapFlags(): Promise<void> {
-  try {
-    await FeatureFlagsManager.bootstrapFlags();
-  } catch (error) {
-    logger.category('feature_flags').debug('Server bootstrap failed; config flags remain active', error);
-  }
-}
+// ─── Clock Verification ──────────────────────────────────────────────────────
 
 /**
  * Verify device clock is in sync with server (±60s tolerance).
@@ -54,7 +27,7 @@ export async function bootstrapFlags(): Promise<void> {
  */
 export async function verifyDeviceClock(): Promise<boolean> {
   try {
-    return await FeatureFlagsManager.verifyDeviceClock();
+    return await checkDeviceClock();
   } catch (error) {
     logger.category('feature_flags').warn('Device clock verification failed', error);
     return true;
@@ -172,15 +145,4 @@ export function subscribe(callback: (flags: Record<string, any>) => void): () =>
     unsubscribeServer();
     unsubscribeConfig();
   };
-}
-
-// ─── Sync ────────────────────────────────────────────────────────────────────
-
-/**
- * Sync config-driven flags with server-resolved values.
- * Called after server bootstrap so config singleton reflects server state.
- * @internal Used by bootstrap process
- */
-export function syncFromServer(serverFlags: Record<string, any>): void {
-  FeatureFlags.syncFromServer(serverFlags);
 }

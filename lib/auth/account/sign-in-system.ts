@@ -6,21 +6,15 @@
  * - Token restore / re-auth (bootstrap, email-link, oauth, password-reset)
  * - Native ID token sign-in (Google, Apple)
  *
- * All three share the same post-auth setup (Steps 2-4). Only Step 1 differs.
- *
- * Flow:
- * 1. Establish session (varies by entry point)
- * 2. Store HAS_ACCOUNT flag
- * 3. Sync data (profile + worlds) + update LAST_LOGGED_IN timestamp
- * 4. Determine redirect based on profile completeness + context
- *
  * Entry points:
  *   performSignIn(email, password)         — user typed credentials
- *   performReAuth(tokens, context)         — automatic restore (bootstrap, oauth, etc.)
+ *   performReAuth(tokens, context)         — automatic restore (delegates to performReAuthJob)
  *   performSignInWithIdToken(provider, t)  — Google/Apple native
+ *
+ * Note: performReAuth delegates to lib/jobs/core/auth/reauth-job.ts for orchestration.
+ * This matches the sign-out-system pattern where the system file is the main entry point.
  */
 
-import { JobsManager } from '@/lib/jobs';
 import { buildRoute, determineEnterErrorRedirect, determineEnterRedirect } from '@/lib/navigation';
 import { logger } from '@/lib/utils/logger';
 import { STORAGE_KEYS } from '@/maps';
@@ -77,7 +71,7 @@ export interface ReAuthError {
  *
  * Steps:
  * 2. Set HAS_ACCOUNT flag
- * 3. Sync data (JobsManager) + update LAST_LOGGED_IN timestamp
+ * 3. Mark sync required (deferred to post-appReady) + update LAST_LOGGED_IN timestamp
  * 4. Determine redirect (profile-based, with pending invite check)
  *
  * @param userId - Authenticated user ID
@@ -101,18 +95,12 @@ async function performPostAuthSetup(
   }
 
   // =====================================================================
-  // STEP 3: SYNC DATA + UPDATE LAST_LOGGED_IN
+  // STEP 3: MARK SYNC REQUIRED + UPDATE LAST_LOGGED_IN
   // =====================================================================
-  let worldIds: string[] = [];
-
-  try {
-    const syncResult = await JobsManager.performSync({ mode: 'automatic', direction: 'download' });
-    worldIds = syncResult.worlds?.worldIds || [];
-    logger.category('auth').debug(`[${context}] Post-auth: Sync complete, worlds: ${worldIds.length}`);
-  } catch (error) {
-    logger.category('auth').warn(`[${context}] Post-auth: Sync failed`, error);
-    // Non-blocking
-  }
+  // worldIds from sync are not used for routing — sync runs post-appReady via useSyncSplash
+  const worldIds: string[] = [];
+  AuthStateManager.markSyncRequired();
+  logger.category('auth').debug(`[${context}] Post-auth: Sync deferred to post-appReady`);
 
   try {
     const { StorageManager } = await import('@/lib/storage');
@@ -252,49 +240,54 @@ export async function performSignIn(
 // TOKEN RESTORE / RE-AUTH (bootstrap, email-link, oauth, password-reset)
 // ============================================================================
 
+/**
+ * Re-authenticate using tokens (delegates to performReAuthJob).
+ *
+ * Delegates to lib/jobs/core/auth/reauth-job.ts which handles:
+ * 1. Session restoration from tokens
+ * 2. Post-auth setup (HAS_ACCOUNT, sync required, LAST_LOGGED_IN)
+ * 3. Redirect determination (profile-based or bootstrap-based)
+ *
+ * This maintains sign-in-system as the main entry point (like sign-out-system pattern).
+ *
+ * @param tokens - Access token and optional refresh token
+ * @param context - What triggered re-auth (bootstrap, email-link, oauth, password-reset, recovery)
+ * @returns ReAuthResult with success, redirect, userId, and errors
+ */
 export async function performReAuth(
   tokens: AuthTokens,
   context: ReAuthContext = 'bootstrap'
 ): Promise<ReAuthResult> {
-  const result: ReAuthResult = { success: true, errors: [] };
-
-  logger.category('auth').info(`Re-auth: Starting [${context}] flow`);
+  logger.category('auth').info(`Re-auth: Starting [${context}] flow (delegating to performReAuthJob)`);
 
   try {
-    // STEP 1: RESTORE SESSION FROM TOKENS
-    try {
-      if (!tokens.access_token) throw new Error('access_token is required');
-      const { authRestoreSession } = await import('@/lib/middleware/services/auth-service');
-      const restored = await authRestoreSession(tokens);
-      if (!restored) throw new Error('Session restoration failed');
-    } catch (error) {
-      result.success = false;
-      result.errors?.push({ phase: 'restore', message: error instanceof Error ? error.message : 'Session restoration failed', error: error instanceof Error ? error : undefined });
-      logger.category('auth').warn(`[${context}] Re-auth: Session restoration failed`, error);
-      return result;
-    }
+    const { performReAuthJob } = await import('@/lib/jobs/core/auth/reauth-job');
+    const result = await performReAuthJob(tokens, context);
 
-    const userId = await AuthStateManager.getUserId();
-    if (!userId) {
-      result.success = false;
-      result.errors?.push({ phase: 'restore', message: 'No userId available after restore' });
-      return result;
-    }
-    result.userId = userId;
-
-    // STEPS 2-4: Shared post-auth setup
-    const setup = await performPostAuthSetup(userId, context);
-    result.redirect = setup.redirect;
-    result.worldIds = setup.worldIds;
-    if (setup.errors.length > 0) result.errors?.push(...(setup.errors as ReAuthError[]));
-
-    logger.category('auth').info(`[${context}] Re-auth: Complete. Redirect: ${result.redirect}`);
-    return result;
+    // Map job result to ReAuthResult (same shape)
+    return {
+      success: result.success,
+      redirect: result.redirect,
+      userId: result.userId,
+      worldIds: result.worldIds,
+      errors: result.errors?.map((err) => ({
+        phase: err.phase as ReAuthError['phase'],
+        message: err.message,
+        error: err.error,
+      })),
+    };
   } catch (error) {
-    result.success = false;
-    result.errors?.push({ phase: 'restore', message: 'Unexpected error during re-auth', error: error instanceof Error ? error : undefined });
-    logger.category('auth').error(`[${context}] Re-auth: Unexpected error`, error);
-    return result;
+    logger.category('auth').error(`[${context}] Re-auth: Job delegation failed`, error);
+    return {
+      success: false,
+      errors: [
+        {
+          phase: 'restore',
+          message: error instanceof Error ? error.message : 'Re-auth job failed',
+          error: error instanceof Error ? error : undefined,
+        },
+      ],
+    };
   }
 }
 

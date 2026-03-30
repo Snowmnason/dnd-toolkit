@@ -3,21 +3,20 @@ import { Body, ObjHeading, TextType } from '@/components/ui/AppText'
 import { $, tone, useScale, UseTheme } from '@/theme'
 import { useMemo, useRef, useState } from 'react'
 import {
-  FlatList,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View,
+    FlatList,
+    Modal,
+    Platform,
+    Pressable,
+    StyleSheet,
+    TextInput,
+    View,
 } from 'react-native'
 import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+    withTiming,
 } from 'react-native-reanimated'
 
 interface DropdownItem {
@@ -87,13 +86,10 @@ function DropdownItemComponent({
       style={[hoverStyle, hoverColorStyle]} 
       key={item.value}
     >
-      <TouchableOpacity
-        activeOpacity={0.8}
+      <Pressable
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        onMouseEnter={handlePressIn}
-        onMouseLeave={handlePressOut}
         style={[
           {
             borderColor,
@@ -107,7 +103,7 @@ function DropdownItemComponent({
         <Body color={isSelected ? selectedTextColor : defaultTextColor}>
           {item.label}
         </Body>
-      </TouchableOpacity>
+      </Pressable>
     </Animated.View>
   )
 }
@@ -236,10 +232,9 @@ export default function Dropdown({
         </ObjHeading>
       ) : null}
 
-      <TouchableOpacity
+      <Pressable
         ref={headerRef}
         accessibilityRole="button"
-        activeOpacity={0.8}
         onPress={() => {
           const toOpen = !isOpen
           if (toOpen) {
@@ -277,7 +272,7 @@ export default function Dropdown({
             style={{ transform: [{ rotate: isOpen ? '90deg' : '0deg' }] }}
           />
         </Animated.View>
-      </TouchableOpacity>
+      </Pressable>
 
       {isMounted && anchor && (
         <Modal transparent animationType="fade">
@@ -296,8 +291,9 @@ export default function Dropdown({
                 left: Math.max(anchor.x - SAFE_AREA, 0),
                 width: anchor.width + SAFE_AREA * 2,
                 padding: SAFE_AREA,
-                pointerEvents: 'box-none',
+                ...(Platform.OS === 'web' ? { pointerEvents: 'box-none' as const } : {}),
               }}
+              pointerEvents={Platform.OS === 'web' ? undefined : 'box-none'}
             >
               <Animated.View
                 style={[
@@ -309,10 +305,11 @@ export default function Dropdown({
                     borderRadius: S.radius.md,
                     maxHeight: computedMaxHeight,
                     transformOrigin: 'top center',
-                    pointerEvents: 'auto',
+                    ...(Platform.OS === 'web' ? { pointerEvents: 'auto' as const } : {}),
                   },
                   dropdownAnimStyle,
                 ]}
+                pointerEvents={Platform.OS === 'web' ? undefined : 'auto'}
               >
           {enableSearch && (
             <View

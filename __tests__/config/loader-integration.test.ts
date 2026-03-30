@@ -4,6 +4,7 @@
  * Tests that getAppConfig() properly applies platform-specific overrides.
  */
 
+import type { AppSettings } from "@/config";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the platform detection
@@ -29,7 +30,8 @@ vi.mock("@/lib/config/loader", () => ({
   isProduction: vi.fn(() => true),
 }));
 
-import { type AppSettings, getAppConfig, getPlatformName, resetCachedConfig } from "@/config";
+/* eslint-disable-next-line import/first -- vitest requires imports after mocks */
+import { getAppConfig, getPlatformName, resetCachedConfig } from "@/config";
 
 // Define the mock config
 const mockConfig: AppSettings = {
@@ -62,7 +64,18 @@ const configWithoutPlatforms: AppSettings = {
   platforms: undefined,
 };
 
+/* eslint-disable-next-line @typescript-eslint/no-unused-vars -- used in test setup for context */
 let currentConfig = mockConfig;
+
+// Helper to safely cast featureFlag values to objects with enabled property
+function getFeatureFlagValue(flags: Record<string, any>, flagName: string) {
+  /* eslint-disable-next-line security/detect-object-injection -- safe: flagName is from test setup, not user input */
+  const value = flags[flagName];
+  if (typeof value === "object" && value !== null && "enabled" in value) {
+    return value as { enabled: boolean; description?: string };
+  }
+  return null;
+}
 
 describe("getAppConfig - platform merging integration", () => {
   beforeEach(() => {
@@ -144,9 +157,15 @@ describe("getAppConfig - platform merging integration", () => {
 
     const config = getAppConfig();
 
-    expect(config.featureFlags.testFlag.enabled).toBe(false); // Overridden
-    expect(config.featureFlags.testFlag.description).toBe("Test flag"); // Preserved
-    expect(config.featureFlags.anotherFlag.enabled).toBe(false); // Unchanged
+    const testFlag = getFeatureFlagValue(config.featureFlags, "testFlag");
+    const anotherFlag = getFeatureFlagValue(config.featureFlags, "anotherFlag");
+    
+    expect(testFlag).not.toBeNull();
+    expect(testFlag?.enabled).toBe(false); // Overridden
+    expect(testFlag?.description).toBe("Test flag"); // Preserved
+    
+    expect(anotherFlag).not.toBeNull();
+    expect(anotherFlag?.enabled).toBe(false); // Unchanged
   });
 
   it.skip("handles nested object merging in platform overrides", () => {

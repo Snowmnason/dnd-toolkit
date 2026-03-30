@@ -1,7 +1,7 @@
 /**
  * AppKernel - Centralized app bootstrap and lifecycle management
  *
- * Consolidates all bootstrapping phases (config, preload, network, storage, services, jobs, registration, auth, app ready)
+ * Consolidates all bootstrapping phases (config, preload, network, storage, services, jobs, registration, auth, feature flags, app ready)
  * into a single, explicit contract. Ensures all consumers subscribe to one source of truth.
  *
  * Phases (in order):
@@ -11,15 +11,16 @@
  * - NETWORK: Network detection initialization (before storage for offline awareness)
  * - STORAGE: Cache validation & migrations (knows network status)
  * - SERVICES: Register auth provider, error tracker, analytics exporters (must be before AUTH)
- * - JOB_SETUP: Initialize job queue + register handlers (non-critical, runs before AUTH)
+ * - JOB_SETUP: Initialize job queue infrastructure (non-critical, runs before AUTH)
  * - AUTH: Session restoration (non-blocking, fires in background after job setup ready)
+ * - FEATURE_FLAGS: Load and apply feature flags (non-critical, runs after AUTH)
+ * - REGISTRATION: Register job handlers + activate subscriptions (non-critical, runs after FEATURE_FLAGS)
  * - READY: App is ready to render main UI
  * - ERROR: A critical phase failed
  */
 
 import {
   cleanupAnalyticsNetworkIntegration,
-  initializeAnalyticsNetworkIntegration,
 } from "@/lib/analytics/exporters/analytics-network-integration";
 import {
   createSafeModeState,
@@ -29,8 +30,8 @@ import {
   SafeModeReason,
   type SafeModeState,
 } from "@/lib/error";
-import { getPhaseMessage, type PhaseName } from "@/lib/localization/phase-messages";
 import { logger } from "@/lib/utils";
+import { getPhaseMessage, type PhaseName } from "@/localization";
 import {
   NetworkDetection,
   NetworkStatus,
@@ -46,9 +47,11 @@ import {
 } from "@/type-definitions/kernel-types";
 import { authPhase } from "./phases/auth-phase";
 import { configPhase } from "./phases/config-phase";
+import { featureFlagsPhase } from "./phases/feature-flags-phase";
 import { jobSetupPhase } from "./phases/job-setup-phase";
 import { networkPhase } from "./phases/network-phase";
 import { preloadPhase } from "./phases/preload-phase";
+import { registrationPhase } from "./phases/registration-phase";
 import { servicesPhase } from "./phases/services-phase";
 import { storagePhase } from "./phases/storage-phase";
 
@@ -70,7 +73,7 @@ export {
   type KernelCapabilities,
   type KernelError,
   type KernelListener,
-  type PhaseProgress,
+  type PhaseProgress
 } from "@/type-definitions/kernel-types";
 
 /**
@@ -86,13 +89,15 @@ const PHASE_SEQUENCE = [
   "services",
   "jobSetup",
   "auth",
+  "featureFlags",
+  "registration",
 ] as const;
 
 const INITIAL_PHASE_PROGRESS: PhaseProgress = {
   currentPhaseIndex: 0, // Start at phase 0 (config) — the first incomplete phase in initial state
   currentPhaseName: "config",
   progressPercent: 0,
-  phaseLabel: "0/7 Initializing...",
+  phaseLabel: "0/9 Initializing...",
 };
 
 /**
@@ -105,13 +110,15 @@ const INITIAL_PHASE_PROGRESS: PhaseProgress = {
  *          Storage takes 500ms, no wait = 500ms total
  */
 const PHASE_MIN_DISPLAY_MS = {
-  config:   50,
-  preload:  50,
-  network:  50,
-  storage:  50,
-  services: 50,
-  jobSetup: 50,
-  auth:     50,
+  config:       50,
+  preload:      50,
+  network:      50,
+  storage:      50,
+  services:     50,
+  jobSetup:     50,
+  auth:         50,
+  featureFlags: 50,
+  registration: 50,
 } as const;
 
 class AppKernelClass {
@@ -125,7 +132,8 @@ class AppKernelClass {
       servicesReady: false,
       jobSetupReady: false,
       authReady: false,
-      syncReady: false,
+      featureFlagsReady: false,
+      registrationReady: false,
       appReady: false,
     },
     error: null,
@@ -195,11 +203,17 @@ class AppKernelClass {
       // Phase 4: SERVICES — register auth/error/analytics providers (critical, throws on failure)
       await this.runPhase("services", () => servicesPhase());
 
-      // Phase 5: JOB_SETUP — initialize job queue + register handlers (non-critical)
+      // Phase 5: JOB_SETUP — initialize job queue infrastructure (non-critical)
       await this.runPhase("jobSetup", () => jobSetupPhase());
 
-      // Phase 6: AUTH — restore persisted session + evaluate staleness (non-critical, guest mode on failure)
+      // Phase 6: AUTH — restore persisted session + evaluate staleness (non-critical, redirects to login on failure via useAuthGuard)
       await this.runPhase("auth", () => authPhase());
+
+      // Phase 7: FEATURE_FLAGS — bootstrap feature flags from remote or cache (non-critical)
+      await this.runPhase("featureFlags", () => featureFlagsPhase());
+
+      // Phase 8: REGISTRATION — register job handlers + activate subscriptions (non-critical)
+      await this.runPhase("registration", () => registrationPhase());
 
       // ═══════════════════════════════════════════════════════════════
       // APP READY — all phases complete, UI can render
@@ -356,14 +370,29 @@ class AppKernelClass {
    * Log bootstrap timing summary after appReady
    */
   private logBootstrapSummary(): void {
-    const totalBootstrapTime = Object.values(this.state.timing).reduce(
-      (a, b) => a + b,
-      0,
-    );
+    const t = this.state.timing;
+    // Static key access avoids Generic Object Injection Sink warning.
+    // Explicit ordering mirrors PHASE_SEQUENCE — all phases always present.
+    const orderedTiming = {
+      config:       t["config"]       ?? 0,
+      preload:      t["preload"]      ?? 0,
+      network:      t["network"]      ?? 0,
+      storage:      t["storage"]      ?? 0,
+      services:     t["services"]     ?? 0,
+      jobSetup:     t["jobSetup"]     ?? 0,
+      authPhase:    t["auth"]         ?? 0,  // keyed as "authPhase" — "auth" matches PII redaction rules
+      featureFlags: t["featureFlags"] ?? 0,
+      registration: t["registration"] ?? 0,
+    };
 
-    logger.category("bootstrap").info("AppKernel ready", {
-      timing: this.state.timing,
-      totalMs: totalBootstrapTime,
+    const totalMs =
+      orderedTiming.config + orderedTiming.preload + orderedTiming.network +
+      orderedTiming.storage + orderedTiming.services + orderedTiming.jobSetup +
+      orderedTiming.authPhase + orderedTiming.featureFlags + orderedTiming.registration;
+
+    logger.category("bootstrap").info(`✅ AppKernel ready — ${totalMs}ms end-to-end`, {
+      timing: orderedTiming,
+      totalMs,
     });
   }
 
@@ -372,114 +401,13 @@ class AppKernelClass {
    * Non-critical: failures don't affect app functionality
    *
    * These run AFTER the user has access to the app — network subscriptions,
-   * feature flags, analytics. None affect core functionality.
+   * analytics. None affect core functionality.
    * 
    * NOTE: User settings are now loaded as part of performDataSync during re-auth/sign-in,
    * so they don't need separate loading here.
    */
   private runPostReadyTasks(): void {
     ;(async () => {
-      // ─── Analytics Network Integration ────────────────────────────
-      // Auto-flush analytics buffer on network reconnect
-      try {
-        initializeAnalyticsNetworkIntegration();
-        logger.category("bootstrap").debug("Analytics network integration initialized");
-      } catch (error) {
-        logger
-          .category("bootstrap")
-          .warn("Analytics network integration initialization failed (non-critical)", {
-            error: (error as Error).message,
-          });
-      }
-
-      // ─── Job Queue Handlers ───────────────────────────────────────
-      try {
-        const { getJobQueue } = await import("@/lib/jobs");
-        const queue = getJobQueue();
-        queue.registerHandler("feature_flags_refresh", async () => {
-          const { refreshSubscription } = await import("@/lib/premium");
-          await refreshSubscription();
-          logger.category("jobs").info("feature_flags_refresh job completed");
-          return { updatedAt: Date.now() };
-        });
-        logger.category("bootstrap").debug("Job queue handlers registered");
-      } catch (error) {
-        logger
-          .category("bootstrap")
-          .warn("Failed to register job queue handlers (non-critical)", {
-            error: (error as Error).message,
-          });
-      }
-
-      // ─── Feature Flags Bootstrap ──────────────────────────────────
-      try {
-        const { FeatureFlagsManager } =
-          await import("@/lib/feature-flags/server-sync/orchestrator");
-        const { getDatabaseProvider } = await import("@/system/Services");
-
-        if (!getDatabaseProvider().isConfigured()) {
-          logger
-            .category("bootstrap")
-            .warn("Database not configured — skipping feature flags bootstrap");
-        } else {
-          let userId: string | undefined;
-          try {
-            const { AuthStateManager } = await import("@/lib/auth/auth-state");
-            userId = await AuthStateManager.getUserId();
-          } catch {
-            // userId unavailable — remote per-user overrides won't load
-          }
-          await FeatureFlagsManager.initialize(userId);
-
-          const clockValid = await FeatureFlagsManager.verifyDeviceClock();
-          if (!clockValid) {
-            logger
-              .category("bootstrap")
-              .warn(
-                "Device clock validation failed - premium features may be restricted",
-              );
-          }
-
-          await FeatureFlagsManager.bootstrapFlags();
-          logger
-            .category("bootstrap")
-            .info("Feature flags bootstrapped successfully");
-
-          // Bridge server-synced flags to the legacy FeatureFlags system
-          try {
-            const { FeatureFlags } = await import(
-              "@/lib/feature-flags/local-flags"
-            );
-            const serverFlags = FeatureFlagsManager.getAllFlags();
-            FeatureFlags.syncFromServer(serverFlags);
-
-            const debugLogsEnabled = FeatureFlagsManager.getFlag(
-              "debugLogs",
-              false,
-            );
-            logger.reconfigure(debugLogsEnabled);
-          } catch (bridgeError) {
-            logger
-              .category("bootstrap")
-              .warn(
-                "Failed to bridge server flags to legacy system (non-critical)",
-                {
-                  error: (bridgeError as Error).message,
-                },
-              );
-          }
-        }
-      } catch (error) {
-        logger
-          .category("bootstrap")
-          .warn(
-            "Feature flags bootstrap failed (using hardcoded fallback)",
-            {
-              error: (error as Error).message,
-            },
-          );
-      }
-
       // ─── Analytics Tracking ───────────────────────────────────────
       try {
         const totalBootstrapTime = Object.values(this.state.timing).reduce(
@@ -620,6 +548,8 @@ class AppKernelClass {
       { name: "services", completed: phases.servicesReady },
       { name: "jobSetup", completed: phases.jobSetupReady },
       { name: "auth", completed: phases.authReady },
+      { name: "featureFlags", completed: phases.featureFlagsReady },
+      { name: "registration", completed: phases.registrationReady },
     ];
 
     let completedCount = 0;
@@ -667,6 +597,8 @@ class AppKernelClass {
       case "services": return "servicesReady";
       case "jobSetup": return "jobSetupReady";
       case "auth": return "authReady";
+      case "featureFlags": return "featureFlagsReady";
+      case "registration": return "registrationReady";
     }
   }
 
@@ -756,6 +688,8 @@ class AppKernelClass {
           case "services": return PHASE_MIN_DISPLAY_MS.services;
           case "jobSetup": return PHASE_MIN_DISPLAY_MS.jobSetup;
           case "auth": return PHASE_MIN_DISPLAY_MS.auth;
+          case "featureFlags": return PHASE_MIN_DISPLAY_MS.featureFlags;
+          case "registration": return PHASE_MIN_DISPLAY_MS.registration;
         }
       })();
       const enforceDelay = Math.max(0, minDisplay - actualDuration);
@@ -763,12 +697,17 @@ class AppKernelClass {
         await new Promise((resolve) => setTimeout(resolve, enforceDelay));
       }
 
+      // Wall-clock duration = actual fn time + forced display delay
+      // Ensures fast phases (e.g. auth on unauthenticated path) always record a non-zero value
+      const wallClockDuration = actualDuration + enforceDelay;
+
       // Mark phase complete first, then calculate progress with updated phases
       const updatedPhases = { ...this.state.phases, [phaseKey]: true };
       this.calculatePhaseProgress(updatedPhases);
       this.updateState({
         phases: updatedPhases,
-        timing: { ...this.state.timing, [phaseName]: actualDuration },
+         
+        timing: { ...this.state.timing, [phaseName]: wallClockDuration },
         phaseProgress: { ...this.state.phaseProgress },
       });
 
@@ -776,7 +715,7 @@ class AppKernelClass {
         logger
           .category("bootstrap")
           .debug(
-            `${phaseName} phase complete (${actualDuration}ms, +${enforceDelay}ms display delay)`,
+            `${phaseName} phase complete (${actualDuration}ms fn + ${enforceDelay}ms display = ${wallClockDuration}ms)`,
           );
       } else {
         logger
@@ -871,7 +810,8 @@ class AppKernelClass {
         jobSetupReady: false,
         servicesReady: false,
         authReady: false,
-        syncReady: false,
+        featureFlagsReady: false,
+        registrationReady: false,
         appReady: false,
       },
       error: null,
@@ -918,7 +858,7 @@ class AppKernelClass {
    * Re-run a specific phase
    * Useful for refreshing auth, network status, etc. without full restart
    */
-  async rerunPhase(phase: "auth" | "sync" | "network" | "storage"): Promise<void> {
+  async rerunPhase(phase: "auth" | "network" | "storage"): Promise<void> {
     logger.category("bootstrap").info("Rerunning phase", { phase });
 
     if (this.state.currentPhase === KernelPhase.ERROR) {
@@ -945,7 +885,7 @@ class AppKernelClass {
 
       default:
         throw new Error(
-          `Cannot rerun phase: ${phase}. Only auth, sync, network, and storage can be rerun.`,
+          `Cannot rerun phase: ${phase}. Only auth, network, and storage can be rerun.`,
         );
     }
   }

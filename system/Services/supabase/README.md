@@ -228,7 +228,6 @@ from(table: string, schema?: string): QueryBuilder {
 | File | Purpose |
 | ---- | ------- |
 | `supabase-client.ts` | Lazy-loaded Supabase client with platform-specific session handling |
-| `supabase-lazy.ts` | Lazy loading utilities and client caching |
 | `supabase-database-provider.ts` | SupabaseDatabaseProvider implementation of DatabaseProvider interface |
 | `supabase-auth-provider.ts` | SupabaseAuthProvider implementation of AuthProvider interface |
 | `supabase-initializer.ts` | Service initialization and provider registration |

@@ -37,17 +37,22 @@
  */
 
 import { logger } from "@/lib/utils/logger";
+import type { AuthTokens, ReAuthContext, ReAuthJobResult } from "../auth/reauth-job";
+import { determinePostAuthRedirect } from "../auth/reauth-job";
+import type {
+  FeatureFlagsSyncResult,
+} from "./feature-flags-sync-job";
 import {
-    performProfileSync,
-    ProfileSyncResult,
+  performProfileSync,
+  ProfileSyncResult,
 } from "./profile-sync-job";
 import {
-    performQueueSync,
-    QueueSyncResult,
+  performQueueSync,
+  QueueSyncResult,
 } from "./queue-sync-job";
 import {
-    performWorldsSync,
-    WorldsSyncResult,
+  performWorldsSync,
+  WorldsSyncResult,
 } from "./worlds-sync-job";
 
 // ============================================================================
@@ -64,8 +69,9 @@ export interface DataSyncResult {
   success: boolean;
   profile?: ProfileSyncResult;
   worlds?: WorldsSyncResult;
+  featureFlags?: FeatureFlagsSyncResult;
   errors: {
-    target: "profile" | "worlds";
+    target: "profile" | "worlds" | "featureFlags";
     message: string;
     error?: Error;
   }[];
@@ -93,6 +99,25 @@ export interface FullSyncResult {
 }
 
 /**
+ * Combined result from full sync including re-auth (4 parallel jobs).
+ * Used by sync-splash after login or stale re-auth.
+ */
+export interface FullSyncWithReAuthResult {
+  success: boolean;
+  reAuth?: ReAuthJobResult;
+  profile?: ProfileSyncResult;
+  worlds?: WorldsSyncResult;
+  featureFlags?: FeatureFlagsSyncResult;
+  redirect?: string;
+  errors: {
+    job: "reauth" | "profile" | "worlds" | "featureFlags" | "redirect";
+    message: string;
+    error?: Error;
+  }[];
+  durationMs: number;
+}
+
+/**
  * Job handler signature for registration with BackgroundJobQueue.
  *
  * Allows sync jobs to be persisted, retried, and managed by the job system.
@@ -102,7 +127,7 @@ export interface ISyncJobHandler {
   execute: (payload: {
     mode: SyncMode;
     direction?: SyncDirection;
-    target?: "profile" | "worlds" | "queue";
+    target?: "profile" | "worlds" | "queue" | "featureFlags";
   }) => Promise<void>;
 }
 
@@ -187,6 +212,33 @@ export async function performDataSync(
       logger
         .category("auth")
         .warn("Worlds sync orchestration failed:", error);
+    }
+
+    // ─── SYNC FEATURE FLAGS (download only) ──────────────────────────────
+    if (direction === "download") {
+      try {
+        const { performFeatureFlagSync } = await import("./feature-flags-sync-job");
+        result.featureFlags = await performFeatureFlagSync();
+        if (!result.featureFlags.success) {
+          // Feature flags failure is non-critical — don't fail overall sync
+          result.featureFlags.errors.forEach((err) => {
+            result.errors.push({
+              target: "featureFlags",
+              message: err.message,
+              error: err.error,
+            });
+          });
+        }
+      } catch (error) {
+        result.errors.push({
+          target: "featureFlags",
+          message: error instanceof Error ? error.message : "Feature flags sync failed",
+          error: error instanceof Error ? error : undefined,
+        });
+        logger
+          .category("auth")
+          .warn("Feature flags sync orchestration failed:", error);
+      }
     }
 
     // ─── FINALIZE ───────────────────────────────────────────────────────
@@ -330,6 +382,245 @@ export async function performDataSyncAll(
   }
 }
 
+/**
+ * Perform full sync with re-authentication (4 parallel jobs).
+ *
+ * **Job 1 (Sequential):** Re-auth job — restore session from tokens + post-auth setup
+ * **Jobs 2-4 (Parallel):** Profile sync, worlds sync, feature-flags sync (download only)
+ *
+ * Used by sync-splash after login or stale re-auth during bootstrap.
+ *
+ * Flow:
+ * 1. Call performReAuthJob (with tokens) — restores session, gets userId, marks sync required
+ * 2. After re-auth completes, run profile + worlds + feature-flags in parallel
+ * 3. Call onProgress callback after each job completes (4 total calls: 0/4, 1/4, 2/4, 3/4, 4/4)
+ * 4. Return combined result with errors and durations
+ *
+ * @param tokens - Access token and optional refresh token
+ * @param context - What triggered re-auth (bootstrap, email-link, oauth, etc.)
+ * @param onProgress - Optional callback: (completed: number, total: number) => void
+ * @returns Combined result from all 4 jobs
+ */
+export async function performFullSync(
+  tokens: AuthTokens,
+  context: ReAuthContext = "bootstrap",
+  onProgress?: (completed: number, total: number) => void
+): Promise<FullSyncWithReAuthResult> {
+  const startTime = Date.now();
+  const result: FullSyncWithReAuthResult = {
+    success: true,
+    reAuth: undefined,
+    profile: undefined,
+    worlds: undefined,
+    featureFlags: undefined,
+    errors: [],
+    durationMs: 0,
+  };
+
+  const TOTAL_JOBS = 4;
+  let completedJobs = 0;
+
+  const reportProgress = () => {
+    completedJobs++;
+    if (onProgress) {
+      onProgress(completedJobs, TOTAL_JOBS);
+    }
+  };
+
+  try {
+    logger
+      .category("auth")
+      .info(`Full sync with re-auth starting [${context}]`);
+
+    // ─────────────────────────────────────────────────────────────────────
+    // JOB 1 (SEQUENTIAL): RE-AUTH JOB
+    // ─────────────────────────────────────────────────────────────────────
+    try {
+      const { performReAuthJob } = await import("../auth/reauth-job");
+      result.reAuth = await performReAuthJob(tokens, context);
+      if (!result.reAuth.success) {
+        result.success = false;
+        result.reAuth.errors?.forEach((err) => {
+          result.errors.push({
+            job: "reauth",
+            message: err.message,
+            error: err.error,
+          });
+        });
+      }
+      reportProgress();
+      logger
+        .category("auth")
+        .debug(`Full sync: Re-auth job complete (${result.reAuth.durationMs}ms)`);
+    } catch (error) {
+      result.success = false;
+      result.errors.push({
+        job: "reauth",
+        message: error instanceof Error ? error.message : "Re-auth job failed",
+        error: error instanceof Error ? error : undefined,
+      });
+      logger
+        .category("auth")
+        .warn("Full sync: Re-auth job orchestration failed:", error);
+      reportProgress();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // JOBS 2-4 (PARALLEL): PROFILE + WORLDS + FEATURE-FLAGS
+    // ─────────────────────────────────────────────────────────────────────
+    const [profileResult, worldsResult, flagsResult] = await Promise.allSettled([
+      // Job 2: Profile Sync
+      (async () => {
+        try {
+          const res = await performProfileSync("automatic", "download");
+          if (!res.success) {
+            result.success = false;
+            res.errors.forEach((err) => {
+              result.errors.push({
+                job: "profile",
+                message: err.message,
+                error: err.error,
+              });
+            });
+          }
+          reportProgress();
+          return res;
+        } catch (error) {
+          result.success = false;
+          result.errors.push({
+            job: "profile",
+            message: error instanceof Error ? error.message : "Profile sync failed",
+            error: error instanceof Error ? error : undefined,
+          });
+          logger
+            .category("auth")
+            .warn("Full sync: Profile sync failed:", error);
+          reportProgress();
+          throw error;
+        }
+      })(),
+      // Job 3: Worlds Sync
+      (async () => {
+        try {
+          const res = await performWorldsSync("automatic", "download");
+          if (!res.success) {
+            result.success = false;
+            res.errors.forEach((err) => {
+              result.errors.push({
+                job: "worlds",
+                message: err.message,
+                error: err.error,
+              });
+            });
+          }
+          reportProgress();
+          return res;
+        } catch (error) {
+          result.success = false;
+          result.errors.push({
+            job: "worlds",
+            message: error instanceof Error ? error.message : "Worlds sync failed",
+            error: error instanceof Error ? error : undefined,
+          });
+          logger
+            .category("auth")
+            .warn("Full sync: Worlds sync failed:", error);
+          reportProgress();
+          throw error;
+        }
+      })(),
+      // Job 4: Feature Flags Sync (download only, non-critical)
+      (async () => {
+        try {
+          const { performFeatureFlagSync } = await import("./feature-flags-sync-job");
+          const res = await performFeatureFlagSync();
+          if (!res.success) {
+            // Feature flags failure is non-critical — don't fail overall sync
+            res.errors.forEach((err) => {
+              result.errors.push({
+                job: "featureFlags",
+                message: err.message,
+                error: err.error,
+              });
+            });
+          }
+          reportProgress();
+          return res;
+        } catch (error) {
+          result.errors.push({
+            job: "featureFlags",
+            message: error instanceof Error ? error.message : "Feature flags sync failed",
+            error: error instanceof Error ? error : undefined,
+          });
+          logger
+            .category("auth")
+            .warn("Full sync: Feature flags sync failed:", error);
+          reportProgress();
+          throw error;
+        }
+      })(),
+    ]);
+
+    // Extract results from Promise.allSettled
+    if (profileResult.status === "fulfilled") {
+      result.profile = profileResult.value;
+    }
+    if (worldsResult.status === "fulfilled") {
+      result.worlds = worldsResult.value;
+    }
+    if (flagsResult.status === "fulfilled") {
+      result.featureFlags = flagsResult.value;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // DETERMINE REDIRECT (after all sync completes)
+    // ─────────────────────────────────────────────────────────────────────
+    try {
+      const redirectResult = await determinePostAuthRedirect(context);
+      result.redirect = redirectResult.redirect;
+      if (redirectResult.errors.length > 0) {
+        redirectResult.errors.forEach((err) => {
+          result.errors.push({
+            job: "redirect",
+            message: err.message,
+            error: err.error,
+          });
+        });
+      }
+      logger.category("auth").info(`Full sync: Determined redirect (${result.redirect})`);
+    } catch (error) {
+      logger.category("auth").warn("Full sync: Failed to determine redirect:", error);
+      result.errors.push({
+        job: "redirect",
+        message: error instanceof Error ? error.message : "Failed to determine redirect",
+        error: error instanceof Error ? error : undefined,
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // FINALIZE
+    // ─────────────────────────────────────────────────────────────────────
+    result.durationMs = Date.now() - startTime;
+
+    logger
+      .category("auth")
+      .info(
+        `Full sync with re-auth completed (${result.durationMs}ms): ${result.success ? "SUCCESS" : "WITH ERRORS"}`
+      );
+
+    return result;
+  } catch (error) {
+    result.success = false;
+    result.durationMs = Date.now() - startTime;
+
+    logger
+      .category("auth")
+      .error("Full sync with re-auth failed:", error);
+
+    return result;
+  }
+}
+
 // ============================================================================
 // JOB HANDLERS (For Registration with BackgroundJobQueue)
 // ============================================================================
@@ -343,8 +634,8 @@ export async function performDataSyncAll(
 export async function executeSyncOperation(payload: {
   mode?: SyncMode;
   direction?: SyncDirection;
-  target?: "profile" | "worlds" | "queue";
-}): Promise<{ profile?: ProfileSyncResult; worlds?: WorldsSyncResult; queue?: QueueSyncResult }> {
+  target?: "profile" | "worlds" | "queue" | "featureFlags";
+}): Promise<{ profile?: ProfileSyncResult; worlds?: WorldsSyncResult; queue?: QueueSyncResult; featureFlags?: FeatureFlagsSyncResult }> {
   const { mode = "automatic", direction = "download", target } = payload;
   const results: any = {};
 
@@ -354,11 +645,18 @@ export async function executeSyncOperation(payload: {
     results.worlds = await performWorldsSync(mode, direction);
   } else if (target === "queue") {
     results.queue = await performQueueSync(mode, direction);
+  } else if (target === "featureFlags") {
+    const { performFeatureFlagSync } = await import("./feature-flags-sync-job");
+    results.featureFlags = await performFeatureFlagSync();
   } else {
     // Default: run all
     results.profile = await performProfileSync(mode, direction);
     results.worlds = await performWorldsSync(mode, direction);
     results.queue = await performQueueSync(mode, direction);
+    if (direction === "download") {
+      const { performFeatureFlagSync } = await import("./feature-flags-sync-job");
+      results.featureFlags = await performFeatureFlagSync();
+    }
   }
 
   return results;

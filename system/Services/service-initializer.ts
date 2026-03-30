@@ -248,7 +248,14 @@ async function initializeAuthProvider(): Promise<void> {
     // Register globally so AuthStateManager and other code can access it
     await registerAuthProvider(validatedProvider);
     logger.category('bootstrap').info(`Auth provider '${providerName}' registered successfully`);
+    
+    // Register auth strategies (done here via middleware to avoid circular deps in system/)
+    const { initializeAuthStrategies } = await import('@/lib/middleware/services');
+    await initializeAuthStrategies();
+
     updateServiceStatus('auth', 'ready', providerName);
+
+    // NOTE: Auth strategies were registered above via initializeAuthStrategies() from middleware
   } catch (error) {
     logger.category('bootstrap').error(`Failed to initialize auth provider: ${error}`);
     // Auth is critical, record failure and re-throw

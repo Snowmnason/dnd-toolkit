@@ -58,12 +58,19 @@ export const PHASE_MESSAGES = {
     "Validating the sigil...",
     "Confirming your identity with the council...",
   ],
-  sync: [
-    "Synchronizing the tapestry...",
-    "Aligning the constellations...",
-    "Harmonizing the threads...",
-    "Settling into the realm...",
-    "The adventure awaits...",
+  featureFlags: [
+    "Inscribing character abilities...",
+    "Engraving the magic items...",
+    "Blessing the artifacts...",
+    "Unlocking special powers...",
+    "Preparing the arsenal...",
+  ],
+  registration: [
+    "Assembling the party...",
+    "Briefing the guild members...",
+    "Registering with the adventurers' guild...",
+    "Signing the contracts...",
+    "Enlisting the companions...",
   ],
   ready: [
     "Welcome, adventurer!",
@@ -71,6 +78,13 @@ export const PHASE_MESSAGES = {
     "Your quest begins now...",
     "All is prepared for your journey.",
     "The expedition awaits!",
+  ],
+  sync: [
+    "Consulting the arcane archives...",
+    "Harmonizing the spell components...",
+    "Synchronizing the dimensional planes...",
+    "Binding the ancient contracts...",
+    "Updating the tome of knowledge...",
   ],
 } as const;
 
@@ -111,11 +125,17 @@ export function getPhaseMessage(phaseName: PhaseName): string {
     case "auth":
       messages = PHASE_MESSAGES.auth;
       break;
-    case "sync":
-      messages = PHASE_MESSAGES.sync;
+    case "featureFlags":
+      messages = PHASE_MESSAGES.featureFlags;
+      break;
+    case "registration":
+      messages = PHASE_MESSAGES.registration;
       break;
     case "ready":
       messages = PHASE_MESSAGES.ready;
+      break;
+    case "sync":
+      messages = PHASE_MESSAGES.sync;
       break;
   }
 

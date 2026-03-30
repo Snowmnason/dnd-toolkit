@@ -5,7 +5,7 @@ import { useAppKernel } from "@/hooks/kernel";
 import { logger } from "@/hooks/utils";
 import { useRouter } from "expo-router";
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 const FAILSAFE_TIMEOUT = 8000; // Show failsafe button after 8 seconds
 
@@ -66,9 +66,9 @@ export default function HomePage() {
     return () => clearTimeout(t);
   }, [isAuthChecked, hasAccount, router]);
 
-  console.log(
-    `[ui] [HomePage] render — appReady=${kernel.phases.appReady}, isAuthChecked=${isAuthChecked}, hasAccount=${hasAccount}`,
-  );
+  // console.log(
+  //   `[ui] [HomePage] render — appReady=${kernel.phases.appReady}, isAuthChecked=${isAuthChecked}, hasAccount=${hasAccount}`,
+  // );
 
   // While kernel is initializing, UIBlockerLayer (in _layout.tsx) shows the splash.
   // Render a fallback SplashScreen here too in case UIBlockerLayer is not yet mounted.
@@ -91,7 +91,7 @@ export default function HomePage() {
 
         {showFailsafe && (
           <View style={styles.failsafeContainer}>
-            <TouchableOpacity
+            <Pressable
               style={styles.failsafeButton}
               onPress={() => {
                 logger.category("bootstrap").info(
@@ -99,12 +99,11 @@ export default function HomePage() {
                 );
                 // Welcome screen is already showing, so this is a manual refresh
               }}
-              activeOpacity={0.8}
             >
               <Text style={styles.failsafeIcon}>{randomLocation.icon}</Text>
               <Text style={styles.failsafeText}>{randomLocation.text}</Text>
               <Text style={styles.failsafeSubtext}>Manual Navigation</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         )}
       </View>

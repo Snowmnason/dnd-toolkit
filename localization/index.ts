@@ -5,6 +5,9 @@ export {
   getRecoveryActionLabel,
   getSafeModeDescription,
   NAVIGATION_ERROR_MESSAGES,
-  SAFE_MODE_MESSAGES,
+  SAFE_MODE_MESSAGES
 } from "./ErrorMessages";
+
+export { getPhaseMessage } from "./phase-messages";
+export type { PhaseName } from "./phase-messages";
 
