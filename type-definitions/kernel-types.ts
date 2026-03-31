@@ -81,6 +81,19 @@ export interface PhaseProgress {
 }
 
 /**
+ * Individual phase execution state
+ * Tracks what happened during phase execution
+ * Used by error classifier and phase executor for routing failures
+ */
+export interface PhaseState {
+  status: "pending" | "running" | "success" | "skipped" | "failed";
+  reason?: "unreachable" | "timeout" | "non-recoverable"; // Why phase was skipped/failed
+  retriable?: boolean; // true if timeout (can retry on-demand)
+  durationMs?: number; // How long the phase took
+  error?: Error | string; // The error that occurred
+}
+
+/**
  * Full kernel state snapshot
  * Includes phase completion, timing, capabilities, network status, and safe mode state
  */
