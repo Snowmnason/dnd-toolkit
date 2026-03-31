@@ -82,7 +82,7 @@ export const userSettingsDB = {
       await StorageManager.set(STORAGE_KEYS.USER_SETTINGS, data);
       await StorageManager.set(STORAGE_KEYS.USER_SETTINGS_META, {
         timestamp: Date.now(),
-        source: "supabase",
+        source: "remote",
       });
     } catch (storageError) {
       logger.category("database").warn(
@@ -166,7 +166,7 @@ export const userSettingsDB = {
       await StorageManager.set(STORAGE_KEYS.USER_SETTINGS_META, {
         timestamp: Date.now(),
         userId,
-        source: "supabase",
+        source: "remote",
       });
     } catch (storageError) {
       logger.category("database").warn(

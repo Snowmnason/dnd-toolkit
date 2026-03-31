@@ -6,15 +6,15 @@
  *
  * Phases (in order):
  * - IDLE: Initial state, not started
- * - CONFIG: Load Supabase env vars & initialize client (MUST run first)
+ * - CONFIG: Load and validate application configuration (appsettings.json)
  * - PRELOAD: Loading fonts, platform assets (critical, <500ms target)
  * - NETWORK: Network detection initialization (before storage for offline awareness)
- * - STORAGE: Cache validation & migrations (knows network status)
+ * - STORAGE: Cache validation & migrations (critical; enables persistence)
  * - SERVICES: Register auth provider, error tracker, analytics exporters (must be before AUTH)
- * - JOB_SETUP: Initialize job queue infrastructure (non-critical, runs before AUTH)
+ * - JOB_SETUP: Initialize job queue infrastructure (critical, runs before AUTH)
  * - AUTH: Session restoration (non-blocking, fires in background after job setup ready)
  * - FEATURE_FLAGS: Load and apply feature flags (non-critical, runs after AUTH)
- * - REGISTRATION: Register job handlers + activate subscriptions (non-critical, runs after FEATURE_FLAGS)
+ * - REGISTRATION: Register job handlers + activate subscriptions (conditionally critical, runs after FEATURE_FLAGS)
  * - READY: App is ready to render main UI
  * - ERROR: A critical phase failed
  */
@@ -197,13 +197,13 @@ class AppKernelClass {
         this.setupNetworkSubscription();
       });
 
-      // Phase 3: STORAGE — classification validation, health monitoring, defaults (non-critical)
+      // Phase 3: STORAGE — classification validation, health monitoring, defaults (critical)
       await this.runPhase("storage", () => storagePhase());
 
       // Phase 4: SERVICES — register auth/error/analytics providers (critical, throws on failure)
       await this.runPhase("services", () => servicesPhase());
 
-      // Phase 5: JOB_SETUP — initialize job queue infrastructure (non-critical)
+      // Phase 5: JOB_SETUP — initialize job queue infrastructure (critical)
       await this.runPhase("jobSetup", () => jobSetupPhase());
 
       // Phase 6: AUTH — restore persisted session + evaluate staleness (non-critical, redirects to login on failure via useAuthGuard)
@@ -212,7 +212,7 @@ class AppKernelClass {
       // Phase 7: FEATURE_FLAGS — bootstrap feature flags from remote or cache (non-critical)
       await this.runPhase("featureFlags", () => featureFlagsPhase());
 
-      // Phase 8: REGISTRATION — register job handlers + activate subscriptions (non-critical)
+      // Phase 8: REGISTRATION — register job handlers + activate subscriptions (conditionally critical)
       await this.runPhase("registration", () => registrationPhase());
 
       // ═══════════════════════════════════════════════════════════════
@@ -452,12 +452,12 @@ class AppKernelClass {
 
     try {
       // Run all independent capability checks in parallel
-      const [platformResult, storageResult, analyticsResult, supabaseResult] =
+      const [platformResult, storageResult, analyticsResult, backendResult] =
         await Promise.allSettled([
           import("react-native"),
           import("@/lib/storage"),
           import("@/lib/analytics"),
-          import("@/system/Services/supabase/supabase-client"),
+          import("@/system/Services").then(m => m.isBackendAvailable()),
         ]);
 
       // Platform detection
@@ -495,11 +495,10 @@ class AppKernelClass {
         logger.category("bootstrap").debug("Analytics not available");
       }
 
-      // Backend (Supabase) availability
-      if (supabaseResult.status === "fulfilled") {
-        const { isSupabaseConfigured } = supabaseResult.value;
-        capabilities.backend = isSupabaseConfigured();
-        capabilities.auth = isSupabaseConfigured(); // Auth depends on backend
+      // Backend availability (provider-agnostic)
+      if (backendResult.status === "fulfilled") {
+        capabilities.backend = backendResult.value;
+        capabilities.auth = backendResult.value; // Auth depends on backend
       } else {
         logger.category("bootstrap").debug("Backend not configured");
       }

@@ -89,3 +89,10 @@ export {
   type ServiceStatusDetail
 } from './service-status';
 
+// Backend Availability — provider-agnostic backend checks
+export {
+  getBackendHealthUrl,
+  getBackendProjectUrl,
+  isBackendAvailable,
+} from './backend-availability';
+

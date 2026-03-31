@@ -11,8 +11,7 @@
  * Does:
  * 1. Load application config (appsettings.json)
  * 2. Validate configuration completeness
- * 3. Initialize feature flags, safe mode config, sync settings
- * 4. Update kernel state
+ * 3. Provide validated config for downstream phases
  *
  * Enables: ALL subsequent phases depend on this completing first
  */

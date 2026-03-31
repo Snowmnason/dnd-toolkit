@@ -15,7 +15,7 @@
  */
 
 import { getAppConfig } from "@/config";
-import { getHealthEndpointUrl } from "@/lib/database/edge/constants";
+import { getBackendHealthUrl } from "@/system/Services";
 import { logger } from "@/lib/utils/logger";
 import {
   NetworkStateManager,
@@ -443,9 +443,9 @@ class NetworkDetectionClass {
       const timeout = setTimeout(() => controller.abort(), getAppConfig().network?.pingTimeoutMs ?? 5000);
       const startTime = performance.now();
 
-      // Use Supabase health endpoint instead of Cloudflare for CSP compliance
-      // Supabase is already whitelisted in CSP for API calls
-      const response = await fetch(getHealthEndpointUrl(), {
+      // Use backend health endpoint for network availability checks
+      // Backend URL is already whitelisted in CSP for API calls
+      const response = await fetch(getBackendHealthUrl(), {
         method: "HEAD",
         signal: controller.signal,
       });

@@ -193,7 +193,7 @@ export const updateStorageCache = {
             await worldBackend.setJSON(cacheKey, true);
             await worldBackend.setJSON(metaKey, {
               timestamp,
-              source: "supabase",
+              source: "remote",
             });
           }),
         );

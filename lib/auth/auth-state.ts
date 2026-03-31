@@ -65,7 +65,7 @@ export interface AuthState {
 
 export interface CacheMetadata {
   timestamp: number; // When cache was last updated
-  source: "supabase" | "local"; // Where data came from
+  source: "remote" | "local"; // Where data came from
 }
 
 export const AuthStateManager = {
@@ -666,10 +666,10 @@ export const AuthStateManager = {
   },
 
   /**
-   * Check world access in Supabase database
+   * Check world access in remote database
    * This is the "slow" source of truth
    */
-  async checkWorldAccessInSupabase(
+  async checkWorldAccessRemote(
     worldId: string,
   ): Promise<{ hasAccess: boolean; reason?: string }> {
     try {
@@ -700,7 +700,7 @@ export const AuthStateManager = {
         throw error;
       }
     } catch (error) {
-      logger.category('auth').error(`[VERIFY] Supabase query failed:`, error);
+      logger.category('auth').error(`[VERIFY] Remote database query failed:`, error);
       throw error; // Let caller handle
     }
   },
