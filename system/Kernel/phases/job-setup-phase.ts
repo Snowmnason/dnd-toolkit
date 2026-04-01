@@ -49,11 +49,15 @@ export async function jobSetupPhase(): Promise<void> {
       .info("✅ Job infrastructure initialized (fastcache + secure adapters)");
   } catch (error) {
     const { logger } = await import("@/lib/utils");
+    const { reportJobsBootstrapCrash } = await import(
+      '@/system/Degrade/handlers/crash-handlers'
+    );
     logger
       .category("bootstrap")
       .warn("Job setup phase warning (non-critical)", {
         error: (error as Error).message,
       });
+    reportJobsBootstrapCrash(String(error));
     // Non-critical — app boots without background jobs
   }
 }

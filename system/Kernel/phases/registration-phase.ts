@@ -32,9 +32,15 @@ import { logger } from "@/lib/utils";
  */
 export async function registrationPhase(): Promise<void> {
   try {
+    const { degradeManager } = await import("@/system/Degrade");
+    const { initializeConnectivityHandler } = await import("@/system/Degrade/handlers/connectivity-handler");
     const { CORE_JOBS } = await import("@/lib/jobs/registry");
     const { SUBSCRIPTIONS } = await import("@/lib/subscriptions/registry");
     const { getJobQueue } = await import("@/system/Jobs/background-job-queue");
+
+    // Initialize connectivity handler (always-listening subscription)
+    initializeConnectivityHandler();
+    logger.category("bootstrap").debug("Connectivity handler initialized");
 
     const queue = getJobQueue();
     const jobErrors: string[] = [];
@@ -45,12 +51,18 @@ export async function registrationPhase(): Promise<void> {
       try {
         await job.register(queue);
       } catch (error) {
-        jobErrors.push(`${job.name}: ${(error as Error).message}`);
+        const errorMsg = (error as Error).message;
+        jobErrors.push(`${job.name}: ${errorMsg}`);
         logger
           .category("bootstrap")
           .warn(`Job handler registration failed: ${job.name}`, {
-            error: (error as Error).message,
+            error: errorMsg,
           });
+        // Mark background jobs as degraded if registrations fail
+        degradeManager.set('backgroundJobs', false, {
+          source: 'registration-phase',
+          reason: `Job handler registration failed: ${job.name}`,
+        });
       }
     }
 
@@ -65,12 +77,18 @@ export async function registrationPhase(): Promise<void> {
       try {
         await sub.activate();
       } catch (error) {
-        subErrors.push(`${sub.name}: ${(error as Error).message}`);
+        const errorMsg = (error as Error).message;
+        subErrors.push(`${sub.name}: ${errorMsg}`);
         logger
           .category("bootstrap")
           .warn(`Subscription activation failed: ${sub.name}`, {
-            error: (error as Error).message,
+            error: errorMsg,
           });
+        // Mark background jobs as degraded if subscriptions fail
+        degradeManager.set('backgroundJobs', false, {
+          source: 'registration-phase',
+          reason: `Subscription activation failed: ${sub.name}`,
+        });
       }
     }
 
@@ -80,11 +98,18 @@ export async function registrationPhase(): Promise<void> {
         `✅ Subscriptions activated (${SUBSCRIPTIONS.length - subErrors.length}/${SUBSCRIPTIONS.length})`,
       );
   } catch (error) {
+    const { degradeManager } = await import("@/system/Degrade");
+    const errorMsg = (error as Error).message;
     logger
       .category("bootstrap")
       .warn("Registration phase warning (non-critical)", {
-        error: (error as Error).message,
+        error: errorMsg,
       });
+    // Mark background jobs as degraded if phase fails
+    degradeManager.set('backgroundJobs', false, {
+      source: 'registration-phase',
+      reason: `Registration phase failed: ${errorMsg}`,
+    });
     // Non-critical — app boots without handlers/subscriptions
   }
 }

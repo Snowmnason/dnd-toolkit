@@ -40,17 +40,17 @@ Analytics.withTiming('api_call', () => apiRequest(), 5000);
 ### Registering a Custom Exporter
 
 ```typescript
-import { registerExporter } from '@/lib/analytics/exporters';
+import { exporterRegistry } from '@/lib/analytics';
 import { CustomDashboardExporter } from './custom-dashboard-exporter';
 
 // Register on app init
-registerExporter(new CustomDashboardExporter());
+exporterRegistry.register(new CustomDashboardExporter());
 ```
 
 ### Implementing a Custom Exporter
 
 ```typescript
-import { AnalyticsExporter, AnalyticsEvent, ExportContext } from '@/lib/analytics/exporters';
+import { AnalyticsExporter, AnalyticsEvent, ExportContext } from '@/lib/analytics';
 
 class CustomDashboardExporter implements AnalyticsExporter {
   name = 'custom-dashboard';

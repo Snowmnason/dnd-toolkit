@@ -37,6 +37,7 @@
  */
 export async function servicesPhase(): Promise<void> {
   const { logger } = await import("@/lib/utils");
+  const { degradeManager } = await import("@/system/Degrade");
 
   try {
     const { initializeServices } = await import("@/system/Services/service-initializer");
@@ -58,11 +59,47 @@ export async function servicesPhase(): Promise<void> {
         .info(`  ${icon} ${service}: ${detail.status} (${detail.provider})${message}`);
     });
 
+    // Set degradation flags based on service status
+    if (allStatusDetails.database?.status !== 'ready') {
+      degradeManager.set('database', false, {
+        source: 'services-phase',
+        reason: `database service ${allStatusDetails.database?.status}: ${allStatusDetails.database?.message}`,
+      });
+    }
+    if (allStatusDetails.auth?.status !== 'ready') {
+      degradeManager.set('auth', false, {
+        source: 'services-phase',
+        reason: `auth service ${allStatusDetails.auth?.status}: ${allStatusDetails.auth?.message}`,
+      });
+    }
+    if (allStatusDetails.analytics?.status !== 'ready') {
+      degradeManager.set('analytics', false, {
+        source: 'services-phase',
+        reason: `analytics service ${allStatusDetails.analytics?.status}: ${allStatusDetails.analytics?.message}`,
+      });
+    }
+    if (allStatusDetails.errorTracker?.status !== 'ready') {
+      degradeManager.set('errorTracking', false, {
+        source: 'services-phase',
+        reason: `errorTracker service ${allStatusDetails.errorTracker?.status}: ${allStatusDetails.errorTracker?.message}`,
+      });
+    }
+
     logger
       .category("bootstrap")
       .info("✅ Services phase completed");
   } catch (error) {
+    const errorMsg = (error as Error).message;
     logger.category("bootstrap").error("[servicesPhase] ✗ Failed:", error);
+    // Mark critical services as degraded
+    degradeManager.set('database', false, {
+      source: 'services-phase',
+      reason: `Services initialization failed: ${errorMsg}`,
+    });
+    degradeManager.set('auth', false, {
+      source: 'services-phase',
+      reason: `Services initialization failed: ${errorMsg}`,
+    });
     throw error;
   }
 }

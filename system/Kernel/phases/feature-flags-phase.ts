@@ -83,13 +83,7 @@ export async function featureFlagsPhase(): Promise<void> {
     //   none        → hardcoded defaults (first launch)
     if (freshness === "fresh") {
       const seeded = await seedManagerFromCache();
-      if (seeded) {
-        state.bootstrapped = true;
-        notifySubscribers(state);
-        logger.category("bootstrap").debug(
-          "Feature flags: fresh snapshot seeded from cache and subscribers notified",
-        );
-      } else {
+      if (!seeded) {
         logger.category("bootstrap").debug(
           "Fresh snapshot expected but cache read failed — using hardcoded fallback",
         );
@@ -130,18 +124,22 @@ export async function featureFlagsPhase(): Promise<void> {
     });
 
   } catch (error) {
+    const { degradeManager } = await import("@/system/Degrade");
+    const errorMsg = (error as Error).message;
     logger.category("bootstrap").warn("Feature flags phase failed — using hardcoded fallback", {
-      error: (error as Error).message,
+      error: errorMsg,
+    });
+    // Mark premium features as degraded
+    degradeManager.set('premiumFeatures', false, {
+      source: 'feature-flags-phase',
+      reason: `Feature flags initialization failed: ${errorMsg}`,
     });
     try {
       const { FeatureFlagsManager } = await import(
         "@/lib/feature-flags/server-sync/orchestrator"
       );
-      const fallbackState = FeatureFlagsManager.state;
-      loadHardcodedFlags(fallbackState);
-      fallbackState.bootstrapped = true;
-      notifySubscribers(fallbackState);
-      logger.category("bootstrap").debug("Feature flags phase fallback notified subscribers");
+      loadHardcodedFlags(FeatureFlagsManager.state);
+      FeatureFlagsManager.state.bootstrapped = true;
     } catch { /* Nothing more we can do */ }
   }
 }

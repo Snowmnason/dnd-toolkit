@@ -26,19 +26,27 @@
  * @throws Error if config validation fails (critical)
  */
 export async function configPhase(): Promise<void> {
-  // Load config system
-  const { getAppConfig, validateConfig, logValidationResults } =
-    await import('@/config');
+  try {
+    // Load config system
+    const { getAppConfig, validateConfig, logValidationResults } =
+      await import('@/config');
 
-  // Get and validate config
-  const config = getAppConfig();
-  const configValidation = validateConfig(config);
-  logValidationResults(configValidation);
+    // Get and validate config
+    const config = getAppConfig();
+    const configValidation = validateConfig(config);
+    logValidationResults(configValidation);
 
-  // Fail if config is invalid (critical)
-  if (!configValidation.valid) {
-    throw new Error(
-      `Configuration validation failed: ${configValidation.errors.join("; ")}`,
+    // Fail if config is invalid (critical)
+    if (!configValidation.valid) {
+      throw new Error(
+        `Configuration validation failed: ${configValidation.errors.join("; ")}`,
+      );
+    }
+  } catch (error) {
+    const { reportConfigBootstrapCrash } = await import(
+      '@/system/Degrade/handlers/crash-handlers'
     );
+    reportConfigBootstrapCrash(String(error));
+    throw error;
   }
 }

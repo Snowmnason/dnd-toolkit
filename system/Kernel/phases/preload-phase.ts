@@ -97,11 +97,15 @@ export async function preloadPhase(): Promise<void> {
     });
   } catch (error) {
     const { logger } = await import("@/lib/utils");
+    const { reportPreloadBootstrapCrash } = await import(
+      '@/system/Degrade/handlers/crash-handlers'
+    );
     logger
       .category("bootstrap")
       .warn("Preload assets failed (non-critical)", {
         error: (error as Error).message,
       });
+    reportPreloadBootstrapCrash(String(error));
     // Non-critical — app continues
   }
 }
