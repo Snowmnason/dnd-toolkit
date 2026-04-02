@@ -10,10 +10,11 @@
  */
 
 import { getAppConfig } from '@/config';
-import { createSafeModeState, SafeModeReason } from "@/lib/error";
+import { reportCrash } from "@/lib/error";
 import { getJobQueue } from "@/lib/jobs";
 import { logger } from "@/lib/utils/logger";
 import { AppKernel } from "@/system/Kernel";
+import { DegradeCapability } from "@/type-definitions/degrade";
 
 const STORAGE_HEALTH_CHECK_JOB_TYPE = "storage_health_check";
 // Default to 5 minutes if not configured
@@ -100,16 +101,11 @@ export async function validateStorageHealth(): Promise<void> {
           recoveryError: String(recoveryError),
         });
 
-        // Recovery failed, trigger safe mode
-        const safeMode = createSafeModeState(
-          SafeModeReason.STORAGE_UNREADABLE,
-          {
-            details:
-              "Storage system is unreadable or corrupted. Automatic recovery failed.",
-            originalError: storageError as Error,
-          },
-        );
-        AppKernel.setSafeMode(safeMode);
+        // Recovery failed, trigger safe mode via centralized degradation manager
+        reportCrash(DegradeCapability.STORAGE, 'unreadable', {
+          details: 'Storage system is unreadable or corrupted. Automatic recovery failed.',
+          originalError: storageError as Error,
+        });
         return;
       }
     }

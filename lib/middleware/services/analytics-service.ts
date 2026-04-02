@@ -16,8 +16,10 @@
  * - Manage consent state (that stays in lib/analytics/consent/)
  */
 
+import { reportFault } from '@/lib/error';
 import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
 import { logger } from '@/lib/utils/logger';
+import { DegradeCapability } from '@/type-definitions/degrade';
 import { ConnectionQuality, NetworkDetection } from '@/system/Network';
 import { getAdapter, isServiceReady, listAdapters } from '@/system/Services';
 import type { BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '@/type-definitions/breadcrumb-queue-types.ts';
@@ -51,6 +53,7 @@ function canSendAnalytics(): boolean {
         // FUTURE: Queue for retry after initialization.
         // Current behavior: silently drop (acceptable since consent check already filters disabled services).
         logger.category('analytics').debug('[analytics-service] Analytics provider not ready — dropping data');
+        reportFault(DegradeCapability.ANALYTICS, 'Analytics provider not ready');
         return false;
     }
 

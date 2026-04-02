@@ -2,20 +2,20 @@
  * Connectivity Degradation Handler
  *
  * ALWAYS-LISTENING subscription. Wires NetworkDetection status changes
- * to the degradeManager CONNECTIVITY capability.
+ * to the appDegrade CONNECTIVITY capability.
  *
  * Lifecycle: initialized during kernel bootstrap (after network phase),
  * stays subscribed for the full app lifetime — network can flip at any time.
- * Cleaned up via degradeManager.clear() → registered cleanup fires.
+ * Cleaned up via appDegrade.clear() → registered cleanup fires.
  *
- * Pattern: Subscribe → call degradeManager.set() on each status change.
+ * Pattern: Subscribe → call appDegrade.set() on each status change.
  * Logic lives here, not scattered across phases.
  */
 
 import type { NetworkStatus } from '@/system/Network';
 import { ConnectionQuality, NetworkDetection } from '@/system/Network';
-import { degradeManager } from '../degrade-manager';
-import { DegradeCapability } from '../types';
+import { DegradeCapability } from '@/type-definitions/degrade';
+import { appDegrade } from '../app-degrade';
 
 const HANDLER_NAME = 'connectivity';
 const SOURCE = 'network-detection';
@@ -30,7 +30,7 @@ const SOURCE = 'network-detection';
  * - Any other quality → capable (true)
  *
  * Call once during bootstrap. Cleanup is registered automatically
- * with degradeManager so destroy() handles it.
+ * with appDegrade so destroy() handles it.
  */
 export function initializeConnectivityHandler(): void {
   // Set initial state from current network status before subscribing
@@ -42,18 +42,18 @@ export function initializeConnectivityHandler(): void {
     applyNetworkStatus(status);
   });
 
-  // Register cleanup with degrade manager — fires on degradeManager.clear()
-  degradeManager.registerHandlerCleanup(HANDLER_NAME, unsubscribe);
+  // Register cleanup with degrade manager — fires on appDegrade.clear()
+  appDegrade.registerHandlerCleanup(HANDLER_NAME, unsubscribe);
 }
 
 /**
- * Map NetworkStatus → degradeManager.set() for CONNECTIVITY.
+ * Map NetworkStatus → appDegrade.set() for CONNECTIVITY.
  * Separated for reuse by both initial state and subscription callback.
  */
 function applyNetworkStatus(status: NetworkStatus): void {
   const isOffline = !status.isOnline || status.connectionQuality === ConnectionQuality.OFFLINE;
 
-  degradeManager.set(DegradeCapability.CONNECTIVITY, !isOffline, {
+  appDegrade.set(DegradeCapability.CONNECTIVITY, !isOffline, {
     source: SOURCE,
     reason: isOffline
       ? `offline (type=${status.type}, quality=${status.connectionQuality})`

@@ -27,6 +27,9 @@ import {
     type TrackerUser,
 } from '@/system/Services';
 
+// Re-export types for consumers
+export type { SeverityLevel };
+
 // ─── Precondition Checks ───────────────────────────────────────────
 
 /**

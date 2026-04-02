@@ -80,18 +80,17 @@ export async function storagePhase(): Promise<void> {
       .debug("Storage system initialized and ready");
   } catch (error) {
     const { logger } = await import("@/lib/utils");
-    const { degradeManager } = await import("@/system/Degrade");
+    const { reportStorageCrash } = await import(
+      "@/system/Degrade/handlers/crash-handlers"
+    );
     const errorMsg = (error as Error).message;
     logger
       .category("bootstrap")
       .warn("Storage validation warning (non-critical)", {
         error: errorMsg,
       });
-    // Mark storage as degraded
-    degradeManager.set('storage', false, {
-      source: 'storage-phase',
-      reason: `Storage initialization failed: ${errorMsg}`,
-    });
+    // Mark storage as crashed via centralized handler
+    reportStorageCrash(`Storage initialization failed: ${errorMsg}`, false);
     // Non-critical - app can still boot
   }
 }

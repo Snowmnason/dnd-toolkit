@@ -60,18 +60,17 @@ export async function networkPhase(): Promise<void> {
     }
   } catch (error) {
     const { logger } = await import("@/lib/utils");
-    const { degradeManager } = await import("@/system/Degrade");
+    const { reportConnectivityBootstrapFault } = await import(
+      "@/system/Degrade/handlers/fault-handlers"
+    );
     const errorMsg = (error as Error).message;
     logger
       .category("bootstrap")
       .warn("Network detection failed (non-critical)", {
         error: errorMsg,
       });
-    // Mark connectivity as degraded
-    degradeManager.set('connectivity', false, {
-      source: 'network-phase',
-      reason: `Network detection failed: ${errorMsg}`,
-    });
+    // Mark connectivity as degraded via centralized handler
+    reportConnectivityBootstrapFault(`Network detection failed: ${errorMsg}`);
     // Network failure is non-critical — app works offline
   }
 }

@@ -4,10 +4,12 @@
  */
 
 import { getAppConfig } from '@/config';
+import { reportFault } from '@/lib/error';
 import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
 import { getConsentCategoryForEvent, shouldEmitEvent } from '@/lib/analytics/consent/consent-gating';
 import { getNetworkStatus } from "@/lib/middleware/network";
 import { logger } from '@/lib/utils/logger';
+import { DegradeCapability } from '@/type-definitions/degrade';
 
 /**
  * Analytics event to be exported to backends
@@ -395,6 +397,10 @@ async function dispatchSingleWithTimeout(event: AnalyticsEvent, context: ExportC
 
   if (exporters.length === 0) {
     logger.category('analytics').debug(`No exporters registered for event type "${event.type}", skipping dispatch`);
+    // Report degradation only if the registry itself is globally empty (no exporters at all)
+    if (exporterRegistry.getAll().length === 0) {
+      reportFault(DegradeCapability.ANALYTICS, 'No analytics exporters registered');
+    }
     return;
   }
 

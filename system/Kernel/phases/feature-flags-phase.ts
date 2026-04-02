@@ -124,16 +124,15 @@ export async function featureFlagsPhase(): Promise<void> {
     });
 
   } catch (error) {
-    const { degradeManager } = await import("@/system/Degrade");
+    const { reportPremiumFault } = await import(
+      "@/system/Degrade/handlers/fault-handlers"
+    );
     const errorMsg = (error as Error).message;
     logger.category("bootstrap").warn("Feature flags phase failed — using hardcoded fallback", {
       error: errorMsg,
     });
-    // Mark premium features as degraded
-    degradeManager.set('premiumFeatures', false, {
-      source: 'feature-flags-phase',
-      reason: `Feature flags initialization failed: ${errorMsg}`,
-    });
+    // Mark premium features as degraded via centralized handler
+    reportPremiumFault(`Feature flags initialization failed: ${errorMsg}`);
     try {
       const { FeatureFlagsManager } = await import(
         "@/lib/feature-flags/server-sync/orchestrator"

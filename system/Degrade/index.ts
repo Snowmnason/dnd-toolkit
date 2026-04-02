@@ -6,62 +6,52 @@
  *
  * Usage:
  * ```typescript
- * import { degradeManager, DegradeCapability } from '@/system/Degrade';
+ * import { appDegrade, DegradeCapability } from '@/system/Degrade';
  *
  * // Report degradation
- * degradeManager.set('database', false, {
+ * appDegrade.set('database', false, {
  *   source: 'services-phase',
  *   reason: 'database connection failed'
  * });
  *
  * // Check capability
- * if (degradeManager.isCapable('database')) {
+ * if (appDegrade.isCapable('database')) {
  *   // Can query database
  * } else {
  *   // Use cached/offline fallback
  * }
  *
  * // Subscribe to changes
- * const unsubscribe = degradeManager.subscribe((state) => {
+ * const unsubscribe = appDegrade.subscribe((state) => {
  *   console.log('Degradation state:', state.capabilities);
  * });
  * ```
  */
 
 // Core manager + types
-export { degradeManager, DegradeManager } from './degrade-manager';
-export {
-  DegradeCapability,
-  type DegradeCapabilityState,
-  type DegradeState,
-  type DegradeSubscriber,
-} from './types';
+export { appDegrade, DegradeManager } from './app-degrade';
 
 // Handlers: connectivity (always-listening subscription)
 export { initializeConnectivityHandler } from './handlers/connectivity-handler';
 
 // Handlers: fault (on-demand, called from middleware error paths)
 export {
-  reportDatabaseFault,
-  reportDatabaseRecovery,
-  reportAuthFault,
-  reportAuthRecovery,
-  reportAnalyticsFault,
-  reportAnalyticsRecovery,
-  reportErrorTrackingFault,
-  reportErrorTrackingRecovery,
-  reportPremiumFault,
-  reportPremiumRecovery,
-  syncServiceStatusesToDegradeManager,
-  areCriticalCapabilitiesReady,
+    areCriticalCapabilitiesReady, reportAnalyticsFault,
+    reportAnalyticsRecovery, reportAuthFault,
+    reportAuthRecovery, reportDatabaseFault,
+    reportDatabaseRecovery, reportErrorTrackingFault,
+    reportErrorTrackingRecovery,
+    reportPremiumFault,
+    reportPremiumRecovery,
+    syncServiceStatusesToDegradeManager
 } from './handlers/fault-handlers';
 
 // Handlers: crash (unrecoverable failures — follow with error boundary or safe mode)
 export {
-  reportStorageCrash,
-  reportConfigBootstrapCrash,
-  reportPreloadBootstrapCrash,
-  reportJobsBootstrapCrash,
+    reportConfigBootstrapCrash, reportJobsBootstrapCrash, reportPreloadBootstrapCrash, reportStorageCrash
 } from './handlers/crash-handlers';
+
+// System-level response handlers (registered during bootstrap)
+export { registerAllSystemResponses } from './responses/system-responses';
 
 

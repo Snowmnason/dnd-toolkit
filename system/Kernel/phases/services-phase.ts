@@ -37,11 +37,13 @@
  */
 export async function servicesPhase(): Promise<void> {
   const { logger } = await import("@/lib/utils");
-  const { degradeManager } = await import("@/system/Degrade");
 
   try {
     const { initializeServices } = await import("@/system/Services/service-initializer");
     const { getAllServiceStatuses } = await import("@/system/Services");
+    const { syncServiceStatusesToDegradeManager } = await import(
+      "@/system/Degrade/handlers/fault-handlers"
+    );
     
     await initializeServices();
     // Auth strategies are registered within initializeServices by the middleware
@@ -59,47 +61,28 @@ export async function servicesPhase(): Promise<void> {
         .info(`  ${icon} ${service}: ${detail.status} (${detail.provider})${message}`);
     });
 
-    // Set degradation flags based on service status
-    if (allStatusDetails.database?.status !== 'ready') {
-      degradeManager.set('database', false, {
-        source: 'services-phase',
-        reason: `database service ${allStatusDetails.database?.status}: ${allStatusDetails.database?.message}`,
-      });
-    }
-    if (allStatusDetails.auth?.status !== 'ready') {
-      degradeManager.set('auth', false, {
-        source: 'services-phase',
-        reason: `auth service ${allStatusDetails.auth?.status}: ${allStatusDetails.auth?.message}`,
-      });
-    }
-    if (allStatusDetails.analytics?.status !== 'ready') {
-      degradeManager.set('analytics', false, {
-        source: 'services-phase',
-        reason: `analytics service ${allStatusDetails.analytics?.status}: ${allStatusDetails.analytics?.message}`,
-      });
-    }
-    if (allStatusDetails.errorTracker?.status !== 'ready') {
-      degradeManager.set('errorTracking', false, {
-        source: 'services-phase',
-        reason: `errorTracker service ${allStatusDetails.errorTracker?.status}: ${allStatusDetails.errorTracker?.message}`,
-      });
-    }
+    // Sync all service statuses to degradeManager via centralized handler
+    syncServiceStatusesToDegradeManager();
 
     logger
       .category("bootstrap")
       .info("✅ Services phase completed");
   } catch (error) {
+    const { 
+      reportDatabaseFault, 
+      reportAuthFault,
+      reportAnalyticsFault,
+      reportErrorTrackingFault
+    } = await import(
+      "@/system/Degrade/handlers/fault-handlers"
+    );
     const errorMsg = (error as Error).message;
     logger.category("bootstrap").error("[servicesPhase] ✗ Failed:", error);
-    // Mark critical services as degraded
-    degradeManager.set('database', false, {
-      source: 'services-phase',
-      reason: `Services initialization failed: ${errorMsg}`,
-    });
-    degradeManager.set('auth', false, {
-      source: 'services-phase',
-      reason: `Services initialization failed: ${errorMsg}`,
-    });
+    // Mark all services as degraded via centralized handlers
+    reportDatabaseFault(`Services initialization failed: ${errorMsg}`);
+    reportAuthFault(`Services initialization failed: ${errorMsg}`);
+    reportAnalyticsFault(`Services initialization failed: ${errorMsg}`);
+    reportErrorTrackingFault(`Services initialization failed: ${errorMsg}`);
     throw error;
   }
 }

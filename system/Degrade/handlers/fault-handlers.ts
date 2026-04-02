@@ -1,27 +1,31 @@
 /**
  * Fault Degradation Handlers
  *
- * ON-DEMAND functions — called from middleware error paths, NOT always-listening.
- * Each function checks a specific capability and sets the degradeManager flag
- * when the system is unavailable.
+ * ON-DEMAND functions — called from middleware error paths and bootstrap phases.
+ * Each function updates the appDegrade flag when a system is unavailable
+ * or recovers.
  *
- * Pattern: middleware catches error → calls checkXxxHealth() → degradeManager updated.
- * Logic lives here, centralized, not duplicated inline across middleware files.
+ * Pattern: phase/middleware catches error → calls reportXxxFault() → appDegrade updated.
+ * Logic lives here, centralized, not duplicated inline across phase or middleware files.
  *
  * Capabilities covered (on-demand):
- * - DATABASE: called when database provider check fails in middleware
- * - AUTH: called when auth provider is missing/unavailable in middleware
+ * - DATABASE: called when database provider check fails
+ * - AUTH: called when auth provider is missing/unavailable
  * - ANALYTICS: called when no enabled exporters are found
  * - ERROR_TRACKING: called when error tracker is not ready
  * - PREMIUM_FEATURES: called when entitlement check fails
+ * - CONNECTIVITY: called when network detection fails at bootstrap (different from
+ *   connectivity-handler.ts which is an always-listening subscription)
+ * - BACKGROUND_JOBS: called when job registration fails (non-critical fault,
+ *   different from crash-handler's reportJobsBootstrapCrash for full infra failure)
  *
- * Note: SYNC and BACKGROUND_JOBS subscription handlers live in lib/degrade/handlers/
- * because they depend on lib-layer systems (sync-manager, job-service).
+ * Note: SYNC subscription handler lives in lib/degrade/handlers/ (Track 4)
+ * because it depends on lib-layer sync-manager.
  */
 
 import { getAllServiceStatuses } from '@/system/Services/service-status';
-import { degradeManager } from '../degrade-manager';
-import { DegradeCapability } from '../types';
+import { DegradeCapability } from '@/type-definitions/degrade';
+import { appDegrade } from '../app-degrade';
 
 const SOURCE = 'fault-handler';
 
@@ -36,7 +40,7 @@ const SOURCE = 'fault-handler';
  * @param reason Human-readable failure reason from the middleware
  */
 export function reportDatabaseFault(reason: string): void {
-  degradeManager.set(DegradeCapability.DATABASE, false, {
+  appDegrade.set(DegradeCapability.DATABASE, false, {
     source: SOURCE,
     reason,
   });
@@ -47,7 +51,7 @@ export function reportDatabaseFault(reason: string): void {
  * Clears the fault so DATABASE capability is restored.
  */
 export function reportDatabaseRecovery(): void {
-  degradeManager.set(DegradeCapability.DATABASE, true, {
+  appDegrade.set(DegradeCapability.DATABASE, true, {
     source: SOURCE,
     reason: 'database provider available',
   });
@@ -64,7 +68,7 @@ export function reportDatabaseRecovery(): void {
  * @param reason Human-readable failure reason from the middleware
  */
 export function reportAuthFault(reason: string): void {
-  degradeManager.set(DegradeCapability.AUTH, false, {
+  appDegrade.set(DegradeCapability.AUTH, false, {
     source: SOURCE,
     reason,
   });
@@ -74,7 +78,7 @@ export function reportAuthFault(reason: string): void {
  * Called when auth provider becomes available again.
  */
 export function reportAuthRecovery(): void {
-  degradeManager.set(DegradeCapability.AUTH, true, {
+  appDegrade.set(DegradeCapability.AUTH, true, {
     source: SOURCE,
     reason: 'auth provider available',
   });
@@ -92,7 +96,7 @@ export function reportAuthRecovery(): void {
  * @param reason Human-readable failure reason
  */
 export function reportAnalyticsFault(reason: string): void {
-  degradeManager.set(DegradeCapability.ANALYTICS, false, {
+  appDegrade.set(DegradeCapability.ANALYTICS, false, {
     source: SOURCE,
     reason,
   });
@@ -102,7 +106,7 @@ export function reportAnalyticsFault(reason: string): void {
  * Called when analytics exporter becomes available again.
  */
 export function reportAnalyticsRecovery(): void {
-  degradeManager.set(DegradeCapability.ANALYTICS, true, {
+  appDegrade.set(DegradeCapability.ANALYTICS, true, {
     source: SOURCE,
     reason: 'analytics exporter available',
   });
@@ -120,7 +124,7 @@ export function reportAnalyticsRecovery(): void {
  * @param reason Human-readable failure reason
  */
 export function reportErrorTrackingFault(reason: string): void {
-  degradeManager.set(DegradeCapability.ERROR_TRACKING, false, {
+  appDegrade.set(DegradeCapability.ERROR_TRACKING, false, {
     source: SOURCE,
     reason,
   });
@@ -130,7 +134,7 @@ export function reportErrorTrackingFault(reason: string): void {
  * Called when error tracker becomes available again.
  */
 export function reportErrorTrackingRecovery(): void {
-  degradeManager.set(DegradeCapability.ERROR_TRACKING, true, {
+  appDegrade.set(DegradeCapability.ERROR_TRACKING, true, {
     source: SOURCE,
     reason: 'error tracker available',
   });
@@ -150,7 +154,7 @@ export function reportErrorTrackingRecovery(): void {
  * @param reason Human-readable failure reason
  */
 export function reportPremiumFault(reason: string): void {
-  degradeManager.set(DegradeCapability.PREMIUM_FEATURES, false, {
+  appDegrade.set(DegradeCapability.PREMIUM_FEATURES, false, {
     source: SOURCE,
     reason,
   });
@@ -160,9 +164,59 @@ export function reportPremiumFault(reason: string): void {
  * Called when entitlements are successfully verified again.
  */
 export function reportPremiumRecovery(): void {
-  degradeManager.set(DegradeCapability.PREMIUM_FEATURES, true, {
+  appDegrade.set(DegradeCapability.PREMIUM_FEATURES, true, {
     source: SOURCE,
     reason: 'entitlements verified',
+  });
+}
+
+// ==========================================
+// CONNECTIVITY (bootstrap fault — not runtime)
+// ==========================================
+
+/**
+ * Called when network detection initialization fails at bootstrap.
+ * This is NOT the same as going offline at runtime (that's connectivity-handler.ts).
+ * This means the NetworkDetection system itself couldn't start.
+ *
+ * The app continues — it defaults to "assumed online" and works offline-first.
+ *
+ * @param reason Network detection failure detail
+ */
+export function reportConnectivityBootstrapFault(reason: string): void {
+  appDegrade.set(DegradeCapability.CONNECTIVITY, false, {
+    source: 'network-phase',
+    reason,
+  });
+}
+
+// ==========================================
+// BACKGROUND JOBS (registration faults)
+// ==========================================
+
+/**
+ * Called when individual job handler registration or subscription activation fails.
+ * Non-critical — the app continues but some background tasks won't execute.
+ *
+ * Different from crash-handler's reportJobsBootstrapCrash() which is for
+ * complete job infrastructure failure (queue can't initialize at all).
+ *
+ * @param reason Registration failure detail (e.g., "Job handler registration failed: syncJob")
+ */
+export function reportBackgroundJobsFault(reason: string): void {
+  appDegrade.set(DegradeCapability.BACKGROUND_JOBS, false, {
+    source: 'registration-phase',
+    reason,
+  });
+}
+
+/**
+ * Called when background jobs recover (e.g., re-registration succeeds).
+ */
+export function reportBackgroundJobsRecovery(): void {
+  appDegrade.set(DegradeCapability.BACKGROUND_JOBS, true, {
+    source: 'registration-phase',
+    reason: 'job handlers registered',
   });
 }
 
@@ -172,10 +226,10 @@ export function reportPremiumRecovery(): void {
 
 /**
  * Reads all service statuses from the service registry and maps them
- * to degradeManager capability flags.
+ * to appDegrade capability flags.
  *
  * Call this after bootstrap completes to sync initial service health state
- * into the degradeManager. Subsequent changes should use the individual
+ * into the appDegrade. Subsequent changes should use the individual
  * report* functions above.
  *
  * Maps:
@@ -192,28 +246,28 @@ export function syncServiceStatusesToDegradeManager(): void {
 
     switch (service) {
       case 'database':
-        degradeManager.set(DegradeCapability.DATABASE, !degraded, {
+        appDegrade.set(DegradeCapability.DATABASE, !degraded, {
           source: 'service-status-sync',
           reason: degraded ? (detail.message ?? `database ${detail.status}`) : 'database ready',
         });
         break;
 
       case 'auth':
-        degradeManager.set(DegradeCapability.AUTH, !degraded, {
+        appDegrade.set(DegradeCapability.AUTH, !degraded, {
           source: 'service-status-sync',
           reason: degraded ? (detail.message ?? `auth ${detail.status}`) : 'auth ready',
         });
         break;
 
       case 'analytics':
-        degradeManager.set(DegradeCapability.ANALYTICS, !degraded, {
+        appDegrade.set(DegradeCapability.ANALYTICS, !degraded, {
           source: 'service-status-sync',
           reason: degraded ? (detail.message ?? `analytics ${detail.status}`) : 'analytics ready',
         });
         break;
 
       case 'errorTracker':
-        degradeManager.set(DegradeCapability.ERROR_TRACKING, !degraded, {
+        appDegrade.set(DegradeCapability.ERROR_TRACKING, !degraded, {
           source: 'service-status-sync',
           reason: degraded ? (detail.message ?? `error tracker ${detail.status}`) : 'error tracker ready',
         });
@@ -226,11 +280,11 @@ export function syncServiceStatusesToDegradeManager(): void {
 
 /**
  * Quick health check: are critical services (database + auth) capable?
- * Convenience wrapper over degradeManager.isCapable() for both at once.
+ * Convenience wrapper over appDegrade.isCapable() for both at once.
  */
 export function areCriticalCapabilitiesReady(): boolean {
   return (
-    degradeManager.isCapable(DegradeCapability.DATABASE) &&
-    degradeManager.isCapable(DegradeCapability.AUTH)
+    appDegrade.isCapable(DegradeCapability.DATABASE) &&
+    appDegrade.isCapable(DegradeCapability.AUTH)
   );
 }

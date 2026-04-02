@@ -12,6 +12,24 @@ export {
     type ErrorUser
 } from "./error-manager";
 
+// Degradation Manager — domain wrapper for degradation reporting & hook subscriptions
+export {
+    clearLibResponses,
+    getDegradationState,
+    getLibResponseCount,
+    getPrimaryFault,
+    isCapableOf,
+    registerDegradeResponse,
+    reportCrash,
+    reportFault,
+    reportRecovery,
+    subscribeToDegradation,
+    type FaultRecord
+} from "./degrade/degrade-manager";
+
+// Lib-level response handlers (registered during app init)
+export { registerAllLibResponses } from "./degrade/lib-responses";
+
 // Auth-specific errors — used by lib/auth module
 export {
     AuthError,

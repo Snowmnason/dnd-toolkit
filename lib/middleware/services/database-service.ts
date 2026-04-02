@@ -16,7 +16,9 @@
  * - Transform entities (modules do that)
  */
 
+import { reportFault } from '@/lib/error';
 import { logger } from '@/lib/utils/logger';
+import { DegradeCapability } from '@/type-definitions/degrade';
 import { ConnectionQuality, NetworkDetection } from '@/system/Network';
 import {
     getDatabaseProvider,
@@ -79,6 +81,7 @@ export function getDatabase(): DatabaseProvider {
         // TODO: Should we throw here, or let NoOp provider handle with clear error?
         // Current behavior: NoOp provider returns, throws on actual query with clear message.
         logger.category('database').warn('[database-service] Database provider not initialized — queries will fail');
+        reportFault(DegradeCapability.DATABASE, 'Provider not initialized');
     }
 
     return getDatabaseProvider();
@@ -95,6 +98,7 @@ export function getDatabaseWithAuth(): DatabaseProvider {
     if (!isServiceReady('auth')) {
         // TODO: Should we throw a typed error? Queue for later?
         // For now, throw immediately — auth-gated DB writes must not proceed without auth.
+        reportFault(DegradeCapability.DATABASE, 'Authenticated database unavailable — auth not ready');
         throw new Error('[database-service] Auth provider not ready — cannot perform authenticated database operation');
     }
 

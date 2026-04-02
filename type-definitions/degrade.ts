@@ -116,6 +116,35 @@ export interface DegradeState {
 }
 
 /**
+ * Context passed to response handlers when a capability degrades or recovers.
+ * Contains enough information for the handler to decide what action to take.
+ */
+export interface DegradeResponseContext {
+  /** The capability that changed */
+  capability: DegradeCapability;
+  /** true = recovered, false = degraded */
+  available: boolean;
+  /** Human-readable reason for the change */
+  reason: string;
+  /** Which system/phase/component triggered the change */
+  source: string;
+  /** true if this is a crash-level (unrecoverable) event */
+  isCrash: boolean;
+}
+
+/**
+ * Response handler for a degradation event.
+ * Called automatically when a capability's state changes.
+ *
+ * System-level handlers (in system/Degrade/responses/) handle infrastructure:
+ *   stop processes, kill threads, capture mutations, pause queues.
+ *
+ * Lib-level handlers (in lib/error/degrade/lib-responses.ts) handle orchestration:
+ *   UI state decisions, feature gating, user-facing messaging.
+ */
+export type DegradeResponseHandler = (context: DegradeResponseContext) => void;
+
+/**
  * Subscription callback for degradation state changes
  */
 export type DegradeSubscriber = (state: DegradeState) => void;

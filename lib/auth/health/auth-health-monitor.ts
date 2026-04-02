@@ -10,10 +10,11 @@
  */
 
 import { getAppConfig } from '@/config';
-import { createSafeModeState, SafeModeReason } from "@/lib/error";
+import { reportCrash } from "@/lib/error";
 import { getJobQueue } from "@/lib/jobs";
-import { isKernelIdle, setSafeMode } from "@/lib/kernel/kernel-manager";
+import { isKernelIdle } from "@/lib/kernel/kernel-manager";
 import { logger } from "@/lib/utils";
+import { DegradeCapability } from "@/type-definitions/degrade";
 
 const AUTH_HEALTH_CHECK_JOB_TYPE = "auth_health_check";
 // Default to 4 hours if not configured
@@ -98,12 +99,10 @@ async function validateAuthHealth(): Promise<void> {
             "Auth health check failed: previously authenticated user session is now invalid",
           );
 
-        // Trigger safe mode - UI routing layer will detect and redirect to login
-        const safeMode = createSafeModeState(SafeModeReason.AUTH_EXPIRED, {
-          details:
-            "User session was valid but has expired. Please log in again.",
+        // Trigger safe mode via centralized degradation manager — UI routing layer will redirect to login
+        reportCrash(DegradeCapability.AUTH, 'session-expired', {
+          details: 'User session was valid but has expired. Please log in again.',
         });
-        setSafeMode(safeMode);
       } else {
         logger
           .category("auth")

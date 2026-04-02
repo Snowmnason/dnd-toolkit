@@ -17,15 +17,86 @@
  * - BOOTSTRAP_PRELOAD: preload phase failed — fonts/assets missing, renders will break
  * - BOOTSTRAP_JOBS: job registration failed during bootstrap (flagged but deferred)
  *
- * IMPORTANT: Crash handlers set the capability flag AND are expected to be
- * followed by a hard-fail path in the caller (error boundary, safe mode screen, etc.).
- * Setting the flag alone does NOT crash the app — the caller must act on it.
+ * Crash handlers:
+ * 1. Set the capability flag on appDegrade (state tracking)
+ * 2. Notify the registered crash callback (so the kernel/lib can trigger safe mode)
+ * 3. The CALLER still controls whether to throw/continue — handlers don't crash the app
+ *
+ * Callback pattern: system/ can't import lib/ safe-mode types, so we export a
+ * registrable callback. The kernel registers it during bootstrap to bridge the gap.
  */
 
-import { degradeManager } from '../degrade-manager';
-import { DegradeCapability } from '../types';
+import { DegradeCapability } from '@/type-definitions/degrade';
+import { appDegrade } from '../app-degrade';
 
 const SOURCE = 'crash-handler';
+
+// ==========================================
+// CRASH CALLBACK REGISTRY
+// ==========================================
+
+/**
+ * Structured crash notification sent to the registered callback.
+ * Contains enough info for the kernel/lib layer to decide how to respond
+ * (trigger safe mode, show error boundary, or continue with degradation).
+ */
+export interface CrashNotification {
+  /** Which capability crashed */
+  capability: DegradeCapability;
+  /** Human-readable reason for the crash */
+  reason: string;
+  /** Whether this is a critical crash (true) or a flagged non-critical (false) */
+  isCritical: boolean;
+  /**
+   * Suggested response action:
+   * - 'safe-mode': trigger SafeModeScreen with appropriate reason
+   * - 'error-boundary': let the error propagate to AppErrorBoundary
+   * - 'continue': flag is set but app should continue (non-critical crash)
+   */
+  suggestedAction: 'safe-mode' | 'error-boundary' | 'continue';
+}
+
+/**
+ * Callback type for crash notifications.
+ * Registered by the kernel or lib layer to bridge system/ → lib/ boundary.
+ */
+export type CrashCallback = (notification: CrashNotification) => void;
+
+/** Registered crash callback — null until kernel registers one */
+let crashCallback: CrashCallback | null = null;
+
+/**
+ * Register a callback to receive crash notifications.
+ * Called by the kernel during bootstrap to wire crash handlers → safe mode.
+ *
+ * Only one callback is supported — subsequent calls replace the previous one.
+ * Returns an unregister function.
+ *
+ * @param callback Function to call when a crash is reported
+ * @returns Unregister function
+ */
+export function registerCrashCallback(callback: CrashCallback): () => void {
+  crashCallback = callback;
+  return () => {
+    if (crashCallback === callback) {
+      crashCallback = null;
+    }
+  };
+}
+
+/**
+ * Internal: notify crash callback if registered
+ */
+function notifyCrash(notification: CrashNotification): void {
+  if (crashCallback) {
+    try {
+      crashCallback(notification);
+    } catch {
+      // Crash callback itself failed — nothing we can safely do here.
+      // The flag is already set on appDegrade, so state is tracked.
+    }
+  }
+}
 
 // ==========================================
 // STORAGE (runtime + bootstrap)
@@ -35,20 +106,26 @@ const SOURCE = 'crash-handler';
  * Called when persistent storage becomes completely unavailable at any point.
  * This is unrecoverable — the app cannot safely read or write encrypted data.
  *
- * Sets STORAGE capability to false AND marks it as a crash-level event.
+ * Actions:
+ * 1. Sets STORAGE capability to false on appDegrade
+ * 2. Notifies crash callback → kernel triggers safe mode (STORAGE_UNREADABLE)
  *
- * Expected caller behavior:
- * 1. Call this function
- * 2. Trigger safe mode: setSafeMode(SafeModeReason.STORAGE_UNREADABLE)
- * 3. Show recovery screen (user must clear cache / reinstall)
+ * Caller still controls the throw — this function does NOT throw.
  *
  * @param reason Storage error detail from classifyStorageError()
  * @param isCritical If true, quota-exceeded or corrupted (vs transient IO error)
  */
 export function reportStorageCrash(reason: string, isCritical = true): void {
-  degradeManager.set(DegradeCapability.STORAGE, false, {
+  appDegrade.set(DegradeCapability.STORAGE, false, {
     source: SOURCE,
     reason: isCritical ? `unrecoverable: ${reason}` : `storage unavailable: ${reason}`,
+  });
+
+  notifyCrash({
+    capability: DegradeCapability.STORAGE,
+    reason,
+    isCritical,
+    suggestedAction: isCritical ? 'safe-mode' : 'continue',
   });
 }
 
@@ -60,11 +137,12 @@ export function reportStorageCrash(reason: string, isCritical = true): void {
  * Called when the config phase fails during bootstrap.
  * No valid app configuration = no safe defaults = the app cannot start.
  *
- * Sets multiple capabilities to false since config drives everything.
+ * Actions:
+ * 1. Sets ALL downstream capabilities to false (config is the root dependency)
+ * 2. Notifies crash callback → kernel lets error boundary catch the throw
  *
- * Expected caller behavior:
- * 1. Call this function
- * 2. Crash to error boundary — config failure is non-recoverable
+ * The config phase always re-throws after calling this, so the error
+ * propagates to AppErrorBoundary. The callback is informational.
  *
  * @param reason Config failure detail
  */
@@ -80,11 +158,18 @@ export function reportConfigBootstrapCrash(reason: string): void {
   ];
 
   for (const capability of allCrashCapabilities) {
-    degradeManager.set(capability, false, {
+    appDegrade.set(capability, false, {
       source: SOURCE,
       reason: `config bootstrap failed: ${reason}`,
     });
   }
+
+  notifyCrash({
+    capability: DegradeCapability.DATABASE, // Use DATABASE as representative — all are down
+    reason: `config bootstrap failed: ${reason}`,
+    isCritical: true,
+    suggestedAction: 'error-boundary',
+  });
 }
 
 // ==========================================
@@ -93,21 +178,28 @@ export function reportConfigBootstrapCrash(reason: string): void {
 
 /**
  * Called when the preload phase fails during bootstrap.
- * Fonts/assets/themes failed to load — UI will be broken/unstyled.
+ * Fonts/assets/themes failed to load — UI will be visually broken.
  *
- * This is a crash-level event because rendered output will be visually broken.
+ * Actions:
+ * 1. Sets STORAGE capability to false (assets are stored resources)
+ * 2. Notifies crash callback (non-critical — app continues with fallback fonts)
  *
- * Expected caller behavior:
- * 1. Call this function
- * 2. Crash to error boundary with KERNEL_PRELOAD_FAILED reason
+ * Despite being a "crash" handler, preload failures are survivable.
+ * The app continues with system fonts. Flagged for visibility.
  *
  * @param reason Preload failure detail
  */
 export function reportPreloadBootstrapCrash(reason: string): void {
-  // Preload failure means UI is broken; no capabilities work reliably
-  degradeManager.set(DegradeCapability.STORAGE, false, {
+  appDegrade.set(DegradeCapability.STORAGE, false, {
     source: SOURCE,
     reason: `preload bootstrap failed (assets unavailable): ${reason}`,
+  });
+
+  notifyCrash({
+    capability: DegradeCapability.STORAGE,
+    reason: `preload bootstrap failed: ${reason}`,
+    isCritical: false,
+    suggestedAction: 'continue',
   });
 }
 
@@ -116,22 +208,28 @@ export function reportPreloadBootstrapCrash(reason: string): void {
 // ==========================================
 
 /**
- * Called when background job registration fails during bootstrap.
+ * Called when background job infrastructure or registration fails during bootstrap.
  * Jobs are queued work — if registration fails, no background tasks will run.
  *
- * This sets BACKGROUND_JOBS to false. Recovery strategy is TBD (see plan).
- * Flagged here for visibility; the app continues — jobs are non-critical for bootstrap.
+ * Actions:
+ * 1. Sets BACKGROUND_JOBS capability to false
+ * 2. Notifies crash callback (non-critical — app continues without background jobs)
  *
- * Expected caller behavior:
- * 1. Call this function
- * 2. Log the failure, continue bootstrap (do NOT crash)
- * 3. Show degraded-jobs indicator in UI if desired (via useCapability hook)
+ * The app continues — jobs are non-critical for core functionality.
+ * Users may notice missing auto-refresh, but manual actions still work.
  *
  * @param reason Job registration failure detail
  */
 export function reportJobsBootstrapCrash(reason: string): void {
-  degradeManager.set(DegradeCapability.BACKGROUND_JOBS, false, {
+  appDegrade.set(DegradeCapability.BACKGROUND_JOBS, false, {
     source: SOURCE,
     reason: `job registration failed at bootstrap: ${reason}`,
+  });
+
+  notifyCrash({
+    capability: DegradeCapability.BACKGROUND_JOBS,
+    reason,
+    isCritical: false,
+    suggestedAction: 'continue',
   });
 }

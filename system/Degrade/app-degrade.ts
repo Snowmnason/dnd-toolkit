@@ -9,7 +9,7 @@
  * SYNC is only available when ALL sources report it as available.
  */
 
-import { DegradeCapability, DegradeCapabilityState, DegradeState, DegradeSubscriber } from './types';
+import { DegradeCapability, DegradeCapabilityState, DegradeResponseHandler, DegradeState, DegradeSubscriber } from '@/type-definitions/degrade';
 
 /**
  * Central degradation manager singleton
@@ -20,6 +20,19 @@ export class DegradeManager {
   private lastNotificationTime = 0;
   private notificationDebounceMs = 0; // No debounce for now, can be added later
   private handlerCleanups: Map<string, () => void> = new Map();
+
+  /**
+   * System-level response handlers — centralized registry.
+   * Each capability maps to ONE handler that runs automatically when its state changes.
+   * Handlers are registered once during bootstrap and execute on every state transition.
+   *
+   * These are SYSTEM-LEVEL responses: stop processes, capture mutations, pause queues.
+   * For lib/UI-level responses, see lib/error/degrade/degrade-manager.ts.
+   */
+  private systemResponses: Map<DegradeCapability, DegradeResponseHandler> = new Map();
+
+  /** Track previous capability values to detect transitions (avoid re-firing on same state) */
+  private previousCapabilityValues: Map<DegradeCapability, boolean> = new Map();
 
   /**
    * Update degradation state for a capability from a specific source
@@ -49,9 +62,86 @@ export class DegradeManager {
       updatedAt: now,
     });
 
+    // Check if aggregate capability value actually changed — fire system response if so
+    if (typeof capability === 'string' && Object.values(DegradeCapability).includes(capability as DegradeCapability)) {
+      const enumCap = capability as DegradeCapability;
+      const currentValue = this.isCapable(enumCap);
+      const previousValue = this.previousCapabilityValues.get(enumCap);
+
+      if (previousValue === undefined || previousValue !== currentValue) {
+        this.previousCapabilityValues.set(enumCap, currentValue);
+        this.executeSystemResponse(enumCap, currentValue, options);
+      }
+    }
+
     // Notify subscribers of state change
     this.notifySubscribers();
   }
+
+  // ──────────────────────────────────────────────────────
+  // System Response Registry
+  // ──────────────────────────────────────────────────────
+
+  /**
+   * Register a system-level response handler for a capability.
+   * Only ONE handler per capability — last registration wins.
+   * Handler fires automatically when the capability's aggregate value transitions.
+   *
+   * System responses handle infrastructure concerns:
+   * - Stopping background processes
+   * - Pausing job queues
+   * - Capturing offline mutations
+   * - Switching to fallback transports
+   *
+   * @returns Unregister function
+   */
+  registerResponse(capability: DegradeCapability, handler: DegradeResponseHandler): () => void {
+    this.systemResponses.set(capability, handler);
+    return () => {
+      // Only delete if it's still the same handler (avoids removing a newer registration)
+      if (this.systemResponses.get(capability) === handler) {
+        this.systemResponses.delete(capability);
+      }
+    };
+  }
+
+  /**
+   * Execute the registered system response for a capability.
+   * Called internally by set() when aggregate value transitions.
+   * Wrapped in try/catch — response errors must never crash the degradation system itself.
+   */
+  private executeSystemResponse(
+    capability: DegradeCapability,
+    available: boolean,
+    options: { source: string; reason: string },
+  ): void {
+    const handler = this.systemResponses.get(capability);
+    if (!handler) return;
+
+    try {
+      handler({
+        capability,
+        available,
+        reason: options.reason,
+        source: options.source,
+        isCrash: false, // System layer doesn't distinguish — lib layer handles crash semantics
+      });
+    } catch (error) {
+      // Response handler must never take down the degradation system
+      console.error(`[DegradeManager] System response error for ${capability}:`, error);
+    }
+  }
+
+  /**
+   * Get count of registered system response handlers (for debugging/testing)
+   */
+  getResponseCount(): number {
+    return this.systemResponses.size;
+  }
+
+  // ──────────────────────────────────────────────────────
+  // Subscriptions
+  // ──────────────────────────────────────────────────────
 
   /**
    * Subscribe to degradation state changes
@@ -199,6 +289,8 @@ export class DegradeManager {
    */
   clear(): void {
     this.sourceStates.clear();
+    this.previousCapabilityValues.clear();
+    this.systemResponses.clear();
     // Run all registered handler cleanups (unsubscribes, teardowns)
     for (const [name, cleanup] of this.handlerCleanups) {
       try {
@@ -255,4 +347,4 @@ export class DegradeManager {
  * Global degradation manager singleton
  * Initialized once, reused throughout app lifecycle
  */
-export const degradeManager = new DegradeManager();
+export const appDegrade = new DegradeManager();
