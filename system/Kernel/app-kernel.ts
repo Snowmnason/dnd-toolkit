@@ -20,31 +20,32 @@
  */
 
 import {
-  cleanupAnalyticsNetworkIntegration,
+    cleanupAnalyticsNetworkIntegration,
 } from "@/lib/analytics/exporters/analytics-network-integration";
 import {
-  createSafeModeState,
-  DEFAULT_SAFE_MODE_CONFIG,
-  NetworkCascadeDetector,
-  SafeModeLevel,
-  SafeModeReason,
-  type SafeModeState,
+    createSafeModeState,
+    DEFAULT_SAFE_MODE_CONFIG,
+    NetworkCascadeDetector,
+    SafeModeLevel,
+    SafeModeReason,
+    type SafeModeState,
 } from "@/lib/error";
 import { logger } from "@/lib/utils";
 import { getPhaseMessage, type PhaseName } from "@/localization";
 import {
-  NetworkDetection,
-  NetworkStatus,
+    NetworkDetection,
+    NetworkStatus,
 } from "@/system/Network";
 import {
-  KernelErrorCode,
-  KernelPhase,
-  type AppKernelState,
-  type KernelCapabilities,
-  type KernelError,
-  type KernelListener,
-  type PhaseProgress,
+    KernelErrorCode,
+    KernelPhase,
+    type AppKernelState,
+    type KernelCapabilities,
+    type KernelError,
+    type KernelListener,
+    type PhaseProgress,
 } from "@/type-definitions/kernel-types";
+import { classifyPhaseError } from "./phase-helpers/phase-error-classifier";
 import { authPhase } from "./phases/auth-phase";
 import { configPhase } from "./phases/config-phase";
 import { featureFlagsPhase } from "./phases/feature-flags-phase";
@@ -68,12 +69,12 @@ import { storagePhase } from "./phases/storage-phase";
  * These exports prevent breaking external imports from system/Kernel
  */
 export {
-  KernelErrorCode,
-  KernelPhase, type AppKernelState,
-  type KernelCapabilities,
-  type KernelError,
-  type KernelListener,
-  type PhaseProgress
+    KernelErrorCode,
+    KernelPhase, type AppKernelState,
+    type KernelCapabilities,
+    type KernelError,
+    type KernelListener,
+    type PhaseProgress
 } from "@/type-definitions/kernel-types";
 
 /**
@@ -120,6 +121,29 @@ const PHASE_MIN_DISPLAY_MS = {
   featureFlags: 50,
   registration: 50,
 } as const;
+
+/**
+ * TRACK 8: Phases that ALWAYS crash on failure (no graceful degradation)
+ * Any error in these phases is fatal to the bootstrap process.
+ */
+const CRITICAL_PHASES = ["config", "preload", "storage", "jobSetup"] as const;
+
+/**
+ * TRACK 8: Maps each phase to the capability flags it affects on failure.
+ * Non-critical phases use this map to set degradation flags before skipping.
+ * Critical phases have empty arrays (they crash, never degrade).
+ */
+const PHASE_CAPABILITY_MAP: Record<typeof PHASE_SEQUENCE[number], string[]> = {
+  config:       [],                                              // Critical: crash
+  preload:      [],                                              // Critical: crash
+  network:      ["connectivity"],                               // Non-critical
+  storage:      ["storage"],                                     // Critical: crash
+  services:     ["database", "auth", "analytics", "errorTracking"], // Non-critical
+  jobSetup:     [],                                              // Critical: crash
+  auth:         ["auth"],                                        // Non-critical
+  featureFlags: ["premiumFeatures"],                             // Non-critical
+  registration: ["backgroundJobs", "sync"],                      // Non-critical
+};
 
 class AppKernelClass {
   private state: AppKernelState = {
@@ -321,7 +345,6 @@ class AppKernelClass {
           state.phases.appReady &&
           state.safeMode?.reason === SafeModeReason.KERNEL_TIMEOUT
         ) {
-          console.log('[CRITICAL] Kernel completed after timeout — auto-clearing KERNEL_TIMEOUT safe mode');
           logger
             .category('bootstrap')
             .info('Kernel completed after timeout — auto-clearing KERNEL_TIMEOUT safe mode');
@@ -334,6 +357,10 @@ class AppKernelClass {
   /**
    * Set up network status subscription and update kernel state on changes
    * Called after networkPhase() initializes the NetworkDetection state machine
+   *
+   * TRACK 7 (Early): Wire network changes to degradation manager
+   * - Network reconnects → appDegrade.set('connectivity', true)
+   * - Network disconnects → appDegrade.set('connectivity', false)
    */
   private setupNetworkSubscription(): void {
     // Clean up existing subscription
@@ -350,6 +377,22 @@ class AppKernelClass {
         .debug(
           `Network status changed: online=${status.isOnline}, type=${status.type}`,
         );
+
+      // TRACK 7: Wire network changes to degradation manager
+      // Dynamic import to avoid circular dep at top-level
+      (async () => {
+        try {
+          const { appDegrade } = await import("@/system/Degrade");
+          appDegrade.set("connectivity", status.isOnline, {
+            source: "network-detection",
+            reason: status.isOnline ? "back online" : "offline",
+          });
+        } catch (error) {
+          logger
+            .category("bootstrap")
+            .warn("Failed to update degradation on network change", { error });
+        }
+      })();
     });
 
     // Get and set initial status
@@ -728,11 +771,65 @@ class AppKernelClass {
 
       const err = error instanceof Error ? error : new Error(String(error));
       const actualDuration = Date.now() - startTime;
-      logger.category("bootstrap").error(`${phaseName} phase failed`, {
-        error: err.message,
-        durationMs: actualDuration,
+      const isCritical = (CRITICAL_PHASES as readonly string[]).includes(phaseName);
+      const failureType = classifyPhaseError(err);
+      // Static switch avoids Generic Object Injection Sink warning (mirrors resolvePhaseKey pattern)
+      const capabilities = (() => {
+        switch (phaseName) {
+          case "config":       return PHASE_CAPABILITY_MAP.config;
+          case "preload":      return PHASE_CAPABILITY_MAP.preload;
+          case "network":      return PHASE_CAPABILITY_MAP.network;
+          case "storage":      return PHASE_CAPABILITY_MAP.storage;
+          case "services":     return PHASE_CAPABILITY_MAP.services;
+          case "jobSetup":     return PHASE_CAPABILITY_MAP.jobSetup;
+          case "auth":         return PHASE_CAPABILITY_MAP.auth;
+          case "featureFlags": return PHASE_CAPABILITY_MAP.featureFlags;
+          case "registration": return PHASE_CAPABILITY_MAP.registration;
+        }
+      })();
+
+      // Critical phases or non-recoverable errors always crash bootstrap
+      if (isCritical || failureType === "non-recoverable") {
+        logger.category("bootstrap").error(
+          `${phaseName} phase failed (${failureType}, critical=${isCritical})`,
+          { error: err.message, durationMs: actualDuration },
+        );
+        throw err;
+      }
+
+      // Non-critical phase with recoverable failure ('unreachable' | 'timeout'):
+      // set degradation flags, skip phase, continue bootstrap
+      logger.category("bootstrap").warn(
+        `${phaseName} phase skipped (${failureType}) — bootstrap continues`,
+        { error: err.message, capabilities, durationMs: actualDuration },
+      );
+
+      // Set degradation flags for all capabilities this phase affects
+      if (capabilities.length > 0) {
+        try {
+          const { appDegrade } = await import("@/system/Degrade");
+          for (const cap of capabilities) {
+            appDegrade.set(cap, false, {
+              source: phaseName,
+              reason: `${phaseName} phase failed: ${failureType}`,
+            });
+          }
+        } catch (degradeError) {
+          logger.category("bootstrap").warn(
+            `Failed to set degradation flags for ${phaseName}`,
+            { error: (degradeError as Error).message },
+          );
+        }
+      }
+
+      // Mark phase as complete (skipped) and continue
+      const updatedPhases = { ...this.state.phases, [phaseKey]: true };
+      this.calculatePhaseProgress(updatedPhases);
+      this.updateState({
+        phases: updatedPhases,
+        timing: { ...this.state.timing, [phaseName]: actualDuration },
+        phaseProgress: { ...this.state.phaseProgress },
       });
-      throw err;
     }
   }
 
@@ -1054,6 +1151,18 @@ class AppKernelClass {
       logger.category("bootstrap").warn("Failed to cleanup analytics network integration", {
         error: (error as Error).message,
       });
+    }
+
+    // Cleanup bootstrap timeout handle (if not already cleared)
+    if (this.bootstrapTimeoutHandle) {
+      clearTimeout(this.bootstrapTimeoutHandle);
+      this.bootstrapTimeoutHandle = null;
+    }
+
+    // Cleanup bootstrap timeout subscription (if not already cleared)
+    if (this.bootstrapTimeoutUnsubscribe) {
+      this.bootstrapTimeoutUnsubscribe();
+      this.bootstrapTimeoutUnsubscribe = null;
     }
 
     // Unsubscribe from network changes

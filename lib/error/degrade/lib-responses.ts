@@ -17,7 +17,7 @@
  */
 
 import { DegradeCapability, DegradeResponseContext } from '@/type-definitions/degrade';
-import { registerDegradeResponse } from './degrade-manager';
+import { getDisplayCallbacks, registerDegradeResponse } from './degrade-manager';
 
 // ──────────────────────────────────────────────────────────
 // Degradation report rate-limiting (for optional providers)
@@ -56,94 +56,166 @@ function recordDegradationReport(capability: string): void {
 // ──────────────────────────────────────────────────────────
 
 function handleDatabaseResponse(ctx: DegradeResponseContext): void {
+  const callbacks = getDisplayCallbacks();
+
   if (!ctx.available) {
-    // TODO: Show "offline mode" banner or toast via lib/toast
-    // TODO: Gate features that require live database (world creation, settings sync)
-    // TODO: Switch data reads to cache-only mode via QueryCache
-    // TODO: If isCrash, consider navigating to safe mode screen
-    console.warn(`[LibResponse] DATABASE ${ctx.isCrash ? 'CRASHED' : 'degraded'} — reason: ${ctx.reason}`);
+    if (ctx.isCrash) {
+      // Unrecoverable: show safe mode
+      callbacks.showSafeMode?.(ctx.capability, ctx.reason);
+    } else {
+      // Recoverable: show toast
+      // TODO: [Toast Redesign] Use `message` field when new toast component lands (title + detailed message)
+      callbacks.showToast?.({
+        title: 'Database Offline',
+        severity: 'warning',
+        message: 'Database connection unavailable. Working with cached data only. Changes will sync when connection returns.',
+        duration: 5000,
+      });
+    }
   } else {
-    // TODO: Hide offline banner
-    // TODO: Un-gate database-dependent features
-    // TODO: Trigger stale data refresh for any cached reads
-    console.info('[LibResponse] DATABASE recovered');
+    // Recovered
+    callbacks.showToast?.({
+      title: 'Database Reconnected',
+      severity: 'info',
+      message: 'Database connection restored. Your changes are now syncing.',
+      duration: 3000,
+    });
   }
 }
 
 function handleAuthResponse(ctx: DegradeResponseContext): void {
+  const callbacks = getDisplayCallbacks();
+
   if (!ctx.available) {
-    // TODO: Show "session expired" banner or redirect to login
-    // TODO: Gate operations that require authenticated state
-    // TODO: If isCrash, force navigation to login screen
-    // TODO: Preserve unsaved user work before redirecting
-    console.warn(`[LibResponse] AUTH ${ctx.isCrash ? 'CRASHED' : 'degraded'} — reason: ${ctx.reason}`);
+    if (ctx.isCrash) {
+      // Unrecoverable: show safe mode
+      callbacks.showSafeMode?.(ctx.capability, ctx.reason);
+    } else {
+      // Recoverable: show toast
+      // TODO: [Toast Redesign] Use `message` field when new toast component lands (title + detailed message)
+      callbacks.showToast?.({
+        title: 'Authentication Unavailable',
+        severity: 'error',
+        message: 'Unable to verify authentication. Some features may be restricted. Please try again later.',
+        duration: 5000,
+      });
+    }
   } else {
-    // TODO: Hide session expired banner
-    // TODO: Restore authenticated feature access
-    // TODO: Re-validate world access if user was in a world
-    console.info('[LibResponse] AUTH recovered');
+    // Recovered
+    callbacks.showToast?.({
+      title: 'Authentication Restored',
+      severity: 'info',
+      message: 'Your session has been restored.',
+      duration: 3000,
+    });
   }
 }
 
 function handleSyncResponse(ctx: DegradeResponseContext): void {
+  const callbacks = getDisplayCallbacks();
+
   if (!ctx.available) {
-    // TODO: Show "sync unavailable" indicator in UI
-    // TODO: Mark data as potentially stale (show timestamps on last-synced data)
-    // TODO: Disable real-time collaboration features
-    // TODO: If isCrash, show persistent warning about data consistency
-    console.warn(`[LibResponse] SYNC ${ctx.isCrash ? 'CRASHED' : 'degraded'} — reason: ${ctx.reason}`);
+    // Sync failure is recoverable, show toast
+    // TODO: [Toast Redesign] Use `message` field when new toast component lands (title + detailed message)
+    callbacks.showToast?.({
+      title: 'Sync Paused',
+      severity: 'warning',
+      message: 'Real-time synchronization is temporarily paused. Changes will sync when connection improves.',
+      duration: 5000,
+    });
   } else {
-    // TODO: Hide sync unavailable indicator
-    // TODO: Clear stale data markers
-    // TODO: Re-enable real-time collaboration
-    console.info('[LibResponse] SYNC recovered');
+    // Recovered
+    callbacks.showToast?.({
+      title: 'Sync Resumed',
+      severity: 'info',
+      message: 'Synchronization has resumed. Your changes are being synced.',
+      duration: 3000,
+    });
   }
 }
 
 function handleConnectivityResponse(ctx: DegradeResponseContext): void {
+  const callbacks = getDisplayCallbacks();
+
   if (!ctx.available) {
-    // TODO: Show persistent "no connection" banner at top of screen
-    // TODO: Switch entire app to offline-first mode
-    // TODO: Disable features that absolutely require network (world joining, account creation)
-    // TODO: Show cached data with "offline" watermark
-    console.warn(`[LibResponse] CONNECTIVITY degraded — reason: ${ctx.reason}`);
+    // Offline: show toast
+    // TODO: [Toast Redesign] Use `message` field when new toast component lands (title + detailed message)
+    callbacks.showToast?.({
+      title: 'Offline Mode',
+      severity: 'warning',
+      message: 'You are offline. Using cached data. Changes will sync when you\'re back online.',
+      duration: 5000,
+    });
   } else {
-    // TODO: Hide "no connection" banner
-    // TODO: Trigger data sync for any changes made while offline
-    // TODO: Re-enable network-dependent features
-    // TODO: Show brief "back online" toast
-    console.info('[LibResponse] CONNECTIVITY recovered');
+    // Back online: show toast
+    callbacks.showToast?.({
+      title: 'Back Online',
+      severity: 'info',
+      message: 'Connection restored. Syncing your changes now.',
+      duration: 3000,
+    });
   }
 }
 
 function handleStorageResponse(ctx: DegradeResponseContext): void {
+  const callbacks = getDisplayCallbacks();
+
   if (!ctx.available) {
-    // TODO: Show critical warning — storage failures affect data persistence
-    // TODO: Disable features that write to storage (settings, preferences, world data)
-    // TODO: If isCrash, navigate to safe mode (data loss risk)
-    console.warn(`[LibResponse] STORAGE ${ctx.isCrash ? 'CRASHED' : 'degraded'} — reason: ${ctx.reason}`);
+    if (ctx.isCrash) {
+      // Unrecoverable: show safe mode
+      callbacks.showSafeMode?.(ctx.capability, ctx.reason);
+    } else {
+      // Recoverable: show toast
+      // TODO: [Toast Redesign] Use `message` field when new toast component lands (title + detailed message)
+      callbacks.showToast?.({
+        title: 'Storage Unavailable',
+        severity: 'error',
+        message: 'Local storage is unavailable. Preferences and data cannot be saved. Please check your device storage.',
+        duration: 5000,
+      });
+    }
   } else {
-    // TODO: Hide storage warning
-    // TODO: Re-enable storage-dependent features
-    // TODO: Verify data integrity after recovery
-    console.info('[LibResponse] STORAGE recovered');
+    // Recovered
+    callbacks.showToast?.({
+      title: 'Storage Restored',
+      severity: 'info',
+      message: 'Local storage is available again.',
+      duration: 3000,
+    });
   }
 }
 
 function handleBackgroundJobsResponse(ctx: DegradeResponseContext): void {
+  const callbacks = getDisplayCallbacks();
+
   if (!ctx.available) {
-    // TODO: Show subtle indicator that background processing is paused
-    // TODO: Warn user that scheduled operations (auto-save, sync) are delayed
-    // TODO: If jobs are user-visible (export, import), show specific status
-    console.warn(`[LibResponse] BACKGROUND_JOBS degraded — reason: ${ctx.reason}`);
+    if (ctx.isCrash) {
+      // Unrecoverable: show safe mode
+      callbacks.showSafeMode?.(ctx.capability, ctx.reason);
+    } else {
+      // Degraded: show toast
+      // TODO: [Toast Redesign] Use `message` field when new toast component lands (title + detailed message)
+      callbacks.showToast?.({
+        title: 'Background Jobs Paused',
+        severity: 'warning',
+        message: 'Background tasks are paused. Syncing and automatic updates will resume when available.',
+        duration: 5000,
+      });
+    }
   } else {
-    // TODO: Hide background processing indicator
-    // TODO: Show brief "operations resumed" toast if user was waiting
-    console.info('[LibResponse] BACKGROUND_JOBS recovered');
+    // Recovered
+    callbacks.showToast?.({
+      title: 'Background Jobs Resumed',
+      severity: 'info',
+      message: 'Syncing and other background tasks have resumed.',
+      duration: 3000,
+    });
   }
 }
 
 function handleAnalyticsResponse(ctx: DegradeResponseContext): void {
+  const callbacks = getDisplayCallbacks();
+
   // Skip entirely if analytics is disabled in config — don't report degradation for disabled providers
   try {
     const config = require('../../../config/appsettings.json');
@@ -155,21 +227,33 @@ function handleAnalyticsResponse(ctx: DegradeResponseContext): void {
   }
 
   if (!ctx.available) {
-    // Rate-limit degradation reports to prevent spam (e.g., on every screen transition)
+    // Analytics failures are invisible to users (no crash, no user-facing feature loss)
+    // Rate-limit to prevent spam
     if (shouldReportDegradation('ANALYTICS')) {
-      // Analytics degradation is invisible to users — no UI response needed
-      // TODO: Log internally for debugging purposes only
-      console.warn(`[LibResponse] ANALYTICS degraded — reason: ${ctx.reason}`);
+      // TODO: [Toast Redesign] Use `message` field when new toast component lands (title + detailed message)
+      callbacks.showToast?.({
+        title: 'Analytics Unavailable',
+        severity: 'info',
+        message: 'Event tracking is temporarily unavailable. This does not affect app functionality.',
+        duration: 3000,
+      });
       recordDegradationReport('ANALYTICS');
     }
   } else {
-    // Always report recovery (user gets service back)
-    console.info('[LibResponse] ANALYTICS recovered');
+    // Recovered
+    callbacks.showToast?.({
+      title: 'Analytics Restored',
+      severity: 'info',
+      message: 'Event tracking has resumed.',
+      duration: 2000,
+    });
     lastDegradationReport.delete('ANALYTICS'); // Reset timer on recovery
   }
 }
 
 function handleErrorTrackingResponse(ctx: DegradeResponseContext): void {
+  const callbacks = getDisplayCallbacks();
+
   // Skip entirely if error tracking is disabled in config — don't report degradation for disabled providers
   try {
     const config = require('../../../config/appsettings.json');
@@ -181,30 +265,50 @@ function handleErrorTrackingResponse(ctx: DegradeResponseContext): void {
   }
 
   if (!ctx.available) {
-    // Rate-limit degradation reports to prevent spam (e.g., on every screen transition)
+    // Error tracking failures are invisible to users (no crash, no user-facing feature loss)
+    // Rate-limit to prevent spam
     if (shouldReportDegradation('ERROR_TRACKING')) {
-      // Error tracking degradation is invisible to users — no UI response needed
-      // TODO: Log internally; consider buffering critical errors for later submission
-      console.warn(`[LibResponse] ERROR_TRACKING degraded — reason: ${ctx.reason}`);
+      // TODO: [Toast Redesign] Use `message` field when new toast component lands (title + detailed message)
+      callbacks.showToast?.({
+        title: 'Error Reporting Unavailable',
+        severity: 'info',
+        message: 'Error reporting is temporarily unavailable. Errors will be stored locally and reported later.',
+        duration: 3000,
+      });
       recordDegradationReport('ERROR_TRACKING');
     }
   } else {
-    // Always report recovery (user gets service back)
-    console.info('[LibResponse] ERROR_TRACKING recovered');
+    // Recovered
+    callbacks.showToast?.({
+      title: 'Error Reporting Restored',
+      severity: 'info',
+      message: 'Error reporting has resumed.',
+      duration: 2000,
+    });
     lastDegradationReport.delete('ERROR_TRACKING'); // Reset timer on recovery
   }
 }
 
 function handlePremiumFeaturesResponse(ctx: DegradeResponseContext): void {
+  const callbacks = getDisplayCallbacks();
+
   if (!ctx.available) {
-    // TODO: Gate premium UI features (lock icons, upgrade prompts)
-    // TODO: Show "premium unavailable" messaging if user had active subscription
-    // TODO: Gracefully hide premium-only screens/components
-    console.warn(`[LibResponse] PREMIUM_FEATURES degraded — reason: ${ctx.reason}`);
+    // Premium feature verification degraded: gate premium UI
+    // TODO: [Toast Redesign] Use `message` field when new toast component lands (title + detailed message)
+    callbacks.showToast?.({
+      title: 'Premium Features Unavailable',
+      severity: 'warning',
+      message: 'Premium features are temporarily unavailable. Your subscription status cannot be verified.',
+      duration: 5000,
+    });
   } else {
-    // TODO: Unlock premium UI features
-    // TODO: Refresh entitlements display
-    console.info('[LibResponse] PREMIUM_FEATURES recovered');
+    // Recovered: unlock premium UI
+    callbacks.showToast?.({
+      title: 'Premium Features Restored',
+      severity: 'info',
+      message: 'Premium features are available again.',
+      duration: 3000,
+    });
   }
 }
 

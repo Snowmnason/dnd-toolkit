@@ -16,6 +16,7 @@
  * - isCrash: always false at system layer (lib layer owns crash semantics)
  */
 
+import { logger } from '@/lib/utils';
 import { DegradeCapability, DegradeResponseContext } from '@/type-definitions/degrade';
 import type { DegradeManager } from '../app-degrade';
 
@@ -28,12 +29,12 @@ function handleDatabaseResponse(ctx: DegradeResponseContext): void {
     // TODO: Pause all pending database write operations
     // TODO: Switch to local-only storage fallback (SecureStorage queue)
     // TODO: Start buffering mutations for replay when DB recovers
-    console.warn(`[SystemResponse] DATABASE degraded — reason: ${ctx.reason}, source: ${ctx.source}`);
+    logger.category('error').warn('DATABASE degraded', { reason: ctx.reason, source: ctx.source });
   } else {
     // TODO: Flush buffered mutations to database
     // TODO: Resume normal database operations
     // TODO: Re-validate cached data freshness
-    console.info('[SystemResponse] DATABASE recovered');
+    logger.category('error').info('DATABASE recovered', { source: ctx.source });
   }
 }
 
@@ -42,11 +43,11 @@ function handleAuthResponse(ctx: DegradeResponseContext): void {
     // TODO: Pause operations that require authenticated API calls
     // TODO: Cache current auth tokens before they expire (if applicable)
     // TODO: Queue auth-dependent requests for retry after recovery
-    console.warn(`[SystemResponse] AUTH degraded — reason: ${ctx.reason}, source: ${ctx.source}`);
+    logger.category('error').warn('AUTH degraded', { reason: ctx.reason, source: ctx.source });
   } else {
     // TODO: Retry queued auth-dependent operations
     // TODO: Re-validate session state
-    console.info('[SystemResponse] AUTH recovered');
+    logger.category('error').info('AUTH recovered', { source: ctx.source });
   }
 }
 
@@ -55,11 +56,11 @@ function handleSyncResponse(ctx: DegradeResponseContext): void {
     // TODO: Pause real-time sync subscriptions (Supabase realtime channels)
     // TODO: Mark local data as potentially stale
     // TODO: Switch to pull-based data refresh when connectivity returns
-    console.warn(`[SystemResponse] SYNC degraded — reason: ${ctx.reason}, source: ${ctx.source}`);
+    logger.category('error').warn('SYNC degraded', { reason: ctx.reason, source: ctx.source });
   } else {
     // TODO: Re-establish real-time sync subscriptions
     // TODO: Trigger full data reconciliation (pull latest, resolve conflicts)
-    console.info('[SystemResponse] SYNC recovered');
+    logger.category('error').info('SYNC recovered', { source: ctx.source });
   }
 }
 
@@ -68,12 +69,12 @@ function handleConnectivityResponse(ctx: DegradeResponseContext): void {
     // TODO: Pause all outbound API requests (let circuit breaker handle retries)
     // TODO: Switch to offline-first mode (serve from cache, queue writes)
     // TODO: Stop background polling/heartbeat intervals
-    console.warn(`[SystemResponse] CONNECTIVITY degraded — reason: ${ctx.reason}, source: ${ctx.source}`);
+    logger.category('error').warn('CONNECTIVITY degraded', { reason: ctx.reason, source: ctx.source });
   } else {
     // TODO: Drain offline mutation queue (replay buffered writes)
     // TODO: Resume background polling/heartbeat
     // TODO: Trigger priority data refresh for stale queries
-    console.info('[SystemResponse] CONNECTIVITY recovered');
+    logger.category('error').info('CONNECTIVITY recovered', { source: ctx.source });
   }
 }
 
@@ -82,11 +83,11 @@ function handleStorageResponse(ctx: DegradeResponseContext): void {
     // TODO: Switch to in-memory fallback for critical data
     // TODO: Stop writing non-essential data (analytics, preferences)
     // TODO: Alert system that persistence is unreliable
-    console.warn(`[SystemResponse] STORAGE degraded — reason: ${ctx.reason}, source: ${ctx.source}`);
+    logger.category('error').warn('STORAGE degraded', { reason: ctx.reason, source: ctx.source });
   } else {
     // TODO: Flush in-memory fallback data to persistent storage
     // TODO: Resume normal write operations
-    console.info('[SystemResponse] STORAGE recovered');
+    logger.category('error').info('STORAGE recovered', { source: ctx.source });
   }
 }
 
@@ -95,11 +96,11 @@ function handleBackgroundJobsResponse(ctx: DegradeResponseContext): void {
     // TODO: Pause job queue processing (stop dequeuing new jobs)
     // TODO: Let currently-running jobs finish gracefully (don't kill mid-execution)
     // TODO: Preserve queue state so jobs aren't lost
-    console.warn(`[SystemResponse] BACKGROUND_JOBS degraded — reason: ${ctx.reason}, source: ${ctx.source}`);
+    logger.category('error').warn('BACKGROUND_JOBS degraded', { reason: ctx.reason, source: ctx.source });
   } else {
     // TODO: Resume job queue processing
     // TODO: Re-process any jobs that were queued while paused
-    console.info('[SystemResponse] BACKGROUND_JOBS recovered');
+    logger.category('error').info('BACKGROUND_JOBS recovered', { source: ctx.source });
   }
 }
 
@@ -107,24 +108,24 @@ function handleAnalyticsResponse(ctx: DegradeResponseContext): void {
   if (!ctx.available) {
     // TODO: Stop sending analytics events (buffer locally if space permits)
     // TODO: This is low-priority — analytics failure should never block user operations
-    console.warn(`[SystemResponse] ANALYTICS degraded — reason: ${ctx.reason}, source: ${ctx.source}`);
+    logger.category('error').warn('ANALYTICS degraded', { reason: ctx.reason, source: ctx.source });
   } else {
     // TODO: Flush buffered analytics events
     // TODO: Resume normal event dispatch
-    console.info('[SystemResponse] ANALYTICS recovered');
+    logger.category('error').info('ANALYTICS recovered', { source: ctx.source });
   }
 }
 
 function handleErrorTrackingResponse(ctx: DegradeResponseContext): void {
   if (!ctx.available) {
-    // TODO: Fall back to console.error for critical errors
+    // TODO: Fall back to logger.category('error').error() for critical errors
     // TODO: Buffer error reports locally for later submission
     // TODO: This is low-priority — error tracking failure should never block user operations
-    console.warn(`[SystemResponse] ERROR_TRACKING degraded — reason: ${ctx.reason}, source: ${ctx.source}`);
+    logger.category('error').warn('ERROR_TRACKING degraded', { reason: ctx.reason, source: ctx.source });
   } else {
     // TODO: Flush buffered error reports
     // TODO: Resume normal error tracking dispatch
-    console.info('[SystemResponse] ERROR_TRACKING recovered');
+    logger.category('error').info('ERROR_TRACKING recovered', { source: ctx.source });
   }
 }
 
@@ -132,11 +133,11 @@ function handlePremiumFeaturesResponse(ctx: DegradeResponseContext): void {
   if (!ctx.available) {
     // TODO: Revoke access to premium-gated system resources (cloud storage buckets, etc.)
     // TODO: Stop premium-only background sync operations
-    console.warn(`[SystemResponse] PREMIUM_FEATURES degraded — reason: ${ctx.reason}, source: ${ctx.source}`);
+    logger.category('error').warn('PREMIUM_FEATURES degraded', { reason: ctx.reason, source: ctx.source });
   } else {
     // TODO: Restore premium system resource access
     // TODO: Resume premium-only background operations
-    console.info('[SystemResponse] PREMIUM_FEATURES recovered');
+    logger.category('error').info('PREMIUM_FEATURES recovered', { source: ctx.source });
   }
 }
 

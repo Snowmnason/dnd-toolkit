@@ -35,7 +35,12 @@ export async function registrationPhase(): Promise<void> {
     const { initializeConnectivityHandler, appDegrade } = await import("@/system/Degrade");
     const { registerAllSystemResponses } = await import("@/system/Degrade/responses/system-responses");
     const { registerAllLibResponses } = await import("@/lib/error/degrade/lib-responses");
+    const { registerDisplayCallbacks } = await import("@/lib/error/degrade/degrade-manager");
+    const { setSafeMode } = await import("@/lib/kernel");
+    const { createSafeModeState, SafeModeReason } = await import("@/lib/error");
+    const { showDegradeToast } = await import("@/lib/utils/toast-queue");
     const { reportBackgroundJobsFault } = await import("@/system/Degrade/handlers/fault-handlers");
+    const { registerCrashCallback } = await import("@/system/Degrade/handlers/crash-handlers");
     const { CORE_JOBS } = await import("@/lib/jobs/registry");
     const { SUBSCRIPTIONS } = await import("@/lib/subscriptions/registry");
     const { getJobQueue } = await import("@/system/Jobs/background-job-queue");
@@ -47,6 +52,98 @@ export async function registrationPhase(): Promise<void> {
     // Register system-level degradation responses (infrastructure: stop processes, pause queues)
     registerAllSystemResponses(appDegrade);
     logger.category("bootstrap").debug("System degradation responses registered");
+
+    // Register UI display callbacks for degradation events
+    registerDisplayCallbacks({
+      showSafeMode: (capability, reason) => {
+        try {
+          // Map capability to appropriate SafeModeReason
+          let safeModeReason = SafeModeReason.UNKNOWN;
+          switch (capability) {
+            case "database":
+              safeModeReason = SafeModeReason.STORAGE_UNREADABLE;
+              break;
+            case "auth":
+              safeModeReason = SafeModeReason.AUTH_INVALID;
+              break;
+            case "storage":
+              safeModeReason = SafeModeReason.STORAGE_CORRUPTED;
+              break;
+            case "sync":
+              safeModeReason = SafeModeReason.NETWORK_SYNC_FAILURES;
+              break;
+            case "connectivity":
+              safeModeReason = SafeModeReason.NETWORK_UNAVAILABLE;
+              break;
+            default:
+              safeModeReason = SafeModeReason.UNKNOWN;
+          }
+
+          const safeModeState = createSafeModeState(safeModeReason, {
+            details: `${capability}: ${reason}`,
+          });
+          setSafeMode(safeModeState);
+        } catch (error) {
+          // Fallback if safe mode creation fails
+          logger
+            .category("bootstrap")
+            .error("Failed to enter safe mode", { error, capability, reason });
+        }
+      },
+      showToast: (options) => {
+        try {
+          showDegradeToast(options);
+        } catch (error) {
+          logger
+            .category("bootstrap")
+            .error("Failed to show toast", { error, options });
+        }
+      },
+    });
+    logger.category("bootstrap").debug("Display callbacks registered");
+
+    // Register crash callback — bridges crash-handlers (system/) → safe mode (lib/)
+    // 'safe-mode': trigger SafeModeScreen
+    // 'error-boundary': no-op here — the phase re-throws, AppErrorBoundary catches it
+    // 'continue': no-op — flag is set on appDegrade, app proceeds with degradation
+    registerCrashCallback((notification) => {
+      if (notification.suggestedAction === 'safe-mode') {
+        try {
+          let safeModeReason = SafeModeReason.UNKNOWN;
+          switch (notification.capability) {
+            case "database":
+              safeModeReason = SafeModeReason.STORAGE_UNREADABLE;
+              break;
+            case "auth":
+              safeModeReason = SafeModeReason.AUTH_INVALID;
+              break;
+            case "storage":
+              safeModeReason = SafeModeReason.STORAGE_CORRUPTED;
+              break;
+            case "sync":
+              safeModeReason = SafeModeReason.NETWORK_SYNC_FAILURES;
+              break;
+            case "connectivity":
+              safeModeReason = SafeModeReason.NETWORK_UNAVAILABLE;
+              break;
+            default:
+              safeModeReason = SafeModeReason.UNKNOWN;
+          }
+          const safeModeState = createSafeModeState(safeModeReason, {
+            details: `${notification.capability}: ${notification.reason}`,
+          });
+          setSafeMode(safeModeState);
+        } catch (error) {
+          logger.category("bootstrap").error("Crash callback failed to enter safe mode", {
+            error,
+            capability: notification.capability,
+            reason: notification.reason,
+          });
+        }
+      }
+      // 'error-boundary' and 'continue' are intentionally no-ops here
+    });
+    logger.category("bootstrap").debug("Crash callback registered");
 
     // Register lib-level degradation responses (UI decisions: feature gating, banners)
     registerAllLibResponses();

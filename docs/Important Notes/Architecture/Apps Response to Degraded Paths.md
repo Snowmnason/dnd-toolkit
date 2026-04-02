@@ -391,6 +391,36 @@ if (!canQuery) {
 
 ---
 
+## Error Sources
+
+The degradation system responds to failures across multiple system layers:
+
+### Bootstrap Phase Failures
+- **Configuration**: Missing or invalid app settings
+- **Preload**: Asset loading failures (fonts, images)
+- **Network**: Connectivity initialization issues
+- **Storage**: SecureStorage setup failures
+- **Services**: Provider initialization (database, auth, analytics)
+- **Jobs**: Background job queue setup
+- **Auth**: Authentication provider configuration
+- **Feature Flags**: Remote flag loading failures
+
+### Runtime System Failures
+- **Connectivity**: Network status changes (online/offline)
+- **Database**: Provider unavailability or connection issues
+- **Auth**: Session expiration or provider failures
+- **Storage**: Read/write failures or corruption
+- **Sync**: Repeated synchronization failures
+- **Background Jobs**: Queue failures or critical job errors
+- **Analytics**: Telemetry system unavailability
+- **Error Tracking**: Reporting system failures
+
+### User-Initiated Triggers
+- **Manual Recovery**: User-triggered system resets
+- **Configuration Changes**: Runtime config updates
+- **Consent Updates**: Privacy setting modifications
+- **Feature Flag Overrides**: Administrative controls
+
 ## Implementation Patterns
 
 ### Error Reporting

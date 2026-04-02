@@ -9,6 +9,7 @@
  * SYNC is only available when ALL sources report it as available.
  */
 
+import { logger } from '@/lib/utils';
 import { DegradeCapability, DegradeCapabilityState, DegradeResponseHandler, DegradeState, DegradeSubscriber } from '@/type-definitions/degrade';
 
 /**
@@ -128,7 +129,7 @@ export class DegradeManager {
       });
     } catch (error) {
       // Response handler must never take down the degradation system
-      console.error(`[DegradeManager] System response error for ${capability}:`, error);
+      logger.category('error').error('System response handler threw', { capability, error });
     }
   }
 
@@ -296,7 +297,7 @@ export class DegradeManager {
       try {
         cleanup();
       } catch (error) {
-        console.error(`[DegradeManager] Cleanup error for handler "${name}":`, error);
+        logger.category('error').error('Cleanup error for degrade handler', { name, error });
       }
     }
     this.handlerCleanups.clear();
@@ -323,7 +324,7 @@ export class DegradeManager {
         subscriber(currentState);
       } catch (error) {
         // Log but don't crash if a subscriber throws
-        console.error('[DegradeManager] Subscriber error:', error);
+        logger.category('error').error('Degrade subscriber threw', { error });
       }
     }
   }

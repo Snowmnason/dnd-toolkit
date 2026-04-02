@@ -23,7 +23,7 @@
  *
  * // Subscribe to changes
  * const unsubscribe = appDegrade.subscribe((state) => {
- *   console.log('Degradation state:', state.capabilities);
+ *   logger.category('error').info('Degradation state updated', { state });
  * });
  * ```
  */

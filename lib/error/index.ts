@@ -16,10 +16,12 @@ export {
 export {
     clearLibResponses,
     getDegradationState,
+    getDisplayCallbacks,
     getLibResponseCount,
     getPrimaryFault,
     isCapableOf,
     registerDegradeResponse,
+    registerDisplayCallbacks,
     reportCrash,
     reportFault,
     reportRecovery,

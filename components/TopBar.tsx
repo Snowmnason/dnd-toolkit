@@ -1,16 +1,15 @@
 import { logger } from "@/lib";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
-import { ConnectionQuality, NetworkManager } from "@/lib/network/network-manager";
 import { S, UseTheme } from "@/theme";
 import { useRouter, useSegments } from "expo-router";
 import { memo, useEffect, useRef, useState } from "react";
 import {
-    AccessibilityInfo,
-    Platform,
-    StyleSheet,
-    Text,
-    View,
-    useWindowDimensions,
+  AccessibilityInfo,
+  Platform,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SettingsMenu from "./modals/SettingsModal";
@@ -49,20 +48,9 @@ function TopBar({
   const isMobile = Platform.OS !== "web" || width < 900;
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [showErrorToast, setShowErrorToast] = useState(false);
-  const [networkStatus, setNetworkStatus] = useState(
-    NetworkManager.getStatus(),
-  );
   const { theme } = UseTheme();
   const insets = useSafeAreaInsets();
   const lastAnnouncedTitle = useRef<string | undefined>(undefined);
-
-  // Subscribe to network status changes
-  useEffect(() => {
-    const unsubscribe = NetworkManager.subscribe((status) => {
-      setNetworkStatus(status);
-    });
-    return () => unsubscribe();
-  }, []);
 
   // A11y: announce title changes for screen readers without relying on DOM focus
   useEffect(() => {
@@ -88,19 +76,7 @@ function TopBar({
     setShowSettingsMenu(true);
   };
 
-  // Get wifi indicator color based on connection quality
-  const getWifiColor = () => {
-    if (!networkStatus?.isOnline) {
-      return "#EF4444"; // Red - no connection
-    }
-    if (networkStatus.connectionQuality === ConnectionQuality.CELLULAR) {
-      return "#FBBF24"; // Yellow - no wifi (cellular)
-    }
-    if (networkStatus.connectionQuality === ConnectionQuality.BAD) {
-      return "#FBBF24"; // Yellow - poor connection
-    }
-    return "#10B981"; // Green - good connection
-  };
+
 
   return (
     <>
@@ -126,7 +102,7 @@ function TopBar({
           )}
         </View>
 
-        {/* Center: Title + WiFi indicator */}
+        {/* Center: Title */}
         <View
           style={[
             styles.centerSlot,
@@ -146,18 +122,6 @@ function TopBar({
           >
             {title}
           </Text>
-          {(Platform.OS !== "web" ||
-            (typeof navigator !== "undefined" &&
-              navigator.userAgent.includes("Electron"))) && (
-            <View
-              style={[
-                styles.wifiIndicator,
-                { backgroundColor: getWifiColor() },
-              ]}
-              accessible={true}
-              accessibilityLabel={`Network: ${networkStatus?.isOnline ? (networkStatus?.connectionQuality === ConnectionQuality.GOOD ? "Online" : "Weak connection") : "Offline"}`}
-            />
-          )}
         </View>
 
         {/* Right: Hamburger Menu (fixed width to mirror left) */}
@@ -255,14 +219,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-  },
-  wifiIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginLeft: 8,
-    backgroundColor: "#10B981",
-    alignSelf: "center",
   },
 });
 

@@ -27,8 +27,9 @@
  * - Degradation mode UI (reduced feature set)
  */
 
+import { logger } from '@/lib/utils';
 import { appDegrade } from '@/system/Degrade';
-import { DegradeCapability, DegradeResponseContext, DegradeResponseHandler, DegradeState } from '@/type-definitions/degrade';
+import { DegradeCapability, DegradeDisplayCallback, DegradeResponseContext, DegradeResponseHandler, DegradeState } from '@/type-definitions/degrade';
 
 // ─── Priority Queue ────────────────────────────────────────────────
 
@@ -89,6 +90,51 @@ function dequeueFault(capability: DegradeCapability): void {
   if (idx !== -1) {
     activeFaults.splice(idx, 1);
   }
+}
+
+// ─── Display Callback Registry ─────────────────────────────────────
+
+/**
+ * Registered display callbacks that handlers can invoke to show UI.
+ * Initialized at bootstrap via registerDisplayCallbacks().
+ * Handlers call these when degradation occurs that needs user-facing feedback.
+ *
+ * Example:
+ * ```ts
+ * if (displayCallbacks.showSafeMode) {
+ *   displayCallbacks.showSafeMode(capability, reason);
+ * }
+ * ```
+ */
+let displayCallbacks: DegradeDisplayCallback = {};
+
+/**
+ * Register display callback functions at bootstrap.
+ * Called in registration-phase to wire up UI responses.
+ *
+ * @param callbacks - Object with optional showSafeMode, showToast, updateTopBar functions
+ *
+ * @example
+ * ```ts
+ * import { registerDisplayCallbacks } from '@/lib/error/degrade';
+ *
+ * registerDisplayCallbacks({
+ *   showSafeMode: (capability, reason) => navigateToSafeMode(capability, reason),
+ *   showToast: (msg) => showAppToast(msg, 'warning'),
+ *   updateTopBar: (level, msg) => setTopBarStatus({ level, message: msg })
+ * });
+ * ```
+ */
+export function registerDisplayCallbacks(callbacks: DegradeDisplayCallback): void {
+  displayCallbacks = { ...displayCallbacks, ...callbacks };
+}
+
+/**
+ * Get current display callbacks (for internal use in response handlers).
+ * @internal
+ */
+export function getDisplayCallbacks(): DegradeDisplayCallback {
+  return displayCallbacks;
 }
 
 /**
@@ -177,7 +223,7 @@ function executeLibResponse(context: DegradeResponseContext): void {
   try {
     handler(context);
   } catch (error) {
-    console.error(`[DegradeManager] Lib response error for ${context.capability}:`, error);
+    logger.category('error').error('Lib response handler threw', { capability: context.capability, error });
   }
 }
 
@@ -301,7 +347,7 @@ function triggerSafeModeForCrash(
       originalError: context?.originalError as Error | undefined,
     }));
   } catch (err) {
-    console.error('[DegradeManager] Failed to trigger safe mode for crash:', err);
+    logger.category('error').error('Failed to trigger safe mode for crash', { err });
   }
 }
 
@@ -457,7 +503,7 @@ function notifySubscribers(): void {
       callback(state);
     } catch (error) {
       // Log but don't propagate — one bad subscriber shouldn't break others
-      console.error('[DegradeManager] Subscriber error:', error);
+      logger.category('error').error('Degrade subscriber threw', { error });
     }
   });
 }

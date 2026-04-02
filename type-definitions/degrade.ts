@@ -148,3 +148,45 @@ export type DegradeResponseHandler = (context: DegradeResponseContext) => void;
  * Subscription callback for degradation state changes
  */
 export type DegradeSubscriber = (state: DegradeState) => void;
+
+/**
+ * Toast notification options for degradation alerts.
+ * Structured to support future toast redesign (title + detailed message).
+ * Currently only uses `title` and `severity` for display.
+ *
+ * TODO: [Toast Redesign] When new toast component (title + detailed message + actions) lands,
+ * update toast rendering in callback implementation to use `message`, `severity`, and `duration`.
+ * Data structure is already in place for future migration.
+ */
+export interface DegradeToastOptions {
+  /** Short title shown as primary message (used now) */
+  title: string;
+
+  /** Severity level for color/styling (used now) */
+  severity?: 'info' | 'warning' | 'error';
+
+  /** Detailed explanation (dead code - used in future toast redesign) */
+  message?: string;
+
+  /** Optional duration in ms (dead code - used in future toast redesign) */
+  duration?: number;
+}
+
+/**
+ * Display callback types for degradation UI responses.
+ * Registered at bootstrap to handle UI updates when capabilities degrade or recover.
+ *
+ * Only two callbacks:
+ * - `showSafeMode`: redirect to safe mode screen (crash-level failures)
+ * - `showToast`: show temporary notification (recoverable faults)
+ */
+export type DegradeDisplayCallback = {
+  showSafeMode?: (capability: DegradeCapability, reason: string) => void;
+  showToast?: (options: DegradeToastOptions) => void;
+};
+
+/**
+ * Priority-ordered list of degradation levels for UI decision-making.
+ * Used by hooks and UI components to determine what to show/hide.
+ */
+export type DegradationLevel = 'normal' | 'degraded' | 'critical';

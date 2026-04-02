@@ -23,7 +23,7 @@ import { useAnalyticsNavigation, useNavigate, useRouteConfig } from "@/hooks/nav
 import {
     type AccessRole,
 } from "@/hooks/storage";
-import { logger } from "@/hooks/utils";
+import { logger, useInjectToastSystem } from "@/hooks/utils";
 import {
     AppParamsStableProvider,
     AppParamsVolatileProvider,
@@ -101,6 +101,10 @@ function RootLayoutContent() {
   // and hides automatically when appReady or on kernel error.
   useKernelLoadingSync();
   useSyncSplash();
+
+  // Inject the centralized toast system for degradation handlers
+  // Allows lib/error layers to display toasts without React dependencies
+  useInjectToastSystem();
 
   // FUTURE: Offline conflict resolution (disabled for v1 - LWW only)
   // v1 uses automatic Last-Write-Wins for all conflicts
