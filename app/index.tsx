@@ -31,7 +31,7 @@ export default function HomePage() {
   // While kernel is initializing, UIBlockerLayer (in _layout.tsx) shows the splash.
   // Render a fallback SplashScreen here too in case UIBlockerLayer is not yet mounted.
   if (!kernel.phases.appReady) {
-    console.log('[ui] [HomePage] → rendering SplashScreen (kernel not ready)');
+
     return <SplashScreen subtitle="Loading App" message="Preparing your world..." />;
   }
 
@@ -39,9 +39,6 @@ export default function HomePage() {
   // For authenticated users: they'll see the welcome screen momentarily,
   // but the select route guard will pull them to /select/world-selection
   if (isAuthChecked) {
-    console.log(
-      `[ui] [HomePage] → rendering Welcome screen (hasAccount=${hasAccount})`,
-    );
 
     return (
       <View style={styles.container}>
@@ -53,7 +50,6 @@ export default function HomePage() {
   // Auth check in progress — show splash screen to avoid white flash.
   // UIBlockerLayer has already hidden (kernel is ready), so this route
   // must render visible content during the async storage reads.
-  console.log('[ui] [HomePage] → rendering SplashScreen (auth check in progress)');
   return <SplashScreen subtitle="Authenticating" message="Checking your credentials..." />;
 }
 // Styles for HomePage

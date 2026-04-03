@@ -326,8 +326,29 @@ class AppKernelClass {
       await this.runPhase("registration", async () => {
         registrationResult = await registrationPhase();
       });
-      // TODO: Track C-2 — Show safe mode screen if registrations failed and app not degraded
-      // if (registrationResult?.failed.length) { showSafeModeForRegistrationFailures(registrationResult); }
+
+      // Track C-2: Critical check — if registration was skipped due to services failure
+      // (which means database isn't initialized), trigger safe mode immediately
+      // This prevents crashes when trying to access unregistered repositories
+      if (!this.state.phases.registrationReady) {
+        // Registration phase was skipped or failed
+        const servicesWasSkipped = !this.state.phases.servicesReady;
+        if (servicesWasSkipped) {
+          logger.category("bootstrap").error(
+            "[CRITICAL CASCADE] Registration skipped due to services failure — database uninitialized",
+            { registrationReady: this.state.phases.registrationReady, servicesReady: this.state.phases.servicesReady }
+          );
+
+          const safeMode = createSafeModeState(
+            SafeModeReason.STORAGE_UNREADABLE, // Services includes database init
+            {
+              details: "Critical services failed during bootstrap — unable to initialize database. Please restart the app.",
+            },
+          );
+          this.setSafeMode(safeMode);
+          return; // Exit bootstrap, don't proceed to appReady
+        }
+      }
 
       // Track D: Finalize bootstrap analytics
       if (this.bootstrapAnalytics) {
@@ -852,26 +873,68 @@ class AppKernelClass {
         }
       }, 50); // Wait 50ms before starting polling (phase might complete in <50ms)
 
-      // Track D: Execute with adaptive timeout
-      const effectiveTimeout = calculateEffectiveTimeout(
+      // Track D: Execute with adaptive timeout + RETRY LOGIC
+      let effectiveTimeout = calculateEffectiveTimeout(
         phaseName, this.deviceSlowdown, this.networkMultiplier,
       );
-      let phaseTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
-      try {
-        await Promise.race([
-          fn(),
-          new Promise<never>((_, reject) => {
-            phaseTimeoutHandle = setTimeout(() => {
-              const err = new Error(
-                `Phase ${phaseName} timed out after ${effectiveTimeout}ms`,
-              );
-              (err as Error & { code: string }).code = "ETIMEDOUT";
-              reject(err);
-            }, effectiveTimeout);
-          }),
-        ]);
-      } finally {
-        if (phaseTimeoutHandle) clearTimeout(phaseTimeoutHandle);
+      
+      // HARDCODED OVERRIDE: config phase needs guaranteed 3000ms minimum
+      // Config loading can be slow due to lazy imports; we don't slow down factor this phase
+      // since the baseMs is used for device slowdown detection, not the actual configtimeout
+      if (phaseName === "config") {
+        effectiveTimeout = Math.max(effectiveTimeout, 3000);
+      }
+      
+      // RETRY LOGIC: Attempt up to 3 times (initial + 2 retries) with exponential backoff
+      const MAX_RETRIES = 2;
+      const BACKOFF_BASE_MS = 100;
+      const BACKOFF_FACTOR = 2;
+      let lastError: Error | null = null;
+      
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        let phaseTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+        try {
+          await Promise.race([
+            fn(),
+            new Promise<never>((_, reject) => {
+              phaseTimeoutHandle = setTimeout(() => {
+                const err = new Error(
+                  `Phase ${phaseName} timed out after ${effectiveTimeout}ms`,
+                );
+                (err as Error & { code: string }).code = "ETIMEDOUT";
+                reject(err);
+              }, effectiveTimeout);
+            }),
+          ]);
+          // Success! Break out of retry loop
+          lastError = null;
+          break;
+        } catch (error) {
+          lastError = error as Error;
+          const isTimeout = (error as Error & { code: string }).code === "ETIMEDOUT";
+          const shouldRetry = attempt < MAX_RETRIES && (isTimeout || (error instanceof Error && error.message.includes("unreachable")));
+          
+          if (shouldRetry) {
+            // Calculate backoff: 100ms, then 200ms
+            const backoffMs = Math.pow(BACKOFF_FACTOR, attempt) * BACKOFF_BASE_MS;
+            logger.category("bootstrap").warn(
+              `${phaseName} failed (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${backoffMs}ms...`,
+              { reason: isTimeout ? "timeout" : "retriable error", error: (error as Error).message },
+            );
+            await new Promise((resolve) => setTimeout(resolve, backoffMs));
+            continue; // Retry
+          }
+          
+          // Non-retriable error or max retries exhausted - rethrow
+          throw error;
+        } finally {
+          if (phaseTimeoutHandle) clearTimeout(phaseTimeoutHandle);
+        }
+      }
+      
+      // If we exhausted retries with an error, throw it
+      if (lastError) {
+        throw lastError;
       }
       const actualDuration = Date.now() - startTime;
 
@@ -975,6 +1038,15 @@ class AppKernelClass {
           `${phaseName} phase failed (${failureType}, critical=${isCritical})`,
           { error: err.message, durationMs: actualDuration },
         );
+
+        // For TIMEOUT failures on critical phases: set safe mode + degradation immediately
+        // (don't just throw; let UI show safe mode screen instead of blank screen)
+        if (failureType === "timeout") {
+          await this.handleCriticalTimeoutCrash(phaseName, err);
+          // Don't re-throw; safe mode is set, let app continue
+          return;
+        }
+
         throw err;
       }
 
@@ -1012,6 +1084,91 @@ class AppKernelClass {
         phaseProgress: { ...this.state.phaseProgress },
       });
     }
+  }
+
+  /**
+   * Handle critical phase timeout crashes
+   *
+   * When a critical phase times out, set safe mode immediately (with crash details)
+   * + set degradation flags for affected capabilities. This allows the UI to show
+   * SafeModeScreen instead of a blank screen.
+   *
+   * @param phaseName Name of the phase that timed out
+   * @param error The timeout error
+   */
+  private async handleCriticalTimeoutCrash(
+    phaseName: string,
+    error: Error,
+  ): Promise<void> {
+    logger.category("bootstrap").warn(
+      "[TIMEOUT CRASH HANDLER] Setting safe mode for critical phase timeout",
+      { phase: phaseName, errorMsg: error.message },
+    );
+
+    // Map phase to degradation capabilities + appropriate safe mode reason
+    const timeoutDegradationMap: Record<string, string[]> = {
+      config: ["connectivity", "database", "auth", "analytics", "errorTracking", "backgroundJobs", "sync"],
+      preload: ["premiumFeatures"],
+      network: ["connectivity"],
+      storage: ["storage", "database", "auth", "analytics", "errorTracking", "backgroundJobs", "sync"],
+      services: ["database", "auth", "analytics", "errorTracking"],
+      jobSetup: ["backgroundJobs", "sync"],
+      auth: ["auth"],
+      featureFlags: ["premiumFeatures"],
+      registration: ["backgroundJobs", "sync"],
+    };
+
+    // Get capabilities affected by this phase timeout
+    const affectedCapabilities = timeoutDegradationMap[phaseName] || [];
+
+    // Set degradation flags for all affected capabilities
+    try {
+      const { appDegrade } = await import("@/system/Degrade");
+      for (const cap of affectedCapabilities) {
+        appDegrade.set(cap, false, {
+          source: `${phaseName}-timeout`,
+          reason: `${phaseName} phase timed out during bootstrap`,
+        });
+      }
+      logger.category("bootstrap").debug(
+        "[TIMEOUT CRASH HANDLER] Degradation flags set",
+        { capabilities: affectedCapabilities },
+      );
+    } catch (degradeError) {
+      logger.category("bootstrap").warn(
+        "[TIMEOUT CRASH HANDLER] Failed to set degradation flags",
+        { error: (degradeError as Error).message },
+      );
+    }
+
+    // Determine safe mode reason based on phase
+    let safeModeReason = SafeModeReason.KERNEL_TIMEOUT;
+    if (phaseName === "config") {
+      safeModeReason = SafeModeReason.KERNEL_CONFIG_FAILED;
+    } else if (phaseName === "preload") {
+      safeModeReason = SafeModeReason.KERNEL_PRELOAD_FAILED;
+    }
+
+    // Create and set safe mode state immediately
+    const safeMode = createSafeModeState(
+      safeModeReason,
+      {
+        details: `Bootstrap phase '${phaseName}' timed out. Services may be unavailable.`,
+      },
+    );
+    this.setSafeMode(safeMode);
+
+    // Update kernel state to show we're in error phase
+    this.updateState({
+      currentPhase: KernelPhase.ERROR,
+      error: this.createKernelError(
+        KernelErrorCode.PHASE_TIMEOUT,
+        `Phase ${phaseName} timed out`,
+        KernelPhase.ERROR,
+        error,
+        true, // critical
+      ),
+    });
   }
 
   /**

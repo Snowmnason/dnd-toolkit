@@ -1,8 +1,8 @@
 import {
-    ERROR_MESSAGES,
-    getRandomMessage,
-    NAVIGATION_ERROR_MESSAGES,
-    SAFE_MODE_MESSAGES,
+  ERROR_MESSAGES,
+  getRandomMessage,
+  NAVIGATION_ERROR_MESSAGES,
+  SAFE_MODE_MESSAGES,
 } from "@/localization/ErrorMessages";
 import { useScale, UseTheme } from "@/theme";
 import { useMemo } from "react";
@@ -141,8 +141,10 @@ export function ErrorFallbackShell({
             align="center"
             style={{
               marginBottom: S.space.lg,
-              lineHeight: 1.6,
+              lineHeight: 1.8,
               opacity: 0.9,
+              flexWrap: "wrap",
+              flexShrink: 1,
             }}
           >
             {explanation}

@@ -41,16 +41,33 @@ System Ready → Emit Events → App Continues
 
 ## Phase Execution Order
 
-The kernel executes phases in a strict, dependency-aware order:
+The kernel executes phases in a strict, dependency-aware order with adaptive timeouts:
 
-1. **CONFIG** - Environment setup, Supabase client initialization
+1. **CONFIG** - Environment setup, configuration loading, and device performance measurement
 2. **PRELOAD** - Critical fonts and assets loading (<500ms target)
-3. **NETWORK** - Network detection and status monitoring
+3. **NETWORK** - Network detection and speed classification
 4. **STORAGE** - Cache validation and migration (network-aware)
 5. **SERVICES** - Auth provider, error tracker, analytics registration
 6. **JOB_SETUP** - Background job queue initialization and handlers
 7. **AUTH** - Session restoration (non-blocking, runs in background)
-8. **READY** - All critical systems initialized, app can render UI
+8. **FEATURE_FLAGS** - Load and apply feature flags from server
+9. **REGISTRATION** - Register job handlers and activate subscriptions
+10. **READY** - All critical systems initialized, app can render UI
+
+**Phase Dependencies:**
+- CONFIG: No dependencies (runs first)
+- PRELOAD/NETWORK/STORAGE: Can run in parallel after CONFIG
+- SERVICES: Requires NETWORK
+- AUTH: Requires NETWORK + SERVICES
+- JOB_SETUP: Requires STORAGE + PRELOAD
+- FEATURE_FLAGS: Requires all previous phases
+- REGISTRATION: Requires FEATURE_FLAGS
+- READY: Requires all previous phases complete
+
+**Failure Classification:**
+- **Unreachable**: Skip phase, mark capabilities unavailable (e.g., network unreachable)
+- **Timeout**: Defer to on-demand retry, enable degraded mode (e.g., slow network)
+- **Non-recoverable**: Critical phases only, trigger safe mode (e.g., storage corruption)
 
 ## API Reference
 
@@ -105,13 +122,15 @@ if (kernel.error?.recoverable) {
 
 Each phase is implemented as a separate function in the `/phases/` directory:
 
-- **`configPhase()`** - Environment variables and Supabase client
+- **`configPhase()`** - Configuration loading and device performance measurement
 - **`preloadPhase()`** - Font and asset loading
-- **`networkPhase()`** - Network detection initialization
+- **`networkPhase()`** - Network detection and speed classification
 - **`storagePhase()`** - Cache validation and migrations
 - **`servicesPhase()`** - Service provider registration
 - **`jobSetupPhase()`** - Background job queue setup
 - **`authPhase()`** - Session restoration (non-blocking)
+- **`featureFlagsPhase()`** - Feature flag loading and application
+- **`registrationPhase()`** - Job and subscription registration
 
 ### State Management
 
@@ -128,9 +147,39 @@ interface AppKernelState {
     servicesReady: boolean;
     jobSetupReady: boolean;
     authReady: boolean;
-    syncReady: boolean;
+    featureFlagsReady: boolean;
+    registrationReady: boolean;
     appReady: boolean;
   };
+  capabilities: KernelCapabilities; // Network, storage, auth availability
+  error?: KernelError;
+  progress: PhaseProgress;
+}
+```
+
+#### Capability Tracking
+
+The kernel tracks system capabilities that may degrade during runtime:
+
+```typescript
+interface KernelCapabilities {
+  network: boolean;      // Network connectivity available
+  storage: boolean;      // Local storage accessible
+  auth: boolean;         // Authentication system ready
+  database: boolean;     // Database queries possible
+  sync: boolean;         // Data synchronization available
+  // ... additional capabilities
+}
+```
+
+### Degradation Integration
+
+The kernel integrates with the degradation system (`system/Degrade`) to track capability availability:
+
+- Phase failures automatically update capability states
+- System responses trigger infrastructure adaptation
+- UI components can check capabilities before operations
+- Recovery mechanisms restore degraded functionality
   error: KernelError | null;
   timing: Record<string, number>; // Phase durations in ms
   capabilities: KernelCapabilities;

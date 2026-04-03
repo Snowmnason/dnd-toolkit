@@ -62,6 +62,41 @@ The `CONNECTIVITY` response stub says "switch to offline-first mode (serve from 
 
 ---
 
+## **Track C-3: Gradually Add Degraded Executors (DEFERRED)**
+
+**Status:** ⏳ **DEFERRED** — Depends on degrade system maturity
+
+**Goal:** Per-phase fallback executors that do partial work when dependencies fail (do NOT cascade failures)
+
+**When to implement:**
+- After degrade system is fully feature-complete (subscriptions, flags, responses all wired)
+- Per-phase as needed (not all phases need degraded variants)
+- Start with `authPhase` as proof-of-concept: skip backend calls, validate local cache only
+
+**Example** (future implementation):
+```typescript
+// system/Kernel/phases/phase-config.ts
+export const PHASE_CONFIG = {
+  authPhase: {
+    name: "authPhase",
+    canDegradeIfDependencyFails: true,
+    degradedExecutor: async () => {
+      // Skip backend auth, validate cache only
+      await AuthStateManager.validateCacheOnly();
+    },
+  },
+  // registration could skip if job infrastructure failed
+  // featureFlags could use config-based flags only (skip server sync)
+};
+```
+
+**Implementation flow** (future):
+1. If parent phase fails but `canDegradeIfDependencyFails: true`, call degraded executor
+2. Otherwise, either skip or proceed with reduced functionality
+3. Track "degraded mode" in `PhaseAnalytics` for analytics
+
+---
+
 ## Summary
 
 | Gap | Severity | Fix Location | Blocked On |
@@ -69,8 +104,8 @@ The `CONNECTIVITY` response stub says "switch to offline-first mode (serve from 
 | `registerCrashCallback` never registered | High (storage/config crashes silently fail to enter safe mode) | `registration-phase.ts` (1 import + ~10 lines) | Nothing — ready to implement now |
 | `system-responses.ts` infrastructure bodies | Low-Medium (flags set correctly, actions just no-op) | `system/Degrade/responses/system-responses.ts` | Offline Queue, circuit breaker, analytics buffer |
 | **Track C:** Placeholder subscriptions | Low (expected, not yet ready) | `lib/subscriptions/registry.ts` | Sync/job managers recovery APIs |
-| **Track C:** Retry logic system | Medium (needed for Track 7) | `lib/kernel/registration-retry-system.ts` + Settings UI | Auto-increment version, recovery detection |
-| **Track C:** Safe mode screen display | Medium (Track C-2) | `lib/kernel/safe-mode-screen-builder.ts` | SafeModeState support |
+| **Track C-2:** Safe mode screen display | Medium | `lib/kernel/safe-mode-screen-builder.ts` | SafeModeState support |
+| **Track C-3:** Degraded executors (per-phase fallback) | Low (future iteration) | `system/Kernel/phases/phase-config.ts` | Degrade system fully wired |
 | **Track C:** Analytics events | Low (nice-to-have) | `lib/analytics/` integration | Not blocking implementation |
 
 ## **Track C-2: Safe Mode Screen Integration (DEFERRED)**

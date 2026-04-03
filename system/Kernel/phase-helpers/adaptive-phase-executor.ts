@@ -192,8 +192,12 @@ export function calculateSlowdownFactor(
   actualDurationMs: number,
   baselineMs: number
 ): number {
-  if (baselineMs <= 0) return 1.0;
-  return actualDurationMs / baselineMs;
+  if (baselineMs <= 0 || actualDurationMs <= 0) return 1.0;
+  // Slowdown = baseline / actual
+  // - If actual > baseline (slow device), slowdown > 1.0 (give more time)
+  // - If actual < baseline (fast device), slowdown < 1.0 (give less time)
+  // - Clamp to minimum 1.0 to avoid negative multipliers
+  return Math.max(1.0, baselineMs / actualDurationMs);
 }
 
 /**
