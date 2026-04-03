@@ -1,35 +1,42 @@
 /**
- * Phase 1: Preload Phase (NON-CRITICAL)
+ * Phase 1: Preload Phase (MIXED: fonts non-critical, themes critical)
  * 
- * Responsibility: Load critical fonts and platform assets
+ * Responsibility: Initialize themes and load critical fonts
  * Called by: system/Kernel/app-kernel.ts
  * 
  * Timing: ~100-400ms, max 1000ms (defined in app-kernel)
- * Critical: NO — app renders without fonts (fallbacks available)
- * Failure mode: Logged as warning; non-critical fonts load asynchronously
+ * Critical: PARTIAL
+ *   - Theme preload: YES — themes must be initialized before rendering (styling breaks without them)
+ *   - Font loading: NO — system fallback fonts available if load fails
+ * Failure mode: 
+ *   - If themes fail to preload: app continues but styling may be incomplete
+ *   - If fonts fail to load: app continues with system fonts (visible but acceptable)
  * 
  * Does:
- * 1. Load platform-specific fonts (web injects <link>, native uses RN Linking)
- * 2. Preload themes in background
+ * 1. Preload themes (CRITICAL — tokens/colors needed for rendering)
+ * 2. Load platform-specific fonts (non-critical — fallbacks available)
  * 3. Mark fonts as ready when complete
  * 
  * What initializes:
- * - Fonts: GrenzeGotisch (text), platform-specific sans-serif
- * - Themes: Dark/light theme tokens
+ * - Themes: Dark/light theme tokens and colors (CRITICAL for styling)
+ * - Fonts: GrenzeGotisch (text), platform-specific sans-serif (non-critical, fallback available)
  *
- * NOTE: Non-critical; failures don't block app startup
+ * NOTE: Theme initialization is critical; font loading is non-critical.
+ * Overall: ensure themes preload successfully; font failures are acceptable.
  */
 
 /**
  * Execute preload phase
  * 
  * Loads critical fonts and themes. Platform-aware (web uses web fonts,
- * native uses expo-font). Preload failures don't block bootstrap.
+ * native uses expo-font). Preload failures don't block bootstrap or
+ * affect capability degradation — they're logged as informational warnings.
  * 
  * @param state - Mutable kernel state
  */
-export async function preloadPhase(): Promise<void> {
+export async function preloadPhase(signal: AbortSignal): Promise<void> {
   try {
+    if (signal.aborted) return;
     const { Platform } = await import("react-native");
     const { preloadThemes } = await import("@/theme");
     const { logger } = await import("@/lib/utils");
@@ -91,10 +98,19 @@ export async function preloadPhase(): Promise<void> {
       }
     }
 
-    // Preload themes in background
-    preloadThemes().catch(() => {
-      // Silently fail — theme preload is background task
-    });
+    // Preload themes — critical for styling tokens and colors
+    // This MUST complete successfully before UI renders
+    try {
+      await preloadThemes();
+    } catch (themeError) {
+      logger
+        .category("bootstrap")
+        .error("Theme preload failed (critical)", {
+          error: (themeError as Error).message,
+        });
+      // Rethrow — theme preload is critical; don't continue without themes
+      throw themeError;
+    }
   } catch (error) {
     const { logger } = await import("@/lib/utils");
     const { reportPreloadBootstrapCrash } = await import(

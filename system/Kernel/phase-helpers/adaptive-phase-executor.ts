@@ -193,11 +193,10 @@ export function calculateSlowdownFactor(
   baselineMs: number
 ): number {
   if (baselineMs <= 0 || actualDurationMs <= 0) return 1.0;
-  // Slowdown = baseline / actual
-  // - If actual > baseline (slow device), slowdown > 1.0 (give more time)
-  // - If actual < baseline (fast device), slowdown < 1.0 (give less time)
-  // - Clamp to minimum 1.0 to avoid negative multipliers
-  return Math.max(1.0, baselineMs / actualDurationMs);
+  // Slowdown = actual / baseline
+  // - If actual > baseline (slow device), slowdown > 1.0 (give more time) ✓
+  // - If actual < baseline (fast device), slowdown < 1.0 → clamped to 1.0 (don't give less time) ✓
+  return Math.max(1.0, actualDurationMs / baselineMs);
 }
 
 /**
@@ -265,12 +264,13 @@ export function calculateEffectiveTimeout(
  */
 export async function executePhaseWithTimeout(
   phaseName: string,
-  fn: () => Promise<void>,
+  fn: (signal: AbortSignal) => Promise<void>,
   deviceSlowdown: number = 1.0,
   networkMultiplier: number = 1.0
 ): Promise<PhaseState> {
   const timeout = calculateEffectiveTimeout(phaseName, deviceSlowdown, networkMultiplier);
   const startTime = Date.now();
+  const controller = new AbortController();
 
   return new Promise((resolve) => {
     let completed = false;
@@ -279,6 +279,7 @@ export async function executePhaseWithTimeout(
     const timeoutHandle = setTimeout(() => {
       if (!completed) {
         completed = true;
+        controller.abort(); // cancel the phase fn — prevent post-timeout state mutations
         resolve({
           status: "skipped",
           reason: "timeout",
@@ -289,9 +290,9 @@ export async function executePhaseWithTimeout(
       }
     }, timeout);
 
-    // Execute the phase
+    // Execute the phase, passing the abort signal so it can stop on timeout
     Promise.resolve()
-      .then(() => fn())
+      .then(() => fn(controller.signal))
       .then(() => {
         if (!completed) {
           completed = true;

@@ -245,7 +245,7 @@ class AppKernelClass {
       // ═══════════════════════════════════════════════════════════════
 
       // Phase 0: CONFIG — validate app configuration (critical, throws on failure)
-      await this.runPhase("config", () => configPhase());
+      await this.runPhase("config", (signal) => configPhase(signal));
 
       // Track D: Calculate device slowdown after config phase completes
       {
@@ -262,11 +262,11 @@ class AppKernelClass {
       }
 
       // Phase 1: PRELOAD — load fonts, themes, platform assets (non-critical)
-      await this.runPhase("preload", () => preloadPhase());
+      await this.runPhase("preload", (signal) => preloadPhase(signal));
 
       // Phase 2: NETWORK — initialize detection + telemetry (non-critical, app works offline)
-      await this.runPhase("network", async () => {
-        await networkPhase();
+      await this.runPhase("network", async (signal) => {
+        await networkPhase(signal);
         this.setupNetworkSubscription();
       });
 
@@ -305,26 +305,26 @@ class AppKernelClass {
       }
 
       // Phase 3: STORAGE — classification validation, health monitoring, defaults (critical)
-      await this.runPhase("storage", () => storagePhase());
+      await this.runPhase("storage", (signal) => storagePhase(signal));
 
       // Phase 4: SERVICES — register auth/error/analytics providers (critical, throws on failure)
-      await this.runPhase("services", () => servicesPhase());
+      await this.runPhase("services", (signal) => servicesPhase(signal));
 
       // Phase 5: JOB_SETUP — initialize job queue infrastructure (critical)
-      await this.runPhase("jobSetup", () => jobSetupPhase());
+      await this.runPhase("jobSetup", (signal) => jobSetupPhase(signal));
 
       // Phase 6: AUTH — restore persisted session + evaluate staleness (non-critical, redirects to login on failure via useAuthGuard)
-      await this.runPhase("auth", () => authPhase());
+      await this.runPhase("auth", (signal) => authPhase(signal));
 
       // Phase 7: FEATURE_FLAGS — bootstrap feature flags from remote or cache (non-critical)
-      await this.runPhase("featureFlags", () => featureFlagsPhase());
+      await this.runPhase("featureFlags", (signal) => featureFlagsPhase(signal));
 
       // Phase 8: REGISTRATION — register job handlers + activate subscriptions (conditionally critical)
       // Track C: Captures failures with required capability for future retry logic
       // Track D: Wrapped in runPhase for dependency checking + adaptive timeout
       let registrationResult: RegistrationResult | null = null;
-      await this.runPhase("registration", async () => {
-        registrationResult = await registrationPhase();
+      await this.runPhase("registration", async (signal) => {
+        registrationResult = await registrationPhase(signal);
       });
 
       // Track C-2: Critical check — if registration was skipped due to services failure
@@ -790,7 +790,7 @@ class AppKernelClass {
    */
   private async runPhase(
     phaseName: typeof PHASE_SEQUENCE[number],
-    fn: () => Promise<void>,
+    fn: (signal: AbortSignal) => Promise<void>,
   ): Promise<void> {
     const phaseKey = this.resolvePhaseKey(phaseName);
     const startTime = Date.now();
@@ -892,16 +892,18 @@ class AppKernelClass {
       let lastError: Error | null = null;
       
       for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        const attemptController = new AbortController();
         let phaseTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
         try {
           await Promise.race([
-            fn(),
+            fn(attemptController.signal),
             new Promise<never>((_, reject) => {
               phaseTimeoutHandle = setTimeout(() => {
                 const err = new Error(
                   `Phase ${phaseName} timed out after ${effectiveTimeout}ms`,
                 );
                 (err as Error & { code: string }).code = "ETIMEDOUT";
+                attemptController.abort(); // cancel the phase fn — prevent post-timeout state mutations
                 reject(err);
               }, effectiveTimeout);
             }),
@@ -910,6 +912,7 @@ class AppKernelClass {
           lastError = null;
           break;
         } catch (error) {
+          attemptController.abort(); // ensure abort on non-timeout errors too
           lastError = error as Error;
           const isTimeout = (error as Error & { code: string }).code === "ETIMEDOUT";
           const shouldRetry = attempt < MAX_RETRIES && (isTimeout || (error instanceof Error && error.message.includes("unreachable")));
@@ -1307,18 +1310,18 @@ class AppKernelClass {
 
     switch (phase) {
       case "auth":
-        await this.runPhase("auth", () => authPhase());
+        await this.runPhase("auth", (signal) => authPhase(signal));
         break;
 
       case "network":
-        await this.runPhase("network", async () => {
-          await networkPhase();
+        await this.runPhase("network", async (signal) => {
+          await networkPhase(signal);
           this.setupNetworkSubscription();
         });
         break;
 
       case "storage":
-        await this.runPhase("storage", () => storagePhase());
+        await this.runPhase("storage", (signal) => storagePhase(signal));
         break;
 
       default:

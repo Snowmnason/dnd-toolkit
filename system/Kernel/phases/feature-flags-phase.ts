@@ -49,8 +49,9 @@ import { loadHardcodedFlags, seedManagerFromCache } from "./bootstrap-helpers";
  * Non-critical: any unhandled failure falls back to hardcoded config defaults
  * and does not block appReady.
  */
-export async function featureFlagsPhase(): Promise<void> {
+export async function featureFlagsPhase(signal: AbortSignal): Promise<void> {
   try {
+    if (signal.aborted) return;
     const [{ FeatureFlagsManager }, { getDatabaseProvider }] = await Promise.all([
       import("@/lib/feature-flags/server-sync/orchestrator"),
       import("@/system/Services"),
@@ -88,6 +89,10 @@ export async function featureFlagsPhase(): Promise<void> {
           "Fresh snapshot expected but cache read failed — using hardcoded fallback",
         );
         loadHardcodedFlags(state);
+        state.bootstrapped = true;
+        notifySubscribers(state);
+      } else {
+        logger.category("bootstrap").debug("Feature flags: using fresh cached snapshot");
         state.bootstrapped = true;
         notifySubscribers(state);
       }

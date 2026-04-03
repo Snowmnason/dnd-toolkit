@@ -25,8 +25,9 @@
  * Initializes the background job queue with storage adapters.
  * Handler registration happens later in registration-phase.ts.
  */
-export async function jobSetupPhase(): Promise<void> {
+export async function jobSetupPhase(signal: AbortSignal): Promise<void> {
   try {
+    if (signal.aborted) return;
     const { logger } = await import("@/lib/utils");
     const { getJobQueue } = await import("@/system/Jobs/background-job-queue");
     const { FastCacheAdapter } = await import(

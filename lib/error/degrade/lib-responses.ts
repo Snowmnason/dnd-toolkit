@@ -16,6 +16,7 @@
  * - isCrash: true if reportCrash() was called (unrecoverable failure)
  */
 
+import { getAppConfig } from '@/config';
 import { DegradeCapability, DegradeResponseContext } from '@/type-definitions/degrade';
 import { getDisplayCallbacks, registerDegradeResponse } from './degrade-manager';
 
@@ -218,12 +219,12 @@ function handleAnalyticsResponse(ctx: DegradeResponseContext): void {
 
   // Skip entirely if analytics is disabled in config — don't report degradation for disabled providers
   try {
-    const config = require('../../../config/appsettings.json');
+    const config = getAppConfig();
     if (config?.services?.analytics?.enabled === false) {
       return; // Analytics disabled; no response needed
     }
   } catch {
-    // If config load fails, proceed with handler (shouldn't happen)
+    // If config load fails, proceed with handler (fallback to showing degradation)
   }
 
   if (!ctx.available) {
@@ -256,12 +257,12 @@ function handleErrorTrackingResponse(ctx: DegradeResponseContext): void {
 
   // Skip entirely if error tracking is disabled in config — don't report degradation for disabled providers
   try {
-    const config = require('../../../config/appsettings.json');
+    const config = getAppConfig();
     if (config?.services?.errorProvider?.enabled === false) {
       return; // Error tracking disabled; no response needed
     }
   } catch {
-    // If config load fails, proceed with handler (shouldn't happen)
+    // If config load fails, proceed with handler (fallback to showing degradation)
   }
 
   if (!ctx.available) {

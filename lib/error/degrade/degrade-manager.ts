@@ -388,9 +388,6 @@ export function reportCrash(
   // Trigger safe mode for critical crash-level capabilities
   triggerSafeModeForCrash(capability, reason, context);
 
-  // Report via middleware (which delegates to error-service)
-  getDegradationService().reportDegradationEvent(capability, reason);
-
   // Notify subscribers
   notifySubscribers();
 }

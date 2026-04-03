@@ -178,29 +178,23 @@ export function reportConfigBootstrapCrash(reason: string): void {
 
 /**
  * Called when the preload phase fails during bootstrap.
- * Fonts/assets/themes failed to load — UI will be visually broken.
+ * Fonts/assets/themes failed to load — UI will use fallback fonts.
  *
  * Actions:
- * 1. Sets STORAGE capability to false (assets are stored resources)
- * 2. Notifies crash callback (non-critical — app continues with fallback fonts)
+ * 1. Does NOT degrade any capability — preload is about UI assets, not persistent storage
+ * 2. Does NOT notify — no capability change means nothing for the system to do
  *
- * Despite being a "crash" handler, preload failures are survivable.
- * The app continues with system fonts. Flagged for visibility.
+ * Preload failures are survivable and don't indicate any system capability issue.
+ * The app continues with system fallback fonts and renders correctly.
+ * Failures are logged as warnings in preload-phase.ts but don't trigger degradation.
  *
  * @param reason Preload failure detail
  */
 export function reportPreloadBootstrapCrash(reason: string): void {
-  appDegrade.set(DegradeCapability.STORAGE, false, {
-    source: SOURCE,
-    reason: `preload bootstrap failed (assets unavailable): ${reason}`,
-  });
-
-  notifyCrash({
-    capability: DegradeCapability.STORAGE,
-    reason: `preload bootstrap failed: ${reason}`,
-    isCritical: false,
-    suggestedAction: 'continue',
-  });
+  // Preload failures are UI-level only; no capability degradation needed
+  // No appDegrade.set() call — preload is not a capability issue
+  // No notifyCrash() call — nothing for the crash handler to do
+  // (Logging happens in preload-phase.ts; this function is a no-op)
 }
 
 // ==========================================

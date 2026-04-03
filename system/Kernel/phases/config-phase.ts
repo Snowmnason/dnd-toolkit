@@ -25,8 +25,9 @@
  * @param state - Mutable kernel state
  * @throws Error if config validation fails (critical)
  */
-export async function configPhase(): Promise<void> {
+export async function configPhase(signal: AbortSignal): Promise<void> {
   try {
+    if (signal.aborted) return;
     // Load config system
     const { getAppConfig, validateConfig, logValidationResults } =
       await import('@/config');

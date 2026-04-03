@@ -1,12 +1,12 @@
 /**
- * Phase 3: Storage Phase (NON-CRITICAL)
+ * Phase 3: Storage Phase (CRITICAL)
  * 
  * Responsibility: Initialize SecureStorage and validate data integrity
  * Called by: system/Kernel/app-kernel.ts
  * 
  * Timing: ~50-200ms, max 1000ms (defined in app-kernel)
- * Critical: NO — cache is lossy by design; app works in-memory only
- * Failure mode: Logged as warning; storage marked unavailable
+ * Critical: YES — persistent storage is required for app operation (caching, offline mutation queue, session persistence)
+ * Failure mode: Reported as critical crash; app enters safe mode
  * 
  * Does:
  * 1. Validate data classification registry
@@ -21,20 +21,21 @@
  * - Offline mutation queue
  * - Query cache class
  *
- * NOTE: Non-critical; cache is lossy by design
+ * NOTE: Critical component — storage unavailability is a fatal bootstrap error
  */
 
 /**
  * Execute storage phase
  * 
  * Initializes SecureStorage system, validates data classifications,
- * and sets default values for all storage keys. Non-critical failures
- * don't block bootstrap.
+ * and sets default values for all storage keys. Critical failures
+ * trigger crash handler and enter safe mode.
  * 
  * @param state - Mutable kernel state
  */
-export async function storagePhase(): Promise<void> {
+export async function storagePhase(signal: AbortSignal): Promise<void> {
   try {
+    if (signal.aborted) return;
     const { logger } = await import("@/lib/utils");
     const { validateClassifications } = await import("@/type-definitions");
     const { getAppConfig } = await import("@/config");
@@ -86,12 +87,12 @@ export async function storagePhase(): Promise<void> {
     const errorMsg = (error as Error).message;
     logger
       .category("bootstrap")
-      .warn("Storage validation warning (non-critical)", {
+      .warn("Storage initialization error (critical)", {
         error: errorMsg,
       });
-    // Mark storage as crashed via centralized handler
+    // Mark storage as crashed — storage unavailability is a critical failure
     reportStorageCrash(`Storage initialization failed: ${errorMsg}`, false);
-    // Non-critical - app can still boot
+    // Critical failure — app must enter safe mode
   }
 }
 

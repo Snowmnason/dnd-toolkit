@@ -119,13 +119,15 @@ function buildFailuresSummary(failed: RegistrationFailure[]): string {
  *
  * Returns a RegistrationResult tracking all registered and failed items.
  */
-export async function registrationPhase(): Promise<RegistrationResult> {
+export async function registrationPhase(signal: AbortSignal): Promise<RegistrationResult> {
   const result: RegistrationResult = {
     success: true,
     registered: [],
     skipped: [],
     failed: [],
   };
+
+  if (signal.aborted) return { ...result, success: false, failuresSummary: 'Phase cancelled' };
 
   try {
     // CRITICAL IMPORTS ONLY
@@ -204,6 +206,7 @@ export async function registrationPhase(): Promise<RegistrationResult> {
     if (result.failed.length > 0) {
       result.failuresSummary = buildFailuresSummary(result.failed);
       logger.category("bootstrap").warn(`Registration failures: ${result.failuresSummary}`);
+      result.success = false;
     }
 
     logger.category("bootstrap").info(

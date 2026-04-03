@@ -46,8 +46,10 @@
  * The orchestrator (app-kernel) marks authReady via runPhase.
  * STALE re-auth is handled by sync-splash at runtime for centralized control.
  */
-export async function authPhase(): Promise<void> {
+export async function authPhase(signal: AbortSignal): Promise<void> {
   const { logger } = await import("@/lib/utils");
+
+  if (signal.aborted) return;
 
   try {
     // ─── Evaluate Data Staleness (Early Decision) ───────────────────

@@ -29,8 +29,9 @@
  * Network subscription and status tracking are handled by the orchestrator (app-kernel).
  * Network failures don't block bootstrap.
  */
-export async function networkPhase(): Promise<void> {
+export async function networkPhase(signal: AbortSignal): Promise<void> {
   try {
+    if (signal.aborted) return;
     const { NetworkDetection } = await import("@/system/Network");
     const { logger } = await import("@/lib/utils");
 

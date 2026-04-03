@@ -35,8 +35,10 @@
  * @param state - Mutable kernel state
  * @throws Error if service initialization fails (critical)
  */
-export async function servicesPhase(): Promise<void> {
+export async function servicesPhase(signal: AbortSignal): Promise<void> {
   const { logger } = await import("@/lib/utils");
+
+  if (signal.aborted) return;
 
   try {
     const { initializeServices } = await import("@/system/Services/service-initializer");

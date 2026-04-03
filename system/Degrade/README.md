@@ -42,18 +42,22 @@ Infrastructure adapts (jobs pause, transports switch, etc.)
 
 ## API Reference
 
-### DegradeManager Class
+### DegradeManager (appDegrade) singleton
 
 Central singleton for managing capability degradation state.
 
-#### `DegradeManager.getInstance(): DegradeManager`
+#### `appDegrade` (preferred)
 
-Get the singleton instance.
+Use the shared singleton instance exported by the module.
 
 ```typescript
-import { DegradeManager } from '@/system/Degrade';
+import { appDegrade } from '@/system/Degrade';
 
-const degrade = DegradeManager.getInstance();
+// the appDegrade instance is the central manager; there is no getInstance() API.
+appDegrade.set(DegradeCapability.STORAGE, false, {
+  source: 'storage-health-check',
+  reason: 'Storage backend not available',
+});
 ```
 
 #### `degrade.set(capability, value, options)`
@@ -89,9 +93,10 @@ if (degrade.isCapable(DegradeCapability.SYNC)) {
 Get complete degradation state snapshot.
 
 ```typescript
-const state = degrade.getState();
-console.log(state.capabilities.sync); // true/false
-console.log(state.sources); // Source-specific states
+const state = appDegrade.getState();
+console.log(state.capabilities.sync.value); // true/false
+console.log(state.capabilities.sync.reason); // reason text
+console.log(state.timestamp); // snapshot timestamp
 ```
 
 #### `degrade.registerResponse(capability, handler): () => void`

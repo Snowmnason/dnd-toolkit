@@ -445,7 +445,16 @@ class NetworkDetectionClass {
 
       // Use backend health endpoint for network availability checks
       // Backend URL is already whitelisted in CSP for API calls
-      const response = await fetch(getBackendHealthUrl(), {
+      const healthUrl = getBackendHealthUrl();
+      if (!healthUrl) {
+        logger
+          .category("network")
+          .debug("Backend health URL not configured; skipping web ping and keeping existing online status");
+        clearTimeout(timeout);
+        return; // No endpoint to ping (e.g., no backend configured)
+      }
+
+      const response = await fetch(healthUrl, {
         method: "HEAD",
         signal: controller.signal,
       });
