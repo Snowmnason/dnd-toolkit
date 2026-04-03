@@ -19,9 +19,95 @@
  *
  * NOTE: Job queue infrastructure is initialized in job-setup-phase.
  *       This phase only registers handlers and activates subscriptions.
+ *
+ * Track C: Capability-driven failure tracking
+ * - Tracks failures with required capability for future retry logic
+ * - Builds failuresSummary for safe mode display
+ * - Returns RegistrationResult with all registrations/failures
  */
 
 import { logger } from "@/lib/utils";
+import { DegradeCapability } from "@/type-definitions/degrade";
+import type { RegistrationFailure, RegistrationResult } from "@/type-definitions/registration";
+
+/**
+ * Map job/subscription names to their required capabilities
+ */
+function getRequiredCapability(itemName: string): DegradeCapability {
+  switch (itemName) {
+    case "sync-orchestrator":
+      return DegradeCapability.CONNECTIVITY;
+    case "network-recovery-retry":
+      return DegradeCapability.CONNECTIVITY;
+    case "feature-flags-refresh":
+      return DegradeCapability.CONNECTIVITY;
+    case "storage-health-check":
+      return DegradeCapability.STORAGE;
+    case "analytics-network-integration":
+      return DegradeCapability.CONNECTIVITY;
+    case "network-recovery-subscription":
+      return DegradeCapability.CONNECTIVITY;
+    default:
+      return DegradeCapability.CONNECTIVITY;
+  }
+}
+
+/**
+ * Check if a subscription/job is recoverable on capability recovery
+ */
+function isRecoverable(itemName: string): boolean {
+  const nonRecoverable = [
+    "network-recovery-subscription",
+    "sync-recovery-subscription",
+    "job-recovery-subscription",
+    "service-health-subscription",
+  ];
+  return !nonRecoverable.includes(itemName);
+}
+
+/**
+ * Convert internal names to human-readable feature names
+ */
+function humanReadableName(itemName: string): string {
+  switch (itemName) {
+    case "sync-orchestrator":
+      return "Auto-save";
+    case "network-recovery-retry":
+      return "Network Recovery";
+    case "feature-flags-refresh":
+      return "Feature Updates";
+    case "storage-health-check":
+      return "Storage Check";
+    case "analytics-network-integration":
+      return "Analytics";
+    case "network-recovery-subscription":
+      return "Connection Monitor";
+    default:
+      return itemName;
+  }
+}
+
+/**
+ * Build human-readable summary of failures grouped by capability
+ */
+function buildFailuresSummary(failed: RegistrationFailure[]): string {
+  if (failed.length === 0) return "";
+
+  const grouped = new Map<string, string[]>();
+
+  for (const item of failed) {
+    const key = item.requiredCapability;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key)!.push(humanReadableName(item.item));
+  }
+
+  const summaries: string[] = [];
+  for (const [capability, items] of grouped) {
+    summaries.push(`${items.join(", ")} (requires ${capability})`);
+  }
+
+  return summaries.join(" | ");
+}
 
 /**
  * Execute registration phase
@@ -29,8 +115,11 @@ import { logger } from "@/lib/utils";
  * Registers all job handlers from the explicit registry, then activates
  * all subscriptions. Each entry is independent — failures are logged
  * but don't block other registrations or app startup.
+ *
+ * Returns a RegistrationResult tracking all registered, skipped, and failed items
+ * with capability information for future retry logic.
  */
-export async function registrationPhase(): Promise<void> {
+export async function registrationPhase(): Promise<RegistrationResult> {
   try {
     const { initializeConnectivityHandler, appDegrade } = await import("@/system/Degrade");
     const { registerAllSystemResponses } = await import("@/system/Degrade/responses/system-responses");
@@ -150,61 +239,115 @@ export async function registrationPhase(): Promise<void> {
     logger.category("bootstrap").debug("Lib degradation responses registered");
 
     const queue = getJobQueue();
-    const jobErrors: string[] = [];
-    const subErrors: string[] = [];
 
-    // Register all job handlers
+    const result: RegistrationResult = {
+      success: true,
+      registered: [],
+      skipped: [],
+      failed: [],
+    };
+
+    // Register all job handlers (ALWAYS TRY, never skip)
     for (const job of CORE_JOBS) {
       try {
         await job.register(queue);
+        result.registered.push(job.name);
+        logger.category("bootstrap").debug(`Job registered: ${job.name}`);
       } catch (error) {
         const errorMsg = (error as Error).message;
-        jobErrors.push(`${job.name}: ${errorMsg}`);
-        logger
-          .category("bootstrap")
-          .warn(`Job handler registration failed: ${job.name}`, {
-            error: errorMsg,
-          });
+        const requiredCapability = getRequiredCapability(job.name);
+
+        result.failed.push({
+          item: job.name,
+          error: errorMsg,
+          requiredCapability,
+          recoverable: isRecoverable(job.name),
+        });
+
+        logger.category("bootstrap").warn(`Job registration failed: ${job.name}`, {
+          error: errorMsg,
+          requiredCapability,
+        });
         reportBackgroundJobsFault(`Job handler registration failed: ${job.name}`);
       }
     }
 
-    logger
-      .category("bootstrap")
-      .info(
-        `✅ Job handlers registered (${CORE_JOBS.length - jobErrors.length}/${CORE_JOBS.length})`,
-      );
+    logger.category("bootstrap").info(
+      `✅ Job handlers registered (${result.registered.filter(n => CORE_JOBS.find(j => j.name === n)).length}/${CORE_JOBS.length})`,
+    );
 
-    // Activate all subscriptions
+    // Activate all subscriptions (ALWAYS TRY, never skip)
     for (const sub of SUBSCRIPTIONS) {
       try {
         await sub.activate();
+        result.registered.push(sub.name);
+        logger.category("bootstrap").debug(`Subscription activated: ${sub.name}`);
       } catch (error) {
         const errorMsg = (error as Error).message;
-        subErrors.push(`${sub.name}: ${errorMsg}`);
-        logger
-          .category("bootstrap")
-          .warn(`Subscription activation failed: ${sub.name}`, {
-            error: errorMsg,
-          });
+        const requiredCapability = getRequiredCapability(sub.name);
+
+        // Special handling: recovery subscriptions are critical
+        if (sub.name.includes("recovery")) {
+          logger.category("bootstrap").error(
+            `CRITICAL: Recovery subscription failed: ${sub.name}`,
+            { error: errorMsg },
+          );
+          result.success = false;
+        }
+
+        result.failed.push({
+          item: sub.name,
+          error: errorMsg,
+          requiredCapability,
+          recoverable: isRecoverable(sub.name),
+        });
+
+        logger.category("bootstrap").warn(`Subscription activation failed: ${sub.name}`, {
+          error: errorMsg,
+          requiredCapability,
+        });
         reportBackgroundJobsFault(`Subscription activation failed: ${sub.name}`);
       }
     }
 
-    logger
-      .category("bootstrap")
-      .info(
-        `✅ Subscriptions activated (${SUBSCRIPTIONS.length - subErrors.length}/${SUBSCRIPTIONS.length})`,
-      );
+    logger.category("bootstrap").info(
+      `✅ Subscriptions activated (${result.registered.filter(n => SUBSCRIPTIONS.find(s => s.name === n)).length}/${SUBSCRIPTIONS.length})`,
+    );
+
+    // Build summary for safe mode screen display
+    if (result.failed.length > 0) {
+      result.failuresSummary = buildFailuresSummary(result.failed);
+      logger.category("bootstrap").warn(`Registration failures: ${result.failuresSummary}`);
+    }
+
+    logger.category("bootstrap").info(
+      `Registration complete: ${result.registered.length} registered, ${result.failed.length} failed`,
+    );
+
+    return result;
   } catch (error) {
     const { reportBackgroundJobsFault } = await import("@/system/Degrade/handlers/fault-handlers");
     const errorMsg = (error as Error).message;
-    logger
-      .category("bootstrap")
-      .warn("Registration phase warning (non-critical)", {
-        error: errorMsg,
-      });
+    logger.category("bootstrap").error("Registration phase error", {
+      error: errorMsg,
+    });
     reportBackgroundJobsFault(`Registration phase failed: ${errorMsg}`);
-    // Non-critical — app boots without handlers/subscriptions
+
+    // Return failed result even on catastrophic error
+    return {
+      success: false,
+      registered: [],
+      skipped: [],
+      failed: [
+        {
+          item: "registration-phase",
+          error: errorMsg,
+          requiredCapability: DegradeCapability.CONNECTIVITY,
+          recoverable: false,
+        },
+      ],
+      failuresSummary: "Registration phase failed catastrophically",
+    };
   }
 }
+
