@@ -290,5 +290,17 @@ export const NetworkRecoveryRetryJobManager = {
   },
 };
 
+/**
+ * Get the handler function for the network recovery retry job
+ * This is called by the job registry during registration phase (fast)
+ * The actual handler requires _networkStateMachine and _jobQueue to be initialized,
+ * which happens in the deferred init phase
+ */
+export function getNetworkRecoveryRetryHandler() {
+  return NetworkRecoveryRetryJobManager._handleRecoveryRetry.bind(
+    NetworkRecoveryRetryJobManager,
+  );
+}
+
 export type { NetworkRecoveryRetryJobConfig };
 

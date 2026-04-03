@@ -54,11 +54,10 @@
 
 import { getAppConfig, OFFLINE_SYNC_DEFAULTS } from "@/config";
 import {
-    createSafeModeState,
     NetworkCascadeDetector,
-    SafeModeReason,
+    reportCrash,
 } from "@/lib/error";
-import { setSafeMode } from "@/lib/kernel/kernel-manager";
+import { DegradeCapability } from "@/type-definitions/degrade";
 import { getNetworkStatus, subscribeToNetworkStatus, type NetworkStatus } from "@/lib/middleware/network";
 import { QueryCache } from "@/lib/middleware/storage";
 import { logger } from "@/lib/utils";
@@ -289,11 +288,9 @@ class OnlineSyncManagerService {
             consecutiveFailures:
               NetworkCascadeDetector.getConsecutiveFailures(),
           });
-        setSafeMode(
-          createSafeModeState(SafeModeReason.NETWORK_CASCADE, {
+        reportCrash(DegradeCapability.SYNC, 'cascade-detected', {
             details: `Consecutive sync failures: ${NetworkCascadeDetector.getConsecutiveFailures()}`,
-          }),
-        );
+          });
       }
     } finally {
       this.isSyncing = false;

@@ -536,7 +536,7 @@ Dispatches events to all enabled exporters asynchronously with error isolation.
 To create a custom exporter:
 
 ```typescript
-import { exporterRegistry } from '@/lib/analytics/exporters';
+import { exporterRegistry } from '@/lib/analytics';
 
 class CustomExporter implements AnalyticsExporter {
   name = 'custom';

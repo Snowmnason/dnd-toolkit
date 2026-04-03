@@ -123,7 +123,7 @@ export const usersDB = {
       await AuthStateManager.saveUserData(data);
       await SecureStorage.setJSON(`${STORAGE_KEYS.USER_DATA}_meta`, {
         timestamp: Date.now(),
-        source: "supabase",
+        source: "remote",
       });
     } catch (storageError) {
       logger.category("database").warn("Failed to save user data to storage (non-critical):", storageError);

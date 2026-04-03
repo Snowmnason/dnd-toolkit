@@ -35,12 +35,17 @@
  * @param state - Mutable kernel state
  * @throws Error if service initialization fails (critical)
  */
-export async function servicesPhase(): Promise<void> {
+export async function servicesPhase(signal: AbortSignal): Promise<void> {
   const { logger } = await import("@/lib/utils");
+
+  if (signal.aborted) return;
 
   try {
     const { initializeServices } = await import("@/system/Services/service-initializer");
     const { getAllServiceStatuses } = await import("@/system/Services");
+    const { syncServiceStatusesToDegradeManager } = await import(
+      "@/system/Degrade/handlers/fault-handlers"
+    );
     
     await initializeServices();
     // Auth strategies are registered within initializeServices by the middleware
@@ -58,11 +63,28 @@ export async function servicesPhase(): Promise<void> {
         .info(`  ${icon} ${service}: ${detail.status} (${detail.provider})${message}`);
     });
 
+    // Sync all service statuses to degradeManager via centralized handler
+    syncServiceStatusesToDegradeManager();
+
     logger
       .category("bootstrap")
       .info("✅ Services phase completed");
   } catch (error) {
+    const { 
+      reportDatabaseFault, 
+      reportAuthFault,
+      reportAnalyticsFault,
+      reportErrorTrackingFault
+    } = await import(
+      "@/system/Degrade/handlers/fault-handlers"
+    );
+    const errorMsg = (error as Error).message;
     logger.category("bootstrap").error("[servicesPhase] ✗ Failed:", error);
+    // Mark all services as degraded via centralized handlers
+    reportDatabaseFault(`Services initialization failed: ${errorMsg}`);
+    reportAuthFault(`Services initialization failed: ${errorMsg}`);
+    reportAnalyticsFault(`Services initialization failed: ${errorMsg}`);
+    reportErrorTrackingFault(`Services initialization failed: ${errorMsg}`);
     throw error;
   }
 }

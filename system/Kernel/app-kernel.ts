@@ -6,19 +6,20 @@
  *
  * Phases (in order):
  * - IDLE: Initial state, not started
- * - CONFIG: Load Supabase env vars & initialize client (MUST run first)
+ * - CONFIG: Load and validate application configuration (appsettings.json)
  * - PRELOAD: Loading fonts, platform assets (critical, <500ms target)
  * - NETWORK: Network detection initialization (before storage for offline awareness)
- * - STORAGE: Cache validation & migrations (knows network status)
+ * - STORAGE: Cache validation & migrations (critical; enables persistence)
  * - SERVICES: Register auth provider, error tracker, analytics exporters (must be before AUTH)
- * - JOB_SETUP: Initialize job queue infrastructure (non-critical, runs before AUTH)
+ * - JOB_SETUP: Initialize job queue infrastructure (critical, runs before AUTH)
  * - AUTH: Session restoration (non-blocking, fires in background after job setup ready)
  * - FEATURE_FLAGS: Load and apply feature flags (non-critical, runs after AUTH)
- * - REGISTRATION: Register job handlers + activate subscriptions (non-critical, runs after FEATURE_FLAGS)
+ * - REGISTRATION: Register job handlers + activate subscriptions (conditionally critical, runs after FEATURE_FLAGS)
  * - READY: App is ready to render main UI
  * - ERROR: A critical phase failed
  */
 
+import { getAppConfig } from "@/config";
 import {
   cleanupAnalyticsNetworkIntegration,
 } from "@/lib/analytics/exporters/analytics-network-integration";
@@ -45,6 +46,23 @@ import {
   type KernelListener,
   type PhaseProgress,
 } from "@/type-definitions/kernel-types";
+import type { RegistrationResult } from "@/type-definitions/registration";
+import {
+  calculateEffectiveTimeout,
+  calculateSlowdownFactor,
+  createSlowdownAnalytics,
+  finalizeBootstrapAnalytics,
+  initializeBootstrapAnalytics,
+  type KernelBootstrapAnalytics,
+} from "./phase-helpers/adaptive-phase-executor";
+import { createPhaseContext } from "./phase-helpers/phase-context";
+import {
+  canRunPhase,
+  isNonRecoverablePhase,
+  validatePhaseGraph,
+  type PhaseName as DependencyPhaseName,
+} from "./phase-helpers/phase-dependency-graph";
+import { classifyPhaseError } from "./phase-helpers/phase-error-classifier";
 import { authPhase } from "./phases/auth-phase";
 import { configPhase } from "./phases/config-phase";
 import { featureFlagsPhase } from "./phases/feature-flags-phase";
@@ -121,6 +139,29 @@ const PHASE_MIN_DISPLAY_MS = {
   registration: 50,
 } as const;
 
+/**
+ * TRACK 8: Phases that ALWAYS crash on failure (no graceful degradation)
+ * Any error in these phases is fatal to the bootstrap process.
+ */
+const CRITICAL_PHASES = ["config", "preload", "storage", "jobSetup"] as const;
+
+/**
+ * TRACK 8: Maps each phase to the capability flags it affects on failure.
+ * Non-critical phases use this map to set degradation flags before skipping.
+ * Critical phases have empty arrays (they crash, never degrade).
+ */
+const PHASE_CAPABILITY_MAP: Record<typeof PHASE_SEQUENCE[number], string[]> = {
+  config:       [],                                              // Critical: crash
+  preload:      [],                                              // Critical: crash
+  network:      ["connectivity"],                               // Non-critical
+  storage:      ["storage"],                                     // Critical: crash
+  services:     ["database", "auth", "analytics", "errorTracking"], // Non-critical
+  jobSetup:     [],                                              // Critical: crash
+  auth:         ["auth"],                                        // Non-critical
+  featureFlags: ["premiumFeatures"],                             // Non-critical
+  registration: ["backgroundJobs", "sync"],                      // Non-critical
+};
+
 class AppKernelClass {
   private state: AppKernelState = {
     currentPhase: KernelPhase.IDLE,
@@ -157,6 +198,12 @@ class AppKernelClass {
   private bootstrapTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
   private bootstrapTimeoutUnsubscribe: (() => void) | null = null;
 
+  // Track D: Phase execution tracking
+  private completedPhases = new Set<DependencyPhaseName>();
+  private deviceSlowdown = 1.0;
+  private networkMultiplier = 1.0;
+  private bootstrapAnalytics: KernelBootstrapAnalytics | null = null;
+
   /**
    * Initialize the kernel once
    * Safe to call multiple times - only initializes once
@@ -178,6 +225,18 @@ class AppKernelClass {
       // Detect platform and initial capabilities
       await this.detectCapabilities();
 
+      // Track D: Validate phase dependency graph (detect circular deps, missing phases)
+      validatePhaseGraph();
+
+      // Track D: Create phase context and initialize bootstrap analytics
+      const phaseContext = createPhaseContext();
+      this.bootstrapAnalytics = initializeBootstrapAnalytics();
+      logger.category("bootstrap").debug("Phase context", {
+        platform: phaseContext.platform,
+        deviceType: phaseContext.deviceType,
+        environment: phaseContext.environment,
+      });
+
       // Set up kernel timeout — if bootstrap doesn't reach appReady, trigger RECOVERY safe mode
       this.setupBootstrapTimeout();
 
@@ -186,34 +245,115 @@ class AppKernelClass {
       // ═══════════════════════════════════════════════════════════════
 
       // Phase 0: CONFIG — validate app configuration (critical, throws on failure)
-      await this.runPhase("config", () => configPhase());
+      await this.runPhase("config", (signal) => configPhase(signal));
+
+      // Track D: Calculate device slowdown after config phase completes
+      {
+        const configTiming = this.state.timing["config"] || 0;
+        const configBaseline = getAppConfig().kernel?.phaseTiming?.config?.baseMs || 800; // Use conservative baseline to avoid runaway multiplier
+        this.deviceSlowdown = calculateSlowdownFactor(configTiming, configBaseline);
+        if (this.bootstrapAnalytics) {
+          this.bootstrapAnalytics.slowdown = createSlowdownAnalytics(configTiming, configBaseline);
+        }
+        logger.category("bootstrap").debug(
+          `Device slowdown: ${this.deviceSlowdown.toFixed(2)}x`,
+          { configActualMs: configTiming, configBaselineMs: configBaseline },
+        );
+      }
 
       // Phase 1: PRELOAD — load fonts, themes, platform assets (non-critical)
-      await this.runPhase("preload", () => preloadPhase());
+      await this.runPhase("preload", (signal) => preloadPhase(signal));
 
       // Phase 2: NETWORK — initialize detection + telemetry (non-critical, app works offline)
-      await this.runPhase("network", async () => {
-        await networkPhase();
+      await this.runPhase("network", async (signal) => {
+        await networkPhase(signal);
         this.setupNetworkSubscription();
       });
 
-      // Phase 3: STORAGE — classification validation, health monitoring, defaults (non-critical)
-      await this.runPhase("storage", () => storagePhase());
+      // Track D: Detect network multiplier from detected connection type
+      try {
+        const netStatus = NetworkDetection.getStatus();
+        if (netStatus.type === "wifi" || netStatus.type === "cellular") {
+          const effType = netStatus.effectiveType || "4g";
+          const normalized = effType === "slow-2g" ? "2G" : effType.toUpperCase();
+          const netKey = `${netStatus.type}-${normalized}`;
+          const nc = getAppConfig().kernel?.networkConditions;
+          if (nc) {
+            // Static dispatch avoids Generic Object Injection Sink
+            switch (netKey) {
+              case "cellular-2G": this.networkMultiplier = nc["cellular-2G"] ?? 1.0; break;
+              case "cellular-3G": this.networkMultiplier = nc["cellular-3G"] ?? 1.0; break;
+              case "cellular-4G": this.networkMultiplier = nc["cellular-4G"] ?? 1.0; break;
+              case "wifi-2G": this.networkMultiplier = nc["wifi-2G"] ?? 1.0; break;
+              case "wifi-3G": this.networkMultiplier = nc["wifi-3G"] ?? 1.0; break;
+              case "wifi-4G": this.networkMultiplier = nc["wifi-4G"] ?? 1.0; break;
+              default: break; // Keep 1.0
+            }
+          }
+          if (this.bootstrapAnalytics) {
+            this.bootstrapAnalytics.networkType = netKey;
+            this.bootstrapAnalytics.networkMultiplier = this.networkMultiplier;
+          }
+          logger.category("bootstrap").debug(
+            `Network multiplier: ${this.networkMultiplier}x (${netKey})`,
+          );
+        }
+      } catch (e) {
+        logger.category("bootstrap").debug("Network multiplier detection skipped", {
+          error: (e as Error).message,
+        });
+      }
+
+      // Phase 3: STORAGE — classification validation, health monitoring, defaults (critical)
+      await this.runPhase("storage", (signal) => storagePhase(signal));
 
       // Phase 4: SERVICES — register auth/error/analytics providers (critical, throws on failure)
-      await this.runPhase("services", () => servicesPhase());
+      await this.runPhase("services", (signal) => servicesPhase(signal));
 
-      // Phase 5: JOB_SETUP — initialize job queue infrastructure (non-critical)
-      await this.runPhase("jobSetup", () => jobSetupPhase());
+      // Phase 5: JOB_SETUP — initialize job queue infrastructure (critical)
+      await this.runPhase("jobSetup", (signal) => jobSetupPhase(signal));
 
       // Phase 6: AUTH — restore persisted session + evaluate staleness (non-critical, redirects to login on failure via useAuthGuard)
-      await this.runPhase("auth", () => authPhase());
+      await this.runPhase("auth", (signal) => authPhase(signal));
 
       // Phase 7: FEATURE_FLAGS — bootstrap feature flags from remote or cache (non-critical)
-      await this.runPhase("featureFlags", () => featureFlagsPhase());
+      await this.runPhase("featureFlags", (signal) => featureFlagsPhase(signal));
 
-      // Phase 8: REGISTRATION — register job handlers + activate subscriptions (non-critical)
-      await this.runPhase("registration", () => registrationPhase());
+      // Phase 8: REGISTRATION — register job handlers + activate subscriptions (conditionally critical)
+      // Track C: Captures failures with required capability for future retry logic
+      // Track D: Wrapped in runPhase for dependency checking + adaptive timeout
+      let registrationResult: RegistrationResult | null = null;
+      await this.runPhase("registration", async (signal) => {
+        registrationResult = await registrationPhase(signal);
+      });
+
+      // Track C-2: Critical check — if registration was skipped due to services failure
+      // (which means database isn't initialized), trigger safe mode immediately
+      // This prevents crashes when trying to access unregistered repositories
+      if (!this.state.phases.registrationReady) {
+        // Registration phase was skipped or failed
+        const servicesWasSkipped = !this.state.phases.servicesReady;
+        if (servicesWasSkipped) {
+          logger.category("bootstrap").error(
+            "[CRITICAL CASCADE] Registration skipped due to services failure — database uninitialized",
+            { registrationReady: this.state.phases.registrationReady, servicesReady: this.state.phases.servicesReady }
+          );
+
+          const safeMode = createSafeModeState(
+            SafeModeReason.STORAGE_UNREADABLE, // Services includes database init
+            {
+              details: "Critical services failed during bootstrap — unable to initialize database. Please restart the app.",
+            },
+          );
+          this.setSafeMode(safeMode);
+          return; // Exit bootstrap, don't proceed to appReady
+        }
+      }
+
+      // Track D: Finalize bootstrap analytics
+      if (this.bootstrapAnalytics) {
+        this.bootstrapAnalytics = finalizeBootstrapAnalytics(this.bootstrapAnalytics);
+      }
 
       // ═══════════════════════════════════════════════════════════════
       // APP READY — all phases complete, UI can render
@@ -321,7 +461,6 @@ class AppKernelClass {
           state.phases.appReady &&
           state.safeMode?.reason === SafeModeReason.KERNEL_TIMEOUT
         ) {
-          console.log('[CRITICAL] Kernel completed after timeout — auto-clearing KERNEL_TIMEOUT safe mode');
           logger
             .category('bootstrap')
             .info('Kernel completed after timeout — auto-clearing KERNEL_TIMEOUT safe mode');
@@ -334,6 +473,10 @@ class AppKernelClass {
   /**
    * Set up network status subscription and update kernel state on changes
    * Called after networkPhase() initializes the NetworkDetection state machine
+   *
+   * TRACK 7 (Early): Wire network changes to degradation manager
+   * - Network reconnects → appDegrade.set('connectivity', true)
+   * - Network disconnects → appDegrade.set('connectivity', false)
    */
   private setupNetworkSubscription(): void {
     // Clean up existing subscription
@@ -350,6 +493,22 @@ class AppKernelClass {
         .debug(
           `Network status changed: online=${status.isOnline}, type=${status.type}`,
         );
+
+      // TRACK 7: Wire network changes to degradation manager
+      // Dynamic import to avoid circular dep at top-level
+      (async () => {
+        try {
+          const { appDegrade } = await import("@/system/Degrade");
+          appDegrade.set("connectivity", status.isOnline, {
+            source: "network-detection",
+            reason: status.isOnline ? "back online" : "offline",
+          });
+        } catch (error) {
+          logger
+            .category("bootstrap")
+            .warn("Failed to update degradation on network change", { error });
+        }
+      })();
     });
 
     // Get and set initial status
@@ -415,6 +574,22 @@ class AppKernelClass {
           0,
         );
         const { Analytics } = await import("@/lib/analytics");
+
+        // Track D: Send structured bootstrap analytics (phase timings, slowdown, network)
+        if (this.bootstrapAnalytics) {
+          Analytics.track("kernel_bootstrap_analytics", {
+            platform: this.bootstrapAnalytics.platform,
+            networkType: this.bootstrapAnalytics.networkType,
+            networkMultiplier: this.bootstrapAnalytics.networkMultiplier,
+            slowdownFactor: this.bootstrapAnalytics.slowdown.factor,
+            totalDurationMs: this.bootstrapAnalytics.totalDurationMs,
+            phaseCount: this.bootstrapAnalytics.phases.length,
+            failedPhases: this.bootstrapAnalytics.phases
+              .filter(p => p.status !== "success")
+              .map(p => p.name),
+          });
+        }
+
         Analytics.track("app_bootstrap_complete", {
           total: totalBootstrapTime,
           ...this.state.timing,
@@ -452,12 +627,12 @@ class AppKernelClass {
 
     try {
       // Run all independent capability checks in parallel
-      const [platformResult, storageResult, analyticsResult, supabaseResult] =
+      const [platformResult, storageResult, analyticsResult, backendResult] =
         await Promise.allSettled([
           import("react-native"),
           import("@/lib/storage"),
           import("@/lib/analytics"),
-          import("@/system/Services/supabase/supabase-client"),
+          import("@/system/Services").then(m => m.isBackendAvailable()),
         ]);
 
       // Platform detection
@@ -495,11 +670,10 @@ class AppKernelClass {
         logger.category("bootstrap").debug("Analytics not available");
       }
 
-      // Backend (Supabase) availability
-      if (supabaseResult.status === "fulfilled") {
-        const { isSupabaseConfigured } = supabaseResult.value;
-        capabilities.backend = isSupabaseConfigured();
-        capabilities.auth = isSupabaseConfigured(); // Auth depends on backend
+      // Backend availability (provider-agnostic)
+      if (backendResult.status === "fulfilled") {
+        capabilities.backend = backendResult.value;
+        capabilities.auth = backendResult.value; // Auth depends on backend
       } else {
         logger.category("bootstrap").debug("Backend not configured");
       }
@@ -616,7 +790,7 @@ class AppKernelClass {
    */
   private async runPhase(
     phaseName: typeof PHASE_SEQUENCE[number],
-    fn: () => Promise<void>,
+    fn: (signal: AbortSignal) => Promise<void>,
   ): Promise<void> {
     const phaseKey = this.resolvePhaseKey(phaseName);
     const startTime = Date.now();
@@ -646,6 +820,35 @@ class AppKernelClass {
           KernelPhase.IDLE,
       });
 
+      // Track D: Check dependencies before executing phase
+      if (!canRunPhase(phaseName as DependencyPhaseName, this.completedPhases)) {
+        if (isNonRecoverablePhase(phaseName as DependencyPhaseName)) {
+          throw new Error(`Cannot run phase ${phaseName}: dependencies not met`);
+        }
+        // Skippable phase: identify which dependency failed + log
+        const { PHASE_DEPENDENCIES } = await import("@/system/Kernel/phase-helpers/phase-dependency-graph");
+        const phaseDeps = [...PHASE_DEPENDENCIES.entries()].find(([key]) => key === (phaseName as DependencyPhaseName))?.[1] || [];
+        const failedDeps = phaseDeps.filter((dep) => !this.completedPhases.has(dep));
+        const depReason = failedDeps.length > 0 ? `dependency '${failedDeps[0]}' failed` : "unknown";
+        logger.category("bootstrap").warn(
+          `${phaseName} skipped (${depReason}) — continuing to degraded mode`,
+        );
+        const updatedPhases = { ...this.state.phases, [phaseKey]: true };
+        this.calculatePhaseProgress(updatedPhases);
+        this.updateState({
+          phases: updatedPhases,
+          phaseProgress: { ...this.state.phaseProgress },
+        });
+        this.bootstrapAnalytics?.phases.push({
+          name: phaseName,
+          baselineMs: 0,
+          timeoutMs: 0,
+          actualDurationMs: 0,
+          status: "skipped",
+        });
+        return;
+      }
+
       // Schedule polling for long-running phases (UX theater)
       // CRITICAL: Must capture the timeout handle to cancel if phase completes quickly
       pollTimeoutHandle = setTimeout(() => {
@@ -670,7 +873,72 @@ class AppKernelClass {
         }
       }, 50); // Wait 50ms before starting polling (phase might complete in <50ms)
 
-      await fn();
+      // Track D: Execute with adaptive timeout + RETRY LOGIC
+      let effectiveTimeout = calculateEffectiveTimeout(
+        phaseName, this.deviceSlowdown, this.networkMultiplier,
+      );
+      
+      // HARDCODED OVERRIDE: config phase needs guaranteed 3000ms minimum
+      // Config loading can be slow due to lazy imports; we don't slow down factor this phase
+      // since the baseMs is used for device slowdown detection, not the actual configtimeout
+      if (phaseName === "config") {
+        effectiveTimeout = Math.max(effectiveTimeout, 3000);
+      }
+      
+      // RETRY LOGIC: Attempt up to 3 times (initial + 2 retries) with exponential backoff
+      const MAX_RETRIES = 2;
+      const BACKOFF_BASE_MS = 100;
+      const BACKOFF_FACTOR = 2;
+      let lastError: Error | null = null;
+      
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        const attemptController = new AbortController();
+        let phaseTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+        try {
+          await Promise.race([
+            fn(attemptController.signal),
+            new Promise<never>((_, reject) => {
+              phaseTimeoutHandle = setTimeout(() => {
+                const err = new Error(
+                  `Phase ${phaseName} timed out after ${effectiveTimeout}ms`,
+                );
+                (err as Error & { code: string }).code = "ETIMEDOUT";
+                attemptController.abort(); // cancel the phase fn — prevent post-timeout state mutations
+                reject(err);
+              }, effectiveTimeout);
+            }),
+          ]);
+          // Success! Break out of retry loop
+          lastError = null;
+          break;
+        } catch (error) {
+          attemptController.abort(); // ensure abort on non-timeout errors too
+          lastError = error as Error;
+          const isTimeout = (error as Error & { code: string }).code === "ETIMEDOUT";
+          const shouldRetry = attempt < MAX_RETRIES && (isTimeout || (error instanceof Error && error.message.includes("unreachable")));
+          
+          if (shouldRetry) {
+            // Calculate backoff: 100ms, then 200ms
+            const backoffMs = Math.pow(BACKOFF_FACTOR, attempt) * BACKOFF_BASE_MS;
+            logger.category("bootstrap").warn(
+              `${phaseName} failed (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${backoffMs}ms...`,
+              { reason: isTimeout ? "timeout" : "retriable error", error: (error as Error).message },
+            );
+            await new Promise((resolve) => setTimeout(resolve, backoffMs));
+            continue; // Retry
+          }
+          
+          // Non-retriable error or max retries exhausted - rethrow
+          throw error;
+        } finally {
+          if (phaseTimeoutHandle) clearTimeout(phaseTimeoutHandle);
+        }
+      }
+      
+      // If we exhausted retries with an error, throw it
+      if (lastError) {
+        throw lastError;
+      }
       const actualDuration = Date.now() - startTime;
 
       // Clean up both the timeout and polling interval (MUST do both)
@@ -701,6 +969,16 @@ class AppKernelClass {
       // Ensures fast phases (e.g. auth on unauthenticated path) always record a non-zero value
       const wallClockDuration = actualDuration + enforceDelay;
 
+      // Track D: Record phase completion + analytics
+      this.completedPhases.add(phaseName as DependencyPhaseName);
+      this.bootstrapAnalytics?.phases.push({
+        name: phaseName,
+        baselineMs: calculateEffectiveTimeout(phaseName, 1.0, 1.0),
+        timeoutMs: effectiveTimeout,
+        actualDurationMs: wallClockDuration,
+        status: "success",
+      });
+
       // Mark phase complete first, then calculate progress with updated phases
       const updatedPhases = { ...this.state.phases, [phaseKey]: true };
       this.calculatePhaseProgress(updatedPhases);
@@ -729,12 +1007,171 @@ class AppKernelClass {
 
       const err = error instanceof Error ? error : new Error(String(error));
       const actualDuration = Date.now() - startTime;
-      logger.category("bootstrap").error(`${phaseName} phase failed`, {
-        error: err.message,
-        durationMs: actualDuration,
+      const isCritical = (CRITICAL_PHASES as readonly string[]).includes(phaseName);
+      const failureType = classifyPhaseError(err);
+
+      // Track D: Record failure analytics (before crash/skip decision)
+      this.bootstrapAnalytics?.phases.push({
+        name: phaseName,
+        baselineMs: calculateEffectiveTimeout(phaseName, 1.0, 1.0),
+        timeoutMs: calculateEffectiveTimeout(phaseName, this.deviceSlowdown, this.networkMultiplier),
+        actualDurationMs: actualDuration,
+        status: isCritical || failureType === "non-recoverable" ? "failed" : "skipped",
+        reason: failureType,
       });
-      throw err;
+
+      // Static switch avoids Generic Object Injection Sink warning (mirrors resolvePhaseKey pattern)
+      const capabilities = (() => {
+        switch (phaseName) {
+          case "config":       return PHASE_CAPABILITY_MAP.config;
+          case "preload":      return PHASE_CAPABILITY_MAP.preload;
+          case "network":      return PHASE_CAPABILITY_MAP.network;
+          case "storage":      return PHASE_CAPABILITY_MAP.storage;
+          case "services":     return PHASE_CAPABILITY_MAP.services;
+          case "jobSetup":     return PHASE_CAPABILITY_MAP.jobSetup;
+          case "auth":         return PHASE_CAPABILITY_MAP.auth;
+          case "featureFlags": return PHASE_CAPABILITY_MAP.featureFlags;
+          case "registration": return PHASE_CAPABILITY_MAP.registration;
+        }
+      })();
+
+      // Critical phases or non-recoverable errors always crash bootstrap
+      if (isCritical || failureType === "non-recoverable") {
+        logger.category("bootstrap").error(
+          `${phaseName} phase failed (${failureType}, critical=${isCritical})`,
+          { error: err.message, durationMs: actualDuration },
+        );
+
+        // For TIMEOUT failures on critical phases: set safe mode + degradation immediately
+        // (don't just throw; let UI show safe mode screen instead of blank screen)
+        if (failureType === "timeout") {
+          await this.handleCriticalTimeoutCrash(phaseName, err);
+          // Don't re-throw; safe mode is set, let app continue
+          return;
+        }
+
+        throw err;
+      }
+
+      // Non-critical phase with recoverable failure ('unreachable' | 'timeout'):
+      // set degradation flags, skip phase, continue bootstrap
+      logger.category("bootstrap").warn(
+        `${phaseName} phase skipped (${failureType}) — bootstrap continues`,
+        { error: err.message, capabilities, durationMs: actualDuration },
+      );
+
+      // Set degradation flags for all capabilities this phase affects
+      if (capabilities.length > 0) {
+        try {
+          const { appDegrade } = await import("@/system/Degrade");
+          for (const cap of capabilities) {
+            appDegrade.set(cap, false, {
+              source: phaseName,
+              reason: `${phaseName} phase failed: ${failureType}`,
+            });
+          }
+        } catch (degradeError) {
+          logger.category("bootstrap").warn(
+            `Failed to set degradation flags for ${phaseName}`,
+            { error: (degradeError as Error).message },
+          );
+        }
+      }
+
+      // Mark phase as complete (skipped) and continue
+      const updatedPhases = { ...this.state.phases, [phaseKey]: true };
+      this.calculatePhaseProgress(updatedPhases);
+      this.updateState({
+        phases: updatedPhases,
+        timing: { ...this.state.timing, [phaseName]: actualDuration },
+        phaseProgress: { ...this.state.phaseProgress },
+      });
     }
+  }
+
+  /**
+   * Handle critical phase timeout crashes
+   *
+   * When a critical phase times out, set safe mode immediately (with crash details)
+   * + set degradation flags for affected capabilities. This allows the UI to show
+   * SafeModeScreen instead of a blank screen.
+   *
+   * @param phaseName Name of the phase that timed out
+   * @param error The timeout error
+   */
+  private async handleCriticalTimeoutCrash(
+    phaseName: string,
+    error: Error,
+  ): Promise<void> {
+    logger.category("bootstrap").warn(
+      "[TIMEOUT CRASH HANDLER] Setting safe mode for critical phase timeout",
+      { phase: phaseName, errorMsg: error.message },
+    );
+
+    // Map phase to degradation capabilities + appropriate safe mode reason
+    const timeoutDegradationMap: Record<string, string[]> = {
+      config: ["connectivity", "database", "auth", "analytics", "errorTracking", "backgroundJobs", "sync"],
+      preload: ["premiumFeatures"],
+      network: ["connectivity"],
+      storage: ["storage", "database", "auth", "analytics", "errorTracking", "backgroundJobs", "sync"],
+      services: ["database", "auth", "analytics", "errorTracking"],
+      jobSetup: ["backgroundJobs", "sync"],
+      auth: ["auth"],
+      featureFlags: ["premiumFeatures"],
+      registration: ["backgroundJobs", "sync"],
+    };
+
+    // Get capabilities affected by this phase timeout
+    const affectedCapabilities = timeoutDegradationMap[phaseName] || [];
+
+    // Set degradation flags for all affected capabilities
+    try {
+      const { appDegrade } = await import("@/system/Degrade");
+      for (const cap of affectedCapabilities) {
+        appDegrade.set(cap, false, {
+          source: `${phaseName}-timeout`,
+          reason: `${phaseName} phase timed out during bootstrap`,
+        });
+      }
+      logger.category("bootstrap").debug(
+        "[TIMEOUT CRASH HANDLER] Degradation flags set",
+        { capabilities: affectedCapabilities },
+      );
+    } catch (degradeError) {
+      logger.category("bootstrap").warn(
+        "[TIMEOUT CRASH HANDLER] Failed to set degradation flags",
+        { error: (degradeError as Error).message },
+      );
+    }
+
+    // Determine safe mode reason based on phase
+    let safeModeReason = SafeModeReason.KERNEL_TIMEOUT;
+    if (phaseName === "config") {
+      safeModeReason = SafeModeReason.KERNEL_CONFIG_FAILED;
+    } else if (phaseName === "preload") {
+      safeModeReason = SafeModeReason.KERNEL_PRELOAD_FAILED;
+    }
+
+    // Create and set safe mode state immediately
+    const safeMode = createSafeModeState(
+      safeModeReason,
+      {
+        details: `Bootstrap phase '${phaseName}' timed out. Services may be unavailable.`,
+      },
+    );
+    this.setSafeMode(safeMode);
+
+    // Update kernel state to show we're in error phase
+    this.updateState({
+      currentPhase: KernelPhase.ERROR,
+      error: this.createKernelError(
+        KernelErrorCode.PHASE_TIMEOUT,
+        `Phase ${phaseName} timed out`,
+        KernelPhase.ERROR,
+        error,
+        true, // critical
+      ),
+    });
   }
 
   /**
@@ -829,6 +1266,10 @@ class AppKernelClass {
       phaseProgress: INITIAL_PHASE_PROGRESS,
     };
     this.initPromise = null;
+    this.completedPhases.clear();
+    this.deviceSlowdown = 1.0;
+    this.networkMultiplier = 1.0;
+    this.bootstrapAnalytics = null;
 
     this.notifyListeners();
   }
@@ -869,18 +1310,18 @@ class AppKernelClass {
 
     switch (phase) {
       case "auth":
-        await this.runPhase("auth", () => authPhase());
+        await this.runPhase("auth", (signal) => authPhase(signal));
         break;
 
       case "network":
-        await this.runPhase("network", async () => {
-          await networkPhase();
+        await this.runPhase("network", async (signal) => {
+          await networkPhase(signal);
           this.setupNetworkSubscription();
         });
         break;
 
       case "storage":
-        await this.runPhase("storage", () => storagePhase());
+        await this.runPhase("storage", (signal) => storagePhase(signal));
         break;
 
       default:
@@ -1055,6 +1496,18 @@ class AppKernelClass {
       logger.category("bootstrap").warn("Failed to cleanup analytics network integration", {
         error: (error as Error).message,
       });
+    }
+
+    // Cleanup bootstrap timeout handle (if not already cleared)
+    if (this.bootstrapTimeoutHandle) {
+      clearTimeout(this.bootstrapTimeoutHandle);
+      this.bootstrapTimeoutHandle = null;
+    }
+
+    // Cleanup bootstrap timeout subscription (if not already cleared)
+    if (this.bootstrapTimeoutUnsubscribe) {
+      this.bootstrapTimeoutUnsubscribe();
+      this.bootstrapTimeoutUnsubscribe = null;
     }
 
     // Unsubscribe from network changes

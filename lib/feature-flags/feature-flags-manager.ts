@@ -12,7 +12,9 @@
  * Public API for hooks and managers. Never call the singletons directly.
  */
 
+import { reportFault } from '@/lib/error';
 import { logger } from '@/lib/utils/logger';
+import { DegradeCapability } from '@/type-definitions/degrade';
 import { verifyDeviceClock as checkDeviceClock } from '@/system/Kernel/clock-integrity';
 import { type FlagContext } from './evaluation/conditions';
 import type { FeatureFlagKind, FeatureFlagName } from './local-flags';
@@ -103,6 +105,7 @@ export async function getEntitlement(
     return await FeatureFlagsManager.getEntitlement(key, userId);
   } catch (error) {
     logger.category('feature_flags').warn(`getEntitlement("${key}"): server check failed`, error);
+    reportFault(DegradeCapability.PREMIUM_FEATURES, error instanceof Error ? error.message : String(error));
     return { granted: false, source: 'error', expiresAt: undefined };
   }
 }

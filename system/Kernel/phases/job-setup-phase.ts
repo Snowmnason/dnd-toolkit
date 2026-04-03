@@ -25,8 +25,9 @@
  * Initializes the background job queue with storage adapters.
  * Handler registration happens later in registration-phase.ts.
  */
-export async function jobSetupPhase(): Promise<void> {
+export async function jobSetupPhase(signal: AbortSignal): Promise<void> {
   try {
+    if (signal.aborted) return;
     const { logger } = await import("@/lib/utils");
     const { getJobQueue } = await import("@/system/Jobs/background-job-queue");
     const { FastCacheAdapter } = await import(
@@ -49,11 +50,15 @@ export async function jobSetupPhase(): Promise<void> {
       .info("✅ Job infrastructure initialized (fastcache + secure adapters)");
   } catch (error) {
     const { logger } = await import("@/lib/utils");
+    const { reportJobsBootstrapCrash } = await import(
+      '@/system/Degrade/handlers/crash-handlers'
+    );
     logger
       .category("bootstrap")
       .warn("Job setup phase warning (non-critical)", {
         error: (error as Error).message,
       });
+    reportJobsBootstrapCrash(String(error));
     // Non-critical — app boots without background jobs
   }
 }

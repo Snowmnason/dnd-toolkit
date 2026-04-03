@@ -61,3 +61,10 @@ export type {
 
 export { CacheInvalidationError } from "./cache-invalidation";
 
+export {
+    DegradeCapability,
+    type DegradeCapabilityState,
+    type DegradeState,
+    type DegradeSubscriber
+} from './degrade';
+

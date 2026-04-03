@@ -15,9 +15,11 @@
  * - Manage auth state (that stays in lib/auth/auth-state.ts)
  */
 
+import { reportFault } from '@/lib/error';
 import { logger } from '@/lib/utils/logger';
 import { ERROR_CODES } from '@/maps/ERROR_CODES';
 import { AppError } from '@/pure-algo-immutables/app-error';
+import { DegradeCapability } from '@/type-definitions/degrade';
 import { ConnectionQuality, NetworkDetection } from '@/system/Network';
 import {
     isServiceReady,
@@ -62,6 +64,7 @@ function ensureAuthReady(): void {
     const isReady = isServiceReady('auth') || providerExists;
     
     if (!isReady) {
+        reportFault(DegradeCapability.AUTH, 'Provider not initialized');
         throw new AppError(
             ERROR_CODES.AUTH.UNKNOWN,
             'Auth provider not initialized — cannot perform auth operation. Please restart the app.'

@@ -235,6 +235,29 @@ export interface AppSettings {
       syncTimeoutMs?: number;
       description?: string;
     };
+    /** Network condition multipliers for adaptive timeout scaling. */
+    networkConditions?: {
+      "cellular-2G"?: number;
+      "cellular-3G"?: number;
+      "cellular-4G"?: number;
+      "wifi-2G"?: number;
+      "wifi-3G"?: number;
+      "wifi-4G"?: number;
+      description?: string;
+    };
+    /** Per-phase timeout configuration (baseMs values scaled by networkConditions at runtime). */
+    phaseTiming?: {
+      config?: { baseMs?: number; onFailure?: 'fail' | 'force-skip' };
+      preload?: { baseMs?: number; onFailure?: 'fail' | 'force-skip' };
+      network?: { baseMs?: number; onFailure?: 'fail' | 'force-skip' };
+      storage?: { baseMs?: number; onFailure?: 'fail' | 'force-skip' };
+      services?: { baseMs?: number; onFailure?: 'fail' | 'force-skip' };
+      jobSetup?: { baseMs?: number; onFailure?: 'fail' | 'force-skip' };
+      auth?: { baseMs?: number; onFailure?: 'fail' | 'force-skip' };
+      featureFlags?: { baseMs?: number; onFailure?: 'fail' | 'force-skip' };
+      registration?: { baseMs?: number; onFailure?: 'fail' | 'force-skip' | 'conditional-fail' };
+    };
+    description?: string;
   };
   services?: {
     auth?: {

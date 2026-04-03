@@ -37,6 +37,7 @@ interface AppKernelProviderProps {
  */
 export function AppKernelProvider({ children }: AppKernelProviderProps) {
   const [state, setState] = useState<AppKernelState>(getKernelState());
+  const [bootstrapError, setBootstrapError] = useState<Error | null>(null);
 
   useEffect(() => {
     logger
@@ -47,7 +48,9 @@ export function AppKernelProvider({ children }: AppKernelProviderProps) {
     initializeKernel().catch((error: unknown) => {
       logger
         .category("bootstrap")
-        .error("[AppKernelProvider] Kernel initialization failed:", error);
+        .error("[AppKernelProvider] CRITICAL: Kernel initialization failed:", error);
+      // Store error in state so it's caught by error boundary on next render
+      setBootstrapError(error instanceof Error ? error : new Error(String(error)));
     });
 
     // Subscribe to kernel state changes
@@ -59,6 +62,11 @@ export function AppKernelProvider({ children }: AppKernelProviderProps) {
       unsubscribe();
     };
   }, []);
+
+  // If bootstrap failed, throw error so error boundary catches it
+  if (bootstrapError) {
+    throw bootstrapError;
+  }
 
   return (
     <AppKernelContext.Provider value={state}>

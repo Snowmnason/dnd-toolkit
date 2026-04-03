@@ -34,6 +34,7 @@ export enum KernelPhase {
 export enum KernelErrorCode {
   CONFIG_FAILED = "CONFIG_FAILED",
   PRELOAD_FAILED = "PRELOAD_FAILED",
+  PHASE_TIMEOUT = "PHASE_TIMEOUT",
   STORAGE_MIGRATION_FAILED = "STORAGE_MIGRATION_FAILED",
   STORAGE_VALIDATION_FAILED = "STORAGE_VALIDATION_FAILED",
   NETWORK_INIT_FAILED = "NETWORK_INIT_FAILED",
@@ -78,6 +79,19 @@ export interface PhaseProgress {
   currentPhaseName: PhaseName; // Narrowly typed to match PHASE_MESSAGES keys: "config", "preload", ..., "ready"
   progressPercent: number; // 0-100 based on phases completed
   phaseLabel: string; // e.g., "2/8 Loading fonts..."
+}
+
+/**
+ * Individual phase execution state
+ * Tracks what happened during phase execution
+ * Used by error classifier and phase executor for routing failures
+ */
+export interface PhaseState {
+  status: "pending" | "running" | "success" | "skipped" | "failed";
+  reason?: "unreachable" | "timeout" | "non-recoverable"; // Why phase was skipped/failed
+  retriable?: boolean; // true if timeout (can retry on-demand)
+  durationMs?: number; // How long the phase took
+  error?: Error | string; // The error that occurred
 }
 
 /**

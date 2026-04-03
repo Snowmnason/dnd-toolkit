@@ -11,8 +11,7 @@
  * Does:
  * 1. Load application config (appsettings.json)
  * 2. Validate configuration completeness
- * 3. Initialize feature flags, safe mode config, sync settings
- * 4. Update kernel state
+ * 3. Provide validated config for downstream phases
  *
  * Enables: ALL subsequent phases depend on this completing first
  */
@@ -26,20 +25,29 @@
  * @param state - Mutable kernel state
  * @throws Error if config validation fails (critical)
  */
-export async function configPhase(): Promise<void> {
-  // Load config system
-  const { getAppConfig, validateConfig, logValidationResults } =
-    await import('@/config');
+export async function configPhase(signal: AbortSignal): Promise<void> {
+  try {
+    if (signal.aborted) return;
+    // Load config system
+    const { getAppConfig, validateConfig, logValidationResults } =
+      await import('@/config');
 
-  // Get and validate config
-  const config = getAppConfig();
-  const configValidation = validateConfig(config);
-  logValidationResults(configValidation);
+    // Get and validate config
+    const config = getAppConfig();
+    const configValidation = validateConfig(config);
+    logValidationResults(configValidation);
 
-  // Fail if config is invalid (critical)
-  if (!configValidation.valid) {
-    throw new Error(
-      `Configuration validation failed: ${configValidation.errors.join("; ")}`,
+    // Fail if config is invalid (critical)
+    if (!configValidation.valid) {
+      throw new Error(
+        `Configuration validation failed: ${configValidation.errors.join("; ")}`,
+      );
+    }
+  } catch (error) {
+    const { reportConfigBootstrapCrash } = await import(
+      '@/system/Degrade/handlers/crash-handlers'
     );
+    reportConfigBootstrapCrash(String(error));
+    throw error;
   }
 }

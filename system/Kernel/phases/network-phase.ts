@@ -29,8 +29,9 @@
  * Network subscription and status tracking are handled by the orchestrator (app-kernel).
  * Network failures don't block bootstrap.
  */
-export async function networkPhase(): Promise<void> {
+export async function networkPhase(signal: AbortSignal): Promise<void> {
   try {
+    if (signal.aborted) return;
     const { NetworkDetection } = await import("@/system/Network");
     const { logger } = await import("@/lib/utils");
 
@@ -60,11 +61,17 @@ export async function networkPhase(): Promise<void> {
     }
   } catch (error) {
     const { logger } = await import("@/lib/utils");
+    const { reportConnectivityBootstrapFault } = await import(
+      "@/system/Degrade/handlers/fault-handlers"
+    );
+    const errorMsg = (error as Error).message;
     logger
       .category("bootstrap")
       .warn("Network detection failed (non-critical)", {
-        error: (error as Error).message,
+        error: errorMsg,
       });
+    // Mark connectivity as degraded via centralized handler
+    reportConnectivityBootstrapFault(`Network detection failed: ${errorMsg}`);
     // Network failure is non-critical — app works offline
   }
 }

@@ -49,8 +49,9 @@ import { loadHardcodedFlags, seedManagerFromCache } from "./bootstrap-helpers";
  * Non-critical: any unhandled failure falls back to hardcoded config defaults
  * and does not block appReady.
  */
-export async function featureFlagsPhase(): Promise<void> {
+export async function featureFlagsPhase(signal: AbortSignal): Promise<void> {
   try {
+    if (signal.aborted) return;
     const [{ FeatureFlagsManager }, { getDatabaseProvider }] = await Promise.all([
       import("@/lib/feature-flags/server-sync/orchestrator"),
       import("@/system/Services"),
@@ -83,17 +84,15 @@ export async function featureFlagsPhase(): Promise<void> {
     //   none        → hardcoded defaults (first launch)
     if (freshness === "fresh") {
       const seeded = await seedManagerFromCache();
-      if (seeded) {
-        state.bootstrapped = true;
-        notifySubscribers(state);
-        logger.category("bootstrap").debug(
-          "Feature flags: fresh snapshot seeded from cache and subscribers notified",
-        );
-      } else {
+      if (!seeded) {
         logger.category("bootstrap").debug(
           "Fresh snapshot expected but cache read failed — using hardcoded fallback",
         );
         loadHardcodedFlags(state);
+        state.bootstrapped = true;
+        notifySubscribers(state);
+      } else {
+        logger.category("bootstrap").debug("Feature flags: using fresh cached snapshot");
         state.bootstrapped = true;
         notifySubscribers(state);
       }
@@ -130,18 +129,21 @@ export async function featureFlagsPhase(): Promise<void> {
     });
 
   } catch (error) {
+    const { reportPremiumFault } = await import(
+      "@/system/Degrade/handlers/fault-handlers"
+    );
+    const errorMsg = (error as Error).message;
     logger.category("bootstrap").warn("Feature flags phase failed — using hardcoded fallback", {
-      error: (error as Error).message,
+      error: errorMsg,
     });
+    // Mark premium features as degraded via centralized handler
+    reportPremiumFault(`Feature flags initialization failed: ${errorMsg}`);
     try {
       const { FeatureFlagsManager } = await import(
         "@/lib/feature-flags/server-sync/orchestrator"
       );
-      const fallbackState = FeatureFlagsManager.state;
-      loadHardcodedFlags(fallbackState);
-      fallbackState.bootstrapped = true;
-      notifySubscribers(fallbackState);
-      logger.category("bootstrap").debug("Feature flags phase fallback notified subscribers");
+      loadHardcodedFlags(FeatureFlagsManager.state);
+      FeatureFlagsManager.state.bootstrapped = true;
     } catch { /* Nothing more we can do */ }
   }
 }

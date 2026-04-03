@@ -31,8 +31,8 @@ External packages           Third-party dependencies (React, Expo, Supabase, etc
 
 - App type: React Native + Expo Router (web, iOS, Android). Entry at `index.tsx`; routing/layout in `app/_layout.tsx`.
 - Root providers: `AppKernelProvider` → `ThemeProvider` → `ScaleProvider` → `PlatformProvider` → `SubscriptionProvider` → `AppParamsStableProvider` + `AppParamsVolatileProvider` (see `app/_layout.tsx`). Don't move or reorder these casually.
-- Kernel flow: `lib/kernel/use-app-kernel.tsx` preloads fonts/images/themes, initializes network, and restores Supabase session where appropriate. UI waits on `kernel.phases.appReady` or specific phase flags.
-- Auth: `lib/auth/auth-manager.ts` provides the domain wrapper; `lib/auth/auth-state.ts` (`AuthStateManager`) handles authentication checks and world access verification. `lib/auth/useAuthGuard.ts` is the primary hook for protecting routes with tiered levels ('account-only', 'world-required'). Supabase is dynamically imported and guarded by `isSupabaseConfigured()` to support GH Pages/no-env scenarios.
+- Kernel flow: `lib/kernel/use-app-kernel.tsx` preloads fonts/images/themes, initializes network, and restores backend authentication where appropriate. UI waits on `kernel.phases.appReady` or specific phase flags.
+- Auth: `lib/auth/auth-manager.ts` provides the domain wrapper; `lib/auth/auth-state.ts` (`AuthStateManager`) handles authentication checks and world access verification. `lib/auth/useAuthGuard.ts` is the primary hook for protecting routes with tiered levels ('account-only', 'world-required'). Backend services are dynamically initialized to support graceful fallback (e.g., GH Pages without backend, offline-first scenarios).
 - Navigation: Centralized in `lib/navigation/navigation-config.ts`. Each route's TopBar, back button, params, modals, and redirects are defined declaratively. Use `getRouteConfig(context)` instead of inline switch/case.
 - Route params: Expo Router segments (`useSegments()`) + URL params merged into split contexts (`AppParamsStableContext` for userId/connectedWorlds, `AppParamsVolatileContext` for worldId/userRole). Use selector hooks (`useWorldId()`, `useUserId()`, `useConnectedWorlds()`, `useUserRole()`) instead of full context consumers to minimize re-renders.
 
@@ -242,12 +242,19 @@ const result = await AuthManager.signOut('user-initiated');
 
 ## Data and services
 
-- Supabase client/config under `lib/database/`. Always guard usage with `isSupabaseConfigured()` and prefer dynamic imports to avoid circular deps and to keep web fallback working.
-- **Auth**: Call `lib/auth/auth-manager.ts` (not direct operations). Use `useAuthGuard(kernel.phases.appReady, level)` in protected layouts with level='account-only' (needs auth) or 'world-required' (needs auth + world access).
-- **Database**: Call `lib/database/database-manager.ts` for coordinated database operations. Direct repository calls for low-level queries.
+**Service Abstraction Pattern:**
+- All external services are abstracted behind manager layers (`auth-manager`, `database-manager`, `analytics-manager`, etc.) in `lib/`.
+- Concrete provider implementations live in `system/Services/` (e.g., Supabase adapter) and `lib/database/` (database repos).
+- Never import concrete providers directly in components, hooks, or most lib modules. Always go through the abstraction layer.
+- Use dynamic imports and availability guards where services are optional (backend, analytics, error tracking). This enables graceful degradation (offline, no-backend scenarios).
+- When a service is optional, guard access with the abstraction layer's availability pattern (not provider-specific checks).
+
+**Key Service Layers:**
+- **Auth**: Call `lib/auth/auth-manager.ts` (not direct provider operations). Use `useAuthGuard(kernel.phases.appReady, level)` in protected layouts with level='account-only' (needs auth) or 'world-required' (needs auth + world access).
+- **Database**: Call `lib/database/database-manager.ts` for coordinated operations. Direct repository calls in `lib/database/` for low-level queries. Dynamic imports prevent circular deps and enable offline fallback.
 - **Analytics**: Call `lib/analytics/analytics-manager.ts` for event dispatch and tracking (respects consent via middleware).
 - **Error Tracking**: Call `lib/error/error-manager.ts` for reporting errors (respects consent via middleware).
-- **World Access Verification**: Use `verifyWorldAccessWithDatabase(worldId)` which implements cache-first verification (fresh <2h = instant, stale 2-4h = Supabase check). Use `forceVerification: true` option for sensitive pages (settings).
+- **World Access Verification**: Use `verifyWorldAccessWithDatabase(worldId)` which implements cache-first verification (fresh <2h = instant, stale 2-4h = backend check). Use `forceVerification: true` option for sensitive pages (settings).
 - **Storage**: Use `SecureStorage` from `@/system/storage/cache/` for all persistent app data. All data is encrypted via AES-CTR on all platforms (web, iOS, Android, desktop). Never use direct `localStorage`, `sessionStorage`, or `EncryptedStorage`—always go through `SecureStorage`. Use `STORAGE_KEYS` constants from `/maps/storage-keys.ts`, never hardcode keys.
 - **Query Cache**: Use `QueryCache` from `@/system/storage/cache/` for in-memory caching of API responses. Follow hierarchical key naming (`domain:entity:action:identifier`). Use tags for invalidation. Cache keys are in `/maps/cache-keys.ts`.
 - **Context Optimization**: Use granular selector hooks (`useWorldId()`, `useUserId()`, etc.) instead of consuming full contexts. This prevents unnecessary re-renders.

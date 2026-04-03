@@ -1,6 +1,6 @@
 # Kernel Module
 
-Centralized application bootstrap and lifecycle management. Orchestrates startup phases (configuration, preload, network, storage, services, job_setup, auth, feature_flags) into single explicit contract. Ensures all critical systems initialized before rendering main UI. Provides real-time phase tracking and recovery mechanisms.
+Centralized application bootstrap and lifecycle management. Orchestrates startup phases (config, preload, network, storage, services, job_setup, auth, feature_flags, registration) into single explicit contract. Ensures all critical systems initialized before rendering main UI. Provides real-time phase tracking, capability monitoring, and recovery mechanisms.
 
 ## When to Use This Module
 
@@ -28,10 +28,11 @@ AppKernelProvider mounted
         ↓
 AppKernel.initialize() starts
         ↓
-System bootstrap phases execute (see system/kernel for phase details)
+System bootstrap phases execute (config → preload/network/storage → services → auth → feature_flags → registration → ready)
         ↓
 Post-READY (non-critical, async):
         └─ Analytics: Track bootstrap metrics
+        └─ Degradation: Monitor capability states
         ↓
 UI renders with kernel.phases.appReady = true
 ```

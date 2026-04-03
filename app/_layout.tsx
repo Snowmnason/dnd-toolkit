@@ -1,14 +1,14 @@
 import {
-    AppErrorBoundary,
-    TopBar,
-    UIBlockerLayer
+  AppErrorBoundary,
+  TopBar,
+  UIBlockerLayer
 } from "@/components";
 import { OfflineSyncNotificationLayer } from "@/components/offline";
 import {
-    CrashFallBack,
-    RouteErrorBoundary,
-    SafeModeErrorBoundary,
-    SafeModeScreen,
+  CrashFallBack,
+  RouteErrorBoundary,
+  SafeModeErrorBoundary,
+  SafeModeScreen,
 } from "@/components/SplashScreen";
 import { AppToastLayer, NotificationContainer } from "@/components/ui";
 import { AppToastProvider, ModalProvider, NotificationProvider } from "@/contexts";
@@ -21,29 +21,29 @@ import { useClearSafeMode } from "@/hooks/error/use-safe-mode";
 import { AppKernelProvider, useAppKernel, useKernelLoadingSync, useSyncSplash } from "@/hooks/kernel";
 import { useAnalyticsNavigation, useNavigate, useRouteConfig } from "@/hooks/navigation";
 import {
-    type AccessRole,
+  type AccessRole,
 } from "@/hooks/storage";
-import { logger } from "@/hooks/utils";
+import { logger, useInjectToastSystem } from "@/hooks/utils";
 import {
-    AppParamsStableProvider,
-    AppParamsVolatileProvider,
-    PlatformProvider,
-    ScaleProvider,
-    SubscriptionProvider,
-    ThemeProvider,
-    UseTheme,
-    useAppParamsStable,
-    useAppParamsVolatile,
-    usePlatform,
-    useUserId,
-    useUserRole,
-    useWorldId,
+  AppParamsStableProvider,
+  AppParamsVolatileProvider,
+  PlatformProvider,
+  ScaleProvider,
+  SubscriptionProvider,
+  ThemeProvider,
+  UseTheme,
+  useAppParamsStable,
+  useAppParamsVolatile,
+  usePlatform,
+  useUserId,
+  useUserRole,
+  useWorldId,
 } from "@/providers";
 import {
-    Stack,
-    useLocalSearchParams,
-    useRouter,
-    useSegments,
+  Stack,
+  useLocalSearchParams,
+  useRouter,
+  useSegments,
 } from "expo-router";
 import { useEffect } from "react";
 import { View } from "react-native";
@@ -101,6 +101,10 @@ function RootLayoutContent() {
   // and hides automatically when appReady or on kernel error.
   useKernelLoadingSync();
   useSyncSplash();
+
+  // Inject the centralized toast system for degradation handlers
+  // Allows lib/error layers to display toasts without React dependencies
+  useInjectToastSystem();
 
   // FUTURE: Offline conflict resolution (disabled for v1 - LWW only)
   // v1 uses automatic Last-Write-Wins for all conflicts
@@ -347,43 +351,53 @@ function RootLayoutContent() {
           backgroundColor: theme.background || "#2f353d",
         }}
       >
-        {/* Global TopBar - driven by centralized navigation config */}
-        {!hideTopBar && topBarTitle && (
-          <TopBar
-            title={topBarTitle}
-            showBackButton={routeConfig.back !== undefined}
-            showHamburger={routeConfig.showHamburger}
-            onBackPress={handleTopBarBack}
-            userId={userId}
-            worldId={worldId}
-            userRole={userRole}
-            a11yFocusTarget={routeConfig.a11yFocusTarget}
-          />
+        {/* Gate the entire navigator tree on appReady.
+            UIBlockerLayer already shows the splash screen on top during bootstrap,
+            but React still mounts and runs effects in hidden components unless we
+            explicitly suppress mounting. Rendering null here prevents route-level
+            useEffects (auth guards, data fetches, etc.) from firing against
+            uninitialized services during bootstrap. */}
+        {kernel.phases.appReady && (
+          <>
+            {/* Global TopBar - driven by centralized navigation config */}
+            {!hideTopBar && topBarTitle && (
+              <TopBar
+                title={topBarTitle}
+                showBackButton={routeConfig.back !== undefined}
+                showHamburger={routeConfig.showHamburger}
+                onBackPress={handleTopBarBack}
+                userId={userId}
+                worldId={worldId}
+                userRole={userRole}
+                a11yFocusTarget={routeConfig.a11yFocusTarget}
+              />
+            )}
+
+            {/* Stack container - must flex to fill available space */}
+            <View style={{ flex: 1 }}>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: {
+                    backgroundColor: "$background",
+                  },
+                }}
+              />
+            </View>
+
+            {/* Notification Container - renders all queued notifications */}
+            <NotificationContainer />
+
+            {/* App Toast Layer - renders global app-level toasts */}
+            <AppToastLayer />
+
+            {/* Offline sync status and notifications */}
+            <OfflineSyncNotificationLayer />
+
+            {/* FUTURE: Conflict resolution modal (disabled for v1 - LWW only) */}
+            {/* v1 uses automatic Last-Write-Wins for all conflicts */}
+          </>
         )}
-
-        {/* Stack container - must flex to fill available space */}
-        <View style={{ flex: 1 }}>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: {
-                backgroundColor: "$background",
-              },
-            }}
-          />
-        </View>
-
-        {/* Notification Container - renders all queued notifications */}
-        <NotificationContainer />
-
-        {/* App Toast Layer - renders global app-level toasts */}
-        <AppToastLayer />
-
-        {/* Offline sync status and notifications */}
-        <OfflineSyncNotificationLayer />
-
-        {/* FUTURE: Conflict resolution modal (disabled for v1 - LWW only) */}
-        {/* v1 uses automatic Last-Write-Wins for all conflicts */}
       </View>
     </RouteErrorBoundary>
   );

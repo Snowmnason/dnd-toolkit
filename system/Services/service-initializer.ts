@@ -16,7 +16,6 @@
  */
 
 import { getAppConfig } from '@/config';
-import { AnalyticsExporter, exporterRegistry } from '@/lib/analytics/';
 import { performanceBaselineService } from '@/lib/analytics/performance/performance-baseline';
 import { logger } from '@/lib/utils/logger';
 import { createValidatedAuthProvider, registerAuthProvider, type AuthProvider } from './auth-adapter';
@@ -393,7 +392,8 @@ async function initializeSentryExporter(): Promise<void> {
         // Lazy-load SentryExporter to avoid require cycle
         // (sentry-analytics-exporter imports from lib/analytics, which imports services)
         const { SentryExporter } = await import('./sentry/sentry-analytics-exporter');
-        const sentryExporter: AnalyticsExporter = new SentryExporter();
+        const { exporterRegistry } = await import('@/lib/analytics/exporters/exporter-registry');
+        const sentryExporter = new SentryExporter();
 
         // Initialize exporter if it has an initialize lifecycle hook
         if (sentryExporter.initialize) {
@@ -424,9 +424,5 @@ async function initializeSentryExporter(): Promise<void> {
   }
 }
 
-/**
- * Export registry for direct use if needed
- */
-export { exporterRegistry } from '@/lib/analytics/exporters/exporter-registry';
-export type { AnalyticsEvent, AnalyticsExporter, ExportContext } from '@/lib/analytics/exporters/exporter-registry';
+
 
