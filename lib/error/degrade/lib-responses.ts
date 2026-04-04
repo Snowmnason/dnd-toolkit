@@ -117,7 +117,6 @@ function handleSyncResponse(ctx: DegradeResponseContext): void {
 
   if (!ctx.available) {
     // Sync failure is recoverable, show toast
-    // TODO: [Toast Redesign] Use `message` field when new toast component lands (title + detailed message)
     callbacks.showToast?.({
       title: 'Sync Paused',
       severity: 'warning',
@@ -140,7 +139,6 @@ function handleConnectivityResponse(ctx: DegradeResponseContext): void {
 
   if (!ctx.available) {
     // Offline: show toast
-    // TODO: [Toast Redesign] Use `message` field when new toast component lands (title + detailed message)
     callbacks.showToast?.({
       title: 'Offline Mode',
       severity: 'warning',
@@ -195,7 +193,6 @@ function handleBackgroundJobsResponse(ctx: DegradeResponseContext): void {
       callbacks.showSafeMode?.(ctx.capability, ctx.reason);
     } else {
       // Degraded: show toast
-      // TODO: [Toast Redesign] Use `message` field when new toast component lands (title + detailed message)
       callbacks.showToast?.({
         title: 'Background Jobs Paused',
         severity: 'warning',
@@ -231,7 +228,6 @@ function handleAnalyticsResponse(ctx: DegradeResponseContext): void {
     // Analytics failures are invisible to users (no crash, no user-facing feature loss)
     // Rate-limit to prevent spam
     if (shouldReportDegradation('ANALYTICS')) {
-      // TODO: [Toast Redesign] Use `message` field when new toast component lands (title + detailed message)
       callbacks.showToast?.({
         title: 'Analytics Unavailable',
         severity: 'info',
@@ -269,7 +265,6 @@ function handleErrorTrackingResponse(ctx: DegradeResponseContext): void {
     // Error tracking failures are invisible to users (no crash, no user-facing feature loss)
     // Rate-limit to prevent spam
     if (shouldReportDegradation('ERROR_TRACKING')) {
-      // TODO: [Toast Redesign] Use `message` field when new toast component lands (title + detailed message)
       callbacks.showToast?.({
         title: 'Error Reporting Unavailable',
         severity: 'info',
@@ -295,7 +290,6 @@ function handlePremiumFeaturesResponse(ctx: DegradeResponseContext): void {
 
   if (!ctx.available) {
     // Premium feature verification degraded: gate premium UI
-    // TODO: [Toast Redesign] Use `message` field when new toast component lands (title + detailed message)
     callbacks.showToast?.({
       title: 'Premium Features Unavailable',
       severity: 'warning',

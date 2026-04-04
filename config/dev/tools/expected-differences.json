@@ -57,6 +57,7 @@
   "ui.toastDurationMs": "UI toast durations are shorter in dev for faster feedback; production uses longer durations",
   "ui.syncToastDurationMs": "Sync toast durations differ between dev and prod",
   "ui.description": "UI configuration descriptions may differ between dev and production",
+  "ui.navDrawer.enabled": "Dev enables global NavDrawer for easier navigation during testing; production may disable for simpler UI",
   "remoteConfig.entitlementPollIntervalMs": "Remote config polling is faster in dev for quicker tests; production uses longer polls",
   "remoteConfig.description": "Remote config descriptions differ to explain dev vs production polling behavior",
   "safeMode.storageHealthCheckIntervalMs": "Safe mode health checks are faster in dev for debugging; production uses longer intervals",

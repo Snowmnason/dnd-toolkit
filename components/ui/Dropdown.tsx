@@ -3,20 +3,20 @@ import { Body, ObjHeading, TextType } from '@/components/ui/AppText'
 import { $, tone, useScale, UseTheme } from '@/theme'
 import { useMemo, useRef, useState } from 'react'
 import {
-    FlatList,
-    Modal,
-    Platform,
-    Pressable,
-    StyleSheet,
-    TextInput,
-    View,
+  FlatList,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
 } from 'react-native'
 import Animated, {
-    runOnJS,
-    useAnimatedStyle,
-    useSharedValue,
-    withSpring,
-    withTiming,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
 } from 'react-native-reanimated'
 
 interface DropdownItem {
@@ -291,9 +291,8 @@ export default function Dropdown({
                 left: Math.max(anchor.x - SAFE_AREA, 0),
                 width: anchor.width + SAFE_AREA * 2,
                 padding: SAFE_AREA,
-                ...(Platform.OS === 'web' ? { pointerEvents: 'box-none' as const } : {}),
+                pointerEvents: 'box-none',
               }}
-              pointerEvents={Platform.OS === 'web' ? undefined : 'box-none'}
             >
               <Animated.View
                 style={[
@@ -305,11 +304,10 @@ export default function Dropdown({
                     borderRadius: S.radius.md,
                     maxHeight: computedMaxHeight,
                     transformOrigin: 'top center',
-                    ...(Platform.OS === 'web' ? { pointerEvents: 'auto' as const } : {}),
+                    pointerEvents: 'auto',
                   },
                   dropdownAnimStyle,
                 ]}
-                pointerEvents={Platform.OS === 'web' ? undefined : 'auto'}
               >
           {enableSearch && (
             <View

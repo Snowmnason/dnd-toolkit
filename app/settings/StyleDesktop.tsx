@@ -3,7 +3,6 @@ import { ThemeSelector } from "@/Screens/settings/ThemeSelector";
 import {
   Accordion,
   AppModal,
-  AppToast,
   AppTooltip,
   Body,
   Button,
@@ -21,7 +20,6 @@ import {
   Paragraph,
   ProgressBar,
   RadioButtonGroup,
-  SnackBar,
   SubTitle,
   Surface,
   Switch,
@@ -33,6 +31,8 @@ import {
   ToggleGroup
 } from "@/components/ui";
 import { AppSplit } from "@/components/ui/AppView";
+import { useAppSnackbar } from "@/contexts/app-snackbar-context";
+import { useAppToast } from "@/contexts/app-toast-context";
 import { useNotifications } from "@/contexts/notifications-context";
 
 import { $, UseTheme, useScale } from "@/theme";
@@ -43,6 +43,8 @@ export default function StyleDesktop() {
   const S = useScale();
   const { theme } = UseTheme();
   const { showNotification } = useNotifications();
+  const { show: showToast } = useAppToast();
+  const { show: showSnackbar } = useAppSnackbar();
 
   // Simple display states (not controlling components, just for right panel display)
   const [primaryClicks, setPrimaryClicks] = useState(0);
@@ -81,11 +83,7 @@ export default function StyleDesktop() {
   // Modal/Toast/Snackbar states
   const [modalVisible, setModalVisible] = useState(false);
   const [modal2Visible, setModal2Visible] = useState(false);
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastVisible1, setToastVisible1] = useState(false);
-  const [toastVisible2, setToastVisible2] = useState(false);
-  const [toastVisible3, setToastVisible3] = useState(false);
-  const [snackVisible, setSnackVisible] = useState(false);
+
 
   return (
     <AppSplit
@@ -715,23 +713,23 @@ export default function StyleDesktop() {
               />
               <Button
                 text="Show Toast Info"
-                onPress={() => setToastVisible(true)}
+                onPress={() => showToast('Info', 'Hello from Desktop! Info', 'info')}
               />
               <Button
                 text="Show Toast Success"
-                onPress={() => setToastVisible1(true)}
+                onPress={() => showToast('Saved', 'Your progress has been saved successfully.', 'success')}
               />
               <Button
                 text="Show Toast Warning"
-                onPress={() => setToastVisible2(true)}
+                onPress={() => showToast('Warning', 'Hello from Desktop! Warning', 'warning')}
               />
               <Button
                 text="Show Toast Error"
-                onPress={() => setToastVisible3(true)}
+                onPress={() => showToast('Error', 'Hello from Desktop! Error', 'error')}
               />
               <Button
                 text="Show Snackbar"
-                onPress={() => setSnackVisible(true)}
+                onPress={() => showSnackbar('Saved successfully', { tone: 'success' })}
               />
             </View>
           </Surface>
@@ -1021,39 +1019,7 @@ export default function StyleDesktop() {
         </View>
       </AppModal>
 
-      <AppToast
-        message="Hello from Desktop! Info"
-        visible={toastVisible}
-        type="info"
-        onHide={() => setToastVisible(false)}
-      />
-      <AppToast
-        message="Hello from Desktop! Success"
-        visible={toastVisible1}
-        type="success"
-        onHide={() => setToastVisible1(false)}
-      />
 
-      <AppToast
-        message="Hello from Desktop! Warning"
-        visible={toastVisible2}
-        type="warning"
-        onHide={() => setToastVisible2(false)}
-      />
-
-      <AppToast
-        message="Hello from Desktop! Error"
-        visible={toastVisible3}
-        type="error"
-        onHide={() => setToastVisible3(false)}
-      />
-
-      <SnackBar
-        visible={snackVisible}
-        message="Saved successfully"
-        tone="success"
-        onHide={() => setSnackVisible(false)}
-      />
     </AppSplit>
   );
 }

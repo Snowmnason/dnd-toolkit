@@ -1,5 +1,9 @@
 import {
   AppErrorBoundary,
+  AppToastLayer,
+  NavDrawerLayer,
+  NotificationContainer,
+  SnackBarLayer,
   TopBar,
   UIBlockerLayer
 } from "@/components";
@@ -10,11 +14,11 @@ import {
   SafeModeErrorBoundary,
   SafeModeScreen,
 } from "@/components/SplashScreen";
-import { AppToastLayer, NotificationContainer } from "@/components/ui";
-import { AppToastProvider, ModalProvider, NotificationProvider } from "@/contexts";
+import { OverlayProvider } from "@/contexts";
 // Trigger modal registration side effects — must run before any openModal() call.
 // Imported here (leaf module) instead of modal-context.tsx to avoid circular dependency.
 import "@/components/modals/register-all-modals";
+import { getAppConfig } from "@/config";
 import { Analytics, sessionManager } from "@/hooks/analytics";
 import { SafeModeReason, executeRecoveryAction } from "@/hooks/error";
 import { useClearSafeMode } from "@/hooks/error/use-safe-mode";
@@ -46,7 +50,7 @@ import {
   useSegments,
 } from "expo-router";
 import { useEffect } from "react";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 
 // Suppress known benign warnings from React Navigation / Expo Router / React Native Web
 // 1. "Blocked aria-hidden on an element because its descendant retained focus"
@@ -118,6 +122,14 @@ function RootLayoutContent() {
   // }, [sessionId, segments]);
   // Analytics hook (must be called unconditionally)
   useAnalyticsNavigation();
+
+  // NavDrawer feature flag: Determine if drawer should be rendered based on global flag and route
+  const config = getAppConfig();
+  const navDrawerConfig = config.ui?.navDrawer;
+  const navDrawerEnabled = navDrawerConfig?.enabled ?? false;
+  const skipRoutes = navDrawerConfig?.skipRoutes ?? [];
+  const currentRoute = segments[0] || 'index';
+  const shouldRenderNavDrawer = navDrawerEnabled && !skipRoutes.includes(currentRoute);
 
   // Navigation hooks (must be called unconditionally before any early returns)
   const navContext = {
@@ -373,16 +385,22 @@ function RootLayoutContent() {
               />
             )}
 
-            {/* Stack container - must flex to fill available space */}
-            <View style={{ flex: 1 }}>
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: {
-                    backgroundColor: "$background",
-                  },
-                }}
-              />
+            {/* Content area: sidebar + stack in row layout on desktop */}
+            <View style={{ flex: 1, flexDirection: Platform.OS === 'web' ? 'row' : 'column' }}>
+              {/* Desktop sidebar — inline, always visible, animated width (feature-flagged) */}
+              {Platform.OS === 'web' && shouldRenderNavDrawer && <NavDrawerLayer />}
+
+              {/* Stack container - flex-grows to fill remaining space */}
+              <View style={{ flex: 1 }}>
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: {
+                      backgroundColor: "$background",
+                    },
+                  }}
+                />
+              </View>
             </View>
 
             {/* Notification Container - renders all queued notifications */}
@@ -390,6 +408,12 @@ function RootLayoutContent() {
 
             {/* App Toast Layer - renders global app-level toasts */}
             <AppToastLayer />
+
+            {/* Snackbar Layer - renders global bottom-anchored snackbars */}
+            <SnackBarLayer />
+
+            {/* Mobile drawer overlay — modal-based, only on native (feature-flagged) */}
+            {Platform.OS !== 'web' && shouldRenderNavDrawer && <NavDrawerLayer />}
 
             {/* Offline sync status and notifications */}
             <OfflineSyncNotificationLayer />
@@ -413,9 +437,7 @@ export default function RootLayout() {
             <SubscriptionProvider>
               <AppParamsStableProvider>
                 <AppParamsVolatileProvider>
-                  <ModalProvider>
-                    <NotificationProvider>
-                      <AppToastProvider>
+                  <OverlayProvider>
                         {/* UIBlockerLayer renders the splash overlay (isLoading: true by default)
                             and provides the setLoading() context. Placed here — inside all theme
                             providers (SplashScreen needs UseTheme) but above RootLayoutContent
@@ -429,9 +451,7 @@ export default function RootLayout() {
                             <RootLayoutContent />
                           </AppErrorBoundary>
                         </UIBlockerLayer>
-                      </AppToastProvider>
-                    </NotificationProvider>
-                  </ModalProvider>
+                  </OverlayProvider>
                 </AppParamsVolatileProvider>
               </AppParamsStableProvider>
             </SubscriptionProvider>

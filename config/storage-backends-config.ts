@@ -31,30 +31,30 @@ export interface StorageKeyConfig {
  */
 export const STORAGE_BACKEND_CONFIG: Record<string, StorageBackend> = {
   // =============== localStorage (Persistent, Sensitive) ===============
-  // Auth state - must persist across sessions
-  "dnd:auth:has_account": "localStorage",
-  "dnd:auth:user_data": "localStorage",
-  "dnd:auth:user_data_meta": "localStorage",
-  "dnd:auth:user_data_timestamp": "localStorage",
-  "dnd:auth:last_logged_in": "localStorage",
-  "dnd:auth:attempts": "localStorage",
+  // Auth state - must persist across sessions (shared infrastructure)
+  "sno:auth:has_account": "localStorage",
+  "sno:auth:user_data": "localStorage",
+  "sno:auth:user_data_meta": "localStorage",
+  "sno:auth:user_data_timestamp": "localStorage",
+  "sno:auth:last_logged_in": "localStorage",
+  "sno:auth:attempts": "localStorage",
 
-  // App-level state - must persist across sessions
+  // App-level state - must persist across sessions (DnD-specific)
   "dnd:app:connected_worlds": "localStorage",
 
-  // User preferences - must persist across sessions
-  "dnd:user:theme": "localStorage",
-  "dnd:user:theme_mode": "localStorage",
-  "dnd:user:scale": "localStorage",
+  // User preferences - must persist across sessions (shared infrastructure)
+  "sno:user:theme": "localStorage",
+  "sno:user:theme_mode": "localStorage",
+  "sno:user:scale": "localStorage",
 
-  // Dev settings - must persist across sessions
-  "dnd:dev:mode": "localStorage",
+  // Dev settings - must persist across sessions (shared infrastructure)
+  "sno:dev:mode": "localStorage",
 
-  // Invites - important auth flow state
+  // Invites - important auth flow state (DnD-specific)
   "dnd:invite:pending": "localStorage",
 
-  // Offline sync queue - user mutations with sensitive payload data, must be encrypted
-  "dnd:offline:mutation_queue": "secure",
+  // Offline sync queue - user mutations with sensitive payload data, must be encrypted (shared infrastructure)
+  "sno:offline:mutation_queue": "secure",
 
   // =============== sessionStorage (Ephemeral, Cache) ===============
   // Query cache - refetchable on demand, can use faster unencrypted storage

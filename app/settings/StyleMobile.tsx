@@ -1,37 +1,37 @@
 import { ThemeSelector } from "@/Screens/settings/ThemeSelector";
 import {
-  Accordion,
-  AppModal,
-  AppToast,
-  AppTooltip,
-  Body,
-  Button,
-  ButtonGroup,
-  Caption,
-  Card,
-  CustomLoad,
-  DescInput,
-  Dropdown,
-  DropdownGroup,
-  Heading,
-  IconButton,
-  Link,
-  ObjHeading,
-  Paragraph,
-  RadioButtonGroup,
-  SnackBar,
-  SubTitle,
-  Surface,
-  Switch,
-  SwitchGroup,
-  Tabs,
-  TextInput,
-  TextInputGroup,
-  Title,
-  ToggleGroup,
+    Accordion,
+    AppModal,
+    AppTooltip,
+    Body,
+    Button,
+    ButtonGroup,
+    Caption,
+    Card,
+    CustomLoad,
+    DescInput,
+    Dropdown,
+    DropdownGroup,
+    Heading,
+    IconButton,
+    Link,
+    ObjHeading,
+    Paragraph,
+    RadioButtonGroup,
+    SubTitle,
+    Surface,
+    Switch,
+    SwitchGroup,
+    Tabs,
+    TextInput,
+    TextInputGroup,
+    Title,
+    ToggleGroup,
 } from "@/components/ui";
 // CrashTester removed
 
+import { useAppSnackbar } from "@/contexts/app-snackbar-context";
+import { useAppToast } from "@/contexts/app-toast-context";
 import { useNotifications } from "@/contexts/notifications-context";
 import { $, useScale } from "@/theme";
 import React, { useState } from "react";
@@ -40,6 +40,8 @@ import { ScrollView, Text, View } from "react-native";
 export default function StyleMobile() {
   const S = useScale();
   const { showNotification } = useNotifications();
+  const { show: showToast } = useAppToast();
+  const { show: showSnackbar } = useAppSnackbar();
 
   // Simple display states
   const [primaryClicks, setPrimaryClicks] = useState(0);
@@ -64,8 +66,7 @@ export default function StyleMobile() {
   // Modal/Toast/Snackbar states
   const [modalVisible, setModalVisible] = useState(false);
   const [modal2Visible, setModal2Visible] = useState(false);
-  const [toastVisible, setToastVisible] = useState(false);
-  const [snackVisible, setSnackVisible] = useState(false);
+
 
   return (
     <>
@@ -519,10 +520,10 @@ export default function StyleMobile() {
               text="Open Custom Modal"
               onPress={() => setModal2Visible(true)}
             />
-            <Button text="Show Toast" onPress={() => setToastVisible(true)} />
+            <Button text="Show Toast" onPress={() => showToast('Info', 'Hello from Mobile!', 'info')} />
             <Button
               text="Show Snackbar"
-              onPress={() => setSnackVisible(true)}
+              onPress={() => showSnackbar('Saved successfully', { tone: 'success' })}
             />
           </View>
         </Card>
@@ -728,19 +729,7 @@ export default function StyleMobile() {
         </View>
       </AppModal>
 
-      <AppToast
-        message="Hello from Mobile!"
-        visible={toastVisible}
-        type="info"
-        onHide={() => setToastVisible(false)}
-      />
 
-      <SnackBar
-        visible={snackVisible}
-        message="Saved successfully"
-        tone="success"
-        onHide={() => setSnackVisible(false)}
-      />
     </>
   );
 }

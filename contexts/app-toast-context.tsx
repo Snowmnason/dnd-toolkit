@@ -4,6 +4,7 @@ export type ToastType = 'info' | 'success' | 'error' | 'warning'
 
 export interface AppToastState {
   visible: boolean
+  title: string
   message: string
   type: ToastType
   duration: number
@@ -11,6 +12,7 @@ export interface AppToastState {
 
 interface ToastItem {
   id: string
+  title: string
   message: string
   type: ToastType
   duration: number
@@ -18,7 +20,7 @@ interface ToastItem {
 
 interface AppToastContextValue {
   toast: AppToastState
-  show: (message: string, type?: ToastType, duration?: number) => void
+  show: (title: string, message: string, type?: ToastType, duration?: number) => void
   hide: () => void
 }
 
@@ -36,6 +38,7 @@ const AppToastContext = createContext<AppToastContextValue | undefined>(undefine
 export function AppToastProvider({ children }: { children: React.ReactNode }) {
   const [toast, setToast] = useState<AppToastState>({
     visible: false,
+    title: '',
     message: '',
     type: 'info',
     duration: 3000,
@@ -52,6 +55,7 @@ export function AppToastProvider({ children }: { children: React.ReactNode }) {
       const nextToast = toastQueue[0]
       setToast({
         visible: true,
+        title: nextToast.title,
         message: nextToast.message,
         type: nextToast.type,
         duration: nextToast.duration,
@@ -73,9 +77,10 @@ export function AppToastProvider({ children }: { children: React.ReactNode }) {
     }
   }, [toast.visible, toastQueue])
 
-  const show = useCallback((message: string, type: ToastType = 'info', duration: number = 3000) => {
+  const show = useCallback((title: string, message: string, type: ToastType = 'info', duration: number = 3000) => {
     const toastItem: ToastItem = {
       id: `toast-${++toastIdRef.current}`,
+      title,
       message,
       type,
       duration,

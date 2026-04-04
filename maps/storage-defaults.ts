@@ -17,29 +17,29 @@
  * Must match STORAGE_KEYS in lib/storage/index.ts
  */
 const STORAGE_KEY_CONSTANTS = {
-  // World Management
+  // World Management (DnD-specific)
   CONNECTED_WORLDS: "dnd:app:connected_worlds",
   LAST_SELECTED_WORLD: "dnd:session:last_selected_world",
   LAST_USER_ROLE: "dnd:session:last_user_role",
 
-  // Authentication & Account
-  HAS_ACCOUNT: "dnd:auth:has_account",
-  USER_DATA: "dnd:auth:user_data",
-  USER_DATA_TIMESTAMP: "dnd:auth:user_data_timestamp",
-  LAST_LOGGED_IN: "dnd:auth:last_logged_in",
-  AUTH_ATTEMPTS: "dnd:auth:attempts",
+  // Authentication & Account (shared infrastructure)
+  HAS_ACCOUNT: "sno:auth:has_account",
+  USER_DATA: "sno:auth:user_data",
+  USER_DATA_TIMESTAMP: "sno:auth:user_data_timestamp",
+  LAST_LOGGED_IN: "sno:auth:last_logged_in",
+  AUTH_ATTEMPTS: "sno:auth:attempts",
   PENDING_INVITE: "dnd:invite:pending",
 
-  // UI Preferences
-  THEME_PREFERENCE: "dnd:user:theme",
-  THEME_MODE: "dnd:user:theme_mode",
-  SCALE_PREFERENCE: "dnd:user:scale",
+  // UI Preferences (shared infrastructure)
+  THEME_PREFERENCE: "sno:user:theme",
+  THEME_MODE: "sno:user:theme_mode",
+  SCALE_PREFERENCE: "sno:user:scale",
 
-  // Safe Mode
-  SAFE_MODE_DIAGNOSTICS: "dnd:session:safe_mode_diagnostics",
+  // Safe Mode (shared infrastructure)
+  SAFE_MODE_DIAGNOSTICS: "sno:session:safe_mode_diagnostics",
 
-  // Developer
-  DEV_MODE: "dnd:dev:mode",
+  // Developer (shared infrastructure)
+  DEV_MODE: "sno:dev:mode",
 } as const;
 
 /**

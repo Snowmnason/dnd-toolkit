@@ -121,6 +121,11 @@ export interface AppSettings {
   ui?: {
     toastDurationMs?: number;
     syncToastDurationMs?: number;
+    navDrawer?: {
+      enabled?: boolean;
+      skipRoutes?: string[];
+      description?: string;
+    };
     description?: string;
   };
   analytics?: {

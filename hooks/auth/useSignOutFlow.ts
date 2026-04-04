@@ -120,7 +120,7 @@ export function useSignOutFlow(mode: SignOutFlowMode): {
   // Show "Syncing..." toast when entering sync phase, dismiss when leaving
   useEffect(() => {
     if (state.phase === 'syncing') {
-      showToast('Syncing...', 'warning', 60000) // Show for 60 seconds (or until hidden)
+      showToast('Sync', 'Syncing...', 'warning', 60000) // Show for 60 seconds (or until hidden)
     } else if (state.phase !== 'idle') {
       // Dismiss toast when moving to next phase
       hideToast()

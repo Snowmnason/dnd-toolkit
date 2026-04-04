@@ -34,7 +34,7 @@ export function useForceResync({ isOffline }: { isOffline: boolean }): UseForceR
     if (isResyncing || isOffline) return;
 
     setIsResyncing(true);
-    showToast('Syncing latest data...', 'warning', 5000);
+    showToast('Sync', 'Syncing latest data...', 'warning', 5000);
     const startTime = Date.now();
 
     try {
@@ -48,13 +48,13 @@ export function useForceResync({ isOffline }: { isOffline: boolean }): UseForceR
 
       timeoutRef.current = setTimeout(() => {
         if (isMountedRef.current) {
-          showToast('App Data Synced', 'success', 4000);
+          showToast('Sync', 'App Data Synced', 'success', 4000);
         }
       }, remainingTime);
     } catch (error: any) {
       logger.category('storage').error('Force resync failed:', error);
       if (isMountedRef.current) {
-        showToast('Failed to resync data. Please try again.', 'error', 4000);
+        showToast('Sync', 'Failed to resync data. Please try again.', 'error', 4000);
       }
     } finally {
       if (isMountedRef.current) {

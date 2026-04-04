@@ -17,7 +17,11 @@
  */
 
 // Root-level components
+export * from './layer/AppToastLayer';
 export { AppErrorBoundary } from "./layer/ErrorBoundary";
+export * from './layer/NotificationContainer';
+export * from './layer/NavDrawerLayer';
+export * from './layer/SnackBarLayer';
 export { UIBlockerLayer } from "./layer/UIBlockerLayer";
 export { SmartDownloadButton } from "./SmartDownloadButton";
 export { default as TopBar } from "./TopBar";
@@ -39,4 +43,7 @@ export * from "./offline";
 // Splash/Error Screens
 export * from "./SplashScreen";
 
-// Need, Nav Draw, progress bar, loading spinners, and other shared UI elements
+// Gates
+export * from './FeatureGate';
+
+// Need, Nav Draw, loading spinners, and other shared UI elements

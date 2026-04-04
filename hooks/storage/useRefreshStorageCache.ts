@@ -37,7 +37,7 @@ export function useRefreshStorageCache({
     if (isRefreshing || isOffline) return;
 
     setIsRefreshing(true);
-    showToast('Syncing latest data...', 'warning', 5000);
+    showToast('Sync', 'Syncing latest data...', 'warning', 5000);
     const startTime = Date.now();
 
     try {
@@ -51,13 +51,13 @@ export function useRefreshStorageCache({
 
       timeoutRef.current = setTimeout(() => {
         if (isMountedRef.current) {
-          showToast('App Data Synced', 'success', 4000);
+          showToast('Sync', 'App Data Synced', 'success', 4000);
         }
       }, remainingTime);
     } catch (error: any) {
       logger.category('storage').error('Force refresh failed:', error);
       if (isMountedRef.current) {
-        showToast('Failed to sync data. Please try again.', 'error', 4000);
+        showToast('Sync', 'Failed to sync data. Please try again.', 'error', 4000);
       }
     } finally {
       if (isMountedRef.current) {
