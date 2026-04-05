@@ -1,16 +1,20 @@
 import { useScale } from '@/providers/ScaleProvider';
 import { UseTheme } from '@/theme';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { Animated, View } from 'react-native';
+import { Animated, Platform, View } from 'react-native';
 import { Caption } from './AppText';
 
 export interface ProgressBarProps {
-  /** Optional label displayed above the bar */
+  /** Display variant: 'linear' (default bar) or 'circular' (ring) */
+  variant?: 'linear' | 'circular';
+  /** Optional label displayed above the indicator */
   label?: string;
   /** Smooth animate between values (default: true) */
   animated?: boolean;
-  /** Height in theme-relative units (default: uses S.space.sm) */
+  /** Height in theme-relative units (default: uses S.space.sm) — linear only */
   height?: number;
+  /** Diameter of the circular ring (default: 64) — circular only */
+  size?: number;
   /** Highlight/fill color (default: theme.accent) */
   highlightColor?: string;
   /** Track background color (default: theme.border) */
@@ -46,9 +50,11 @@ export interface ProgressBarRef {
 export const ProgressBar = forwardRef<ProgressBarRef, ProgressBarProps>(
   (
     {
+      variant = 'linear',
       label,
       animated = true,
       height,
+      size,
       highlightColor,
       trackColor,
       initialProgress = 0,
@@ -60,6 +66,10 @@ export const ProgressBar = forwardRef<ProgressBarRef, ProgressBarProps>(
 
     // Internal state for progress value
     const [progress, setProgress] = useState(Math.max(0, Math.min(100, initialProgress)));
+    
+    // For web circular animation: track animated degrees for smooth conic-gradient
+    const [animatedDegrees, setAnimatedDegrees] = useState((initialProgress / 100) * 360);
+    const listenerRef = useRef<string | null>(null);
 
     // Default height to S.space.sm (responsive)
     const barHeight = height ?? S.space.sm;
@@ -82,6 +92,21 @@ export const ProgressBar = forwardRef<ProgressBarRef, ProgressBarProps>(
       } else {
         animatedValue.setValue(progress);
       }
+
+      // Also set up listener for web circular animation
+      if (listenerRef.current) {
+        animatedValue.removeListener(listenerRef.current);
+      }
+      
+      listenerRef.current = animatedValue.addListener(({ value }) => {
+        setAnimatedDegrees((value / 100) * 360);
+      });
+
+      return () => {
+        if (listenerRef.current) {
+          animatedValue.removeListener(listenerRef.current);
+        }
+      };
     }, [progress, animated, animatedValue]);
 
     // Expose control methods via ref
@@ -108,6 +133,44 @@ export const ProgressBar = forwardRef<ProgressBarRef, ProgressBarProps>(
       outputRange: ['0%', '100%'],
     });
 
+    // ─── Circular variant ───
+    if (variant === 'circular') {
+      const circularSize = size ?? 64;
+      const strokeWidth = Math.max(circularSize * 0.1, 3);
+      const innerRadius = (circularSize / 2) - strokeWidth;
+
+      const webRingStyle = Platform.OS === 'web' ? {
+        background: `conic-gradient(${fillColor} ${animatedDegrees}deg, ${bgColor} ${animatedDegrees}deg)`,
+        mask: `radial-gradient(farthest-side, transparent ${innerRadius}px, #000 ${innerRadius}px)`,
+        WebkitMask: `radial-gradient(farthest-side, transparent ${innerRadius}px, #000 ${innerRadius}px)`,
+      } : {};
+
+      return (
+        <View style={{ alignItems: 'center', gap: label ? S.space.xs : 0 }}>
+          {label && (
+            <Caption textType="secondary" opacity={0.8}>
+              {label}
+            </Caption>
+          )}
+          <View
+            style={[
+              {
+                width: circularSize,
+                height: circularSize,
+                borderRadius: circularSize / 2,
+              },
+              Platform.OS !== 'web' && {
+                borderWidth: strokeWidth,
+                borderColor: bgColor,
+              },
+              webRingStyle as any,
+            ]}
+          />
+        </View>
+      );
+    }
+
+    // ─── Linear variant (default) ───
   return (
     <View style={{ gap: label ? S.space.xs : 0 }}>
       {label && (

@@ -18,6 +18,7 @@ import {
   Link,
   ObjHeading,
   Paragraph,
+  ProgressBar,
   RadioButtonGroup,
   SubTitle,
   Surface,
@@ -27,7 +28,7 @@ import {
   TextInput,
   TextInputGroup,
   Title,
-  ToggleGroup,
+  ToggleGroup
 } from "@/components/ui";
 import { AppSplit } from "@/components/ui/AppView";
 import { useAppSnackbar } from "@/contexts/app-snackbar-context";
@@ -48,6 +49,8 @@ export default function StyleDesktop() {
   // Simple display states (not controlling components, just for right panel display)
   const [primaryClicks, setPrimaryClicks] = useState(0);
   const [iconButtonClicks, setIconButtonClicks] = useState("");
+  const [progressDisplay, setProgressDisplay] = useState(30);
+  const [progressCircularDisplay, setProgressCircularDisplay] = useState(30);
   const [textInputValue, setTextInputValue] = useState("");
   const [descInputValue, setDescInputValue] = useState("");
   const [dropdownValue, setDropdownValue] = useState<string | null>(null);
@@ -75,6 +78,9 @@ export default function StyleDesktop() {
   const switchGroupMaxRef = useRef<any>(null);
   const radioGroupRef = useRef<any>(null);
   const toggleGroupRef = useRef<any>(null);
+  const progressBarControlledRef = useRef<any>(null);
+  const progressBarVariantRef = useRef<any>(null);
+  const circularProgressRef = useRef<any>(null);
 
   // Modal/Toast/Snackbar states
   const [modalVisible, setModalVisible] = useState(false);
@@ -204,6 +210,79 @@ export default function StyleDesktop() {
             <Caption style={{ marginTop: S.space.sm }}>
               Last icon clicked: {iconButtonClicks || "None"}
             </Caption>
+          </Surface>
+
+          <Surface style={{ marginTop: S.space.lg }}>
+            <Heading>Progress Bar</Heading>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <ProgressBar
+                ref={progressBarControlledRef}
+                label={`Progress: ${progressDisplay}%`}
+                animated
+                initialProgress={30}
+              />
+              <View style={{ flexDirection: "row", gap: S.space.sm }}>
+                <Button
+                  variant="outlined"
+                  text="-10"
+                  onPress={() => {
+                    progressBarControlledRef.current?.decrement(10);
+                    progressBarVariantRef.current?.decrement(10);
+                    setProgressDisplay(progressBarControlledRef.current?.getProgress() || 0);
+                  }}
+                />
+                <Button
+                  variant="outlined"
+                  text="+10"
+                  onPress={() => {
+                    progressBarControlledRef.current?.increment(10);
+                    progressBarVariantRef.current?.increment(10);
+                    setProgressDisplay(progressBarControlledRef.current?.getProgress() || 0);
+                  }}
+                />
+                <Button
+                  variant="outlined"
+                  text="Reset"
+                  onPress={() => {
+                    progressBarControlledRef.current?.reset();
+                    progressBarVariantRef.current?.reset();
+                    setProgressDisplay(0);
+                  }}
+                />
+              </View>
+              <ProgressBar
+                ref={progressBarVariantRef}
+                animated={false}
+                highlightColor={theme.success}
+                initialProgress={progressDisplay}
+              />
+              <Caption>Current progress: {progressDisplay}%</Caption>
+            </View>
+          </Surface>
+
+          <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.lg }}>
+            <Heading>Progress Bar (Circular)</Heading>
+            <View
+              style={{
+                flexDirection: "column",
+                gap: S.space.xs,
+                alignItems: "flex-start",
+              }}
+            >
+              <ProgressBar 
+                variant="circular" 
+                ref={circularProgressRef} 
+                initialProgress={30} 
+                size={80} 
+                label={`Progress: ${progressCircularDisplay}%`} 
+              />
+              <View style={{ flexDirection: "row", gap: S.space.sm}}>
+                <Button text="-10" onPress={() => { circularProgressRef.current?.decrement(10);  setProgressCircularDisplay(circularProgressRef.current?.getProgress() || 0); }} />
+                <Button text="+10" onPress={() => { circularProgressRef.current?.increment(10);  setProgressCircularDisplay(circularProgressRef.current?.getProgress() || 0); }} />
+                <Button text="Reset" onPress={() => { circularProgressRef.current?.reset();  setProgressCircularDisplay(0); }} />
+              </View>
+            </View>
+           
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg }}>
@@ -665,7 +744,7 @@ export default function StyleDesktop() {
               />
               <Button
                 text="Show Toast Success"
-                onPress={() => showToast('Success', 'Hello from Desktop! Success', 'success')}
+                onPress={() => showToast('Saved', 'Your progress has been saved successfully.', 'success')}
               />
               <Button
                 text="Show Toast Warning"
@@ -683,7 +762,7 @@ export default function StyleDesktop() {
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.lg }}>
-            <Heading>Loading Spinner</Heading>
+            <Heading>Spinner (CustomLoad)</Heading>
             <View
               style={{
                 flexDirection: "row",
@@ -693,6 +772,22 @@ export default function StyleDesktop() {
             >
               <CustomLoad size="small" />
               <CustomLoad size="large" />
+            </View>
+          </Surface>
+
+          <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.lg }}>
+            <Heading>Loading Spinner</Heading>
+            <View
+              style={{
+                flexDirection: "row",
+                gap: S.space.md,
+                marginTop: S.space.md,
+                alignItems: "center",
+              }}
+            >
+              <CustomLoad size="small" mode="spinner" />
+              <CustomLoad size="medium" mode="spinner" />
+              <CustomLoad size="large" mode="spinner" />
             </View>
           </Surface>
 
@@ -823,90 +918,6 @@ export default function StyleDesktop() {
                 <Body>Dramatic depth</Body>
               </Card>
             </View>
-          </Surface>
-
-          <Surface style={{ marginTop: S.space.lg }}>
-            <Heading>🔔 Notification Testing</Heading>
-            <Body style={{ marginBottom: S.space.md }}>
-              Test in-app notification queue system
-            </Body>
-            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
-              <Button
-                text="Show Info Notification"
-                onPress={() =>
-                  showNotification({
-                    type: "info",
-                    title: "Info Message",
-                    message: "This is an info notification to test the system.",
-                  })
-                }
-              />
-              <Button
-                variant="outlined"
-                text="Show Update Notification"
-                onPress={() =>
-                  showNotification({
-                    type: "update",
-                    title: "System Update",
-                    message: "A new version of the app is available.",
-                  })
-                }
-              />
-              <Button
-                text="Show Alert Notification"
-                onPress={() =>
-                  showNotification({
-                    type: "alert",
-                    title: "Alert",
-                    message: "This is an important alert notification.",
-                  })
-                }
-              />
-              <Button
-                variant="outlined"
-                text="Show Message Notification"
-                onPress={() =>
-                  showNotification({
-                    type: "message",
-                    title: "New Message",
-                    message: "You have a new message from someone.",
-                  })
-                }
-              />
-              <Button
-                text="Queue Multiple Notifications"
-                onPress={() => {
-                  showNotification({
-                    type: "message",
-                    title: "First",
-                    message: "This is the first notification",
-                  });
-                  setTimeout(() => {
-                    showNotification({
-                      type: "info",
-                      title: "Second",
-                      message: "This is the second notification",
-                    });
-                  }, 100);
-                  setTimeout(() => {
-                    showNotification({
-                      type: "update",
-                      title: "Third",
-                      message: "This is the third notification",
-                    });
-                  }, 200);
-                }}
-              />
-            </View>
-            <Body
-              style={{
-                marginTop: S.space.md,
-                color: $("textSecondary", theme),
-              }}
-            >
-              Notifications appear in the top-right corner (desktop) or
-              top-center (mobile) and auto-dismiss after 5 seconds.
-            </Body>
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg }}>

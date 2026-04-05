@@ -50,6 +50,7 @@ export default function StyleDesktop() {
   const [primaryClicks, setPrimaryClicks] = useState(0);
   const [iconButtonClicks, setIconButtonClicks] = useState("");
   const [progressDisplay, setProgressDisplay] = useState(30);
+  const [progressCircularDisplay, setProgressCircularDisplay] = useState(30);
   const [textInputValue, setTextInputValue] = useState("");
   const [descInputValue, setDescInputValue] = useState("");
   const [dropdownValue, setDropdownValue] = useState<string | null>(null);
@@ -79,6 +80,7 @@ export default function StyleDesktop() {
   const toggleGroupRef = useRef<any>(null);
   const progressBarControlledRef = useRef<any>(null);
   const progressBarVariantRef = useRef<any>(null);
+  const circularProgressRef = useRef<any>(null);
 
   // Modal/Toast/Snackbar states
   const [modalVisible, setModalVisible] = useState(false);
@@ -256,6 +258,31 @@ export default function StyleDesktop() {
               />
               <Caption>Current progress: {progressDisplay}%</Caption>
             </View>
+          </Surface>
+
+          <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.lg }}>
+            <Heading>Progress Bar (Circular)</Heading>
+            <View
+              style={{
+                flexDirection: "column",
+                gap: S.space.xs,
+                alignItems: "flex-start",
+              }}
+            >
+              <ProgressBar 
+                variant="circular" 
+                ref={circularProgressRef} 
+                initialProgress={30} 
+                size={80} 
+                label={`Progress: ${progressCircularDisplay}%`} 
+              />
+              <View style={{ flexDirection: "row", gap: S.space.sm}}>
+                <Button text="-10" onPress={() => { circularProgressRef.current?.decrement(10);  setProgressCircularDisplay(circularProgressRef.current?.getProgress() || 0); }} />
+                <Button text="+10" onPress={() => { circularProgressRef.current?.increment(10);  setProgressCircularDisplay(circularProgressRef.current?.getProgress() || 0); }} />
+                <Button text="Reset" onPress={() => { circularProgressRef.current?.reset();  setProgressCircularDisplay(0); }} />
+              </View>
+            </View>
+           
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg }}>
@@ -735,7 +762,7 @@ export default function StyleDesktop() {
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.lg }}>
-            <Heading>Loading Spinner</Heading>
+            <Heading>Spinner (CustomLoad)</Heading>
             <View
               style={{
                 flexDirection: "row",
@@ -745,6 +772,22 @@ export default function StyleDesktop() {
             >
               <CustomLoad size="small" />
               <CustomLoad size="large" />
+            </View>
+          </Surface>
+
+          <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.lg }}>
+            <Heading>Loading Spinner</Heading>
+            <View
+              style={{
+                flexDirection: "row",
+                gap: S.space.md,
+                marginTop: S.space.md,
+                alignItems: "center",
+              }}
+            >
+              <CustomLoad size="small" mode="spinner" />
+              <CustomLoad size="medium" mode="spinner" />
+              <CustomLoad size="large" mode="spinner" />
             </View>
           </Surface>
 
