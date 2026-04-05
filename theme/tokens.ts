@@ -46,6 +46,11 @@ export const TOKENS = {
   fontFamilyTitle: 'fontFamilyTitle', // Used for headings or titles
   fontFamily: 'fontFamily',           // Primary body text
   fontFamilyPara: 'fontFamilyPara',   // Long-form or paragraph text
+
+  /*Chrome Bar*/
+  ChromeBackground: 'ChromeBackground',
+  ChromeText: 'ChromeText',
+  ChromeBorder: 'ChromeBorder',
 } as const
 
 export type TokenName = keyof typeof TOKENS

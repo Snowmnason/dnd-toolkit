@@ -1,3 +1,20 @@
+```ts
+/**
+ * ⚠️  DEPRECATED — Use ChromeLayer instead
+ * 
+ * This component has been replaced by the ChromeLayer pattern:
+ * - components/layer/ChromeLayer.tsx (orchestration skeleton)
+ * - components/chrome/ChromeTopBar.tsx (styled component)
+ * - contexts/chrome-context.tsx (state management)
+ * 
+ * Kept for reference during the transition period.
+ * Safe to delete once ChromeLayer is verified in production.
+ * 
+ * Migration guide:
+ * Replace <TopBar {...props} /> with:
+ * <ChromeLayer topBar={{ title, showBackButton, showHamburger, onBackPress, a11yFocusTarget }} />
+ */
+
 import { useAppToast } from "@/contexts/app-toast-context";
 import { logger } from "@/lib";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";

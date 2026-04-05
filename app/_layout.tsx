@@ -1,20 +1,21 @@
 import {
-  AppErrorBoundary,
-  AppToastLayer,
-  NavDrawerLayer,
-  NotificationContainer,
-  SnackBarLayer,
-  TopBar,
-  UIBlockerLayer
+    AppErrorBoundary,
+    AppToastLayer,
+    ChromeLayer,
+    NavDrawerLayer,
+    NotificationContainer,
+    SnackBarLayer,
+    UIBlockerLayer
 } from "@/components";
+import SettingsModal from "@/components/modals/SettingsModal";
 import { OfflineSyncNotificationLayer } from "@/components/offline";
 import {
-  CrashFallBack,
-  RouteErrorBoundary,
-  SafeModeErrorBoundary,
-  SafeModeScreen,
+    CrashFallBack,
+    RouteErrorBoundary,
+    SafeModeErrorBoundary,
+    SafeModeScreen,
 } from "@/components/SplashScreen";
-import { OverlayProvider } from "@/contexts";
+import { OverlayProvider, useChrome } from "@/contexts";
 // Trigger modal registration side effects — must run before any openModal() call.
 // Imported here (leaf module) instead of modal-context.tsx to avoid circular dependency.
 import "@/components/modals/register-all-modals";
@@ -25,29 +26,30 @@ import { useClearSafeMode } from "@/hooks/error/use-safe-mode";
 import { AppKernelProvider, useAppKernel, useKernelLoadingSync, useSyncSplash } from "@/hooks/kernel";
 import { useAnalyticsNavigation, useNavigate, useRouteConfig } from "@/hooks/navigation";
 import {
-  type AccessRole,
+    type AccessRole,
 } from "@/hooks/storage";
 import { logger, useInjectToastSystem } from "@/hooks/utils";
+import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
 import {
-  AppParamsStableProvider,
-  AppParamsVolatileProvider,
-  PlatformProvider,
-  ScaleProvider,
-  SubscriptionProvider,
-  ThemeProvider,
-  UseTheme,
-  useAppParamsStable,
-  useAppParamsVolatile,
-  usePlatform,
-  useUserId,
-  useUserRole,
-  useWorldId,
+    AppParamsStableProvider,
+    AppParamsVolatileProvider,
+    PlatformProvider,
+    ScaleProvider,
+    SubscriptionProvider,
+    ThemeProvider,
+    UseTheme,
+    useAppParamsStable,
+    useAppParamsVolatile,
+    usePlatform,
+    useUserId,
+    useUserRole,
+    useWorldId,
 } from "@/providers";
 import {
-  Stack,
-  useLocalSearchParams,
-  useRouter,
-  useSegments,
+    Stack,
+    useLocalSearchParams,
+    useRouter,
+    useSegments,
 } from "expo-router";
 import { useEffect } from "react";
 import { Platform, View } from "react-native";
@@ -95,6 +97,7 @@ function RootLayoutContent() {
   const userRole = useUserRole();
   const { updateVolatileParams, clearWorldParams } = useAppParamsVolatile();
   const { clearAllParams } = useAppParamsStable();
+  const { closeSettingsMenu, settingsMenuVisible } = useChrome();
 
   // Data loading hooks
   const kernel = useAppKernel();
@@ -350,6 +353,36 @@ function RootLayoutContent() {
     }
   };
 
+  // SettingsMenu handlers
+  const handleAccountSettings = async () => {
+    closeSettingsMenu();
+    try {
+      const { AuthStateManager } = await import("@/lib/auth/auth-state");
+      const user = await AuthStateManager.getUserData();
+      const username = user?.username || "user";
+
+      const target = buildNavigationTarget(
+        `/settings/${encodeURIComponent(username)}`,
+        { worldId, userRole },
+        ["worldId", "userRole"],
+      );
+
+      router.push(target as any);
+    } catch (err) {
+      logger.category("navigation").warn("Root layout: failed to resolve username route, falling back", err);
+    }
+  };
+
+  const handleReturnToWorldSelection = () => {
+    closeSettingsMenu();
+    const target = buildNavigationTarget(
+      "/select/world-selection",
+      {},
+      [],
+    );
+    router.replace(target as any);
+  };
+
   return (
     <RouteErrorBoundary
       routeConfig={routeConfig}
@@ -371,24 +404,31 @@ function RootLayoutContent() {
             uninitialized services during bootstrap. */}
         {kernel.phases.appReady && (
           <>
-            {/* Global TopBar - driven by centralized navigation config */}
+            {/* Global ChromeLayer (TopBar + BottomBar) - driven by centralized navigation config */}
             {!hideTopBar && topBarTitle && (
-              <TopBar
-                title={topBarTitle}
-                showBackButton={routeConfig.back !== undefined}
-                showHamburger={routeConfig.showHamburger}
-                onBackPress={handleTopBarBack}
-                userId={userId}
-                worldId={worldId}
-                userRole={userRole}
-                a11yFocusTarget={routeConfig.a11yFocusTarget}
+              <ChromeLayer
+                topBar={{
+                  title: topBarTitle,
+                  showBackButton: routeConfig.back !== undefined,
+                  showHamburger: routeConfig.showHamburger ?? false,
+                  onBackPress: handleTopBarBack,
+                  a11yFocusTarget: routeConfig.a11yFocusTarget,
+                }}
               />
             )}
+
+            {/* SettingsMenu Modal */}
+            <SettingsModal
+              visible={settingsMenuVisible}
+              onClose={closeSettingsMenu}
+              onAccountSettings={handleAccountSettings}
+              onReturnToWorldSelection={handleReturnToWorldSelection}
+            />
 
             {/* Content area: sidebar + stack in row layout on desktop */}
             <View style={{ flex: 1, flexDirection: Platform.OS === 'web' ? 'row' : 'column' }}>
               {/* Desktop sidebar — inline, always visible, animated width (feature-flagged) */}
-              {Platform.OS === 'web' && shouldRenderNavDrawer && <NavDrawerLayer />}
+              {Platform.OS === 'web' && shouldRenderNavDrawer && <NavDrawerLayer mode="expandable" />}
 
               {/* Stack container - flex-grows to fill remaining space */}
               <View style={{ flex: 1 }}>
@@ -413,7 +453,7 @@ function RootLayoutContent() {
             <SnackBarLayer />
 
             {/* Mobile drawer overlay — modal-based, only on native (feature-flagged) */}
-            {Platform.OS !== 'web' && shouldRenderNavDrawer && <NavDrawerLayer />}
+            {Platform.OS !== 'web' && shouldRenderNavDrawer && <NavDrawerLayer mode="modal" position="left" />}
 
             {/* Offline sync status and notifications */}
             <OfflineSyncNotificationLayer />
@@ -426,6 +466,27 @@ function RootLayoutContent() {
     </RouteErrorBoundary>
   );
 }
+
+/* ═════════════════════════════════════════════════════════════
+   OLD CODE: Commented out for reference during transition
+   
+   Previous implementation used inline TopBar component with local state.
+   Now replaced with ChromeLayer (orchestration) + ChromeContext (state).
+   Delete this section once ChromeLayer is verified working.
+   ═════════════════════════════════════════════════════════════
+   
+   <TopBar
+     title={topBarTitle}
+     showBackButton={routeConfig.back !== undefined}
+     showHamburger={routeConfig.showHamburger}
+     onBackPress={handleTopBarBack}
+     userId={userId}
+     worldId={worldId}
+     userRole={userRole}
+     a11yFocusTarget={routeConfig.a11yFocusTarget}
+   />
+   
+   ═════════════════════════════════════════════════════════════ */
 
 // Main export with provider wrapper and error boundary
 export default function RootLayout() {

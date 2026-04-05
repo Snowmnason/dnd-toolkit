@@ -18,13 +18,13 @@
 
 // Root-level components
 export * from './layer/AppToastLayer';
+export * from './layer/ChromeLayer';
 export { AppErrorBoundary } from "./layer/ErrorBoundary";
-export * from './layer/NotificationContainer';
 export * from './layer/NavDrawerLayer';
+export * from './layer/NotificationContainer';
 export * from './layer/SnackBarLayer';
 export { UIBlockerLayer } from "./layer/UIBlockerLayer";
 export { SmartDownloadButton } from "./SmartDownloadButton";
-export { default as TopBar } from "./TopBar";
 
 export { default as VersionDisplay } from "./VersionDisplay";
 

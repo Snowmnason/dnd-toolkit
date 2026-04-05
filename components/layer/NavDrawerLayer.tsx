@@ -1,7 +1,7 @@
-import { Body, ViewCust } from '@/components/ui'
-import { useNavDrawer } from '@/contexts/nav-drawer-context'
+import { ViewCust } from '@/components/ui'
+import { useNavDrawer, type DrawerPosition } from '@/contexts/nav-drawer-context'
 import { $, UseTheme, useScale } from '@/theme'
-import { useEffect } from 'react'
+import React, { useEffect } from 'react'
 import { Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native'
 import Animated, {
   FadeInLeft,
@@ -14,38 +14,79 @@ import Animated, {
 } from 'react-native-reanimated'
 
 const ANIMATION_DURATION = 150
+const BACKDROP_OPACITY = 0.5
+
+// ─── Types ──────────────────────────────────────────────────────────
+
+export type NavDrawerMode = 'permanent-sidebar' | 'expandable' | 'modal'
+
+export interface NavDrawerLayerProps {
+  /** Desktop: all 3 modes. Mobile: 'modal' | 'permanent-sidebar'. */
+  mode: NavDrawerMode
+  /** Position for mobile modal (left or right). Desktop modal is always right. Defaults to 'left'. */
+  position?: DrawerPosition
+  /** Content for collapsed/permanent state (icons only). Used by permanent-sidebar + expandable collapsed. */
+  childrenClosed?: React.ReactNode
+  /** Content for expanded/modal state (full content). Used by expandable expanded + modal. */
+  childrenOpen?: React.ReactNode
+  /** Custom toggle render for expandable mode. If omitted, a default chevron toggle is rendered. */
+  renderToggle?: (isExpanded: boolean, onToggle: () => void) => React.ReactNode
+}
+
+// ─── Shared: Permanent Sidebar ──────────────────────────────────────
 
 /**
- * 🎯 NavDrawerLayer
- * 
- * Platform-split rendering:
- * 
- * Desktop (web): Inline sidebar in layout flow. Always renders.
- *   - Collapsed: icon-width (~72px scaled), shows icons/abbreviations
- *   - Expanded: full-width (~240px scaled), shows icons + text
- *   - Animated width transitions (150ms, synchronized with main content flex)
- *   - Main content flex-grows/shrinks naturally (no overlay, no backdrop)
- * 
- * Mobile (native): Modal overlay, 60% net viewport width.
- *   - Only renders when drawer.visible
- *   - Dim backdrop, tap-to-close
- *   - FadeIn/Out slide animations
+ * Fixed-width sidebar, always visible. Renders childrenClosed (icon-only content).
+ * Shared between desktop and mobile permanent-sidebar modes.
  */
+function PermanentSidebar({ children }: { children?: React.ReactNode }) {
+  const { theme } = UseTheme()
+  const S = useScale()
 
-// ─── Desktop Sidebar (Web) ───────────────────────────────────────────
+  const SIDEBAR_WIDTH = S.space.lg * 2.5 // ~72px
 
-function DesktopSidebar() {
-  const { drawer, isExpanded, setExpanded } = useNavDrawer()
+  return (
+    <View
+      style={{
+        width: SIDEBAR_WIDTH,
+        height: '100%',
+        backgroundColor: $('surface', theme),
+        borderRightWidth: 1,
+        borderRightColor: $('borderSubtle', theme),
+        overflow: 'hidden',
+        paddingVertical: S.space.md,
+        paddingHorizontal: S.space.sm,
+        gap: S.space.sm,
+      }}
+    >
+      {children}
+    </View>
+  )
+}
+
+// ─── Desktop: Expandable Sidebar ────────────────────────────────────
+
+/**
+ * Animated sidebar that toggles between collapsed (childrenClosed) and expanded (childrenOpen).
+ * Width animates between COLLAPSED_WIDTH (~72px) and EXPANDED_WIDTH (~240px).
+ * Includes a default chevron toggle that can be overridden via renderToggle.
+ */
+function DesktopExpandableSidebar({
+  childrenClosed,
+  childrenOpen,
+  renderToggle,
+}: {
+  childrenClosed?: React.ReactNode
+  childrenOpen?: React.ReactNode
+  renderToggle?: (isExpanded: boolean, onToggle: () => void) => React.ReactNode
+}) {
+  const { isExpanded, setExpanded } = useNavDrawer()
   const { theme } = UseTheme()
   const S = useScale()
 
   const COLLAPSED_WIDTH = S.space.lg * 2.5 // ~72px
   const EXPANDED_WIDTH = S.space.lg * 12   // ~240px
 
-  const drawerBg = $('surface', theme)
-  const borderColor = $('borderSubtle', theme)
-
-  // Animated width
   const animatedWidth = useSharedValue(isExpanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH)
 
   useEffect(() => {
@@ -59,165 +100,202 @@ function DesktopSidebar() {
     width: animatedWidth.value,
   }))
 
+  const handleToggle = () => setExpanded(!isExpanded)
+
   return (
     <Animated.View
       style={[
         {
           height: '100%',
-          backgroundColor: drawerBg,
+          backgroundColor: $('surface', theme),
           borderRightWidth: 1,
-          borderRightColor: borderColor,
+          borderRightColor: $('borderSubtle', theme),
           overflow: 'hidden',
+          paddingVertical: S.space.md,
+          paddingHorizontal: S.space.sm,
+          gap: S.space.sm,
         },
         sidebarAnimStyle,
       ]}
     >
-      {/* Toggle expand/collapse area — shown at top */}
-      <Pressable
-        onPress={() => setExpanded(!isExpanded)}
-        style={{
-          paddingVertical: S.space.md,
-          paddingHorizontal: S.space.sm,
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: S.space.sm,
-        }}
-      >
-        {/* Chevron icon */}
-        <View style={{ width: S.space.lg, height: S.space.lg, justifyContent: 'center', alignItems: 'center' }}>
-          <View
-            style={{
-              width: S.space.sm,
-              height: S.space.sm,
-              borderLeftWidth: 2,
-              borderBottomWidth: 2,
-              borderColor: $('textSecondary', theme),
-              transform: [{ rotate: isExpanded ? '45deg' : '-135deg' }],
-            }}
-          />
-        </View>
-        {/* Text shows inline when expanded */}
-        {isExpanded && (
-          <Body style={{ color: $('textPrimary', theme), flex: 1 }}>NavDraw</Body>
-        )}
-      </Pressable>
+      {/* Toggle action — default chevron or custom renderToggle */}
+      {renderToggle
+        ? renderToggle(isExpanded, handleToggle)
+        : <DefaultToggle isExpanded={isExpanded} onToggle={handleToggle} />
+      }
 
-      {/* Drawer content slot */}
-      {drawer.content}
+      {/* Content slot: collapsed icons or expanded full content */}
+      {isExpanded ? childrenOpen : childrenClosed}
     </Animated.View>
   )
 }
 
-// ─── Mobile Modal Overlay (Native) ──────────────────────────────────
+// ─── Default Toggle (Chevron) ───────────────────────────────────────
 
-function MobileDrawerOverlay() {
-  const { drawer, hide } = useNavDrawer()
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions()
+function DefaultToggle({ isExpanded, onToggle }: { isExpanded: boolean; onToggle: () => void }) {
   const { theme } = UseTheme()
+  const S = useScale()
 
-  const DRAWER_WIDTH = screenWidth * 0.6 // 60% net viewport width
-  const BACKDROP_OPACITY = 0.6
+  return (
+    <Pressable
+      onPress={onToggle}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: S.space.sm,
+      }}
+    >
+      <View style={{ width: S.space.lg, height: S.space.lg, justifyContent: 'center', alignItems: 'center' }}>
+        <View
+          style={{
+            width: S.space.sm,
+            height: S.space.sm,
+            borderLeftWidth: 2,
+            borderBottomWidth: 2,
+            borderColor: $('textSecondary', theme),
+            transform: [{ rotate: isExpanded ? '45deg' : '-135deg' }],
+          }}
+        />
+      </View>
+    </Pressable>
+  )
+}
 
-  const backdropBaseColor = $('background', theme)
-  const drawerBg = $('surface', theme)
+// ─── Desktop: Modal Overlay ─────────────────────────────────────────
 
-  // Backdrop animation
+/**
+ * Right-positioned overlay with dimmed backdrop. Renders childrenOpen.
+ * Triggered via show()/hide() from NavDrawer context (e.g. top bar button).
+ * Uses position:fixed so it doesn't affect flex layout.
+ */
+function DesktopModalOverlay({ children }: { children?: React.ReactNode }) {
+  const { drawer, hide } = useNavDrawer()
+  const { height: screenHeight } = useWindowDimensions()
+  const { theme } = UseTheme()
+  const S = useScale()
+
+  const MODAL_WIDTH = S.space.lg * 12 // ~240px (EXPANDED_WIDTH)
+
   const backdropOpacity = useSharedValue(0)
-
   const backdropAnimStyle = useAnimatedStyle(() => ({
     opacity: backdropOpacity.value * BACKDROP_OPACITY,
   }))
 
-  // Drawer enter/exit
-  const drawerEnterAnim =
-    drawer.position === 'left'
-      ? FadeInLeft.duration(ANIMATION_DURATION)
-      : FadeInRight.duration(ANIMATION_DURATION)
-
-  const drawerExitAnim =
-    drawer.position === 'left'
-      ? FadeOutLeft.duration(ANIMATION_DURATION)
-      : FadeOutRight.duration(ANIMATION_DURATION)
-
   useEffect(() => {
-    if (drawer.visible) {
-      backdropOpacity.value = withTiming(1, { duration: ANIMATION_DURATION })
-    } else {
-      backdropOpacity.value = withTiming(0, { duration: ANIMATION_DURATION })
-    }
+    backdropOpacity.value = withTiming(drawer.visible ? 1 : 0, { duration: ANIMATION_DURATION })
   }, [drawer.visible, backdropOpacity])
 
   if (!drawer.visible) return null
 
-  const gradientDirection = drawer.position === 'left' ? 90 : 270
+  return (
+    <View
+      style={{
+        position: 'fixed' as any,
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+      }}
+    >
+      {/* Tap outside to close */}
+      <Pressable onPress={hide} style={StyleSheet.absoluteFillObject} />
 
-  // ─── Web fallback (mobile web) ───
-  if (Platform.OS === 'web') {
-    return (
-      <View
+      {/* Dimmed backdrop with gradient */}
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFillObject,
+          { pointerEvents: 'none' },
+          backdropAnimStyle,
+        ]}
+      >
+        <ViewCust
+          gradient
+          gradientColor={$('background', theme)}
+          gradientColor2="transparent"
+          gradientDirection={270}
+          gradientTransitionPoint={70}
+          style={{ flex: 1 }}
+        />
+      </Animated.View>
+
+      {/* Drawer panel — always right-positioned on desktop */}
+      <Animated.View
+        entering={FadeInRight.duration(ANIMATION_DURATION)}
+        exiting={FadeOutRight.duration(ANIMATION_DURATION)}
         style={{
-          position: 'fixed' as any,
+          position: 'absolute',
           top: 0,
-          left: 0,
           right: 0,
-          bottom: 0,
-          zIndex: 9999,
-          pointerEvents: 'box-none',
+          width: MODAL_WIDTH,
+          height: screenHeight,
+          backgroundColor: $('surface', theme),
+          borderLeftWidth: 1,
+          borderLeftColor: $('borderSubtle', theme),
+          zIndex: 10000,
+          pointerEvents: 'auto',
+          paddingVertical: S.space.md,
+          paddingHorizontal: S.space.sm,
+          gap: S.space.sm,
         }}
       >
-        <Pressable
-          onPress={() => hide()}
-          style={StyleSheet.absoluteFillObject}
-        />
+        {children}
+      </Animated.View>
+    </View>
+  )
+}
 
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFillObject,
-            { pointerEvents: 'none' },
-            backdropAnimStyle,
-          ]}
-        >
-          <ViewCust
-            gradient
-            gradientColor={backdropBaseColor}
-            gradientColor2="transparent"
-            gradientDirection={gradientDirection}
-            gradientTransitionPoint={70}
-            style={{ flex: 1 }}
-          />
-        </Animated.View>
+// ─── Mobile: Modal Overlay ──────────────────────────────────────────
 
-        {drawer.visible && (
-          <Animated.View
-            entering={drawerEnterAnim}
-            exiting={drawerExitAnim}
-            style={{
-              position: 'absolute',
-              top: 0,
-              [drawer.position]: 0,
-              width: DRAWER_WIDTH,
-              height: screenHeight,
-              backgroundColor: drawerBg,
-              zIndex: 10000,
-              pointerEvents: 'auto',
-            }}
-          >
-            {drawer.content}
-          </Animated.View>
-        )}
-      </View>
-    )
-  }
+/**
+ * Position-aware modal overlay for native platforms.
+ * 60% viewport width, slides in from left or right based on position prop.
+ * Only renders when drawer.visible AND drawer.position matches this instance's position.
+ * Supports two independent drawers (left + right) via separate NavDrawerLayer instances.
+ */
+function MobileModalOverlay({
+  children,
+  position = 'left',
+}: {
+  children?: React.ReactNode
+  position?: DrawerPosition
+}) {
+  const { drawer, hide } = useNavDrawer()
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions()
+  const { theme } = UseTheme()
+  const S = useScale()
 
-  // ─── Native Modal ───
+  const DRAWER_WIDTH = screenWidth * 0.6
+  const isVisible = drawer.visible && drawer.position === position
+
+  const backdropOpacity = useSharedValue(0)
+  const backdropAnimStyle = useAnimatedStyle(() => ({
+    opacity: backdropOpacity.value * BACKDROP_OPACITY,
+  }))
+
+  const enterAnim = position === 'left'
+    ? FadeInLeft.duration(ANIMATION_DURATION)
+    : FadeInRight.duration(ANIMATION_DURATION)
+
+  const exitAnim = position === 'left'
+    ? FadeOutLeft.duration(ANIMATION_DURATION)
+    : FadeOutRight.duration(ANIMATION_DURATION)
+
+  useEffect(() => {
+    backdropOpacity.value = withTiming(isVisible ? 1 : 0, { duration: ANIMATION_DURATION })
+  }, [isVisible, backdropOpacity])
+
+  if (!isVisible) return null
+
+  const gradientDirection = position === 'left' ? 90 : 270
+
   return (
-    <Modal transparent animationType="fade" visible={drawer.visible}>
+    <Modal transparent animationType="fade" visible>
       <View style={{ flex: 1 }}>
-        <Pressable
-          onPress={() => hide()}
-          style={StyleSheet.absoluteFillObject}
-        />
+        {/* Tap outside to close */}
+        <Pressable onPress={hide} style={StyleSheet.absoluteFillObject} />
 
+        {/* Dimmed backdrop with gradient */}
         <Animated.View
           style={[
             StyleSheet.absoluteFillObject,
@@ -227,7 +305,7 @@ function MobileDrawerOverlay() {
         >
           <ViewCust
             gradient
-            gradientColor={backdropBaseColor}
+            gradientColor={$('background', theme)}
             gradientColor2="transparent"
             gradientDirection={gradientDirection}
             gradientTransitionPoint={70}
@@ -235,22 +313,24 @@ function MobileDrawerOverlay() {
           />
         </Animated.View>
 
-        {drawer.visible && (
-          <Animated.View
-            entering={drawerEnterAnim}
-            exiting={drawerExitAnim}
-            style={{
-              position: 'absolute',
-              top: 0,
-              [drawer.position]: 0,
-              width: DRAWER_WIDTH,
-              height: screenHeight,
-              backgroundColor: drawerBg,
-            }}
-          >
-            {drawer.content}
-          </Animated.View>
-        )}
+        {/* Drawer panel — position-aware */}
+        <Animated.View
+          entering={enterAnim}
+          exiting={exitAnim}
+          style={{
+            position: 'absolute',
+            top: 0,
+            [position]: 0,
+            width: DRAWER_WIDTH,
+            height: screenHeight,
+            backgroundColor: $('surface', theme),
+            paddingVertical: S.space.md,
+            paddingHorizontal: S.space.sm,
+            gap: S.space.sm,
+          }}
+        >
+          {children}
+        </Animated.View>
       </View>
     </Modal>
   )
@@ -259,18 +339,51 @@ function MobileDrawerOverlay() {
 // ─── Exported Component ─────────────────────────────────────────────
 
 /**
- * NavDrawerLayer — renders the appropriate drawer variant per platform.
- * 
- * On web (desktop): Renders DesktopSidebar (inline, always visible, animated width).
- *   Must be placed INSIDE a flexDirection:'row' container beside main content.
- * 
- * On native (mobile): Renders MobileDrawerOverlay (modal, 60% width).
- *   Can be placed anywhere in the tree (Modal renders as portal).
+ * NavDrawerLayer — Skeletal navigation drawer system.
+ *
+ * Handles platform-specific rendering, animations, sizing, and backdrop behavior.
+ * Content is provided via children props; mode determines rendering strategy.
+ *
+ * Desktop (Web/Electron):
+ *   - permanent-sidebar: Fixed-width icon sidebar, always visible (childrenClosed)
+ *   - expandable: Animated collapse/expand with toggle (childrenClosed ↔ childrenOpen)
+ *   - modal: Right-positioned overlay with dimmed backdrop (childrenOpen)
+ *
+ * Mobile (iOS/Android):
+ *   - modal: Position-aware overlay, 60% viewport, dimmed backdrop (childrenOpen)
+ *   - permanent-sidebar: Fixed-width icon sidebar (childrenClosed)
  */
-export function NavDrawerLayer() {
+export function NavDrawerLayer({
+  mode,
+  position = 'left',
+  childrenClosed,
+  childrenOpen,
+  renderToggle,
+}: NavDrawerLayerProps) {
   if (Platform.OS === 'web') {
-    return <DesktopSidebar />
+    switch (mode) {
+      case 'permanent-sidebar':
+        return <PermanentSidebar>{childrenClosed}</PermanentSidebar>
+      case 'expandable':
+        return (
+          <DesktopExpandableSidebar
+            childrenClosed={childrenClosed}
+            childrenOpen={childrenOpen}
+            renderToggle={renderToggle}
+          />
+        )
+      case 'modal':
+        return <DesktopModalOverlay>{childrenOpen}</DesktopModalOverlay>
+    }
   }
 
-  return <MobileDrawerOverlay />
+  // Mobile (native)
+  switch (mode) {
+    case 'modal':
+      return <MobileModalOverlay position={position}>{childrenOpen}</MobileModalOverlay>
+    case 'permanent-sidebar':
+      return <PermanentSidebar>{childrenClosed}</PermanentSidebar>
+    default:
+      return null
+  }
 }

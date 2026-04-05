@@ -27,8 +27,12 @@ export type { ModalState } from './modal-context';
 export { NavDrawerProvider, useNavDrawer } from './nav-drawer-context';
 export type { DrawerPosition, NavDrawerContextType, NavDrawerState } from './nav-drawer-context';
 
+// Chrome Context (TopBar + BottomBar navigation chrome)
+export { ChromeProvider, useChrome } from './chrome-context';
+export type { ChromeContextType } from './chrome-context';
+
 // Overlay Provider (composite: Modal + NavDrawer + Notification + Toast + Snackbar)
-export { OverlayProvider } from './overlay-provider';
+export { OverlayProvider } from '../providers/overlay-provider';
 
 // Theme Context
 export { ThemeContext, useTheme } from './ThemeContext';

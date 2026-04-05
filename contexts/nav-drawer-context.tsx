@@ -2,7 +2,7 @@ import { useAppKernel } from '@/hooks/kernel/use-app-kernel'
 import { logger } from '@/lib'
 import { STORAGE_KEYS } from '@/maps/storage-keys'
 import { SecureStorage } from '@/system/Storage'
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 
 /**
  * 🔓 NavDrawerContext
@@ -29,8 +29,6 @@ export type DrawerPosition = 'left' | 'right'
 export interface NavDrawerState {
   visible: boolean
   position: DrawerPosition
-  content: React.ReactNode
-  id?: string // Optional: for multi-drawer scenarios
 }
 
 export interface NavDrawerContextType {
@@ -39,9 +37,11 @@ export interface NavDrawerContextType {
   isExpanded: boolean
   /** Toggle desktop sidebar expanded/collapsed (persists to storage) */
   setExpanded: (expanded: boolean) => void
-  show: (content: React.ReactNode, options?: { position?: DrawerPosition; id?: string }) => void
+  /** Open the modal drawer. Position defaults to 'left'. */
+  show: (options?: { position?: DrawerPosition }) => void
   hide: () => void
-  toggle: (content?: React.ReactNode, options?: { position?: DrawerPosition; id?: string }) => void
+  /** Toggle the modal drawer open/closed. */
+  toggle: (options?: { position?: DrawerPosition }) => void
 }
 
 // ─── Context ─────────────────────────────────────────────────────────
@@ -64,11 +64,9 @@ export function NavDrawerProvider({ children }: { children: React.ReactNode }) {
   const [drawer, setDrawer] = useState<NavDrawerState>({
     visible: false,
     position: 'left',
-    content: null,
   })
 
   const [isExpanded, setIsExpanded] = useState(false)
-  const [, setQueue] = useState<{ content: ReactNode; options?: { position?: DrawerPosition; id?: string } }[]>([])
 
   // Load persisted sidebar expanded state after bootstrap completes → auto-open if user preferred expanded
   useEffect(() => {
@@ -96,59 +94,24 @@ export function NavDrawerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [kernel.phases.appReady])
 
-  // Mobile: show drawer as modal overlay
-  const show = useCallback(
-    (content: React.ReactNode, options?: { position?: DrawerPosition; id?: string }) => {
-      if (drawer.visible) {
-        // Already showing → queue this drawer
-        setQueue((prev) => [...prev, { content, options }])
-      } else {
-        setDrawer({
-          visible: true,
-          position: options?.position || 'left',
-          content,
-          id: options?.id,
-        })
-      }
-    },
-    [drawer.visible]
-  )
-
-  // Mobile: hide drawer modal overlay
-  const hide = useCallback(() => {
-    setDrawer((prev) => ({ ...prev, visible: false }))
-
-    // Auto-show next queued drawer
-    setQueue((prev) => {
-      if (prev.length === 0) return prev
-
-      const next = prev[0]
-      const remaining = prev.slice(1)
-
-      // Schedule the next drawer to show (after current animation completes)
-      setTimeout(() => {
-        setDrawer({
-          visible: true,
-          position: next.options?.position || 'left',
-          content: next.content,
-          id: next.options?.id,
-        })
-      }, 150) // Match animation duration
-
-      return remaining
+  const show = useCallback((options?: { position?: DrawerPosition }) => {
+    setDrawer({
+      visible: true,
+      position: options?.position || 'left',
     })
   }, [])
 
-  const toggle = useCallback(
-    (content?: React.ReactNode, options?: { position?: DrawerPosition; id?: string }) => {
-      if (drawer.visible) {
-        hide()
-      } else if (content !== undefined) {
-        show(content, options)
-      }
-    },
-    [drawer.visible, show, hide]
-  )
+  const hide = useCallback(() => {
+    setDrawer(prev => ({ ...prev, visible: false }))
+  }, [])
+
+  const toggle = useCallback((options?: { position?: DrawerPosition }) => {
+    if (drawer.visible) {
+      hide()
+    } else {
+      show(options)
+    }
+  }, [drawer.visible, show, hide])
 
   const contextValue: NavDrawerContextType = {
     drawer,
@@ -171,17 +134,17 @@ export function NavDrawerProvider({ children }: { children: React.ReactNode }) {
 /**
  * 🔓 useNavDrawer
  * 
- * Consumer hook for displaying drawers.
+ * Consumer hook for drawer state management.
  * 
  * Usage:
  * ```tsx
- * const { show, hide } = useNavDrawer();
+ * const { show, hide, isExpanded, setExpanded } = useNavDrawer();
  * 
- * // Show drawer from left
- * <Button onPress={() => show(<MyDrawerContent />, { position: 'left' })} />
+ * // Open modal drawer from left
+ * <Button onPress={() => show({ position: 'left' })} />
  * 
- * // Hide drawer
- * <Button onPress={() => hide()} />
+ * // Toggle sidebar (expandable mode)
+ * <Button onPress={() => setExpanded(!isExpanded)} />
  * ```
  */
 export function useNavDrawer(): NavDrawerContextType {
