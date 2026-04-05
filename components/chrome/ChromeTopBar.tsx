@@ -1,5 +1,6 @@
 import { ObjHeading } from '@/components/ui'
 import { IconButton } from '@/components/ui/IconButton'
+import { usePanelNavigation } from '@/hooks/navigation'
 import { $, UseTheme } from '@/theme'
 import { memo, useEffect, useRef } from 'react'
 import {
@@ -8,6 +9,12 @@ import {
     View,
     useWindowDimensions,
 } from 'react-native'
+import Animated, {
+    Easing,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
+} from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 export interface ChromeTopBarProps {
@@ -32,6 +39,25 @@ export const ChromeTopBar = memo(function ChromeTopBar({
   const { theme } = UseTheme()
   const insets = useSafeAreaInsets()
   const lastAnnouncedTitle = useRef<string | undefined>(undefined)
+  const panelNav = usePanelNavigation()
+
+  // When right panel is open on mobile, the back arrow rotates ← → →
+  // Start at 180° (showing ←), animate to 0° (showing →) when right panel opens
+  // This ensures → is the "resting" state when panel is open — safe against failed animations
+  // Use isMobile (window width check) not isDesktop, so simulated mobile on web works too
+  const isClosePanelMode = panelNav.isActive && isMobile && panelNav.activePanel === 'right'
+  const rotation = useSharedValue(isClosePanelMode ? 0 : 180)
+
+  useEffect(() => {
+    rotation.value = withTiming(isClosePanelMode ? 0 : 180, {
+      duration: 250,
+      easing: Easing.out(Easing.cubic),
+    })
+  }, [isClosePanelMode, rotation])
+
+  const arrowAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ rotateY: `${rotation.value}deg` }],
+  }), [])
 
   useEffect(() => {
     if (a11yFocusTarget !== 'title') return
@@ -55,16 +81,19 @@ export const ChromeTopBar = memo(function ChromeTopBar({
         borderBottomColor: $('ChromeBorder'),
       }}
     >
-      {/* Left slot */}
+      {/* Left slot — back arrow rotates ← → → when closing right panel */}
       <View style={{ width: 56, alignItems: 'center', justifyContent: 'center' }}>
-        {showBackButton && (
-          <IconButton
-            variant="text"
-            content="←"
-            textColor={$('ChromeText', theme)}
-            onPress={onBackPress}
-            size="lg"
-          />
+        {(showBackButton || isClosePanelMode) && (
+          <Animated.View style={arrowAnimatedStyle}>
+            <IconButton
+              variant="text"
+              content="→"
+              textColor={$('ChromeText', theme)}
+              onPress={onBackPress}
+              size="lg"
+              //accessibilityLabel={isClosePanelMode ? 'Close panel' : 'Go back'}
+            />
+          </Animated.View>
         )}
       </View>
 

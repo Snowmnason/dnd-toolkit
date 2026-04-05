@@ -16,7 +16,7 @@ export default function SelectLayout() {
     }
   }, [authState]);
 
-  // Always render content - UIBlockerLayer handles loading overlay with splash screen
+  // ScreenProvider at root layout enables AppSplit screens to share panel state with TopBar
   return (
     <AppPage>
       <Stack screenOptions={{ headerShown: false }} />

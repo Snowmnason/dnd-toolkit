@@ -1,19 +1,19 @@
 import {
-    AppErrorBoundary,
-    AppToastLayer,
-    ChromeLayer,
-    NavDrawerLayer,
-    NotificationContainer,
-    SnackBarLayer,
-    UIBlockerLayer
+  AppErrorBoundary,
+  AppToastLayer,
+  ChromeLayer,
+  NavDrawerLayer,
+  NotificationContainer,
+  SnackBarLayer,
+  UIBlockerLayer
 } from "@/components";
 import SettingsModal from "@/components/modals/SettingsModal";
 import { OfflineSyncNotificationLayer } from "@/components/offline";
 import {
-    CrashFallBack,
-    RouteErrorBoundary,
-    SafeModeErrorBoundary,
-    SafeModeScreen,
+  CrashFallBack,
+  RouteErrorBoundary,
+  SafeModeErrorBoundary,
+  SafeModeScreen,
 } from "@/components/SplashScreen";
 import { OverlayProvider, useChrome } from "@/contexts";
 // Trigger modal registration side effects — must run before any openModal() call.
@@ -24,32 +24,29 @@ import { Analytics, sessionManager } from "@/hooks/analytics";
 import { SafeModeReason, executeRecoveryAction } from "@/hooks/error";
 import { useClearSafeMode } from "@/hooks/error/use-safe-mode";
 import { AppKernelProvider, useAppKernel, useKernelLoadingSync, useSyncSplash } from "@/hooks/kernel";
-import { useAnalyticsNavigation, useNavigate, useRouteConfig } from "@/hooks/navigation";
+import { useAnalyticsNavigation, useNavigate, usePanelNavigation, useRouteConfig } from "@/hooks/navigation";
 import {
-    type AccessRole,
+  type AccessRole,
 } from "@/hooks/storage";
 import { logger, useInjectToastSystem } from "@/hooks/utils";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
+import { AppParamsProvider } from "@/providers/AppParamsProvider";
+import { ViewportProvider } from "@/providers/ViewportProvider";
 import {
-    AppParamsStableProvider,
-    AppParamsVolatileProvider,
-    PlatformProvider,
-    ScaleProvider,
-    SubscriptionProvider,
-    ThemeProvider,
-    UseTheme,
-    useAppParamsStable,
-    useAppParamsVolatile,
-    usePlatform,
-    useUserId,
-    useUserRole,
-    useWorldId,
+  SubscriptionProvider,
+  UseTheme,
+  useAppParamsStable,
+  useAppParamsVolatile,
+  usePlatform,
+  useUserId,
+  useUserRole,
+  useWorldId,
 } from "@/providers";
 import {
-    Stack,
-    useLocalSearchParams,
-    useRouter,
-    useSegments,
+  Stack,
+  useLocalSearchParams,
+  useRouter,
+  useSegments,
 } from "expo-router";
 import { useEffect } from "react";
 import { Platform, View } from "react-native";
@@ -149,9 +146,15 @@ function RootLayoutContent() {
 
   const { config: routeConfig, title: resolvedTitle, backTarget: topBarBackTarget } = useRouteConfig(navContext);
   const { replace: navigateTo } = useNavigate();
+  const panelNav = usePanelNavigation();
 
   // ==================== EFFECT HOOKS SECTION ====================
   // All effects that depend on above hooks
+
+  // Reset right panel to left whenever the route group changes.
+  // Prevents stale panel state (right panel open) from persisting across navigations.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { panelNav.goToLeftPanel(); }, [segments[0], segments[1]]);
 
   // Identify user to analytics when available
   useEffect(() => {
@@ -333,7 +336,13 @@ function RootLayoutContent() {
   const topBarTitle = !hideTopBar ? resolvedTitle : undefined;
 
   // Build back press handler using config
+  // Panel navigation gets first chance to handle back (right panel → left panel on mobile)
   const handleTopBarBack = () => {
+    // If panel navigation handles the back (mobile right→left), stop here
+    if (panelNav.handleBackPress()) {
+      return;
+    }
+
     if (topBarBackTarget) {
       if (routeConfig.preserveParamsOnBack && (worldId || userRole)) {
         navigateTo(
@@ -492,33 +501,27 @@ function RootLayoutContent() {
 export default function RootLayout() {
   return (
     <AppKernelProvider>
-      <ThemeProvider>
-        <ScaleProvider>
-          <PlatformProvider>
-            <SubscriptionProvider>
-              <AppParamsStableProvider>
-                <AppParamsVolatileProvider>
-                  <OverlayProvider>
-                        {/* UIBlockerLayer renders the splash overlay (isLoading: true by default)
-                            and provides the setLoading() context. Placed here — inside all theme
-                            providers (SplashScreen needs UseTheme) but above RootLayoutContent
-                            where useKernelLoadingSync() calls setLoading(false) on appReady. */}
-                        <UIBlockerLayer>
-                          <AppErrorBoundary
-                            renderFallback={(error: Error | null, onRetry: () => void) => (
-                              <CrashFallBack error={error} onRetry={onRetry} />
-                            )}
-                          >
-                            <RootLayoutContent />
-                          </AppErrorBoundary>
-                        </UIBlockerLayer>
-                  </OverlayProvider>
-                </AppParamsVolatileProvider>
-              </AppParamsStableProvider>
-            </SubscriptionProvider>
-          </PlatformProvider>
-        </ScaleProvider>
-      </ThemeProvider>
+      <ViewportProvider>
+        <SubscriptionProvider>
+          <AppParamsProvider>
+            <OverlayProvider>
+              {/* UIBlockerLayer renders the splash overlay (isLoading: true by default)
+                  and provides the setLoading() context. Placed here — inside all theme
+                  providers (SplashScreen needs UseTheme) but above RootLayoutContent
+                  where useKernelLoadingSync() calls setLoading(false) on appReady. */}
+              <UIBlockerLayer>
+                <AppErrorBoundary
+                  renderFallback={(error: Error | null, onRetry: () => void) => (
+                    <CrashFallBack error={error} onRetry={onRetry} />
+                  )}
+                >
+                  <RootLayoutContent />
+                </AppErrorBoundary>
+              </UIBlockerLayer>
+            </OverlayProvider>
+          </AppParamsProvider>
+        </SubscriptionProvider>
+      </ViewportProvider>
     </AppKernelProvider>
   );
 }

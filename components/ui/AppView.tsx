@@ -16,7 +16,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { ViewCust } from "./base/ViewCust";
-import { IconButton } from "./IconButton";
 
 /* ───────────────────────────────
    🪶 AppView Props
@@ -307,25 +306,7 @@ export function AppSplit({
               rightAnimatedStyle,
             ]}
           >
-            {/* Mobile close button in top-right corner */}
-            {onMobileRightPanelClose && (
-              <View
-                style={{
-                  position: "absolute",
-                  top: S.space.lg,
-                  right: S.space.lg,
-                  zIndex: 20,
-                }}
-              >
-                <IconButton
-                  variant="text"
-                  content="✕"
-                  size="lg"
-                  onPress={onMobileRightPanelClose}
-                  textColor={$("textPrimary" as any)}
-                />
-              </View>
-            )}
+            {/* Close button removed — TopBar back arrow now handles panel close on mobile */}
             {right}
           </Animated.View>
         ))}

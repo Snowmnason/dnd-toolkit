@@ -5,7 +5,6 @@
  *   import { AppToastProvider, useAppToast } from '@/contexts';
  *   import { NotificationProvider, useNotifications } from '@/contexts';
  *   import { ThemeContext, useTheme } from '@/contexts';
- *   import { WorldSelectionProvider, useWorldSelection } from '@/contexts';
  */
 
 // App Toast Context
@@ -37,9 +36,6 @@ export { OverlayProvider } from '../providers/overlay-provider';
 // Theme Context
 export { ThemeContext, useTheme } from './ThemeContext';
 export type { ThemeContextType } from './ThemeContext';
-
-// World Selection Context
-export { useWorldSelection, WorldSelectionProvider } from './single_screen/WorldSelectionContext';
 
 // UIBlockerContext is purposely a separate file (no SplashScreen/theme imports)
 // so hooks/kernel can import useUIBlocker without creating a require cycle.
