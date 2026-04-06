@@ -29,6 +29,8 @@ The app uses **layered providers** to manage different aspects of state and beha
 │  ├─ AppParamsStableProvider ............... User ID + connected worlds (stable)
 │  ├─ AppParamsVolatileProvider ............ World ID + user role (volatile)
 │  ├─ ModalProvider ......................... Modal stack management
+│  ├─ TooltipPortalProvider ................ Tooltips portal rendering
+│  ├─ DropdownPortalProvider ............... Dropdown portal rendering
 │  ├─ NavDrawerProvider ..................... Drawer state + sidebar expand/collapse
 │  ├─ NotificationProvider .................. Notification queue
 │  ├─ AppToastProvider ...................... Toast message state management
@@ -197,16 +199,20 @@ const { worldId, userRole } = useAppParamsVolatile();
 
 **Contains (in nesting order):**
 1. **ModalProvider** — Modal stack (topmost, overlays everything)
-2. **NavDrawerProvider** — Drawer state (below modals)
-3. **NotificationProvider** — Notification queue
-4. **AppToastProvider** — Toast message state management
-5. **AppToastLayer** — Toast rendering, positioning, and animations
-6. **AppSnackbarProvider** — Snackbar messages
-7. **JobOperationProvider** — Job operation tracking
-8. **ChromeProvider** — Top/bottom bar state (innermost)
+2. **TooltipPortalProvider** — Tooltip portal rendering
+3. **DropdownPortalProvider** — Dropdown portal rendering
+4. **NavDrawerProvider** — Drawer state (below modals)
+5. **NotificationProvider** — Notification queue
+6. **AppToastProvider** — Toast message state management
+7. **AppToastLayer** — Toast rendering, positioning, and animations
+8. **AppSnackbarProvider** — Snackbar messages
+9. **JobOperationProvider** — Job operation tracking
+10. **ChromeProvider** — Top/bottom bar state (innermost)
 
 **Why this order matters:**
 - Modals need to be rendered last (highest z-index)
+- Tooltip portal renders above dropdowns for tooltips on dropdown items
+- Dropdown portal renders above content but below tooltips and modals
 - Toast layer renders above provider state but below modals
 - Chrome (top/bottom bars) rendered first but appears behind toasts
 - Overlays are rendered by outer providers, appearing above inner content
@@ -234,6 +240,53 @@ show(<MyModalContent />);
 
 **Related files:**
 - `contexts/modal-context.tsx` — Modal stack management
+
+---
+
+### 10. TooltipPortalProvider
+
+**What it does:**
+- Provides a portal outlet for tooltip rendering
+- Allows tooltips to escape parent stacking contexts and scroll containers
+- Manages tooltip positioning and z-index layering
+
+**Why separate:**
+- Tooltips need to render above most UI elements including dropdowns
+- Portal ensures tooltips aren't clipped by parent containers
+
+**Related files:**
+- `providers/TooltipPortalProvider.tsx` — Portal implementation
+- `contexts/tooltip-portal-context.tsx` — Context for tooltip registration
+
+---
+
+### 11. DropdownPortalProvider
+
+**What it does:**
+- Provides a portal outlet for dropdown content rendering
+- Allows dropdowns to escape parent stacking contexts and scroll containers
+- Manages single active dropdown at a time
+- Handles click-outside detection and dropdown lifecycle
+
+**Key behaviors:**
+- Single dropdown active at a time (opening new one closes previous)
+- Portal uses `pointerEvents="box-none"` for web scroll compatibility
+- Z-index: 8500 (above content, below tooltips and modals)
+- Position tracking handled by Dropdown component via shared values
+
+**Context:**
+- Dropdown registration and lifecycle management
+
+**Example:**
+```tsx
+// Used internally by Dropdown component
+const { openDropdown, closeDropdown } = useDropdownPortal();
+```
+
+**Related files:**
+- `providers/DropdownPortalProvider.tsx` — Portal implementation
+- `contexts/dropdown-portal-context.tsx` — Context for dropdown registration
+- `components/ui/Dropdown.tsx` — Dropdown component that uses the portal
 
 ---
 
@@ -458,10 +511,12 @@ Once `kernel.phases.appReady === true`:
 providers/
   ├─ AppParamsStableProvider.tsx
   ├─ AppParamsVolatileProvider.tsx
+  ├─ DropdownPortalProvider.tsx
   ├─ PlatformProvider.tsx
   ├─ ScaleProvider.tsx
   ├─ SubscriptionProvider.tsx
   ├─ ThemeProvider.tsx
+  ├─ TooltipPortalProvider.tsx
   ├─ overlay-provider.tsx (composite)
   └─ JobOperationProvider.tsx
 
@@ -469,9 +524,11 @@ contexts/
   ├─ app-snackbar-context.tsx
   ├─ app-toast-context.tsx
   ├─ chrome-context.tsx
+  ├─ dropdown-portal-context.tsx
   ├─ modal-context.tsx
   ├─ nav-drawer-context.tsx
   ├─ notifications-context.tsx
+  ├─ tooltip-portal-context.tsx
   └─ index.ts (barrel)
 
 components/

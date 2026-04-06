@@ -62,6 +62,9 @@ export { SubscriptionProvider, useSubscription } from "./SubscriptionProvider";
 // Tooltip Portal (overlay — used internally by AppTooltip)
 export { TooltipPortalProvider } from "./TooltipPortalProvider";
 
+// Dropdown Portal (overlay — used internally by Dropdown)
+export { DropdownPortalProvider } from "./DropdownPortalProvider";
+
 // Theme
 export {
     ThemeProvider,

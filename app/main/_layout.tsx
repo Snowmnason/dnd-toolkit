@@ -58,7 +58,7 @@ export default function MainLayout() {
     if (tabParam && tabParam !== activeTab) {
       setActiveTab(tabParam);
     }
-  }, [params.tab, activeTab]);
+  }, [params.tab, activeTab, setActiveTab]);
 
   // 🧭 Handle tab switching with centralized navigation helpers
   const handleTabChange = (tabKey: string) => {
