@@ -1,71 +1,50 @@
 /**
  * OfflineSyncNotificationLayer Component
- * Aggregates offline and sync notifications and renders them as Toast/Snackbar.
+ * Aggregates offline and sync notifications and shows them via centralized toast system.
  * Mount this once near the app root (e.g., in AppKernel provider or top-level layout).
  *
  * Notification Priority & Sequencing:
  * - Offline notifications (warning/info) take priority when offline status changes
  * - Sync notifications (progress/success) are shown only when online and syncing
  * - Snackbar (errors) are always visible when there are sync failures
- * - Uses a simple state machine to prevent race conditions and flickering
+ * - Uses the centralized AppToast system for consistent positioning/animation
  *
  * Usage:
  *   <OfflineSyncNotificationLayer />
  */
 
-import { AppToast, SnackBar } from "@/components/ui";
+import { useAppSnackbar } from "@/contexts/app-snackbar-context";
+import { useAppToast } from "@/contexts/app-toast-context";
 import { useOfflineNotifications, useSyncNotifications } from "@/hooks/offline";
-import { useEffect, useState } from "react";
-
-interface ActiveToastState {
-  message: string;
-  type: "info" | "warning" | "success";
-  visible: boolean;
-  duration: number;
-}
+import { useEffect, useRef } from "react";
 
 export function OfflineSyncNotificationLayer() {
   const offlineToast = useOfflineNotifications();
   const { toastProps: syncToast, snackbarProps: syncSnackbar } =
     useSyncNotifications();
+  const { show: showToast } = useAppToast();
+  const { show: showSnackbar } = useAppSnackbar();
 
-  // State machine to prevent race condition between offline and sync toasts
-  // When offline toast becomes invisible, delay showing sync toast to avoid flicker
-  const [activeToast, setActiveToast] =
-    useState<ActiveToastState>(offlineToast);
+  // Track last shown message to avoid duplicates
+  const lastShownRef = useRef<string>('');
 
   useEffect(() => {
     if (offlineToast.visible) {
-      // Offline status changed: show offline toast immediately
-      setActiveToast({
-        message: offlineToast.message,
-        type: offlineToast.type,
-        visible: offlineToast.visible,
-        duration: offlineToast.duration,
-      });
+      const key = `offline:${offlineToast.message}`;
+      if (lastShownRef.current !== key) {
+        lastShownRef.current = key;
+        showToast('Status', offlineToast.message, offlineToast.type, offlineToast.duration);
+      }
     } else if (syncToast.visible) {
-      // Offline toast is done; only show sync toast if it's visible
-      // Small delay to avoid visual flicker from rapid toast switching
-      const timer = setTimeout(() => {
-        setActiveToast({
-          message: syncToast.message,
-          type: syncToast.type,
-          visible: syncToast.visible,
-          duration: syncToast.duration,
-        });
-      }, 100);
-      return () => clearTimeout(timer);
-    } else {
-      // Both are invisible; keep showing last active toast briefly to avoid flicker
-      const timer = setTimeout(() => {
-        setActiveToast({
-          message: syncToast.message,
-          type: syncToast.type,
-          visible: syncToast.visible,
-          duration: syncToast.duration,
-        });
-      }, 50);
-      return () => clearTimeout(timer);
+      const key = `sync:${syncToast.message}`;
+      if (lastShownRef.current !== key) {
+        lastShownRef.current = key;
+        // Small delay to avoid visual flicker from rapid toast switching
+        const timer = setTimeout(() => {
+          showToast('Sync', syncToast.message, syncToast.type, syncToast.duration);
+        }, 100);
+        return () => clearTimeout(timer);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -75,22 +54,18 @@ export function OfflineSyncNotificationLayer() {
     syncToast.message,
   ]);
 
-  return (
-    <>
-      <AppToast
-        message={activeToast.message}
-        type={activeToast.type}
-        visible={activeToast.visible}
-        duration={activeToast.duration}
-      />
-      <SnackBar
-        message={syncSnackbar.message}
-        tone={syncSnackbar.tone}
-        visible={syncSnackbar.visible}
-        actionText={syncSnackbar.actionText}
-        onAction={syncSnackbar.onAction}
-        duration={syncSnackbar.duration}
-      />
-    </>
-  );
+  // Show sync error snackbar via centralized system
+  useEffect(() => {
+    if (syncSnackbar.visible) {
+      showSnackbar(syncSnackbar.message, {
+        tone: syncSnackbar.tone,
+        duration: syncSnackbar.duration,
+        actionText: syncSnackbar.actionText,
+        onAction: syncSnackbar.onAction,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncSnackbar.visible, syncSnackbar.message]);
+
+  return null;
 }

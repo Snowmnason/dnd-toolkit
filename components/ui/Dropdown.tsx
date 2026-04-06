@@ -1,22 +1,22 @@
 import { IconSymbol } from '@/components/built-in/icon-symbol'
 import { Body, ObjHeading, TextType } from '@/components/ui/AppText'
+import { useDropdownPortal } from '@/contexts/dropdown-portal-context'
 import { $, tone, useScale, UseTheme } from '@/theme'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-    FlatList,
-    Modal,
-    Platform,
-    Pressable,
-    StyleSheet,
-    TextInput,
-    View,
+  FlatList,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
 } from 'react-native'
 import Animated, {
-    runOnJS,
-    useAnimatedStyle,
-    useSharedValue,
-    withSpring,
-    withTiming,
+  SharedValue,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
 } from 'react-native-reanimated'
 
 interface DropdownItem {
@@ -126,199 +126,133 @@ interface DropdownProps {
   maxHeightDelta?: number
 }
 
-export default function Dropdown({
+const SAFE_AREA = 24
+
+interface DropdownContentProps {
+  items: DropdownItem[]
+  value: string | null
+  onChange: (value: string | null) => void
+  enableSearch: boolean
+  borderColor: string
+  background: string
+  shadowColor: string
+  textInverseColor: string
+  S: ReturnType<typeof useScale>
+  theme: ReturnType<typeof UseTheme>['theme']
+  separatorColor: string
+  computedMaxHeight: number
+  opacity: SharedValue<number>
+  scaleVal: SharedValue<number>
+  shadow: SharedValue<number>
+  positionStyle: any
+  onClose: () => void
+  dropdownId: string
+}
+
+/**
+ * Internal component rendered inside the DropdownPortal outlet.
+ * Owns search state, filtered items, animated styles, and click-outside detection.
+ * This keeps search responsive (state lives in the portal render tree) and
+ * prevents stale-closure issues for user input.
+ */
+function DropdownContent({
   items,
   value,
   onChange,
-  placeholder = 'Select an option',
-  enableSearch = false,
-  heading,
-  textTypeHeading = 'primary',
-  textType = 'inverse',
-  style,
-  maxHeightDelta = 0,
-}: DropdownProps) {
-  const S = useScale()
-  const { theme } = UseTheme()
-  const [isOpen, setIsOpen] = useState(false)
-  const [isMounted, setIsMounted] = useState(false)
+  enableSearch,
+  borderColor,
+  background,
+  shadowColor,
+  textInverseColor,
+  S,
+  theme,
+  separatorColor,
+  computedMaxHeight,
+  opacity,
+  scaleVal,
+  shadow,
+  positionStyle,
+  onClose,
+  dropdownId,
+}: DropdownContentProps) {
   const [search, setSearch] = useState('')
-  const rotate = useSharedValue(0)
-  const scale = useSharedValue(0.9)
-  const opacity = useSharedValue(0)
-  const shadow = useSharedValue(0)
-
-  const borderColor = $('accent')  // Direct style usage - use CSS vars
-  const background = $('bgInverse')  // Direct style usage - use CSS vars
-  const shadowColor = $('shadow')  // Direct style usage - use CSS vars
-  const textInverseColor = $('textInverse')
-  // For tone(), we need resolved hex values because tone() processes colors with a library
-  const accentThemed = $('accent', theme)
-  const separatorColor = useMemo(() => tone(accentThemed, 'hover', undefined, undefined, theme), [accentThemed, theme])
-
-  const chevronStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotate.value}deg` }],
-  }))
-
-  const dropdownAnimStyle = useAnimatedStyle(() => {
-    const style: any = {
-      opacity: opacity.value,
-      transform: [{ scale: scale.value }],
-    }
-    if (Platform.OS === 'web') {
-      // Use our unified "combined" shadow on web
-      // Two-layer shadow similar to ElevatedView 'combined'
-      style.boxShadow = `0px 4px 4px ${shadowColor}, 0px 12px 12px ${shadowColor}`
-    } else {
-      // Native platforms: keep elevation (shadow* props are fine on native)
-      style.elevation = 1 + shadow.value * 4
-    }
-    return style
-  })
-
-  const openDropdown = () => {
-    setIsMounted(true)
-    setIsOpen(true)
-    rotate.value = withTiming(180, { duration: 220 })
-    opacity.value = withTiming(1, { duration: 120 })
-    scale.value = withSpring(1, { damping: 10, stiffness: 250, mass: 0.5 })
-    shadow.value = withTiming(1, { duration: 200 })
-  }
-
-  const handleUnmount = () => {
-    setIsMounted(false)
-    setSearch('')
-  }
-
-  const closeDropdown = () => {
-    setIsOpen(false)
-    // Use spring for a nicer reverse on the chevron as well
-    rotate.value = withSpring(0, { damping: 12, stiffness: 140, mass: 0.6 })
-    // Reverse animations and unmount after fade completes
-    opacity.value = withTiming(0, { duration: 150 }, (finished) => {
-      if (finished) {
-        // Use runOnJS to safely update React state from the animation thread
-        runOnJS(handleUnmount)()
-      }
-    })
-    scale.value = withSpring(0.9, { damping: 15, stiffness: 120, mass: 0.6 })
-    shadow.value = withTiming(0, { duration: 150 })
-  }
-
-  // Note: toggleDropdown was replaced by explicit open/close calls
+  const [searchHeight, setSearchHeight] = useState(0)
 
   const filteredItems = useMemo(() => {
     if (!enableSearch || search.trim() === '') return items
     return items.filter((i) => i.label.toLowerCase().includes(search.trim().toLowerCase()))
   }, [items, search, enableSearch])
 
-  const selectedLabel = items.find((item) => item.value === value)?.label || placeholder
-  const SAFE_AREA = 24
-  const headerRef = useRef<View>(null)
-  const [anchor, setAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
-  const [searchHeight, setSearchHeight] = useState(0)
+  const dropdownAnimStyle = useAnimatedStyle(() => {
+    const s: any = {
+      opacity: opacity.value,
+      transform: [{ scale: scaleVal.value }],
+    }
+    if (Platform.OS === 'web') {
+      s.boxShadow = `0px 4px 4px ${shadowColor}, 0px 12px 12px ${shadowColor}`
+    } else {
+      s.elevation = 1 + shadow.value * 4
+    }
+    return s
+  })
 
-  // We open with index 0 aligned to the button (no translation needed)
+  // Web: close on click outside dropdown content or trigger
+  useEffect(() => {
+    if (Platform.OS !== 'web') return
 
-  // Base max height plus optional additive delta
-  const baseMaxHeight = S.space.xxl * 10
-  const computedMaxHeight = Math.max(100, baseMaxHeight + (maxHeightDelta))
+    const handlePointerDown = (e: PointerEvent) => {
+      const target = e.target as Node
+      const content = document.getElementById(`dropdown-content-${dropdownId}`)
+      const trigger = document.getElementById(`dropdown-trigger-${dropdownId}`)
+      if (content?.contains(target)) return
+      if (trigger?.contains(target)) return
+      onClose()
+    }
+
+    // Delay one tick so the opening click doesn't immediately close
+    const timer = setTimeout(() => {
+      document.addEventListener('pointerdown', handlePointerDown)
+    }, 0)
+
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('pointerdown', handlePointerDown)
+    }
+  }, [onClose, dropdownId])
 
   return (
-  <View style={[{ width: '100%', position: 'relative' }, style]}>
-      {heading ? (
-        <ObjHeading textType={textTypeHeading} style={{ marginBottom: S.space.xs, marginLeft: S.space.xs }}>
-          {heading}
-        </ObjHeading>
-      ) : null}
+    <>
+      {/* Native-only backdrop — closes on tap (same UX as the previous Modal) */}
+      {Platform.OS !== 'web' && (
+        <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
+      )}
 
-      <Pressable
-        ref={headerRef}
-        accessibilityRole="button"
-        onPress={() => {
-          const toOpen = !isOpen
-          if (toOpen) {
-            openDropdown()
-            // Measure on next frame so layout is settled
-            requestAnimationFrame(() => {
-              headerRef.current?.measureInWindow?.((x, y, width, height) => {
-                setAnchor({ x, y, width, height })
-              })
-            })
-          } else {
-            closeDropdown()
-          }
-        }}
-        style={[
-          styles.header,
-          {
-            borderColor,
-            backgroundColor: background,
-            borderRadius: S.radius.md,
-            paddingVertical: S.space.sm,
-            paddingHorizontal: S.space.md,
-          },
-        ]}
-      >
-        <Body textType={value ? textType : 'inverse'} style={{ flex: 1 }}>
-          {selectedLabel}
-        </Body>
-        <Animated.View style={chevronStyle}>
-          <IconSymbol
-            name="chevron.right"
-            size={18}
-            weight="medium"
-            color={textInverseColor}
-            style={{ transform: [{ rotate: isOpen ? '90deg' : '0deg' }] }}
-          />
-        </Animated.View>
-      </Pressable>
-
-      {isMounted && anchor && (
-        <Modal transparent animationType="fade">
-          <View style={{ flex: 1 }}>
-            {/* Full-screen backdrop closes dropdown when pressed anywhere */}
-            <Pressable 
-              style={StyleSheet.absoluteFillObject} 
-              onPress={closeDropdown}
-            />
-
-            {/* Positioned container with safety padding so clicks near dropdown won't close */}
-            <View
-              style={{
-                position: 'absolute',
-                top: Math.max(anchor.y - SAFE_AREA, 0),
-                left: Math.max(anchor.x - SAFE_AREA, 0),
-                width: anchor.width + SAFE_AREA * 2,
-                padding: SAFE_AREA,
-                ...(Platform.OS === 'web' ? { pointerEvents: 'box-none' as const } : {}),
-              }}
-              pointerEvents={Platform.OS === 'web' ? undefined : 'box-none'}
-            >
-              <Animated.View
-                style={[
-                  styles.dropdown,
-                  {
-                    borderColor,
-                    backgroundColor: background,
-                    boxShadow: `0px 4px 4px ${shadowColor}, 0px 12px 12px ${shadowColor}`,
-                    borderRadius: S.radius.md,
-                    maxHeight: computedMaxHeight,
-                    transformOrigin: 'top center',
-                    ...(Platform.OS === 'web' ? { pointerEvents: 'auto' as const } : {}),
-                  },
-                  dropdownAnimStyle,
-                ]}
-                pointerEvents={Platform.OS === 'web' ? undefined : 'auto'}
-              >
+      {/* Positioned container — tracks trigger position via shared values */}
+      <Animated.View style={positionStyle} pointerEvents="box-none">
+        <Animated.View
+          nativeID={`dropdown-content-${dropdownId}`}
+          style={[
+            styles.dropdown,
+            {
+              borderColor,
+              backgroundColor: background,
+              boxShadow: `0px 4px 4px ${shadowColor}, 0px 12px 12px ${shadowColor}`,
+              borderRadius: S.radius.md,
+              maxHeight: computedMaxHeight,
+              transformOrigin: 'top center',
+              pointerEvents: 'auto',
+            },
+            dropdownAnimStyle,
+          ]}
+        >
           {enableSearch && (
             <View
               onLayout={(e) => setSearchHeight(e.nativeEvent.layout.height)}
-              style={{ 
-                position: 'absolute', 
-                top: 0, 
-                left: 0, 
-                right: 0, 
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
                 paddingHorizontal: S.space.xs,
                 paddingVertical: S.space.xs,
                 zIndex: 15,
@@ -350,7 +284,7 @@ export default function Dropdown({
             keyExtractor={(item) => item.value}
             scrollEnabled={true}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={enableSearch ? { paddingTop: searchHeight } : {  }}
+            contentContainerStyle={enableSearch ? { paddingTop: searchHeight } : {}}
             ItemSeparatorComponent={() => (
               <View
                 style={{
@@ -366,7 +300,7 @@ export default function Dropdown({
                 isSelected={item.value === value}
                 onPress={() => {
                   onChange(item.value)
-                  closeDropdown()
+                  onClose()
                 }}
                 borderColor={borderColor}
                 S={S}
@@ -374,11 +308,205 @@ export default function Dropdown({
               />
             )}
           />
-              </Animated.View>
-            </View>
-          </View>
-          </Modal>
-      )}
+        </Animated.View>
+      </Animated.View>
+    </>
+  )
+}
+
+export default function Dropdown({
+  items,
+  value,
+  onChange,
+  placeholder = 'Select an option',
+  enableSearch = false,
+  heading,
+  textTypeHeading = 'primary',
+  textType = 'inverse',
+  style,
+  maxHeightDelta = 0,
+}: DropdownProps) {
+  const S = useScale()
+  const { theme } = UseTheme()
+  const portal = useDropdownPortal()
+  const dropdownId = useRef(`dropdown-${Math.random().toString(36).slice(2)}`).current
+
+  const [isOpen, setIsOpen] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
+  const rotate = useSharedValue(0)
+  const scale = useSharedValue(0.9)
+  const opacity = useSharedValue(0)
+  const shadow = useSharedValue(0)
+
+  // Position tracking — updated every frame by RAF loop while open
+  const anchorX = useSharedValue(0)
+  const anchorY = useSharedValue(0)
+  const anchorW = useSharedValue(0)
+  const anchorH = useSharedValue(0)
+
+  const borderColor = $('accent')
+  const background = $('bgInverse')
+  const shadowColor = $('shadow')
+  const textInverseColor = $('textInverse')
+  const accentThemed = $('accent', theme)
+  const separatorColor = useMemo(() => tone(accentThemed, 'hover', undefined, undefined, theme), [accentThemed, theme])
+
+  const chevronStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotate.value}deg` }],
+  }))
+
+  // Animated position style — follows trigger via shared values so the
+  // dropdown moves with page scroll without React re-renders.
+  const positionStyle = useAnimatedStyle(() => ({
+    position: 'absolute' as const,
+    top: Math.max(anchorY.value - SAFE_AREA, 0),
+    left: Math.max(anchorX.value - SAFE_AREA, 0),
+    width: anchorW.value + SAFE_AREA * 2,
+    padding: SAFE_AREA,
+  }))
+
+  const headerRef = useRef<View>(null)
+  const isClosingRef = useRef(false)
+  const baseMaxHeight = S.space.xxl * 10
+  const computedMaxHeight = Math.max(100, baseMaxHeight + maxHeightDelta)
+
+  const openDropdown = () => {
+    isClosingRef.current = false
+    setIsMounted(true)
+    setIsOpen(true)
+    rotate.value = withTiming(180, { duration: 220 })
+    opacity.value = withTiming(1, { duration: 120 })
+    scale.value = withSpring(1, { damping: 10, stiffness: 250, mass: 0.5 })
+    shadow.value = withTiming(1, { duration: 200 })
+  }
+
+  const handleUnmount = () => {
+    setIsMounted(false)
+  }
+
+  const closeDropdown = () => {
+    if (isClosingRef.current) return
+    isClosingRef.current = true
+    setIsOpen(false)
+    rotate.value = withSpring(0, { damping: 12, stiffness: 140, mass: 0.6 })
+    opacity.value = withTiming(0, { duration: 150 }, (finished) => {
+      if (finished) {
+        setTimeout(handleUnmount, 0)
+      }
+    })
+    scale.value = withSpring(0.9, { damping: 15, stiffness: 120, mass: 0.6 })
+    shadow.value = withTiming(0, { duration: 150 })
+  }
+
+  const selectedLabel = items.find((item) => item.value === value)?.label || placeholder
+
+  // ── RAF position tracking ──────────────────────────────────────────────
+  // Continuously re-measures the trigger so the portal content follows
+  // scroll position. Shared-value updates bypass React re-renders.
+  useEffect(() => {
+    if (!isOpen) return
+    let raf: number
+    const track = () => {
+      headerRef.current?.measureInWindow?.((x, y, w, h) => {
+        anchorX.value = x
+        anchorY.value = y
+        anchorW.value = w
+        anchorH.value = h
+      })
+      raf = requestAnimationFrame(track)
+    }
+    track()
+    return () => cancelAnimationFrame(raf)
+    // Shared values are stable refs — intentionally omitted
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
+
+  // ── Portal registration ────────────────────────────────────────────────
+  useEffect(() => {
+    if (isMounted) {
+      portal.openDropdown({
+        id: dropdownId,
+        render: () => (
+          <DropdownContent
+            items={items}
+            value={value}
+            onChange={onChange}
+            enableSearch={enableSearch}
+            borderColor={borderColor}
+            background={background}
+            shadowColor={shadowColor}
+            textInverseColor={textInverseColor}
+            S={S}
+            theme={theme}
+            separatorColor={separatorColor}
+            computedMaxHeight={computedMaxHeight}
+            opacity={opacity}
+            scaleVal={scale}
+            shadow={shadow}
+            positionStyle={positionStyle}
+            onClose={closeDropdown}
+            dropdownId={dropdownId}
+          />
+        ),
+        onClose: closeDropdown,
+      })
+    } else {
+      portal.closeDropdown(dropdownId)
+    }
+    // Only re-register when data-affecting deps change; others are stable refs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMounted, items, value, enableSearch])
+
+  // Cleanup on component unmount (e.g. navigation)
+  useEffect(() => {
+    return () => portal.closeDropdown(dropdownId)
+    // Stable refs — only runs on unmount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return (
+    <View style={[{ width: '100%', position: 'relative' }, style]}>
+      {heading ? (
+        <ObjHeading textType={textTypeHeading} style={{ marginBottom: S.space.xs, marginLeft: S.space.xs }}>
+          {heading}
+        </ObjHeading>
+      ) : null}
+
+      <Pressable
+        ref={headerRef}
+        nativeID={`dropdown-trigger-${dropdownId}`}
+        accessibilityRole="button"
+        onPress={() => {
+          if (!isOpen) {
+            openDropdown()
+          } else {
+            closeDropdown()
+          }
+        }}
+        style={[
+          styles.header,
+          {
+            borderColor,
+            backgroundColor: background,
+            borderRadius: S.radius.md,
+            paddingVertical: S.space.sm,
+            paddingHorizontal: S.space.md,
+          },
+        ]}
+      >
+        <Body textType={value ? textType : 'inverse'} style={{ flex: 1 }}>
+          {selectedLabel}
+        </Body>
+        <Animated.View style={chevronStyle}>
+          <IconSymbol
+            name="chevron.right"
+            size={18}
+            weight="medium"
+            color={textInverseColor}
+            style={{ transform: [{ rotate: isOpen ? '90deg' : '0deg' }] }}
+          />
+        </Animated.View>
+      </Pressable>
     </View>
   )
 }
@@ -396,7 +524,6 @@ const styles = StyleSheet.create({
     elevation: 3,
     flex: 1,
   },
-  item: {},
   searchInput: {
     borderWidth: 1,
     paddingVertical: Platform.OS === 'ios' ? 8 : 6,

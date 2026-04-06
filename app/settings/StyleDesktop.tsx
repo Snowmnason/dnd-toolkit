@@ -3,7 +3,6 @@ import { ThemeSelector } from "@/Screens/settings/ThemeSelector";
 import {
   Accordion,
   AppModal,
-  AppToast,
   AppTooltip,
   Body,
   Button,
@@ -21,7 +20,6 @@ import {
   Paragraph,
   ProgressBar,
   RadioButtonGroup,
-  SnackBar,
   SubTitle,
   Surface,
   Switch,
@@ -33,8 +31,11 @@ import {
   ToggleGroup
 } from "@/components/ui";
 import { AppSplit } from "@/components/ui/AppView";
+import { useAppSnackbar } from "@/contexts/app-snackbar-context";
+import { useAppToast } from "@/contexts/app-toast-context";
 import { useNotifications } from "@/contexts/notifications-context";
 
+import { useJobOperation } from "@/hooks/jobs/useJobOperation";
 import { $, UseTheme, useScale } from "@/theme";
 import { useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
@@ -43,11 +44,15 @@ export default function StyleDesktop() {
   const S = useScale();
   const { theme } = UseTheme();
   const { showNotification } = useNotifications();
+  const { show: showToast } = useAppToast();
+  const { show: showSnackbar } = useAppSnackbar();
+  const { addJob, updateJob } = useJobOperation();
 
   // Simple display states (not controlling components, just for right panel display)
   const [primaryClicks, setPrimaryClicks] = useState(0);
   const [iconButtonClicks, setIconButtonClicks] = useState("");
   const [progressDisplay, setProgressDisplay] = useState(30);
+  const [progressCircularDisplay, setProgressCircularDisplay] = useState(30);
   const [textInputValue, setTextInputValue] = useState("");
   const [descInputValue, setDescInputValue] = useState("");
   const [dropdownValue, setDropdownValue] = useState<string | null>(null);
@@ -77,15 +82,74 @@ export default function StyleDesktop() {
   const toggleGroupRef = useRef<any>(null);
   const progressBarControlledRef = useRef<any>(null);
   const progressBarVariantRef = useRef<any>(null);
+  const circularProgressRef = useRef<any>(null);
 
   // Modal/Toast/Snackbar states
   const [modalVisible, setModalVisible] = useState(false);
   const [modal2Visible, setModal2Visible] = useState(false);
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastVisible1, setToastVisible1] = useState(false);
-  const [toastVisible2, setToastVisible2] = useState(false);
-  const [toastVisible3, setToastVisible3] = useState(false);
-  const [snackVisible, setSnackVisible] = useState(false);
+
+  // Job Operation test handlers
+  const handleAddSuccessfulUpload = () => {
+    const jobId = `upload-success-${Date.now()}`;
+    addJob({
+      id: jobId,
+      title: 'Uploading character sheet...',
+      type: 'upload',
+      status: 'pending',
+      progress: 0,
+      isUserInitiated: true,
+      onCancel: () => console.log('Upload cancelled:', jobId),
+    });
+
+    // Simulate job progression: pending → active → completed
+    setTimeout(() => {
+      updateJob(jobId, { status: 'active', progress: 0 });
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += Math.random() * 25;
+        if (progress >= 100) {
+          clearInterval(interval);
+          updateJob(jobId, { status: 'completed', progress: 100 });
+        } else {
+          updateJob(jobId, { progress: Math.min(progress, 99) });
+        }
+      }, 300);
+    }, 500);
+  };
+
+  const handleAddFailingDownload = () => {
+    const jobId = `download-fail-${Date.now()}`;
+    addJob({
+      id: jobId,
+      title: 'Downloading campaign data... (will take 30 seconds)',
+      type: 'download',
+      status: 'pending',
+      progress: 0,
+      isUserInitiated: true,
+      onCancel: () => console.log('Download cancelled:', jobId),
+      onRetry: () => handleAddFailingDownload(),
+    });
+
+    // Simulate job progression then fail mid-way
+    setTimeout(() => {
+      updateJob(jobId, { status: 'active', progress: 0 });
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += Math.random() * 20;
+        if (progress >= 60) {
+          clearInterval(interval);
+          updateJob(jobId, {
+            status: 'error',
+            progress: 60,
+            error: 'Network timeout after 30 seconds. Your internet is probably potato-quality.',
+          });
+        } else {
+          updateJob(jobId, { progress: Math.min(progress, 59) });
+        }
+      }, 400);
+    }, 500);
+  };
+
 
   return (
     <AppSplit
@@ -258,6 +322,31 @@ export default function StyleDesktop() {
               />
               <Caption>Current progress: {progressDisplay}%</Caption>
             </View>
+          </Surface>
+
+          <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.lg }}>
+            <Heading>Progress Bar (Circular)</Heading>
+            <View
+              style={{
+                flexDirection: "column",
+                gap: S.space.xs,
+                alignItems: "flex-start",
+              }}
+            >
+              <ProgressBar 
+                variant="circular" 
+                ref={circularProgressRef} 
+                initialProgress={30} 
+                size={80} 
+                label={`Progress: ${progressCircularDisplay}%`} 
+              />
+              <View style={{ flexDirection: "row", gap: S.space.sm}}>
+                <Button text="-10" onPress={() => { circularProgressRef.current?.decrement(10);  setProgressCircularDisplay(circularProgressRef.current?.getProgress() || 0); }} />
+                <Button text="+10" onPress={() => { circularProgressRef.current?.increment(10);  setProgressCircularDisplay(circularProgressRef.current?.getProgress() || 0); }} />
+                <Button text="Reset" onPress={() => { circularProgressRef.current?.reset();  setProgressCircularDisplay(0); }} />
+              </View>
+            </View>
+           
           </Surface>
 
           <Surface style={{ marginTop: S.space.lg }}>
@@ -715,24 +804,57 @@ export default function StyleDesktop() {
               />
               <Button
                 text="Show Toast Info"
-                onPress={() => setToastVisible(true)}
+                onPress={() => showToast('Info', 'Hello from Desktop! Info', 'info')}
               />
               <Button
                 text="Show Toast Success"
-                onPress={() => setToastVisible1(true)}
+                onPress={() => showToast('Saved', 'Your progress has been saved successfully.', 'success')}
               />
               <Button
                 text="Show Toast Warning"
-                onPress={() => setToastVisible2(true)}
+                onPress={() => showToast('Warning', 'Hello from Desktop! Warning', 'warning')}
               />
               <Button
                 text="Show Toast Error"
-                onPress={() => setToastVisible3(true)}
+                onPress={() => showToast('Error', 'Hello from Desktop! Error', 'error')}
               />
               <Button
                 text="Show Snackbar"
-                onPress={() => setSnackVisible(true)}
+                onPress={() => showSnackbar('Saved successfully', { tone: 'success' })}
               />
+            </View>
+          </Surface>
+          
+          <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.xl }}>
+            <Heading>Job Operations (Test Panel)</Heading>
+            <Body style={{ marginBottom: S.space.md }}>
+              Click buttons to add jobs to the JobOperationPanel (bottom-right corner). The panel expands upward from the bottom anchor.
+            </Body>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <Button
+                variant="primary"
+                text="Add Successful Upload (will complete in 3-5s)"
+                onPress={handleAddSuccessfulUpload}
+              />
+              <Button
+                variant="destructive"
+                text="Add Failing Download (will fail at 60%)"
+                onPress={handleAddFailingDownload}
+              />
+            </View>
+          </Surface>
+
+          <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.lg }}>
+            <Heading>Spinner (CustomLoad)</Heading>
+            <View
+              style={{
+                flexDirection: "row",
+                gap: S.space.md,
+                marginTop: S.space.md,
+              }}
+            >
+              <CustomLoad size="small" />
+              <CustomLoad size="large" />
             </View>
           </Surface>
 
@@ -743,10 +865,12 @@ export default function StyleDesktop() {
                 flexDirection: "row",
                 gap: S.space.md,
                 marginTop: S.space.md,
+                alignItems: "center",
               }}
             >
-              <CustomLoad size="small" />
-              <CustomLoad size="large" />
+              <CustomLoad size="small" mode="spinner" />
+              <CustomLoad size="medium" mode="spinner" />
+              <CustomLoad size="large" mode="spinner" />
             </View>
           </Surface>
 
@@ -1021,39 +1145,7 @@ export default function StyleDesktop() {
         </View>
       </AppModal>
 
-      <AppToast
-        message="Hello from Desktop! Info"
-        visible={toastVisible}
-        type="info"
-        onHide={() => setToastVisible(false)}
-      />
-      <AppToast
-        message="Hello from Desktop! Success"
-        visible={toastVisible1}
-        type="success"
-        onHide={() => setToastVisible1(false)}
-      />
 
-      <AppToast
-        message="Hello from Desktop! Warning"
-        visible={toastVisible2}
-        type="warning"
-        onHide={() => setToastVisible2(false)}
-      />
-
-      <AppToast
-        message="Hello from Desktop! Error"
-        visible={toastVisible3}
-        type="error"
-        onHide={() => setToastVisible3(false)}
-      />
-
-      <SnackBar
-        visible={snackVisible}
-        message="Saved successfully"
-        tone="success"
-        onHide={() => setSnackVisible(false)}
-      />
     </AppSplit>
   );
 }

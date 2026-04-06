@@ -151,12 +151,8 @@ export type DegradeSubscriber = (state: DegradeState) => void;
 
 /**
  * Toast notification options for degradation alerts.
- * Structured to support future toast redesign (title + detailed message).
- * Currently only uses `title` and `severity` for display.
- *
- * TODO: [Toast Redesign] When new toast component (title + detailed message + actions) lands,
- * update toast rendering in callback implementation to use `message`, `severity`, and `duration`.
- * Data structure is already in place for future migration.
+ * Supports title, severity, message, and duration.
+ * Maps to AppToast via the toast adapter (lib/utils/toast-queue.ts).
  */
 export interface DegradeToastOptions {
   /** Short title shown as primary message (used now) */

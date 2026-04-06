@@ -24,7 +24,7 @@ export type MutationPersistence = "full" | "reduced" | "ephemeral";
 /**
  * A mutation queued while offline, waiting to sync when online
  *
- * Stored in SecureStorage with key: dnd:offline:mutation_queue
+ * Stored in SecureStorage with key: sno:offline:mutation_queue
  *
  * Phase 4 Enhancements:
  * - authStrategy: Ensures replayed requests use fresh tokens from AuthLayer

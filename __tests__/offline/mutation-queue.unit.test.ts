@@ -27,7 +27,7 @@ vi.mock("@/lib/storage", () => {
       }),
     },
     STORAGE_KEYS: {
-      OFFLINE_MUTATION_QUEUE: "dnd:offline:mutation_queue",
+      OFFLINE_MUTATION_QUEUE: "sno:offline:mutation_queue",
     },
   };
 });

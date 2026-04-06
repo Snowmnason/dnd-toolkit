@@ -48,6 +48,16 @@ export const classicTheme: ClassicTheme = {
     [TOKENS.fontFamilyTitle]: "GrenzeGotisch",
     [TOKENS.fontFamily]: "GrenzeGotisch",
     [TOKENS.fontFamilyPara]: "HelveticaNeue",
+
+    // Chrome (Top Bar + Bottom Bar)
+    [TOKENS.ChromeBackground]: "#1f262e",
+    [TOKENS.ChromeText]: "#F5E6D3",
+    [TOKENS.ChromeBorder]: "#969696",
+
+        //Jobs
+    [TOKENS.JobUpload]: '#00b894',
+    [TOKENS.JobDownload]: '#0984e3',
+    [TOKENS.JobBackground]: '#bea74e',
   },
 
   light: {
@@ -92,5 +102,15 @@ export const classicTheme: ClassicTheme = {
     [TOKENS.fontFamilyTitle]: "GrenzeGotisch",
     [TOKENS.fontFamily]: "GrenzeGotisch",
     [TOKENS.fontFamilyPara]: "HelveticaNeue",
+
+    // Chrome (Top Bar + Bottom Bar)
+    [TOKENS.ChromeBackground]: "#1f262e",
+    [TOKENS.ChromeText]: "#F5E6D3",
+    [TOKENS.ChromeBorder]: "#969696",
+
+        //Jobs
+    [TOKENS.JobUpload]: '#00b894',
+    [TOKENS.JobDownload]: '#0984e3',
+    [TOKENS.JobBackground]: '#bea74e',
   },
 };

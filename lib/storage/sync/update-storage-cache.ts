@@ -8,7 +8,7 @@ import { getPrivacyStorageBackend } from "@/lib/middleware/storage/helpers/priva
 
 // Re-export commonly used keys for this module
 const STORAGE_KEYS = {
-  USER_DATA: "dnd:auth:user_data",
+  USER_DATA: "sno:auth:user_data",
   CONNECTED_WORLDS: "dnd:app:connected_worlds",
   CONNECTED_WORLDS_METADATA: "dnd:app:connected_worlds_metadata",
 } as const;

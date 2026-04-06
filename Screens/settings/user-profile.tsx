@@ -57,7 +57,7 @@ export default function UserProfile({ profile }: UserProfileProps) {
   // Show toast on success
   useEffect(() => {
     if (credsState.phase === 'success' && credsState.successMessage) {
-      showToast(credsState.successMessage, 'success', 2000)
+      showToast('Success', credsState.successMessage, 'success', 2000)
       // Auto-close modal after brief delay
       setTimeout(() => {
         credsHandlers.cancelModal()

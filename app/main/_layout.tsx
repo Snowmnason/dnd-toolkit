@@ -1,10 +1,11 @@
+import { ChromeBottomBar } from "@/components/chrome/ChromeBottomBar";
+import { useChrome } from "@/contexts";
 import { useAuthGuard } from "@/hooks/auth";
 import { useAppKernel } from "@/hooks/kernel";
 import { useNavigate } from "@/hooks/navigation";
 import { logger } from "@/hooks/utils";
-import { BottomTabBar } from "@/Screens/main-panels/BottomTabBar";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Platform, useWindowDimensions, View } from "react-native";
 
 export default function MainLayout() {
@@ -13,9 +14,11 @@ export default function MainLayout() {
   const kernel = useAppKernel();
   const authState = useAuthGuard(kernel.phases.appReady, "world-required");
   const params = useLocalSearchParams();
-  const [activeTab, setActiveTab] = useState("characters");
   const { width } = useWindowDimensions();
   const isMobile = Platform.OS !== "web" || width < 900;
+
+  // Chrome context for shared navigation state
+  const { activeTab, setActiveTab } = useChrome();
 
   // All hooks must be called unconditionally (before any conditional returns)
   useEffect(() => {
@@ -55,11 +58,11 @@ export default function MainLayout() {
     if (tabParam && tabParam !== activeTab) {
       setActiveTab(tabParam);
     }
-  }, [params.tab, activeTab]);
+  }, [params.tab, activeTab, setActiveTab]);
 
   // 🧭 Handle tab switching with centralized navigation helpers
   const handleTabChange = (tabKey: string) => {
-    setActiveTab(tabKey); // Update UI immediately for responsive feedback
+    setActiveTab(tabKey); // Update context state for chrome layer
     const worldId =
       typeof params.worldId === "string" ? params.worldId : undefined;
     const userRole =
@@ -81,10 +84,32 @@ export default function MainLayout() {
       {/* Stack for main routes and nested navigation */}
       <Stack screenOptions={{ headerShown: false }} />
 
-      {/* Bottom bar only for mobile */}
+      {/* Chrome BottomBar - mobile only (Platform check is inside ChromeBottomBar) */}
       {isMobile && (
-        <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} />
+        <ChromeBottomBar
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+        />
       )}
     </View>
   );
 }
+
+/*
+══════════════════════════════════════════════════════════════════════
+   OLD CODE: Commented out for reference during transition
+   
+   Previous implementation used useState for activeTab management.
+   Now replaced with ChromeContext state via useChrome() hook.
+   BottomTabBar component is no longer used - replaced with ChromeBottomBar.
+   Delete this section once migration is verified.
+══════════════════════════════════════════════════════════════════════
+
+  OLD: const [activeTab, setActiveTab] = useState("characters");
+
+  OLD RENDER:
+  {isMobile && (
+    <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} />
+  )}
+
+══════════════════════════════════════════════════════════════════════ */

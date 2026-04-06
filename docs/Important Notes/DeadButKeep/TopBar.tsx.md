@@ -1,19 +1,36 @@
+```ts
+/**
+ * ⚠️  DEPRECATED — Use ChromeLayer instead
+ * 
+ * This component has been replaced by the ChromeLayer pattern:
+ * - components/layer/ChromeLayer.tsx (orchestration skeleton)
+ * - components/chrome/ChromeTopBar.tsx (styled component)
+ * - contexts/chrome-context.tsx (state management)
+ * 
+ * Kept for reference during the transition period.
+ * Safe to delete once ChromeLayer is verified in production.
+ * 
+ * Migration guide:
+ * Replace <TopBar {...props} /> with:
+ * <ChromeLayer topBar={{ title, showBackButton, showHamburger, onBackPress, a11yFocusTarget }} />
+ */
+
+import { useAppToast } from "@/contexts/app-toast-context";
 import { logger } from "@/lib";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
 import { S, UseTheme } from "@/theme";
 import { useRouter, useSegments } from "expo-router";
 import { memo, useEffect, useRef, useState } from "react";
 import {
-  AccessibilityInfo,
-  Platform,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
+    AccessibilityInfo,
+    Platform,
+    StyleSheet,
+    Text,
+    View,
+    useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SettingsMenu from "./modals/SettingsModal";
-import { AppToast } from "./ui/AppToast";
 import { IconButton } from "./ui/IconButton";
 
 // 🎨 Fixed palette (matches BottomTabBar)
@@ -47,8 +64,8 @@ function TopBar({
   const { width } = useWindowDimensions();
   const isMobile = Platform.OS !== "web" || width < 900;
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
-  const [showErrorToast, setShowErrorToast] = useState(false);
   const { theme } = UseTheme();
+  const { show: showToast } = useAppToast();
   const insets = useSafeAreaInsets();
   const lastAnnouncedTitle = useRef<string | undefined>(undefined);
 
@@ -69,7 +86,7 @@ function TopBar({
       return;
     }
     logger.category("navigation").warn("TopBar back press with no handler; ignoring");
-    setShowErrorToast(true);
+    showToast('Navigation Error', 'Failed to navigate to settings. Please try again.', 'error');
   };
 
   const handleHamburgerPress = () => {
@@ -160,7 +177,7 @@ function TopBar({
             router.push(target as any);
           } catch (err) {
             logger.category("navigation").warn("TopBar: failed to resolve username route, falling back", err);
-            setShowErrorToast(true);
+            showToast('Navigation Error', 'Failed to navigate to settings. Please try again.', 'error');
           }
         }}
         onReturnToWorldSelection={() => {
@@ -173,14 +190,6 @@ function TopBar({
           );
           router.replace(target as any);
         }}
-      />
-
-      {/* Error feedback */}
-      <AppToast
-        visible={showErrorToast}
-        message="Failed to navigate to settings. Please try again."
-        type="error"
-        onHide={() => setShowErrorToast(false)}
       />
     </>
   );

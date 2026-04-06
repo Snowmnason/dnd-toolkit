@@ -2,7 +2,11 @@
  * Storage Keys
  *
  * Centralized key constants with namespacing.
- * Format: dnd:<domain>:<key>
+ * 
+ * Namespace convention:
+ * - sno: Shared infrastructure (auth, preferences, offline queues, analytics, feature flags, etc.)
+ *        Can be safely shared across different apps built on the same platform
+ * - dnd: DnD-Toolkit app-specific (world connections, invites, session state tied to app logic)
  *
  * NEVER use raw string keys - always use these constants.
  *
@@ -10,86 +14,88 @@
  * See config/storage-backends-config.ts for the complete routing strategy.
  */
 export const STORAGE_KEYS = {
-  // ========== PERSISTENT (localStorage) - Sensitive Auth/User Data ==========
+  // ========== DND APP-SPECIFIC DATA (dnd:) ==========
 
-  // App-level data
+  // App-level data (DnD-specific world management)
   CONNECTED_WORLDS: "dnd:app:connected_worlds",
   CONNECTED_WORLDS_METADATA: "dnd:app:connected_worlds_metadata",
 
-  // Auth-related data
-  HAS_ACCOUNT: "dnd:auth:has_account",
-  AUTH_SESSION: "dnd:auth:session", // Supabase session tokens (web platform workaround for persistSession=false)
-  USER_DATA: "dnd:auth:user_data",
-  USER_DATA_META: "dnd:auth:user_data_meta",
-  USER_DATA_TIMESTAMP: "dnd:auth:user_data_timestamp",
-  LAST_LOGGED_IN: "dnd:auth:last_logged_in", // Timestamp of last successful sign-in
-  PROFILE_COMPLETED: "dnd:auth:profile_completed", // false after signup, true after profile created, null/undefined for normal users
-
-  // Auth attempt rate limiting
-  AUTH_ATTEMPTS: "dnd:auth:attempts",
-
-  // Invites - important auth flow state
+  // Invites - DnD-specific auth flow state
   PENDING_INVITE: "dnd:invite:pending",
 
-  // Session email cache
-  SESSION_USER_EMAIL: "dnd_session_user_email",
-
-  // User preferences - must persist
-  THEME_PREFERENCE: "dnd:user:theme",
-  THEME_MODE: "dnd:user:theme_mode",
-  SCALE_PREFERENCE: "dnd:user:scale",
-
-  // User settings (theme, language, timezone, preferences, analytics_consent_level)
-  USER_SETTINGS: "dnd:user:settings",
-  USER_SETTINGS_META: "dnd:user:settings_meta",
-
-  // Feature flags / dev settings
-  DEV_MODE: "dnd:dev:mode",
-
-  // ========== EPHEMERAL (sessionStorage) - Query Cache & Metadata ==========
-  // Note: These are pattern prefixes; actual keys use these prefixes
-
-  // Session state (volatile, refetchable)
+  // Session state tied to DnD world selection
   LAST_SELECTED_WORLD: "dnd:session:last_selected_world",
   LAST_USER_ROLE: "dnd:session:last_user_role",
 
-  // Safe mode diagnostics (transient, cleared when user recovers or restarts)
-  SAFE_MODE_DIAGNOSTICS: "dnd:session:safe_mode_diagnostics",
+  // ========== SHARED INFRASTRUCTURE (sno:) ==========
 
-  // Offline request queue (persistent, survives app restart)
-  OFFLINE_QUEUE: "dnd:api:offline_queue",
+  // Auth-related data (shared auth infrastructure)
+  HAS_ACCOUNT: "sno:auth:has_account",
+  AUTH_SESSION: "sno:auth:session", // Supabase session tokens (web platform workaround for persistSession=false)
+  USER_DATA: "sno:auth:user_data",
+  USER_DATA_META: "sno:auth:user_data_meta",
+  USER_DATA_TIMESTAMP: "sno:auth:user_data_timestamp",
+  LAST_LOGGED_IN: "sno:auth:last_logged_in", // Timestamp of last successful sign-in
+  PROFILE_COMPLETED: "sno:auth:profile_completed", // false after signup, true after profile created, null/undefined for normal users
 
-  // Offline mutation queue (persistent, survives app restart)
-  OFFLINE_MUTATION_QUEUE: "dnd:offline:mutation_queue",
+  // Auth attempt rate limiting (shared infrastructure)
+  AUTH_ATTEMPTS: "sno:auth:attempts",
 
-  // Offline mutation dead-letter queue (permanent failures)
-  OFFLINE_DEAD_LETTER: "dnd:offline:dead_letter",
+  // Session email cache (shared auth infrastructure)
+  SESSION_USER_EMAIL: "sno:session_user_email",
 
-  // Analytics event buffer (offline queueing)
-  ANALYTICS_OFFLINE_QUEUE: "dnd:analytics:offline_queue",
+  // User preferences - must persist (shared preference structure)
+  THEME_PREFERENCE: "sno:user:theme",
+  THEME_MODE: "sno:user:theme_mode",
+  SCALE_PREFERENCE: "sno:user:scale",
 
-  // Performance baseline tracking
-  PERF_BASELINES: "dnd:analytics:performance_baselines",
+  // Component UI state (framework-level, reusable across apps)
+  NAV_DRAWER_EXPANDED: "sno:ui:nav_drawer_expanded",
 
-  // Analytics consent (persisted user choice)
-  ANALYTICS_CONSENT: "dnd:analytics:consent",
-  ANALYTICS_CONSENT_META: "dnd:analytics:consent_meta",
+  // User settings (shared storage contract, app fills with own settings)
+  USER_SETTINGS: "sno:user:settings",
+  USER_SETTINGS_META: "sno:user:settings_meta",
 
-  // Analytics consent sync queue (pending DB updates)
-  CONSENT_SYNC_QUEUE: "dnd:analytics:consent_sync_queue",
+  // Feature flags / dev settings (shared infrastructure)
+  DEV_MODE: "sno:dev:mode",
 
-  // Breadcrumb queue (Sentry offline persistence)
-  BREADCRUMB_QUEUE: "dnd:sentry:breadcrumb_queue",
-  BREADCRUMB_DEDUP_CACHE: "dnd:sentry:sent_fingerprints",
+  // Safe mode diagnostics (shared infrastructure)
+  SAFE_MODE_DIAGNOSTICS: "sno:session:safe_mode_diagnostics",
 
-  // Network recovery state (retry count, backoff timing)
-  NETWORK_RECOVERY_STATE: "dnd:network:recovery_state",
+  // Offline request queue (shared infrastructure, persistent)
+  OFFLINE_QUEUE: "sno:api:offline_queue",
 
-  // Feature flags and premium entitlements
-  FEATURE_FLAGS: "dnd:feature_flags:v1",
-  ENTITLEMENTS: "dnd:entitlements:v1",
-  CLOCK_INVALID: "dnd:clock_invalid",
+  // Offline mutation queue (shared infrastructure, persistent)
+  OFFLINE_MUTATION_QUEUE: "sno:offline:mutation_queue",
 
-  // Kernel clock integrity (device time-manipulation detection)
-  LAST_CLOCK_CHECK: "dnd:kernel:last_clock_check",
+  // Offline mutation dead-letter queue (shared infrastructure)
+  OFFLINE_DEAD_LETTER: "sno:offline:dead_letter",
+
+  // Analytics event buffer (shared infrastructure)
+  ANALYTICS_OFFLINE_QUEUE: "sno:analytics:offline_queue",
+
+  // Performance baseline tracking (shared infrastructure)
+  PERF_BASELINES: "sno:analytics:performance_baselines",
+
+  // Analytics consent (shared infrastructure)
+  ANALYTICS_CONSENT: "sno:analytics:consent",
+  ANALYTICS_CONSENT_META: "sno:analytics:consent_meta",
+
+  // Analytics consent sync queue (shared infrastructure)
+  CONSENT_SYNC_QUEUE: "sno:analytics:consent_sync_queue",
+
+  // Breadcrumb queue (shared infrastructure - Sentry offline persistence)
+  BREADCRUMB_QUEUE: "sno:sentry:breadcrumb_queue",
+  BREADCRUMB_DEDUP_CACHE: "sno:sentry:sent_fingerprints",
+
+  // Network recovery state (shared infrastructure)
+  NETWORK_RECOVERY_STATE: "sno:network:recovery_state",
+
+  // Feature flags and premium entitlements (shared infrastructure)
+  FEATURE_FLAGS: "sno:feature_flags:v1",
+  ENTITLEMENTS: "sno:entitlements:v1",
+  CLOCK_INVALID: "sno:clock_invalid",
+
+  // Kernel clock integrity (shared infrastructure)
+  LAST_CLOCK_CHECK: "sno:kernel:last_clock_check",
 } as const;

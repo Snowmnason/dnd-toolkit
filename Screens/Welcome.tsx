@@ -32,7 +32,7 @@ export default function Welcome({ isLoading = false }: WelcomeScreenProps) {
     try {
       router.push('/login/sign-in');
     } catch {
-      showToast('Unable to navigate to sign-in', 'error');
+      showToast('Navigation Error', 'Unable to navigate to sign-in', 'error');
     } finally {
       setAuthIsLoading(false);
     }
@@ -43,7 +43,7 @@ export default function Welcome({ isLoading = false }: WelcomeScreenProps) {
     try {
       router.push('/login/sign-up');
     } catch {
-      showToast('Unable to navigate to sign-up', 'error');
+      showToast('Navigation Error', 'Unable to navigate to sign-up', 'error');
     } finally {
       setAuthIsLoading(false);
     }

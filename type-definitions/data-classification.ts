@@ -99,46 +99,46 @@ export const DATA_CLASSIFICATIONS: Record<string, DataClassification> = {
       "Marker indicating device clock manipulation was detected (stale entitlements rejected)",
   },
 
-  // ========== AUTHENTICATION & ACCOUNT ==========
-  "dnd:auth:has_account": {
-    key: "dnd:auth:has_account",
+  // ========== AUTHENTICATION & ACCOUNT (shared infrastructure) ==========
+  "sno:auth:has_account": {
+    key: "sno:auth:has_account",
     sensitivity: DataSensitivity.SENSITIVE,
     description: "Whether user has created an account",
   },
 
-  "dnd:auth:user_data": {
-    key: "dnd:auth:user_data",
+  "sno:auth:user_data": {
+    key: "sno:auth:user_data",
     sensitivity: DataSensitivity.SENSITIVE,
     description: "User profile data (ID, email, etc.)",
   },
 
-  "dnd:auth:user_data_meta": {
-    key: "dnd:auth:user_data_meta",
+  "sno:auth:user_data_meta": {
+    key: "sno:auth:user_data_meta",
     sensitivity: DataSensitivity.SENSITIVE,
     description: "Metadata for user profile cache (timestamp, version)",
   },
 
-  "dnd:auth:user_data_timestamp": {
-    key: "dnd:auth:user_data_timestamp",
+  "sno:auth:user_data_timestamp": {
+    key: "sno:auth:user_data_timestamp",
     sensitivity: DataSensitivity.SENSITIVE,
     description: "Timestamp of last user data update",
   },
 
-  "dnd:auth:last_logged_in": {
-    key: "dnd:auth:last_logged_in",
+  "sno:auth:last_logged_in": {
+    key: "sno:auth:last_logged_in",
     sensitivity: DataSensitivity.SENSITIVE,
     description: "Timestamp of last successful login",
   },
 
-  "dnd:auth:attempts": {
-    key: "dnd:auth:attempts",
+  "sno:auth:attempts": {
+    key: "sno:auth:attempts",
     sensitivity: DataSensitivity.SENSITIVE,
     description: "Failed auth attempt tracking for brute-force protection",
     ttl: 15 * 60 * 1000, // 15 minutes
   },
 
-  "dnd:auth:session": {
-    key: "dnd:auth:session",
+  "sno:auth:session": {
+    key: "sno:auth:session",
     sensitivity: DataSensitivity.PII,
     description:
       "Supabase session tokens (access + refresh) for web platform (persistSession=false workaround)",
@@ -209,29 +209,29 @@ export const DATA_CLASSIFICATIONS: Record<string, DataClassification> = {
       "Metadata for world access cache (pattern: world_access_{worldId}_meta)",
   },
 
-  // ========== UI PREFERENCES ==========
-  "dnd:user:theme": {
-    key: "dnd:user:theme",
+  // ========== UI PREFERENCES (shared infrastructure) ==========
+  "sno:user:theme": {
+    key: "sno:user:theme",
     sensitivity: DataSensitivity.NON_SENSITIVE,
     description:
       "User theme preference (classic, cyberpunk, etc.) - persists across restarts",
   },
 
-  "dnd:user:theme_mode": {
-    key: "dnd:user:theme_mode",
+  "sno:user:theme_mode": {
+    key: "sno:user:theme_mode",
     sensitivity: DataSensitivity.NON_SENSITIVE,
     description: "User theme mode (light, dark) - persists across restarts",
   },
 
-  "dnd:user:scale": {
-    key: "dnd:user:scale",
+  "sno:user:scale": {
+    key: "sno:user:scale",
     sensitivity: DataSensitivity.NON_SENSITIVE,
     description: "UI scale multiplier preference - persists across restarts",
   },
 
-  // ========== DEV & DEBUG ==========
-  "dnd:dev:mode": {
-    key: "dnd:dev:mode",
+  // ========== DEV & DEBUG (shared infrastructure) ==========
+  "sno:dev:mode": {
+    key: "sno:dev:mode",
     sensitivity: DataSensitivity.PUBLIC,
     description: "Developer mode flag",
   },
@@ -257,27 +257,27 @@ export const DATA_CLASSIFICATIONS: Record<string, DataClassification> = {
     description: "Dynamic job state keys (pattern: job:*)",
   },
 
-  // ========== ANALYTICS & TELEMETRY ==========
-  "dnd:sentry:breadcrumb_queue": {
-    key: "dnd:sentry:breadcrumb_queue",
+  // ========== ANALYTICS & TELEMETRY (shared infrastructure) ==========
+  "sno:sentry:breadcrumb_queue": {
+    key: "sno:sentry:breadcrumb_queue",
     sensitivity: DataSensitivity.SENSITIVE,
     description: "Offline queue of breadcrumbs (debug events) waiting to be sent to Sentry",
     ttl: 14 * 24 * 60 * 60 * 1000, // 14 days
   },
 
-  "dnd:sentry:sent_fingerprints": {
-    key: "dnd:sentry:sent_fingerprints",
+  "sno:sentry:sent_fingerprints": {
+    key: "sno:sentry:sent_fingerprints",
     sensitivity: DataSensitivity.SENSITIVE,
     description: "Deduplication cache for sent breadcrumbs (fingerprint -> timestamp)",
     ttl: 24 * 60 * 60 * 1000, // 24 hours
   },
 
-  // ========== RECOVERY & DIAGNOSTICS ==========
-  // Pattern: dnd:recovery:* - recovery and diagnostic data
-  "dnd:recovery:*": {
-    key: "dnd:recovery:*",
+  // ========== RECOVERY & DIAGNOSTICS (shared infrastructure) ==========
+  // Pattern: sno:recovery:* - recovery and diagnostic data
+  "sno:recovery:*": {
+    key: "sno:recovery:*",
     sensitivity: DataSensitivity.SENSITIVE,
-    description: "Recovery and diagnostic data (pattern: dnd:recovery:*)",
+    description: "Recovery and diagnostic data (pattern: sno:recovery:*)",
   },
 };
 

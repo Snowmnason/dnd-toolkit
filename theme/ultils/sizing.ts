@@ -62,6 +62,20 @@ const spaceBase = {
 };
 
 /* ───────────────────────────────
+   Sizing (base values; multiples of 8)
+   Used for icons, avatars, spinners, and other component dimensions
+──────────────────────────────── */
+const sizeBase = {
+  xxs: 4,
+  xs: 8,
+  sm: 16,
+  md: 24,
+  lg: 32,
+  xl: 48,
+  xxl: 64,
+};
+
+/* ───────────────────────────────
    Line Height (base values)
    Paired with corresponding font sizes for consistent typography
 ──────────────────────────────── */
@@ -153,6 +167,16 @@ export function buildSizing(scaleValue: number) {
     xxl: spaceBase.xxl * scaleValue,
   };
 
+  const size = {
+    xxs: sizeBase.xxs * scaleValue,
+    xs: sizeBase.xs * scaleValue,
+    sm: sizeBase.sm * scaleValue,
+    md: sizeBase.md * scaleValue,
+    lg: sizeBase.lg * scaleValue,
+    xl: sizeBase.xl * scaleValue,
+    xxl: sizeBase.xxl * scaleValue,
+  };
+
   const lineHeight = {
     caption: lineHeightBase.caption * 1,
     subtitle: lineHeightBase.subtitle * 1,
@@ -203,6 +227,7 @@ export function buildSizing(scaleValue: number) {
     scale: scaleValue,
     font,
     space,
+    size,
     lineHeight,
     button,
     modal,
@@ -223,6 +248,7 @@ export const S = buildSizing(scale);
 export type Sizing = ReturnType<typeof buildSizing>;
 export type FontSizes = keyof typeof fontBase;
 export type SpacingSizes = keyof typeof spaceBase;
+export type SizeSizes = keyof typeof sizeBase;
 export type LineHeightSizes = keyof typeof lineHeightBase;
 export type ButtonSizes = keyof typeof buttonBase;
 export type ModalSizes = keyof typeof modalBase;
@@ -232,6 +258,7 @@ export type RadiusSizes = keyof typeof radius;
 // Legacy exports for backward compatibility
 export const font = S.font;
 export const space = S.space;
+export const size = S.size;
 export const lineHeight = S.lineHeight;
 export const button = S.button;
 export const modal = S.modal;

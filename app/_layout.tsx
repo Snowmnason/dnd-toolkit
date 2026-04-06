@@ -1,8 +1,14 @@
 import {
   AppErrorBoundary,
-  TopBar,
+  AppToastLayer,
+  ChromeLayer,
+  JobOperationLayer,
+  NavDrawerLayer,
+  NotificationContainer,
+  SnackBarLayer,
   UIBlockerLayer
 } from "@/components";
+import SettingsModal from "@/components/modals/SettingsModal";
 import { OfflineSyncNotificationLayer } from "@/components/offline";
 import {
   CrashFallBack,
@@ -10,27 +16,23 @@ import {
   SafeModeErrorBoundary,
   SafeModeScreen,
 } from "@/components/SplashScreen";
-import { AppToastLayer, NotificationContainer } from "@/components/ui";
-import { AppToastProvider, ModalProvider, NotificationProvider } from "@/contexts";
+import { OverlayProvider, useChrome } from "@/contexts";
 // Trigger modal registration side effects — must run before any openModal() call.
 // Imported here (leaf module) instead of modal-context.tsx to avoid circular dependency.
 import "@/components/modals/register-all-modals";
+import { getAppConfig } from "@/config";
 import { Analytics, sessionManager } from "@/hooks/analytics";
 import { SafeModeReason, executeRecoveryAction } from "@/hooks/error";
 import { useClearSafeMode } from "@/hooks/error/use-safe-mode";
 import { AppKernelProvider, useAppKernel, useKernelLoadingSync, useSyncSplash } from "@/hooks/kernel";
-import { useAnalyticsNavigation, useNavigate, useRouteConfig } from "@/hooks/navigation";
+import { useAnalyticsNavigation, useNavigate, usePanelNavigation, useRouteConfig } from "@/hooks/navigation";
 import {
   type AccessRole,
 } from "@/hooks/storage";
 import { logger, useInjectToastSystem } from "@/hooks/utils";
+import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
 import {
-  AppParamsStableProvider,
-  AppParamsVolatileProvider,
-  PlatformProvider,
-  ScaleProvider,
   SubscriptionProvider,
-  ThemeProvider,
   UseTheme,
   useAppParamsStable,
   useAppParamsVolatile,
@@ -39,6 +41,8 @@ import {
   useUserRole,
   useWorldId,
 } from "@/providers";
+import { AppParamsProvider } from "@/providers/AppParamsProvider";
+import { ViewportProvider } from "@/providers/ViewportProvider";
 import {
   Stack,
   useLocalSearchParams,
@@ -46,7 +50,7 @@ import {
   useSegments,
 } from "expo-router";
 import { useEffect } from "react";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 
 // Suppress known benign warnings from React Navigation / Expo Router / React Native Web
 // 1. "Blocked aria-hidden on an element because its descendant retained focus"
@@ -91,6 +95,7 @@ function RootLayoutContent() {
   const userRole = useUserRole();
   const { updateVolatileParams, clearWorldParams } = useAppParamsVolatile();
   const { clearAllParams } = useAppParamsStable();
+  const { closeSettingsMenu, settingsMenuVisible } = useChrome();
 
   // Data loading hooks
   const kernel = useAppKernel();
@@ -119,6 +124,14 @@ function RootLayoutContent() {
   // Analytics hook (must be called unconditionally)
   useAnalyticsNavigation();
 
+  // NavDrawer feature flag: Determine if drawer should be rendered based on global flag and route
+  const config = getAppConfig();
+  const navDrawerConfig = config.ui?.navDrawer;
+  const navDrawerEnabled = navDrawerConfig?.enabled ?? false;
+  const skipRoutes = navDrawerConfig?.skipRoutes ?? [];
+  const currentRoute = segments[0] || 'index';
+  const shouldRenderNavDrawer = navDrawerEnabled && !skipRoutes.includes(currentRoute);
+
   // Navigation hooks (must be called unconditionally before any early returns)
   const navContext = {
     segments,
@@ -134,9 +147,15 @@ function RootLayoutContent() {
 
   const { config: routeConfig, title: resolvedTitle, backTarget: topBarBackTarget } = useRouteConfig(navContext);
   const { replace: navigateTo } = useNavigate();
+  const panelNav = usePanelNavigation();
 
   // ==================== EFFECT HOOKS SECTION ====================
   // All effects that depend on above hooks
+
+  // Reset right panel to left whenever the route group changes.
+  // Prevents stale panel state (right panel open) from persisting across navigations.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { panelNav.goToLeftPanel(); }, [(segments as string[])[0], (segments as string[])[1]]);
 
   // Identify user to analytics when available
   useEffect(() => {
@@ -318,7 +337,13 @@ function RootLayoutContent() {
   const topBarTitle = !hideTopBar ? resolvedTitle : undefined;
 
   // Build back press handler using config
+  // Panel navigation gets first chance to handle back (right panel → left panel on mobile)
   const handleTopBarBack = () => {
+    // If panel navigation handles the back (mobile right→left), stop here
+    if (panelNav.handleBackPress()) {
+      return;
+    }
+
     if (topBarBackTarget) {
       if (routeConfig.preserveParamsOnBack && (worldId || userRole)) {
         navigateTo(
@@ -336,6 +361,36 @@ function RootLayoutContent() {
         ["worldId", "userRole"],
       );
     }
+  };
+
+  // SettingsMenu handlers
+  const handleAccountSettings = async () => {
+    closeSettingsMenu();
+    try {
+      const { AuthStateManager } = await import("@/lib/auth/auth-state");
+      const user = await AuthStateManager.getUserData();
+      const username = user?.username || "user";
+
+      const target = buildNavigationTarget(
+        `/settings/${encodeURIComponent(username)}`,
+        { worldId, userRole },
+        ["worldId", "userRole"],
+      );
+
+      router.push(target as any);
+    } catch (err) {
+      logger.category("navigation").warn("Root layout: failed to resolve username route, falling back", err);
+    }
+  };
+
+  const handleReturnToWorldSelection = () => {
+    closeSettingsMenu();
+    const target = buildNavigationTarget(
+      "/select/world-selection",
+      {},
+      [],
+    );
+    router.replace(target as any);
   };
 
   return (
@@ -359,30 +414,43 @@ function RootLayoutContent() {
             uninitialized services during bootstrap. */}
         {kernel.phases.appReady && (
           <>
-            {/* Global TopBar - driven by centralized navigation config */}
+            {/* Global ChromeLayer (TopBar + BottomBar) - driven by centralized navigation config */}
             {!hideTopBar && topBarTitle && (
-              <TopBar
-                title={topBarTitle}
-                showBackButton={routeConfig.back !== undefined}
-                showHamburger={routeConfig.showHamburger}
-                onBackPress={handleTopBarBack}
-                userId={userId}
-                worldId={worldId}
-                userRole={userRole}
-                a11yFocusTarget={routeConfig.a11yFocusTarget}
+              <ChromeLayer
+                topBar={{
+                  title: topBarTitle,
+                  showBackButton: routeConfig.back !== undefined,
+                  showHamburger: routeConfig.showHamburger ?? false,
+                  onBackPress: handleTopBarBack,
+                  a11yFocusTarget: routeConfig.a11yFocusTarget,
+                }}
               />
             )}
 
-            {/* Stack container - must flex to fill available space */}
-            <View style={{ flex: 1 }}>
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: {
-                    backgroundColor: "$background",
-                  },
-                }}
-              />
+            {/* SettingsMenu Modal */}
+            <SettingsModal
+              visible={settingsMenuVisible}
+              onClose={closeSettingsMenu}
+              onAccountSettings={handleAccountSettings}
+              onReturnToWorldSelection={handleReturnToWorldSelection}
+            />
+
+            {/* Content area: sidebar + stack in row layout on desktop */}
+            <View style={{ flex: 1, flexDirection: Platform.OS === 'web' ? 'row' : 'column' }}>
+              {/* Desktop sidebar — inline, always visible, animated width (feature-flagged) */}
+              {Platform.OS === 'web' && shouldRenderNavDrawer && <NavDrawerLayer mode="expandable" />}
+
+              {/* Stack container - flex-grows to fill remaining space */}
+              <View style={{ flex: 1 }}>
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: {
+                      backgroundColor: "$background",
+                    },
+                  }}
+                />
+              </View>
             </View>
 
             {/* Notification Container - renders all queued notifications */}
@@ -390,6 +458,15 @@ function RootLayoutContent() {
 
             {/* App Toast Layer - renders global app-level toasts */}
             <AppToastLayer />
+
+            {/* Job Operation Panel - Google Drive-style job tracking overlay */}
+            <JobOperationLayer />
+
+            {/* Snackbar Layer - renders global bottom-anchored snackbars */}
+            <SnackBarLayer />
+
+            {/* Mobile drawer overlay — modal-based, only on native (feature-flagged) */}
+            {Platform.OS !== 'web' && shouldRenderNavDrawer && <NavDrawerLayer mode="modal" position="left" />}
 
             {/* Offline sync status and notifications */}
             <OfflineSyncNotificationLayer />
@@ -403,41 +480,52 @@ function RootLayoutContent() {
   );
 }
 
+/* ═════════════════════════════════════════════════════════════
+   OLD CODE: Commented out for reference during transition
+   
+   Previous implementation used inline TopBar component with local state.
+   Now replaced with ChromeLayer (orchestration) + ChromeContext (state).
+   Delete this section once ChromeLayer is verified working.
+   ═════════════════════════════════════════════════════════════
+   
+   <TopBar
+     title={topBarTitle}
+     showBackButton={routeConfig.back !== undefined}
+     showHamburger={routeConfig.showHamburger}
+     onBackPress={handleTopBarBack}
+     userId={userId}
+     worldId={worldId}
+     userRole={userRole}
+     a11yFocusTarget={routeConfig.a11yFocusTarget}
+   />
+   
+   ═════════════════════════════════════════════════════════════ */
+
 // Main export with provider wrapper and error boundary
 export default function RootLayout() {
   return (
     <AppKernelProvider>
-      <ThemeProvider>
-        <ScaleProvider>
-          <PlatformProvider>
-            <SubscriptionProvider>
-              <AppParamsStableProvider>
-                <AppParamsVolatileProvider>
-                  <ModalProvider>
-                    <NotificationProvider>
-                      <AppToastProvider>
-                        {/* UIBlockerLayer renders the splash overlay (isLoading: true by default)
-                            and provides the setLoading() context. Placed here — inside all theme
-                            providers (SplashScreen needs UseTheme) but above RootLayoutContent
-                            where useKernelLoadingSync() calls setLoading(false) on appReady. */}
-                        <UIBlockerLayer>
-                          <AppErrorBoundary
-                            renderFallback={(error: Error | null, onRetry: () => void) => (
-                              <CrashFallBack error={error} onRetry={onRetry} />
-                            )}
-                          >
-                            <RootLayoutContent />
-                          </AppErrorBoundary>
-                        </UIBlockerLayer>
-                      </AppToastProvider>
-                    </NotificationProvider>
-                  </ModalProvider>
-                </AppParamsVolatileProvider>
-              </AppParamsStableProvider>
-            </SubscriptionProvider>
-          </PlatformProvider>
-        </ScaleProvider>
-      </ThemeProvider>
+      <ViewportProvider>
+        <SubscriptionProvider>
+          <AppParamsProvider>
+            <OverlayProvider>
+              {/* UIBlockerLayer renders the splash overlay (isLoading: true by default)
+                  and provides the setLoading() context. Placed here — inside all theme
+                  providers (SplashScreen needs UseTheme) but above RootLayoutContent
+                  where useKernelLoadingSync() calls setLoading(false) on appReady. */}
+              <UIBlockerLayer>
+                <AppErrorBoundary
+                  renderFallback={(error: Error | null, onRetry: () => void) => (
+                    <CrashFallBack error={error} onRetry={onRetry} />
+                  )}
+                >
+                  <RootLayoutContent />
+                </AppErrorBoundary>
+              </UIBlockerLayer>
+            </OverlayProvider>
+          </AppParamsProvider>
+        </SubscriptionProvider>
+      </ViewportProvider>
     </AppKernelProvider>
   );
 }

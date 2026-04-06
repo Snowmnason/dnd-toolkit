@@ -1,7 +1,29 @@
+```ts
+/**
+ * ⚠️  DEPRECATED — Use ChromeBottomBar instead
+ * 
+ * This component has been replaced by the ChromeBottomBar pattern:
+ * - components/chrome/ChromeBottomBar.tsx (styled component)
+ * - contexts/chrome-context.tsx (shared state with ChromeTopBar)
+ * - components/layer/ChromeLayer.tsx (orchestration)
+ * 
+ * Kept for reference during the transition period.
+ * Safe to delete once ChromeLayer is verified in production.
+ * 
+ * Migration guide:
+ * Replace <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} /> with:
+ * <ChromeBottomBar activeTab={activeTab} onTabChange={handleTabChange} />
+ * 
+ * State is now managed via ChromeContext (useChrome hook).
+ */
+
 import { UseTheme } from '@/theme';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { panelConfigs } from './PanelData';
+import { panelConfigs } from '../Screens/main-panels/PanelData';
 
+/**
+ * ⚠️  DEPRECATED — Use ChromeBottomBar instead (see deprecation notice at top of file)
+ */
 interface BottomTabBarProps {
   activeTab: string;
   onTabChange: (tabKey: string) => void;

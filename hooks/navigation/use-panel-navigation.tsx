@@ -1,85 +1,131 @@
 import { usePlatform } from '@/providers'
-import { useState } from 'react'
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import { Platform } from 'react-native'
 
-interface UsePanelNavigationOptions {
+/**
+ * PanelNavigationContext
+ * 
+ * Provides panel navigation state to the entire subtree (including TopBar).
+ * This enables the TopBar back button to be aware of panel state and intercept
+ * back navigation when a right panel is visible on mobile.
+ */
+interface PanelNavigationContextType {
+  activePanel: 'left' | 'right'
+  showLeftPanel: boolean
+  showRightPanel: boolean
+  goToRightPanel: () => void
+  goToLeftPanel: () => void
+  /** Returns true if the back was handled (right→left), false if not (needs router navigation) */
+  handleBackPress: () => boolean
+  isDesktop: boolean
+  isActualMobile: boolean
+  /** Whether any screen in this subtree has active panel navigation (AppSplit mounted) */
+  isActive: boolean
+}
+
+const PanelNavigationContext = createContext<PanelNavigationContextType | null>(null)
+
+interface PanelNavigationProviderProps {
+  children: React.ReactNode
   onPanelChange?: (panel: 'left' | 'right') => void
-  onBackPress?: () => boolean // Return true if back was handled
 }
 
 /**
- * Hook to manage left/right panel navigation for mobile layouts.
- * Handles panel switching, back navigation, and will support gestures/hardware back in the future.
+ * PanelNavigationProvider
  * 
- * TODO: Integrate with top bar back button override
- * TODO: Add hardware back button support (Android)
- * TODO: Add swipe gesture support (iOS/Android only)
- * TODO: Add panel transition animations
+ * Wrap around any layout that contains an AppSplit screen.
+ * Provides shared panel navigation state to all children, including the TopBar.
+ * 
+ * ✅ Gate-Free: Does not depend on kernel phases.
+ * ✅ Reusable: Works for any AppSplit screen (worlds, characters, encounters, etc.)
+ * ✅ TopBar Aware: TopBar back button can check `handleBackPress()` before router.back()
+ * 
+ * Usage:
+ *   <PanelNavigationProvider>
+ *     <Stack />  (Contains AppSplit screens)
+ *   </PanelNavigationProvider>
  */
-export function usePanelNavigation(options?: UsePanelNavigationOptions) {
+export function PanelNavigationProvider({ children, onPanelChange }: PanelNavigationProviderProps) {
   const { isDesktop } = usePlatform()
   const [activePanel, setActivePanel] = useState<'left' | 'right'>('left')
 
-  // Check if we're on actual mobile device (not just small screen)
   const isActualMobile = Platform.OS === 'ios' || Platform.OS === 'android'
 
   const showLeftPanel = isDesktop || activePanel === 'left'
   const showRightPanel = isDesktop || activePanel === 'right'
 
-  const goToRightPanel = () => {
+  const goToRightPanel = useCallback(() => {
     if (!isDesktop) {
       setActivePanel('right')
-      options?.onPanelChange?.('right')
+      onPanelChange?.('right')
     }
-  }
+  }, [isDesktop, onPanelChange])
 
-  const goToLeftPanel = () => {
+  const goToLeftPanel = useCallback(() => {
     if (!isDesktop) {
       setActivePanel('left')
-      options?.onPanelChange?.('left')
+      onPanelChange?.('left')
     }
-  }
+  }, [isDesktop, onPanelChange])
 
-  // Handle back button press (from top bar, hardware, or gesture)
-  const handleBackPress = (): boolean => {
-    // If on right panel and not desktop, go back to left panel
+  const handleBackPress = useCallback((): boolean => {
     if (!isDesktop && activePanel === 'right') {
-      goToLeftPanel()
-      return true // Indicates back was handled
+      setActivePanel('left')
+      onPanelChange?.('left')
+      return true
     }
-    
-    // Otherwise, let default back behavior happen
     return false
-  }
+  }, [isDesktop, activePanel, onPanelChange])
 
-  // TODO: Add hardware back button listener here when navigation overhaul happens
-  // useEffect(() => {
-  //   if (isActualMobile) {
-  //     const backHandler = BackHandler.addEventListener('hardwareBackPress', handleBackPress)
-  //     return () => backHandler.remove()
-  //   }
-  // }, [activePanel, isActualMobile])
-
-  // TODO: Add swipe gesture recognizer here
-  // const panGestureHandler = useMemo(() => {
-  //   if (isActualMobile) {
-  //     return Gesture.Pan()
-  //       .onEnd((e) => {
-  //         if (e.translationX > 50 && activePanel === 'right') {
-  //           goToLeftPanel()
-  //         }
-  //       })
-  //   }
-  // }, [activePanel, isActualMobile])
-
-  return {
+  const value = useMemo(() => ({
     activePanel,
     showLeftPanel,
     showRightPanel,
     goToRightPanel,
     goToLeftPanel,
-    handleBackPress, // Expose this for top bar integration
+    handleBackPress,
     isDesktop,
     isActualMobile,
-  }
+    isActive: true,
+  }), [activePanel, showLeftPanel, showRightPanel, goToRightPanel, goToLeftPanel, handleBackPress, isDesktop, isActualMobile])
+
+  return (
+    <PanelNavigationContext.Provider value={value}>
+      {children}
+    </PanelNavigationContext.Provider>
+  )
+}
+
+// Default no-op value for when no provider is mounted (single-panel screens)
+const NO_PANEL_NAVIGATION: PanelNavigationContextType = {
+  activePanel: 'left',
+  showLeftPanel: true,
+  showRightPanel: true,
+  goToRightPanel: () => {},
+  goToLeftPanel: () => {},
+  handleBackPress: () => false,
+  isDesktop: true,
+  isActualMobile: false,
+  isActive: false,
+}
+
+/**
+ * usePanelNavigation
+ * 
+ * Access panel navigation state from any component in the subtree.
+ * Safe to call even outside a PanelNavigationProvider — returns no-op defaults.
+ * This is how single-panel screens (Settings, etc.) remain unaffected.
+ * 
+ * Key behaviors:
+ * - AppSplit screens: Wrap layout with PanelNavigationProvider, get real panel state
+ * - Single-panel screens: No provider needed, hook returns safe defaults (isActive: false)
+ * - TopBar: Calls handleBackPress() — returns true if panel navigation handled back, false if router should
+ * 
+ * TODO: Add hardware back button support (Android)
+ * TODO: Add swipe gesture support (iOS/Android only)
+ * TODO: Add panel transition animations
+ */
+export function usePanelNavigation() {
+  const context = useContext(PanelNavigationContext)
+  return context ?? NO_PANEL_NAVIGATION
 }

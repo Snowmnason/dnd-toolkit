@@ -28,14 +28,14 @@ import type { ToastType } from '@/contexts/app-toast-context';
 import type { DegradeToastOptions } from '@/type-definitions/degrade';
 
 // Injected at bootstrap — the actual show() function from AppToastContext
-let toastShowFunction: ((message: string, type?: ToastType, duration?: number) => void) | null = null;
+let toastShowFunction: ((title: string, message: string, type?: ToastType, duration?: number) => void) | null = null;
 
 /**
  * Inject the centralized toast show() function at bootstrap
  * Called from registration-phase with the actual AppToastContext.show
  */
 export function injectToastShowFunction(
-  showFunction: (message: string, type?: ToastType, duration?: number) => void,
+  showFunction: (title: string, message: string, type?: ToastType, duration?: number) => void,
 ): void {
   toastShowFunction = showFunction;
 }
@@ -58,8 +58,10 @@ export function showDegradeToast(options: DegradeToastOptions): void {
     const message = options.message || options.title || 'Notification';
     // Use provided duration or default
     const duration = options.duration ?? 3000;
+    // Use title field for toast title, fall back to severity
+    const title = options.title || type.charAt(0).toUpperCase() + type.slice(1);
 
-    toastShowFunction(message, type, duration);
+    toastShowFunction(title, message, type, duration);
   } catch (error) {
     console.error('[ToastAdapter] Error showing toast:', error, options);
   }

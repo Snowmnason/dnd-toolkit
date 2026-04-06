@@ -35,7 +35,8 @@ export function useOfflineNotifications(): OfflineToastState {
   // Use ref to track the timer ID for cleanup (prevents memory leaks)
   // Timer can be either a number (browser) or NodeJS.Timeout (Node/Electron)
   const timerRef = useRef<NodeJS.Timeout | number | null>(null);
-  const lastOnlineStateRef = useRef<boolean | null>(null);
+  // Initialize to the current online state to prevent showing "Back Online" on first status update
+  const lastOnlineStateRef = useRef<boolean>(typeof navigator !== "undefined" ? navigator.onLine : true);
 
   useEffect(() => {
     const subscription = NetworkDetection.subscribe((status: NetworkStatus) => {
