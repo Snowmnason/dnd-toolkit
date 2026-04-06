@@ -31,8 +31,6 @@ import {
 } from "@/hooks/storage";
 import { logger, useInjectToastSystem } from "@/hooks/utils";
 import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
-import { AppParamsProvider } from "@/providers/AppParamsProvider";
-import { ViewportProvider } from "@/providers/ViewportProvider";
 import {
   SubscriptionProvider,
   UseTheme,
@@ -43,6 +41,8 @@ import {
   useUserRole,
   useWorldId,
 } from "@/providers";
+import { AppParamsProvider } from "@/providers/AppParamsProvider";
+import { ViewportProvider } from "@/providers/ViewportProvider";
 import {
   Stack,
   useLocalSearchParams,
@@ -155,7 +155,7 @@ function RootLayoutContent() {
   // Reset right panel to left whenever the route group changes.
   // Prevents stale panel state (right panel open) from persisting across navigations.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { panelNav.goToLeftPanel(); }, [segments[0], segments[1]]);
+  useEffect(() => { panelNav.goToLeftPanel(); }, [(segments as string[])[0], (segments as string[])[1]]);
 
   // Identify user to analytics when available
   useEffect(() => {
