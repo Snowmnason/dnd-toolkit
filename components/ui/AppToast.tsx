@@ -39,8 +39,14 @@ export function AppToast({ title, message, type = "info" }: AppToastProps) {
     : type === "warning" ? "warning"
     : "info";
 
+  // Breakpoint-aware width: full-width with margins on mobile, fixed max on desktop
+  const MOBILE_BREAKPOINT = 768;
+  const maxWidth = screenWidth < MOBILE_BREAKPOINT
+    ? screenWidth - S.space.xl * 2  // Mobile: full-width minus 2×margin
+    : 420;  // Desktop: fixed max-width
+
   return (
-    <View style={{ maxWidth: screenWidth * 0.25 }}>
+    <View style={{ maxWidth }}>
     <ComponentView
       borderTone={borderTone}
       shadow="softer"

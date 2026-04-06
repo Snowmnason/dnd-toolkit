@@ -13,6 +13,7 @@
 
 import { useAppToast } from '@/contexts/app-toast-context'
 import { useScale } from '@/theme'
+import { Pressable } from 'react-native'
 import Animated, { FadeInDown, FadeOutUp } from 'react-native-reanimated'
 import { AppToast } from '../ui/AppToast'
 
@@ -33,13 +34,17 @@ export function AppToastLayer() {
         zIndex: 9999,
         pointerEvents: 'box-none' as const,
       }}
-      onTouchEnd={hide}
     >
-      <AppToast
-        title={toast.title}
-        message={toast.message}
-        type={toast.type}
-      />
+      <Pressable
+        onPress={hide}
+        pointerEvents="auto"
+      >
+        <AppToast
+          title={toast.title}
+          message={toast.message}
+          type={toast.type}
+        />
+      </Pressable>
     </Animated.View>
   )
 }

@@ -341,7 +341,7 @@ const { show, isExpanded, setExpanded } = useNavDrawer();
 **Example:**
 ```tsx
 const { show, hide } = useAppToast();
-show('File uploaded!', 'success', 2000);
+show('Upload Complete', 'File uploaded successfully!', 'success', 2000);
 ```
 
 **Related files:**
@@ -406,7 +406,7 @@ show('File uploaded!', 'success', 2000);
 **Example:**
 ```tsx
 const { addJob, updateJob } = useJobOperation();
-addJob({ id, type: 'JobUpload', status: 'pending', ... });
+addJob({ id, type: 'upload', status: 'pending', title: 'Uploading file', ... });
 updateJob(id, { status: 'active', progress: 50 });
 ```
 

@@ -26,7 +26,7 @@ pending (user clicked "Upload")
 
 Each job displays:
 - **Status icon** — Spinner (pending), progress bar (active), checkmark (completed), alert (error)
-- **Job label** — Human-readable name (e.g., "Uploading map.txt")
+- **Job title** — Human-readable name (e.g., "Uploading map.txt")
 - **Progress** — Percentage (only while active)
 - **Buttons** — Cancel/Dismiss/Retry (context-specific)
 
@@ -54,7 +54,7 @@ The main accordion container. Renders list of jobs.
 Single row per job. Shows:
 - Left colored border (type-based color: upload=blue, download=green, etc.)
 - Status icon (spinner/progress/checkmark/alert)
-- Job label + optional progress %
+- Job title + optional progress %
 - Action buttons (Cancel/Dismiss/Retry)
 
 ```
@@ -99,9 +99,9 @@ export function MapUploadButton() {
     // Create the job
     addJob({
       id: jobId,
-      type: 'JobUpload',  // or 'JobDownload', 'JobBackground'
+      type: 'upload',  // or 'download', 'background-job'
       status: 'pending',
-      label: 'Uploading map file',
+      title: 'Uploading map file',
       progress: 0,
       isUserInitiated: true,
       onCancel: async () => { /* abort upload */ },
@@ -153,9 +153,9 @@ Once you call `addJob()`:
 ```tsx
 interface JobOperation {
   id: string;                      // Unique ID (UUID recommended)
-  type: 'JobUpload' | 'JobDownload' | 'JobBackground';  // Determines icon color
+  type: 'upload' | 'download' | 'background-job';  // Determines icon color
   status: 'pending' | 'active' | 'completed' | 'error';
-  label: string;                   // Human-readable: "Uploading map.txt"
+  title: string;                   // Human-readable: "Uploading map.txt"
   progress: number;                // 0-100 (only used when status='active')
   error?: string;                  // Error message (shown on hover)
   isUserInitiated: boolean;         // MUST be true to show in panel
@@ -236,9 +236,9 @@ export function FileDownloadButton() {
 
     addJob({
       id: jobId,
-      type: 'JobDownload',
+      type: 'download',
       status: 'pending',
-      label: 'Preparing download...',
+      title: 'Preparing download...',
       progress: 0,
       isUserInitiated: true,
       onCancel: async () => {
@@ -252,7 +252,7 @@ export function FileDownloadButton() {
     });
 
     try {
-      updateJob(jobId, { status: 'active', label: 'Downloading...' });
+      updateJob(jobId, { status: 'active', title: 'Downloading...' });
 
       await downloadFile(jobId, {
         signal: abortController.signal,
@@ -263,7 +263,7 @@ export function FileDownloadButton() {
 
       updateJob(jobId, {
         status: 'completed',
-        label: 'Download complete',
+        title: 'Download complete',
       });
     } catch (error) {
       if (error.name === 'AbortError') {
@@ -318,7 +318,7 @@ updateJob(jobId, {
   status: 'error',
   error: 'Upload failed: 403 Forbidden',
 });
-// Panel shows alert icon + truncated label
+// Panel shows alert icon + truncated title
 // Hover (desktop) → Tooltip with full error
 // Click [Retry] or [Dismiss] → job removed
 ```

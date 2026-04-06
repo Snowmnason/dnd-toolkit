@@ -1,6 +1,6 @@
 import {
-    JobOperation,
-    JobOperationUpdate,
+  JobOperation,
+  JobOperationUpdate,
 } from '@/type-definitions/';
 import React, { createContext, useCallback, useContext, useState } from 'react';
 
@@ -56,8 +56,10 @@ export function JobOperationProvider({ children }: JobOperationProviderProps) {
   // Only user-initiated jobs. FIFO order.
   const [jobs, setJobs] = useState<JobOperation[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
-  // autoExpandEnabled tracks whether the panel should auto-open on the NEXT new job.
-  // Once the user manually collapses the panel, this is set to false permanently.
+  // autoExpandEnabled: Tracks whether new jobs should auto-open the panel.
+  // Design: Once user manually collapses (setExpanded(false)), the panel stays closed for the session
+  // (even when new jobs arrive). This prevents annoying auto-open interruptions.
+  // Manual opens do NOT re-enable auto-expand; the "stay closed" intent is permanent per session.
   const [autoExpandEnabled, setAutoExpandEnabled] = useState(true);
 
   const addJob = useCallback((job: JobOperation) => {
@@ -65,9 +67,8 @@ export function JobOperationProvider({ children }: JobOperationProviderProps) {
 
     setJobs((prev) => [...prev, job]);
     setIsExpanded((prevExpanded) => {
-      // Auto-expand only if enabled (user has not manually collapsed)
+      // Auto-expand only if user hasn't manually closed the panel this session
       if (autoExpandEnabled) {
-        setAutoExpandEnabled(true); // Keep it enabled until user collapses
         return true;
       }
       return prevExpanded;

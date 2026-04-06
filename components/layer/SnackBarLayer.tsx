@@ -15,7 +15,7 @@ import { useAppSnackbar } from '@/contexts/app-snackbar-context'
 import { useScale } from '@/theme'
 import * as Haptics from 'expo-haptics'
 import { useEffect, useState } from 'react'
-import { Keyboard, Platform } from 'react-native'
+import { Keyboard, Platform, Pressable } from 'react-native'
 import Animated, { FadeInUp, FadeOutDown } from 'react-native-reanimated'
 import { SnackBar } from '../ui/Snackbar'
 
@@ -65,14 +65,18 @@ export function SnackBarLayer() {
         zIndex: 9999,
         pointerEvents: 'box-none' as const,
       }}
-      onTouchEnd={hide}
     >
-      <SnackBar
-        message={snackbar.message}
-        tone={snackbar.tone}
-        actionText={snackbar.actionText}
-        onAction={snackbar.onAction}
-      />
+      <Pressable
+        onPress={hide}
+        pointerEvents="auto"
+      >
+        <SnackBar
+          message={snackbar.message}
+          tone={snackbar.tone}
+          actionText={snackbar.actionText}
+          onAction={snackbar.onAction}
+        />
+      </Pressable>
     </Animated.View>
   )
 }
