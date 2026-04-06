@@ -5,35 +5,43 @@ import { ChromeProvider } from '../contexts/chrome-context'
 import { ModalProvider } from '../contexts/modal-context'
 import { NavDrawerProvider } from '../contexts/nav-drawer-context'
 import { NotificationProvider } from '../contexts/notifications-context'
+import { JobOperationProvider } from './JobOperationProvider'
+import { TooltipPortalProvider } from './TooltipPortalProvider'
 
 /**
  * 🔔 OverlayProvider
- * Composite provider that groups all overlay/notification + chrome contexts:
- * ModalProvider → NavDrawerProvider → NotificationProvider → AppToastProvider → AppSnackbarProvider → ChromeProvider
+ * Composite provider that groups all overlay/notification + chrome contexts.
  *
- * Order matters:
- * - Modal is outermost (overlays appear above everything)
- * - Notifications next
- * - Toast and Snackbar innermost (appear above chrome elements)
- * - ChromeProvider innermost (provides state for TopBar + BottomBar)
- *   Overlays render on top of chrome because they're rendered by outer providers
+ * Order matters (outermost → innermost / highest z-index → lowest):
+ * - ModalProvider ............. z-index: 1000+ (above everything)
+ * - TooltipPortalProvider ..... z-index: 9000  (above NavDraw so tooltips on drawer items work)
+ * - NavDrawerProvider ......... z-index: 800+
+ * - NotificationProvider ...... z-index: 700+
+ * - AppToastProvider .......... z-index: 600+
+ * - AppSnackbarProvider ....... z-index: 500+
+ * - JobOperationProvider ...... z-index: 400+
+ * - ChromeProvider ............ (TopBar/BottomBar state — no z-index)
  *
  * ✅ Gate-Free: None of these depend on kernel phases.
  */
 export function OverlayProvider({ children }: { children: React.ReactNode }) {
   return (
     <ModalProvider>
-      <NavDrawerProvider>
-        <NotificationProvider>
-          <AppToastProvider>
-            <AppSnackbarProvider>
-              <ChromeProvider>
-                {children}
-              </ChromeProvider>
-            </AppSnackbarProvider>
-          </AppToastProvider>
-        </NotificationProvider>
-      </NavDrawerProvider>
+      <TooltipPortalProvider>
+        <NavDrawerProvider>
+          <NotificationProvider>
+            <AppToastProvider>
+              <AppSnackbarProvider>
+                <JobOperationProvider>
+                  <ChromeProvider>
+                    {children}
+                  </ChromeProvider>
+                </JobOperationProvider>
+              </AppSnackbarProvider>
+            </AppToastProvider>
+          </NotificationProvider>
+        </NavDrawerProvider>
+      </TooltipPortalProvider>
     </ModalProvider>
   )
 }

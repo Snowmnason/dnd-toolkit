@@ -28,8 +28,8 @@ export function AppToastLayer() {
       exiting={FadeOutUp.duration(200)}
       style={{
         position: 'absolute',
-        top: S.space.xxl,
-        right: S.space.xl,
+        top: S.space.xxl * 2,
+        right: S.space.xl * 2,
         zIndex: 9999,
         pointerEvents: 'box-none' as const,
       }}

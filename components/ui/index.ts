@@ -19,6 +19,8 @@ export * from './ElevatedView'; // Now exports ElevatedView, Card, Surface, and 
 export * from './ErrorFallbackShell';
 export * from './IconButton';
 export * from './ImageSkeleton';
+export * from './JobOperationItem';
+export * from './JobOperationPanel';
 export * from './LazyImage';
 export * from './Notification';
 export * from './ProgressBar';

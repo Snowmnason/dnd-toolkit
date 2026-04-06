@@ -1,5 +1,5 @@
-import { ThemeTokens } from "@/theme/tokens";
 import { UseTheme } from "@/providers";
+import { ThemeTokens } from "@/theme/tokens";
 import { $ as cssVarDollar } from "./cssVars";
 import { S } from "./sizing";
 
@@ -12,6 +12,7 @@ function mergeTokens(theme: ThemeTokens) {
     ...theme, // all color tokens
     ...S.font, // font sizes ($sm, $md, etc.)
     ...S.space, // spacing ($sm, $md, etc.)
+    ...S.size, // component sizing ($sm, $md, etc.)
     ...S.radius, // radius tokens ($sm, $md, etc.)
     ...S.border, // border width tokens
   };
@@ -28,11 +29,11 @@ function mergeTokens(theme: ThemeTokens) {
    Theme parameter is optional; if omitted, fetches from context.
 ──────────────────────────────── */
 export function $(
-  key: keyof ThemeTokens | keyof typeof S.font | keyof typeof S.space,
+  key: keyof ThemeTokens | keyof typeof S.font | keyof typeof S.space | keyof typeof S.size,
   theme?: ThemeTokens,
 ): any {
   // Check if this is a sizing/spacing token (not a color)
-  const sizingTokens = { ...S.font, ...S.space, ...S.radius, ...S.border };
+  const sizingTokens = { ...S.font, ...S.space, ...S.size, ...S.radius, ...S.border };
   if (key in sizingTokens) {
     return sizingTokens[key as keyof typeof sizingTokens];
   }

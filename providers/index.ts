@@ -59,6 +59,9 @@ export { ScaleProvider, useScale } from "./ScaleProvider";
 // Subscription
 export { SubscriptionProvider, useSubscription } from "./SubscriptionProvider";
 
+// Tooltip Portal (overlay — used internally by AppTooltip)
+export { TooltipPortalProvider } from "./TooltipPortalProvider";
+
 // Theme
 export {
     ThemeProvider,

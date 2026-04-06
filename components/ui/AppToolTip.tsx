@@ -1,15 +1,20 @@
+import { useTooltipPortal } from "@/contexts/tooltip-portal-context";
 import { useScale } from "@/theme";
-import React, { useRef, useState } from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import { Platform, Pressable, View } from "react-native";
 import Animated, {
-    runOnJS,
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
+import { SubTitle } from "./AppText";
 import { Card } from "./ElevatedView";
 
-import { SubTitle } from "./AppText";
+// Stable incrementing ID per AppTooltip instance
+let _idCounter = 0;
+function nextTooltipId() {
+  return `tt-${++_idCounter}`;
+}
 
 interface AppTooltipProps {
   text: string;
@@ -24,7 +29,11 @@ interface AppTooltipProps {
  * Cross-platform tooltip:
  * - Web: hover to show
  * - Mobile: press-hold to show (if enableMobilePress=true)
- * Uses ComponentView for consistent styling and Reanimated for animations.
+ *
+ * Renders via TooltipPortalProvider so the bubble always appears above all
+ * stacking contexts (Accordion headers, NavDrawer, etc.). The inline API
+ * is unchanged — just wrap any element:
+ *   <AppTooltip text="..."><Button /></AppTooltip>
  */
 export function AppTooltip({
   text,
@@ -33,108 +42,142 @@ export function AppTooltip({
   children,
 }: AppTooltipProps) {
   const S = useScale();
-  const [visible, setVisible] = useState(false);
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(6);
+  const portal = useTooltipPortal();
+  const containerRef = useRef<View>(null);
+  const idRef = useRef(nextTooltipId());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const show = () => {
-    // Clear any existing timers
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
-
-    timerRef.current = setTimeout(() => {
-      setVisible(true);
-      opacity.value = withTiming(1, { duration: 200 });
-      translateY.value = withTiming(0, { duration: 200 });
-    }, delay);
-  };
-
-  const hide = () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
-
-    opacity.value = withTiming(0, { duration: 150 });
-    translateY.value = withTiming(6, { duration: 150 }, () => {
-      // run on JS thread to update React state
-      runOnJS(setVisible)(false);
-    });
-  };
-
-  // Mobile: show tooltip on long press (after 500ms hold)
-  const handlePressIn = () => {
-    if (Platform.OS === "web" || !enableMobilePress) return;
-
-    pressTimerRef.current = setTimeout(() => {
-      show();
-    }, 300); // Trigger after 300ms hold
-  };
-
-  const handlePressOut = () => {
-    if (Platform.OS === "web" || !enableMobilePress) return;
-
-    if (pressTimerRef.current) {
-      clearTimeout(pressTimerRef.current);
-    }
-    // Keep showing for a moment before hiding
-    setTimeout(() => {
-      hide();
-    }, 1500);
-  };
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(6);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ translateY: translateY.value }],
   }));
 
-  const styles = React.useMemo(
-    () =>
-      StyleSheet.create({
-        container: {
-          position: "relative",
-        },
-        tooltipWrapper: {
-          position: "absolute",
-          bottom: "100%",
-          left: "50%",
-          transform: [{ translateX: -50 }],
-          marginBottom: S.space.xs,
-          zIndex: 100,
-          // Ensure tooltip content doesn't get clipped
-          pointerEvents: "none",
-        },
-      }),
-    [S]
+  // Stable tooltip bubble — mirrors the original positioning logic.
+  // Rendered inside a portal entry anchored at the trigger's absolute position,
+  // so `bottom: "100%"` / `left: "50%"` is relative to the trigger bounds.
+   
+  const tooltipContent = useMemo(
+    () => (
+      <Animated.View
+        style={[
+          {
+            position: "absolute",
+            // Position above the trigger, centered horizontally —
+            // same as the original local-render approach
+            bottom: "100%" as any,
+            left: "50%" as any,
+            transform: [{ translateX: -50 }],
+            marginBottom: S.space.xs,
+            pointerEvents: "none",
+          },
+          animatedStyle,
+        ]}
+      >
+        <Card
+          padding="xs"
+          gradient
+          gradientIntensity={25}
+          gradientTransitionPoint={70}
+          gradientDirection={180}
+          radius="sm"
+        >
+          <SubTitle textType="primary" align="center">
+            {text}
+          </SubTitle>
+        </Card>
+      </Animated.View>
+    ),
+    // animatedStyle is a stable Reanimated worklet ref — no dep needed.
+    // text and S.space.xs are the only real dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [text, S.space.xs]
   );
 
+  const doUnregister = useCallback(() => {
+    portal.unregisterEntry(idRef.current);
+  }, [portal]);
+
+  const show = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+
+    timerRef.current = setTimeout(() => {
+      // measureInWindow gives reliable window-relative coords on both web and native.
+      // measure() can silently skip its callback on RN Web.
+      containerRef.current?.measureInWindow((x, y, width, height) => {
+        // Start at hidden state before registering
+        opacity.value = 0;
+        translateY.value = 6;
+
+        portal.registerEntry({
+          id: idRef.current,
+          pageX: x,
+          pageY: y,
+          triggerWidth: width,
+          triggerHeight: height,
+          content: tooltipContent,
+        });
+
+        // One frame delay so React commits the Animated.View to the native tree
+        // before Reanimated tries to drive it.
+        requestAnimationFrame(() => {
+          opacity.value = withTiming(1, { duration: 200 });
+          translateY.value = withTiming(0, { duration: 200 });
+        });
+      });
+    }, delay);
+  }, [delay, opacity, translateY, portal, tooltipContent]);
+
+  const hide = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+
+    opacity.value = withTiming(0, { duration: 150 });
+    translateY.value = withTiming(6, { duration: 150 });
+
+    // Unregister after animation completes (150ms)
+    timerRef.current = setTimeout(() => {
+      doUnregister();
+    }, 150);
+  }, [opacity, translateY, doUnregister]);
+
+  const handlePressIn = useCallback(() => {
+    if (Platform.OS === "web" || !enableMobilePress) return;
+    pressTimerRef.current = setTimeout(() => show(), 300);
+  }, [enableMobilePress, show]);
+
+  const handlePressOut = useCallback(() => {
+    if (Platform.OS === "web" || !enableMobilePress) return;
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+    setTimeout(() => hide(), 1500);
+  }, [enableMobilePress, hide]);
+
+  // Cleanup on unmount — remove from portal if still visible
+  useEffect(() => {
+    const id = idRef.current;
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+      portal.unregisterEntry(id);
+    };
+  }, [portal]);
+
   return (
-    <Pressable
-      onHoverIn={Platform.OS === "web" ? show : undefined}
-      onHoverOut={Platform.OS === "web" ? hide : undefined}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      style={styles.container}
-    >
-      <View>
+    // collapsable={false} ensures the View always has a native node that can be measured
+    <View ref={containerRef} collapsable={false}>
+      <Pressable
+        onHoverIn={Platform.OS === "web" ? show : undefined}
+        onHoverOut={Platform.OS === "web" ? hide : undefined}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+      >
         {children}
-        {visible && (
-          <Animated.View style={[styles.tooltipWrapper, animatedStyle]}>
-            <Card
-              padding="xs"
-              gradient
-              gradientIntensity={25}
-              gradientTransitionPoint={70}
-              gradientDirection={180}
-              radius="sm"
-            >
-              <SubTitle textType="primary" align="center">
-                {text}
-              </SubTitle>
-            </Card>
-          </Animated.View>
-        )}
-      </View>
-    </Pressable>
+      </Pressable>
+    </View>
   );
 }
+

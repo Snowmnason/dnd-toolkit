@@ -38,7 +38,7 @@ export const TOKENS = {
   destructiveButton: 'destructiveButton',
   destructiveButtonText: 'destructiveButtonText', //Always Light Text
 
-  // Cancel Button
+  /*Cancel Button */
   cancelButton: 'cancelButton',
   cancelButtonText: 'cancelButtonText', //Always Dark Text
 
@@ -51,6 +51,13 @@ export const TOKENS = {
   ChromeBackground: 'ChromeBackground',
   ChromeText: 'ChromeText',
   ChromeBorder: 'ChromeBorder',
+
+  /*Job Status*/
+  JobUpload: 'JobUpload',
+  JobDownload: 'JobDownload',
+  JobBackground: 'JobBackground',
+  
+
 } as const
 
 export type TokenName = keyof typeof TOKENS

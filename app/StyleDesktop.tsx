@@ -35,6 +35,7 @@ import { useAppSnackbar } from "@/contexts/app-snackbar-context";
 import { useAppToast } from "@/contexts/app-toast-context";
 import { useNotifications } from "@/contexts/notifications-context";
 
+import { useJobOperation } from "@/hooks/jobs/useJobOperation";
 import { $, UseTheme, useScale } from "@/theme";
 import { useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
@@ -45,6 +46,7 @@ export default function StyleDesktop() {
   const { showNotification } = useNotifications();
   const { show: showToast } = useAppToast();
   const { show: showSnackbar } = useAppSnackbar();
+  const { addJob, updateJob } = useJobOperation();
 
   // Simple display states (not controlling components, just for right panel display)
   const [primaryClicks, setPrimaryClicks] = useState(0);
@@ -85,6 +87,68 @@ export default function StyleDesktop() {
   // Modal/Toast/Snackbar states
   const [modalVisible, setModalVisible] = useState(false);
   const [modal2Visible, setModal2Visible] = useState(false);
+
+  // Job Operation test handlers
+  const handleAddSuccessfulUpload = () => {
+    const jobId = `upload-success-${Date.now()}`;
+    addJob({
+      id: jobId,
+      title: 'Uploading character sheet...',
+      type: 'upload',
+      status: 'pending',
+      progress: 0,
+      isUserInitiated: true,
+      onCancel: () => console.log('Upload cancelled:', jobId),
+    });
+
+    // Simulate job progression: pending → active → completed
+    setTimeout(() => {
+      updateJob(jobId, { status: 'active', progress: 0 });
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += Math.random() * 25;
+        if (progress >= 100) {
+          clearInterval(interval);
+          updateJob(jobId, { status: 'completed', progress: 100 });
+        } else {
+          updateJob(jobId, { progress: Math.min(progress, 99) });
+        }
+      }, 300);
+    }, 500);
+  };
+
+  const handleAddFailingDownload = () => {
+    const jobId = `download-fail-${Date.now()}`;
+    addJob({
+      id: jobId,
+      title: 'Downloading campaign data... (will take 30 seconds)',
+      type: 'download',
+      status: 'pending',
+      progress: 0,
+      isUserInitiated: true,
+      onCancel: () => console.log('Download cancelled:', jobId),
+      onRetry: () => handleAddFailingDownload(),
+    });
+
+    // Simulate job progression then fail mid-way
+    setTimeout(() => {
+      updateJob(jobId, { status: 'active', progress: 0 });
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += Math.random() * 20;
+        if (progress >= 60) {
+          clearInterval(interval);
+          updateJob(jobId, {
+            status: 'error',
+            progress: 60,
+            error: 'Network timeout after 30 seconds. Your internet is probably potato-quality.',
+          });
+        } else {
+          updateJob(jobId, { progress: Math.min(progress, 59) });
+        }
+      }, 400);
+    }, 500);
+  };
 
 
   return (
@@ -760,6 +824,25 @@ export default function StyleDesktop() {
               />
             </View>
           </Surface>
+          
+          <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.xl }}>
+            <Heading>Job Operations (Test Panel)</Heading>
+            <Body style={{ marginBottom: S.space.md }}>
+              Click buttons to add jobs to the JobOperationPanel (bottom-right corner). The panel expands upward from the bottom anchor.
+            </Body>
+            <View style={{ gap: S.space.md, marginTop: S.space.md }}>
+              <Button
+                variant="primary"
+                text="Add Successful Upload (will complete in 3-5s)"
+                onPress={handleAddSuccessfulUpload}
+              />
+              <Button
+                variant="destructive"
+                text="Add Failing Download (will fail at 60%)"
+                onPress={handleAddFailingDownload}
+              />
+            </View>
+          </Surface>
 
           <Surface style={{ marginTop: S.space.lg, marginBottom: S.space.lg }}>
             <Heading>Spinner (CustomLoad)</Heading>
@@ -1061,8 +1144,6 @@ export default function StyleDesktop() {
           <Button text="Close" onPress={() => setModal2Visible(false)} />
         </View>
       </AppModal>
-
-
     </AppSplit>
   );
 }

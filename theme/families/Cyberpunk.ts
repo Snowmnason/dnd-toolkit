@@ -54,6 +54,11 @@ export const cyberpunkTheme: CyberpunkTheme = {
     [TOKENS.ChromeBackground]: "#1f262e",
     [TOKENS.ChromeText]: "#F5E6D3",
     [TOKENS.ChromeBorder]: "#969696",
+
+        //Jobs
+    [TOKENS.JobUpload]: '#00b894',
+    [TOKENS.JobDownload]: '#0984e3',
+    [TOKENS.JobBackground]: '#bea74e',
   },
 
   light: {
@@ -103,5 +108,10 @@ export const cyberpunkTheme: CyberpunkTheme = {
     [TOKENS.ChromeBackground]: "#1f262e",
     [TOKENS.ChromeText]: "#F5E6D3",
     [TOKENS.ChromeBorder]: "#969696",
+
+    //Jobs
+    [TOKENS.JobUpload]: '#00b894',
+    [TOKENS.JobDownload]: '#0984e3',
+    [TOKENS.JobBackground]: '#bea74e',
   },
 }

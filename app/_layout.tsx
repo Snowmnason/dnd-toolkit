@@ -2,6 +2,7 @@ import {
   AppErrorBoundary,
   AppToastLayer,
   ChromeLayer,
+  JobOperationLayer,
   NavDrawerLayer,
   NotificationContainer,
   SnackBarLayer,
@@ -457,6 +458,9 @@ function RootLayoutContent() {
 
             {/* App Toast Layer - renders global app-level toasts */}
             <AppToastLayer />
+
+            {/* Job Operation Panel - Google Drive-style job tracking overlay */}
+            <JobOperationLayer />
 
             {/* Snackbar Layer - renders global bottom-anchored snackbars */}
             <SnackBarLayer />
