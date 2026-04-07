@@ -1,3 +1,4 @@
+```ts
 import React, { createContext, useCallback, useContext, useState } from 'react';
 
 interface WorldSelectionContextType {
