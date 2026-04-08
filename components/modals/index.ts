@@ -22,3 +22,6 @@ export { FeatureGatedModal } from './FeatureGatedModal'
 export { default as SettingsModal } from './SettingsModal'
 export { SuccessModal } from './SuccessModal'
 
+// Error modals
+export { NavFailureModal } from './NavFailureModal'
+

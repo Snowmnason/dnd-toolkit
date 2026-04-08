@@ -2,13 +2,13 @@ import Welcome from "@/Screens/Welcome";
 import { SplashScreen } from "@/components/SplashScreen";
 import { useBootstrapAuth } from "@/hooks/auth";
 import { useAppKernel } from "@/hooks/kernel";
+import { useGuardedNavigation } from "@/hooks/navigation";
 import { logger } from "@/lib/utils";
-import { useRouter } from "expo-router";
 import React from "react";
 import { StyleSheet, View } from "react-native";
 
 export default function HomePage() {
-  const router = useRouter();
+  const navigate = useGuardedNavigation();
 
   // Wait for kernel to complete before routing
   const kernel = useAppKernel();
@@ -20,9 +20,9 @@ export default function HomePage() {
   React.useEffect(() => {
     if (!isAuthChecked || !hasAccount) return;
     logger.category("bootstrap").info("✅ Recent login detected, redirecting to world selection");
-    const t = setTimeout(() => router.replace("/select/world-selection"), 100);
+    const t = setTimeout(() => { void navigate.replace("/select/world-selection"); }, 100);
     return () => clearTimeout(t);
-  }, [isAuthChecked, hasAccount, router]);
+  }, [isAuthChecked, hasAccount, navigate]);
 
   // console.log(
   //   `[ui] [HomePage] render — appReady=${kernel.phases.appReady}, isAuthChecked=${isAuthChecked}, hasAccount=${hasAccount}`,

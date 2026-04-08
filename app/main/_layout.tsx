@@ -1,18 +1,13 @@
 import { ChromeBottomBar } from "@/components/chrome/ChromeBottomBar";
 import { useChrome } from "@/contexts";
-import { useAuthGuard } from "@/hooks/auth";
-import { useAppKernel } from "@/hooks/kernel";
-import { useNavigate } from "@/hooks/navigation";
+import { useGuardedNavigation } from "@/hooks/navigation";
 import { logger } from "@/hooks/utils";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 import { Platform, useWindowDimensions, View } from "react-native";
 
 export default function MainLayout() {
-  const router = useRouter();
-  const { replace } = useNavigate();
-  const kernel = useAppKernel();
-  const authState = useAuthGuard(kernel.phases.appReady, "world-required");
+  const navigate = useGuardedNavigation();
   const params = useLocalSearchParams();
   const { width } = useWindowDimensions();
   const isMobile = Platform.OS !== "web" || width < 900;
@@ -30,13 +25,10 @@ export default function MainLayout() {
 
   // Validate world access on mount and when worldId changes
   useEffect(() => {
-    // Skip validation while auth guard is still checking
-    if (authState === "loading") return;
-
     const urlWorldId =
       typeof params.worldId === "string" ? params.worldId : undefined;
 
-    // If no worldId in URL, redirect (shouldn't happen as guard checks this)
+    // If no worldId in URL, redirect
     if (!urlWorldId) {
       logger.category("navigation").warn(
         "[MainLayout] No worldId in URL, redirecting to world selection",
@@ -45,9 +37,7 @@ export default function MainLayout() {
       return;
     }
 
-    // The auth guard already verified access via Supabase, so we're good
-    // (see useAuthGuard with 'world-required' level in this component)
-    logger.category("navigation").debug("[MainLayout] Auth guard passed, rendering world screen", {
+    logger.category("navigation").debug("[MainLayout] Rendering world screen", {
       urlWorldId,
     });
   }, [authState, params.worldId, replace, router]);

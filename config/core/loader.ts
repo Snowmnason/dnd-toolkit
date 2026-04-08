@@ -316,6 +316,12 @@ export interface AppSettings {
     targetAfterEviction?: number; // 0.7 = evict until cache reaches 70% of hardMax
     description?: string;
   };
+  navigationPolicy?: {
+    defaultAccessMode?: 'protected_by_default' | 'public_by_default';
+    alwaysPublic?: string[]; // Route names that are always public
+    alwaysProtected?: string[]; // Route names that are always protected
+    description?: string;
+  };
 }
 
 let cachedConfig: AppSettings | null = null;

@@ -17,12 +17,6 @@ export {
   type AuthFlowPhase,
   type AuthFlowState
 } from "./useAuthFlow";
-export {
-  useAuthGuard,
-  type AuthGuardOptions,
-  type AuthGuardState,
-  type AuthLevel
-} from "./useAuthGuard";
 export { useAuthStateListener } from "./useAuthStateListener";
 export {
   useChangeCredsFlow,

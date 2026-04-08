@@ -47,6 +47,36 @@ module.exports = defineConfig([
       'no-restricted-globals': 'off',
     },
   },
+  // === NAVIGATION BOUNDARY RULE ===
+  // All navigation must go through useGuardedNavigation to ensure the guard pipeline runs.
+  // This catches: direct router.push/replace/back calls anywhere in the codebase.
+  //
+  // Exemptions (only files that IMPLEMENT the pipeline itself):
+  // - hooks/navigation/use-guarded-navigation.ts  (the pipeline — calls router directly by design)
+  // - hooks/navigation/use-route-change-observer.ts  (route-change detection — needs raw router)
+  // - pure-algo-immutables/navigation-actions.ts  (navigation primitive definitions)
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    ignores: [
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'CallExpression[callee.object.name="router"][callee.property.name="push"]',
+          message: 'Use navigate.push() from useGuardedNavigation instead of router.push() — this ensures navigation goes through the guard pipeline.',
+        },
+        {
+          selector: 'CallExpression[callee.object.name="router"][callee.property.name="replace"]',
+          message: 'Use navigate.replace() from useGuardedNavigation instead of router.replace() — this ensures navigation goes through the guard pipeline.',
+        },
+        {
+          selector: 'CallExpression[callee.object.name="router"][callee.property.name="back"]',
+          message: 'Use navigate.back() from useGuardedNavigation instead of router.back() — this ensures navigation goes through the guard pipeline.',
+        },
+      ],
+    },
+  },
   // === ARCHITECTURE BOUNDARY RULES ===
   // Components should NOT import from lib/ or system/ (use hooks instead)
   // Note: Glob patterns like 'lib/*' aren't supported in ESLint 9's no-restricted-imports

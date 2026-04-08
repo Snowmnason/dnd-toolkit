@@ -40,6 +40,10 @@ export const DEFAULT_EVENT_CONSENT_MAPPING = new Map<string, ConsentCategory>([
   // Bootstrap — kernel lifecycle; required for reliability monitoring
   ['app_bootstrap_complete', 'essential'],
 
+  // Navigation system — errors and timeouts are system health signals
+  ['nav_error', 'essential'],
+  ['nav_guard_timeout', 'essential'],
+
   // ─── Performance events ──────────────────────────────────────────────────────
   // Requires >= 'basic' consent (user opted into basic tracking)
   ['performance_measure', 'performance'],
@@ -51,11 +55,19 @@ export const DEFAULT_EVENT_CONSENT_MAPPING = new Map<string, ConsentCategory>([
   ['feature_blocked', 'performance'],
   ['api_request', 'performance'],
 
+  // Navigation — standard metrics (transitions, redirects, aborts)
+  ['nav_transition_success', 'performance'],
+  ['nav_transition_redirected', 'performance'],
+  ['nav_transition_aborted', 'performance'],
+
   // ─── Usage events ────────────────────────────────────────────────────────────
   // Requires 'full' consent (user opted into full usage tracking)
   ['screen_view', 'usage'],
   ['component_usage', 'usage'],
   ['feature_usage', 'usage'],
+
+  // Navigation — detailed tracking (user throttled)
+  ['nav_user_throttled', 'usage'],
 
   // Session lifecycle — behavioural data; requires full consent
   ['session_started', 'usage'],

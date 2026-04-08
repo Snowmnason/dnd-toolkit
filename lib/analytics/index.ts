@@ -63,6 +63,9 @@ export { ConsentSyncQueue, type PendingConsentSync } from "./consent/consent-syn
 // Session manager
 export { sessionManager } from "./session";
 
+// Domain-specific analytics wrappers
+export { NavAnalytics } from "./nav-analytics";
+
 // Analytics utilities
 export { getThreshold, sanitizeError } from "./utils";
 

@@ -75,3 +75,20 @@ export {
     type JobOperationUpdate
 } from './job-operation';
 
+export type {
+    NavigationContext,
+    NavigationDecision,
+    NavigationGuardConfig,
+    NavigationPolicyMode,
+    NavigationTransaction
+} from './navigation-decision';
+
+export type {
+    NavigationAnalyticsEvent
+} from './navigation-analytics';
+
+export {
+    NavigationConsentCategory,
+    NavigationEventType
+} from './navigation-analytics';
+

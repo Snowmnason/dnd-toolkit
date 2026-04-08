@@ -8,6 +8,7 @@ import {
   SnackBarLayer,
   UIBlockerLayer
 } from "@/components";
+import { NavFailureModal } from "@/components/modals";
 import SettingsModal from "@/components/modals/SettingsModal";
 import { OfflineSyncNotificationLayer } from "@/components/offline";
 import {
@@ -25,7 +26,7 @@ import { Analytics, sessionManager } from "@/hooks/analytics";
 import { SafeModeReason, executeRecoveryAction } from "@/hooks/error";
 import { useClearSafeMode } from "@/hooks/error/use-safe-mode";
 import { AppKernelProvider, useAppKernel, useKernelLoadingSync, useSyncSplash } from "@/hooks/kernel";
-import { useAnalyticsNavigation, useNavigate, usePanelNavigation, useRouteConfig } from "@/hooks/navigation";
+import { useGuardedNavigation, usePanelNavigation, useRouteChangeObserver, useRouteConfig } from "@/hooks/navigation";
 import {
   type AccessRole,
 } from "@/hooks/storage";
@@ -121,8 +122,6 @@ function RootLayoutContent() {
   //     `[SESSION:${sessionId}] 📍 Root layout rendered - route: ${segments[0] || "index"}`,
   //   );
   // }, [sessionId, segments]);
-  // Analytics hook (must be called unconditionally)
-  useAnalyticsNavigation();
 
   // NavDrawer feature flag: Determine if drawer should be rendered based on global flag and route
   const config = getAppConfig();
@@ -146,8 +145,12 @@ function RootLayoutContent() {
   };
 
   const { config: routeConfig, title: resolvedTitle, backTarget: topBarBackTarget } = useRouteConfig(navContext);
-  const { replace: navigateTo } = useNavigate();
   const panelNav = usePanelNavigation();
+  const navigate = useGuardedNavigation();
+
+  // Route change observer — catches deep links, URL edits, back button
+  // Mounted unconditionally; starts observing once kernel.phases.appReady gates the tree
+  const observer = useRouteChangeObserver();
 
   // ==================== EFFECT HOOKS SECTION ====================
   // All effects that depend on above hooks
@@ -433,6 +436,14 @@ function RootLayoutContent() {
               onClose={closeSettingsMenu}
               onAccountSettings={handleAccountSettings}
               onReturnToWorldSelection={handleReturnToWorldSelection}
+            />
+
+            {/* Navigation Failure Modal — from route observer */}
+            <NavFailureModal
+              visible={observer.navFailureVisible}
+              heading={observer.navFailureHeading}
+              body={observer.navFailureBody}
+              onClose={observer.dismissNavFailure}
             />
 
             {/* Content area: sidebar + stack in row layout on desktop */}
