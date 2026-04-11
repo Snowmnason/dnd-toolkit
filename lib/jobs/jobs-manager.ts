@@ -25,9 +25,9 @@
  * ```
  */
 
-import { jobService } from '@/lib/middleware/jobs/job-service';
-import { executeSyncOperation, type SyncMode, type SyncDirection } from '@/lib/jobs/core/sync/sync-orchestrator';
+import { executeSyncOperation, type SyncDirection, type SyncMode } from '@/lib/jobs/core/sync/sync-orchestrator';
 import { logger } from '@/lib/utils/logger';
+import { jobService } from '@/middleware/jobs/job-service';
 import type { EnqueueOptions, JobEventSubscriber, JobRecord } from '@/type-definitions/job-queue-types';
 
 export const JobsManager = {

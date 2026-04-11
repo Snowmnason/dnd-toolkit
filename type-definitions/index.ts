@@ -76,19 +76,13 @@ export {
 } from './job-operation';
 
 export type {
+    ExecutionContext, ExternalLinkOptions, GuardPipelineProfile,
     NavigationContext,
-    NavigationDecision,
-    NavigationGuardConfig,
+    NavigationDecision, NavigationExecutionResult, NavigationGuardConfig,
     NavigationPolicyMode,
-    NavigationTransaction
-} from './navigation-decision';
-
-export type {
-    NavigationAnalyticsEvent
-} from './navigation-analytics';
-
-export {
-    NavigationConsentCategory,
-    NavigationEventType
-} from './navigation-analytics';
+    NavigationRequest,
+    NavigationTransaction,
+    NavigationUiInstruction,
+    Platform, TransportResult
+} from './transport-types';
 

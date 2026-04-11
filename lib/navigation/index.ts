@@ -7,13 +7,14 @@ export {
     getAllRouteConfigs, getRouteConfig, getTransitionAnimation, registerRouteConfig, resolveBackTarget, resolveTitle, shouldRedirect, type A11yFocusTarget,
     type AnimationType,
     type ModalConfig, type NavigationContext, type RouteConfig
-} from "./navigation-config";
+} from "./navigationConfig";
 
 export {
-    buildNavigationTarget, buildRoute, extractParamsFromUrl, hasRequiredParams, mergeParams, normalizePath,
+    canonicalizePath,
     pathEquals,
-    pathStartsWith, preserveParams, validateParams, type RouteParams
-} from "./uri-helpers";
+    pathStartsWith,
+    type RouteParams
+} from "./routeCanonicalizer";
 
 export {
     LOGIN_ROUTES, MAIN_ROUTES, SELECT_ROUTES, SETTINGS_ROUTES,
@@ -28,9 +29,17 @@ export {
  * - Exit flows: sign-out, delete account
  */
 
-export { determineEnterErrorRedirect, determineEnterRedirect } from './account/enter-navigation';
-export type { EntryFlowType, NavigationDecision, NavigationUser } from './account/enter-navigation';
+export { determineEnterErrorRedirect, determineEnterRedirect } from './account/enterNavigation';
+export type { EntryFlowType, NavigationDecision, NavigationUser } from './account/enterNavigation';
 
-export { determineExitErrorRedirect, determineExitRedirect } from './account/exit-navigation';
-export type { ExitFlowType } from './account/exit-navigation';
+export { determineExitErrorRedirect, determineExitRedirect } from './account/exitNavigation';
+export type { ExitFlowType } from './account/exitNavigation';
+
+
+export {
+    evaluateObservedRouteChange, executeExternalNavigation,
+    executeHistoryNavigation,
+    executeInternalRedirectNavigation,
+    executeRouteNavigation
+} from './navManager';
 

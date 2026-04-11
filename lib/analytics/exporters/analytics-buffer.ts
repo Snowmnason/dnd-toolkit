@@ -19,10 +19,10 @@
  * Use getAndResetOverflowCount() to inspect and optionally reset the counter during a session.
  */
 import { ANALYTICS_RETRY_DEFAULTS, getAppConfig } from '@/config';
-import { isNetworkOnline } from "@/lib/middleware/network";
-import { clearAnalyticsQueue, loadAnalyticsQueueJSON, persistAnalyticsQueueJSON } from "@/lib/middleware/storage";
 import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
+import { isNetworkOnline } from "@/middleware/network";
+import { clearAnalyticsQueue, loadAnalyticsQueueJSON, persistAnalyticsQueueJSON } from "@/middleware/storage";
 
 /**
  * An analytics event queued for offline delivery

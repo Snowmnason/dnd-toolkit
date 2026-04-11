@@ -16,11 +16,11 @@ export { Performance, withTiming } from "./performance/performance-manager";
 // Consent and event management
 export { AnalyticsConsent, type ConsentLevel } from "./consent/consent";
 export {
-  DEFAULT_EVENT_CONSENT_MAPPING,
-  getConsentCategoryForEvent,
-  registerEventConsentMapping,
-  shouldEmitEvent,
-  type ConsentCategory
+    DEFAULT_EVENT_CONSENT_MAPPING,
+    getConsentCategoryForEvent,
+    registerEventConsentMapping,
+    shouldEmitEvent,
+    type ConsentCategory
 } from "./consent/consent-gating";
 
 // Error and consent payload handling
@@ -28,30 +28,30 @@ export { getCrashReportPayload } from "./consent/consent-error-payload";
 
 // Performance monitoring
 export {
-  OperationBaseline,
-  PerformanceBaselineConfig,
-  PerformanceBaselines,
-  PerformanceBaselineService,
-  performanceBaselineService,
-  RegressionDetectionResult
+    OperationBaseline,
+    PerformanceBaselineConfig,
+    PerformanceBaselines,
+    PerformanceBaselineService,
+    performanceBaselineService,
+    RegressionDetectionResult
 } from "./performance/performance-baseline";
 
 // Analytics buffering (Phase 1a - offline persistence)
 export {
-  analyticsBufferService,
-  calculateExponentialBackoff,
-  generateUUID,
-  type AnalyticsBufferConfig,
-  type AnalyticsBufferStats,
-  type QueuedAnalyticsEvent
+    analyticsBufferService,
+    calculateExponentialBackoff,
+    generateUUID,
+    type AnalyticsBufferConfig,
+    type AnalyticsBufferStats,
+    type QueuedAnalyticsEvent
 } from "./exporters/analytics-buffer";
 
 // Analytics network integration
 export {
-  cleanupAnalyticsNetworkIntegration,
-  flushAnalyticsQueue,
-  handleAnalyticsConsentWithdrawal,
-  initializeAnalyticsNetworkIntegration
+    cleanupAnalyticsNetworkIntegration,
+    flushAnalyticsQueue,
+    handleAnalyticsConsentWithdrawal,
+    initializeAnalyticsNetworkIntegration
 } from "./exporters/analytics-network-integration";
 
 // Breadcrumb queue (Phase 1a - offline persistence)
@@ -64,31 +64,31 @@ export { ConsentSyncQueue, type PendingConsentSync } from "./consent/consent-syn
 export { sessionManager } from "./session";
 
 // Domain-specific analytics wrappers
-export { NavAnalytics } from "./nav-analytics";
+export { NavAnalytics } from "./modules/nav-analytics";
 
 // Analytics utilities
 export { getThreshold, sanitizeError } from "./utils";
 
 // Variant tracking
 export {
-  trackVariantAssignment,
-  trackVariantEngagement,
-  trackVariantPerformance,
-  type VariantAssignmentEvent,
-  type VariantEngagementEvent,
-  type VariantPerformanceEvent
+    trackVariantAssignment,
+    trackVariantEngagement,
+    trackVariantPerformance,
+    type VariantAssignmentEvent,
+    type VariantEngagementEvent,
+    type VariantPerformanceEvent
 } from "./variant-tracking";
 
 // Exporter system
 export {
-  createExportContext,
-  dispatchEvent,
-  ExporterRegistry,
-  exporterRegistry,
-  validateEvent,
-  type AnalyticsEvent,
-  type AnalyticsExporter,
-  type ExportContext
+    createExportContext,
+    dispatchEvent,
+    ExporterRegistry,
+    exporterRegistry,
+    validateEvent,
+    type AnalyticsEvent,
+    type AnalyticsExporter,
+    type ExportContext
 } from "./exporters/exporter-registry";
 
 

@@ -1,14 +1,14 @@
-import Welcome from "@/Screens/Welcome";
+import Welcome from "@/AppScreens/Welcome";
 import { SplashScreen } from "@/components/SplashScreen";
 import { useBootstrapAuth } from "@/hooks/auth";
 import { useAppKernel } from "@/hooks/kernel";
-import { useGuardedNavigation } from "@/hooks/navigation";
+import { useNavigation } from "@/hooks/navigation";
 import { logger } from "@/lib/utils";
 import React from "react";
 import { StyleSheet, View } from "react-native";
 
 export default function HomePage() {
-  const navigate = useGuardedNavigation();
+  const navigate = useNavigation();
 
   // Wait for kernel to complete before routing
   const kernel = useAppKernel();

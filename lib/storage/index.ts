@@ -40,7 +40,7 @@
 export { StorageManager } from './storage-manager';
 
 // ─── Query cache (in-memory SWR cache for API/database results) ─────
-export { QueryCache } from '@/lib/middleware/storage';
+export { QueryCache } from '@/middleware/storage';
 export type {
     CacheSchema, StorageGracefulResult,
     StorageHealthReport, StorageManagerReadOptions, StorageManagerWriteOptions

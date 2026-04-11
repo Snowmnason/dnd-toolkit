@@ -234,7 +234,7 @@ export function isDatabaseConfigured(): boolean {
  */
 export async function executeSyncMutationHandler(mutation: any) {
   // Get Supabase client through middleware (precondition checks: network, auth, provider readiness)
-  const { getDatabase } = await import("@/lib/middleware/services/database-service");
+  const { getDatabase } = await import("@/middleware/services/database-service");
   const supabase = getDatabase();
 
   // Import and execute the sync handler

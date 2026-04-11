@@ -98,10 +98,66 @@ Revisit granular source detection when:
 4. Add event-consent mappings for new source types if PII implications exist
 5. Update analytics.md with new telemetry fields
 
+---
+
+# Critical: Transport Router Initialization
+
+**Status:** TODO — CRITICAL SYSTEM REQUIREMENT
+
+**What needs to happen:**
+- `initializeRouter()` from `system/navigation/adapter/transport-adapter.ts` MUST be called early in bootstrap
+- This registers the Expo Router instance globally for centralized execution layer
+- **If this fails, the entire navigation system crashes** — no fallback possible
+
+**Why it's critical:**
+- All navigation requests depend on router being available in the transport adapter
+- Without router initialization, any navigation attempt will throw "Router not initialized"
+- Should happen BEFORE kernel.phases.appReady is set
+
+**Current status:**
+- ✅ Transport adapter code and JSDoc are complete
+- ✅ Types moved to `type-definitions/transport-types.ts`
+- ❌ Initialization hook/provider not yet created
+- ❌ Bootstrap sequence not yet integrated
+
+**Implementation notes (DO NOT DEFER):**
+- Cannot go in system kernel phases (requires React hook `useRouter`)
+- MUST go in a React component/hook that wraps the kernel
+- Suggested location: Hook in the `AppKernelProvider` BEFORE phases start, or create `useInitializeTransportRouter()` hook
+- Should crash immediately if fails (not a graceful degradation scenario)
+- Add to bootstrap error tracking/telemetry
+
+**Degrade System Integration (REQUIRED):**
+- Add `NAVIGATION_SYSTEM` as a critical capability to the degrade system
+- Router initialization failure should trigger hard-crash behavior (no graceful mode)
+- Navigation is non-degradable: if transport adapter fails, the entire app is unusable
+- Update degrade capability enum to include navigation system as a mandatory capability
+- Log all navigation initialization failures to `navigation` category with CRITICAL level
+
 ## Related Systems
 
 - `hooks/navigation/use-route-change-observer.ts` — Basic back button detection (implemented)
 - `lib/analytics/nav-analytics.ts` — Navigation event tracking
 - `lib/middleware/navigation/nav-service.ts` — Analytics dispatch point
 - `type-definitions/navigation-decision.ts` — NavigationContext (has basic `triggeredBy` field)
+- `system/Kernel/phases/registration-phase.ts` — Router initialization happens here (EXCEPTION to system-layer rules)
 
+
+## Settings Modal
+
+**Short answer: Yes it can, but it's a more involved refactor because the trigger point is different.**
+
+Here's the key difference:
+
+- **NavModal / TrustModal** — triggered from `useGuardedNavigation` (a hook), which already has all the navigation context needed for their callbacks. `openModal()` is called from within a hook = easy.
+- **SettingsModal** — triggered from `ChromeLayer` (a *presentation component*) via `openSettingsMenu`. The action callbacks (`onAccountSettings`, `onReturnToWorldSelection`) need `router` + `AuthStateManager` + `worldId`/`userRole` — context that `ChromeLayer` doesn't have. So currently those callbacks are defined in _layout.tsx and the manual `<SettingsModal>` render wires them together.
+
+**The current state is also slightly inconsistent** — `SettingsModal` has `registerModal('settings', SettingsModal)` at the bottom already, but it's never actually opened via `openModal()`. The registry entry is dead code right now.
+
+**Migration path when you get to it:**
+1. Extract the two action callbacks into a `useSettingsActions` hook in navigation (or ui)
+2. Have `ChromeLayer` call `openModal('settings', { onAccountSettings, onReturnToWorldSelection, onClose: closeModal })` via `useModal()` instead of `openSettingsMenu`
+3. Remove `settingsMenuVisible` / `openSettingsMenu` / `closeSettingsMenu` from `chrome-context`
+4. Remove the manual `<SettingsModal>` render from _layout.tsx
+
+Not urgent, but definitely worth doing to clean up the `chrome-context` and kill the _layout.tsx manual render. Worth noting as a follow-up task.

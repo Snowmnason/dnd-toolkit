@@ -49,6 +49,9 @@ export * from "./offline/useForceResync";
 // Storage
 export * from "./storage/useRefreshStorageCache";
 
+// Chrome & Navigation
+export { useChromeBottom } from './provider/use-chrome-bottom';
+
 // Analytics
 export * from "./analytics";
 

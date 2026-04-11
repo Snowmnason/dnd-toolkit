@@ -7,10 +7,10 @@
  * Security policy: fail-secure (deny access if clock is invalid or server unavailable).
  */
 import { fetchEntitlementsByUserId } from "@/lib/database/entitlements";
-import { getDatabase } from "@/lib/middleware/services/database-service";
 import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
+import { getDatabase } from "@/middleware/services/database-service";
 import { isClockInvalid } from "@/system/Kernel/clock-integrity";
 import { isOverrideActive } from "./overrides";
 import { type ServerSyncState } from "./state";

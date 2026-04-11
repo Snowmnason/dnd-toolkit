@@ -58,6 +58,8 @@ module.exports = defineConfig([
   {
     files: ['**/*.ts', '**/*.tsx'],
     ignores: [
+      'system/Navigation/expo-router/transport_adapter.ts', // EXCEPTION: Centralized transport layer (all router.* calls must go here)
+      'providers/AppKernelProvider.tsx', // EXCEPTION: Bootstrap bridge — calls useRouter() and system/Navigation to seed the router instance alongside kernel init
     ],
     rules: {
       'no-restricted-syntax': [

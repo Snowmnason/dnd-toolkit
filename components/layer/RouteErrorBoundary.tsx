@@ -1,4 +1,4 @@
-import { NavigationContext, RouteConfig } from '@/lib/navigation/navigation-config';
+import { NavigationContext, RouteConfig } from '@/lib/navigation/navigationConfig';
 import { logger } from '@/lib/utils';
 import React, { ReactNode } from 'react';
 import { NavigationErrorScreen } from '../SplashScreen/NavigationErrorScreen';

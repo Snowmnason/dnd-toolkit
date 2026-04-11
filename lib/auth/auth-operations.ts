@@ -19,9 +19,9 @@ import {
     RateLimitError,
     UserNotFoundError,
 } from "@/lib/error";
-import type { Session } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils";
 import { type AuthErrorCode, ERROR_CODES } from "@/maps";
+import type { Session } from "@/middleware/services";
 import { validateEmail, validatePassword } from "@/validation/";
 import {
     checkAuthGuard,

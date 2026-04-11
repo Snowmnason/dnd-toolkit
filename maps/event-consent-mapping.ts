@@ -55,19 +55,21 @@ export const DEFAULT_EVENT_CONSENT_MAPPING = new Map<string, ConsentCategory>([
   ['feature_blocked', 'performance'],
   ['api_request', 'performance'],
 
-  // Navigation — standard metrics (transitions, redirects, aborts)
-  ['nav_transition_success', 'performance'],
-  ['nav_transition_redirected', 'performance'],
+  // Navigation — standard metrics (transitions, redirects, denials, policy decisions)
+  ['nav_transition_allowed', 'performance'],
   ['nav_transition_aborted', 'performance'],
+  ['nav_guard_auth_denied', 'performance'],
+  ['nav_guard_world_access', 'performance'],
+  ['nav_guard_platform_mismatch', 'performance'],
+  ['nav_guard_timeout', 'performance'],
+  ['nav_ui_required', 'performance'],
+  ['nav_error', 'performance'],
 
   // ─── Usage events ────────────────────────────────────────────────────────────
   // Requires 'full' consent (user opted into full usage tracking)
   ['screen_view', 'usage'],
   ['component_usage', 'usage'],
   ['feature_usage', 'usage'],
-
-  // Navigation — detailed tracking (user throttled)
-  ['nav_user_throttled', 'usage'],
 
   // Session lifecycle — behavioural data; requires full consent
   ['session_started', 'usage'],

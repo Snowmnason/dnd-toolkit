@@ -3,13 +3,12 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { View } from "react-native";
 
+import { CreateLeftPanel } from "@/AppScreens/select/create-world/CreateLeftPanel";
+import MapCanvas from "@/AppScreens/select/create-world/MapCanvas";
 import { AppSplit, Button } from "@/components/ui";
 import { useCurrentSession } from "@/hooks/auth";
-import { useSuccessNavigation } from "@/hooks/navigation/use-success-navigation";
 import { useWorldCreation } from "@/hooks/utils/use-world-creation";
 import { usePlatform } from "@/providers";
-import { CreateLeftPanel } from "@/Screens/select/create-world/CreateLeftPanel";
-import MapCanvas from "@/Screens/select/create-world/MapCanvas";
 import { useScale } from "@/theme";
 import { worldSchema, type WorldFormData } from "@/validation";
 
@@ -61,19 +60,11 @@ export default function CreateWorldScreen() {
   const { session } = useCurrentSession();
   const {
     isCreating,
-    successWorldId,
+    //successWorldId,
     createWorld,
     showSignInModal,
     showValidationModal,
-    registerSuccessNavigate,
   } = useWorldCreation();
-  const { navigateToWorld } = useSuccessNavigation({
-    showSuccessModal: false, // Modal is managed by hook now
-    successWorldId,
-  });
-
-  // Register the navigation callback for the success modal
-  registerSuccessNavigate(() => navigateToWorld());
 
   // Logic
   const onSubmit = async (data: WorldFormData) => {

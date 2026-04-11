@@ -30,5 +30,7 @@ import '@/components/modals/FeatureGatedModal'
 import '@/components/modals/SettingsModal'
 import '@/components/modals/SuccessModal'
 
-// Error modals
-import '@/components/modals/NavFailureModal'
+// Navigation modals
+import '@/components/modals/NavModal'
+import '@/components/modals/TrustedUrlConsentModal'
+

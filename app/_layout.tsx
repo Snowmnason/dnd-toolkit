@@ -8,7 +8,6 @@ import {
   SnackBarLayer,
   UIBlockerLayer
 } from "@/components";
-import { NavFailureModal } from "@/components/modals";
 import SettingsModal from "@/components/modals/SettingsModal";
 import { OfflineSyncNotificationLayer } from "@/components/offline";
 import {
@@ -25,14 +24,14 @@ import { getAppConfig } from "@/config";
 import { Analytics, sessionManager } from "@/hooks/analytics";
 import { SafeModeReason, executeRecoveryAction } from "@/hooks/error";
 import { useClearSafeMode } from "@/hooks/error/use-safe-mode";
-import { AppKernelProvider, useAppKernel, useKernelLoadingSync, useSyncSplash } from "@/hooks/kernel";
-import { useGuardedNavigation, usePanelNavigation, useRouteChangeObserver, useRouteConfig } from "@/hooks/navigation";
+import { useAppKernel, useKernelLoadingSync, useSyncSplash } from "@/hooks/kernel";
+import { usePanelNavigation, useRouteChangeObserver, useRouteConfig } from "@/hooks/navigation";
 import {
   type AccessRole,
 } from "@/hooks/storage";
 import { logger, useInjectToastSystem } from "@/hooks/utils";
-import { buildNavigationTarget } from "@/lib/navigation/uri-helpers";
 import {
+  AppKernelProvider,
   SubscriptionProvider,
   UseTheme,
   useAppParamsStable,
@@ -40,7 +39,7 @@ import {
   usePlatform,
   useUserId,
   useUserRole,
-  useWorldId,
+  useWorldId
 } from "@/providers";
 import { AppParamsProvider } from "@/providers/AppParamsProvider";
 import { ViewportProvider } from "@/providers/ViewportProvider";
@@ -146,11 +145,10 @@ function RootLayoutContent() {
 
   const { config: routeConfig, title: resolvedTitle, backTarget: topBarBackTarget } = useRouteConfig(navContext);
   const panelNav = usePanelNavigation();
-  const navigate = useGuardedNavigation();
 
   // Route change observer — catches deep links, URL edits, back button
   // Mounted unconditionally; starts observing once kernel.phases.appReady gates the tree
-  const observer = useRouteChangeObserver();
+  useRouteChangeObserver();
 
   // ==================== EFFECT HOOKS SECTION ====================
   // All effects that depend on above hooks
@@ -374,13 +372,11 @@ function RootLayoutContent() {
       const user = await AuthStateManager.getUserData();
       const username = user?.username || "user";
 
-      const target = buildNavigationTarget(
-        `/settings/${encodeURIComponent(username)}`,
-        { worldId, userRole },
-        ["worldId", "userRole"],
-      );
-
-      router.push(target as any);
+      // TODO: replace when navigation adapter is fully built
+      router.push({
+        pathname: `/settings/${encodeURIComponent(username)}` as any,
+        params: { worldId, userRole },
+      });
     } catch (err) {
       logger.category("navigation").warn("Root layout: failed to resolve username route, falling back", err);
     }
@@ -388,12 +384,8 @@ function RootLayoutContent() {
 
   const handleReturnToWorldSelection = () => {
     closeSettingsMenu();
-    const target = buildNavigationTarget(
-      "/select/world-selection",
-      {},
-      [],
-    );
-    router.replace(target as any);
+    // TODO: replace when navigation adapter is fully built
+    router.replace("/select/world-selection" as any);
   };
 
   return (
@@ -436,14 +428,6 @@ function RootLayoutContent() {
               onClose={closeSettingsMenu}
               onAccountSettings={handleAccountSettings}
               onReturnToWorldSelection={handleReturnToWorldSelection}
-            />
-
-            {/* Navigation Failure Modal — from route observer */}
-            <NavFailureModal
-              visible={observer.navFailureVisible}
-              heading={observer.navFailureHeading}
-              body={observer.navFailureBody}
-              onClose={observer.dismissNavFailure}
             />
 
             {/* Content area: sidebar + stack in row layout on desktop */}
@@ -516,27 +500,27 @@ function RootLayoutContent() {
 export default function RootLayout() {
   return (
     <AppKernelProvider>
-      <ViewportProvider>
-        <SubscriptionProvider>
-          <AppParamsProvider>
-            <OverlayProvider>
+        <ViewportProvider>
+          <SubscriptionProvider>
+            <AppParamsProvider>
+              <OverlayProvider>
               {/* UIBlockerLayer renders the splash overlay (isLoading: true by default)
                   and provides the setLoading() context. Placed here — inside all theme
                   providers (SplashScreen needs UseTheme) but above RootLayoutContent
                   where useKernelLoadingSync() calls setLoading(false) on appReady. */}
-              <UIBlockerLayer>
-                <AppErrorBoundary
-                  renderFallback={(error: Error | null, onRetry: () => void) => (
-                    <CrashFallBack error={error} onRetry={onRetry} />
-                  )}
-                >
-                  <RootLayoutContent />
-                </AppErrorBoundary>
-              </UIBlockerLayer>
-            </OverlayProvider>
-          </AppParamsProvider>
-        </SubscriptionProvider>
-      </ViewportProvider>
+                      <UIBlockerLayer>
+                        <AppErrorBoundary
+                          renderFallback={(error: Error | null, onRetry: () => void) => (
+                            <CrashFallBack error={error} onRetry={onRetry} />
+                          )}
+                      >
+                    <RootLayoutContent />
+                  </AppErrorBoundary>
+                </UIBlockerLayer>
+              </OverlayProvider>
+            </AppParamsProvider>
+          </SubscriptionProvider>
+        </ViewportProvider>
     </AppKernelProvider>
   );
 }

@@ -12,8 +12,8 @@
  * Swapping to a different backend means updating this file and service-initializer.ts.
  */
 
-import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
+import { getDatabase } from "@/middleware/services";
 import { registerRepositories, type RepositoryBundle } from "./repositories";
 import { SupabaseEntitlementsRepository } from "./repositories/SupabaseEntitlementsRepository";
 import { SupabaseFeatureFlagsRepository } from "./repositories/SupabaseFeatureFlagsRepository";

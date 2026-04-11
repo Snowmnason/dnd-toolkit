@@ -1,9 +1,9 @@
-import { QueryCache } from "@/lib/middleware/storage";
 import { StorageManager } from "@/lib/storage";
 import { worldAccessCache } from "@/lib/storage/sync/world-access-cache";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
 import { CACHE_TAGS } from "@/maps/cache-keys";
+import { QueryCache } from "@/middleware/storage";
 import { getCurrentUserProfile } from "./database-manager";
 import { getInviteRepository, getWorldAccessRepository, getWorldRepository } from "./repositories";
 

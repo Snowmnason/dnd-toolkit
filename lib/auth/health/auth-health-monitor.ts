@@ -71,7 +71,7 @@ async function validateAuthHealth(): Promise<void> {
     logger.category("auth").debug("Running auth health check");
 
     // Check if auth backend is configured via middleware
-    const { isAuthConfigured } = await import("@/lib/middleware/services");
+    const { isAuthConfigured } = await import("@/middleware/services");
     if (!isAuthConfigured()) {
       logger
         .category("auth")

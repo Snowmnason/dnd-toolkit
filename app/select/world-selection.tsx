@@ -1,14 +1,14 @@
+import { WorldListPanel } from "@/AppScreens/select/world-selection/WorldListPanel";
+import { WorldRightPanel } from "@/AppScreens/select/world-selection/WorldRightPanel";
 import { AppPage, AppSplit, Body, Button } from "@/components/ui";
 import { useAppKernel } from "@/hooks/kernel";
-import { usePanelNavigation } from "@/hooks/navigation/use-panel-navigation";
+import { usePanelNavigation } from "@/hooks/navigation";
 import { useWorlds } from "@/hooks/storage";
 import { useWorldModal } from "@/hooks/utils/use-world-modal";
 import {
     useAppParamsStable,
     useUserId,
 } from "@/providers";
-import { WorldListPanel } from "@/Screens/select/world-selection/WorldListPanel";
-import { WorldRightPanel } from "@/Screens/select/world-selection/WorldRightPanel";
 import { useScale } from "@/theme";
 import { useState } from "react";
 

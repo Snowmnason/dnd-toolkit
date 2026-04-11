@@ -22,14 +22,14 @@ import { createValidatedAuthProvider, registerAuthProvider, type AuthProvider } 
 import { NoOpErrorTracker, registerErrorTracker } from './error-adapter';
 import { initializeSentryErrorTracker } from './sentry/sentry-service-initializer';
 import {
-  updateServiceStatus
+    updateServiceStatus
 } from './service-status';
 import {
-  logValidationResult,
-  validateSentryAnalyticsConfig,
-  validateSentryErrorConfig,
-  validateSupabaseAuthConfig,
-  validateSupabaseDatabaseConfig,
+    logValidationResult,
+    validateSentryAnalyticsConfig,
+    validateSentryErrorConfig,
+    validateSupabaseAuthConfig,
+    validateSupabaseDatabaseConfig,
 } from './service-validation';
 import { SupabaseAuthProvider } from './supabase/supabase-auth-provider';
 
@@ -249,7 +249,7 @@ async function initializeAuthProvider(): Promise<void> {
     logger.category('bootstrap').info(`Auth provider '${providerName}' registered successfully`);
     
     // Register auth strategies (done here via middleware to avoid circular deps in system/)
-    const { initializeAuthStrategies } = await import('@/lib/middleware/services');
+    const { initializeAuthStrategies } = await import('@/middleware/services');
     await initializeAuthStrategies();
 
     updateServiceStatus('auth', 'ready', providerName);

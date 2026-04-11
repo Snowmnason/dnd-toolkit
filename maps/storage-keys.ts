@@ -98,4 +98,7 @@ export const STORAGE_KEYS = {
 
   // Kernel clock integrity (shared infrastructure)
   LAST_CLOCK_CHECK: "sno:kernel:last_clock_check",
+
+  // Trusted external URL origins (navigation, shared infrastructure)
+  TRUSTED_URL_ORIGINS: "sno:nav:trusted_url_origins",
 } as const;

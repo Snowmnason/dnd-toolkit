@@ -5,9 +5,9 @@
  * Token lifecycle is abstracted via AuthProvider.refreshSession() — provider-agnostic.
  */
 
-import { getAuthProviderSync } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils";
 import { ERROR_CODES } from "@/maps/ERROR_CODES";
+import { getAuthProviderSync } from "@/middleware/services";
 import { AuthStrategy, type AuthContext } from "./auth-layer";
 
 /**

@@ -28,7 +28,12 @@
  */
 
 import { logger } from '@/lib/utils';
-import { appDegrade } from '@/system/Degrade';
+import {
+  getDegradedState,
+  getOperationalStatus,
+  reportDegradationEvent,
+  setCapabilityState,
+} from '@/middleware/degrade/degradation-service';
 import { DegradeCapability, DegradeDisplayCallback, DegradeResponseContext, DegradeResponseHandler, DegradeState } from '@/type-definitions/degrade';
 
 // ─── Priority Queue ────────────────────────────────────────────────
@@ -145,10 +150,7 @@ export function getPrimaryFault(): FaultRecord | null {
   return activeFaults.length > 0 ? (activeFaults[0] ?? null) : null;
 }
 
-// Lazy import to break circular dependency with error-service
-function getDegradationService() {
-  return require('@/lib/middleware/degrade/degradation-service') as typeof import('@/lib/middleware/degrade/degradation-service');
-}
+
 
 // Lazy imports — avoids circular deps with safe-mode and kernel modules
 function getSafeModeModule() {
@@ -290,10 +292,7 @@ export function subscribeToDegradation(callback: DegradationSubscriber): () => v
  * ```
  */
 export function getDegradationState(): DegradeState {
-  if (!appDegrade?.getState) {
-    return {} as DegradeState;
-  }
-  return appDegrade.getState();
+  return getDegradedState();
 }
 
 /**
@@ -315,10 +314,7 @@ export function getDegradationState(): DegradeState {
  * ```
  */
 export function isCapableOf(capability: DegradeCapability): boolean {
-  if (!appDegrade?.isCapable) {
-    return false; // System not initialized, assume degraded
-  }
-  return appDegrade.isCapable(capability);
+  return getOperationalStatus(capability);
 }
 
 // ─── Degradation Reporting ────────────────────────────────────────
@@ -374,16 +370,14 @@ export function reportCrash(
   // Track in priority queue (crash-level)
   enqueueFault(capability, reason, true);
 
-  // Set degradation flag immediately
-  if (appDegrade?.set) {
-    appDegrade.set(capability, false, { reason, source: 'bootstrap-crash', ...context });
-  }
+  // Set degradation flag immediately via middleware
+  setCapabilityState(capability, false, { reason, source: 'bootstrap-crash', ...context });
 
   // Execute lib-level response (UI decisions, feature gating)
   executeLibResponse({ capability, available: false, reason, source: 'bootstrap-crash', isCrash: true });
 
   // Report as ERROR severity (Sentry): unrecoverable failure
-  getDegradationService().reportDegradationEvent(capability, reason, 'error');
+  reportDegradationEvent(capability, reason, 'error');
 
   // Trigger safe mode for critical crash-level capabilities
   triggerSafeModeForCrash(capability, reason, context);
@@ -427,21 +421,14 @@ export function reportFault(
   // Track in priority queue (recoverable fault)
   enqueueFault(capability, reason, false);
 
-  // Set degradation flag immediately
-  if (appDegrade?.set) {
-    appDegrade.set(capability, false, { reason, source: 'runtime-fault', ...context });
-  }
+  // Set degradation flag immediately via middleware
+  setCapabilityState(capability, false, { reason, source: 'runtime-fault', ...context });
 
   // Execute lib-level response (UI decisions, feature gating)
   executeLibResponse({ capability, available: false, reason, source: 'runtime-fault', isCrash: false });
 
   // Report as WARNING severity (Sentry): recoverable fault
-  getDegradationService().reportDegradationEvent(capability, reason, 'warning');
-
-  // Report via middleware
-  // (Note: reportDegradationEvent already handles it, but keeping this for audit trail if needed)
-  // getDegradationService().reportDegradationEvent(capability, reason);
-
+  reportDegradationEvent(capability, reason, 'warning');
 
   // Notify subscribers
   notifySubscribers();
@@ -472,16 +459,14 @@ export function reportRecovery(
   // Remove from priority queue
   dequeueFault(capability);
 
-  // Clear degradation flag
-  if (appDegrade?.set) {
-    appDegrade.set(capability, true, { reason, source: 'recovery', ...context });
-  }
+  // Clear degradation flag via middleware
+  setCapabilityState(capability, true, { reason, source: 'recovery', ...context });
 
   // Execute lib-level response (restore UI, re-enable features)
   executeLibResponse({ capability, available: true, reason, source: 'recovery', isCrash: false });
 
   // Report as INFO severity (Sentry): context only, not an error
-  getDegradationService().reportDegradationEvent(capability, `[Recovery] ${reason}`, 'info');
+  reportDegradationEvent(capability, `[Recovery] ${reason}`, 'info');
 
   // Notify subscribers
   notifySubscribers();

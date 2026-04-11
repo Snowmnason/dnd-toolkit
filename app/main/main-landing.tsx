@@ -1,5 +1,5 @@
-import { panelConfigs } from "@/Screens/main-panels/PanelData";
-import { PanelView } from "@/Screens/main-panels/PanelView";
+import { panelConfigs } from "@/AppScreens/main-panels/PanelData";
+import { PanelView } from "@/AppScreens/main-panels/PanelView";
 import { AppPage } from "@/components/ui";
 import type { AccessRole } from "@/hooks/storage";
 import { usePlatform } from "@/providers";

@@ -3,9 +3,9 @@
  * Organized by screen area (functional grouping)
  */
 
-export { LOGIN_ROUTES } from "./login-routes";
-export { MAIN_ROUTES } from "./main-routes";
-export { SELECT_ROUTES } from "./select-routes";
-export { SETTINGS_ROUTES } from "./settings-routes";
-export { WEB_ROUTES } from "./web-routes";
+export { LOGIN_ROUTES } from "./loginRoutes";
+export { MAIN_ROUTES } from "./mainRoutes";
+export { SELECT_ROUTES } from "./selectRoutes";
+export { SETTINGS_ROUTES } from "./settingsRoutes";
+export { WEB_ROUTES } from "./webRoutes";
 

@@ -18,9 +18,9 @@
  */
 
 import { AuthLayer } from "@/lib/auth/auth-layer";
-import { getCircuitBreakerState } from "@/lib/middleware/api";
-import { QueryCache } from "@/lib/middleware/storage";
 import { logger } from "@/lib/utils/logger";
+import { getCircuitBreakerState } from "@/middleware/api";
+import { QueryCache } from "@/middleware/storage";
 import type { ZodType } from "zod";
 import { fetchRequest, type RequestInterceptor, type RequestOptions } from "./api-manager";
 

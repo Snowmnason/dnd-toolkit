@@ -57,16 +57,16 @@ import {
     NetworkCascadeDetector,
     reportCrash,
 } from "@/lib/error";
-import { DegradeCapability } from "@/type-definitions/degrade";
-import { getNetworkStatus, subscribeToNetworkStatus, type NetworkStatus } from "@/lib/middleware/network";
-import { QueryCache } from "@/lib/middleware/storage";
 import { logger } from "@/lib/utils";
+import { getNetworkStatus, subscribeToNetworkStatus, type NetworkStatus } from "@/middleware/network";
+import { QueryCache } from "@/middleware/storage";
 import type {
     OfflineSyncConfig,
     OfflineSyncStatus,
     QueuedMutation,
     SyncResult,
 } from "@/type-definitions";
+import { DegradeCapability } from "@/type-definitions/degrade";
 import { getConflictQueueManager } from "./conflict/conflict-queue-manager";
 import { executeConflictResolution } from "./conflict/conflict-resolution";
 import { OfflineMutationQueue } from "./mutation-queue";

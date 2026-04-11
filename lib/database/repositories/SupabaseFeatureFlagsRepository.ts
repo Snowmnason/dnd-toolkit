@@ -1,11 +1,11 @@
 import { dbRequestOptions } from "@/config";
 import { fetchRequest } from "@/lib/api";
-import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
+import { getDatabase } from "@/middleware/services";
 import type {
-  FeatureFlagOverrideRow,
-  FeatureFlagRow,
-  FeatureFlagsRepository,
+    FeatureFlagOverrideRow,
+    FeatureFlagRow,
+    FeatureFlagsRepository,
 } from "./repo-types";
 
 /**

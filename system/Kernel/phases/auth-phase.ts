@@ -129,7 +129,7 @@ export async function authPhase(signal: AbortSignal): Promise<void> {
             // Clear query cache
             try {
               const { QueryCache } = await import(
-                "@/lib/middleware/storage"
+                "@/middleware/storage"
               );
               await QueryCache.clearAll();
               logger.category("bootstrap").debug("Cleared query cache");

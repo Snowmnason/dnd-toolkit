@@ -4,11 +4,11 @@
  */
 
 import { getAppConfig } from '@/config';
-import { reportFault } from '@/lib/error';
 import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
 import { getConsentCategoryForEvent, shouldEmitEvent } from '@/lib/analytics/consent/consent-gating';
-import { getNetworkStatus } from "@/lib/middleware/network";
+import { reportFault } from '@/lib/error';
 import { logger } from '@/lib/utils/logger';
+import { getNetworkStatus } from "@/middleware/network";
 import { DegradeCapability } from '@/type-definitions/degrade';
 
 /**

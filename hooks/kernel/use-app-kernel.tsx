@@ -1,79 +1,15 @@
 /**
- * AppKernel React Context and Hook
+ * AppKernel Consumer Hooks
  *
- * Provides centralized access to kernel state throughout the app.
- * Must wrap the app at the root level for all consumers to work.
+ * Consumer hooks for kernel state. The provider and context live in
+ * providers/AppKernelProvider.tsx — these hooks import the context from there.
  *
- * All kernel access goes through lib/kernel/kernel-manager (never system/Kernel directly).
+ * All kernel access goes through lib/kernel (never system/Kernel directly).
  */
 
-import {
-  getKernelState,
-  initializeKernel,
-  onKernelStateChange,
-  type AppKernelState,
-} from "@/lib/kernel";
-import { logger } from "@/lib/utils/logger";
-import {
-  createContext,
-  ReactNode,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
-
-/**
- * React context for kernel state
- */
-const AppKernelContext = createContext<AppKernelState | null>(null);
-
-interface AppKernelProviderProps {
-  children: ReactNode;
-}
-
-/**
- * Provider component - must wrap the app at root level
- * Initializes the kernel and provides state to all consumers
- */
-export function AppKernelProvider({ children }: AppKernelProviderProps) {
-  const [state, setState] = useState<AppKernelState>(getKernelState());
-  const [bootstrapError, setBootstrapError] = useState<Error | null>(null);
-
-  useEffect(() => {
-    logger
-      .category("bootstrap")
-      .debug("[KERNEL_PROVIDER] Initializing kernel");
-
-    // Initialize kernel once on mount
-    initializeKernel().catch((error: unknown) => {
-      logger
-        .category("bootstrap")
-        .error("[AppKernelProvider] CRITICAL: Kernel initialization failed:", error);
-      // Store error in state so it's caught by error boundary on next render
-      setBootstrapError(error instanceof Error ? error : new Error(String(error)));
-    });
-
-    // Subscribe to kernel state changes
-    const unsubscribe = onKernelStateChange((newState: AppKernelState) => {
-      setState(newState);
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
-  // If bootstrap failed, throw error so error boundary catches it
-  if (bootstrapError) {
-    throw bootstrapError;
-  }
-
-  return (
-    <AppKernelContext.Provider value={state}>
-      {children}
-    </AppKernelContext.Provider>
-  );
-}
+import { type AppKernelState } from "@/lib/kernel";
+import { AppKernelContext } from "@/providers/AppKernelProvider";
+import { useContext } from "react";
 
 /**
  * Hook to access kernel state

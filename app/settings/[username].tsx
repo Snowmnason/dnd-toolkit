@@ -14,12 +14,12 @@ import {
     Heading,
     Surface
 } from "@/components/ui";
-import UserProfile from "../../Screens/settings/user-profile";
+import UserProfile from "../../AppScreens/settings/user-profile";
 import VersionDisplay from "../../components/VersionDisplay";
 
 // 🎨 Theme + Loading
-import { AppSettings } from "@/Screens/settings/AppSettings";
-import { ThemeSelector } from "@/Screens/settings/ThemeSelector";
+import { AppSettings } from "@/AppScreens/settings/AppSettings";
+import { ThemeSelector } from "@/AppScreens/settings/ThemeSelector";
 import { useScale } from "@/theme";
 
 export default function SettingsPage() {

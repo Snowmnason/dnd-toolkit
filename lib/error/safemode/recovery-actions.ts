@@ -14,11 +14,11 @@
 
 import { Analytics, Performance } from "@/lib/analytics";
 import { AuthStateManager } from "@/lib/auth";
-import { QueryCache } from "@/lib/middleware/storage";
 import { getAllRouteConfigs } from "@/lib/navigation";
 import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
+import { QueryCache } from "@/middleware/storage";
 import { FastCache } from "@/system/Storage";
 import { Router } from "expo-router";
 import { RecoveryAction, SafeModeState } from "./safe-mode";

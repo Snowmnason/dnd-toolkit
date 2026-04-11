@@ -1,5 +1,5 @@
+import { panelConfigs } from '@/AppScreens/main-panels/PanelData'
 import { Body, Caption } from '@/components/ui'
-import { panelConfigs } from '@/Screens/main-panels/PanelData'
 import { $ } from '@/theme'
 import { memo } from 'react'
 import { Pressable, View } from 'react-native'

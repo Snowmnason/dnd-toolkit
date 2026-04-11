@@ -50,7 +50,7 @@ export const CORE_JOBS: JobRegistryEntry[] = [
     name: "storage-health-check",
     register: async (queue) => {
       const { registerStorageHealthCheckJob } = await import(
-        "@/lib/middleware/storage/helpers/storage-health-monitor"
+        "@/middleware/storage/helpers/storage-health-monitor"
       );
       // Register handler and enqueue first health check to run in background
       // (does NOT block registration — check runs asynchronously after appReady)

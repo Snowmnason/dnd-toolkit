@@ -1,4 +1,4 @@
-import { QueryCacheInternals } from "@/lib/middleware/storage";
+import { QueryCacheInternals } from "@/middleware/storage";
 import { beforeEach, describe, expect, it } from "vitest";
 
 describe("QueryCache LRU Eviction", () => {

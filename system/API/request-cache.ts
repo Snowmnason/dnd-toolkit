@@ -1,5 +1,5 @@
-import { QueryCache } from "@/lib/middleware/storage";
 import { logger } from "@/lib/utils";
+import { QueryCache } from "@/middleware/storage";
 
 /**
  * Request Cache Integration

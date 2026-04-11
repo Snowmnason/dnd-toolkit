@@ -1,14 +1,14 @@
 import {
-  decode,
-  encode,
-  getDecodeStats,
-  getStats,
-  resetStats,
-} from "@/lib/middleware/storage/compression/compression-middleware";
+    decode,
+    encode,
+    getDecodeStats,
+    getStats,
+    resetStats,
+} from "@/middleware/storage/compression/compression-middleware";
 import {
-  startPeriodicReset,
-  stopPeriodicReset,
-} from "@/lib/middleware/storage/compression/compression-stats";
+    startPeriodicReset,
+    stopPeriodicReset,
+} from "@/middleware/storage/compression/compression-stats";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock logger to silence output

@@ -194,7 +194,7 @@ export async function performSignIn(
     // STEP 1: CALL AUTH PROVIDER
     let session;
     try {
-      const { authSignIn } = await import('@/lib/middleware/services/auth-service');
+      const { authSignIn } = await import('@/middleware/services/auth-service');
       const authResult = await authSignIn(email, password);
       if (!authResult.success) throw new Error(authResult.error?.message || 'Authentication failed');
       session = authResult.data;
@@ -304,7 +304,7 @@ export async function performSignInWithIdToken(
 
   try {
     // STEP 1: CALL AUTH PROVIDER WITH ID TOKEN
-    const { authSignInWithIdToken } = await import('@/lib/middleware/services/auth-service');
+    const { authSignInWithIdToken } = await import('@/middleware/services/auth-service');
     const authResult = await authSignInWithIdToken(provider, token, options);
 
     if (!authResult.success) {

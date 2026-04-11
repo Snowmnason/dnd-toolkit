@@ -22,3 +22,5 @@ export { STORAGE_KEYS } from './storage-keys';
 
 export { getStorageDefaults } from './storage-defaults';
 
+export { DEV_APPROVED_ORIGINS } from './trusted-origins';
+

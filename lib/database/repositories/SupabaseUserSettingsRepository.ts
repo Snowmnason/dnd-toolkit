@@ -1,15 +1,15 @@
 import { dbRequestOptions } from "@/config";
 import { fetchRequest } from "@/lib/api";
 import {
-  getCurrentUserProfile,
-  validateUserForWrite,
+    getCurrentUserProfile,
+    validateUserForWrite,
 } from "@/lib/database/database-manager";
-import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
+import { getDatabase } from "@/middleware/services";
 import type {
-  CacheOptions,
-  UserSettings,
-  UserSettingsRepository,
+    CacheOptions,
+    UserSettings,
+    UserSettingsRepository,
 } from "./repo-types";
 
 /**

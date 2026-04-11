@@ -217,7 +217,7 @@ export async function performReAuthJob(
 
     try {
       if (!tokens.access_token) throw new Error('access_token is required');
-      const { authRestoreSession } = await import('@/lib/middleware/services/auth-service');
+      const { authRestoreSession } = await import('@/middleware/services/auth-service');
       const restored = await authRestoreSession(tokens);
       if (!restored) throw new Error('Session restoration failed');
 

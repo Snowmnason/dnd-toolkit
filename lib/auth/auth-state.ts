@@ -1,8 +1,8 @@
 import { getUserRepository, getWorldAccessRepository } from "@/lib/database";
-import { clearAllUserData, getAllSecureStorageKeys, getPrivacyStorageBackend } from "@/lib/middleware/storage";
 import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
+import { clearAllUserData, getAllSecureStorageKeys, getPrivacyStorageBackend } from "@/middleware/storage";
 import { classifyCacheAge } from "@/pure-algo-immutables";
 
 // In-memory flag: signals that data sync should run after appReady.
@@ -203,7 +203,7 @@ export const AuthStateManager = {
       await SessionAdapter.clearSession();
 
       // Clear query cache (all user-specific cached queries)
-      const { QueryCache } = await import("@/lib/middleware/storage");
+      const { QueryCache } = await import("@/middleware/storage");
       await QueryCache.clearAll();
 
       // Clear FastCache (in-memory session cache)

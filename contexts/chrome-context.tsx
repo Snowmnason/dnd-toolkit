@@ -7,10 +7,6 @@ export interface ChromeContextType {
   settingsMenuVisible: boolean
   openSettingsMenu: () => void
   closeSettingsMenu: () => void
-
-  // BottomBar: Active tab state (mobile only)
-  activeTab: string
-  setActiveTab: (tab: string) => void
 }
 
 // ─── Context ─────────────────────────────────────────────────────────
@@ -22,23 +18,19 @@ const ChromeContext = createContext<ChromeContextType | undefined>(undefined)
 /**
  * 🔲 ChromeProvider
  *
- * Centralized state for persistent navigation chrome (TopBar + BottomBar).
+ * Centralized state for persistent navigation chrome UI state (TopBar only).
  *
  * TopBar state:
  *   - SettingsMenu visibility (openSettingsMenu / closeSettingsMenu)
  *
- * BottomBar state:
- *   - Active tab key for mobile tab navigation (activeTab / setActiveTab)
- *
  * ✅ Gate-Free: Does not depend on kernel phases.
  * UI chrome components consume this via useChrome() hook.
+ *
+ * Note: Bottom bar behavior is now managed separately by useChromeBottom() hook.
  */
 export function ChromeProvider({ children }: { children: React.ReactNode }) {
   // TopBar: SettingsMenu visibility
   const [settingsMenuVisible, setSettingsMenuVisible] = useState(false)
-
-  // BottomBar: Active tab key (mobile only, default to first tab)
-  const [activeTab, setActiveTab] = useState('characters')
 
   const openSettingsMenu = useCallback(() => {
     setSettingsMenuVisible(true)
@@ -52,9 +44,7 @@ export function ChromeProvider({ children }: { children: React.ReactNode }) {
     settingsMenuVisible,
     openSettingsMenu,
     closeSettingsMenu,
-    activeTab,
-    setActiveTab,
-  }), [settingsMenuVisible, openSettingsMenu, closeSettingsMenu, activeTab])
+  }), [settingsMenuVisible, openSettingsMenu, closeSettingsMenu])
 
   return (
     <ChromeContext.Provider value={contextValue}>
@@ -68,13 +58,14 @@ export function ChromeProvider({ children }: { children: React.ReactNode }) {
 /**
  * 🔲 useChrome
  *
- * Consumer hook for navigation chrome state (TopBar + BottomBar).
+ * Consumer hook for navigation chrome state (TopBar UI state).
  *
  * Usage:
  * ```tsx
  * const { openSettingsMenu, closeSettingsMenu, settingsMenuVisible } = useChrome();
- * const { activeTab, setActiveTab } = useChrome();
  * ```
+ *
+ * Note: Bottom bar behavior is now owned by useChromeBottom() hook.
  */
 export function useChrome(): ChromeContextType {
   const context = useContext(ChromeContext)

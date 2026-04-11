@@ -19,10 +19,10 @@
  */
 
 import {
-  executeRequest,
-  type RequestInterceptor,
-  type RequestOptions,
-} from '@/lib/middleware/api';
+    executeRequest,
+    type RequestInterceptor,
+    type RequestOptions,
+} from '@/middleware/api';
 
 // Re-export types so consumers only need @/lib/api
 export type { RequestInterceptor, RequestOptions };

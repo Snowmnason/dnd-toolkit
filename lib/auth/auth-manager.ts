@@ -1,51 +1,51 @@
 import { EmailAlreadyExistsError } from "@/lib/error";
-import {
-  authGetSession,
-  authGetUser,
-  authOnStateChange,
-  authResendConfirmation,
-  authResetPassword,
-  authRestoreSession,
-  authSignIn,
-  authSignInWithOAuth,
-  authUpdatePassword,
-} from "@/lib/middleware/services";
 import { logger } from "@/lib/utils";
+import {
+    authGetSession,
+    authGetUser,
+    authOnStateChange,
+    authResendConfirmation,
+    authResetPassword,
+    authRestoreSession,
+    authSignIn,
+    authSignInWithOAuth,
+    authUpdatePassword,
+} from "@/middleware/services";
 import { validatePassword } from "@/validation";
 import type {
-  DeletePhase1Result,
-  DeletePhase2Result,
+    DeletePhase1Result,
+    DeletePhase2Result,
 } from "./account/delete-account-system";
 import type {
-  SignOutPhase1Result,
-  SignOutPhase2Result,
-  SignOutSource,
+    SignOutPhase1Result,
+    SignOutPhase2Result,
+    SignOutSource,
 } from "./account/sign-out-system";
 import type {
-  Phase1VerifyResult,
-  Phase2UpdatePasswordResult,
-  Phase2UpdateUsernameResult,
+    Phase1VerifyResult,
+    Phase2UpdatePasswordResult,
+    Phase2UpdateUsernameResult,
 } from "./account/update-creds-system";
 import {
-  prepareResendConfirmation,
-  prepareResetPassword,
-  prepareSignIn,
-  prepareSignUp,
-  prepareUpdatePassword,
-  recordAuthAttempt,
-  type AuthOperationResult,
-  type ResendResult,
-  type ResetPasswordResult,
-  type Session,
-  type SignInResult,
-  type SignUpResult,
+    prepareResendConfirmation,
+    prepareResetPassword,
+    prepareSignIn,
+    prepareSignUp,
+    prepareUpdatePassword,
+    recordAuthAttempt,
+    type AuthOperationResult,
+    type ResendResult,
+    type ResetPasswordResult,
+    type Session,
+    type SignInResult,
+    type SignUpResult,
 } from "./auth-operations";
 
 // Re-export types so consumers only need @/lib/auth
 export type {
-  AuthOperationResult, ResendResult, ResetPasswordResult, Session,
-  SignInResult,
-  SignUpResult
+    AuthOperationResult, ResendResult, ResetPasswordResult, Session,
+    SignInResult,
+    SignUpResult
 };
 
 // ============================================================================
@@ -74,7 +74,7 @@ export async function ensureUserLoggedIn(): Promise<{ authId: string; email: str
  * @throws Error with user-facing message if provider is not ready.
  */
 export async function ensureAuthProviderReady(): Promise<void> {
-  const { isAuthConfigured } = await import('@/lib/middleware/services/auth-service');
+  const { isAuthConfigured } = await import('@/middleware/services/auth-service');
   if (!isAuthConfigured()) {
     throw new Error('Auth provider is not available. Please check your network connection and try again.');
   }
