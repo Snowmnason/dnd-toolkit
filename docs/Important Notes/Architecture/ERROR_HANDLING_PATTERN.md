@@ -106,7 +106,7 @@ async function handleOperationWithRetry() {
 
       if (error.code === ERROR_CODES.AUTH.SESSION_EXPIRED) {
         await clearSession();
-        router.push('/login/sign-in');
+        navigate.push('/login/sign-in');
         return null;
       }
 

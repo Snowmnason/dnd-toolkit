@@ -113,7 +113,7 @@ export async function performSignUp(
         : 'https://dnd-tool.thesnowpost.com';
 
     const signupResult = await authSignUp(email, password, {
-      emailRedirectTo: `${baseUrl}/login/auth-redirect?action=signup-confirm`,
+      emailRedirectTo: `${baseUrl}/login/sign-up?action=signup-confirm`,
     });
 
     if (!signupResult.success) {

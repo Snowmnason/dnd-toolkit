@@ -20,22 +20,20 @@ import { OverlayProvider, useChrome } from "@/contexts";
 // Trigger modal registration side effects — must run before any openModal() call.
 // Imported here (leaf module) instead of modal-context.tsx to avoid circular dependency.
 import "@/components/modals/register-all-modals";
-import { getAppConfig } from "@/config";
 import { Analytics, sessionManager } from "@/hooks/analytics";
-import { SafeModeReason, executeRecoveryAction } from "@/hooks/error";
+import { useAuthLinkObserver } from "@/hooks/auth";
+import { executeRecoveryAction, getSafeModeNavigationTarget } from "@/hooks/error";
 import { useClearSafeMode } from "@/hooks/error/use-safe-mode";
 import { useAppKernel, useKernelLoadingSync, useSyncSplash } from "@/hooks/kernel";
-import { usePanelNavigation, useRouteChangeObserver, useRouteConfig } from "@/hooks/navigation";
-import {
-  type AccessRole,
-} from "@/hooks/storage";
+import { useNavigation, usePanelNavigation, useRouteChangeObserver, useRouteConfig } from "@/hooks/navigation";
+import { useChromeBottom } from "@/hooks/provider/use-chrome-bottom";
+import { useChromePolicy } from "@/hooks/provider/use-chrome-policy";
+import { useAppParamsSync } from "@/hooks/provider/use-app-params-sync";
 import { logger, useInjectToastSystem } from "@/hooks/utils";
 import {
   AppKernelProvider,
   SubscriptionProvider,
   UseTheme,
-  useAppParamsStable,
-  useAppParamsVolatile,
   usePlatform,
   useUserId,
   useUserRole,
@@ -45,37 +43,10 @@ import { AppParamsProvider } from "@/providers/AppParamsProvider";
 import { ViewportProvider } from "@/providers/ViewportProvider";
 import {
   Stack,
-  useLocalSearchParams,
-  useRouter,
   useSegments,
 } from "expo-router";
 import { useEffect } from "react";
 import { Platform, View } from "react-native";
-
-// Suppress known benign warnings from React Navigation / Expo Router / React Native Web
-// 1. "Blocked aria-hidden on an element because its descendant retained focus"
-//    - Focus management timing issue in navigation library (doesn't affect functionality)
-// 2. "props.pointerEvents is deprecated. Use style.pointerEvents"
-//    - Coming from third-party components during bootstrap; we're fixing this proactively in our codebase
-if (typeof window !== "undefined") {
-  const originalWarn = console.warn;
-
-  console.warn = (...args: any[]) => {
-    try {
-      const message = args[0]?.toString?.() || "";
-      if (
-        (message.includes("Blocked aria-hidden") &&
-          message.includes("descendant retained focus")) ||
-        message.includes("props.pointerEvents is deprecated")
-      ) {
-        return; // Suppress these specific warnings
-      }
-    } catch {
-      // Ignore errors in filter logic, pass through to original warn
-    }
-    originalWarn(...args);
-  };
-}
 
 function RootLayoutContent() {
   // ==================== HOOKS SECTION ====================
@@ -84,8 +55,6 @@ function RootLayoutContent() {
 
   // Theme and routing hooks
   const { theme } = UseTheme();
-  const urlParams = useLocalSearchParams();
-  const router = useRouter();
   const segments = useSegments();
   const { isMobile } = usePlatform();
 
@@ -93,8 +62,6 @@ function RootLayoutContent() {
   const userId = useUserId();
   const worldId = useWorldId();
   const userRole = useUserRole();
-  const { updateVolatileParams, clearWorldParams } = useAppParamsVolatile();
-  const { clearAllParams } = useAppParamsStable();
   const { closeSettingsMenu, settingsMenuVisible } = useChrome();
 
   // Data loading hooks
@@ -111,24 +78,12 @@ function RootLayoutContent() {
   // Allows lib/error layers to display toasts without React dependencies
   useInjectToastSystem();
 
-  // FUTURE: Offline conflict resolution (disabled for v1 - LWW only)
-  // v1 uses automatic Last-Write-Wins for all conflicts
+  // Chrome visibility policy: resolved from AppConfig ui.chrome + navDrawer config
+  const chromePolicy = useChromePolicy(segments as string[]);
+  const { showTopBar, showBottomBar, showHamburger, showNavDrawer: shouldRenderNavDrawer } = chromePolicy;
 
-  // Log every render with session ID
-  // Debug: Uncomment to trace root layout renders
-  // useEffect(() => {
-  //   logger.category('navigation').debug(
-  //     `[SESSION:${sessionId}] 📍 Root layout rendered - route: ${segments[0] || "index"}`,
-  //   );
-  // }, [sessionId, segments]);
-
-  // NavDrawer feature flag: Determine if drawer should be rendered based on global flag and route
-  const config = getAppConfig();
-  const navDrawerConfig = config.ui?.navDrawer;
-  const navDrawerEnabled = navDrawerConfig?.enabled ?? false;
-  const skipRoutes = navDrawerConfig?.skipRoutes ?? [];
-  const currentRoute = segments[0] || 'index';
-  const shouldRenderNavDrawer = navDrawerEnabled && !skipRoutes.includes(currentRoute);
+  // Bottom bar behavior hook
+  const chromeBottom = useChromeBottom();
 
   // Navigation hooks (must be called unconditionally before any early returns)
   const navContext = {
@@ -137,18 +92,25 @@ function RootLayoutContent() {
       worldId: worldId as string | undefined,
       userRole: userRole as string | undefined,
     },
-    router,
     worldId: worldId as string | undefined,
     userRole: userRole as string | undefined,
     isMobile,
   };
 
-  const { config: routeConfig, title: resolvedTitle, backTarget: topBarBackTarget } = useRouteConfig(navContext);
+  const { config: routeConfig, title: resolvedTitle } = useRouteConfig(navContext);
   const panelNav = usePanelNavigation();
+  const navigate = useNavigation();
 
   // Route change observer — catches deep links, URL edits, back button
   // Mounted unconditionally; starts observing once kernel.phases.appReady gates the tree
   useRouteChangeObserver();
+
+  // Auth link observer — intercepts email redirect URLs (signup, password reset, invites)
+  // Fires on mount and param changes, processes entry via lib/auth/account/email-link-system.ts
+  useAuthLinkObserver();
+
+  // URL→context param sync: seed-on-main, clear-on-login, clear-world-on-select
+  useAppParamsSync();
 
   // ==================== EFFECT HOOKS SECTION ====================
   // All effects that depend on above hooks
@@ -168,116 +130,9 @@ function RootLayoutContent() {
     }
   }, [userId]);
 
-  // Update context params when URL params change
-  useEffect(() => {
-    const firstSegment = typeof segments[0] === "string" ? segments[0] : "";
-
-    // Main routes: allow initial set from URL only if context is empty; otherwise ignore overrides
-    if (firstSegment === "main") {
-      const urlWorldId =
-        typeof urlParams.worldId === "string" ? urlParams.worldId : undefined;
-      const urlUserRole =
-        typeof urlParams.userRole === "string" ? (urlParams.userRole as AccessRole) : undefined;
-
-      // If no world in context yet, seed from URL once (owner navigating directly to their world)
-      if (!worldId && urlWorldId) {
-        logger.category("navigation").info("[NavGuard] Seeding world from URL on main route", {
-          urlWorldId,
-          urlUserRole,
-        });
-        updateVolatileParams({ worldId: urlWorldId, userRole: urlUserRole });
-      }
-      // Skip further processing for main routes to avoid clearing params
-      return;
-    }
-
-    const currentWorldId =
-      typeof urlParams.worldId === "string" ? urlParams.worldId : undefined;
-    const currentUserRole =
-      typeof urlParams.userRole === "string" ? (urlParams.userRole as AccessRole) : undefined;
-
-    // Only update if values are different from context (userId is loaded from storage, not URL)
-    let shouldUpdate = false;
-    const updates: { worldId?: string; userRole?: AccessRole } = {};
-    if (currentWorldId && currentWorldId !== worldId) {
-      updates.worldId = currentWorldId;
-      shouldUpdate = true;
-    }
-    if (currentUserRole && currentUserRole !== userRole) {
-      updates.userRole = currentUserRole;
-      shouldUpdate = true;
-    }
-
-    if (shouldUpdate) {
-      updateVolatileParams(updates);
-    }
-
-    // Only clear params when entering login routes and params exist
-    if (segments[0] === "login" && (userId || worldId || userRole)) {
-      clearAllParams();
-    }
-    // Only clear world params when entering select routes and world params exist
-    else if (segments[0] === "select" && (worldId || userRole)) {
-      clearWorldParams();
-    }
-  }, [
-    urlParams,
-    segments,
-    updateVolatileParams,
-    clearAllParams,
-    clearWorldParams,
-    userId,
-    worldId,
-    userRole,
-  ]);
-
   // ==================== RENDER LOGIC SECTION ====================
   // Note: UIBlockerLayer (outermost in provider tree) handles all loading overlays.
   // Kernel and other systems call setLoading() via useUIBlocker().
-
-  // Helper to determine safe navigation target based on safe mode reason
-  const getNavigationTarget = (reason?: string): string => {
-    // Auth failures → must go to login
-    if (
-      reason === SafeModeReason.AUTH_EXPIRED ||
-      reason === SafeModeReason.AUTH_INVALID ||
-      reason === SafeModeReason.SESSION_LOST
-    ) {
-      return "/login/sign-in";
-    }
-
-    // Storage/kernel issues → try world selection (auth should be OK)
-    if (
-      reason === SafeModeReason.STORAGE_UNREADABLE ||
-      reason === SafeModeReason.STORAGE_CORRUPTED ||
-      reason === SafeModeReason.STORAGE_QUOTA_EXCEEDED ||
-      reason === SafeModeReason.KERNEL_TIMEOUT ||
-      reason === SafeModeReason.KERNEL_PRELOAD_FAILED ||
-      reason === SafeModeReason.KERNEL_CONFIG_FAILED
-    ) {
-      return "/select/world-selection";
-    }
-
-    // Network issues → try world selection
-    if (
-      reason === SafeModeReason.NETWORK_SYNC_FAILURES ||
-      reason === SafeModeReason.NETWORK_CASCADE ||
-      reason === SafeModeReason.NETWORK_UNAVAILABLE
-    ) {
-      return "/select/world-selection";
-    }
-
-    // Default/unknown → safest option is index (welcome/splash screen)
-    return "/";
-  };
-
-  // DEBUG: Log safe mode state
-  if (kernel.safeMode) {
-    console.log('[ui] [RootLayoutContent] → rendering SafeModeScreen', {
-      reason: kernel.safeMode?.reason,
-      level: kernel.safeMode?.level,
-    });
-  }
 
   // Show safe mode screen if app entered safe mode (takes priority over normal rendering)
   // CRITICAL: SafeModeScreen is wrapped in error boundary - if it crashes, we still have fallback UI
@@ -288,8 +143,8 @@ function RootLayoutContent() {
           state={kernel.safeMode}
           onNavigateHome={() => {
             // Navigate to appropriate route based on safe mode reason
-            const target = getNavigationTarget(kernel.safeMode?.reason);
-            router.replace(target as any);
+            const target = getSafeModeNavigationTarget(kernel.safeMode?.reason);
+            navigate.replace(target);
           }}
           onRecoveryAction={async (action) => {
             // Execute the recovery action
@@ -301,18 +156,20 @@ function RootLayoutContent() {
               const result = await executeRecoveryAction(
                 action,
                 kernel.safeMode!,
-                router,
-                () => {
-                  // On success, clear the safe mode state to exit safe mode
-                  // This allows the app to resume normal operation after recovery
-                  logger
-                    .category("bootstrap")
-                    .info(`[SafeMode] Recovery action succeeded: ${action}`);
-                  clearKernelSafeMode();
+                async (targetRoute: string) => {
+                  // Navigation callback: handle navigation after recovery succeeds
+                  navigate.replace(targetRoute);
                 },
               );
 
-              if (!result.success) {
+              if (result.success) {
+                // On success, clear the safe mode state to exit safe mode
+                // This allows the app to resume normal operation after recovery
+                logger
+                  .category("bootstrap")
+                  .info(`[SafeMode] Recovery action succeeded: ${action}`);
+                clearKernelSafeMode();
+              } else {
                 logger
                   .category("error")
                   .warn(`[SafeMode] Recovery action failed: ${result.message}`);
@@ -328,40 +185,12 @@ function RootLayoutContent() {
     );
   }
 
-  // Determine if we should show the TopBar - hide on login routes and index route
-  // Hide TopBar when: on login flow, on welcome screen, on root/index (loading screen), or web routes (downloads)
-  const firstSegment = typeof segments[0] === "string" ? segments[0] : "";
-  const isRootRoute = segments[0] === undefined;
-  const hideTopBar =
-    isRootRoute || firstSegment === "login" || firstSegment === "web";
+  const topBarTitle = showTopBar ? resolvedTitle : undefined;
 
-  const topBarTitle = !hideTopBar ? resolvedTitle : undefined;
-
-  // Build back press handler using config
-  // Panel navigation gets first chance to handle back (right panel → left panel on mobile)
+  // Back button: panel-first (right→left on mobile), then history pop
   const handleTopBarBack = () => {
-    // If panel navigation handles the back (mobile right→left), stop here
-    if (panelNav.handleBackPress()) {
-      return;
-    }
-
-    if (topBarBackTarget) {
-      if (routeConfig.preserveParamsOnBack && (worldId || userRole)) {
-        navigateTo(
-          topBarBackTarget,
-          { worldId, userRole },
-          routeConfig.preserveParamsOnBack || [],
-        );
-      } else {
-        router.replace(topBarBackTarget as any);
-      }
-    } else {
-      navigateTo(
-        "/select/world-selection",
-        { worldId, userRole },
-        ["worldId", "userRole"],
-      );
-    }
+    if (panelNav.handleBackPress()) return;
+    navigate.back();
   };
 
   // SettingsMenu handlers
@@ -372,11 +201,10 @@ function RootLayoutContent() {
       const user = await AuthStateManager.getUserData();
       const username = user?.username || "user";
 
-      // TODO: replace when navigation adapter is fully built
-      router.push({
-        pathname: `/settings/${encodeURIComponent(username)}` as any,
-        params: { worldId, userRole },
-      });
+      const params: Record<string, string> = {};
+      if (worldId) params.worldId = worldId as string;
+      if (userRole) params.userRole = userRole as string;
+      navigate.to(`/settings/${encodeURIComponent(username)}`, params);
     } catch (err) {
       logger.category("navigation").warn("Root layout: failed to resolve username route, falling back", err);
     }
@@ -384,8 +212,7 @@ function RootLayoutContent() {
 
   const handleReturnToWorldSelection = () => {
     closeSettingsMenu();
-    // TODO: replace when navigation adapter is fully built
-    router.replace("/select/world-selection" as any);
+    navigate.replace('/select/world-selection');
   };
 
   return (
@@ -409,16 +236,21 @@ function RootLayoutContent() {
             uninitialized services during bootstrap. */}
         {kernel.phases.appReady && (
           <>
-            {/* Global ChromeLayer (TopBar + BottomBar) - driven by centralized navigation config */}
-            {!hideTopBar && topBarTitle && (
+            {/* Global ChromeLayer (TopBar + BottomBar) - driven by AppConfig chrome policy */}
+            {showTopBar && topBarTitle && (
               <ChromeLayer
                 topBar={{
                   title: topBarTitle,
-                  showBackButton: routeConfig.back !== undefined,
-                  showHamburger: routeConfig.showHamburger ?? false,
+                  showBackButton: panelNav.isActive || navigate.canGoBack(),
+                  showHamburger: showHamburger, // Whether to show the hamburger menu, add conditional logic if needed
                   onBackPress: handleTopBarBack,
                   a11yFocusTarget: routeConfig.a11yFocusTarget,
                 }}
+                bottomBar={showBottomBar ? {
+                  visible: chromeBottom.visible,
+                  activeTab: chromeBottom.activeTab,
+                  onTabChange: chromeBottom.onTabChange,
+                } : undefined}
               />
             )}
 
@@ -474,27 +306,6 @@ function RootLayoutContent() {
     </RouteErrorBoundary>
   );
 }
-
-/* ═════════════════════════════════════════════════════════════
-   OLD CODE: Commented out for reference during transition
-   
-   Previous implementation used inline TopBar component with local state.
-   Now replaced with ChromeLayer (orchestration) + ChromeContext (state).
-   Delete this section once ChromeLayer is verified working.
-   ═════════════════════════════════════════════════════════════
-   
-   <TopBar
-     title={topBarTitle}
-     showBackButton={routeConfig.back !== undefined}
-     showHamburger={routeConfig.showHamburger}
-     onBackPress={handleTopBarBack}
-     userId={userId}
-     worldId={worldId}
-     userRole={userRole}
-     a11yFocusTarget={routeConfig.a11yFocusTarget}
-   />
-   
-   ═════════════════════════════════════════════════════════════ */
 
 // Main export with provider wrapper and error boundary
 export default function RootLayout() {

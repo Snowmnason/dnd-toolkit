@@ -34,6 +34,7 @@ import {
   callHistoryTransitionNav,
   callRouteTransitionNav,
   callStateQueriesNav,
+  callUtilityTransitionNav,
   type NavAnalyticsContext,
   type NavServiceResult,
 } from '@/middleware/navigation';
@@ -53,6 +54,7 @@ import {
   mergeParameters,
   type RouteMetadata,
 } from './routeTranslator';
+import { isSemanticRoute, resolveSemanticRoute } from './semantic-routes';
 import { isTrustedOrigin, storeTrustedOrigin } from './trusted-urls';
 
 // ---------------------------------------------------------------------------
@@ -126,7 +128,12 @@ export async function executeRouteNavigation(
 ): Promise<NavServiceResult> {
   try {
     const ctx = buildNavigationContext();
-    const canonicalTarget = canonicalizePath(target);
+    let canonicalTarget = canonicalizePath(target);
+
+    // Resolve semantic routes to concrete paths (e.g., 'default' → '/' or '/select/world-selection')
+    if (isSemanticRoute(canonicalTarget)) {
+      canonicalTarget = await resolveSemanticRoute(canonicalTarget as any);
+    }
 
     // Resolve deferred params from approved lib sources (auth state, storage)
     const contextParams = await resolveContextParams(PARAM_RESOLVERS);
@@ -208,7 +215,12 @@ export async function executeInternalRedirectNavigation(
   try {
     // TODO: Validate redirect reason (ensure it's from approved source)
     const ctx = buildNavigationContext();
-    const canonicalTarget = canonicalizePath(target);
+    let canonicalTarget = canonicalizePath(target);
+
+    // Resolve semantic routes to concrete paths (e.g., 'default' → '/' or '/select/world-selection')
+    if (isSemanticRoute(canonicalTarget)) {
+      canonicalTarget = await resolveSemanticRoute(canonicalTarget as any);
+    }
 
     // Resolve deferred params from approved lib sources (auth state, storage)
     const contextParams = await resolveContextParams(PARAM_RESOLVERS);
@@ -414,6 +426,61 @@ export async function executeExternalNavigation(
       error: error instanceof Error ? error : new Error(String(error)),
     };
   }
+}
+
+/**
+ * Execute a utility navigation operation (setParams, prefetch).
+ *
+ * **Use this when:**
+ * - `setParams` — Update query parameters on the current route without navigating.
+ * - `prefetch` — Load a route bundle in the background before the user navigates to it.
+ *
+ * These skip the guard pipeline entirely; they are lightweight utility ops, not navigation decisions.
+ *
+ * @param action - `'setParams'` or `'prefetch'`
+ * @param params - For `setParams`: key-value pairs to set. For `prefetch`: `{ target: 'route/path' }`.
+ * @returns NavServiceResult (executed, no-op, aborted, transport-unavailable)
+ *
+ * @example
+ * // Update URL params on the current screen
+ * await executeUtilityNavigation('setParams', { worldId: '456' });
+ *
+ * // Warm up a route bundle before navigating
+ * await executeUtilityNavigation('prefetch', { target: '/main/characters' });
+ */
+export async function executeUtilityNavigation(
+  action: 'setParams' | 'prefetch',
+  params?: Record<string, any>,
+): Promise<NavServiceResult> {
+  try {
+    return await callUtilityTransitionNav(action, params);
+  } catch (error) {
+    return {
+      status: 'aborted',
+      reason: 'error',
+      error: error instanceof Error ? error : new Error(String(error)),
+    };
+  }
+}
+
+/**
+ * Execute a synchronous state query on the navigation transport.
+ *
+ * **Use this when:** You need to read navigation state (e.g., whether back is available)
+ * without performing any navigation action. Passes directly through to middleware, which
+ * delegates to the transport adapter.
+ *
+ * @param query - The state query to execute.
+ * @returns The synchronous result from the transport layer, or `undefined` if transport is not ready.
+ *
+ * @example
+ * // Check if a back-navigation is available before rendering a back button
+ * const canGoBack = executeStateQueryNavigation('canGoBack'); // boolean | undefined
+ */
+export function executeStateQueryNavigation(
+  query: 'getCurrentRoute' | 'getCurrentParams' | 'canGoBack' | 'canDismiss',
+): any {
+  return callStateQueriesNav(query);
 }
 
 /**

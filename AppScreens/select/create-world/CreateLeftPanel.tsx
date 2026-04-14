@@ -5,7 +5,7 @@ import {
   FormTextInput,
   Heading,
 } from "@/components/ui";
-import { useNavigate } from "@/hooks/navigation";
+import { useNavigation } from "@/hooks/navigation";
 import { usePlatform } from "@/providers";
 import { useScale } from "@/theme";
 import type { WorldFormData } from "@/validation";
@@ -28,7 +28,7 @@ export function CreateLeftPanel({
   isFormValid,
 }: CreateLeftPanelProps) {
   const S = useScale();
-  const { replace: navigateTo } = useNavigate();
+  const navigate = useNavigation();
 
   // Centralized platform detection
   const { isDesktop } = usePlatform();
@@ -108,7 +108,7 @@ export function CreateLeftPanel({
           text="Cancel"
           variant="outlined"
           onPress={() => {
-            navigateTo("/select/world-selection");
+            navigate.replace("/select/world-selection");
           }}
           style={{ flex: 1, marginRight: S.space.sm }}
         />

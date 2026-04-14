@@ -1,5 +1,5 @@
 import { Button, Card, Heading, LazyImage } from "@/components/ui";
-import { useNavigate } from "@/hooks/navigation";
+import { useNavigation } from "@/hooks/navigation";
 import { WorldWithAccess } from "@/hooks/storage";
 import { logger } from "@/hooks/utils";
 import { useAppParamsStable, useAppParamsVolatile, useConnectedWorlds, usePlatform, useUserId } from "@/providers";
@@ -21,7 +21,7 @@ export function WorldRightPanel({
 }: WorldRightPanelProps) {
   const S = useScale();
   const { theme } = UseTheme();
-  const { push: navigatePush } = useNavigate();
+  const navigate = useNavigation();
   const userId = useUserId();
   const { updateVolatileParams } = useAppParamsVolatile();
   const connectedWorldIds = useConnectedWorlds();
@@ -122,14 +122,10 @@ export function WorldRightPanel({
                 });
 
                 // Navigate using centralized navigation helper
-                navigatePush(
-                  "/main/main-landing",
-                  {
-                    worldId: selectedWorld.world_id,
-                    userRole: selectedWorld.user_role,
-                  },
-                  ["worldId", "userRole"],
-                );
+                navigate.to("/main/main-landing", {
+                  worldId: selectedWorld.world_id,
+                  userRole: selectedWorld.user_role,
+                });
               }}
               style={{ width: 160 }}
             />

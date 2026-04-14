@@ -124,6 +124,23 @@ export interface AppSettings {
     navDrawer?: {
       enabled?: boolean;
       skipRoutes?: string[];
+      /** Exact full-path overrides — hide nav drawer on specific screens (e.g., '/select/no-drawer') */
+      skipPaths?: string[];
+      description?: string;
+    };
+    chrome?: {
+      topBar?: {
+        skipRoutes?: string[];
+        /** Exact full-path overrides — hide top bar on specific screens (e.g., '/select/no-topbar') */
+        skipPaths?: string[];
+        description?: string;
+      };
+      bottomBar?: {
+        routeGroups?: string[];
+        /** Exact full-path overrides — show bottom bar on specific screens outside normal route groups */
+        skipPaths?: string[];
+        description?: string;
+      };
       description?: string;
     };
     description?: string;

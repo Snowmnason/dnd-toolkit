@@ -54,7 +54,7 @@ export async function performGenerateInviteLink(
         ? window.location.origin
         : 'https://dnd-tool.thesnowpost.com';
 
-    const inviteLink = `${baseUrl}/login/auth-redirect?action=world-invite&token=${result.inviteLink.token}&worldName=${encodeURIComponent(worldName)}`;
+    const inviteLink = `${baseUrl}/login/sign-in?action=world-invite&token=${result.inviteLink.token}&worldName=${encodeURIComponent(worldName)}`;
 
     // Try to copy to clipboard
     if (typeof window !== 'undefined' && window.navigator?.clipboard) {
@@ -113,3 +113,84 @@ export async function performCheckPendingInvites(): Promise<{
   }
   return null;
 }
+
+// ============================================================================
+// PROCESS INVITE FOR USER
+// ============================================================================
+
+export interface InviteProcessResult {
+  success: boolean;
+  alreadyMember?: boolean;
+  error?: string;
+}
+
+/**
+ * Process an invite token for a logged-in user.
+ * Validates the token, checks membership, and adds user to world.
+ *
+ * @param inviteToken - The invite token from the URL
+ * @returns Result indicating success/failure, alreadyMember status, or error
+ */
+export async function processInviteForUser(
+  inviteToken: string,
+): Promise<InviteProcessResult> {
+  const { invitesDB, usersDB, worldsDB } = await import('@/lib/database');
+
+  const validation = await invitesDB.validateInviteToken(inviteToken);
+  if (!validation.success || !validation.worldId) {
+    return { success: false, error: validation.error ?? 'Invalid invite token' };
+  }
+
+  const userProfile = await usersDB.getCurrentUser();
+  if (!userProfile) {
+    return { success: false, error: 'User profile not found' };
+  }
+
+  const isAlreadyMember = await worldsDB.isUserInWorld(validation.worldId, userProfile.id);
+  if (isAlreadyMember) {
+    return { success: true, alreadyMember: true };
+  }
+
+  await worldsDB.addUserToWorld(validation.worldId, userProfile.id, inviteToken, 'player');
+  return { success: true };
+}
+
+// ============================================================================
+// PENDING INVITE STORAGE
+// ============================================================================
+
+interface PendingInvite {
+  token: string;
+  worldName: string;
+  timestamp: number;
+}
+
+/**
+ * pendingInviteStorage
+ *
+ * Manages pending world invites in local storage.
+ * Used by use-auth-link-observer.ts when a logged-out user lands on an invite link.
+ */
+export const pendingInviteStorage = {
+  async save(token: string, worldName: string): Promise<void> {
+    const inviteData: PendingInvite = { token, worldName, timestamp: Date.now() };
+    await StorageManager.set(STORAGE_KEYS.PENDING_INVITE, inviteData);
+  },
+
+  async get(): Promise<PendingInvite | null> {
+    // Delegate to performCheckPendingInvites which handles TTL validation and cleanup
+    const pendingInvite = await performCheckPendingInvites();
+    if (!pendingInvite) return null;
+    
+    // Return with timestamp (needed by some callers)
+    return {
+      token: pendingInvite.token,
+      worldName: pendingInvite.worldName,
+      timestamp: Date.now(), // Current time since we just validated it exists
+    };
+  },
+
+  async clear(): Promise<void> {
+    await StorageManager.remove(STORAGE_KEYS.PENDING_INVITE);
+  },
+};

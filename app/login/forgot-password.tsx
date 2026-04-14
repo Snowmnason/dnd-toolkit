@@ -12,15 +12,15 @@ import {
   FormAuthInput,
 } from '@/components/auth_components';
 import { useAuthActions } from '@/hooks/auth';
+import { useNavigation } from '@/hooks/navigation';
 import { forgotPasswordSchema, type ForgotPasswordFormData } from '@/validation/auth.schema';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { View } from 'react-native';
 
 export default function ForgotPasswordScreen() {
-  const router = useRouter();
+  const navigate = useNavigation();
   const { resetPassword } = useAuthActions();
   
   const { control, handleSubmit, formState: { isValid }, watch } = useForm<ForgotPasswordFormData>({
@@ -67,7 +67,7 @@ export default function ForgotPasswordScreen() {
       <View style={{ position: 'absolute', top: 50, left: 20, zIndex: 10 }}>
         <AuthButtonBack
           text="← Back"
-          onPress={() => router.replace('/login/sign-in')}
+          onPress={() => navigate.replace('/login/sign-in')}
           disabled={loading}
         />
       </View>
@@ -110,7 +110,7 @@ export default function ForgotPasswordScreen() {
           align="center"
           color="#D4AF37"
           deco="underline"
-          onPress={() => router.replace('/login/sign-in')}
+          onPress={() => navigate.replace('/login/sign-in')}
         >
           ← Back to Sign In
         </AuthBody>
@@ -125,7 +125,7 @@ export default function ForgotPasswordScreen() {
         © 2025 The Snow Post · Forged for storytellers & adventurers
       </AuthCaption>
 
-      {/* 📬 Email Not Found Modal */}
+      {/* 📬 Email Not Found Modal //THISMIGHTBEWRONG */}
       <AuthModal
         visible={showEmailNotFoundModal}
         onClose={() => setShowEmailNotFoundModal(false)}
@@ -141,7 +141,7 @@ export default function ForgotPasswordScreen() {
             text: 'Create Account',
             onPress: () => {
               setShowEmailNotFoundModal(false)
-              router.push('/login/sign-up')
+              navigate.to('/login/sign-up')
             },
             variant: 'primary',
           },

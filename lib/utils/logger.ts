@@ -693,3 +693,44 @@ function redactMetadata(obj: Record<string, any>): Record<string, any> {
 export { LOG_SCHEMAS };
 export type { CategoryLogger, LogCategory, LogLevel, LogMetadata, LogSchema, PerfTimer };
 
+/**
+ * Suppressed warning patterns for the warning filter.
+ * Add patterns here when a known benign third-party warning needs silencing.
+ */
+const SUPPRESSED_WARNING_PATTERNS: ((msg: string) => boolean)[] = [
+  // Focus management timing issue in React Navigation / Expo Router (doesn't affect functionality)
+  (msg) => msg.includes("Blocked aria-hidden") && msg.includes("descendant retained focus"),
+  // Deprecated prop from third-party components; we fix this proactively in our own codebase
+  (msg) => msg.includes("props.pointerEvents is deprecated"),
+];
+
+let _warningFilterInstalled = false;
+
+/**
+ * Install a console.warn filter that suppresses known benign third-party warnings.
+ *
+ * Safe to call multiple times — idempotent after first install.
+ * Should be called once during app bootstrap (e.g., in the kernel or index entry).
+ *
+ * Web-only (no-op on native where these warnings don't occur).
+ */
+export function installWarningFilter(): void {
+  if (typeof window === "undefined") return; // native: no-op
+  if (_warningFilterInstalled) return;        // idempotent
+
+  const originalWarn = console.warn;
+  console.warn = (...args: any[]) => {
+    try {
+      const message = args[0]?.toString?.() || "";
+      if (SUPPRESSED_WARNING_PATTERNS.some((test) => test(message))) {
+        return;
+      }
+    } catch {
+      // Ignore errors in filter logic, pass through to original warn
+    }
+    originalWarn(...args);
+  };
+
+  _warningFilterInstalled = true;
+}
+

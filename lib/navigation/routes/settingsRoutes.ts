@@ -17,16 +17,11 @@ export const SETTINGS_ROUTES: RouteConfig[] = [
       const username = getUsernameParam(context);
       return username ? `Settings - ${username}` : "Settings";
     },
-    showTopBar: true,
-    showHamburger: true,
     analyticsName: "settings",
   },
   {
     path: "/settings/admin-panel",
     title: "Admin Panel",
-    showTopBar: true,
-    showHamburger: false,
-    back: "/select/world-selection",
     analyticsName: "settings_admin",
   },
   {
@@ -35,42 +30,21 @@ export const SETTINGS_ROUTES: RouteConfig[] = [
       const username = getUsernameParam(context);
       return username ? `Settings - ${username}` : "Settings";
     },
-    showTopBar: true,
-    showHamburger: false,
-    back: "/select/world-selection",
     analyticsName: "settings_user",
   },
   {
     path: "/settings/StyleMobile",
     title: "Component Playground (Mobile)",
-    showTopBar: true,
-    showHamburger: false,
-    back: (context) => {
-      const username = getUsernameParam(context);
-      return username ? `/settings/${username}` : "/select/world-selection";
-    },
     analyticsName: "settings_style_mobile",
   },
   {
     path: "/settings/StyleDesktop",
     title: "Component Playground (Desktop)",
-    showTopBar: true,
-    showHamburger: false,
-    back: (context) => {
-      const username = getUsernameParam(context);
-      return username ? `/settings/${username}` : "/select/world-selection";
-    },
     analyticsName: "settings_style_desktop",
   },
   {
     path: "/settings/report-bug",
     title: "Report Bug",
-    showTopBar: true,
-    showHamburger: false,
-    back: (context) => {
-      const username = getUsernameParam(context);
-      return username ? `/settings/${username}` : "/select/world-selection";
-    },
     analyticsName: "settings_report_bug",
   },
 ];

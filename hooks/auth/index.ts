@@ -1,14 +1,11 @@
 // Barrel export for auth hooks
 export type { ResendResult, ResetPasswordResult, Session } from "@/lib/auth";
+export { pendingInviteStorage, processInviteForUser } from "@/lib/auth/account/invite-system";
+export type { InviteProcessResult } from "@/lib/auth/account/invite-system";
 export { useAuthActions } from "./use-auth-actions";
-export { useBootstrapAuth } from "./use-bootstrap-auth";
-export type { BootstrapAuthState } from "./use-bootstrap-auth";
+export { useAuthLinkObserver } from "./use-auth-link-observer";
 export { useCurrentSession } from "./use-current-session";
-export type { CurrentSessionState } from "./use-current-session";
-export {
-  pendingInviteStorage, preloadWorlds, processInviteForUser
-} from "./use-pending-invite";
-export type { InviteProcessResult } from "./use-pending-invite";
+export type { UseCurrentSessionResult } from "./use-current-session";
 export {
   useAuthFlow,
   type AuthFlowAppleHandlers,

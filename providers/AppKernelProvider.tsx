@@ -30,7 +30,7 @@ import {
     onKernelStateChange,
     type AppKernelState,
 } from "@/lib/kernel";
-import { logger } from "@/lib/utils/logger";
+import { installWarningFilter, logger } from "@/lib/utils/logger";
 import { initializeRouter, isTransportReady } from "@/system/Navigation";
 import { useRouter } from "expo-router";
 import {
@@ -79,6 +79,9 @@ export function AppKernelProvider({ children }: AppKernelProviderProps) {
     logger
       .category("bootstrap")
       .debug("[KERNEL_PROVIDER] Initializing kernel");
+
+    // Suppress known benign third-party warnings (web only, idempotent)
+    installWarningFilter();
 
     // Initialize kernel once on mount
     initializeKernel().catch((error: unknown) => {

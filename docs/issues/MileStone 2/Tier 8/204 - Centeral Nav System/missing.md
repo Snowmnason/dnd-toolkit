@@ -57,7 +57,7 @@ When revisiting, consider:
 - URL bar edits vs. deep links (both currently marked as 'deep-link')
 - Programmatic navigation from code vs. user-initiated (would require wrapper layer)
 - Mobile back button swipe vs. Android hardware/iOS gesture (platform-specific detection)
-- Browser back button vs. programmatic router.back() calls
+- Browser back button vs. programmatic navigate.back() calls
 
 ❌ **Enhanced navigation telemetry**:
 - `platform` detection (web back vs. native back gestures)

@@ -2,9 +2,8 @@ import { AuthActionGroup, AuthBody, AuthBodyFooter, AuthButton, AuthButtonSecond
 import CustomLoad from '@/components/ui/CustomLoad';
 import VersionDisplay from '@/components/VersionDisplay';
 import { useAppToast } from '@/contexts';
-import { useNavigate } from '@/hooks/navigation';
+import { useNavigation } from '@/hooks/navigation';
 import { useScale } from '@/theme';
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform, useWindowDimensions, View } from 'react-native';
 
@@ -21,16 +20,14 @@ export default function Welcome({ isLoading = false }: WelcomeScreenProps) {
   const S = useScale();
   const { width } = useWindowDimensions();
   const isMobile = (Platform.OS === 'ios' || Platform.OS === 'android') || (Platform.OS === 'web' && width < 900);
-  
-  const router = useRouter();
-  const { push: navigatePush } = useNavigate();
+  const navigate = useNavigation();
   const { show: showToast } = useAppToast();
   const [authIsLoading, setAuthIsLoading] = useState(false);
 
   const handleSignIn = async () => {
     setAuthIsLoading(true);
     try {
-      router.push('/login/sign-in');
+      navigate.to('/login/sign-in');
     } catch {
       showToast('Navigation Error', 'Unable to navigate to sign-in', 'error');
     } finally {
@@ -41,7 +38,7 @@ export default function Welcome({ isLoading = false }: WelcomeScreenProps) {
   const handleSignUp = async () => {
     setAuthIsLoading(true);
     try {
-      router.push('/login/sign-up');
+      navigate.to('/login/sign-up');
     } catch {
       showToast('Navigation Error', 'Unable to navigate to sign-up', 'error');
     } finally {
@@ -133,7 +130,7 @@ export default function Welcome({ isLoading = false }: WelcomeScreenProps) {
               //do nothing for now
               return;
             } else {
-              navigatePush('/StyleDesktop');
+              navigate.to('/StyleDesktop');
               return;
             }
             // TODO: Implement anonymous auth

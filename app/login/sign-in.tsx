@@ -5,18 +5,16 @@ import {
   AuthButtonSecondary, AuthCaption, AuthError, AuthForm, AuthRoot, AuthSubTitle, AuthTitle,
   FormAuthInput
 } from '@/components/auth_components';
-import { useAuthActions, useAuthFlow, useBootstrapAuth, useCurrentSession } from "@/hooks/auth";
-import { useNavigate } from "@/hooks/navigation";
+import { useAuthActions, useAuthFlow, useCurrentSession } from "@/hooks/auth";
+import { useNavigation } from '@/hooks/navigation';
 import { logger } from "@/hooks/utils";
 import { useScale } from '@/theme';
-import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { TextInput } from 'react-native';
 
 export default function SignInScreen() {
   const S = useScale();
-  const router = useRouter();
-  const { replace, push } = useNavigate();
+  const navigate = useNavigation();
   const { resendConfirmation } = useAuthActions();
   const [isResendingEmail, setIsResendingEmail] = useState(false);
 
@@ -24,24 +22,22 @@ export default function SignInScreen() {
   const passwordInputRef = useRef<TextInput>(null);
 
   const { state, form } = useAuthFlow();
-  const { session, loading: sessionLoading } = useCurrentSession();
-  const { hasAccount, checked } = useBootstrapAuth(!sessionLoading);
+  const { isReady, isAuthenticated } = useCurrentSession();
 
   // Verify authentication status on mount using proper hook boundaries
   useEffect(() => {
-    // Only run after bootstrap and session checks complete
-    if (!checked || sessionLoading) return;
+    // Only run after kernel is ready and session has resolved
+    if (!isReady) return;
 
     logger.category('auth').debug('Sign-in screen: Verifying authentication status');
 
-    // If session exists, user is already authenticated
-    if (session) {
+    // If already authenticated, redirect away
+    // (useAuthGuard in layout will also handle this)
+    if (isAuthenticated) {
       logger.category('auth').info('Sign-in screen: User authenticated, redirecting to world selection');
-      router.replace('/select/world-selection');
-    } else if (!hasAccount) {
-      logger.category('auth').debug('Sign-in screen: No account found, showing login form');
+      navigate.replace('/select/world-selection');
     }
-  }, [checked, sessionLoading, session, hasAccount, router]);
+  }, [isReady, isAuthenticated, navigate]);
 
   const handleResendConfirmationFromError = async (email: string) => {
     setIsResendingEmail(true);
@@ -66,7 +62,7 @@ export default function SignInScreen() {
       <AuthBackButtonContainer>
         <AuthButtonBack
           text="← Back"
-          onPress={() => replace('/')}
+          onPress={() => navigate.replace('/')}
           disabled={state.loading}
         />
       </AuthBackButtonContainer>
@@ -121,7 +117,7 @@ export default function SignInScreen() {
           color="#D4AF37"
           align="right"
           style={{ marginBottom: 4, marginTop: (S.space.sm*-1) }}
-          onPress={() => push('/login/forgot-password')}
+          onPress={() => navigate.to('/login/forgot-password')}
         >
           Forgot Password?
         </AuthSubTitle>
@@ -138,7 +134,7 @@ export default function SignInScreen() {
 
         <AuthButtonSecondary
           text="Need an account? Sign Up"
-          onPress={() => replace('/login/sign-up')}
+          onPress={() => navigate.replace('/login/sign-up')}
           disabled={state.loading}
         />
       </AuthActionGroup>

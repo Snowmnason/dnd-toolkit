@@ -55,7 +55,7 @@
 │  - Returns NavigationExecutionResult                                 │
 ├─────────────────────────────────────────────────────────────────────┤
 │  TRANSPORT (system/Navigation/expo-router/transport_adapter.ts)     │
-│  - Raw Expo Router calls: router.navigate(), router.back(), etc.    │
+│  - Raw Expo Router calls: navigate.navigate(), navigate.back(), etc.    │
 │  - Linking.openURL() for external                                    │
 │  - State queries: canGoBack(), getCurrentRoute()                     │
 │  - Returns TransportResult                                           │
@@ -207,7 +207,7 @@ Screen                Hook                       Manager                    Midd
   │  [NavModal renders] │                          │                          │                           │                          │
   │  User taps "Go Home"│                          │                          │                           │                          │
   │  ──────────────────►│  primaryAction() fires   │                          │                           │                          │
-  │                     │  → router.replace(       │                          │                           │                          │
+  │                     │  → navigate.replace(       │                          │                           │                          │
   │                     │    '/select/             │                          │                           │                          │
   │                     │    world-selection')     │                          │                           │                          │
 ```
@@ -299,7 +299,7 @@ lib/auth/auth-state.ts              lib/navigation/navManager.ts           Middl
   │                                    │  callRouteTransitionNav(             │
   │                                    │    'replace', '/', [], analytics)    │
   │                                    ├─────────────────────────────────────►│
-  │                                    │                                      │  → router.replace('/') ✅
+  │                                    │                                      │  → navigate.replace('/') ✅
   │                                    │  ◄── { status: 'executed' }          │
   │                                    │                                      │
   │  ◄── NavServiceResult { executed } │                                      │
@@ -401,7 +401,7 @@ Browser / Deep Link                  Observer Hook                        Manage
   │  User taps "Go Home"              │                                    │                                │
   │  ────────────────────────────────►│                                    │                                │
   │                                    │  primaryAction() fires             │                                │
-  │                                    │  → router.replace(computeFallback) │                                │
+  │                                    │  → navigate.replace(computeFallback) │                                │
 ```
 
 **Key insight:** Observer runs AFTER navigation already happened. It's corrective, not preventive. The user is already on the wrong page. We show the modal ON that page, then the modal's action moves them.
@@ -517,8 +517,8 @@ switch (result.status) {
 
 **A: `use-navigation-ui-modals` computes them at show-time.** When calling `showNavModal()`, the hook pre-computes:
 - `canGoBack` from `callStateQueriesNav('canGoBack')`
-- `primaryAction` = `() => router.replace(computeFallbackRoute(worldId))` (go home)
-- `secondaryAction` = `() => router.back()` (go back, if canGoBack)
+- `primaryAction` = `() => navigate.replace(computeFallbackRoute(worldId))` (go home)
+- `secondaryAction` = `() => navigate.back()` (go back, if canGoBack)
 
 The modal receives these as props — it never calls navManager.
 

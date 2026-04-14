@@ -14,9 +14,13 @@ export interface NavModalProps {
   heading?: string
   /** Custom message body */
   body?: string
-  /** When true, shows secondary button (failure/warning types only) */
+  /** When true, shows secondary button alongside failure/warning type defaults */
   canGoBack?: boolean
-  /** Callback for secondary action. For failure/warning: go back. For others: ignored */
+  /** Custom label override for the primary button */
+  primaryButtonLabel?: string
+  /** Custom label override for the secondary button. Also causes the secondary button to appear */
+  secondaryButtonLabel?: string
+  /** Callback for secondary action. Presence also causes the secondary button to appear */
   secondaryAction?: () => void
   /** Callback for primary action. For failure: go home. For others: confirm/acknowledge */
   primaryAction: () => void
@@ -56,55 +60,61 @@ export function NavModal({
   heading: customHeading,
   body = '',
   canGoBack = false,
+  primaryButtonLabel: customPrimaryLabel,
+  secondaryButtonLabel: customSecondaryLabel,
   secondaryAction,
   primaryAction,
 }: NavModalProps) {
   // Derive defaults from modalResponseType
   let defaultHeading: string;
-  let primaryButtonLabel: string;
-  let secondaryButtonLabel: string | null;
+  let defaultPrimaryLabel: string;
+  let defaultSecondaryLabel: string | null;
   let borderTone: BorderTone;
   let primaryButtonVariant: 'primary' | 'destructive' | 'secondary' = 'primary';
-  let showSecondaryButton: boolean = false;
+  let showSecondaryByType: boolean = false;
 
   switch (modalResponseType) {
     case 'failure':
       defaultHeading = 'Navigation Failed!';
-      primaryButtonLabel = 'Go Home';
-      secondaryButtonLabel = 'Go Back';
+      defaultPrimaryLabel = 'Go Home';
+      defaultSecondaryLabel = 'Go Back';
       borderTone = 'danger';
       primaryButtonVariant = 'destructive';
-      showSecondaryButton = canGoBack;
+      showSecondaryByType = canGoBack;
       break;
     case 'success':
       defaultHeading = 'Action Successful!';
-      primaryButtonLabel = 'Continue';
-      secondaryButtonLabel = null;
+      defaultPrimaryLabel = 'Continue';
+      defaultSecondaryLabel = null;
       borderTone = 'success';
       primaryButtonVariant = 'primary';
-      showSecondaryButton = false;
+      showSecondaryByType = false;
       break;
     case 'warning':
       defaultHeading = 'Warning!';
-      primaryButtonLabel = 'Understood';
-      secondaryButtonLabel = 'Go Back';
+      defaultPrimaryLabel = 'Understood';
+      defaultSecondaryLabel = 'Go Back';
       borderTone = 'warning';
       primaryButtonVariant = 'secondary';
-      showSecondaryButton = canGoBack;
+      showSecondaryByType = canGoBack;
       break;
     case 'general':
     default:
       defaultHeading = 'Notice';
-      primaryButtonLabel = 'OK';
-      secondaryButtonLabel = null;
+      defaultPrimaryLabel = 'OK';
+      defaultSecondaryLabel = null;
       borderTone = 'accent';
       primaryButtonVariant = 'primary';
-      showSecondaryButton = false;
+      showSecondaryByType = false;
       break;
   }
 
   const S = useScale();
   const finalHeading = customHeading ?? defaultHeading;
+  const finalPrimaryLabel = customPrimaryLabel ?? defaultPrimaryLabel;
+  // Show secondary when: type-driven (canGoBack), secondaryAction provided, or custom label given
+  const showSecondaryButton = showSecondaryByType || !!secondaryAction || !!customSecondaryLabel;
+  const finalSecondaryLabel = customSecondaryLabel ?? defaultSecondaryLabel;
 
   return (
     <AppModal
@@ -122,15 +132,15 @@ export function NavModal({
           marginTop: S.space.md,
         }}
       >
-        {showSecondaryButton && secondaryButtonLabel && (
+        {showSecondaryButton && finalSecondaryLabel && (
           <Button
-            text={secondaryButtonLabel}
+            text={finalSecondaryLabel}
             onPress={secondaryAction ?? onClose}
             variant="ghost"
           />
         )}
         <Button
-          text={primaryButtonLabel}
+          text={finalPrimaryLabel}
           onPress={primaryAction ?? onClose}
           variant={primaryButtonVariant}
           style={{ minWidth: S.s(120) }}

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui";
-import { useNavigate } from "@/hooks/navigation";
+import { useNavigation } from "@/hooks/navigation";
 import { usePlatform } from "@/providers";
 import {
     $,
@@ -23,7 +23,7 @@ export function ThemeSelector() {
   const { isMobile } = usePlatform();
   const { theme: currentTheme } = UseTheme();
   const S = useScale();
-  const { push: navigatePush } = useNavigate();
+  const navigate = useNavigation();
   const segments = useSegments();
 
   // Check if we're already on the StyleMobile or StyleDesktop routes
@@ -121,7 +121,7 @@ export function ThemeSelector() {
             const targetPath = isMobile
               ? "/settings/StyleMobile"
               : "/settings/StyleDesktop";
-            navigatePush(targetPath);
+            navigate.to(targetPath);
           }}
           style={{ alignSelf: "center" }}
         />

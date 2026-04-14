@@ -15,7 +15,7 @@ export interface PanelNavigationContextType {
   showRightPanel: boolean
   goToRightPanel: () => void
   goToLeftPanel: () => void
-  /** Returns true if the back was handled (right→left), false if not (needs router navigation) */
+  /** Returns true if the back was handled (right→left), false if not (needs navigate.back()) */
   handleBackPress: () => boolean
   isDesktop: boolean
   isActualMobile: boolean
@@ -38,7 +38,7 @@ export interface PanelNavigationProviderProps {
  *
  * ✅ Gate-Free: Does not depend on kernel phases.
  * ✅ Reusable: Works for any AppSplit screen (worlds, characters, encounters, etc.)
- * ✅ TopBar Aware: TopBar back button can check `handleBackPress()` before router.back()
+ * ✅ TopBar Aware: TopBar back button can check `handleBackPress()` before navigate.back()
  *
  * Usage:
  * ```tsx
@@ -121,7 +121,7 @@ const NO_PANEL_NAVIGATION: PanelNavigationContextType = {
  * Key behaviors:
  * - AppSplit screens: Wrap layout with PanelNavigationProvider, get real panel state
  * - Single-panel screens: No provider needed, hook returns safe defaults (isActive: false)
- * - TopBar: Calls handleBackPress() — returns true if panel navigation handled back, false if router should
+ * - TopBar: Calls handleBackPress() — returns true if panel navigation handled back, false if navigate.back() should be called
  *
  * Usage:
  * ```tsx

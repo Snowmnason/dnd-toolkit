@@ -21,7 +21,7 @@
  */
 
 import { AuthStateManager } from '@/lib/auth/auth-state';
-import { buildRoute, determineEnterErrorRedirect, determineEnterRedirect } from '@/lib/navigation';
+import { determineEnterErrorRedirect, determineEnterRedirect } from '@/lib/navigation';
 import { logger } from '@/lib/utils/logger';
 import { STORAGE_KEYS } from '@/maps';
 
@@ -148,30 +148,15 @@ export async function determinePostAuthRedirect(
         profileCompleted
       );
 
-      // If routing to world-selection, check for a pending invite first
-      if (navDecision.redirect === '/select/world-selection' && profileCompleted !== false) {
-        try {
-          const { checkPendingInvites } = await import('@/lib/auth');
-          const pendingInvite = await checkPendingInvites();
-
-          if (pendingInvite) {
-            redirect = buildRoute('/login/auth-redirect', {
-              action: 'world-invite',
-              token: pendingInvite.token,
-              worldName: pendingInvite.worldName,
-            }) as string;
-            logger.category('auth').info(`[${context}] Post-sync: Pending invite found, redirecting to invite flow`);
-          } else {
-            redirect = navDecision.redirect;
-            logger.category('auth').info(`[${context}] Post-sync: ${navDecision.reason}`);
-          }
-        } catch {
-          redirect = navDecision.redirect;
-        }
-      } else {
-        redirect = navDecision.redirect;
-        logger.category('auth').info(`[${context}] Post-sync: ${navDecision.reason}`);
-      }
+      // TODO: FixDuringAuthRefactor
+      // Previously, when routing to world-selection with a pending invite, the user was
+      // bounced through `/login/auth-redirect?action=world-invite&...` to show an invite
+      // modal ("Accept later" | "Decline invite"). That dependency on auth-redirect has been
+      // removed so the screen can be deleted. The pending invite remains in storage.
+      // During the auth refactor, restore invite modal UX at the destination (world-selection
+      // or a dedicated invite screen) using executeInternalRedirectNavigation via navManager.
+      redirect = navDecision.redirect;
+      logger.category('auth').info(`[${context}] Post-sync: ${navDecision.reason}`);
     }
   } catch (error) {
     const navDecision = determineEnterErrorRedirect('reauth');

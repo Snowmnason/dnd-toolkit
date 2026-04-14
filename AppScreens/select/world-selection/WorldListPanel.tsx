@@ -1,5 +1,5 @@
 import { Body, Button } from "@/components/ui";
-import { useNavigate } from "@/hooks/navigation";
+import { useNavigation } from "@/hooks/navigation";
 import { WorldWithAccess } from "@/hooks/storage";
 import { useAppParamsVolatile, usePlatform, useUserId } from "@/providers";
 import { useScale } from "@/theme";
@@ -24,7 +24,7 @@ export function WorldListPanel({
   onMobileWorldSelect,
 }: WorldListPanelProps) {
   const S = useScale();
-  const { replace: navigateTo } = useNavigate();
+  const navigate = useNavigation();
   const userId = useUserId();
   const { updateVolatileParams } = useAppParamsVolatile();
 
@@ -106,7 +106,7 @@ export function WorldListPanel({
         text="Create New World"
         variant="primary"
         onPress={() => {
-          navigateTo("/select/create-world");
+          navigate.replace("/select/create-world");
         }}
         style={{
           borderRadius: S.radius.lg,

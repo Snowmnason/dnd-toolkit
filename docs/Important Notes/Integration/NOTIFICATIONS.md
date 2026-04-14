@@ -54,7 +54,7 @@ function SomeComponent() {
       timestamp: new Date(),
       onPress: () => {
         // Navigate to message screen
-        router.push("/messages/123");
+        navigate.push("/messages/123");
       },
     });
   };
@@ -64,7 +64,7 @@ function SomeComponent() {
       type: "update",
       title: "World Updated",
       message: "John added a new location to the campaign",
-      onPress: () => router.push("/world/locations"),
+      onPress: () => navigate.push("/world/locations"),
     });
   };
 
@@ -216,7 +216,7 @@ useEffect(() => {
       title: `${message.sender.name}`,
       message: message.text,
       timestamp: message.createdAt,
-      onPress: () => router.push(`/messages/${message.id}`),
+      onPress: () => navigate.push(`/messages/${message.id}`),
     });
   });
   return unsubscribe;
@@ -231,7 +231,7 @@ const handleWorldUpdate = (update: WorldUpdate) => {
     type: "update",
     title: "World Updated",
     message: `${update.user.name} ${update.action}`,
-    onPress: () => router.push(`/world/${update.worldId}`),
+    onPress: () => navigate.push(`/world/${update.worldId}`),
   });
 };
 ```

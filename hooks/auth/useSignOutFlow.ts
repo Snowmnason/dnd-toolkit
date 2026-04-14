@@ -23,6 +23,7 @@
  */
 
 import { useAppToast, useModal } from '@/contexts'
+import { useNavigation } from '@/hooks/navigation'
 import {
   confirmSignOut,
   deleteAccountUser,
@@ -30,7 +31,6 @@ import {
   initiateSignOut,
 } from '@/lib/auth'
 import { useAppParamsStable } from '@/providers'
-import { useRouter } from 'expo-router'
 import { useCallback, useEffect, useState } from 'react'
 /** Which flow this hook instance manages. */
 export type SignOutFlowMode = 'sign-out' | 'delete-account'
@@ -106,7 +106,7 @@ export function useSignOutFlow(mode: SignOutFlowMode): {
   handlers: SignOutFlowHandlers
 } {
   const [state, setState] = useState<SignOutFlowState>(INITIAL_STATE)
-  const router = useRouter()
+  const navigate = useNavigation()
   const { show: showToast, hide: hideToast } = useAppToast()
   const { openModal, closeModal } = useModal()
   const { clearAllParams } = useAppParamsStable()
@@ -208,7 +208,7 @@ export function useSignOutFlow(mode: SignOutFlowMode): {
       
       const target = deleteResult.redirect ?? '/login/sign-in'
       patch({ phase: 'success', loading: false, redirectTarget: target })
-      router.replace(target as Parameters<typeof router.replace>[0])
+      navigate.replace(target)
 
       // Allow new auth subscriptions to register (login screen)
       endSignOut()
@@ -235,12 +235,12 @@ export function useSignOutFlow(mode: SignOutFlowMode): {
       
       const target = signOutResult.redirect ?? '/login/sign-in'
       patch({ phase: 'success', loading: false, redirectTarget: target })
-      router.replace(target as Parameters<typeof router.replace>[0])
+      navigate.replace(target)
 
       // Allow new auth subscriptions to register (login screen)
       endSignOut()
     }
-  }, [state.phase, mode, patch, closeModal, router, clearAllParams])
+  }, [state.phase, mode, patch, closeModal, navigate, clearAllParams])
 
   // --------------------------------------------------------------------------
   // forceAction — Force sign-out when sync failed (sign-out mode only)
@@ -274,11 +274,11 @@ export function useSignOutFlow(mode: SignOutFlowMode): {
 
     const target = signOutResult.redirect ?? '/login/sign-in'
     patch({ phase: 'success', loading: false, redirectTarget: target })
-    router.replace(target as Parameters<typeof router.replace>[0])
+    navigate.replace(target)
 
     // Allow new auth subscriptions to register (login screen)
     endSignOut()
-  }, [state.phase, patch, closeModal, router, clearAllParams])
+  }, [state.phase, patch, closeModal, navigate, clearAllParams])
 
   // --------------------------------------------------------------------------
   // cancel — User dismisses modal without confirming

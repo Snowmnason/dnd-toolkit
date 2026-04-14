@@ -1,4 +1,3 @@
-import { useChromeBottom } from "@/hooks";
 import { logger } from "@/hooks/utils";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
@@ -6,10 +5,6 @@ import { View } from "react-native";
 
 export default function MainLayout() {
   const params = useLocalSearchParams();
-
-  // Bottom bar behavior is now owned by dedicated hook
-  // TODO: Connect to ChromeLayer via parent compositor in Phase 1B
-  useChromeBottom();
 
   // All hooks must be called unconditionally (before any conditional returns)
   useEffect(() => {
@@ -42,14 +37,6 @@ export default function MainLayout() {
     <View style={{ flex: 1 }}>
       {/* Stack for main routes and nested navigation */}
       <Stack screenOptions={{ headerShown: false }} />
-
-      {/* 
-        🔄 PHASE 1: ChromeBottomBar rendering removed from layout.
-        ChromeLayer.tsx is now the single owner/renderer of all chrome components.
-        Bottom bar behavior is managed by useChromeBottom() hook above.
-        
-        TODO: Connect chromeBottom to ChromeLayer via parent compositor.
-      */}
     </View>
   );
 }

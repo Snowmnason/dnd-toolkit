@@ -57,7 +57,7 @@ export default function CreateWorldScreen() {
   const [mapIndex, setMapIndex] = useState(0);
 
   // Hooks
-  const { session } = useCurrentSession();
+  const { isAuthenticated } = useCurrentSession();
   const {
     isCreating,
     //successWorldId,
@@ -68,7 +68,7 @@ export default function CreateWorldScreen() {
 
   // Logic
   const onSubmit = async (data: WorldFormData) => {
-    if (!session) {
+    if (!isAuthenticated) {
       showSignInModal();
       return;
     }

@@ -14,13 +14,13 @@ import {
   AuthTitle,
   FormAuthInput,
 } from "@/components/auth_components";
+import { useNavigation } from "@/hooks/navigation";
 import { useSignUpFlow } from "@/hooks/auth";
-import { useRouter } from "expo-router";
 import { useRef } from "react";
 import { TextInput } from "react-native";
 
 export default function SignUpScreen() {
-  const router = useRouter();
+  const navigate = useNavigation();
 
   // Refs for keyboard navigation
   const passwordInputRef = useRef<TextInput>(null);
@@ -34,7 +34,7 @@ export default function SignUpScreen() {
       <AuthBackButtonContainer>
         <AuthButtonBack
           text="← Back"
-          onPress={() => router.replace("/")}
+          onPress={() => navigate.replace("/")}
           disabled={state.loading}
         />
       </AuthBackButtonContainer>
@@ -102,7 +102,7 @@ export default function SignUpScreen() {
 
         <AuthButtonSecondary
           text="Already have an account? Sign In"
-          onPress={() => router.push("/login/sign-in")}
+          onPress={() => navigate.to("/login/sign-in")}
           disabled={state.loading}
         />
       </AuthActionGroup>
@@ -133,7 +133,7 @@ export default function SignUpScreen() {
             text: "Sign In",
             onPress: () => {
               handlers.dismissModal();
-              router.push("/login/sign-in");
+              navigate.to("/login/sign-in");
             },
             variant: "primary",
           },

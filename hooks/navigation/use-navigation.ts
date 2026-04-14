@@ -4,9 +4,10 @@ import {
   executeExternalNavigation,
   executeHistoryNavigation,
   executeRouteNavigation,
+  executeStateQueryNavigation,
+  executeUtilityNavigation,
 } from '@/lib/navigation';
 import { logger } from '@/lib/utils';
-import { useRouter } from 'expo-router';
 
 import { useNavigationUiModals } from './use-navigation-ui-modals';
 
@@ -32,14 +33,30 @@ export interface NavigationCallOptions {
 const DEFAULT_THROTTLE_MS = 300;
 
 export interface UseNavigation {
-  // ---- Transition family (guarded, async) ----
-  to: (route: string, params?: Record<string, string>, options?: NavigationCallOptions) => Promise<void>;
-  replace: (route: string, params?: Record<string, string>, options?: NavigationCallOptions) => Promise<void>;
+  // ---- Transition family (guarded, fire-and-go) ----
+  to: (route: string, params?: Record<string, string>, options?: NavigationCallOptions) => void;
+  replace: (route: string, params?: Record<string, string>, options?: NavigationCallOptions) => void;
 
   // ---- History family (stack manipulation) ----
   back: (options?: NavigationCallOptions) => void;
   dismiss: (options?: NavigationCallOptions) => void;
   dismissAll: (target?: string, options?: NavigationCallOptions) => void;
+
+  // ---- Utility family ----
+  /** Update query parameters on the current route without navigating. */
+  setParams: (params: Record<string, string>, options?: NavigationCallOptions) => void;
+  /** Prefetch a route bundle in the background before navigating to it. */
+  prefetch: (route: string, options?: NavigationCallOptions) => void;
+
+  // ---- State queries (synchronous reads, no side-effects) ----
+  /** Returns true if a back navigation is available in the current stack. */
+  canGoBack: () => boolean;
+  /** Returns true if a dismiss operation is available in the current stack. */
+  canDismiss: () => boolean;
+  /** Returns the current route path (e.g. '/main/worlds'). */
+  getCurrentRoute: () => string;
+  /** Returns the current route's query parameters. */
+  getCurrentParams: () => Record<string, any>;
 
   // ---- External family ----
   openWeb: (url: string, options?: NavigationCallOptions) => void;
@@ -91,8 +108,8 @@ function resolveThrottleMs(options?: NavigationCallOptions): number {
  * - `{ throttleMs: 0 }` or `{ throttleMs: false }` — disable for this call
  *
  * **Action Families:**
- * - Transition (`to`, `replace`) — async, full guard pipeline via NavManager
- *   - Returns Promise<void>; failures handled via navFailure state
+ * - Transition (`to`, `replace`) — fire-and-go, full guard pipeline via NavManager
+ *   - Returns void; failures handled via navFailure state (NavModal shown automatically)
  * - History (`back`, `dismiss`, `dismissAll`) — fire-and-forget, no guards
  *   - Synchronous stack manipulation (no Promise)
  * - External (`openWeb`) — scheme-validated with two-level trust model:
@@ -108,17 +125,18 @@ function resolveThrottleMs(options?: NavigationCallOptions): number {
  * - Hook does NOT automatically redirect; failures are advisory
  *
  * **Return Type:**
- * - `to()` / `replace()` are async (await them to know when nav completes)
- * - `back()` / `dismiss()` / `dismissAll()` are void (fire-and-forget)
+ * - All methods return `void` — fire-and-go; do NOT await them at call sites
+ * - `to()` / `replace()` run the full guard pipeline internally; failures show NavModal
+ * - `back()` / `dismiss()` / `dismissAll()` are synchronous stack manipulation
  * - `openWeb()` is void (trust modal opens if needed; hook manages state)
  *
  * **Usage:**
  * ```typescript
  * const navigate = useNavigation();
  *
- * // Guarded transitions (with policy checks)
- * await navigate.to('/main/characters', { worldId: '123' });
- * await navigate.replace('/select/world-selection');
+ * // Guarded transitions (with policy checks) — fire-and-go, no await needed
+ * navigate.to('/main/characters', { worldId: '123' });
+ * navigate.replace('/select/world-selection');
  *
  * // History manipulation (fire-and-forget)
  * navigate.back();
@@ -130,17 +148,16 @@ function resolveThrottleMs(options?: NavigationCallOptions): number {
  * navigate.openWeb('https://example.com');
  *
  * // Disable throttling for a specific call
- * await navigate.to('/debug/logs', undefined, { throttleMs: false });
+ * navigate.to('/debug/logs', undefined, { throttleMs: false });
  *
  * // Extend throttle window for a slow route
- * await navigate.to('/main/heavy-page', { id: '1' }, { throttleMs: 500 });
+ * navigate.to('/main/heavy-page', { id: '1' }, { throttleMs: 500 });
  *
  * // Modals are rendered automatically via ModalProvider — no layout changes needed.
  * ```
  */
 export function useNavigation(): UseNavigation {
   const { showNavModal, dismissNavModal, showTrustModal, dismissTrustModal } = useNavigationUiModals();
-  const router = useRouter();
 
   // ---- Internal throttle state ----
 
@@ -177,7 +194,7 @@ export function useNavigation(): UseNavigation {
           reason: result.reason,
           context,
         });
-        const canGoBack = router.canGoBack();
+        const canGoBack = executeStateQueryNavigation('canGoBack') as boolean ?? false;
         showNavModal(
           'failure',
           undefined,
@@ -187,8 +204,9 @@ export function useNavigation(): UseNavigation {
             dismissNavModal();
             // Directly execute — calling replace() here would create a circular dependency
             // (replace() calls handleResult, handleResult defines this callback)
-            executeRouteNavigation('/select/world-selection', {}, undefined, 'replace').catch(
-              (err: Error) => logger.category('navigation').error('go-home failed', { error: err.message }),
+            // Pass semantic 'default' target; navManager resolves it internally (auth-aware)
+            executeRouteNavigation('default', {}, undefined, 'replace').catch(
+              (err: Error) => logger.category('navigation').error('go-default failed', { error: err.message }),
             );
           },
           canGoBack
@@ -202,43 +220,41 @@ export function useNavigation(): UseNavigation {
         );
       }
     },
-    [showNavModal, dismissNavModal, router],
+    [showNavModal, dismissNavModal],
   );
 
   // ---- Transition family ----
 
   const to = useCallback(
-    async (route: string, params?: Record<string, string>, options?: NavigationCallOptions): Promise<void> => {
+    (route: string, params?: Record<string, string>, options?: NavigationCallOptions): void => {
       const windowMs = resolveThrottleMs(options);
       if (shouldThrottle(buildThrottleKey('to', [route, params]), windowMs)) return;
 
-      try {
-        const result = await executeRouteNavigation(route, params);
-        handleResult(result, 'to');
-      } catch (error) {
-        logger.category('navigation').error('Navigation error', {
-          error: error instanceof Error ? error.message : String(error),
+      executeRouteNavigation(route, params)
+        .then((result) => handleResult(result, 'to'))
+        .catch((error: unknown) => {
+          logger.category('navigation').error('Navigation error', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+          showNavModal('failure', undefined, 'An unexpected error occurred.');
         });
-        showNavModal('failure', undefined, 'An unexpected error occurred.');
-      }
     },
     [handleResult, showNavModal, shouldThrottle],
   );
 
   const replace = useCallback(
-    async (route: string, params?: Record<string, string>, options?: NavigationCallOptions): Promise<void> => {
+    (route: string, params?: Record<string, string>, options?: NavigationCallOptions): void => {
       const windowMs = resolveThrottleMs(options);
       if (shouldThrottle(buildThrottleKey('replace', [route, params]), windowMs)) return;
 
-      try {
-        const result = await executeRouteNavigation(route, params, undefined, 'replace');
-        handleResult(result, 'replace');
-      } catch (error) {
-        logger.category('navigation').error('Navigation error', {
-          error: error instanceof Error ? error.message : String(error),
+      executeRouteNavigation(route, params, undefined, 'replace')
+        .then((result) => handleResult(result, 'replace'))
+        .catch((error: unknown) => {
+          logger.category('navigation').error('Navigation error', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+          showNavModal('failure', undefined, 'An unexpected error occurred.');
         });
-        showNavModal('failure', undefined, 'An unexpected error occurred.');
-      }
     },
     [handleResult, showNavModal, shouldThrottle],
   );
@@ -272,6 +288,54 @@ export function useNavigation(): UseNavigation {
       logger.category('navigation').error('dismissAll failed', { error: err.message }),
     );
   }, [shouldThrottle]);
+
+  // ---- State queries ----
+
+  const canGoBack = useCallback(
+    (): boolean => (executeStateQueryNavigation('canGoBack') as boolean) ?? false,
+    [],
+  );
+
+  const canDismiss = useCallback(
+    (): boolean => (executeStateQueryNavigation('canDismiss') as boolean) ?? false,
+    [],
+  );
+
+  const getCurrentRoute = useCallback(
+    (): string => (executeStateQueryNavigation('getCurrentRoute') as string) ?? '/',
+    [],
+  );
+
+  const getCurrentParams = useCallback(
+    (): Record<string, any> => (executeStateQueryNavigation('getCurrentParams') as Record<string, any>) ?? {},
+    [],
+  );
+
+  // ---- Utility family ----
+
+  const setParams = useCallback(
+    (params: Record<string, string>, options?: NavigationCallOptions): void => {
+      const windowMs = resolveThrottleMs(options);
+      if (shouldThrottle(buildThrottleKey('setParams', [params]), windowMs)) return;
+
+      executeUtilityNavigation('setParams', params).catch((err: Error) =>
+        logger.category('navigation').error('setParams failed', { error: err.message }),
+      );
+    },
+    [shouldThrottle],
+  );
+
+  const prefetch = useCallback(
+    (route: string, options?: NavigationCallOptions): void => {
+      const windowMs = resolveThrottleMs(options);
+      if (shouldThrottle(buildThrottleKey('prefetch', [route]), windowMs)) return;
+
+      executeUtilityNavigation('prefetch', { target: route }).catch((err: Error) =>
+        logger.category('navigation').error('prefetch failed', { error: err.message }),
+      );
+    },
+    [shouldThrottle],
+  );
 
   // ---- External family ----
 
@@ -321,6 +385,12 @@ export function useNavigation(): UseNavigation {
     back,
     dismiss,
     dismissAll,
+    setParams,
+    prefetch,
+    canGoBack,
+    canDismiss,
+    getCurrentRoute,
+    getCurrentParams,
     openWeb,
   };
 }

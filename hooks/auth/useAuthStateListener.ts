@@ -1,8 +1,8 @@
 import {
-    getCurrentSession,
-    listenToAuthStateChanges,
-    mapAuthErrorToCode,
-    resendConfirmationEmail,
+  getCurrentSession,
+  listenToAuthStateChanges,
+  mapAuthErrorToCode,
+  resendConfirmationEmail,
 } from "@/lib/auth";
 
 import type { Session } from "@/lib/auth";
@@ -41,7 +41,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  *     disabled={isLoading}
  *     onPress={async () => {
  *       const result = await signOut();
- *       if (result.success) router.replace('/login/sign-in');
+ *       if (result.success) navigate.replace('/login/sign-in');
  *     }}
  *   >
  *     Sign Out
@@ -51,7 +51,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * @example
  * // Redirect after email confirmation:
  * useAuthStateListener(async (session) => {
- *   if (session?.email === userEmail) router.replace('/login/sign-in');
+ *   if (session?.email === userEmail) navigate.replace('/login/sign-in');
  * });
  */
 export function useAuthStateListener(

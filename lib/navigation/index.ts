@@ -4,9 +4,8 @@
  */
 
 export {
-    getAllRouteConfigs, getRouteConfig, getTransitionAnimation, registerRouteConfig, resolveBackTarget, resolveTitle, shouldRedirect, type A11yFocusTarget,
-    type AnimationType,
-    type ModalConfig, type NavigationContext, type RouteConfig
+    getAllRouteConfigs, getRouteConfig, registerRouteConfig, resolveTitle, type A11yFocusTarget,
+    type NavigationContext, type RouteConfig
 } from "./navigationConfig";
 
 export {
@@ -40,6 +39,8 @@ export {
     evaluateObservedRouteChange, executeExternalNavigation,
     executeHistoryNavigation,
     executeInternalRedirectNavigation,
-    executeRouteNavigation
+    executeRouteNavigation,
+    executeStateQueryNavigation,
+    executeUtilityNavigation,
 } from './navManager';
 

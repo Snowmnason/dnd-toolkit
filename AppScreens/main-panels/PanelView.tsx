@@ -1,7 +1,7 @@
 import { AppPage, Button, Heading } from "@/components/ui";
 import { getShadowStyle } from "@/components/ui/Resuables/shadows";
+import { useNavigation } from "@/hooks/navigation";
 import type { AccessRole } from "@/hooks/storage";
-import { useNavigate } from "@/hooks/navigation";
 import { useAppParamsVolatile, usePlatform } from "@/providers";
 import { $, useScale } from "@/theme";
 import { View } from "react-native";
@@ -26,16 +26,15 @@ export function PanelView({
   showRightBorder = true,
 }: PanelViewProps) {
   const S = useScale();
-  const { push: navigatePush } = useNavigate();
+  const navigate = useNavigation();
   const { updateVolatileParams } = useAppParamsVolatile();
   const { isDesktop } = usePlatform();
-
+  //FIXTHISLATER
   const navigateToFeature = (featurePath: string) => {
     updateVolatileParams({ worldId, userRole });
-    navigatePush(
+    navigate.to(
       `/main/${featurePath}`,
-      { worldId, userRole },
-      ["worldId", "userRole"],
+      { ...(worldId && { worldId }), ...(userRole && { userRole }) },
     );
   };
 

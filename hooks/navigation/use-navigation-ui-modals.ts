@@ -44,12 +44,16 @@ export function useNavigationUiModals() {
       canGoBack?: boolean,
       primaryAction?: () => void,
       secondaryAction?: () => void,
+      primaryButtonLabel?: string,
+      secondaryButtonLabel?: string,
     ) => {
       openModal('nav-alert', {
         modalResponseType,
         heading,
         body,
         canGoBack,
+        primaryButtonLabel,
+        secondaryButtonLabel,
         onClose: closeModal,
         primaryAction: primaryAction ?? closeModal,
         secondaryAction,

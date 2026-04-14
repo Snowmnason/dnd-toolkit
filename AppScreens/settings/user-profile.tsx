@@ -8,7 +8,7 @@ import {
 } from "@/components/ui"
 import { useChangeCredsFlow } from "@/hooks/auth"
 import { useAppToast } from "@/contexts"
-import { useNavigate } from "@/hooks/navigation"
+import { useNavigation } from "@/hooks/navigation"
 import { logger } from "@/hooks/utils"
 import { $, useScale } from "@/theme"
 import { Ionicons } from "@expo/vector-icons"
@@ -24,7 +24,7 @@ interface UserProfileProps {
 
 export default function UserProfile({ profile }: UserProfileProps) {
   const S = useScale()
-  const { replace: navigateTo } = useNavigate()
+  const navigate = useNavigation()
   const { show: showToast } = useAppToast()
   const [sessionUser, setSessionUser] = useState<any>(null)
   const [loadingSession, setLoadingSession] = useState(true)
@@ -85,7 +85,7 @@ export default function UserProfile({ profile }: UserProfileProps) {
           text="Return to Login"
           variant="primary"
           onPress={() => {
-            navigateTo("/login/welcome")
+            navigate.replace("/login/welcome")
           }}
           style={{ alignSelf: "center", minWidth: 140 }}
         />

@@ -20,8 +20,7 @@ import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
 import { QueryCache } from "@/middleware/storage";
 import { FastCache } from "@/system/Storage";
-import { Router } from "expo-router";
-import { RecoveryAction, SafeModeState } from "./safe-mode";
+import { RecoveryAction, SafeModeReason, SafeModeState } from "./safe-mode";
 
 /**
  * Validate that a route exists in the centralized navigation config
@@ -50,22 +49,64 @@ export interface RecoveryResult {
 }
 
 /**
+ * Determine the safest navigation target for a given safe mode reason.
+ *
+ * This is recovery routing policy — it lives here close to the safe-mode domain
+ * rather than in the root layout.
+ *
+ * @param reason - The SafeModeReason string from SafeModeState
+ * @returns Route path string to navigate to
+ */
+export function getSafeModeNavigationTarget(reason?: string): string {
+  // Auth failures → must go to login
+  if (
+    reason === SafeModeReason.AUTH_EXPIRED ||
+    reason === SafeModeReason.AUTH_INVALID ||
+    reason === SafeModeReason.SESSION_LOST
+  ) {
+    return "/login/sign-in";
+  }
+
+  // Storage/kernel issues → try world selection (auth should be OK)
+  if (
+    reason === SafeModeReason.STORAGE_UNREADABLE ||
+    reason === SafeModeReason.STORAGE_CORRUPTED ||
+    reason === SafeModeReason.STORAGE_QUOTA_EXCEEDED ||
+    reason === SafeModeReason.KERNEL_TIMEOUT ||
+    reason === SafeModeReason.KERNEL_PRELOAD_FAILED ||
+    reason === SafeModeReason.KERNEL_CONFIG_FAILED
+  ) {
+    return "/select/world-selection";
+  }
+
+  // Network issues → try world selection
+  if (
+    reason === SafeModeReason.NETWORK_SYNC_FAILURES ||
+    reason === SafeModeReason.NETWORK_CASCADE ||
+    reason === SafeModeReason.NETWORK_UNAVAILABLE
+  ) {
+    return "/select/world-selection";
+  }
+
+  // Default/unknown → safest option is index (welcome/splash screen)
+  return "/";
+}
+
+/**
  * Execute a recovery action
  *
  * @param action - The recovery action to execute
  * @param safeMode - Current safe mode state (for context/logging)
- * @param router - Expo router instance for navigation
- * @param onSuccess - Callback when recovery succeeds
+ * @param onNavigate - Callback for navigation (called with target route path when recovery needs to navigate)
  * @returns Result of the recovery action
  *
- * NOTE: router can be null/undefined for actions that don't navigate (e.g., CONTACT_SUPPORT).
- * Actions that require navigation will fail gracefully with a clear error message.
+ * NOTE: onNavigate will only be called for actions that require navigation.
+ * Actions that don't navigate (e.g., CONTACT_SUPPORT) won't trigger the callback.
  */
 export async function executeRecoveryAction(
   action: RecoveryAction,
   safeMode: SafeModeState,
-  router: Router | null | undefined,
-  onSuccess?: () => void,
+  onNavigate?: (targetRoute: string) => void,
 ): Promise<RecoveryResult> {
   const label = `recovery_action:${action}`;
   Performance.startMeasure(label);
@@ -73,16 +114,16 @@ export async function executeRecoveryAction(
   try {
     switch (action) {
       case RecoveryAction.CLEAR_CACHE:
-        return await handleClearCache(safeMode, router, onSuccess);
+        return await handleClearCache(safeMode, onNavigate);
 
       case RecoveryAction.RESET_AUTH:
-        return await handleResetAuth(safeMode, router, onSuccess);
+        return await handleResetAuth(safeMode, onNavigate);
 
       case RecoveryAction.RESTORE_BACKUP:
-        return await handleRestoreBackup(safeMode, router, onSuccess);
+        return await handleRestoreBackup(safeMode, onNavigate);
 
       case RecoveryAction.CONTACT_SUPPORT:
-        return await handleContactSupport(safeMode, router, onSuccess);
+        return await handleContactSupport(safeMode, onNavigate);
 
       case RecoveryAction.REINSTALL:
         return handleReinstall(safeMode);
@@ -131,22 +172,9 @@ export async function executeRecoveryAction(
  */
 async function handleClearCache(
   safeMode: SafeModeState,
-  router: Router | null | undefined,
-  onSuccess?: () => void,
+  onNavigate?: (targetRoute: string) => void,
 ): Promise<RecoveryResult> {
   try {
-    // Validate router is available for navigation
-    if (!router) {
-      logger
-        .category("error")
-        .error("[SafeMode] CLEAR_CACHE: router is null/undefined");
-      return {
-        success: false,
-        action: RecoveryAction.CLEAR_CACHE,
-        message: "Navigation is unavailable. Please restart the app.",
-      };
-    }
-
     logger
       .category("bootstrap")
       .info("[SafeMode] Starting CLEAR_CACHE recovery");
@@ -170,8 +198,6 @@ async function handleClearCache(
     Performance.endMeasure(`recovery_action:${RecoveryAction.CLEAR_CACHE}`);
 
     // Navigate to world selection (safe starting point)
-    // NOTE: onSuccess callback is invoked after navigation to ensure side effects
-    // (like clearing safe mode state) don't interfere with the navigation itself
     const targetRoute = "/select/world-selection";
     if (!isValidRoute(targetRoute)) {
       logger
@@ -185,8 +211,9 @@ async function handleClearCache(
         message: "Navigation target not found. Please restart the app.",
       };
     }
-    router.push(targetRoute);
-    onSuccess?.();
+
+    // Trigger navigation via callback
+    onNavigate?.(targetRoute);
 
     return {
       success: true,
@@ -208,22 +235,9 @@ async function handleClearCache(
  */
 async function handleResetAuth(
   safeMode: SafeModeState,
-  router: Router | null | undefined,
-  onSuccess?: () => void,
+  onNavigate?: (targetRoute: string) => void,
 ): Promise<RecoveryResult> {
   try {
-    // Validate router is available for navigation
-    if (!router) {
-      logger
-        .category("error")
-        .error("[SafeMode] RESET_AUTH: router is null/undefined");
-      return {
-        success: false,
-        action: RecoveryAction.RESET_AUTH,
-        message: "Navigation is unavailable. Please restart the app.",
-      };
-    }
-
     logger
       .category("bootstrap")
       .info("[SafeMode] Starting RESET_AUTH recovery");
@@ -240,8 +254,6 @@ async function handleResetAuth(
     Performance.endMeasure(`recovery_action:${RecoveryAction.RESET_AUTH}`);
 
     // Redirect to login
-    // NOTE: onSuccess callback is invoked after navigation to ensure side effects
-    // (like clearing safe mode state) don't interfere with the navigation itself
     const targetRoute = "/login/sign-in";
     if (!isValidRoute(targetRoute)) {
       logger
@@ -255,8 +267,9 @@ async function handleResetAuth(
         message: "Navigation target not found. Please restart the app.",
       };
     }
-    router.push(targetRoute);
-    onSuccess?.();
+
+    // Trigger navigation via callback
+    onNavigate?.(targetRoute);
 
     return {
       success: true,
@@ -282,8 +295,7 @@ async function handleResetAuth(
  */
 async function handleRestoreBackup(
   safeMode: SafeModeState,
-  router: Router | null | undefined,
-  onSuccess?: () => void,
+  onNavigate?: (targetRoute: string) => void,
 ): Promise<RecoveryResult> {
   try {
     logger
@@ -314,24 +326,10 @@ async function handleRestoreBackup(
  */
 async function handleContactSupport(
   safeMode: SafeModeState,
-  router: Router | null | undefined,
-  onSuccess?: () => void,
+  onNavigate?: (targetRoute: string) => void,
 ): Promise<RecoveryResult> {
   const label = `recovery_action:${RecoveryAction.CONTACT_SUPPORT}`;
   try {
-    // Validate router is available for navigation
-    if (!router) {
-      logger
-        .category("error")
-        .error("[SafeMode] CONTACT_SUPPORT: router is null/undefined");
-      Performance.endMeasure(label);
-      return {
-        success: false,
-        action: RecoveryAction.CONTACT_SUPPORT,
-        message: "Navigation is unavailable. Please restart the app.",
-      };
-    }
-
     logger.category("error").info("[SafeMode] Navigating to report bug page");
 
     const diagnostics = generateDiagnostics(safeMode);
@@ -376,10 +374,8 @@ async function handleContactSupport(
     // Log diagnostics for reference
     logger.category("bootstrap").info("[SafeMode] Diagnostics:", diagnostics);
 
-    // NOTE: onSuccess callback is invoked after navigation to ensure side effects
-    // (like clearing safe mode state) don't interfere with the navigation itself
-    router.push(targetRoute);
-    onSuccess?.();
+    // Trigger navigation via callback
+    onNavigate?.(targetRoute);
 
     Performance.endMeasure(label);
 

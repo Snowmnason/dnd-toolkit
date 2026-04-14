@@ -11,14 +11,15 @@ import {
 } from '@/components/auth_components';
 import { Body } from '@/components/ui';
 import { useAuthStateListener } from '@/hooks/auth';
+import { useNavigation } from '@/hooks/navigation';
 import { logger } from '@/hooks/utils';
 import { openEmailApp } from '@/validation';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 
 export default function EmailConfirmationScreen() {
-  const router = useRouter();
+  const navigate = useNavigation();
   const { email } = useLocalSearchParams();
   const [loading, setLoading] = useState(false);
   const [showEmailSentModal, setShowEmailSentModal] = useState(false);
@@ -37,7 +38,7 @@ export default function EmailConfirmationScreen() {
       // User successfully confirmed email
       // Redirect to sign-in so they can manually complete their account setup
       logger.category('auth').info('Email confirmed, redirecting to sign-in');
-      router.replace('/login/sign-in');
+      navigate.replace('/login/sign-in');
     }
   });
 
@@ -96,7 +97,7 @@ export default function EmailConfirmationScreen() {
   // Disabled pending clarification and proper implementation
   // const handleChangeEmail = () => {
   //   const target = buildNavigationTarget('/login/welcome', {}, []);
-  //   router.replace(target as any);
+  //   navigate.replace(target as any);
   // };
 
   return (
@@ -105,7 +106,7 @@ export default function EmailConfirmationScreen() {
       <AuthBackButtonContainer>
         <AuthButtonBack
           text="← Back"
-          onPress={() => router.replace('/')}
+          onPress={() => navigate.replace('/')}
           disabled={loading}
         />
       </AuthBackButtonContainer>
@@ -164,7 +165,7 @@ export default function EmailConfirmationScreen() {
             bg="#4285F4"
             text='Already Confirmed?'
             textColor="#FFF"
-            onPress={() => router.replace('/login/sign-in')}
+            onPress={() => navigate.replace('/login/sign-in')}
             style={{ flex: 1, width: 'auto' }}
           />
         </View>
