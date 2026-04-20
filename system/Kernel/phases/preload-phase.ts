@@ -98,6 +98,20 @@ export async function preloadPhase(signal: AbortSignal): Promise<void> {
       }
     }
 
+    // Preload icon assets — non-critical, ensures SVGs are cached before first render
+    try {
+      const { Asset } = await import('expo-asset');
+      const { getAllIconAssets } = await import('@/maps/icon-map');
+      await Asset.loadAsync(getAllIconAssets());
+      logger.category('bootstrap').debug('Icon assets preloaded');
+    } catch (iconError) {
+      logger
+        .category('bootstrap')
+        .warn('Icon asset preload failed (non-critical)', {
+          error: (iconError as Error).message,
+        });
+    }
+
     // Preload themes — critical for styling tokens and colors
     // This MUST complete successfully before UI renders
     try {

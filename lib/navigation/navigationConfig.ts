@@ -13,10 +13,10 @@
 import { logger } from "@/lib/utils";
 import { Router } from "expo-router";
 import {
-  canonicalizePath,
-  pathEquals,
-  pathStartsWith,
-  type RouteParams,
+    canonicalizePath,
+    pathEquals,
+    pathStartsWith,
+    type RouteParams,
 } from "./routeCanonicalizer";
 import { LOGIN_ROUTES } from "./routes/loginRoutes";
 import { MAIN_ROUTES } from "./routes/mainRoutes";
@@ -75,6 +75,34 @@ export interface RouteConfig {
   /** Analytics tracking name */
   analyticsName?: string;
 
+  /**
+   * Platform constraint for this route.
+   * - 'mobile'  — iOS and Android only
+   * - 'desktop' — web and desktop only
+   * - null / omitted — available on all platforms
+   *
+   * Enforced by the navigation manager before any transport execution.
+   * Navigation to an incompatible route returns status 'aborted' with
+   * reason 'platform-incompatible'. Component-level platform checks
+   * may still be used for layout, but this field is the authoritative
+   * route-visibility contract.
+   */
+  platform?: 'mobile' | 'desktop' | null;
+
+  /**
+   * Semantic identifier for in-app component navigation.
+   * Enables `navigate.to('sign-in')` as an alias for the concrete path.
+   * Must be unique across all route configs.
+   * Deep links must always use concrete paths — semantic IDs are in-app only.
+   *
+   * @example
+   * ```ts
+   * navigate.to('sign-in')        // resolves via semanticId
+   * navigate.to('/login/sign-in') // resolves via concrete path
+   * ```
+   */
+  semanticId?: string;
+
   /** Custom error boundary handler */
   onError?: (error: Error, context: NavigationContext) => void;
 }
@@ -83,7 +111,7 @@ export interface RouteConfig {
  * Route configuration registry
  * Add new routes here with their configuration
  */
-const ROUTE_CONFIGS: RouteConfig[] = [
+export const ROUTE_CONFIGS: RouteConfig[] = [
   ...LOGIN_ROUTES,
   ...SELECT_ROUTES,
   ...MAIN_ROUTES,

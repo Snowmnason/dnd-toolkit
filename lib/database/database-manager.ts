@@ -218,7 +218,7 @@ export function extractData<T>(
  * @returns true if database is configured, false if not (e.g., GitHub Pages deployment)
  */
 export function isDatabaseConfigured(): boolean {
-  const { isDatabaseConfigured: isDatabaseConfiguredMiddleware } = require("@/lib/middleware/services/database-service");
+  const { isDatabaseConfigured: isDatabaseConfiguredMiddleware } = require("@/middleware/services/database-service");
   return isDatabaseConfiguredMiddleware();
 }
 

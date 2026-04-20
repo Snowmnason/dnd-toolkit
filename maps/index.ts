@@ -24,3 +24,5 @@ export { getStorageDefaults } from './storage-defaults';
 
 export { DEV_APPROVED_ORIGINS } from './trusted-origins';
 
+export { getAllIconAssets, getIconAsset, type IconKey, type IconVariant } from './icon-map';
+

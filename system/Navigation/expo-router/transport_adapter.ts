@@ -3,15 +3,15 @@
  * 
  * This is the ONLY place in the codebase where Expo Router and Linking are directly called.
  *
- * IMPORTANT: Route transitions intentionally use the `/?${target}` form instead of
- * passing raw arbitrary pathname strings into `router.navigate()` / `router.replace()`.
- * Expo Router's generated route typings accept `"/" | `/?${string}` | ...` here, and
- * plain dynamic strings like `target: string` produce type warnings/errors.
+ * TYPING: Route transitions use the object href form `{ pathname, params }` to call
+ * Expo Router. The generated route types (`.expo/types/router.d.ts`) define `Href` as a
+ * union of literal pathname objects. Because the adapter receives `target` as a dynamic
+ * string from the middleware layer, we cast the object to `any` at the boundary.
+ * This is intentional — the adapter is the single bridge between the dynamic navigation
+ * system and Expo Router's static type system.
  *
- * The contract for this adapter is therefore:
- * - middleware removes the leading `/` before calling transport
- * - transport wraps the normalized target as `/?${target}` for Expo Router
- * - this is a typing/workaround requirement for this bridge, not a malformed route bug
+ * Previous `/?${target}` approach satisfied types but produced malformed web URLs
+ * (e.g., `/?login%2Fsign-in=`). The object href form produces correct pathnames.
  * 
  * All navigation requests flow through this adapter:
  * - System Orchestration calls adapter functions
@@ -53,11 +53,13 @@ import { getRouter } from './transport_provider';
  */
 export function executeRouterPush(
   target: string,
+  params?: Record<string, any>,
 ): TransportResult {
   try {
     const router = getRouter();
     
-    router.navigate(`/?${target}`);
+    const cleanTarget = target.startsWith('/') ? target : `/${target}`;
+    router.navigate({ pathname: cleanTarget, params } as any);
     
     logger.category('navigation').debug(`Router navigate: ${target}`);
     return { success: true };
@@ -82,11 +84,13 @@ export function executeRouterPush(
  */
 export function executeRouterReplace(
   target: string,
+  params?: Record<string, any>,
 ): TransportResult {
   try {
     const router = getRouter();
 
-    router.replace(`/?${target}`);
+    const cleanTarget = target.startsWith('/') ? target : `/${target}`;
+    router.replace({ pathname: cleanTarget, params } as any);
     
     logger.category('navigation').debug(`Router replace: ${target}`);
     return { success: true };
@@ -109,11 +113,14 @@ export function executeRouterReplace(
  *                 Orchestration layer is responsible for building the complete path before passing here
  * @returns Execution result with success state and optional error
  */
-export function executeRouterDismissTo(target: string): TransportResult {
+export function executeRouterDismissTo(
+  target: string,
+  params?: Record<string, any>,
+): TransportResult {
   try {
     const router = getRouter();
-     
-    router.dismissTo(`/?${target}`);
+    const cleanTarget = target.startsWith('/') ? target : `/${target}`;
+    router.dismissTo({ pathname: cleanTarget, params } as any);
     
     logger.category('navigation').debug(`Router dismissTo: ${target}`);
     return { success: true };

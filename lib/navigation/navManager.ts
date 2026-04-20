@@ -29,6 +29,8 @@
  * - Policy evaluation will use lib/navigation auxiliary files (policy-engine, guard-builders)
  */
 
+import { AUTH_CONFIG } from '@/config/routing-auth-config';
+import { logger } from '@/lib/utils';
 import {
   callExternalTransitionNav,
   callHistoryTransitionNav,
@@ -51,7 +53,6 @@ import { canonicalizePath } from './routeCanonicalizer';
 import {
   applyRouteMetadata,
   isPlatformCompatible,
-  mergeParameters,
   type RouteMetadata,
 } from './routeTranslator';
 import { isSemanticRoute, resolveSemanticRoute } from './semantic-routes';
@@ -93,9 +94,13 @@ function getRouteMetadataForPath(canonicalPath: string): RouteMetadata | undefin
     c => c.path === canonicalPath || c.aliases?.some(a => a === canonicalPath),
   );
   if (!config) return undefined;
-  // Only path is available from RouteConfig today. All other RouteMetadata fields
-  // (requiresAuth, platform, contextParamNames, etc.) require future RouteConfig additions.
-  return { path: config.path };
+  return {
+    path: config.path,
+    // Forward platform constraint so isPlatformCompatible() can enforce it.
+    // Other RouteMetadata fields (requiresAuth, contextParamNames, etc.) still require
+    // future RouteConfig additions before they can be forwarded.
+    ...(config.platform !== undefined && { platform: config.platform }),
+  };
 }
 
 /**
@@ -136,9 +141,9 @@ export async function executeRouteNavigation(
     }
 
     // Resolve deferred params from approved lib sources (auth state, storage)
+    // These are used ONLY for guard evaluation (NavigationContext), NOT as URL params.
+    // userId/worldId live in SecureStorage and must never leak into URLs.
     const contextParams = await resolveContextParams(PARAM_RESOLVERS);
-    // Storage-resolved values are base; explicit params passed by caller win
-    const preResolvedParams = mergeParameters(contextParams, params ?? {});
 
     // Resolve route metadata — enables platform check and contextParamNames extraction
     const routeMetadata = getRouteMetadataForPath(canonicalTarget);
@@ -159,8 +164,8 @@ export async function executeRouteNavigation(
     };
 
     // Apply metadata: contextParamNames extraction (dormant until routes declare them)
-    // + final merge with preResolvedParams — result is the URL params for the route
-    const processed = applyRouteMetadata(navCtx, preResolvedParams, routeMetadata);
+    // Only caller-provided params become URL params — context params stay internal.
+    const processed = applyRouteMetadata(navCtx, params ?? {}, routeMetadata);
     const resolvedParams = processed.mergedParams;
 
     const policyMode = getPolicyModeFromConfig();
@@ -175,7 +180,7 @@ export async function executeRouteNavigation(
       platform: ctx.platform,
     };
 
-    return await callRouteTransitionNav(action, canonicalTarget, resolvedParams, guardPipeline, analytics);
+    return await callRouteTransitionNav(action, canonicalTarget, resolvedParams, guardPipeline, analytics, navCtx);
   } catch (error) {
     return {
       status: 'aborted',
@@ -223,9 +228,9 @@ export async function executeInternalRedirectNavigation(
     }
 
     // Resolve deferred params from approved lib sources (auth state, storage)
+    // These are used ONLY for guard evaluation (NavigationContext), NOT as URL params.
+    // userId/worldId live in SecureStorage and must never leak into URLs.
     const contextParams = await resolveContextParams(PARAM_RESOLVERS);
-    // Storage-resolved values are base; explicit params passed by caller win
-    const preResolvedParams = mergeParameters(contextParams, params ?? {});
 
     // Resolve route metadata — enables platform check and contextParamNames extraction
     const routeMetadata = getRouteMetadataForPath(canonicalTarget);
@@ -246,8 +251,8 @@ export async function executeInternalRedirectNavigation(
     };
 
     // Apply metadata: contextParamNames extraction (dormant until routes declare them)
-    // + final merge with preResolvedParams — result is the URL params for the route
-    const processed = applyRouteMetadata(navCtx, preResolvedParams, routeMetadata);
+    // Only caller-provided params become URL params — context params stay internal.
+    const processed = applyRouteMetadata(navCtx, params ?? {}, routeMetadata);
     const resolvedParams = processed.mergedParams;
 
     const policyMode = getPolicyModeFromConfig();
@@ -262,7 +267,7 @@ export async function executeInternalRedirectNavigation(
       platform: ctx.platform,
     };
 
-    return await callRouteTransitionNav(action, canonicalTarget, resolvedParams, guardPipeline, analytics);
+    return await callRouteTransitionNav(action, canonicalTarget, resolvedParams, guardPipeline, analytics, navCtx);
   } catch (error) {
     return {
       status: 'aborted',
@@ -540,17 +545,75 @@ export async function evaluateObservedRouteChange(
       return { status: 'no-op', reason: 'route-allowed' };
     }
 
-    // Route requires authentication, permission, admin, or custom logic.
-    // For safety, redirect to main if user lands on protected route via back button or deep link.
-    // More sophisticated access checking (e.g., verifying current user state) should be added
-    // when AUTH_CONFIG gains per-route access level definitions.
-    const reason = `observer-policy-violation: route-requires-${verdict}`;
-    return await executeInternalRedirectNavigation(
-      reason,
-      '/main',
-      {},
-      _options,
+    // Route requires auth/permission/admin — run the real guard pipeline
+    // with current user state to determine if the user actually has access.
+    const ctx = buildNavigationContext();
+    const contextParams = await resolveContextParams(PARAM_RESOLVERS);
+
+    // If transitioning FROM a public route (e.g. /login/sign-in → /select/world-selection)
+    // and userId couldn't be resolved, this is a post-auth storage race: React auth state
+    // becomes true before the userId is flushed to SecureStorage. The observer is a
+    // fallback for deep links — it must not block trusted post-login transitions.
+    // useAuthGuard in the destination layout enforces actual protection.
+    const previousRoute = canonicalizePath(_previousRoute ?? '');
+    const isFromPublicRoute = AUTH_CONFIG.publicRoutes.some((r: string) =>
+      previousRoute.toLowerCase().includes(r.toLowerCase()),
     );
+    if (!contextParams.userId && isFromPublicRoute) {
+      logger.category('navigation').debug(
+        'Observer: userId unresolved on post-public-route transition — deferring to useAuthGuard',
+        { from: previousRoute, to: canonicalRoute },
+      );
+      return { status: 'no-op', reason: 'post-auth-race-deferred-to-guard' };
+    }
+
+    const navCtx: NavigationContext = {
+      toRoute: canonicalRoute,
+      triggeredBy: 'deep-link',
+      platform: ctx.platform,
+      fromRoute: ctx.fromRoute,
+      userId: contextParams.userId,
+      worldId: contextParams.worldId,
+    };
+
+    const guardPipeline = PolicyEngine.buildGuardPipeline(verdict, navCtx);
+
+    // Execute guards to see if user is actually denied
+    // Run each guard — if any rejects, redirect to its specified target
+    for (const guard of guardPipeline) {
+      const guardResult = await guard.check(navCtx);
+      if (guardResult.status === 'redirect') {
+        const reason = `observer-policy-violation: ${guard.name}-denied`;
+        try {
+          return await executeInternalRedirectNavigation(
+            reason,
+            guardResult.target,
+            {},
+            _options,
+          );
+        } catch (redirectError) {
+          logger.category('navigation').error(
+            'Failed to execute redirect during route validation',
+            { target: guardResult.target, error: redirectError instanceof Error ? redirectError.message : String(redirectError) }
+          );
+          // Return aborted instead of letting redirect error propagate
+          return {
+            status: 'aborted',
+            reason: 'redirect-execution-failed',
+            error: redirectError instanceof Error ? redirectError : new Error(String(redirectError)),
+          };
+        }
+      }
+      if (guardResult.status === 'abort') {
+        return {
+          status: 'aborted',
+          reason: `observer-guard-abort: ${guard.name} - ${guardResult.reason}`,
+        };
+      }
+    }
+
+    // All guards passed — user has access, route is allowed
+    return { status: 'no-op', reason: 'route-allowed-by-guards' };
   } catch (error) {
     return {
       status: 'aborted',

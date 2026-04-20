@@ -1,8 +1,12 @@
+import { AuthBackButtonContainer, AuthButtonBack } from '@/components/auth_components';
+import { useNavigation } from '@/hooks/navigation';
 import { $ } from '@/theme';
 import { Stack } from 'expo-router';
 import { View } from 'react-native';
 
 export default function LoginLayout() {
+  const navigate = useNavigation();
+
   return (
     <View style={{ flex: 1, /*backgroundColor: CoreColors.backgroundDark */ }}>
       <Stack 
@@ -13,6 +17,12 @@ export default function LoginLayout() {
           },
         }}
       />
+      <AuthBackButtonContainer>
+        <AuthButtonBack
+          text="← Back"
+          onPress={() => navigate.canGoBack() ? navigate.back() : navigate.replace('/')}
+        />
+      </AuthBackButtonContainer>
     </View>
   );
 }

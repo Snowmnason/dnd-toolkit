@@ -27,6 +27,7 @@ import '@/components/modals/worlds/EditWorldModal'
 // Other modals
 import '@/components/modals/EntitlementExpiredModal'
 import '@/components/modals/FeatureGatedModal'
+import '@/components/modals/LoginModal'
 import '@/components/modals/SettingsModal'
 import '@/components/modals/SuccessModal'
 

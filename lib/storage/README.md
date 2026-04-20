@@ -87,7 +87,7 @@ Compression is configured globally in `appsettings.json`:
 Track compression effectiveness:
 
 ```typescript
-import { getCompressionStats } from '@/lib/middleware/storage/compression/compression-middleware';
+import { getCompressionStats } from '@/middleware/storage/compression/compression-middleware';
 
 const stats = getCompressionStats();
 // Returns: totalOperations, bytesCompressed, bytesSaved, avgCompressionRatio
@@ -331,7 +331,7 @@ Get compression effectiveness statistics.
 
 **Example:**
 ```ts
-import { getCompressionStats } from "@/lib/middleware/storage/compression/compression-middleware";
+import { getCompressionStats } from "@/middleware/storage/compression/compression-middleware";
 
 const stats = getCompressionStats();
 console.log(`Compressed ${stats.bytesCompressed} bytes, saved ${stats.bytesSaved} bytes`);
@@ -349,7 +349,7 @@ Manually compress data for storage.
 
 **Example:**
 ```ts
-import { compressData } from "@/lib/middleware/storage/compression/compression-middleware";
+import { compressData } from "@/middleware/storage/compression/compression-middleware";
 
 const compressed = await compressData(largeJsonString, { algorithm: 'gzip' });
 await SecureStorage.setItem(key, compressed.data);

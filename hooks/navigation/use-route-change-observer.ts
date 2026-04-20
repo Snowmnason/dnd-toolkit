@@ -9,21 +9,26 @@ import { useNavigationUiModals } from './use-navigation-ui-modals';
 /**
  * useRouteChangeObserver
  *
- * ROOT-ONLY EFFECT HOOK: Detects route changes and validates them post-hoc.
+ * ROOT-ONLY EFFECT HOOK: Runtime fallback that detects in-memory route changes
+ * and validates them post-hoc.
  * Mount exactly once in `app/_layout.tsx` at the root level.
  *
- * **Purpose:**
- * Catches navigation that bypasses the `useNavigation()` hook:
- * - Deep links from OS (notifications, browser, QR codes)
- * - URL edits in address bar (web)
- * - Back button/gesture navigation (mobile)
- * - Programmatic navigation from third-party code
+ * **Role in the protection stack:**
+ * - **Primary protection (web):** `useBootstrapRouteGuard` — handles the initial route
+ *   on every fresh page load (URL edit, refresh, deep link, browser back/forward all
+ *   cause a full app remount on web due to static export).
+ * - **Runtime fallback (this hook):** Catches the rare case where a route change occurs
+ *   in-memory without a full remount — e.g., programmatic navigation from third-party
+ *   code, or native deep links that don't remount the app.
+ * - On native (iOS/Android), deep links arrive as OS intents and may not remount the app,
+ *   so this observer is the primary guard on those platforms.
  *
  * **How It Works:**
  * 1. Watches `useSegments()` for route changes
- * 2. Calls `evaluateObservedRouteChange()` which re-evaluates policy for the new route
- * 3. If denied: `evaluateObservedRouteChange` executes the redirect, then shows NavModal
- * 4. If allowed: no-op (route proceeds)
+ * 2. Skips the initial mount (bootstrap guard handles that on web)
+ * 3. Calls `evaluateObservedRouteChange()` which runs the real guard pipeline
+ * 4. If guards deny: redirect is executed + NavModal shown
+ * 5. If guards allow: no-op (route proceeds)
  *
  * **Guard Behavior:**
  * - **Allow** → no action (route change proceeds normally)
@@ -32,16 +37,10 @@ import { useNavigationUiModals } from './use-navigation-ui-modals';
  *
  * **Return Type:**
  * Void. Modal state is managed by `ModalProvider`/`ModalLayer` via `useNavigationUiModals`.
- * No layout changes required.
  *
  * **Integration:**
  * - Root layout mounts this as a side-effect: `useRouteChangeObserver()`
  * - Failures render automatically via `ModalLayer` (same channel as `useNavigation`)
- *
- * **Notes:**
- * - Does not intercept pre-navigation; runs after-the-fact
- * - For pre-navigation checks, use `useNavigation().to/replace`
- * - Separate concern from user-triggered navigation (different trigger source)
  */
 export function useRouteChangeObserver(): void {
   const segments = useSegments();

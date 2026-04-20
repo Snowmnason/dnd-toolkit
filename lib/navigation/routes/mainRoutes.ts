@@ -3,13 +3,49 @@ import type { NavigationContext, RouteConfig } from '../navigationConfig'
 
 // Main app routes (world-dependent)
 export const MAIN_ROUTES: RouteConfig[] = [
+  // Desktop-only composition surface — renders all panels in a single layout.
+  // Mobile entry points are the per-panel routes below.
   {
     path: '/main/main-landing',
     title: 'D&D Toolkit',
+    platform: 'desktop',
     analyticsName: 'main_landing',
     onError: (error: Error, _context: NavigationContext) => {
       logger.category('navigation').error('[Route Error] main-landing:', error.message)
     },
+  },
+
+  // Mobile panel entry routes — each is a discrete route on iOS/Android.
+  // Desktop uses main-landing instead; these are mobile-only by contract.
+  {
+    path: '/main/characters',
+    title: 'Characters & NPCs',
+    platform: 'mobile',
+    analyticsName: 'main_characters_panel',
+  },
+  {
+    path: '/main/items',
+    title: 'Items & Treasure',
+    platform: 'mobile',
+    analyticsName: 'main_items_panel',
+  },
+  {
+    path: '/main/world',
+    title: 'World & Exploration',
+    platform: 'mobile',
+    analyticsName: 'main_world_panel',
+  },
+  {
+    path: '/main/combat',
+    title: 'Combat & Events',
+    platform: 'mobile',
+    analyticsName: 'main_combat_panel',
+  },
+  {
+    path: '/main/story',
+    title: 'Story & Notes',
+    platform: 'mobile',
+    analyticsName: 'main_story_panel',
   },
 
   // Characters & NPCs

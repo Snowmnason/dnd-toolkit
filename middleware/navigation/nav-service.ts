@@ -21,18 +21,19 @@
 import { NavAnalytics } from '@/lib/analytics/modules/nav-analytics';
 import { logger } from '@/lib/utils';
 import {
-  executeExternalTransitionNav,
-  executeHistoryTransitionNav,
-  executeRouteTransitionNav,
-  executeStateQueriesNav,
-  executeUtilityTransitionNav,
-  isTransportReady,
+    executeExternalTransitionNav,
+    executeHistoryTransitionNav,
+    executeRouteTransitionNav,
+    executeStateQueriesNav,
+    executeUtilityTransitionNav,
+    isTransportReady,
 } from '@/system/Navigation';
 import type {
-  NavigationExecutionResult,
-  NavigationGuardConfig,
-  NavigationRequest,
-  NavigationUiInstruction,
+    NavigationContext,
+    NavigationExecutionResult,
+    NavigationGuardConfig,
+    NavigationRequest,
+    NavigationUiInstruction,
 } from '@/type-definitions';
 
 // ---------------------------------------------------------------------------
@@ -135,6 +136,7 @@ export async function callRouteTransitionNav(
   params?: Record<string, string>,
   guards?: NavigationGuardConfig[],
   analytics?: NavAnalyticsContext,
+  navCtx?: NavigationContext,
 ): Promise<NavServiceResult> {
   if (!isTransportReady()) {
     logger.category('navigation').warn('callRouteTransitionNav: transport not ready');
@@ -158,7 +160,7 @@ export async function callRouteTransitionNav(
     analyticsMode: 'track',
   };
 
-  const result = await executeRouteTransitionNav(request, guards);
+  const result = await executeRouteTransitionNav(request, guards, navCtx);
   fireAnalytics(result, cleanTarget, analytics);
   return stripResult(result);
 }

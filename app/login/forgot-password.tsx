@@ -2,25 +2,25 @@ import {
   AuthActionGroup,
   AuthBody,
   AuthBodyFooter,
-  AuthButton, AuthButtonBack,
+  AuthButton,
   AuthCaption, AuthError, AuthForm,
-  AuthModal,
   AuthRoot,
   AuthSubTitle,
   AuthSuccess,
   AuthTitle,
-  FormAuthInput,
+  FormAuthInput
 } from '@/components/auth_components';
+import { useModal } from '@/contexts';
 import { useAuthActions } from '@/hooks/auth';
 import { useNavigation } from '@/hooks/navigation';
 import { forgotPasswordSchema, type ForgotPasswordFormData } from '@/validation/auth.schema';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { View } from 'react-native';
 
 export default function ForgotPasswordScreen() {
   const navigate = useNavigation();
+  const { openModal, closeModal } = useModal();
   const { resetPassword } = useAuthActions();
   
   const { control, handleSubmit, formState: { isValid }, watch } = useForm<ForgotPasswordFormData>({
@@ -35,7 +35,39 @@ export default function ForgotPasswordScreen() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [showEmailNotFoundModal, setShowEmailNotFoundModal] = useState(false);
+  const [showEmailNotFound, setShowEmailNotFound] = useState(false);
+
+  // Manage email-not-found modal via context
+  useEffect(() => {
+    if (showEmailNotFound) {
+      openModal('login-message', {
+        heading: 'No Account Found 🤔',
+        message: `We couldn't find an account with ${email}. Would you like to create a new account instead?`,
+        buttons: [
+          {
+            text: 'Cancel',
+            onPress: () => {
+              closeModal();
+              setShowEmailNotFound(false);
+            },
+            variant: 'cancel' as const,
+          },
+          {
+            text: 'Create Account',
+            onPress: () => {
+              closeModal();
+              setShowEmailNotFound(false);
+              navigate.to('/login/sign-up');
+            },
+            variant: 'primary' as const,
+          },
+        ],
+      });
+    } else {
+      closeModal();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showEmailNotFound, email, openModal, closeModal]);
 
   // Handle password reset
   const onSubmit = async (values: ForgotPasswordFormData) => {
@@ -51,7 +83,7 @@ export default function ForgotPasswordScreen() {
         setSuccess(true);
         setSuccessMessage(result.message);
       } else if (result.showEmailNotFoundModal) {
-        setShowEmailNotFoundModal(true);
+        setShowEmailNotFound(true);
       } else if (result.error) {
         setError(result.error);
       }
@@ -63,14 +95,6 @@ export default function ForgotPasswordScreen() {
 
   return (
     <AuthRoot>
-      {/* 🔙 Back Button*/}
-      <View style={{ position: 'absolute', top: 50, left: 20, zIndex: 10 }}>
-        <AuthButtonBack
-          text="← Back"
-          onPress={() => navigate.replace('/login/sign-in')}
-          disabled={loading}
-        />
-      </View>
 
       {/* 🧠 Header*/}
       <AuthTitle>Forgot Password</AuthTitle>
@@ -124,29 +148,6 @@ export default function ForgotPasswordScreen() {
       <AuthCaption>
         © 2025 The Snow Post · Forged for storytellers & adventurers
       </AuthCaption>
-
-      {/* 📬 Email Not Found Modal //THISMIGHTBEWRONG */}
-      <AuthModal
-        visible={showEmailNotFoundModal}
-        onClose={() => setShowEmailNotFoundModal(false)}
-        title="No Account Found 🤔"
-        message={`We couldn't find an account with ${email}. Would you like to create a new account instead?`}
-        buttons={[
-          {
-            text: 'Cancel',
-            onPress: () => setShowEmailNotFoundModal(false),
-            variant: 'cancel',
-          },
-          {
-            text: 'Create Account',
-            onPress: () => {
-              setShowEmailNotFoundModal(false)
-              navigate.to('/login/sign-up')
-            },
-            variant: 'primary',
-          },
-        ]}
-      />
     </AuthRoot>
   )
 }

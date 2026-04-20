@@ -60,10 +60,9 @@ export function useChromePolicy(segments: string[]): ChromePolicy {
   const navDrawerEnabled = navDrawerConfig?.enabled ?? false
   const navDrawerSkipRoutes = navDrawerConfig?.skipRoutes ?? []
   const navDrawerSkipPaths = navDrawerConfig?.skipPaths ?? []
-  const currentRoute = firstSegment || 'index'
   const showNavDrawer =
     navDrawerEnabled &&
-    !navDrawerSkipRoutes.includes(currentRoute) &&
+    !navDrawerSkipRoutes.includes(firstSegment) &&
     !navDrawerSkipPaths.includes(fullPath)
 
   return {

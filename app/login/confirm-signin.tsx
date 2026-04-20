@@ -1,16 +1,15 @@
 import {
-  AuthActionGroup,
-  AuthBackButtonContainer,
-  AuthBody,
-  AuthBodyFooter,
-  AuthButton, AuthButtonBack,
-  AuthCaption,
-  AuthError,
-  AuthForm,
-  AuthRoot,
-  AuthSubTitle,
-  AuthTitle,
-  FormAuthInput
+    AuthActionGroup,
+    AuthBody,
+    AuthBodyFooter,
+    AuthButton,
+    AuthCaption,
+    AuthError,
+    AuthForm,
+    AuthRoot,
+    AuthSubTitle,
+    AuthTitle,
+    FormAuthInput
 } from '@/components/auth_components';
 import { useAuthFlow } from "@/hooks/auth";
 import { useNavigation } from '@/hooks/navigation';
@@ -24,15 +23,6 @@ export default function SignInScreen() {
 
   return (
     <AuthRoot>
-      {/* 🔙 Back Button */}
-      <AuthBackButtonContainer>
-        <AuthButtonBack
-          text="← Back"
-          onPress={() => navigate.replace('/')}
-          disabled={state.loading}
-        />
-      </AuthBackButtonContainer>
-
       {/* 🧠 Header */}
       <AuthTitle>Welcome Back</AuthTitle>
 

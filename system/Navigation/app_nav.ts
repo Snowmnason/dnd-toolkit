@@ -25,12 +25,12 @@
 
 import { logger } from '@/lib/utils';
 import type {
-  NavigationContext,
-  NavigationDecision,
-  NavigationExecutionResult,
-  NavigationGuardConfig,
-  NavigationRequest,
-  NavigationTransaction,
+    NavigationContext,
+    NavigationDecision,
+    NavigationExecutionResult,
+    NavigationGuardConfig,
+    NavigationRequest,
+    NavigationTransaction,
 } from '@/type-definitions';
 import * as transportAdapter from './expo-router/transport_adapter';
 import { executeGuardPipeline } from './guard_executor';
@@ -51,14 +51,16 @@ import { TransactionRunner } from './transaction_runner';
  */
 export async function executeRouteTransitionNav(
   request: NavigationRequest,
-  guardsToRun?: NavigationGuardConfig[]
+  guardsToRun?: NavigationGuardConfig[],
+  callerContext?: NavigationContext
 ): Promise<NavigationExecutionResult> {
   const triggerType = request.action === 'replace' ? 'replace' : request.action === 'dismissTo' ? 'dismiss' : 'push';
   const transaction = new TransactionRunner('', request.target, triggerType);
   const transactionId = transaction.getId();
 
-  // Hoist context so the guard pipeline and catch block share the same instance
-  const context: NavigationContext = {
+  // Use caller-provided context (enriched with userId/worldId from navManager)
+  // or fall back to a minimal context derived from the request.
+  const context: NavigationContext = callerContext ?? {
     toRoute: request.target,
     triggeredBy: request.source === 'deeplink' ? 'deep-link' : request.source === 'direct' ? 'user' : 'redirect',
     platform: 'web',
@@ -126,15 +128,15 @@ export async function executeRouteTransitionNav(
     // Guard pipeline passed (or was empty), execute route transition
     switch (request.action) {
       case 'push':
-        transportAdapter.executeRouterPush(request.target);
+        transportAdapter.executeRouterPush(request.target, request.params);
         break;
 
       case 'replace':
-        transportAdapter.executeRouterReplace(request.target);
+        transportAdapter.executeRouterReplace(request.target, request.params);
         break;
 
       case 'dismissTo':
-        transportAdapter.executeRouterDismissTo(request.target);
+        transportAdapter.executeRouterDismissTo(request.target, request.params);
         break;
 
       default:

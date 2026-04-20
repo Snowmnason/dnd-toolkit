@@ -358,7 +358,7 @@ export class NavAnalytics {
     message: string,
     context?: any
   ): void {
-    const logger = require('@/system/logger').logger;
+    const logger = require('@/lib/utils/logger').logger;
     const cat = logger.category('navigation');
 
     switch (level) {

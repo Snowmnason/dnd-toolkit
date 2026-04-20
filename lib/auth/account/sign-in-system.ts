@@ -211,6 +211,15 @@ export async function performSignIn(
     result.redirect = setup.redirect;
     if (setup.errors.length > 0) result.errors?.push(...(setup.errors as SignInError[]));
 
+    // If redirect determination failed, treat as sign-in failure so the UI
+    // shows an inline error instead of navigating to a fallback route.
+    const hasRedirectError = setup.errors.some(e => e.phase === 'redirect');
+    if (hasRedirectError || !result.redirect) {
+      result.success = false;
+      logger.category('auth').warn('Sign-in: Post-auth setup failed to determine redirect — treating as failure');
+      return result;
+    }
+
     logger.category('auth').info(`Sign-in: Complete. Redirect: ${result.redirect}`);
     return result;
   } catch (error) {

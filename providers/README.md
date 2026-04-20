@@ -15,46 +15,50 @@ ScaleProvider (responsive sizing, fonts, breakpoints)
   ↓
 PlatformProvider (web/native platform detection)
   ↓
+ViewportProvider (viewport dimensions, responsive breakpoints)
+  ↓
+ScreenProvider (screen state, focus management)
+  ↓
 SubscriptionProvider (premium subscription state)
   ↓
 AppParamsStableProvider (userId, connectedWorlds)
   ↓
 AppParamsVolatileProvider (worldId, userRole)
   ↓
-NotificationProvider (toast/snackbar notifications)
+JobOperationProvider (background job state)
+  ↓
+DropdownPortalProvider (dropdown positioning)
+  ↓
+TooltipPortalProvider (tooltip positioning)
+  ↓
+overlay-provider (modal overlays)
   ↓
 RootLayout + Navigation Stack
 ```
 
-## Providers
+## Core Providers
 
-### ScaleProvider
+### AppKernelProvider
 
-**File:** `ScaleProvider.tsx`
+**File:** `AppKernelProvider.tsx`
 
-Provides responsive sizing tokens (fonts, spacing, padding) that adapt to screen size. Listens to `Dimensions`, recalculates on resize, memoizes tokens.
+Bootstraps the app kernel, manages initialization phases, and coordinates startup sequence. Handles font loading, image preloading, theme initialization, and network setup.
 
-**Export:** `useScale()` hook
+**Export:** `useAppKernel()` hook
 
 **Example:**
 ```tsx
-import { useScale } from "@/providers/ScaleProvider";
+import { useAppKernel } from "@/providers/AppKernelProvider";
 
-export function MyComponent() {
-  const S = useScale();
-  return (
-    <View style={{ paddingTop: S.space.md, fontSize: S.font.body1 }}>
-      Responsive content
-    </View>
-  );
+export function AppLoader() {
+  const { phases, isReady } = useAppKernel();
+  return isReady ? <MainApp /> : <SplashScreen phase={phases.current} />;
 }
 ```
 
-**Related:** `theme/utils/sizing.ts` (sizes defined here)
+**Related:** `lib/kernel/` (kernel phases and initialization logic)
 
----
-
-### ThemeProvider ★ Moved from `/theme`
+### ThemeProvider
 
 **File:** `ThemeProvider.tsx`
 
@@ -81,9 +85,31 @@ export function MyComponent() {
 
 **Related:** `theme/` folder (token definitions, theme families)
 
----
+### ScaleProvider
 
-### PlatformProvider ★ Moved from `/contexts`
+**File:** `ScaleProvider.tsx`
+
+Provides responsive sizing tokens (fonts, spacing, padding) that adapt to screen size. Listens to `Dimensions`, recalculates on resize, memoizes tokens.
+
+**Export:** `useScale()` hook
+
+**Example:**
+```tsx
+import { useScale } from "@/providers/ScaleProvider";
+
+export function MyComponent() {
+  const S = useScale();
+  return (
+    <View style={{ paddingTop: S.space.md, fontSize: S.font.body1 }}>
+      Responsive content
+    </View>
+  );
+}
+```
+
+**Related:** `theme/utils/sizing.ts` (sizes defined here)
+
+### PlatformProvider
 
 **File:** `PlatformProvider.tsx`
 
@@ -101,9 +127,45 @@ export function ResponsiveComponent() {
 }
 ```
 
----
+### ViewportProvider
 
-### AppParamsStableProvider ★ Moved from `/contexts`
+**File:** `ViewportProvider.tsx`
+
+Manages viewport dimensions and responsive breakpoints. Provides real-time viewport size updates with debouncing.
+
+**Export:** `useViewport()` hook
+
+**Example:**
+```tsx
+import { useViewport } from "@/providers/ViewportProvider";
+
+export function ResponsiveLayout() {
+  const { width, height, breakpoint } = useViewport();
+  return <View style={{ width, height }}>{/* responsive content */}</View>;
+}
+```
+
+### ScreenProvider
+
+**File:** `ScreenProvider.tsx`
+
+Manages screen focus state and navigation context. Tracks current screen and provides focus management utilities.
+
+**Export:** `useScreen()` hook
+
+**Example:**
+```tsx
+import { useScreen } from "@/providers/ScreenProvider";
+
+export function ScreenComponent() {
+  const { isFocused, screenId } = useScreen();
+  return isFocused ? <ActiveContent /> : <InactiveContent />;
+}
+```
+
+## Data Providers
+
+### AppParamsStableProvider
 
 **File:** `AppParamsStableProvider.tsx`
 
@@ -124,9 +186,7 @@ export function WorldSelector() {
 
 **Related:** `lib/auth/auth-state.ts` (world access verification)
 
----
-
-### AppParamsVolatileProvider ★ Moved from `/contexts`
+### AppParamsVolatileProvider
 
 **File:** `AppParamsVolatileProvider.tsx`
 
@@ -144,8 +204,6 @@ export function WorldInfo() {
   return <Text>{role} in world {worldId}</Text>;
 }
 ```
-
----
 
 ### SubscriptionProvider
 
@@ -169,7 +227,81 @@ export function PremiumFeature() {
 
 **Future:** Fetch from Supabase/Stripe, polling, error handling.
 
----
+### JobOperationProvider
+
+**File:** `JobOperationProvider.tsx`
+
+Manages background job operations and their UI state. Provides progress tracking and cancellation for long-running operations.
+
+**Export:** `useJobOperation()` hook
+
+**Example:**
+```tsx
+import { useJobOperation } from "@/providers/JobOperationProvider";
+
+export function JobRunner() {
+  const { runningJobs, cancelJob } = useJobOperation();
+  return <>{runningJobs.map(job => <JobProgress key={job.id} job={job} />)}</>;
+}
+```
+
+**Related:** `system/jobs/` (job queue system)
+
+## UI Providers
+
+### DropdownPortalProvider
+
+**File:** `DropdownPortalProvider.tsx`
+
+Manages dropdown positioning and portal rendering. Handles z-index stacking and positioning calculations for dropdown menus.
+
+**Export:** `useDropdownPortal()` hook
+
+**Example:**
+```tsx
+import { useDropdownPortal } from "@/providers/DropdownPortalProvider";
+
+export function DropdownMenu() {
+  const { portalRef, position } = useDropdownPortal();
+  return <Portal ref={portalRef} style={position}>...</Portal>;
+}
+```
+
+### TooltipPortalProvider
+
+**File:** `TooltipPortalProvider.tsx`
+
+Manages tooltip positioning and portal rendering. Handles tooltip display timing and positioning relative to trigger elements.
+
+**Export:** `useTooltipPortal()` hook
+
+**Example:**
+```tsx
+import { useTooltipPortal } from "@/providers/TooltipPortalProvider";
+
+export function TooltipTrigger() {
+  const { showTooltip, hideTooltip } = useTooltipPortal();
+  return <Touchable onPress={showTooltip}>Hover me</Touchable>;
+}
+```
+
+### overlay-provider
+
+**File:** `overlay-provider.tsx`
+
+Manages modal overlays and backdrop rendering. Handles overlay stacking, backdrop blur, and dismissal gestures.
+
+**Export:** `useOverlay()` hook
+
+**Example:**
+```tsx
+import { useOverlay } from "@/providers/overlay-provider";
+
+export function ModalContainer() {
+  const { isVisible, backdropOpacity } = useOverlay();
+  return isVisible ? <Modal backdropOpacity={backdropOpacity} /> : null;
+}
+```
 
 ## Creating a Custom Provider
 

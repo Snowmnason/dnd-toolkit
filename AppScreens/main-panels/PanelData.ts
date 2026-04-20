@@ -7,7 +7,10 @@ export interface PanelItem {
 export interface PanelConfig {
   key: string
   title: string
-  icon: string               // Placeholder icon emoji
+  /** Ionicons icon name (filled). Render outline variant by appending '-outline' when inactive. */
+  iconName: string
+  /** Canonical mobile panel-entry route for this panel (e.g., '/main/characters') */
+  mobileRoute: string
   items: PanelItem[]
   toneVariant?: 'base' | 'accent' | 'surface' | 'alt' // optional color variant
   image?: string | null      // optional background image URL
@@ -17,7 +20,8 @@ export const panelConfigs: PanelConfig[] = [
   {
     key: 'characters',
     title: 'Characters & NPCs',
-    icon: '👥',
+    iconName: 'people',
+    mobileRoute: '/main/characters',
     image: null,
     items: [
       { name: 'Character Sheets', route: 'characters-npcs/character-sheets' },
@@ -29,7 +33,8 @@ export const panelConfigs: PanelConfig[] = [
   {
     key: 'items',
     title: 'Items & Treasure',
-    icon: '💎',
+    iconName: 'diamond',
+    mobileRoute: '/main/items',
     image: null,
     items: [
       { name: 'Inventory', route: 'items-treasure/inventory' },
@@ -41,7 +46,8 @@ export const panelConfigs: PanelConfig[] = [
   {
     key: 'world',
     title: 'World & Exploration',
-    icon: '🗺️',
+    iconName: 'map',
+    mobileRoute: '/main/world',
     image: null,
     items: [
       { name: 'Dungeon/Town Creator', route: 'world-exploration/dungeon-town-creator' },
@@ -53,7 +59,8 @@ export const panelConfigs: PanelConfig[] = [
   {
     key: 'combat',
     title: 'Combat & Events',
-    icon: '⚔️',
+    iconName: 'flash',
+    mobileRoute: '/main/combat',
     image: null,
     items: [
       { name: 'Encounter Builder', route: 'combat-events/encounter-builder' },
@@ -65,7 +72,8 @@ export const panelConfigs: PanelConfig[] = [
   {
     key: 'story',
     title: 'Story & Notes',
-    icon: '📖',
+    iconName: 'book',
+    mobileRoute: '/main/story',
     image: null,
     items: [
       { name: 'Quest Log', route: 'story-notes/quest-log' },

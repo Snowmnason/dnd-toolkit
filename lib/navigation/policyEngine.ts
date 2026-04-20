@@ -102,8 +102,7 @@ export class PolicyEngine {
     if (overrides?.forcePublic) {
       logger.category('navigation').debug('Policy: forcePublic override active');
       return 'allow_all';
-    }
-    if (overrides?.forceAdmin) {
+    }    if (overrides?.forceAdmin) {
       logger.category('navigation').debug('Policy: forceAdmin override active');
       return 'require_admin';
     }
@@ -114,6 +113,12 @@ export class PolicyEngine {
     if (overrides?.forceAuth) {
       logger.category('navigation').debug('Policy: forceAuth override active');
       return 'require_auth';
+    }
+
+    // Root route is always public (welcome/splash screen, before Expo Router resolves segments)
+    if (toRoute === '/' || toRoute === '') {
+      logger.category('navigation').debug('Policy: root route — always public');
+      return 'allow_all';
     }
 
     // Mode-based decision:
@@ -127,8 +132,9 @@ export class PolicyEngine {
       if (isPublic) {
         return 'allow_all';
       }
-      // Routes containing 'world' require world-level permission verification
-      if (toRoute.toLowerCase().includes('world')) {
+      // Routes under /main/ that reference a world require world-level permission verification.
+      // select/world-selection and other select/ routes are transitional screens that only need auth.
+      if (toRoute.toLowerCase().startsWith('/main') && toRoute.toLowerCase().includes('world')) {
         return 'require_permission';
       }
       return 'require_auth';
@@ -141,8 +147,9 @@ export class PolicyEngine {
     if (!isProtected) {
       return 'allow_all';
     }
-    // Routes containing 'world' require world-level permission verification
-    if (toRoute.toLowerCase().includes('world')) {
+    // Routes under /main/ that reference a world require world-level permission verification.
+    // select/world-selection and other select/ routes are transitional screens that only need auth.
+    if (toRoute.toLowerCase().startsWith('/main') && toRoute.toLowerCase().includes('world')) {
       return 'require_permission';
     }
     return 'require_auth';

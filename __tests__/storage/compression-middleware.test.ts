@@ -31,7 +31,7 @@ vi.mock("@/config", () => ({
 
 // Provide a simple compression provider that is identity for compress/decompress
 vi.mock(
-  "@/lib/middleware/storage/compression/compression-provider",
+  "@/middleware/storage/compression/compression-provider",
   () => ({
     getCompressionProvider: () => ({
       compress: async (data: Uint8Array) => data,

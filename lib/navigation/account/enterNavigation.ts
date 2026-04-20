@@ -124,10 +124,10 @@ export function determineEnterRedirect(
 
       if (stalenessPhase === 'stale') {
         const decision = {
-          redirect: '/welcome',
+          redirect: '/',
           reason: 'Stale data restored (7-30 days old)',
         };
-        logger.category('auth').info('Enter nav (re-auth bootstrap): Stale data, redirecting to welcome', decision);
+        logger.category('auth').info('Enter nav (re-auth bootstrap): Stale data, redirecting to root', decision);
         return decision;
       }
 
@@ -201,9 +201,9 @@ export function determineEnterRedirect(
  */
 export function determineEnterErrorRedirect(flowType: EntryFlowType): NavigationDecision {
   const decision = {
-    redirect: '/welcome',
+    redirect: '/login/sign-in',
     reason: `Error determining ${flowType} redirect`,
   };
-  logger.category('auth').warn(`Enter nav error (${flowType}): Redirecting to welcome`, decision);
+  logger.category('auth').warn(`Enter nav error (${flowType}): Redirecting to sign-in`, decision);
   return decision;
 }

@@ -1,26 +1,25 @@
 import {
   AuthActionGroup,
-  AuthBackButtonContainer,
   AuthBodyFooter,
   AuthButton,
-  AuthButtonBack,
   AuthButtonSecondary,
   AuthCaption,
   AuthError,
   AuthForm,
-  AuthModal,
   AuthRoot,
   AuthSubTitle,
   AuthTitle,
   FormAuthInput,
 } from "@/components/auth_components";
-import { useNavigation } from "@/hooks/navigation";
+import { useModal } from "@/contexts";
 import { useSignUpFlow } from "@/hooks/auth";
-import { useRef } from "react";
+import { useNavigation } from "@/hooks/navigation";
+import { useEffect, useRef } from "react";
 import { TextInput } from "react-native";
 
 export default function SignUpScreen() {
   const navigate = useNavigation();
+  const { openModal, closeModal } = useModal();
 
   // Refs for keyboard navigation
   const passwordInputRef = useRef<TextInput>(null);
@@ -28,17 +27,40 @@ export default function SignUpScreen() {
 
   const { state, form, handlers } = useSignUpFlow();
 
+  // Manage email-exists modal via context
+  useEffect(() => {
+    if (state.modal === 'email-exists') {
+      openModal('login-message', {
+        heading: 'Account Already Exists! 🤔',
+        message: `An account with ${form.email} already exists. Would you like to sign in instead?`,
+        buttons: [
+          {
+            text: 'Cancel',
+            onPress: () => {
+              closeModal();
+              handlers.dismissModal();
+            },
+            variant: 'cancel' as const,
+          },
+          {
+            text: 'Sign In',
+            onPress: () => {
+              closeModal();
+              handlers.dismissModal();
+              navigate.to('/login/sign-in');
+            },
+            variant: 'primary' as const,
+          },
+        ],
+      });
+    } else if (state.modal === null) {
+      closeModal();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.modal, form.email, openModal, closeModal, handlers]);
+
   return (
     <AuthRoot>
-      {/* Back Button */}
-      <AuthBackButtonContainer>
-        <AuthButtonBack
-          text="← Back"
-          onPress={() => navigate.replace("/")}
-          disabled={state.loading}
-        />
-      </AuthBackButtonContainer>
-
       {/* Header */}
       <AuthTitle>Create Account</AuthTitle>
 
@@ -116,29 +138,6 @@ export default function SignUpScreen() {
       <AuthCaption>
         © 2025 The Snow Post · Forged for storytellers & adventurers
       </AuthCaption>
-
-      {/* Email Already Exists Modal */}
-      <AuthModal
-        visible={state.modal === 'email-exists'}
-        onClose={handlers.dismissModal}
-        title="Account Already Exists! 🤔"
-        message={`An account with ${form.email} already exists. Would you like to sign in instead?`}
-        buttons={[
-          {
-            text: "Cancel",
-            onPress: handlers.dismissModal,
-            variant: "cancel",
-          },
-          {
-            text: "Sign In",
-            onPress: () => {
-              handlers.dismissModal();
-              navigate.to("/login/sign-in");
-            },
-            variant: "primary",
-          },
-        ]}
-      />
     </AuthRoot>
   );
 }

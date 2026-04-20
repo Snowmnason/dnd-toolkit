@@ -50,6 +50,8 @@ export interface ButtonProps {
   gradientIntensity?: number
   gradientTransitionPoint?: number
   minWidth?: number | string
+  /** Text and icon alignment inside the button. Defaults to 'center'. Use 'left' for nav rows. */
+  align?: 'left' | 'center'
   style?: StyleProp<ViewStyle>
   onPress?: () => void
   children?: React.ReactNode
@@ -171,6 +173,7 @@ export function Button(props: ButtonProps) {
     gradientIntensity = 25,
     gradientTransitionPoint = 80,
     minWidth,
+    align = 'center',
     style,
     onPress,
     children,
@@ -299,7 +302,7 @@ export function Button(props: ButtonProps) {
       )}
 
       {text ? (
-        <Animated.View style={[{ flex: 1, height: '100%', justifyContent: 'center', alignItems: 'center', padding: S.space.xs }, textFadeStyle]}>
+        <Animated.View style={[{ flex: 1, height: '100%', justifyContent: 'center', alignItems: align === 'left' ? 'flex-start' : 'center', padding: S.space.xs }, textFadeStyle]}>
           <ButtonText
             numberOfLines={1}
             ellipsizeMode="clip"
@@ -360,7 +363,7 @@ export function Button(props: ButtonProps) {
               overflow: 'hidden',
               flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'center',
+              justifyContent: align === 'left' ? 'flex-start' : 'center',
               //...getShadowStyle('softer'),
             }}
           >

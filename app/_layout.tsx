@@ -19,16 +19,17 @@ import {
 import { OverlayProvider, useChrome } from "@/contexts";
 // Trigger modal registration side effects — must run before any openModal() call.
 // Imported here (leaf module) instead of modal-context.tsx to avoid circular dependency.
+import { PanelNavDrawer } from "@/AppScreens/main-panels/PanelNavDrawer";
 import "@/components/modals/register-all-modals";
 import { Analytics, sessionManager } from "@/hooks/analytics";
 import { useAuthLinkObserver } from "@/hooks/auth";
 import { executeRecoveryAction, getSafeModeNavigationTarget } from "@/hooks/error";
 import { useClearSafeMode } from "@/hooks/error/use-safe-mode";
 import { useAppKernel, useKernelLoadingSync, useSyncSplash } from "@/hooks/kernel";
-import { useNavigation, usePanelNavigation, useRouteChangeObserver, useRouteConfig } from "@/hooks/navigation";
+import { useBootstrapRouteGuard, useNavigation, usePanelNavigation, useRouteChangeObserver, useRouteConfig } from "@/hooks/navigation";
+import { useAppParamsSync } from "@/hooks/provider/use-app-params-sync";
 import { useChromeBottom } from "@/hooks/provider/use-chrome-bottom";
 import { useChromePolicy } from "@/hooks/provider/use-chrome-policy";
-import { useAppParamsSync } from "@/hooks/provider/use-app-params-sync";
 import { logger, useInjectToastSystem } from "@/hooks/utils";
 import {
   AppKernelProvider,
@@ -101,8 +102,14 @@ function RootLayoutContent() {
   const panelNav = usePanelNavigation();
   const navigate = useNavigation();
 
-  // Route change observer — catches deep links, URL edits, back button
-  // Mounted unconditionally; starts observing once kernel.phases.appReady gates the tree
+  // Bootstrap route guard (web-only) — validates the initial route on fresh page load.
+  // Runs once when appReady fires, before the UIBlocker drops. Handles deep links, URL
+  // edits, browser back/forward (all cause full remount on web with static export).
+  useBootstrapRouteGuard(kernel.phases.appReady);
+
+  // Route change observer — runtime fallback for in-memory route changes.
+  // On web, most route changes cause a full remount (handled by bootstrap guard above).
+  // This catches the rare in-memory change and native deep links that don't remount.
   useRouteChangeObserver();
 
   // Auth link observer — intercepts email redirect URLs (signup, password reset, invites)
@@ -265,7 +272,13 @@ function RootLayoutContent() {
             {/* Content area: sidebar + stack in row layout on desktop */}
             <View style={{ flex: 1, flexDirection: Platform.OS === 'web' ? 'row' : 'column' }}>
               {/* Desktop sidebar — inline, always visible, animated width (feature-flagged) */}
-              {Platform.OS === 'web' && shouldRenderNavDrawer && <NavDrawerLayer mode="expandable" />}
+              {Platform.OS === 'web' && shouldRenderNavDrawer && (
+                <NavDrawerLayer
+                  mode="expandable"
+                  childrenClosed={<PanelNavDrawer collapsed />}
+                  childrenOpen={<PanelNavDrawer />}
+                />
+              )}
 
               {/* Stack container - flex-grows to fill remaining space */}
               <View style={{ flex: 1 }}>

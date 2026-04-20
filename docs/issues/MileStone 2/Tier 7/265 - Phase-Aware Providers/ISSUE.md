@@ -424,8 +424,8 @@ With Track A in place, Effect 1 will not run until both `servicesReady` is true 
     try {
       const { logger } = await import("@/lib/utils");
       const { getJobQueue } = await import("@/system/Jobs/background-job-queue");
-      const { FastCacheAdapter } = await import("@/lib/middleware/jobs/adapters/fastcache-adapter");
-      const { SecureStorageAdapter } = await import("@/lib/middleware/jobs/adapters/secure-storage-adapter");
+      const { FastCacheAdapter } = await import("@/middleware/jobs/adapters/fastcache-adapter");
+      const { SecureStorageAdapter } = await import("@/middleware/jobs/adapters/secure-storage-adapter");
 
       // Step 1: Initialize queue infrastructure (create adapters, inject into singleton)
       const defaultAdapter = new FastCacheAdapter();

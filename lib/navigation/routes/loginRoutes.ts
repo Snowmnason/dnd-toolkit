@@ -4,12 +4,12 @@ import type { RouteConfig } from '../navigationConfig'
 export const LOGIN_ROUTES: RouteConfig[] = [
   {
     path: '/',
+    semanticId: 'welcome',
     title: 'D&D Toolkit',
     analyticsName: 'root_index',
   },
   {
     path: '/login',
-    aliases: ['/login/welcome'],
     title: 'Welcome',
     analyticsName: 'login_welcome',
   },

@@ -53,7 +53,7 @@ System Adapter (pure transport)
 Execute API request with middleware checks.
 
 ```typescript
-import { executeRequest } from '@/lib/middleware/api';
+import { executeRequest } from '@/middleware/api';
 
 const result = await executeRequest(
   'get-user-profile',
@@ -70,7 +70,7 @@ const result = await executeRequest(
 #### Auth Service
 
 ```typescript
-import { getAuthProvider, isAuthReady } from '@/lib/middleware/services';
+import { getAuthProvider, isAuthReady } from '@/middleware/services';
 
 // Check if auth operations can proceed
 if (isAuthReady()) {
@@ -82,7 +82,7 @@ if (isAuthReady()) {
 #### Database Service
 
 ```typescript
-import { getDatabaseProvider, isDatabaseReady } from '@/lib/middleware/services';
+import { getDatabaseProvider, isDatabaseReady } from '@/middleware/services';
 
 // Check if database operations can proceed
 if (isDatabaseReady()) {

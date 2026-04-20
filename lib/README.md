@@ -109,6 +109,28 @@ import { FeatureFlagsManager } from '@/lib/feature-flags';
 const enabled = await FeatureFlagsManager.isEnabled('newUI');
 ```
 
+#### `RealtimeManager` (`lib/realtime/`)
+
+Real-time event subscriptions and live updates.
+
+```typescript
+class RealtimeManager {
+  static subscribe(channel: string, handler: RealtimeHandler): () => void
+  static unsubscribe(channel: string, handler: RealtimeHandler): void
+  static publish(channel: string, payload: any): void
+  static getConnectedChannels(): string[]
+}
+```
+
+**Example:**
+```typescript
+import { RealtimeManager } from '@/lib/realtime';
+
+const unsubscribe = RealtimeManager.subscribe('world_updates', (payload) => {
+  console.log('World updated:', payload);
+});
+```
+
 ### Utility Modules
 
 #### Logger (`lib/utils/`)

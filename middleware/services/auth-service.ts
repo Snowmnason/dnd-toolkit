@@ -19,7 +19,6 @@ import { reportFault } from '@/lib/error';
 import { logger } from '@/lib/utils/logger';
 import { ERROR_CODES } from '@/maps/ERROR_CODES';
 import { AppError } from '@/pure-algo-immutables/app-error';
-import { DegradeCapability } from '@/type-definitions/degrade';
 import { ConnectionQuality, NetworkDetection } from '@/system/Network';
 import {
     isServiceReady,
@@ -31,6 +30,7 @@ import {
     type DatabaseProvider,
     type Session,
 } from '@/system/Services';
+import { DegradeCapability } from '@/type-definitions/degrade';
 // Note: Low-level database provider access is now abstracted.
 // For raw client access, use isDatabaseProviderConfigured() + getDatabaseProviderRawClient().
 // These functions safely check provider readiness without triggering unnecessary initialization.
@@ -338,6 +338,10 @@ export async function authSignInWithIdToken(
 export async function initializeAuthStrategies(): Promise<void> {
     const { AuthLayer, createUserAuthStrategy, createPublicAuthStrategy, createInviteAuthStrategy } = await import('@/lib/auth');
     
+    // Clear existing strategies first to support idempotent re-initialization
+    // (e.g., React error boundary remount, HMR, or kernel retry)
+    AuthLayer.clearAuthStrategies();
+
     AuthLayer.registerAuthStrategy('user', createUserAuthStrategy());
     AuthLayer.registerAuthStrategy('public', createPublicAuthStrategy());
     AuthLayer.registerAuthStrategy('invite', createInviteAuthStrategy());

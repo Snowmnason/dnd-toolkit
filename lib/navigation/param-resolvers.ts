@@ -12,8 +12,8 @@
  */
 
 import { AuthStateManager } from '@/lib/auth/auth-state';
+import { StorageManager } from '@/lib/storage';
 import { STORAGE_KEYS } from '@/maps/storage-keys';
-import { retrieveValue } from '@/middleware/storage';
 
 /** A single deferred param resolver: async, graceful, returns undefined on failure. */
 export type ParamResolver = () => Promise<string | undefined>;
@@ -26,8 +26,8 @@ async function resolveCurrentUserId(): Promise<string | undefined> {
 }
 
 async function resolveCurrentWorldId(): Promise<string | undefined> {
-  const result = await retrieveValue<string>(STORAGE_KEYS.LAST_SELECTED_WORLD);
-  return result.success && result.data != null ? result.data : undefined;
+  const raw = await StorageManager.getRaw(STORAGE_KEYS.LAST_SELECTED_WORLD);
+  return raw ?? undefined;
 }
 
 /** Default param resolver registry used by navManager for route navigation. */

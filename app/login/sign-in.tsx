@@ -1,15 +1,15 @@
 import {
-  AuthActionGroup, AuthBackButtonContainer,
+  AuthActionGroup,
   AuthBodyFooter,
-  AuthButton, AuthButtonBack,
+  AuthButton,
   AuthButtonSecondary, AuthCaption, AuthError, AuthForm, AuthRoot, AuthSubTitle, AuthTitle,
   FormAuthInput
 } from '@/components/auth_components';
-import { useAuthActions, useAuthFlow, useCurrentSession } from "@/hooks/auth";
+import { useAuthActions, useAuthFlow } from "@/hooks/auth";
 import { useNavigation } from '@/hooks/navigation';
 import { logger } from "@/hooks/utils";
 import { useScale } from '@/theme';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { TextInput } from 'react-native';
 
 export default function SignInScreen() {
@@ -22,22 +22,10 @@ export default function SignInScreen() {
   const passwordInputRef = useRef<TextInput>(null);
 
   const { state, form } = useAuthFlow();
-  const { isReady, isAuthenticated } = useCurrentSession();
 
-  // Verify authentication status on mount using proper hook boundaries
-  useEffect(() => {
-    // Only run after kernel is ready and session has resolved
-    if (!isReady) return;
-
-    logger.category('auth').debug('Sign-in screen: Verifying authentication status');
-
-    // If already authenticated, redirect away
-    // (useAuthGuard in layout will also handle this)
-    if (isAuthenticated) {
-      logger.category('auth').info('Sign-in screen: User authenticated, redirecting to world selection');
-      navigate.replace('/select/world-selection');
-    }
-  }, [isReady, isAuthenticated, navigate]);
+  // Auth redirect for authenticated users is handled by useBootstrapRouteGuard
+  // in the root layout. No screen-level redirect needed here — doing so caused
+  // infinite loops on web (replace → remount → re-detect auth → replace again).
 
   const handleResendConfirmationFromError = async (email: string) => {
     setIsResendingEmail(true);
@@ -58,16 +46,7 @@ export default function SignInScreen() {
 
   return (
     <AuthRoot>
-      {/* 🧭 Back Button*/}
-      <AuthBackButtonContainer>
-        <AuthButtonBack
-          text="← Back"
-          onPress={() => navigate.replace('/')}
-          disabled={state.loading}
-        />
-      </AuthBackButtonContainer>
-
-      {/* 🧙 Header */}
+      {/*  Header */}
       <AuthTitle>Welcome Back</AuthTitle>
 
       <AuthSubTitle fontSize='$para'>Sign in to access your saved worlds and characters</AuthSubTitle>

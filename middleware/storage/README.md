@@ -202,7 +202,7 @@ if (await QueryCache.isApproachingCapacity()) {
 Get compression effectiveness statistics.
 
 ```typescript
-import { getCompressionStats } from "@/lib/middleware/storage/compression";
+import { getCompressionStats } from "@/middleware/storage/compression";
 
 const stats = getCompressionStats();
 // Returns: totalOperations, bytesCompressed, bytesSaved, avgCompressionRatio
@@ -213,7 +213,7 @@ const stats = getCompressionStats();
 Manually compress data for storage.
 
 ```typescript
-import { compressData } from "@/lib/middleware/storage/compression";
+import { compressData } from "@/middleware/storage/compression";
 
 const compressed = await compressData(largeJsonString, { algorithm: 'gzip' });
 ```
@@ -223,7 +223,7 @@ const compressed = await compressData(largeJsonString, { algorithm: 'gzip' });
 #### Analytics Storage Service
 
 ```typescript
-import { analyticsStorageService } from "@/lib/middleware/storage";
+import { analyticsStorageService } from "@/middleware/storage";
 
 await analyticsStorageService.storeEvent('user_action', eventData);
 ```
@@ -231,7 +231,7 @@ await analyticsStorageService.storeEvent('user_action', eventData);
 #### Performance Storage Service
 
 ```typescript
-import { performanceStorageService } from "@/lib/middleware/storage";
+import { performanceStorageService } from "@/middleware/storage";
 
 await performanceStorageService.recordMetric('api_response_time', duration);
 ```

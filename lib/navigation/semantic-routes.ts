@@ -1,47 +1,84 @@
 /**
  * Semantic Route Resolver
  *
- * Resolves semantic route identifiers (e.g., 'default') to concrete app routes based on
- * application context (auth state, etc.).
+ * Resolves semantic route identifiers to concrete app routes based on
+ * application context (auth state, route config, etc.).
+ *
+ * **How it works:**
+ * - Special-case routes (e.g., `'default'`) have built-in resolution logic.
+ * - All other semantic IDs are resolved by matching against `semanticId` fields
+ *   in the route config registry (`ROUTE_CONFIGS`). Add `semanticId: 'sign-in'`
+ *   to a `RouteConfig` entry to make `navigate.to('sign-in')` work.
  *
  * **Semantic Routes:**
- * - `'default'` (fallback target) — Binary auth-aware route for navigation errors and decisions
- *   - Unauthenticated → `/` (welcome screen)
- *   - Authenticated → `/select/world-selection` (world picker)
- * - Future: Additional semantic routes with richer context-awareness (e.g., 'home', 'settings')
+ * - `'default'` — Auth-aware fallback: unauthenticated → `/`, authenticated → `/select/world-selection`
+ * - `'welcome'` — Landing/welcome screen
+ * - `'sign-in'` — Sign-in screen
+ * - `'sign-up'` — Account creation screen
+ * - `'forgot-password'` — Forgot password screen
+ * - `'world-selection'` — World picker
+ * - `'settings'` — User settings
+ * - `'home'` — Main app entry point (desktop landing or mobile panel)
  *
  * **Usage:**
  * ```typescript
+ * navigate.to('sign-in')        // resolves via semanticId in route config
+ * navigate.to('/login/sign-in') // resolves via concrete path (unchanged)
+ *
  * const concreteRoute = await resolveSemanticRoute('default');
  * // Returns: '/' if not signed in, '/select/world-selection' if signed in
- *
- * // Or check directly:
- * const route = await resolveDefaultRoute();
  * ```
  *
  * **When to Use:**
  * - Navigation failure fallback (e.g., deep link error, invalid route)
  * - Auth-state decision routing (e.g., token-based redirects, post-logout)
+ * - Component navigation by meaningful name (e.g., button that goes to 'sign-in')
  * - Error boundary recovery (e.g., safe mode fallback)
  *
  * **Integration Points:**
  * - Called from `lib/navigation/navManager.ts` early in navigation pipeline
  * - Called from error handlers (e.g., `hooks/navigation/use-navigation.ts` failure callback)
  * - Must resolve synchronously or quickly (used in hot paths)
+ *
+ * **Adding a new semantic ID:**
+ * 1. Add the ID string to `SEMANTIC_ROUTE_IDS` below.
+ * 2. Add `semanticId: '<your-id>'` to the matching `RouteConfig` entry in `routes/`.
+ * 3. No changes to `navManager.ts` or `use-navigation.ts` required.
  */
 
-import { getCurrentSession } from '@/lib/auth/auth-manager';
+import { ROUTE_CONFIGS } from '@/lib/navigation/navigationConfig';
 import { logger } from '@/lib/utils';
 
-type SemanticRoute = 'default';
+/**
+ * All valid semantic route identifiers.
+ * Single source of truth — `SemanticRoute` type and runtime set are both derived from this.
+ * Add new IDs here, then add `semanticId: '<id>'` to the matching RouteConfig.
+ */
+const SEMANTIC_ROUTE_IDS = [
+  'default',
+  'welcome',
+  'sign-in',
+  'sign-up',
+  'forgot-password',
+  'world-selection',
+  'settings',
+  'home',
+] as const;
+
+export type SemanticRoute = (typeof SEMANTIC_ROUTE_IDS)[number];
+
+/** O(1) runtime check set — derived from SEMANTIC_ROUTE_IDS */
+const SEMANTIC_ROUTE_SET = new Set<string>(SEMANTIC_ROUTE_IDS);
 
 /**
  * Resolves a semantic route identifier to a concrete app route.
- * Determines target route based on current auth state.
  *
- * @param target - The semantic route identifier (e.g., 'default')
- * @returns Concrete route path (e.g., '/', '/select/world-selection')
- * @throws If resolution fails or target is unknown
+ * - `'default'` uses built-in auth-aware logic.
+ * - All other IDs are resolved by looking up `semanticId` in `ROUTE_CONFIGS`.
+ *
+ * @param target - The semantic route identifier (e.g., 'sign-in')
+ * @returns Concrete route path (e.g., '/login/sign-in')
+ * @throws If no matching route config is found for the target
  */
 export async function resolveSemanticRoute(target: SemanticRoute): Promise<string> {
   try {
@@ -49,10 +86,15 @@ export async function resolveSemanticRoute(target: SemanticRoute): Promise<strin
       return resolveDefaultRoute();
     }
 
-    // Unknown semantic route
-    const errMsg = `Unknown semantic route: ${target}`;
-    logger.category('navigation').warn(errMsg);
-    throw new Error(errMsg);
+    const config = ROUTE_CONFIGS.find((c) => c.semanticId === target);
+
+    if (!config) {
+      const errMsg = `No route config found for semantic route: '${target}'. Add semanticId: '${target}' to the matching RouteConfig entry.`;
+      logger.category('navigation').warn(errMsg);
+      throw new Error(errMsg);
+    }
+
+    return config.path;
   } catch (error) {
     logger
       .category('navigation')
@@ -72,6 +114,7 @@ export async function resolveSemanticRoute(target: SemanticRoute): Promise<strin
  */
 async function resolveDefaultRoute(): Promise<string> {
   try {
+    const { getCurrentSession } = require('@/lib/auth/auth-manager') as typeof import('@/lib/auth/auth-manager');
     const session = await getCurrentSession();
 
     if (session) {
@@ -93,12 +136,12 @@ async function resolveDefaultRoute(): Promise<string> {
 }
 
 /**
- * Checks if a route path is a semantic route (not a concrete route).
+ * Checks if a route string is a semantic route identifier (not a concrete path).
  * Useful for determining if resolution is needed before other navigation steps.
  *
- * @param route - The route path to check
- * @returns true if route is a semantic identifier, false if it's a concrete path
+ * @param route - The route string to check
+ * @returns true if route is a known semantic identifier, false if it's a concrete path
  */
-export function isSemanticRoute(route: string): boolean {
-  return route === 'default';
+export function isSemanticRoute(route: string): route is SemanticRoute {
+  return SEMANTIC_ROUTE_SET.has(route);
 }

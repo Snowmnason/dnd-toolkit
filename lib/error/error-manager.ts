@@ -26,7 +26,7 @@
 
 // Lazy import to break circular dependency with analytics
 function getErrorService() {
-  return require("@/lib/middleware/services/error-service") as typeof import("@/middleware/services/error-service");
+  return require("@/middleware/services/error-service") as typeof import("@/middleware/services/error-service");
 }
 
 // ─── Types ─────────────────────────────────────────────────────────

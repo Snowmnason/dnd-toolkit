@@ -85,7 +85,7 @@ function DesktopExpandableSidebar({
   const S = useScale()
 
   const COLLAPSED_WIDTH = S.space.lg * 2.5 // ~72px
-  const EXPANDED_WIDTH = S.space.lg * 12   // ~240px
+  const EXPANDED_WIDTH = S.space.lg * 8   // ~240px
 
   const animatedWidth = useSharedValue(isExpanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH)
 

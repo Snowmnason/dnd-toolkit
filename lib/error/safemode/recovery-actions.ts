@@ -12,8 +12,6 @@
  * - REINSTALL: Guides user to uninstall and reinstall app
  */
 
-import { Analytics, Performance } from "@/lib/analytics";
-import { AuthStateManager } from "@/lib/auth";
 import { getAllRouteConfigs } from "@/lib/navigation";
 import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils";
@@ -21,6 +19,16 @@ import { STORAGE_KEYS } from "@/maps";
 import { QueryCache } from "@/middleware/storage";
 import { FastCache } from "@/system/Storage";
 import { RecoveryAction, SafeModeReason, SafeModeState } from "./safe-mode";
+
+// Lazy imports — breaks circular dependency: lib/error ↔ lib/analytics
+function getAnalytics() {
+  return require("@/lib/analytics") as typeof import("@/lib/analytics");
+}
+
+// Lazy import — breaks circular dependency: lib/error ↔ lib/auth
+function getAuth() {
+  return require("@/lib/auth") as typeof import("@/lib/auth");
+}
 
 /**
  * Validate that a route exists in the centralized navigation config
@@ -89,6 +97,7 @@ export function getSafeModeNavigationTarget(reason?: string): string {
   }
 
   // Default/unknown → safest option is index (welcome/splash screen)
+  //TODO: THISMIGHTBEWRONG
   return "/";
 }
 
@@ -109,7 +118,7 @@ export async function executeRecoveryAction(
   onNavigate?: (targetRoute: string) => void,
 ): Promise<RecoveryResult> {
   const label = `recovery_action:${action}`;
-  Performance.startMeasure(label);
+  getAnalytics().Performance.startMeasure(label);
 
   try {
     switch (action) {
@@ -141,14 +150,14 @@ export async function executeRecoveryAction(
       .error(`[SafeMode] Recovery action ${action} failed:`, error);
 
     // Track recovery failure with additional context
-    Analytics.track("safe_mode_recovery_action_failed", {
+    getAnalytics().Analytics.track("safe_mode_recovery_action_failed", {
       action,
       reason: safeMode.reason,
       error_message: error instanceof Error ? error.message : "Unknown error",
       safe_mode_duration_ms: Date.now() - safeMode.timestamp,
     });
 
-    Performance.endMeasure(label);
+    getAnalytics().Performance.endMeasure(label);
 
     return {
       success: false,
@@ -191,11 +200,11 @@ async function handleClearCache(
       .info("[SafeMode] CLEAR_CACHE recovery successful");
 
     // Track recovery success
-    Analytics.track("safe_mode_recovery_action_succeeded", {
+    getAnalytics().Analytics.track("safe_mode_recovery_action_succeeded", {
       action: RecoveryAction.CLEAR_CACHE,
     });
 
-    Performance.endMeasure(`recovery_action:${RecoveryAction.CLEAR_CACHE}`);
+    getAnalytics().Performance.endMeasure(`recovery_action:${RecoveryAction.CLEAR_CACHE}`);
 
     // Navigate to world selection (safe starting point)
     const targetRoute = "/select/world-selection";
@@ -243,15 +252,15 @@ async function handleResetAuth(
       .info("[SafeMode] Starting RESET_AUTH recovery");
 
     // Use AuthStateManager's logout flow which handles everything
-    await AuthStateManager.clearAuthState();
+    await getAuth().AuthStateManager.clearAuthState();
     logger.category("bootstrap").info("[SafeMode] Authentication cleared");
 
     // Track recovery success
-    Analytics.track("safe_mode_recovery_action_succeeded", {
+    getAnalytics().Analytics.track("safe_mode_recovery_action_succeeded", {
       action: RecoveryAction.RESET_AUTH,
     });
 
-    Performance.endMeasure(`recovery_action:${RecoveryAction.RESET_AUTH}`);
+    getAnalytics().Performance.endMeasure(`recovery_action:${RecoveryAction.RESET_AUTH}`);
 
     // Redirect to login
     const targetRoute = "/login/sign-in";
@@ -351,7 +360,7 @@ async function handleContactSupport(
     }
 
     // Track success
-    Analytics.track("safe_mode_recovery_action_succeeded", {
+    getAnalytics().Analytics.track("safe_mode_recovery_action_succeeded", {
       action: RecoveryAction.CONTACT_SUPPORT,
     });
 
@@ -363,7 +372,7 @@ async function handleContactSupport(
         .error(
           `[SafeMode] Route ${targetRoute} not found in navigation config`,
         );
-      Performance.endMeasure(label);
+      getAnalytics().Performance.endMeasure(label);
       return {
         success: false,
         action: RecoveryAction.CONTACT_SUPPORT,
@@ -377,7 +386,7 @@ async function handleContactSupport(
     // Trigger navigation via callback
     onNavigate?.(targetRoute);
 
-    Performance.endMeasure(label);
+    getAnalytics().Performance.endMeasure(label);
 
     return {
       success: true,
@@ -385,7 +394,7 @@ async function handleContactSupport(
       message: "Opening report bug page...",
     };
   } catch (error) {
-    Performance.endMeasure(label);
+    getAnalytics().Performance.endMeasure(label);
     throw error;
   }
 }
