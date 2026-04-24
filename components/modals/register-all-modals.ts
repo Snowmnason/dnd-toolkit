@@ -4,7 +4,7 @@
  * This file imports all modal components to trigger their registerModal() side effects.
  * Each modal file calls registerModal(...) at the bottom, which populates the modal registry.
  *
- * This file is imported by ModalProvider at startup to ensure all modals are registered
+ * This file is imported by OverlayProvider at startup to ensure all modals are registered
  * before any openModal() calls are made.
  *
  * Without this, the modal registry would remain empty and modals would fail to render.

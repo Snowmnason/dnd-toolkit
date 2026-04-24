@@ -1,6 +1,6 @@
 import { AppModal } from "@/components/ui/AppModal";
 import { Button } from "@/components/ui/BaseButton";
-import { registerModal } from "@/contexts";
+import { registerModal } from "@/contexts/modal-context";
 import { useScale } from "@/theme";
 import { View } from "react-native";
 

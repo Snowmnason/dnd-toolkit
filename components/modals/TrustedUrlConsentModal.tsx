@@ -1,5 +1,5 @@
 import { AppModal, Button, Switch } from '@/components/ui';
-import { registerModal } from '@/contexts';
+import { registerModal } from '@/contexts/modal-context';
 import { $, useScale } from '@/theme';
 import { useState } from 'react';
 import { View } from 'react-native';

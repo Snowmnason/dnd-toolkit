@@ -86,3 +86,5 @@ export type {
     Platform, TransportResult
 } from './transport-types';
 
+export type { RouteConfig } from '@/lib/navigation/navigationConfig';
+

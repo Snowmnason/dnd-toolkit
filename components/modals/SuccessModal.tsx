@@ -1,5 +1,5 @@
 import { AppModal, Button } from '@/components/ui'; // ✅ unified import
-import { registerModal } from '@/contexts';
+import { registerModal } from '@/contexts/modal-context';
 import { useScale } from '@/theme';
 import { View } from 'react-native';
 

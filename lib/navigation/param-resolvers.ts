@@ -47,6 +47,9 @@ export const PARAM_RESOLVERS: ParamResolverRegistry = {
  * const ctx = await resolveContextParams(PARAM_RESOLVERS);
  * // ctx = { userId: 'uuid-...', worldId: 'uuid-...' }
  */
+/** Keys that must never be assigned onto any object — prototype pollution vectors. */
+const RESERVED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 export async function resolveContextParams(
   registry: ParamResolverRegistry,
 ): Promise<Record<string, string>> {
@@ -57,13 +60,14 @@ export async function resolveContextParams(
     }),
   );
 
-  const result: Record<string, string> = {};
+  // Use Object.create(null) so the result has no prototype chain to pollute.
+  const result = Object.create(null) as Record<string, string>;
   for (const entry of settled) {
     if (entry.status === 'fulfilled') {
       const [key, value] = entry.value;
-      if (value !== undefined) {
-        // Use Object.assign for safer property assignment (avoids linter injection sink warning)
-        Object.assign(result, { [key]: value });
+      if (value !== undefined && !RESERVED_KEYS.has(key)) {
+        // eslint-disable-next-line security/detect-object-injection
+        result[key] = value;
       }
     }
   }

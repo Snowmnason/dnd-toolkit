@@ -54,6 +54,17 @@ export function useAppParamsSync(): void {
       return;
     }
 
+    // Clear params early for login/select before attempting any URL-based updates
+    // (prevents a URL-bearing deep link from briefly writing params that are immediately cleared)
+    if (segments[0] === "login" && (userId || worldId || userRole)) {
+      clearAllParams();
+      return;
+    }
+    if (segments[0] === "select" && (worldId || userRole)) {
+      clearWorldParams();
+      return;
+    }
+
     const currentWorldId =
       typeof urlParams.worldId === "string" ? urlParams.worldId : undefined;
     const currentUserRole =
@@ -73,15 +84,6 @@ export function useAppParamsSync(): void {
 
     if (shouldUpdate) {
       updateVolatileParams(updates);
-    }
-
-    // Only clear params when entering login routes and params exist
-    if (segments[0] === "login" && (userId || worldId || userRole)) {
-      clearAllParams();
-    }
-    // Only clear world params when entering select routes and world params exist
-    else if (segments[0] === "select" && (worldId || userRole)) {
-      clearWorldParams();
     }
   }, [
     urlParams,

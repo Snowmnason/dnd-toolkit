@@ -28,7 +28,7 @@
  */
 
 import { AppModal, Body, Button } from "@/components/ui";
-import { registerModal } from "@/contexts";
+import { registerModal } from "@/contexts/modal-context";
 import { useFeatureGatingStatus } from "@/hooks/feature/use-feature-gating";
 import { AffectedFeature } from "@/lib/error";
 import { useScale } from "@/theme";

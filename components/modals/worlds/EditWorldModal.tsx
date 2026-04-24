@@ -1,5 +1,5 @@
 import { AppModal, Body, Button, FormTextInput } from "@/components/ui";
-import { registerModal } from "@/contexts";
+import { registerModal } from "@/contexts/modal-context";
 import { logger } from "@/lib/utils/logger";
 import { $, useScale, UseTheme } from "@/theme";
 import { editWorldNameSchema, type EditWorldNameFormData } from "@/validation";

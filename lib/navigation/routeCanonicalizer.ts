@@ -58,9 +58,12 @@ export function matchRoute(
 
   if (typeof pattern === 'string') {
     if (pattern.includes('*')) {
-      const regexPattern = pattern
-        .replace(/\./g, '\\.')
-        .replace(/\*/g, '.*');
+      // Canonicalize the pattern first so /Main/* matches /main/...
+      const canonPattern = canonicalizePath(pattern.replace(/\*/g, '\x00'));
+      // Escape all regex metacharacters except the placeholder, then restore * → .*
+      const regexPattern = canonPattern
+        .replace(/[.+?()[\]{}|^$\\]/g, '\\$&')
+        .replace(/\x00/g, '.*');
       // eslint-disable-next-line security/detect-non-literal-regexp -- pattern is sanitized above
       const regex = new RegExp(`^${regexPattern}$`);
       return regex.test(canonPath);

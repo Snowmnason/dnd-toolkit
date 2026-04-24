@@ -27,11 +27,11 @@
  * ```
  */
 
-import { useEffect } from "react";
 import { useAppKernel } from "@/hooks/kernel";
 import { useNavigation } from "@/hooks/navigation";
 import { getAllRouteConfigs } from "@/lib/navigation";
 import { logger } from "@/lib/utils";
+import { useEffect } from "react";
 import { checkFeatureGating } from "./feature-gating";
 import { AffectedFeature } from "./safe-mode";
 
@@ -140,39 +140,41 @@ export function useFeatureGatingGuard(
   const navigate = useNavigation();
   const kernel = useAppKernel();
 
+  const { fallbackRoute, showToast, toastMessage } = options;
+
   useEffect(() => {
     const gatingStatus = checkFeatureGating(feature, kernel.safeMode);
 
     if (gatingStatus.isGated) {
-      const fallbackRoute = options.fallbackRoute || "/select/world-selection";
+      const resolvedFallback = fallbackRoute || "/select/world-selection";
       const message =
-        options.toastMessage ||
+        toastMessage ||
         `${feature} is unavailable in safe mode. Redirecting...`;
 
       logger
         .category("navigation")
         .info(
-          `[FeatureGating] Feature ${feature} is gated, redirecting to ${fallbackRoute}`,
+          `[FeatureGating] Feature ${feature} is gated, redirecting to ${resolvedFallback}`,
         );
 
-      if (options.showToast) {
+      if (showToast) {
         // TODO: Trigger toast notification
         logger.category('navigation').info(`[FeatureGating] ${message}`);
       }
 
       // Validate route exists in centralized navigation config
-      if (!isValidRoute(fallbackRoute)) {
+      if (!isValidRoute(resolvedFallback)) {
         logger
           .category("navigation")
           .error(
-            `[FeatureGating] Fallback route ${fallbackRoute} not found in navigation config`,
+            `[FeatureGating] Fallback route ${resolvedFallback} not found in navigation config`,
           );
         return;
       }
 
-      navigate.replace(fallbackRoute);
+      navigate.replace(resolvedFallback);
     }
-  }, [feature, kernel.safeMode, navigate, options]);
+  }, [feature, kernel.safeMode, navigate, fallbackRoute, showToast, toastMessage]);
 }
 
 /**

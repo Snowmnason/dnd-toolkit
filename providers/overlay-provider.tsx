@@ -1,3 +1,4 @@
+import '@/components/modals/register-all-modals'
 import React from 'react'
 import { AppSnackbarProvider } from '../contexts/app-snackbar-context'
 import { AppToastProvider } from '../contexts/app-toast-context'

@@ -1,5 +1,5 @@
 import { AppModal, Body, Button, FormTextInput, IconButton } from '@/components/ui'
-import { registerModal } from '@/contexts'
+import { registerModal } from '@/contexts/modal-context'
 import { $, useScale, UseTheme } from '@/theme'
 import { type ChangePasswordFormData } from '@/validation/auth.schema'
 import { Ionicons } from '@expo/vector-icons'

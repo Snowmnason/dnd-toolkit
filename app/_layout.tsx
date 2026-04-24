@@ -1,26 +1,25 @@
-import {
-  AppErrorBoundary,
-  AppToastLayer,
-  ChromeLayer,
-  JobOperationLayer,
-  NavDrawerLayer,
-  NotificationContainer,
-  SnackBarLayer,
-  UIBlockerLayer
-} from "@/components";
+// Layer components — direct file imports to avoid resolving the full @/components barrel,
+// which transitively includes the entire UI barrel (42 components) and all modal files.
+import { AppToastLayer } from "@/components/layer/AppToastLayer";
+import { ChromeLayer } from "@/components/layer/ChromeLayer";
+import { AppErrorBoundary } from "@/components/layer/ErrorBoundary";
+import { JobOperationLayer } from "@/components/layer/JobOperationLayer";
+import { NavDrawerLayer } from "@/components/layer/NavDrawerLayer";
+import { NotificationContainer } from "@/components/layer/NotificationContainer";
+import { SnackBarLayer } from "@/components/layer/SnackBarLayer";
+import { UIBlockerLayer } from "@/components/layer/UIBlockerLayer";
 import SettingsModal from "@/components/modals/SettingsModal";
-import { OfflineSyncNotificationLayer } from "@/components/offline";
+import { OfflineSyncNotificationLayer } from "@/components/offline/OfflineSyncNotificationLayer";
 import {
   CrashFallBack,
   RouteErrorBoundary,
   SafeModeErrorBoundary,
   SafeModeScreen,
 } from "@/components/SplashScreen";
-import { OverlayProvider, useChrome } from "@/contexts";
-// Trigger modal registration side effects — must run before any openModal() call.
-// Imported here (leaf module) instead of modal-context.tsx to avoid circular dependency.
+// Contexts — direct file imports to avoid resolving the full @/contexts barrel,
+// which includes toast, snackbar, notification, modal, nav-drawer, and theme contexts.
 import { PanelNavDrawer } from "@/AppScreens/main-panels/PanelNavDrawer";
-import "@/components/modals/register-all-modals";
+import { useChrome } from "@/contexts/chrome-context";
 import { Analytics, sessionManager } from "@/hooks/analytics";
 import { useAuthLinkObserver } from "@/hooks/auth";
 import { executeRecoveryAction, getSafeModeNavigationTarget } from "@/hooks/error";
@@ -31,16 +30,16 @@ import { useAppParamsSync } from "@/hooks/provider/use-app-params-sync";
 import { useChromeBottom } from "@/hooks/provider/use-chrome-bottom";
 import { useChromePolicy } from "@/hooks/provider/use-chrome-policy";
 import { logger, useInjectToastSystem } from "@/hooks/utils";
-import {
-  AppKernelProvider,
-  SubscriptionProvider,
-  UseTheme,
-  usePlatform,
-  useUserId,
-  useUserRole,
-  useWorldId
-} from "@/providers";
+import { OverlayProvider } from "@/providers/overlay-provider";
+// Providers — direct file imports to avoid resolving the full @/providers barrel,
+// which includes ScaleProvider, TooltipPortalProvider, DropdownPortalProvider, and others.
+import { AppKernelProvider } from "@/providers/AppKernelProvider";
 import { AppParamsProvider } from "@/providers/AppParamsProvider";
+import { useUserId } from "@/providers/AppParamsStableProvider";
+import { useUserRole, useWorldId } from "@/providers/AppParamsVolatileProvider";
+import { usePlatform } from "@/providers/PlatformProvider";
+import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
+import { UseTheme } from "@/providers/ThemeProvider";
 import { ViewportProvider } from "@/providers/ViewportProvider";
 import {
   Stack,

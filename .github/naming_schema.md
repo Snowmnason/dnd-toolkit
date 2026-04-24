@@ -1,4 +1,4 @@
-**This is a possible naming convertion, just a consideration, not to be done yet**
+**This is a possible naming convention, just a consideration, not to be done yet**
 
 ## Naming Conventions
 

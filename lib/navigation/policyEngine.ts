@@ -102,7 +102,8 @@ export class PolicyEngine {
     if (overrides?.forcePublic) {
       logger.category('navigation').debug('Policy: forcePublic override active');
       return 'allow_all';
-    }    if (overrides?.forceAdmin) {
+    }
+    if (overrides?.forceAdmin) {
       logger.category('navigation').debug('Policy: forceAdmin override active');
       return 'require_admin';
     }

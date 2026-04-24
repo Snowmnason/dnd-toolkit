@@ -82,7 +82,8 @@ export function useBootstrapRouteGuard(appReady: boolean): void {
         // ─── Step 2: Allow public /web/* routes as deep links ──────────
         // These are public app pages (privacy policy, terms, etc.) that don't
         // require authentication. They should work as direct URLs.
-        if (currentRoute.toLowerCase().startsWith('/web')) {
+        const lowerRoute = currentRoute.toLowerCase();
+        if (lowerRoute === '/web' || lowerRoute.startsWith('/web/')) {
           logger.category('navigation').debug(
             '[WebEntryCoordinator] Public /web/ route — allowed as deep link',
             { currentRoute },

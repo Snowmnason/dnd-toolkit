@@ -124,14 +124,14 @@ export function determineEnterRedirect(
 
       if (stalenessPhase === 'stale') {
         const decision = {
-          redirect: '/',
-          reason: 'Stale data restored (7-30 days old)',
+          redirect: '/login/sign-in',
+          reason: 'Stale data (4-30 days old), re-authentication required',
         };
-        logger.category('auth').info('Enter nav (re-auth bootstrap): Stale data, redirecting to root', decision);
+        logger.category('auth').info('Enter nav (re-auth bootstrap): Stale data, redirecting to sign-in', decision);
         return decision;
       }
 
-      // Fresh data (< 7 days)
+      // Fresh data (< 4 days)
       const decision = {
         redirect: '/select/world-selection',
         reason: 'Fresh data restored (< 7 days)',

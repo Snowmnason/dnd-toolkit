@@ -48,7 +48,7 @@ const ModalContext = createContext<ModalContextValue | undefined>(undefined)
  * but only if their module is actually imported at runtime.
  *
  * CRITICAL: All modal modules are imported via 'register-all-modals.ts'
- * which is imported in app/_layout.tsx (NOT here — to avoid circular deps).
+ * which is imported in providers/overlay-provider.tsx (NOT here — to avoid circular deps).
  */
 const modalRegistry = new Map<string, React.ComponentType<any>>()
 
@@ -75,8 +75,8 @@ export function registerModal(type: string, Component: React.ComponentType<any>)
  * Automatically renders active modals — no need to add a separate ModalLayer to RootLayout.
  *
  * NOTE: Modal registration happens via 'register-all-modals.ts' imported in
- * app/_layout.tsx. This avoids circular dependency (modal files import from
- * @/contexts which re-exports this file).
+ * providers/overlay-provider.tsx. Modal files import registerModal directly
+ * from this module to avoid a provider-barrel cycle during startup.
  *
  * ✅ Gate-Free: ModalProvider does not depend on kernel phases.
  * It only manages modal visibility state and registry with React hooks.
