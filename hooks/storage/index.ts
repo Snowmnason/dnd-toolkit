@@ -24,6 +24,9 @@ export { useQuery } from './use-query';
 export { useMutation } from './use-mutation';
 export type { UseMutationOptions, UseMutationState } from './use-mutation';
 
+export { useRefreshStorageCache } from './useRefreshStorageCache';
+export type { UseRefreshStorageCacheReturn } from './useRefreshStorageCache';
+
 
 
 

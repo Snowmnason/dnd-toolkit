@@ -21,46 +21,48 @@
 
 import { getAppConfig } from "@/config";
 import {
-  cleanupAnalyticsNetworkIntegration,
+    cleanupAnalyticsNetworkIntegration,
 } from "@/lib/analytics/exporters/analytics-network-integration";
 import {
-  createSafeModeState,
-  DEFAULT_SAFE_MODE_CONFIG,
-  NetworkCascadeDetector,
-  SafeModeLevel,
-  SafeModeReason,
-  type SafeModeState,
-} from "@/lib/error";
+    NetworkCascadeDetector,
+} from "@/lib/error/network-cascade-detector";
+import {
+    createSafeModeState,
+    DEFAULT_SAFE_MODE_CONFIG,
+    SafeModeLevel,
+    SafeModeReason,
+    type SafeModeState,
+} from "@/lib/error/safemode/safe-mode";
 import { logger } from "@/lib/utils";
 import { getPhaseMessage, type PhaseName } from "@/localization";
 import {
-  NetworkDetection,
-  NetworkStatus,
+    NetworkDetection,
+    NetworkStatus,
 } from "@/system/Network";
 import {
-  KernelErrorCode,
-  KernelPhase,
-  type AppKernelState,
-  type KernelCapabilities,
-  type KernelError,
-  type KernelListener,
-  type PhaseProgress,
+    KernelErrorCode,
+    KernelPhase,
+    type AppKernelState,
+    type KernelCapabilities,
+    type KernelError,
+    type KernelListener,
+    type PhaseProgress,
 } from "@/type-definitions/kernel-types";
 import type { RegistrationResult } from "@/type-definitions/registration";
 import {
-  calculateEffectiveTimeout,
-  calculateSlowdownFactor,
-  createSlowdownAnalytics,
-  finalizeBootstrapAnalytics,
-  initializeBootstrapAnalytics,
-  type KernelBootstrapAnalytics,
+    calculateEffectiveTimeout,
+    calculateSlowdownFactor,
+    createSlowdownAnalytics,
+    finalizeBootstrapAnalytics,
+    initializeBootstrapAnalytics,
+    type KernelBootstrapAnalytics,
 } from "./phase-helpers/adaptive-phase-executor";
 import { createPhaseContext } from "./phase-helpers/phase-context";
 import {
-  canRunPhase,
-  isNonRecoverablePhase,
-  validatePhaseGraph,
-  type PhaseName as DependencyPhaseName,
+    canRunPhase,
+    isNonRecoverablePhase,
+    validatePhaseGraph,
+    type PhaseName as DependencyPhaseName,
 } from "./phase-helpers/phase-dependency-graph";
 import { classifyPhaseError } from "./phase-helpers/phase-error-classifier";
 import { authPhase } from "./phases/auth-phase";
@@ -86,12 +88,12 @@ import { storagePhase } from "./phases/storage-phase";
  * These exports prevent breaking external imports from system/Kernel
  */
 export {
-  KernelErrorCode,
-  KernelPhase, type AppKernelState,
-  type KernelCapabilities,
-  type KernelError,
-  type KernelListener,
-  type PhaseProgress
+    KernelErrorCode,
+    KernelPhase, type AppKernelState,
+    type KernelCapabilities,
+    type KernelError,
+    type KernelListener,
+    type PhaseProgress
 } from "@/type-definitions/kernel-types";
 
 /**
@@ -261,14 +263,17 @@ class AppKernelClass {
         );
       }
 
-      // Phase 1: PRELOAD — load fonts, themes, platform assets (non-critical)
-      await this.runPhase("preload", (signal) => preloadPhase(signal));
-
-      // Phase 2: NETWORK — initialize detection + telemetry (non-critical, app works offline)
-      await this.runPhase("network", async (signal) => {
-        await networkPhase(signal);
-        this.setupNetworkSubscription();
-      });
+      // Phase 1+2: PRELOAD + NETWORK — run in parallel (no dependency between them)
+      // preload: fonts, themes, platform assets (non-critical)
+      // network: detection + telemetry (non-critical, app works offline)
+      // Both complete before STORAGE needs network state or storage is written.
+      await Promise.all([
+        this.runPhase("preload", (signal) => preloadPhase(signal)),
+        this.runPhase("network", async (signal) => {
+          await networkPhase(signal);
+          this.setupNetworkSubscription();
+        }),
+      ]);
 
       // Track D: Detect network multiplier from detected connection type
       try {
@@ -567,6 +572,38 @@ class AppKernelClass {
    */
   private runPostReadyTasks(): void {
     ;(async () => {
+      // ─── Post-Ready Subscriptions ─────────────────────────────────
+      // Subscriptions marked postReady skipped registration phase to avoid
+      // blocking bootstrap with their module-load cost. Activate them now.
+      try {
+        const { SUBSCRIPTIONS } = await import('@/lib/subscriptions/registry');
+        const postReadySubs = SUBSCRIPTIONS.filter(s => s.postReady);
+        for (const sub of postReadySubs) {
+          try {
+            await sub.activate();
+            logger.category('bootstrap').info(`[post-ready] sub(${sub.name}): activated`);
+          } catch (subError) {
+            logger.category('bootstrap').warn(`[post-ready] sub(${sub.name}) failed: ${(subError as Error).message}`);
+          }
+        }
+      } catch (error) {
+        logger.category('bootstrap').warn(`Post-ready subscriptions failed: ${(error as Error).message}`);
+      }
+
+      // ─── Icon Asset Warmup ────────────────────────────────────────
+      // Icons are bundled but pre-caching them after boot ensures they're
+      // decoded before the user navigates. Fire-and-forget — no blocking.
+      try {
+        const { Asset } = await import('expo-asset');
+        const { getAllIconAssets } = await import('@/maps/icon-map');
+        await Asset.loadAsync(getAllIconAssets());
+        logger.category('bootstrap').debug('Icon assets warmed (post-ready)');
+      } catch (iconError) {
+        logger
+          .category('bootstrap')
+          .debug(`Icon warmup skipped: ${(iconError as Error).message}`);
+      }
+
       // ─── Analytics Tracking ───────────────────────────────────────
       try {
         const totalBootstrapTime = Object.values(this.state.timing).reduce(

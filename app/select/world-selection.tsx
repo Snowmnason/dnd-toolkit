@@ -6,14 +6,14 @@ import { usePanelNavigation } from "@/hooks/navigation";
 import { useWorlds } from "@/hooks/storage";
 import { useWorldModal } from "@/hooks/utils/use-world-modal";
 import {
-    useAppParamsStable,
-    useUserId,
+  useAppParamsStable,
+  useUserId,
 } from "@/providers";
 import { useScale } from "@/theme";
 import { useState } from "react";
 
 // Fallback image
-const noImageSelected = require("../../assets/images/Miku.png");
+const noImageSelected = require("../../assets/images/required/Miku.png");
 
 export default function LandingPage() {
   // Centralized params

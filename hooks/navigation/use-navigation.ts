@@ -36,6 +36,12 @@ export interface UseNavigation {
   // ---- Transition family (guarded, fire-and-go) ----
   to: (route: string, params?: Record<string, string>, options?: NavigationCallOptions) => void;
   replace: (route: string, params?: Record<string, string>, options?: NavigationCallOptions) => void;
+  /**
+   * Navigate to a route and clear the entire navigation stack so it becomes the new root.
+   * Use this for post-auth transitions (e.g., after sign-in → world-selection) where the
+   * previous login stack should not be reachable via the back button.
+   */
+  resetTo: (route: string, params?: Record<string, string>, options?: NavigationCallOptions) => void;
 
   // ---- History family (stack manipulation) ----
   back: (options?: NavigationCallOptions) => void;
@@ -259,6 +265,23 @@ export function useNavigation(): UseNavigation {
     [handleResult, showNavModal, shouldThrottle],
   );
 
+  const resetTo = useCallback(
+    (route: string, params?: Record<string, string>, options?: NavigationCallOptions): void => {
+      const windowMs = resolveThrottleMs(options);
+      if (shouldThrottle(buildThrottleKey('resetTo', [route, params]), windowMs)) return;
+
+      executeRouteNavigation(route, params, undefined, 'reset')
+        .then((result) => handleResult(result, 'resetTo'))
+        .catch((error: unknown) => {
+          logger.category('navigation').error('Navigation error', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+          showNavModal('failure', undefined, 'An unexpected error occurred.');
+        });
+    },
+    [handleResult, showNavModal, shouldThrottle],
+  );
+
   // ---- History family ----
 
   const back = useCallback((options?: NavigationCallOptions) => {
@@ -382,6 +405,7 @@ export function useNavigation(): UseNavigation {
   return {
     to,
     replace,
+    resetTo,
     back,
     dismiss,
     dismissAll,

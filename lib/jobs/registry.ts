@@ -36,7 +36,7 @@ export const CORE_JOBS: JobRegistryEntry[] = [
   {
     name: "sync-orchestrator",
     register: async (queue) => {
-      const { createSyncJobHandler } = await import("@/lib/jobs");
+      const { createSyncJobHandler } = await import("@/lib/jobs/core/sync/sync-orchestrator");
       const syncHandler = createSyncJobHandler();
       queue.registerHandler(
         syncHandler.name,
@@ -60,7 +60,7 @@ export const CORE_JOBS: JobRegistryEntry[] = [
   {
     name: "feature-flags-refresh",
     register: async (queue) => {
-      const { refreshSubscription } = await import("@/lib/premium");
+      const { refreshSubscription } = await import("@/lib/premium/premium-manager");
       const { logger } = await import("@/lib/utils");
       queue.registerHandler("feature_flags_refresh", async () => {
         await refreshSubscription();
@@ -69,148 +69,161 @@ export const CORE_JOBS: JobRegistryEntry[] = [
       });
     },
   },
+  /**
+   * Degrade system init — isolated handler for degradation infrastructure setup.
+   * Kept separate from network-recovery so Metro can analyze each graph independently.
+   */
   {
-    name: "internal_deferred_init",
+    name: "degrade-system-init",
     register: async (queue) => {
       const { logger } = await import("@/lib/utils");
-      
-      // Universal handler for deferred initialization tasks
-      // Allows jobs to defer expensive setup without blocking registration phase
-      queue.registerHandler("internal_deferred_init", async (payload: any) => {
-        const target = payload.target || "unknown";
-        
+
+      queue.registerHandler("degrade_system_init", async (_payload: any) => {
         try {
-          if (target === "network-recovery-retry-full-init") {
-            // COMPLETELY deferred: register handler + initialize
-            const { NetworkRecoveryRetryJobManager, getNetworkRecoveryRetryHandler } = await import(
-              "@/lib/jobs/core/network-recovery-retry-job"
-            );
-            const { NetworkStateManager } = await import(
-              "@/system/Network/state-machine"
-            );
-            
-            // Register the handler
-            queue.registerHandler("network_recovery_retry", getNetworkRecoveryRetryHandler());
-            
-            // Initialize state machine hooks
-            await NetworkRecoveryRetryJobManager.initialize(NetworkStateManager, queue);
-            
-            logger.category("bootstrap").info("Network recovery (full) initialized (deferred)");
-          } else if (target === "degrade-system-setup") {
-            // Degrade system setup deferred (saves ~4.2s during registration)
-            const { initializeConnectivityHandler, appDegrade } = await import("@/system/Degrade");
-            const { registerAllSystemResponses } = await import("@/system/Degrade/responses/system-responses");
-            const { registerAllLibResponses } = await import("@/lib/error/degrade/lib-responses");
-            const { registerDisplayCallbacks } = await import("@/lib/error/degrade/degrade-manager");
-            const { setSafeMode } = await import("@/lib/kernel");
-            const { createSafeModeState, SafeModeReason } = await import("@/lib/error");
-            const { showDegradeToast } = await import("@/lib/utils/toast-queue");
-            const { registerCrashCallback } = await import("@/system/Degrade/handlers/crash-handlers");
+          const { initializeConnectivityHandler } = await import("@/system/Degrade/handlers/connectivity-handler");
+          const { appDegrade } = await import("@/system/Degrade/app-degrade");
+          const { registerAllSystemResponses } = await import("@/system/Degrade/responses/system-responses");
+          const { registerAllLibResponses } = await import("@/lib/error/degrade/lib-responses");
+          const { registerDisplayCallbacks } = await import("@/lib/error/degrade/degrade-manager");
+          const { setSafeMode } = await import("@/lib/kernel/kernel-manager");
+          const { createSafeModeState, SafeModeReason } = await import("@/lib/error/safemode/safe-mode");
+          const { showDegradeToast } = await import("@/lib/utils/toast-queue");
+          const { registerCrashCallback } = await import("@/system/Degrade/handlers/crash-handlers");
 
-            // Initialize connectivity handler (always-listening subscription)
-            initializeConnectivityHandler();
-            logger.category("bootstrap").debug("Connectivity handler initialized (deferred)");
+          // Initialize connectivity handler (always-listening subscription)
+          initializeConnectivityHandler();
+          logger.category("bootstrap").debug("Connectivity handler initialized (deferred)");
 
-            // Register system-level degradation responses
-            registerAllSystemResponses(appDegrade);
-            logger.category("bootstrap").debug("System degradation responses registered (deferred)");
+          // Register system-level degradation responses
+          registerAllSystemResponses(appDegrade);
+          logger.category("bootstrap").debug("System degradation responses registered (deferred)");
 
-            // Register UI display callbacks for degradation events
-            registerDisplayCallbacks({
-              showSafeMode: (capability, reason) => {
-                try {
-                  let safeModeReason = SafeModeReason.UNKNOWN;
-                  switch (capability) {
-                    case "database":
-                      safeModeReason = SafeModeReason.STORAGE_UNREADABLE;
-                      break;
-                    case "auth":
-                      safeModeReason = SafeModeReason.AUTH_INVALID;
-                      break;
-                    case "storage":
-                      safeModeReason = SafeModeReason.STORAGE_CORRUPTED;
-                      break;
-                    case "sync":
-                      safeModeReason = SafeModeReason.NETWORK_SYNC_FAILURES;
-                      break;
-                    case "connectivity":
-                      safeModeReason = SafeModeReason.NETWORK_UNAVAILABLE;
-                      break;
-                    default:
-                      safeModeReason = SafeModeReason.UNKNOWN;
-                  }
-                  const safeModeState = createSafeModeState(safeModeReason, {
-                    details: `${capability}: ${reason}`,
-                  });
-                  setSafeMode(safeModeState);
-                } catch (error) {
-                  logger.category("bootstrap").error("Failed to enter safe mode (deferred)", { error, capability, reason });
+          // Register UI display callbacks for degradation events
+          registerDisplayCallbacks({
+            showSafeMode: (capability, reason) => {
+              try {
+                let safeModeReason = SafeModeReason.UNKNOWN;
+                switch (capability) {
+                  case "database":
+                    safeModeReason = SafeModeReason.STORAGE_UNREADABLE;
+                    break;
+                  case "auth":
+                    safeModeReason = SafeModeReason.AUTH_INVALID;
+                    break;
+                  case "storage":
+                    safeModeReason = SafeModeReason.STORAGE_CORRUPTED;
+                    break;
+                  case "sync":
+                    safeModeReason = SafeModeReason.NETWORK_SYNC_FAILURES;
+                    break;
+                  case "connectivity":
+                    safeModeReason = SafeModeReason.NETWORK_UNAVAILABLE;
+                    break;
+                  default:
+                    safeModeReason = SafeModeReason.UNKNOWN;
                 }
-              },
-              showToast: (options) => {
-                try {
-                  showDegradeToast(options);
-                } catch (error) {
-                  logger.category("bootstrap").error("Failed to show toast (deferred)", { error, options });
-                }
-              },
-            });
-            logger.category("bootstrap").debug("Display callbacks registered (deferred)");
-
-            // Register crash callback
-            registerCrashCallback((notification) => {
-              if (notification.suggestedAction === 'safe-mode') {
-                try {
-                  let safeModeReason = SafeModeReason.UNKNOWN;
-                  switch (notification.capability) {
-                    case "database":
-                      safeModeReason = SafeModeReason.STORAGE_UNREADABLE;
-                      break;
-                    case "auth":
-                      safeModeReason = SafeModeReason.AUTH_INVALID;
-                      break;
-                    case "storage":
-                      safeModeReason = SafeModeReason.STORAGE_CORRUPTED;
-                      break;
-                    case "sync":
-                      safeModeReason = SafeModeReason.NETWORK_SYNC_FAILURES;
-                      break;
-                    case "connectivity":
-                      safeModeReason = SafeModeReason.NETWORK_UNAVAILABLE;
-                      break;
-                    default:
-                      safeModeReason = SafeModeReason.UNKNOWN;
-                  }
-                  const safeModeState = createSafeModeState(safeModeReason, {
-                    details: `${notification.capability}: ${notification.reason}`,
-                  });
-                  setSafeMode(safeModeState);
-                } catch (error) {
-                  logger.category("bootstrap").error("Crash callback failed to enter safe mode", { error, capability: notification.capability, reason: notification.reason });
-                }
+                const safeModeState = createSafeModeState(safeModeReason, {
+                  details: `${capability}: ${reason}`,
+                });
+                setSafeMode(safeModeState);
+              } catch (error) {
+                logger.category("bootstrap").error("Failed to enter safe mode (deferred)", { error, capability, reason });
               }
-            });
-            logger.category("bootstrap").debug("Crash callback registered (deferred)");
+            },
+            showToast: (options) => {
+              try {
+                showDegradeToast(options);
+              } catch (error) {
+                logger.category("bootstrap").error("Failed to show toast (deferred)", { error, options });
+              }
+            },
+          });
+          logger.category("bootstrap").debug("Display callbacks registered (deferred)");
 
-            // Register lib-level degradation responses
-            registerAllLibResponses();
-            logger.category("bootstrap").info("Degrade system fully initialized (deferred)");
-          } else {
-            logger.category("bootstrap").warn(`Unknown deferred init target: ${target}`);
-          }
+          // Register crash callback
+          registerCrashCallback((notification) => {
+            if (notification.suggestedAction === "safe-mode") {
+              try {
+                let safeModeReason = SafeModeReason.UNKNOWN;
+                switch (notification.capability) {
+                  case "database":
+                    safeModeReason = SafeModeReason.STORAGE_UNREADABLE;
+                    break;
+                  case "auth":
+                    safeModeReason = SafeModeReason.AUTH_INVALID;
+                    break;
+                  case "storage":
+                    safeModeReason = SafeModeReason.STORAGE_CORRUPTED;
+                    break;
+                  case "sync":
+                    safeModeReason = SafeModeReason.NETWORK_SYNC_FAILURES;
+                    break;
+                  case "connectivity":
+                    safeModeReason = SafeModeReason.NETWORK_UNAVAILABLE;
+                    break;
+                  default:
+                    safeModeReason = SafeModeReason.UNKNOWN;
+                }
+                const safeModeState = createSafeModeState(safeModeReason, {
+                  details: `${notification.capability}: ${notification.reason}`,
+                });
+                setSafeMode(safeModeState);
+              } catch (error) {
+                logger.category("bootstrap").error("Crash callback failed to enter safe mode", { error, capability: notification.capability, reason: notification.reason });
+              }
+            }
+          });
+          logger.category("bootstrap").debug("Crash callback registered (deferred)");
+
+          // Register lib-level degradation responses
+          registerAllLibResponses();
+          logger.category("bootstrap").info("Degrade system fully initialized (deferred)");
         } catch (error) {
-          logger.category("bootstrap").error(`Deferred init failed for ${target}`, { error: String(error) });
-          throw error; // Let job queue handle retry
+          logger.category("bootstrap").error("Degrade system init failed", { error: String(error) });
+          throw error;
         }
-        
-        return { completedAt: Date.now(), target };
+
+        return { completedAt: Date.now() };
       });
-      
-      // Enqueue the network recovery full initialization to run after appReady
-      // This defers BOTH registration and initialization
+    },
+  },
+  /**
+   * Network recovery full init — isolated handler for network recovery job setup.
+   * Kept separate from degrade-system-init so Metro can analyze each graph independently.
+   */
+  {
+    name: "network-recovery-full-init",
+    register: async (queue) => {
+      const { logger } = await import("@/lib/utils");
+
+      queue.registerHandler("network_recovery_full_init", async (_payload: any) => {
+        try {
+          const { NetworkRecoveryRetryJobManager, getNetworkRecoveryRetryHandler } = await import(
+            "@/lib/jobs/core/network-recovery-retry-job"
+          );
+          const { NetworkStateManager } = await import(
+            "@/system/Network/state-machine"
+          );
+
+          // Register the handler
+          queue.registerHandler("network_recovery_retry", getNetworkRecoveryRetryHandler());
+
+          // Initialize state machine hooks
+          await NetworkRecoveryRetryJobManager.initialize(NetworkStateManager, queue);
+
+          logger.category("bootstrap").info("Network recovery (full) initialized (deferred)");
+        } catch (error) {
+          logger.category("bootstrap").error("Network recovery full init failed", { error: String(error) });
+          throw error;
+        }
+
+        return { completedAt: Date.now() };
+      });
+
+      // Enqueue network recovery full initialization to run after appReady
       await queue.enqueue({
-        type: "internal_deferred_init",
-        payload: { target: "network-recovery-retry-full-init" },
+        type: "network_recovery_full_init",
+        payload: {},
         runAt: Date.now() + 100,
         maxRetries: 1,
         idempotencyKey: "network-recovery-init-complete-deferred",

@@ -195,8 +195,14 @@ function RootLayoutContent() {
 
   // Back button: panel-first (right→left on mobile), then history pop
   const handleTopBarBack = () => {
-    if (panelNav.handleBackPress()) return;
-    navigate.back();
+    try {
+      if (panelNav.handleBackPress()) return;
+      if (navigate.canGoBack()) {
+        navigate.back();
+      }
+    } catch (err) {
+      logger.category('navigation').warn('Back press failed', err);
+    }
   };
 
   // SettingsMenu handlers
@@ -247,7 +253,7 @@ function RootLayoutContent() {
               <ChromeLayer
                 topBar={{
                   title: topBarTitle,
-                  showBackButton: panelNav.isActive || navigate.canGoBack(),
+                  showBackButton: (!panelNav.isDesktop && panelNav.activePanel === 'right') || navigate.canGoBack(),
                   showHamburger: showHamburger, // Whether to show the hamburger menu, add conditional logic if needed
                   onBackPress: handleTopBarBack,
                   a11yFocusTarget: routeConfig.a11yFocusTarget,

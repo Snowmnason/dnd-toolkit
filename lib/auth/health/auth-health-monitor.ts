@@ -10,10 +10,10 @@
  */
 
 import { getAppConfig } from '@/config';
-import { reportCrash } from "@/lib/error";
-import { getJobQueue } from "@/lib/jobs";
+import { reportCrash } from "@/lib/error/degrade/degrade-manager";
 import { isKernelIdle } from "@/lib/kernel/kernel-manager";
 import { logger } from "@/lib/utils";
+import { getJobQueue } from "@/system/Jobs/background-job-queue";
 import { DegradeCapability } from "@/type-definitions/degrade";
 
 const AUTH_HEALTH_CHECK_JOB_TYPE = "auth_health_check";

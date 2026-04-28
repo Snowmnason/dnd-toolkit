@@ -104,7 +104,7 @@ export default function CustomLoad({
       ]}
     >
       <Image
-        source={require('@/assets/images/load.gif')}
+        source={require('@/assets/images/required/load.gif')}
         style={{
           width: sizeValue,
           height: sizeValue,

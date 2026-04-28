@@ -16,13 +16,13 @@
  * - Manage consent state (that stays in lib/analytics/consent/)
  */
 
-import { reportFault } from '@/lib/error';
 import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
+import { reportFault } from '@/lib/error/degrade/degrade-manager';
 import { logger } from '@/lib/utils/logger';
-import { DegradeCapability } from '@/type-definitions/degrade';
 import { ConnectionQuality, NetworkDetection } from '@/system/Network';
 import { getAdapter, isServiceReady, listAdapters } from '@/system/Services';
 import type { BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '@/type-definitions/breadcrumb-queue-types.ts';
+import { DegradeCapability } from '@/type-definitions/degrade';
 
 // ─── Precondition Checks ───────────────────────────────────────────
 

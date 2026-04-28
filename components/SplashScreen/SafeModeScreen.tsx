@@ -1,10 +1,10 @@
 import { getAppConfig } from '@/config';
-import { Analytics, Performance } from "@/lib/analytics";
+import { Analytics, Performance } from "@/hooks/analytics";
 import {
   RecoveryAction,
   SafeModeLevel,
-  SafeModeState,
-} from "@/lib/error";
+  type SafeModeState,
+} from "@/hooks/error";
 import { getRecoveryActionLabel, getSafeModeDescription } from "@/localization/ErrorMessages";
 import { useEffect } from "react";
 import { ErrorFallbackShell } from "../ui";

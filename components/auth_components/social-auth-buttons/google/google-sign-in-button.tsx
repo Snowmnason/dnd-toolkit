@@ -17,7 +17,7 @@
 
 import { Button, ButtonText } from '@/components/ui';
 import { useAuthFlow } from '@/hooks/auth';
-import { logger } from '@/lib';
+import { logger } from '@/hooks/utils';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';

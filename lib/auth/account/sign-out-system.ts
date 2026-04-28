@@ -25,12 +25,12 @@
  *   }
  */
 
-import { JobsManager } from '@/lib/jobs';
 import type {
   SignOutError,
   SignOutPhase2Result,
   SignOutSource,
 } from '@/lib/jobs/core/sign-out-job';
+import { JobsManager } from '@/lib/jobs/jobs-manager';
 import { logger } from '@/lib/utils/logger';
 
 // ============================================================================

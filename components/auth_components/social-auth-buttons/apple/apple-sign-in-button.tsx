@@ -17,7 +17,7 @@
 
 import { Button, ButtonText } from '@/components/ui';
 import { useAuthFlow } from '@/hooks/auth';
-import { logger } from '@/lib';
+import { logger } from '@/hooks/utils';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';

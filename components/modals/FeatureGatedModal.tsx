@@ -29,8 +29,8 @@
 
 import { AppModal, Body, Button } from "@/components/ui";
 import { registerModal } from "@/contexts/modal-context";
+import { AffectedFeature } from "@/hooks/error";
 import { useFeatureGatingStatus } from "@/hooks/feature/use-feature-gating";
-import { AffectedFeature } from "@/lib/error";
 import { useScale } from "@/theme";
 import { View } from "react-native";
 

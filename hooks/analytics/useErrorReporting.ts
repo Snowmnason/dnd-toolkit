@@ -1,6 +1,8 @@
 import { logger } from '@/hooks/utils';
-import { AnalyticsConsent, getCrashReportPayload, sessionManager } from '@/lib/analytics';
-import { reportError } from '@/lib/error';
+import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
+import { getCrashReportPayload } from '@/lib/analytics/consent/consent-error-payload';
+import { sessionManager } from '@/lib/analytics/session';
+import { reportError } from '@/lib/error/error-manager';
 import { ErrorInfo } from 'react';
 
 /**

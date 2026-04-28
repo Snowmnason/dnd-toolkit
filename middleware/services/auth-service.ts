@@ -15,7 +15,7 @@
  * - Manage auth state (that stays in lib/auth/auth-state.ts)
  */
 
-import { reportFault } from '@/lib/error';
+import { reportFault } from '@/lib/error/degrade/degrade-manager';
 import { logger } from '@/lib/utils/logger';
 import { ERROR_CODES } from '@/maps/ERROR_CODES';
 import { AppError } from '@/pure-algo-immutables/app-error';
@@ -332,22 +332,10 @@ export async function authSignInWithIdToken(
  *
  * This is a middleware function because:
  * - It bridges lib/auth strategies with the system-level AuthLayer
- * - It's called during bootstrap by system/Services/service-initializer
- * - Keeps circular deps out of system/ layer
+ * - initializeAuthStrategies() was moved to auth-strategies-init.ts for bootstrap performance.
+ *   Loading auth-service.ts pulls in NetworkDetection, degrade-manager, AppError, and the
+ *   system/Services barrel — too heavy for the services-phase cold-load path.
  */
-export async function initializeAuthStrategies(): Promise<void> {
-    const { AuthLayer, createUserAuthStrategy, createPublicAuthStrategy, createInviteAuthStrategy } = await import('@/lib/auth');
-    
-    // Clear existing strategies first to support idempotent re-initialization
-    // (e.g., React error boundary remount, HMR, or kernel retry)
-    AuthLayer.clearAuthStrategies();
-
-    AuthLayer.registerAuthStrategy('user', createUserAuthStrategy());
-    AuthLayer.registerAuthStrategy('public', createPublicAuthStrategy());
-    AuthLayer.registerAuthStrategy('invite', createInviteAuthStrategy());
-    
-    logger.category('bootstrap').info('Auth strategies registered: user, public, invite');
-}
 
 // Re-export Session type for consumers that import from @/lib/services
 export type { Session };

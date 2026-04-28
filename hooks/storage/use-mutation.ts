@@ -1,7 +1,7 @@
 'use client';
 
-import { QueryCache } from '@/lib/storage';
 import { logger } from '@/lib/utils/logger';
+import { QueryCache } from '@/middleware/storage';
 import React, { useCallback, useRef, useState } from 'react';
 
 /**

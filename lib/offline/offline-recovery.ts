@@ -20,17 +20,17 @@ import { OFFLINE_SYNC_DEFAULTS } from "@/config";
 import type { AuthContext } from "@/lib/auth/auth-layer";
 import { logger } from "@/lib/utils";
 import {
-    isCircuitBreakerOpen,
-    recordCircuitBreakerFailure,
-    recordCircuitBreakerSuccess,
+  isCircuitBreakerOpen,
+  recordCircuitBreakerFailure,
+  recordCircuitBreakerSuccess,
 } from "@/middleware/api";
 
-import { RedactionManager } from "@/pure-algo-immutables";
+import { RedactionManager } from "@/pure-algo-immutables/redaction-manager";
 import type {
-    AuthReplayMetadata,
-    NetworkErrorContract,
-    OfflineQueueStats,
-    QueuedMutation,
+  AuthReplayMetadata,
+  NetworkErrorContract,
+  OfflineQueueStats,
+  QueuedMutation,
 } from "@/type-definitions/mutation-queue-types";
 
 // Re-export QueuedMutation for test imports

@@ -1,5 +1,5 @@
 import { useAppToast } from '@/contexts/app-toast-context';
-import { updateStorageCache } from '@/lib/storage';
+import { updateStorageCache } from '@/lib/storage/sync/update-storage-cache';
 import { logger } from '@/lib/utils/logger';
 import { useCallback, useEffect, useRef, useState } from 'react';
 

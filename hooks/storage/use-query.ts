@@ -1,12 +1,12 @@
 'use client';
 
-import { QueryCache } from '@/lib/storage';
 import { logger } from '@/lib/utils';
+import { QueryCache } from '@/middleware/storage';
 import { NetworkDetection } from '@/system/Network';
 import type {
-    FetchFn,
-    UseQueryOptions,
-    UseQueryState
+  FetchFn,
+  UseQueryOptions,
+  UseQueryState
 } from '@/type-definitions';
 import { useEffect, useRef, useState } from 'react';
 

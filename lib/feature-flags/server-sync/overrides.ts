@@ -10,7 +10,7 @@
 import { trackVariantAssignment } from "@/lib/analytics/variant-tracking";
 import type { FeatureFlagOverrideRow } from "@/lib/database/feature-flag-overrides";
 import { logger } from "@/lib/utils/logger";
-import { isInRolloutMemoized } from "@/pure-algo-immutables";
+import { isInRolloutMemoized } from "@/pure-algo-immutables/rollout";
 import type { EdgeEntitlementOverrideRow } from "@/type-definitions/featureFlagTypes";
 import { notifySubscribers, type ServerSyncState } from "./state";
 

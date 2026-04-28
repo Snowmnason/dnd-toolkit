@@ -1,6 +1,6 @@
 import { AppModal, Body, Button, FormTextInput } from "@/components/ui";
 import { registerModal } from "@/contexts/modal-context";
-import { logger } from "@/lib/utils/logger";
+import { logger } from "@/hooks/utils";
 import { $, useScale, UseTheme } from "@/theme";
 import { editWorldNameSchema, type EditWorldNameFormData } from "@/validation";
 import { zodResolver } from "@hookform/resolvers/zod";

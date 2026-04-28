@@ -23,7 +23,7 @@
  * ```
  */
 
-import { subscribeToDegradation } from '@/lib/error';
+import { subscribeToDegradation } from '@/lib/error/degrade/degrade-manager';
 import { DegradeCapability } from '@/type-definitions/degrade';
 import { useEffect, useState } from 'react';
 

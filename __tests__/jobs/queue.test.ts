@@ -11,7 +11,7 @@
  */
 
 import { BackgroundJobQueue } from "@/lib/jobs";
-import { calculateBackoffDelay, calculateNextRetryTime, formatDelay, isRetryable } from "@/pure-algo-immutables"; // Ensure backoff utilities are included for testing
+import { calculateBackoffDelay, calculateNextRetryTime, formatDelay, isRetryable } from "@/pure-algo-immutables/backoff"; // Ensure backoff utilities are included for testing
 import type { JobRecord, StorageAdapter } from "@/type-definitions";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

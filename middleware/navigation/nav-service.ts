@@ -21,19 +21,19 @@
 import { NavAnalytics } from '@/lib/analytics/modules/nav-analytics';
 import { logger } from '@/lib/utils';
 import {
-    executeExternalTransitionNav,
-    executeHistoryTransitionNav,
-    executeRouteTransitionNav,
-    executeStateQueriesNav,
-    executeUtilityTransitionNav,
-    isTransportReady,
+  executeExternalTransitionNav,
+  executeHistoryTransitionNav,
+  executeRouteTransitionNav,
+  executeStateQueriesNav,
+  executeUtilityTransitionNav,
+  isTransportReady,
 } from '@/system/Navigation';
 import type {
-    NavigationContext,
-    NavigationExecutionResult,
-    NavigationGuardConfig,
-    NavigationRequest,
-    NavigationUiInstruction,
+  NavigationContext,
+  NavigationExecutionResult,
+  NavigationGuardConfig,
+  NavigationRequest,
+  NavigationUiInstruction,
 } from '@/type-definitions';
 
 // ---------------------------------------------------------------------------
@@ -131,7 +131,7 @@ function stripResult(result: NavigationExecutionResult): NavServiceResult {
  * @param analytics  Optional context for analytics enrichment
  */
 export async function callRouteTransitionNav(
-  action: 'push' | 'replace' | 'dismissTo',
+  action: 'push' | 'replace' | 'reset' | 'dismissTo',
   target: string,
   params?: Record<string, string>,
   guards?: NavigationGuardConfig[],

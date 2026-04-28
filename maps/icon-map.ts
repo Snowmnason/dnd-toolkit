@@ -13,7 +13,7 @@
  *   Asset.loadAsync(getAllIconAssets());
  *
  * Adding a new icon:
- *   1. Drop the SVG(s) into assets/icons/ (or assets/icons/panels/ for panel icons).
+ *   1. Drop the SVG(s) into assets/icons/required/ (or assets/icons/required/panels/ for panel icons).
  *   2. Add the entry to ICON_ASSETS below (IconKey is automatically inferred).
  *
  * Note: `world` currently has no filled variant — getIconAsset falls back to
@@ -32,30 +32,30 @@ type IconEntry = {
 
 const ICON_ASSETS = {
   char: {
-    filled: require('../assets/icons/panels/char_filled.svg'),
-    outlined: require('../assets/icons/panels/char_outlined.svg'),
+    filled: require('../assets/icons/required/panels/char_filled.svg'),
+    outlined: require('../assets/icons/required/panels/char_outlined.svg'),
   },
   combat: {
-    filled: require('../assets/icons/panels/combat_filled.svg'),
-    outlined: require('../assets/icons/panels/combat_outlined.svg'),
+    filled: require('../assets/icons/required/panels/combat_filled.svg'),
+    outlined: require('../assets/icons/required/panels/combat_outlined.svg'),
   },
   story: {
-    filled: require('../assets/icons/panels/story_filled.svg'),
-    outlined: require('../assets/icons/panels/story_outlined.svg'),
+    filled: require('../assets/icons/required/panels/story_filled.svg'),
+    outlined: require('../assets/icons/required/panels/story_outlined.svg'),
   },
   // Note: SVG filenames have a typo ("teasure"). Require paths match real filenames.
   treasure: {
-    filled: require('../assets/icons/panels/treasure_filled.svg'),
-    outlined: require('../assets/icons/panels/treasure_outlined.svg'),
+    filled: require('../assets/icons/required/panels/treasure_filled.svg'),
+    outlined: require('../assets/icons/required/panels/treasure_outlined.svg'),
   },
   // Note: No filled variant exists yet — filled calls fall back to outlined.
   world: {
-    outlined: require('../assets/icons/panels/world_outlined.svg'),
-    filled: require('../assets/icons/panels/world_outlined.svg'),
+    outlined: require('../assets/icons/required/panels/world_outlined.svg'),
+    filled: require('../assets/icons/required/panels/world_outlined.svg'),
   },
   settings: {
-    filled: require('../assets/icons/settings_filled.svg'),
-    outlined: require('../assets/icons/settings_outlined.svg'),
+    filled: require('../assets/icons/required/settings_filled.svg'),
+    outlined: require('../assets/icons/required/settings_outlined.svg'),
   },
 };
 

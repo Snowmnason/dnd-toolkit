@@ -1,8 +1,11 @@
-import { Button, SubTitle, Switch } from '@/components/ui'
-import { useAnalyticsConsent, useForceResync, useNetworkStatus, useRefreshStorageCache } from '@/hooks'
-import { logger } from '@/hooks/utils'
-import { useScale } from '@/theme'
-import { View } from 'react-native'
+import { Button, SubTitle, Switch } from '@/components/ui';
+import { useAnalyticsConsent } from '@/hooks/analytics';
+import { useNetworkStatus } from '@/hooks/network';
+import { useForceResync } from '@/hooks/offline';
+import { useRefreshStorageCache } from '@/hooks/storage';
+import { logger } from '@/hooks/utils';
+import { useScale } from '@/theme';
+import { View } from 'react-native';
 
 /**
  * ⚙️ AppSettings

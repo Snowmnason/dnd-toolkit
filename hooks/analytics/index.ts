@@ -1,4 +1,5 @@
 // Barrel export for analytics hooks
+export { Performance } from "@/lib/analytics/performance/performance-manager";
 export { Analytics, sessionManager, useAnalytics } from "./use-analytics";
 export { useAnalyticsConsent } from "./use-analytics-consent";
 export type { UseAnalyticsConsentReturn } from "./use-analytics-consent";

@@ -10,9 +10,9 @@
  */
 
 import { getAppConfig } from '@/config';
-import { reportCrash } from "@/lib/error";
-import { getJobQueue } from "@/lib/jobs";
+import { reportCrash } from "@/lib/error/degrade/degrade-manager";
 import { logger } from "@/lib/utils/logger";
+import { getJobQueue } from "@/system/Jobs/background-job-queue";
 import { AppKernel } from "@/system/Kernel";
 import { DegradeCapability } from "@/type-definitions/degrade";
 

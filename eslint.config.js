@@ -6,7 +6,24 @@ const securityPlugin = require('eslint-plugin-security');
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ['dist/*'],
+    ignores: [
+      // Generated build outputs — keep in sync with metro.config.js BLOCKED_DIRS
+      'dist/**',
+      'dist-desktop/**',
+      'desktop/dist/**',
+      'android/build/**',
+      'android/.gradle/**',
+      // Test infrastructure (linted separately by Jest/Vitest runners)
+      '__mocks__/**',
+      '__tests__/**',
+      // Dev tooling and config — not app source
+      'scripts/**',
+      'docs/**',
+      'supabase/**',
+      '.github/**',
+      '.vscode/**',
+      '.idea/**',
+    ],
     plugins: {
       security: securityPlugin,
     },

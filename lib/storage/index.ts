@@ -39,34 +39,9 @@
 // ─── Manager (primary API for lib modules) ──────────────────────────
 export { StorageManager } from './storage-manager';
 
-// ─── Query cache (in-memory SWR cache for API/database results) ─────
-export { QueryCache } from '@/middleware/storage';
+// Types only kept here for light re-export (no runtime cost)
 export type {
     CacheSchema, StorageGracefulResult,
     StorageHealthReport, StorageManagerReadOptions, StorageManagerWriteOptions
 } from './storage-manager';
-
-// ─── Domain-specific storage (app data structures) ──────────────────
-export { updateStorageCache } from "./sync/update-storage-cache";
-export { worldAccessCache } from "./sync/world-access-cache";
-
-/**
- * Bucket Storage Module - Barrel Export
- *
- * Central location for bucket (file storage) abstractions.
- * Supports multiple backend implementations: Supabase, Firebase Cloud Storage, S3, Cloudinary, etc.
- *
- * Architecture:
- * - registry.ts — registry pattern for mapping semantic operation names to backend implementations
- * - helpers.ts — utility functions (naming, validation, URL normalization)
- * - operations.ts — high-level wrappers combining registry + helpers
- */
-
-// Operations
-export {
-    deleteImage,
-    getImageUrl,
-    listFiles,
-    uploadProfileImage
-} from './buckets/operations';
 

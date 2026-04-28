@@ -18,8 +18,8 @@
  * can trigger safe mode and is used across multiple domains.
  */
 import { getAppConfig } from "@/config";
-import { StorageManager } from "@/lib/storage";
-import { logger } from "@/lib/utils";
+import { StorageManager } from "@/lib/storage/storage-manager";
+import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
 
 // ─── Configuration ───────────────────────────────────────────────────────────

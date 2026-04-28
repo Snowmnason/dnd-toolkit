@@ -1,5 +1,5 @@
 import { useAppToast } from '@/contexts/app-toast-context';
-import { JobsManager } from '@/lib/jobs';
+import { JobsManager } from '@/lib/jobs/jobs-manager';
 import { logger } from '@/lib/utils/logger';
 import { useCallback, useEffect, useRef, useState } from 'react';
 

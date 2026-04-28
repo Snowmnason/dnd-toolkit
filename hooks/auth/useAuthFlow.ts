@@ -111,12 +111,12 @@ async function navigateAfterSocialAuth(navigate: ReturnType<typeof useNavigation
   try {
     const userProfile = await usersDB.getCurrentUser()
     if (userProfile?.username) {
-      navigate.replace('/select/world-selection')
+      navigate.resetTo('/select/world-selection')
     } else {
-      navigate.replace('/login/sign-up')
+      navigate.resetTo('/login/sign-up')
     }
   } catch {
-    navigate.replace('/login/sign-up')
+    navigate.resetTo('/login/sign-up')
   }
 }
 
@@ -162,7 +162,7 @@ export function useAuthFlow(): {
 
     patch({ phase: 'success', loading: false, error: null })
     if (result.redirectTo) {
-      navigate.replace(result.redirectTo)
+      navigate.resetTo(result.redirectTo)
     }
   }, [patch, navigate])
 
@@ -245,7 +245,7 @@ export function useAuthFlow(): {
 
         patch({ phase: 'success', loading: false, error: null })
         if (reAuthResult.redirect) {
-          navigate.replace(reAuthResult.redirect)
+          navigate.resetTo(reAuthResult.redirect)
         } else {
           await navigateAfterSocialAuth(navigate)
         }

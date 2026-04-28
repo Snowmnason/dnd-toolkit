@@ -32,7 +32,7 @@
  * }
  */
 
-import { logger } from "@/lib/utils";
+import { logger } from "@/lib/utils/logger";
 import type { FlagContext } from "./conditions";
 
 // ==========================================

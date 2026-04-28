@@ -39,31 +39,59 @@ import { SupabaseAuthProvider } from './supabase/supabase-auth-provider';
  *
  * Safe to call multiple times (idempotent)
  */
+let _servicesInitialized = false;
+
 export async function initializeServices(): Promise<void> {
+  if (_servicesInitialized) {
+    logger.category('bootstrap').debug('[initializeServices] Already initialized — skipping');
+    return;
+  }
+  _servicesInitialized = true;
+
   logger.category('bootstrap').info('Initializing services...');
 
   try {
+    let _t = Date.now();
+
     // Initialize database provider FIRST — entity files depend on getDatabaseProvider()
     // This must run before auth and any other service that may trigger entity queries
     await initializeDatabaseProvider();
+    logger.category('bootstrap').info(`[services/t] database-provider: ${Date.now() - _t}ms`); _t = Date.now();
 
-    // Initialize repositories SECOND — must happen after DatabaseProvider
-    // Repositories depend on getDatabaseProvider() being available
-    // This must run before AUTH phase, which calls usersDB.getCurrentUser()
-    const { initializeRepositories } = await import('@/lib/database/repository-initializer');
-    await initializeRepositories();
-
-    // Initialize auth provider (Supabase by default)
-    await initializeAuthProvider();
+    // Repositories and auth provider in parallel — both only need database-provider (done above).
+    // repositories: needs getDatabaseProvider() being registered             ✅ done
+    // auth-provider: needs getSupabaseClient() created in database-provider  ✅ done
+    // Auth strategy objects are constructed here; they call repositories only when *executed*,
+    // so their construction does NOT require repositories to be registered yet.
+    // Both must complete before the AUTH phase, which is still guaranteed (services phase is serial).
+    const _parallelStart = Date.now();
+    await Promise.all([
+      (async () => {
+        const t = Date.now();
+        const { initializeRepositories } = await import('@/lib/database/repository-initializer');
+        await initializeRepositories();
+        logger.category('bootstrap').info(`[services/t] repositories: ${Date.now() - t}ms`);
+      })(),
+      (async () => {
+        const t = Date.now();
+        await initializeAuthProvider();
+        logger.category('bootstrap').info(`[services/t] auth-provider: ${Date.now() - t}ms`);
+      })(),
+    ]);
+    logger.category('bootstrap').info(`[services/t] repos+auth (parallel wall-time): ${Date.now() - _parallelStart}ms`);
+    _t = Date.now();
 
     // Initialize performance baseline service (loads baselines from SecureStorage)
     await performanceBaselineService.initialize();
+    logger.category('bootstrap').info(`[services/t] perf-baseline: ${Date.now() - _t}ms`); _t = Date.now();
 
     // Initialize error tracker (Sentry by default)
     await initializeErrorTracker();
+    logger.category('bootstrap').info(`[services/t] error-tracker: ${Date.now() - _t}ms`); _t = Date.now();
 
     // Register Sentry analytics exporter
     await initializeSentryExporter();
+    logger.category('bootstrap').info(`[services/t] sentry-exporter: ${Date.now() - _t}ms`);
   } catch (error) {
     logger.category('bootstrap').error(`Failed to initialize services: ${error}`);
     throw error;
@@ -248,9 +276,12 @@ async function initializeAuthProvider(): Promise<void> {
     await registerAuthProvider(validatedProvider);
     logger.category('bootstrap').info(`Auth provider '${providerName}' registered successfully`);
     
-    // Register auth strategies (done here via middleware to avoid circular deps in system/)
-    const { initializeAuthStrategies } = await import('@/middleware/services');
+    // Register auth strategies — thin dedicated file, no heavy static deps (~auth-service.ts has
+    // NetworkDetection, degrade-manager, AppError, system/Services barrel which cost ~1000ms)
+    const _stratStart = Date.now();
+    const { initializeAuthStrategies } = await import('@/middleware/services/auth-strategies-init');
     await initializeAuthStrategies();
+    logger.category('bootstrap').info(`[services/t] auth-strategies: ${Date.now() - _stratStart}ms`);
 
     updateServiceStatus('auth', 'ready', providerName);
 

@@ -25,12 +25,12 @@
 
 import { logger } from '@/lib/utils';
 import type {
-    NavigationContext,
-    NavigationDecision,
-    NavigationExecutionResult,
-    NavigationGuardConfig,
-    NavigationRequest,
-    NavigationTransaction,
+  NavigationContext,
+  NavigationDecision,
+  NavigationExecutionResult,
+  NavigationGuardConfig,
+  NavigationRequest,
+  NavigationTransaction,
 } from '@/type-definitions';
 import * as transportAdapter from './expo-router/transport_adapter';
 import { executeGuardPipeline } from './guard_executor';
@@ -54,7 +54,7 @@ export async function executeRouteTransitionNav(
   guardsToRun?: NavigationGuardConfig[],
   callerContext?: NavigationContext
 ): Promise<NavigationExecutionResult> {
-  const triggerType = request.action === 'replace' ? 'replace' : request.action === 'dismissTo' ? 'dismiss' : 'push';
+  const triggerType = request.action === 'replace' || request.action === 'reset' ? 'replace' : request.action === 'dismissTo' ? 'dismiss' : 'push';
   const transaction = new TransactionRunner('', request.target, triggerType);
   const transactionId = transaction.getId();
 
@@ -137,6 +137,10 @@ export async function executeRouteTransitionNav(
 
       case 'dismissTo':
         transportAdapter.executeRouterDismissTo(request.target, request.params);
+        break;
+
+      case 'reset':
+        transportAdapter.executeRouterReset(request.target, request.params);
         break;
 
       default:

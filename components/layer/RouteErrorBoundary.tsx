@@ -1,5 +1,5 @@
+import { logger } from '@/hooks/utils';
 import { type NavigationContext } from '@/lib/navigation/navigationConfig';
-import { logger } from '@/lib/utils';
 import { type RouteConfig } from '@/type-definitions';
 import React, { ReactNode } from 'react';
 import { NavigationErrorScreen } from '../SplashScreen/NavigationErrorScreen';

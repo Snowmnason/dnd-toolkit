@@ -23,7 +23,7 @@
 // Type Re-exports (so consumers never import from system/Kernel)
 // ═══════════════════════════════════════════════════════════════════
 
-import type { SafeModeState } from "@/lib/error";
+import type { SafeModeState } from "@/lib/error/safemode/safe-mode";
 import type {
   AppKernelState,
   KernelListener,

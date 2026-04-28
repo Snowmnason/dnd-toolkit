@@ -37,7 +37,7 @@ export function PanelNavDrawer({ collapsed = false }: PanelNavDrawerProps) {
     const params: Record<string, string> = {}
     if (worldId) params.worldId = worldId
     if (userRole) params.userRole = userRole as string
-    navigate.to(`/main/${featurePath}`, params)
+    navigate.replace(`/main/${featurePath}`, params)
   }
 
   // TODO: Open world settings modal when it exists
@@ -112,12 +112,15 @@ export function PanelNavDrawer({ collapsed = false }: PanelNavDrawerProps) {
       {/* Scrollable panel sections */}
       <ScrollView
         contentContainerStyle={{
-          paddingHorizontal: S.space.md,
-          paddingBottom: S.space.xs,
-          gap: S.space.xs,
+          paddingHorizontal: S.space.xxs,
+          paddingBottom: S.space.xxs,
+          gap: S.space.xxs,
         }}
         showsVerticalScrollIndicator={false}
-        style={{ flex: 1 }}
+        // minHeight: 0 is required on web: CSS flex gives ScrollView min-height: auto by
+        // default (= scroll content height), preventing it from shrinking to its flex
+        // allocation. Without this, the footer gets pushed outside the shell and clipped.
+        style={{ flex: 1, minHeight: 0 }}
       >
         {panelConfigs.map((panel) => {
           const isActive = activePanelKey === panel.key
@@ -157,7 +160,7 @@ export function PanelNavDrawer({ collapsed = false }: PanelNavDrawerProps) {
               {/* Feature items — indented to align with section label */}
               <View
                 style={{
-                  paddingLeft: S.size.lg + S.space.sm,
+                  paddingLeft: S.space.lg + S.space.md,
                   gap: S.space.xxs,
                 }}
               >
@@ -183,30 +186,32 @@ export function PanelNavDrawer({ collapsed = false }: PanelNavDrawerProps) {
         })}
       </ScrollView>
 
-      {/* Settings footer — pinned, always visible, clickable */}
+      {/* Settings footer — pinned, always visible */}
       <View
         style={{
-          paddingHorizontal: S.space.md,
-          paddingTop: S.space.xs,
-          paddingBottom: S.space.xs,
           borderTopWidth: 1,
           borderTopColor: $('borderSubtle', theme),
+          paddingTop: S.space.xs,
+          flexDirection: 'row',
+          alignItems: 'center',
         }}
       >
+        {/* Standalone icon — not interactive, purely decorative */}
+        <View style={{ width: S.size.lg, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons
+            name="settings-outline"
+            size={S.size.md}
+            color={$('textSecondary', theme)}
+          />
+        </View>
+
+        {/* Ghost button for the label */}
         <Button
           variant="ghost"
           size="sm"
           align="left"
           text="Settings"
-          iconLeft={
-            <Ionicons
-              name="settings-outline"
-              size={S.size.md}
-              color={$('textSecondary', theme)}
-            />
-          }
           onPress={openWorldSettings}
-          style={{ width: '100%' }}
         />
       </View>
 

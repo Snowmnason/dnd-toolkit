@@ -29,10 +29,10 @@
 
 import { useAppKernel } from "@/hooks/kernel";
 import {
-  AffectedFeature,
   checkFeatureGating,
   getGatedFeatures,
-} from "@/lib/error";
+} from "@/lib/error/safemode/feature-gating";
+import { AffectedFeature } from "@/lib/error/safemode/safe-mode";
 import { useMemo } from "react";
 
 /**

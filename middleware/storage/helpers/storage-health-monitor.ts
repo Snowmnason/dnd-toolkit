@@ -10,10 +10,9 @@
  */
 
 import { getAppConfig } from '@/config';
-import { reportCrash } from "@/lib/error";
-import { getJobQueue } from "@/lib/jobs";
+import { reportCrash } from "@/lib/error/degrade/degrade-manager";
 import { logger } from "@/lib/utils/logger";
-import { AppKernel } from "@/system/Kernel";
+import { getJobQueue } from "@/system/Jobs/background-job-queue";
 import { DegradeCapability } from "@/type-definitions/degrade";
 
 const STORAGE_HEALTH_CHECK_JOB_TYPE = "storage_health_check";
@@ -133,6 +132,7 @@ async function handleStorageHealthCheck(): Promise<{ nextCheckAt: number }> {
 
   // Bounds check: only reschedule if app kernel is still active
   // If kernel was reset (e.g., app destroyed, testing scenario), don't reschedule
+  const { AppKernel } = await import("@/system/Kernel/app-kernel");
   const kernelState = AppKernel.getState();
   if (kernelState.currentPhase === "idle") {
     logger

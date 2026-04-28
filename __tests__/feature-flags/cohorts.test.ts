@@ -11,8 +11,8 @@
  */
 
 import { FeatureFlagsManager } from "@/lib/feature-flags/server-sync/orchestrator";
-import { isUserInCohort } from "@/pure-algo-immutables";
 import { performFeatureFlagSync } from "@/lib/jobs/core/sync/feature-flags-sync-job";
+import { isUserInCohort } from "@/pure-algo-immutables/cohort-bucketing";
 import { SecureStorage } from "@/system/Storage";
 import type { CachedCohort, CachedUserCohortMembership } from "@/type-definitions/featureFlagTypes";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

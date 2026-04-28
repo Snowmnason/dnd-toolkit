@@ -1,7 +1,7 @@
 import {
-    RecoveryAction,
-    SafeModeReason,
-} from "@/lib/error";
+  RecoveryAction,
+  SafeModeReason,
+} from "@/lib/error/safemode/safe-mode";
 
 /**
  * Error Messages — D&D-themed messages for error/fallback screens.

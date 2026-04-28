@@ -24,7 +24,7 @@
  * ```
  */
 
-import { logger } from "@/lib/utils";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * Minimal context passed to strategy for decision-making

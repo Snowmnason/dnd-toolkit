@@ -1,10 +1,9 @@
-import {
-    Analytics,
-    AnalyticsConsent,
-    getCrashReportPayload,
-    sanitizeError as sanitizeErrorForAnalytics,
-} from "@/lib/analytics";
-import { enrichError, extractErrorCode, reportError } from "@/lib/error";
+import { Analytics } from "@/lib/analytics/analytics-manager";
+import { AnalyticsConsent } from "@/lib/analytics/consent/consent";
+import { getCrashReportPayload } from "@/lib/analytics/consent/consent-error-payload";
+import { sanitizeError as sanitizeErrorForAnalytics } from "@/lib/analytics/utils";
+import { enrichError, extractErrorCode } from '@/lib/error/error-enrichment';
+import { reportError } from '@/lib/error/error-manager';
 import { logger, type LogCategory } from "@/lib/utils";
 import type { ErrorCodeType } from "@/maps/ERROR_CODES";
 import type { RequestInterceptor } from "./interceptor";

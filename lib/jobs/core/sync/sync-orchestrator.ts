@@ -38,21 +38,23 @@
 
 import { logger } from "@/lib/utils/logger";
 import type { AuthTokens, ReAuthContext, ReAuthJobResult } from "../auth/reauth-job";
-import { determinePostAuthRedirect } from "../auth/reauth-job";
+// Note: determinePostAuthRedirect is imported dynamically at call site (line ~578)
+// to avoid loading reauth-job.ts (which pulls @/lib/navigation + @/lib/auth/auth-state)
+// at job-registration time. These are ~600ms of cold modules we don't need until a job runs.
 import type {
-  FeatureFlagsSyncResult,
+    FeatureFlagsSyncResult,
 } from "./feature-flags-sync-job";
 import {
-  performProfileSync,
-  ProfileSyncResult,
+    performProfileSync,
+    ProfileSyncResult,
 } from "./profile-sync-job";
 import {
-  performQueueSync,
-  QueueSyncResult,
+    performQueueSync,
+    QueueSyncResult,
 } from "./queue-sync-job";
 import {
-  performWorldsSync,
-  WorldsSyncResult,
+    performWorldsSync,
+    WorldsSyncResult,
 } from "./worlds-sync-job";
 
 // ============================================================================
@@ -576,6 +578,7 @@ export async function performFullSync(
     // DETERMINE REDIRECT (after all sync completes)
     // ─────────────────────────────────────────────────────────────────────
     try {
+      const { determinePostAuthRedirect } = await import("../auth/reauth-job");
       const redirectResult = await determinePostAuthRedirect(context);
       result.redirect = redirectResult.redirect;
       if (redirectResult.errors.length > 0) {

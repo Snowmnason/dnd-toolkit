@@ -352,19 +352,21 @@ export function Button(props: ButtonProps) {
       >
         {isGhost ? (
           // Ghost variant: No gradient, simple centered container
+          // No overflow:hidden needed (no gradient/ripple to clip)
           <View
             style={{
-              height,
+              // minHeight instead of height: lets the button grow to fit content.
+              // The outer Animated.View grows with it, so overflow:hidden (RNW default)
+              // never clips content that exceeds the base button height.
+              minHeight: height,
               paddingHorizontal: paddingH,
               borderRadius: S.radius.md,
               borderColor: borderColorValue,
               borderWidth: 3,
               backgroundColor: 'transparent',
-              overflow: 'hidden',
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: align === 'left' ? 'flex-start' : 'center',
-              //...getShadowStyle('softer'),
             }}
           >
             {contentView}

@@ -98,17 +98,19 @@ export async function preloadPhase(signal: AbortSignal): Promise<void> {
       }
     }
 
-    // Preload icon assets — non-critical, ensures SVGs are cached before first render
+    // Preload required image assets — non-critical but ensures GIF/PNG are decoded
+    // before first render (loading spinner, world map placeholder).
+    // Icons are warmed after app is ready in runPostReadyTasks() instead.
     try {
       const { Asset } = await import('expo-asset');
-      const { getAllIconAssets } = await import('@/maps/icon-map');
-      await Asset.loadAsync(getAllIconAssets());
-      logger.category('bootstrap').debug('Icon assets preloaded');
-    } catch (iconError) {
+      const { getRequiredImageAssets } = await import('@/maps/image-map');
+      await Asset.loadAsync(getRequiredImageAssets());
+      logger.category('bootstrap').debug('Required image assets preloaded');
+    } catch (imageError) {
       logger
         .category('bootstrap')
-        .warn('Icon asset preload failed (non-critical)', {
-          error: (iconError as Error).message,
+        .warn('Required image preload failed (non-critical)', {
+          error: (imageError as Error).message,
         });
     }
 

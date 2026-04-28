@@ -16,15 +16,15 @@
  * - Transform entities (modules do that)
  */
 
-import { reportFault } from '@/lib/error';
+import { reportFault } from '@/lib/error/degrade/degrade-manager';
 import { logger } from '@/lib/utils/logger';
-import { DegradeCapability } from '@/type-definitions/degrade';
 import { ConnectionQuality, NetworkDetection } from '@/system/Network';
 import {
     getDatabaseProvider,
     isServiceReady,
     type DatabaseProvider
 } from '@/system/Services';
+import { DegradeCapability } from '@/type-definitions/degrade';
 
 // ─── RPC Procedure Map ────────────────────────────────────────────
 // Maps semantic edge function names to their Supabase PostgreSQL RPC procedure names.

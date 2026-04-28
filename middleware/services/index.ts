@@ -37,11 +37,11 @@ export {
     getAuth,
     getAuthProvider, getAuthProviderSync, getAuthSync,
     getDatabaseProviderRawClient,
-    initializeAuthStrategies,
     isAuthConfigured,
     isDatabaseProviderConfigured,
     type Session
 } from './auth-service';
+export { initializeAuthStrategies } from './auth-strategies-init';
 
 // ─── Database Service ──────────────────────────────────────────────
 export {

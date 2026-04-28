@@ -151,7 +151,7 @@ export function useSignUpFlow(mode: SignUpFlowMode = 'signup', user?: any): {
         await StorageManager.set(STORAGE_KEYS.PROFILE_COMPLETED, false)
         patch({ phase: 'success', loading: false })
         //THISMIGHTBEWRONG
-        navigate.replace(result.redirectTo)
+        navigate.resetTo(result.redirectTo)
         return
       }
 
@@ -193,7 +193,7 @@ export function useSignUpFlow(mode: SignUpFlowMode = 'signup', user?: any): {
       // Pending invites will be handled by the world-selection screen
       await StorageManager.set(STORAGE_KEYS.PROFILE_COMPLETED, true)
       patch({ phase: 'success', loading: false })
-      navigate.replace('/select/world-selection')
+      navigate.resetTo('/select/world-selection')
     } catch (error: any) {
       logger.category('auth').error('Profile creation error:', error)
 

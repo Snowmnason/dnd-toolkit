@@ -227,6 +227,46 @@ export function executeRouterDismissAll(): TransportResult {
  * @param params - Object containing key-value pairs to set as query parameters (Expo: Partial<RouteInputParams<T>>)
  * @returns Execution result with success state and optional error
  */
+/**
+ * Execute a full stack reset to a new root route.
+ *
+ * Clears the entire navigation history and sets the target as the new root.
+ * Use this when the destination should be unreachable via the back button
+ * (e.g., navigating to world-selection after sign-in should clear the login stack).
+ *
+ * Implementation: dismissAll() pops the stack to its root, then replace() swaps
+ * that root for the target. React 18 batches both dispatches into one re-render
+ * so there is no intermediate flash.
+ *
+ * Falls back to replace() if dismissAll fails.
+ *
+ * @param target - Fully-formed route path to reset to (e.g., '/select/world-selection')
+ * @param params - Optional URL parameters
+ * @returns Execution result with success state and optional error
+ */
+export function executeRouterReset(
+  target: string,
+  params?: Record<string, any>,
+): TransportResult {
+  try {
+    const router = getRouter();
+    const cleanTarget = target.startsWith('/') ? target : `/${target}`;
+
+    // Pop the entire stack back to the root entry, then replace that entry.
+    // React 18 automatic batching means both dispatches resolve in one commit.
+    router.dismissAll();
+    router.replace({ pathname: cleanTarget, params } as any);
+
+    logger.category('navigation').debug(`Router reset: ${target}`);
+    return { success: true };
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.category('navigation').error(`Router reset failed: ${target}`, { error: err });
+    // Fallback: replace only the current entry so navigation at least lands somewhere
+    return executeRouterReplace(target, params);
+  }
+}
+
 export function executeRouterSetParams(params: Record<string, any>): TransportResult {
   try {
     const router = getRouter();

@@ -19,7 +19,7 @@
  *   ✓ 2 pending changes • Synced 2 mins ago
  */
 
-import { useOfflineQueue } from "@/hooks";
+import { useOfflineQueue } from "@/hooks/offline/use-offline-queue";
 import { $ } from "@/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo } from "react";

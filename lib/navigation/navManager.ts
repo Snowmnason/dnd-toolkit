@@ -129,7 +129,7 @@ export async function executeRouteNavigation(
   target: string,
   params?: Record<string, string>,
   options?: NavManagerOptions,
-  action: 'push' | 'replace' | 'dismissTo' = 'push'
+  action: 'push' | 'replace' | 'dismissTo' | 'reset' = 'push'
 ): Promise<NavServiceResult> {
   try {
     const ctx = buildNavigationContext();
@@ -215,7 +215,7 @@ export async function executeInternalRedirectNavigation(
   target: string,
   params?: Record<string, string>,
   options?: NavManagerOptions,
-  action: 'push' | 'replace' | 'dismissTo' = 'replace'
+  action: 'push' | 'replace' | 'dismissTo' | 'reset' = 'replace'
 ): Promise<NavServiceResult> {
   try {
     // TODO: Validate redirect reason (ensure it's from approved source)
