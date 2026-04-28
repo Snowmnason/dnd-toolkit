@@ -1,5 +1,5 @@
 import { AppModal, Body, Button, FormTextInput } from '@/components/ui'
-import { registerModal } from '@/contexts'
+import { registerModal } from '@/contexts/modal-context'
 import { $, useScale, UseTheme } from '@/theme'
 import { type UpdateUsernameFormData } from '@/validation/auth.schema'
 import { Control } from 'react-hook-form'

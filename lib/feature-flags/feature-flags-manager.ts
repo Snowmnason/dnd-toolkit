@@ -12,10 +12,10 @@
  * Public API for hooks and managers. Never call the singletons directly.
  */
 
-import { reportFault } from '@/lib/error';
+import { reportFault } from '@/lib/error/degrade/degrade-manager';
 import { logger } from '@/lib/utils/logger';
-import { DegradeCapability } from '@/type-definitions/degrade';
 import { verifyDeviceClock as checkDeviceClock } from '@/system/Kernel/clock-integrity';
+import { DegradeCapability } from '@/type-definitions/degrade';
 import { type FlagContext } from './evaluation/conditions';
 import type { FeatureFlagKind, FeatureFlagName } from './local-flags';
 import { FeatureFlags } from './local-flags';

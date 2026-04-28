@@ -27,11 +27,14 @@
  */
 
 import { isDevelopment } from "@/config";
-import { validateFlagDependencies } from "@/lib/feature-flags/server-sync/evaluation";
-import { subscribeToRealtimeUpdates } from "@/lib/feature-flags/server-sync/realtime";
 import { notifySubscribers } from "@/lib/feature-flags/server-sync/state";
 import { logger } from "@/lib/utils/logger";
 import { loadHardcodedFlags, seedManagerFromCache } from "./bootstrap-helpers";
+
+// subscribeToRealtimeUpdates and validateFlagDependencies are dynamic — they're only
+// needed conditionally at the end of the phase and both pull in heavy import chains
+// (realtime.ts → @/middleware/feature-flag → @/system/Network, @/system/Services).
+// Static imports here would load those chains on every cold start even when unused.
 
 // ==========================================
 // Exported: Bootstrap Phase Entry Point
@@ -52,10 +55,12 @@ import { loadHardcodedFlags, seedManagerFromCache } from "./bootstrap-helpers";
 export async function featureFlagsPhase(signal: AbortSignal): Promise<void> {
   try {
     if (signal.aborted) return;
+    let _t = Date.now();
     const [{ FeatureFlagsManager }, { getDatabaseProvider }] = await Promise.all([
       import("@/lib/feature-flags/server-sync/orchestrator"),
-      import("@/system/Services"),
+      import("@/system/Services/database-adapter"),
     ]);
+    logger.category("bootstrap").info(`[feature-flags/t] imports: ${Date.now() - _t}ms`);
 
     // ─── Set up state (no userId at bootstrap) ────────────────────
     // userId is set at sign-in by feature-flags-sync-job
@@ -69,19 +74,29 @@ export async function featureFlagsPhase(signal: AbortSignal): Promise<void> {
       return;
     }
 
-    // ─── Evaluate snapshot freshness ────────────────────────────────
-    const { evaluateSnapshotFreshness } = await import(
-      "@/pure-algo-immutables"
-    );
-    const freshness = await evaluateSnapshotFreshness();
+    // ─── Freshness evaluation + clock check — parallel (both are read-only storage ops) ────
+    _t = Date.now();
+    const [{ evaluateSnapshotFreshness }, { verifyDeviceClock: kernelClockCheck }] = await Promise.all([
+      import("@/pure-algo-immutables/cache-freshness"),
+      import("@/system/Kernel/clock-integrity"),
+    ]);
+    const [freshness, clockValid] = await Promise.all([
+      evaluateSnapshotFreshness(),
+      kernelClockCheck(),
+    ]);
+    logger.category("bootstrap").info(`[feature-flags/t] freshness(${freshness})+clock-check: ${Date.now() - _t}ms`);
+    if (!clockValid) {
+      logger.category("bootstrap").warn(
+        "Device clock validation failed — premium features may be restricted",
+      );
+    }
     const state = FeatureFlagsManager.state;
-
-    logger.category("bootstrap").debug(`Feature flags: freshness=${freshness}`);
 
     // ─── Load flags based on freshness (no server fetch) ────────────
     //   fresh       → trust cache (don't override)
     //   stale/dead  → hardcoded safety net (sign-in will override with server data)
     //   none        → hardcoded defaults (first launch)
+    _t = Date.now();
     if (freshness === "fresh") {
       const seeded = await seedManagerFromCache();
       if (!seeded) {
@@ -105,23 +120,24 @@ export async function featureFlagsPhase(signal: AbortSignal): Promise<void> {
         { flagCount: state.currentFlags.size },
       );
     }
+    logger.category("bootstrap").info(`[feature-flags/t] load-flags: ${Date.now() - _t}ms`);
 
-    // ─── Clock integrity check ──────────────────────────────────────
-    const { verifyDeviceClock: kernelClockCheck } = await import(
-      "@/system/Kernel/clock-integrity"
-    );
-    const clockValid = await kernelClockCheck();
-    if (!clockValid) {
-      logger.category("bootstrap").warn(
-        "Device clock validation failed — premium features may be restricted",
-      );
-    }
-
-    // ─── Realtime subscriptions + validation ─────────────────────────
+    // ─── Realtime subscriptions (blocking) + validation (fire-and-forget) ────────────────
+    // Realtime must await — sets up live update channels before app is interactive.
+    // validateFlagDependencies is a pure consistency check — no runtime consequence
+    // if it runs slightly after READY. Fire-and-forget to unblock the phase.
+    _t = Date.now();
     if (!isDevelopment()) {
+      const { subscribeToRealtimeUpdates } = await import(
+        "@/lib/feature-flags/server-sync/realtime"
+      );
       await subscribeToRealtimeUpdates(state);
     }
-    validateFlagDependencies(state);
+    logger.category("bootstrap").info(`[feature-flags/t] realtime: ${Date.now() - _t}ms`);
+    // Fire-and-forget: loads evaluation.ts async, doesn't block READY
+    void import("@/lib/feature-flags/server-sync/evaluation").then(({ validateFlagDependencies }) => {
+      validateFlagDependencies(state);
+    });
 
     logger.category("bootstrap").info("Feature flags phase complete (service initialized)", {
       flagCount: state.currentFlags.size,

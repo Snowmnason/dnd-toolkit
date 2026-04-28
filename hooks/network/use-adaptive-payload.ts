@@ -26,8 +26,8 @@
  */
 
 import { NetworkManager, type AdaptivePayloadOptions } from '@/lib/network/network-manager';
-import { QueryCache } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
+import { QueryCache } from "@/middleware/storage";
 import { useEffect, useMemo, useState } from 'react';
 
 export interface UseAdaptivePayloadResult {

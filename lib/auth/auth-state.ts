@@ -1,8 +1,8 @@
 import { getUserRepository, getWorldAccessRepository } from "@/lib/database";
-import { clearAllUserData, getAllSecureStorageKeys, getPrivacyStorageBackend } from "@/lib/middleware/storage";
 import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
+import { clearAllUserData, getAllSecureStorageKeys, getPrivacyStorageBackend } from "@/middleware/storage";
 import { classifyCacheAge } from "@/pure-algo-immutables";
 
 // In-memory flag: signals that data sync should run after appReady.
@@ -13,6 +13,19 @@ let _pendingSyncRequired = false;
 // Used when we detect a reason to do a full sync (e.g., force refresh, cache validation failed).
 // Not persisted — resets on launch. Bootstrap splash → Sync splash (no flicker).
 let _postBootstrapFullSync = false;
+
+/**
+ * Bootstrap freshness outcome from auth-phase.
+ * Set once during kernel bootstrap, read by the web entry coordinator to determine
+ * the canonical initial destination on full page loads.
+ *
+ * - 'fresh': < 4 days, session restored → /select/world-selection
+ * - 'stale': 4-30 days, re-auth required → /login/sign-in
+ * - 'dead':  > 30 days, storage cleared → /
+ * - 'none':  no previous login found → /
+ */
+export type BootstrapFreshness = 'fresh' | 'stale' | 'dead' | 'none';
+let _bootstrapFreshness: BootstrapFreshness = 'none';
 
 // Callbacks registered via onSyncRequired() — fired when markSyncRequired() is called
 let _syncRequiredCallbacks: (() => void)[] = [];
@@ -51,7 +64,7 @@ async function getAuthManager() {
 function isBackendConfigured(): boolean {
   // Dynamic import cached at module level to avoid repeated imports
   // Uses isAuthConfigured from middleware which checks isServiceReady('auth')
-  const { isAuthConfigured } = require("@/lib/middleware/services/auth-service");
+  const { isAuthConfigured } = require("@/middleware/services");
   return isAuthConfigured();
 }
 
@@ -114,6 +127,16 @@ export const AuthStateManager = {
   },
   isPostBootstrapFullSyncRequested(): boolean { return _postBootstrapFullSync; },
   clearPostBootstrapFullSync(): void { _postBootstrapFullSync = false; },
+
+  // ─── Bootstrap freshness handoff ───────────────────────────────────────────
+  // Set by auth-phase during kernel bootstrap. Read by the web entry coordinator
+  // (useBootstrapRouteGuard) to determine the canonical initial destination.
+  // Not persisted — resets to 'none' on every app launch.
+  setBootstrapFreshness(freshness: BootstrapFreshness): void {
+    _bootstrapFreshness = freshness;
+    logger.category('bootstrap').debug(`[AuthStateManager] Bootstrap freshness set: ${freshness}`);
+  },
+  getBootstrapFreshness(): BootstrapFreshness { return _bootstrapFreshness; },
 
   /**
    * Subscribe to sync required notifications.
@@ -203,7 +226,7 @@ export const AuthStateManager = {
       await SessionAdapter.clearSession();
 
       // Clear query cache (all user-specific cached queries)
-      const { QueryCache } = await import("@/lib/middleware/storage");
+      const { QueryCache } = await import("@/middleware/storage");
       await QueryCache.clearAll();
 
       // Clear FastCache (in-memory session cache)

@@ -196,7 +196,7 @@ export function createSupabaseRpcAdapter<
     handler: async (input: Input) => {
       // Dynamically import the middleware version to avoid circular dependencies.
       // The middleware wraps the raw runEdgeFunction with precondition checks.
-      const { runEdgeFunction: middlewareRunEdgeFunction } = await import('@/lib/middleware/services');
+      const { runEdgeFunction: middlewareRunEdgeFunction } = await import('@/middleware/services');
       return middlewareRunEdgeFunction<Output>(functionName, input);
     },
   };

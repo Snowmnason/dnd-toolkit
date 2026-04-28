@@ -9,7 +9,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { QueryCache } from '../../lib/middleware/storage';
+import { QueryCache } from '../../middleware/storage';
 
 // Mock logger to avoid noise in tests
 vi.mock('../../lib/utils/logger', () => ({

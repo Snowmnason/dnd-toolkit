@@ -8,10 +8,10 @@
  * Each handler applies the change to in-memory state, persists to storage,
  * and notifies subscribers.
  */
-import { getRealtimeProvider } from "@/lib/middleware/feature-flag/feature-flag-service";
 import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils/logger";
 import { STORAGE_KEYS } from "@/maps";
+import { getRealtimeProvider } from "@/middleware/feature-flag/feature-flag-service";
 import type { CachedCohort, CachedEntitlement, CachedUserCohortMembership, FeatureFlagState } from "@/type-definitions/featureFlagTypes";
 import { resolveCohortSlug } from "./evaluation";
 import {

@@ -1,12 +1,12 @@
 import { dbRequestOptions } from "@/config";
 import { fetchRequest } from "@/lib/api";
 import { executeEdgeFunction } from "@/lib/database/edge";
-import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
+import { getDatabase } from "@/middleware/services";
 import type {
-  AccessRole,
-  WorldAccess,
-  WorldAccessRepository
+    AccessRole,
+    WorldAccess,
+    WorldAccessRepository
 } from "./repo-types";
 
 /**

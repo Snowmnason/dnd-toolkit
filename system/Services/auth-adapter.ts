@@ -16,8 +16,8 @@
  */
 
 import { isDevelopment } from '@/config';
-import { logger } from '@/lib/utils';
-import { RedactionManager } from "@/pure-algo-immutables";
+import { logger } from '@/lib/utils/logger';
+import { RedactionManager } from "@/pure-algo-immutables/redaction-manager";
 import { validateEmail, validatePassword } from '@/validation/validation';
 
 /**

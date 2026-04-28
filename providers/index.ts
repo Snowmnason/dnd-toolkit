@@ -56,6 +56,9 @@ export { PlatformProvider, usePlatform } from "./PlatformProvider";
 // Scale
 export { ScaleProvider, useScale } from "./ScaleProvider";
 
+// Kernel (outermost provider — wraps the entire app)
+export { AppKernelProvider } from "./AppKernelProvider";
+
 // Subscription
 export { SubscriptionProvider, useSubscription } from "./SubscriptionProvider";
 

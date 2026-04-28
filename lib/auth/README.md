@@ -103,7 +103,7 @@ Creates a new user account with email verification.
 ```ts
 const result = await signUpUser("user@example.com", "SecurePass123!");
 if (result.success) {
-  router.push(result.redirectTo!); // → email confirmation
+  navigate.push(result.redirectTo!); // → email confirmation
 }
 ```
 
@@ -121,7 +121,7 @@ Authenticates an existing user and performs post-login setup.
 ```ts
 const result = await signInUser("user@example.com", "SecurePass123!");
 if (result.success) {
-  router.push(result.redirectTo!); // → main app
+  navigate.push(result.redirectTo!); // → main app
 }
 ```
 

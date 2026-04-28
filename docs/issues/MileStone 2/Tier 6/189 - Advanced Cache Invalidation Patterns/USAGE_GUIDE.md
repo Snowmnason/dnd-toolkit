@@ -65,7 +65,7 @@ The cache invalidation system initializes automatically during app bootstrap via
 #### Register Dependencies
 
 ```typescript
-import { QueryCache } from "@/lib/middleware/storage";
+import { QueryCache } from "@/middleware/storage";
 
 // Register cascade relationships
 await QueryCache.registerCascade('world:123', [

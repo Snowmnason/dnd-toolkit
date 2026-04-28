@@ -221,7 +221,7 @@ class UpdateCredsSystemImpl {
       logger.category('security').debug('Update Password Phase 2: Updating password with auth provider');
 
       try {
-        const { authUpdatePassword } = await import('@/lib/middleware/services/auth-service');
+        const { authUpdatePassword } = await import('@/middleware/services/auth-service');
         const updateResult = await authUpdatePassword(newPassword);
 
         if (!updateResult.success) {

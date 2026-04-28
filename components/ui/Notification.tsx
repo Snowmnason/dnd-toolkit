@@ -1,4 +1,4 @@
-import { logger } from "@/lib/utils/logger";
+import { logger } from "@/hooks/utils";
 import { usePlatform } from "@/providers";
 import { $, S, UseTheme } from "@/theme";
 import { Ionicons } from "@expo/vector-icons";

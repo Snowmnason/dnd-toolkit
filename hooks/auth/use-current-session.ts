@@ -11,19 +11,19 @@
  */
 
 import { useAppKernel } from "@/hooks/kernel";
-import { getCurrentSession, isEmailConfirmed, type Session } from "@/lib/auth";
+import { getCurrentSession, type Session } from "@/lib/auth";
 import { useEffect, useRef, useState } from "react";
 
-export interface CurrentSessionState {
-  session: Session | null;
-  loading: boolean;
-  isConfirmed: boolean;
+export interface UseCurrentSessionResult {
+  sessionSnapshot: Session | null;
+  isReady: boolean;         // true when kernel ready AND session query resolved
+  isAuthenticated: boolean; // derived: sessionSnapshot !== null
 }
 
-export function useCurrentSession(): CurrentSessionState {
+export function useCurrentSession(): UseCurrentSessionResult {
   const kernel = useAppKernel();
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [sessionSnapshot, setSessionSnapshot] = useState<Session | null>(null);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
   const fetchedRef = useRef(false);
 
   useEffect(() => {
@@ -34,11 +34,16 @@ export function useCurrentSession(): CurrentSessionState {
     fetchedRef.current = true;
 
     getCurrentSession()
-      .then((s) => setSession(s))
-      .catch(() => setSession(null))
-      .finally(() => setLoading(false));
+      .then((s) => setSessionSnapshot(s))
+      .catch(() => setSessionSnapshot(null))
+      .finally(() => setSessionLoaded(true));
   }, [kernel.phases.appReady]);
 
-  return { session, loading, isConfirmed: isEmailConfirmed(session) };
+  const isReady = kernel.phases.appReady && sessionLoaded;
+  return {
+    sessionSnapshot,
+    isReady,
+    isAuthenticated: sessionSnapshot !== null,
+  };
 }
 

@@ -106,14 +106,14 @@ export async function performSignUp(
     // Note: Input validation happens in auth-manager via signUpSchema
     logger.category('auth').debug('Sign-up: Calling auth provider to create account');
 
-    const { authSignUp } = await import('@/lib/middleware/services');
+    const { authSignUp } = await import('@/middleware/services');
     const baseUrl =
       typeof window !== 'undefined'
         ? window.location.origin
         : 'https://dnd-tool.thesnowpost.com';
 
     const signupResult = await authSignUp(email, password, {
-      emailRedirectTo: `${baseUrl}/login/auth-redirect?action=signup-confirm`,
+      emailRedirectTo: `${baseUrl}/login/sign-up?action=signup-confirm`,
     });
 
     if (!signupResult.success) {
@@ -141,7 +141,7 @@ export async function performSignUp(
       logger.category('auth').debug('Sign-up: Caching session + metadata for email confirmation flow');
 
       // Get session from auth provider
-      const { authGetSession } = await import('@/lib/middleware/services');
+      const { authGetSession } = await import('@/middleware/services');
       const session = await authGetSession();
 
       if (session && (session as any).raw) {

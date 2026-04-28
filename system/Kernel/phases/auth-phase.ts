@@ -129,7 +129,7 @@ export async function authPhase(signal: AbortSignal): Promise<void> {
             // Clear query cache
             try {
               const { QueryCache } = await import(
-                "@/lib/middleware/storage"
+                "@/middleware/storage"
               );
               await QueryCache.clearAll();
               logger.category("bootstrap").debug("Cleared query cache");
@@ -142,6 +142,14 @@ export async function authPhase(signal: AbortSignal): Promise<void> {
             logger
               .category("bootstrap")
               .info("✅ All storage cleared (dead session > 30 days)");
+
+            // Signal bootstrap freshness to web entry coordinator
+            try {
+              const { AuthStateManager } = await import("@/lib/auth/auth-state");
+              AuthStateManager.setBootstrapFreshness('dead');
+            } catch (err) {
+              logger.category("bootstrap").warn("Failed to set bootstrap freshness:", err);
+            }
             return; // Exit early - don't attempt to restore session
           }
 
@@ -154,6 +162,7 @@ export async function authPhase(signal: AbortSignal): Promise<void> {
             try {
               const { AuthStateManager } = await import("@/lib/auth/auth-state");
               AuthStateManager.markSyncRequired();
+              AuthStateManager.setBootstrapFreshness('stale');
               logger.category("bootstrap").debug("Marked sync required for STALE session");
             } catch (err) {
               logger.category("bootstrap").warn("Failed to mark sync required:", err);
@@ -164,6 +173,14 @@ export async function authPhase(signal: AbortSignal): Promise<void> {
             logger.category("bootstrap").info(
               `Data is FRESH (${(ageMs / 1000 / 60 / 60).toFixed(1)} hours old) - loading local state`
             );
+
+            // Signal bootstrap freshness to web entry coordinator
+            try {
+              const { AuthStateManager: ASM } = await import("@/lib/auth/auth-state");
+              ASM.setBootstrapFreshness('fresh');
+            } catch (err) {
+              logger.category("bootstrap").warn("Failed to set bootstrap freshness:", err);
+            }
           }
 
           // Load local state for FRESH sessions (STALE re-auth is deferred to sync-splash)
@@ -281,12 +298,24 @@ export async function authPhase(signal: AbortSignal): Promise<void> {
           logger.category("bootstrap").debug(
             "Timestamp validation failed, treating as cleared session",
           );
+          // Signal no valid session to web entry coordinator
+          try {
+            const { AuthStateManager: ASM } = await import("@/lib/auth/auth-state");
+            ASM.setBootstrapFreshness('none');
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          } catch (_) { /* non-critical */ }
         }
       } else {
         // No valid timestamp - first time user or cleared cache
         logger
           .category("bootstrap")
           .debug("No previous login found, unauthenticated (will redirect to login)");
+        // Signal no valid session to web entry coordinator
+        try {
+          const { AuthStateManager: ASM } = await import("@/lib/auth/auth-state");
+          ASM.setBootstrapFreshness('none');
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (_) { /* non-critical */ }
       }
     } catch (error) {
       logger.category("bootstrap").warn("Failed to evaluate staleness:", {

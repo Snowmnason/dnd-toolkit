@@ -11,9 +11,9 @@
  * - NetworkDetection for reachability checks
  */
 
-import { NetworkRecoveryManager } from "@/lib/middleware/api";
-import { isNetworkOnline } from "@/lib/middleware/network";
 import { logger } from "@/lib/utils/logger";
+import { NetworkRecoveryManager } from "@/middleware/api";
+import { isNetworkOnline } from "@/middleware/network";
 import { NetworkStateManager } from "@/system/Network/state-machine";
 
 type NetworkStateMachine = typeof NetworkStateManager;

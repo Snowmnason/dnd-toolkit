@@ -1,4 +1,4 @@
-import { logger } from "@/lib";
+import { logger } from "@/hooks/utils";
 import React, { ReactNode } from "react";
 import { CrashFallBack } from "../SplashScreen/CrashFallBack";
 

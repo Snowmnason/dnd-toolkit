@@ -224,6 +224,33 @@ vi.mock("@sentry/react-native", () => ({
   withScope: (cb: Function) => cb({ setExtras: () => {}, setTag: () => {} }),
 }));
 
+// Mock icon-map to avoid require() of SVG files in tests
+vi.mock("@/maps/icon-map", () => {
+  return {
+    getIconAsset: (key: string, variant: string) => {
+      const assets: Record<string, Record<string, string>> = {
+        char: { filled: 'icon-char-filled', outlined: 'icon-char-outlined' },
+        combat: { filled: 'icon-combat-filled', outlined: 'icon-combat-outlined' },
+        story: { filled: 'icon-story-filled', outlined: 'icon-story-outlined' },
+        treasure: { filled: 'icon-treasure-filled', outlined: 'icon-treasure-outlined' },
+        world: { filled: 'icon-world-outlined', outlined: 'icon-world-outlined' },
+        settings: { filled: 'icon-settings-filled', outlined: 'icon-settings-outlined' },
+      };
+       
+      const entry = assets[key] || {};
+      return variant === 'filled' && entry.filled ? entry.filled : entry.outlined || 'icon-default';
+    },
+    getAllIconAssets: () => [
+      'icon-char-filled', 'icon-char-outlined',
+      'icon-combat-filled', 'icon-combat-outlined',
+      'icon-story-filled', 'icon-story-outlined',
+      'icon-treasure-filled', 'icon-treasure-outlined',
+      'icon-world-outlined',
+      'icon-settings-filled', 'icon-settings-outlined',
+    ],
+  };
+});
+
 // Ensure debug logs are visible by default
 // Fail tests on unhandled promise rejections or uncaught exceptions so
 // Vitest surfaces the actual error/stack instead of worker exits.

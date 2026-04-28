@@ -87,7 +87,7 @@ const handleTopBarBack = () => {
     return;
   }
   // Otherwise do normal route navigation
-  router.replace(backTarget);
+  navigate.replace(backTarget);
 };
 ```
 

@@ -27,11 +27,11 @@
  * ```
  */
 
-import type { Href } from "expo-router";
-import { Router } from "expo-router";
 import { useAppKernel } from "@/hooks/kernel";
+import { useNavigation } from "@/hooks/navigation";
 import { getAllRouteConfigs } from "@/lib/navigation";
 import { logger } from "@/lib/utils";
+import { useEffect } from "react";
 import { checkFeatureGating } from "./feature-gating";
 import { AffectedFeature } from "./safe-mode";
 
@@ -61,19 +61,18 @@ interface FeatureGatingGuardOptions {
 }
 
 /**
- * Navigation guard hook to protect routes from gated features
+ * Navigation guard factory to protect routes from gated features
  *
- * Use this in screen/layout components to redirect when a feature is unavailable.
- * Typically used at route entry points to prevent accessing screens that depend
- * on gated features.
+ * Deprecated: Use `useFeatureGatingGuard()` hook instead for better integration.
+ * This factory function is kept for backward compatibility but should not be used in new code.
  *
  * @param feature - Feature to guard
- * @param router - Expo router instance
+ * @param navigate - Navigation instance from useNavigation hook
  * @param options - Guard options
  */
 export function createFeatureGatingGuard(
   feature: AffectedFeature,
-  router: Router,
+  navigate: ReturnType<typeof useNavigation>,
   options: FeatureGatingGuardOptions = {},
 ) {
   return (safeMode: ReturnType<typeof useAppKernel>["safeMode"]) => {
@@ -107,7 +106,7 @@ export function createFeatureGatingGuard(
         return false; // Guard not applied due to invalid route
       }
 
-      router.push(fallbackRoute as unknown as Href);
+      navigate.replace(fallbackRoute);
       return true; // Guard was applied
     }
 
@@ -116,36 +115,73 @@ export function createFeatureGatingGuard(
 }
 
 /**
- * Alternative: Direct hook for use in components (FUTURE IMPLEMENTATION)
+ * Hook to protect routes from gated features
  *
- * TODO: Implement when we have better router integration
- * This hook would automatically redirect if feature is gated
+ * Use this in screen/layout components to automatically redirect when a feature is unavailable.
+ * Runs an effect that checks feature gating on mount and whenever safeMode changes.
  *
- * Requires:
- * - Router instance from useRouter() hook
- * - Proper exception handling for navigation errors
- * - Integration with layout-level navigation guards
+ * @param feature - Feature to guard
+ * @param options - Guard options
  *
- * Example (when implemented):
+ * @example
  * ```tsx
- * export function useFeatureGatingGuard(
- *   feature: AffectedFeature,
- *   options: FeatureGatingGuardOptions = {},
- * ) {
- *   const router = useRouter();
- *   const kernel = useAppKernel();
- *
- *   useEffect(() => {
- *     const gatingStatus = checkFeatureGating(feature, kernel.safeMode);
- *     if (gatingStatus.isGated) {
- *       const fallbackRoute = options.fallbackRoute || "/select/world-selection";
- *       if (isValidRoute(fallbackRoute)) {
- *         router.push(fallbackRoute);
- *       }
- *     }
- *   }, [feature, kernel.safeMode, router, options]);
- * }
+ * function MyProtectedScreen() {
+ *   useFeatureGatingGuard(AffectedFeature.SYNC, {
+ *     fallbackRoute: "/select/world-selection",
+ *     showToast: true,
+ *   });
+ *   // Rest of component...\n *}
  * ```
  */
-// NOT EXPORTED - Implementation pending
-// export function useFeatureGatingGuard(...)
+export function useFeatureGatingGuard(
+  feature: AffectedFeature,
+  options: FeatureGatingGuardOptions = {},
+) {
+  const navigate = useNavigation();
+  const kernel = useAppKernel();
+
+  const { fallbackRoute, showToast, toastMessage } = options;
+
+  useEffect(() => {
+    const gatingStatus = checkFeatureGating(feature, kernel.safeMode);
+
+    if (gatingStatus.isGated) {
+      const resolvedFallback = fallbackRoute || "/select/world-selection";
+      const message =
+        toastMessage ||
+        `${feature} is unavailable in safe mode. Redirecting...`;
+
+      logger
+        .category("navigation")
+        .info(
+          `[FeatureGating] Feature ${feature} is gated, redirecting to ${resolvedFallback}`,
+        );
+
+      if (showToast) {
+        // TODO: Trigger toast notification
+        logger.category('navigation').info(`[FeatureGating] ${message}`);
+      }
+
+      // Validate route exists in centralized navigation config
+      if (!isValidRoute(resolvedFallback)) {
+        logger
+          .category("navigation")
+          .error(
+            `[FeatureGating] Fallback route ${resolvedFallback} not found in navigation config`,
+          );
+        return;
+      }
+
+      navigate.replace(resolvedFallback);
+    }
+  }, [feature, kernel.safeMode, navigate, fallbackRoute, showToast, toastMessage]);
+}
+
+/**
+ * Alternative: Direct factory function for use in route guards (DEPRECATED)
+ *
+ * Kept for backward compatibility. New code should use `useFeatureGatingGuard()` hook instead.
+ *
+ * If you need a factory pattern, consider extracting the navigation and kernel at the call site
+ * and using the hook version instead.
+ */

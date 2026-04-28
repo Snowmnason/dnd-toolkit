@@ -27,7 +27,7 @@
  * ```
  */
 
-import { JobsManager } from "@/lib/jobs";
+import { JobsManager } from "@/lib/jobs/jobs-manager";
 import type { EnqueueOptions, JobRecord } from "@/type-definitions/job-queue-types";
 import { useCallback } from "react";
 

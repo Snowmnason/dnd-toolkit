@@ -19,8 +19,8 @@
 import { AuthStateManager } from "@/lib/auth/auth-state";
 import { beginSignOut } from "@/lib/auth/auth-subscription-manager";
 import {
-  ENTITLEMENT_OVERRIDE_CACHE_KEY_PREFIX,
-  OVERRIDE_CACHE_KEY_PREFIX,
+    ENTITLEMENT_OVERRIDE_CACHE_KEY_PREFIX,
+    OVERRIDE_CACHE_KEY_PREFIX,
 } from "@/lib/feature-flags/server-sync/state";
 import { determineExitErrorRedirect, determineExitRedirect } from "@/lib/navigation";
 import { logger } from "@/lib/utils/logger";
@@ -181,7 +181,7 @@ export async function performSignOutPhase2_ClearAndSignOut(
 
     // Clear query cache
     try {
-      const { QueryCache } = await import("@/lib/middleware/storage");
+      const { QueryCache } = await import("@/middleware/storage");
       await QueryCache.clearAll();
       result.clearedKeys.push("QUERY_CACHE");
       logger.category("security").debug("Cleared query cache");
@@ -412,7 +412,7 @@ export async function performSignOutPhase2_ClearAndSignOut(
         .debug("Calling auth provider sign-out...");
 
       const { authSignOut } = await import(
-        "@/lib/middleware/services/auth-service"
+        "@/middleware/services/auth-service"
       );
       await authSignOut();
 

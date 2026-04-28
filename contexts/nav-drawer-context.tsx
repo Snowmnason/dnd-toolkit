@@ -1,5 +1,5 @@
 import { useAppKernel } from '@/hooks/kernel/use-app-kernel'
-import { logger } from '@/lib'
+import { logger } from '@/lib/utils/logger'
 import { STORAGE_KEYS } from '@/maps/storage-keys'
 import { SecureStorage } from '@/system/Storage'
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'

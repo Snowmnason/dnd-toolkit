@@ -53,6 +53,11 @@ export {
 
 export { NetworkCascadeDetector } from "./network-cascade-detector";
 export {
+    executeRecoveryAction,
+    getSafeModeNavigationTarget,
+    type RecoveryResult,
+} from "./safemode/recovery-actions";
+export {
     checkFeatureGating,
     getFeatureGatingReason,
     getGatedFeatures,

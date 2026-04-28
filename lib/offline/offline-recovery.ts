@@ -18,14 +18,14 @@
 
 import { OFFLINE_SYNC_DEFAULTS } from "@/config";
 import type { AuthContext } from "@/lib/auth/auth-layer";
+import { logger } from "@/lib/utils";
 import {
   isCircuitBreakerOpen,
   recordCircuitBreakerFailure,
   recordCircuitBreakerSuccess,
-} from "@/lib/middleware/api";
-import { logger } from "@/lib/utils";
+} from "@/middleware/api";
 
-import { RedactionManager } from "@/pure-algo-immutables";
+import { RedactionManager } from "@/pure-algo-immutables/redaction-manager";
 import type {
   AuthReplayMetadata,
   NetworkErrorContract,

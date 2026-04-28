@@ -19,6 +19,11 @@ export { EditWorldModal } from './worlds/EditWorldModal'
 // Other modals
 export { EntitlementExpiredModal } from './EntitlementExpiredModal'
 export { FeatureGatedModal } from './FeatureGatedModal'
+export { LoginModal } from './LoginModal'
 export { default as SettingsModal } from './SettingsModal'
 export { SuccessModal } from './SuccessModal'
+
+// Navigation modals
+export { NavModal } from './NavModal'
+export { TrustedUrlConsentModal } from './TrustedUrlConsentModal'
 

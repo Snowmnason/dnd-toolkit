@@ -75,3 +75,16 @@ export {
     type JobOperationUpdate
 } from './job-operation';
 
+export type {
+    ExecutionContext, ExternalLinkOptions, GuardPipelineProfile,
+    NavigationContext,
+    NavigationDecision, NavigationExecutionResult, NavigationGuardConfig,
+    NavigationPolicyMode,
+    NavigationRequest,
+    NavigationTransaction,
+    NavigationUiInstruction,
+    Platform, TransportResult
+} from './transport-types';
+
+export type { RouteConfig } from '@/lib/navigation/navigationConfig';
+

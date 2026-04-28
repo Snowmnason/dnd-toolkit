@@ -1,9 +1,12 @@
 // Barrel export for navigation hooks
-export { useAnalyticsNavigation } from "./use-analytics-navigation";
-export { useAppNavigation } from "./use-app-navigation";
-export { useNavigate } from "./use-navigate";
-export { PanelNavigationProvider, usePanelNavigation } from "./use-panel-navigation";
+export { useActivePanel } from './use-active-panel';
+export type { PanelKey } from '@/lib/navigation/routes/resolvers/parent-panel-resolver';
+export { PanelNavigationProvider, usePanelNavigation } from "@/contexts/PanelNavigationContext";
+export type { PanelNavigationContextType, PanelNavigationProviderProps } from "@/contexts/PanelNavigationContext";
+export { useNavigation } from "./use-navigation";
+export type { NavigationCallOptions, UseNavigation } from "./use-navigation";
+export { useBootstrapRouteGuard } from "./use-bootstrap-route-guard";
+export { useRouteChangeObserver } from "./use-route-change-observer";
 export { useRouteConfig } from "./use-route-config";
 export type { RouteConfigState } from "./use-route-config";
-export { useSuccessNavigation } from "./use-success-navigation";
 

@@ -10,10 +10,10 @@
  */
 
 import { getAppConfig } from '@/config';
-import { reportCrash } from "@/lib/error";
-import { getJobQueue } from "@/lib/jobs";
+import { reportCrash } from "@/lib/error/degrade/degrade-manager";
 import { isKernelIdle } from "@/lib/kernel/kernel-manager";
 import { logger } from "@/lib/utils";
+import { getJobQueue } from "@/system/Jobs/background-job-queue";
 import { DegradeCapability } from "@/type-definitions/degrade";
 
 const AUTH_HEALTH_CHECK_JOB_TYPE = "auth_health_check";
@@ -71,7 +71,7 @@ async function validateAuthHealth(): Promise<void> {
     logger.category("auth").debug("Running auth health check");
 
     // Check if auth backend is configured via middleware
-    const { isAuthConfigured } = await import("@/lib/middleware/services");
+    const { isAuthConfigured } = await import("@/middleware/services");
     if (!isAuthConfigured()) {
       logger
         .category("auth")

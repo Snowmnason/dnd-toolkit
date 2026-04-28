@@ -124,6 +124,23 @@ export interface AppSettings {
     navDrawer?: {
       enabled?: boolean;
       skipRoutes?: string[];
+      /** Exact full-path overrides — hide nav drawer on specific screens (e.g., '/select/no-drawer') */
+      skipPaths?: string[];
+      description?: string;
+    };
+    chrome?: {
+      topBar?: {
+        skipRoutes?: string[];
+        /** Exact full-path overrides — hide top bar on specific screens (e.g., '/select/no-topbar') */
+        skipPaths?: string[];
+        description?: string;
+      };
+      bottomBar?: {
+        routeGroups?: string[];
+        /** Exact full-path overrides — show bottom bar on specific screens outside normal route groups */
+        skipPaths?: string[];
+        description?: string;
+      };
       description?: string;
     };
     description?: string;
@@ -314,6 +331,12 @@ export interface AppSettings {
     hardMaxBytes?: number; // 10MB (prod) or 50MB (dev); hard capacity limit in bytes
     softThreshold?: number; // 0.9 = evict when cache reaches 90% of hardMax
     targetAfterEviction?: number; // 0.7 = evict until cache reaches 70% of hardMax
+    description?: string;
+  };
+  navigationPolicy?: {
+    defaultAccessMode?: 'protected_by_default' | 'public_by_default';
+    alwaysPublic?: string[]; // Route names that are always public
+    alwaysProtected?: string[]; // Route names that are always protected
     description?: string;
   };
 }

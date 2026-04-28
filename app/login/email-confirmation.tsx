@@ -1,32 +1,55 @@
 import {
-  AuthActionGroup,
-  AuthBackButtonContainer,
-  AuthBodyFooter,
-  AuthButton, AuthButtonBack,
-  AuthCaption,
-  AuthModal,
-  AuthRoot,
-  AuthSubTitle,
-  AuthTitle
+    AuthActionGroup,
+    AuthBodyFooter,
+    AuthButton,
+    AuthCaption,
+    AuthRoot,
+    AuthSubTitle,
+    AuthTitle
 } from '@/components/auth_components';
 import { Body } from '@/components/ui';
+import { useModal } from '@/contexts';
 import { useAuthStateListener } from '@/hooks/auth';
+import { useNavigation } from '@/hooks/navigation';
 import { logger } from '@/hooks/utils';
 import { openEmailApp } from '@/validation';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 
 export default function EmailConfirmationScreen() {
-  const router = useRouter();
+  const navigate = useNavigation();
+  const { openModal, closeModal } = useModal();
   const { email } = useLocalSearchParams();
   const [loading, setLoading] = useState(false);
-  const [showEmailSentModal, setShowEmailSentModal] = useState(false);
+  const [showEmailSent, setShowEmailSent] = useState(false);
   const [waitingResend, setWaitingResend] = useState('Resend Email');
   const [isCountingDown, setIsCountingDown] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
   const userEmail = Array.isArray(email) ? email[0] : email || '';
+
+  // Manage email-sent modal via context
+  useEffect(() => {
+    if (showEmailSent) {
+      openModal('login-message', {
+        heading: 'Email Sent! 📧',
+        message: 'Check your inbox for the confirmation link to complete your account setup.',
+        buttons: [
+          {
+            text: 'Got it!',
+            onPress: () => {
+              closeModal();
+              setShowEmailSent(false);
+            },
+            variant: 'primary' as const,
+          },
+        ],
+      });
+    } else {
+      closeModal();
+    }
+  }, [showEmailSent, openModal, closeModal]);
 
   // Use hook with callback to detect email confirmation
   const { resendConfirmation } = useAuthStateListener((session) => {
@@ -37,7 +60,7 @@ export default function EmailConfirmationScreen() {
       // User successfully confirmed email
       // Redirect to sign-in so they can manually complete their account setup
       logger.category('auth').info('Email confirmed, redirecting to sign-in');
-      router.replace('/login/sign-in');
+      navigate.replace('/login/sign-in');
     }
   });
 
@@ -65,7 +88,7 @@ export default function EmailConfirmationScreen() {
     }
     
     // Success: show modal and start countdown
-    setShowEmailSentModal(true);
+    setShowEmailSent(true);
     setLoading(false);
     setIsCountingDown(true);
     let countdown = 30;
@@ -96,20 +119,11 @@ export default function EmailConfirmationScreen() {
   // Disabled pending clarification and proper implementation
   // const handleChangeEmail = () => {
   //   const target = buildNavigationTarget('/login/welcome', {}, []);
-  //   router.replace(target as any);
+  //   navigate.replace(target as any);
   // };
 
   return (
     <AuthRoot>
-      {/* 🔙 Back Button */}
-      <AuthBackButtonContainer>
-        <AuthButtonBack
-          text="← Back"
-          onPress={() => router.replace('/')}
-          disabled={loading}
-        />
-      </AuthBackButtonContainer>
-
       {/* 🧠 Header */}
       <AuthTitle>Check Your Email</AuthTitle>
 
@@ -164,7 +178,7 @@ export default function EmailConfirmationScreen() {
             bg="#4285F4"
             text='Already Confirmed?'
             textColor="#FFF"
-            onPress={() => router.replace('/login/sign-in')}
+            onPress={() => navigate.replace('/login/sign-in')}
             style={{ flex: 1, width: 'auto' }}
           />
         </View>
@@ -179,21 +193,6 @@ export default function EmailConfirmationScreen() {
       <AuthCaption>
         © 2025 The Snow Post · Forged for storytellers & adventurers
       </AuthCaption>
-
-      {/* 📬 Email Sent Success Modal */}
-      <AuthModal
-        visible={showEmailSentModal}
-        onClose={() => setShowEmailSentModal(false)}
-        title="Email Sent! 📧"
-        message="Check your inbox for the confirmation link to complete your account setup."
-        buttons={[
-          {
-            text: 'Got it!',
-            onPress: () => setShowEmailSentModal(false),
-            variant: 'primary',
-          },
-        ]}
-      />
     </AuthRoot>
   )
 }

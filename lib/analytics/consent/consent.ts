@@ -14,9 +14,9 @@
  */
 
 import { getAppConfig } from '@/config';
-import { loadAnalyticsQueue, loadAnalyticsQueueJSON, persistAnalyticsQueue, persistAnalyticsQueueJSON } from "@/lib/middleware/storage";
 import { logger } from '@/lib/utils/logger';
 import { STORAGE_KEYS } from "@/maps";
+import { loadAnalyticsQueue, loadAnalyticsQueueJSON, persistAnalyticsQueue, persistAnalyticsQueueJSON } from "@/middleware/storage";
 
 export type ConsentLevel = 'none' | 'basic' | 'full';
 

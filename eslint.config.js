@@ -6,7 +6,24 @@ const securityPlugin = require('eslint-plugin-security');
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ['dist/*'],
+    ignores: [
+      // Generated build outputs — keep in sync with metro.config.js BLOCKED_DIRS
+      'dist/**',
+      'dist-desktop/**',
+      'desktop/dist/**',
+      'android/build/**',
+      'android/.gradle/**',
+      // Test infrastructure (linted separately by Jest/Vitest runners)
+      '__mocks__/**',
+      '__tests__/**',
+      // Dev tooling and config — not app source
+      'scripts/**',
+      'docs/**',
+      'supabase/**',
+      '.github/**',
+      '.vscode/**',
+      '.idea/**',
+    ],
     plugins: {
       security: securityPlugin,
     },
@@ -45,6 +62,70 @@ module.exports = defineConfig([
     files: ['lib/storage/FastCache.ts'],
     rules: {
       'no-restricted-globals': 'off',
+    },
+  },
+  // === NAVIGATION BOUNDARY RULE ===
+  // All navigation must go through useNavigation to ensure the guard pipeline runs.
+  // This catches: direct router.push/replace/back calls anywhere in the codebase.
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    ignores: [
+      'system/Navigation/**', // EXCEPTION: Centralized transport layer (all router.* calls must go here)
+      '**/*.test.ts', // Allow in unit/integration tests
+      '**/*.test.tsx', // Allow in UI tests
+      'providers/AppKernelProvider.tsx', // EXCEPTION: Bootstrap bridge — calls useRouter() and system/Navigation to seed the router instance alongside kernel init
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        // ---- Navigation actions ----
+        {
+          selector: 'CallExpression[callee.object.name="router"][callee.property.name="push"]',
+          message: 'Use navigate.to() from useNavigation() instead of router.push() — this ensures navigation goes through the guard pipeline.',
+        },
+        {
+          selector: 'CallExpression[callee.object.name="router"][callee.property.name="navigate"]',
+          message: 'Use navigate.to() from useNavigation() instead of router.navigate() — this ensures navigation goes through the guard pipeline.',
+        },
+        {
+          selector: 'CallExpression[callee.object.name="router"][callee.property.name="replace"]',
+          message: 'Use navigate.replace() from useNavigation() instead of router.replace() — this ensures navigation goes through the guard pipeline.',
+        },
+        {
+          selector: 'CallExpression[callee.object.name="router"][callee.property.name="back"]',
+          message: 'Use navigate.back() from useNavigation() instead of router.back() — this ensures navigation goes through the guard pipeline.',
+        },
+        {
+          selector: 'CallExpression[callee.object.name="router"][callee.property.name="dismiss"]',
+          message: 'Use navigate.dismiss() from useNavigation() instead of router.dismiss() — this ensures navigation goes through the guard pipeline.',
+        },
+        {
+          selector: 'CallExpression[callee.object.name="router"][callee.property.name="dismissAll"]',
+          message: 'Use navigate.dismissAll() from useNavigation() instead of router.dismissAll() — this ensures navigation goes through the guard pipeline.',
+        },
+        {
+          selector: 'CallExpression[callee.object.name="router"][callee.property.name="dismissTo"]',
+          message: 'Use navigate.dismissAll(target) from useNavigation() instead of router.dismissTo() — this ensures navigation goes through the guard pipeline.',
+        },
+        // ---- State queries ----
+        {
+          selector: 'CallExpression[callee.object.name="router"][callee.property.name="canGoBack"]',
+          message: 'Use navigate.canGoBack() from useNavigation() instead of router.canGoBack().',
+        },
+        {
+          selector: 'CallExpression[callee.object.name="router"][callee.property.name="canDismiss"]',
+          message: 'Use navigate.canDismiss() from useNavigation() instead of router.canDismiss().',
+        },
+        // ---- Utility ops ----
+        {
+          selector: 'CallExpression[callee.object.name="router"][callee.property.name="setParams"]',
+          message: 'Use navigate.setParams() from useNavigation() instead of router.setParams().',
+        },
+        {
+          selector: 'CallExpression[callee.object.name="router"][callee.property.name="prefetch"]',
+          message: 'Use navigate.prefetch() from useNavigation() instead of router.prefetch().',
+        },
+      ],
     },
   },
   // === ARCHITECTURE BOUNDARY RULES ===

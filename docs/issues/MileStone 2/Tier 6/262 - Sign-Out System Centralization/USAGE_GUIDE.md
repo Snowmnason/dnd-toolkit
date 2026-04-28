@@ -24,7 +24,7 @@ const result = await signInUser('user@example.com', 'password');
 
 if (result.success) {
   // Navigate to the returned redirect destination
-  router.push(result.redirectTo);
+  navigate.push(result.redirectTo);
 } else {
   // Handle error
   showError(result.error);
@@ -46,7 +46,7 @@ if (phase1Result.success) {
   if (confirmed) {
     const phase2Result = await confirmSignOut();
     if (phase2Result.success) {
-      router.replace('/login');
+      navigate.replace('/login');
     }
   }
 }
@@ -86,12 +86,12 @@ const result = await performReAuth(tokens, 'bootstrap');
 if (result.success) {
   // Check staleness phase for routing
   if (result.stalenessPhase === 'fresh') {
-    router.replace('/select-world');
+    navigate.replace('/select-world');
   } else if (result.stalenessPhase === 'stale') {
-    router.replace('/welcome');
+    navigate.replace('/welcome');
   }
 } else {
-  router.replace('/login');
+  navigate.replace('/login');
 }
 ```
 
@@ -103,7 +103,7 @@ import { signUpUser } from '@/lib/auth';
 const result = await signUpUser('user@example.com', 'SecurePass123!');
 
 if (result.success) {
-  router.push(result.redirectTo); // Usually email confirmation screen
+  navigate.push(result.redirectTo); // Usually email confirmation screen
 } else if (result.showEmailExistsModal) {
   showEmailExistsModal();
 } else {
@@ -120,7 +120,7 @@ import { performDeletePhase2_DeleteAndSignOut } from '@/lib/auth';
 const result = await performDeletePhase2_DeleteAndSignOut('user-initiated');
 
 if (result.success) {
-  router.replace('/login');
+  navigate.replace('/login');
 } else {
   // Account deleted on server but local cleanup failed
   showWarning('Account deleted but some local data may remain');
@@ -141,13 +141,13 @@ const result = await performReAuth(tokens, 'bootstrap');
 
 switch (result.stalenessPhase) {
   case 'fresh':
-    router.replace('/select-world');
+    navigate.replace('/select-world');
     break;
   case 'stale':
-    router.replace('/welcome'); // Shows auto-login button
+    navigate.replace('/welcome'); // Shows auto-login button
     break;
   case 'dead':
-    router.replace('/login'); // Manual sign-in required
+    navigate.replace('/login'); // Manual sign-in required
     break;
 }
 ```

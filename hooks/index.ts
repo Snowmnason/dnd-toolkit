@@ -13,9 +13,6 @@
 // Mutations
 //export * from "./storage/mutations";
 
-// Job Operations
-export * from './jobs/useJobOperation';
-
 // Navigation
 export * from "./navigation";
 
@@ -43,11 +40,13 @@ export * from "./jobs";
 export * from "./network";
 
 // Offline & Sync
-export * from "./offline/use-offline-queue";
-export * from "./offline/useForceResync";
+export * from "./offline";
 
 // Storage
 export * from "./storage/useRefreshStorageCache";
+
+// Chrome & Navigation
+export { useChromeBottom } from './provider/use-chrome-bottom';
 
 // Analytics
 export * from "./analytics";

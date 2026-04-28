@@ -4,9 +4,9 @@
  * Helper functions for offline mutation handling
  */
 
-import { getNetworkStatus } from "@/lib/middleware/network";
-import { QueryCache } from "@/lib/middleware/storage";
 import { logger } from "@/lib/utils/logger";
+import { getNetworkStatus } from "@/middleware/network";
+import { QueryCache } from "@/middleware/storage";
 import type { MutationOperation, MutationPersistence, QueuedMutation } from "../../type-definitions/mutation-queue-types";
 import { OfflineMutationQueue } from "./mutation-queue";
 

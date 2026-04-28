@@ -405,7 +405,7 @@ function processFlags(
  */
 async function fetchAndProcessAllUserData(state: ServerSyncState): Promise<void> {
   const { getDatabase, invokeEdgeFunction } = await import(
-    '@/lib/middleware/services/database-service'
+    '@/middleware/services/database-service'
   );
   if (!getDatabase().isConfigured()) throw new Error('Database not configured');
 

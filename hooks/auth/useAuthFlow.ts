@@ -30,17 +30,17 @@
  */
 
 import {
-    signInUser,
-    signInWithIdToken,
-    signInWithOAuth,
+  signInUser,
+  signInWithIdToken,
+  signInWithOAuth,
 } from '@/lib/auth'
 import { logger } from '@/lib/utils'
+import { signInSchema, type SignInFormData } from '@/validation'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useRouter } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
 import { useCallback, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { signInSchema, type SignInFormData } from '../../validation/auth.schema'
+import { useNavigation } from '../navigation'
 
 // ============================================================================
 // TYPES
@@ -106,17 +106,17 @@ const INITIAL_STATE: AuthFlowState = {
 // POST-AUTH NAVIGATION (social flows where manager doesn't return redirect)
 // ============================================================================
 
-async function navigateAfterSocialAuth(router: ReturnType<typeof useRouter>) {
+async function navigateAfterSocialAuth(navigate: ReturnType<typeof useNavigation>) {
   const { usersDB } = await import('@/lib')
   try {
     const userProfile = await usersDB.getCurrentUser()
     if (userProfile?.username) {
-      router.replace('/select/world-selection')
+      navigate.resetTo('/select/world-selection')
     } else {
-      router.replace('/login/sign-up')
+      navigate.resetTo('/login/sign-up')
     }
   } catch {
-    router.replace('/login/sign-up')
+    navigate.resetTo('/login/sign-up')
   }
 }
 
@@ -132,7 +132,7 @@ export function useAuthFlow(): {
 } {
   const [state, setState] = useState<AuthFlowState>(INITIAL_STATE)
   const [showPassword, setShowPassword] = useState(false)
-  const router = useRouter()
+  const navigate = useNavigation()
 
   const { control, handleSubmit, formState: { isValid }, watch } = useForm<SignInFormData>({
     resolver: zodResolver(signInSchema),
@@ -162,9 +162,9 @@ export function useAuthFlow(): {
 
     patch({ phase: 'success', loading: false, error: null })
     if (result.redirectTo) {
-      router.replace(result.redirectTo as any)
+      navigate.resetTo(result.redirectTo)
     }
-  }, [patch, router])
+  }, [patch, navigate])
 
   // --------------------------------------------------------------------------
   // Social: Google
@@ -185,12 +185,12 @@ export function useAuthFlow(): {
       }
 
       patch({ phase: 'success', loading: false, error: null })
-      await navigateAfterSocialAuth(router)
+      await navigateAfterSocialAuth(navigate)
     } catch (error) {
       logger.category('auth').error('Google web auth error:', error)
       patch({ phase: 'error', loading: false, error: 'An unexpected error occurred during Google sign-in.' })
     }
-  }, [patch, router])
+  }, [patch, navigate])
 
   const handleGoogleMobile = useCallback(async () => {
     patch({ phase: 'authenticating', loading: true, error: null })
@@ -245,9 +245,9 @@ export function useAuthFlow(): {
 
         patch({ phase: 'success', loading: false, error: null })
         if (reAuthResult.redirect) {
-          router.replace(reAuthResult.redirect as any)
+          navigate.resetTo(reAuthResult.redirect)
         } else {
-          await navigateAfterSocialAuth(router)
+          await navigateAfterSocialAuth(navigate)
         }
       } else if (browserResult?.type === 'cancel') {
         // User cancelled — silently return to idle
@@ -259,7 +259,7 @@ export function useAuthFlow(): {
       logger.category('auth').error('Google mobile auth error:', error)
       patch({ phase: 'error', loading: false, error: 'An unexpected error occurred during Google sign-in.' })
     }
-  }, [patch, router])
+  }, [patch, navigate])
 
   const handleGoogleWebError = useCallback(() => {
     logger.category('auth').error('Google web auth error callback triggered')
@@ -296,7 +296,7 @@ export function useAuthFlow(): {
       }
 
       patch({ phase: 'success', loading: false, error: null })
-      await navigateAfterSocialAuth(router)
+      await navigateAfterSocialAuth(navigate)
     } catch (error: any) {
       if (error.code === 'ERR_REQUEST_CANCELED') {
         // User cancelled — silently return to idle
@@ -306,7 +306,7 @@ export function useAuthFlow(): {
       logger.category('auth').error('Apple iOS auth error:', error)
       patch({ phase: 'error', loading: false, error: 'Apple sign-in failed. Please try again.' })
     }
-  }, [patch, router])
+  }, [patch, navigate])
 
   const handleAppleWeb = useCallback(async (appleAuthRequestResponse: any) => {
     const idToken = appleAuthRequestResponse?.authorization?.id_token
@@ -325,12 +325,12 @@ export function useAuthFlow(): {
       }
 
       patch({ phase: 'success', loading: false, error: null })
-      await navigateAfterSocialAuth(router)
+      await navigateAfterSocialAuth(navigate)
     } catch (error) {
       logger.category('auth').error('Apple web auth error:', error)
       patch({ phase: 'error', loading: false, error: 'An unexpected error occurred during Apple sign-in.' })
     }
-  }, [patch, router])
+  }, [patch, navigate])
 
   const handleAppleWebError = useCallback((error: any) => {
     logger.category('auth').error('Apple web auth error callback triggered:', error)

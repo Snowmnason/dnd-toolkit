@@ -93,7 +93,7 @@ system/* (PURE TRANSPORT: storage, API, network, jobs — portable infrastructur
 
 Example: `lib/auth/account/sign-out-system.ts`
 ```typescript
-import { authSignOut } from '@/lib/middleware/services';
+import { authSignOut } from '@/middleware/services';
 import { AuthStateManager } from '@/lib/auth/auth-state';
 import { QueryCache } from '@/system/storage/cache';
 

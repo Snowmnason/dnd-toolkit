@@ -56,7 +56,7 @@ async function executeSyncJob(
     });
 
     // Get session tokens (needed for sync)
-    const backend = (await import('@/lib/middleware/storage')).getPrivacyStorageBackend(STORAGE_KEYS.AUTH_SESSION);
+    const backend = (await import('@/middleware/storage')).getPrivacyStorageBackend(STORAGE_KEYS.AUTH_SESSION);
     const tokens = await backend.getJSON<any>(STORAGE_KEYS.AUTH_SESSION);
 
     if (!tokens?.access_token) {

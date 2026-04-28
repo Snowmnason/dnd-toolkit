@@ -1,5 +1,6 @@
-import { AnalyticsConsent, getCrashReportPayload } from '@/lib/analytics';
-import { flushPendingErrors as flushErrors, reportError } from '@/lib/error';
+import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
+import { getCrashReportPayload } from '@/lib/analytics/consent/consent-error-payload';
+import { flushPendingErrors as flushErrors, reportError } from '@/lib/error/error-manager';
 import { logger } from '@/lib/utils/logger';
 import { useCallback } from 'react';
 

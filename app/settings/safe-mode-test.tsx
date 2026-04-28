@@ -1,18 +1,18 @@
 import { SafeModeScreen } from "@/components/SplashScreen";
 import { Body, Button, Card, Heading } from "@/components/ui";
 import {
-    AffectedFeature,
-    RecoveryAction,
-    SafeModeLevel,
-    SafeModeReason,
+  AffectedFeature,
+  RecoveryAction,
+  SafeModeLevel,
+  SafeModeReason,
 } from "@/hooks/error";
+import { useNavigation } from "@/hooks/navigation";
 import { useScale, UseTheme } from "@/theme";
-import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ScrollView, View } from "react-native";
 
 export default function SafeModeTestScreen() {
-  const router = useRouter();
+  const navigate = useNavigation();
   const S = useScale();
   const { theme } = UseTheme();
   const [showSafeMode, setShowSafeMode] = useState(false);
@@ -81,7 +81,7 @@ export default function SafeModeTestScreen() {
           <Button
             variant="secondary"
             text="Back"
-            onPress={() => router.back()}
+            onPress={() => navigate.back()}
           />
         </View>
       </Card>

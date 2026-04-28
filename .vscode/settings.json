@@ -7,5 +7,53 @@
   "files.associations": {
     "**/public/_headers": "plaintext",
     "**/dist/_headers": "plaintext"
+  },
+
+  // ─── Exclude generated / heavy folders from VS Code file tree ────────────
+  // These match metro.config.js BLOCKED_DIRS and .gitignore patterns.
+  // They are build artifacts, tooling cache, or documentation — never source.
+  "files.exclude": {
+    "dist/": true,
+    "dist-desktop/": true,
+    "desktop/dist/": true,
+    "android/build/": true,
+    "android/.gradle/": true,
+    ".kotlin/": true,
+    "node_modules/": true
+  },
+
+  // ─── Exclude from workspace search (Ctrl+Shift+F / sidebar search) ───────
+  // A superset of files.exclude: also covers docs, scripts, test infra,
+  // and CI config so searches stay focused on app source.
+  "search.exclude": {
+    "dist/": true,
+    "dist-desktop/": true,
+    "desktop/dist/": true,
+    "android/build/": true,
+    "android/.gradle/": true,
+    ".kotlin/": true,
+    "node_modules/": true,
+    "docs/": true,
+    "scripts/": true,
+    "supabase/": true,
+    "__mocks__/": true,
+    "__tests__/": true,
+    ".github/": true
+  },
+
+  // ─── Stop file watcher from tracking non-source folders ──────────────────
+  // Prevents NTFS change notifications accumulating for generated outputs.
+  // Critically reduces Metro hot-reload churn on Windows.
+  "files.watcherExclude": {
+    "**/dist/**": true,
+    "**/dist-desktop/**": true,
+    "**/desktop/dist/**": true,
+    "**/android/build/**": true,
+    "**/android/.gradle/**": true,
+    "**/.kotlin/**": true,
+    "**/node_modules/**": true,
+    "**/.expo/cache/**": true,
+    "**/.metro-health-check*": true
   }
 }
+

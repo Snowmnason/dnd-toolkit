@@ -7,7 +7,7 @@
  */
 import { getAppConfig, getPlatformName } from "@/config";
 import { logger } from "@/lib/utils/logger";
-import { isUserInCohort } from "@/pure-algo-immutables";
+import { isUserInCohort } from "@/pure-algo-immutables/cohort-bucketing";
 import type { CachedCohort, CachedUserCohortMembership } from "@/type-definitions/featureFlagTypes";
 import { FlagEvaluationCache } from "../cache";
 import { evaluateAdvancedCondition, validateAdvancedCondition } from "../evaluation/advanced-conditions";

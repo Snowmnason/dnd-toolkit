@@ -218,7 +218,7 @@ export function extractData<T>(
  * @returns true if database is configured, false if not (e.g., GitHub Pages deployment)
  */
 export function isDatabaseConfigured(): boolean {
-  const { isDatabaseConfigured: isDatabaseConfiguredMiddleware } = require("@/lib/middleware/services/database-service");
+  const { isDatabaseConfigured: isDatabaseConfiguredMiddleware } = require("@/middleware/services/database-service");
   return isDatabaseConfiguredMiddleware();
 }
 
@@ -234,7 +234,7 @@ export function isDatabaseConfigured(): boolean {
  */
 export async function executeSyncMutationHandler(mutation: any) {
   // Get Supabase client through middleware (precondition checks: network, auth, provider readiness)
-  const { getDatabase } = await import("@/lib/middleware/services/database-service");
+  const { getDatabase } = await import("@/middleware/services/database-service");
   const supabase = getDatabase();
 
   // Import and execute the sync handler

@@ -1,8 +1,7 @@
 import { useAuthStateListener, useSignOutFlow } from "@/hooks/auth";
-import { useNavigate } from "@/hooks/navigation";
+import { useNavigation } from "@/hooks/navigation";
 import { getCurrentUserProfile } from "@/hooks/storage";
 import { logger } from "@/hooks/utils";
-import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 
@@ -14,18 +13,17 @@ import {
     Heading,
     Surface
 } from "@/components/ui";
-import UserProfile from "../../Screens/settings/user-profile";
+import UserProfile from "../../AppScreens/settings/user-profile";
 import VersionDisplay from "../../components/VersionDisplay";
 
 // 🎨 Theme + Loading
-import { AppSettings } from "@/Screens/settings/AppSettings";
-import { ThemeSelector } from "@/Screens/settings/ThemeSelector";
+import { AppSettings } from "@/AppScreens/settings/AppSettings";
+import { ThemeSelector } from "@/AppScreens/settings/ThemeSelector";
 import { useScale } from "@/theme";
 
 export default function SettingsPage() {
-  const router = useRouter();
+  const navigate = useNavigation();
   const S = useScale();
-  const { replace: navigateTo } = useNavigate();
   
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -39,7 +37,7 @@ export default function SettingsPage() {
   useAuthStateListener((session) => {
     if (!session) {
       logger.category("auth").debug("Auth state changed: user signed out");
-      navigateTo('/');
+      navigate.replace('/');
     }
   });
 
@@ -55,7 +53,7 @@ export default function SettingsPage() {
         logger.category('ui').error('Error fetching profile on settings mount:', err)
         setLoading(false)
       })
-  }, [navigateTo, router])
+  }, [navigate]);
 
   // NOTE: Modal visibility and error states are now managed by hook state machines.
   // See signOutFlow.state.modal and deleteFlow.state.modal for which modal to show.

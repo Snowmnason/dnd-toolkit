@@ -15,7 +15,7 @@
  */
 
 import { getAppConfig } from "@/config";
-import { StorageManager } from "@/lib/storage";
+import { StorageManager } from "@/lib/storage/storage-manager";
 import { STORAGE_KEYS } from "@/maps";
 
 // ============================================================================

@@ -46,19 +46,9 @@ System Layer (transport)
 - During operation: Handle loading states, optimistic updates
 - Post-operation: Update UI state, handle errors, trigger side effects
 
-## API Reference
+## Hook Categories
 
-### Navigation Hooks
-
-```typescript
-useAppNavigation(): {
-  navigate: (route: RouteName, params?: RouteParams) => void;
-  goBack: () => void;
-  reset: (route: RouteName) => void;
-}
-```
-
-### Query Hooks
+### Data Hooks
 
 ```typescript
 useWorldsQuery(options?: QueryOptions): {
@@ -80,12 +70,22 @@ useCreateWorldMutation(): {
 }
 ```
 
-### UI Hooks
+### UI State Hooks
 
 ```typescript
 useTheme(): ThemeTokens;
 useScale(): ScaleValues;
 useToast(): ToastActions;
+```
+
+### Navigation Hooks
+
+```typescript
+useAppNavigation(): {
+  navigate: (route: RouteName, params?: RouteParams) => void;
+  goBack: () => void;
+  reset: (route: RouteName) => void;
+}
 ```
 
 ## Dependencies

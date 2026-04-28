@@ -1,22 +1,20 @@
 import {
-  AuthActionGroup, AuthBackButtonContainer,
+  AuthActionGroup,
   AuthBodyFooter,
-  AuthButton, AuthButtonBack,
+  AuthButton,
   AuthButtonSecondary, AuthCaption, AuthError, AuthForm, AuthRoot, AuthSubTitle, AuthTitle,
   FormAuthInput
 } from '@/components/auth_components';
-import { useAuthActions, useAuthFlow, useBootstrapAuth, useCurrentSession } from "@/hooks/auth";
-import { useNavigate } from "@/hooks/navigation";
+import { useAuthActions, useAuthFlow } from "@/hooks/auth";
+import { useNavigation } from '@/hooks/navigation';
 import { logger } from "@/hooks/utils";
 import { useScale } from '@/theme';
-import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { TextInput } from 'react-native';
 
 export default function SignInScreen() {
   const S = useScale();
-  const router = useRouter();
-  const { replace, push } = useNavigate();
+  const navigate = useNavigation();
   const { resendConfirmation } = useAuthActions();
   const [isResendingEmail, setIsResendingEmail] = useState(false);
 
@@ -24,24 +22,10 @@ export default function SignInScreen() {
   const passwordInputRef = useRef<TextInput>(null);
 
   const { state, form } = useAuthFlow();
-  const { session, loading: sessionLoading } = useCurrentSession();
-  const { hasAccount, checked } = useBootstrapAuth(!sessionLoading);
 
-  // Verify authentication status on mount using proper hook boundaries
-  useEffect(() => {
-    // Only run after bootstrap and session checks complete
-    if (!checked || sessionLoading) return;
-
-    logger.category('auth').debug('Sign-in screen: Verifying authentication status');
-
-    // If session exists, user is already authenticated
-    if (session) {
-      logger.category('auth').info('Sign-in screen: User authenticated, redirecting to world selection');
-      router.replace('/select/world-selection');
-    } else if (!hasAccount) {
-      logger.category('auth').debug('Sign-in screen: No account found, showing login form');
-    }
-  }, [checked, sessionLoading, session, hasAccount, router]);
+  // Auth redirect for authenticated users is handled by useBootstrapRouteGuard
+  // in the root layout. No screen-level redirect needed here — doing so caused
+  // infinite loops on web (replace → remount → re-detect auth → replace again).
 
   const handleResendConfirmationFromError = async (email: string) => {
     setIsResendingEmail(true);
@@ -62,16 +46,7 @@ export default function SignInScreen() {
 
   return (
     <AuthRoot>
-      {/* 🧭 Back Button*/}
-      <AuthBackButtonContainer>
-        <AuthButtonBack
-          text="← Back"
-          onPress={() => replace('/')}
-          disabled={state.loading}
-        />
-      </AuthBackButtonContainer>
-
-      {/* 🧙 Header */}
+      {/*  Header */}
       <AuthTitle>Welcome Back</AuthTitle>
 
       <AuthSubTitle fontSize='$para'>Sign in to access your saved worlds and characters</AuthSubTitle>
@@ -121,7 +96,7 @@ export default function SignInScreen() {
           color="#D4AF37"
           align="right"
           style={{ marginBottom: 4, marginTop: (S.space.sm*-1) }}
-          onPress={() => push('/login/forgot-password')}
+          onPress={() => navigate.to('/login/forgot-password')}
         >
           Forgot Password?
         </AuthSubTitle>
@@ -138,7 +113,7 @@ export default function SignInScreen() {
 
         <AuthButtonSecondary
           text="Need an account? Sign Up"
-          onPress={() => replace('/login/sign-up')}
+          onPress={() => navigate.replace('/login/sign-up')}
           disabled={state.loading}
         />
       </AuthActionGroup>

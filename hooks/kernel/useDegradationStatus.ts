@@ -29,7 +29,7 @@
  * ```
  */
 
-import { getDegradationState, getPrimaryFault, subscribeToDegradation } from '@/lib/error';
+import { getDegradationState, getPrimaryFault, subscribeToDegradation } from '@/lib/error/degrade/degrade-manager';
 import { DegradationLevel, DegradeCapability, DegradeState } from '@/type-definitions/degrade';
 import { useEffect, useState } from 'react';
 

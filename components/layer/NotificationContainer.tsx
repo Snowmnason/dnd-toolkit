@@ -1,6 +1,6 @@
 import { Notification } from "@/components/ui/Notification";
 import { useNotifications } from "@/contexts/notifications-context";
-import { logger } from "@/lib/utils/logger";
+import { logger } from "@/hooks/utils";
 import { memo, useEffect } from "react";
 
 /**

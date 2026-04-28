@@ -1,6 +1,7 @@
-import { Body, Caption } from '@/components/ui'
-import { panelConfigs } from '@/Screens/main-panels/PanelData'
+import { panelConfigs } from '@/AppScreens/main-panels/PanelData'
+import { Caption } from '@/components/ui'
 import { $ } from '@/theme'
+import { Ionicons } from '@expo/vector-icons'
 import { memo } from 'react'
 import { Pressable, View } from 'react-native'
 
@@ -51,9 +52,12 @@ export const ChromeBottomBar = memo(function ChromeBottomBar({
                 }}
               />
             )}
-            <Body fontSize={24} style={{ marginBottom: 2 }}>
-              {panel.icon}
-            </Body>
+            <Ionicons
+              name={(isActive ? panel.iconName : `${panel.iconName}-outline`) as any}
+              size={24}
+              color={isActive ? $('accent') : $('ChromeText')}
+              style={{ marginBottom: 2 }}
+            />
             <Caption
               color={isActive ? '$accent' : '$ChromeText'}
               variant={isActive ? 'bold' : 'regular'}

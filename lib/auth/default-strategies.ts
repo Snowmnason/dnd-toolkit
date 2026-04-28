@@ -5,9 +5,11 @@
  * Token lifecycle is abstracted via AuthProvider.refreshSession() — provider-agnostic.
  */
 
-import { getAuthProviderSync } from "@/lib/middleware/services";
-import { logger } from "@/lib/utils";
+import { logger } from "@/lib/utils/logger";
 import { ERROR_CODES } from "@/maps/ERROR_CODES";
+// Direct import — @/middleware/services barrel pulls in the full middleware graph (~1200ms cold load).
+// getAuthProviderSync is a thin registry lookup in auth-adapter with no transitive deps.
+import { getAuthProviderSync } from "@/system/Services/auth-adapter";
 import { AuthStrategy, type AuthContext } from "./auth-layer";
 
 /**

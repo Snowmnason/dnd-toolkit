@@ -11,7 +11,7 @@ import {
   Switch,
   Title,
 } from "@/components/ui";
-import { useNavigate } from "@/hooks/navigation";
+import { useNavigation } from "@/hooks/navigation";
 import { getCurrentUserProfile } from "@/hooks/storage";
 import { logger } from "@/hooks/utils";
 import { useScale } from "@/theme";
@@ -36,7 +36,7 @@ type SettingsEntry = {
 export default function AdminPanelScreen() {
   const routeParams = useLocalSearchParams();
   const S = useScale();
-  const { replace: navigateTo } = useNavigate();
+  const navigate = useNavigation();
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [flags, setFlags] = useState<FlagEntry[]>([]);
@@ -210,25 +210,22 @@ export default function AdminPanelScreen() {
     }
 
     const { username: _ignored, ...rest } = routeParams || {};
-    const sanitizedParams: Record<string, string | number | boolean> = {};
+    const sanitizedParams: Record<string, string> = {};
     for (const [key, value] of Object.entries(rest)) {
       const normalized = Array.isArray(value) ? value[0] : value;
       if (normalized === undefined) continue;
-      if (
-        typeof normalized === "string" ||
-        typeof normalized === "number" ||
-        typeof normalized === "boolean"
-      ) {
-        // Only persist defined primitives to avoid undefined params downstream
+      if (typeof normalized === "string") {
         // eslint-disable-next-line security/detect-object-injection
         sanitizedParams[key] = normalized;
+      } else if (typeof normalized === "number" || typeof normalized === "boolean") {
+        // eslint-disable-next-line security/detect-object-injection
+        sanitizedParams[key] = String(normalized);
       }
     }
 
-    navigateTo(
+    navigate.replace(
       `/settings/${username}`,
       sanitizedParams,
-      ["worldId", "userRole"],
     );
   };
 

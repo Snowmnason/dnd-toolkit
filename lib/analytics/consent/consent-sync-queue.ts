@@ -23,9 +23,9 @@
  */
 
 import { CONSENT_SYNC_DEFAULTS } from '@/config';
-import { loadAnalyticsQueueJSON, persistAnalyticsQueueJSON } from "@/lib/middleware/storage";
 import { logger } from '@/lib/utils/logger';
 import { STORAGE_KEYS } from "@/maps";
+import { loadAnalyticsQueueJSON, persistAnalyticsQueueJSON } from "@/middleware/storage";
 import type { ConsentLevel } from './consent';
 
 /**

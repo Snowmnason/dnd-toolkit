@@ -50,6 +50,8 @@ export interface ButtonProps {
   gradientIntensity?: number
   gradientTransitionPoint?: number
   minWidth?: number | string
+  /** Text and icon alignment inside the button. Defaults to 'center'. Use 'left' for nav rows. */
+  align?: 'left' | 'center'
   style?: StyleProp<ViewStyle>
   onPress?: () => void
   children?: React.ReactNode
@@ -171,6 +173,7 @@ export function Button(props: ButtonProps) {
     gradientIntensity = 25,
     gradientTransitionPoint = 80,
     minWidth,
+    align = 'center',
     style,
     onPress,
     children,
@@ -299,7 +302,7 @@ export function Button(props: ButtonProps) {
       )}
 
       {text ? (
-        <Animated.View style={[{ flex: 1, height: '100%', justifyContent: 'center', alignItems: 'center', padding: S.space.xs }, textFadeStyle]}>
+        <Animated.View style={[{ flex: 1, height: '100%', justifyContent: 'center', alignItems: align === 'left' ? 'flex-start' : 'center', padding: S.space.xs }, textFadeStyle]}>
           <ButtonText
             numberOfLines={1}
             ellipsizeMode="clip"
@@ -349,19 +352,21 @@ export function Button(props: ButtonProps) {
       >
         {isGhost ? (
           // Ghost variant: No gradient, simple centered container
+          // No overflow:hidden needed (no gradient/ripple to clip)
           <View
             style={{
-              height,
+              // minHeight instead of height: lets the button grow to fit content.
+              // The outer Animated.View grows with it, so overflow:hidden (RNW default)
+              // never clips content that exceeds the base button height.
+              minHeight: height,
               paddingHorizontal: paddingH,
               borderRadius: S.radius.md,
               borderColor: borderColorValue,
               borderWidth: 3,
               backgroundColor: 'transparent',
-              overflow: 'hidden',
               flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'center',
-              //...getShadowStyle('softer'),
+              justifyContent: align === 'left' ? 'flex-start' : 'center',
             }}
           >
             {contentView}

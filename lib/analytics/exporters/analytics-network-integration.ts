@@ -12,8 +12,8 @@
  */
 
 import { getAppConfig } from '@/config';
-import { isNetworkOnline, subscribeToNetworkStatus, type NetworkStatus } from "@/lib/middleware/network";
 import { logger } from "@/lib/utils/logger";
+import { isNetworkOnline, subscribeToNetworkStatus, type NetworkStatus } from "@/middleware/network";
 import { _setAnalyticsBufferFlushing, analyticsBufferService } from "./analytics-buffer";
 
 

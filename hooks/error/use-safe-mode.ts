@@ -8,14 +8,14 @@ import {
   SafeModeReason,
   SafeModeState,
   createSafeModeState,
-} from "@/lib/error";
+} from "@/lib/error/safemode/safe-mode";
 import {
   clearSafeMode,
   getSafeMode,
   onKernelStateChange,
   setSafeMode,
   type AppKernelState,
-} from "@/lib/kernel";
+} from "@/lib/kernel/kernel-manager";
 import { useCallback, useEffect, useState } from "react";
 
 /**

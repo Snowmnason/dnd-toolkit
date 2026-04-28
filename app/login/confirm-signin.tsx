@@ -1,38 +1,28 @@
 import {
-  AuthActionGroup,
-  AuthBackButtonContainer,
-  AuthBody,
-  AuthBodyFooter,
-  AuthButton, AuthButtonBack,
-  AuthCaption,
-  AuthError,
-  AuthForm,
-  AuthRoot,
-  AuthSubTitle,
-  AuthTitle,
-  FormAuthInput
+    AuthActionGroup,
+    AuthBody,
+    AuthBodyFooter,
+    AuthButton,
+    AuthCaption,
+    AuthError,
+    AuthForm,
+    AuthRoot,
+    AuthSubTitle,
+    AuthTitle,
+    FormAuthInput
 } from '@/components/auth_components';
 import { useAuthFlow } from "@/hooks/auth";
+import { useNavigation } from '@/hooks/navigation';
 import { useScale } from '@/theme';
-import { useRouter } from 'expo-router';
 
 export default function SignInScreen() {
   const S = useScale();
-  const router = useRouter();
+  const navigate = useNavigation();
 
   const { state, form } = useAuthFlow();
 
   return (
     <AuthRoot>
-      {/* 🔙 Back Button */}
-      <AuthBackButtonContainer>
-        <AuthButtonBack
-          text="← Back"
-          onPress={() => router.replace('/')}
-          disabled={state.loading}
-        />
-      </AuthBackButtonContainer>
-
       {/* 🧠 Header */}
       <AuthTitle>Welcome Back</AuthTitle>
 
@@ -72,7 +62,7 @@ export default function SignInScreen() {
           align="right"
           style={{ marginBottom: S.space.xs,
                         marginTop: (S.space.sm*-1), }}
-          onPress={() => router.push('/login/forgot-password')}
+          onPress={() => navigate.to('/login/forgot-password')}
         >
           Forgot Password?
         </AuthSubTitle>
@@ -99,7 +89,7 @@ export default function SignInScreen() {
           color="#D4AF37"
           deco="underline"
           style={{ marginTop: 8 }}
-          onPress={() => router.replace('/')}
+          onPress={() => navigate.replace('/')}
         >
           ← Back to Welcome
         </AuthBody>

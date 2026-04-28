@@ -21,24 +21,23 @@
  *   const { state, form } = useSignUpFlow('complete-profile', user)
  */
 
+import { useNavigation } from "@/hooks/navigation"
 import {
-    signUpUser,
+  signUpUser,
 } from '@/lib/auth'
-import { buildRoute } from '@/lib/navigation'
 import { StorageManager } from '@/lib/storage'
 import { logger } from '@/lib/utils'
 import { STORAGE_KEYS } from '@/maps/storage-keys'
-import { getPasswordRequirementsForUI } from '@/validation/auth.schema'
+import {
+  completeProfileSchema,
+  getPasswordRequirementsForUI,
+  signUpSchema,
+  type CompleteProfileFormData,
+  type SignUpFormData,
+} from '@/validation'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useRouter } from 'expo-router'
 import { useCallback, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import {
-    completeProfileSchema,
-    signUpSchema,
-    type CompleteProfileFormData,
-    type SignUpFormData,
-} from '../../validation/auth.schema'
 
 // ============================================================================
 // TYPES
@@ -113,7 +112,7 @@ export function useSignUpFlow(mode: SignUpFlowMode = 'signup', user?: any): {
 } {
   const [state, setState] = useState<SignUpFlowState>(INITIAL_STATE)
   const [showPassword, setShowPassword] = useState(false)
-  const router = useRouter()
+  const navigate = useNavigation()
 
   const patch = useCallback((partial: Partial<SignUpFlowState>) => {
     setState(prev => ({ ...prev, ...partial }))
@@ -151,7 +150,8 @@ export function useSignUpFlow(mode: SignUpFlowMode = 'signup', user?: any): {
         // Mark that profile needs to be completed
         await StorageManager.set(STORAGE_KEYS.PROFILE_COMPLETED, false)
         patch({ phase: 'success', loading: false })
-        router.replace(result.redirectTo as any)
+        //THISMIGHTBEWRONG
+        navigate.resetTo(result.redirectTo)
         return
       }
 
@@ -165,7 +165,7 @@ export function useSignUpFlow(mode: SignUpFlowMode = 'signup', user?: any): {
       logger.category('auth').error('Sign-up error:', error)
       patch({ phase: 'error', loading: false, error: 'An unexpected error occurred. Please try again.' })
     }
-  }, [patch, router])
+  }, [patch, navigate])
 
   // --------------------------------------------------------------------------
   // Submit — 'complete-profile' path
@@ -193,7 +193,7 @@ export function useSignUpFlow(mode: SignUpFlowMode = 'signup', user?: any): {
       // Pending invites will be handled by the world-selection screen
       await StorageManager.set(STORAGE_KEYS.PROFILE_COMPLETED, true)
       patch({ phase: 'success', loading: false })
-      router.replace(buildRoute('/select/world-selection') as any)
+      navigate.resetTo('/select/world-selection')
     } catch (error: any) {
       logger.category('auth').error('Profile creation error:', error)
 
@@ -203,7 +203,7 @@ export function useSignUpFlow(mode: SignUpFlowMode = 'signup', user?: any): {
         patch({ phase: 'error', loading: false, error: 'Failed to create profile. Please try again.' })
       }
     }
-  }, [user, patch, router])
+  }, [user, patch, navigate])
 
   // --------------------------------------------------------------------------
   // Handlers

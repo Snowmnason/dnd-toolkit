@@ -28,6 +28,8 @@ export interface ChromeLayerTopBarProps {
 export interface ChromeLayerBottomBarProps {
   /** Whether to show the bottom bar (mobile only, route-dependent) */
   visible: boolean
+  /** Current active tab key */
+  activeTab: string
   /** Tab change handler — typically navigates to tab route */
   onTabChange: (tabKey: string) => void
 }
@@ -38,7 +40,7 @@ export interface ChromeLayerProps {
 }
 
 export function ChromeLayer({ topBar, bottomBar }: ChromeLayerProps) {
-  const { openSettingsMenu, activeTab } = useChrome()
+  const { openSettingsMenu } = useChrome()
   const isMobile = Platform.OS !== 'web'
 
   return (
@@ -55,7 +57,7 @@ export function ChromeLayer({ topBar, bottomBar }: ChromeLayerProps) {
       {/* BottomBar: Mobile only, when visible */}
       {isMobile && bottomBar?.visible && (
         <ChromeBottomBar
-          activeTab={activeTab}
+          activeTab={bottomBar.activeTab}
           onTabChange={bottomBar.onTabChange}
         />
       )}

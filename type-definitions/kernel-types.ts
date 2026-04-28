@@ -5,7 +5,7 @@
  * Used by system/Kernel/app-kernel.ts and lib/kernel/kernel-manager.ts.
  */
 
-import type { SafeModeState } from "@/lib/error";
+import type { SafeModeState } from "@/lib/error/safemode/safe-mode";
 import type { PhaseName } from "@/localization";
 import type { NetworkStatus } from "@/system/Network";
 

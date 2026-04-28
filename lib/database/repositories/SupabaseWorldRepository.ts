@@ -2,15 +2,15 @@ import { dbRequestOptions } from "@/config";
 import { fetchRequest } from "@/lib/api";
 import { getCurrentSession } from "@/lib/auth";
 import type { AccessRole } from "@/lib/database/worlds";
-import { getDatabase } from "@/lib/middleware/services";
 import { logger } from "@/lib/utils/logger";
+import { getDatabase } from "@/middleware/services";
 import type {
-  CreateWorldData,
-  PaginatedResult,
-  PaginationOptions,
-  World,
-  WorldRepository,
-  WorldWithAccess
+    CreateWorldData,
+    PaginatedResult,
+    PaginationOptions,
+    World,
+    WorldRepository,
+    WorldWithAccess
 } from "./repo-types";
 
 /**

@@ -12,9 +12,9 @@ import * as Crypto from 'expo-crypto';
 import { ANALYTICS_RETRY_DEFAULTS, getAppConfig } from '@/config';
 import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
 import { shouldEmitEvent, type ConsentCategory } from '@/lib/analytics/consent/consent-gating';
-import { clearAnalyticsQueue, loadAnalyticsQueue, persistAnalyticsQueue } from "@/lib/middleware/storage";
 import { logger } from '@/lib/utils';
 import { STORAGE_KEYS } from "@/maps";
+import { clearAnalyticsQueue, loadAnalyticsQueue, persistAnalyticsQueue } from "@/middleware/storage";
 import type { QueuedBreadcrumb } from '@/type-definitions/breadcrumb-queue-types.ts';
 
 /**
@@ -350,7 +350,7 @@ class BreadcrumbQueueService {
       this.currentBatchIds = new Set(batch.map((b) => b.id));
       logger.category('analytics').debug('BreadcrumbQueue', `Flushing batch: batchSize=${batch.length}`);
 
-      const { sendBreadcrumbs } = require('@/lib/middleware/services/analytics-service');
+      const { sendBreadcrumbs } = require('@/middleware/services/analytics-service');
       const result = await sendBreadcrumbs(this.providerName, batch);
       if (result === null) {
         logger.category('analytics').debug('BreadcrumbQueue', 'Flush aborted: Middleware returned null');

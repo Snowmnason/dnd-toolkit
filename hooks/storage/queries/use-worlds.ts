@@ -1,7 +1,7 @@
 import { useAdaptivePayloadCacheInvalidation } from "@/hooks/network";
 import { worldsDB, WorldWithAccess } from "@/lib/database";
 import { getQualityAwareCacheKey } from "@/lib/network";
-import { worldAccessCache } from "@/lib/storage";
+import { worldAccessCache } from "@/lib/storage/sync/world-access-cache";
 import { logger } from "@/lib/utils";
 import { CACHE_CONFIG, CACHE_KEYS, CACHE_TAGS } from "@/maps";
 import { useCallback, useMemo, useState } from "react";

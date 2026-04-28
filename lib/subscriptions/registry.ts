@@ -25,6 +25,12 @@
 export interface SubscriptionRegistryEntry {
   name: string;
   activate: () => Promise<void>;
+  /**
+   * If true, this subscription is skipped during the registration phase and
+   * activated in runPostReadyTasks() after appReady. Use for subscriptions
+   * whose module-load cost (import graph) would otherwise block bootstrap.
+   */
+  postReady?: boolean;
 }
 
 /**
@@ -34,6 +40,7 @@ export interface SubscriptionRegistryEntry {
 export const SUBSCRIPTIONS: SubscriptionRegistryEntry[] = [
   {
     name: "analytics-network-integration",
+    postReady: true,
     activate: async () => {
       const { initializeAnalyticsNetworkIntegration } = await import(
         "@/lib/analytics/exporters/analytics-network-integration"
@@ -44,21 +51,26 @@ export const SUBSCRIPTIONS: SubscriptionRegistryEntry[] = [
   // TRACK 7: Post-Registration recovery signal subscriptions
   {
     name: "network-recovery-subscription",
+    postReady: true,
     activate: async () => {
-      const { reportRecovery } = await import("@/lib/error");
+      const { reportRecovery } = await import("@/lib/error/degrade/degrade-manager");
       const { DegradeCapability } = await import("@/type-definitions/degrade");
-      const { NetworkDetection } = await import("@/system/Network");
+      const { NetworkDetection } = await import("@/system/Network/network-detection");
       const { logger } = await import("@/lib/utils");
 
-      // Subscribe to network reconnection events
-      // When network comes back online after being offline
+      // Track previous online state so we only fire on offline → online transitions,
+      // not on every periodic ping while already connected.
+      let wasOnline = NetworkDetection.getStatus().isOnline;
+
       NetworkDetection.subscribe((status) => {
-        if (status.isOnline) {
+        const isNowOnline = status.isOnline;
+        if (!wasOnline && isNowOnline) {
           logger
             .category("bootstrap")
-            .debug("Network recovered, reporting to degradation manager");
+            .debug("Network recovered (offline→online), reporting to degradation manager");
           reportRecovery(DegradeCapability.CONNECTIVITY, "Network connection restored");
         }
+        wasOnline = isNowOnline;
       });
     },
   },

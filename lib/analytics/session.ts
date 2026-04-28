@@ -3,7 +3,7 @@
  * Tracks user sessions, duration, and engagement metrics
  */
 import { getAppConfig } from '@/config';
-import { addBreadcrumb, isTrackingEnabled } from '@/lib/error';
+import { addBreadcrumb, isTrackingEnabled } from '@/lib/error/error-manager';
 import { logger } from '@/lib/utils';
 import { AnalyticsConsent } from './consent/consent';
 import { shouldEmitEvent } from './consent/consent-gating';

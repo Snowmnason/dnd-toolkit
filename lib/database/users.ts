@@ -1,5 +1,5 @@
-import { QueryCache } from "@/lib/middleware/storage";
 import { logger } from "@/lib/utils";
+import { QueryCache } from "@/middleware/storage";
 import { validateUsername } from "../../validation/validation";
 import { getUserRepository } from "./repositories";
 

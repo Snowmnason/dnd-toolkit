@@ -98,6 +98,22 @@ export async function preloadPhase(signal: AbortSignal): Promise<void> {
       }
     }
 
+    // Preload required image assets — non-critical but ensures GIF/PNG are decoded
+    // before first render (loading spinner, world map placeholder).
+    // Icons are warmed after app is ready in runPostReadyTasks() instead.
+    try {
+      const { Asset } = await import('expo-asset');
+      const { getRequiredImageAssets } = await import('@/maps/image-map');
+      await Asset.loadAsync(getRequiredImageAssets());
+      logger.category('bootstrap').debug('Required image assets preloaded');
+    } catch (imageError) {
+      logger
+        .category('bootstrap')
+        .warn('Required image preload failed (non-critical)', {
+          error: (imageError as Error).message,
+        });
+    }
+
     // Preload themes — critical for styling tokens and colors
     // This MUST complete successfully before UI renders
     try {

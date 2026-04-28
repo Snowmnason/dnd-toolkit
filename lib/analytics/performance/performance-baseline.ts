@@ -17,9 +17,9 @@
 /* eslint-disable security/detect-object-injection */
 
 import { getAppConfig } from '@/config';
-import { loadPerformanceMetrics, persistPerformanceMetrics } from '@/lib/middleware/storage';
 import { logger } from '@/lib/utils/logger';
 import { STORAGE_KEYS } from "@/maps";
+import { loadPerformanceMetrics, persistPerformanceMetrics } from '@/middleware/storage';
 
 /**
  * Single operation's baseline statistics

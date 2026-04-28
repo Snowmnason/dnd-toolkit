@@ -22,14 +22,14 @@
  *   // form.handleSubmit — "Update Password" button
  */
 
+import { useNavigation } from '@/hooks/navigation'
 import {
-    getUser,
-    restoreSession,
-    updatePassword,
+  getUser,
+  restoreSession,
+  updatePassword,
 } from '@/lib/auth'
 import { logger } from '@/lib/utils'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useRouter } from 'expo-router'
 import { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Platform } from 'react-native'
@@ -91,7 +91,7 @@ export function usePasswordResetFlow(): {
 } {
   const [state, setState] = useState<PasswordResetState>(INITIAL_STATE)
   const [showPassword, setShowPassword] = useState(false)
-  const router = useRouter()
+  const navigate = useNavigation()
 
   const { control, handleSubmit, formState: { isValid }, watch, reset } = useForm<ResetPasswordFormData>({
     resolver: zodResolver(resetPasswordSchema),
@@ -178,9 +178,9 @@ export function usePasswordResetFlow(): {
     })
 
     setTimeout(() => {
-      router.replace('/login/sign-in')
+      navigate.replace('/login/sign-in')
     }, REDIRECT_DELAY_MS)
-  }, [patch, reset, router])
+  }, [patch, reset, navigate])
 
   // --------------------------------------------------------------------------
   // Return
@@ -199,7 +199,7 @@ export function usePasswordResetFlow(): {
       handleSubmit: handleSubmit(onSubmit),
     },
     handlers: {
-      goToSignIn: () => router.replace('/login/sign-in'),
+      goToSignIn: () => navigate.replace('/login/sign-in'),
     },
   }
 }

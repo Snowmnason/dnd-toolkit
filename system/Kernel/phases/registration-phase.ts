@@ -132,31 +132,41 @@ export async function registrationPhase(signal: AbortSignal): Promise<Registrati
   try {
     // CRITICAL IMPORTS ONLY
     // Degrade system (~4.2s import overhead) is deferred to background job
+    let _t = Date.now();
     const { CORE_JOBS } = await import("@/lib/jobs/registry");
     const { SUBSCRIPTIONS } = await import("@/lib/subscriptions/registry");
     const { getJobQueue } = await import("@/system/Jobs/background-job-queue");
+    logger.category("bootstrap").info(`[registration/t] imports: ${Date.now() - _t}ms`);
 
     const queue = getJobQueue();
 
-    // Register all job handlers (ALWAYS TRY, never skip)
-    for (const job of CORE_JOBS) {
-      try {
-        await job.register(queue);
-        result.registered.push(job.name);
-        logger.category("bootstrap").debug(`Job registered: ${job.name}`);
-      } catch (error) {
-        const errorMsg = (error as Error).message;
-        const requiredCapability = getRequiredCapability(job.name);
+    // Register all job handlers in parallel — they are independent
+    const jobResults = await Promise.all(
+      CORE_JOBS.map(async (job): Promise<{ name: string; success: boolean; errorMsg?: string }> => {
+        const t = Date.now();
+        try {
+          await job.register(queue);
+          logger.category("bootstrap").info(`[registration/t] job(${job.name}): ${Date.now() - t}ms`);
+          return { name: job.name, success: true };
+        } catch (error) {
+          const errorMsg = (error as Error).message;
+          logger.category("bootstrap").warn(`Job registration failed: ${job.name} (${Date.now() - t}ms FAILED)`, {
+            error: errorMsg,
+          });
+          return { name: job.name, success: false, errorMsg };
+        }
+      })
+    );
 
+    for (const r of jobResults) {
+      if (r.success) {
+        result.registered.push(r.name);
+      } else {
         result.failed.push({
-          item: job.name,
-          error: errorMsg,
-          requiredCapability,
-          recoverable: isRecoverable(job.name),
-        });
-
-        logger.category("bootstrap").warn(`Job registration failed: ${job.name}`, {
-          error: errorMsg,
+          item: r.name,
+          error: r.errorMsg ?? 'unknown',
+          requiredCapability: getRequiredCapability(r.name),
+          recoverable: isRecoverable(r.name),
         });
       }
     }
@@ -165,12 +175,14 @@ export async function registrationPhase(signal: AbortSignal): Promise<Registrati
       `✅ Job handlers registered (${result.registered.filter(n => CORE_JOBS.find(j => j.name === n)).length}/${CORE_JOBS.length})`,
     );
 
-    // Register all subscriptions (ALWAYS TRY, never skip)
-    for (const sub of SUBSCRIPTIONS) {
+    // Register pre-ready subscriptions only — postReady ones activate after appReady
+    const preReadySubs = SUBSCRIPTIONS.filter(s => !s.postReady);
+    for (const sub of preReadySubs) {
+      _t = Date.now();
       try {
         await sub.activate();
         result.registered.push(sub.name);
-        logger.category("bootstrap").debug(`Subscription registered: ${sub.name}`);
+        logger.category("bootstrap").info(`[registration/t] sub(${sub.name}): ${Date.now() - _t}ms`);
       } catch (error) {
         const errorMsg = (error as Error).message;
         const requiredCapability = getRequiredCapability(sub.name);
@@ -182,25 +194,28 @@ export async function registrationPhase(signal: AbortSignal): Promise<Registrati
           recoverable: isRecoverable(sub.name),
         });
 
-        logger.category("bootstrap").warn(`Subscription registration failed: ${sub.name}`, {
+        logger.category("bootstrap").warn(`Subscription registration failed: ${sub.name} (${Date.now() - _t}ms FAILED)`, {
           error: errorMsg,
         });
       }
     }
 
+    const postReadyCount = SUBSCRIPTIONS.filter(s => s.postReady).length;
     logger.category("bootstrap").info(
-      `✅ Subscriptions registered (${result.registered.filter(n => SUBSCRIPTIONS.find(s => s.name === n)).length}/${SUBSCRIPTIONS.length})`,
+      `✅ Subscriptions registered (${result.registered.filter(n => preReadySubs.find(s => s.name === n)).length}/${preReadySubs.length}, ${postReadyCount} deferred to post-ready)`,
     );
 
     // DEFERRED: Set up degrade system in background job
     // This avoids importing and initializing 12 degrade modules during registration
+    _t = Date.now();
     await queue.enqueue({
-      type: "internal_deferred_init",
-      payload: { target: "degrade-system-setup" },
+      type: "degrade_system_init",
+      payload: {},
       runAt: Date.now() + 150, // Run after network-recovery init
       maxRetries: 1,
       idempotencyKey: "degrade-system-setup-once",
     });
+    logger.category("bootstrap").info(`[registration/t] enqueue-degrade: ${Date.now() - _t}ms`);
 
     // Build summary for safe mode screen display
     if (result.failed.length > 0) {

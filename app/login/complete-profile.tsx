@@ -14,17 +14,17 @@ import {
 } from "@/components/auth_components";
 import { Body } from "@/components/ui";
 import { useSignUpFlow } from "@/hooks/auth";
-import { getCurrentSession } from "@/lib/auth";
+import { useNavigation } from "@/hooks/navigation";
 import { getCurrentUserProfile } from "@/hooks/storage";
 import { logger } from "@/hooks/utils";
+import { getCurrentSession } from "@/lib/auth";
 import { useScale } from "@/theme";
-import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 
 export default function CompleteProfileScreen() {
   const S = useScale();
-  const router = useRouter();
+  const navigate = useNavigation();
   const [user, setUser] = useState<any>(null);
   const [initializing, setInitializing] = useState(true);
 
@@ -43,7 +43,7 @@ export default function CompleteProfileScreen() {
           logger.category('auth').warn(
             "No authenticated user found, redirecting to sign-in",
           );
-          router.replace("/login/sign-in");
+          navigate.replace("/login/sign-in");
           return;
         }
 
@@ -88,7 +88,7 @@ export default function CompleteProfileScreen() {
           logger.category('auth').info(
             "User already has complete profile, redirecting to world selection",
           );
-          router.replace("/select/world-selection");
+          navigate.replace("/select/world-selection");
           return;
         }
         logger.category('auth').info(
@@ -96,7 +96,7 @@ export default function CompleteProfileScreen() {
         );
       } catch (error) {
         logger.category('auth').error("Auth check error:", error);
-        router.replace("/login/sign-in");
+        navigate.replace("/login/sign-in");
       } finally {
         setInitializing(false);
         logger.category('auth').debug("Auth check completed, initializing set to false");
@@ -104,7 +104,7 @@ export default function CompleteProfileScreen() {
     };
 
     checkAuthAndProfile();
-  }, [router]);
+  }, [navigate]);
 
   // Use the unified form hook in complete-profile mode
   const { state, form } = useSignUpFlow("complete-profile", user);
@@ -185,7 +185,7 @@ export default function CompleteProfileScreen() {
 
         <AuthButtonSecondary
           text="Sign Out"
-          onPress={() => router.push("/login/sign-up")}
+          onPress={() => navigate.to("/login/sign-up")}
           disabled={state.loading}
         />
       </AuthActionGroup>

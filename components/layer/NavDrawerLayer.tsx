@@ -68,7 +68,7 @@ function PermanentSidebar({ children }: { children?: React.ReactNode }) {
 
 /**
  * Animated sidebar that toggles between collapsed (childrenClosed) and expanded (childrenOpen).
- * Width animates between COLLAPSED_WIDTH (~72px) and EXPANDED_WIDTH (~240px).
+ * Width animates between COLLAPSED_WIDTH (~72px) and EXPANDED_WIDTH (~224px).
  * Includes a default chevron toggle that can be overridden via renderToggle.
  */
 function DesktopExpandableSidebar({
@@ -85,7 +85,7 @@ function DesktopExpandableSidebar({
   const S = useScale()
 
   const COLLAPSED_WIDTH = S.space.lg * 2.5 // ~72px
-  const EXPANDED_WIDTH = S.space.lg * 12   // ~240px
+  const EXPANDED_WIDTH = S.space.lg * 8   // ~224px
 
   const animatedWidth = useSharedValue(isExpanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH)
 
@@ -174,7 +174,7 @@ function DesktopModalOverlay({ children }: { children?: React.ReactNode }) {
   const { theme } = UseTheme()
   const S = useScale()
 
-  const MODAL_WIDTH = S.space.lg * 12 // ~240px (EXPANDED_WIDTH)
+  const MODAL_WIDTH = S.space.lg * 12 // ~240px
 
   const backdropOpacity = useSharedValue(0)
   const backdropAnimStyle = useAnimatedStyle(() => ({

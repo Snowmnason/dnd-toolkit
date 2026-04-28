@@ -24,6 +24,7 @@
  * - Classify errors (middleware handles it)
  */
 
+import { logger } from '@/lib/utils/logger';
 import {
     checkStorageServiceHealth,
     persistRawValue,
@@ -35,15 +36,14 @@ import {
     type StorageHealthReport,
     type StorageReadOptions,
     type StorageWriteOptions
-} from '@/lib/middleware/storage/storage-service';
-import { logger } from '@/lib/utils/logger';
+} from '@/middleware/storage/storage-service';
 import type { CacheSchema } from '@/system/Storage/versioning/cache-versioning';
 
 // Lazy-load QueryCache to break circular dependency
 let _queryCache: any = null;
 function getQueryCache() {
   if (!_queryCache) {
-    _queryCache = require('@/lib/middleware/storage').QueryCache;
+    _queryCache = require('@/middleware/storage').QueryCache;
   }
   return _queryCache;
 }

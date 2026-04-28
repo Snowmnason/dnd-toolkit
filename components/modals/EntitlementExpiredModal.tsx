@@ -11,7 +11,7 @@
  */
 
 import { AppModal, Button } from '@/components/ui';
-import { registerModal } from '@/contexts';
+import { registerModal } from '@/contexts/modal-context';
 import { useScale } from '@/theme';
 import { View } from 'react-native';
 

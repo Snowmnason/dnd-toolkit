@@ -1,5 +1,5 @@
 import { getAppConfig } from '@/config';
-import { useRouter } from 'expo-router';
+import { useNavigation } from '@/hooks/navigation';
 import { ErrorFallbackShell } from '../ui';
 
 export interface NavigationErrorScreenProps {
@@ -19,14 +19,14 @@ export function NavigationErrorScreen({
   error,
   fallbackRoute = '/select/world-selection',
 }: NavigationErrorScreenProps) {
-  const router = useRouter();
+  const navigate = useNavigation();
   const config = getAppConfig();
   const showDetailedErrors =
     config.overrides?.verboseErrorMessages ??
     process.env.NODE_ENV === 'development';
 
   const handleRecover = () => {
-    router.replace(fallbackRoute as any);
+    navigate.replace(fallbackRoute);
   };
 
   return (
