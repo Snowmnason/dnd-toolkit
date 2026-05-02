@@ -24,13 +24,13 @@
 
 import { useNavigation } from '@/hooks/navigation'
 import {
-  getUser,
-  restoreSession,
-  updatePassword,
+    getUser,
+    restoreSession,
+    updatePassword,
 } from '@/lib/auth'
 import { logger } from '@/lib/utils'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Platform } from 'react-native'
 import { resetPasswordSchema, type ResetPasswordFormData } from '../../validation/auth.schema'
@@ -92,6 +92,10 @@ export function usePasswordResetFlow(): {
   const [state, setState] = useState<PasswordResetState>(INITIAL_STATE)
   const [showPassword, setShowPassword] = useState(false)
   const navigate = useNavigation()
+  // useNavigation() returns a new object literal each render; including it in
+  // useCallback deps would recreate every callback on every render.
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
 
   const { control, handleSubmit, formState: { isValid }, watch, reset } = useForm<ResetPasswordFormData>({
     resolver: zodResolver(resetPasswordSchema),
@@ -178,9 +182,9 @@ export function usePasswordResetFlow(): {
     })
 
     setTimeout(() => {
-      navigate.replace('/login/sign-in')
+      navigateRef.current.replace('sign-in')
     }, REDIRECT_DELAY_MS)
-  }, [patch, reset, navigate])
+  }, [patch, reset])
 
   // --------------------------------------------------------------------------
   // Return

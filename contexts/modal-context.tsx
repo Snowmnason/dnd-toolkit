@@ -109,6 +109,12 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const closeModal = useCallback(() => {
+    // Cancel any previous close timer so repeated close calls stay idempotent.
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current)
+      closeTimeoutRef.current = null
+    }
+
     setModal(prev => ({
       ...prev,
       visible: false,

@@ -7,11 +7,11 @@ import { View } from "react-native";
 
 // 🧱 New UI Components
 import {
-    AppPage,
-    Body,
-    Button,
-    Heading,
-    Surface
+  AppPage,
+  Body,
+  Button,
+  Heading,
+  Surface
 } from "@/components/ui";
 import UserProfile from "../../AppScreens/settings/user-profile";
 import VersionDisplay from "../../components/VersionDisplay";
@@ -53,7 +53,7 @@ export default function SettingsPage() {
         logger.category('ui').error('Error fetching profile on settings mount:', err)
         setLoading(false)
       })
-  }, [navigate]);
+  }, []);
 
   // NOTE: Modal visibility and error states are now managed by hook state machines.
   // See signOutFlow.state.modal and deleteFlow.state.modal for which modal to show.

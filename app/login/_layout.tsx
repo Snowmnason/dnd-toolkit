@@ -20,7 +20,7 @@ export default function LoginLayout() {
       <AuthBackButtonContainer>
         <AuthButtonBack
           text="← Back"
-          onPress={() => navigate.canGoBack() ? navigate.back() : navigate.replace('/')}
+          onPress={() => navigate.replace('/')}
         />
       </AuthBackButtonContainer>
     </View>

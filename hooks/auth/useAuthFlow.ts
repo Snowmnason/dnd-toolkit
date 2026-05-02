@@ -38,7 +38,7 @@ import { logger } from '@/lib/utils'
 import { signInSchema, type SignInFormData } from '@/validation'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as WebBrowser from 'expo-web-browser'
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigation } from '../navigation'
 
@@ -111,12 +111,12 @@ async function navigateAfterSocialAuth(navigate: ReturnType<typeof useNavigation
   try {
     const userProfile = await usersDB.getCurrentUser()
     if (userProfile?.username) {
-      navigate.resetTo('/select/world-selection')
+      navigate.resetTo('world-selection')
     } else {
-      navigate.resetTo('/login/sign-up')
+      navigate.resetTo('sign-up')
     }
   } catch {
-    navigate.resetTo('/login/sign-up')
+    navigate.resetTo('sign-up')
   }
 }
 
@@ -133,6 +133,11 @@ export function useAuthFlow(): {
   const [state, setState] = useState<AuthFlowState>(INITIAL_STATE)
   const [showPassword, setShowPassword] = useState(false)
   const navigate = useNavigation()
+  // useNavigation() returns a new object literal each render; including it in
+  // useCallback deps would recreate every callback on every render.
+  // Use a ref so callbacks always call the latest navigate without deps instability.
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
 
   const { control, handleSubmit, formState: { isValid }, watch } = useForm<SignInFormData>({
     resolver: zodResolver(signInSchema),
@@ -162,9 +167,9 @@ export function useAuthFlow(): {
 
     patch({ phase: 'success', loading: false, error: null })
     if (result.redirectTo) {
-      navigate.resetTo(result.redirectTo)
+      navigateRef.current.resetTo(result.redirectTo)
     }
-  }, [patch, navigate])
+  }, [patch])
 
   // --------------------------------------------------------------------------
   // Social: Google
@@ -185,12 +190,12 @@ export function useAuthFlow(): {
       }
 
       patch({ phase: 'success', loading: false, error: null })
-      await navigateAfterSocialAuth(navigate)
+      await navigateAfterSocialAuth(navigateRef.current)
     } catch (error) {
       logger.category('auth').error('Google web auth error:', error)
       patch({ phase: 'error', loading: false, error: 'An unexpected error occurred during Google sign-in.' })
     }
-  }, [patch, navigate])
+  }, [patch])
 
   const handleGoogleMobile = useCallback(async () => {
     patch({ phase: 'authenticating', loading: true, error: null })
@@ -245,9 +250,9 @@ export function useAuthFlow(): {
 
         patch({ phase: 'success', loading: false, error: null })
         if (reAuthResult.redirect) {
-          navigate.resetTo(reAuthResult.redirect)
+          navigateRef.current.resetTo(reAuthResult.redirect)
         } else {
-          await navigateAfterSocialAuth(navigate)
+          await navigateAfterSocialAuth(navigateRef.current)
         }
       } else if (browserResult?.type === 'cancel') {
         // User cancelled — silently return to idle
@@ -259,7 +264,7 @@ export function useAuthFlow(): {
       logger.category('auth').error('Google mobile auth error:', error)
       patch({ phase: 'error', loading: false, error: 'An unexpected error occurred during Google sign-in.' })
     }
-  }, [patch, navigate])
+  }, [patch])
 
   const handleGoogleWebError = useCallback(() => {
     logger.category('auth').error('Google web auth error callback triggered')
@@ -296,7 +301,7 @@ export function useAuthFlow(): {
       }
 
       patch({ phase: 'success', loading: false, error: null })
-      await navigateAfterSocialAuth(navigate)
+      await navigateAfterSocialAuth(navigateRef.current)
     } catch (error: any) {
       if (error.code === 'ERR_REQUEST_CANCELED') {
         // User cancelled — silently return to idle
@@ -306,7 +311,8 @@ export function useAuthFlow(): {
       logger.category('auth').error('Apple iOS auth error:', error)
       patch({ phase: 'error', loading: false, error: 'Apple sign-in failed. Please try again.' })
     }
-  }, [patch, navigate])
+   
+  }, [patch])
 
   const handleAppleWeb = useCallback(async (appleAuthRequestResponse: any) => {
     const idToken = appleAuthRequestResponse?.authorization?.id_token
@@ -325,12 +331,12 @@ export function useAuthFlow(): {
       }
 
       patch({ phase: 'success', loading: false, error: null })
-      await navigateAfterSocialAuth(navigate)
+      await navigateAfterSocialAuth(navigateRef.current)
     } catch (error) {
       logger.category('auth').error('Apple web auth error:', error)
       patch({ phase: 'error', loading: false, error: 'An unexpected error occurred during Apple sign-in.' })
     }
-  }, [patch, navigate])
+  }, [patch])
 
   const handleAppleWebError = useCallback((error: any) => {
     logger.category('auth').error('Apple web auth error callback triggered:', error)

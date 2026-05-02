@@ -4,6 +4,7 @@ import type { RouteConfig } from '../navigationConfig'
 export const SELECT_ROUTES: RouteConfig[] = [
   {
     path: '/select/world-selection',
+    semanticId: 'world-selection',
     title: 'Select World',
     analyticsName: 'select_world',
   },

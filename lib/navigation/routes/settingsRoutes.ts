@@ -32,13 +32,25 @@ export const SETTINGS_ROUTES: RouteConfig[] = [
     },
     analyticsName: "settings_user",
   },
+  // Semantic anchor — no platform constraint; holds the lookup ID and platform branching.
+  // navigate.to('style-playground') resolves here, then platformPaths picks the concrete route.
   {
-    path: "/settings/StyleMobile",
+    path: "/settings/stylemobile",
+    semanticId: "style-playground",
+    platformPaths: { mobile: "/settings/stylemobile", desktop: "/settings/styledesktop" },
+    title: "Component Playground",
+    analyticsName: "settings_style_playground",
+  },
+  // Concrete platform entries — matched directly when navigating to their exact paths.
+  {
+    path: "/settings/stylemobile",
+    platform: "mobile",
     title: "Component Playground (Mobile)",
     analyticsName: "settings_style_mobile",
   },
   {
-    path: "/settings/StyleDesktop",
+    path: "/settings/styledesktop",
+    platform: "desktop",
     title: "Component Playground (Desktop)",
     analyticsName: "settings_style_desktop",
   },

@@ -15,7 +15,7 @@ import { useAuthActions } from '@/hooks/auth';
 import { useNavigation } from '@/hooks/navigation';
 import { forgotPasswordSchema, type ForgotPasswordFormData } from '@/validation/auth.schema';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 
 export default function ForgotPasswordScreen() {
@@ -35,39 +35,30 @@ export default function ForgotPasswordScreen() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [showEmailNotFound, setShowEmailNotFound] = useState(false);
 
-  // Manage email-not-found modal via context
-  useEffect(() => {
-    if (showEmailNotFound) {
-      openModal('login-message', {
-        heading: 'No Account Found 🤔',
-        message: `We couldn't find an account with ${email}. Would you like to create a new account instead?`,
-        buttons: [
-          {
-            text: 'Cancel',
-            onPress: () => {
-              closeModal();
-              setShowEmailNotFound(false);
-            },
-            variant: 'cancel' as const,
+  const showEmailNotFoundModal = () => {
+    openModal('login-message', {
+      heading: 'No Account Found',
+      message: `We couldn't find an account with ${email}. Would you like to create a new account instead?`,
+      buttons: [
+        {
+          text: 'Cancel',
+          onPress: () => {
+            closeModal();
           },
-          {
-            text: 'Create Account',
-            onPress: () => {
-              closeModal();
-              setShowEmailNotFound(false);
-              navigate.to('/login/sign-up');
-            },
-            variant: 'primary' as const,
+          variant: 'cancel' as const,
+        },
+        {
+          text: 'Create Account',
+          onPress: () => {
+            closeModal();
+            navigate.to('/login/sign-up');
           },
-        ],
-      });
-    } else {
-      closeModal();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showEmailNotFound, email, openModal, closeModal]);
+          variant: 'primary' as const,
+        },
+      ],
+    });
+  };
 
   // Handle password reset
   const onSubmit = async (values: ForgotPasswordFormData) => {
@@ -83,7 +74,7 @@ export default function ForgotPasswordScreen() {
         setSuccess(true);
         setSuccessMessage(result.message);
       } else if (result.showEmailNotFoundModal) {
-        setShowEmailNotFound(true);
+        showEmailNotFoundModal();
       } else if (result.error) {
         setError(result.error);
       }

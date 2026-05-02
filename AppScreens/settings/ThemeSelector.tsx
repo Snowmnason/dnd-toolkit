@@ -1,13 +1,12 @@
 import { Button } from "@/components/ui";
 import { useNavigation } from "@/hooks/navigation";
-import { usePlatform } from "@/providers";
 import {
-    $,
-    allThemes,
-    ThemeFamily,
-    ThemeMode,
-    useScale,
-    UseTheme,
+  $,
+  allThemes,
+  ThemeFamily,
+  ThemeMode,
+  useScale,
+  UseTheme,
 } from "@/theme";
 import { useSegments } from "expo-router";
 import { Pressable, Text, View } from "react-native";
@@ -20,7 +19,6 @@ export function ThemeSelector() {
   const { setTheme, mode, setMode, family: activeTheme } = UseTheme();
   const changeTheme = (themeName: ThemeFamily) => setTheme(themeName, mode);
   const toggleMode = () => setMode(mode === 'light' ? 'dark' : 'light');
-  const { isMobile } = usePlatform();
   const { theme: currentTheme } = UseTheme();
   const S = useScale();
   const navigate = useNavigation();
@@ -28,8 +26,8 @@ export function ThemeSelector() {
 
   // Check if we're already on the StyleMobile or StyleDesktop routes
   const isOnStylePage =
-    (segments as string[]).includes("StyleMobile") ||
-    (segments as string[]).includes("StyleDesktop");
+    (segments as string[]).includes("stylemobile") ||
+    (segments as string[]).includes("styledesktop");
 
   const handleSelect = (themeName: ThemeFamily, themeMode: ThemeMode) => {
     // Change theme family first
@@ -117,12 +115,7 @@ export function ThemeSelector() {
         <Button
           variant="secondary"
           text="Playground"
-          onPress={() => {
-            const targetPath = isMobile
-              ? "/settings/StyleMobile"
-              : "/settings/StyleDesktop";
-            navigate.to(targetPath);
-          }}
+          onPress={() => navigate.to('style-playground')}
           style={{ alignSelf: "center" }}
         />
       )}

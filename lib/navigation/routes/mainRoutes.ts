@@ -3,12 +3,20 @@ import type { NavigationContext, RouteConfig } from '../navigationConfig'
 
 // Main app routes (world-dependent)
 export const MAIN_ROUTES: RouteConfig[] = [
-  // Desktop-only composition surface — renders all panels in a single layout.
-  // Mobile entry points are the per-panel routes below.
+  // Semantic anchor — no platform constraint; holds the lookup ID and platform branching.
+  // navigate.to('home') resolves here, then platformPaths picks the concrete route.
   {
     path: '/main/main-landing',
+    semanticId: 'home',
+    platformPaths: { mobile: '/main/world', desktop: '/main/main-landing' },
     title: 'D&D Toolkit',
+    analyticsName: 'main_home',
+  },
+  // Concrete platform entries — matched directly when navigating to their exact paths.
+  {
+    path: '/main/main-landing',
     platform: 'desktop',
+    title: 'D&D Toolkit',
     analyticsName: 'main_landing',
     onError: (error: Error, _context: NavigationContext) => {
       logger.category('navigation').error('[Route Error] main-landing:', error.message)

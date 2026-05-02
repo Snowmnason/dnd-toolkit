@@ -20,6 +20,7 @@ import { TextInput } from "react-native";
 export default function SignUpScreen() {
   const navigate = useNavigation();
   const { openModal, closeModal } = useModal();
+  const lastHandledModalRef = useRef<typeof state.modal>('none');
 
   // Refs for keyboard navigation
   const passwordInputRef = useRef<TextInput>(null);
@@ -29,6 +30,13 @@ export default function SignUpScreen() {
 
   // Manage email-exists modal via context
   useEffect(() => {
+    if (lastHandledModalRef.current === state.modal) {
+      return;
+    }
+
+    const previousModal = lastHandledModalRef.current;
+    lastHandledModalRef.current = state.modal;
+
     if (state.modal === 'email-exists') {
       openModal('login-message', {
         heading: 'Account Already Exists! 🤔',
@@ -53,7 +61,7 @@ export default function SignUpScreen() {
           },
         ],
       });
-    } else if (state.modal === null) {
+    } else if (previousModal === 'email-exists' && state.modal === 'none') {
       closeModal();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

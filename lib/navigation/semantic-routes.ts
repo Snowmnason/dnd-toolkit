@@ -19,6 +19,7 @@
  * - `'world-selection'` — World picker
  * - `'settings'` — User settings
  * - `'home'` — Main app entry point (desktop landing or mobile panel)
+ * - `'style-playground'` — Component playground (resolves to mobile or desktop variant based on platform)
  *
  * **Usage:**
  * ```typescript
@@ -43,7 +44,8 @@
  * **Adding a new semantic ID:**
  * 1. Add the ID string to `SEMANTIC_ROUTE_IDS` below.
  * 2. Add `semanticId: '<your-id>'` to the matching `RouteConfig` entry in `routes/`.
- * 3. No changes to `navManager.ts` or `use-navigation.ts` required.
+ * 3. For platform-conditional routes, also add `platformPaths: { mobile: '...', desktop: '...' }` to that entry.
+ * 4. No changes to `navManager.ts` or `use-navigation.ts` required.
  */
 
 import { ROUTE_CONFIGS } from '@/lib/navigation/navigationConfig';
@@ -63,6 +65,7 @@ const SEMANTIC_ROUTE_IDS = [
   'world-selection',
   'settings',
   'home',
+  'style-playground',
 ] as const;
 
 export type SemanticRoute = (typeof SEMANTIC_ROUTE_IDS)[number];
@@ -75,12 +78,18 @@ const SEMANTIC_ROUTE_SET = new Set<string>(SEMANTIC_ROUTE_IDS);
  *
  * - `'default'` uses built-in auth-aware logic.
  * - All other IDs are resolved by looking up `semanticId` in `ROUTE_CONFIGS`.
+ * - If the matching config has `platformPaths` and a `platform` is provided, the
+ *   platform-specific path is returned instead of the base `path`.
  *
  * @param target - The semantic route identifier (e.g., 'sign-in')
+ * @param platform - Optional current platform for routes with platform-conditional paths
  * @returns Concrete route path (e.g., '/login/sign-in')
  * @throws If no matching route config is found for the target
  */
-export async function resolveSemanticRoute(target: SemanticRoute): Promise<string> {
+export async function resolveSemanticRoute(
+  target: SemanticRoute,
+  platform?: 'mobile' | 'desktop',
+): Promise<string> {
   try {
     if (target === 'default') {
       return resolveDefaultRoute();
@@ -92,6 +101,12 @@ export async function resolveSemanticRoute(target: SemanticRoute): Promise<strin
       const errMsg = `No route config found for semantic route: '${target}'. Add semanticId: '${target}' to the matching RouteConfig entry.`;
       logger.category('navigation').warn(errMsg);
       throw new Error(errMsg);
+    }
+
+    // Platform-conditional resolution: pick mobile or desktop path when available
+    if (platform && config.platformPaths) {
+      const platformPath = config.platformPaths[platform];
+      if (platformPath) return platformPath;
     }
 
     return config.path;

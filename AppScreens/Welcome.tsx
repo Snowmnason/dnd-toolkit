@@ -126,14 +126,7 @@ export default function Welcome({ isLoading = false }: WelcomeScreenProps) {
         <AuthLink
           color={loading ? '#BDB76B' : '#D4AF37'}
           onPress={() => {
-            if (isMobile) {
-              //do nothing for now
-              return;
-            } else {
-              navigate.to('/StyleDesktop');
-              return;
-            }
-            // TODO: Implement anonymous auth
+            showToast('Feature Unavailable', 'Continuing without an account is not available yet. Please sign in or create an account to access all features.', 'info');
           }}
         >
           Continue without an account

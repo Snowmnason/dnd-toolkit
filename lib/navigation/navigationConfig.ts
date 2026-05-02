@@ -90,6 +90,19 @@ export interface RouteConfig {
   platform?: 'mobile' | 'desktop' | null;
 
   /**
+   * Platform-conditional paths for semantic routes that resolve to different concrete routes
+   * per platform. When set on an entry with `semanticId`, `resolveSemanticRoute` will return
+   * the platform-specific path instead of `path`. Falls back to `path` if no entry matches.
+   *
+   * @example
+   * ```ts
+   * // In a RouteConfig entry with semanticId: 'style-playground':
+   * platformPaths: { mobile: '/settings/stylemobile', desktop: '/settings/styledesktop' }
+   * ```
+   */
+  platformPaths?: { mobile?: string; desktop?: string };
+
+  /**
    * Semantic identifier for in-app component navigation.
    * Enables `navigate.to('sign-in')` as an alias for the concrete path.
    * Must be unique across all route configs.

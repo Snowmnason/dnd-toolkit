@@ -1,11 +1,11 @@
 import {
-    AuthActionGroup,
-    AuthBodyFooter,
-    AuthButton,
-    AuthCaption,
-    AuthRoot,
-    AuthSubTitle,
-    AuthTitle
+  AuthActionGroup,
+  AuthBodyFooter,
+  AuthButton,
+  AuthCaption,
+  AuthRoot,
+  AuthSubTitle,
+  AuthTitle
 } from '@/components/auth_components';
 import { Body } from '@/components/ui';
 import { useModal } from '@/contexts';
@@ -22,34 +22,27 @@ export default function EmailConfirmationScreen() {
   const { openModal, closeModal } = useModal();
   const { email } = useLocalSearchParams();
   const [loading, setLoading] = useState(false);
-  const [showEmailSent, setShowEmailSent] = useState(false);
   const [waitingResend, setWaitingResend] = useState('Resend Email');
   const [isCountingDown, setIsCountingDown] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
   const userEmail = Array.isArray(email) ? email[0] : email || '';
 
-  // Manage email-sent modal via context
-  useEffect(() => {
-    if (showEmailSent) {
-      openModal('login-message', {
-        heading: 'Email Sent! 📧',
-        message: 'Check your inbox for the confirmation link to complete your account setup.',
-        buttons: [
-          {
-            text: 'Got it!',
-            onPress: () => {
-              closeModal();
-              setShowEmailSent(false);
-            },
-            variant: 'primary' as const,
+  const showEmailSentModal = () => {
+    openModal('login-message', {
+      heading: 'Email Sent! 📧',
+      message: 'Check your inbox for the confirmation link to complete your account setup.',
+      buttons: [
+        {
+          text: 'Got it!',
+          onPress: () => {
+            closeModal();
           },
-        ],
-      });
-    } else {
-      closeModal();
-    }
-  }, [showEmailSent, openModal, closeModal]);
+          variant: 'primary' as const,
+        },
+      ],
+    });
+  };
 
   // Use hook with callback to detect email confirmation
   const { resendConfirmation } = useAuthStateListener((session) => {
@@ -88,7 +81,7 @@ export default function EmailConfirmationScreen() {
     }
     
     // Success: show modal and start countdown
-    setShowEmailSent(true);
+    showEmailSentModal();
     setLoading(false);
     setIsCountingDown(true);
     let countdown = 30;

@@ -15,6 +15,7 @@ export const LOGIN_ROUTES: RouteConfig[] = [
   },
   {
     path: '/login/sign-in',
+    semanticId: 'sign-in',
     title: 'Sign In',
     analyticsName: 'login_signin',
   },
@@ -25,11 +26,13 @@ export const LOGIN_ROUTES: RouteConfig[] = [
   },
   {
     path: '/login/sign-up',
+    semanticId: 'sign-up',
     title: 'Create Account',
     analyticsName: 'login_signup',
   },
   {
     path: '/login/forgot-password',
+    semanticId: 'forgot-password',
     title: 'Forgot Password',
     analyticsName: 'login_forgot',
   },
@@ -52,12 +55,6 @@ export const LOGIN_ROUTES: RouteConfig[] = [
     path: '/login/complete-profile',
     title: 'Complete Profile',
     analyticsName: 'login_complete_profile',
-  },
-  {
-    path: '/StyleDesktop',
-    aliases: ['/styledesktop'],
-    title: 'Component Playground (Anonymous)',
-    analyticsName: 'style_desktop_anonymous',
   },
 ]
 

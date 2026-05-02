@@ -133,11 +133,17 @@ export async function executeRouteNavigation(
 ): Promise<NavServiceResult> {
   try {
     const ctx = buildNavigationContext();
-    let canonicalTarget = canonicalizePath(target);
+    const semanticPlatform: 'mobile' | 'desktop' =
+      ctx.platform === 'ios' || ctx.platform === 'android' ? 'mobile' : 'desktop';
 
-    // Resolve semantic routes to concrete paths (e.g., 'default' → '/' or '/select/world-selection')
-    if (isSemanticRoute(canonicalTarget)) {
-      canonicalTarget = await resolveSemanticRoute(canonicalTarget as any);
+    // Resolve semantic routes BEFORE canonicalizePath — semantic IDs are not paths and must
+    // not be prefixed with '/'. Check the raw target, then canonicalize the resolved path.
+    let canonicalTarget: string;
+    if (isSemanticRoute(target)) {
+      const resolved = await resolveSemanticRoute(target as any, semanticPlatform);
+      canonicalTarget = canonicalizePath(resolved);
+    } else {
+      canonicalTarget = canonicalizePath(target);
     }
 
     // Resolve deferred params from approved lib sources (auth state, storage)
@@ -148,7 +154,7 @@ export async function executeRouteNavigation(
     // Resolve route metadata — enables platform check and contextParamNames extraction
     const routeMetadata = getRouteMetadataForPath(canonicalTarget);
 
-    // Early reject: platform incompatibility (no-op until routes declare platform constraints)
+    // Early reject: platform incompatibility
     if (!isPlatformCompatible(ctx.platform, routeMetadata)) {
       return { status: 'aborted', reason: 'platform-incompatible' };
     }
@@ -220,11 +226,17 @@ export async function executeInternalRedirectNavigation(
   try {
     // TODO: Validate redirect reason (ensure it's from approved source)
     const ctx = buildNavigationContext();
-    let canonicalTarget = canonicalizePath(target);
+    const semanticPlatform: 'mobile' | 'desktop' =
+      ctx.platform === 'ios' || ctx.platform === 'android' ? 'mobile' : 'desktop';
 
-    // Resolve semantic routes to concrete paths (e.g., 'default' → '/' or '/select/world-selection')
-    if (isSemanticRoute(canonicalTarget)) {
-      canonicalTarget = await resolveSemanticRoute(canonicalTarget as any);
+    // Resolve semantic routes BEFORE canonicalizePath — semantic IDs are not paths and must
+    // not be prefixed with '/'. Check the raw target, then canonicalize the resolved path.
+    let canonicalTarget: string;
+    if (isSemanticRoute(target)) {
+      const resolved = await resolveSemanticRoute(target as any, semanticPlatform);
+      canonicalTarget = canonicalizePath(resolved);
+    } else {
+      canonicalTarget = canonicalizePath(target);
     }
 
     // Resolve deferred params from approved lib sources (auth state, storage)
@@ -235,7 +247,7 @@ export async function executeInternalRedirectNavigation(
     // Resolve route metadata — enables platform check and contextParamNames extraction
     const routeMetadata = getRouteMetadataForPath(canonicalTarget);
 
-    // Early reject: platform incompatibility (no-op until routes declare platform constraints)
+    // Early reject: platform incompatibility
     if (!isPlatformCompatible(ctx.platform, routeMetadata)) {
       return { status: 'aborted', reason: 'platform-incompatible' };
     }
