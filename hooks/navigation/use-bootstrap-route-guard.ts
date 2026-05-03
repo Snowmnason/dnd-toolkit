@@ -3,29 +3,35 @@ import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
 import { AuthStateManager } from '@/lib/auth/auth-state';
-import { executeInternalRedirectNavigation } from '@/lib/navigation';
+import { evaluateObservedRouteChange, executeInternalRedirectNavigation } from '@/lib/navigation';
 import { logger } from '@/lib/utils';
 
 /**
  * useBootstrapRouteGuard — Web Entry Coordinator
  *
  * WEB-ONLY hook that runs once when `appReady` fires. Determines the canonical
- * initial destination based on auth-phase freshness, ignoring protected deep links.
+ * initial destination for every full web page load.
  *
- * **Ownership contract:**
- * Auth-phase is the source of truth for where the user lands on a full web load.
- * This hook reads the freshness outcome and routes accordingly:
- * - FRESH  → /select/world-selection  (session valid, skip login)
- * - STALE  → /login/sign-in           (re-authentication required)
- * - DEAD   → /                         (storage cleared, welcome)
- * - NONE   → /                         (first-time user, welcome)
+ * **Navigation type handling:**
  *
- * **Deep link policy:**
- * - Auth/email links (signup confirm, password reset, invites): ALLOWED — deferred to
+ * `back_forward` / `reload` + fresh session:
+ *   User was already in the app. Honor the URL directly — no guard re-run needed.
+ *   Stale/dead sessions still get redirected to sign-in/welcome.
+ *
+ * `navigate` (new tab, typed URL, bookmark, external link) + fresh session:
+ *   Run the full guard pipeline for the requested URL via `evaluateObservedRouteChange`:
+ *   - Guards pass → user lands on their target (deep link honored, analytics captured)
+ *   - Guards deny → redirect already executed inside evaluateObservedRouteChange
+ *   - Pipeline aborted → fall back to freshness-based redirect
+ *   Auth/login routes are excluded from this path — a fresh user who bookmarked
+ *   the sign-in page should be redirected to world-selection, not left on sign-in.
+ *
+ * `navigate` + stale/dead/none session → standard freshness redirect.
+ *
+ * **Always-allowed entry points:**
+ * - Auth/email links (signup confirm, password reset, invites): deferred to
  *   useAuthLinkObserver which handles them independently.
- * - Public /web/* routes: ALLOWED — these are app pages that don't require auth.
- * - All other deep links on protected routes: IGNORED on full web loads. The user
- *   is routed by freshness, not by the URL they entered.
+ * - Public /web/* routes: no auth required, always honored.
  *
  * **Why not the route observer?**
  * `useRouteChangeObserver` handles runtime in-memory route changes after the app
@@ -94,6 +100,57 @@ export function useBootstrapRouteGuard(appReady: boolean): void {
         // ─── Step 3: Read auth-phase freshness ─────────────────────────
         const freshness = AuthStateManager.getBootstrapFreshness();
 
+        // ─── Step 3.5: Honor URL for fresh sessions ────────────────────
+        const navType = getWebNavigationType();
+
+        if (freshness === 'fresh') {
+          if (navType === 'back_forward' || navType === 'reload') {
+            // Restored navigation: user was already in the app at this URL.
+            // Honor it directly — layout-level useAuthGuard enforces protection.
+            logger.category('navigation').debug(
+              '[WebEntryCoordinator] Restored navigation with fresh session — honoring URL',
+              { navType, currentRoute },
+            );
+            return;
+          }
+
+          if (navType === 'navigate') {
+            // Deep link (bookmark, external link, typed URL) with a live session.
+            // Run the guard pipeline instead of blindly bouncing to world-selection.
+            // Auth/login routes are excluded: a fresh user who bookmarked /login/sign-in
+            // should be redirected to world-selection, not left on the sign-in page.
+            const isAuthPublicRoute = lowerRoute === '/' || lowerRoute.startsWith('/login');
+            if (!isAuthPublicRoute) {
+              // Extract the worldId from the URL so the permission guard validates
+              // the deep-linked world, not the stored LAST_SELECTED_WORLD.
+              const urlSearchParams = typeof window !== 'undefined'
+                ? new URLSearchParams(window.location.search)
+                : null;
+              const deepLinkWorldId = urlSearchParams?.get('worldId') ?? undefined;
+              const overrideParams = deepLinkWorldId ? { worldId: deepLinkWorldId } : undefined;
+
+              const deepLinkResult = await evaluateObservedRouteChange(
+                currentRoute,
+                '',
+                'deep-link',
+                overrideParams ? { overrideParams } : undefined,
+              );
+              if (deepLinkResult.status !== 'aborted') {
+                logger.category('navigation').debug(
+                  '[WebEntryCoordinator] Deep link honored for fresh session',
+                  { currentRoute, guardStatus: deepLinkResult.status, deepLinkWorldId },
+                );
+                return;
+              }
+              // Guard pipeline aborted (error) — fall through to freshness redirect
+              logger.category('navigation').warn(
+                '[WebEntryCoordinator] Deep link guard check aborted, falling back to freshness redirect',
+                { currentRoute },
+              );
+            }
+          }
+        }
+
         // Map freshness → canonical bootstrap destination
         let bootstrapDestination: string;
         switch (freshness) {
@@ -146,4 +203,37 @@ export function useBootstrapRouteGuard(appReady: boolean): void {
     coordinateEntry();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appReady]);
+}
+
+/**
+ * Detect the type of the current web page navigation.
+ *
+ * Uses the modern `PerformanceNavigationTiming` API with fallback to the
+ * legacy `performance.navigation` for older browsers.
+ *
+ * @returns
+ * - `'navigate'`     — New tab, typed URL, link from external page
+ * - `'reload'`       — Hard refresh (F5, Cmd+R)
+ * - `'back_forward'` — Browser back or forward button
+ * - `'unknown'`      — API unavailable or unrecognized value
+ */
+export function getWebNavigationType(): 'navigate' | 'reload' | 'back_forward' | 'unknown' {
+  if (typeof performance === 'undefined') return 'unknown';
+
+  // Modern API: PerformanceNavigationTiming (Chrome 57+, Firefox 58+, Safari 15.4+)
+  const entries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+  if (entries.length > 0) {
+    const t = entries[0].type;
+    if (t === 'navigate' || t === 'reload' || t === 'back_forward') return t;
+  }
+
+  // Legacy fallback: deprecated but still widely available
+  const legacy = (performance as any).navigation;
+  if (legacy) {
+    if (legacy.type === 0) return 'navigate';
+    if (legacy.type === 1) return 'reload';
+    if (legacy.type === 2) return 'back_forward';
+  }
+
+  return 'unknown';
 }

@@ -2,6 +2,7 @@ import { useAuthStateListener, useSignOutFlow } from "@/hooks/auth";
 import { useNavigation } from "@/hooks/navigation";
 import { getCurrentUserProfile } from "@/hooks/storage";
 import { logger } from "@/hooks/utils";
+import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 
@@ -24,6 +25,7 @@ import { useScale } from "@/theme";
 export default function SettingsPage() {
   const navigate = useNavigation();
   const S = useScale();
+  const { username: urlUsername } = useLocalSearchParams<{ username: string }>();
   
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -45,14 +47,27 @@ export default function SettingsPage() {
     // Fetch user profile
     getCurrentUserProfile()
       .then((profile) => {
-        setProfile(profile ?? null)
-        setSecureReady(true)
-        setLoading(false)
+        setProfile(profile ?? null);
+        setSecureReady(true);
+        setLoading(false);
+
+        // Validate URL slug matches the actual logged-in user's username.
+        // If it doesn't (e.g. deeplink with a fake/wrong slug), redirect to the
+        // canonical URL so the address bar always reflects the real username.
+        const actualUsername = profile?.username;
+        if (actualUsername && urlUsername && urlUsername.toLowerCase() !== actualUsername.toLowerCase()) {
+          logger.category('navigation').warn('Settings: URL username slug does not match actual user, redirecting', {
+            urlUsername,
+            actualUsername,
+          });
+          navigate.replace(`/settings/${encodeURIComponent(actualUsername)}`);
+        }
       })
       .catch((err: unknown) => {
         logger.category('ui').error('Error fetching profile on settings mount:', err)
         setLoading(false)
       })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // NOTE: Modal visibility and error states are now managed by hook state machines.

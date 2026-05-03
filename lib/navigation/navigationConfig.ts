@@ -13,10 +13,10 @@
 import { logger } from "@/lib/utils";
 import { Router } from "expo-router";
 import {
-    canonicalizePath,
-    pathEquals,
-    pathStartsWith,
-    type RouteParams,
+  canonicalizePath,
+  pathEquals,
+  pathStartsWith,
+  type RouteParams,
 } from "./routeCanonicalizer";
 import { LOGIN_ROUTES } from "./routes/loginRoutes";
 import { MAIN_ROUTES } from "./routes/mainRoutes";
@@ -118,6 +118,14 @@ export interface RouteConfig {
 
   /** Custom error boundary handler */
   onError?: (error: Error, context: NavigationContext) => void;
+
+  /**
+   * Contextual back destination shown when there is no navigation stack (e.g. after a deep link).
+   * Can be a string (static) or a function that computes the destination based on context (e.g. platform-specific).
+   * The TopBar renders a back arrow that navigates to this route instead of calling navigate.back().
+   * If omitted and there is no stack, no back arrow is shown.
+   */
+  backDestination?: string | ((context: NavigationContext) => string);
 }
 
 /**

@@ -1,12 +1,10 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import React, { createContext, useContext } from 'react'
 
 // ─── Types ───────────────────────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface ChromeContextType {
-  // TopBar: SettingsMenu modal state
-  settingsMenuVisible: boolean
-  openSettingsMenu: () => void
-  closeSettingsMenu: () => void
+  // Reserved for future TopBar chrome state (e.g. TopBar title overrides, visibility flags)
 }
 
 // ─── Context ─────────────────────────────────────────────────────────
@@ -20,8 +18,7 @@ const ChromeContext = createContext<ChromeContextType | undefined>(undefined)
  *
  * Centralized state for persistent navigation chrome UI state (TopBar only).
  *
- * TopBar state:
- *   - SettingsMenu visibility (openSettingsMenu / closeSettingsMenu)
+ * Settings menu is now managed via the modal system (openModal('settings')).
  *
  * ✅ Gate-Free: Does not depend on kernel phases.
  * UI chrome components consume this via useChrome() hook.
@@ -29,25 +26,8 @@ const ChromeContext = createContext<ChromeContextType | undefined>(undefined)
  * Note: Bottom bar behavior is now managed separately by useChromeBottom() hook.
  */
 export function ChromeProvider({ children }: { children: React.ReactNode }) {
-  // TopBar: SettingsMenu visibility
-  const [settingsMenuVisible, setSettingsMenuVisible] = useState(false)
-
-  const openSettingsMenu = useCallback(() => {
-    setSettingsMenuVisible(true)
-  }, [])
-
-  const closeSettingsMenu = useCallback(() => {
-    setSettingsMenuVisible(false)
-  }, [])
-
-  const contextValue: ChromeContextType = useMemo(() => ({
-    settingsMenuVisible,
-    openSettingsMenu,
-    closeSettingsMenu,
-  }), [settingsMenuVisible, openSettingsMenu, closeSettingsMenu])
-
   return (
-    <ChromeContext.Provider value={contextValue}>
+    <ChromeContext.Provider value={{}}>
       {children}
     </ChromeContext.Provider>
   )
@@ -60,12 +40,8 @@ export function ChromeProvider({ children }: { children: React.ReactNode }) {
  *
  * Consumer hook for navigation chrome state (TopBar UI state).
  *
- * Usage:
- * ```tsx
- * const { openSettingsMenu, closeSettingsMenu, settingsMenuVisible } = useChrome();
- * ```
- *
  * Note: Bottom bar behavior is now owned by useChromeBottom() hook.
+ * Note: Settings menu is now opened via openModal('settings') from modal-context.
  */
 export function useChrome(): ChromeContextType {
   const context = useContext(ChromeContext)

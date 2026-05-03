@@ -5,7 +5,7 @@ import { useAppToast } from '@/contexts';
 import { useNavigation } from '@/hooks/navigation';
 import { useScale } from '@/theme';
 import { useState } from 'react';
-import { Platform, useWindowDimensions, View } from 'react-native';
+import { View } from 'react-native';
 
 
 // TODO: Uncomment when ready to enable social authentication
@@ -18,8 +18,6 @@ interface WelcomeScreenProps {
 
 export default function Welcome({ isLoading = false }: WelcomeScreenProps) {
   const S = useScale();
-  const { width } = useWindowDimensions();
-  const isMobile = (Platform.OS === 'ios' || Platform.OS === 'android') || (Platform.OS === 'web' && width < 900);
   const navigate = useNavigation();
   const { show: showToast } = useAppToast();
   const [authIsLoading, setAuthIsLoading] = useState(false);

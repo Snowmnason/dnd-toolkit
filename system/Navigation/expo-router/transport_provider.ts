@@ -8,6 +8,12 @@ import { useRouter } from 'expo-router';
 let routerInstance: ReturnType<typeof useRouter> | null = null;
 
 /**
+ * Current canonical pathname, kept in sync by the route change observer.
+ * Updated before any navigation call so fromRoute is accurate.
+ */
+let currentPathname: string = '/';
+
+/**
  * Initialize the router instance for use by transport layer.
  * 
  * This MUST be called by the kernel/bootstrap layer before any navigation operations.
@@ -46,4 +52,21 @@ export function getRouter(): ReturnType<typeof useRouter> {
  */
 export function isTransportReady(): boolean {
   return routerInstance !== null;
+}
+
+/**
+ * Update the current pathname. Called by the route change observer on every segment change.
+ * This is the authoritative source for getCurrentRoute() — avoids relying on router.getState()
+ * which only returns the top-level segment key, not the full nested path.
+ */
+export function setCurrentPathname(pathname: string): void {
+  currentPathname = pathname;
+}
+
+/**
+ * Get the current pathname as last reported by the route change observer.
+ * Falls back to '/' before the observer has fired.
+ */
+export function getCurrentPathname(): string {
+  return currentPathname;
 }

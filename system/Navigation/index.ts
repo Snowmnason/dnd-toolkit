@@ -29,7 +29,7 @@ export { executeGuardPipeline, type GuardPipelineResult } from './guard_executor
 export { TransactionRunner } from './transaction_runner';
 
 // Transport Provider (router instance lifecycle)
-export { initializeRouter, isTransportReady } from './expo-router/transport_provider';
+export { getCurrentPathname, initializeRouter, isTransportReady, setCurrentPathname } from './expo-router/transport_provider';
 
 // Transport Adapter Layer (all router.* calls centralized here)
 export * from './expo-router/transport_adapter';

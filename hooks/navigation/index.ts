@@ -9,4 +9,5 @@ export { useBootstrapRouteGuard } from "./use-bootstrap-route-guard";
 export { useRouteChangeObserver } from "./use-route-change-observer";
 export { useRouteConfig } from "./use-route-config";
 export type { RouteConfigState } from "./use-route-config";
+export { useSettingsActions } from "./use-settings-actions";
 

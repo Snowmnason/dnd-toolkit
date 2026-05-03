@@ -46,6 +46,7 @@ import type {
   Platform,
 } from '@/type-definitions/transport-types';
 import { Platform as RNPlatform } from 'react-native';
+import { recordIntent } from './nav-intent-log';
 import { getAllRouteConfigs } from './navigationConfig';
 import { PARAM_RESOLVERS, resolveContextParams } from './param-resolvers';
 import { PolicyEngine, getPolicyModeFromConfig } from './policyEngine';
@@ -132,6 +133,7 @@ export async function executeRouteNavigation(
   action: 'push' | 'replace' | 'dismissTo' | 'reset' = 'push'
 ): Promise<NavServiceResult> {
   try {
+    recordIntent('user');
     const ctx = buildNavigationContext();
     const semanticPlatform: 'mobile' | 'desktop' =
       ctx.platform === 'ios' || ctx.platform === 'android' ? 'mobile' : 'desktop';
@@ -159,14 +161,17 @@ export async function executeRouteNavigation(
       return { status: 'aborted', reason: 'platform-incompatible' };
     }
 
-    // Enrich context with resolved userId/worldId for guard evaluation
+    // Enrich context with resolved userId/worldId for guard evaluation.
+    // Caller-provided params win over storage-resolved values: when the caller explicitly
+    // passes worldId (e.g. WorldRightPanel navigating to /main/main-landing), the guard
+    // must validate THAT world, not whichever world was last stored in LAST_SELECTED_WORLD.
     const navCtx: NavigationContext = {
       toRoute: canonicalTarget,
       triggeredBy: 'user',
       platform: ctx.platform,
       fromRoute: ctx.fromRoute,
       userId: contextParams.userId,
-      worldId: contextParams.worldId,
+      worldId: params?.worldId ?? contextParams.worldId,
     };
 
     // Apply metadata: contextParamNames extraction (dormant until routes declare them)
@@ -224,6 +229,7 @@ export async function executeInternalRedirectNavigation(
   action: 'push' | 'replace' | 'dismissTo' | 'reset' = 'replace'
 ): Promise<NavServiceResult> {
   try {
+    recordIntent('redirect');
     // TODO: Validate redirect reason (ensure it's from approved source)
     const ctx = buildNavigationContext();
     const semanticPlatform: 'mobile' | 'desktop' =
@@ -252,14 +258,15 @@ export async function executeInternalRedirectNavigation(
       return { status: 'aborted', reason: 'platform-incompatible' };
     }
 
-    // Enrich context with resolved userId/worldId for guard evaluation
+    // Enrich context with resolved userId/worldId for guard evaluation.
+    // Caller-provided params win over storage-resolved values.
     const navCtx: NavigationContext = {
       toRoute: canonicalTarget,
       triggeredBy: 'redirect',
       platform: ctx.platform,
       fromRoute: ctx.fromRoute,
       userId: contextParams.userId,
-      worldId: contextParams.worldId,
+      worldId: params?.worldId ?? contextParams.worldId,
     };
 
     // Apply metadata: contextParamNames extraction (dormant until routes declare them)
@@ -314,6 +321,7 @@ export async function executeHistoryNavigation(
   options?: NavManagerOptions
 ): Promise<NavServiceResult> {
   try {
+    recordIntent(action === 'back' ? 'back' : 'dismiss');
     if (action === 'dismissTo' && !target) {
       return { status: 'aborted', reason: 'dismissTo requires a target route' };
     }
@@ -542,7 +550,7 @@ export function executeStateQueryNavigation(
 export async function evaluateObservedRouteChange(
   currentRoute: string,
   _previousRoute: string,
-  _context?: Record<string, any>,
+  triggeredBy?: NavigationContext['triggeredBy'],
   _options?: NavManagerOptions
 ): Promise<NavServiceResult> {
   try {
@@ -561,6 +569,11 @@ export async function evaluateObservedRouteChange(
     // with current user state to determine if the user actually has access.
     const ctx = buildNavigationContext();
     const contextParams = await resolveContextParams(PARAM_RESOLVERS);
+
+    // Caller-supplied overrides win over storage-resolved values.
+    // Primary use case: bootstrap guard injects the deep-link worldId from the URL
+    // so the permission guard validates the correct world, not LAST_SELECTED_WORLD.
+    const mergedParams = { ...contextParams, ...(_options?.overrideParams ?? {}) };
 
     // If transitioning FROM a public route (e.g. /login/sign-in → /select/world-selection)
     // and userId couldn't be resolved, this is a post-auth storage race: React auth state
@@ -581,11 +594,11 @@ export async function evaluateObservedRouteChange(
 
     const navCtx: NavigationContext = {
       toRoute: canonicalRoute,
-      triggeredBy: 'deep-link',
+      triggeredBy: triggeredBy ?? 'deep-link',
       platform: ctx.platform,
       fromRoute: ctx.fromRoute,
-      userId: contextParams.userId,
-      worldId: contextParams.worldId,
+      userId: mergedParams.userId,
+      worldId: mergedParams.worldId,
     };
 
     const guardPipeline = PolicyEngine.buildGuardPipeline(verdict, navCtx);

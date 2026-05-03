@@ -31,6 +31,7 @@ export const SETTINGS_ROUTES: RouteConfig[] = [
       return username ? `Settings - ${username}` : "Settings";
     },
     analyticsName: "settings_user",
+    backDestination: "/select/world-selection",
   },
   // Semantic anchor — no platform constraint; holds the lookup ID and platform branching.
   // navigate.to('style-playground') resolves here, then platformPaths picks the concrete route.
@@ -40,6 +41,7 @@ export const SETTINGS_ROUTES: RouteConfig[] = [
     platformPaths: { mobile: "/settings/stylemobile", desktop: "/settings/styledesktop" },
     title: "Component Playground",
     analyticsName: "settings_style_playground",
+    backDestination: "/select/world-selection",
   },
   // Concrete platform entries — matched directly when navigating to their exact paths.
   {
