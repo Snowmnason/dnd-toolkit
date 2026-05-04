@@ -126,30 +126,27 @@ describe('evaluateObservedRouteChange() — platform gate', () => {
 
     it('blocks a deep link to the mobile-only landing route (/main/world)', async () => {
       const result = await evaluateObservedRouteChange('/main/world', '/', 'deep-link');
-      expect(result.status).toBe('aborted');
-      expect(result.reason).toBe('platform-incompatible');
+      expect(result).toMatchObject({ status: 'aborted', reason: 'platform-incompatible' });
     });
 
     it('blocks a deep link to a mobile-only panel route (/main/characters)', async () => {
       const result = await evaluateObservedRouteChange('/main/characters', '/', 'deep-link');
-      expect(result.status).toBe('aborted');
-      expect(result.reason).toBe('platform-incompatible');
+      expect(result).toMatchObject({ status: 'aborted', reason: 'platform-incompatible' });
     });
 
     it('blocks a deep link to the mobile-only style playground (/settings/stylemobile)', async () => {
       const result = await evaluateObservedRouteChange('/settings/stylemobile', '/', 'deep-link');
-      expect(result.status).toBe('aborted');
-      expect(result.reason).toBe('platform-incompatible');
+      expect(result).toMatchObject({ status: 'aborted', reason: 'platform-incompatible' });
     });
 
     it('allows a desktop-only route (/main/main-landing) — not platform-incompatible', async () => {
       const result = await evaluateObservedRouteChange('/main/main-landing', '/', 'deep-link');
-      expect(result.reason).not.toBe('platform-incompatible');
+      expect(result).not.toMatchObject({ status: 'aborted', reason: 'platform-incompatible' });
     });
 
     it('allows a desktop-only style playground (/settings/styledesktop) — not platform-incompatible', async () => {
       const result = await evaluateObservedRouteChange('/settings/styledesktop', '/', 'deep-link');
-      expect(result.reason).not.toBe('platform-incompatible');
+      expect(result).not.toMatchObject({ status: 'aborted', reason: 'platform-incompatible' });
     });
   });
 
@@ -162,24 +159,22 @@ describe('evaluateObservedRouteChange() — platform gate', () => {
 
     it('blocks a deep link to the desktop-only landing route (/main/main-landing)', async () => {
       const result = await evaluateObservedRouteChange('/main/main-landing', '/', 'deep-link');
-      expect(result.status).toBe('aborted');
-      expect(result.reason).toBe('platform-incompatible');
+      expect(result).toMatchObject({ status: 'aborted', reason: 'platform-incompatible' });
     });
 
     it('blocks a deep link to the desktop-only style playground (/settings/styledesktop)', async () => {
       const result = await evaluateObservedRouteChange('/settings/styledesktop', '/', 'deep-link');
-      expect(result.status).toBe('aborted');
-      expect(result.reason).toBe('platform-incompatible');
+      expect(result).toMatchObject({ status: 'aborted', reason: 'platform-incompatible' });
     });
 
     it('allows a mobile-only route (/main/world) — not platform-incompatible', async () => {
       const result = await evaluateObservedRouteChange('/main/world', '/', 'deep-link');
-      expect(result.reason).not.toBe('platform-incompatible');
+      expect(result).not.toMatchObject({ status: 'aborted', reason: 'platform-incompatible' });
     });
 
     it('allows a mobile-only panel route (/main/characters) — not platform-incompatible', async () => {
       const result = await evaluateObservedRouteChange('/main/characters', '/', 'deep-link');
-      expect(result.reason).not.toBe('platform-incompatible');
+      expect(result).not.toMatchObject({ status: 'aborted', reason: 'platform-incompatible' });
     });
   });
 
@@ -192,13 +187,12 @@ describe('evaluateObservedRouteChange() — platform gate', () => {
 
     it('blocks a deep link to the desktop-only landing route (/main/main-landing)', async () => {
       const result = await evaluateObservedRouteChange('/main/main-landing', '/', 'deep-link');
-      expect(result.status).toBe('aborted');
-      expect(result.reason).toBe('platform-incompatible');
+      expect(result).toMatchObject({ status: 'aborted', reason: 'platform-incompatible' });
     });
 
     it('allows a mobile-only route (/main/world)', async () => {
       const result = await evaluateObservedRouteChange('/main/world', '/', 'deep-link');
-      expect(result.reason).not.toBe('platform-incompatible');
+      expect(result).not.toMatchObject({ status: 'aborted', reason: 'platform-incompatible' });
     });
   });
 
@@ -208,25 +202,25 @@ describe('evaluateObservedRouteChange() — platform gate', () => {
     it('allows /login/sign-in on desktop', async () => {
       mutablePlatform.OS = 'web';
       const result = await evaluateObservedRouteChange('/login/sign-in', '/', 'deep-link');
-      expect(result.reason).not.toBe('platform-incompatible');
+      expect(result).not.toMatchObject({ status: 'aborted', reason: 'platform-incompatible' });
     });
 
     it('allows /login/sign-in on mobile', async () => {
       mutablePlatform.OS = 'ios';
       const result = await evaluateObservedRouteChange('/login/sign-in', '/', 'deep-link');
-      expect(result.reason).not.toBe('platform-incompatible');
+      expect(result).not.toMatchObject({ status: 'aborted', reason: 'platform-incompatible' });
     });
 
     it('allows /select/world-selection on desktop', async () => {
       mutablePlatform.OS = 'web';
       const result = await evaluateObservedRouteChange('/select/world-selection', '/', 'deep-link');
-      expect(result.reason).not.toBe('platform-incompatible');
+      expect(result).not.toMatchObject({ status: 'aborted', reason: 'platform-incompatible' });
     });
 
     it('allows /select/world-selection on mobile', async () => {
       mutablePlatform.OS = 'ios';
       const result = await evaluateObservedRouteChange('/select/world-selection', '/', 'deep-link');
-      expect(result.reason).not.toBe('platform-incompatible');
+      expect(result).not.toMatchObject({ status: 'aborted', reason: 'platform-incompatible' });
     });
   });
 });
