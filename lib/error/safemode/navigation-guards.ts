@@ -81,7 +81,7 @@ export function useFeatureGatingGuard(
     const gatingStatus = checkFeatureGating(feature, kernel.safeMode);
 
     if (gatingStatus.isGated) {
-      const resolvedFallback = fallbackRoute || 'world-selection';
+      const resolvedFallback = fallbackRoute || '/select/world-selection';
       const message =
         toastMessage ||
         `${feature} is unavailable in safe mode. Redirecting...`;

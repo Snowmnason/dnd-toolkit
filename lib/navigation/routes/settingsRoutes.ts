@@ -51,12 +51,14 @@ export const SETTINGS_ROUTES: RouteConfig[] = [
     platform: "mobile",
     title: "Component Playground (Mobile)",
     analyticsName: "settings_style_mobile",
+    backDestination: "/select/world-selection",
   },
   {
     path: "/settings/styledesktop",
     platform: "desktop",
     title: "Component Playground (Desktop)",
     analyticsName: "settings_style_desktop",
+    backDestination: "/select/world-selection",
   },
   {
     path: "/settings/report-bug",
