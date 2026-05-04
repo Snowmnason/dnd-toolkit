@@ -3,6 +3,7 @@ import { useActivePanel, useNavigation } from '@/hooks/navigation'
 import { useUserRole, useWorldId } from '@/providers'
 import { $, UseTheme, useScale } from '@/theme'
 import { Ionicons } from '@expo/vector-icons'
+import { useSegments } from 'expo-router'
 import { Pressable, ScrollView, View } from 'react-native'
 import { panelConfigs } from './PanelData'
 
@@ -28,6 +29,7 @@ interface PanelNavDrawerProps {
 export function PanelNavDrawer({ collapsed = false }: PanelNavDrawerProps) {
   const activePanelKey = useActivePanel()
   const navigate = useNavigation()
+  const segments = useSegments()
   const worldId = useWorldId()
   const userRole = useUserRole()
   const S = useScale()
@@ -37,7 +39,14 @@ export function PanelNavDrawer({ collapsed = false }: PanelNavDrawerProps) {
     const params: Record<string, string> = {}
     if (worldId) params.worldId = worldId
     if (userRole) params.userRole = userRole as string
-    navigate.replace(`/main/${featurePath}`, params)
+    // From landing → push so the user can press back to return to it.
+    // From any feature → replace so the drawer doesn’t stack every selection.
+    const isOnLanding = (segments as string[]).includes('main-landing')
+    if (isOnLanding) {
+      navigate.to(`/main/${featurePath}`, params)
+    } else {
+      navigate.replace(`/main/${featurePath}`, params)
+    }
   }
 
   // TODO: Open world settings modal when it exists

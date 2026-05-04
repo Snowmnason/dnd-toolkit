@@ -90,14 +90,18 @@ export type ExecutionContext = {
  * Represents the navigation request in flight
  *
  * triggeredBy values:
- * - 'user'      : Initiated by a user gesture (tap, click, back button)
+ * - 'user'      : Initiated by a user gesture (tap, click, forward navigation)
  * - 'redirect'  : Initiated programmatically by app logic (auth guard, kernel bootstrap, route protection)
- * - 'deep-link' : Initiated from an external source (OS deep link, browser URL, notification)
+ * - 'back'      : Explicit back navigation — `navigate.back()`, dismiss, or back button press
+ * - 'dismiss'   : Modal/sheet dismissal — `navigate.dismiss()`, `dismissAll()`, `dismissTo()`
+ * - 'deep-link' : Initiated from outside the app (OS deep link, browser URL, notification).
+ *                 This is the fallback when no navManager intent was recorded — meaning the
+ *                 segment change originated outside the app's own navigation calls.
  */
 export type NavigationContext = {
   fromRoute?: string;
   toRoute: string;
-  triggeredBy: 'user' | 'redirect' | 'deep-link';
+  triggeredBy: 'user' | 'redirect' | 'back' | 'dismiss' | 'deep-link';
   userId?: string;
   worldId?: string;
   platform: Platform;
@@ -400,5 +404,14 @@ export type NavManagerOptions = {
    * Default: false
    */
   skipTrustCheck?: boolean;
+
+  /**
+   * Override resolved context params for guard evaluation.
+   * Caller-supplied values win over storage-resolved values.
+   * Used by the bootstrap guard to inject the worldId from the deep-link URL
+   * instead of the stored LAST_SELECTED_WORLD, so the permission guard validates
+   * the correct world.
+   */
+  overrideParams?: Record<string, string>;
 };
 

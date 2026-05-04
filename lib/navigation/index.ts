@@ -4,8 +4,8 @@
  */
 
 export {
-    getAllRouteConfigs, getRouteConfig, registerRouteConfig, resolveTitle, type A11yFocusTarget,
-    type NavigationContext, type RouteConfig
+    getAllRouteConfigs, getRouteConfig, registerRouteConfig, resolveTitle, validateRouteRegistry,
+    type A11yFocusTarget, type NavigationContext, type RouteConfig, type RouteRegistryViolation
 } from "./navigationConfig";
 
 export {
@@ -41,6 +41,6 @@ export {
     executeInternalRedirectNavigation,
     executeRouteNavigation,
     executeStateQueryNavigation,
-    executeUtilityNavigation,
+    executeUtilityNavigation
 } from './navManager';
 

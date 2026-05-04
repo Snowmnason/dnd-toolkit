@@ -2,9 +2,15 @@ import { useSegments } from 'expo-router';
 import { useEffect, useRef } from 'react';
 
 import { evaluateObservedRouteChange } from '@/lib/navigation';
+import { consumeIntent } from '@/lib/navigation/nav-intent-log';
 import { logger } from '@/lib/utils';
+import { setCurrentPathname } from '@/system/Navigation';
 
 import { useNavigationUiModals } from './use-navigation-ui-modals';
+
+// Maximum number of routes to keep in the navigation history stack.
+// Covers typical user flows without unbounded memory growth.
+const MAX_HISTORY = 10;
 
 /**
  * useRouteChangeObserver
@@ -26,9 +32,33 @@ import { useNavigationUiModals } from './use-navigation-ui-modals';
  * **How It Works:**
  * 1. Watches `useSegments()` for route changes
  * 2. Skips the initial mount (bootstrap guard handles that on web)
- * 3. Calls `evaluateObservedRouteChange()` which runs the real guard pipeline
- * 4. If guards deny: redirect is executed + NavModal shown
- * 5. If guards allow: no-op (route proceeds)
+ * 3. Resolves the `triggeredBy` intent for the change (see Intent Resolution below)
+ * 4. Calls `evaluateObservedRouteChange()` which runs the real guard pipeline
+ * 5. If guards deny: redirect is executed + NavModal shown
+ * 6. If guards allow: no-op (route proceeds)
+ *
+ * **Intent Resolution (triggeredBy):**
+ * The observer owns two-stage intent resolution so guards receive accurate context:
+ *
+ * Stage 1 — App-initiated (via navManager):
+ *   `consumeIntent()` reads the slot that navManager write-once-records before each
+ *   navigation call. If a value is present, it is the authoritative source:
+ *   - 'user'     → tap/click via navigate.to() / navigate.replace()
+ *   - 'redirect' → forced by auth guard or bootstrap
+ *   - 'back'     → explicit navigate.back() call
+ *   - 'dismiss'  → modal/sheet dismiss
+ *
+ * Stage 2 — OS-initiated (slot is null):
+ *   Nothing was recorded → the segment change came from outside the app's JS. The
+ *   observer infers intent from route history:
+ *   - currentRoute IS in history → 'back'  (hardware back / iOS swipe-back / Android gesture)
+ *   - currentRoute NOT in history → 'deep-link'  (OS notification tap, external URL on native)
+ *
+ * **History Stack:**
+ * A lightweight ring buffer (`routeHistoryRef`, max 10 entries) tracks the in-app forward
+ * navigation path. It is updated after each change:
+ * - Forward ('user' / 'redirect' / 'deep-link'): append currentRoute
+ * - Backward ('back' / 'dismiss'): truncate back to (and including) currentRoute
  *
  * **Guard Behavior:**
  * - **Allow** → no action (route change proceeds normally)
@@ -45,6 +75,7 @@ import { useNavigationUiModals } from './use-navigation-ui-modals';
 export function useRouteChangeObserver(): void {
   const segments = useSegments();
   const previousSegmentsRef = useRef<string[] | null>(null);
+  const routeHistoryRef = useRef<string[]>([]);
 
   const { showNavModal } = useNavigationUiModals();
 
@@ -54,10 +85,16 @@ export function useRouteChangeObserver(): void {
       ? '/' + previousSegmentsRef.current.join('/')
       : null;
 
+    // Always keep the transport layer's pathname in sync first.
+    // buildNavigationContext() in navManager reads this for fromRoute.
+    setCurrentPathname(currentRoute);
+
     previousSegmentsRef.current = [...segments];
 
-    // Skip policy check on initial mount
+    // Initial mount: seed the history stack and skip policy check.
+    // Bootstrap guard handles the initial route on web; layouts handle it on native.
     if (!previousRoute) {
+      routeHistoryRef.current = [currentRoute];
       logger.category('navigation').debug('Route observer: initial mount, skipping policy check');
       return;
     }
@@ -65,14 +102,50 @@ export function useRouteChangeObserver(): void {
     // Skip if route hasn't actually changed (can happen during re-renders)
     if (currentRoute === previousRoute) return;
 
+    // ── Intent resolution ────────────────────────────────────────────────────
+    // Stage 1: check if navManager recorded an intent for this navigation.
+    const intent = consumeIntent();
+
+    // Stage 2: if nothing was recorded, infer from route history.
+    // A route that appears in our forward-navigation history was previously visited —
+    // the most likely cause is hardware back / swipe-back without a JS navigate.back() call.
+    // A route that has never been visited is a genuine external deep link.
+    type ResolvedTrigger = 'user' | 'redirect' | 'back' | 'dismiss' | 'deep-link';
+    const resolvedTrigger: ResolvedTrigger = intent !== null
+      ? intent
+      : routeHistoryRef.current.includes(currentRoute) ? 'back' : 'deep-link';
+
+    // ── Update history stack ─────────────────────────────────────────────────
+    if (resolvedTrigger === 'back' || resolvedTrigger === 'dismiss') {
+      // Truncate history back to (and including) the route being returned to.
+      const idx = routeHistoryRef.current.lastIndexOf(currentRoute);
+      routeHistoryRef.current = idx !== -1
+        ? routeHistoryRef.current.slice(0, idx + 1)
+        : [...routeHistoryRef.current.slice(-(MAX_HISTORY - 1)), currentRoute];
+    } else {
+      // Forward navigation: append current route (ring-buffer, max MAX_HISTORY).
+      routeHistoryRef.current = [...routeHistoryRef.current.slice(-(MAX_HISTORY - 1)), currentRoute];
+    }
+
     logger.category('navigation').debug('Route change detected', {
       fromRoute: previousRoute,
       toRoute: currentRoute,
+      triggeredBy: resolvedTrigger,
     });
+
+    // ── Skip re-evaluation for manager-initiated navigations ─────────────────
+    // 'user' and 'redirect' navigations already ran the full guard pipeline inside
+    // executeRouteNavigation / executeInternalRedirectNavigation. Re-running here
+    // would fail because worldId params exist in the call site but are not yet
+    // flushed to storage, causing the permission guard to read undefined.
+    // History has already been updated above — we just don't re-check policy.
+    if (resolvedTrigger === 'user' || resolvedTrigger === 'redirect') {
+      return;
+    }
 
     const checkRoutePolicy = async () => {
       try {
-        const result = await evaluateObservedRouteChange(currentRoute, previousRoute);
+        const result = await evaluateObservedRouteChange(currentRoute, previousRoute, resolvedTrigger);
 
         logger.category('navigation').debug('Route observer: policy result', {
           status: result.status,
@@ -80,10 +153,19 @@ export function useRouteChangeObserver(): void {
         });
 
         if (result.status === 'aborted') {
-          logger.category('navigation').warn('Route observer: policy check aborted', {
-            reason: result.reason,
-          });
-          showNavModal('failure');
+          if (result.reason === 'platform-incompatible') {
+            // Platform-incompatible: the OS or browser sent us to a route that
+            // doesn't exist on this platform. Log it but don't show a failure modal —
+            // the bootstrap guard or layout-level auth guard will redirect silently.
+            logger.category('navigation').warn('Route observer: platform-incompatible route, skipping failure modal', {
+              reason: result.reason,
+            });
+          } else {
+            logger.category('navigation').warn('Route observer: policy check aborted', {
+              reason: result.reason,
+            });
+            showNavModal('failure');
+          }
         } else if (result.status === 'redirected') {
           // Redirect was already executed inside evaluateObservedRouteChange
           logger.category('navigation').debug('Route observer: policy violation corrected', {

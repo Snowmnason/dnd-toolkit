@@ -25,13 +25,13 @@
 import { useAppToast, useModal } from '@/contexts'
 import { useNavigation } from '@/hooks/navigation'
 import {
-  confirmSignOut,
-  deleteAccountUser,
-  endSignOut,
-  initiateSignOut,
+    confirmSignOut,
+    deleteAccountUser,
+    endSignOut,
+    initiateSignOut,
 } from '@/lib/auth'
 import { useAppParamsStable } from '@/providers'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 /** Which flow this hook instance manages. */
 export type SignOutFlowMode = 'sign-out' | 'delete-account'
 
@@ -107,6 +107,12 @@ export function useSignOutFlow(mode: SignOutFlowMode): {
 } {
   const [state, setState] = useState<SignOutFlowState>(INITIAL_STATE)
   const navigate = useNavigation()
+  // Stable ref so confirm/forceAction don't change on every render.
+  // useNavigation() returns a new object literal each render; including it in
+  // useCallback deps would invalidate confirm/forceAction every render, causing
+  // the openModal effect to fire continuously while a modal is open.
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
   const { show: showToast, hide: hideToast } = useAppToast()
   const { openModal, closeModal } = useModal()
   const { clearAllParams } = useAppParamsStable()
@@ -206,9 +212,9 @@ export function useSignOutFlow(mode: SignOutFlowMode): {
       // This ensures next login has completely fresh state.
       clearAllParams()
       
-      const target = deleteResult.redirect ?? '/login/sign-in'
+      const target = deleteResult.redirect ?? 'sign-in'
       patch({ phase: 'success', loading: false, redirectTarget: target })
-      navigate.replace(target)
+      navigateRef.current.replace(target)
 
       // Allow new auth subscriptions to register (login screen)
       endSignOut()
@@ -233,14 +239,14 @@ export function useSignOutFlow(mode: SignOutFlowMode): {
       // This ensures next sign-in has completely fresh state.
       clearAllParams()
       
-      const target = signOutResult.redirect ?? '/login/sign-in'
+      const target = signOutResult.redirect ?? 'sign-in'
       patch({ phase: 'success', loading: false, redirectTarget: target })
-      navigate.replace(target)
+      navigateRef.current.replace(target)
 
       // Allow new auth subscriptions to register (login screen)
       endSignOut()
     }
-  }, [state.phase, mode, patch, closeModal, navigate, clearAllParams])
+  }, [state.phase, mode, patch, closeModal, clearAllParams])
 
   // --------------------------------------------------------------------------
   // forceAction — Force sign-out when sync failed (sign-out mode only)
@@ -272,13 +278,13 @@ export function useSignOutFlow(mode: SignOutFlowMode): {
     // This ensures next sign-in has completely fresh state.
     clearAllParams()
 
-    const target = signOutResult.redirect ?? '/login/sign-in'
+    const target = signOutResult.redirect ?? 'sign-in'
     patch({ phase: 'success', loading: false, redirectTarget: target })
-    navigate.replace(target)
+    navigateRef.current.replace(target)
 
     // Allow new auth subscriptions to register (login screen)
     endSignOut()
-  }, [state.phase, patch, closeModal, navigate, clearAllParams])
+  }, [state.phase, patch, closeModal, clearAllParams])
 
   // --------------------------------------------------------------------------
   // cancel — User dismisses modal without confirming

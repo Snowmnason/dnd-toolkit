@@ -1,28 +1,17 @@
 /**
  * Feature Gating Navigation Guards
  *
- * Provides guards to protect routes/screens from access when features are gated due to safe mode.
- *
- * Currently Implemented:
- * - createFeatureGatingGuard(): Factory function for creating route-level guards
- *
- * Future (TODO):
- * - useFeatureGatingGuard(): Hook for direct use in screen components
+ * Provides hooks to protect routes/screens from access when features are gated due to safe mode.
  *
  * Usage:
  * ```tsx
- * import { createFeatureGatingGuard } from '@/lib/error/navigation-guards';
+ * import { useFeatureGatingGuard } from '@/lib/error/safemode/navigation-guards';
  *
- * const guardFeature = createFeatureGatingGuard(AffectedFeature.SYNC, router, {
- *   fallbackRoute: "/select/world-selection",
- *   showToast: true,
- * });
- *
- * // Check guard in screen
- * if (guardFeature(safeMode)) {
- *   // Feature is gated, user was redirected
- * } else {
- *   // Feature is available, render screen
+ * function MyProtectedScreen() {
+ *   useFeatureGatingGuard(AffectedFeature.SYNC, {
+ *     fallbackRoute: 'world-selection',
+ *     showToast: true,
+ *   });
  * }
  * ```
  */
@@ -61,60 +50,6 @@ interface FeatureGatingGuardOptions {
 }
 
 /**
- * Navigation guard factory to protect routes from gated features
- *
- * Deprecated: Use `useFeatureGatingGuard()` hook instead for better integration.
- * This factory function is kept for backward compatibility but should not be used in new code.
- *
- * @param feature - Feature to guard
- * @param navigate - Navigation instance from useNavigation hook
- * @param options - Guard options
- */
-export function createFeatureGatingGuard(
-  feature: AffectedFeature,
-  navigate: ReturnType<typeof useNavigation>,
-  options: FeatureGatingGuardOptions = {},
-) {
-  return (safeMode: ReturnType<typeof useAppKernel>["safeMode"]) => {
-    const gatingStatus = checkFeatureGating(feature, safeMode);
-
-    if (gatingStatus.isGated) {
-      const fallbackRoute = options.fallbackRoute || "/select/world-selection";
-      const message =
-        options.toastMessage ||
-        `${feature} is unavailable in safe mode. Redirecting...`;
-
-      logger
-        .category("navigation")
-        .info(
-          `[FeatureGating] Feature ${feature} is gated, redirecting to ${fallbackRoute}`,
-        );
-
-      if (options.showToast) {
-        // TODO: Trigger toast notification
-        // This would require AppToast context or similar
-        logger.category('navigation').info(`[FeatureGating] ${message}`);
-      }
-
-      // Validate route exists in centralized navigation config
-      if (!isValidRoute(fallbackRoute)) {
-        logger
-          .category("navigation")
-          .error(
-            `[FeatureGating] Fallback route ${fallbackRoute} not found in navigation config`,
-          );
-        return false; // Guard not applied due to invalid route
-      }
-
-      navigate.replace(fallbackRoute);
-      return true; // Guard was applied
-    }
-
-    return false; // Feature is available, allow access
-  };
-}
-
-/**
  * Hook to protect routes from gated features
  *
  * Use this in screen/layout components to automatically redirect when a feature is unavailable.
@@ -146,7 +81,7 @@ export function useFeatureGatingGuard(
     const gatingStatus = checkFeatureGating(feature, kernel.safeMode);
 
     if (gatingStatus.isGated) {
-      const resolvedFallback = fallbackRoute || "/select/world-selection";
+      const resolvedFallback = fallbackRoute || '/select/world-selection';
       const message =
         toastMessage ||
         `${feature} is unavailable in safe mode. Redirecting...`;
@@ -176,12 +111,3 @@ export function useFeatureGatingGuard(
     }
   }, [feature, kernel.safeMode, navigate, fallbackRoute, showToast, toastMessage]);
 }
-
-/**
- * Alternative: Direct factory function for use in route guards (DEPRECATED)
- *
- * Kept for backward compatibility. New code should use `useFeatureGatingGuard()` hook instead.
- *
- * If you need a factory pattern, consider extracting the navigation and kernel at the call site
- * and using the hook version instead.
- */

@@ -8,7 +8,6 @@ import { NavDrawerLayer } from "@/components/layer/NavDrawerLayer";
 import { NotificationContainer } from "@/components/layer/NotificationContainer";
 import { SnackBarLayer } from "@/components/layer/SnackBarLayer";
 import { UIBlockerLayer } from "@/components/layer/UIBlockerLayer";
-import SettingsModal from "@/components/modals/SettingsModal";
 import { OfflineSyncNotificationLayer } from "@/components/offline/OfflineSyncNotificationLayer";
 import {
   CrashFallBack,
@@ -19,7 +18,6 @@ import {
 // Contexts — direct file imports to avoid resolving the full @/contexts barrel,
 // which includes toast, snackbar, notification, modal, nav-drawer, and theme contexts.
 import { PanelNavDrawer } from "@/AppScreens/main-panels/PanelNavDrawer";
-import { useChrome } from "@/contexts/chrome-context";
 import { Analytics, sessionManager } from "@/hooks/analytics";
 import { useAuthLinkObserver } from "@/hooks/auth";
 import { executeRecoveryAction, getSafeModeNavigationTarget } from "@/hooks/error";
@@ -62,7 +60,6 @@ function RootLayoutContent() {
   const userId = useUserId();
   const worldId = useWorldId();
   const userRole = useUserRole();
-  const { closeSettingsMenu, settingsMenuVisible } = useChrome();
 
   // Data loading hooks
   const kernel = useAppKernel();
@@ -193,38 +190,25 @@ function RootLayoutContent() {
 
   const topBarTitle = showTopBar ? resolvedTitle : undefined;
 
-  // Back button: panel-first (right→left on mobile), then history pop
+  // Resolve backDestination if it's a function (e.g. platform-conditional)
+  const resolvedBackDestination = routeConfig.backDestination
+    ? typeof routeConfig.backDestination === 'function'
+      ? routeConfig.backDestination(navContext)
+      : routeConfig.backDestination
+    : undefined;
+
+  // Back button: panel-first (right→left on mobile), then history pop, then backDestination fallback
   const handleTopBarBack = () => {
     try {
       if (panelNav.handleBackPress()) return;
       if (navigate.canGoBack()) {
         navigate.back();
+      } else if (resolvedBackDestination) {
+        navigate.replace(resolvedBackDestination);
       }
     } catch (err) {
       logger.category('navigation').warn('Back press failed', err);
     }
-  };
-
-  // SettingsMenu handlers
-  const handleAccountSettings = async () => {
-    closeSettingsMenu();
-    try {
-      const { AuthStateManager } = await import("@/lib/auth/auth-state");
-      const user = await AuthStateManager.getUserData();
-      const username = user?.username || "user";
-
-      const params: Record<string, string> = {};
-      if (worldId) params.worldId = worldId as string;
-      if (userRole) params.userRole = userRole as string;
-      navigate.to(`/settings/${encodeURIComponent(username)}`, params);
-    } catch (err) {
-      logger.category("navigation").warn("Root layout: failed to resolve username route, falling back", err);
-    }
-  };
-
-  const handleReturnToWorldSelection = () => {
-    closeSettingsMenu();
-    navigate.replace('/select/world-selection');
   };
 
   return (
@@ -253,7 +237,7 @@ function RootLayoutContent() {
               <ChromeLayer
                 topBar={{
                   title: topBarTitle,
-                  showBackButton: (!panelNav.isDesktop && panelNav.activePanel === 'right') || navigate.canGoBack(),
+                  showBackButton: (!panelNav.isDesktop && panelNav.activePanel === 'right') || navigate.canGoBack() || !!resolvedBackDestination,
                   showHamburger: showHamburger, // Whether to show the hamburger menu, add conditional logic if needed
                   onBackPress: handleTopBarBack,
                   a11yFocusTarget: routeConfig.a11yFocusTarget,
@@ -265,14 +249,6 @@ function RootLayoutContent() {
                 } : undefined}
               />
             )}
-
-            {/* SettingsMenu Modal */}
-            <SettingsModal
-              visible={settingsMenuVisible}
-              onClose={closeSettingsMenu}
-              onAccountSettings={handleAccountSettings}
-              onReturnToWorldSelection={handleReturnToWorldSelection}
-            />
 
             {/* Content area: sidebar + stack in row layout on desktop */}
             <View style={{ flex: 1, flexDirection: Platform.OS === 'web' ? 'row' : 'column' }}>

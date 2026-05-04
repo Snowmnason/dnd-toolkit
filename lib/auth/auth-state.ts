@@ -1,7 +1,7 @@
 import { getUserRepository, getWorldAccessRepository } from "@/lib/database";
 import { StorageManager } from "@/lib/storage";
 import { logger } from "@/lib/utils";
-import { STORAGE_KEYS } from "@/maps";
+import { STORAGE_KEYS } from "@/maps/storage-keys";
 import { clearAllUserData, getAllSecureStorageKeys, getPrivacyStorageBackend } from "@/middleware/storage";
 import { classifyCacheAge } from "@/pure-algo-immutables";
 

@@ -104,7 +104,8 @@ export default function CompleteProfileScreen() {
     };
 
     checkAuthAndProfile();
-  }, [navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Use the unified form hook in complete-profile mode
   const { state, form } = useSignUpFlow("complete-profile", user);

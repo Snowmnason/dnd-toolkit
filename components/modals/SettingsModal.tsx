@@ -1,28 +1,23 @@
 import { AppModal } from "@/components/ui/AppModal";
 import { Button } from "@/components/ui/BaseButton";
-import { registerModal } from "@/contexts/modal-context";
+import { registerModal, useModal } from "@/contexts/modal-context";
+import { useSettingsActions } from "@/hooks/navigation/use-settings-actions";
 import { useScale } from "@/theme";
 import { View } from "react-native";
 
 interface SettingsMenuProps {
   visible: boolean;
-  onClose: () => void;
-  onAccountSettings: () => void;
-  onReturnToWorldSelection: () => void;
 }
 
-export default function SettingsModal({
-  visible,
-  onClose,
-  onAccountSettings,
-  onReturnToWorldSelection,
-}: SettingsMenuProps) {
+export default function SettingsModal({ visible }: SettingsMenuProps) {
   const S = useScale();
+  const { closeModal } = useModal();
+  const { handleAccountSettings, handleReturnToWorldSelection } = useSettingsActions();
 
   return (
     <AppModal
       visible={visible}
-      onClose={onClose}
+      onClose={closeModal}
       heading="Settings"
       borderTone="accent"
     >
@@ -31,23 +26,17 @@ export default function SettingsModal({
         <Button
           text="Return to World Selection"
           variant="outlined"
-          onPress={() => {
-            onClose();
-            onReturnToWorldSelection();
-          }}
+          onPress={handleReturnToWorldSelection}
         />
         {/* Account Settings */}
         <Button
           text="Account Settings"
           variant="secondary"
-          onPress={() => {
-            onClose();
-            onAccountSettings();
-          }}
+          onPress={handleAccountSettings}
         />
 
         {/* Cancel */}
-        <Button text="Cancel" variant="cancel" onPress={onClose} />
+        <Button text="Cancel" variant="cancel" onPress={closeModal} />
       </View>
     </AppModal>
   );

@@ -122,7 +122,7 @@ export function WorldRightPanel({
                 });
 
                 // Navigate using centralized navigation helper
-                navigate.to("/main/main-landing", {
+                navigate.to('home', {
                   worldId: selectedWorld.world_id,
                   userRole: selectedWorld.user_role,
                 });

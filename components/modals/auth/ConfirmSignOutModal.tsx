@@ -5,6 +5,7 @@ import { useScale } from '@/theme'
 import { View } from 'react-native'
 
 interface ConfirmSignOutModalProps {
+  visible: boolean
   onCancel: () => void
   onConfirm: () => void
   loading?: boolean
@@ -23,6 +24,7 @@ interface ConfirmSignOutModalProps {
  * when the offline sync queue failed to drain.
  */
 export function ConfirmSignOutModal({
+  visible,
   onCancel,
   onConfirm,
   loading = false,
@@ -42,7 +44,7 @@ export function ConfirmSignOutModal({
 
   return (
     <AppModal
-      visible={true}
+      visible={visible}
       onClose={onCancel}
       heading={heading}
       body={body}

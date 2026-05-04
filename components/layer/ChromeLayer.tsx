@@ -1,6 +1,6 @@
 import { ChromeBottomBar } from '@/components/chrome/ChromeBottomBar'
 import { ChromeTopBar } from '@/components/chrome/ChromeTopBar'
-import { useChrome } from '@/contexts/chrome-context'
+import { useModal } from '@/contexts/modal-context'
 import { Platform } from 'react-native'
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -40,7 +40,7 @@ export interface ChromeLayerProps {
 }
 
 export function ChromeLayer({ topBar, bottomBar }: ChromeLayerProps) {
-  const { openSettingsMenu } = useChrome()
+  const { openModal } = useModal()
   const isMobile = Platform.OS !== 'web'
 
   return (
@@ -50,7 +50,7 @@ export function ChromeLayer({ topBar, bottomBar }: ChromeLayerProps) {
         showBackButton={topBar.showBackButton}
         showHamburger={topBar.showHamburger}
         onBackPress={topBar.onBackPress}
-        onHamburgerPress={openSettingsMenu}
+        onHamburgerPress={() => openModal('settings')}
         a11yFocusTarget={topBar.a11yFocusTarget}
       />
 

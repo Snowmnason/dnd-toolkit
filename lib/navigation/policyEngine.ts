@@ -16,7 +16,10 @@
 import { getAppConfig } from '@/config/core/loader';
 import { AUTH_CONFIG } from '@/config/routing-auth-config';
 import { AuthStateManager } from '@/lib/auth/auth-state';
+import { canonicalizePath } from '@/lib/navigation/routeCanonicalizer';
+import { StorageManager } from '@/lib/storage';
 import { logger } from '@/lib/utils';
+import { STORAGE_KEYS } from '@/maps';
 import { NavigationContext, NavigationDecision, NavigationGuardConfig, NavigationPolicyMode } from '@/type-definitions/';
 
 /**
@@ -63,6 +66,25 @@ export function getPolicyModeFromConfig(): NavigationPolicyMode {
     });
     return 'protected_by_default';
   }
+}
+
+/**
+ * Check whether a canonical route falls under a top-level path segment.
+ *
+ * Enforces a segment boundary so that '/maintain' does not match 'main',
+ * and '/webinar' does not match 'web'. Only exact-segment matches count:
+ *   isUnderSegment('/main', 'main')            → true  (exact)
+ *   isUnderSegment('/main/world', 'main')       → true  (child)
+ *   isUnderSegment('/maintain', 'main')         → false (no boundary)
+ *   isUnderSegment('/mainland/x', 'main')       → false (no boundary)
+ *
+ * @param route   Canonical route path (e.g. '/main/world')
+ * @param segment Top-level segment name without slashes (e.g. 'main')
+ */
+function isUnderSegment(route: string, segment: string): boolean {
+  const canonical = canonicalizePath(route);
+  const seg = segment.toLowerCase();
+  return canonical === `/${seg}` || canonical.startsWith(`/${seg}/`);
 }
 
 /**
@@ -125,32 +147,36 @@ export class PolicyEngine {
     // Mode-based decision:
     // - protected_by_default: only explicitly public routes allow access
     // - public_by_default: only explicitly protected routes require auth
+    //
+    // AUTH_CONFIG values are top-level path segments (e.g. 'login', 'web', 'main').
+    // isUnderSegment() enforces a segment boundary so '/maintain' cannot match '/main'
+    // and '/webinar' cannot match '/web'.
     if (mode === 'protected_by_default') {
       // Reject unless explicitly in publicRoutes
-      const isPublic = AUTH_CONFIG.publicRoutes.some((publicRoute: string) =>
-        toRoute.toLowerCase().includes(publicRoute.toLowerCase()),
+      const isPublic = AUTH_CONFIG.publicRoutes.some((segment: string) =>
+        isUnderSegment(toRoute, segment),
       );
       if (isPublic) {
         return 'allow_all';
       }
-      // Routes under /main/ that reference a world require world-level permission verification.
-      // select/world-selection and other select/ routes are transitional screens that only need auth.
-      if (toRoute.toLowerCase().startsWith('/main') && toRoute.toLowerCase().includes('world')) {
+      // All /main/* routes require world-level permission verification — they are always
+      // rendered in a world context and the worldId must be validated against the user's
+      // connected worlds. The path itself may not contain 'world' (e.g. /main/main-landing).
+      if (isUnderSegment(toRoute, 'main')) {
         return 'require_permission';
       }
       return 'require_auth';
     }
 
     // public_by_default: allow unless explicitly protected
-    const isProtected = AUTH_CONFIG.protectedRoutes.some((protectedRoute: string) =>
-      toRoute.toLowerCase().includes(protectedRoute.toLowerCase()),
+    const isProtected = AUTH_CONFIG.protectedRoutes.some((segment: string) =>
+      isUnderSegment(toRoute, segment),
     );
     if (!isProtected) {
       return 'allow_all';
     }
-    // Routes under /main/ that reference a world require world-level permission verification.
-    // select/world-selection and other select/ routes are transitional screens that only need auth.
-    if (toRoute.toLowerCase().startsWith('/main') && toRoute.toLowerCase().includes('world')) {
+    // All /main/* routes require world-level permission verification.
+    if (isUnderSegment(toRoute, 'main')) {
       return 'require_permission';
     }
     return 'require_auth';
@@ -224,13 +250,41 @@ export class PolicyEngine {
           name: 'permission-check',
           priority: 'normal',
           check: async (ctx: NavigationContext): Promise<NavigationDecision> => {
-            if (ctx.worldId) {
-              return { status: 'allow' };
+            if (!ctx.worldId) {
+              logger.category('navigation').warn('Permission guard: ctx.worldId is undefined', {
+                toRoute: ctx.toRoute,
+                userId: ctx.userId,
+              });
+              return {
+                status: 'redirect',
+                target: '/select/world-selection',
+                reason: 'No world selected',
+              };
+            }
+            // Verify the worldId is in the user's connected worlds list.
+            // This prevents deep links or back-navigation into worlds the user
+            // doesn't have access to.
+            try {
+              const connectedWorlds = await StorageManager.get<string[]>(STORAGE_KEYS.CONNECTED_WORLDS);
+              logger.category('navigation').debug('Permission guard: checking world access', {
+                worldId: ctx.worldId,
+                connectedWorldsType: Array.isArray(connectedWorlds) ? 'array' : typeof connectedWorlds,
+                connectedWorldsCount: Array.isArray(connectedWorlds) ? connectedWorlds.length : 'n/a',
+                connectedWorlds,
+                hasAccess: Array.isArray(connectedWorlds) && connectedWorlds.includes(ctx.worldId),
+              });
+              if (Array.isArray(connectedWorlds) && connectedWorlds.includes(ctx.worldId)) {
+                return { status: 'allow' };
+              }
+            } catch (error) {
+              logger.category('navigation').error('Permission check: failed to read connected worlds', {
+                error: error instanceof Error ? error.message : String(error),
+              });
             }
             return {
               status: 'redirect',
               target: '/select/world-selection',
-              reason: 'Permission verification required',
+              reason: 'World access denied',
             };
           },
           timeoutMs: 5000,

@@ -30,7 +30,7 @@
 import { logger } from '@/lib/utils/logger';
 import type { ExternalLinkOptions, TransportResult } from '@/type-definitions';
 import { Linking } from 'react-native';
-import { getRouter } from './transport_provider';
+import { getCurrentPathname, getRouter } from './transport_provider';
 
 
 
@@ -430,22 +430,10 @@ export async function executeOpenWeb(
  * @returns Current route path string, or '/' if unable to determine
  */
 export function getCurrentRoute(): string {
-  try {
-    const router = getRouter();
-    
-    // Get current state from router
-    const state = (router as any).getState?.();
-    
-    if (state?.routes) {
-      const current = state.routes[state.routes.length - 1];
-      return current?.name ?? '/';
-    }
-    
-    return '/';
-  } catch (error) {
-    logger.category('navigation').warn(`getCurrentRoute failed`, { error });
-    return '/';
-  }
+  // getCurrentPathname() is kept in sync by the route change observer on every segment change.
+  // This is more reliable than router.getState() which returns only the top-level segment
+  // key (e.g. "main") rather than the full nested path (e.g. "/main/main-landing").
+  return getCurrentPathname();
 }
 
 /**

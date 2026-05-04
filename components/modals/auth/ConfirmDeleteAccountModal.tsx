@@ -9,6 +9,7 @@ import { useState } from 'react'
 import { View } from 'react-native'
 
 interface ConfirmDeleteAccountModalProps {
+  visible: boolean
   onCancel: () => void
   onConfirm: (password: string) => Promise<void>
   loading?: boolean
@@ -21,6 +22,7 @@ interface ConfirmDeleteAccountModalProps {
  * Shows real-time password requirements feedback using centralized validation.
  */
 export function ConfirmDeleteAccountModal({
+  visible,
   onCancel,
   onConfirm,
   loading = false,
@@ -35,7 +37,7 @@ export function ConfirmDeleteAccountModal({
 
   return (
     <AppModal
-      visible={true}
+      visible={visible}
       onClose={onCancel}
       heading="Delete Account?"
       body="This action is permanent. Please enter your password to confirm."
