@@ -33,10 +33,12 @@ export const SETTINGS_ROUTES: RouteConfig[] = [
     analyticsName: "settings_user",
     backDestination: "/select/world-selection",
   },
-  // Semantic anchor — no platform constraint; holds the lookup ID and platform branching.
-  // navigate.to('style-playground') resolves here, then platformPaths picks the concrete route.
+  // Semantic anchor — dispatch only; navigate.to('style-playground') resolves here.
+  // getRouteConfig() skips this entry (semanticAnchor: true).
+  // The concrete mobile/desktop entries below are the real route configs.
   {
     path: "/settings/stylemobile",
+    semanticAnchor: true,
     semanticId: "style-playground",
     platformPaths: { mobile: "/settings/stylemobile", desktop: "/settings/styledesktop" },
     title: "Component Playground",

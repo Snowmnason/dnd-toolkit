@@ -91,8 +91,12 @@ function buildNavigationContext(): SharedNavContext {
  */
 function getRouteMetadataForPath(canonicalPath: string): RouteMetadata | undefined {
   const configs = getAllRouteConfigs();
+  // Skip semantic anchors — they are dispatch-only entries and do not carry authoritative
+  // platform constraints. A semantic anchor for '/main/main-landing' has no platform field,
+  // so plain find() would return it first and make isPlatformCompatible() always pass.
+  // The concrete entry (which carries platform: 'desktop' / 'mobile') must win here.
   const config = configs.find(
-    c => c.path === canonicalPath || c.aliases?.some(a => a === canonicalPath),
+    c => !c.semanticAnchor && (c.path === canonicalPath || c.aliases?.some(a => a === canonicalPath)),
   );
   if (!config) return undefined;
   return {
@@ -555,6 +559,23 @@ export async function evaluateObservedRouteChange(
 ): Promise<NavServiceResult> {
   try {
     const canonicalRoute = canonicalizePath(currentRoute);
+    const ctx = buildNavigationContext();
+
+    // Platform compatibility check — same gate as executeRouteNavigation.
+    // Enforces that deep links, browser entry, and OS intents cannot land on
+    // routes that are restricted to the opposite platform (e.g., a mobile-only
+    // route loaded by a desktop user via a URL bar).
+    const routeMetadata = getRouteMetadataForPath(canonicalRoute);
+    if (!isPlatformCompatible(ctx.platform, routeMetadata)) {
+      logger.category('navigation').warn('Observer: platform-incompatible route blocked', {
+        route: canonicalRoute,
+        platform: ctx.platform,
+        routePlatform: routeMetadata?.platform,
+        triggeredBy,
+      });
+      return { status: 'aborted', reason: 'platform-incompatible' };
+    }
+
     const policyMode = getPolicyModeFromConfig();
 
     // Re-evaluate policy for the current route
@@ -567,7 +588,7 @@ export async function evaluateObservedRouteChange(
 
     // Route requires auth/permission/admin — run the real guard pipeline
     // with current user state to determine if the user actually has access.
-    const ctx = buildNavigationContext();
+    // (ctx was already resolved above for the platform check)
     const contextParams = await resolveContextParams(PARAM_RESOLVERS);
 
     // Caller-supplied overrides win over storage-resolved values.

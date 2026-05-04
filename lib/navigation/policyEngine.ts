@@ -16,6 +16,7 @@
 import { getAppConfig } from '@/config/core/loader';
 import { AUTH_CONFIG } from '@/config/routing-auth-config';
 import { AuthStateManager } from '@/lib/auth/auth-state';
+import { canonicalizePath } from '@/lib/navigation/routeCanonicalizer';
 import { StorageManager } from '@/lib/storage';
 import { logger } from '@/lib/utils';
 import { STORAGE_KEYS } from '@/maps';
@@ -65,6 +66,25 @@ export function getPolicyModeFromConfig(): NavigationPolicyMode {
     });
     return 'protected_by_default';
   }
+}
+
+/**
+ * Check whether a canonical route falls under a top-level path segment.
+ *
+ * Enforces a segment boundary so that '/maintain' does not match 'main',
+ * and '/webinar' does not match 'web'. Only exact-segment matches count:
+ *   isUnderSegment('/main', 'main')            → true  (exact)
+ *   isUnderSegment('/main/world', 'main')       → true  (child)
+ *   isUnderSegment('/maintain', 'main')         → false (no boundary)
+ *   isUnderSegment('/mainland/x', 'main')       → false (no boundary)
+ *
+ * @param route   Canonical route path (e.g. '/main/world')
+ * @param segment Top-level segment name without slashes (e.g. 'main')
+ */
+function isUnderSegment(route: string, segment: string): boolean {
+  const canonical = canonicalizePath(route);
+  const seg = segment.toLowerCase();
+  return canonical === `/${seg}` || canonical.startsWith(`/${seg}/`);
 }
 
 /**
@@ -127,10 +147,14 @@ export class PolicyEngine {
     // Mode-based decision:
     // - protected_by_default: only explicitly public routes allow access
     // - public_by_default: only explicitly protected routes require auth
+    //
+    // AUTH_CONFIG values are top-level path segments (e.g. 'login', 'web', 'main').
+    // isUnderSegment() enforces a segment boundary so '/maintain' cannot match '/main'
+    // and '/webinar' cannot match '/web'.
     if (mode === 'protected_by_default') {
       // Reject unless explicitly in publicRoutes
-      const isPublic = AUTH_CONFIG.publicRoutes.some((publicRoute: string) =>
-        toRoute.toLowerCase().includes(publicRoute.toLowerCase()),
+      const isPublic = AUTH_CONFIG.publicRoutes.some((segment: string) =>
+        isUnderSegment(toRoute, segment),
       );
       if (isPublic) {
         return 'allow_all';
@@ -138,21 +162,21 @@ export class PolicyEngine {
       // All /main/* routes require world-level permission verification — they are always
       // rendered in a world context and the worldId must be validated against the user's
       // connected worlds. The path itself may not contain 'world' (e.g. /main/main-landing).
-      if (toRoute.toLowerCase().startsWith('/main')) {
+      if (isUnderSegment(toRoute, 'main')) {
         return 'require_permission';
       }
       return 'require_auth';
     }
 
     // public_by_default: allow unless explicitly protected
-    const isProtected = AUTH_CONFIG.protectedRoutes.some((protectedRoute: string) =>
-      toRoute.toLowerCase().includes(protectedRoute.toLowerCase()),
+    const isProtected = AUTH_CONFIG.protectedRoutes.some((segment: string) =>
+      isUnderSegment(toRoute, segment),
     );
     if (!isProtected) {
       return 'allow_all';
     }
     // All /main/* routes require world-level permission verification.
-    if (toRoute.toLowerCase().startsWith('/main')) {
+    if (isUnderSegment(toRoute, 'main')) {
       return 'require_permission';
     }
     return 'require_auth';

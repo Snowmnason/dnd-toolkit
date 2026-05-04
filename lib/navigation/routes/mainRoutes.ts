@@ -3,10 +3,12 @@ import type { NavigationContext, RouteConfig } from '../navigationConfig'
 
 // Main app routes (world-dependent)
 export const MAIN_ROUTES: RouteConfig[] = [
-  // Semantic anchor — no platform constraint; holds the lookup ID and platform branching.
-  // navigate.to('home') resolves here, then platformPaths picks the concrete route.
+  // Semantic anchor — dispatch only; navigate.to('home') resolves here.
+  // getRouteConfig() skips this entry (semanticAnchor: true).
+  // The concrete desktop and mobile entries below are the real route configs.
   {
     path: '/main/main-landing',
+    semanticAnchor: true,
     semanticId: 'home',
     platformPaths: { mobile: '/main/world', desktop: '/main/main-landing' },
     title: 'D&D Toolkit',
@@ -37,6 +39,8 @@ export const MAIN_ROUTES: RouteConfig[] = [
 
   // Mobile panel entry routes — each is a discrete route on iOS/Android.
   // Desktop uses main-landing instead; these are mobile-only by contract.
+  // Note: /main/world is intentionally absent here — it is already covered by
+  // the concrete mobile landing entry above (main_world_landing).
   {
     path: '/main/characters',
     title: 'Characters & NPCs',
@@ -49,13 +53,6 @@ export const MAIN_ROUTES: RouteConfig[] = [
     title: 'Items & Treasure',
     platform: 'mobile',
     analyticsName: 'main_items_panel',
-    backDestination: '/select/world-selection',
-  },
-  {
-    path: '/main/world',
-    title: 'World & Exploration',
-    platform: 'mobile',
-    analyticsName: 'main_world_panel',
     backDestination: '/select/world-selection',
   },
   {

@@ -153,10 +153,19 @@ export function useRouteChangeObserver(): void {
         });
 
         if (result.status === 'aborted') {
-          logger.category('navigation').warn('Route observer: policy check aborted', {
-            reason: result.reason,
-          });
-          showNavModal('failure');
+          if (result.reason === 'platform-incompatible') {
+            // Platform-incompatible: the OS or browser sent us to a route that
+            // doesn't exist on this platform. Log it but don't show a failure modal —
+            // the bootstrap guard or layout-level auth guard will redirect silently.
+            logger.category('navigation').warn('Route observer: platform-incompatible route, skipping failure modal', {
+              reason: result.reason,
+            });
+          } else {
+            logger.category('navigation').warn('Route observer: policy check aborted', {
+              reason: result.reason,
+            });
+            showNavModal('failure');
+          }
         } else if (result.status === 'redirected') {
           // Redirect was already executed inside evaluateObservedRouteChange
           logger.category('navigation').debug('Route observer: policy violation corrected', {

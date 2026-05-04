@@ -13,10 +13,10 @@
 import { logger } from "@/lib/utils";
 import { Router } from "expo-router";
 import {
-  canonicalizePath,
-  pathEquals,
-  pathStartsWith,
-  type RouteParams,
+    canonicalizePath,
+    pathEquals,
+    pathStartsWith,
+    type RouteParams,
 } from "./routeCanonicalizer";
 import { LOGIN_ROUTES } from "./routes/loginRoutes";
 import { MAIN_ROUTES } from "./routes/mainRoutes";
@@ -116,6 +116,22 @@ export interface RouteConfig {
    */
   semanticId?: string;
 
+  /**
+   * Marks this entry as a semantic dispatch anchor.
+   *
+   * Semantic anchors exist solely so `resolveSemanticRoute()` can look up a `semanticId` and
+   * optionally branch via `platformPaths`. They are NOT real navigable routes and must
+   * never be returned by `getRouteConfig()`. The concrete platform entries below the anchor
+   * (with `platform: 'mobile'` / `platform: 'desktop'`) are the authoritative route configs.
+   *
+   * Rules:
+   * - Always paired with `semanticId` + `platformPaths`.
+   * - `path` should match the desktop concrete path (fallback when no platform is given).
+   * - `getRouteConfig()` skips these entries entirely.
+   * - `validateRouteRegistry()` ensures no two entries share the same `semanticId`.
+   */
+  semanticAnchor?: true;
+
   /** Custom error boundary handler */
   onError?: (error: Error, context: NavigationContext) => void;
 
@@ -141,8 +157,48 @@ export const ROUTE_CONFIGS: RouteConfig[] = [
 ];
 
 /**
- * Get route configuration for current navigation context
- * Uses intelligent matching: exact path, aliases, first segment, default
+ * Pick the best concrete RouteConfig match from a set of candidates.
+ *
+ * Semantic anchors (semanticAnchor: true) are dispatch-only entries used by
+ * resolveSemanticRoute(). They are always skipped here. Among real concrete
+ * entries, platform-matched entries win over unconstrained entries.
+ *
+ * @param candidates - All entries whose path/alias matched
+ * @param isMobile   - Whether the current runtime is mobile (iOS/Android)
+ * @returns Best concrete match, or undefined if no compatible entry exists
+ */
+function pickBestMatch(
+  candidates: RouteConfig[],
+  isMobile: boolean,
+): RouteConfig | undefined {
+  const concrete = candidates.filter((c) => !c.semanticAnchor);
+  if (concrete.length === 0) return undefined;
+
+  const targetPlatform: 'mobile' | 'desktop' = isMobile ? 'mobile' : 'desktop';
+
+  // 1. Exact platform match
+  const platformMatched = concrete.find((c) => c.platform === targetPlatform);
+  if (platformMatched) return platformMatched;
+
+  // 2. Unconstrained (available on all platforms)
+  const unconstrained = concrete.find((c) => !c.platform);
+  if (unconstrained) return unconstrained;
+
+  // 3. No compatible entry (route only exists for the other platform)
+  return undefined;
+}
+
+/**
+ * Get route configuration for current navigation context.
+ *
+ * Matching strategies (in priority order):
+ * 1. Exact path / alias match — platform-preferred via pickBestMatch
+ * 2. Prefix match (for nested routes like /main/characters-npcs/[id])
+ * 3. First-segment match (coarse fallback for unknown sub-routes)
+ * 4. Hard-coded default
+ *
+ * Semantic anchor entries (semanticAnchor: true) are never returned.
+ * Platform-specific entries are preferred over unconstrained entries.
  */
 export function getRouteConfig(context: NavigationContext): RouteConfig {
   const currentPath = "/" + context.segments.join("/");
@@ -153,12 +209,13 @@ export function getRouteConfig(context: NavigationContext): RouteConfig {
     params: context.params,
   });
 
-  // Strategy 1: Exact match
-  let match = ROUTE_CONFIGS.find(
+  // Strategy 1: Exact match (path or alias)
+  const exactCandidates = ROUTE_CONFIGS.filter(
     (config) =>
       pathEquals(config.path, currentPath) ||
       config.aliases?.some((alias) => pathEquals(alias, currentPath)),
   );
+  let match = pickBestMatch(exactCandidates, context.isMobile);
 
   if (match) {
     logger.category("navigation").debug("Route matched (exact)", {
@@ -169,10 +226,11 @@ export function getRouteConfig(context: NavigationContext): RouteConfig {
     return applyDefaults(match);
   }
 
-  // Strategy 2: Starts with (for nested routes like /main/characters-npcs/[id])
-  match = ROUTE_CONFIGS.find((config) =>
+  // Strategy 2: Prefix match (for nested routes like /main/characters-npcs/[id])
+  const prefixCandidates = ROUTE_CONFIGS.filter((config) =>
     pathStartsWith(currentPath, config.path),
   );
+  match = pickBestMatch(prefixCandidates, context.isMobile);
 
   if (match) {
     logger.category("navigation").debug("Route matched (starts with)", {
@@ -186,12 +244,13 @@ export function getRouteConfig(context: NavigationContext): RouteConfig {
   // Strategy 3: First segment match (e.g., /main/* matches /main/main-landing)
   const firstSegment = context.segments[0];
   if (firstSegment) {
-    match = ROUTE_CONFIGS.find((config) => {
+    const firstSegCandidates = ROUTE_CONFIGS.filter((config) => {
       const configFirstSegment = config.path.split("/").filter(Boolean)[0];
       return (
         canonicalizePath(firstSegment) === canonicalizePath(configFirstSegment || "")
       );
     });
+    match = pickBestMatch(firstSegCandidates, context.isMobile);
 
     if (match) {
       logger.category("navigation").debug("Route matched (first segment)", {
@@ -244,6 +303,81 @@ export function resolveTitle(
  */
 export function getAllRouteConfigs(): RouteConfig[] {
   return ROUTE_CONFIGS;
+}
+
+/**
+ * Violation detected by validateRouteRegistry()
+ */
+export interface RouteRegistryViolation {
+  type: 'duplicate-path-platform' | 'duplicate-semantic-id';
+  message: string;
+}
+
+/**
+ * Validate the route registry for structural integrity.
+ *
+ * Checks:
+ * - No two concrete entries (non-anchor) share the same `path + platform` key.
+ *   Duplicate concrete entries cause first-match shadowing in getRouteConfig().
+ * - No two entries share the same `semanticId`.
+ *   Duplicate semantic IDs cause non-deterministic resolveSemanticRoute() results.
+ *
+ * @param configs - Defaults to the real ROUTE_CONFIGS registry. Pass a custom array in tests.
+ * @returns Array of violations (empty = registry is clean).
+ *
+ * Called automatically in dev mode at module load. Call directly in tests:
+ * ```ts
+ * expect(validateRouteRegistry()).toHaveLength(0);
+ * ```
+ */
+export function validateRouteRegistry(
+  configs: RouteConfig[] = ROUTE_CONFIGS,
+): RouteRegistryViolation[] {
+  const violations: RouteRegistryViolation[] = [];
+
+  // ── Duplicate concrete path + platform ──────────────────────────────────────
+  const concreteSeen = new Set<string>();
+  for (const config of configs) {
+    if (config.semanticAnchor) continue;
+    const key = `${config.path}::${config.platform ?? 'all'}`;
+    if (concreteSeen.has(key)) {
+      violations.push({
+        type: 'duplicate-path-platform',
+        message: `Duplicate concrete route: path='${config.path}' platform='${
+          config.platform ?? 'all'
+        }'. Add semanticAnchor:true if this is a dispatch anchor, or remove the duplicate.`,
+      });
+    } else {
+      concreteSeen.add(key);
+    }
+  }
+
+  // ── Duplicate semanticId ────────────────────────────────────────────────────
+  const semanticIdSeen = new Map<string, string>();
+  for (const config of configs) {
+    if (!config.semanticId) continue;
+    const existing = semanticIdSeen.get(config.semanticId);
+    if (existing !== undefined) {
+      violations.push({
+        type: 'duplicate-semantic-id',
+        message: `Duplicate semanticId '${config.semanticId}' on paths '${existing}' and '${config.path}'. Each semanticId must be unique.`,
+      });
+    } else {
+      semanticIdSeen.set(config.semanticId, config.path);
+    }
+  }
+
+  return violations;
+}
+
+// ── Dev-mode integrity check ──────────────────────────────────────────────────
+// Runs once at module load in development. Logs each violation as a navigation
+// error so it appears in the category-filtered dev console immediately.
+if (typeof __DEV__ !== 'undefined' && __DEV__) {
+  const violations = validateRouteRegistry();
+  violations.forEach((v) =>
+    logger.category('navigation').error(`[RouteRegistry] ${v.message}`),
+  );
 }
 
 /**

@@ -1,7 +1,7 @@
-import { useNavigation } from '@/hooks/navigation/use-navigation'
-import { useWorldId, useUserRole } from '@/providers/AppParamsVolatileProvider'
 import { useModal } from '@/contexts/modal-context'
+import { useNavigation } from '@/hooks/navigation/use-navigation'
 import { logger } from '@/hooks/utils'
+import { useUserRole, useWorldId } from '@/providers/AppParamsVolatileProvider'
 
 /**
  * useSettingsActions
