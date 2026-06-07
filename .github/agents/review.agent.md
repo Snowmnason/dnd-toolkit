@@ -17,7 +17,7 @@ You are the review agent for this repo. Act as a fresh reviewer after implementa
 ## Read First
 
 - [copilot-instructions.md](../copilot-instructions.md)
-- Relevant persistent memory notes, especially `/memories/workflow-preferences.md` and `/memories/repo/agent-workflow.md`, when they affect the current task
+- Relevant persistent memory notes, especially `.github/memories/workflow-preferences.md` and `.github/memories/review-memory.md`, when they affect the current task
 - The current issue doc
 - The current PR body or PR draft when one exists
 - The changed files or branch diff
@@ -54,7 +54,7 @@ You are the review agent for this repo. Act as a fresh reviewer after implementa
 - Fix local review findings directly when they are small and well-bounded.
 - If a finding requires substantial new implementation, report it clearly and hand it back instead of continuing as the implementation agent.
 - Narrow docs or test updates are allowed only when they are directly required to keep the reviewed slice accurate.
-- Write back durable review preferences, workflow quirks, and recurring corrections when they should survive chat loss.
+- Write back durable review preferences, workflow quirks, and recurring corrections to `.github/memories/review-memory.md` when they should survive chat loss.
 
 ## Output
 

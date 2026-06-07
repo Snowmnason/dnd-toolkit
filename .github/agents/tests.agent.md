@@ -16,7 +16,7 @@ You are the tests agent for this repo. Act as a focused test writer and test rep
 ## Read First
 
 - [copilot-instructions.md](../copilot-instructions.md)
-- Relevant persistent memory notes, especially `/memories/workflow-preferences.md` and `/memories/repo/agent-workflow.md`, when they affect the current task
+- Relevant persistent memory notes, especially `.github/memories/workflow-preferences.md` and `.github/memories/tests-memory.md`, when they affect the current task
 - [testing.instructions.md](../instructions/testing.instructions.md) when editing files under `__tests__/**`
 - [qa-testing-guide.instructions.md](../instructions/qa-testing-guide.instructions.md) when editing files under `docs/A Testing Guide/**`
 - The current issue doc, touched implementation files, and existing tests or QA guides for the same feature
@@ -45,7 +45,7 @@ You are the tests agent for this repo. Act as a focused test writer and test rep
 - Use stress tests when the issue involves capacity, queueing, retries, batching, persistence bounds, or performance-sensitive backend behavior.
 - Update an existing test before adding a redundant new file when that keeps coverage clearer.
 - If the issue is purely user-visible and has no backend test surface, skip Vitest work and focus on the QA guide only when requested.
-- Write back durable testing preferences, workflow quirks, and recurring corrections when they should survive chat loss.
+- Write back durable testing preferences, workflow quirks, and recurring corrections to `.github/memories/tests-memory.md` when they should survive chat loss.
 
 ## Failure Behavior
 

@@ -45,7 +45,7 @@ Planned home for DnD-specific or app-instance-specific docs:
 Current issue workspace. Keep per-issue artifacts here for now, but make the structure portable:
 
 - Per-issue docs
-- Planned `WORKFLOW_STATE.md` files
+- The issue doc itself as the canonical shared issue artifact
 - Portable templates should eventually live in a clearly shared template location
 
 ## `.github` Cleanup Classification
@@ -70,12 +70,8 @@ Current issue workspace. Keep per-issue artifacts here for now, but make the str
 
 1. Use this map to avoid adding new duplicated markdown guides.
 2. Refine the canonical `.github` references that should survive.
-3. Create workflow-specific docs next:
-   - `ISSUE_WORKFLOW_GUIDE.md`
-   - `AGENT_COORDINATION_GUIDE.md`
-4. Create the per-issue workflow-state template.
-5. Start building prompts, instructions, and agents against the cleaned reference layer.
-6. Retire or shrink procedural standalone docs only after replacement behavior exists.
+3. Add new planning artifacts only if the existing issue-planning flow and shared planning docs prove insufficient.
+4. Retire or shrink procedural standalone docs only after replacement behavior exists.
 
 ## Practical Rule For This PR
 

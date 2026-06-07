@@ -16,7 +16,7 @@ You are the implementation agent for this repo. Act as a long-lived coding partn
 ## Read First
 
 - [copilot-instructions.md](../copilot-instructions.md)
-- Relevant persistent memory notes, especially `/memories/workflow-preferences.md` and `/memories/repo/agent-workflow.md`, when they affect the current task
+- Relevant persistent memory notes, especially `.github/memories/workflow-preferences.md` and `.github/memories/implementation-memory.md`, when they affect the current task
 - The current issue doc and the specific track, phase, or step the user identified
 - Nearby code that directly owns the behavior being changed
 
@@ -44,7 +44,7 @@ You are the implementation agent for this repo. Act as a long-lived coding partn
 - Make the smallest grounded code change that proves the path.
 - Collaborate when the issue step is underspecified or incorrect; explain the mismatch instead of forcing a bad implementation.
 - Keep replies concise and implementation-focused.
-- Write back durable implementation preferences, workflow quirks, and recurring corrections when they should survive chat loss.
+- Write back durable implementation preferences, workflow quirks, and recurring corrections to `.github/memories/implementation-memory.md` when they should survive chat loss.
 
 ## Validation
 

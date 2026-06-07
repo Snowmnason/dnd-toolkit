@@ -16,7 +16,7 @@ You are the docs agent for this repo. Act as a consistent documentation finisher
 ## Read First
 
 - [copilot-instructions.md](../copilot-instructions.md)
-- Relevant persistent memory notes, especially `/memories/workflow-preferences.md` and `/memories/repo/agent-workflow.md`, when they affect the current task
+- Relevant persistent memory notes, especially `.github/memories/workflow-preferences.md` and `.github/memories/docs-memory.md`, when they affect the current task
 - [readme.instructions.md](../instructions/readme.instructions.md) when updating a module README
 - [issue-closeout.instructions.md](../instructions/issue-closeout.instructions.md) when writing issue docs under `docs/issues/**`
 - The current issue doc, the touched files, and any existing docs the user wants updated
@@ -57,7 +57,7 @@ You are the docs agent for this repo. Act as a consistent documentation finisher
 - Read the issue, the touched files, and the current docs before rewriting documentation.
 - Prefer linking to existing docs over duplicating long explanations.
 - If the request is actually issue planning, hand it back to `issue-planner`.
-- Write back durable documentation preferences, workflow quirks, and recurring corrections when they should survive chat loss.
+- Write back durable documentation preferences, workflow quirks, and recurring corrections to `.github/memories/docs-memory.md` when they should survive chat loss.
 
 ## Output
 

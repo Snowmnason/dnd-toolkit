@@ -97,8 +97,8 @@ Do not collapse these responsibilities into one layer unless the architecture fo
 - Use chat continuity when it exists, but do not depend on it. A restarted chat should be able to recover from the issue artifact layer plus persistent memory notes.
 - Before acting on a multi-step workflow task, check relevant persistent memory when it could affect tone, scope, workflow choice, or known repo habits.
 - Write back only durable, reusable learnings:
-    - user preferences and recurring collaboration habits go in `/memories/workflow-preferences.md`
-    - repo workflow facts, validated conventions, and stable process learnings go in `/memories/repo/`
+    - user preferences and recurring collaboration habits go in `.github/memories/workflow-preferences.md`
+    - repo workflow facts, validated conventions, and stable process learnings go in `.github/memories/*.md`
 - Do not store secrets, temporary issue state, speculative ideas, or long narrative summaries in persistent memory.
 - Prefer updating an existing memory note over creating a new one, and keep memory entries short enough to stay useful after many sessions.
 
