@@ -167,5 +167,3 @@ useAppNavigation(): {
 
 ---
 
-*This module follows the canonical README structure defined in `docs/README_STYLE_GUIDE.md`.*
-
