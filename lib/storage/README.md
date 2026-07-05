@@ -35,7 +35,7 @@ All data stored here is classified by sensitivity level to determine encryption,
 
 **For developers:** Register new keys in `DATA_CLASSIFICATIONS` (data-classification.ts). Use `getStorageBackend(key)` for automatic routing. For PII redaction, use the centralized `RedactionManager` (see `lib/utils/redaction-manager.ts`).
 
-Full policy: [docs/issues/MileStone 2/168 - Privacy PII Data/PRIVACY_POLICY.md](../../docs/issues/MileStone%202/168%20-%20Privacy%20PII%20Data/PRIVACY_POLICY.md)
+Current issue-era note: [docs/issues/MileStone 2/Tier 2/168 - Privacy PII Data/PII Redaction Improvements.md](../../docs/issues/MileStone%202/Tier%202/168%20-%20Privacy%20PII%20Data/PII%20Redaction%20Improvements.md)
 
 ## Compression & Storage Optimization
 

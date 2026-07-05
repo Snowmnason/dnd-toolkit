@@ -9,6 +9,7 @@ Purpose: enforce the small set of rules that must apply in every coding session.
 - Delete dead code exposed by the change: unused branches, stale helpers, obsolete exports, compatibility shims, and duplicate entry points.
 - Prefer one clear active code path over multiple partially active paths.
 - Keep changes typed, minimal, and aligned with the intended architecture.
+- Prefer the repo logger over ad hoc `console.*` calls for operational or debugging code; keep logging structured by category.
 
 ## Architecture Model
 

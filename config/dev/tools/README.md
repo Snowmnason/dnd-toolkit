@@ -111,4 +111,4 @@ const issues = validateSchema(devConfig, prodConfig);
 ## See Also
 
 - [lib/config/loader.ts](../loader.ts) — Config loading and resolution
-- [docs/issues/MileStone 1/092 - Config Diff Tool/](../../../docs/issues/MileStone%201/092%20-%20Config%20Diff%20Tool/) — Feature documentation
+- [docs/issues/MileStone 2/Tier 3/192 - Config Diff Tool/IMPLEMENTATION.md](../../../docs/issues/MileStone%202/Tier%203/192%20-%20Config%20Diff%20Tool/IMPLEMENTATION.md) — Current issue-era implementation note

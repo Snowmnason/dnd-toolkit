@@ -400,7 +400,7 @@ Implement server-side support via separate issue (placeholder #XXX).
 
 ## Network Telemetry
 
-Local telemetry via `logger.category('network')`. Events help track network quality distribution, failure correlation, and system health. Phase 1 emits locally; Phase 2+ covers backend integration.
+Local telemetry via `logger.category('network')`. Events help track network quality distribution, failure correlation, and system health. Exporting that telemetry beyond local logging is optional follow-up work, not part of the core network module contract.
 
 ### Event Types
 

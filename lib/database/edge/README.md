@@ -280,14 +280,6 @@ const result = await runEdgeFunction('createInviteLink', {
 expect(result.invite_token).toBeDefined();
 ```
 
-## Future Enhancements
-
-- [ ] Add Firebase Cloud Functions adapter
-- [ ] Add AWS Lambda adapter
-- [ ] Add retry/circuit-breaker logic to registry
-- [ ] Add metrics/tracing to each edge function call
-- [ ] Build dashboard for edge function monitoring
-
 ## Related Modules
 
 - **`lib/database/repositories/`** — Repository pattern for database queries (similar abstraction principle)
@@ -297,6 +289,6 @@ expect(result.invite_token).toBeDefined();
 
 ## See Also
 
-- [Edge Function Architecture](../../Tier%202/TIER_2_OVERVIEW.md)
-- [Database Provider Abstraction](../../Tier%202/Tier%205/255-Database%20Provider%20Abstraction/ARCHITECTURE.md)
-- [Semantic Repository Pattern Issue #261-Lite](../256-Lite-Semantic%20Repository%20Pattern%20%26%20True%20Database%20Abstraction.md)
+- [docs/issues/MileStone 2/Tier 3/192 - Config Diff Tool/IMPLEMENTATION.md](../../../docs/issues/MileStone%202/Tier%203/192%20-%20Config%20Diff%20Tool/IMPLEMENTATION.md)
+- [docs/issues/MileStone 2/Tier 5/255-Database Provider Abstraction/IMPLEMENTATION.md](../../../docs/issues/MileStone%202/Tier%205/255-Database%20Provider%20Abstraction/IMPLEMENTATION.md)
+- [docs/issues/MileStone 2/Tier 5/261 - Semantic Repository Pattern/IMPLEMENTATION_GUIDE.md](../../../docs/issues/MileStone%202/Tier%205/261%20-%20Semantic%20Repository%20Pattern/IMPLEMENTATION_GUIDE.md)

@@ -1,263 +1,195 @@
-# Services Architecture: Provider → Adapter → Reporter
+# Services Architecture
 
-## Overview
+Technical overview of the current `system/Services` layer and how service providers are initialized, registered, and consumed.
 
-The services layer uses a three-tier pattern to separate external service dependencies from application logic. This enables service swapping, testing, and clean boundaries.
+## Purpose
 
+The services layer isolates third-party service details from the rest of the app.
+
+In the current repo, this layer is responsible for:
+
+- registering external-service providers
+- exposing stable adapter contracts
+- tracking service readiness
+- validating service configuration
+- giving bootstrap and runtime code one consistent import surface
+
+## Current High-Level Shape
+
+```text
+Third-party SDKs / provider implementations
+        ↓
+system/Services/[provider folders]
+        ↓
+root adapters and registration APIs
+        ↓
+service initialization + status tracking
+        ↓
+system and higher layers consume through @/system/Services
 ```
-External Services (Sentry, Supabase, Firebase, etc.)
-    ↓
-Providers (Sentry-specific code, Supabase SDK calls)
-    ↓
-Adapters (Generic provider interfaces)
-    ↓
-Reporters (Single entry points in lib modules)
-    ↓
-Hooks/Components/Screens (Application layer)
-```
 
----
+The current repo is not using a separate reporter tier as the main organizing principle here. The important boundary today is provider implementation versus adapter contract versus bootstrap/runtime access.
 
-## Tier 1: Providers — External Service Implementations
+## Current Folder Structure
 
-**Location:** `System/Services/[service]/` (e.g., `sentry/`, `supabase/`)
+The current `system/Services/` surface includes:
 
-**Characteristics:**
-- Contains **service-specific code and SDK calls** (Sentry SDK, Supabase client, etc.)
-- Implements the adapter interface (provider contract)
-- Completely **deletable** — when switching services, delete entire folder
-- Never imported outside System/Services (except by initializers and adapters)
-- Examples:
-  - `System/Services/sentry/sentry-error-tracker.ts` → ErrorTrackerProvider impl
-  - `System/Services/sentry/sentry-adapter.ts` → BreadcrumbProvider impl
-  - `System/Services/supabase/supabase-auth-provider.ts` → AuthProvider impl
-  - `System/Services/supabase/supabase-database-provider.ts` → DatabaseProvider impl
-
-**When to add:** New service implementation for an existing adapter (e.g., Firebase auth provider)
-
-**When to delete:** Entire service folder when switching backends (e.g., Sentry → DataDog)
-
----
-
-## Tier 2: Adapters — Generic Provider Interfaces
-
-**Location:** `System/Services/` (root level)
-
-**Characteristics:**
-- Contains **generic, service-agnostic interfaces** defining the contract
-- Adapter-specific logic (translating between app code and provider implementations)
-- **Minimal changes** when switching providers (update interface if needed)
-- Examples:
-  - `error-adapter.ts` → ErrorTrackerProvider interface + registration API
-  - `auth-adapter.ts` → AuthProvider interface + registration API
-  - `database-adapter.ts` → DatabaseProvider interface + query builder
-  - `breadcrumb-adapter.ts` → BreadcrumbProvider interface + queue handling
-
-**Key responsibility:** Map between app expectations and provider-specific implementations
-
-**Exception:** Initializers (`*-service-initializer.ts`) — exception to naming scheme, live here
-
----
-
-## Tier 3: Reporters — Single Entry Points to Adapters
-
-**Location:** `lib/[module]/[module]-reporter.ts` (or similar)
-
-**Characteristics:**
-- Contains **static methods that never change** (no service-switching logic)
-- **Single file per lib module** that imports from adapters
-- All other files in lib/hooks/components import from reporter, never directly from adapters
-- Examples:
-  - `lib/error/error-reporter.ts`:
-    ```ts
-    import { getErrorAdapter } from '@/system/Services';
-    export function reportError(err: Error) { getErrorAdapter().captureException(err); }
-    ```
-  - `lib/auth/auth-reporter.ts`:
-    ```ts
-    import { getAuthAdapter } from '@/system/Services';
-    export async function signIn(email, password) { return getAuthAdapter().signIn(email, password); }
-    ```
-  - `lib/analytics/analytics-reporter.ts`:
-    ```ts
-    import { getAdapter as getBreadcrumbAdapter } from '@/system/Services';
-    export function addBreadcrumb(crumb) { getBreadcrumbAdapter().sendBatch([crumb]); }
-    ```
-
-**Key benefits:**
-- Services can be swapped with minimal changes (only reporters re-exported or logic updated)
-- No adapter details leak to application layer
-- Type-safe, single source of truth for each operation
-
----
-
-## Import Rules
-
-### ✅ ALLOWED
-
-- `lib/error/error-reporter.ts` imports from `@/system/Services` (adapters only)
-- `lib/auth/auth-reporter.ts` imports from `@/system/Services` (adapters only)
-- `lib/database/[entity].ts` imports from `@/system/Services` (adapters only)
-- `lib/analytics/exporters/*.ts` imports from `@/system/Services` (adapters only)
-- **Any hook/component/screen** imports from `@/lib/[module]/[reporter]`
-
-### ❌ NOT ALLOWED
-
-- Hooks/components importing `getErrorAdapter()` directly from `@/system/Services`
-- Hooks/components importing `getAuthAdapter()` directly
-- Hooks/components importing from inside `System/Services/sentry/` or `System/Services/supabase/`
-
----
-
-## Current State & Mapping
-
-### Services Folder Structure
-
-```
-System/Services/
-├── error-adapter.ts (was: error-tracker.ts) ← RENAME
-├── auth-adapter.ts (was: auth-provider.ts) ← RENAME
-├── database-adapter.ts ✓
-├── breadcrumb-adapter.ts ✓
-├── service-initializer.ts (EXCEPTION)
+```text
+system/Services/
+├── analytics-adapter.ts
+├── auth-adapter.ts
+├── backend-availability.ts
+├── database-adapter.ts
+├── error-adapter.ts
+├── index.ts
+├── service-initializer.ts
 ├── service-status.ts
 ├── service-validation.ts
+├── session-adapter.ts
 ├── sentry/
-│   ├── sentry-error-tracker.ts (Provider) ✓
-│   ├── sentry-adapter.ts (Provider) ✓
-│   ├── sentry-analytics-exporter.ts (Provider) ✓
-│   └── sentry-service-initializer.ts (Initializer) ✓
 └── supabase/
-    ├── supabase-auth-provider.ts (Provider) ✓
-    ├── supabase-database-provider.ts (Provider) ✓
-    ├── supabase-buckets-adapter.ts (Provider) ✓
-    ├── supabase-rpc-adapter.ts (Provider) ✓
-    ├── supabase-realtime-adapter.ts (Provider) ✓
-    ├── supabase-error-translation.ts (Utility)
-    ├── supabase-client.ts (Utility)
-    └── supabase-initializer.ts (Initializer) ✓
 ```
 
-### Lib Reporters Needed
+## Provider Implementations
 
-```
-lib/error/
-├── error-reporter.ts (NEW) ← single entry point to error-adapter
-└── (other error handling files)
+Provider-specific code lives in provider folders such as `sentry/` and `supabase/`.
 
-lib/auth/
-├── auth-reporter.ts (NEW or consolidate into existing pattern)
-└── (other auth files)
+Characteristics:
 
-lib/database/
-├── database-reporter.ts (NEW or extend common.ts)
-└── (other database files)
+- SDK-specific logic lives here
+- these files know the real provider APIs
+- these folders are the main swap point when changing a backend or external service
 
-lib/analytics/
-├── analytics-reporter.ts (NEW for breadcrumbs)
-└── (other analytics files)
-```
+Examples in the current repo:
 
----
+- `supabase/supabase-auth-provider.ts`
+- `supabase/supabase-database-provider.ts`
+- `supabase/supabase-initializer.ts`
+- `sentry/sentry-error-tracker.ts`
+- `sentry/sentry-service-initializer.ts`
 
-## Communication from Provider Failures Through Tiers
+## Root Adapters
 
-### Error Flow Example
+The root adapter files define the contracts and registration APIs consumed by the rest of the app.
 
-```
-Provider Layer (Sentry)
-  ↓ throws SentryException
-Adapter Layer (error-adapter)
-  ↓ catches, normalizes to ErrorTrackerProvider contract
-Reporter Layer (error-reporter)
-  ↓ calls adapter, adds context
-Application Layer (hook/component)
-  ↓ calls reportError(error)
-```
+### `auth-adapter.ts`
 
-In real code:
-1. Sentry SDK throws error
-2. `sentry-error-tracker.ts` implements `captureException()` which calls Sentry SDK
-3. `error-adapter.ts` provides `ErrorTrackerProvider` interface that guarantees these methods exist
-4. `error-reporter.ts` exports `reportError(error)` that calls `getErrorAdapter().captureException(error)`
-5. App calls `reportError(error)` from `@/lib/error` ← no visibility into adapter/provider
+Owns:
 
----
+- the `AuthProvider` contract
+- auth registration and lookup
+- validated-provider creation helpers
+- shared auth error types
 
-## Service Switching Example
+### `database-adapter.ts`
 
-### Scenario: Switch from Sentry to DataDog
+Owns:
 
-**Before (with clean architecture):**
-1. Delete `System/Services/sentry/` folder
-2. Create `System/Services/datadog/` folder with:
-   - `datadog-error-tracker.ts` (implements ErrorTrackerProvider)
-   - `datadog-adapter.ts` (implements BreadcrumbProvider)
-   - `datadog-analytics-exporter.ts`
-   - `datadog-service-initializer.ts`
-3. Update `System/Services/service-initializer.ts` to call `initializeDataDogErrorTracker()`
-4. Update `System/Services/index.ts` to export `DataDogErrorTracker` instead of `SentryErrorTracker`
-5. Update `service-validation.ts` to validate DataDog config
-6. **Zero changes to lib/auth, lib/error, lib/database, lib/analytics, hooks, components, screens**
+- the `DatabaseProvider` contract
+- provider registration and lookup
+- query helpers and result types
+- the no-op database fallback used in degraded startup
 
----
+### `error-adapter.ts`
 
-## Naming Exceptions
+Owns:
 
-The following files are named exceptions and don't follow the Provider/Adapter/Reporter pattern:
+- the `ErrorTrackerProvider` contract
+- tracker registration and lookup
+- no-op tracker fallback
+- shared severity and breadcrumb types for direct error reporting
 
-- `*-service-initializer.ts` — Bootstrap coordination (exception to naming)
-- `*-initializer.ts` — Provider-specific bootstrap (exception to naming)
-- `service-status.ts` — System health tracking
-- `service-validation.ts` — Configuration validation
-- Utility files like `supabase-error-translation.ts`, `supabase-client.ts`
+### `analytics-adapter.ts`
 
----
+Owns:
 
-## Future Work
+- breadcrumb-oriented adapter registration
+- provider lookup for queued analytics breadcrumb delivery
+- shared breadcrumb send result types
 
-1. **Deferred service splits** (too early to separate now):
-   - Offline state machine (when implemented)
-   - Feature flag evaluation engine
-   - Error classification system
+### `session-adapter.ts`
 
-2. **Analytics consolidation** (large refactor):
-   - Currently has both `AnalyticsExporter` (outbound) and event emission (inbound)
-   - Future: unified analytics pipeline with clear provider/adapter/reporter tiers
+Owns system-level persisted session save or restore behavior.
 
-3. **Database optimization** (potential future improvement):
-   - Consider pooling or read-replica routing logic in database-adapter
-   - Reporter layer can remain simple
+This matters because auth bootstrap and runtime session recovery depend on one place to read and write persisted session data.
 
----
+## Bootstrap And Registration
 
-## Adding a New Service
+### `service-initializer.ts`
 
-### Example: Add Datadog Error Tracking alongside Sentry
+This is the main bootstrap switchboard for the services layer.
 
-1. **Create Provider** (full Datadog SDK integration):
-   - `System/Services/datadog/datadog-error-tracker.ts`
-   - Implements `ErrorTrackerProvider` interface
-   - Uses Datadog SDK directly
+Current responsibilities include:
 
-2. **Register in Adapter**:
-   - Adapter (`error-adapter.ts`) remains unchanged
-   - Initializer (`service-initializer.ts`) adds `initializeDataDogErrorTracker()` before auth
+- initialize the database provider first
+- initialize repositories and auth provider in parallel once database setup is ready
+- initialize the performance baseline service
+- initialize the error tracker
+- register the Sentry analytics exporter
 
-3. **Update Service Validation**:
-   - `service-validation.ts` adds `validateDatadogErrorConfig()`
+This file is the main answer to where services come online during startup.
 
-4. **Update Index for Exports**:
-   - `System/Services/index.ts` exports `DataDogErrorTracker` (for tests)
+## Status And Validation
 
-5. **Reporters remain unchanged**
+### `service-status.ts`
 
----
+Tracks readiness state for registered services.
 
-## References
+This gives bootstrap and health checks a consistent view of which services are ready, degraded, failed, or disabled.
 
-- **Provider Pattern:** Pluggable backends, service-specific implementation
-- **Adapter Pattern:** Interface abstraction, consistent contract
-- **Reporter Pattern:** Single entry point, static business logic
-- **Dependency Inversion:** High-level modules don't depend on service-specific details
+### `service-validation.ts`
 
+Owns config validation for service-specific startup requirements.
+
+Examples include validating:
+
+- Supabase database config
+- Supabase auth config
+- Sentry analytics config
+- Sentry error-tracking config
+
+### `backend-availability.ts`
+
+Provides provider-agnostic backend availability helpers.
+
+This separates general backend reachability checks from provider-specific API logic.
+
+## Runtime Consumption Pattern
+
+Higher layers should consume this module through `@/system/Services` or through the specific adapter surface when needed.
+
+Examples from the current repo include:
+
+- auth phase restoring a saved session through auth-provider access
+- bootstrap code checking whether an auth provider is configured
+- service initialization updating readiness state
+- database and error-tracking registration during startup
+
+The main point is that callers should depend on the adapter contract, not on provider-specific folders.
+
+## Degraded And Fallback Behavior
+
+The current services layer is designed to allow partial startup even when some providers are unavailable.
+
+Examples:
+
+- database can fall back to a no-op provider instead of crashing every caller immediately
+- error tracking can fall back to a no-op tracker
+- auth provider registration can be skipped if config is missing
+- service status reflects failed, degraded, or disabled states for later decisions
+
+This matters because service availability feeds into bootstrap decisions, degrade handling, and safe-mode escalation.
+
+## Design Rules
+
+- Put SDK-specific logic in provider folders, not in callers.
+- Expose stable contracts from root adapter files.
+- Centralize startup wiring in `service-initializer.ts`.
+- Track readiness through `service-status.ts` instead of ad hoc booleans.
+- Prefer consuming the `@/system/Services` surface over reaching into provider folders.
+
+## Related Guides
+
+- `../../KERNEL_ARCHITECTURE_ANALYSIS.md`
+- `../../AUTH_AND_SYNC_FLOW.md`
+- `../../Apps Response to Degraded Paths.md`
