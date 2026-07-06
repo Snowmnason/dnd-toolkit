@@ -456,16 +456,6 @@ This means screens do NOT need try/catch around navigation calls.
 
 ---
 
-## Future Enhancements
-
-1. **Prefetch API** — `navigate.prefetch(route)` to warm cache before transition
-2. **Conditional Guards** — Feature flags on guards (e.g., "enable strict age check on beta")
-3. **Navigation Analytics** — Formalize per-route telemetry in manager
-4. **Back-Button Customization** — Per-route back behavior (dismiss, pop, replace)
-5. **Route Stacks** — Named stacks for side-by-side navigation (e.g., split panes on tablet)
-
----
-
 ## FAQ
 
 **Q: Can I use `useNavigation()` in a non-screen component?**
@@ -481,4 +471,4 @@ A: Not via this hook. Global state changes should call lib managers directly: `e
 A: You don't need to—failures are shown via modal automatically. The promise resolves normally even on failure. Just await and continue; the UI handles the feedback.
 
 **Q: Can I customize the NavModal appearance?**
-A: The modal is registered globally and styled centrally. To customize, edit `components/modals/NavModal.tsx`. Per-route customizations would require a more complex modal system (future enhancement).
+A: The modal is registered globally and styled centrally. To customize it, edit `components/modals/NavModal.tsx`.

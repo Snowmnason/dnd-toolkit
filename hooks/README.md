@@ -106,7 +106,7 @@ useAppNavigation(): {
 
 **Network errors:** Hooks automatically handle network failures and provide user-friendly error messages through the `error` property.
 
-**Authentication errors:** Auth hooks redirect to login on session expiry. Use `useAuthGuard()` to protect routes.
+**Authentication errors:** Auth hooks redirect to login on session expiry. Initial route protection and unauthenticated redirects are coordinated by `useBootstrapRouteGuard()` plus `AUTH_CONFIG`.
 
 **Loading states:** All async hooks provide `isLoading` state. Use loading overlays for better UX.
 
@@ -150,22 +150,5 @@ useAppNavigation(): {
 | `storage/` | Local storage persistence hooks |
 | `utils/` | Utility hooks (debounce, throttle, etc.) |
 
-## Testing
-
-**Unit tests:** Each hook has corresponding test files in `__tests__/hooks/`. Tests mock lib managers and verify UI behavior.
-
-**Integration tests:** Test hook-to-manager integration in `e2e/` tests.
-
-**Manual testing:** Use React DevTools Profiler to verify re-render behavior and performance.
-
-## Future Enhancements
-
-- Real-time subscription hooks for live data updates
-- Advanced caching strategies for offline-first apps
-- Hook composition utilities for complex state management
-- Performance monitoring and analytics integration
-
 ---
-
-*This module follows the canonical README structure defined in `docs/README_STYLE_GUIDE.md`.*
 

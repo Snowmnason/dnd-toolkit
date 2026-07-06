@@ -266,15 +266,6 @@ const stored = await AnalyticsConsent.getStoredConsent(); // For diagnostics
   - **Android**: Uses SharedPreferences via Expo SecureStore
   - **Desktop**: Uses OS-specific secure storage
 
-#### Future Enhancements
-
-- **Granular consent levels**: Per-category toggles (performance, usage, marketing)
-- **Audit history UI**: Show consent change timeline
-- **Server-side sync**: Conflict resolution for cross-device consent changes
-- **Consent expiration**: Time-based consent refresh requirements
-
----
-
 ### `ConsentSyncQueue` Object
 
 **Asynchronous database sync for consent changes.**

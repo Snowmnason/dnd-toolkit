@@ -1,3 +1,182 @@
+# Kernel Architecture
+
+Wiki reference for how app bootstrap is organized and how the UI reads kernel state.
+
+## Purpose
+
+The kernel is the app's startup coordinator.
+
+It gives the rest of the app one source of truth for:
+
+- which bootstrap phase is running
+- which phases are ready
+- whether the app can safely render the normal shell
+- whether bootstrap failed badly enough to trigger safe mode
+- what progress and capability state should be surfaced upward
+
+## Layer Model
+
+The kernel is intentionally split across four layers.
+
+```text
+system/Kernel
+  ↓
+lib/kernel/kernel-manager.ts
+  ↓
+providers/AppKernelProvider.tsx
+  ↓
+hooks/kernel/use-app-kernel.tsx
+  ↓
+screens and components
+```
+
+### system/Kernel
+
+Owns the real bootstrap engine.
+
+- phase ordering
+- timeout behavior
+- capability degradation
+- safe mode escalation
+- phase progress calculation
+
+This is the lowest layer in the kernel flow and should stay app-shell agnostic where possible.
+
+### lib/kernel/kernel-manager.ts
+
+Owns the boundary between the rest of the app and `system/Kernel`.
+
+- exposes kernel state and subscription helpers
+- exposes bootstrap entry points
+- keeps callers from importing `system/Kernel` directly
+- holds bootstrap-facing helper functions used by phases
+
+This file is the facade the rest of the app should depend on.
+
+### providers/AppKernelProvider.tsx
+
+Owns the React context bridge.
+
+- initializes the kernel on mount
+- subscribes to kernel state changes
+- exposes current kernel state through context
+- initializes the router transport for the navigation system
+
+This is the outermost provider because the rest of the app depends on startup state being available.
+
+### hooks/kernel/use-app-kernel.tsx
+
+Owns the React-facing read API.
+
+- `useAppKernel()` gives the full state
+- `useAppReady()` gives the main ready flag
+- `usePhaseReady()` gives a typed phase-ready check
+
+This keeps components and screens out of the manager and system layers.
+
+## Bootstrap Phases
+
+The kernel runs an explicit ordered sequence:
+
+1. `config`
+2. `preload`
+3. `network`
+4. `storage`
+5. `services`
+6. `jobSetup`
+7. `auth`
+8. `featureFlags`
+9. `registration`
+
+When all required work completes, the kernel marks the app as ready.
+
+## What The Kernel Tracks
+
+The kernel state includes:
+
+- current phase
+- per-phase readiness flags
+- timing information
+- capability state
+- network status
+- safe mode state
+- phase progress
+
+This matters because app startup is not just a boolean. The shell needs to know whether the app is still booting, partially degraded, ready, or in recovery.
+
+## Critical Versus Degradable Phases
+
+Not every bootstrap failure is treated the same.
+
+- Some phases are treated as critical and can force a crash or safe-mode path.
+- Others can degrade capabilities and let the app continue in a limited state.
+
+This keeps the app from pretending everything is fine when foundation work failed, while still allowing non-critical systems to fail gracefully.
+
+## Safe Mode And Degradation
+
+The kernel is one of the main escalation points for resilience behavior.
+
+- It can enter safe mode when bootstrap failures are severe enough.
+- It can expose capability loss upward so the UI can adapt.
+- It can keep the app from rendering a broken normal shell when startup is not trustworthy.
+
+Related reading:
+- `Apps Response to Degraded Paths.md`
+- `ERROR_HANDLING_PATTERN.md`
+
+## Phase Progress
+
+The kernel also owns progress calculation for startup.
+
+- progress is based on the ordered phase sequence
+- readiness updates advance the phase progress state
+- the UI can surface startup progress without every phase inventing its own loading model
+
+That keeps the splash or loading experience tied to one real startup contract instead of scattered component-level guesses.
+
+## UI Integration
+
+The kernel affects the visible shell in three main ways.
+
+### 1. Root gating
+
+The root provider stack is wrapped by `AppKernelProvider`, and the loading overlay is controlled from kernel-driven readiness.
+
+### 2. Loading transition
+
+`UIBlockerLayer` starts visible and is released when the app reaches a usable ready state.
+
+### 3. Crash or recovery path
+
+If startup fails badly enough, safe mode or crash fallback behavior can take over instead of letting the normal app shell proceed.
+
+## Why This Pattern Exists
+
+This split avoids several failure modes:
+
+- screens directly calling low-level bootstrap code
+- multiple startup sources of truth
+- bootstrap logic mixed into UI components
+- routing code trying to infer readiness from unrelated state
+- resilience logic split across too many layers
+
+The kernel gives the repo one startup contract instead of many partial ones.
+
+## Extension Rules
+
+When adding or changing bootstrap behavior:
+
+- add or change the phase in `system/Kernel` first
+- expose only the needed surface through `lib/kernel/kernel-manager.ts`
+- consume kernel state from hooks, not from the manager in screen code
+- keep UI effects tied to kernel state changes rather than custom startup flags
+
+## Related Guides
+
+- `PROVIDER_LAYERS.md`
+- `AUTH_AND_SYNC_FLOW.md`
+- `modules/services/SERVICES_ARCHITECTURE.md`
 # Kernel Architecture Analysis
 
 ## Summary

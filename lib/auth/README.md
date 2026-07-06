@@ -149,24 +149,17 @@ Restores a user session from tokens (used during bootstrap/re-auth).
 
 **Returns:** Restored session object.
 
-#### `useAuthGuard(bootstrapReady?, level?, options?): AuthState`
+#### Route Protection Ownership
 
-React hook for protecting routes based on auth state.
+`lib/auth` does not currently export a `useAuthGuard()` hook.
 
-**Parameters:**
-- `bootstrapReady` (boolean?) – App bootstrap completion status
-- `level` (AuthLevel?) – `'account-only'` or `'world-required'`
-- `options` (AuthGuardOptions?) – Additional options like force verification
+Route protection is coordinated by the navigation layer instead:
 
-**Returns:** `'loading'`, `'authenticated'`, or `'unauthenticated'`
+- `config/routing-auth-config.ts` defines protected and public top-level route groups
+- `hooks/navigation/use-bootstrap-route-guard.ts` handles bootstrap-time web entry redirects
+- `lib/navigation/policyEngine.ts` evaluates route access during navigation
 
-**Example:**
-```ts
-const authState = useAuthGuard(kernel.phases.appReady, 'account-only');
-if (authState === 'loading') return <LoadingSpinner />;
-if (authState === 'unauthenticated') return <Redirect href="/login" />;
-return <ProtectedContent />;
-```
+`lib/auth` remains the source of auth state, session restoration, and auth operations that those layers depend on.
 
 ### Domain Systems (Internal API)
 

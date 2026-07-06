@@ -1,19 +1,36 @@
 # Architecture Documentation
 
-High-level architectural decisions and policies that guide the app design.
+Wiki-style reference for the large systems that shape how the app boots, routes, stores data, degrades, and talks to backend services.
 
-## Contents
+## How To Use This Folder
 
-- **[REALTIME_ARCHITECTURE.md](REALTIME_ARCHITECTURE.md)** - Event-driven architecture for feature flags using Supabase Realtime
-- **[CACHING_POLICY.md](CACHING_POLICY.md)** - Data caching strategy across all layers (memory, disk, encrypted storage)
+Use this folder when you need to understand the current system model, not just a single feature.
 
-## Feature Flags Implementation
+- Start here for cross-cutting architecture questions.
+- Use the linked documents for subsystem details.
+- Treat `modules/` as the place for deeper module-specific architecture notes that will expand over time.
 
-For code-level documentation, see the detailed guides:
-- **[CLIENT_IMPLEMENTATION.md](../../issues/MileStone%202/Tier%203/223%20-%20Event-Driven%20Feature%20Flags%20Architecture/CLIENT_IMPLEMENTATION.md)** - FeatureFlagsManager API reference
-- **[EDGE_FUNCTION_GUIDE.md](../../issues/MileStone%202/Tier%203/223%20-%20Event-Driven%20Feature%20Flags%20Architecture/EDGE_FUNCTION_GUIDE.md)** - Edge Function implementation
+## Core System Guides
 
-## See Also
+- **[PROVIDER_LAYERS.md](PROVIDER_LAYERS.md)** - Root provider stack, ownership, and why ordering matters
+- **[KERNEL_ARCHITECTURE_ANALYSIS.md](KERNEL_ARCHITECTURE_ANALYSIS.md)** - Kernel bootstrap model and the hook or manager bridge into the UI
+- **[AUTH_AND_SYNC_FLOW.md](AUTH_AND_SYNC_FLOW.md)** - How auth restoration, re-auth, and sync flow through bootstrap and runtime
+- **[REALTIME_ARCHITECTURE.md](REALTIME_ARCHITECTURE.md)** - Realtime feature flag and entitlement update model
+- **[Apps Response to Degraded Paths.md](Apps%20Response%20to%20Degraded%20Paths.md)** - Degradation paths, capability flags, and recovery behavior
 
-- For detailed implementation, see `docs/issues/MileStone 2/` folder
-- For build configuration, see `docs/Important Notes/Integration/`
+## Foundation Policies
+
+- **[CACHING_POLICY.md](CACHING_POLICY.md)** - Cache and persistence rules across memory, disk, and secure storage
+- **[CSP-Configuration.md](CSP-Configuration.md)** - Web CSP note and current security constraints
+- **[ERROR_HANDLING_PATTERN.md](ERROR_HANDLING_PATTERN.md)** - Centralized error-code and `AppError` pattern
+
+## Module Notes
+
+The `modules/` folder is for narrower architecture references that sit below the app-wide system layer.
+
+- `modules/navigation/` - Navigation system and route-flow notes
+- `modules/services/` - Service adapter and provider architecture
+
+## Notes
+
+Some deeper implementation writeups still live under `docs/issues/`, but this folder should prefer current-system pages that stand on their own without depending on issue history.

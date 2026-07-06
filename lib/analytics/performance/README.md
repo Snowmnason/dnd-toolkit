@@ -235,10 +235,3 @@ Config via `appsettings.json`:
 - **Regression check:** O(1) comparison
 - **Storage:** Async debounced persistence (non-blocking)
 
-## Future Enhancements
-
-- Separate baselines per platform (web/ios/android)
-- Separate cold/warm cache baselines
-- ML-based anomaly detection
-- Adaptive thresholds
-- Baseline segments by user cohort

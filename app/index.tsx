@@ -14,8 +14,9 @@ export default function HomePage() {
     return <SplashScreen subtitle="Loading App" message="Preparing your world..." />;
   }
 
-  // Kernel is ready — show welcome screen
-  // For authenticated users: useAuthGuard in layout will redirect to /select/world-selection
+  // Kernel is ready — show welcome screen.
+  // For authenticated users, bootstrap route coordination in _layout.tsx may
+  // redirect to /select/world-selection before this route remains visible.
   return (
     <View style={styles.container}>
       <Welcome />

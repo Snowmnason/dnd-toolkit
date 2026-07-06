@@ -1,87 +1,190 @@
 # Degradation Architecture
 
-Comprehensive framework for handling system failures and degraded states across the application. Defines how the app responds to various failure scenarios while maintaining user experience and data integrity.
+Technical overview of how the current repo tracks capability loss, surfaces recovery state, and decides when a failure stays degradable versus when it escalates to safe mode.
 
 ## Overview
 
-The degradation system provides graceful handling of system failures through:
+The degradation system is built around capability truth instead of one-off error handling.
 
-- **Capability Flags**: Boolean states tracking system availability (database, network, auth, etc.)
-- **Priority Queue**: Error prioritization ensuring critical failures are handled first
-- **Recovery Mechanisms**: Automatic and manual recovery paths for degraded systems
-- **UI Adaptation**: Components that adapt behavior based on system capabilities
+The goal is to answer three questions consistently:
 
-## Degradation Manager
+1. Which parts of the app are still safe to use?
+2. Which failures should only reduce capability?
+3. Which failures should force safe mode or recovery UI?
 
-Centralized system for tracking and managing application degradation states.
+## Current Architecture
 
-### Architecture
+The current implementation is split across system, lib, and UI-facing layers.
 
+```text
+Bootstrap phases / runtime handlers
+        ↓
+system/Degrade/app-degrade.ts
+        ↓
+system-level response handlers
+        ↓
+lib/error/degrade/degrade-manager.ts
+        ↓
+lib-level response handlers + UI callbacks
+        ↓
+hooks/kernel/useDegradationStatus.ts and safe-mode UI
 ```
-System Components → Degrade Manager → UI Components
-       ↓                    ↓              ↓
-   Report faults      Queue by priority   Subscribe to flags
-   (network down,     (network > auth >   (show offline banner,
-    DB unavailable)    storage > sync)     disable features)
-```
 
-### Core Components
+This split matters because the repo distinguishes between:
 
-#### `appDegrade` Singleton
-- **Location**: `system/Degrade/app-degrade.ts`
-- **Purpose**: Central state store for all degradation flags
-- **API**:
-  - `set(capability, value, { source, reason })` — Update capability flag
-  - `subscribe(callback)` — React to state changes
-  - `getState()` — Synchronous state snapshot
-  - `isCapable(capability)` — Check if capability is available
+- system reactions such as pausing work or changing infrastructure behavior
+- lib or UI reactions such as toasts, gating, safe-mode transitions, and primary-fault display
 
-#### Error Priority Queue
-Manages multiple simultaneous failures with proper precedence:
+## System Capability Registry
 
-| Priority | Capability | Reason | Cascades To |
-|----------|------------|--------|-------------|
-| 0 | `connectivity` | Network is foundation | database, sync, analytics |
-| 1 | `auth` | Critical for data sync | database, sync, premium |
-| 2 | `storage` | Blocks all persistence | database |
-| 3 | `sync` | Transient data issues | analytics |
-| 4 | `backgroundJobs` | Degradable operations | analytics |
-| 5 | `analytics` | Optional telemetry | N/A |
-| 6 | `errorTracking` | Optional reporting | N/A |
-| 99 | `premiumFeatures` | Optional features | N/A |
+### `system/Degrade/app-degrade.ts`
 
-**Queue Logic**:
-- Lower number = higher priority (processed first)
-- Automatic cascading (network failure affects dependent systems)
-- Recovery unblocks dependent systems
-- UI shows highest-priority error only
+`appDegrade` is the low-level capability registry.
 
-### Integration Points
+Responsibilities:
 
-#### Phase Failure Handling
+- store capability state by source
+- aggregate multiple sources that report on the same capability
+- notify subscribers when capability truth changes
+- execute registered system-level response handlers when aggregate state transitions
+
+Important property of the system model:
+
+- a capability is only healthy if all active sources say it is healthy
+- one degraded source is enough to keep that capability degraded
+
+This prevents false recovery when only one reporter clears while another subsystem is still broken.
+
+## Fault Sources And Handlers
+
+### `system/Degrade/handlers/fault-handlers.ts`
+
+This file centralizes on-demand fault reporting for capabilities such as:
+
+- database
+- auth
+- analytics
+- error tracking
+- premium features
+- bootstrap-time connectivity faults
+- background jobs
+
+Pattern:
+
 ```typescript
-// In system/Kernel/phases/*.ts
-try {
-  await initializeDatabase();
-} catch (error) {
-  appDegrade.set('database', false, {
-    source: 'services-phase',
-    reason: error.message
-  });
-  // Continue with fallback behavior
+reportDatabaseFault(reason);
+reportAuthFault(reason);
+reportPremiumRecovery();
+```
+
+The point is to keep phase and middleware code from duplicating degrade-state wiring inline.
+
+### `system/Degrade/responses/system-responses.ts`
+
+This file defines what the system layer intends to do when a capability degrades or recovers.
+
+Examples include planned behavior for:
+
+- pausing outbound work
+- draining queues after recovery
+- switching to offline-first behavior
+- buffering or resuming background operations
+
+In the current repo, many of these handlers still act mainly as structured placeholders plus logging, which is useful to know when reading the path matrix below.
+
+## Lib-Level Degradation Manager
+
+### `lib/error/degrade/degrade-manager.ts`
+
+This is the app-facing degradation wrapper that other lib code and hooks should import.
+
+Responsibilities:
+
+- report crashes, degradations, and recoveries
+- maintain an in-memory active-fault queue
+- prioritize capabilities so the app can surface one primary issue cleanly
+- expose subscriptions for hooks and UI
+- bridge degradation into safe-mode escalation where appropriate
+
+### Priority Queue
+
+The lib layer maintains an active fault list ordered by capability priority.
+
+Current priority map:
+
+| Priority | Capability |
+|----------|------------|
+| 0 | `connectivity` |
+| 1 | `auth` |
+| 2 | `storage` |
+| 3 | `sync` |
+| 4 | `backgroundJobs` |
+| 5 | `analytics` |
+| 6 | `errorTracking` |
+| 7 | `database` |
+| 99 | `premiumFeatures` |
+
+This queue is what lets the app pick a primary fault instead of surfacing every failure equally.
+
+## Lib Responses And UI Callbacks
+
+### `lib/error/degrade/lib-responses.ts`
+
+This file defines app-level responses for each capability.
+
+Examples include:
+
+- showing toast feedback
+- showing safe mode for crash-level cases
+- downgrading to offline messaging
+- restoring normal messaging on recovery
+
+These handlers are closer to product behavior than the system response layer.
+
+## Hook Surface
+
+### `hooks/kernel/useDegradationStatus.ts`
+
+This is the current React-facing degradation snapshot hook.
+
+It exposes:
+
+- overall level: `normal`, `degraded`, or `critical`
+- flattened capability booleans
+- timestamp
+- primary reason
+- whether safe mode is active
+
+Example:
+
+```typescript
+const { level, capabilities, reason, isSafeMode } = useDegradationStatus();
+
+if (!capabilities.database) {
+  // switch to cached-data UI
 }
 ```
 
-#### UI Adaptation
-```typescript
-// In components/hooks
-const { capabilities } = useDegradation();
-const canQuery = capabilities.database.value;
+Critical level currently maps to crash-level capabilities such as database, auth, or storage being unavailable.
 
-if (!canQuery) {
-  return <OfflineMessage />;
-}
-```
+## Relationship To Safe Mode
+
+Degradation and safe mode are related but not identical.
+
+- degradation tracks capability loss broadly
+- safe mode is the stronger UI and recovery response for failures that make the normal shell unsafe or untrustworthy
+
+The degradation layer can feed safe-mode escalation, but not every degraded capability should become a safe-mode event.
+
+## Reading The Path Matrix Below
+
+The path matrix below is useful as both a technical overview and a status map.
+
+- **Built** means the repo has meaningful end-to-end behavior already wired
+- **Partial** means the core path exists but visible UX, automation, or recovery is incomplete
+- **Missing** means the path is still mostly design intent
+
+The path list is still valuable because it describes the failure modes the repo is designed around, even where the implementation is not yet complete.
 
 ## Degradation Paths
 

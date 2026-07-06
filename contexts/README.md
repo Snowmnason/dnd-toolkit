@@ -1,211 +1,56 @@
 # contexts
 
-**React Context definitions for legacy/local app state.**
+Lightweight React contexts used by the app shell and overlay systems. This folder is not the main provider stack; the root app-shell wrappers live in `providers/`.
 
-⚠️ **Note:** Most providers have been consolidated to `/providers` folder. This folder now contains only domain-specific contexts (Theme, WorldSelection) that aren't part of the core provider stack.
+## What Lives Here
 
----
+- toast and snackbar state
+- notification and modal state
+- nav drawer and chrome state
+- portal-related shared context
+- the legacy `ThemeContext`
+- `UIBlockerContext` for loading overlays and splash gating
 
-## Quick Start
+## Key Responsibilities
 
-```tsx
-import { useWorldSelection } from "@/contexts/WorldSelectionContext";
+- expose narrow UI-shell context hooks without pulling in the full provider stack
+- keep overlay-related state close to the overlay provider composition
+- provide cycle-safe access to the UI blocker layer from kernel-facing hooks
+- preserve the legacy theme context while new theme ownership stays in `providers/ThemeProvider.tsx`
 
-export function WorldSelector() {
-  const { selectedWorld, setSelectedWorld } = useWorldSelection();
+## Important Paths
 
-  return (
-    <Button
-      onPress={() => setSelectedWorld("world-123")}
-      title={selectedWorld ? "Change World" : "Select World"}
-    />
-  );
-}
-```
+- `index.ts` — barrel export for the lightweight contexts
+- `app-toast-context.tsx` — app toast queue and display state
+- `app-snackbar-context.tsx` — snackbar messaging state
+- `notifications-context.tsx` — notification center state
+- `modal-context.tsx` — modal registration and open-state tracking
+- `nav-drawer-context.tsx` — nav drawer visibility and placement
+- `chrome-context.tsx` — top bar and bottom bar chrome state
+- `dropdown-portal-context.tsx` and `tooltip-portal-context.tsx` — shared portal positioning state
+- `ThemeContext.tsx` — legacy theme access path
+- `UIBlockerContext.ts` — cycle-safe loading blocker access for kernel and splash flows
 
----
+## Related Modules
 
-## When to Create a Context
+- `providers/README.md` — root app-shell providers and combined wrappers
+- `providers/overlay-provider.tsx` — composite overlay provider that wires many of these contexts together
+- `components/layer/` — rendering layers that consume toast, snackbar, nav drawer, and blocker state
+- `hooks/provider/` — provider-shell coordination hooks
 
-**Use React Context when:**
+## File Breakdown
 
-✅ State needs to be accessible by many components at different nesting levels
-✅ State changes relatively infrequently (not multiple times per second)
-✅ State is domain-specific and needs clear ownership (theme, world selection, auth)
-✅ You want to avoid prop drilling through 5+ component levels
-✅ You need to share state across distinct parts of the app
-
-**Don't use React Context for:**
-
-❌ Frequently changing data (animations, form inputs, scroll position) → Use local state or Ref
-❌ Server state or API data → Use query hooks instead
-❌ Data that belongs to a single component → Use useState
-❌ Global configuration that rarely changes → Use constants or singletons
-❌ Complex state logic with many transitions → Use useReducer + hook or state machine
-
----
-
-## Contexts in This Folder
-
-### ThemeContext
-
-**File:** `ThemeContext.tsx`
-
-**Purpose:** Manage theme family and dark/light mode (legacy context, consider using `/providers/ThemeProvider` instead).
-
-**Exports:** `useTheme()` hook, `ThemeContext` object
-
-**Usage:**
-
-```tsx
-import { useTheme } from "@/contexts/ThemeContext";
-
-export function MyComponent() {
-  const { themeName, isDark, setTheme } = useTheme();
-
-  return (
-    <View>
-      <Text>
-        Current: {themeName} ({isDark ? "dark" : "light"})
-      </Text>
-      <Button onPress={() => setTheme("cyberpunk")} title="Switch Theme" />
-    </View>
-  );
-}
-```
-
-**State shape:**
-
-```typescript
-{
-  theme: any;                    // Theme object (colors, fonts, etc.)
-  themeName: 'classic' | 'cyberpunk' | 'fantasy';  // Active theme family
-  setTheme: (name: ThemeFamilyName) => void;       // Change theme
-  isDark: boolean;               // Dark/light mode flag
-}
-```
-
-**⚠️ Note:** Prefer `/providers/ThemeProvider` for new code. This context is maintained for backward compatibility.
-
----
-
-### WorldSelectionContext
-
-**File:** `WorldSelectionContext.tsx`
-
-**Purpose:** Track currently selected world in world selection flow (temporary UI state).
-
-**Exports:** `useWorldSelection()` hook, `WorldSelectionProvider` component
-
-**Usage:**
-
-```tsx
-import { useWorldSelection } from "@/contexts/WorldSelectionContext";
-
-export function WorldCard({ world }) {
-  const { selectedWorld, setSelectedWorld } = useWorldSelection();
-  const isSelected = selectedWorld === world.id;
-
-  return (
-    <Button
-      onPress={() => setSelectedWorld(world.id)}
-      style={{ opacity: isSelected ? 1 : 0.5 }}
-      title={world.name}
-    />
-  );
-}
-
-export function ConfirmButton() {
-  const { selectedWorld, handleBackPress } = useWorldSelection();
-
-  const onConfirm = () => {
-    if (selectedWorld) {
-      // Navigate with world
-      handleBackPress();
-    }
-  };
-
-  return <Button onPress={onConfirm} title="Confirm" />;
-}
-```
-
-**State shape:**
-
-```typescript
-{
-  selectedWorld: string | null;              // World ID or null
-  setSelectedWorld: (id: string | null) => void;  // Update selection
-  handleBackPress: () => boolean;            // Back button handler
-}
-```
-
-**When to use:**
-
-- In world selection UI (list → detail → confirm flow)
-- When you need to track user's selection state temporarily
-- Not for persistent world access (use `/providers/AppParamsVolatileProvider` instead)
-
----
-
-⚠️ **Note:** The `LoadingContext` and `LoadingProvider` have been consolidated into [`components/UIBlockerLayer`](../components/UIBlockerLayer.tsx). Use [`useUIBlocker()`](../components/UIBlockerContext.ts) instead. See [Tier 7 - Phase-Aware Providers](../docs/issues/MileStone%202/Tier%207/265%20-%20Phase-Aware%20Providers/) for details.
-
----
-
-## Best Practices
-
-### ✅ Do
-
-- Keep context state minimal (single focused concern)
-- Memoize context values with `useMemo` (prevents unnecessary re-renders)
-- Provide clear error messages if context not provided
-- Document state shape and update functions
-- Use specific hooks instead of consuming context directly
-- Consider if a hook would be simpler (many contexts can be hooks)
-
-### ❌ Don't
-
-- Store frequently-changing data (animations, scroll position) in context
-- Create context for everything (use hooks for simple state)
-- Nest contexts deeply without purpose (keep provider tree shallow)
-- Update context state from multiple unrelated components (creates spaghetti)
-- Forget to memoize context values (causes re-render cascades)
-- Use context for server/API state (use query hooks instead)
-
----
-
-## Migration Path
-
-**Most contexts have been moved to `/providers`:**
-
-| Old Location                            | New Location                              | Status                                    |
-| --------------------------------------- | ----------------------------------------- | ----------------------------------------- |
-| `contexts/AppParamsStableContext.tsx`   | `providers/AppParamsStableProvider.tsx`   | ✅ Migrated                               |
-| `contexts/AppParamsVolatileContext.tsx` | `providers/AppParamsVolatileProvider.tsx` | ✅ Migrated                               |
-| `contexts/PlatformContext.tsx`          | `providers/PlatformProvider.tsx`          | ✅ Migrated                               |
-| `contexts/ThemeContext.tsx`             | `providers/ThemeProvider.tsx`             | ⚠️ Legacy (use `/providers` for new code) |
-| `contexts/WorldSelectionContext.tsx`    | —                                         | Current (domain-specific)                 |
-
-**When adding new contexts:**
-
-- If it's a core app provider (auth, theme, scale) → Put in `/providers`
-- If it's domain-specific UI state (world selection) → Put in `/contexts`
-- If it's just local component state → Use `useState` instead
-
----
-
-## File Structure
-
-```
-contexts/
-├── ThemeContext.tsx           # Legacy theme context (prefer /providers/ThemeProvider)
-└── WorldSelectionContext.tsx  # World selection UI state
-```
-
----
-
-## Related
-
-- [providers/](../providers/) – Core app providers (consolidated provider stack)
-- [providers/ThemeProvider.tsx](../providers/ThemeProvider.tsx) – Modern theme provider
-- [hooks/](../hooks/) – Custom hooks (often simpler than contexts)
-- [docs/COMPONENTS.md](../docs/COMPONENTS.md) – UI component patterns
+| File | Purpose |
+| --- | --- |
+| `app-toast-context.tsx` | Toast queue and toast actions |
+| `app-snackbar-context.tsx` | Snackbar state and tone handling |
+| `chrome-context.tsx` | Top bar and bottom bar chrome state |
+| `dropdown-portal-context.tsx` | Dropdown portal placement state |
+| `modal-context.tsx` | Modal registry and modal open-state helpers |
+| `nav-drawer-context.tsx` | Drawer visibility, placement, and drawer actions |
+| `notifications-context.tsx` | Notification list and notification actions |
+| `PanelNavigationContext.tsx` | Dual-panel navigation state used by panel-aware layouts |
+| `ThemeContext.tsx` | Legacy theme context kept for compatibility |
+| `tooltip-portal-context.tsx` | Tooltip portal placement state |
+| `UIBlockerContext.ts` | Loading blocker state used by the splash and safe-mode shell |
+| `index.ts` | Public barrel for the folder |
