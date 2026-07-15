@@ -22,7 +22,10 @@ import { RecoveryAction, SafeModeReason, SafeModeState } from "./safe-mode";
 
 // Lazy imports — breaks circular dependency: lib/error ↔ lib/analytics
 function getAnalytics() {
-  return require("@/lib/analytics") as typeof import("@/lib/analytics");
+  return {
+    Analytics: require("@/managers/analytics/analytics-manager").Analytics,
+    Performance: require("@/lib/analytics/performance/performance-manager").Performance,
+  };
 }
 
 // Lazy import — breaks circular dependency: lib/error ↔ lib/auth

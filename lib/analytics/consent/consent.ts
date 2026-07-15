@@ -17,6 +17,7 @@ import { getAppConfig } from '@/config';
 import { logger } from '@/lib/utils/logger';
 import { STORAGE_KEYS } from "@/maps";
 import { loadAnalyticsQueue, loadAnalyticsQueueJSON, persistAnalyticsQueue, persistAnalyticsQueueJSON } from "@/middleware/storage";
+import { setCurrentConsentLevel } from '@/type-definitions/analytics-types';
 
 export type ConsentLevel = 'none' | 'basic' | 'full';
 
@@ -95,6 +96,7 @@ class AnalyticsConsentManager {
             });
             this.consentLevel = sourceOfTruth;
             this.isInitialized = true;
+            setCurrentConsentLevel(sourceOfTruth);
             return sourceOfTruth;
           }
 
@@ -134,6 +136,7 @@ class AnalyticsConsentManager {
 
             this.consentLevel = sourceOfTruth;
             this.isInitialized = true;
+            setCurrentConsentLevel(sourceOfTruth);
             return sourceOfTruth;
           }
         }
@@ -154,6 +157,7 @@ class AnalyticsConsentManager {
         });
         this.consentLevel = sourceOfTruth;
         this.isInitialized = true;
+        setCurrentConsentLevel(sourceOfTruth);
         return sourceOfTruth;
       }
 
@@ -172,6 +176,7 @@ class AnalyticsConsentManager {
 
     this.consentLevel = sourceOfTruth;
     this.isInitialized = true;
+    setCurrentConsentLevel(sourceOfTruth);
     return sourceOfTruth;
   }
 
@@ -243,52 +248,12 @@ class AnalyticsConsentManager {
   }
 
   /**
-   * Get stored consent from SecureStorage without updating in-memory state.
-   */
-  async getStoredConsent(): Promise<ConsentLevel> {
-    try {
-      const stored = await loadAnalyticsQueue(STORAGE_KEYS.ANALYTICS_CONSENT);
-      if (stored && this.isValidConsentLevel(stored)) {
-        return stored as ConsentLevel;
-      }
-    } catch (err) {
-      // Ignore storage errors
-      logger.category('analytics').error('consent', 'Failed to retrieve stored consent level from storage', { error: err });
-    }
-    return DEFAULT_CONSENT;
-  }
-
-  /**
    * Reset consent to default 'basic' (for testing only)
    */
   resetToDefault(): void {
     this.consentLevel = DEFAULT_CONSENT;
     this.isInitialized = false;
     logger.category('analytics').analytics('consent', 'Consent reset to default');
-  }
-
-  /**
-   * Check if tracking is allowed for a given consent category.
-   *
-   * @deprecated Prefer `shouldEmitEvent(category, AnalyticsConsent.getLevel())` from consent-gating.ts.
-   * This method is kept for backwards-compat with tests; logic mirrors shouldEmitEvent().
-   *
-   * Gate logic:
-   * - 'essential': always true (even for 'none')
-   * - 'performance': true if >= 'basic'
-   * - 'usage': true only for 'full'
-   */
-  isAllowed(category: 'essential' | 'performance' | 'usage'): boolean {
-    switch (category) {
-      case 'essential':
-        return true; // Essential always allowed, even for 'none'
-      case 'performance':
-        return this.consentLevel === 'basic' || this.consentLevel === 'full';
-      case 'usage':
-        return this.consentLevel === 'full';
-      default:
-        return true;
-    }
   }
 
   /**

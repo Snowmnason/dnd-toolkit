@@ -41,8 +41,8 @@
  * ✗ app-specific data or customer data
  *
  * Privacy Controls:
- * - Consent gating: respects config.network.telemetry.enabled and shouldEmitEvent('performance', AnalyticsConsent.getLevel())
- * - Integrates with lib/analytics/consent.ts for centralized consent management
+ * - Consent gating: respects config.network.telemetry.enabled and currentConsentLevel (from type-definitions/analytics-types)
+ * - Integrates with centralized consent manager for consistency with other analytics systems
  * - If consent is not granted or config disabled, NO data is captured or emitted
  * - Error queue is bounded to prevent memory exhaustion; oldest events dropped on overflow
  * - No backend ingestion yet; Phase 1 is local logging only (Phase 2+ will add server integration)
@@ -51,10 +51,11 @@
  */
 
 import { getPlatformName } from '@/config';
-import { AnalyticsConsent, shouldEmitEvent } from "@/lib/analytics";
+
 import { logger } from "@/lib/utils/logger";
 import { composeNetworkContext, type ConnectionType, type NetworkContext } from "@/system/Network/helpers";
 import { NetworkDetection, type NetworkStatus } from "@/system/Network/network-detection";
+import { currentConsentLevel } from "@/type-definitions/analytics-types";
 
 /**
  * Quality tier for telemetry events
@@ -221,11 +222,11 @@ function shouldSample(sampleRate: number): boolean {
  * 
  * Network telemetry is categorized as 'performance' data (Network Information API,
  * latency measurements, connection quality metrics). This respects the centralized
- * AnalyticsConsent manager in lib/analytics for consistency with other analytics systems.
+ * consent level for consistency with other analytics systems.
  * 
  * Behavior:
  * - If config.network.telemetry.enabled === false => false (config takes priority)
- * - Otherwise, check shouldEmitEvent('performance', AnalyticsConsent.getLevel())
+ * - Otherwise, check if currentConsentLevel allows performance tracking ('basic' or 'full')
  * 
  * @returns true if telemetry is enabled and user has consented to performance tracking
  */
@@ -240,9 +241,9 @@ function hasPrivacyConsent(): boolean {
       if (enabled === false) return false;
     }
 
-    // Check centralized analytics consent system
-    // Network telemetry is considered 'performance' data
-    return shouldEmitEvent('performance', AnalyticsConsent.getLevel());
+    // Check centralized consent level: 'basic' and 'full' allow performance telemetry
+    // 'none' disables all analytics
+    return currentConsentLevel !== 'none';
   } catch {
     // Legacy default: if consent system or config loading errors occur, fall
     // back to legacy behavior (telemetry enabled). This keeps development and

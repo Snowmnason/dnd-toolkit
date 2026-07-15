@@ -1,92 +1,48 @@
-import { AnalyticsConsent, type ConsentLevel } from '@/lib/analytics';
+
 import { logger } from '@/lib/utils/logger';
-import { useCallback, useEffect, useState } from 'react';
+import { Analytics } from '@/managers/analytics/analytics-manager';
+import { currentConsentLevel, type ConsentLevel } from '@/type-definitions/analytics-types';
+import { useCallback, useState } from 'react';
 
 export interface UseAnalyticsConsentReturn {
   /** Current consent level */
   level: ConsentLevel;
   /** Update consent level (automatically persists to SecureStorage + queues database sync) */
   setLevel: (level: ConsentLevel) => Promise<void>;
-  /** Loading state during initialization or level changes */
+  /** Loading state during level changes */
   isLoading: boolean;
-  /** Whether consent has been initialized from storage */
+  /** Always true (initialized by auth flows during bootstrap/sign-in) */
   isInitialized: boolean;
 }
 
 /**
  * Hook for managing analytics consent level.
  *
- * On mount, loads consent from SecureStorage (or database if stale).
+ * Consent is initialized during auth flows (bootstrap sign-in, token restore).
+ * This hook reads from the global consent state and provides a way to update it.
  * When level changes, automatically persists to SecureStorage and queues server sync.
  *
  * Usage:
  *   const { level, setLevel, isLoading } = useAnalyticsConsent();
  *   await setLevel('full');  // Updates storage and queues database sync
- *
- * @param options - Optional configuration
- * @param options.maxAgeMs - Cache freshness threshold (default 4 hours)
- * @param options.forceRefresh - Skip cache and force database refresh
  */
-export function useAnalyticsConsent(options?: {
-  maxAgeMs?: number;
-  forceRefresh?: boolean;
-}): UseAnalyticsConsentReturn {
-  const [level, setLevelState] = useState<ConsentLevel>(() => AnalyticsConsent.getLevel());
+export function useAnalyticsConsent(): UseAnalyticsConsentReturn {
+  const [level, setLevelState] = useState<ConsentLevel>(currentConsentLevel);
   const [isLoading, setIsLoading] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  // Initialize consent on mount
-  useEffect(() => {
-    let mounted = true;
-
-    const initializeConsent = async () => {
-      setIsLoading(true);
-      try {
-        const initialLevel = await AnalyticsConsent.initialize(options);
-        if (mounted) {
-          setLevelState(initialLevel);
-          setIsInitialized(true);
-          logger.category('analytics').debug('hook_initialized', 'useAnalyticsConsent hook initialized', {
-            level: initialLevel,
-          });
-        }
-      } catch (err) {
-        if (mounted) {
-          logger.category('analytics').error('hook_initialized', 'Failed to initialize consent hook', {
-            error: err instanceof Error ? err.message : String(err),
-          });
-          // Use current in-memory level even if initialization failed
-          setLevelState(AnalyticsConsent.getLevel());
-          setIsInitialized(true);
-        }
-      } finally {
-        if (mounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    initializeConsent();
-
-    // Cleanup: mark component as unmounted to prevent setState calls
-    return () => {
-      mounted = false;
-    };
-  }, [options?.maxAgeMs, options?.forceRefresh]);
 
   // Update consent level and persist
   const updateLevel = useCallback(
     async (newLevel: ConsentLevel) => {
       setIsLoading(true);
       try {
-        await AnalyticsConsent.setLevel(newLevel);
+        await Analytics.updateConsentLevel(newLevel);
         setLevelState(newLevel);
-        logger.category('analytics').info('consent_changed', 'Consent level updated via hook', {
+        logger.category('analytics').info('Consent level updated via hook', {
           newLevel,
           prevLevel: level,
         });
       } catch (err) {
-        logger.category('analytics').error('consent_changed', 'Failed to update consent level', {
+        logger.category('analytics').error('Failed to update consent level', {
           newLevel,
           error: err instanceof Error ? err.message : String(err),
         });
@@ -102,6 +58,6 @@ export function useAnalyticsConsent(options?: {
     level,
     setLevel: updateLevel,
     isLoading,
-    isInitialized,
+    isInitialized: true, // Always initialized by auth flows (bootstrap sign-in, token restore)
   };
 }

@@ -1,8 +1,8 @@
 import { logger } from '@/hooks/utils';
-import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
 import { getCrashReportPayload } from '@/lib/analytics/consent/consent-error-payload';
 import { sessionManager } from '@/lib/analytics/session';
 import { reportError } from '@/lib/error/error-manager';
+import { currentConsentLevel } from '@/type-definitions/analytics-types';
 import { ErrorInfo } from 'react';
 
 /**
@@ -30,7 +30,7 @@ export function handleErrorReport(error: Error, errorInfo: ErrorInfo): void {
     const captureOptions = getCrashReportPayload(
       error,
       errorInfo.componentStack || undefined,
-      AnalyticsConsent.getLevel()
+      currentConsentLevel
     );
     if (captureOptions !== null) {
       reportError(error, captureOptions);

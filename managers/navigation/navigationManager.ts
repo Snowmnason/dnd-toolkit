@@ -1,44 +1,45 @@
 /**
- * Navigation Analytics Wrapper
+ * Navigation Manager
  *
- * Domain-specific analytics for navigation events. Normalizes navigation
+ * Domain-specific orchestration for navigation events. Normalizes navigation
  * data and handles event construction before sending to Analytics.track().
  *
  * This module is the **single audit point** for all navigation analytics.
  * All navigation tracking goes through here, no scattered calls to Analytics.track().
  *
  * Usage:
- *   import { NavAnalytics } from '@/lib/analytics/nav-analytics';
+ *   import { NavigationManager } from '@/managers/navigation/navigationManager';
  *
  *   // After guard decision
- *   NavAnalytics.trackNavigationDecision({
- *     decision: { outcome: 'allowed' },
- *     fromRoute: '/main',
- *     toRoute: '/main/world-settings',
+ *   NavigationManager.trackNavigationResult({
+ *     result: { status: 'executed', ... },
+ *     target: '/main/world-settings',
  *     // ... more fields
  *   });
  *
  * Integration:
- *   - Called by: `lib/middleware/navigation/nav-service.ts` after guard pipeline
- *   - Calls: `Analytics.track()` (lib/analytics/analytics-manager.ts)
+ *   - Called by: `middleware/navigation/nav-service.ts` after guard pipeline
+ *   - Calls: `Analytics.track()` (managers/analytics/analytics-manager.ts)
  *   - Types: `type-definitions/transport-types.ts` (NavigationAnalyticsEvent, NavigationEventType)
- *   - Consent: Gated via `maps/event-consent-mapping.ts`
+ *   - Consent: Gated via analytics manager
  */
 
+import { logger } from '@/lib/utils/logger';
+import { Analytics } from '@/managers/analytics/analytics-manager';
 import {
-  NavigationAnalyticsEvent,
-  NavigationEventType,
-  type NavigationExecutionResult,
+    NavigationAnalyticsEvent,
+    NavigationEventType,
+    type NavigationExecutionResult,
 } from '@/type-definitions/transport-types';
 
 /**
- * NavAnalytics — central hub for navigation event tracking.
+ * NavigationManager — central hub for navigation event tracking.
  * All navigation events are constructed here for consistent shape and audit trail.
  */
 /** Source values as passed from middleware analytics context */
 type NavAnalyticsSource = 'user' | 'redirect' | 'deep-link';
 
-export class NavAnalytics {
+export class NavigationManager {
   /**
    * Track a navigation execution result (called by nav-service middleware).
    *
@@ -69,7 +70,7 @@ export class NavAnalytics {
     if (result.status === 'no-op') return;
 
     // Resolve event name directly from result.status — the discriminated union is the source of truth
-    const resolvedEventName = NavAnalytics.resolveEventName(result);
+    const resolvedEventName = NavigationManager.resolveEventName(result);
 
     // Map NavigationExecutionResult → trackNavigationDecision params
     let outcome: 'allowed' | 'redirected' | 'aborted' | 'timeout' | 'error';
@@ -116,7 +117,7 @@ export class NavAnalytics {
       'deep-link': 'deep_link',
     };
 
-    NavAnalytics.trackNavigationDecision({
+    NavigationManager.trackNavigationDecision({
       eventName: resolvedEventName,
       decision: { outcome, reason, redirectTarget },
       fromRoute: params.fromRoute,
@@ -158,7 +159,7 @@ export class NavAnalytics {
    * @param params.throttleIntervalMs - Hook-detected: throttle window size
    *
    * @example
-   * NavAnalytics.trackNavigationDecision({
+   * NavigationManager.trackNavigationDecision({
    *   decision: { outcome: 'aborted', reason: 'throttled' },
    *   fromRoute: '/main',
    *   toRoute: '/main/world-settings',
@@ -195,9 +196,6 @@ export class NavAnalytics {
     throttled?: boolean;
     throttleIntervalMs?: number;
   }): void {
-    // Import dynamically to avoid circular deps
-    const Analytics = require('@/lib/analytics/analytics-manager').Analytics;
-
     // Construct event
     const event: NavigationAnalyticsEvent = {
       eventName: params.eventName,
@@ -252,7 +250,7 @@ export class NavAnalytics {
     };
 
     // Log for audit trail (category-based)
-    this.log('info', `Navigation decision: ${eventName}`, {
+    NavigationManager.log('info', `Navigation decision: ${eventName}`, {
       from: event.routing.fromRoute,
       to: event.routing.toRoute,
       outcome: event.decision.outcome,
@@ -262,22 +260,6 @@ export class NavAnalytics {
     // Fire to Analytics (consent checking happens at dispatch layer)
     Analytics.track(eventName, payload);
   }
-
-  /**
-   * Map navigation decision outcome to event name.
-   *
-   * Maps decision outcome + reason to specific navigation event:
-   * - 'allowed' → nav_transition_allowed
-   * - 'redirected' (auth) → nav_guard_auth_denied
-   * - 'redirected' (permission/world) → nav_guard_world_access
-   * - 'redirected' (platform) → nav_guard_platform_mismatch
-   * - 'ui-required' → nav_ui_required
-   * - 'timeout' → nav_guard_timeout
-   * - 'error' → nav_error
-   * - 'aborted' → nav_transition_aborted
-   *
-   * @internal
-   */
 
   /**
    * Resolve the analytics event name directly from a NavigationExecutionResult.
@@ -358,7 +340,6 @@ export class NavAnalytics {
     message: string,
     context?: any
   ): void {
-    const logger = require('@/lib/utils/logger').logger;
     const cat = logger.category('navigation');
 
     switch (level) {

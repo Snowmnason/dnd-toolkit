@@ -1,7 +1,7 @@
-import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
 import { getCrashReportPayload } from '@/lib/analytics/consent/consent-error-payload';
 import { flushPendingErrors as flushErrors, reportError } from '@/lib/error/error-manager';
 import { logger } from '@/lib/utils/logger';
+import { currentConsentLevel } from '@/type-definitions/analytics-types';
 import { useCallback } from 'react';
 
 /**
@@ -23,8 +23,7 @@ import { useCallback } from 'react';
  * @returns Object with optIn capability and send function
  */
 export function useCrashConsentReport() {
-  const consentLevel = AnalyticsConsent.getLevel();
-  const canOptIn = consentLevel === 'none';
+  const canOptIn = currentConsentLevel === 'none';
 
   /**
    * Send a crash report with full payload when user explicitly opts in.

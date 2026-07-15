@@ -48,6 +48,41 @@ Possible future improvements:
 
 - dedicated crash-report consent modal copy
 - user education around what is sent and what is not
+
+## Analytics Debug Panel (Infrastructure Introspection)
+
+**Status**: Code written but not connected to any screen. Intended for future admin/debug UI.
+
+**What exists**: `hooks/analytics/use-analytics-status.ts` contains two hooks and one helper for inspecting internal analytics state:
+
+- `useAnalyticsBufferStatus()` — React hook that subscribes to real-time event queue status
+  - Returns: queue size, flushing status, event types queued, oldest event age, max queue size
+  - Implementation: Uses event subscription (reactive, no polling)
+  - Purpose: Display pending analytics events in a debug panel
+  - Example output: `{ queueSize: 20, isFlushing: false, lastFlushTime: 1234567890, queuedEventTypes: ['pageview', 'error'], maxSize: 100, oldestEventAge: 5000 }`
+
+- `useBreadcrumbQueueStatus()` — React hook for breadcrumb queue state
+  - Returns: queue size, oldest breadcrumb time, overflow count, provider name, flushing status
+  - Implementation: Polls every 2 seconds (breadcrumb queue doesn't emit events)
+  - Purpose: Display pending breadcrumbs alongside event queue
+  - Example output: `{ queueSize: 15, oldestBreadcrumbTime: 1234567890, overflowCount: 3, providerName: 'Sentry', isFlushing: false }`
+
+- `getBreadcrumbQueueStatus()` — Synchronous helper (not a hook) for programmatic access
+  - Use in logging or conditional logic where hook overhead isn't needed
+  - Example: `logger.debug('Queue state:', getBreadcrumbQueueStatus())`
+
+**Why not connected yet**: 
+- No admin screen or debug panel built yet to display this data
+- Code is scaffolded but incomplete (breadcrumb hook has missing import)
+- Infrastructure introspection is nice-to-have, not core app functionality
+
+**To use later**:
+1. Create a debug/admin screen component (e.g., `AppScreens/admin/AnalyticsDebug.tsx`)
+2. Import `useAnalyticsBufferStatus()` and `useBreadcrumbQueueStatus()`
+3. Render queue stats alongside buttons to trigger manual flushes or clear queue
+4. Fix missing `breadcrumbQueue` import in the hook (or move breadcrumb stats to a cleaner source)
+
+**Related infrastructure**: `lib/analytics/exporters/analytics-buffer.ts` (active — manages event queue) and `lib/analytics/exporters/analytics-network-integration.ts` (active — flushes queue on network changes)
 - optional remembered preference for future crash-report prompts
 
 ### Audit And Debug Visibility

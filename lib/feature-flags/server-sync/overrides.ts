@@ -7,9 +7,9 @@
  *
  * Priority: local admin override > remote server override > flag value
  */
-import { trackVariantAssignment } from "@/lib/analytics/variant-tracking";
 import type { FeatureFlagOverrideRow } from "@/lib/database/feature-flag-overrides";
 import { logger } from "@/lib/utils/logger";
+import { VariantAnalytics } from "@/managers/analytics/feature-analytics-manager";
 import { isInRolloutMemoized } from "@/pure-algo-immutables/rollout";
 import type { EdgeEntitlementOverrideRow } from "@/type-definitions/featureFlagTypes";
 import { notifySubscribers, type ServerSyncState } from "./state";
@@ -179,7 +179,7 @@ export async function evaluateRollout(
     );
 
     const variant = inRollout ? "B" : "A";
-    trackVariantAssignment({
+    VariantAnalytics.trackVariantAssignment({
       flagName,
       variant,
       userId,

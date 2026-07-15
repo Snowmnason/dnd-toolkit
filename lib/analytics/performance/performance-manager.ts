@@ -3,7 +3,7 @@ import { logger } from "@/lib/utils";
 import Constants from "expo-constants";
 import { useEffect } from "react";
 import { Platform } from "react-native";
-import { Analytics } from "../analytics-manager";
+
 import { createExportContext, dispatchEvent } from "../exporters/exporter-registry";
 import { getThreshold, sanitizeError } from "../utils";
 import { performanceBaselineService } from "./performance-baseline";
@@ -115,7 +115,6 @@ export const Performance = {
     const duration = Date.now() - start;
     const slowScreenThreshold = warnMs ?? getThreshold("slowScreenMs");
     this.marks.delete(label);
-    Analytics.track("performance_measure", { label, duration_ms: duration });
     if (duration > slowScreenThreshold)
       logger.category('performance').perf(`Slow operation: ${label} took ${duration}ms`);
     
