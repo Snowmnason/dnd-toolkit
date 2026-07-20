@@ -1,12 +1,9 @@
 /**
  * Session & User Retention Tracking
- * Tracks user sessions, duration, and engagement metrics
+ * Pure state tracking: maintains session lifecycle and activity metrics
+ * No side effects (breadcrumb/event emission handled by manager layer)
  */
-import { getAppConfig } from '@/config';
-import { addBreadcrumb, isTrackingEnabled } from '@/lib/error/error-manager';
 import { logger } from '@/lib/utils';
-import { AnalyticsConsent } from './consent/consent';
-import { shouldEmitEvent } from './consent/consent-gating';
 
 interface SessionData {
   startedAt: number;
@@ -39,39 +36,32 @@ class SessionManager {
       lastActivityAt: now,
     };
 
-    this.trackEvent('session_started', {
-      userId: userId || undefined,
-      timestamp: now,
-    });
-
     logger.category('analytics').analytics('Session started:', { userId });
   }
 
   /**
-   * End current session and track metrics
+   * End current session and return session metrics
    */
-  endSession(): void {
-    if (!this.currentSession) return;
+  endSession(): { duration: number; screenViews: number; errorCount: number } | null {
+    if (!this.currentSession) return null;
 
     const now = Date.now();
     const duration = now - this.currentSession.startedAt;
-    const durationMinutes = Math.round(duration / 60000);
-
-    this.trackEvent('session_ended', {
-      duration_ms: duration,
-      duration_minutes: durationMinutes,
-      screen_views: this.currentSession.screenViews,
-      errors: this.currentSession.errorCount,
-      userId: this.currentSession.userId || undefined,
-    });
+    const metrics = {
+      duration,
+      screenViews: this.currentSession.screenViews,
+      errorCount: this.currentSession.errorCount,
+      userId: this.currentSession.userId,
+    };
 
     logger.category('analytics').analytics('Session ended:', {
-      durationMinutes,
-      screenViews: this.currentSession.screenViews,
-      errors: this.currentSession.errorCount,
+      durationMinutes: Math.round(duration / 60000),
+      screenViews: metrics.screenViews,
+      errors: metrics.errorCount,
     });
 
     this.currentSession = null;
+    return metrics;
   }
 
   /**
@@ -112,29 +102,6 @@ class SessionManager {
     return inactiveMs < thirtyMinutesMs;
   }
 
-  /**
-   * Internal method to track session events to error tracker
-   * Avoids circular dependency with Analytics module
-   */
-  private trackEvent(event: string, data?: Record<string, any>): void {
-    try {
-      const perfFlag = getAppConfig().features?.performanceMonitoring;
-      if (!isTrackingEnabled() || !perfFlag) return;
-
-      // Session lifecycle events are usage-level data (behavioral: when sessions start/end)
-      // Require 'full' consent before sending to error tracker
-      if (!shouldEmitEvent('usage', AnalyticsConsent.getLevel())) return;
-
-      addBreadcrumb({
-        category: 'analytics',
-        message: event,
-        data,
-        level: 'info',
-      });
-    } catch (err) {
-      logger.category('analytics').warn('Failed to track session event:', err);
-    }
-  }
 }
 
 export const sessionManager = new SessionManager();

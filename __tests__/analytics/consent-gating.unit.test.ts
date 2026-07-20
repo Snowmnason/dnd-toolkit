@@ -1,17 +1,16 @@
-/* eslint-disable security/detect-object-injection */
 import { describe, expect, it } from 'vitest';
 
-import { ConsentLevel } from '@/lib/analytics/consent/consent';
 import {
-  DEFAULT_EVENT_CONSENT_MAPPING,
-  getConsentCategoryForEvent,
-  shouldEmitEvent,
+    DEFAULT_EVENT_CONSENT_MAPPING,
+    getConsentCategoryForEvent,
+    shouldEmitEvent,
 } from '@/lib/analytics/consent/consent-gating';
+import type { ConsentLevel } from '@/type-definitions/analytics-types';
 
 describe('Consent Gating — unit', () => {
   it('resolves every mapping key via getConsentCategoryForEvent()', () => {
-    for (const [eventType, category] of DEFAULT_EVENT_CONSENT_MAPPING.entries()) {
-      expect(getConsentCategoryForEvent(undefined, eventType)).toBe(category);
+    for (const [eventName, category] of DEFAULT_EVENT_CONSENT_MAPPING.entries()) {
+      expect(getConsentCategoryForEvent(eventName)).toBe(category);
     }
   });
 
@@ -20,10 +19,10 @@ describe('Consent Gating — unit', () => {
     const basic: ConsentLevel = 'basic';
     const full: ConsentLevel = 'full';
 
-    // Pick one representative event type for each category from the actual mapping.
+    // Pick one representative event name for each category from the actual mapping.
     const representatives: Record<string, string> = {};
-    for (const [eventType, category] of DEFAULT_EVENT_CONSENT_MAPPING.entries()) {
-      if (!representatives[category]) representatives[category] = eventType;
+    for (const [eventName, category] of DEFAULT_EVENT_CONSENT_MAPPING.entries()) {
+      if (!representatives[category]) representatives[category] = eventName;
       if (representatives.essential && representatives.performance && representatives.usage) break;
     }
 
@@ -33,21 +32,21 @@ describe('Consent Gating — unit', () => {
     expect(representatives.usage).toBeDefined();
 
     // Essential events: always emitted regardless of consent.
-    const essentialCat = getConsentCategoryForEvent(undefined, representatives.essential);
+    const essentialCat = getConsentCategoryForEvent(representatives.essential);
     expect(essentialCat).toBe('essential');
     expect(shouldEmitEvent(essentialCat, none)).toBe(true);
     expect(shouldEmitEvent(essentialCat, basic)).toBe(true);
     expect(shouldEmitEvent(essentialCat, full)).toBe(true);
 
     // Performance events: emitted for basic+ and full, blocked for none.
-    const perfCat = getConsentCategoryForEvent(undefined, representatives.performance);
+    const perfCat = getConsentCategoryForEvent(representatives.performance);
     expect(perfCat).toBe('performance');
     expect(shouldEmitEvent(perfCat, none)).toBe(false);
     expect(shouldEmitEvent(perfCat, basic)).toBe(true);
     expect(shouldEmitEvent(perfCat, full)).toBe(true);
 
     // Usage events: only emitted when consent is full.
-    const usageCat = getConsentCategoryForEvent(undefined, representatives.usage);
+    const usageCat = getConsentCategoryForEvent(representatives.usage);
     expect(usageCat).toBe('usage');
     expect(shouldEmitEvent(usageCat, none)).toBe(false);
     expect(shouldEmitEvent(usageCat, basic)).toBe(false);
@@ -56,7 +55,7 @@ describe('Consent Gating — unit', () => {
 
   it('treats unmapped events as performance (strict default — never leaks to none)', () => {
     const unknownEvent = '__this_event_is_not_mapped__';
-    const cat = getConsentCategoryForEvent(undefined, unknownEvent);
+    const cat = getConsentCategoryForEvent(unknownEvent);
     expect(cat).toBeNull();
 
     // shouldEmitEvent should treat null/unmapped as 'performance' semantics:
@@ -69,7 +68,7 @@ describe('Consent Gating — unit', () => {
   });
 
   it('verifies regression_detected mapping and gating matches its category', () => {
-    const regressionCategory = getConsentCategoryForEvent(undefined, 'regression_detected');
+    const regressionCategory = getConsentCategoryForEvent('regression_detected');
     // The mapping determines how regression events are handled. The test asserts
     // the mapping is one of the allowed categories and that gating follows that
     // category's semantics.

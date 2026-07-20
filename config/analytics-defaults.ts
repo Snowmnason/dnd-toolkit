@@ -2,15 +2,14 @@
  * Analytics Defaults
  *
  * Shared tunable values used across the analytics module:
- * - analytics-buffer.ts  (ANALYTICS_RETRY_DEFAULTS)
  * - breadcrumb-queue.ts  (ANALYTICS_RETRY_DEFAULTS)
  * - consent-sync-queue.ts (CONSENT_SYNC_DEFAULTS)
  *
- * ANALYTICS_RETRY_DEFAULTS: shared retry/flush behaviour for event and breadcrumb queues.
+ * ANALYTICS_RETRY_DEFAULTS: shared retry/flush behaviour for the breadcrumb queue.
  * CONSENT_SYNC_DEFAULTS: more conservative settings for consent sync (fewer retries, longer delays).
  */
 
-/** Shared retry and flush defaults for analytics-buffer and breadcrumb-queue */
+/** Shared retry and flush defaults for breadcrumb-queue */
 export const ANALYTICS_RETRY_DEFAULTS = {
   /** Max retry attempts before discarding an event/breadcrumb */
   maxRetries: 5,

@@ -54,8 +54,6 @@ export {
 
 // ─── Analytics Service ─────────────────────────────────────────────
 export {
-    getBreadcrumbProvider,
-    listBreadcrumbProviders,
-    sendBreadcrumbs
+    sendAnalyticsEvent, sendBreadcrumbs, type AnalyticsEventPayload
 } from './analytics-service';
 

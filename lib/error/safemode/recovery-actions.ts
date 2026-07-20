@@ -24,7 +24,6 @@ import { RecoveryAction, SafeModeReason, SafeModeState } from "./safe-mode";
 function getAnalytics() {
   return {
     Analytics: require("@/managers/analytics/analytics-manager").Analytics,
-    Performance: require("@/lib/analytics/performance/performance-manager").Performance,
   };
 }
 
@@ -121,7 +120,7 @@ export async function executeRecoveryAction(
   onNavigate?: (targetRoute: string) => void,
 ): Promise<RecoveryResult> {
   const label = `recovery_action:${action}`;
-  getAnalytics().Performance.startMeasure(label);
+  getAnalytics().Analytics.startMeasure(label);
 
   try {
     switch (action) {
@@ -160,7 +159,7 @@ export async function executeRecoveryAction(
       safe_mode_duration_ms: Date.now() - safeMode.timestamp,
     });
 
-    getAnalytics().Performance.endMeasure(label);
+    getAnalytics().Analytics.endMeasure(label);
 
     return {
       success: false,
@@ -207,7 +206,7 @@ async function handleClearCache(
       action: RecoveryAction.CLEAR_CACHE,
     });
 
-    getAnalytics().Performance.endMeasure(`recovery_action:${RecoveryAction.CLEAR_CACHE}`);
+getAnalytics().Analytics.endMeasure(`recovery_action:${RecoveryAction.CLEAR_CACHE}`);
 
     // Navigate to world selection (safe starting point)
     const targetRoute = "/select/world-selection";
@@ -263,7 +262,7 @@ async function handleResetAuth(
       action: RecoveryAction.RESET_AUTH,
     });
 
-    getAnalytics().Performance.endMeasure(`recovery_action:${RecoveryAction.RESET_AUTH}`);
+getAnalytics().Analytics.endMeasure(`recovery_action:${RecoveryAction.RESET_AUTH}`);
 
     // Redirect to login
     const targetRoute = "/login/sign-in";
@@ -375,7 +374,7 @@ async function handleContactSupport(
         .error(
           `[SafeMode] Route ${targetRoute} not found in navigation config`,
         );
-      getAnalytics().Performance.endMeasure(label);
+      getAnalytics().Analytics.endMeasure(label);
       return {
         success: false,
         action: RecoveryAction.CONTACT_SUPPORT,
@@ -389,7 +388,7 @@ async function handleContactSupport(
     // Trigger navigation via callback
     onNavigate?.(targetRoute);
 
-    getAnalytics().Performance.endMeasure(label);
+    getAnalytics().Analytics.endMeasure(label);
 
     return {
       success: true,
@@ -397,7 +396,7 @@ async function handleContactSupport(
       message: "Opening report bug page...",
     };
   } catch (error) {
-    getAnalytics().Performance.endMeasure(label);
+    getAnalytics().Analytics.endMeasure(label);
     throw error;
   }
 }

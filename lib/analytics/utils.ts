@@ -4,6 +4,21 @@
  */
 
 import { getAppConfig } from '@/config';
+import type { AnalyticsErrorCode } from '@/type-definitions/error-codes';
+
+/**
+ * Structured error for analytics operations.
+ * Thrown by lib/analytics modules; caught by managers for error handling.
+ */
+export class AnalyticsError extends Error {
+  constructor(
+    public code: AnalyticsErrorCode,
+    public context?: Record<string, any>
+  ) {
+    super(`Analytics error: ${code}`);
+    this.name = 'AnalyticsError';
+  }
+}
 
 /**
  * Get performance threshold from config with fallback

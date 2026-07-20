@@ -289,7 +289,7 @@ export class SentryAdapter implements BreadcrumbProvider {
  * Call during app bootstrap (e.g., in AppKernel.initialize())
  */
 export function registerSentryAdapter(dsn?: string): SentryAdapter {
-  const { registerAdapter } = require('../breadcrumb-adapter');
+  const { registerAdapter } = require('../analytics-adapter');
   const adapter = new SentryAdapter(dsn);
   registerAdapter('sentry', () => adapter);
   logger.category('analytics').analytics('SentryAdapter', 'Registered as provider adapter');

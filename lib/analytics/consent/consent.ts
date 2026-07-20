@@ -14,12 +14,12 @@
  */
 
 import { getAppConfig } from '@/config';
+import { AnalyticsError } from '@/lib/analytics/utils';
 import { logger } from '@/lib/utils/logger';
 import { STORAGE_KEYS } from "@/maps";
 import { loadAnalyticsQueue, loadAnalyticsQueueJSON, persistAnalyticsQueue, persistAnalyticsQueueJSON } from "@/middleware/storage";
-import { setCurrentConsentLevel } from '@/type-definitions/analytics-types';
-
-export type ConsentLevel = 'none' | 'basic' | 'full';
+import { setCurrentConsentLevel, type ConsentLevel } from '@/type-definitions/analytics-types';
+import { AnalyticsErrorCode } from '@/type-definitions/error-codes';
 
 /**
  * Read and validate the configured default consent level.
@@ -38,7 +38,7 @@ function getConfiguredDefaultConsent(): ConsentLevel {
   }
 
   // Invalid or missing config - log and fall back to 'basic'
-    if (configValue) {
+  if (configValue) {
     logger.category('analytics').warn('InvalidConsentConfig', 'Invalid analytics consent level in config, using default', {
       configured: configValue,
       fallback: 'basic',
@@ -186,40 +186,68 @@ class AnalyticsConsentManager {
    * - 'basic': Only essential events (errors, auth)
    * - 'full': All analytics events including usage/performance
    * 
-   * Non-blocking: Persists locally immediately, queues server sync for later.
+   * Retries persistence up to 3 times on transient failures.
+   * Throws AnalyticsError if level is invalid or persist exhausts retries (critical).
+   * Non-blocking side effects (purge, sync) are best-effort.
+   *
+   * @returns `{ downgraded }` — true if this call lowered the consent level (e.g. full -> basic).
+   *   Callers (analytics-manager) use this to decide whether to clear pending analytics jobs.
    */
-  async setLevel(level: ConsentLevel): Promise<void> {
+  async setLevel(level: ConsentLevel): Promise<{ downgraded: boolean }> {
     if (!this.isValidConsentLevel(level)) {
-      const error = new Error(`Invalid consent level: ${level}`);
-      logger.category('analytics').error('consent', 'Attempted to set invalid consent level', { level, error });
-      throw error;
+      throw new AnalyticsError(AnalyticsErrorCode.CONSENT_INVALID, { attempted_level: level });
     }
 
     const previousLevel = this.consentLevel;
     this.consentLevel = level;
 
-    try {
-      await persistAnalyticsQueue(STORAGE_KEYS.ANALYTICS_CONSENT, level);
-      // Update meta timestamp so next app start treats cache as fresh
-      await persistAnalyticsQueueJSON(STORAGE_KEYS.ANALYTICS_CONSENT_META, {
-        timestamp: Date.now(),
-        source: 'user',
-      });
-    } catch (err) {
-      logger.category('analytics').error('consent', 'Failed to persist consent level to storage', { level, error: err });
+    // Persist with retry logic (max 3 attempts with exponential backoff)
+    const maxRetries = 3;
+    let lastError: any;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await persistAnalyticsQueue(STORAGE_KEYS.ANALYTICS_CONSENT, level);
+        // Update meta timestamp so next app start treats cache as fresh
+        await persistAnalyticsQueueJSON(STORAGE_KEYS.ANALYTICS_CONSENT_META, {
+          timestamp: Date.now(),
+          source: 'user',
+        });
+        // Success — break out and continue
+        logger.category('analytics').analytics('consent', 'Consent level persisted', { level });
+        break;
+      } catch (err) {
+        lastError = err;
+        // Transient failure — log and retry if attempts remain
+        if (attempt < maxRetries) {
+          const backoffMs = Math.pow(2, attempt - 1) * 100; // 100ms, 200ms, 400ms
+          logger.category('analytics').warn('consent', `Persist failed (attempt ${attempt}/${maxRetries}), retrying in ${backoffMs}ms`, {
+            level,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          // Exponential backoff before retry
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+        }
+      }
     }
 
-    // If consent was downgraded, purge all pending analytics buffers and breadcrumbs
+    // After all retries exhausted, check if last attempt failed
+    if (lastError) {
+      logger.category('analytics').error('consent', 'Failed to persist consent level after all retries', { level, error: lastError });
+      throw new AnalyticsError(AnalyticsErrorCode.CONSENT_PERSIST_FAILED, {
+        level,
+        attempted_change: `${previousLevel} → ${level}`,
+        cause: lastError instanceof Error ? lastError.message : String(lastError),
+        retries: maxRetries,
+      });
+    }
+
+    // If consent was downgraded, purge all pending breadcrumbs
     const CONSENT_ORDER: Record<ConsentLevel, number> = { none: 0, basic: 1, full: 2 };
     // eslint-disable-next-line security/detect-object-injection
-    if (CONSENT_ORDER[level] < CONSENT_ORDER[previousLevel]) {
-      logger.category('analytics').analytics('consent', 'Consent downgraded — purging analytics buffers and breadcrumbs', { previousLevel, level });
-      try {
-        const { handleAnalyticsConsentWithdrawal } = await import('../exporters/analytics-network-integration');
-        await handleAnalyticsConsentWithdrawal();
-      } catch (err) {
-        logger.category('analytics').warn('consent', 'Failed to purge analytics buffer on consent withdrawal (non-critical)', { error: err });
-      }
+    const downgraded = CONSENT_ORDER[level] < CONSENT_ORDER[previousLevel];
+    if (downgraded) {
+      logger.category('analytics').analytics('consent', 'Consent downgraded — purging breadcrumbs', { previousLevel, level });
       try {
         const { breadcrumbQueue } = await import('../exporters/breadcrumb-queue');
         await breadcrumbQueue.clear();
@@ -238,6 +266,8 @@ class AnalyticsConsentManager {
       logger.category('analytics').warn('consent', 'Failed to queue consent sync (non-critical)', { level, error: err });
       // Don't throw - local persistence succeeded, queue failure is non-blocking
     }
+
+    return { downgraded };
   }
 
   /**

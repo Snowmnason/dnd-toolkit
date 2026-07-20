@@ -2,16 +2,17 @@
  * Analytics Manager — Public API
  * 
  * Entry point for tracking events and managing user context.
- * Delegates sanitization to helpers, queues events to lib analytics buffer.
+ * Delegates sanitization to helpers, queues events to the background job queue.
  * Handles consent initialization during auth flows (bootstrap + sign-in).
  * 
- * Flow: Manager (orchestration) → lib (buffering/queueing) → (buffer auto-flushes via middleware)
+ * Flow: Manager (orchestration) → lib (JobsManager) → background job queue (persists + retries automatically)
  */
 
-import { analyticsBufferService } from "@/lib/analytics/exporters/analytics-buffer";
-import { getThreshold } from "@/lib/analytics/utils";
-import { clearErrorUser, isTrackingEnabled, setErrorUser } from "@/lib/error";
+import { AnalyticsError as AnalyticsErrorClass, getThreshold } from "@/lib/analytics/utils";
+import { addBreadcrumb, clearErrorUser, isTrackingEnabled, setErrorUser } from "@/lib/error";
+import { JobsManager } from "@/lib/jobs/jobs-manager";
 import { logger } from "@/lib/utils";
+import { AnalyticsError as ErrorHandler } from "@/managers/error/module/analyticsError";
 import { currentConsentLevel, setCurrentConsentLevel, type ConsentLevel } from "@/type-definitions/analytics-types";
 import { mapEventType, sanitizeProps } from "./analytics-helpers";
 
@@ -75,9 +76,21 @@ export const Analytics = {
   },
 
   /**
+   * Track an error occurring within the current session.
+   * Delegates to the session manager, which tracks error counts for the
+   * active session lifecycle (surfaced when the session ends).
+   * Safe to call even if no session is active (no-op).
+   */
+  trackSessionError(): void {
+    const { sessionManager } = require("@/lib/analytics/session");
+    sessionManager.trackError();
+  },
+
+  /**
    * Initialize analytics session and user context
    * Called when user logs in or logs out
    * Identifies user for error tracking and starts session tracking
+   * Emits session breadcrumb for error tracking when session begins
    */
   initializeSession(userId?: string | null): void {
     // Identify user (or clear on logout)
@@ -87,6 +100,16 @@ export const Analytics = {
     if (userId) {
       const { sessionManager } = require("@/lib/analytics/session");
       sessionManager.startSession(userId);
+
+      // Emit session start breadcrumb for error tracking
+      if (isTrackingEnabled()) {
+        addBreadcrumb({
+          category: 'analytics',
+          message: 'session_started',
+          data: { userId, timestamp: Date.now() },
+          level: 'info',
+        });
+      }
     }
   },
 
@@ -99,15 +122,17 @@ export const Analytics = {
   track(event: string, props?: AnalyticsEventProps): void {
     const safeProps = sanitizeProps(props);
     const eventType = mapEventType(event);
-    
-    // Queue to buffer (lib layer) — fire-and-forget, buffer handles persistence + auto-flush in background
-    analyticsBufferService.enqueue({
-      eventType,
-      payload: { name: event, properties: safeProps || {} },
+
+    // Enqueue as a background job — persists across restarts and retries
+    // automatically on reconnect via the BackgroundJobQueue (#167).
+    JobsManager.enqueue({
+      type: 'analytics_send_event',
+      payload: { eventType, name: event, properties: safeProps || {} },
+      requiresNetwork: 'defer',
       maxRetries: 5,
     }).catch((error) => {
-      // Silently fail — queuing is best-effort, non-critical
-      logger.category('analytics').debug('Failed to queue event', { event, error });
+      // Silently fail — enqueueing is best-effort, non-critical
+      logger.category('analytics').debug('Failed to enqueue event', { event, error });
     });
   },
 
@@ -128,21 +153,84 @@ export const Analytics = {
    * Update analytics consent level (runtime)
    * Persists to SecureStorage and queues database sync
    * Updates global consent state for fast subsequent reads
+   * 
+   * Flow:
+   * 1. Call lib/consent to persist change
+   * 2. On error: catch AnalyticsError, call error handler to decide
+   * 3. Log decision to error system (Sentry)
+   * 4. If non-breaking: return error status, continue with old consent
+   * 5. If breaking: throw to caller with context
    */
   async updateConsentLevel(level: ConsentLevel): Promise<void> {
     try {
       const { AnalyticsConsent } = await import("@/lib/analytics/consent/consent");
-      await AnalyticsConsent.setLevel(level);
+      const { downgraded } = await AnalyticsConsent.setLevel(level);
       // Update global after lib operation succeeds
       setCurrentConsentLevel(level);
       logger.category("analytics").info("Consent level updated", { level });
+
+      // If consent was downgraded, clear any pending analytics send jobs (non-critical)
+      if (downgraded) {
+        try {
+          const cleared = await JobsManager.clearByType('analytics_send_event');
+          logger.category("analytics").info("Consent downgraded — cleared pending analytics send jobs", { level, cleared });
+        } catch (error) {
+          logger.category("analytics").warn("Failed to clear pending analytics jobs on consent downgrade (non-critical)", {
+            level,
+            error,
+          });
+        }
+      }
     } catch (error) {
-      logger.category("analytics").error("Failed to update consent level", {
+      // Catch lib/consent errors and delegate to error handler
+      if (error instanceof AnalyticsErrorClass) {
+        const decision = ErrorHandler.handle(error.code, error.context);
+        
+        // Log decision to error system (Sentry, etc.)
+        logger.category("analytics").warn("Consent update failed, handled by error system", {
+          level,
+          code: error.code,
+          decision: decision.action,
+          message: decision.message,
+        });
+
+        // Execute decision:
+        // - Non-breaking (fallback, ignore): Return gracefully, app continues with old consent
+        // - Breaking (propagate): Re-throw so caller knows the change failed
+        if (decision.action === 'propagate' || decision.action === 'safe_mode') {
+          throw error;
+        }
+        // For fallback/ignore: silently return, consent remains at previous level
+        return;
+      }
+
+      // Unknown error type — log and re-throw
+      logger.category("analytics").error("Unexpected error during consent update", {
         level,
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }
+  },
+
+  /**
+   * Performance measurement API - delegates to performance manager
+   * Allows lib files to measure performance without direct dependency on performance-manager
+   * @param label Operation label
+   */
+  startMeasure(label: string): void {
+    const { Performance } = require("@/managers/analytics/performance-manager");
+    Performance.startMeasure(label);
+  },
+
+  /**
+   * End performance measurement - delegates to performance manager
+   * @param label Operation label
+   * @param warnMs Optional warning threshold
+   */
+  endMeasure(label: string, warnMs?: number): void {
+    const { Performance } = require("@/managers/analytics/performance-manager");
+    Performance.endMeasure(label, warnMs);
   },
 };
 

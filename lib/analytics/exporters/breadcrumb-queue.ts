@@ -351,7 +351,7 @@ class BreadcrumbQueueService {
       logger.category('analytics').debug('BreadcrumbQueue', `Flushing batch: batchSize=${batch.length}`);
 
       const { sendBreadcrumbs } = require('@/middleware/services/analytics-service');
-      const result = await sendBreadcrumbs(this.providerName, batch);
+      const result = await sendBreadcrumbs(batch);
       if (result === null) {
         logger.category('analytics').debug('BreadcrumbQueue', 'Flush aborted: Middleware returned null');
         this.isFlushing = false;

@@ -182,3 +182,23 @@ System (Portable Infrastructure Only)
 - Each phase can be reviewed independently; phased rollout reduces review burden.
 - Expected to improve code quality, reduce duplication, and make future refactors easier.
 - See [copilot-instructions.md](../../copilot-instructions.md) for broader dependency boundary rules.
+
+---
+
+## App-Specific Files (Not for NPM Packaging)
+
+These files contain app-bootstrap and provider-specific logic. They stay in the app repo and are **not** packaged for reuse:
+
+- `system/Services/sentry/` — All Sentry bootstrap and adapter registration code
+  - `sentry-analytics-exporter.ts` — Sentry-specific envelope formatting
+  - `sentry-error-tracker.ts` — Sentry error capture implementation
+  - `sentry-provider.ts` — SentryAdapter registration and DSN parsing
+  - `sentry-service-initializer.ts` — Service initialization
+
+**Why:** These files contain Sentry SDK hooks, DSN management, and provider-specific response parsing. They're tightly coupled to this app's Sentry configuration and would need customization per new repo.
+
+**Reusable infrastructure (suitable for packaging):**
+- `system/Services/analytics-adapter.ts` — Generic factory pattern (zero provider dependencies)
+- `type-definitions/breadcrumb-queue-types.ts` — Type contracts
+- `managers/analytics/` — Manager orchestration logic
+- `lib/analytics/performance/performance-baseline.ts` — Domain logic

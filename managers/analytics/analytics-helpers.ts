@@ -5,9 +5,7 @@
  * Not exported; used only within the analytics manager module
  */
 
-import { generateUUID } from "@/lib/analytics/exporters/analytics-buffer";
 import { sanitizeError } from "@/lib/analytics/utils";
-import { logger } from "@/lib/utils";
 
 type AnalyticsEventProps = Record<string, any>;
 
@@ -49,35 +47,6 @@ export const sanitizeProps = (
   }
 
   return cloned;
-};
-
-/**
- * Dispatch event to all registered exporters
- * Fire-and-forget: doesn't block caller or raise exceptions
- */
-export const dispatchToExporters = (eventName: string, props: AnalyticsEventProps | undefined): void => {
-  // Fire-and-forget: don't await, don't block
-  Promise.resolve().then(() => {
-    try {
-      // Lazy require to break circular dependency
-      const { dispatchAnalyticsEvent, createAnalyticsExportContext } = require("@/middleware/services/analytics-service");
-      
-      const analyticsEvent = {
-        id: generateUUID(),
-        timestamp: Date.now(),
-        type: mapEventType(eventName),
-        name: eventName,
-        properties: props || {},
-      };
-
-      const context = createAnalyticsExportContext();
-      if (!context) return;
-
-      dispatchAnalyticsEvent(analyticsEvent, context);
-    } catch (error) {
-      logger.category('analytics').debug(`Failed to dispatch to exporters: ${error}`);
-    }
-  });
 };
 
 /**

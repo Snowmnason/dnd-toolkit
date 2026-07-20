@@ -45,8 +45,6 @@ function getRequiredCapability(itemName: string): DegradeCapability {
       // Meta-job for deferred initialization; depends on what it defers
       // Default to CONNECTIVITY as most deferred tasks are network/state-related
       return DegradeCapability.CONNECTIVITY;
-    case "analytics-network-integration":
-      return DegradeCapability.CONNECTIVITY;
     case "network-recovery-subscription":
       return DegradeCapability.CONNECTIVITY;
     default:
@@ -80,8 +78,6 @@ function humanReadableName(itemName: string): string {
       return "Storage Check";
     case "internal_deferred_init":
       return "Deferred Initialization";
-    case "analytics-network-integration":
-      return "Analytics";
     case "network-recovery-subscription":
       return "Connection Monitor";
     default:

@@ -1,6 +1,6 @@
-import { getCrashReportPayload } from '@/lib/analytics/consent/consent-error-payload';
 import { flushPendingErrors as flushErrors, reportError } from '@/lib/error/error-manager';
 import { logger } from '@/lib/utils/logger';
+import { AnalyticsError } from '@/managers/error/module/analyticsError';
 import { currentConsentLevel } from '@/type-definitions/analytics-types';
 import { useCallback } from 'react';
 
@@ -40,7 +40,7 @@ export function useCrashConsentReport() {
     async (error: Error, componentStack?: string) => {
       try {
         // Generate full tiered payload as if user has 'full' consent
-        const payload = getCrashReportPayload(error, componentStack, 'full');
+        const payload = AnalyticsError.getCrashReportPayload(error, componentStack, 'full');
 
         if (payload) {
           reportError(error, payload);

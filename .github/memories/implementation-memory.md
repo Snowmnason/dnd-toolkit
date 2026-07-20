@@ -16,6 +16,32 @@
 
 ---
 
+## Code Classification
+
+**Dead Code** (delete immediately):
+- Code replaced with cleaner/optimized versions
+- Unused callsites after refactoring where the new path is active
+- Old patterns made obsolete by architectural changes
+
+**Unused Code for Future Features** (keep with "// Unused: ..." or "// Upcoming: ..." comments):
+- Foundational infrastructure built for planned features not yet implemented
+- Plugin/extension points designed but not yet used by the app
+- Architecture-forward functions that are part of the design but not activated
+- Mark with comment explaining intended use case
+
+Example: `registerEventConsentMapping()` and `runtimeMapping` are foundational for plugin analytics (planned feature). Not dead—keep with "Unused" comment.
+
+## Code Cleanup Patterns
+
+**Consent Gating Refactoring (Issue #301):**
+- Mark unused foundational code with `// Unused: ... ` comments explaining intended use case rather than deleting
+- Remove re-exports that bloat import surface; let callers import from source directly
+- Change log level from `.warn()` to `.debug()` for expected conditions (unmapped events) to reduce noise
+- Remove unused function parameters, even if "kept for future expansion"—adds cognitive load and type complexity
+- Test files must be updated when function signatures change (parameter removals)
+
+---
+
 ## Manager Gateway Pattern Learnings
 
 **Issue #301 — Analytics Manager Gateway**

@@ -16,13 +16,20 @@
  * - Manage consent state (that stays in lib/analytics/consent/)
  */
 
-import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
+import { getAppConfig } from '@/config';
 import { reportFault } from '@/lib/error/degrade/degrade-manager';
 import { logger } from '@/lib/utils/logger';
 import { ConnectionQuality, NetworkDetection } from '@/system/Network';
-import { getAdapter, isServiceReady, listAdapters } from '@/system/Services';
+import { getAdapter, isServiceReady } from '@/system/Services';
+import { currentConsentLevel } from '@/type-definitions/analytics-types';
 import type { BreadcrumbProvider, BreadcrumbSendResult, QueuedBreadcrumb } from '@/type-definitions/breadcrumb-queue-types.ts';
 import { DegradeCapability } from '@/type-definitions/degrade';
+
+export interface AnalyticsEventPayload {
+  eventType: string;
+  name: string;
+  properties: Record<string, any>;
+}
 
 // ─── Precondition Checks ───────────────────────────────────────────
 
@@ -40,8 +47,7 @@ function canSendAnalytics(): boolean {
     }
 
     // 2. Analytics consent? (requires at least 'basic' consent)
-    const consentLevel = AnalyticsConsent.getLevel();
-    if (consentLevel === 'none') {
+    if (currentConsentLevel === 'none') {
         // User opted out — respect that
         logger.category('analytics').debug('[analytics-service] Consent level is "none" — dropping analytics data');
         return false;
@@ -65,11 +71,12 @@ function canSendAnalytics(): boolean {
 /**
  * Get a registered breadcrumb provider adapter by name.
  * Checks provider readiness and consent before returning.
+ * Internal precondition check before sending breadcrumbs.
  *
  * @param providerName - The name of the provider (e.g., 'sentry')
  * @returns The breadcrumb provider adapter, or null if preconditions not met
  */
-export function getBreadcrumbProvider(providerName: string): BreadcrumbProvider | null {
+function getBreadcrumbProvider(providerName: string): BreadcrumbProvider | null {
     if (!canSendAnalytics()) return null;
 
     try {
@@ -82,82 +89,103 @@ export function getBreadcrumbProvider(providerName: string): BreadcrumbProvider 
 }
 
 /**
- * Send a batch of breadcrumbs through the named provider.
- * Checks all preconditions before sending.
+ * Send a batch of breadcrumbs through the configured provider.
+ * Checks all preconditions (consent, network, provider ready) before sending.
+ * Provider name is resolved from config automatically.
  *
- * @param providerName - The name of the provider (e.g., 'sentry')
  * @param breadcrumbs - The breadcrumbs to send
  * @returns Send result, or null if preconditions not met
  */
 export async function sendBreadcrumbs(
-    providerName: string,
     breadcrumbs: QueuedBreadcrumb[]
 ): Promise<BreadcrumbSendResult | null> {
-    if (!canSendAnalytics()) return null;
     if (breadcrumbs.length === 0) return null;
 
     try {
-        const adapter = getAdapter(providerName);
+        // Get provider name from config
+        const config = getAppConfig();
+        const providerName = config?.analytics?.breadcrumbs?.provider ?? 'sentry';
+
+        // Get and validate provider through precondition checks
+        const adapter = getBreadcrumbProvider(providerName);
+        if (!adapter) return null;
+
         return await adapter.sendBatch(breadcrumbs);
     } catch (error) {
         // TODO: Should we queue failed breadcrumbs for retry? Or discard?
         // breadcrumb-queue handles its own retry logic, so this is a fallback.
-        logger.category('analytics').warn(`[analytics-service] Failed to send breadcrumbs via "${providerName}": ${error}`);
+        logger.category('analytics').warn(`[analytics-service] Failed to send breadcrumbs: ${error}`);
         return null;
     }
 }
 
-/**
- * List all registered breadcrumb provider adapters.
- */
-export function listBreadcrumbProviders(): string[] {
-    return listAdapters();
-}
-
-// ─── Event Dispatch Operations ─────────────────────────────────────
+// ─── Analytics Event Operations ────────────────────────────────────
 
 /**
- * Dispatch an analytics event to all registered exporters.
- * Checks all preconditions before dispatching.
- * Fire-and-forget: doesn't block caller.
+ * Send a single analytics event through the configured provider.
+ * Checks all preconditions (consent, network, provider ready) before sending.
+ * Event is converted to breadcrumb format for transport via the provider adapter.
  *
- * @param event - The analytics event to dispatch
- * @param context - Export context with network status, consent level, etc.
+ * Used by background jobs and synchronous event tracking.
+ *
+ * @param event - The analytics event to send
+ * @throws Error if send fails (retryable failures like network/5xx)
  */
-export async function dispatchAnalyticsEvent(
-    event: any,
-    context: any
-): Promise<void> {
-    if (!canSendAnalytics()) return;
+export async function sendAnalyticsEvent(event: AnalyticsEventPayload): Promise<void> {
+    if (!canSendAnalytics()) {
+        logger.category('analytics').debug('[analytics-service] Preconditions not met — dropping event');
+        return;
+    }
 
     try {
-        // Lazy require to break circular dependency
-        const { dispatchEvent } = require('@/lib/analytics/exporters/exporter-registry');
-        // Fire-and-forget: don't await or block
-        Promise.resolve().then(() => {
-            try {
-                dispatchEvent(event, context);
-            } catch (error) {
-                logger.category('analytics').debug(`Failed to dispatch event: ${error}`);
+        // Get provider from config
+        const config = getAppConfig();
+        const providerName = config?.analytics?.breadcrumbs?.provider ?? 'sentry';
+
+        // Get and validate provider through precondition checks
+        const adapter = getBreadcrumbProvider(providerName);
+        if (!adapter) {
+            logger.category('analytics').debug('[analytics-service] No provider available — dropping event');
+            return;
+        }
+
+        // Convert event to breadcrumb format for transmission
+        const breadcrumb: QueuedBreadcrumb = {
+            id: `analytics-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: Date.now(),
+            category: 'analytics',
+            level: 'info',
+            message: event.name,
+            data: {
+                eventType: event.eventType,
+                name: event.name,
+                properties: event.properties,
+            },
+            fingerprint: `${event.eventType}:${event.name}`,
+            retryCount: 0,
+            maxRetries: 5,
+        };
+
+        // Send via provider adapter
+        const result = await adapter.sendBatch([breadcrumb]);
+
+        // Check if send was successful
+        if (!result || result.sent.length === 0) {
+            // Permanent failure (4xx) or other issue — log but don't throw
+            if (result?.discard.length) {
+                logger.category('analytics').debug('[analytics-service] Event permanently discarded by provider');
+                return;
             }
-        });
+            // Retryable failure — throw so job queue can retry
+            throw new Error('[analytics-service] Failed to send event (will retry)');
+        }
+
+        logger.category('analytics').debug('[analytics-service] Event sent successfully');
     } catch (error) {
-        logger.category('analytics').warn('[analytics-service] Failed to dispatch analytics event', error);
+        logger.category('analytics').warn(`[analytics-service] Failed to send analytics event: ${error}`);
+        throw error; // Re-throw so job queue retries with backoff
     }
 }
 
-/**
- * Create a context object for analytics event export.
- * Includes current network status and consent level.
- */
-export function createAnalyticsExportContext(): any {
-    try {
-        // Lazy require to break circular dependency
-        const { createExportContext } = require('@/lib/analytics/exporters/exporter-registry');
-        return createExportContext();
-    } catch (error) {
-        logger.category('analytics').warn('[analytics-service] Failed to create export context', error);
-        return null;
-    }
-}
+
 

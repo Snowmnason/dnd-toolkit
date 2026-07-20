@@ -38,16 +38,6 @@ export interface SubscriptionRegistryEntry {
  * Activated during the registration phase, after all domain phases complete.
  */
 export const SUBSCRIPTIONS: SubscriptionRegistryEntry[] = [
-  {
-    name: "analytics-network-integration",
-    postReady: true,
-    activate: async () => {
-      const { initializeAnalyticsNetworkIntegration } = await import(
-        "@/lib/analytics/exporters/analytics-network-integration"
-      );
-      initializeAnalyticsNetworkIntegration();
-    },
-  },
   // TRACK 7: Post-Registration recovery signal subscriptions
   {
     name: "network-recovery-subscription",

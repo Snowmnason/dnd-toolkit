@@ -14,81 +14,50 @@
  * - **'usage'**: Emit only if consentLevel === 'full'
  * - **null/unmapped**: Default to 'performance' (requires >= 'basic' consent).
  *   This prevents forgotten events from leaking to 'none' consent users.
- *   A warning is logged to prompt the developer to add an explicit mapping.
+ *   A debug message is logged for unmapped events to prompt developer to add explicit mapping.
  */
 
-import type { ConsentLevel } from '@/lib/analytics/consent/consent';
+import type { ConsentLevel } from '@/type-definitions/analytics-types';
 import { logger } from '@/lib/utils/logger';
 import {
   ConsentCategory,
   DEFAULT_EVENT_CONSENT_MAPPING,
 } from '@/maps/event-consent-mapping';
 
-// Re-export for convenience
-export { ConsentCategory, DEFAULT_EVENT_CONSENT_MAPPING };
+// Type and map exports
 export type { ConsentLevel };
+export { ConsentCategory, DEFAULT_EVENT_CONSENT_MAPPING };
 
-/**
- * Runtime-extended consent mapping.
- * Merged with DEFAULT_EVENT_CONSENT_MAPPING during lookup.
- */
-let runtimeMapping = new Map<string, ConsentCategory>();
-
-/**
- * Register additional event-to-consent mappings at runtime.
- *
- * Used by extensions/plugins that add custom analytics events.
- * Provided mappings are merged with default mapping; runtime mappings override
- * defaults for the same event names.
- *
- * @param overrides - Map of event names to consent categories
- *
- * @example
- * registerEventConsentMapping(new Map([
- *   ['custom_event', 'usage'],
- *   ['plugin_metric', 'performance'],
- * ]));
- */
-export function registerEventConsentMapping(
-  overrides: Map<string, ConsentCategory>
-): void {
-  for (const [eventName, category] of overrides.entries()) {
-    runtimeMapping.set(eventName, category);
-    logger.category('analytics').info('Event consent mapping registered', {
-      eventName,
-      category,
-    });
-  }
-}
+// Unused: Plugin analytics support (planned for plugin architecture phase)
+// When implemented, will allow extensions/plugins to register custom event consent mappings.
+// let runtimeMapping = new Map<string, ConsentCategory>();
+// export function registerEventConsentMapping(...) — see git history
 
 /**
  * Get the consent category required for an event.
  *
- * Looks up event in runtime mapping first, then default mapping.
+ * Looks up event name in default mapping.
  * Returns null if not found; caller should apply default ('performance' — requires >= 'basic' consent).
  *
- * @param eventType - Event type (unused; kept for API consistency with future expansion)
  * @param eventName - Event name to look up
  * @returns Consent category or null if unmapped
  *
  * @example
- * const category = getConsentCategoryForEvent(undefined, 'screen_view');
+ * const category = getConsentCategoryForEvent('screen_view');
  * // Returns 'usage'
  *
- * const unknown = getConsentCategoryForEvent(undefined, 'custom_event');
+ * const unknown = getConsentCategoryForEvent('custom_event');
  * // Returns null
  */
 export function getConsentCategoryForEvent(
-  eventType: string | undefined,
   eventName: string
 ): ConsentCategory | null {
-  // Check runtime mapping first, then default mapping
-  let category = runtimeMapping.get(eventName) ?? DEFAULT_EVENT_CONSENT_MAPPING.get(eventName);
+  const category = DEFAULT_EVENT_CONSENT_MAPPING.get(eventName);
 
   if (!category) {
     logger
       .category('analytics')
-      .warn(`Event '${eventName}' not in consent mapping; defaulting to 'performance' (requires >= 'basic' consent). Add an explicit mapping to event-consent-mapping.ts.`);
+      .debug(`Event '${eventName}' not in consent mapping; will default to 'performance' (requires >= 'basic' consent). Add to event-consent-mapping.ts if needed.`);
     return null;
   }
 
@@ -130,7 +99,7 @@ export function shouldEmitEvent(
 ): boolean {
   // Unmapped events default to 'performance' (requires >= 'basic' consent).
   // This ensures forgotten/new events cannot leak to 'none' consent users.
-  // A warning is already logged by getConsentCategoryForEvent() for unmapped names.
+  // A debug message is logged by getConsentCategoryForEvent() for unmapped names.
   const effectiveCategory = category || 'performance';
 
   switch (effectiveCategory) {

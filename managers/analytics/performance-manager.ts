@@ -1,12 +1,11 @@
 import { isAppIdle } from "@/hooks/utils/use-app-state";
+import { performanceBaselineService } from "@/lib/analytics/performance/performance-baseline";
+import { getThreshold, sanitizeError } from "@/lib/analytics/utils";
+import { JobsManager } from "@/lib/jobs/jobs-manager";
 import { logger } from "@/lib/utils";
 import Constants from "expo-constants";
 import { useEffect } from "react";
 import { Platform } from "react-native";
-
-import { createExportContext, dispatchEvent } from "../exporters/exporter-registry";
-import { getThreshold, sanitizeError } from "../utils";
-import { performanceBaselineService } from "./performance-baseline";
 
 function withTiming<T>(
   label: string,
@@ -36,8 +35,8 @@ function withTiming<T>(
         `Performance regression detected for '${label}': ${result.current}ms vs baseline ${result.baseline?.p95}ms (threshold: ${result.threshold}%, delta: ${result.deltaPct?.toFixed(1)}%, samples: ${result.baseline?.count ?? 0}, app_version: ${Constants.expoConfig?.version ?? 'unknown'}, platform: ${Platform.OS})`
       );
       
-      // Emit regression event via #178 exporters (fire-and-forget) with rich context
-      // dispatchEvent() gates by consent; no need to check here
+      // Enqueue regression event via background job queue (#301) with rich context
+      // Job queue persists and retries; middleware gates by consent
       const regressionEvent = {
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: Date.now(),
@@ -61,8 +60,15 @@ function withTiming<T>(
           platform: Platform.OS,
         },
       };
-      const exportContext = createExportContext();
-      dispatchEvent(regressionEvent, exportContext);
+      JobsManager.enqueue({
+        type: 'performance_regression_detected',
+        payload: regressionEvent,
+        requiresNetwork: 'defer',
+        maxRetries: 5,
+      }).catch((error) => {
+        // Silently fail — enqueueing is best-effort, non-critical
+        logger.category('performance').debug('Failed to enqueue regression event', { label, error });
+      });
     }
   };
 
@@ -124,8 +130,8 @@ export const Performance = {
     const result = performanceBaselineService.detectRegression(label, duration, context);
     if (result.isRegression) {
       logger.category('performance').perf(`Performance regression detected for '${label}': ${result.current}ms vs p95 ${result.baseline?.p95}ms (threshold: ${result.threshold}%, delta: ${result.deltaPct?.toFixed(1)}%)`);
-      // Emit regression event via #178 exporters (fire-and-forget)
-      // dispatchEvent() gates by consent; no need to check here
+      // Enqueue regression event via background job queue (#301)
+      // Job queue persists and retries; middleware gates by consent
       const regressionEvent = {
         id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: Date.now(),
@@ -149,9 +155,15 @@ export const Performance = {
           platform: Platform.OS,
         },
       };
-      const exportContext = createExportContext();
-      dispatchEvent(regressionEvent, exportContext);
-      // Don't await — fire-and-forget pattern for exporter failures
+      JobsManager.enqueue({
+        type: 'performance_regression_detected',
+        payload: regressionEvent,
+        requiresNetwork: 'defer',
+        maxRetries: 5,
+      }).catch((error) => {
+        // Silently fail — enqueueing is best-effort, non-critical
+        logger.category('performance').debug('Failed to enqueue regression event', { label, error });
+      });
     }
   },
 

@@ -21,9 +21,6 @@
 
 import { getAppConfig } from "@/config";
 import {
-  cleanupAnalyticsNetworkIntegration,
-} from "@/lib/analytics/exporters/analytics-network-integration";
-import {
   NetworkCascadeDetector,
 } from "@/lib/error/network-cascade-detector";
 import {
@@ -1521,15 +1518,6 @@ class AppKernelClass {
    */
   destroy(): void {
     logger.category("bootstrap").info("AppKernel shutting down");
-
-    // Cleanup analytics network integration
-    try {
-      cleanupAnalyticsNetworkIntegration();
-    } catch (error) {
-      logger.category("bootstrap").warn("Failed to cleanup analytics network integration", {
-        error: (error as Error).message,
-      });
-    }
 
     // Cleanup bootstrap timeout handle (if not already cleared)
     if (this.bootstrapTimeoutHandle) {
