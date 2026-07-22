@@ -8,6 +8,7 @@
  * Flow: Manager (orchestration) → lib (JobsManager) → background job queue (persists + retries automatically)
  */
 
+import { getConsentCategoryForEvent, shouldEmitEvent } from "@/lib/analytics/consent/consent-gating";
 import { AnalyticsError as AnalyticsErrorClass, getThreshold } from "@/lib/analytics/utils";
 import { addBreadcrumb, clearErrorUser, isTrackingEnabled, setErrorUser } from "@/lib/error";
 import { JobsManager } from "@/lib/jobs/jobs-manager";
@@ -120,6 +121,14 @@ export const Analytics = {
    * Fire-and-forget: doesn't block caller
    */
   track(event: string, props?: AnalyticsEventProps): void {
+    const consentCategory = getConsentCategoryForEvent(event);
+    if (!shouldEmitEvent(consentCategory, currentConsentLevel)) {
+      logger.category('analytics').debug(
+        `Event '${event}' dropped (category=${consentCategory ?? 'unmapped'}, level=${currentConsentLevel})`,
+      );
+      return;
+    }
+
     const safeProps = sanitizeProps(props);
     const eventType = mapEventType(event);
 

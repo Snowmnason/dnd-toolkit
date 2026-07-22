@@ -1,6 +1,6 @@
 # Analytics Module
 
-Consent-aware analytics and performance monitoring system handling event tracking, user identification, and offline event queuing.
+Consent-aware analytics and performance monitoring primitives for event tracking, user identification, and offline event queuing. Public callers now use `managers/analytics/analytics-manager.ts`; this module holds the lower-level analytics implementation.
 
 ## When to Use This Module
 
@@ -48,7 +48,7 @@ Network Online?
 
 ### `Analytics` Object
 
-Main entry point. Imported from `@/lib/analytics`.
+Lower-level analytics API. Public event emission is routed through `@/managers/analytics/analytics-manager`.
 
 #### `Analytics.enabled(): boolean`
 

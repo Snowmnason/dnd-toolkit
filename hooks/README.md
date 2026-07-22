@@ -99,7 +99,8 @@ useAppNavigation(): {
 - `@/lib/auth` - Authentication state
 - `@/lib/navigation` - Route configuration
 - `@/lib/feature-flags` - Feature flag evaluation
-- `@/lib/analytics` - Event tracking
+- `@/managers/analytics/analytics-manager` - Event tracking gateway
+- `@/lib/analytics` - Analytics consent, buffering, and telemetry internals
 - `@/lib/error` - Error reporting
 
 ## Error Handling & Edge Cases

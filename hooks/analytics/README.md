@@ -1,6 +1,6 @@
 # Analytics
 
-Hooks for analytics buffer status, breadcrumb queue monitoring, consent management, and telemetry integration. Used to monitor analytics event queues, manage user consent, and ensure events are sent reliably.
+Hooks for analytics buffer status, breadcrumb queue monitoring, consent management, and telemetry integration. Public event emission now lives in `managers/analytics/analytics-manager.ts`; this module stays focused on UI-facing consent and queue state.
 
 ## When to Use This Module
 
@@ -12,8 +12,8 @@ Hooks for analytics buffer status, breadcrumb queue monitoring, consent manageme
 - Trigger UI changes based on analytics queue state
 
 **Do NOT use this module for:**
-- Sending analytics events directly (use `lib/analytics`)
-- Managing analytics configuration (see `lib/analytics`)
+- Sending analytics events directly (use `@/managers/analytics/analytics-manager`)
+- Managing analytics configuration and lower-level analytics plumbing (see `lib/analytics`)
 
 ## Architecture & Data Flow
 
@@ -31,7 +31,7 @@ Update UI or trigger flush / persist consent changes / send crash reports
 - **Observability**: Hooks expose analytics buffer and breadcrumb queue state for UI/monitoring.
 - **Consent Management**: `useAnalyticsConsent` provides GDPR-compliant consent management with persistence.
 - **Crash Opt-in**: `useCrashConsentReport` enables privacy-first error reporting when consent is 'none'.
-- **Separation**: Event sending and config live in `lib/analytics`.
+- **Separation**: Event sending lives in the manager gateway; consent, buffering, and exporter plumbing live in `lib/analytics`.
 
 ## API Reference
 
@@ -94,6 +94,7 @@ if (canOptIn) {
 - None
 
 ### Internal Dependencies
+- **`@/managers/analytics/analytics-manager`** – public analytics emission gateway
 - **`lib/analytics`** – analytics event buffer, breadcrumb queue, and telemetry logic
 
 ## Error Handling & Edge Cases
@@ -109,6 +110,7 @@ Breadcrumb queue status should handle cases where the queue is corrupted or prov
 Buffer and queue status checks are lightweight; avoid polling too frequently.
 
 ## Related Modules
+- **`@/managers/analytics/analytics-manager`** – Public analytics emission gateway
 - **`lib/analytics`** – analytics event buffer, breadcrumb queue, and telemetry
 
 ## File Breakdown
