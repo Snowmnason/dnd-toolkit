@@ -379,6 +379,11 @@ Adds a breadcrumb to the queue. Deduplicates based on fingerprint hash to preven
 
 Returns queue metrics like size, oldest breadcrumb age, provider name.
 
+#### `getBreadcrumbQueueStats()` — Synchronous helper for queue introspection
+
+Returns `{ queueSize, isFlushing, lastFlushTime, oldestBreadcrumbTime, providerName, overflowCount }`.
+Use in logging or conditional logic where hook overhead isn't needed.
+
 #### `flush()` — Manual flush (async)
 
 Triggers a manual flush of queued breadcrumbs via the provider.
@@ -386,10 +391,6 @@ Triggers a manual flush of queued breadcrumbs via the provider.
 #### `BreadcrumbProvider` interface — contract for implementing adapters
 
 Interface for provider adapters: `sendBatch(breadcrumbs)`, `parseHttpResponse(response)`.
-
-#### `useBreadcrumbQueueStatus()` — Debug hook
-
-Returns `{ queueSize, isFlushing, lastFlushTime, oldestBreadcrumbTime, providerName }`.
 
 **Queue config** (in `config/appsettings.json`):
 

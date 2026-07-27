@@ -206,7 +206,7 @@ async function handleClearCache(
       action: RecoveryAction.CLEAR_CACHE,
     });
 
-getAnalytics().Analytics.endMeasure(`recovery_action:${RecoveryAction.CLEAR_CACHE}`);
+    getAnalytics().Analytics.endMeasure(`recovery_action:${RecoveryAction.CLEAR_CACHE}`);
 
     // Navigate to world selection (safe starting point)
     const targetRoute = "/select/world-selection";
@@ -262,7 +262,7 @@ async function handleResetAuth(
       action: RecoveryAction.RESET_AUTH,
     });
 
-getAnalytics().Analytics.endMeasure(`recovery_action:${RecoveryAction.RESET_AUTH}`);
+    getAnalytics().Analytics.endMeasure(`recovery_action:${RecoveryAction.RESET_AUTH}`);
 
     // Redirect to login
     const targetRoute = "/login/sign-in";

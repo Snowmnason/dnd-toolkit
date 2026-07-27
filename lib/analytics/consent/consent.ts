@@ -213,7 +213,8 @@ class AnalyticsConsentManager {
           timestamp: Date.now(),
           source: 'user',
         });
-        // Success — break out and continue
+        // Success — clear error and break
+        lastError = undefined;
         logger.category('analytics').analytics('consent', 'Consent level persisted', { level });
         break;
       } catch (err) {
@@ -241,6 +242,9 @@ class AnalyticsConsentManager {
         retries: maxRetries,
       });
     }
+
+    // Persist succeeded — update the shared hot-path so direct callers see fresh state
+    setCurrentConsentLevel(level);
 
     // If consent was downgraded, purge all pending breadcrumbs
     const CONSENT_ORDER: Record<ConsentLevel, number> = { none: 0, basic: 1, full: 2 };

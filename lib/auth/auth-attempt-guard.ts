@@ -3,6 +3,7 @@ import { reportError } from "@/lib/error";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
 import { getPrivacyStorageBackend } from "@/middleware/storage";
+import { currentConsentLevel } from "@/type-definitions/analytics-types";
 
 export type AuthGuardScope = "signin" | "signup" | "reset";
 
@@ -111,6 +112,11 @@ export const recordAuthFailure = async (
   if (record.attempts >= MAX_ATTEMPTS) {
     record.lockedUntil = now + LOCKOUT_MS;
     // Report lockout to error tracker with structured security telemetry
+    // Respect user's analytics consent preference.
+    // NOTE: This gates telemetry reporting but NOT the lockout itself (which always enforces).
+    // Trade-off: if consent='none', we lose audit trail of abuse attempts, but honor user's opt-out.
+    // Future: Consider making security events bypass consent (requires policy decision).
+    if (currentConsentLevel !== 'none') {
       try {
         const emailDomain = email.split('@')[1] || 'unknown';
         reportError(
@@ -137,6 +143,7 @@ export const recordAuthFailure = async (
         );
       }
     }
+  }
 
   // eslint-disable-next-line security/detect-object-injection
   store[key] = record;

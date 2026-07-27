@@ -53,27 +53,48 @@ System (transport only)
 Managers sit between UI/Hooks and Infrastructure, with clear responsibilities:
 
 ```
-Presentation (Components/Screens/Hooks)
+Presentation (Components/Screens/Hooks) — PUBLIC
+    ↓ (can import managers)
     ↓
-Managers (Orchestration, Business Rules, Coordination)
+Managers (Orchestration, Business Rules, Coordination) — PUBLIC
     ├─ Own when/why to call other services
     ├─ Implement domain consent/validation rules
-    ├─ Never import other lib modules (except via manager pattern)
+    ├─ ONLY layer that imports lib modules directly
     └─ Route through Middleware for infrastructure
     ↓
-Middleware (Preconditions & Adaptation)
+Lib (Domain Logic) — PRIVATE
+    ├─ Reusable business logic
+    ├─ Cannot import managers (no upward calls)
+    ├─ Cannot import middleware (no sibling calls)
+    ├─ Cannot import system (routes through middleware)
+    └─ Can import shared utilities (config, types, maps, etc.)
+    ↓
+Managers (Again to prevent lib to middleware calls)
+    ↓
+Middleware (Preconditions & Adaptation) — PUBLIC
     ├─ Service readiness checks
     ├─ Network/system preconditions
     ├─ Transport adaptation (API, storage, etc.)
     └─ Route to System for actual work
     ↓
-System (Portable Infrastructure Only)
+System (Portable Infrastructure Only) — PRIVATE
     ├─ HTTP requests, database, files
     ├─ Must remain app-agnostic
-    └─ Never imports lib or middleware
+    ├─ Cannot import lib or middleware
+    └─ Can import shared utilities (config, types, etc.)
+
+Shared Support Directories — EXEMPT FROM RULES
+    ├─ config/, type-definitions/, maps/, validation/
+    ├─ pure-algo-immutables/, localization/
+    └─ Can be imported by any layer (no hierarchical rules)
 ```
 
-**Core principle:** Unidirectional flow with ONE entry point per domain. No lib-to-lib shortcuts.
+**Core principles:**
+1. **Unidirectional flow** — Hooks → Managers → Middleware → System (never backwards)
+2. **Single entry point per domain** — One manager, zero lib-to-lib shortcuts
+3. **Public vs. Private layers** — Managers/Middleware are entry points; Lib/System are implementation details
+4. **Shared utilities exempt** — Global directories break hierarchy rules freely (they're infrastructure)
+5. **No upward calls** — Lib cannot import managers; System cannot import lib
 
 ---
 
@@ -141,12 +162,14 @@ System (Portable Infrastructure Only)
 **Goal:** Apply pattern to JobsManager, NetworkManager, FeatureFlagsManager.
 
 **Scope:**
-- JobsManager: Consolidate job-service calls
-- NetworkManager: Audit direct network calls
-- FeatureFlagsManager: Audit direct flag evaluation
+- **JobsManager:** Audit coordination; add batching, dedup, rate-limit backoff, generic tasks; unify offline handling
+- **NetworkManager:** Audit direct network calls; establish manager entry point
+- **FeatureFlagsManager:** Audit direct flag evaluation; ensure manager ownership
 - Create consistent entry point interfaces for each
 
-**Outcome:** All managers follow consistent pattern; orchestration layer clear.
+**Issue:** [Jobs Manager Gateway - Phase 2](../../../suggestions/Jobs%20Manager%20Gateway%20-%20Phase%202.md) — Detailed child issue with 6 implementation phases
+
+**Outcome:** All managers follow consistent pattern; orchestration layer clear; unified async/offline infrastructure.
 
 ---
 
@@ -163,6 +186,22 @@ System (Portable Infrastructure Only)
 
 ---
 
+### Phase 6: Foundation Portability (Post-Milestone 2)
+**Goal:** Extract and document foundation for reuse in new apps.
+
+**Scope:**
+- Document which files are portable (system, lib, shared) vs. app-specific
+- Create templates for managers, middleware, jobs, bootstrap
+- Extract foundation package for reuse
+- Write setup guide for new projects (<30 min bootstrap)
+- Validate across contexts
+
+**Issue:** [Manager Gateway Foundation - Portable Package](../../../suggestions/Manager%20Gateway%20Foundation%20-%20Portable%20Package.md)
+
+**Outcome:** New apps can bootstrap Manager Gateway pattern in <30 min; foundation reusable.
+
+---
+
 ## Acceptance Criteria
 
 - [ ] Phase 1 (Analytics) complete — two-API pattern established
@@ -175,11 +214,65 @@ System (Portable Infrastructure Only)
 
 ---
 
+## Implementation Patterns (Learned from Analytics Phase 1)
+
+### Manager Structure Options
+
+**Option A: Single API** — All operations as methods on manager object (StorageManager, JobsManager)
+```typescript
+export const JobsManager = {
+  enqueue(...) { ... },
+  getJob(...) { ... },
+  subscribe(...) { ... },
+};
+```
+
+**Option B: Two-API Split** — Separate APIs for different consumer contexts (AnalyticsManager)
+```typescript
+// analytics-tracker.ts — UI/Hooks API (simple, no consent complexity)
+export function track(event, props) { ... }
+
+// analytics-orchestrator.ts — Lib API (business logic, consent gates)
+export async function trackWithConsent(category, event, props) { ... }
+```
+
+Choose based on:
+- If APIs share identical responsibility → Single object (JobsManager)
+- If APIs serve different concerns (UI vs. business logic) → Two files (AnalyticsManager)
+
+### Optimization Patterns
+
+**Batching & Deduplication:**
+- Group high-volume events into single requests (analytics, breadcrumbs)
+- Skip duplicate items within time window (prevent quota waste)
+- Implement in transport layer (job queue, middleware) not managers
+
+**Consent Gating:**
+- Always check before emitting (in manager or orchestrator, not callers)
+- Separate "consent-free" API from "consent-gated" API when needed
+- Prevent duplicated consent checks across modules
+
+**Rate-Limit Backoff:**
+- Block entire job type (not individual items) when provider rate-limits
+- Parse `retryAfterMs` from error responses
+- Implement in job queue/middleware, not managers
+
+### Testing Strategy
+
+- **Manager tests:** Mock middleware; verify orchestration logic
+- **Middleware tests:** Mock system; verify preconditions and normalization
+- **System tests:** Verify transport and data flow (integration)
+- **Call-site tests:** Verify manager is called (not direct lib imports)
+
+---
+
 ## Notes
 
 - This is a **strategic architectural refactor**, not a bug fix. Changes are high-confidence but wide-reaching.
 - Pattern is already proven by StorageManager; applying broadly is low-risk.
 - Each phase can be reviewed independently; phased rollout reduces review burden.
+- Each manager is a separate issue for clarity; children can be reviewed in parallel.
+- Analytics Phase 1 established the pattern; Jobs Phase 4 refines and extends it.
 - Expected to improve code quality, reduce duplication, and make future refactors easier.
 - See [copilot-instructions.md](../../copilot-instructions.md) for broader dependency boundary rules.
 
